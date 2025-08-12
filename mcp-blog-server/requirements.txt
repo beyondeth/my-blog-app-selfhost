@@ -1,0 +1,7 @@
+# MCP Server Dependencies
+mcp==1.12.4
+aiohttp==3.9.1
+python-dotenv==1.0.0
+python-frontmatter==1.0.1
+markdown==3.5.1
+pydantic>=2.8.0

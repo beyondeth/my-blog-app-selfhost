@@ -84,10 +84,10 @@ const applySyntaxHighlighting = (html: string): string => {
     /<pre class="hljs"><code class="language-(typescript|javascript|ts|js)">([\s\S]*?)<\/code><\/pre>/gi,
     (match, language, codeContent) => {
       try {
-        const decodedCode = decodeHtmlEntities(codeContent);
+        // 코드 블록 내용은 HTML 엔티티를 디코딩하지 않음 - 보안 및 표시 문제 방지
         const mappedLanguage = language === 'ts' ? 'typescript' : language === 'js' ? 'javascript' : language;
         
-        const result = lowlight.highlight(mappedLanguage, decodedCode);
+        const result = lowlight.highlight(mappedLanguage, codeContent);
         
         if (result?.children) {
           const highlightedHtml = result.children.map((child: any) => {

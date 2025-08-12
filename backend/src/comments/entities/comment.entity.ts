@@ -32,7 +32,7 @@ export class Comment {
   @JoinColumn({ name: 'authorId' })
   author: User;
 
-  @ManyToOne(() => Post, post => post.comments)
+  @ManyToOne(() => Post, post => post.comments, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'postId' })
   post: Post;
 
