@@ -219,7 +219,8 @@ class ApiClient {
     page?: number; 
     limit?: number; 
     search?: string; 
-    category?: string; 
+    category?: string;
+    blogSlug?: string; 
   }): Promise<PaginatedResponse<Post>> {
     return this.request<PaginatedResponse<Post>>({
       method: 'GET',
@@ -444,7 +445,7 @@ export const apiClient = new ApiClient();
 
 // Export posts API for convenience
 export const postsAPI = {
-  getPosts: (params?: { page?: number; limit?: number; search?: string; category?: string; }) => 
+  getPosts: (params?: { page?: number; limit?: number; search?: string; category?: string; blogSlug?: string; }) => 
     apiClient.getPosts(params),
   getPost: (id: number) => apiClient.getPost(id),
   getPostBySlug: (slug: string) => apiClient.getPostBySlug(slug),

@@ -40,10 +40,14 @@ export class AuthController {
       path: '/',
     });
 
-    // 토큰 제외하고 사용자 정보만 반환
+    // 토큰 제외하고 사용자 정보만 반환 (개발 환경에서는 토큰도 포함)
     return res.json({
       user: authResponse.user,
       message: '로그인 성공',
+      ...(process.env.NODE_ENV !== 'production' && {
+        access_token: authResponse.access_token,
+        refresh_token: authResponse.refresh_token,
+      }),
     });
   }
 
@@ -72,10 +76,14 @@ export class AuthController {
       path: '/',
     });
 
-    // 토큰 제외하고 사용자 정보만 반환
+    // 토큰 제외하고 사용자 정보만 반환 (개발 환경에서는 토큰도 포함)
     return res.json({
       user: authResponse.user,
       message: '회원가입 성공',
+      ...(process.env.NODE_ENV !== 'production' && {
+        access_token: authResponse.access_token,
+        refresh_token: authResponse.refresh_token,
+      }),
     });
   }
 

@@ -2,6 +2,7 @@ import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateCol
 import { User } from '../../users/entities/user.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { File } from '../../files/entities/file.entity';
+import { Blog } from '../../blogs/entities/blog.entity';
 
 @Entity('posts')
 @Index(['isPublished'])
@@ -41,6 +42,9 @@ export class Post {
   @Column({ type: 'uuid' })
   authorId: string;
 
+  @Column({ type: 'uuid', nullable: true })
+  blogId: string;
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -53,6 +57,10 @@ export class Post {
   @ManyToOne(() => User, user => user.posts)
   @JoinColumn({ name: 'authorId' })
   author: User;
+
+  @ManyToOne(() => Blog, blog => blog.posts, { nullable: true })
+  @JoinColumn({ name: 'blogId' })
+  blog: Blog;
 
   @OneToMany(() => Comment, comment => comment.post)
   comments: Comment[];

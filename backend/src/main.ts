@@ -91,7 +91,7 @@ async function bootstrap() {
 
   // API prefix
   app.setGlobalPrefix('api/v1', {
-    exclude: ['/', '/health', '/api-docs'],
+    exclude: ['/', '/health', '/api-docs', 'mcp', 'mcp/(.*)'],
   });
 
   // Swagger documentation

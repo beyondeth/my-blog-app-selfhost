@@ -8,7 +8,7 @@ import { useRef, useCallback } from 'react';
 export const postQueryKeys = {
   all: ['posts'] as const,
   lists: () => [...postQueryKeys.all, 'list'] as const,
-  list: (filters: { search?: string; category?: string }) => 
+  list: (filters: { search?: string; category?: string; blogSlug?: string }) => 
     [...postQueryKeys.lists(), filters] as const,
   details: () => [...postQueryKeys.all, 'detail'] as const,
   detail: (slugOrId: string | number) => [...postQueryKeys.details(), slugOrId] as const,
@@ -26,17 +26,19 @@ const commonQueryOptions = {
 export function useInfinitePosts(options: { 
   search?: string; 
   category?: string;
+  blogSlug?: string;
   enabled?: boolean;
 } = {}) {
-  const { search, category, enabled = true } = options;
+  const { search, category, blogSlug, enabled = true } = options;
   
   return useInfiniteQuery({
-    queryKey: postQueryKeys.list({ search, category }),
+    queryKey: postQueryKeys.list({ search, category, blogSlug }),
     queryFn: ({ pageParam = 1 }) => postsAPI.getPosts({ 
       page: pageParam, 
       limit: 10,
       search: search || undefined,
       category: category || undefined,
+      blogSlug: blogSlug || undefined,
     }),
     getNextPageParam: (lastPage, allPages) => {
       const currentPage = allPages.length;

@@ -16,6 +16,9 @@ import { UsersModule } from './users/users.module';
 import { PostsModule } from './posts/posts.module';
 import { CommentsModule } from './comments/comments.module';
 import { FilesModule } from './files/files.module';
+import { BlogsModule } from './blogs/blogs.module';
+import { ApiKeysModule } from './api-keys/api-keys.module';
+import { McpModule } from './mcp/mcp.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
 
 // Guards
@@ -59,6 +62,9 @@ import { RolesGuard } from './common/guards/roles.guard';
     PostsModule,
     CommentsModule,
     FilesModule,
+    BlogsModule,
+    ApiKeysModule,
+    McpModule,
     // AnalyticsModule,
   ],
   providers: [

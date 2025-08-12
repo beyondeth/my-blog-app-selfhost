@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Header from '@/components/layout/Header';
 import ClientProviders from '@/components/ClientProviders';
+import { Toaster } from 'sonner';
 
 export const metadata: Metadata = {
   title: "My Blog",
@@ -27,6 +28,7 @@ export default function RootLayout({
         <ClientProviders>
           <Header />
           {children}
+          <Toaster position="top-center" richColors />
         </ClientProviders>
       </body>
     </html>

@@ -43,14 +43,16 @@ export class PostsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'blogSlug', required: false, type: String })
   findAll(
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('blogSlug') blogSlug?: string,
   ) {
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limitNumber = limit ? parseInt(limit, 10) : 10;
-    return this.postsService.findAll(pageNumber, limitNumber, search);
+    return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug);
   }
 
   @Get('categories')

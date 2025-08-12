@@ -1,9 +1,10 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In, SelectQueryBuilder } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { User } from '../users/entities/user.entity';
 import { File } from '../files/entities/file.entity';
+import { Blog } from '../blogs/entities/blog.entity';
 import { Role } from '../common/enums/role.enum';
 import { CreatePostDto } from './dto/create-post.dto';
 import { FilesService } from '../files/files.service';
@@ -18,15 +19,28 @@ export class PostsService {
     private postsRepository: Repository<Post>,
     @InjectRepository(File)
     private filesRepository: Repository<File>,
+    @InjectRepository(Blog)
+    private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
   ) {}
 
   async create(createPostDto: CreatePostDto, user: User): Promise<any> {
+    // 사용자의 블로그를 찾음 (한 사용자당 하나의 블로그)
+    const blog = await this.blogsRepository.findOne({
+      where: { userId: user.id },
+    });
+
+    if (!blog) {
+      throw new BadRequestException('블로그를 먼저 생성해주세요.');
+    }
+
     const post = this.postsRepository.create({
       ...createPostDto,
       author: user,
-      isPublished: user.role === Role.ADMIN,
-      publishedAt: user.role === Role.ADMIN ? new Date() : null,
+      blog: blog,
+      blogId: blog.id,
+      isPublished: true, // Multi-user blog system - all posts are published
+      publishedAt: new Date(),
     });
 
     await this.ensureUniqueSlug(post);
@@ -47,6 +61,7 @@ export class PostsService {
     return {
       ...post,
       author: user,
+      blog: blog, // 블로그 정보 포함
       attachedFiles: post.attachedFiles || attachedFiles,
     };
   }
@@ -54,7 +69,7 @@ export class PostsService {
   private async findPostById(id: string): Promise<Post> {
     const post = await this.postsRepository.findOne({
       where: { id },
-      relations: ['author', 'attachedFiles'],
+      relations: ['author', 'attachedFiles', 'blog'],
     });
 
     if (!post) {
@@ -64,11 +79,16 @@ export class PostsService {
     return post;
   }
 
-  async findAll(page: number = 1, limit: number = 10, search?: string): Promise<{ posts: any[]; total: number }> {
+  async findAll(page: number = 1, limit: number = 10, search?: string, blogSlug?: string): Promise<{ posts: any[]; total: number }> {
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'files')
+      .leftJoinAndSelect('post.blog', 'blog')
       .where('post.isPublished = :isPublished', { isPublished: true });
+
+    if (blogSlug) {
+      query.andWhere('blog.slug = :blogSlug', { blogSlug });
+    }
 
     if (search) {
       query.andWhere('(post.title LIKE :search OR post.content LIKE :search OR post.tags LIKE :search)', {
@@ -130,12 +150,14 @@ export class PostsService {
     const qb = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'file')
+      .leftJoinAndSelect('post.blog', 'blog')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role',
         'file.id', 'file.fileUrl', 'file.fileType',
+        'blog.id', 'blog.slug', 'blog.name',
       ])
       .where('post.slug = :slug', { slug })
       .andWhere('post.isPublished = :isPublished', { isPublished: true });

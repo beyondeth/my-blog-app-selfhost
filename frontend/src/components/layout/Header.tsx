@@ -1,17 +1,29 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import { useUserBlog } from '@/hooks/useUserBlog';
 import { FiEdit3, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
 import { routes, navigation } from '@/lib/navigation';
 
 export default function Header() {
   const { user, isAdmin, logout } = useAuth();
+  const { blog, loading: blogLoading, checkAndRedirect } = useUserBlog();
+  
+  // Debug logging
+  useEffect(() => {
+    console.log('🔍 [Header] Blog state changed:', { 
+      user: user?.username, 
+      blog: blog ? `${blog.name} (${blog.slug})` : null, 
+      loading: blogLoading 
+    });
+  }, [user?.username, blog, blogLoading]);
   const router = useRouter();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isCheckingBlog, setIsCheckingBlog] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // 홈 페이지로 이동 (캐시 보존)
@@ -39,6 +51,27 @@ export default function Header() {
   const closeMobileMenu = () => {
     setIsMobileMenuOpen(false);
   };
+
+  // Handle write button click with blog check
+  const handleWriteClick = useCallback(async (e: React.MouseEvent) => {
+    e.preventDefault();
+    
+    if (isCheckingBlog) return;
+    
+    setIsCheckingBlog(true);
+    closeMobileMenu();
+    
+    try {
+      const redirectPath = await checkAndRedirect();
+      router.push(redirectPath);
+    } catch (error) {
+      console.error('Error checking blog:', error);
+      // Fallback to blog creation page
+      router.push('/blog/new');
+    } finally {
+      setIsCheckingBlog(false);
+    }
+  }, [checkAndRedirect, router, isCheckingBlog]);
 
   // 외부 클릭으로 메뉴 닫기
   useEffect(() => {
@@ -116,16 +149,25 @@ export default function Header() {
             <div className="flex items-center space-x-4">
               {user ? (
                 <>
-                  {/* Admin Write Button */}
-                  {isAdmin && (
+                  {/* My Blog Button */}
+                  {!blogLoading && (
                     <Link 
-                      href={navigation.toPostNew()}
-                      className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-md transition-colors"
+                      href={blog ? `/blog/${blog.slug}` : "/blog/new"}
+                      className="text-sm text-gray-900 hover:text-amber-800"
                     >
-                      <FiEdit3 className="mr-1 w-4 h-4" />
-                      글쓰기
+                      {blog ? '내 블로그' : '블로그 만들기'}
                     </Link>
                   )}
+                  
+                  {/* Write Button - All logged in users can write */}
+                  <button 
+                    onClick={handleWriteClick}
+                    disabled={isCheckingBlog}
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <FiEdit3 className="mr-1 w-4 h-4" />
+                    {isCheckingBlog ? '확인 중...' : '글쓰기'}
+                  </button>
                   
                   {/* User Menu */}
                   <div className="flex items-center space-x-3">
@@ -220,17 +262,26 @@ export default function Header() {
                       </span>
                     </div>
                     
-                    {/* Admin Write Button */}
-                    {isAdmin && (
+                    {/* My Blog Button for Mobile */}
+                    {!blogLoading && (
                       <Link 
-                        href={navigation.toPostNew()}
+                        href={blog ? `/blog/${blog.slug}` : "/blog/new"}
                         onClick={closeMobileMenu}
-                        className="inline-flex items-center px-4 py-3 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-md transition-colors w-full justify-center"
+                        className="block text-center py-2 px-2 text-sm text-gray-900 hover:text-amber-800 rounded-md hover:bg-gray-50 transition-colors"
                       >
-                        <FiEdit3 className="mr-2 w-4 h-4" />
-                        글쓰기
+                        {blog ? '내 블로그' : '블로그 만들기'}
                       </Link>
                     )}
+                    
+                    {/* Write Button - All logged in users can write */}
+                    <button 
+                      onClick={handleWriteClick}
+                      disabled={isCheckingBlog}
+                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-md transition-colors w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FiEdit3 className="mr-2 w-4 h-4" />
+                      {isCheckingBlog ? '확인 중...' : '글쓰기'}
+                    </button>
                     
                     <button
                       onClick={() => {

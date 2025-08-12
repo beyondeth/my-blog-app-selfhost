@@ -1,0 +1,14 @@
+{
+  "name": "mcp-blog-server",
+  "version": "1.0.0",
+  "description": "MCP server for blog posting",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0",
+    "axios": "^1.6.0"
+  }
+}
