@@ -4,6 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Post } from '@/types';
 import OptimizedImage from '@/components/ui/OptimizedImage';
+import { FiHeart, FiMessageCircle } from 'react-icons/fi';
 
 interface PostArticleProps {
   post: Post;
@@ -73,12 +74,20 @@ const PostArticle = React.memo(function PostArticle({
           
           {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
           <div>
-            {/* 메타 정보 (날짜,조회,작성자) - 고정 위치 */}
+            {/* 메타 정보 (날짜,조회,좋아요,댓글,작성자) - 고정 위치 */}
             <div className="flex flex-wrap items-center text-xs text-gray-500 gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
                 {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
               </span>
               <span className="whitespace-nowrap">조회 {post.viewCount || 0}</span>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiHeart className="w-3 h-3" />
+                {post.likeCount || 0}
+              </span>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiMessageCircle className="w-3 h-3" />
+                {post.commentCount || 0}
+              </span>
               {post.author && (
                 <span className="whitespace-nowrap">by {post.author.username}</span>
               )}

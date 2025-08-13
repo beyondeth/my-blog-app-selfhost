@@ -110,6 +110,7 @@ export class PostsService {
       updatedAt: formatDate(post.updatedAt),
       // 첨부된 이미지 파일들
       images: post.attachedFiles?.filter(file => file.fileType === 'image') || [],
+      commentCount: post.commentCount || 0,
     }));
 
     return { posts: postsWithFormattedDates, total };
@@ -124,7 +125,7 @@ export class PostsService {
       .leftJoinAndSelect('post.likedBy', 'likedBy')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.tags', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role',
         'file.id', 'file.fileUrl', 'file.fileType',
@@ -162,7 +163,7 @@ export class PostsService {
       .leftJoinAndSelect('post.likedBy', 'likedBy')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.tags', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role',
         'file.id', 'file.fileUrl', 'file.fileType',
@@ -176,6 +177,9 @@ export class PostsService {
       throw new NotFoundException('Post not found');
     }
     
+    // 조회수 증가 (모든 사용자)
+    await this.incrementViewCountForAll(post.id);
+    
     // 사용자 좋아요 상태 확인
     const liked = user ? post.likedBy?.some(likedUser => likedUser.id === user.id) || false : false;
     
@@ -187,6 +191,7 @@ export class PostsService {
       publishedAt: formatDate(post.publishedAt),
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
+      viewCount: post.viewCount + 1, // 증가된 조회수 반영
     };
     this.logger.log(`Returning post data with ${result.attachedFiles?.length || 0} attached files`);
     return result;
@@ -418,6 +423,11 @@ export class PostsService {
     await this.postsRepository.save(post);
   }
 
+  // 조회수 증가 (모든 사용자)
+  private async incrementViewCountForAll(postId: string): Promise<void> {
+    await this.postsRepository.increment({ id: postId }, 'viewCount', 1);
+  }
+
   async getCategories(): Promise<string[]> {
     const categories = await this.postsRepository
       .createQueryBuilder('post')
@@ -442,6 +452,16 @@ export class PostsService {
       .getManyAndCount();
 
     return { posts, total };
+  }
+
+  // 댓글 수 증가
+  async incrementCommentCount(postId: string): Promise<void> {
+    await this.postsRepository.increment({ id: postId }, 'commentCount', 1);
+  }
+
+  // 댓글 수 감소
+  async decrementCommentCount(postId: string): Promise<void> {
+    await this.postsRepository.decrement({ id: postId }, 'commentCount', 1);
   }
 
   // slug 고유성 보장 메소드

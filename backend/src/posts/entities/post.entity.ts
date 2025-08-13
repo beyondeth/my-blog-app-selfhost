@@ -33,6 +33,9 @@ export class Post {
   @Column({ default: 0 })
   likeCount: number;
 
+  @Column({ default: 0 })
+  commentCount: number;
+
   @Column('simple-array', { nullable: true })
   tags: string[];
 

@@ -61,6 +61,7 @@ export interface Post {
   isPublished: boolean;
   viewCount: number;
   likeCount: number;
+  commentCount: number;
   liked: boolean;
   tags?: string[];
   category?: string;

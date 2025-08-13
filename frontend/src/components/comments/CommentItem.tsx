@@ -151,7 +151,7 @@ export default function CommentItem({
   }
 
   return (
-    <div className={`py-4 ${level === 1 ? 'ml-10 pl-4' : ''}`}>
+    <div className={`${level === 0 ? 'py-4' : 'py-2'} ${level === 1 ? 'ml-11' : ''}`}>
       <div className="flex items-start gap-3">
         {/* Profile Avatar */}
         <div className="flex-shrink-0">
@@ -290,11 +290,11 @@ export default function CommentItem({
 
       {/* Replies Section - YouTube Style - L0(부모)에서만 표시 */}
       {totalReplies > 0 && level === 0 && (
-        <div className="mt-4 ml-11">
+        <div className="mt-2">
           {!showReplies ? (
             <button
               onClick={() => toggleReplies(comment.id)}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium py-2"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium py-2 ml-11"
             >
               <FiChevronDown className="w-4 h-4" />
               답글 {totalReplies}개
@@ -303,7 +303,7 @@ export default function CommentItem({
             <>
               <button
                 onClick={() => toggleReplies(comment.id)}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 text-sm py-2 mb-3"
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 text-sm py-1 mb-1 ml-11"
               >
                 <FiChevronDown className="w-4 h-4 transform rotate-180" />
                 답글 숨기기

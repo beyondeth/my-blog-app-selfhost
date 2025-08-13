@@ -29,7 +29,12 @@ export class CommentsService {
       parentComment: parentCommentId ? { id: parentCommentId } : null,
     });
 
-    return await this.commentsRepository.save(comment) as unknown as Comment;
+    const savedComment = await this.commentsRepository.save(comment) as unknown as Comment;
+    
+    // 댓글 수 증가 - 답글도 포함
+    await this.postsService.incrementCommentCount(postId);
+    
+    return savedComment;
   }
 
   async findAllByPost(postId: string, user?: User): Promise<Comment[]> {
@@ -104,6 +109,9 @@ export class CommentsService {
 
     comment.isDeleted = true;
     await this.commentsRepository.save(comment);
+    
+    // 댓글 수 감소
+    await this.postsService.decrementCommentCount(comment.post.id);
   }
 
   async findAllComments(): Promise<Comment[]> {
