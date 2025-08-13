@@ -1,6 +1,7 @@
 import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Post } from '../../posts/entities/post.entity';
+import { CommentLike } from './comment-like.entity';
 
 @Entity('comments')
 export class Comment {
@@ -12,6 +13,12 @@ export class Comment {
 
   @Column({ default: false })
   isDeleted: boolean;
+
+  @Column({ type: 'int', default: 0 })
+  likesCount: number;
+
+  @Column({ type: 'int', default: 0 })
+  dislikesCount: number;
 
   @Column({ type: 'uuid' })
   authorId: string;
@@ -42,4 +49,7 @@ export class Comment {
 
   @OneToMany(() => Comment, comment => comment.parentComment)
   replies: Comment[];
+
+  @OneToMany(() => CommentLike, commentLike => commentLike.comment)
+  commentLikes: CommentLike[];
 } 

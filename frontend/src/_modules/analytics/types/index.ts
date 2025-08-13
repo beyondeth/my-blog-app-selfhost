@@ -25,6 +25,7 @@ export interface AnalyticsConfig {
   privacyMode?: boolean;
   enableTracking?: boolean;
   maxActivities?: number;
+  trackingInterval?: number;
 }
 
 export interface SessionData {

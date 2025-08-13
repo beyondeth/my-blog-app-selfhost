@@ -279,7 +279,7 @@ class ApiClient {
   }
 
   // Comments API
-  async getComments(postId: number): Promise<Comment[]> {
+  async getComments(postId: string): Promise<Comment[]> {
     return this.request<Comment[]>({
       method: 'GET',
       url: `/comments/post/${postId}`,
@@ -294,7 +294,7 @@ class ApiClient {
     });
   }
 
-  async updateComment(id: number, content: string): Promise<Comment> {
+  async updateComment(id: string, content: string): Promise<Comment> {
     return this.request<Comment>({
       method: 'PUT',
       url: `/comments/${id}`,
@@ -302,10 +302,24 @@ class ApiClient {
     });
   }
 
-  async deleteComment(id: number): Promise<void> {
+  async deleteComment(id: string): Promise<void> {
     return this.request<void>({
       method: 'DELETE',
       url: `/comments/${id}`,
+    });
+  }
+
+  async toggleCommentLike(id: string): Promise<{ liked: boolean; likesCount: number; dislikesCount: number }> {
+    return this.request<{ liked: boolean; likesCount: number; dislikesCount: number }>({
+      method: 'POST',
+      url: `/comments/${id}/like`,
+    });
+  }
+
+  async toggleCommentDislike(id: string): Promise<{ disliked: boolean; likesCount: number; dislikesCount: number }> {
+    return this.request<{ disliked: boolean; likesCount: number; dislikesCount: number }>({
+      method: 'POST',
+      url: `/comments/${id}/dislike`,
     });
   }
 

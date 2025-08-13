@@ -13,6 +13,7 @@ import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
 import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
+import { CommentLike } from '../../comments/entities/comment-like.entity';
 import { Role } from '../../common/enums/role.enum';
 
 export enum AuthProvider {
@@ -92,6 +93,9 @@ export class User {
 
   @OneToMany(() => Comment, comment => comment.author, { lazy: true })
   comments: Promise<Comment[]>;
+
+  @OneToMany(() => CommentLike, commentLike => commentLike.user, { lazy: true })
+  commentLikes: Promise<CommentLike[]>;
 
   @BeforeInsert()
   @BeforeUpdate()

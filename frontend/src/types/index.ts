@@ -75,15 +75,21 @@ export interface Post {
 
 // 댓글 관련 타입
 export interface Comment {
-  id: number;
+  id: string;
   content: string;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
   author: User;
   post: Post;
+  postId: string;
   parentComment?: Comment;
+  parentCommentId?: string;
   replies?: Comment[];
+  likesCount?: number;
+  dislikesCount?: number;
+  userLiked?: boolean;
+  userDisliked?: boolean;
 }
 
 // API 응답 타입
@@ -127,8 +133,8 @@ export interface PostForm {
 
 export interface CommentForm {
   content: string;
-  postId: number;
-  parentCommentId?: number;
+  postId: string;
+  parentCommentId?: string;
 }
 
 // 검색 및 필터링 타입

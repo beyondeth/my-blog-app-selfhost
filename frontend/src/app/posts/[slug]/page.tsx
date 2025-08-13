@@ -9,21 +9,19 @@ import PostHeader from '@/components/posts/PostHeader';
 import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useAuth } from '@/hooks/useAuth';
-import { usePost, useDeletePost, useTogglePostLike, useBatchLikeManager } from '@/hooks/usePosts';
+import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
+import CommentSection from '@/components/comments/CommentSection';
 
 export default function PostDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const queryClient = useQueryClient();
   const hasViewed = useRef(false);
-  const { updateLike } = useBatchLikeManager();
 
   const slug = params.slug as string;
 
@@ -35,12 +33,6 @@ export default function PostDetailPage() {
     // TODO: toast/모달/로그인 라우팅 등으로 대체 가능
   });
 
-  useEffect(() => {
-    if (post) {
-      setLiked(post.liked);
-      setLikeCount(post.likeCount);
-    }
-  }, [post]);
 
   const handleEdit = useCallback(() => {
     if (post) {
@@ -74,19 +66,9 @@ export default function PostDetailPage() {
 
   const handleLike = useCallback(() => {
     if (!post) return;
-    // 즉시 UI 반영
-    if (liked) {
-      setLiked(false);
-      setLikeCount((c) => Math.max(0, c - 1));
-      updateLike(post.id, false);
-    } else {
-      setLiked(true);
-      setLikeCount((c) => c + 1);
-      updateLike(post.id, true);
-    }
-    // 서버 요청은 배치로만 처리 (즉시 요청 제거)
-    // likeMutation.mutate(post.id);
-  }, [post, liked, updateLike]);
+    // 서버에 즉시 요청 (optimistic update는 hook에서 처리)
+    likeMutation.mutate(post.id);
+  }, [post, likeMutation]);
 
   const handleShare = useCallback(async () => {
     if (navigator.share && post) {
@@ -169,15 +151,15 @@ export default function PostDetailPage() {
       {/* Article Content */}
       <article className="max-w-3xl mx-auto px-6 py-16">
         <PostHeader 
-          post={{ ...post, liked, likeCount }}
+          post={post}
           canEdit={canEdit}
           onBack={handleBack}
           onEdit={handleEdit}
           onDelete={handleDelete}
           LikeButtonComponent={
             <LikeButton
-              liked={liked}
-              likeCount={likeCount}
+              liked={post.liked || false}
+              likeCount={post.likeCount || 0}
               onClick={handleLike}
               tooltip={!user ? '로그인 후 좋아요 가능' : undefined}
             />
@@ -207,6 +189,9 @@ export default function PostDetailPage() {
         )}
 
         <AuthorInfo author={post.author} />
+
+        {/* 댓글 섹션 */}
+        <CommentSection postId={post.id} />
       </article>
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}

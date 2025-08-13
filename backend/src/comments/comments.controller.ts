@@ -3,6 +3,8 @@ import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { CommentsService } from './comments.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { User } from '../users/entities/user.entity';
 
 @ApiTags('comments')
 @Controller('comments')
@@ -20,8 +22,8 @@ export class CommentsController {
   @Get('post/:postId')
   @Public()
   @ApiOperation({ summary: '게시글별 댓글 조회' })
-  findAllByPost(@Param('postId') postId: string) {
-    return this.commentsService.findAllByPost(postId);
+  findAllByPost(@Param('postId') postId: string, @CurrentUser() user?: User) {
+    return this.commentsService.findAllByPost(postId, user);
   }
 
   @Get('all')
@@ -52,5 +54,21 @@ export class CommentsController {
   @ApiBearerAuth()
   remove(@Param('id') id: string, @Request() req) {
     return this.commentsService.remove(id, req.user);
+  }
+
+  @Post(':id/like')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '댓글 좋아요 토글' })
+  @ApiBearerAuth()
+  toggleLike(@Param('id') id: string, @Request() req) {
+    return this.commentsService.toggleLike(id, req.user);
+  }
+
+  @Post(':id/dislike')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '댓글 싫어요 토글' })
+  @ApiBearerAuth()
+  toggleDislike(@Param('id') id: string, @Request() req) {
+    return this.commentsService.toggleDislike(id, req.user);
   }
 } 

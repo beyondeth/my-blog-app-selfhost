@@ -8,8 +8,9 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostHeader from '@/components/posts/PostHeader';
 import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
+import CommentSection from '@/components/comments/CommentSection';
 import { useAuth } from '@/hooks/useAuth';
-import { usePost, useDeletePost, useTogglePostLike, useBatchLikeManager } from '@/hooks/usePosts';
+import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
@@ -30,13 +31,10 @@ export default function BlogPostDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
-  const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [blog, setBlog] = useState<Blog | null>(null);
   const queryClient = useQueryClient();
   const hasViewed = useRef(false);
-  const { updateLike } = useBatchLikeManager();
 
   const blogSlug = params.blogSlug as string;
   const postSlug = params.postSlug as string;
@@ -68,13 +66,6 @@ export default function BlogPostDetailPage() {
   const likeMutation = useTogglePostLike(postSlug, () => {
     alert('로그인이 필요합니다.\n로그인 후 좋아요를 누를 수 있습니다.');
   });
-
-  useEffect(() => {
-    if (post) {
-      setLiked(post.liked);
-      setLikeCount(post.likeCount);
-    }
-  }, [post]);
 
   const handleEdit = useCallback(() => {
     if (post) {
@@ -108,17 +99,8 @@ export default function BlogPostDetailPage() {
 
   const handleLike = useCallback(() => {
     if (!post) return;
-    // Immediate UI update
-    if (liked) {
-      setLiked(false);
-      setLikeCount((c) => Math.max(0, c - 1));
-      updateLike(post.id, false);
-    } else {
-      setLiked(true);
-      setLikeCount((c) => c + 1);
-      updateLike(post.id, true);
-    }
-  }, [post, liked, updateLike]);
+    likeMutation.mutate(post.id);
+  }, [post, likeMutation]);
 
   const handleShare = useCallback(async () => {
     if (navigator.share && post) {
@@ -197,8 +179,8 @@ export default function BlogPostDetailPage() {
         <div className="flex items-center justify-between mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center space-x-4">
             <LikeButton
-              liked={liked}
-              likeCount={likeCount}
+              liked={post.liked}
+              likeCount={post.likeCount}
               onClick={handleLike}
               loading={likeMutation.isPending}
             />
@@ -213,6 +195,12 @@ export default function BlogPostDetailPage() {
             </button>
           </div>
         </div>
+
+        {/* Comments Section */}
+        <CommentSection
+          postId={post.id.toString()}
+          postAuthorId={post.author?.id}
+        />
       </div>
 
       {/* Delete confirmation dialog */}

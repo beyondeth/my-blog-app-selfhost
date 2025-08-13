@@ -115,18 +115,20 @@ export class PostsService {
     return { posts: postsWithFormattedDates, total };
   }
 
-  async findOne(id: string): Promise<any> {
+  async findOne(id: string, user?: User): Promise<any> {
     this.logger.log(`Finding post by ID: ${id}`);
-    // QueryBuilder로 필요한 컬럼만 select, 불필요한 join 제거
+    // QueryBuilder로 필요한 컬럼만 select, 사용자 좋아요 상태도 포함
     const qb = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'file')
+      .leftJoinAndSelect('post.likedBy', 'likedBy')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role',
         'file.id', 'file.fileUrl', 'file.fileType',
+        'likedBy.id',
       ])
       .where('post.id = :id', { id });
     const post = await qb.getOne();
@@ -134,9 +136,15 @@ export class PostsService {
       this.logger.warn(`Post not found for ID: ${id}`);
       throw new NotFoundException('Post not found');
     }
+    
+    // 사용자 좋아요 상태 확인
+    const liked = user ? post.likedBy?.some(likedUser => likedUser.id === user.id) || false : false;
+    
     // 날짜 포맷 등 기존 가공 유지
     const result = {
       ...post,
+      liked, // 사용자 좋아요 상태 추가
+      likedBy: undefined, // 민감한 정보 제거
       publishedAt: formatDate(post.publishedAt),
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
@@ -145,12 +153,13 @@ export class PostsService {
     return result;
   }
 
-  async findBySlug(slug: string): Promise<any> {
-    // QueryBuilder로 필요한 컬럼만 select, 불필요한 join 제거
+  async findBySlug(slug: string, user?: User): Promise<any> {
+    // QueryBuilder로 필요한 컬럼만 select, 사용자 좋아요 상태도 포함
     const qb = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'file')
       .leftJoinAndSelect('post.blog', 'blog')
+      .leftJoinAndSelect('post.likedBy', 'likedBy')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.tags', 'post.category',
@@ -158,6 +167,7 @@ export class PostsService {
         'author.id', 'author.username', 'author.profileImage', 'author.role',
         'file.id', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name',
+        'likedBy.id',
       ])
       .where('post.slug = :slug', { slug })
       .andWhere('post.isPublished = :isPublished', { isPublished: true });
@@ -165,9 +175,15 @@ export class PostsService {
     if (!post) {
       throw new NotFoundException('Post not found');
     }
+    
+    // 사용자 좋아요 상태 확인
+    const liked = user ? post.likedBy?.some(likedUser => likedUser.id === user.id) || false : false;
+    
     // 날짜 포맷 등 기존 가공 유지
     const result = {
       ...post,
+      liked, // 사용자 좋아요 상태 추가
+      likedBy: undefined, // 민감한 정보 제거
       publishedAt: formatDate(post.publishedAt),
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
@@ -221,7 +237,7 @@ export class PostsService {
   }
 
   async remove(id: string, user: User): Promise<void> {
-    const post = await this.findOne(id);
+    const post = await this.findPostById(id);
 
     if (post.author.id !== user.id && user.role !== Role.ADMIN) {
       throw new ForbiddenException('You can only delete your own posts');
@@ -251,14 +267,14 @@ export class PostsService {
   }
 
   async publish(id: string): Promise<Post> {
-    const post = await this.findOne(id);
+    const post = await this.findPostById(id);
     post.isPublished = true;
     post.publishedAt = new Date();
     return this.postsRepository.save(post);
   }
 
   async unpublish(id: string): Promise<Post> {
-    const post = await this.findOne(id);
+    const post = await this.findPostById(id);
     post.isPublished = false;
     post.publishedAt = null;
     return this.postsRepository.save(post);
@@ -369,8 +385,8 @@ export class PostsService {
     }
   }
 
-  // 좋아요 토글 (로그인 유저만)
-  async toggleLike(id: string, user: User): Promise<{ liked: boolean }> {
+  // 좋아요 토글 (로그인/비로그인 모두 지원, but 로그인 유저만 실제 동작)
+  async toggleLike(id: string, user: User | null): Promise<{ liked: boolean }> {
     if (!user?.id) throw new ForbiddenException('로그인한 유저만 좋아요를 누를 수 있습니다.');
     // QueryBuilder로 post + likedBy만 join해서 불필요한 데이터 로딩 최소화
     const post = await this.postsRepository.createQueryBuilder('post')

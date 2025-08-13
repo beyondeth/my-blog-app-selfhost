@@ -153,34 +153,43 @@ export function useTogglePostLike(slug: string | number, onRequireLogin?: () => 
     mutationFn: (postId: number) => {
       if (!user) {
         if (onRequireLogin) onRequireLogin();
-        // 즉시 에러 발생시켜 onError로 분기
         return Promise.reject(new Error('로그인이 필요합니다.'));
       }
       return postsAPI.toggleLike(postId);
     },
-    onMutate: () => {
+    onMutate: async () => {
+      // 진행 중인 리페치 취소
+      await queryClient.cancelQueries({ queryKey: postQueryKeys.detail(slug) });
+      
+      // 이전 데이터 백업
+      const previousPost = queryClient.getQueryData<Post>(postQueryKeys.detail(slug));
+      
       // 낙관적 업데이트: liked/likeCount
-      queryClient.setQueryData(postQueryKeys.detail(slug), (old: Post | undefined) => {
-        if (!old) return old;
-        const liked = !old.liked;
-        let likeCount = old.likeCount + (liked ? 1 : -1);
+      if (previousPost) {
+        const liked = !previousPost.liked;
+        let likeCount = previousPost.likeCount + (liked ? 1 : -1);
         if (likeCount < 0) likeCount = 0;
-        return { ...old, liked, likeCount };
-      });
+        
+        queryClient.setQueryData(postQueryKeys.detail(slug), {
+          ...previousPost,
+          liked,
+          likeCount
+        });
+      }
+      
+      return { previousPost };
     },
-    onError: (_, __, context) => {
-      // 롤백: 원래 데이터로 복구
-      queryClient.invalidateQueries({ queryKey: postQueryKeys.detail(slug) });
+    onError: (err, variables, context) => {
+      // 롤백: 이전 데이터로 복구
+      if (context?.previousPost) {
+        queryClient.setQueryData(postQueryKeys.detail(slug), context.previousPost);
+      }
     },
-    onSuccess: (response) => {
-      // 서버 응답에 따라 liked/likeCount 동기화
+    onSuccess: (response, variables, context) => {
+      // 서버 응답 성공: 실제 데이터로 교체하지만 invalidation은 하지 않음
       queryClient.setQueryData(postQueryKeys.detail(slug), (old: Post | undefined) => {
         if (!old) return old;
-        const liked = response.liked;
-        let likeCount = old.likeCount;
-        if (liked && !old.liked) likeCount = old.likeCount + 1;
-        if (!liked && old.liked) likeCount = Math.max(0, old.likeCount - 1);
-        return { ...old, liked, likeCount };
+        return { ...old, liked: response.liked };
       });
     },
     retry: 1,

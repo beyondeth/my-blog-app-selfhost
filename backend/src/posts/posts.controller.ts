@@ -80,15 +80,19 @@ export class PostsController {
   @Get(':id')
   @Public()
   @ApiOperation({ summary: '게시글 상세 조회' })
-  findOne(@Param('id') id: string) {
-    return this.postsService.findOne(id);
+  findOne(@Param('id') id: string, @Request() req: any) {
+    // @Public()과 함께 사용할 때는 req.user를 직접 사용
+    const user = req.user || null;
+    return this.postsService.findOne(id, user);
   }
 
   @Get('slug/:slug')
   @Public()
   @ApiOperation({ summary: 'Slug로 게시글 조회' })
-  findBySlug(@Param('slug') slug: string) {
-    return this.postsService.findBySlug(slug);
+  findBySlug(@Param('slug') slug: string, @Request() req: any) {
+    // @Public()과 함께 사용할 때는 req.user를 직접 사용
+    const user = req.user || null;
+    return this.postsService.findBySlug(slug, user);
   }
 
   @Patch(':id')
@@ -114,8 +118,11 @@ export class PostsController {
   @ApiOperation({ summary: '게시글 좋아요 토글 (로그인/비로그인 모두 지원)' })
   async toggleLike(
     @Param('id') id: string,
-    @CurrentUser() user: any,
+    @Request() req: any,
   ) {
+    // @Public()과 함께 사용할 때는 req.user를 직접 사용
+    const user = req.user || null;
+    console.log('toggleLike called with user:', user ? `${user.username} (${user.id})` : 'null');
     return this.postsService.toggleLike(id, user);
   }
 
