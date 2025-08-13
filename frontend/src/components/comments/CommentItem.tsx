@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronDown } from 'react-icons/fi';
+import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronDown, FiUser } from 'react-icons/fi';
 import type { Comment } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
@@ -155,8 +155,8 @@ export default function CommentItem({
       <div className="flex items-start gap-3">
         {/* Profile Avatar */}
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-sm font-medium text-gray-600">
-            {comment.author.username?.charAt(0).toUpperCase() || 'U'}
+          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
+            <FiUser className="w-5 h-5 text-gray-400" />
           </div>
         </div>
 

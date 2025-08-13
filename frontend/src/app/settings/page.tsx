@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { FiCheck, FiX, FiMail, FiCalendar, FiShield } from 'react-icons/fi';
+import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -87,10 +87,8 @@ export default function ProfileSettingsPage() {
             프로필 이미지
           </label>
           <div className="flex items-center space-x-4">
-            <div className="w-20 h-20 rounded-full bg-amber-100 flex items-center justify-center">
-              <span className="text-2xl font-bold text-amber-800">
-                {user.username.charAt(0).toUpperCase()}
-              </span>
+            <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
+              <FiUser className="w-10 h-10 text-gray-400" />
             </div>
             <div>
               <button

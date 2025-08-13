@@ -82,10 +82,27 @@ export default function HomePage() {
     return allPosts.slice(0, 5);
   }, [allPosts]);
 
-  // 태그 추출 (간단한 예시) - 메모이제이션
+  // 실제 포스트에서 태그 추출 - 메모이제이션
   const tags = useMemo(() => {
-    return ['JavaScript', 'React', 'Node.js', 'TypeScript', 'Next.js'];
-  }, []);
+    const tagMap = new Map<string, number>();
+    
+    allPosts.forEach(post => {
+      if (post.tags && Array.isArray(post.tags)) {
+        post.tags.forEach((tag: string) => {
+          if (tag && tag.trim()) {
+            const trimmedTag = tag.trim();
+            tagMap.set(trimmedTag, (tagMap.get(trimmedTag) || 0) + 1);
+          }
+        });
+      }
+    });
+    
+    // 태그를 빈도순으로 정렬하고 상위 20개만 반환
+    return Array.from(tagMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([tag]) => tag);
+  }, [allPosts]);
 
   const loadMorePosts = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -103,6 +120,13 @@ export default function HomePage() {
     const newUrl = createSearchUrl(newParams);
     router.push(newUrl);
   }, [router]);
+
+  // 태그 클릭 처리
+  const handleTagClick = useCallback((tag: string) => {
+    // 태그를 검색어로 사용
+    setSearchQuery(tag);
+    handleSearch(tag);
+  }, [handleSearch]);
 
   // 검색어 변경 시 URL 파라미터와 동기화 - Context7 모범 사례: 조건부 실행
   useEffect(() => {
@@ -214,7 +238,7 @@ export default function HomePage() {
           
           <RecentPostsSection posts={recentPosts} />
           
-          <TagsSection tags={tags} />
+          <TagsSection tags={tags} onTagClick={handleTagClick} />
           
           <ProfileSection />
           </aside>

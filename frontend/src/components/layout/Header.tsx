@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
@@ -35,15 +36,13 @@ export default function Header() {
     // 모바일 메뉴 닫기
     setIsMobileMenuOpen(false);
     
-    // 이미 홈 페이지에 있다면 페이지 새로고침 방지
-    if (pathname === '/') {
-      // 스크롤을 맨 위로 이동
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-      return;
-    }
+    // 홈으로 이동 (모든 검색 파라미터 초기화)
+    router.push('/');
     
-    // 다른 페이지에서 홈으로 이동
-    router.push(routes.home());
+    // 이미 홈 페이지에 있다면 스크롤을 맨 위로
+    if (pathname === '/') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
   };
 
   const toggleMobileMenu = () => {
@@ -112,40 +111,31 @@ export default function Header() {
 
   return (
     <header className="border-b border-gray-200 sticky top-0 z-50 bg-white" ref={mobileMenuRef}>
-      <div className="max-w-6xl mx-auto px-4 py-4 sm:py-5">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-5">
         <div className="flex items-center justify-between">
           {/* Logo */}
           <div className="flex items-center">
             <a 
               href={routes.home()}
               onClick={handleHomeNavigation}
-              className="text-lg sm:text-xl font-normal text-amber-800 hover:text-amber-900 cursor-pointer"
+              className="hover:opacity-80 transition-opacity cursor-pointer flex items-center space-x-2"
             >
-              Dev Log
+              {/* Code Icon */}
+              <div className="bg-blue-500 rounded-lg p-3 flex items-center justify-center min-w-[48px] min-h-[48px]">
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 8l-4 4 4 4M18 8l4 4-4 4M14 7l-4 10"/>
+                </svg>
+              </div>
+              {/* Text */}
+              <div className="flex flex-col">
+                <span className="text-xl font-bold text-black leading-tight">codebase.</span>
+                <span className="text-xl font-bold text-black leading-tight -mt-1">blog</span>
+              </div>
             </a>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6 lg:space-x-8">
-            <a 
-              href={routes.home()}
-              onClick={handleHomeNavigation}
-              className="text-sm text-gray-900 hover:text-amber-800 cursor-pointer"
-            >
-              홈
-            </a>
-            <Link href="/posts" className="text-sm text-gray-900 hover:text-amber-800">
-              포스트
-            </Link>
-            <Link href="/categories" className="text-sm text-gray-900 hover:text-amber-800">
-              카테고리
-            </Link>
-            <Link href="/about" className="text-sm text-gray-900 hover:text-amber-800">
-              소개
-            </Link>
-            {/* <Link href="/analytics" className="text-sm text-gray-900 hover:text-amber-800">
-              📊 분석
-            </Link> */}
             
             {/* Desktop Auth Section */}
             <div className="flex items-center space-x-4">
@@ -165,7 +155,7 @@ export default function Header() {
                   <button 
                     onClick={handleWriteClick}
                     disabled={isCheckingBlog}
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <FiEdit3 className="mr-1 w-4 h-4" />
                     {isCheckingBlog ? '확인 중...' : '글쓰기'}
@@ -213,34 +203,6 @@ export default function Header() {
             <div className="pt-4 space-y-4">
               {/* Navigation Links */}
               <div className="space-y-3">
-                <a 
-                  href={routes.home()}
-                  onClick={handleHomeNavigation}
-                  className="block text-base text-gray-900 hover:text-amber-800 cursor-pointer py-2 px-2 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  홈
-                </a>
-                <Link 
-                  href="/posts" 
-                  onClick={closeMobileMenu}
-                  className="block text-base text-gray-900 hover:text-amber-800 py-2 px-2 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  포스트
-                </Link>
-                <Link 
-                  href="/categories" 
-                  onClick={closeMobileMenu}
-                  className="block text-base text-gray-900 hover:text-amber-800 py-2 px-2 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  카테고리
-                </Link>
-                <Link 
-                  href="/about" 
-                  onClick={closeMobileMenu}
-                  className="block text-base text-gray-900 hover:text-amber-800 py-2 px-2 rounded-md hover:bg-gray-50 transition-colors"
-                >
-                  소개
-                </Link>
                 <Link 
                   href="/analytics" 
                   onClick={closeMobileMenu}
@@ -275,7 +237,7 @@ export default function Header() {
                     <button 
                       onClick={handleWriteClick}
                       disabled={isCheckingBlog}
-                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-md transition-colors w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-md transition-all w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FiEdit3 className="mr-2 w-4 h-4" />
                       {isCheckingBlog ? '확인 중...' : '글쓰기'}

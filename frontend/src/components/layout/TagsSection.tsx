@@ -5,21 +5,35 @@ import SidebarSection from './SidebarSection';
 
 interface TagsSectionProps {
   tags: string[];
+  onTagClick?: (tag: string) => void;
 }
 
-const TagsSection = React.memo(function TagsSection({ tags }: TagsSectionProps) {
+const TagsSection = React.memo(function TagsSection({ tags, onTagClick }: TagsSectionProps) {
+  const handleTagClick = (tag: string) => {
+    if (onTagClick) {
+      onTagClick(tag);
+    }
+  };
+
   return (
     <SidebarSection title="태그">
       <div className="flex flex-wrap gap-2">
         {tags.map((tag, index) => (
           <span
             key={index}
+            onClick={() => handleTagClick(tag)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                handleTagClick(tag);
+              }
+            }}
             className="px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-800 cursor-pointer rounded-md sm:rounded-none transition-colors min-h-[44px] sm:min-h-auto flex items-center"
             role="button"
             tabIndex={0}
             aria-label={`${tag} 태그`}
           >
-            {tag}
+            #{tag}
           </span>
         ))}
         {tags.length === 0 && (

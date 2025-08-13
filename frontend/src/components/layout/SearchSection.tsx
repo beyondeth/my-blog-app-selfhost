@@ -56,14 +56,14 @@ const SearchSection = React.memo(function SearchSection({
           value={searchQuery}
           onChange={handleInputChange}
           placeholder="검색어를 입력하세요"
-          className="flex-1 px-3 py-2.5 sm:py-2 text-sm sm:text-xs border border-gray-300 rounded-md sm:rounded-none focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 bg-white"
+          className="flex-1 px-3 py-2.5 sm:py-2 text-sm sm:text-xs border border-gray-300 rounded-md sm:rounded-none focus:outline-none focus:ring-2 focus:ring-gray-300 focus:border-gray-400 bg-white"
           autoComplete="off"
           autoCapitalize="off"
           autoCorrect="off"
         />
         <button
           type="submit"
-          className="px-4 py-2.5 sm:px-3 sm:py-2 bg-amber-700 text-white rounded-md sm:rounded-none hover:bg-amber-800 focus:outline-none focus:ring-2 focus:ring-amber-500 transition-colors min-w-[44px] flex items-center justify-center"
+          className="px-4 py-2.5 sm:px-3 sm:py-2 border border-gray-300 text-gray-600 rounded-md sm:rounded-none hover:border-gray-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300 transition-all min-w-[44px] flex items-center justify-center"
           aria-label="검색"
         >
           <FiSearch className="w-4 h-4" />

@@ -59,10 +59,8 @@ export default function ProfileDropdown({
                 className="w-8 h-8 rounded-full object-cover"
               />
             ) : (
-              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center">
-                <span className="text-amber-800 font-medium text-xs">
-                  {user.username.charAt(0).toUpperCase()}
-                </span>
+              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
+                <FiUser className="w-5 h-5 text-gray-400" />
               </div>
             )}
             <span className="text-gray-700 font-medium">{user.username}</span>

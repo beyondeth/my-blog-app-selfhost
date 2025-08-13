@@ -23,7 +23,7 @@ const LoadMoreSection = React.memo(function LoadMoreSection({
         <button
           onClick={onLoadMore}
           disabled={isFetchingNextPage}
-          className="px-6 py-2 text-sm border border-amber-600 text-amber-600 hover:bg-amber-600 hover:text-white transition-colors disabled:opacity-50"
+          className="px-6 py-2 text-sm border border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-50"
         >
           {isFetchingNextPage ? '로딩 중...' : '더 많은 포스트 보기'}
         </button>
