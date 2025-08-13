@@ -1,6 +1,7 @@
 import { Controller, Post, Body, UseGuards, Request, Get, Res, Response } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
+import { AuthApiKeyService } from './auth-api-key.service';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { KakaoAuthGuard } from './guards/kakao-auth.guard';
@@ -9,11 +10,15 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
+import { VerifyApiKeyDto } from './dto/verify-api-key.dto';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly authApiKeyService: AuthApiKeyService,
+  ) {}
 
   @Public()
   @Post('login')
@@ -231,5 +236,67 @@ export class AuthController {
     });
 
     return res.json({ message: '로그아웃되었습니다.' });
+  }
+
+  @Post('verify-api-key')
+  @Public()
+  @ApiOperation({ summary: 'API 키 HMAC 서명 검증' })
+  @ApiResponse({ status: 200, description: 'API 키 검증 성공' })
+  @ApiResponse({ status: 401, description: 'API 키 검증 실패' })
+  async verifyApiKey(@Body() verifyDto: VerifyApiKeyDto, @Response() res) {
+    const result = await this.authApiKeyService.verifyApiKeySignature(
+      verifyDto.timestamp,
+      verifyDto.nonce,
+      verifyDto.signature,
+      verifyDto.keyId,
+    );
+
+    if (!result.valid) {
+      return res.status(401).json({ 
+        message: 'Invalid API key signature',
+        valid: false 
+      });
+    }
+
+    // 검증 성공 시 세션 토큰 생성 (선택적)
+    const sessionToken = await this.authService.createSessionToken(result.userId);
+
+    return res.json({
+      valid: true,
+      userId: result.userId,
+      blogId: result.blogId,
+      sessionToken,
+      message: 'API key verified successfully'
+    });
+  }
+
+  @Post('verify-request')
+  @Public()
+  @ApiOperation({ summary: 'API 요청 서명 검증' })
+  @ApiResponse({ status: 200, description: '요청 서명 검증 성공' })
+  @ApiResponse({ status: 401, description: '요청 서명 검증 실패' })
+  async verifyRequest(@Body() body: any, @Response() res) {
+    const { method, endpoint, timestamp, nonce, signature, apiKey } = body;
+    
+    const isValid = await this.authApiKeyService.verifyRequestSignature(
+      method,
+      endpoint,
+      timestamp,
+      nonce,
+      signature,
+      apiKey,
+    );
+
+    if (!isValid) {
+      return res.status(401).json({ 
+        message: 'Invalid request signature',
+        valid: false 
+      });
+    }
+
+    return res.json({
+      valid: true,
+      message: 'Request signature verified successfully'
+    });
   }
 } 

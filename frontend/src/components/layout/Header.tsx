@@ -7,6 +7,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useUserBlog } from '@/hooks/useUserBlog';
 import { FiEdit3, FiLogOut, FiMenu, FiX } from 'react-icons/fi';
 import { routes, navigation } from '@/lib/navigation';
+import ProfileDropdown from './ProfileDropdown';
+import { blogLogger } from '@/utils/logger';
 
 export default function Header() {
   const { user, isAdmin, logout } = useAuth();
@@ -14,9 +16,9 @@ export default function Header() {
   
   // Debug logging
   useEffect(() => {
-    console.log('🔍 [Header] Blog state changed:', { 
-      user: user?.username, 
-      blog: blog ? `${blog.name} (${blog.slug})` : null, 
+    blogLogger.debug('[Header] Blog state changed', { 
+      // 민감한 정보 제외
+      hasBlog: !!blog, 
       loading: blogLoading 
     });
   }, [user?.username, blog, blogLoading]);
@@ -169,19 +171,15 @@ export default function Header() {
                     {isCheckingBlog ? '확인 중...' : '글쓰기'}
                   </button>
                   
-                  {/* User Menu */}
-                  <div className="flex items-center space-x-3">
-                    <span className="text-sm text-gray-600">
-                      {user.username}
-                    </span>
-                    <button
-                      onClick={() => logout('/')}
-                      className="text-sm text-gray-500 hover:text-gray-700"
-                      title="로그아웃"
-                    >
-                      <FiLogOut className="w-4 h-4" />
-                    </button>
-                  </div>
+                  {/* Profile Dropdown */}
+                  <ProfileDropdown
+                    user={user}
+                    blog={blog}
+                    blogLoading={blogLoading}
+                    onLogout={() => logout('/')}
+                    onWriteClick={handleWriteClick}
+                    isCheckingBlog={isCheckingBlog}
+                  />
                 </>
               ) : (
                 <Link 

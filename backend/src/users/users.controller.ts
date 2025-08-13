@@ -5,6 +5,7 @@ import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
+import { UpdateProfileDto } from './dto/update-profile.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -38,8 +39,8 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '내 프로필 수정' })
   @ApiBearerAuth()
-  updateProfile(@Request() req, @Body() updateUserDto: any) {
-    return this.usersService.update(req.user.id, updateUserDto);
+  updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
+    return this.usersService.update(req.user.id, updateProfileDto);
   }
 
   @Delete(':id')

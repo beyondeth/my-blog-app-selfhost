@@ -1,161 +1,93 @@
-# Blog MCP Server
+# 🚀 Blog MCP - 원클릭 블로그 포스팅 (FastMCP 기반)
 
-Claude Code와 통합되는 블로그 관리 MCP 서버입니다.
+Claude와 연동하여 마크다운으로 블로그 포스트를 작성할 수 있는 FastMCP 기반 서버입니다.
 
-## 🚀 빠른 시작
-
-### 1. 의존성 설치
+## ⚡ 빠른 설치 (30초)
 
 ```bash
-cd mcp-blog-server
-pip install -r requirements.txt
+# 1. 저장소 클론
+git clone https://github.com/your-repo/blog-mcp.git
+cd blog-mcp
+
+# 2. 원클릭 설치
+./install.sh
 ```
 
-### 2. 설정
+끝! 이제 Claude에서 `create_post` 도구를 사용할 수 있습니다.
 
-```bash
-python setup.py
+## 🎯 주요 특징
+
+### ✅ 간단함
+- **FastMCP 기반**: 현대적 MCP 프레임워크 사용
+- **원클릭 설치**: 스크립트 실행 한 번으로 완료
+- **자동 설정**: Claude Desktop 설정도 자동으로 추가
+
+### ✅ 빠름
+- **즉시 사용**: 설치 후 바로 포스팅 가능
+- **자동 인증**: 서버 시작 시 자동으로 로그인
+- **마크다운 변환**: HTML 변환 자동 처리
+
+### ✅ 안전함
+- **보안 인증**: 이메일 + 비밀번호 + API 키 2단계 인증
+- **환경 변수**: 민감 정보는 .env 파일로 보호
+- **권한 설정**: .env 파일 600 권한으로 보호
+
+## 🔧 사용법
+
+### Claude에서 사용
+
+```
+Claude: "create_post 도구를 사용해서 오늘 개발한 내용을 블로그에 포스팅해줘"
 ```
 
-블로그 API 정보를 입력하세요:
-- API URL: http://localhost:3000
-- Email: your-email@example.com
-- Password: your-password
+### 지원하는 방법
 
-### 3. Claude Code 재시작
-
-MCP 서버가 자동으로 로드됩니다.
-
-## 📝 사용 방법
-
-Claude Code에서 다음과 같이 사용하세요:
-
-### 포스트 생성
+1. **파일에서 포스팅**:
 ```
-"새 블로그 포스트를 작성해줘"
-"README.md 파일을 블로그에 포스팅해줘"
+create_post({
+    "file_path": "posts/my-post.md"
+})
 ```
 
-### 포스트 목록 조회
+2. **직접 내용 입력**:
 ```
-"draft 포스트 목록을 보여줘"
-"최근 포스트 10개를 보여줘"
-```
-
-### 포스트 발행
-```
-"포스트 ID 5를 발행해줘"
+create_post({
+    "title": "제목",
+    "content": "# 마크다운 내용...",
+    "tags": ["태그1", "태그2"]
+})
 ```
 
-## 🛠️ MCP 도구
-
-### create_post
-마크다운 콘텐츠나 파일로부터 새 포스트 생성
-
-**파라미터:**
-- `title`: 포스트 제목
-- `content`: 마크다운 콘텐츠
-- `file_path`: 마크다운 파일 경로 (content 대신 사용)
-- `category`: 카테고리 (기본: general)
-- `tags`: 태그 배열
-- `status`: draft 또는 published
-
-### publish_post
-draft 포스트를 발행
-
-**파라미터:**
-- `post_id`: 발행할 포스트 ID
-
-### update_post
-기존 포스트 수정
-
-**파라미터:**
-- `post_id`: 수정할 포스트 ID
-- `title`: 새 제목
-- `content`: 새 콘텐츠
-- `category`: 새 카테고리
-- `tags`: 새 태그들
-- `status`: 새 상태
-
-### list_posts
-포스트 목록 조회
-
-**파라미터:**
-- `status`: draft, published, 또는 all (기본: all)
-- `limit`: 조회할 포스트 수 (기본: 10)
-
-### get_post
-특정 포스트 조회
-
-**파라미터:**
-- `post_id`: 조회할 포스트 ID
-
-### delete_post
-포스트 삭제
-
-**파라미터:**
-- `post_id`: 삭제할 포스트 ID
-
-### save_markdown
-포스트를 마크다운 파일로 저장
-
-**파라미터:**
-- `post_id`: 저장할 포스트 ID
-- `file_path`: 저장할 파일 경로
-
-## 📁 파일 구조
+## 📁 프로젝트 구조
 
 ```
 mcp-blog-server/
 ├── src/
-│   ├── mcp_server.py      # MCP 서버 메인
-│   ├── blog_client.py      # 블로그 API 클라이언트
-│   └── markdown_handler.py # 마크다운 처리
-├── requirements.txt        # Python 의존성
-├── setup.py               # 설정 스크립트
-├── .env.example           # 환경변수 예시
-└── README.md              # 이 파일
+│   └── fastmcp_blog_server.py # FastMCP 기반 블로그 서버 (메인)
+├── posts/                     # 마크다운 포스트 저장소
+├── requirements.txt           # Python 의존성
+├── run_server.sh             # 서버 실행 스크립트
+└── .env                      # 환경 변수
 ```
 
-## 🔧 문제 해결
+## 🔒 보안 기능
 
-### MCP 서버가 인식되지 않음
-1. Claude Code를 완전히 재시작하세요
-2. `~/.claude/claude_desktop_config.json` 파일을 확인하세요
-3. Python 경로가 올바른지 확인하세요
+- **2단계 인증**: 이메일/패스워드 + API 키
+- **환경 변수 보호**: 민감한 정보는 .env 파일로 관리
+- **안전한 마크다운 처리**: XSS 방지
 
-### 로그인 실패
-1. `.blog-mcp/.env` 파일의 자격 증명을 확인하세요
-2. 블로그 API 서버가 실행 중인지 확인하세요
+## 📝 마크다운 지원
 
-### Python 모듈 오류
-```bash
-pip install --upgrade -r requirements.txt
-```
+- 제목 (h1 ~ h6)
+- 코드 블록 (언어별 하이라이팅)
+- 인라인 코드
+- 테이블
+- 리스트 (순서 있음/없음)
+- 링크와 이미지
+- 굵은 글씨, 기울임, 취소선
+- 인용문
+- 수평선
 
-## 📝 마크다운 Frontmatter 지원
-
-마크다운 파일에 frontmatter를 추가할 수 있습니다:
-
-```markdown
----
-title: 포스트 제목
-category: tech
-tags: [python, mcp, blog]
-status: draft
----
-
-# 포스트 내용
-
-여기에 내용을 작성하세요...
-```
-
-## 🔒 보안
-
-- 자격 증명은 `~/.blog-mcp/.env` 파일에 저장됩니다
-- 파일 권한은 600으로 설정됩니다 (소유자만 읽기/쓰기)
-- 절대 자격 증명을 git에 커밋하지 마세요
-
-## 📄 라이센스
+## 📄 라이선스
 
 MIT

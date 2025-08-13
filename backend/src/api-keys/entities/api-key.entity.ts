@@ -10,6 +10,9 @@ export class ApiKey {
   @Column({ unique: true })
   key: string; // 실제 API 키 (해시 저장)
 
+  @Column({ nullable: true })
+  signingSecret: string; // HMAC 서명용 시크릿 (암호화 저장)
+
   @Column()
   name: string; // API 키 이름 (사용자가 구분하기 위한 용도)
 

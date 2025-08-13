@@ -1,4 +1,5 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { apiLogger } from '@/utils/logger';
 import { 
   AuthResponse, 
   LoginForm, 
@@ -41,13 +42,12 @@ class ApiClient {
     // 요청 인터셉터 (Authorization 헤더 제거 - 쿠키 사용)
     this.client.interceptors.request.use(
       (config) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`🔄 API Request: ${config.method?.toUpperCase()} ${config.url}`);
-        }
+        // 보안 강화된 로거 사용
+        apiLogger.apiRequest(config.method?.toUpperCase() || 'GET', config.url || '');
         return config;
       },
       (error) => {
-        console.error('Request interceptor error:', error);
+        apiLogger.error('Request interceptor error', error);
         return Promise.reject(error);
       }
     );
@@ -55,9 +55,8 @@ class ApiClient {
     // 응답 인터셉터
     this.client.interceptors.response.use(
       (response) => {
-        if (process.env.NODE_ENV === 'development') {
-          console.log(`✅ API Response: ${response.status} ${response.config.url}`);
-        }
+        // 보안 강화된 로거 사용
+        apiLogger.apiResponse(response.status, response.config.url || '');
         return response;
       },
       async (error) => {
@@ -132,7 +131,7 @@ class ApiClient {
       await this.client.post('/auth/refresh');
       return 'refreshed'; // 쿠키가 자동으로 업데이트됨
     } catch (error) {
-      console.error('Token refresh failed:', error);
+      apiLogger.error('Token refresh failed');
       return null;
     }
   }
@@ -144,14 +143,13 @@ class ApiClient {
   }
 
   private handleError(error: any): ApiError {
-    if (process.env.NODE_ENV === 'development') {
-      console.error('API Error:', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: error.response?.status,
-        data: error.response?.data,
-      });
-    }
+    // 보안 강화된 로거 사용 (민감한 데이터 자동 제거)
+    apiLogger.error('API Error', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      // data는 민감할 수 있어 제외
+    });
 
     const apiError: ApiError = {
       message: error.response?.data?.message || error.message || 'An error occurred',
@@ -386,11 +384,10 @@ class ApiClient {
   // 통합 파일 업로드 메서드
   async uploadFile(file: File, fileType: 'image' | 'document' | 'video' | 'general' = 'general'): Promise<FileUpload> {
     try {
-      console.log('🚀 uploadFile started:', {
+      apiLogger.debug('uploadFile started', {
         fileName: file.name,
         fileType,
-        apiBaseUrl: API_BASE_URL,
-        hasToken: !!this.getStoredToken()
+        // 민감한 정보 제외
       });
 
       // 1. Presigned URL 요청 - 반드시 인자로 받은 file 객체의 정보 사용
@@ -401,9 +398,9 @@ class ApiClient {
         fileType,
       };
 
-      console.log('📤 Requesting presigned URL with data:', uploadData);
+      apiLogger.debug('Requesting presigned URL', uploadData);
       const presignedResponse = await this.createUploadUrl(uploadData);
-      console.log('📥 Presigned URL response:', presignedResponse);
+      apiLogger.debug('Presigned URL response received');
 
       // 2. S3에 파일 업로드 (file 객체 그대로)
       await this.uploadFileToS3(file, presignedResponse.uploadUrl);
@@ -418,12 +415,126 @@ class ApiClient {
         fileType: fileType
       };
 
-      console.log('실제 업로드할 파일 정보:', file.name, file.type, file.size);
+      apiLogger.debug('Uploading file', { name: file.name, type: file.type, size: file.size });
       return await this.uploadComplete(completeData);
     } catch (error) {
-      console.error('File upload failed:', error);
+      apiLogger.error('File upload failed', error);
       throw error;
     }
+  }
+
+  // Profile Management
+  async updateProfile(data: { 
+    username?: string; 
+    email?: string; 
+    bio?: string; 
+    profileImage?: string;
+  }): Promise<User> {
+    return this.request<User>({
+      method: 'PUT',
+      url: '/users/profile',
+      data,
+    });
+  }
+
+  // Settings Management
+  async getNotificationSettings(): Promise<any> {
+    return this.request<any>({
+      method: 'GET',
+      url: '/users/settings/notifications',
+    });
+  }
+
+  async updateNotificationSettings(settings: {
+    emailNotifications?: boolean;
+    pushNotifications?: boolean;
+    weeklyDigest?: boolean;
+    marketingEmails?: boolean;
+  }): Promise<any> {
+    return this.request<any>({
+      method: 'PUT',
+      url: '/users/settings/notifications',
+      data: settings,
+    });
+  }
+
+  async getSecuritySettings(): Promise<any> {
+    return this.request<any>({
+      method: 'GET',
+      url: '/users/settings/security',
+    });
+  }
+
+  async changePassword(data: {
+    currentPassword: string;
+    newPassword: string;
+    confirmPassword: string;
+  }): Promise<void> {
+    return this.request<void>({
+      method: 'PUT',
+      url: '/users/change-password',
+      data,
+    });
+  }
+
+  async enableTwoFactor(): Promise<{ qrCode: string; secret: string }> {
+    return this.request<{ qrCode: string; secret: string }>({
+      method: 'POST',
+      url: '/users/2fa/enable',
+    });
+  }
+
+  async verifyTwoFactor(token: string): Promise<void> {
+    return this.request<void>({
+      method: 'POST',
+      url: '/users/2fa/verify',
+      data: { token },
+    });
+  }
+
+  async disableTwoFactor(password: string): Promise<void> {
+    return this.request<void>({
+      method: 'POST',
+      url: '/users/2fa/disable',
+      data: { password },
+    });
+  }
+
+  // API Keys Management
+  async getApiKeys(): Promise<any[]> {
+    return this.request<any[]>({
+      method: 'GET',
+      url: '/api-keys',
+    });
+  }
+
+  async getApiKeysByBlog(blogId: string): Promise<any[]> {
+    return this.request<any[]>({
+      method: 'GET',
+      url: `/api-keys/blog/${blogId}`,
+    });
+  }
+
+  async createApiKey(data: { name: string; description?: string; blogId: string }): Promise<any> {
+    return this.request<any>({
+      method: 'POST',
+      url: '/api-keys',
+      data,
+    });
+  }
+
+  async toggleApiKey(id: string): Promise<any> {
+    return this.request<any>({
+      method: 'PUT',
+      url: `/api-keys/${id}/toggle`,
+    });
+  }
+
+  async deleteApiKey(id: string): Promise<void> {
+    return this.request<void>({
+      method: 'DELETE',
+      url: `/api-keys/${id}`,
+    });
   }
 
   // OAuth methods

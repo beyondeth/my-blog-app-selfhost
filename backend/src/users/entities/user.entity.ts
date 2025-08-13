@@ -42,6 +42,9 @@ export class User {
   @Column({ nullable: true, length: 500 })
   profileImage: string;
 
+  @Column({ nullable: true, length: 500 })
+  bio: string;
+
   @Column({
     type: 'enum',
     enum: Role,

@@ -20,6 +20,7 @@ export interface User {
   readonly email: string;
   readonly username: string;
   readonly profileImage?: string;
+  readonly bio?: string;
   readonly role: UserRoleType;
   readonly authProvider: AuthProviderType;
   readonly isEmailVerified: boolean;

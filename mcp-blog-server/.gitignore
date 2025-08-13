@@ -1,1 +1,65 @@
+# Python
 __pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv
+
+# Environment Variables (중요!)
+.env
+*.env
+.env.*
+.env.local
+.env.production
+.env.development
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node.js (backup server)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs & Audit
+*.log
+audit.log
+logs/
+
+# Test & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+
+# Build
+build/
+dist/
+*.egg-info/
+
+# Sensitive Data
+cookies.txt
+*.pem
+*.key
+*.crt
+*.pfx
+
+# Backup files
+*.backup
+*.bak
+*~

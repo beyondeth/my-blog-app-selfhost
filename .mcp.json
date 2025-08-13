@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "my-blog": {
+      "type": "stdio",
+      "command": "bash",
+      "args": ["mcp-blog-server/run_server.sh"],
+      "cwd": "/Users/sihyungpark/Desktop/code/my-blog-app",
+      "env": {}
+    }
+  }
+}

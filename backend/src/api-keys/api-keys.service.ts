@@ -36,9 +36,16 @@ export class ApiKeysService {
     // API 키 해시 (실제 저장되는 값)
     const hashedKey = await bcrypt.hash(plainKey, 10);
 
+    // HMAC 서명용 시크릿 생성 (32바이트)
+    const signingSecret = crypto.randomBytes(32).toString('hex');
+    
+    // 서명 시크릿 암호화 (AES-256-GCM)
+    const encryptedSecret = this.encryptSigningSecret(signingSecret);
+
     // API 키 엔티티 생성
     const apiKey = this.apiKeyRepository.create({
       key: hashedKey,
+      signingSecret: encryptedSecret,
       name: createApiKeyDto.name,
       description: createApiKeyDto.description,
       userId: user.id,
@@ -52,7 +59,8 @@ export class ApiKeysService {
     return { 
       apiKey: {
         ...apiKey,
-        key: undefined // 해시된 키는 반환하지 않음
+        key: undefined, // 해시된 키는 반환하지 않음
+        signingSecret: undefined // 암호화된 시크릿도 반환하지 않음
       }, 
       plainKey 
     };
@@ -175,5 +183,79 @@ export class ApiKeysService {
     await this.apiKeyRepository.save(apiKey);
 
     return { ...apiKey, key: undefined };
+  }
+
+  /**
+   * 서명 시크릿 암호화
+   */
+  private encryptSigningSecret(secret: string): string {
+    const algorithm = 'aes-256-gcm';
+    const key = crypto.scryptSync(
+      process.env.ENCRYPTION_KEY || 'default-encryption-key-for-dev',
+      'salt',
+      32
+    );
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv(algorithm, key, iv);
+    
+    let encrypted = cipher.update(secret, 'utf8', 'hex');
+    encrypted += cipher.final('hex');
+    
+    const authTag = cipher.getAuthTag();
+    
+    // IV + authTag + encrypted를 합쳐서 저장
+    return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
+  }
+
+  /**
+   * 서명 시크릿 복호화
+   */
+  decryptSigningSecret(encryptedSecret: string): string {
+    const algorithm = 'aes-256-gcm';
+    const key = crypto.scryptSync(
+      process.env.ENCRYPTION_KEY || 'default-encryption-key-for-dev',
+      'salt',
+      32
+    );
+    
+    const parts = encryptedSecret.split(':');
+    const iv = Buffer.from(parts[0], 'hex');
+    const authTag = Buffer.from(parts[1], 'hex');
+    const encrypted = parts[2];
+    
+    const decipher = crypto.createDecipheriv(algorithm, key, iv);
+    decipher.setAuthTag(authTag);
+    
+    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
+    decrypted += decipher.final('utf8');
+    
+    return decrypted;
+  }
+
+  /**
+   * API 키 ID로 서명 시크릿 가져오기
+   */
+  async getSigningSecret(apiKeyId: string): Promise<string | null> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { id: apiKeyId, isActive: true }
+    });
+
+    if (!apiKey || !apiKey.signingSecret) {
+      return null;
+    }
+
+    return this.decryptSigningSecret(apiKey.signingSecret);
+  }
+
+  /**
+   * API 키 ID로 조회
+   */
+  async findById(id: string): Promise<ApiKey | null> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { id },
+      relations: ['user', 'blog']
+    });
+
+    return apiKey;
   }
 }

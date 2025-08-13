@@ -168,6 +168,27 @@ export class AuthService {
     this.logger.log(`User ${userId} logged out`);
   }
 
+  async createSessionToken(userId: string): Promise<string> {
+    // API 키 검증 후 세션 토큰 생성
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException('User not found');
+    }
+
+    const payload: JwtPayload = {
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tokenType: 'session',
+      iat: Math.floor(Date.now() / 1000),
+    };
+
+    // 세션 토큰은 2시간 유효 (GitHub 스타일)
+    return this.jwtService.sign(payload, {
+      expiresIn: '2h',
+    });
+  }
+
   private async generateTokenResponse(user: User): Promise<AuthResponse> {
     const now = Math.floor(Date.now() / 1000);
 

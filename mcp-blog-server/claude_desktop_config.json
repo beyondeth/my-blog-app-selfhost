@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "blog-mcp": {
+      "command": "/Users/sihyungpark/Desktop/code/my-blog-app/mcp-blog-server/venv/bin/python",
+      "args": [
+        "/Users/sihyungpark/Desktop/code/my-blog-app/mcp-blog-server/src/fastmcp_blog_server.py"
+      ],
+      "cwd": "/Users/sihyungpark/Desktop/code/my-blog-app/mcp-blog-server",
+      "env": {
+        "PATH": "/Users/sihyungpark/Desktop/code/my-blog-app/mcp-blog-server/venv/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}

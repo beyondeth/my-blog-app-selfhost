@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
+import { blogLogger } from '@/utils/logger';
 
 interface Blog {
   id: string;
@@ -19,12 +20,12 @@ export function useUserBlog() {
 
   const fetchUserBlog = useCallback(async () => {
     if (!user) {
-      console.log('🔄 [useUserBlog] No user, clearing blog state');
+      blogLogger.debug('[useUserBlog] No user, clearing blog state');
       setBlog(null);
       return;
     }
 
-    console.log('🔄 [useUserBlog] Fetching blog for user:', user.id);
+    blogLogger.debug('[useUserBlog] Fetching blog for user');
     setLoading(true);
     setError(null);
     
@@ -36,29 +37,29 @@ export function useUserBlog() {
         }
       );
 
-      console.log('🔄 [useUserBlog] API Response status:', response.status);
+      blogLogger.debug('[useUserBlog] API Response status', { status: response.status });
 
       if (response.ok) {
         const blogs = await response.json();
-        console.log('🔄 [useUserBlog] API Response data:', blogs);
+        blogLogger.debug('[useUserBlog] API Response data received');
         // Since users can only have one blog, take the first one
         if (blogs && blogs.length > 0) {
-          console.log('✅ [useUserBlog] Found user blog:', blogs[0]);
+          blogLogger.info('[useUserBlog] Found user blog');
           setBlog(blogs[0]);
         } else {
-          console.log('❌ [useUserBlog] No blogs found for user');
+          blogLogger.debug('[useUserBlog] No blogs found for user');
           setBlog(null);
         }
       } else if (response.status === 404) {
-        console.log('❌ [useUserBlog] 404 - No blogs found');
+        blogLogger.debug('[useUserBlog] 404 - No blogs found');
         setBlog(null);
       } else {
         const errorText = await response.text();
-        console.error('❌ [useUserBlog] API Error:', response.status, errorText);
+        blogLogger.error('[useUserBlog] API Error', { status: response.status });
         setError('Failed to fetch user blog');
       }
     } catch (err) {
-      console.error('❌ [useUserBlog] Network Error:', err);
+      blogLogger.error('[useUserBlog] Network Error');
       setError('Failed to fetch user blog');
     } finally {
       setLoading(false);
@@ -72,7 +73,7 @@ export function useUserBlog() {
   // Listen for custom refresh events
   useEffect(() => {
     const handleRefresh = () => {
-      console.log('🔄 [useUserBlog] Received refresh event, refetching...');
+      blogLogger.debug('[useUserBlog] Received refresh event, refetching...');
       fetchUserBlog();
     };
 
@@ -95,7 +96,7 @@ export function useUserBlog() {
 
   // Refresh function for external use (e.g., after blog creation)
   const refresh = useCallback(() => {
-    console.log('🔄 [useUserBlog] Manual refresh triggered');
+    blogLogger.debug('[useUserBlog] Manual refresh triggered');
     return fetchUserBlog();
   }, [fetchUserBlog]);
 
