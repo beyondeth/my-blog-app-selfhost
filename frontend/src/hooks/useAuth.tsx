@@ -116,6 +116,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (mounted) {
         localStorage.setItem('user', JSON.stringify(response.user));
       }
+      
+      // 로그인 성공 후 블로그 정보 새로고침을 위한 이벤트 발생
+      setTimeout(() => {
+        window.dispatchEvent(new Event('userBlogRefresh'));
+      }, 500);
     } catch (error) {
       handleError(error, '로그인에 실패했습니다.');
     } finally {
@@ -135,6 +140,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (mounted) {
         localStorage.setItem('user', JSON.stringify(response.user));
       }
+      
+      // 회원가입 성공 후 블로그 정보 새로고침을 위한 이벤트 발생
+      // 약간의 지연을 두어 블로그 생성이 완료되도록 함
+      setTimeout(() => {
+        window.dispatchEvent(new Event('userBlogRefresh'));
+      }, 1000);
     } catch (error) {
       handleError(error, '회원가입에 실패했습니다.');
     } finally {

@@ -67,8 +67,8 @@ export default function Header() {
       router.push(redirectPath);
     } catch (error) {
       console.error('Error checking blog:', error);
-      // Fallback to blog creation page
-      router.push('/blog/new');
+      // Fallback to home page if there's an error
+      router.push('/');
     } finally {
       setIsCheckingBlog(false);
     }
@@ -142,12 +142,12 @@ export default function Header() {
               {user ? (
                 <>
                   {/* My Blog Button */}
-                  {!blogLoading && (
+                  {!blogLoading && blog && (
                     <Link 
-                      href={blog ? `/blog/${blog.slug}` : "/blog/new"}
+                      href={`/blog/${blog.slug}`}
                       className="text-sm text-gray-900 hover:text-amber-800"
                     >
-                      {blog ? '내 블로그' : '블로그 만들기'}
+                      내 블로그
                     </Link>
                   )}
                   
@@ -223,13 +223,13 @@ export default function Header() {
                     </div>
                     
                     {/* My Blog Button for Mobile */}
-                    {!blogLoading && (
+                    {!blogLoading && blog && (
                       <Link 
-                        href={blog ? `/blog/${blog.slug}` : "/blog/new"}
+                        href={`/blog/${blog.slug}`}
                         onClick={closeMobileMenu}
                         className="block text-center py-2 px-2 text-sm text-gray-900 hover:text-amber-800 rounded-md hover:bg-gray-50 transition-colors"
                       >
-                        {blog ? '내 블로그' : '블로그 만들기'}
+                        내 블로그
                       </Link>
                     )}
                     

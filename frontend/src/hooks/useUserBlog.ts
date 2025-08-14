@@ -90,8 +90,10 @@ export function useUserBlog() {
       return `/blog/${blog.slug}/posts/new`;
     }
 
-    // If no blog, redirect to blog creation
-    return '/blog/new';
+    // If no blog exists (shouldn't happen for new users), redirect to home
+    // This might occur for existing users before the auto-blog feature
+    console.error('User does not have a blog. This should not happen for new users.');
+    return '/';
   };
 
   // Refresh function for external use (e.g., after blog creation)

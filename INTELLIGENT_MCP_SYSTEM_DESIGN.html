@@ -1,0 +1,2949 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codebase.blog 지능형 MCP 시스템 - 종합 설계 문서</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", Roboto, "Helvetica Neue", Arial, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: #f5f5f5;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: #2563eb;
+            border-bottom: 3px solid #2563eb;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+        }
+        
+        h2 {
+            color: #1e40af;
+            margin-top: 40px;
+            margin-bottom: 20px;
+            padding-left: 10px;
+            border-left: 4px solid #3b82f6;
+            font-size: 1.8em;
+        }
+        
+        h3 {
+            color: #1e3a8a;
+            margin-top: 30px;
+            margin-bottom: 15px;
+            font-size: 1.4em;
+        }
+        
+        h4 {
+            color: #1e3a8a;
+            margin-top: 25px;
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        p {
+            margin-bottom: 15px;
+            line-height: 1.8;
+        }
+        
+        ul, ol {
+            margin-bottom: 20px;
+            margin-left: 30px;
+        }
+        
+        li {
+            margin-bottom: 8px;
+            line-height: 1.7;
+        }
+        
+        code {
+            background: #f3f4f6;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+            font-size: 0.9em;
+            color: #e11d48;
+        }
+        
+        pre {
+            background: #1e293b;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-size: 0.9em;
+            line-height: 1.5;
+        }
+        
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+            font-size: inherit;
+        }
+        
+        blockquote {
+            border-left: 4px solid #3b82f6;
+            padding-left: 20px;
+            margin: 20px 0;
+            color: #4b5563;
+            font-style: italic;
+            background: #f9fafb;
+            padding: 15px 20px;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 20px 0;
+            overflow-x: auto;
+            display: block;
+        }
+        
+        th {
+            background: #2563eb;
+            color: white;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+        
+        td {
+            padding: 12px;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        tr:nth-child(even) {
+            background: #f9fafb;
+        }
+        
+        tr:hover {
+            background: #f3f4f6;
+        }
+        
+        strong {
+            color: #1e293b;
+            font-weight: 600;
+        }
+        
+        em {
+            color: #475569;
+        }
+        
+        hr {
+            border: none;
+            border-top: 2px solid #e5e7eb;
+            margin: 30px 0;
+        }
+        
+        a {
+            color: #2563eb;
+            text-decoration: none;
+            border-bottom: 1px solid transparent;
+            transition: border-color 0.2s;
+        }
+        
+        a:hover {
+            border-bottom-color: #2563eb;
+        }
+        
+        .toc {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .toc h2 {
+            margin-top: 0;
+            font-size: 1.3em;
+            color: #1e293b;
+            border: none;
+            padding: 0;
+        }
+        
+        .toc ul {
+            margin-left: 20px;
+            margin-bottom: 0;
+        }
+        
+        .toc a {
+            color: #475569;
+        }
+        
+        .toc a:hover {
+            color: #2563eb;
+        }
+        
+        /* Mermaid diagram styles */
+        .language-mermaid {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            overflow-x: auto;
+        }
+        
+        /* Syntax highlighting */
+        .language-typescript,
+        .language-javascript,
+        .language-python,
+        .language-sql,
+        .language-bash,
+        .language-json,
+        .language-yaml {
+            position: relative;
+        }
+        
+        .language-typescript::before,
+        .language-javascript::before,
+        .language-python::before,
+        .language-sql::before,
+        .language-bash::before,
+        .language-json::before,
+        .language-yaml::before {
+            position: absolute;
+            top: 0;
+            right: 0;
+            padding: 4px 8px;
+            background: rgba(255,255,255,0.1);
+            color: #94a3b8;
+            font-size: 0.8em;
+            border-radius: 0 8px 0 4px;
+        }
+        
+        .language-typescript::before { content: 'TypeScript'; }
+        .language-javascript::before { content: 'JavaScript'; }
+        .language-python::before { content: 'Python'; }
+        .language-sql::before { content: 'SQL'; }
+        .language-bash::before { content: 'Bash'; }
+        .language-json::before { content: 'JSON'; }
+        .language-yaml::before { content: 'YAML'; }
+        
+        /* Responsive design */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+            
+            .container {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            h2 {
+                font-size: 1.4em;
+            }
+            
+            h3 {
+                font-size: 1.2em;
+            }
+            
+            table {
+                font-size: 0.9em;
+            }
+        }
+        
+        /* Print styles */
+        @media print {
+            body {
+                background: white;
+                color: black;
+            }
+            
+            .container {
+                box-shadow: none;
+                padding: 0;
+            }
+            
+            pre {
+                background: #f5f5f5;
+                color: black;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Codebase.blog Intelligent MCP System - Comprehensive Design Document</h1>
+<h2>Table of Contents</h2>
+<ol>
+<li><a href="#executive-summary">Executive Summary</a></li>
+<li><a href="#system-architecture-overview">System Architecture Overview</a></li>
+<li><a href="#implementation-approaches">Implementation Approaches</a><ul>
+<li><a href="#approach-1-postgresql--pgvector">Approach 1: PostgreSQL + pgvector</a></li>
+<li><a href="#approach-2-aws-elasticsearch">Approach 2: AWS Elasticsearch</a></li>
+<li><a href="#approach-3-rag-system">Approach 3: RAG System</a></li>
+</ul>
+</li>
+<li><a href="#mcp-technology-deep-dive">MCP Technology Deep Dive</a></li>
+<li><a href="#user-feedback-system">User Feedback System</a></li>
+<li><a href="#detailed-implementation-guide">Detailed Implementation Guide</a></li>
+<li><a href="#cost-analysis">Cost Analysis</a></li>
+<li><a href="#performance-optimization">Performance Optimization</a></li>
+<li><a href="#security-considerations">Security Considerations</a></li>
+<li><a href="#future-roadmap">Future Roadmap</a></li>
+</ol>
+<hr>
+<h2>Executive Summary</h2>
+<h3>Vision Statement</h3>
+<p>Transform codebase.blog from a simple technical blogging platform into an intelligent knowledge base that serves as a living documentation system for developers. The system will enable seamless code discovery through natural language queries via MCP (Model Context Protocol), making technical knowledge instantly accessible to AI assistants.</p>
+<h3>Core Capabilities</h3>
+<ul>
+<li><strong>Semantic Code Search</strong>: Find relevant code snippets using natural language</li>
+<li><strong>Context-Aware Responses</strong>: Provide code examples with full context</li>
+<li><strong>Real-time Learning</strong>: Continuously improve based on user interactions</li>
+<li><strong>Multi-modal Support</strong>: Handle code, documentation, and diagrams</li>
+<li><strong>Feedback Loop</strong>: Learn from user interactions to improve relevance</li>
+</ul>
+<h3>Business Value</h3>
+<ul>
+<li><strong>Developer Productivity</strong>: 10x faster code discovery</li>
+<li><strong>Knowledge Retention</strong>: Preserve institutional knowledge</li>
+<li><strong>AI-First Documentation</strong>: Native integration with AI tools</li>
+<li><strong>Community Building</strong>: Share and discover best practices</li>
+</ul>
+<hr>
+<h2>System Architecture Overview</h2>
+<h3>High-Level Architecture</h3>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;User Layer&quot;
+        A[Claude Code CLI/Desktop]
+        B[Web Interface]
+        C[API Clients]
+    end
+    
+    subgraph &quot;MCP Layer&quot;
+        D[MCP Server]
+        E[Tool Registry]
+        F[Authentication]
+        G[Rate Limiting]
+    end
+    
+    subgraph &quot;Application Layer&quot;
+        H[Search Service]
+        I[Embedding Service]
+        J[Ranking Service]
+        K[Feedback Service]
+    end
+    
+    subgraph &quot;Data Layer&quot;
+        L[PostgreSQL]
+        M[Vector Store]
+        N[Cache Layer]
+        O[CDN]
+    end
+    
+    subgraph &quot;External Services&quot;
+        P[OpenAI API]
+        Q[Analytics]
+        R[Monitoring]
+    end
+    
+    A --&gt; D
+    B --&gt; D
+    C --&gt; D
+    D --&gt; E
+    D --&gt; F
+    D --&gt; G
+    E --&gt; H
+    H --&gt; I
+    H --&gt; J
+    H --&gt; K
+    I --&gt; P
+    J --&gt; L
+    J --&gt; M
+    H --&gt; N
+    N --&gt; O
+    K --&gt; Q
+    H --&gt; R
+</code></pre>
+<h3>Data Flow Architecture</h3>
+<pre><code class="language-mermaid">sequenceDiagram
+    participant User as User (Claude Code)
+    participant MCP as MCP Server
+    participant Auth as Auth Service
+    participant Search as Search Service
+    participant Embed as Embedding Service
+    participant Vector as Vector DB
+    participant Cache as Cache Layer
+    participant LLM as LLM Response
+    
+    User-&gt;&gt;MCP: Query &quot;find login code&quot;
+    MCP-&gt;&gt;Auth: Validate API Key
+    Auth--&gt;&gt;MCP: Authorized
+    MCP-&gt;&gt;Search: Process Query
+    Search-&gt;&gt;Cache: Check Cache
+    alt Cache Hit
+        Cache--&gt;&gt;Search: Return Cached Results
+    else Cache Miss
+        Search-&gt;&gt;Embed: Generate Embedding
+        Embed--&gt;&gt;Search: Query Vector
+        Search-&gt;&gt;Vector: Similarity Search
+        Vector--&gt;&gt;Search: Top K Results
+        Search-&gt;&gt;Cache: Store Results
+    end
+    Search--&gt;&gt;MCP: Formatted Results
+    MCP--&gt;&gt;User: Code Snippets
+    User-&gt;&gt;LLM: Generate Response
+    LLM--&gt;&gt;User: Final Answer
+</code></pre>
+<hr>
+<h2>Implementation Approaches</h2>
+<h2>Approach 1: PostgreSQL + pgvector</h2>
+<h3>Detailed Architecture</h3>
+<p>pgvector is a PostgreSQL extension that adds vector similarity search capabilities. This approach leverages your existing PostgreSQL infrastructure.</p>
+<h4>Database Schema</h4>
+<pre><code class="language-sql">-- Enable pgvector extension
+CREATE EXTENSION IF NOT EXISTS vector;
+
+-- Main content table with vector embeddings
+CREATE TABLE blog_embeddings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    post_id UUID REFERENCES posts(id) ON DELETE CASCADE,
+    content_type VARCHAR(50) NOT NULL, -- &#39;full_post&#39;, &#39;code_block&#39;, &#39;section&#39;
+    content TEXT NOT NULL,
+    metadata JSONB NOT NULL DEFAULT &#39;{}&#39;,
+    embedding vector(1536), -- OpenAI ada-002 dimensions
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Indexes for performance
+    INDEX idx_post_id (post_id),
+    INDEX idx_content_type (content_type),
+    INDEX idx_metadata_gin (metadata),
+    INDEX idx_created_at (created_at)
+);
+
+-- Create HNSW index for vector similarity search
+CREATE INDEX embedding_hnsw_idx ON blog_embeddings 
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+-- Query performance tracking
+CREATE TABLE search_queries (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query_text TEXT NOT NULL,
+    query_embedding vector(1536),
+    results_count INTEGER,
+    response_time_ms INTEGER,
+    user_id UUID REFERENCES users(id),
+    session_id VARCHAR(255),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User feedback table
+CREATE TABLE search_feedback (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    query_id UUID REFERENCES search_queries(id),
+    result_id UUID REFERENCES blog_embeddings(id),
+    feedback_type VARCHAR(50), -- &#39;helpful&#39;, &#39;not_helpful&#39;, &#39;wrong&#39;
+    feedback_text TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+</code></pre>
+<h4>Embedding Generation Pipeline</h4>
+<pre><code class="language-typescript">// Embedding Service Implementation
+import { OpenAI } from &#39;openai&#39;;
+import { Pool } from &#39;pg&#39;;
+import { z } from &#39;zod&#39;;
+
+interface EmbeddingConfig {
+  model: &#39;text-embedding-3-small&#39; | &#39;text-embedding-3-large&#39;;
+  dimensions: number;
+  batchSize: number;
+  retryAttempts: number;
+}
+
+class EmbeddingService {
+  private openai: OpenAI;
+  private db: Pool;
+  private config: EmbeddingConfig;
+  
+  constructor(config: EmbeddingConfig) {
+    this.openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    this.db = new Pool({ connectionString: process.env.DATABASE_URL });
+    this.config = config;
+  }
+  
+  /**
+   * Generate embeddings for a blog post
+   * Implements intelligent chunking strategy
+   */
+  async generatePostEmbeddings(postId: string): Promise&lt;void&gt; {
+    const post = await this.fetchPost(postId);
+    const chunks = this.chunkContent(post);
+    
+    // Batch process chunks for efficiency
+    for (let i = 0; i &lt; chunks.length; i += this.config.batchSize) {
+      const batch = chunks.slice(i, i + this.config.batchSize);
+      const embeddings = await this.generateBatchEmbeddings(batch);
+      await this.storeEmbeddings(postId, batch, embeddings);
+    }
+  }
+  
+  /**
+   * Intelligent content chunking strategy
+   */
+  private chunkContent(post: BlogPost): ContentChunk[] {
+    const chunks: ContentChunk[] = [];
+    
+    // Strategy 1: Extract code blocks as separate chunks
+    const codeBlocks = this.extractCodeBlocks(post.content);
+    codeBlocks.forEach(block =&gt; {
+      chunks.push({
+        type: &#39;code_block&#39;,
+        content: block.code,
+        metadata: {
+          language: block.language,
+          title: block.title,
+          tags: post.tags,
+          postTitle: post.title
+        }
+      });
+    });
+    
+    // Strategy 2: Chunk remaining content by sections
+    const sections = this.extractSections(post.content);
+    sections.forEach(section =&gt; {
+      if (section.content.length &gt; 1000) {
+        // Further chunk large sections
+        const subChunks = this.chunkBySentence(section.content, 500);
+        subChunks.forEach(subChunk =&gt; {
+          chunks.push({
+            type: &#39;section&#39;,
+            content: subChunk,
+            metadata: {
+              sectionTitle: section.title,
+              postTitle: post.title,
+              tags: post.tags
+            }
+          });
+        });
+      } else {
+        chunks.push({
+          type: &#39;section&#39;,
+          content: section.content,
+          metadata: {
+            sectionTitle: section.title,
+            postTitle: post.title,
+            tags: post.tags
+          }
+        });
+      }
+    });
+    
+    // Strategy 3: Add full post for context
+    chunks.push({
+      type: &#39;full_post&#39;,
+      content: post.content.substring(0, 2000), // Limit size
+      metadata: {
+        title: post.title,
+        tags: post.tags,
+        author: post.author,
+        createdAt: post.createdAt
+      }
+    });
+    
+    return chunks;
+  }
+  
+  /**
+   * Generate embeddings with retry logic
+   */
+  private async generateBatchEmbeddings(
+    chunks: ContentChunk[]
+  ): Promise&lt;number[][]&gt; {
+    const texts = chunks.map(c =&gt; c.content);
+    
+    for (let attempt = 0; attempt &lt; this.config.retryAttempts; attempt++) {
+      try {
+        const response = await this.openai.embeddings.create({
+          model: this.config.model,
+          input: texts,
+          dimensions: this.config.dimensions
+        });
+        
+        return response.data.map(d =&gt; d.embedding);
+      } catch (error) {
+        if (attempt === this.config.retryAttempts - 1) throw error;
+        await this.sleep(Math.pow(2, attempt) * 1000); // Exponential backoff
+      }
+    }
+    
+    throw new Error(&#39;Failed to generate embeddings&#39;);
+  }
+}
+</code></pre>
+<h4>Search Implementation</h4>
+<pre><code class="language-typescript">// Advanced Search Service
+class SearchService {
+  private db: Pool;
+  private embeddingService: EmbeddingService;
+  private cache: Redis;
+  
+  /**
+   * Hybrid search combining vector similarity and keyword matching
+   */
+  async search(query: string, options: SearchOptions): Promise&lt;SearchResult[]&gt; {
+    // Check cache first
+    const cacheKey = this.getCacheKey(query, options);
+    const cached = await this.cache.get(cacheKey);
+    if (cached) return JSON.parse(cached);
+    
+    // Generate query embedding
+    const queryEmbedding = await this.embeddingService.generateEmbedding(query);
+    
+    // Parallel search strategies
+    const [vectorResults, keywordResults, tagResults] = await Promise.all([
+      this.vectorSearch(queryEmbedding, options),
+      this.keywordSearch(query, options),
+      this.tagSearch(query, options)
+    ]);
+    
+    // Merge and rank results
+    const mergedResults = this.mergeResults(
+      vectorResults,
+      keywordResults,
+      tagResults,
+      options
+    );
+    
+    // Apply re-ranking based on user feedback
+    const rerankedResults = await this.rerank(mergedResults, query);
+    
+    // Cache results
+    await this.cache.setex(cacheKey, 3600, JSON.stringify(rerankedResults));
+    
+    // Track query for analytics
+    await this.trackQuery(query, queryEmbedding, rerankedResults);
+    
+    return rerankedResults;
+  }
+  
+  /**
+   * Vector similarity search using pgvector
+   */
+  private async vectorSearch(
+    embedding: number[],
+    options: SearchOptions
+  ): Promise&lt;SearchResult[]&gt; {
+    const query = `
+      SELECT 
+        be.id,
+        be.post_id,
+        be.content,
+        be.metadata,
+        be.embedding &lt;=&gt; $1 as distance,
+        p.title as post_title,
+        p.slug as post_slug,
+        p.author_id,
+        u.username as author_name
+      FROM blog_embeddings be
+      JOIN posts p ON be.post_id = p.id
+      JOIN users u ON p.author_id = u.id
+      WHERE 
+        be.embedding &lt;=&gt; $1 &lt; $2  -- Distance threshold
+        ${options.contentType ? &#39;AND be.content_type = $3&#39; : &#39;&#39;}
+        ${options.tags ? &#39;AND be.metadata-&gt;\&#39;tags\&#39; ?| $4&#39; : &#39;&#39;}
+      ORDER BY distance
+      LIMIT $5
+    `;
+    
+    const params = [
+      `[${embedding.join(&#39;,&#39;)}]`,
+      options.distanceThreshold || 0.5,
+      options.contentType,
+      options.tags,
+      options.limit || 10
+    ].filter(Boolean);
+    
+    const result = await this.db.query(query, params);
+    
+    return result.rows.map(row =&gt; ({
+      id: row.id,
+      postId: row.post_id,
+      content: row.content,
+      metadata: row.metadata,
+      score: 1 - row.distance, // Convert distance to similarity score
+      postTitle: row.post_title,
+      postSlug: row.post_slug,
+      authorName: row.author_name
+    }));
+  }
+  
+  /**
+   * Intelligent result re-ranking based on multiple factors
+   */
+  private async rerank(
+    results: SearchResult[],
+    query: string
+  ): Promise&lt;SearchResult[]&gt; {
+    // Fetch historical feedback for these results
+    const feedback = await this.fetchFeedback(results.map(r =&gt; r.id));
+    
+    // Calculate composite score
+    return results.map(result =&gt; {
+      let score = result.score;
+      
+      // Factor 1: User feedback history
+      const resultFeedback = feedback[result.id];
+      if (resultFeedback) {
+        score *= (1 + resultFeedback.helpfulRatio * 0.2);
+      }
+      
+      // Factor 2: Content freshness
+      const ageInDays = this.calculateAge(result.metadata.createdAt);
+      score *= Math.exp(-ageInDays / 365); // Decay over time
+      
+      // Factor 3: Author reputation
+      score *= (1 + (result.metadata.authorReputation || 0) * 0.1);
+      
+      // Factor 4: Code block relevance for code queries
+      if (this.isCodeQuery(query) &amp;&amp; result.metadata.hasCode) {
+        score *= 1.2;
+      }
+      
+      return { ...result, score };
+    }).sort((a, b) =&gt; b.score - a.score);
+  }
+}
+</code></pre>
+<h3>Performance Optimizations</h3>
+<h4>1. Index Optimization</h4>
+<pre><code class="language-sql">-- Optimize HNSW parameters based on dataset size
+ALTER INDEX embedding_hnsw_idx SET (m = 32, ef_construction = 128);
+
+-- Add covering index for common queries
+CREATE INDEX idx_embeddings_covering ON blog_embeddings 
+  (post_id, content_type) 
+  INCLUDE (content, metadata);
+
+-- Partial index for active content only
+CREATE INDEX idx_active_embeddings ON blog_embeddings (embedding)
+  WHERE created_at &gt; NOW() - INTERVAL &#39;1 year&#39;;
+</code></pre>
+<h4>2. Query Optimization</h4>
+<pre><code class="language-typescript">// Implement query result caching with intelligent invalidation
+class QueryCache {
+  private redis: Redis;
+  private bloomFilter: BloomFilter;
+  
+  async get(query: string): Promise&lt;SearchResult[] | null&gt; {
+    // Use Bloom filter for quick negative lookups
+    if (!this.bloomFilter.has(query)) {
+      return null;
+    }
+    
+    const cached = await this.redis.get(this.hashQuery(query));
+    if (cached) {
+      // Extend TTL for popular queries
+      await this.redis.expire(this.hashQuery(query), 7200);
+      return JSON.parse(cached);
+    }
+    
+    return null;
+  }
+  
+  async set(query: string, results: SearchResult[]): Promise&lt;void&gt; {
+    const hashedQuery = this.hashQuery(query);
+    
+    // Add to Bloom filter
+    this.bloomFilter.add(query);
+    
+    // Adaptive TTL based on query popularity
+    const ttl = await this.calculateTTL(query);
+    
+    await this.redis.setex(
+      hashedQuery,
+      ttl,
+      JSON.stringify(results)
+    );
+  }
+  
+  private async calculateTTL(query: string): Promise&lt;number&gt; {
+    const popularity = await this.getQueryPopularity(query);
+    
+    if (popularity &gt; 100) return 86400; // 24 hours for very popular
+    if (popularity &gt; 10) return 7200;   // 2 hours for popular
+    return 3600; // 1 hour default
+  }
+}
+</code></pre>
+<hr>
+<h2>Approach 2: AWS Elasticsearch</h2>
+<h3>Architecture Overview</h3>
+<p>AWS Elasticsearch (OpenSearch) provides a managed search service with built-in vector search capabilities through k-NN plugin.</p>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;AWS Cloud&quot;
+        subgraph &quot;Application Layer&quot;
+            A[Lambda Functions]
+            B[API Gateway]
+            C[SQS Queue]
+        end
+        
+        subgraph &quot;Search Layer&quot;
+            D[OpenSearch Domain]
+            E[OpenSearch Dashboards]
+            F[k-NN Plugin]
+        end
+        
+        subgraph &quot;Storage Layer&quot;
+            G[S3 Bucket]
+            H[DynamoDB]
+            I[ElastiCache]
+        end
+        
+        subgraph &quot;Processing Layer&quot;
+            J[Kinesis Data Stream]
+            K[Lambda Processors]
+            L[SageMaker Endpoints]
+        end
+    end
+    
+    B --&gt; A
+    A --&gt; D
+    D --&gt; F
+    A --&gt; I
+    C --&gt; K
+    K --&gt; D
+    J --&gt; K
+    K --&gt; L
+    L --&gt; D
+    D --&gt; G
+    A --&gt; H
+</code></pre>
+<h3>OpenSearch Index Configuration</h3>
+<pre><code class="language-json">{
+  &quot;settings&quot;: {
+    &quot;index&quot;: {
+      &quot;number_of_shards&quot;: 3,
+      &quot;number_of_replicas&quot;: 2,
+      &quot;knn&quot;: true,
+      &quot;knn.space_type&quot;: &quot;cosinesimil&quot;,
+      &quot;analysis&quot;: {
+        &quot;analyzer&quot;: {
+          &quot;code_analyzer&quot;: {
+            &quot;type&quot;: &quot;custom&quot;,
+            &quot;tokenizer&quot;: &quot;standard&quot;,
+            &quot;filter&quot;: [&quot;lowercase&quot;, &quot;stop&quot;, &quot;code_synonyms&quot;]
+          }
+        },
+        &quot;filter&quot;: {
+          &quot;code_synonyms&quot;: {
+            &quot;type&quot;: &quot;synonym&quot;,
+            &quot;synonyms&quot;: [
+              &quot;auth,authentication,login&quot;,
+              &quot;db,database,sql&quot;,
+              &quot;api,endpoint,route&quot;
+            ]
+          }
+        }
+      }
+    }
+  },
+  &quot;mappings&quot;: {
+    &quot;properties&quot;: {
+      &quot;post_id&quot;: { &quot;type&quot;: &quot;keyword&quot; },
+      &quot;title&quot;: { 
+        &quot;type&quot;: &quot;text&quot;,
+        &quot;analyzer&quot;: &quot;standard&quot;,
+        &quot;fields&quot;: {
+          &quot;keyword&quot;: { &quot;type&quot;: &quot;keyword&quot; }
+        }
+      },
+      &quot;content&quot;: { 
+        &quot;type&quot;: &quot;text&quot;,
+        &quot;analyzer&quot;: &quot;code_analyzer&quot;
+      },
+      &quot;code_blocks&quot;: {
+        &quot;type&quot;: &quot;nested&quot;,
+        &quot;properties&quot;: {
+          &quot;language&quot;: { &quot;type&quot;: &quot;keyword&quot; },
+          &quot;code&quot;: { &quot;type&quot;: &quot;text&quot; },
+          &quot;description&quot;: { &quot;type&quot;: &quot;text&quot; }
+        }
+      },
+      &quot;embedding&quot;: {
+        &quot;type&quot;: &quot;knn_vector&quot;,
+        &quot;dimension&quot;: 1536,
+        &quot;method&quot;: {
+          &quot;name&quot;: &quot;hnsw&quot;,
+          &quot;space_type&quot;: &quot;cosinesimil&quot;,
+          &quot;engine&quot;: &quot;nmslib&quot;,
+          &quot;parameters&quot;: {
+            &quot;ef_construction&quot;: 128,
+            &quot;m&quot;: 24
+          }
+        }
+      },
+      &quot;tags&quot;: { &quot;type&quot;: &quot;keyword&quot; },
+      &quot;author&quot;: { &quot;type&quot;: &quot;keyword&quot; },
+      &quot;created_at&quot;: { &quot;type&quot;: &quot;date&quot; },
+      &quot;updated_at&quot;: { &quot;type&quot;: &quot;date&quot; },
+      &quot;view_count&quot;: { &quot;type&quot;: &quot;integer&quot; },
+      &quot;helpful_count&quot;: { &quot;type&quot;: &quot;integer&quot; },
+      &quot;metadata&quot;: { &quot;type&quot;: &quot;object&quot; }
+    }
+  }
+}
+</code></pre>
+<h3>Lambda Implementation</h3>
+<pre><code class="language-typescript">// Lambda function for search API
+import { Client } from &#39;@opensearch-project/opensearch&#39;;
+import { AwsSigv4Signer } from &#39;@opensearch-project/opensearch/aws&#39;;
+import { defaultProvider } from &#39;@aws-sdk/credential-provider-node&#39;;
+
+export const handler = async (event: APIGatewayProxyEvent) =&gt; {
+  const { query, filters, options } = JSON.parse(event.body || &#39;{}&#39;);
+  
+  // Initialize OpenSearch client
+  const client = new Client({
+    ...AwsSigv4Signer({
+      region: process.env.AWS_REGION,
+      service: &#39;es&#39;,
+      getCredentials: () =&gt; defaultProvider()()
+    }),
+    node: process.env.OPENSEARCH_ENDPOINT
+  });
+  
+  // Generate embedding for query
+  const queryEmbedding = await generateEmbedding(query);
+  
+  // Build OpenSearch query
+  const searchQuery = {
+    index: &#39;blog-content&#39;,
+    body: {
+      size: options?.limit || 10,
+      query: {
+        bool: {
+          should: [
+            // Vector similarity search
+            {
+              knn: {
+                embedding: {
+                  vector: queryEmbedding,
+                  k: 20
+                }
+              }
+            },
+            // Text search with boosting
+            {
+              multi_match: {
+                query: query,
+                fields: [
+                  &#39;title^3&#39;,
+                  &#39;content^2&#39;,
+                  &#39;code_blocks.code&#39;,
+                  &#39;tags^2&#39;
+                ],
+                type: &#39;best_fields&#39;,
+                fuzziness: &#39;AUTO&#39;
+              }
+            }
+          ],
+          filter: buildFilters(filters),
+          minimum_should_match: 1
+        }
+      },
+      // Custom scoring
+      rescore: {
+        window_size: 50,
+        query: {
+          rescore_query: {
+            function_score: {
+              functions: [
+                {
+                  field_value_factor: {
+                    field: &#39;helpful_count&#39;,
+                    factor: 1.2,
+                    modifier: &#39;log1p&#39;
+                  }
+                },
+                {
+                  gauss: {
+                    created_at: {
+                      origin: &#39;now&#39;,
+                      scale: &#39;30d&#39;,
+                      decay: 0.5
+                    }
+                  }
+                }
+              ],
+              score_mode: &#39;sum&#39;,
+              boost_mode: &#39;multiply&#39;
+            }
+          },
+          query_weight: 0.7,
+          rescore_query_weight: 1.2
+        }
+      },
+      // Aggregations for facets
+      aggs: {
+        tags: {
+          terms: { field: &#39;tags&#39;, size: 20 }
+        },
+        languages: {
+          terms: { field: &#39;code_blocks.language&#39;, size: 10 }
+        },
+        authors: {
+          terms: { field: &#39;author&#39;, size: 10 }
+        }
+      },
+      // Highlighting
+      highlight: {
+        fields: {
+          content: {
+            fragment_size: 150,
+            number_of_fragments: 3
+          },
+          &#39;code_blocks.code&#39;: {
+            fragment_size: 200,
+            number_of_fragments: 2
+          }
+        }
+      }
+    }
+  };
+  
+  const response = await client.search(searchQuery);
+  
+  // Process and format results
+  const results = response.body.hits.hits.map(hit =&gt; ({
+    id: hit._id,
+    score: hit._score,
+    ...hit._source,
+    highlights: hit.highlight
+  }));
+  
+  // Log search metrics
+  await logSearchMetrics({
+    query,
+    resultsCount: results.length,
+    responseTime: response.body.took,
+    maxScore: response.body.hits.max_score
+  });
+  
+  return {
+    statusCode: 200,
+    body: JSON.stringify({
+      results,
+      facets: response.body.aggregations,
+      total: response.body.hits.total.value
+    })
+  };
+};
+</code></pre>
+<h3>Real-time Indexing Pipeline</h3>
+<pre><code class="language-typescript">// Kinesis processor for real-time content indexing
+export const kinesisProcessor = async (event: KinesisStreamEvent) =&gt; {
+  const client = getOpenSearchClient();
+  const sagemakerRuntime = new SageMakerRuntimeClient();
+  
+  const records = event.Records.map(record =&gt; {
+    const payload = Buffer.from(record.kinesis.data, &#39;base64&#39;).toString();
+    return JSON.parse(payload);
+  });
+  
+  const bulkOperations = [];
+  
+  for (const record of records) {
+    // Generate embedding using SageMaker endpoint
+    const embeddingResponse = await sagemakerRuntime.send(
+      new InvokeEndpointCommand({
+        EndpointName: process.env.EMBEDDING_ENDPOINT,
+        ContentType: &#39;application/json&#39;,
+        Body: JSON.stringify({ text: record.content })
+      })
+    );
+    
+    const embedding = JSON.parse(
+      new TextDecoder().decode(embeddingResponse.Body)
+    ).embedding;
+    
+    // Prepare bulk index operation
+    bulkOperations.push(
+      { index: { _index: &#39;blog-content&#39;, _id: record.id } },
+      {
+        ...record,
+        embedding,
+        indexed_at: new Date().toISOString()
+      }
+    );
+  }
+  
+  // Bulk index to OpenSearch
+  if (bulkOperations.length &gt; 0) {
+    const bulkResponse = await client.bulk({
+      body: bulkOperations
+    });
+    
+    if (bulkResponse.body.errors) {
+      console.error(&#39;Bulk indexing errors:&#39;, bulkResponse.body.items);
+    }
+  }
+};
+</code></pre>
+<hr>
+<h2>Approach 3: RAG System</h2>
+<h3>RAG Architecture Overview</h3>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;RAG Pipeline&quot;
+        A[Document Ingestion]
+        B[Chunking Strategy]
+        C[Embedding Generation]
+        D[Vector Storage]
+        E[Retrieval]
+        F[Reranking]
+        G[Context Assembly]
+        H[Response Generation]
+    end
+    
+    subgraph &quot;Knowledge Base&quot;
+        I[Blog Posts]
+        J[Code Snippets]
+        K[Documentation]
+        L[Comments]
+    end
+    
+    subgraph &quot;Enhancement Layer&quot;
+        M[Query Expansion]
+        N[Semantic Cache]
+        O[Feedback Loop]
+        P[Fine-tuning]
+    end
+    
+    I --&gt; A
+    J --&gt; A
+    K --&gt; A
+    L --&gt; A
+    A --&gt; B
+    B --&gt; C
+    C --&gt; D
+    E --&gt; F
+    F --&gt; G
+    G --&gt; H
+    M --&gt; E
+    D --&gt; E
+    N --&gt; E
+    O --&gt; P
+    P --&gt; F
+</code></pre>
+<h3>Advanced RAG Implementation</h3>
+<pre><code class="language-python"># Advanced RAG System Implementation
+import numpy as np
+from typing import List, Dict, Any, Optional
+from dataclasses import dataclass
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings import OpenAIEmbeddings
+from langchain.vectorstores import Chroma
+from langchain.chains import RetrievalQA
+from langchain.llms import OpenAI
+import faiss
+import torch
+from transformers import AutoTokenizer, AutoModel
+from sentence_transformers import CrossEncoder
+
+@dataclass
+class RAGConfig:
+    chunk_size: int = 1000
+    chunk_overlap: int = 200
+    embedding_model: str = &quot;text-embedding-3-small&quot;
+    rerank_model: str = &quot;cross-encoder/ms-marco-MiniLM-L-6-v2&quot;
+    retrieval_k: int = 20
+    rerank_k: int = 5
+    temperature: float = 0.0
+    max_tokens: int = 2000
+
+class AdvancedRAGSystem:
+    def __init__(self, config: RAGConfig):
+        self.config = config
+        self.embeddings = OpenAIEmbeddings(model=config.embedding_model)
+        self.reranker = CrossEncoder(config.rerank_model)
+        self.vector_store = None
+        self.metadata_index = {}
+        
+    def ingest_documents(self, documents: List[Dict[str, Any]]):
+        &quot;&quot;&quot;
+        Intelligent document ingestion with metadata preservation
+        &quot;&quot;&quot;
+        processed_chunks = []
+        
+        for doc in documents:
+            # Custom chunking based on document type
+            chunks = self._intelligent_chunk(doc)
+            
+            # Add metadata to each chunk
+            for chunk in chunks:
+                chunk_id = self._generate_chunk_id(doc[&#39;id&#39;], chunk)
+                processed_chunk = {
+                    &#39;id&#39;: chunk_id,
+                    &#39;content&#39;: chunk[&#39;content&#39;],
+                    &#39;metadata&#39;: {
+                        **doc[&#39;metadata&#39;],
+                        &#39;chunk_type&#39;: chunk[&#39;type&#39;],
+                        &#39;chunk_index&#39;: chunk[&#39;index&#39;],
+                        &#39;parent_id&#39;: doc[&#39;id&#39;],
+                        &#39;timestamp&#39;: doc[&#39;created_at&#39;]
+                    }
+                }
+                processed_chunks.append(processed_chunk)
+                self.metadata_index[chunk_id] = processed_chunk[&#39;metadata&#39;]
+        
+        # Generate embeddings and store
+        self._store_embeddings(processed_chunks)
+        
+    def _intelligent_chunk(self, document: Dict[str, Any]) -&gt; List[Dict]:
+        &quot;&quot;&quot;
+        Content-aware chunking strategy
+        &quot;&quot;&quot;
+        chunks = []
+        content = document[&#39;content&#39;]
+        doc_type = document.get(&#39;type&#39;, &#39;general&#39;)
+        
+        if doc_type == &#39;code&#39;:
+            # For code, chunk by functions/classes
+            chunks.extend(self._chunk_code(content))
+        elif doc_type == &#39;tutorial&#39;:
+            # For tutorials, chunk by sections
+            chunks.extend(self._chunk_by_sections(content))
+        else:
+            # Default recursive chunking
+            text_splitter = RecursiveCharacterTextSplitter(
+                chunk_size=self.config.chunk_size,
+                chunk_overlap=self.config.chunk_overlap,
+                separators=[&quot;\n\n&quot;, &quot;\n&quot;, &quot;. &quot;, &quot; &quot;, &quot;&quot;]
+            )
+            text_chunks = text_splitter.split_text(content)
+            chunks = [
+                {&#39;content&#39;: chunk, &#39;type&#39;: &#39;text&#39;, &#39;index&#39;: i}
+                for i, chunk in enumerate(text_chunks)
+            ]
+        
+        return chunks
+    
+    def _chunk_code(self, content: str) -&gt; List[Dict]:
+        &quot;&quot;&quot;
+        Intelligent code chunking by logical units
+        &quot;&quot;&quot;
+        import ast
+        chunks = []
+        
+        try:
+            # Parse Python code
+            tree = ast.parse(content)
+            
+            for node in ast.walk(tree):
+                if isinstance(node, (ast.FunctionDef, ast.ClassDef)):
+                    # Extract function or class as a chunk
+                    start_line = node.lineno - 1
+                    end_line = node.end_lineno
+                    
+                    chunk_content = &#39;\n&#39;.join(
+                        content.split(&#39;\n&#39;)[start_line:end_line]
+                    )
+                    
+                    chunks.append({
+                        &#39;content&#39;: chunk_content,
+                        &#39;type&#39;: &#39;code_function&#39; if isinstance(node, ast.FunctionDef) else &#39;code_class&#39;,
+                        &#39;index&#39;: len(chunks),
+                        &#39;name&#39;: node.name
+                    })
+        except:
+            # Fallback for non-Python or invalid code
+            lines = content.split(&#39;\n&#39;)
+            chunk_size = 50  # lines per chunk
+            
+            for i in range(0, len(lines), chunk_size - 10):
+                chunk_content = &#39;\n&#39;.join(lines[i:i + chunk_size])
+                chunks.append({
+                    &#39;content&#39;: chunk_content,
+                    &#39;type&#39;: &#39;code_block&#39;,
+                    &#39;index&#39;: len(chunks)
+                })
+        
+        return chunks
+    
+    def retrieve(
+        self,
+        query: str,
+        filters: Optional[Dict] = None
+    ) -&gt; List[Dict]:
+        &quot;&quot;&quot;
+        Multi-stage retrieval with reranking
+        &quot;&quot;&quot;
+        # Stage 1: Query expansion
+        expanded_queries = self._expand_query(query)
+        
+        # Stage 2: Initial retrieval
+        candidates = []
+        for exp_query in expanded_queries:
+            results = self.vector_store.similarity_search_with_score(
+                exp_query,
+                k=self.config.retrieval_k,
+                filter=filters
+            )
+            candidates.extend(results)
+        
+        # Remove duplicates
+        unique_candidates = self._deduplicate_results(candidates)
+        
+        # Stage 3: Reranking
+        reranked = self._rerank_results(query, unique_candidates)
+        
+        # Stage 4: Context assembly
+        final_context = self._assemble_context(reranked[:self.config.rerank_k])
+        
+        return final_context
+    
+    def _expand_query(self, query: str) -&gt; List[str]:
+        &quot;&quot;&quot;
+        Query expansion using multiple strategies
+        &quot;&quot;&quot;
+        expanded = [query]
+        
+        # Strategy 1: Synonym expansion
+        synonyms = self._get_synonyms(query)
+        expanded.extend(synonyms)
+        
+        # Strategy 2: Acronym expansion
+        acronyms = self._expand_acronyms(query)
+        expanded.extend(acronyms)
+        
+        # Strategy 3: Related terms
+        related = self._get_related_terms(query)
+        expanded.extend(related)
+        
+        return list(set(expanded))[:5]  # Limit to 5 queries
+    
+    def _rerank_results(
+        self,
+        query: str,
+        candidates: List[tuple]
+    ) -&gt; List[Dict]:
+        &quot;&quot;&quot;
+        Cross-encoder reranking for better relevance
+        &quot;&quot;&quot;
+        if not candidates:
+            return []
+        
+        # Prepare pairs for reranking
+        pairs = [[query, doc[0].page_content] for doc in candidates]
+        
+        # Get reranking scores
+        scores = self.reranker.predict(pairs)
+        
+        # Combine with original scores
+        reranked = []
+        for i, (doc, original_score) in enumerate(candidates):
+            combined_score = 0.7 * scores[i] + 0.3 * (1 - original_score)
+            reranked.append({
+                &#39;content&#39;: doc.page_content,
+                &#39;metadata&#39;: doc.metadata,
+                &#39;score&#39;: combined_score,
+                &#39;original_score&#39;: original_score,
+                &#39;rerank_score&#39;: scores[i]
+            })
+        
+        # Sort by combined score
+        reranked.sort(key=lambda x: x[&#39;score&#39;], reverse=True)
+        
+        return reranked
+    
+    def _assemble_context(self, documents: List[Dict]) -&gt; List[Dict]:
+        &quot;&quot;&quot;
+        Intelligent context assembly with deduplication
+        &quot;&quot;&quot;
+        assembled = []
+        seen_content = set()
+        
+        for doc in documents:
+            # Check for near-duplicates
+            content_hash = self._fuzzy_hash(doc[&#39;content&#39;])
+            if content_hash not in seen_content:
+                seen_content.add(content_hash)
+                
+                # Add parent context if available
+                if doc[&#39;metadata&#39;].get(&#39;parent_id&#39;):
+                    parent_context = self._get_parent_context(
+                        doc[&#39;metadata&#39;][&#39;parent_id&#39;]
+                    )
+                    doc[&#39;parent_context&#39;] = parent_context
+                
+                assembled.append(doc)
+        
+        return assembled
+    
+    def generate_response(
+        self,
+        query: str,
+        context: List[Dict]
+    ) -&gt; str:
+        &quot;&quot;&quot;
+        Generate response using retrieved context
+        &quot;&quot;&quot;
+        # Format context for LLM
+        formatted_context = self._format_context(context)
+        
+        # Create prompt
+        prompt = f&quot;&quot;&quot;
+        You are an AI assistant helping developers find relevant code and documentation.
+        
+        Query: {query}
+        
+        Context:
+        {formatted_context}
+        
+        Based on the context above, provide a helpful response to the query.
+        Include relevant code examples and explanations.
+        &quot;&quot;&quot;
+        
+        # Generate response
+        llm = OpenAI(
+            temperature=self.config.temperature,
+            max_tokens=self.config.max_tokens
+        )
+        
+        response = llm(prompt)
+        
+        # Post-process response
+        processed_response = self._post_process_response(response, context)
+        
+        return processed_response
+</code></pre>
+<h3>RAG Optimization Strategies</h3>
+<pre><code class="language-python">class RAGOptimizer:
+    &quot;&quot;&quot;
+    Advanced optimization strategies for RAG systems
+    &quot;&quot;&quot;
+    
+    def __init__(self, rag_system: AdvancedRAGSystem):
+        self.rag = rag_system
+        self.cache = {}
+        self.feedback_store = []
+        
+    def optimize_chunking(self, documents: List[Dict]) -&gt; Dict[str, Any]:
+        &quot;&quot;&quot;
+        Adaptive chunking based on content analysis
+        &quot;&quot;&quot;
+        optimization_results = {
+            &#39;original_chunks&#39;: 0,
+            &#39;optimized_chunks&#39;: 0,
+            &#39;strategies_used&#39;: []
+        }
+        
+        for doc in documents:
+            content_length = len(doc[&#39;content&#39;])
+            content_type = self._detect_content_type(doc[&#39;content&#39;])
+            
+            # Dynamic chunk size based on content
+            if content_type == &#39;code&#39;:
+                chunk_size = min(1500, content_length // 10)
+                overlap = 100
+                strategy = &#39;code_aware_chunking&#39;
+            elif content_type == &#39;tutorial&#39;:
+                chunk_size = min(2000, content_length // 8)
+                overlap = 200
+                strategy = &#39;section_based_chunking&#39;
+            else:
+                chunk_size = min(1000, content_length // 15)
+                overlap = 150
+                strategy = &#39;standard_chunking&#39;
+            
+            optimization_results[&#39;strategies_used&#39;].append(strategy)
+            
+        return optimization_results
+    
+    def implement_hybrid_search(
+        self,
+        query: str,
+        alpha: float = 0.5
+    ) -&gt; List[Dict]:
+        &quot;&quot;&quot;
+        Hybrid search combining dense and sparse retrieval
+        &quot;&quot;&quot;
+        # Dense retrieval (vector similarity)
+        dense_results = self.rag.vector_store.similarity_search(
+            query,
+            k=50
+        )
+        
+        # Sparse retrieval (BM25)
+        sparse_results = self._bm25_search(query, k=50)
+        
+        # Combine results using reciprocal rank fusion
+        combined = self._reciprocal_rank_fusion(
+            dense_results,
+            sparse_results,
+            alpha=alpha
+        )
+        
+        return combined
+    
+    def _reciprocal_rank_fusion(
+        self,
+        dense_results: List,
+        sparse_results: List,
+        alpha: float = 0.5,
+        k: int = 60
+    ) -&gt; List[Dict]:
+        &quot;&quot;&quot;
+        Reciprocal Rank Fusion for combining search results
+        &quot;&quot;&quot;
+        scores = {}
+        
+        # Score dense results
+        for rank, doc in enumerate(dense_results):
+            doc_id = doc.metadata.get(&#39;id&#39;, str(doc))
+            scores[doc_id] = scores.get(doc_id, 0) + alpha / (k + rank + 1)
+        
+        # Score sparse results
+        for rank, doc in enumerate(sparse_results):
+            doc_id = doc.metadata.get(&#39;id&#39;, str(doc))
+            scores[doc_id] = scores.get(doc_id, 0) + (1 - alpha) / (k + rank + 1)
+        
+        # Sort by combined score
+        sorted_docs = sorted(
+            scores.items(),
+            key=lambda x: x[1],
+            reverse=True
+        )
+        
+        # Retrieve full documents
+        results = []
+        for doc_id, score in sorted_docs[:20]:
+            doc = self._get_document_by_id(doc_id)
+            if doc:
+                doc[&#39;fusion_score&#39;] = score
+                results.append(doc)
+        
+        return results
+    
+    def implement_caching(self, ttl: int = 3600) -&gt; None:
+        &quot;&quot;&quot;
+        Multi-level caching strategy
+        &quot;&quot;&quot;
+        # Level 1: Query result cache
+        self.query_cache = LRUCache(maxsize=1000, ttl=ttl)
+        
+        # Level 2: Embedding cache
+        self.embedding_cache = LRUCache(maxsize=5000, ttl=ttl * 2)
+        
+        # Level 3: Document cache
+        self.document_cache = LRUCache(maxsize=10000, ttl=ttl * 4)
+    
+    def collect_feedback(
+        self,
+        query: str,
+        results: List[Dict],
+        feedback: Dict[str, Any]
+    ) -&gt; None:
+        &quot;&quot;&quot;
+        Collect user feedback for continuous improvement
+        &quot;&quot;&quot;
+        feedback_entry = {
+            &#39;timestamp&#39;: datetime.now().isoformat(),
+            &#39;query&#39;: query,
+            &#39;results&#39;: [r[&#39;id&#39;] for r in results],
+            &#39;feedback&#39;: feedback,
+            &#39;context&#39;: {
+                &#39;user_id&#39;: feedback.get(&#39;user_id&#39;),
+                &#39;session_id&#39;: feedback.get(&#39;session_id&#39;),
+                &#39;device&#39;: feedback.get(&#39;device&#39;)
+            }
+        }
+        
+        self.feedback_store.append(feedback_entry)
+        
+        # Trigger retraining if enough feedback collected
+        if len(self.feedback_store) &gt;= 100:
+            self._trigger_retraining()
+    
+    def _trigger_retraining(self) -&gt; None:
+        &quot;&quot;&quot;
+        Fine-tune embeddings based on user feedback
+        &quot;&quot;&quot;
+        # Prepare training data from feedback
+        positive_pairs = []
+        negative_pairs = []
+        
+        for entry in self.feedback_store:
+            query = entry[&#39;query&#39;]
+            for i, result_id in enumerate(entry[&#39;results&#39;]):
+                if entry[&#39;feedback&#39;].get(f&#39;result_{i}_helpful&#39;):
+                    positive_pairs.append((query, result_id))
+                elif entry[&#39;feedback&#39;].get(f&#39;result_{i}_not_helpful&#39;):
+                    negative_pairs.append((query, result_id))
+        
+        # Fine-tune embedding model (pseudo-code)
+        # This would typically involve:
+        # 1. Creating contrastive learning dataset
+        # 2. Fine-tuning the embedding model
+        # 3. Re-indexing documents with new embeddings
+        
+        print(f&quot;Collected {len(positive_pairs)} positive and {len(negative_pairs)} negative pairs for training&quot;)
+</code></pre>
+<hr>
+<h2>MCP Technology Deep Dive</h2>
+<h3>MCP Architecture and Capabilities</h3>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;MCP Core&quot;
+        A[Protocol Handler]
+        B[Tool Registry]
+        C[Resource Manager]
+        D[Prompt Manager]
+        E[Event System]
+    end
+    
+    subgraph &quot;Extensions&quot;
+        F[Custom Tools]
+        G[Custom Resources]
+        H[Custom Prompts]
+        I[Event Handlers]
+    end
+    
+    subgraph &quot;Integrations&quot;
+        J[Claude Desktop]
+        K[Claude CLI]
+        L[Custom Clients]
+        M[IDE Plugins]
+    end
+    
+    A --&gt; B
+    A --&gt; C
+    A --&gt; D
+    A --&gt; E
+    B --&gt; F
+    C --&gt; G
+    D --&gt; H
+    E --&gt; I
+    J --&gt; A
+    K --&gt; A
+    L --&gt; A
+    M --&gt; A
+</code></pre>
+<h3>Advanced MCP Server Implementation</h3>
+<pre><code class="language-typescript">// Advanced MCP Server with all capabilities
+import { 
+  MCPServer, 
+  Tool, 
+  Resource, 
+  Prompt,
+  EventHandler,
+  Feedback 
+} from &#39;@modelcontextprotocol/sdk&#39;;
+
+class AdvancedBlogMCPServer extends MCPServer {
+  private searchService: SearchService;
+  private feedbackService: FeedbackService;
+  private analyticsService: AnalyticsService;
+  private ragSystem: RAGSystem;
+  
+  constructor() {
+    super({
+      name: &#39;codebase-blog-mcp&#39;,
+      version: &#39;2.0.0&#39;,
+      description: &#39;Intelligent code search and knowledge retrieval&#39;
+    });
+    
+    this.initializeServices();
+    this.registerTools();
+    this.registerResources();
+    this.registerPrompts();
+    this.registerEventHandlers();
+  }
+  
+  /**
+   * Register advanced tools
+   */
+  private registerTools(): void {
+    // Tool 1: Semantic search
+    this.registerTool({
+      name: &#39;search_code&#39;,
+      description: &#39;Search for code examples and technical content&#39;,
+      inputSchema: {
+        type: &#39;object&#39;,
+        properties: {
+          query: {
+            type: &#39;string&#39;,
+            description: &#39;Natural language search query&#39;
+          },
+          filters: {
+            type: &#39;object&#39;,
+            properties: {
+              language: { type: &#39;string&#39; },
+              tags: { type: &#39;array&#39;, items: { type: &#39;string&#39; } },
+              author: { type: &#39;string&#39; },
+              dateRange: {
+                type: &#39;object&#39;,
+                properties: {
+                  from: { type: &#39;string&#39;, format: &#39;date&#39; },
+                  to: { type: &#39;string&#39;, format: &#39;date&#39; }
+                }
+              }
+            }
+          },
+          options: {
+            type: &#39;object&#39;,
+            properties: {
+              limit: { type: &#39;integer&#39;, minimum: 1, maximum: 100 },
+              includeContext: { type: &#39;boolean&#39; },
+              explainRelevance: { type: &#39;boolean&#39; }
+            }
+          }
+        },
+        required: [&#39;query&#39;]
+      },
+      handler: async (params) =&gt; {
+        const results = await this.searchService.search(
+          params.query,
+          params.filters,
+          params.options
+        );
+        
+        // Track usage for analytics
+        await this.analyticsService.trackSearch({
+          query: params.query,
+          resultsCount: results.length,
+          timestamp: new Date()
+        });
+        
+        return {
+          results,
+          metadata: {
+            totalResults: results.length,
+            searchTime: results.searchTime,
+            relevanceScores: results.map(r =&gt; r.score)
+          }
+        };
+      }
+    });
+    
+    // Tool 2: RAG-based code generation
+    this.registerTool({
+      name: &#39;generate_code&#39;,
+      description: &#39;Generate code based on examples from the knowledge base&#39;,
+      inputSchema: {
+        type: &#39;object&#39;,
+        properties: {
+          prompt: {
+            type: &#39;string&#39;,
+            description: &#39;Description of the code to generate&#39;
+          },
+          language: {
+            type: &#39;string&#39;,
+            description: &#39;Programming language&#39;
+          },
+          context: {
+            type: &#39;object&#39;,
+            description: &#39;Additional context for generation&#39;
+          },
+          examples: {
+            type: &#39;integer&#39;,
+            description: &#39;Number of examples to use&#39;,
+            minimum: 1,
+            maximum: 10
+          }
+        },
+        required: [&#39;prompt&#39;]
+      },
+      handler: async (params) =&gt; {
+        // Retrieve relevant examples
+        const examples = await this.ragSystem.retrieve(
+          params.prompt,
+          { language: params.language }
+        );
+        
+        // Generate code using RAG
+        const generatedCode = await this.ragSystem.generate({
+          prompt: params.prompt,
+          examples: examples.slice(0, params.examples || 3),
+          context: params.context
+        });
+        
+        return {
+          code: generatedCode,
+          examples: examples.map(e =&gt; ({
+            id: e.id,
+            snippet: e.content,
+            source: e.metadata.source
+          })),
+          confidence: generatedCode.confidence
+        };
+      }
+    });
+    
+    // Tool 3: Provide feedback
+    this.registerTool({
+      name: &#39;provide_feedback&#39;,
+      description: &#39;Submit feedback on search results or generated code&#39;,
+      inputSchema: {
+        type: &#39;object&#39;,
+        properties: {
+          type: {
+            type: &#39;string&#39;,
+            enum: [&#39;helpful&#39;, &#39;not_helpful&#39;, &#39;incorrect&#39;, &#39;outdated&#39;]
+          },
+          targetId: {
+            type: &#39;string&#39;,
+            description: &#39;ID of the result or generated code&#39;
+          },
+          comment: {
+            type: &#39;string&#39;,
+            description: &#39;Additional feedback comment&#39;
+          },
+          suggestion: {
+            type: &#39;string&#39;,
+            description: &#39;Suggested improvement&#39;
+          },
+          metadata: {
+            type: &#39;object&#39;,
+            description: &#39;Additional metadata&#39;
+          }
+        },
+        required: [&#39;type&#39;, &#39;targetId&#39;]
+      },
+      handler: async (params) =&gt; {
+        // Store feedback
+        const feedbackId = await this.feedbackService.store({
+          ...params,
+          timestamp: new Date(),
+          sessionId: this.getSessionId(),
+          userId: this.getUserId()
+        });
+        
+        // Update relevance scores based on feedback
+        if (params.type === &#39;helpful&#39;) {
+          await this.searchService.boostRelevance(params.targetId);
+        } else if (params.type === &#39;not_helpful&#39;) {
+          await this.searchService.reduceRelevance(params.targetId);
+        }
+        
+        // Send to analytics
+        await this.analyticsService.trackFeedback(params);
+        
+        return {
+          feedbackId,
+          message: &#39;Thank you for your feedback!&#39;
+        };
+      }
+    });
+    
+    // Tool 4: Explain code
+    this.registerTool({
+      name: &#39;explain_code&#39;,
+      description: &#39;Get detailed explanation of code from the knowledge base&#39;,
+      inputSchema: {
+        type: &#39;object&#39;,
+        properties: {
+          codeId: {
+            type: &#39;string&#39;,
+            description: &#39;ID of the code snippet&#39;
+          },
+          level: {
+            type: &#39;string&#39;,
+            enum: [&#39;beginner&#39;, &#39;intermediate&#39;, &#39;advanced&#39;],
+            default: &#39;intermediate&#39;
+          },
+          focus: {
+            type: &#39;array&#39;,
+            items: { type: &#39;string&#39; },
+            description: &#39;Specific aspects to focus on&#39;
+          }
+        },
+        required: [&#39;codeId&#39;]
+      },
+      handler: async (params) =&gt; {
+        const code = await this.searchService.getById(params.codeId);
+        const explanation = await this.ragSystem.explain({
+          code: code.content,
+          level: params.level,
+          focus: params.focus,
+          context: code.metadata
+        });
+        
+        return {
+          explanation,
+          relatedConcepts: explanation.concepts,
+          examples: explanation.examples,
+          resources: explanation.resources
+        };
+      }
+    });
+  }
+  
+  /**
+   * Register resources (browsable content)
+   */
+  private registerResources(): void {
+    // Resource 1: Recent posts
+    this.registerResource({
+      uri: &#39;blog://recent&#39;,
+      name: &#39;Recent Blog Posts&#39;,
+      mimeType: &#39;application/json&#39;,
+      handler: async () =&gt; {
+        const posts = await this.searchService.getRecent(10);
+        return {
+          content: JSON.stringify(posts, null, 2)
+        };
+      }
+    });
+    
+    // Resource 2: Popular code snippets
+    this.registerResource({
+      uri: &#39;blog://popular&#39;,
+      name: &#39;Popular Code Snippets&#39;,
+      mimeType: &#39;application/json&#39;,
+      handler: async () =&gt; {
+        const snippets = await this.searchService.getPopular(20);
+        return {
+          content: JSON.stringify(snippets, null, 2)
+        };
+      }
+    });
+    
+    // Resource 3: Tags taxonomy
+    this.registerResource({
+      uri: &#39;blog://tags&#39;,
+      name: &#39;Available Tags&#39;,
+      mimeType: &#39;application/json&#39;,
+      handler: async () =&gt; {
+        const tags = await this.searchService.getTagTaxonomy();
+        return {
+          content: JSON.stringify(tags, null, 2)
+        };
+      }
+    });
+  }
+  
+  /**
+   * Register prompt templates
+   */
+  private registerPrompts(): void {
+    // Prompt 1: Code review
+    this.registerPrompt({
+      name: &#39;code_review&#39;,
+      description: &#39;Review code using best practices from the knowledge base&#39;,
+      arguments: [
+        {
+          name: &#39;code&#39;,
+          description: &#39;Code to review&#39;,
+          required: true
+        },
+        {
+          name: &#39;language&#39;,
+          description: &#39;Programming language&#39;,
+          required: false
+        }
+      ],
+      handler: async (args) =&gt; {
+        const bestPractices = await this.searchService.search(
+          `${args.language || &#39;&#39;} best practices code review`,
+          { tags: [&#39;best-practices&#39;, &#39;code-review&#39;] }
+        );
+        
+        return {
+          prompt: `
+Review the following code based on these best practices:
+
+${bestPractices.map(p =&gt; `- ${p.title}: ${p.summary}`).join(&#39;\n&#39;)}
+
+Code to review:
+\`\`\`${args.language || &#39;&#39;}
+${args.code}
+\`\`\`
+
+Provide specific feedback on:
+1. Code quality and maintainability
+2. Performance considerations
+3. Security issues
+4. Best practice violations
+5. Suggested improvements
+          `.trim()
+        };
+      }
+    });
+    
+    // Prompt 2: Implementation guide
+    this.registerPrompt({
+      name: &#39;implementation_guide&#39;,
+      description: &#39;Get step-by-step implementation guide&#39;,
+      arguments: [
+        {
+          name: &#39;feature&#39;,
+          description: &#39;Feature to implement&#39;,
+          required: true
+        },
+        {
+          name: &#39;stack&#39;,
+          description: &#39;Technology stack&#39;,
+          required: false
+        }
+      ],
+      handler: async (args) =&gt; {
+        const examples = await this.ragSystem.retrieve(
+          `implement ${args.feature} ${args.stack || &#39;&#39;}`,
+          { limit: 5 }
+        );
+        
+        return {
+          prompt: `
+Create a step-by-step implementation guide for: ${args.feature}
+
+Based on these examples from our knowledge base:
+
+${examples.map((e, i) =&gt; `
+Example ${i + 1}: ${e.metadata.title}
+${e.content}
+---
+`).join(&#39;\n&#39;)}
+
+Provide:
+1. Prerequisites and setup
+2. Step-by-step implementation
+3. Code examples for each step
+4. Testing approach
+5. Common pitfalls to avoid
+          `.trim()
+        };
+      }
+    });
+  }
+  
+  /**
+   * Register event handlers for real-time updates
+   */
+  private registerEventHandlers(): void {
+    // Event: New content indexed
+    this.on(&#39;content.indexed&#39;, async (event) =&gt; {
+      // Notify connected clients
+      this.broadcast({
+        type: &#39;content.new&#39;,
+        data: {
+          id: event.contentId,
+          title: event.title,
+          tags: event.tags
+        }
+      });
+    });
+    
+    // Event: Search performed
+    this.on(&#39;search.performed&#39;, async (event) =&gt; {
+      // Update trending queries
+      await this.analyticsService.updateTrending(event.query);
+    });
+    
+    // Event: Feedback received
+    this.on(&#39;feedback.received&#39;, async (event) =&gt; {
+      // Trigger reranking if threshold met
+      if (await this.feedbackService.shouldRerank()) {
+        await this.searchService.rerank();
+      }
+    });
+  }
+  
+  /**
+   * Advanced session management
+   */
+  private getSessionId(): string {
+    return this.context?.sessionId || &#39;anonymous&#39;;
+  }
+  
+  private getUserId(): string {
+    return this.context?.userId || &#39;anonymous&#39;;
+  }
+  
+  /**
+   * Handle streaming responses for large results
+   */
+  async *streamResults(query: string) {
+    const BATCH_SIZE = 5;
+    let offset = 0;
+    let hasMore = true;
+    
+    while (hasMore) {
+      const results = await this.searchService.search(
+        query,
+        {},
+        { limit: BATCH_SIZE, offset }
+      );
+      
+      if (results.length &gt; 0) {
+        yield results;
+        offset += BATCH_SIZE;
+      } else {
+        hasMore = false;
+      }
+    }
+  }
+}
+</code></pre>
+<h3>MCP Client Integration</h3>
+<pre><code class="language-typescript">// Client-side integration with MCP server
+import { MCPClient } from &#39;@modelcontextprotocol/client&#39;;
+
+class BlogMCPClient {
+  private client: MCPClient;
+  private connected: boolean = false;
+  
+  async connect(): Promise&lt;void&gt; {
+    this.client = new MCPClient({
+      serverUrl: &#39;mcp://codebase-blog&#39;,
+      apiKey: process.env.MCP_API_KEY,
+      options: {
+        retryAttempts: 3,
+        timeout: 10000
+      }
+    });
+    
+    await this.client.connect();
+    this.connected = true;
+    
+    // Subscribe to server events
+    this.client.on(&#39;content.new&#39;, this.handleNewContent);
+    this.client.on(&#39;error&#39;, this.handleError);
+  }
+  
+  async searchCode(query: string): Promise&lt;SearchResult[]&gt; {
+    if (!this.connected) await this.connect();
+    
+    const response = await this.client.callTool(&#39;search_code&#39;, {
+      query,
+      options: {
+        limit: 10,
+        includeContext: true
+      }
+    });
+    
+    return response.results;
+  }
+  
+  async provideFeedback(
+    targetId: string,
+    type: &#39;helpful&#39; | &#39;not_helpful&#39;,
+    comment?: string
+  ): Promise&lt;void&gt; {
+    if (!this.connected) await this.connect();
+    
+    await this.client.callTool(&#39;provide_feedback&#39;, {
+      targetId,
+      type,
+      comment
+    });
+  }
+  
+  private handleNewContent = (event: any) =&gt; {
+    console.log(&#39;New content available:&#39;, event);
+    // Update UI or cache
+  };
+  
+  private handleError = (error: any) =&gt; {
+    console.error(&#39;MCP error:&#39;, error);
+    // Implement retry logic
+  };
+}
+</code></pre>
+<hr>
+<h2>User Feedback System</h2>
+<h3>Comprehensive Feedback Architecture</h3>
+<pre><code class="language-mermaid">graph TB
+    subgraph &quot;Feedback Collection&quot;
+        A[Implicit Feedback]
+        B[Explicit Feedback]
+        C[Behavioral Signals]
+    end
+    
+    subgraph &quot;Processing Pipeline&quot;
+        D[Data Validation]
+        E[Sentiment Analysis]
+        F[Pattern Detection]
+        G[Aggregation]
+    end
+    
+    subgraph &quot;Learning System&quot;
+        H[Relevance Adjustment]
+        I[Model Fine-tuning]
+        J[Query Understanding]
+        K[Result Reranking]
+    end
+    
+    subgraph &quot;Analytics&quot;
+        L[Dashboard]
+        M[Reports]
+        N[Alerts]
+    end
+    
+    A --&gt; D
+    B --&gt; D
+    C --&gt; D
+    D --&gt; E
+    E --&gt; F
+    F --&gt; G
+    G --&gt; H
+    G --&gt; I
+    G --&gt; J
+    G --&gt; K
+    H --&gt; L
+    I --&gt; L
+    J --&gt; M
+    K --&gt; N
+</code></pre>
+<h3>Feedback Implementation</h3>
+<pre><code class="language-typescript">// Comprehensive feedback system
+interface FeedbackData {
+  type: &#39;implicit&#39; | &#39;explicit&#39; | &#39;behavioral&#39;;
+  action: string;
+  target: string;
+  value: any;
+  context: {
+    sessionId: string;
+    userId?: string;
+    timestamp: Date;
+    query?: string;
+    resultPosition?: number;
+  };
+}
+
+class FeedbackSystem {
+  private feedbackQueue: FeedbackData[] = [];
+  private batchSize = 100;
+  private flushInterval = 5000; // 5 seconds
+  
+  constructor(
+    private storage: FeedbackStorage,
+    private analytics: AnalyticsService,
+    private mlPipeline: MLPipeline
+  ) {
+    this.startBatchProcessor();
+  }
+  
+  /**
+   * Collect implicit feedback
+   */
+  collectImplicit(action: string, target: string, context: any): void {
+    this.addFeedback({
+      type: &#39;implicit&#39;,
+      action,
+      target,
+      value: this.inferValue(action),
+      context: {
+        ...context,
+        timestamp: new Date()
+      }
+    });
+  }
+  
+  /**
+   * Collect explicit feedback
+   */
+  collectExplicit(
+    target: string,
+    rating: number,
+    comment?: string,
+    context?: any
+  ): void {
+    this.addFeedback({
+      type: &#39;explicit&#39;,
+      action: &#39;rate&#39;,
+      target,
+      value: { rating, comment },
+      context: {
+        ...context,
+        timestamp: new Date()
+      }
+    });
+  }
+  
+  /**
+   * Collect behavioral signals
+   */
+  collectBehavioral(signal: BehavioralSignal): void {
+    this.addFeedback({
+      type: &#39;behavioral&#39;,
+      action: signal.type,
+      target: signal.target,
+      value: signal.data,
+      context: signal.context
+    });
+  }
+  
+  /**
+   * Infer feedback value from implicit actions
+   */
+  private inferValue(action: string): number {
+    const actionValues: Record&lt;string, number&gt; = {
+      &#39;click&#39;: 0.5,
+      &#39;copy&#39;: 0.8,
+      &#39;share&#39;: 0.9,
+      &#39;bookmark&#39;: 0.7,
+      &#39;dwell_time_high&#39;: 0.6,
+      &#39;dwell_time_low&#39;: -0.3,
+      &#39;bounce&#39;: -0.5,
+      &#39;scroll_to_end&#39;: 0.4
+    };
+    
+    return actionValues[action] || 0;
+  }
+  
+  /**
+   * Process feedback batch
+   */
+  private async processBatch(batch: FeedbackData[]): Promise&lt;void&gt; {
+    // Store raw feedback
+    await this.storage.storeBatch(batch);
+    
+    // Aggregate feedback by target
+    const aggregated = this.aggregateFeedback(batch);
+    
+    // Update relevance scores
+    for (const [targetId, feedback] of Object.entries(aggregated)) {
+      await this.updateRelevance(targetId, feedback);
+    }
+    
+    // Send to ML pipeline for model updates
+    await this.mlPipeline.processFeedback(batch);
+    
+    // Update analytics
+    await this.analytics.updateMetrics(batch);
+  }
+  
+  /**
+   * Aggregate feedback by target
+   */
+  private aggregateFeedback(
+    batch: FeedbackData[]
+  ): Record&lt;string, AggregatedFeedback&gt; {
+    const aggregated: Record&lt;string, AggregatedFeedback&gt; = {};
+    
+    for (const feedback of batch) {
+      if (!aggregated[feedback.target]) {
+        aggregated[feedback.target] = {
+          positive: 0,
+          negative: 0,
+          neutral: 0,
+          totalScore: 0,
+          count: 0,
+          signals: []
+        };
+      }
+      
+      const agg = aggregated[feedback.target];
+      agg.count++;
+      
+      if (feedback.type === &#39;explicit&#39;) {
+        const rating = feedback.value.rating;
+        if (rating &gt;= 4) agg.positive++;
+        else if (rating &lt;= 2) agg.negative++;
+        else agg.neutral++;
+        agg.totalScore += rating;
+      } else if (feedback.type === &#39;implicit&#39;) {
+        const value = feedback.value as number;
+        if (value &gt; 0) agg.positive++;
+        else if (value &lt; 0) agg.negative++;
+        else agg.neutral++;
+        agg.totalScore += value;
+      }
+      
+      agg.signals.push(feedback);
+    }
+    
+    return aggregated;
+  }
+  
+  /**
+   * Update relevance scores based on feedback
+   */
+  private async updateRelevance(
+    targetId: string,
+    feedback: AggregatedFeedback
+  ): Promise&lt;void&gt; {
+    const score = feedback.totalScore / feedback.count;
+    const confidence = Math.min(feedback.count / 10, 1); // Confidence based on sample size
+    
+    // Calculate new relevance score
+    const currentRelevance = await this.storage.getRelevance(targetId);
+    const newRelevance = currentRelevance * (1 - confidence * 0.3) + score * confidence * 0.3;
+    
+    await this.storage.updateRelevance(targetId, newRelevance);
+    
+    // Trigger reindexing if significant change
+    if (Math.abs(newRelevance - currentRelevance) &gt; 0.2) {
+      await this.triggerReindex(targetId);
+    }
+  }
+  
+  /**
+   * Start batch processor
+   */
+  private startBatchProcessor(): void {
+    setInterval(async () =&gt; {
+      if (this.feedbackQueue.length &gt; 0) {
+        const batch = this.feedbackQueue.splice(0, this.batchSize);
+        await this.processBatch(batch);
+      }
+    }, this.flushInterval);
+  }
+  
+  private addFeedback(feedback: FeedbackData): void {
+    this.feedbackQueue.push(feedback);
+    
+    // Immediate flush if queue is full
+    if (this.feedbackQueue.length &gt;= this.batchSize) {
+      const batch = this.feedbackQueue.splice(0, this.batchSize);
+      this.processBatch(batch).catch(console.error);
+    }
+  }
+}
+</code></pre>
+<hr>
+<h2>Detailed Implementation Guide</h2>
+<h3>Phase 1: Foundation (Weeks 1-2)</h3>
+<h4>Week 1: Infrastructure Setup</h4>
+<pre><code class="language-bash"># Database setup
+psql -U postgres -c &quot;CREATE DATABASE codebase_blog_vectors;&quot;
+psql -U postgres -d codebase_blog_vectors -c &quot;CREATE EXTENSION vector;&quot;
+
+# Environment setup
+npm init -y
+npm install @pgvector/pgvector openai @modelcontextprotocol/sdk
+npm install -D typescript @types/node
+
+# Project structure
+mkdir -p src/{services,models,utils,mcp}
+touch src/index.ts
+touch src/services/{embedding,search,feedback}.service.ts
+touch src/mcp/server.ts
+</code></pre>
+<h4>Week 2: Basic Implementation</h4>
+<pre><code class="language-typescript">// src/services/embedding.service.ts
+import { OpenAI } from &#39;openai&#39;;
+import { Pool } from &#39;pg&#39;;
+
+export class EmbeddingService {
+  private openai: OpenAI;
+  private db: Pool;
+  
+  constructor() {
+    this.openai = new OpenAI({
+      apiKey: process.env.OPENAI_API_KEY
+    });
+    
+    this.db = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000
+    });
+  }
+  
+  async generateEmbedding(text: string): Promise&lt;number[]&gt; {
+    const response = await this.openai.embeddings.create({
+      model: &#39;text-embedding-3-small&#39;,
+      input: text
+    });
+    
+    return response.data[0].embedding;
+  }
+  
+  async storeEmbedding(
+    postId: string,
+    content: string,
+    embedding: number[]
+  ): Promise&lt;void&gt; {
+    await this.db.query(
+      `INSERT INTO blog_embeddings (post_id, content, embedding)
+       VALUES ($1, $2, $3)`,
+      [postId, content, `[${embedding.join(&#39;,&#39;)}]`]
+    );
+  }
+}
+</code></pre>
+<h3>Phase 2: MCP Integration (Weeks 3-4)</h3>
+<pre><code class="language-typescript">// src/mcp/server.ts
+import { MCPServer } from &#39;@modelcontextprotocol/sdk&#39;;
+import { SearchService } from &#39;../services/search.service&#39;;
+
+export class BlogMCPServer extends MCPServer {
+  private searchService: SearchService;
+  
+  constructor() {
+    super({
+      name: &#39;codebase-blog&#39;,
+      version: &#39;1.0.0&#39;
+    });
+    
+    this.searchService = new SearchService();
+    this.registerSearchTool();
+  }
+  
+  private registerSearchTool(): void {
+    this.registerTool({
+      name: &#39;search_code&#39;,
+      description: &#39;Search for code examples&#39;,
+      inputSchema: {
+        type: &#39;object&#39;,
+        properties: {
+          query: { type: &#39;string&#39; }
+        },
+        required: [&#39;query&#39;]
+      },
+      handler: async (params) =&gt; {
+        const results = await this.searchService.search(params.query);
+        return { results };
+      }
+    });
+  }
+}
+
+// Start server
+const server = new BlogMCPServer();
+server.listen(3456);
+</code></pre>
+<h3>Phase 3: Advanced Features (Weeks 5-8)</h3>
+<p>Implementation of RAG, feedback system, and optimization strategies as detailed in previous sections.</p>
+<hr>
+<h2>Cost Analysis</h2>
+<h3>Detailed Cost Breakdown</h3>
+<h4>OpenAI Embeddings Cost</h4>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Dimensions</th>
+<th>Cost per 1K tokens</th>
+<th>Monthly Usage</th>
+<th>Monthly Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>text-embedding-3-small</td>
+<td>1536</td>
+<td>$0.00002</td>
+<td>1M tokens</td>
+<td>$0.02</td>
+</tr>
+<tr>
+<td>text-embedding-3-large</td>
+<td>3072</td>
+<td>$0.00013</td>
+<td>1M tokens</td>
+<td>$0.13</td>
+</tr>
+<tr>
+<td>text-embedding-ada-002</td>
+<td>1536</td>
+<td>$0.0001</td>
+<td>1M tokens</td>
+<td>$0.10</td>
+</tr>
+</tbody></table>
+<h4>AWS Elasticsearch Cost</h4>
+<table>
+<thead>
+<tr>
+<th>Instance Type</th>
+<th>vCPUs</th>
+<th>Memory</th>
+<th>Storage</th>
+<th>Monthly Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>t3.small.search</td>
+<td>2</td>
+<td>2 GB</td>
+<td>10 GB</td>
+<td>$25</td>
+</tr>
+<tr>
+<td>t3.medium.search</td>
+<td>2</td>
+<td>4 GB</td>
+<td>100 GB</td>
+<td>$50</td>
+</tr>
+<tr>
+<td>c5.large.search</td>
+<td>2</td>
+<td>4 GB</td>
+<td>500 GB</td>
+<td>$120</td>
+</tr>
+<tr>
+<td>c5.xlarge.search</td>
+<td>4</td>
+<td>8 GB</td>
+<td>1 TB</td>
+<td>$240</td>
+</tr>
+</tbody></table>
+<h4>PostgreSQL + pgvector Cost</h4>
+<table>
+<thead>
+<tr>
+<th>Setup</th>
+<th>Storage</th>
+<th>Compute</th>
+<th>Backup</th>
+<th>Monthly Cost</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Development</td>
+<td>10 GB</td>
+<td>Shared</td>
+<td>None</td>
+<td>$0</td>
+</tr>
+<tr>
+<td>Small</td>
+<td>100 GB</td>
+<td>2 vCPU, 4GB</td>
+<td>Daily</td>
+<td>$50</td>
+</tr>
+<tr>
+<td>Medium</td>
+<td>500 GB</td>
+<td>4 vCPU, 16GB</td>
+<td>Continuous</td>
+<td>$200</td>
+</tr>
+<tr>
+<td>Large</td>
+<td>2 TB</td>
+<td>8 vCPU, 32GB</td>
+<td>Continuous</td>
+<td>$500</td>
+</tr>
+</tbody></table>
+<h3>ROI Analysis</h3>
+<pre><code>Initial Investment: $5,000 - $10,000
+- Development: $3,000 - $6,000
+- Infrastructure setup: $1,000 - $2,000
+- Testing and optimization: $1,000 - $2,000
+
+Monthly Operating Costs:
+- Small scale (&lt; 10K queries/month): $50 - $100
+- Medium scale (10K - 100K queries/month): $200 - $500
+- Large scale (&gt; 100K queries/month): $500 - $2,000
+
+Expected Benefits:
+- Developer time saved: 10 hours/month @ $100/hour = $1,000/month
+- Improved documentation quality: 20% reduction in support tickets
+- Knowledge retention: Invaluable for team scaling
+
+ROI Timeline:
+- Break-even: 3-6 months
+- Positive ROI: 6-12 months
+- 3x ROI: 18-24 months
+</code></pre>
+<hr>
+<h2>Performance Optimization</h2>
+<h3>Query Optimization Strategies</h3>
+<pre><code class="language-sql">-- Optimize vector search with pre-filtering
+CREATE OR REPLACE FUNCTION search_similar_content(
+  query_embedding vector(1536),
+  tag_filter text[] DEFAULT NULL,
+  date_from timestamp DEFAULT NULL,
+  limit_count int DEFAULT 10
+) RETURNS TABLE (
+  id uuid,
+  content text,
+  similarity float,
+  metadata jsonb
+) AS $$
+BEGIN
+  RETURN QUERY
+  WITH filtered AS (
+    SELECT * FROM blog_embeddings
+    WHERE 
+      (tag_filter IS NULL OR metadata-&gt;&gt;&#39;tags&#39; ?| tag_filter)
+      AND (date_from IS NULL OR created_at &gt;= date_from)
+  )
+  SELECT 
+    f.id,
+    f.content,
+    1 - (f.embedding &lt;=&gt; query_embedding) as similarity,
+    f.metadata
+  FROM filtered f
+  ORDER BY f.embedding &lt;=&gt; query_embedding
+  LIMIT limit_count;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create materialized view for popular searches
+CREATE MATERIALIZED VIEW popular_search_cache AS
+SELECT 
+  query_text,
+  query_embedding,
+  array_agg(result_id ORDER BY score DESC) as top_results,
+  avg(response_time_ms) as avg_response_time,
+  count(*) as search_count
+FROM search_queries sq
+JOIN search_results sr ON sq.id = sr.query_id
+WHERE sq.created_at &gt; NOW() - INTERVAL &#39;7 days&#39;
+GROUP BY query_text, query_embedding
+HAVING count(*) &gt; 5;
+
+-- Refresh cache periodically
+CREATE OR REPLACE FUNCTION refresh_search_cache() RETURNS void AS $$
+BEGIN
+  REFRESH MATERIALIZED VIEW CONCURRENTLY popular_search_cache;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Schedule refresh
+SELECT cron.schedule(&#39;refresh-search-cache&#39;, &#39;*/30 * * * *&#39;, &#39;SELECT refresh_search_cache()&#39;);
+</code></pre>
+<h3>Caching Strategy</h3>
+<pre><code class="language-typescript">// Multi-layer caching implementation
+class CacheManager {
+  private l1Cache: Map&lt;string, CacheEntry&gt;; // In-memory
+  private l2Cache: Redis; // Redis
+  private l3Cache: CDN; // CloudFlare
+  
+  async get(key: string): Promise&lt;any&gt; {
+    // L1: Check memory cache
+    const l1Result = this.l1Cache.get(key);
+    if (l1Result &amp;&amp; !this.isExpired(l1Result)) {
+      return l1Result.value;
+    }
+    
+    // L2: Check Redis
+    const l2Result = await this.l2Cache.get(key);
+    if (l2Result) {
+      this.l1Cache.set(key, {
+        value: l2Result,
+        timestamp: Date.now(),
+        ttl: 300000 // 5 minutes
+      });
+      return l2Result;
+    }
+    
+    // L3: Check CDN
+    const l3Result = await this.l3Cache.get(key);
+    if (l3Result) {
+      await this.l2Cache.setex(key, 3600, l3Result);
+      this.l1Cache.set(key, {
+        value: l3Result,
+        timestamp: Date.now(),
+        ttl: 300000
+      });
+      return l3Result;
+    }
+    
+    return null;
+  }
+  
+  async set(key: string, value: any, ttl?: number): Promise&lt;void&gt; {
+    // Set in all layers
+    this.l1Cache.set(key, {
+      value,
+      timestamp: Date.now(),
+      ttl: ttl || 300000
+    });
+    
+    await this.l2Cache.setex(key, ttl || 3600, value);
+    
+    if (this.isCacheable(value)) {
+      await this.l3Cache.put(key, value, ttl || 86400);
+    }
+  }
+}
+</code></pre>
+<hr>
+<h2>Security Considerations</h2>
+<h3>API Security</h3>
+<pre><code class="language-typescript">// Rate limiting and authentication
+class SecurityMiddleware {
+  private rateLimiter: RateLimiter;
+  private authService: AuthService;
+  
+  async validateRequest(req: Request): Promise&lt;void&gt; {
+    // API key validation
+    const apiKey = req.headers[&#39;x-api-key&#39;];
+    if (!apiKey) {
+      throw new UnauthorizedError(&#39;API key required&#39;);
+    }
+    
+    const isValid = await this.authService.validateApiKey(apiKey);
+    if (!isValid) {
+      throw new UnauthorizedError(&#39;Invalid API key&#39;);
+    }
+    
+    // Rate limiting
+    const userId = await this.authService.getUserId(apiKey);
+    const allowed = await this.rateLimiter.checkLimit(userId);
+    if (!allowed) {
+      throw new RateLimitError(&#39;Rate limit exceeded&#39;);
+    }
+    
+    // Input validation
+    this.validateInput(req.body);
+    
+    // Log request
+    await this.logRequest(req, userId);
+  }
+  
+  private validateInput(input: any): void {
+    // Prevent injection attacks
+    if (typeof input.query === &#39;string&#39;) {
+      // Remove potential SQL injection attempts
+      input.query = input.query.replace(/[&#39;;--]/g, &#39;&#39;);
+      
+      // Limit query length
+      if (input.query.length &gt; 1000) {
+        throw new ValidationError(&#39;Query too long&#39;);
+      }
+    }
+    
+    // Validate filters
+    if (input.filters) {
+      this.validateFilters(input.filters);
+    }
+  }
+}
+</code></pre>
+<h3>Data Privacy</h3>
+<pre><code class="language-typescript">// Privacy-preserving analytics
+class PrivacyManager {
+  anonymizeUser(userId: string): string {
+    // Hash user ID for privacy
+    return crypto
+      .createHash(&#39;sha256&#39;)
+      .update(userId + process.env.SALT)
+      .digest(&#39;hex&#39;);
+  }
+  
+  sanitizeContent(content: string): string {
+    // Remove PII
+    const patterns = [
+      /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, // Email
+      /\b\d{3}[-.]?\d{3}[-.]?\d{4}\b/g, // Phone
+      /\b\d{3}-\d{2}-\d{4}\b/g, // SSN
+    ];
+    
+    let sanitized = content;
+    for (const pattern of patterns) {
+      sanitized = sanitized.replace(pattern, &#39;[REDACTED]&#39;);
+    }
+    
+    return sanitized;
+  }
+}
+</code></pre>
+<hr>
+<h2>Future Roadmap</h2>
+<h3>Short Term (3-6 months)</h3>
+<ol>
+<li><p><strong>Multi-language Support</strong></p>
+<ul>
+<li>Implement language detection</li>
+<li>Language-specific chunking strategies</li>
+<li>Cross-language search capabilities</li>
+</ul>
+</li>
+<li><p><strong>Advanced Analytics</strong></p>
+<ul>
+<li>User behavior tracking</li>
+<li>Search pattern analysis</li>
+<li>Content gap identification</li>
+</ul>
+</li>
+<li><p><strong>Integration Expansions</strong></p>
+<ul>
+<li>VS Code extension</li>
+<li>JetBrains plugin</li>
+<li>Slack bot</li>
+</ul>
+</li>
+</ol>
+<h3>Medium Term (6-12 months)</h3>
+<ol>
+<li><p><strong>AI Enhancements</strong></p>
+<ul>
+<li>Fine-tuned embedding models</li>
+<li>Custom reranking models</li>
+<li>Query understanding improvements</li>
+</ul>
+</li>
+<li><p><strong>Collaboration Features</strong></p>
+<ul>
+<li>Team workspaces</li>
+<li>Shared knowledge bases</li>
+<li>Collaborative filtering</li>
+</ul>
+</li>
+<li><p><strong>Enterprise Features</strong></p>
+<ul>
+<li>SSO integration</li>
+<li>Audit logging</li>
+<li>Compliance tools</li>
+</ul>
+</li>
+</ol>
+<h3>Long Term (12+ months)</h3>
+<ol>
+<li><p><strong>Advanced AI Capabilities</strong></p>
+<ul>
+<li>Code generation from examples</li>
+<li>Automatic documentation generation</li>
+<li>Bug pattern detection</li>
+</ul>
+</li>
+<li><p><strong>Platform Expansion</strong></p>
+<ul>
+<li>Mobile SDKs</li>
+<li>API marketplace</li>
+<li>Partner integrations</li>
+</ul>
+</li>
+<li><p><strong>ML Operations</strong></p>
+<ul>
+<li>Automated model training</li>
+<li>A/B testing framework</li>
+<li>Continuous learning pipeline</li>
+</ul>
+</li>
+</ol>
+<hr>
+<h2>Conclusion</h2>
+<p>This comprehensive design document outlines multiple approaches to building an intelligent MCP-powered code search and retrieval system for codebase.blog. The system can start with a simple pgvector implementation costing less than $1/month and scale to enterprise-grade solutions using AWS Elasticsearch or advanced RAG systems.</p>
+<p>Key takeaways:</p>
+<ul>
+<li><strong>Start simple</strong>: Begin with pgvector and OpenAI embeddings</li>
+<li><strong>Iterate based on usage</strong>: Add features as needed</li>
+<li><strong>Monitor and optimize</strong>: Use feedback to improve relevance</li>
+<li><strong>Scale gradually</strong>: Move to more sophisticated solutions as you grow</li>
+</ul>
+<p>The MCP integration provides a powerful interface for AI assistants to access your knowledge base, while the feedback system ensures continuous improvement. With proper implementation, this system can transform codebase.blog into an invaluable resource for developers using AI-powered coding assistants.</p>
+
+    </div>
+</body>
+</html>

@@ -32,6 +32,10 @@ importers:
       zod:
         specifier: ^3.25.67
         version: 3.25.67
+    devDependencies:
+      marked:
+        specifier: ^16.1.2
+        version: 16.1.2
 
 packages:
 
@@ -257,6 +261,11 @@ packages:
   get-nonce@1.0.1:
     resolution: {integrity: sha512-FJhYRoDaiatfEkUK8HKlicmu/3SGFD51q3itKDGoSTysQJBnfOcxU5GxnhE1E6soB76MbT0MBtnKJuXyAx+96Q==}
     engines: {node: '>=6'}
+
+  marked@16.1.2:
+    resolution: {integrity: sha512-rNQt5EvRinalby7zJZu/mB+BvaAY2oz3wCuCjt1RDrWNpS1Pdf9xqMOeC9Hm5adBdcV/3XZPJpG58eT+WBc0XQ==}
+    engines: {node: '>= 20'}
+    hasBin: true
 
   react-dom@19.1.0:
     resolution: {integrity: sha512-Xs1hdnE+DyKgeHJeJznQmYMIBG3TKIHJJT95Q58nHLSrElKlGQqDTR2HQ9fx5CN/Gk6Vh/kupBTDLU11/nDk/g==}
@@ -486,6 +495,8 @@ snapshots:
   detect-node-es@1.1.0: {}
 
   get-nonce@1.0.1: {}
+
+  marked@16.1.2: {}
 
   react-dom@19.1.0(react@19.1.0):
     dependencies:

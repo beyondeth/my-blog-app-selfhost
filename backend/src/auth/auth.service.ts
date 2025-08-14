@@ -8,6 +8,7 @@ import {
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
+import { BlogsService } from '../blogs/blogs.service';
 import { User, AuthProvider } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -21,6 +22,7 @@ export class AuthService {
 
   constructor(
     private readonly usersService: UsersService,
+    private readonly blogsService: BlogsService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -86,7 +88,10 @@ export class AuthService {
         authProvider: AuthProvider.LOCAL,
       });
 
-      this.logger.log(`New user registered: ${email}`);
+      // 자동으로 블로그 생성
+      await this.createUserBlog(user);
+
+      this.logger.log(`New user registered with blog: ${email}`);
       return this.generateTokenResponse(user);
     } catch (error) {
       this.logger.error(`Registration failed for ${email}:`, error.message);
@@ -119,7 +124,11 @@ export class AuthService {
         };
 
         user = await this.usersService.create(userData);
-        this.logger.log(`New OAuth user created: ${user.email} via ${provider}`);
+        
+        // 자동으로 블로그 생성
+        await this.createUserBlog(user);
+        
+        this.logger.log(`New OAuth user created with blog: ${user.email} via ${provider}`);
       } else {
         // 마지막 로그인 시간 업데이트
         await this.usersService.updateLastLogin(user.id);
@@ -256,5 +265,40 @@ export class AuthService {
       return parseInt(expiresIn) * 60;
     }
     return parseInt(expiresIn) || 900;
+  }
+
+  private async createUserBlog(user: User): Promise<void> {
+    try {
+      // 이메일에서 @ 앞 부분 추출
+      const emailPrefix = user.email.split('@')[0].toLowerCase();
+      
+      // slug 규칙에 맞게 변환 (영문 소문자, 숫자, 하이픈만 허용)
+      let slug = emailPrefix.replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      
+      // slug가 비어있거나 너무 짧으면 기본값 사용
+      if (!slug || slug.length < 3) {
+        slug = `user-${user.id.slice(0, 8)}`;
+      }
+      
+      // slug 중복 확인 및 고유하게 만들기
+      let finalSlug = slug;
+      let counter = 1;
+      while (!(await this.blogsService.checkSlugAvailability(finalSlug))) {
+        finalSlug = `${slug}-${counter}`;
+        counter++;
+      }
+      
+      // 블로그 생성
+      await this.blogsService.create({
+        slug: finalSlug,
+        name: user.username || emailPrefix,
+        description: `${user.username || emailPrefix}님의 블로그입니다.`,
+      }, user);
+      
+      this.logger.log(`Blog created automatically for user: ${user.email} with slug: ${finalSlug}`);
+    } catch (error) {
+      // 블로그 생성 실패는 회원가입을 막지 않음 (로그만 남김)
+      this.logger.error(`Failed to create blog for user ${user.email}:`, error.message);
+    }
   }
 } 

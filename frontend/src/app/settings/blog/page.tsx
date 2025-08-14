@@ -82,14 +82,14 @@ export default function BlogSettingsPage() {
           <FiEdit3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">블로그가 없습니다</h3>
           <p className="text-sm text-gray-600 mb-4">
-            먼저 블로그를 만들어주세요
+            블로그를 찾을 수 없습니다. 새로고침을 시도해보세요.
           </p>
-          <a
-            href="/blog/new"
+          <button
+            onClick={() => window.location.reload()}
             className="inline-flex items-center px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800"
           >
-            블로그 만들기
-          </a>
+            새로고침
+          </button>
         </div>
       </div>
     );

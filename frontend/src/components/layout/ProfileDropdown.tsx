@@ -88,13 +88,13 @@ export default function ProfileDropdown({
         </DropdownMenuItem>
 
         {/* My Blog */}
-        {!blogLoading && (
+        {!blogLoading && blog && (
           <DropdownMenuItem 
-            onClick={() => handleNavigation(blog ? `/blog/${blog.slug}` : '/blog/new')}
+            onClick={() => handleNavigation(`/blog/${blog.slug}`)}
             className="cursor-pointer"
           >
             <FiBookOpen className="mr-2 h-4 w-4" />
-            <span>{blog ? '내 블로그' : '블로그 만들기'}</span>
+            <span>내 블로그</span>
           </DropdownMenuItem>
         )}
 

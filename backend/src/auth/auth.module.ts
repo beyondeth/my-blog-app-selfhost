@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { AuthApiKeyService } from './auth-api-key.service';
 import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
+import { BlogsModule } from '../blogs/blogs.module';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { ApiKey } from '../api-keys/entities/api-key.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
@@ -16,6 +17,7 @@ import { KakaoStrategy } from './strategies/kakao.strategy';
 @Module({
   imports: [
     UsersModule,
+    BlogsModule,
     ApiKeysModule,
     PassportModule,
     TypeOrmModule.forFeature([ApiKey]),
