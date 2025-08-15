@@ -14,6 +14,7 @@ interface PostHeaderProps {
   likeCount?: number;
   onLike?: () => void;
   onShare?: () => void;
+  onCopy?: () => void;
   LikeButtonComponent?: ReactNode;
 }
 
@@ -27,6 +28,7 @@ export default function PostHeader({
   likeCount = 0,
   onLike,
   onShare,
+  onCopy,
   LikeButtonComponent
 }: PostHeaderProps) {
   return (
@@ -104,6 +106,19 @@ export default function PostHeader({
             >
               <FiShare2 className="w-3 h-3" />
               <span>공유</span>
+            </button>
+          )}
+          
+          {onCopy && (
+            <button
+              onClick={onCopy}
+              className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+              title="포스트 내용 복사"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span>복사</span>
             </button>
           )}
         </div>

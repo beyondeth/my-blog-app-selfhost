@@ -14,6 +14,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
 import CommentSection from '@/components/comments/CommentSection';
+import { toast } from 'sonner';
 
 export default function PostDetailPage() {
   const params = useParams();
@@ -84,6 +85,46 @@ export default function PostDetailPage() {
     } else {
       navigator.clipboard.writeText(window.location.href);
       alert('링크가 클립보드에 복사되었습니다!');
+    }
+  }, [post]);
+
+  const handleCopyContent = useCallback(async () => {
+    if (!post) return;
+    
+    try {
+      // HTML을 텍스트로 변환하면서 코드 블록 처리
+      const tempDiv = document.createElement('div');
+      tempDiv.innerHTML = post.content;
+      
+      // 코드 블록들을 보기 좋게 포맷팅
+      const codeBlocks = tempDiv.querySelectorAll('pre code');
+      codeBlocks.forEach((block) => {
+        const codeText = block.textContent || '';
+        const language = block.className.match(/language-(\w+)/)?.[1] || 'code';
+        block.textContent = `\n[${language}]\n${codeText}\n`;
+      });
+      
+      // pre 태그만 있는 경우도 처리
+      const preBlocks = tempDiv.querySelectorAll('pre:not(:has(code))');
+      preBlocks.forEach((block) => {
+        const text = block.textContent || '';
+        block.textContent = `\n[code]\n${text}\n`;
+      });
+      
+      const textContent = tempDiv.textContent || tempDiv.innerText || '';
+      const fullText = `${post.title}\n\n${textContent}`;
+      
+      await navigator.clipboard.writeText(fullText);
+      toast.success('포스트가 클립보드에 복사되었습니다', {
+        duration: 3000,
+        position: 'bottom-right',
+      });
+    } catch (error) {
+      console.error('복사 실패:', error);
+      toast.error('복사에 실패했습니다', {
+        duration: 3000,
+        position: 'bottom-right',
+      });
     }
   }, [post]);
 
@@ -165,6 +206,7 @@ export default function PostDetailPage() {
             />
           }
           onShare={handleShare}
+          onCopy={handleCopyContent}
         />
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}
