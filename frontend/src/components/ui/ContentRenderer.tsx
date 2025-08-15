@@ -140,11 +140,15 @@ export default function ContentRenderer({ content, className = '' }: ContentRend
       const cleanHtml = DOMPurify.sanitize(sanitizedHtml, {
         ALLOWED_TAGS: [
           'p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-          'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'code', 'pre', 'span', 'div'
+          'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'code', 'pre', 'span', 'div',
+          // 테이블 관련 태그 추가 (안전한 구조적 태그들)
+          'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col'
         ],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'data-*', 'width', 'height', 'class'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'data-*', 'width', 'height', 'class', 'style'],
         ALLOW_DATA_ATTR: true,
-        FORBID_ATTR: ['style'],
+        FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover'],
+        // style 속성은 테이블 스타일링을 위해 허용하되, 위험한 내용은 DOMPurify가 자동 필터링
+        ALLOWED_ATTR_IN_STYLE: ['border', 'padding', 'background-color', 'text-align', 'width', 'border-collapse', 'margin']
       });
       // 2. sanitize 후에도 혹시 남은 밑줄 제거
       let processedHtml = stripUnderline(cleanHtml);

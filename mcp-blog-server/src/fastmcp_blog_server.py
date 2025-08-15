@@ -38,17 +38,81 @@ class MarkdownRenderer:
     def convert_to_html(self, text: str) -> str:
         """마크다운을 HTML로 변환 (기존 로직 유지)"""
         
-        # 코드 블록과 인라인 코드 보호
+        # 보호된 섹션을 저장할 딕셔너리
         protected_blocks = {}
         protected_inline = {}
+        protected_tables = {}
+        
+        # 테이블을 먼저 처리 (코드 블록보다 먼저 처리해야 함)
+        def protect_table(match):
+            key = f"[[TABLE{len(protected_tables)}]]"
+            lines = match.group(0).strip().split('\n')
+            if len(lines) < 3:
+                return match.group(0)
+            
+            html = '<table style="border-collapse: collapse; width: 100%; margin: 1em 0;">'
+            html += '<thead><tr>'
+            
+            # 헤더 처리 - 파이프로 구분하되 양끝 파이프는 선택적
+            header_line = lines[0].strip()
+            if header_line.startswith('|'):
+                header_line = header_line[1:]
+            if header_line.endswith('|'):
+                header_line = header_line[:-1]
+            
+            headers = [cell.strip() for cell in header_line.split('|')]
+            for header in headers:
+                if header:  # 빈 문자열 제외
+                    html += f'<th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">{header}</th>'
+            html += '</tr></thead><tbody>'
+            
+            # 바디 처리 - 구분선(두 번째 줄) 이후부터
+            for line in lines[2:]:
+                line = line.strip()
+                if not line or not '|' in line:
+                    continue
+                    
+                # 양끝 파이프 제거
+                if line.startswith('|'):
+                    line = line[1:]
+                if line.endswith('|'):
+                    line = line[:-1]
+                    
+                cells = [cell.strip() for cell in line.split('|')]
+                if cells:  # 빈 행 제외
+                    html += '<tr>'
+                    for cell in cells:
+                        if cell:  # 빈 셀도 포함 (공백 유지)
+                            html += f'<td style="border: 1px solid #ddd; padding: 8px;">{cell if cell else "&nbsp;"}</td>'
+                    html += '</tr>'
+            
+            html += '</tbody></table>'
+            protected_tables[key] = html
+            return key
+        
+        # 테이블 패턴 매칭 및 보호 (더 유연한 패턴)
+        # 패턴 설명:
+        # - 줄 시작에 있지 않아도 매치 (^ 제거)
+        # - 파이프 사이에 최소 1개 이상의 문자가 있어야 함
+        # - 구분선은 -, :, | 와 공백으로 구성
+        text = re.sub(
+            r'(?:^|\n)(\|[^\n]+\|)\s*\n(\|[\s\-:|]+\|)\s*\n((?:\|[^\n]+\|\s*\n?)+)',
+            lambda m: '\n' + protect_table(m),
+            text,
+            flags=re.MULTILINE
+        )
         
         # 코드 블록 보호 (```...```)
         def protect_code_block(match):
             key = f"[[CODEBLOCK{len(protected_blocks)}]]"
-            language = match.group(1) or ''
+            language = match.group(1).strip() if match.group(1) else ''
             code = match.group(2)
+            
             # HTML 특수문자 이스케이프
             code = code.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            
+            # 백틱 이스케이프 (코드 내부의 백틱을 HTML 엔티티로 변환)
+            code = code.replace('`', '&#96;')
             
             if language:
                 protected_blocks[key] = f'''<pre style="background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto;"><code class="language-{language}">{code}</code></pre>'''
@@ -56,7 +120,8 @@ class MarkdownRenderer:
                 protected_blocks[key] = f'''<pre style="background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>{code}</code></pre>'''
             return key
         
-        text = re.sub(r'```(\w*)\n(.*?)```', protect_code_block, text, flags=re.DOTALL)
+        # 더 정확한 코드 블록 매칭 (줄 시작에서만 매칭)
+        text = re.sub(r'^```([^\n]*)\n(.*?)\n```', protect_code_block, text, flags=re.DOTALL | re.MULTILINE)
         
         # 인라인 코드 보호 (`...`)
         def protect_inline_code(match):
@@ -132,41 +197,10 @@ class MarkdownRenderer:
         
         text = '\n'.join(result_lines)
         
-        # 테이블 처리
-        def process_table(match):
-            lines = match.group(0).strip().split('\n')
-            if len(lines) < 3:
-                return match.group(0)
-            
-            html = '<table style="border-collapse: collapse; width: 100%; margin: 1em 0;">'
-            html += '<thead><tr>'
-            
-            # 헤더
-            headers = [cell.strip() for cell in lines[0].split('|')[1:-1]]
-            for header in headers:
-                html += f'<th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">{header}</th>'
-            html += '</tr></thead><tbody>'
-            
-            # 바디
-            for line in lines[2:]:
-                if '|' in line:
-                    cells = [cell.strip() for cell in line.split('|')[1:-1]]
-                    html += '<tr>'
-                    for cell in cells:
-                        html += f'<td style="border: 1px solid #ddd; padding: 8px;">{cell}</td>'
-                    html += '</tr>'
-            
-            html += '</tbody></table>'
-            return html
+        # 보호된 요소들 복원 (테이블, 코드 블록, 인라인 코드)
+        for key, value in protected_tables.items():
+            text = text.replace(key, value)
         
-        text = re.sub(
-            r'\|[^\n]+\|\s*\n\|[\s\-:|]+\|\s*\n(\|[^\n]+\|\s*\n?)+',
-            process_table,
-            text,
-            flags=re.MULTILINE
-        )
-        
-        # 보호된 코드 블록과 인라인 코드 복원
         for key, value in protected_blocks.items():
             text = text.replace(key, value)
         
