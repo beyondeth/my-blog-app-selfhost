@@ -10,6 +10,7 @@ from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+import unicodedata
 
 # FastMCP imports
 from fastmcp import FastMCP
@@ -428,6 +429,44 @@ async def create_post(
     final_title = title or metadata['title']
     final_tags = tags or metadata.get('tags', [])
     
+    # MD 파일 저장 (posts 폴더에)
+    posts_dir = Path(__file__).parent.parent / 'posts'
+    posts_dir.mkdir(exist_ok=True)
+    
+    # 파일명 생성: YYYYMMDD_제목 (특수문자 제거)
+    date_str = datetime.now().strftime('%Y%m%d')
+    
+    # 제목에서 파일명 생성 (한글 포함 안전한 처리)
+    safe_title = final_title
+    # 특수문자를 언더스코어로 변경
+    safe_title = re.sub(r'[\\/:*?"<>|\s]+', '_', safe_title)
+    # 연속된 언더스코어 제거
+    safe_title = re.sub(r'_+', '_', safe_title)
+    # 앞뒤 언더스코어 제거
+    safe_title = safe_title.strip('_')
+    # 길이 제한 (파일명이 너무 길면 문제 발생)
+    if len(safe_title) > 50:
+        safe_title = safe_title[:50]
+    
+    filename = f"{date_str}_{safe_title}.md"
+    file_path_saved = posts_dir / filename
+    
+    # Front matter와 함께 전체 마크다운 저장
+    full_content = f"""---
+title: "{final_title}"
+tags: {json.dumps(final_tags, ensure_ascii=False)}
+date: {datetime.now().isoformat()}
+---
+
+{body}"""
+    
+    try:
+        with open(file_path_saved, 'w', encoding='utf-8') as f:
+            f.write(full_content)
+        saved_message = f"💾 MD 파일 저장: {filename}"
+    except Exception as e:
+        saved_message = f"⚠️ MD 파일 저장 실패: {str(e)}"
+    
     # 포스트 생성 API 호출
     try:
         async with httpx.AsyncClient() as client:
@@ -450,6 +489,7 @@ async def create_post(
                 post_url = f"{auth.base_url}/blog/{blog_slug}/posts/{post['slug']}"
                 
                 return f"""✅ 포스트 생성 성공!
+{saved_message}
 📝 제목: {post['title']}
 🔗 슬러그: {post['slug']}
 🏷️ 태그: {', '.join(final_tags) if final_tags else '없음'}
@@ -496,6 +536,45 @@ async def create_post_from_file(file_path: str) -> str:
     final_title = metadata['title']
     final_tags = metadata.get('tags', [])
     
+    # MD 파일 저장 (posts 폴더에) - 원본 파일과 별도로 백업
+    posts_dir = Path(__file__).parent.parent / 'posts'
+    posts_dir.mkdir(exist_ok=True)
+    
+    # 파일명 생성: YYYYMMDD_제목 (특수문자 제거)
+    date_str = datetime.now().strftime('%Y%m%d')
+    
+    # 제목에서 파일명 생성 (한글 포함 안전한 처리)
+    safe_title = final_title
+    # 특수문자를 언더스코어로 변경
+    safe_title = re.sub(r'[\\/:*?"<>|\s]+', '_', safe_title)
+    # 연속된 언더스코어 제거
+    safe_title = re.sub(r'_+', '_', safe_title)
+    # 앞뒤 언더스코어 제거
+    safe_title = safe_title.strip('_')
+    # 길이 제한 (파일명이 너무 길면 문제 발생)
+    if len(safe_title) > 50:
+        safe_title = safe_title[:50]
+    
+    filename = f"{date_str}_{safe_title}.md"
+    file_path_saved = posts_dir / filename
+    
+    # Front matter와 함께 전체 마크다운 저장
+    full_content = f"""---
+title: "{final_title}"
+tags: {json.dumps(final_tags, ensure_ascii=False)}
+date: {datetime.now().isoformat()}
+source: {Path(file_path).name}
+---
+
+{body}"""
+    
+    try:
+        with open(file_path_saved, 'w', encoding='utf-8') as f:
+            f.write(full_content)
+        saved_message = f"💾 MD 파일 저장: {filename}"
+    except Exception as e:
+        saved_message = f"⚠️ MD 파일 저장 실패: {str(e)}"
+    
     # 포스트 생성 API 호출
     try:
         async with httpx.AsyncClient() as client:
@@ -518,6 +597,7 @@ async def create_post_from_file(file_path: str) -> str:
                 post_url = f"{auth.base_url}/blog/{blog_slug}/posts/{post['slug']}"
                 
                 return f"""✅ 포스트 생성 성공!
+{saved_message}
 📝 제목: {post['title']}
 🔗 슬러그: {post['slug']}
 🏷️ 태그: {', '.join(final_tags) if final_tags else '없음'}
