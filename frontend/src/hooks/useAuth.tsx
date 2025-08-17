@@ -35,7 +35,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (error.statusCode === 401) {
       errorMessage = '인증에 실패했습니다. 다시 로그인해주세요.';
     } else if (error.statusCode === 409) {
-      errorMessage = '이미 사용 중인 정보입니다.';
+      // 409 에러는 서버에서 구체적인 메시지를 보내므로 그대로 사용
+      errorMessage = error.message || '이미 사용 중인 정보입니다.';
     } else if (error.statusCode === 400) {
       errorMessage = '입력 정보를 확인해주세요.';
     } else if (error.statusCode === 500) {
@@ -194,6 +195,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     register,
     logout,
     refreshUser,
+    checkAuth,
+    clearError,
     error,
   };
 

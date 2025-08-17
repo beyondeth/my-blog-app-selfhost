@@ -9,13 +9,14 @@ import { FiEye, FiEyeOff, FiMail, FiLock, FiArrowLeft } from 'react-icons/fi';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, isAuthenticated, error } = useAuth();
+  const { login, isLoading, isAuthenticated, clearError } = useAuth();
   const [formData, setFormData] = useState<LoginForm>({
     email: '',
     password: '',
   });
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loginError, setLoginError] = useState(''); // 로컬 에러 상태
   const [validationErrors, setValidationErrors] = useState<{
     email?: string;
     password?: string;
@@ -27,6 +28,11 @@ export default function LoginPage() {
       router.replace('/');
     }
   }, [isAuthenticated, isLoading]); // router 의존성 제거 (안정적인 함수)
+
+  // 컴포넌트 마운트 시 전역 에러 상태 초기화
+  useEffect(() => {
+    clearError();
+  }, [clearError]);
 
   const validateForm = (): boolean => {
     const errors: { email?: string; password?: string } = {};
@@ -71,13 +77,14 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
+    setLoginError(''); // 이전 에러 초기화
     
     try {
       await login(formData);
       // 성공 시 useEffect에서 리다이렉트 처리
-    } catch (error) {
-      // 에러는 useAuth에서 처리됨
-      console.error('Login error:', error);
+    } catch (error: any) {
+      // 로컬 에러 상태에 저장
+      setLoginError(error.message || '로그인에 실패했습니다.');
     } finally {
       setIsSubmitting(false);
     }
@@ -111,17 +118,14 @@ export default function LoginPage() {
         <div className="w-full max-w-md">
           {/* Logo */}
           <div className="text-center mb-12">
-            <Link href="/" className="text-2xl font-light text-gray-900">
-              Dev Log
-            </Link>
             <p className="mt-4 text-gray-600">로그인하여 계속하세요</p>
           </div>
 
           {/* Login Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
-            {error && (
+            {loginError && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-                {error}
+                {loginError}
               </div>
             )}
 
@@ -205,7 +209,7 @@ export default function LoginPage() {
             
             <button
               type="button"
-              onClick={() => window.location.href = 'http://localhost:3000/auth/google'}
+              onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/google'}
               className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
@@ -219,7 +223,7 @@ export default function LoginPage() {
             
             <button
               type="button"
-              onClick={() => window.location.href = 'http://localhost:3000/auth/kakao'}
+              onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/kakao'}
               className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-yellow-400 hover:bg-yellow-500 transition-colors"
             >
               <span className="mr-2 text-lg">💬</span>
@@ -231,7 +235,17 @@ export default function LoginPage() {
           <div className="mt-8 text-center space-y-4">
             <p className="text-sm text-gray-600">
               계정이 없으신가요?{' '}
-              <Link href="/register" className="text-gray-900 font-medium hover:underline">
+              <Link 
+                href="/register" 
+                className="text-gray-900 font-medium hover:underline"
+                onClick={(e) => {
+                  // 회원가입 페이지로 이동 시 상태 완전 초기화를 위해 강제 새로고침
+                  if (window.location.pathname === '/register') {
+                    e.preventDefault();
+                    window.location.href = '/register';
+                  }
+                }}
+              >
                 회원가입
               </Link>
             </p>

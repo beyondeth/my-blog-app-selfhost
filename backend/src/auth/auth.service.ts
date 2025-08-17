@@ -9,6 +9,7 @@ import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../users/users.service';
 import { BlogsService } from '../blogs/blogs.service';
+import { EmailService } from '../email/email.service';
 import { User, AuthProvider } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -23,6 +24,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly blogsService: BlogsService,
+    private readonly emailService: EmailService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -66,18 +68,26 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
-    const { email, username, password } = registerDto;
+    const { email, username, password, emailVerificationToken } = registerDto;
+
+    // 이메일 인증 확인 (선택적)
+    if (emailVerificationToken) {
+      const isVerified = await this.emailService.checkVerificationStatus(email, emailVerificationToken);
+      if (!isVerified) {
+        throw new BadRequestException('Invalid or expired email verification token');
+      }
+    }
 
     // 이메일 중복 체크
     const existingUser = await this.usersService.findByEmail(email);
     if (existingUser) {
-      throw new ConflictException('Email already exists');
+      throw new ConflictException('이미 존재하는 회원입니다. 로그인 페이지에서 로그인해주세요.');
     }
 
     // 사용자명 중복 체크
     const existingUsername = await this.usersService.findByUsername(username);
     if (existingUsername) {
-      throw new ConflictException('Username already exists');
+      throw new ConflictException(`이미 사용 중인 '${username}'입니다. 다른 사용자명을 선택해주세요.`);
     }
 
     try {
@@ -106,17 +116,63 @@ export class AuthService {
       if (!user) {
         // 이메일로 기존 사용자 확인
         const email = profile.emails?.[0]?.value;
-        if (email) {
-          const existingUser = await this.usersService.findByEmail(email);
-          if (existingUser && existingUser.authProvider !== provider) {
-            throw new ConflictException('Account exists with different provider');
-          }
+        
+        // OAuth에서 이메일을 반드시 가져와야 함
+        if (!email) {
+          this.logger.error(`OAuth ${provider} failed to get email from profile`);
+          throw new BadRequestException(
+            `${provider} 계정에서 이메일을 가져올 수 없습니다. ` +
+            `${provider} 계정 설정에서 이메일 공개를 허용해주세요.`
+          );
         }
+        
+        this.logger.log(`OAuth ${provider} email from profile:`, email);
+        
+        const existingUser = await this.usersService.findByEmail(email);
+          
+          if (existingUser) {
+            // ✅ OAuth 로그인은 이메일 검증을 보장하므로 자동 병합
+            // Google/Kakao OAuth는 이미 이메일 소유권을 확인했음
+            
+            // 기존 계정에 OAuth 정보 추가 및 이메일 검증 처리
+            existingUser.providerId = profile.id;
+            existingUser.authProvider = provider;
+            
+            // OAuth 로그인 시 이메일을 자동으로 검증 처리
+            if (!existingUser.isEmailVerified) {
+              existingUser.isEmailVerified = true;
+              this.logger.log(`Email automatically verified through OAuth ${provider} for: ${email}`);
+            }
+            
+            // 프로필 이미지가 없다면 OAuth에서 가져온 것으로 업데이트
+            if (!existingUser.profileImage && profile.photos?.[0]?.value) {
+              existingUser.profileImage = profile.photos[0].value;
+            }
+            
+            user = await this.usersService.update(existingUser.id, existingUser);
+            
+            // 계정 병합 알림 이메일 (선택적)
+            try {
+              await this.emailService.sendAccountLinkNotification(
+                email,
+                `${provider} 로그인이 계정에 연결되었습니다.`
+              );
+            } catch (emailError) {
+              // 이메일 실패는 무시하고 계속 진행
+              this.logger.warn(`Failed to send account link notification: ${emailError.message}`);
+            }
+            
+            this.logger.log(`OAuth ${provider} linked to existing account: ${email}`);
+            
+            // 마지막 로그인 시간 업데이트
+            await this.usersService.updateLastLogin(user.id);
+            return this.generateTokenResponse(user);
+          }
 
-        // 새 사용자 생성
+        // 새 사용자 생성 (이메일은 이미 위에서 검증됨)
         const userData = {
-          email: email || `${profile.id}@${provider}.com`,
-          username: this.generateUniqueUsername(profile),
+          email: email, // email은 반드시 존재함
+          username: this.generateUsernameFromEmail(email),
           profileImage: profile.photos?.[0]?.value,
           authProvider: provider,
           providerId: profile.id,
@@ -130,6 +186,19 @@ export class AuthService {
         
         this.logger.log(`New OAuth user created with blog: ${user.email} via ${provider}`);
       } else {
+        // 기존 OAuth 사용자 - 이메일이 providerId로 생성된 임시 이메일인 경우에만 업데이트
+        const email = profile.emails?.[0]?.value;
+        
+        // providerId@provider.com 형식의 임시 이메일인지 확인
+        const isTempEmail = user.email === `${profile.id}@${provider}.com`;
+        
+        if (email && isTempEmail) {
+          // 임시 이메일을 실제 이메일로 업데이트
+          this.logger.log(`Updating temporary email ${user.email} to ${email}`);
+          user.email = email;
+          user = await this.usersService.update(user.id, { email });
+        }
+        
         // 마지막 로그인 시간 업데이트
         await this.usersService.updateLastLogin(user.id);
       }
@@ -239,6 +308,27 @@ export class AuthService {
       expires_in: this.getTokenExpiresIn('JWT_ACCESS_EXPIRES_IN', '15m'),
       user: user.toPublicJSON(), // 보안 강화: 공개 정보만 반환
     };
+  }
+
+  private generateUsernameFromEmail(email: string): string {
+    // 이메일에서 @ 앞 부분 추출
+    const emailPrefix = email.split('@')[0].toLowerCase();
+    
+    // 영문, 숫자, 언더스코어만 허용 (사용자명 규칙)
+    let username = emailPrefix.replace(/[^a-z0-9_]/g, '_');
+    
+    // 너무 짧으면 랜덤 문자 추가
+    if (username.length < 3) {
+      const uniqueId = crypto.randomUUID().slice(0, 4);
+      username = `${username}_${uniqueId}`;
+    }
+    
+    // 너무 길면 자르기
+    if (username.length > 20) {
+      username = username.slice(0, 20);
+    }
+    
+    return username;
   }
 
   private generateUniqueUsername(profile: any): string {

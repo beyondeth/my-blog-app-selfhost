@@ -24,6 +24,7 @@ import { McpModule } from './mcp/mcp.module';
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -65,6 +66,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     BlogsModule,
     ApiKeysModule,
     McpModule,
+    EmailModule,
     // AnalyticsModule,
   ],
   providers: [

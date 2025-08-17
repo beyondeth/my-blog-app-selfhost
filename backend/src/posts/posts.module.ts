@@ -7,10 +7,11 @@ import { File } from '../files/entities/file.entity';
 import { Blog } from '../blogs/entities/blog.entity';
 import { UsersModule } from '../users/users.module';
 import { FilesModule } from '../files/files.module';
+import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Post, File, Blog]), UsersModule, FilesModule],
-  providers: [PostsService],
+  providers: [PostsService, MarkdownRendererService],
   controllers: [PostsController],
   exports: [PostsService],
 })

@@ -175,6 +175,17 @@ export default function Header() {
                 <Link 
                   href={routes.login()}
                   className="text-sm text-gray-900 hover:text-amber-800"
+                  onClick={(e) => {
+                    // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
+                    if (pathname === '/register') {
+                      e.preventDefault();
+                      router.push('/login');
+                      // 약간의 지연 후 회원가입 페이지 상태 초기화를 위한 새로고침
+                      setTimeout(() => {
+                        window.dispatchEvent(new Event('register-page-reset'));
+                      }, 100);
+                    }
+                  }}
                 >
                   로그인
                 </Link>
@@ -257,7 +268,18 @@ export default function Header() {
                 ) : (
                   <Link 
                     href={routes.login()}
-                    onClick={closeMobileMenu}
+                    onClick={(e) => {
+                      closeMobileMenu();
+                      // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
+                      if (pathname === '/register') {
+                        e.preventDefault();
+                        router.push('/login');
+                        // 약간의 지연 후 회원가입 페이지 상태 초기화를 위한 새로고침
+                        setTimeout(() => {
+                          window.dispatchEvent(new Event('register-page-reset'));
+                        }, 100);
+                      }
+                    }}
                     className="block text-base text-gray-900 hover:text-amber-800 py-2 px-2 rounded-md hover:bg-gray-50 transition-colors"
                   >
                     로그인

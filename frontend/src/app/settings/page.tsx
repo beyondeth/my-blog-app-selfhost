@@ -3,12 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser } from 'react-icons/fi';
+import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 export default function ProfileSettingsPage() {
-  const { user, refreshUser } = useAuth();
+  const { user, refreshUser, logout } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -18,6 +18,9 @@ export default function ProfileSettingsPage() {
     email: '',
     bio: '',
   });
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -60,6 +63,35 @@ export default function ProfileSettingsPage() {
       setError(err.message || '오류가 발생했습니다');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    setDeleteLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/account`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          password: deletePassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '계정 삭제에 실패했습니다');
+      }
+
+      // 로그아웃 처리 및 홈으로 이동
+      await logout('/');
+    } catch (err: any) {
+      setError(err.message || '오류가 발생했습니다');
+      setDeleteLoading(false);
     }
   };
 
@@ -204,6 +236,89 @@ export default function ProfileSettingsPage() {
           </button>
         </div>
       </form>
+
+      {/* 회원 탈퇴 섹션 */}
+      <div className="mt-12 pt-8 border-t border-gray-200">
+        <h3 className="text-lg font-medium text-red-600 mb-4">위험 구역</h3>
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <h4 className="text-base font-medium text-gray-900 mb-2">계정 삭제</h4>
+          <p className="text-sm text-gray-600 mb-4">
+            계정을 삭제하면 모든 블로그 게시물, 댓글, 파일이 영구적으로 삭제되며 복구할 수 없습니다.
+          </p>
+          <button
+            onClick={() => setShowDeleteModal(true)}
+            className="px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 transition-colors"
+          >
+            계정 삭제
+          </button>
+        </div>
+      </div>
+
+      {/* 삭제 확인 모달 */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+            <div className="flex items-center mb-4">
+              <FiAlertTriangle className="text-red-600 w-6 h-6 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900">계정 삭제 확인</h3>
+            </div>
+            
+            <p className="text-gray-600 mb-6">
+              정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 다음 항목들이 모두 삭제됩니다:
+            </p>
+            
+            <ul className="list-disc list-inside text-sm text-gray-600 mb-6 space-y-1">
+              <li>모든 블로그 게시물</li>
+              <li>모든 댓글</li>
+              <li>업로드한 모든 파일</li>
+              <li>API 키</li>
+              <li>프로필 정보</li>
+            </ul>
+
+            {user?.authProvider === 'local' && (
+              <div className="mb-6">
+                <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 mb-2">
+                  비밀번호 확인
+                </label>
+                <input
+                  type="password"
+                  id="deletePassword"
+                  value={deletePassword}
+                  onChange={(e) => setDeletePassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  placeholder="비밀번호를 입력하세요"
+                />
+              </div>
+            )}
+
+            {error && (
+              <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 rounded-md">
+                {error}
+              </div>
+            )}
+
+            <div className="flex space-x-3">
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteLoading || (user?.authProvider === 'local' && !deletePassword)}
+                className="flex-1 px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              >
+                {deleteLoading ? '삭제 중...' : '영구 삭제'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletePassword('');
+                  setError('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -16,6 +16,11 @@ export class GoogleStrategy extends PassportStrategy(Strategy, 'google') {
       clientSecret: configService.get('GOOGLE_CLIENT_SECRET'),
       callbackURL: configService.get('GOOGLE_CALLBACK_URL'),
       scope: ['email', 'profile'],
+      // Google OAuth 2.0 공식 문서 권장 설정
+      accessType: 'offline',  // refresh token 받기 위해 필요
+      prompt: 'consent',       // 항상 동의 화면 표시 (refresh token 보장)
+      state: false,           // Guard에서 직접 처리하므로 false
+      includeGrantedScopes: true, // 점진적 권한 부여
     });
   }
 

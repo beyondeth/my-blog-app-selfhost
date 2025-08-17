@@ -21,6 +21,19 @@ export class Post {
   @Column('text')
   content: string;
 
+  @Column('text', { nullable: true })
+  content_markdown: string;  // 마크다운 원본 (편집용)
+
+  @Column({ 
+    type: 'enum', 
+    enum: ['markdown', 'html'], 
+    default: 'html'
+  })
+  content_type: 'markdown' | 'html';
+
+  @Column({ type: 'timestamp', nullable: true })
+  content_rendered_at: Date;  // 렌더링 시점
+
   @Column({ nullable: true })
   thumbnail: string;
 

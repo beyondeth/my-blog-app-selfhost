@@ -9,6 +9,7 @@ import { Role } from '../common/enums/role.enum';
 import { CreatePostDto } from './dto/create-post.dto';
 import { FilesService } from '../files/files.service';
 import { formatDate, extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
+import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 
 @Injectable()
 export class PostsService {
@@ -22,6 +23,7 @@ export class PostsService {
     @InjectRepository(Blog)
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
+    private markdownRenderer: MarkdownRendererService,
   ) {}
 
   async create(createPostDto: CreatePostDto, user: User): Promise<any> {
@@ -34,8 +36,33 @@ export class PostsService {
       throw new BadRequestException('블로그를 먼저 생성해주세요.');
     }
 
+    // 하이브리드 저장 시스템: 마크다운과 HTML 모두 저장
+    let processedContent = createPostDto.content;
+    let markdownContent = null;
+    let contentType: 'markdown' | 'html' = 'html';
+    
+    // 마크다운 콘텐츠인지 확인 (MCP에서 오는 경우)
+    if (createPostDto.content_markdown) {
+      // MCP에서 content_markdown만 보낸 경우
+      markdownContent = createPostDto.content_markdown;
+      processedContent = this.markdownRenderer.convertToHtml(markdownContent);
+      contentType = 'markdown';
+    } else if (createPostDto.content && this.isMarkdownContent(createPostDto.content)) {
+      // content가 마크다운인 경우
+      markdownContent = createPostDto.content;
+      processedContent = this.markdownRenderer.convertToHtml(markdownContent);
+      contentType = 'markdown';
+    } else if (!createPostDto.content && !createPostDto.content_markdown) {
+      // content와 content_markdown 둘 다 없는 경우
+      throw new BadRequestException('게시글 내용이 필요합니다.');
+    }
+
     const post = this.postsRepository.create({
       ...createPostDto,
+      content: processedContent, // HTML 버전 (디스플레이용)
+      content_markdown: markdownContent, // 마크다운 원본 (편집용)
+      content_type: contentType,
+      content_rendered_at: contentType === 'markdown' ? new Date() : null,
       author: user,
       blog: blog,
       blogId: blog.id,
@@ -208,17 +235,42 @@ export class PostsService {
       throw new ForbiddenException('You can only update your own posts');
     }
 
-    if (updatePostDto.content && updatePostDto.content !== post.content) {
-      await this.cleanupUnusedImages(post.id, post.content, updatePostDto.content, user.id);
+    // 하이브리드 저장 시스템: 마크다운 업데이트 처리
+    let processedContent = updatePostDto.content;
+    let markdownContent = updatePostDto.content_markdown;
+    
+    // 마크다운이 업데이트된 경우
+    if (updatePostDto.content_markdown && updatePostDto.content_markdown !== post.content_markdown) {
+      markdownContent = updatePostDto.content_markdown;
+      processedContent = this.markdownRenderer.convertToHtml(markdownContent);
+      post.content_type = 'markdown';
+      post.content_rendered_at = new Date();
+    }
+    // HTML이 직접 업데이트된 경우
+    else if (updatePostDto.content && updatePostDto.content !== post.content) {
+      processedContent = updatePostDto.content;
+      // 마크다운 원본이 없고 HTML이 변경된 경우, content_type을 html로 설정
+      if (!post.content_markdown) {
+        post.content_type = 'html';
+      }
     }
 
-    Object.assign(post, updatePostDto);
+    if (processedContent && processedContent !== post.content) {
+      await this.cleanupUnusedImages(post.id, post.content, processedContent, user.id);
+    }
+
+    // 업데이트 적용
+    Object.assign(post, {
+      ...updatePostDto,
+      content: processedContent,
+      content_markdown: markdownContent,
+    });
 
     if (updatePostDto.title && updatePostDto.title !== post.title) {
       await this.ensureUniqueSlug(post);
     }
-    if (updatePostDto.content) {
-      post.thumbnail = this.extractThumbnailFromContent(updatePostDto.content);
+    if (processedContent) {
+      post.thumbnail = this.extractThumbnailFromContent(processedContent);
     }
 
     await this.postsRepository.save(post);
@@ -621,5 +673,41 @@ export class PostsService {
     }
 
     return null;
+  }
+
+  // 마크다운 콘텐츠인지 확인하는 헬퍼 메소드
+  private isMarkdownContent(content: string): boolean {
+    if (!content) return false;
+    
+    // 마크다운 패턴 검사
+    const markdownPatterns = [
+      /^#{1,6}\s+/m, // 헤딩
+      /\*\*.*\*\*/, // 굵은 글씨
+      /\*.*\*/, // 기울임
+      /^\s*[-*+]\s+/m, // 리스트
+      /^\s*\d+\.\s+/m, // 번호 리스트
+      /```[\s\S]*?```/, // 코드 블록
+      /`[^`]+`/, // 인라인 코드
+      /\[.*?\]\(.*?\)/, // 링크
+      /!\[.*?\]\(.*?\)/, // 이미지
+      /^---$/m, // 수평선
+      /^>\s+/m, // 인용문
+    ];
+    
+    return markdownPatterns.some(pattern => pattern.test(content));
+  }
+
+  // 마크다운 재렌더링 (필요시 호출)
+  async rerenderMarkdown(postId: string): Promise<void> {
+    const post = await this.postsRepository.findOne({ where: { id: postId } });
+    if (!post || !post.content_markdown) {
+      throw new NotFoundException('Post with markdown content not found');
+    }
+    
+    post.content = this.markdownRenderer.convertToHtml(post.content_markdown);
+    post.content_rendered_at = new Date();
+    post.thumbnail = this.extractThumbnailFromContent(post.content);
+    
+    await this.postsRepository.save(post);
   }
 } 

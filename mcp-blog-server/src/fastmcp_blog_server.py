@@ -421,9 +421,8 @@ async def create_post(
     elif not content:
         return "❌ content 또는 file_path가 필요합니다."
     
-    # 마크다운 파싱 및 HTML 변환
+    # 마크다운 파싱 (HTML 변환은 백엔드에서 처리)
     metadata, body = renderer.parse_markdown(content)
-    html_content = renderer.convert_to_html(body)
     
     # 제목과 태그 결정
     final_title = title or metadata['title']
@@ -470,11 +469,12 @@ date: {datetime.now().isoformat()}
     # 포스트 생성 API 호출
     try:
         async with httpx.AsyncClient() as client:
+            # 하이브리드 저장: 마크다운 원본 전송 (60% 토큰 절약)
             response = await client.post(
                 f"{auth.api_url}/posts",
                 json={
                     "title": final_title,
-                    "content": html_content,
+                    "content_markdown": body,  # 마크다운 원본 전송
                     "tags": final_tags
                 },
                 headers={
@@ -528,9 +528,8 @@ async def create_post_from_file(file_path: str) -> str:
     except Exception as e:
         return f"❌ 파일 읽기 실패: {str(e)}"
     
-    # 마크다운 파싱 및 HTML 변환
+    # 마크다운 파싱 (HTML 변환은 백엔드에서 처리)
     metadata, body = renderer.parse_markdown(content)
-    html_content = renderer.convert_to_html(body)
     
     # 제목과 태그 결정
     final_title = metadata['title']
@@ -578,11 +577,12 @@ source: {Path(file_path).name}
     # 포스트 생성 API 호출
     try:
         async with httpx.AsyncClient() as client:
+            # 하이브리드 저장: 마크다운 원본 전송 (60% 토큰 절약)
             response = await client.post(
                 f"{auth.api_url}/posts",
                 json={
                     "title": final_title,
-                    "content": html_content,
+                    "content_markdown": body,  # 마크다운 원본 전송
                     "tags": final_tags
                 },
                 headers={

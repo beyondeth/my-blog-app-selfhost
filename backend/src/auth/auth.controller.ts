@@ -1,7 +1,11 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Res, Response } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AuthApiKeyService } from './auth-api-key.service';
+import { EmailService } from '../email/email.service';
+import { UserDeletionService } from '../users/services/user-deletion.service';
+import { SendCodeDto } from '../email/dto/send-code.dto';
+import { VerifyCodeDto } from '../email/dto/verify-code.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { KakaoAuthGuard } from './guards/kakao-auth.guard';
@@ -11,6 +15,8 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { VerifyApiKeyDto } from './dto/verify-api-key.dto';
+import { DeleteAccountDto } from './dto/delete-account.dto';
+import { User } from '../users/entities/user.entity';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -18,6 +24,8 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly authApiKeyService: AuthApiKeyService,
+    private readonly emailService: EmailService,
+    private readonly userDeletionService: UserDeletionService,
   ) {}
 
   @Public()
@@ -160,6 +168,95 @@ export class AuthController {
     res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
   }
 
+  @Public()
+  @Post('email/send-code')
+  @ApiOperation({ summary: '이메일 인증 코드 발송' })
+  @ApiResponse({ status: 200, description: '인증 코드 발송 성공' })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @ApiResponse({ status: 409, description: '이미 존재하는 이메일' })
+  async sendEmailCode(@Body() dto: SendCodeDto, @Response() res) {
+    try {
+      await this.emailService.sendVerificationCode(dto.email);
+      return res.json({ 
+        success: true,
+        message: '인증 코드가 발송되었습니다. 이메일을 확인해주세요.' 
+      });
+    } catch (error) {
+      if (error.status === 409) {
+        // ConflictException - 이미 가입된 이메일
+        return res.status(409).json({ 
+          success: false,
+          message: error.message,
+          code: 'EMAIL_ALREADY_EXISTS'
+        });
+      }
+      if (error.status === 400) {
+        return res.status(400).json({ 
+          success: false,
+          message: error.message 
+        });
+      }
+      return res.status(500).json({ 
+        success: false,
+        message: '인증 코드 발송에 실패했습니다.' 
+      });
+    }
+  }
+
+  @Public()
+  @Post('email/verify-code')
+  @ApiOperation({ summary: '이메일 인증 코드 검증' })
+  @ApiResponse({ status: 200, description: '인증 코드 검증 성공' })
+  @ApiResponse({ status: 401, description: '인증 실패' })
+  async verifyEmailCode(@Body() dto: VerifyCodeDto, @Response() res) {
+    try {
+      const result = await this.emailService.verifyCode(dto.email, dto.code);
+      return res.json({ 
+        success: true,
+        verified: result.verified,
+        sessionToken: result.sessionToken,
+        message: '이메일 인증이 완료되었습니다.' 
+      });
+    } catch (error) {
+      if (error.status === 401 || error.status === 400) {
+        return res.status(error.status).json({ 
+          success: false,
+          message: error.message 
+        });
+      }
+      return res.status(500).json({ 
+        success: false,
+        message: '인증 코드 검증에 실패했습니다.' 
+      });
+    }
+  }
+
+  @Public()
+  @Post('email/resend-code')
+  @ApiOperation({ summary: '이메일 인증 코드 재발송' })
+  @ApiResponse({ status: 200, description: '인증 코드 재발송 성공' })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  async resendEmailCode(@Body() dto: SendCodeDto, @Response() res) {
+    try {
+      await this.emailService.resendVerificationCode(dto.email);
+      return res.json({ 
+        success: true,
+        message: '인증 코드가 재발송되었습니다. 이메일을 확인해주세요.' 
+      });
+    } catch (error) {
+      if (error.status === 400) {
+        return res.status(400).json({ 
+          success: false,
+          message: error.message 
+        });
+      }
+      return res.status(500).json({ 
+        success: false,
+        message: '인증 코드 재발송에 실패했습니다.' 
+      });
+    }
+  }
+
   @Post('refresh')
   @Public()
   @ApiOperation({ summary: '토큰 갱신' })
@@ -298,5 +395,70 @@ export class AuthController {
       valid: true,
       message: 'Request signature verified successfully'
     });
+  }
+
+  @Delete('account')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '계정 탈퇴' })
+  @ApiResponse({ status: 200, description: '계정 삭제 성공' })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @ApiResponse({ status: 401, description: '인증 실패' })
+  async deleteAccount(
+    @CurrentUser() user: User,
+    @Body() dto: DeleteAccountDto,
+    @Response() res
+  ) {
+    // 비밀번호 재확인
+    const validUser = await this.authService.validateUser(user.email, dto.password);
+    if (!validUser) {
+      return res.status(401).json({
+        success: false,
+        message: '비밀번호가 일치하지 않습니다.'
+      });
+    }
+
+    try {
+      // 계정 삭제 실행
+      const result = await this.userDeletionService.deleteUserAccount(
+        user.id,
+        {
+          softDelete: dto.softDelete || false,
+          backupData: true,
+          notifyByEmail: true
+        }
+      );
+
+      // 쿠키 제거
+      res.clearCookie('access_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/',
+      });
+
+      res.clearCookie('refresh_token', {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        path: '/',
+      });
+
+      return res.json({
+        success: true,
+        message: dto.softDelete 
+          ? '계정이 비활성화되었습니다. 30일 이내에 복구 가능합니다.'
+          : '계정이 완전히 삭제되었습니다.',
+        deletionResult: {
+          deletedAt: result.deletedAt,
+          affectedRecords: result.affectedRecords,
+          backupId: result.backupId
+        }
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || '계정 삭제 중 오류가 발생했습니다.'
+      });
+    }
   }
 } 

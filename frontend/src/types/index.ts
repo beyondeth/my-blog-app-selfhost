@@ -48,6 +48,8 @@ export interface AuthContextType {
   register: (userData: RegisterForm) => Promise<void>;
   logout: (redirectTo?: string) => Promise<void>;
   refreshUser: () => Promise<void>;
+  checkAuth: () => Promise<void>;
+  clearError: () => void;
   error: string | null;
 }
 
@@ -121,6 +123,7 @@ export interface RegisterForm {
   email: string;
   password: string;
   username: string;
+  emailVerificationToken?: string;
 }
 
 export interface PostForm {

@@ -9,12 +9,13 @@ export class CreatePostDto {
   @IsString()
   title: string;
 
-  @ApiProperty({
-    description: '게시글 내용',
+  @ApiPropertyOptional({
+    description: '게시글 내용 (HTML 형식 또는 마크다운이 변환된 HTML)',
     example: '게시글의 상세 내용...',
   })
+  @IsOptional()
   @IsString()
-  content: string;
+  content?: string;
 
   @ApiPropertyOptional({
     description: '썸네일 이미지 URL',
@@ -49,4 +50,12 @@ export class CreatePostDto {
   @IsArray()
   @IsString({ each: true })
   attachedFileIds?: string[];
+
+  @ApiPropertyOptional({
+    description: '마크다운 원본 내용 (하이브리드 저장용)',
+    example: '# 제목\n\n마크다운 **내용**...',
+  })
+  @IsOptional()
+  @IsString()
+  content_markdown?: string;
 } 

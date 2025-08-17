@@ -8,6 +8,7 @@
 - **이미지 업로드**: AWS S3를 활용한 이미지 업로드 및 관리
 - **이미지 프록시**: S3 이미지를 안전하게 서빙하는 프록시 시스템
 - **사용자 인증**: JWT 기반 인증 시스템
+- **이메일 인증**: 회원가입 시 이메일 인증 코드 발송 및 검증
 - **반응형 디자인**: 모바일 친화적인 UI/UX
 - **TanStack Query**: 효율적인 데이터 페칭 및 캐싱
 
@@ -59,6 +60,7 @@ my-blog-app/
 - pnpm
 - PostgreSQL
 - AWS S3 계정
+- Gmail 계정 (이메일 인증용)
 
 
 ### 설치 및 실행
@@ -73,6 +75,11 @@ cd my-blog-app
 ```bash
 cd backend
 pnpm install
+
+# .env 파일 생성 및 설정
+cp .env.example .env
+# .env 파일을 열어 필요한 값들 설정
+
 pnpm run start:dev
 ```
 
@@ -83,7 +90,24 @@ pnpm install
 pnpm run dev
 ```
 
-4. **접속**
+4. **Gmail SMTP 설정 (이메일 인증용)**
+   
+   Gmail 계정에서 앱 비밀번호 생성:
+   1. Google 계정 설정 접속
+   2. 보안 → 2단계 인증 활성화
+   3. 앱 비밀번호 생성 (메일 선택)
+   4. 생성된 16자리 비밀번호를 `.env` 파일의 `SMTP_PASS`에 입력
+   
+   ```env
+   # .env 파일
+   SMTP_HOST=smtp.gmail.com
+   SMTP_PORT=587
+   SMTP_USER=your-email@gmail.com
+   SMTP_PASS=xxxx-xxxx-xxxx-xxxx  # 16자리 앱 비밀번호
+   SMTP_FROM=your-email@gmail.com
+   ```
+
+5. **접속**
 - Frontend: http://localhost:3001
 - Backend API: http://localhost:3000
 
@@ -113,6 +137,9 @@ pnpm run dev
 - `POST /auth/login` - 로그인
 - `POST /auth/register` - 회원가입
 - `GET /auth/profile` - 프로필 조회
+- `POST /auth/email/send-code` - 이메일 인증 코드 발송
+- `POST /auth/email/verify-code` - 이메일 인증 코드 검증
+- `POST /auth/email/resend-code` - 이메일 인증 코드 재발송
 
 ### 포스트
 - `GET /posts` - 포스트 목록

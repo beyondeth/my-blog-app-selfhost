@@ -22,7 +22,7 @@ export class Blog {
   @Column({ type: 'uuid', nullable: true, unique: true })
   userId: string;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'userId' })
   owner: User;
 

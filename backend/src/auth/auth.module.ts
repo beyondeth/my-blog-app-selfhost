@@ -9,6 +9,7 @@ import { AuthController } from './auth.controller';
 import { UsersModule } from '../users/users.module';
 import { BlogsModule } from '../blogs/blogs.module';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
+import { EmailModule } from '../email/email.module';
 import { ApiKey } from '../api-keys/entities/api-key.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
@@ -19,6 +20,7 @@ import { KakaoStrategy } from './strategies/kakao.strategy';
     UsersModule,
     BlogsModule,
     ApiKeysModule,
+    EmailModule,
     PassportModule,
     TypeOrmModule.forFeature([ApiKey]),
     JwtModule.registerAsync({
