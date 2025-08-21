@@ -1,0 +1,43 @@
+{
+  "scripts": {
+    "test:files": "jest src/files/tests --config jest.config.js",
+    "test:files:watch": "jest src/files/tests --watch --config jest.config.js",
+    "test:files:coverage": "jest src/files/tests --coverage --config jest.config.js",
+    "test:lifecycle": "jest src/files/tests/services/file-lifecycle.service.spec.ts",
+    "test:migration": "jest src/files/tests/services/file-migration.service.spec.ts",
+    "test:contextual": "jest src/files/tests/services/contextual-file.service.spec.ts",
+    "test:monitoring": "jest src/files/tests/services/file-monitoring.service.spec.ts",
+    "test:all": "jest --coverage",
+    "test:unit": "jest --testPathPattern='.spec.ts$'",
+    "test:integration": "jest --testPathPattern='.integration.spec.ts$'",
+    "test:e2e": "jest --config ./test/jest-e2e.json"
+  },
+  "jest": {
+    "moduleFileExtensions": ["js", "json", "ts"],
+    "rootDir": "src",
+    "testRegex": ".*\\.spec\\.ts$",
+    "transform": {
+      "^.+\\.(t|j)s$": "ts-jest"
+    },
+    "collectCoverageFrom": [
+      "files/**/*.(t|j)s",
+      "!files/**/*.spec.ts",
+      "!files/**/tests/**",
+      "!files/**/index.ts",
+      "!**/node_modules/**"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 85,
+        "lines": 85,
+        "statements": 85
+      }
+    },
+    "coverageDirectory": "../coverage",
+    "testEnvironment": "node",
+    "moduleNameMapper": {
+      "^@/(.*)$": "<rootDir>/$1"
+    }
+  }
+}

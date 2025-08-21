@@ -1,0 +1,3 @@
+DELETE FROM users WHERE id = '4513dd20-c23a-4d54-bd75-90b7e7bbf454';
+
+SELECT * FROM users

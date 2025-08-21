@@ -280,7 +280,7 @@ export class AuthService {
     };
 
     const accessToken = this.jwtService.sign(accessPayload, {
-      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRES_IN', '15m'),
+      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRES_IN', '1d'),
     });
 
     // Refresh Token 생성 (긴 수명)
@@ -305,7 +305,7 @@ export class AuthService {
       access_token: accessToken,
       refresh_token: refreshToken,
       token_type: 'Bearer',
-      expires_in: this.getTokenExpiresIn('JWT_ACCESS_EXPIRES_IN', '15m'),
+      expires_in: this.getTokenExpiresIn('JWT_ACCESS_EXPIRES_IN', '1d'),
       user: user.toPublicJSON(), // 보안 강화: 공개 정보만 반환
     };
   }

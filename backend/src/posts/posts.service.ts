@@ -70,7 +70,7 @@ export class PostsService {
       publishedAt: new Date(),
     });
 
-    await this.ensureUniqueSlug(post);
+    // Entity의 @BeforeInsert에서 UUID로 고유 slug 생성됨
     await this.postsRepository.save(post);
 
     let attachedFiles: File[] = [];
@@ -266,9 +266,8 @@ export class PostsService {
       content_markdown: markdownContent,
     });
 
-    if (updatePostDto.title && updatePostDto.title !== post.title) {
-      await this.ensureUniqueSlug(post);
-    }
+    // Title 변경 시 slug는 변경하지 않음 (이미 고유한 UUID 포함)
+    // SEO를 위해 기존 slug 유지가 더 좋음
     if (processedContent) {
       post.thumbnail = this.extractThumbnailFromContent(processedContent);
     }
@@ -442,29 +441,48 @@ export class PostsService {
     }
   }
 
-  // 좋아요 토글 (로그인/비로그인 모두 지원, but 로그인 유저만 실제 동작)
+  // 좋아요 토글 (최적화된 원자적 업데이트)
   async toggleLike(id: string, user: User | null): Promise<{ liked: boolean }> {
     if (!user?.id) throw new ForbiddenException('로그인한 유저만 좋아요를 누를 수 있습니다.');
-    // QueryBuilder로 post + likedBy만 join해서 불필요한 데이터 로딩 최소화
-    const post = await this.postsRepository.createQueryBuilder('post')
-      .leftJoinAndSelect('post.likedBy', 'likedBy')
-      .where('post.id = :id', { id })
-      .select([
-        'post.id', 'post.likeCount',
-        'likedBy.id',
-      ])
-      .getOne();
-    if (!post) throw new NotFoundException('Post not found');
-    const isLiked = post.likedBy?.some(likedUser => likedUser.id === user.id);
-    if (isLiked) {
-      post.likedBy = post.likedBy.filter(likedUser => likedUser.id !== user.id);
-      post.likeCount = Math.max(0, post.likeCount - 1);
-    } else {
-      if (!post.likedBy) post.likedBy = [];
-      post.likedBy.push(user);
-      post.likeCount++;
-    }
-    await this.postsRepository.save(post);
+    
+    // 1. 현재 좋아요 상태 확인 (트랜잭션 없이)
+    const existingLike = await this.postsRepository.manager
+      .query(
+        'SELECT 1 FROM post_likes WHERE "postId" = $1 AND "userId" = $2',
+        [id, user.id]
+      );
+
+    const isLiked = existingLike.length > 0;
+
+    // 2. 한 번의 트랜잭션으로 원자적 처리
+    await this.postsRepository.manager.transaction(async manager => {
+      if (isLiked) {
+        // 좋아요 취소
+        await manager.query(
+          'DELETE FROM post_likes WHERE "postId" = $1 AND "userId" = $2',
+          [id, user.id]
+        );
+        await manager.query(
+          'UPDATE posts SET "likeCount" = GREATEST(0, "likeCount" - 1), version = version + 1 WHERE id = $1',
+          [id]
+        );
+      } else {
+        // 좋아요 추가 (ON CONFLICT로 중복 방지)
+        const insertResult = await manager.query(
+          'INSERT INTO post_likes ("postId", "userId") VALUES ($1, $2) ON CONFLICT ("postId", "userId") DO NOTHING RETURNING *',
+          [id, user.id]
+        );
+        
+        // 실제로 삽입되었을 때만 카운트 증가
+        if (insertResult.length > 0) {
+          await manager.query(
+            'UPDATE posts SET "likeCount" = "likeCount" + 1, version = version + 1 WHERE id = $1',
+            [id]
+          );
+        }
+      }
+    });
+
     return { liked: !isLiked };
   }
 
@@ -516,26 +534,9 @@ export class PostsService {
     await this.postsRepository.decrement({ id: postId }, 'commentCount', 1);
   }
 
-  // slug 고유성 보장 메소드
-  private async ensureUniqueSlug(post: Post): Promise<void> {
-    if (!post.slug) {
-      // generateSlug가 호출되지 않았다면 수동으로 호출
-      post.generateSlug();
-    }
-
-    let finalSlug = post.slug;
-    let counter = 1;
-    
-    // 중복 체크 및 해결
-    while (await this.postsRepository.findOne({ where: { slug: finalSlug } })) {
-      const now = new Date();
-      const timestamp = now.getTime().toString().slice(-6);
-      finalSlug = `${post.slug}-${counter}-${timestamp}`;
-      counter++;
-    }
-    
-    post.slug = finalSlug;
-  }
+  // ❌ DEPRECATED: Entity의 @BeforeInsert에서 UUID로 고유성 보장
+  // 이 메소드는 더 이상 사용되지 않음 (DB 부하 방지)
+  // private async ensureUniqueSlug(post: Post): Promise<void> {}
 
   async generateMissingSlugs(): Promise<void> {
     const postsWithoutSlugs = await this.postsRepository.find({

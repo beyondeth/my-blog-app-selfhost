@@ -123,78 +123,128 @@ export class CommentsService {
   }
 
   async toggleLike(commentId: string, user: User): Promise<{ liked: boolean; likesCount: number; dislikesCount: number }> {
-    const comment = await this.findOne(commentId);
+    // 트랜잭션으로 원자성 보장
+    const queryRunner = this.commentsRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     
-    // 기존 좋아요/싫어요 확인
-    const existingLike = await this.commentLikesRepository.findOne({
-      where: { commentId, userId: user.id },
-    });
-
-    if (existingLike) {
-      if (existingLike.type === LikeType.LIKE) {
-        // 좋아요 취소
-        await this.commentLikesRepository.remove(existingLike);
-        comment.likesCount = Math.max(0, comment.likesCount - 1);
-        await this.commentsRepository.save(comment);
-        return { liked: false, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
-      } else {
-        // 싫어요 -> 좋아요로 변경
-        existingLike.type = LikeType.LIKE;
-        await this.commentLikesRepository.save(existingLike);
-        comment.likesCount = comment.likesCount + 1;
-        comment.dislikesCount = Math.max(0, comment.dislikesCount - 1);
-        await this.commentsRepository.save(comment);
-        return { liked: true, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
+    try {
+      // 행 잠금으로 동시성 문제 방지
+      const comment = await queryRunner.manager
+        .createQueryBuilder(Comment, 'comment')
+        .where('comment.id = :id', { id: commentId })
+        .setLock('pessimistic_write')
+        .getOne();
+        
+      if (!comment) {
+        throw new NotFoundException('Comment not found');
       }
-    } else {
-      // 새 좋아요 추가
-      const newLike = this.commentLikesRepository.create({
-        userId: user.id,
-        commentId,
-        type: LikeType.LIKE,
+      
+      // 기존 좋아요/싫어요 확인
+      const existingLike = await queryRunner.manager.findOne(CommentLike, {
+        where: { commentId, userId: user.id },
       });
-      await this.commentLikesRepository.save(newLike);
-      comment.likesCount = comment.likesCount + 1;
-      await this.commentsRepository.save(comment);
-      return { liked: true, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
+
+      let liked = false;
+      
+      if (existingLike) {
+        if (existingLike.type === LikeType.LIKE) {
+          // 좋아요 취소
+          await queryRunner.manager.remove(existingLike);
+          comment.likesCount = Math.max(0, comment.likesCount - 1);
+          liked = false;
+        } else {
+          // 싫어요 -> 좋아요로 변경
+          existingLike.type = LikeType.LIKE;
+          await queryRunner.manager.save(existingLike);
+          comment.likesCount = comment.likesCount + 1;
+          comment.dislikesCount = Math.max(0, comment.dislikesCount - 1);
+          liked = true;
+        }
+      } else {
+        // 새 좋아요 추가
+        const newLike = queryRunner.manager.create(CommentLike, {
+          userId: user.id,
+          commentId,
+          type: LikeType.LIKE,
+        });
+        await queryRunner.manager.save(newLike);
+        comment.likesCount = comment.likesCount + 1;
+        liked = true;
+      }
+      
+      await queryRunner.manager.save(comment);
+      await queryRunner.commitTransaction();
+      
+      return { liked, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
   }
 
   async toggleDislike(commentId: string, user: User): Promise<{ disliked: boolean; likesCount: number; dislikesCount: number }> {
-    const comment = await this.findOne(commentId);
+    // 트랜잭션으로 원자성 보장
+    const queryRunner = this.commentsRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
     
-    // 기존 좋아요/싫어요 확인
-    const existingLike = await this.commentLikesRepository.findOne({
-      where: { commentId, userId: user.id },
-    });
-
-    if (existingLike) {
-      if (existingLike.type === LikeType.DISLIKE) {
-        // 싫어요 취소
-        await this.commentLikesRepository.remove(existingLike);
-        comment.dislikesCount = Math.max(0, comment.dislikesCount - 1);
-        await this.commentsRepository.save(comment);
-        return { disliked: false, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
-      } else {
-        // 좋아요 -> 싫어요로 변경
-        existingLike.type = LikeType.DISLIKE;
-        await this.commentLikesRepository.save(existingLike);
-        comment.dislikesCount = comment.dislikesCount + 1;
-        comment.likesCount = Math.max(0, comment.likesCount - 1);
-        await this.commentsRepository.save(comment);
-        return { disliked: true, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
+    try {
+      // 행 잠금으로 동시성 문제 방지
+      const comment = await queryRunner.manager
+        .createQueryBuilder(Comment, 'comment')
+        .where('comment.id = :id', { id: commentId })
+        .setLock('pessimistic_write')
+        .getOne();
+        
+      if (!comment) {
+        throw new NotFoundException('Comment not found');
       }
-    } else {
-      // 새 싫어요 추가
-      const newDislike = this.commentLikesRepository.create({
-        userId: user.id,
-        commentId,
-        type: LikeType.DISLIKE,
+      
+      // 기존 좋아요/싫어요 확인
+      const existingLike = await queryRunner.manager.findOne(CommentLike, {
+        where: { commentId, userId: user.id },
       });
-      await this.commentLikesRepository.save(newDislike);
-      comment.dislikesCount = comment.dislikesCount + 1;
-      await this.commentsRepository.save(comment);
-      return { disliked: true, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
+
+      let disliked = false;
+      
+      if (existingLike) {
+        if (existingLike.type === LikeType.DISLIKE) {
+          // 싫어요 취소
+          await queryRunner.manager.remove(existingLike);
+          comment.dislikesCount = Math.max(0, comment.dislikesCount - 1);
+          disliked = false;
+        } else {
+          // 좋아요 -> 싫어요로 변경
+          existingLike.type = LikeType.DISLIKE;
+          await queryRunner.manager.save(existingLike);
+          comment.dislikesCount = comment.dislikesCount + 1;
+          comment.likesCount = Math.max(0, comment.likesCount - 1);
+          disliked = true;
+        }
+      } else {
+        // 새 싫어요 추가
+        const newDislike = queryRunner.manager.create(CommentLike, {
+          userId: user.id,
+          commentId,
+          type: LikeType.DISLIKE,
+        });
+        await queryRunner.manager.save(newDislike);
+        comment.dislikesCount = comment.dislikesCount + 1;
+        disliked = true;
+      }
+      
+      await queryRunner.manager.save(comment);
+      await queryRunner.commitTransaction();
+      
+      return { disliked, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
   }
 } 

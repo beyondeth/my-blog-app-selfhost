@@ -9,9 +9,16 @@ export class AddHybridMarkdownStorage1755000000000 implements MigrationInterface
         `);
 
         // Add content_type column to posts table (enum: 'markdown' | 'html')
-        await queryRunner.query(`
-            CREATE TYPE "posts_content_type_enum" AS ENUM('markdown', 'html')
+        // Check if enum type exists
+        const enumExists = await queryRunner.query(`
+            SELECT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'posts_content_type_enum')
         `);
+        
+        if (!enumExists[0].exists) {
+            await queryRunner.query(`
+                CREATE TYPE "posts_content_type_enum" AS ENUM('markdown', 'html')
+            `);
+        }
         
         await queryRunner.query(`
             ALTER TABLE "posts" 

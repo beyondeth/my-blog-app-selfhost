@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, ManyToMany, JoinTable, BeforeInsert, BeforeUpdate, JoinColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, ManyToMany, JoinTable, BeforeInsert, BeforeUpdate, JoinColumn, Index, VersionColumn } from 'typeorm';
+import { v4 as uuidv4 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { File } from '../../files/entities/file.entity';
@@ -70,6 +71,9 @@ export class Post {
   @Column({ nullable: true })
   publishedAt: Date;
 
+  @VersionColumn()
+  version: number;
+
   @ManyToOne(() => User, user => user.posts)
   @JoinColumn({ name: 'authorId' })
   author: User;
@@ -106,13 +110,11 @@ export class Post {
         .replace(/[^a-z0-9가-힣]/g, '-')
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '')
-        .substring(0, 80); // 길이를 줄여서 timestamp 공간 확보
+        .substring(0, 50); // UUID를 위한 공간 확보
       
-      // 날짜와 시간 추가로 고유성 보장
-      const now = new Date();
-      const date = now.toISOString().split('T')[0];
-      const timestamp = now.getTime().toString().slice(-6); // 마지막 6자리
-      this.slug = `${date}-${baseSlug}-${timestamp}`;
+      // UUID를 사용하여 완벽한 고유성 보장
+      const uniqueId = uuidv4().split('-')[0]; // UUID의 첫 부분만 사용 (8자)
+      this.slug = `${baseSlug}-${uniqueId}`;
     }
 
     // 콘텐츠가 있을 때마다 썸네일 재생성 (이미지가 추가/제거될 수 있으므로)

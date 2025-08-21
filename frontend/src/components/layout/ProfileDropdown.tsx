@@ -147,13 +147,13 @@ export default function ProfileDropdown({
 
         <DropdownMenuSeparator />
 
-        {/* Help */}
+        {/* Help Center */}
         <DropdownMenuItem 
-          onClick={() => window.open('/help', '_blank')}
+          onClick={() => handleNavigation('/help-center')}
           className="cursor-pointer"
         >
           <FiHelpCircle className="mr-2 h-4 w-4" />
-          <span>도움말</span>
+          <span>고객센터</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
