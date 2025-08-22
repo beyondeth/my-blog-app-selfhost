@@ -1,0 +1,207 @@
+'use client';
+
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
+import {
+  LayoutDashboard,
+  Users,
+  FileText,
+  Flag,
+  Settings,
+  LogOut,
+  Menu,
+  X,
+  Shield
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useAuth } from '@/hooks/useAuth';
+import { toast } from 'sonner';
+import { t } from '@/constants/adminTranslations';
+
+const navigation = [
+  { name: t.navigation.dashboard, href: '/admin', icon: LayoutDashboard },
+  { name: t.navigation.users, href: '/admin/users', icon: Users },
+  { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
+  { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
+  { name: t.navigation.settings, href: '/admin/settings', icon: Settings },
+];
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user, logout, isLoading: authLoading } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+
+  useEffect(() => {
+    console.log('AdminLayout - Auth state:', { authLoading, user, role: user?.role });
+    
+    // Auth가 로딩 중이면 대기
+    if (authLoading) {
+      console.log('AdminLayout - Still loading auth...');
+      return;
+    }
+
+    // 권한 체크
+    if (!user) {
+      console.log('AdminLayout - No user, redirecting to login');
+      toast.error('로그인이 필요합니다');
+      router.push('/login?redirect=/admin');
+      return;
+    }
+
+    console.log('AdminLayout - User role:', user.role);
+    if (user.role !== 'admin' && user.role !== 'moderator') {
+      console.log('AdminLayout - Insufficient permissions, redirecting to home');
+      toast.error('관리자 권한이 필요합니다');
+      router.push('/');
+      return;
+    }
+
+    console.log('AdminLayout - Access granted!');
+    setIsInitialized(true);
+  }, [user, router, authLoading]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      router.push('/');
+    } catch (error) {
+      toast.error('로그아웃 실패');
+    }
+  };
+
+  if (authLoading || !isInitialized) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
+
+  if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
+    return null;
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile sidebar backdrop */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-gray-600 bg-opacity-75 lg:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+
+      {/* Sidebar */}
+      <div
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white border-r border-gray-200 lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col transform ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        } transition-transform duration-300 ease-in-out lg:translate-x-0`}
+      >
+        <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-200">
+          <div className="flex items-center">
+            <div className="relative">
+              <Shield className="h-8 w-8 text-indigo-600 fill-indigo-200" />
+              <div className="absolute inset-0 h-8 w-8 animate-shimmer">
+                <Shield className="h-8 w-8 text-indigo-500 fill-transparent" />
+              </div>
+            </div>
+            <span className="ml-2 text-xl font-semibold">{t.navigation.adminPanel}</span>
+          </div>
+          <button
+            type="button"
+            className="lg:hidden"
+            onClick={() => setSidebarOpen(false)}
+          >
+            <X className="h-6 w-6" />
+          </button>
+        </div>
+
+        <nav className="flex-1 space-y-1 px-4 py-4">
+          {navigation.map((item) => {
+            const isActive = pathname === item.href;
+            const Icon = item.icon;
+            
+            // Moderator는 Settings 접근 불가
+            if (item.name === t.navigation.settings && user.role === 'moderator') {
+              return null;
+            }
+
+            return (
+              <Link
+                key={item.name}
+                href={item.href}
+                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                  isActive
+                    ? 'bg-indigo-50 text-indigo-600'
+                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                }`}
+              >
+                <Icon
+                  className={`mr-3 h-5 w-5 ${
+                    isActive ? 'text-indigo-600' : 'text-gray-400 group-hover:text-gray-500'
+                  }`}
+                />
+                {item.name}
+              </Link>
+            );
+          })}
+        </nav>
+
+        <div className="border-t border-gray-200 p-4">
+          <div className="flex items-center">
+            <img
+              className="h-8 w-8 rounded-full"
+              src={user.profileImage || `https://ui-avatars.com/api/?name=${user.username}`}
+              alt={user.username}
+            />
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-medium text-gray-700">{user.username}</p>
+              <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+            </div>
+          </div>
+          <Button
+            onClick={handleLogout}
+            variant="ghost"
+            className="mt-3 w-full justify-start"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            {t.navigation.logout}
+          </Button>
+        </div>
+      </div>
+
+      {/* Main content */}
+      <div className="lg:pl-64">
+        {/* Mobile header */}
+        <div className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm lg:hidden">
+          <button
+            type="button"
+            className="text-gray-700"
+            onClick={() => setSidebarOpen(true)}
+          >
+            <Menu className="h-6 w-6" />
+          </button>
+          <div className="flex flex-1 items-center justify-between">
+            <h1 className="text-lg font-semibold">{t.navigation.adminPanel}</h1>
+            <div className="relative">
+              <Shield className="h-6 w-6 text-indigo-600 fill-indigo-200" />
+              <div className="absolute inset-0 h-6 w-6 animate-shimmer">
+                <Shield className="h-6 w-6 text-indigo-500 fill-transparent" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Page content */}
+        <main className="py-6">
+          <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+            {children}
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

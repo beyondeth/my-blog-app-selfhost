@@ -44,15 +44,25 @@ export class PostsController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'blogSlug', required: false, type: String })
+  @ApiQuery({ name: 'isPublished', required: false, type: Boolean })
   findAll(
+    @Request() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('blogSlug') blogSlug?: string,
+    @Query('isPublished') isPublished?: string,
   ) {
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limitNumber = limit ? parseInt(limit, 10) : 10;
-    return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug);
+    const user = req.user || null;
+    
+    // isPublished 파라미터 파싱
+    let publishedFilter: boolean | undefined = undefined;
+    if (isPublished === 'true') publishedFilter = true;
+    else if (isPublished === 'false') publishedFilter = false;
+    
+    return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug, user, publishedFilter);
   }
 
   @Get('categories')

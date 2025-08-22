@@ -109,6 +109,12 @@ export default function Header() {
     setIsMobileMenuOpen(false);
   }, [pathname]);
 
+  // Admin 페이지에서는 헤더를 숨김
+  const isAdminPage = pathname?.startsWith('/admin');
+  if (isAdminPage) {
+    return null;
+  }
+
   return (
     <header className="border-b border-gray-200 sticky top-0 z-50 bg-white" ref={mobileMenuRef}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-5">

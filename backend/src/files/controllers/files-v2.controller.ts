@@ -20,6 +20,7 @@ import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../users/entities/user.entity';
 import { ContextualFileService } from '../services/contextual-file.service';
 import { FileContextType, FilePurpose } from '../entities/file-context.entity';
+import { UsersService } from '../../users/users.service';
 
 export class CreateUploadUrlDto {
   contextType: FileContextType;
@@ -35,12 +36,13 @@ export class CompleteUploadDto {
 }
 
 @ApiTags('Files V2')
-@Controller('api/v2/files')
+@Controller('files/v2')
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class FilesV2Controller {
   constructor(
     private readonly contextualFileService: ContextualFileService,
+    private readonly usersService: UsersService,
   ) {}
 
   /**
@@ -55,11 +57,18 @@ export class FilesV2Controller {
     @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.contextualFileService.uploadProfileImage(
+    const result = await this.contextualFileService.uploadProfileImage(
       user.id,
       file,
       'avatar',
     );
+    
+    // 사용자 프로필에 이미지 URL 업데이트
+    await this.usersService.update(user.id, {
+      profileImage: result.s3Key,
+    });
+    
+    return result;
   }
 
   /**

@@ -106,12 +106,29 @@ export class PostsService {
     return post;
   }
 
-  async findAll(page: number = 1, limit: number = 10, search?: string, blogSlug?: string): Promise<{ posts: any[]; total: number }> {
+  async findAll(
+    page: number = 1, 
+    limit: number = 10, 
+    search?: string, 
+    blogSlug?: string,
+    user?: User,
+    isPublished?: boolean
+  ): Promise<{ posts: any[]; total: number; page: number; totalPages: number }> {
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'files')
-      .leftJoinAndSelect('post.blog', 'blog')
-      .where('post.isPublished = :isPublished', { isPublished: true });
+      .leftJoinAndSelect('post.blog', 'blog');
+
+    // Admin can see all posts, regular users only see published posts
+    if (user?.role === Role.ADMIN) {
+      // Admin: filter by isPublished only if explicitly requested
+      if (isPublished !== undefined) {
+        query.where('post.isPublished = :isPublished', { isPublished });
+      }
+    } else {
+      // Regular users: always show only published posts
+      query.where('post.isPublished = :isPublished', { isPublished: true });
+    }
 
     if (blogSlug) {
       query.andWhere('blog.slug = :blogSlug', { blogSlug });
@@ -140,7 +157,14 @@ export class PostsService {
       commentCount: post.commentCount || 0,
     }));
 
-    return { posts: postsWithFormattedDates, total };
+    const totalPages = Math.ceil(total / limit);
+
+    return { 
+      posts: postsWithFormattedDates, 
+      total,
+      page,
+      totalPages 
+    };
   }
 
   async findOne(id: string, user?: User): Promise<any> {

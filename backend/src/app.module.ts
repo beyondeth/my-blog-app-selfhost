@@ -19,12 +19,15 @@ import { FilesModule } from './files/files.module';
 import { BlogsModule } from './blogs/blogs.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
 import { McpModule } from './mcp/mcp.module';
+import { EmailModule } from './email/email.module';
+import { ReportsModule } from './reports/reports.module';
+import { AuditModule } from './audit/audit.module';
+import { AdminModule } from './admin/admin.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
 
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
-import { EmailModule } from './email/email.module';
 
 @Module({
   imports: [
@@ -67,6 +70,9 @@ import { EmailModule } from './email/email.module';
     ApiKeysModule,
     McpModule,
     EmailModule,
+    ReportsModule,
+    AuditModule,
+    AdminModule,
     // AnalyticsModule,
   ],
   providers: [

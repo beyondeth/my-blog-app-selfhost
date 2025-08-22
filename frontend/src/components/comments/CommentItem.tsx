@@ -3,13 +3,15 @@
 import { useState, useMemo } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronDown, FiUser } from 'react-icons/fi';
+import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronDown, FiUser, FiMoreVertical, FiFlag } from 'react-icons/fi';
 import type { Comment } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import CommentForm from './CommentForm';
 import { useCommentStore } from '@/contexts/CommentContext';
 import { useToggleCommentLike, useToggleCommentDislike } from '@/hooks/useComments';
+import { useReport } from '@/hooks/useReport';
+import ReportModal from '@/components/reports/ReportModal';
 
 interface CommentItemProps {
   comment: Comment;
@@ -35,6 +37,8 @@ export default function CommentItem({
   const [isEditing, setIsEditing] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
   
   // Like/Dislike mutations
   const likeMutation = useToggleCommentLike(comment.postId);
@@ -45,6 +49,7 @@ export default function CommentItem({
 
   const canEdit = user && (user.id === comment.author.id || isAdmin);
   const canDelete = user && (user.id === comment.author.id || isAdmin);
+  const isAuthor = user?.id === comment.author.id;
 
   // Content display logic - 200 char limit
   const isLongContent = comment.content.length > 200;
@@ -120,6 +125,14 @@ export default function CommentItem({
     dislikeMutation.mutate(comment.id);
   };
 
+  const handleReport = () => {
+    const contentPreview = comment.content.length > 100 
+      ? comment.content.substring(0, 100) + '...' 
+      : comment.content;
+    openReportModal('comment', comment.id, contentPreview);
+    setShowDropdown(false);
+  };
+
   const formatTime = (dateString: string) => {
     const utcDate = new Date(dateString);
     const koreaTime = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000));
@@ -162,22 +175,58 @@ export default function CommentItem({
 
         <div className="flex-1 min-w-0">
           {/* Author Info */}
-          <div className="flex items-center gap-2 mb-2">
-            {/* Post Author Highlight */}
-            {isPostAuthor ? (
-              <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
-                @{comment.author.username || '익명'} 
-                <span className="ml-1 text-xs">작성자</span>
-              </div>
-            ) : (
-              <span className="font-medium text-sm text-gray-900">
-                {comment.author.username || '익명'}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              {/* Post Author Highlight */}
+              {isPostAuthor ? (
+                <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
+                  @{comment.author.username || '익명'} 
+                  <span className="ml-1 text-xs">작성자</span>
+                </div>
+              ) : (
+                <span className="font-medium text-sm text-gray-900">
+                  {comment.author.username || '익명'}
+                </span>
+              )}
+              
+              <span className="text-xs text-gray-500">
+                {formatTime(comment.createdAt)}
               </span>
+            </div>
+
+            {/* More Options Menu - Only show if not the author */}
+            {!isAuthor && (
+              <div className="relative">
+                <button
+                  onClick={() => setShowDropdown(!showDropdown)}
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  title="더보기"
+                >
+                  <FiMoreVertical className="w-4 h-4" />
+                </button>
+                
+                {showDropdown && (
+                  <>
+                    {/* Backdrop */}
+                    <div 
+                      className="fixed inset-0 z-10" 
+                      onClick={() => setShowDropdown(false)}
+                    />
+                    
+                    {/* Dropdown Menu */}
+                    <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                      <button
+                        onClick={handleReport}
+                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                      >
+                        <FiFlag className="mr-2 w-3 h-3" />
+                        신고
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
             )}
-            
-            <span className="text-xs text-gray-500">
-              {formatTime(comment.createdAt)}
-            </span>
           </div>
 
           {/* Comment Content */}
@@ -324,6 +373,18 @@ export default function CommentItem({
             </>
           )}
         </div>
+      )}
+
+      {/* Report Modal */}
+      {isReportModalOpen && reportTarget && (
+        <ReportModal
+          isOpen={isReportModalOpen}
+          onClose={closeReportModal}
+          onSubmit={submitReport}
+          targetTitle={reportTarget.targetTitle}
+          targetType={reportTarget.type}
+          isSubmitting={isSubmitting}
+        />
       )}
     </div>
   );

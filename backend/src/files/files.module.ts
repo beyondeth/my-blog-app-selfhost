@@ -13,6 +13,7 @@ import { ContextualFileService } from './services/contextual-file.service';
 import { FileMigrationService } from './services/file-migration.service';
 import { FileMonitoringService } from './services/file-monitoring.service';
 import { FileLifecycleService } from './services/file-lifecycle.service';
+import { UsersModule } from '../users/users.module';
 import s3Config from '../config/s3.config';
 
 @Module({
@@ -20,6 +21,7 @@ import s3Config from '../config/s3.config';
     TypeOrmModule.forFeature([File, FileContext]),
     ConfigModule.forFeature(s3Config),
     ScheduleModule.forRoot(),
+    UsersModule,
   ],
   controllers: [
     FilesController,

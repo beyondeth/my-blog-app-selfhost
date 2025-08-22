@@ -42,21 +42,35 @@ export class UsersService {
   async findOne(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({ 
       where: { id },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive']
+      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive', 'bio']
     });
     
     if (!user) {
       throw new NotFoundException('User not found');
     }
     
+    // 프로필 이미지를 프록시 URL로 변환
+    if (user.profileImage && user.profileImage.startsWith('v2/')) {
+      // 프록시 URL 사용 (공개 접근 가능)
+      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+    }
+    
     return user;
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    return this.usersRepository.findOne({ 
+    const user = await this.usersRepository.findOne({ 
       where: { email },
-      select: ['id', 'email', 'password', 'username', 'role', 'authProvider', 'isActive', 'profileImage', 'isEmailVerified']
+      select: ['id', 'email', 'password', 'username', 'role', 'authProvider', 'isActive', 'profileImage', 'isEmailVerified', 'bio']
     });
+    
+    // 프로필 이미지를 프록시 URL로 변환
+    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
+      // 프록시 URL 사용 (공개 접근 가능)
+      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+    }
+    
+    return user;
   }
 
   async findByUsername(username: string): Promise<User | null> {
@@ -67,10 +81,18 @@ export class UsersService {
   }
 
   async findByProviderId(providerId: string, provider: AuthProvider): Promise<User | null> {
-    return this.usersRepository.findOne({ 
+    const user = await this.usersRepository.findOne({ 
       where: { providerId, authProvider: provider },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'authProvider', 'providerId']
+      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'authProvider', 'providerId', 'bio']
     });
+    
+    // 프로필 이미지를 프록시 URL로 변환
+    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
+      // 프록시 URL 사용 (공개 접근 가능)
+      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+    }
+    
+    return user;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {

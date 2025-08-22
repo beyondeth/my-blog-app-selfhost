@@ -106,6 +106,68 @@ if (!response.ok) {
 
 ---
 
+## 🔒 Vibe Coding Security Guidelines
+
+### Critical Security Risks in AI-Generated Code
+
+**Statistics**: ~40-45% of AI-generated code contains security vulnerabilities
+
+### Common Vulnerabilities to Review
+
+#### Frontend Security
+1. **Insecure HTTP Connections**
+   - Always enforce HTTPS with proper TLS/SSL
+   - Add security headers (HSTS, CSP)
+   - Never transmit sensitive data over HTTP
+
+2. **XSS (Cross-Site Scripting)**
+   - Validate and sanitize ALL user inputs
+   - Use parameterized queries, never concatenate
+   - Escape output when rendering user content
+
+3. **Insecure Client Storage**
+   - NEVER store JWT/tokens in localStorage
+   - Use HttpOnly cookies for sensitive data
+   - Assume all client-side storage is accessible
+
+#### Backend Security
+1. **Authentication & Authorization**
+   - Never implement auth checks client-side only
+   - Use modern hashing (Argon2id, bcrypt)
+   - Implement proper RBAC server-side
+   - Never store passwords in plain text
+
+2. **SQL Injection**
+   - Always use parameterized queries
+   - Never concatenate user input into SQL
+   - Validate and sanitize all inputs
+
+3. **Secret Management**
+   - NEVER hardcode credentials in source
+   - Use environment variables
+   - Implement proper secret rotation
+
+### Security Checklist for AI Code
+- [ ] Review all authentication/authorization logic
+- [ ] Check for input validation on ALL user inputs  
+- [ ] Verify HTTPS enforcement
+- [ ] Audit data storage methods (especially tokens)
+- [ ] Review database query construction
+- [ ] Check for hardcoded secrets
+- [ ] Test for injection vulnerabilities
+- [ ] Verify error handling doesn't leak info
+
+### Red Flags in AI Code
+- Generic variable names without context
+- Excessive comments explaining basic logic
+- Missing error handling
+- Outdated or vulnerable dependencies
+- Client-side only validation/auth
+
+**Remember**: AI can generate functional code quickly but often misses critical security considerations. Always review and test thoroughly.
+
+---
+
 ## 🐛 일반적인 문제 해결
 
 ### 1. API 404 에러
@@ -142,3 +204,28 @@ pnpm dev
 ## 📚 추가 문서
 - [Multi-User Blog Implementation](./MULTI_USER_BLOG_IMPLEMENTATION.md)
 - [Blog System Design](./BLOG_SYSTEM_DESIGN.md)
+
+---
+
+## 📅 최근 작업 내역 (2025-08-22)
+
+### Admin Dashboard UI 개선
+1. **통계 카드 정렬 개선**
+   - 전체 신고 카드: "처리완료 / 전체" 형식으로 변경
+   - 처리 완료 퍼센트 표시 (초록색)
+   - 모든 카드의 검색창 위치 통일
+   - 검색창과 퍼센트 사이 여백 증가 (mt-3)
+
+2. **차트 개선**
+   - 주간 동향: 범례를 좌측 상단으로 이동, 툴바와 겹침 해결
+   - 사용자 분포: 3D 효과 추가 (그라데이션, 드롭쉐도우, 중앙에 실제 전체 사용자 수 표시)
+   - 성능 메트릭: 사용자 활성도 표시 (DAU/MAU 비율)
+
+3. **UI 디테일**
+   - Admin Panel 아이콘: Shield에 fill-indigo-200 + shimmer 애니메이션 추가
+   - 인기 포스트 카드: 고정 높이(h-32) + flexbox로 하단 정보 고정
+   - 사이드바 타이틀: "관리자 패널" → "Admin Panel"로 변경
+
+4. **데이터 검증**
+   - DAU/MAU: lastLoginAt 필드 기반으로 정확히 계산
+   - 통계 정확성: 포스트/사용자 평균 9.4, 댓글/포스트 평균 0.6 확인

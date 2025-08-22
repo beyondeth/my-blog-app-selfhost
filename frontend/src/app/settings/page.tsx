@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'next/navigation';
-import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle } from 'react-icons/fi';
+import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, FiLoader } from 'react-icons/fi';
 import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
+import { ko } from 'date-fns/locale/ko';
+import Image from 'next/image';
 
 export default function ProfileSettingsPage() {
   const { user, refreshUser, logout } = useAuth();
@@ -21,6 +22,9 @@ export default function ProfileSettingsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteLoading, setDeleteLoading] = useState(false);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (user) {
@@ -29,8 +33,69 @@ export default function ProfileSettingsPage() {
         email: user.email || '',
         bio: user.bio || '',
       });
+      if (user.profileImage) {
+        console.log('User profileImage:', user.profileImage);
+        // 백엔드에서 프록시 URL로 올 수 있음
+        const imageUrl = user.profileImage.startsWith('/api/') 
+          ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage.replace('/api/v1', '')}`
+          : user.profileImage;
+        setProfileImageUrl(imageUrl);
+      }
     }
   }, [user]);
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // 파일 크기 체크 (5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setError('파일 크기는 5MB 이하여야 합니다');
+      return;
+    }
+
+    // 파일 타입 체크
+    if (!file.type.startsWith('image/')) {
+      setError('이미지 파일만 업로드 가능합니다');
+      return;
+    }
+
+    setUploadingImage(true);
+    setError('');
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/v2/profile/avatar`,
+        {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '이미지 업로드에 실패했습니다');
+      }
+
+      const result = await response.json();
+      console.log('Upload result:', result);
+      
+      // 사용자 정보 새로고침
+      // refreshUser가 호출되면 useEffect가 실행되어 새로운 이미지가 자동으로 설정됨
+      await refreshUser();
+      
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message || '이미지 업로드 중 오류가 발생했습니다');
+    } finally {
+      setUploadingImage(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,16 +184,47 @@ export default function ProfileSettingsPage() {
             프로필 이미지
           </label>
           <div className="flex items-center space-x-4">
-            <div className="w-20 h-20 rounded-full bg-gray-200 flex items-center justify-center">
-              <FiUser className="w-10 h-10 text-gray-400" />
+            <div className="relative w-20 h-20 rounded-full bg-gray-200 overflow-hidden">
+              {profileImageUrl ? (
+                <Image
+                  src={profileImageUrl}
+                  alt="Profile"
+                  fill
+                  sizes="80px"
+                  className="object-cover w-full h-full"
+                  priority
+                  unoptimized
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <FiUser className="w-10 h-10 text-gray-400" />
+                </div>
+              )}
+              {uploadingImage && (
+                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
+                  <FiLoader className="w-6 h-6 text-white animate-spin" />
+                </div>
+              )}
             </div>
             <div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
               <button
                 type="button"
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                이미지 변경
+                {uploadingImage ? '업로드 중...' : '이미지 변경'}
               </button>
+              <p className="mt-1 text-xs text-gray-500">
+                JPG, PNG, GIF (최대 5MB)
+              </p>
             </div>
           </div>
         </div>

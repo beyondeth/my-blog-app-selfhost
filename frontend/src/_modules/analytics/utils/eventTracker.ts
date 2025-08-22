@@ -21,7 +21,7 @@ export class EventTracker {
     this.isTracking = true;
 
     // 스크롤 추적
-    this.addEventListner(window, 'scroll', this.throttle(this.handleScroll.bind(this), this.config.trackingInterval));
+    this.addEventListner(window, 'scroll', this.throttle(this.handleScroll.bind(this), this.config.trackingInterval || 1000));
 
     // 가시성 변경 추적
     this.addEventListner(document, 'visibilitychange', this.handleVisibilityChange.bind(this));

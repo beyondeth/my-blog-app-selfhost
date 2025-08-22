@@ -5,7 +5,7 @@ import { FiArrowLeft } from 'react-icons/fi';
 import ContentRenderer from '@/components/ui/ContentRenderer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
-import PostHeader from '@/components/posts/PostHeader';
+import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';
 import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useAuth } from '@/hooks/useAuth';
@@ -191,7 +191,7 @@ export default function PostDetailPage() {
     <>
       {/* Article Content */}
       <article className="max-w-3xl mx-auto px-6 py-16">
-        <PostHeader 
+        <PostHeaderWithReport 
           post={post}
           canEdit={canEdit}
           onBack={handleBack}

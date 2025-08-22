@@ -445,13 +445,8 @@ export class ContextualFileService {
     file: Express.Multer.File,
     context: FileContext,
   ): Promise<FileUploadResult> {
-    // S3 업로드
-    const uploadUrl = await this.s3Service.generatePresignedUploadUrl(
-      s3Key,
-      file.mimetype,
-      file.size,
-      this.getFileTypeFromContext(context.contextType),
-    );
+    // S3에 실제 파일 업로드
+    const s3Result = await this.s3Service.uploadFile(file, s3Key);
 
     // 파일 레코드 생성
     const fileRecord = this.fileRepository.create({
@@ -481,7 +476,7 @@ export class ContextualFileService {
       fileId: fileRecord.id,
       contextId: context.id,
       s3Key,
-      url: uploadUrl.uploadUrl,
+      url: s3Result.location || s3Key,
       version: context.version,
     };
   }

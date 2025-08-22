@@ -968,3 +968,23 @@ input, textarea, button, select {
   animation: shake 0.5s ease-in-out;
 }
 
+/* Shimmer animation for Admin Panel icon */
+@keyframes shimmer {
+  0% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+  }
+  100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 2s ease-in-out infinite;
+}
+

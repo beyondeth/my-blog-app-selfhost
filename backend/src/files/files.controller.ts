@@ -178,8 +178,8 @@ export class FilesController {
         this.logger.log(`🧹 [PROXY] Cleaned fileKey (removed query params): ${processedFileKey}`);
       }
       
-      // uploads/ 접두사 확인 및 추가
-      if (!processedFileKey.startsWith('uploads/')) {
+      // v2/ 또는 uploads/ 접두사 확인
+      if (!processedFileKey.startsWith('uploads/') && !processedFileKey.startsWith('v2/')) {
         processedFileKey = `uploads/${processedFileKey}`;
         this.logger.log(`📁 [PROXY] Added uploads/ prefix: ${processedFileKey}`);
       }

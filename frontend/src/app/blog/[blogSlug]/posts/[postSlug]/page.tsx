@@ -5,7 +5,7 @@ import { FiArrowLeft } from 'react-icons/fi';
 import ContentRenderer from '@/components/ui/ContentRenderer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
-import PostHeader from '@/components/posts/PostHeader';
+import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';
 import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import CommentSection from '@/components/comments/CommentSection';
@@ -198,13 +198,17 @@ export default function BlogPostDetailPage() {
           {blog ? `${blog.name}으로 돌아가기` : '블로그로 돌아가기'}
         </button>
 
-        {/* Post header */}
-        <PostHeader
+        {/* Post header with report functionality */}
+        <PostHeaderWithReport
           post={post}
           canEdit={canEditDelete}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onCopy={handleCopyContent}
+          liked={post.liked}
+          likeCount={post.likeCount}
+          onLike={handleLike}
+          onShare={handleShare}
         />
 
         {/* Author info */}
