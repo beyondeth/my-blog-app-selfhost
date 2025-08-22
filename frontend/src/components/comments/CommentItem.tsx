@@ -7,6 +7,7 @@ import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevron
 import type { Comment } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Avatar } from '@/components/ui/avatar';
 import CommentForm from './CommentForm';
 import { useCommentStore } from '@/contexts/CommentContext';
 import { useToggleCommentLike, useToggleCommentDislike } from '@/hooks/useComments';
@@ -168,9 +169,12 @@ export default function CommentItem({
       <div className="flex items-start gap-3">
         {/* Profile Avatar */}
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-            <FiUser className="w-5 h-5 text-gray-400" />
-          </div>
+          <Avatar 
+            src={comment.author.profileImage} 
+            alt={comment.author.username || '익명'}
+            fallback={comment.author.username || '익명'}
+            size="sm"
+          />
         </div>
 
         <div className="flex-1 min-w-0">

@@ -10,6 +10,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Avatar } from '@/components/ui/avatar';
 import { 
   FiUser, 
   FiSettings, 
@@ -52,17 +53,12 @@ export default function ProfileDropdown({
       <DropdownMenuTrigger asChild>
         <button className="flex items-center space-x-2 px-3 py-2 text-sm rounded-md hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
           <div className="flex items-center space-x-2">
-            {user.profileImage ? (
-              <img 
-                src={user.profileImage} 
-                alt={user.username}
-                className="w-8 h-8 rounded-full object-cover"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center">
-                <FiUser className="w-5 h-5 text-gray-400" />
-              </div>
-            )}
+            <Avatar 
+              src={user.profileImage} 
+              alt={user.username}
+              fallback={user.username}
+              size="sm"
+            />
             <span className="text-gray-700 font-medium">{user.username}</span>
             <FiChevronDown className="w-4 h-4 text-gray-500" />
           </div>

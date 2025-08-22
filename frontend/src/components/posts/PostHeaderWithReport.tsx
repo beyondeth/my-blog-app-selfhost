@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag } from 'react-icons/fi';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
+import { Avatar } from '@/components/ui/avatar';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import { useAuth } from '@/hooks/useAuth';
@@ -83,7 +84,13 @@ export default function PostHeaderWithReport({
           {/* Left: Meta Information with Like/Share */}
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center">
-              <FiUser className="mr-2 w-4 h-4" />
+              <Avatar 
+                src={post.author?.profileImage} 
+                alt={post.author?.username || 'Author'}
+                fallback={post.author?.username || 'Author'}
+                size="xs"
+                className="mr-2"
+              />
               <span className="font-medium">{post.author?.username || 'Author'}</span>
             </div>
             <div className="flex items-center">

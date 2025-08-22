@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Avatar } from '@/components/ui/avatar';
 import {
   Select,
   SelectContent,
@@ -326,10 +327,11 @@ export default function UsersManagement() {
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center space-x-3">
-                        <img
-                          className="h-8 w-8 rounded-full"
-                          src={user.profileImage || `https://ui-avatars.com/api/?name=${user.username}`}
+                        <Avatar 
+                          src={user.profileImage} 
                           alt={user.username}
+                          fallback={user.username}
+                          size="sm"
                         />
                         <div>
                           <p className="font-medium">{user.username}</p>

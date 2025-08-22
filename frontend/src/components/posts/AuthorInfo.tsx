@@ -1,6 +1,6 @@
 "use client";
 
-import { FiUser } from 'react-icons/fi';
+import { Avatar } from '@/components/ui/avatar';
 import { Post } from '@/types';
 
 interface AuthorInfoProps {
@@ -15,9 +15,13 @@ export default function AuthorInfo({
   return (
     <div className="mt-12 p-6 bg-gray-50 rounded-lg">
       <div className="flex items-start space-x-4">
-        <div className="w-12 h-12 bg-gray-200 rounded-full flex items-center justify-center flex-shrink-0">
-          <FiUser className="w-6 h-6 text-gray-400" />
-        </div>
+        <Avatar 
+          src={author?.profileImage} 
+          alt={author?.username || 'Author'}
+          fallback={author?.username || 'Author'}
+          size="lg"
+          className="flex-shrink-0"
+        />
         <div className="flex-1">
           <h3 className="text-xs font-medium text-gray-900 mb-1">
             {author?.username || 'Author'}

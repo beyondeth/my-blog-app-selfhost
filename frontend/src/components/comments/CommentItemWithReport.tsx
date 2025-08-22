@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { FiMoreVertical, FiFlag, FiEdit2, FiTrash2 } from 'react-icons/fi';
+import { Avatar } from '@/components/ui/avatar';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 
@@ -76,19 +77,12 @@ export default function CommentItemWithReport({
       <div className="flex space-x-3">
         {/* Profile Image */}
         <div className="flex-shrink-0">
-          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center">
-            {comment.author.profileImage ? (
-              <img 
-                src={comment.author.profileImage} 
-                alt={comment.author.username}
-                className="w-8 h-8 rounded-full object-cover"
-              />
-            ) : (
-              <span className="text-xs font-medium text-gray-600">
-                {comment.author.username.charAt(0).toUpperCase()}
-              </span>
-            )}
-          </div>
+          <Avatar 
+            src={comment.author.profileImage} 
+            alt={comment.author.username}
+            fallback={comment.author.username}
+            size="sm"
+          />
         </div>
 
         {/* Comment Content */}
