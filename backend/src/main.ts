@@ -23,10 +23,12 @@ async function bootstrap() {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'"],
-        imgSrc: ["'self'", "data:", "https:"],
+        imgSrc: ["'self'", "data:", "https:", "http://localhost:*", "*.s3.amazonaws.com", "*.cloudfront.net"],
+        connectSrc: ["'self'", "http://localhost:*", "https:", "*.s3.amazonaws.com", "*.cloudfront.net"],
       },
     },
     crossOriginEmbedderPolicy: false,
+    crossOriginResourcePolicy: { policy: "cross-origin" },
   }));
 
   // Compression middleware

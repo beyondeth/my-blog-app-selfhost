@@ -12,7 +12,9 @@ import {
   LogOut,
   Menu,
   X,
-  Shield
+  Shield,
+  Image,
+  Bug
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -23,7 +25,9 @@ const navigation = [
   { name: t.navigation.dashboard, href: '/admin', icon: LayoutDashboard },
   { name: t.navigation.users, href: '/admin/users', icon: Users },
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
+  { name: '이미지 관리', href: '/admin/images', icon: Image },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
+  { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: t.navigation.settings, href: '/admin/settings', icon: Settings },
 ];
 
@@ -124,8 +128,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             const isActive = pathname === item.href;
             const Icon = item.icon;
             
-            // Moderator는 Settings 접근 불가
-            if (item.name === t.navigation.settings && user.role === 'moderator') {
+            // Moderator는 Settings와 Debug 접근 불가
+            if ((item.name === t.navigation.settings || item.adminOnly) && user.role === 'moderator') {
               return null;
             }
 

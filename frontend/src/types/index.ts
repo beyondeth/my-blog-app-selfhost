@@ -16,14 +16,17 @@ export const AuthProvider = {
 export type AuthProviderType = typeof AuthProvider[keyof typeof AuthProvider];
 
 export interface User {
-  readonly id: number;
+  readonly id: string;
   readonly email: string;
   readonly username: string;
   readonly profileImage?: string;
   readonly bio?: string;
   readonly role: UserRoleType;
   readonly authProvider: AuthProviderType;
+  readonly providerId?: string;
   readonly isEmailVerified: boolean;
+  readonly isActive?: boolean;
+  readonly lastLoginAt?: string;
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -53,9 +56,26 @@ export interface AuthContextType {
   error: string | null;
 }
 
+// 블로그 관련 타입
+export interface Blog {
+  readonly id: string;
+  readonly slug: string;
+  readonly name: string;
+  readonly description?: string;
+  readonly thumbnailUrl?: string;
+  readonly userId: string;
+  readonly owner?: User;
+  readonly posts?: Post[];
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly postCount?: number;
+  readonly isPublic?: boolean;
+  readonly allowComments?: boolean;
+}
+
 // 게시글 관련 타입
 export interface Post {
-  id: number;
+  id: string;
   title: string;
   slug: string;
   content: string;
@@ -71,6 +91,8 @@ export interface Post {
   updatedAt: string;
   publishedAt?: string;
   author: User;
+  blog?: Blog;
+  blogId?: string;
   comments?: Comment[];
   likedBy?: User[];
   attachedFiles?: FileUpload[];

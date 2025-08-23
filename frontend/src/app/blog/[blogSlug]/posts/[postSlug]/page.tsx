@@ -69,10 +69,10 @@ export default function BlogPostDetailPage() {
   });
 
   const handleEdit = useCallback(() => {
-    if (post) {
-      router.push(`/posts/edit/${post.slug || post.id}`);
+    if (post && blog) {
+      router.push(`/blog/${blog.slug}/posts/${post.slug || post.id}/edit`);
     }
-  }, [post, router]);
+  }, [post, blog, router]);
 
   const handleDelete = useCallback(() => {
     setDeleteDialogOpen(true);
@@ -187,69 +187,57 @@ export default function BlogPostDetailPage() {
   const canEditDelete = isAuthor || isAdmin;
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-900">
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        {/* Back to blog button */}
-        <button
-          onClick={() => router.push(`/blog/${blogSlug}`)}
-          className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white mb-6"
-        >
-          <FiArrowLeft className="mr-2 h-4 w-4" />
-          {blog ? `${blog.name}으로 돌아가기` : '블로그로 돌아가기'}
-        </button>
-
-        {/* Post header with report functionality */}
-        <PostHeaderWithReport
+    <>
+      {/* Article Content - /posts/[slug] 스타일 적용 */}
+      <article className="max-w-3xl mx-auto px-6 py-16">
+        <PostHeaderWithReport 
           post={post}
           canEdit={canEditDelete}
+          onBack={() => router.push(`/blog/${blogSlug}`)}
           onEdit={handleEdit}
           onDelete={handleDelete}
-          onCopy={handleCopyContent}
-          liked={post.liked}
-          likeCount={post.likeCount}
-          onLike={handleLike}
-          onShare={handleShare}
-        />
-
-        {/* Author info */}
-        <AuthorInfo
-          author={post.author}
-        />
-
-        {/* Post content */}
-        <article className="prose prose-lg dark:prose-invert max-w-none mt-8">
-          <ContentRenderer content={post.content} />
-        </article>
-
-        {/* Post actions */}
-        <div className="flex items-center justify-between mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
-          <div className="flex items-center space-x-4">
+          LikeButtonComponent={
             <LikeButton
-              liked={post.liked}
-              likeCount={post.likeCount}
+              liked={post.liked || false}
+              likeCount={post.likeCount || 0}
               onClick={handleLike}
-              disabled={likeMutation.isPending}
+              tooltip={!user ? '로그인 후 좋아요 가능' : undefined}
             />
-            <button
-              onClick={handleShare}
-              className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-white transition-colors"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m9.032 4.026a9.001 9.001 0 01-7.432 0m9.032-4.026A9.001 9.001 0 0112 3c-4.474 0-8.268 3.12-9.032 7.326m0 0A9.001 9.001 0 0012 21c4.474 0 8.268-3.12 9.032-7.326" />
-              </svg>
-              <span>공유</span>
-            </button>
-          </div>
+          }
+          onShare={handleShare}
+          onCopy={handleCopyContent}
+        />
+
+        {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}
+        <div className="blog-content">
+          <ContentRenderer content={post.content} />
         </div>
 
-        {/* Comments Section */}
-        <CommentSection
-          postId={post.id.toString()}
+        {/* Tags */}
+        {post.tags && post.tags.length > 0 && (
+          <div className="mt-16 pt-8 border-t border-gray-100">
+            <div className="flex flex-wrap gap-2">
+              {post.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 cursor-pointer transition-colors"
+                >
+                  #{tag}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <AuthorInfo author={post.author} />
+
+        {/* 댓글 섹션 */}
+        <CommentSection 
+          postId={String(post.id)}
           postAuthorId={post.author?.id?.toString()}
         />
-      </div>
-
-      {/* Delete confirmation dialog */}
+      </article>
+      
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}
         onClose={handleCloseDeleteDialog}
@@ -259,6 +247,6 @@ export default function BlogPostDetailPage() {
         title="게시글을 삭제하시겠습니까?"
         description={`"${post.title}" 게시글이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}
       />
-    </div>
+    </>
   );
 }

@@ -83,11 +83,11 @@ export class Report {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'reportedById' })
   reportedBy: User;
 
-  @ManyToOne(() => User, { nullable: true })
+  @ManyToOne(() => User, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'reviewedById' })
   reviewedBy: User;
 

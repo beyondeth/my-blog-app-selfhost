@@ -1,5 +1,7 @@
 import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
+import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -30,8 +32,9 @@ export class PostsController {
   ) {}
 
   @Post()
-  @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '게시글 작성' })
+  @UseGuards(JwtAuthGuard, PostsThrottlerGuard)
+  @Throttle({ default: { limit: 15, ttl: 3600000 } }) // 시간당 15개 제한
+  @ApiOperation({ summary: '게시글 작성 (시간당 15개 제한)' })
   @ApiBearerAuth()
   create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: User) {
     return this.postsService.create(createPostDto, user);
@@ -154,5 +157,15 @@ export class PostsController {
   async relinkFiles() {
     await this.postsService.relinkContentFiles();
     return { message: 'Files relinked successfully' };
+  }
+
+  @Post(':id/view')
+  @Public()
+  @ApiOperation({ summary: '게시글 조회수 증가' })
+  @ApiResponse({ status: 200, description: '조회수 증가 성공' })
+  @ApiResponse({ status: 404, description: '게시글을 찾을 수 없음' })
+  async incrementViewCount(@Param('id') id: string) {
+    await this.postsService.incrementViewCount(id);
+    return { message: 'View count incremented' };
   }
 } 

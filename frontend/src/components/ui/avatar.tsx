@@ -49,38 +49,7 @@ export function Avatar({
   const showFallback = !imageUrl || imageError;
 
   if (showFallback) {
-    // If we have a fallback name, show initial letters
-    if (fallback) {
-      const initials = fallback
-        .split(' ')
-        .map(word => word[0])
-        .join('')
-        .toUpperCase()
-        .slice(0, 2);
-
-      return (
-        <div
-          className={cn(
-            sizeClasses[size],
-            'rounded-full bg-gradient-to-br from-amber-400 to-amber-600 flex items-center justify-center text-white font-medium cursor-pointer hover:opacity-90 transition-opacity',
-            className
-          )}
-          onClick={onClick}
-        >
-          <span className={cn(
-            size === 'xs' && 'text-xs',
-            size === 'sm' && 'text-sm',
-            size === 'md' && 'text-base',
-            size === 'lg' && 'text-lg',
-            size === 'xl' && 'text-xl'
-          )}>
-            {initials}
-          </span>
-        </div>
-      );
-    }
-
-    // Default icon fallback
+    // Always use default icon fallback for users without profile image
     return (
       <div
         className={cn(

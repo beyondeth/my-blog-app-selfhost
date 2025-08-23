@@ -34,6 +34,14 @@ export default function PostDetailPage() {
     // TODO: toast/모달/로그인 라우팅 등으로 대체 가능
   });
 
+  // 포스트 데이터가 로드되면 블로그 URL로 리다이렉트
+  useEffect(() => {
+    if (post && post.blog?.slug) {
+      // 올바른 블로그 URL로 리다이렉트
+      router.replace(`/blog/${post.blog.slug}/posts/${post.slug || post.id}`);
+    }
+  }, [post, router]);
+
 
   const handleEdit = useCallback(() => {
     if (post) {
@@ -233,7 +241,7 @@ export default function PostDetailPage() {
         <AuthorInfo author={post.author} />
 
         {/* 댓글 섹션 */}
-        <CommentSection postId={post.id} />
+        <CommentSection postId={String(post.id)} />
       </article>
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}

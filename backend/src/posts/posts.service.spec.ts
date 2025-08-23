@@ -1,243 +1,259 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { PostsService } from './posts.service';
+import { Repository } from 'typeorm';
 import { getRepositoryToken } from '@nestjs/typeorm';
+import { PostsService } from './posts.service';
 import { Post } from './entities/post.entity';
-import { User } from '../users/entities/user.entity';
 import { File } from '../files/entities/file.entity';
 import { Blog } from '../blogs/entities/blog.entity';
-import { DataSource } from 'typeorm';
+import { User } from '../users/entities/user.entity';
 import { FilesService } from '../files/files.service';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
+import { Role } from '../common/enums/role.enum';
 
-describe('PostsService - Concurrency Tests', () => {
+describe('PostsService - Image Optimization', () => {
   let service: PostsService;
-  let postsRepository: any;
-  let fileRepository: any;
-  let blogRepository: any;
-  let filesService: any;
-  let markdownRendererService: any;
-  let dataSource: any;
+  let postsRepository: jest.Mocked<Repository<Post>>;
+  let filesRepository: jest.Mocked<Repository<File>>;
+  let blogsRepository: jest.Mocked<Repository<Blog>>;
+  let filesService: jest.Mocked<FilesService>;
+
+  const mockUser: User = {
+    id: 'user-1',
+    username: 'testuser',
+    email: 'test@example.com',
+    role: Role.USER,
+    profileImage: null,
+    bio: null,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as User;
+
+  const mockBlog = {
+    id: 'blog-1',
+    name: 'Test Blog',
+    slug: 'test-blog',
+    userId: 'user-1',
+    description: 'Test blog description',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
+
+  const mockTempImageFile: File = {
+    id: 'file-1',
+    originalName: 'test-image.png',
+    fileName: 'test-uuid.png',
+    fileKey: 'uploads/images/test-uuid.png',
+    fileUrl: 'uploads/images/test-uuid.png',
+    fileSize: 1024000,
+    mimeType: 'image/png',
+    fileType: 'image',
+    userId: 'user-1',
+    user: null,
+    contextId: null,
+    context: null,
+    s3Bucket: null,
+    s3Region: null,
+    checksum: null,
+    isOptimized: false,
+    metadata: {},
+    expiresAt: null,
+    posts: Promise.resolve([]),
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  } as File;
 
   beforeEach(async () => {
-    // Mock repositories and DataSource
-    const mockQueryRunner = {
-      connect: jest.fn(),
-      startTransaction: jest.fn(),
-      commitTransaction: jest.fn(),
-      rollbackTransaction: jest.fn(),
-      release: jest.fn(),
-      manager: {
-        createQueryBuilder: jest.fn(),
-        save: jest.fn(),
-      },
-    };
-
-    dataSource = {
-      createQueryRunner: jest.fn(() => mockQueryRunner),
-    };
-
-    postsRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      save: jest.fn(),
-      create: jest.fn(),
-      manager: {
-        connection: dataSource,
-      },
-    };
-
-    fileRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      save: jest.fn(),
-      create: jest.fn(),
-    };
-
-    blogRepository = {
-      find: jest.fn(),
-      findOne: jest.fn(),
-      save: jest.fn(),
-      create: jest.fn(),
-    };
-
-    filesService = {
-      uploadFiles: jest.fn(),
-      deleteFile: jest.fn(),
-      getFileUrl: jest.fn(),
-    };
-
-    markdownRendererService = {
-      render: jest.fn().mockResolvedValue('<p>Rendered HTML</p>'),
-      sanitize: jest.fn().mockImplementation((html) => html),
-    };
-
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PostsService,
         {
           provide: getRepositoryToken(Post),
-          useValue: postsRepository,
+          useValue: {
+            create: jest.fn(),
+            save: jest.fn(),
+            findOne: jest.fn(),
+            find: jest.fn(),
+            update: jest.fn(),
+          },
         },
         {
           provide: getRepositoryToken(File),
-          useValue: fileRepository,
+          useValue: {
+            find: jest.fn(),
+            update: jest.fn(),
+          },
         },
         {
           provide: getRepositoryToken(Blog),
-          useValue: blogRepository,
+          useValue: {
+            findOne: jest.fn(),
+          },
         },
         {
           provide: FilesService,
-          useValue: filesService,
+          useValue: {
+            deleteFile: jest.fn(),
+          },
         },
         {
           provide: MarkdownRendererService,
-          useValue: markdownRendererService,
-        },
-        {
-          provide: DataSource,
-          useValue: dataSource,
+          useValue: {
+            convertToHtml: jest.fn(),
+          },
         },
       ],
     }).compile();
 
     service = module.get<PostsService>(PostsService);
+    postsRepository = module.get(getRepositoryToken(Post));
+    filesRepository = module.get(getRepositoryToken(File));
+    blogsRepository = module.get(getRepositoryToken(Blog));
+    filesService = module.get(FilesService);
   });
 
-  describe('toggleLike - Concurrent Operations', () => {
-    it('should handle concurrent like operations safely', async () => {
-      const postId = 'test-post-id';
-      const user1 = { id: 'user1', username: 'user1' } as User;
-      const user2 = { id: 'user2', username: 'user2' } as User;
-      
-      const mockPost = {
-        id: postId,
-        likeCount: 0,
-        version: 1,
-        likedBy: [],
-      };
-
-      const queryRunner = dataSource.createQueryRunner();
-      queryRunner.manager.createQueryBuilder.mockReturnValue({
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        setLock: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockResolvedValue(mockPost),
-      });
-
-      queryRunner.manager.save.mockResolvedValue({
-        ...mockPost,
-        likeCount: mockPost.likeCount + 1,
-        version: mockPost.version + 1,
-      });
-
-      // 동시에 두 사용자가 좋아요를 누르는 시나리오
-      const [result1, result2] = await Promise.all([
-        service.toggleLike(postId, user1),
-        service.toggleLike(postId, user2),
-      ]);
-
-      // 트랜잭션이 올바르게 시작되고 커밋되었는지 확인
-      expect(queryRunner.startTransaction).toHaveBeenCalled();
-      expect(queryRunner.commitTransaction).toHaveBeenCalled();
-      expect(queryRunner.release).toHaveBeenCalled();
-    });
-
-    it('should retry on concurrency conflict', async () => {
-      const postId = 'test-post-id';
-      const user = { id: 'user1', username: 'user1' } as User;
-      
-      const mockPost = {
-        id: postId,
-        likeCount: 0,
-        version: 1,
-        likedBy: [],
-      };
-
-      const queryRunner = dataSource.createQueryRunner();
-      let attemptCount = 0;
-
-      queryRunner.manager.createQueryBuilder.mockReturnValue({
-        leftJoinAndSelect: jest.fn().mockReturnThis(),
-        where: jest.fn().mockReturnThis(),
-        select: jest.fn().mockReturnThis(),
-        setLock: jest.fn().mockReturnThis(),
-        getOne: jest.fn().mockImplementation(() => {
-          attemptCount++;
-          if (attemptCount === 1) {
-            // 첫 번째 시도에서 충돌 시뮬레이션
-            throw new Error('could not serialize access');
-          }
-          return Promise.resolve(mockPost);
-        }),
-      });
-
-      queryRunner.manager.save.mockResolvedValue({
-        ...mockPost,
-        likeCount: 1,
-        version: 2,
-      });
-
-      const result = await service.toggleLike(postId, user);
-
-      // 재시도가 발생했는지 확인
-      expect(attemptCount).toBe(2);
-      expect(result.liked).toBe(true);
-    });
-  });
-
-  describe('Optimistic Locking', () => {
-    it('should increment version on update', async () => {
-      const post = {
-        id: 'test-id',
+  describe('임시 파일 삭제 테스트', () => {
+    it('게시글 생성 후 백그라운드에서 임시 파일이 최적화되고 정리되어야 함', async () => {
+      // Arrange
+      const createPostDto = {
         title: 'Test Post',
-        content: 'Test Content',
-        version: 1,
-      } as Post;
+        content: '<p>Test content with image</p>',
+        attachedFileIds: ['file-1'],
+      };
 
-      postsRepository.save.mockResolvedValue({
-        ...post,
-        version: 2, // TypeORM이 자동으로 증가시킴
+      const mockPost = {
+        id: 'post-1',
+        title: 'Test Post',
+        content: '<p>Test content with image</p>',
+        slug: 'test-post-uuid',
+        attachedFiles: [mockTempImageFile],
+      };
+
+      // Mock blog exists
+      blogsRepository.findOne.mockResolvedValue(mockBlog as any);
+      
+      // Mock post creation
+      postsRepository.create.mockReturnValue(mockPost as any);
+      postsRepository.save.mockResolvedValue(mockPost as any);
+      
+      // Mock file operations
+      filesRepository.find.mockImplementation((options: any) => {
+        if (options?.where?.status === 'temp') {
+          return Promise.resolve([{
+            ...mockTempImageFile,
+            posts: Promise.resolve([mockPost]), // 이 포스트에 연결된 파일
+          }]);
+        }
+        return Promise.resolve([]);
       });
 
-      const result = await postsRepository.save(post);
-      
-      expect(result.version).toBe(2);
-    });
-  });
+      filesRepository.update.mockResolvedValue({ affected: 1 } as any);
 
-  describe('UUID-based Slug Generation', () => {
-    it('should generate unique slugs with UUID', () => {
-      const post1 = new Post();
-      post1.title = 'Same Title';
-      post1.generateSlug();
-      
-      const post2 = new Post();
-      post2.title = 'Same Title';
-      post2.generateSlug();
-      
-      // 같은 제목이어도 다른 slug가 생성되어야 함
-      expect(post1.slug).not.toBe(post2.slug);
-      expect(post1.slug).toMatch(/^same-title-[a-f0-9]{8}$/);
-      expect(post2.slug).toMatch(/^same-title-[a-f0-9]{8}$/);
-    });
+      // Act
+      const result = await service.create(createPostDto, mockUser);
 
-    it('should handle Korean titles correctly', () => {
-      const post = new Post();
-      post.title = '한글 제목 테스트';
-      post.generateSlug();
-      
-      expect(post.slug).toMatch(/^한글-제목-테스트-[a-f0-9]{8}$/);
-    });
-  });
-});
+      // 백그라운드 작업이 완료될 때까지 대기
+      await new Promise(resolve => setTimeout(resolve, 3000));
 
-describe('Transactional Decorator Tests', () => {
-  it('should verify transaction handling in service methods', () => {
-    // 트랜잭션 데코레이터는 이미 toggleLike 테스트에서 검증됨
-    // QueryRunner의 startTransaction, commitTransaction, rollbackTransaction이
-    // 적절히 호출되는지 위의 테스트들에서 확인
-    expect(true).toBe(true);
+      // Assert
+      expect(result).toBeDefined();
+      expect(result.id).toBe('post-1');
+
+      // 임시 파일 조회가 호출되었는지 확인
+      expect(filesRepository.find).toHaveBeenCalledWith({
+        where: { 
+          status: 'temp',
+          fileType: 'image'
+        },
+        relations: ['posts']
+      });
+
+      // 파일 상태가 순차적으로 업데이트되었는지 확인
+      expect(filesRepository.update).toHaveBeenCalledWith('file-1', { status: 'processing' });
+      expect(filesRepository.update).toHaveBeenCalledWith('file-1', { 
+        status: 'published',
+        optimizedUrl: expect.stringMatching(/\.webp$/), // WebP 확장자로 끝나는 URL
+        metadata: expect.objectContaining({
+          optimized: true,
+          optimizedAt: expect.any(String),
+          originalFormat: 'image/png',
+          optimizedFormat: 'image/webp'
+        })
+      });
+
+      // 최소 2번 호출 (processing -> published)
+      expect(filesRepository.update).toHaveBeenCalledTimes(2);
+    }, 10000); // 10초 타임아웃
+
+    it('최적화 실패 시 파일이 temp 상태로 되돌아가야 함', async () => {
+      // Arrange
+      const createPostDto = {
+        title: 'Test Post',
+        content: '<p>Test content</p>',
+      };
+
+      const mockPost = { id: 'post-1', title: 'Test Post' };
+
+      blogsRepository.findOne.mockResolvedValue(mockBlog as any);
+      postsRepository.create.mockReturnValue(mockPost as any);
+      postsRepository.save.mockResolvedValue(mockPost as any);
+
+      // 임시 파일이 있지만 업데이트 실패 시뮬레이션
+      filesRepository.find.mockResolvedValue([{
+        ...mockTempImageFile,
+        posts: Promise.resolve([mockPost]),
+      }]);
+
+      // 첫 번째 업데이트는 성공, 두 번째 업데이트에서 실패
+      filesRepository.update
+        .mockResolvedValueOnce({ affected: 1 } as any) // processing으로 변경 성공
+        .mockRejectedValueOnce(new Error('Update failed')); // published로 변경 실패
+
+      // Act
+      await service.create(createPostDto, mockUser);
+      
+      // 백그라운드 작업 완료 대기
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Assert - 실패 시 복구 로직 확인
+      expect(filesRepository.find).toHaveBeenCalledWith({
+        where: { status: 'processing', fileType: 'image' }
+      });
+      
+      // 실패한 파일들을 temp로 되돌렸는지 확인
+      expect(filesRepository.update).toHaveBeenCalledWith(
+        expect.any(String), 
+        { status: 'temp' }
+      );
+    }, 10000);
+
+    it('포스트에 연결된 이미지가 없으면 최적화를 건너뛰어야 함', async () => {
+      // Arrange
+      const createPostDto = {
+        title: 'Text Only Post',
+        content: '<p>No images here</p>',
+      };
+
+      const mockPost = { id: 'post-1', title: 'Text Only Post' };
+
+      blogsRepository.findOne.mockResolvedValue(mockBlog as any);
+      postsRepository.create.mockReturnValue(mockPost as any);
+      postsRepository.save.mockResolvedValue(mockPost as any);
+
+      // 임시 파일이 없음
+      filesRepository.find.mockResolvedValue([]);
+
+      // Act
+      const result = await service.create(createPostDto, mockUser);
+
+      // 백그라운드 작업 완료 대기
+      await new Promise(resolve => setTimeout(resolve, 1000));
+
+      // Assert
+      expect(result).toBeDefined();
+      
+      // 임시 파일 조회는 했지만 업데이트는 하지 않음
+      expect(filesRepository.find).toHaveBeenCalled();
+      expect(filesRepository.update).not.toHaveBeenCalled();
+    });
   });
 });

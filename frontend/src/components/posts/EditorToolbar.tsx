@@ -43,7 +43,13 @@ export default function EditorToolbar({
   }) => (
     <button
       type="button"
-      onClick={onClick}
+      onMouseDown={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!disabled) {
+          onClick();
+        }
+      }}
       disabled={disabled}
       title={title}
       className={`p-2 rounded transition-colors ${

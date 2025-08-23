@@ -10,9 +10,9 @@ interface PostArticleProps {
   post: Post;
   isAdmin: boolean;
   isAuthenticated: boolean;
-  userId?: number;
+  userId?: string;
   onEdit: (slug: string) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: string) => void;
   isDeleting?: boolean;
 }
 

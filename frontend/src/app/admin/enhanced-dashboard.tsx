@@ -591,9 +591,9 @@ export default function EnhancedDashboard() {
     {
       title: t.dashboard.totalReports,
       value: `${stats?.reports.resolved || 0} / ${stats?.reports.total || 0}`,
-      valueLabel: '처리완료 / 전체',
-      change: stats?.reports.total > 0 
-        ? Math.round((stats.reports.resolved / stats.reports.total) * 100) 
+      subtitle: '처리완료 / 전체',
+      change: (stats?.reports?.total || 0) > 0 
+        ? Math.round(((stats?.reports?.resolved || 0) / (stats?.reports?.total || 1)) * 100) 
         : 0,
       changeLabel: '처리 완료',
       icon: Flag,
@@ -995,7 +995,7 @@ export default function EnhancedDashboard() {
                   <circle
                     className="text-indigo-600"
                     strokeWidth="5"
-                    strokeDasharray={`${(stats?.metrics.dau / stats?.metrics.mau) * 188.5 || 0} 188.5`}
+                    strokeDasharray={`${((stats?.metrics?.dau || 0) / (stats?.metrics?.mau || 1)) * 188.5} 188.5`}
                     strokeLinecap="round"
                     stroke="currentColor"
                     fill="transparent"
@@ -1006,7 +1006,7 @@ export default function EnhancedDashboard() {
                   />
                 </svg>
                 <span className="absolute text-lg font-semibold">
-                  {Math.round((stats?.metrics.dau / stats?.metrics.mau) * 100) || 0}%
+                  {Math.round(((stats?.metrics?.dau || 0) / (stats?.metrics?.mau || 1)) * 100)}%
                 </span>
               </div>
               <p className="text-sm font-medium mt-2">DAU/MAU 비율</p>

@@ -206,8 +206,8 @@ export default function ReportsManagement() {
 
   const handleBatchAction = async (action: string) => {
     const selectedIds = reports
-      .filter(r => r.status === 'pending')
-      .map(r => r.id);
+      .filter((r: any) => r.status === 'pending')
+      .map((r: any) => r.id);
 
     if (selectedIds.length === 0) {
       toast.error('업데이트할 대기 중인 신고가 없습니다');
@@ -262,7 +262,7 @@ export default function ReportsManagement() {
     };
   };
 
-  const filteredReports = reports.filter((report) => {
+  const filteredReports = reports.filter((report: any) => {
     const matchesSearch = 
       report.description?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       report.reportedBy?.username.toLowerCase().includes(searchTerm.toLowerCase());
@@ -369,7 +369,7 @@ export default function ReportsManagement() {
               {t.actions.refresh}
             </Button>
           </div>
-          {(statusFilter === 'pending' || statusFilter === '') && reports.some(r => r.status === 'pending') && (
+          {(statusFilter === 'pending' || statusFilter === '') && reports.some((r: any) => r.status === 'pending') && (
             <div className="mt-4 flex gap-2">
               <Button
                 size="sm"
@@ -420,7 +420,7 @@ export default function ReportsManagement() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredReports.map((report) => {
+                filteredReports.map((report: any) => {
                   const targetInfo = getTargetInfo(report);
                   return (
                     <TableRow key={report.id}>

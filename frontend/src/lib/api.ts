@@ -143,17 +143,24 @@ class ApiClient {
   }
 
   private handleError(error: any): ApiError {
-    // 보안 강화된 로거 사용 (민감한 데이터 자동 제거)
-    apiLogger.error('API Error', {
-      url: error.config?.url,
-      method: error.config?.method,
-      status: error.response?.status,
-      // data는 민감할 수 있어 제외
-    });
+    const status = error.response?.status;
+    
+    // 401, 404 에러는 정상적인 상황이므로 로그에서 제외
+    // 401: 인증 실패 (로그아웃 상태)
+    // 404: 리소스 없음 (이미 삭제된 파일 등)
+    if (status !== 401 && status !== 404) {
+      // 보안 강화된 로거 사용 (민감한 데이터 자동 제거)
+      apiLogger.error('API Error', {
+        url: error.config?.url,
+        method: error.config?.method,
+        status: status,
+        // data는 민감할 수 있어 제외
+      });
+    }
 
     const apiError: ApiError = {
       message: error.response?.data?.message || error.message || 'An error occurred',
-      statusCode: error.response?.status || 500,
+      statusCode: status || 500,
       error: error.response?.data?.error,
       details: error.response?.data?.details,
     };
@@ -227,7 +234,7 @@ class ApiClient {
     });
   }
 
-  async getPost(id: number): Promise<Post> {
+  async getPost(id: string): Promise<Post> {
     return this.request<Post>({
       method: 'GET',
       url: `/posts/${id}`,
@@ -249,7 +256,7 @@ class ApiClient {
     });
   }
 
-  async updatePost(id: number, data: Partial<PostForm>): Promise<Post> {
+  async updatePost(id: string, data: Partial<PostForm>): Promise<Post> {
     return this.request<Post>({
       method: 'PATCH',
       url: `/posts/${id}`,
@@ -257,14 +264,14 @@ class ApiClient {
     });
   }
 
-  async deletePost(id: number): Promise<void> {
+  async deletePost(id: string): Promise<void> {
     return this.request<void>({
       method: 'DELETE',
       url: `/posts/${id}`,
     });
   }
 
-  async toggleLike(id: number): Promise<{ liked: boolean }> {
+  async toggleLike(id: string): Promise<{ liked: boolean }> {
     return this.request<{ liked: boolean }>({
       method: 'POST',
       url: `/posts/${id}/like`,
@@ -272,7 +279,7 @@ class ApiClient {
   }
 
   // 여러 포스트의 좋아요 상태를 한 번에 서버로 전송 (배치)
-  async batchUpdateLikes(batch: Record<number, boolean>): Promise<void> {
+  async batchUpdateLikes(batch: Record<string, boolean>): Promise<void> {
     // TODO: 실제 엔드포인트에 맞게 구현
     // return this.request({ method: 'POST', url: '/posts/likes/batch', data: batch });
     return Promise.resolve();
@@ -381,7 +388,7 @@ class ApiClient {
     });
   }
 
-  async deleteFile(id: number): Promise<void> {
+  async deleteFile(id: string): Promise<void> {
     return this.request<void>({
       method: 'DELETE',
       url: `/files/${id}`,
@@ -396,7 +403,10 @@ class ApiClient {
   }
 
   // 통합 파일 업로드 메서드
-  async uploadFile(file: File, fileType: 'image' | 'document' | 'video' | 'general' = 'general'): Promise<FileUpload> {
+  async uploadFile(
+    file: File, 
+    fileType: 'image' | 'document' | 'video' | 'general' = 'general'
+  ): Promise<FileUpload> {
     try {
       apiLogger.debug('uploadFile started', {
         fileName: file.name,
@@ -572,14 +582,49 @@ export const apiClient = new ApiClient();
 export const postsAPI = {
   getPosts: (params?: { page?: number; limit?: number; search?: string; category?: string; blogSlug?: string; }) => 
     apiClient.getPosts(params),
-  getPost: (id: number) => apiClient.getPost(id),
+  getPost: (id: string) => apiClient.getPost(id),
   getPostBySlug: (slug: string) => apiClient.getPostBySlug(slug),
   createPost: (data: PostForm) => apiClient.createPost(data),
-  updatePost: (id: number, data: Partial<PostForm>) => apiClient.updatePost(id, data),
-  deletePost: (id: number) => apiClient.deletePost(id),
-  toggleLike: (id: number) => apiClient.toggleLike(id),
-  batchUpdateLikes: (batch: Record<number, boolean>) => apiClient.batchUpdateLikes(batch),
+  updatePost: (id: string, data: Partial<PostForm>) => apiClient.updatePost(id, data),
+  deletePost: (id: string) => apiClient.deletePost(id),
+  toggleLike: (id: string) => apiClient.toggleLike(id),
+  batchUpdateLikes: (batch: Record<string, boolean>) => apiClient.batchUpdateLikes(batch),
 };
+
+// Export individual functions for convenience with proper binding
+export const login = (...args: Parameters<typeof apiClient.login>) => apiClient.login(...args);
+export const register = (...args: Parameters<typeof apiClient.register>) => apiClient.register(...args);
+export const logout = (...args: Parameters<typeof apiClient.logout>) => apiClient.logout(...args);
+export const getProfile = (...args: Parameters<typeof apiClient.getProfile>) => apiClient.getProfile(...args);
+export const refreshAuthToken = (...args: Parameters<typeof apiClient.refreshToken>) => apiClient.refreshToken(...args);
+export const getPosts = (...args: Parameters<typeof apiClient.getPosts>) => apiClient.getPosts(...args);
+export const getPost = (...args: Parameters<typeof apiClient.getPost>) => apiClient.getPost(...args);
+export const getPostBySlug = (...args: Parameters<typeof apiClient.getPostBySlug>) => apiClient.getPostBySlug(...args);
+export const createPost = (...args: Parameters<typeof apiClient.createPost>) => apiClient.createPost(...args);
+export const updatePost = (...args: Parameters<typeof apiClient.updatePost>) => apiClient.updatePost(...args);
+export const deletePost = (...args: Parameters<typeof apiClient.deletePost>) => apiClient.deletePost(...args);
+export const toggleLike = (...args: Parameters<typeof apiClient.toggleLike>) => apiClient.toggleLike(...args);
+export const batchUpdateLikes = (...args: Parameters<typeof apiClient.batchUpdateLikes>) => apiClient.batchUpdateLikes(...args);
+export const getComments = (...args: Parameters<typeof apiClient.getComments>) => apiClient.getComments(...args);
+export const createComment = (...args: Parameters<typeof apiClient.createComment>) => apiClient.createComment(...args);
+export const updateComment = (...args: Parameters<typeof apiClient.updateComment>) => apiClient.updateComment(...args);
+export const deleteComment = (...args: Parameters<typeof apiClient.deleteComment>) => apiClient.deleteComment(...args);
+export const toggleCommentLike = (...args: Parameters<typeof apiClient.toggleCommentLike>) => apiClient.toggleCommentLike(...args);
+export const getBlogs = (...args: Parameters<typeof apiClient.getBlogs>) => apiClient.getBlogs(...args);
+export const createBlog = (...args: Parameters<typeof apiClient.createBlog>) => apiClient.createBlog(...args);
+export const getMyBlogs = (...args: Parameters<typeof apiClient.getMyBlogs>) => apiClient.getMyBlogs(...args);
+export const getBlogBySlug = (...args: Parameters<typeof apiClient.getBlogBySlug>) => apiClient.getBlogBySlug(...args);
+export const updateBlog = (...args: Parameters<typeof apiClient.updateBlog>) => apiClient.updateBlog(...args);
+export const deleteBlog = (...args: Parameters<typeof apiClient.deleteBlog>) => apiClient.deleteBlog(...args);
+export const createUploadUrl = (...args: Parameters<typeof apiClient.createUploadUrl>) => apiClient.createUploadUrl(...args);
+export const uploadComplete = (...args: Parameters<typeof apiClient.uploadComplete>) => apiClient.uploadComplete(...args);
+export const getFileStats = (...args: Parameters<typeof apiClient.getFileStats>) => apiClient.getFileStats(...args);
+export const deleteFile = (...args: Parameters<typeof apiClient.deleteFile>) => apiClient.deleteFile(...args);
+export const createApiKey = (...args: Parameters<typeof apiClient.createApiKey>) => apiClient.createApiKey(...args);
+export const getApiKeys = (...args: Parameters<typeof apiClient.getApiKeys>) => apiClient.getApiKeys(...args);
+export const deleteApiKey = (...args: Parameters<typeof apiClient.deleteApiKey>) => apiClient.deleteApiKey(...args);
+export const googleAuth = (...args: Parameters<typeof apiClient.googleAuth>) => apiClient.googleAuth(...args);
+export const kakaoAuth = (...args: Parameters<typeof apiClient.kakaoAuth>) => apiClient.kakaoAuth(...args);
 
 // Export for backward compatibility
 export default apiClient; 

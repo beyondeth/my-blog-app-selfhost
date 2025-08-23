@@ -148,7 +148,7 @@ export const adminTranslations = {
     totalViews: '전체 조회수',
     
     // Table Headers
-    title: '제목',
+    postTitle: '제목',
     author: '작성자',
     status: '상태',
     category: '카테고리',

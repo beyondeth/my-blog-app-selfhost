@@ -7,7 +7,7 @@ export function useUpdatePost() {
   const router = useRouter();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => postsAPI.updatePost(id, data),
+    mutationFn: ({ id, data }: { id: string; data: any }) => postsAPI.updatePost(id, data),
     onSuccess: (updatedPost) => {
       // 최신 데이터로 캐시 동기화
       queryClient.setQueryData(['posts', 'detail', updatedPost.slug], updatedPost);

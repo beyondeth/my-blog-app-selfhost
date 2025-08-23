@@ -30,4 +30,5 @@ export class CreateUploadUrlDto {
   @IsOptional()
   @IsIn(['image', 'document', 'video', 'general'])
   fileType?: string = 'general';
+
 } 

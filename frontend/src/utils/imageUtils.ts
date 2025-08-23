@@ -48,11 +48,12 @@ export function getProxyImageUrl(s3Key: string): string {
   }
   
   // uploads/ 접두사가 없으면 추가
-  if (!cleanKey.startsWith('uploads/')) {
+  if (!cleanKey.startsWith('uploads/') && !cleanKey.startsWith('v2/')) {
     cleanKey = `uploads/${cleanKey}`;
   }
   
-  const proxyUrl = `${BACKEND_URL}/api/v1/files/proxy/${cleanKey}`;
+  // API_URL 사용 - /api/v1 이미 포함되어 있음
+  const proxyUrl = `${API_URL}/files/proxy/${cleanKey}`;
   
   if (DEBUG_MODE) {
     console.log('[imageUtils] Generated proxy URL:', {
@@ -72,17 +73,14 @@ export function normalizeImageUrl(url: string): string {
   if (!url) return '';
 
   try {
-    // 이미 localhost 프록시 URL인 경우
-    if (url.includes('localhost:3000/api/v1/files/proxy/')) {
-      return url;
-    }
-
-    // 상대 경로 프록시 URL인 경우
+    // 이미 완전한 프록시 URL인 경우
     if (url.includes('/api/v1/files/proxy/')) {
-      const match = url.match(/\/api\/v1\/files\/proxy\/(.+)/);
-      if (match) {
-        return getProxyImageUrl(match[1]);
+      // 이미 정확한 형식이면 그대로 반환
+      if (url.startsWith('http')) {
+        return url;
       }
+      // 상대 경로인 경우 절대 경로로 변환
+      return `${API_URL.replace('/api/v1', '')}${url}`;
     }
 
     // S3 직접 URL인 경우

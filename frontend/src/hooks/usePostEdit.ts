@@ -46,7 +46,7 @@ export function usePostEdit({ slugOrId }: UsePostEditOptions) {
        // slug인지 ID인지 판단하여 적절한 메서드 사용
        const isNumericId = /^\d+$/.test(slugOrId);
        if (isNumericId) {
-         return await apiClient.getPost(parseInt(slugOrId));
+         return await apiClient.getPost(slugOrId);
        } else {
          return await apiClient.getPostBySlug(slugOrId);
        }

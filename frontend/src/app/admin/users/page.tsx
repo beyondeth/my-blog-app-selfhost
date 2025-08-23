@@ -202,7 +202,7 @@ export default function UsersManagement() {
               <div>
                 <p className="text-sm text-gray-600">{t.dashboard.activeUsers}</p>
                 <p className="text-2xl font-semibold">
-                  {users.filter(u => u.isActive).length}
+                  {users.filter((u: any) => u.isActive).length}
                 </p>
               </div>
               <Activity className="h-8 w-8 text-green-500" />
@@ -215,7 +215,7 @@ export default function UsersManagement() {
               <div>
                 <p className="text-sm text-gray-600">{t.status.verified}</p>
                 <p className="text-2xl font-semibold">
-                  {users.filter(u => u.isEmailVerified).length}
+                  {users.filter((u: any) => u.isEmailVerified).length}
                 </p>
               </div>
               <Mail className="h-8 w-8 text-blue-500" />
@@ -228,7 +228,7 @@ export default function UsersManagement() {
               <div>
                 <p className="text-sm text-gray-600">{t.users.admin}</p>
                 <p className="text-2xl font-semibold">
-                  {users.filter(u => u.role === 'admin').length}
+                  {users.filter((u: any) => u.role === 'admin').length}
                 </p>
               </div>
               <Shield className="h-8 w-8 text-indigo-500" />
@@ -282,7 +282,7 @@ export default function UsersManagement() {
                 <SelectItem value="inactive">{t.status.inactive}</SelectItem>
               </SelectContent>
             </Select>
-            <Button onClick={fetchUsers} variant="outline">
+            <Button onClick={() => fetchUsers()} variant="outline">
               <RefreshCw className="h-4 w-4 mr-2" />
               {t.actions.refresh}
             </Button>
@@ -323,7 +323,7 @@ export default function UsersManagement() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredUsers.map((user) => (
+                filteredUsers.map((user: any) => (
                   <TableRow key={user.id}>
                     <TableCell>
                       <div className="flex items-center space-x-3">

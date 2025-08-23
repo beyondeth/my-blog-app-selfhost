@@ -58,40 +58,46 @@ export class AdminUsersService {
     sortBy = 'createdAt',
     sortOrder: 'ASC' | 'DESC' = 'DESC',
   ) {
-    const where: FindOptionsWhere<User> = {};
+    // Use QueryBuilder for complex queries with OR conditions
+    let query = this.userRepository.createQueryBuilder('user');
 
-    if (filters.role) where.role = filters.role;
-    if (filters.isActive !== undefined) where.isActive = filters.isActive;
-    if (filters.isEmailVerified !== undefined) where.isEmailVerified = filters.isEmailVerified;
+    // Apply filters
+    if (filters.role) {
+      query = query.andWhere('user.role = :role', { role: filters.role });
+    }
+    
+    if (filters.isActive !== undefined) {
+      query = query.andWhere('user.isActive = :isActive', { isActive: filters.isActive });
+    }
+    
+    if (filters.isEmailVerified !== undefined) {
+      query = query.andWhere('user.isEmailVerified = :isEmailVerified', { 
+        isEmailVerified: filters.isEmailVerified 
+      });
+    }
     
     if (filters.search) {
-      // Search in email and username
-      where.email = Like(`%${filters.search}%`);
-      // Note: For OR conditions, we'd need QueryBuilder
+      // Search in both email and username using OR
+      query = query.andWhere(
+        '(user.email LIKE :search OR user.username LIKE :search)',
+        { search: `%${filters.search}%` }
+      );
     }
 
     if (filters.startDate && filters.endDate) {
-      where.createdAt = Between(filters.startDate, filters.endDate);
+      query = query.andWhere('user.createdAt BETWEEN :startDate AND :endDate', {
+        startDate: filters.startDate,
+        endDate: filters.endDate,
+      });
     }
 
-    const [users, total] = await this.userRepository.findAndCount({
-      where,
-      order: { [sortBy]: sortOrder },
-      skip: (page - 1) * limit,
-      take: limit,
-      select: [
-        'id',
-        'email',
-        'username',
-        'role',
-        'isActive',
-        'isEmailVerified',
-        'authProvider',
-        'lastLoginAt',
-        'createdAt',
-        'updatedAt',
-      ],
-    });
+    // Apply sorting and pagination
+    query = query
+      .orderBy(`user.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [users, total] = await query.getManyAndCount();
 
     // Get additional stats for each user
     const usersWithStats = await Promise.all(

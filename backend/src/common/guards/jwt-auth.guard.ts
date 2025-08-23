@@ -10,7 +10,18 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   }
 
   canActivate(context: ExecutionContext) {
-    // isPublic 체크는 handleRequest에서 수행하므로 여기서는 항상 인증 시도
+    // Check if the route is marked as public
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+    
+    // If it's a public route, skip authentication
+    if (isPublic) {
+      return true;
+    }
+    
+    // Otherwise, proceed with JWT authentication
     return super.canActivate(context);
   }
 

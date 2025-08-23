@@ -28,6 +28,7 @@ export default function BlogNewPostPage() {
   const [attachedFileIds, setAttachedFileIds] = useState<string[]>([]);
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const { user } = useAuth();
   const router = useRouter();
@@ -85,12 +86,19 @@ export default function BlogNewPostPage() {
     e.preventDefault();
     setError('');
 
+    // 이미 제출 중이거나 mutation이 진행 중이면 중복 실행 방지
+    if (isSubmitting || createPostMutation.isPending) {
+      return;
+    }
+
     if (!blog) {
       setError('블로그 정보를 확인할 수 없습니다.');
       return;
     }
 
     try {
+      setIsSubmitting(true); // 작성 완료 진행 중 플래그 설정
+      
       const newPost = await createPostMutation.mutateAsync({
         title,
         content,
@@ -104,6 +112,7 @@ export default function BlogNewPostPage() {
       // Use the blog slug from the current page since we already have it
       router.push(`/blog/${blogSlug}/posts/${newPost.slug || newPost.id}`);
     } catch (error: any) {
+      setIsSubmitting(false); // 에러 발생 시 플래그 리셋
       setError(error.message || '게시글 작성에 실패했습니다.');
     }
   };
@@ -114,6 +123,24 @@ export default function BlogNewPostPage() {
 
   const handleFilesChange = (fileIds: string[]) => {
     setAttachedFileIds(fileIds);
+  };
+
+  const handleCancel = async () => {
+    // 작성 취소 시 업로드된 파일들 수동 cleanup
+    try {
+      // RichTextEditor에서 imageTracker 인스턴스를 가져오기 위해
+      // 글로벌 이벤트를 통해 force cleanup 요청
+      window.dispatchEvent(new CustomEvent('cleanup-uploaded-files', { detail: { force: true } }));
+      
+      // 약간의 지연 후 페이지 이동
+      setTimeout(() => {
+        router.push(`/blog/${blogSlug}`);
+      }, 100);
+    } catch (error) {
+      console.error('Failed to cleanup files:', error);
+      // 에러가 있어도 페이지는 이동
+      router.push(`/blog/${blogSlug}`);
+    }
   };
 
   if (loading) {
@@ -205,6 +232,7 @@ export default function BlogNewPostPage() {
                 onChange={handleContentChange}
                 onFilesChange={handleFilesChange}
                 className="min-h-[500px]"
+                enableCleanupOnUnmount={!isSubmitting}
               />
               
               <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 flex items-center space-x-4">
@@ -223,7 +251,7 @@ export default function BlogNewPostPage() {
             <div className="flex items-center justify-between pt-6 border-t border-gray-200 dark:border-gray-700">
               <button
                 type="button"
-                onClick={() => router.push(`/blog/${blogSlug}`)}
+                onClick={handleCancel}
                 className="px-6 py-3 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-lg shadow-sm hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
               >
                 취소

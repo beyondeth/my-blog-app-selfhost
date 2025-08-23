@@ -107,8 +107,7 @@ export class UserDeletionService {
     const user = await this.dataSource
       .getRepository(User)
       .findOne({ 
-        where: { id: userId },
-        relations: ['blogs']
+        where: { id: userId }
       });
 
     if (!user) {

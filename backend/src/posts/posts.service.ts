@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In, SelectQueryBuilder } from 'typeorm';
+import { Repository, Like, In, SelectQueryBuilder, MoreThan } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { User } from '../users/entities/user.entity';
 import { File } from '../files/entities/file.entity';
@@ -14,6 +14,7 @@ import { MarkdownRendererService } from '../common/services/markdown-renderer.se
 @Injectable()
 export class PostsService {
   private readonly logger = new Logger(PostsService.name);
+  private readonly MAX_POST_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
 
   constructor(
     @InjectRepository(Post)
@@ -34,6 +35,20 @@ export class PostsService {
 
     if (!blog) {
       throw new BadRequestException('블로그를 먼저 생성해주세요.');
+    }
+
+    // 중복 포스트 생성 방지: 동일한 사용자가 동일한 제목으로 10초 내에 포스트 생성하는 것을 방지
+    const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
+    const existingPost = await this.postsRepository.findOne({
+      where: {
+        title: createPostDto.title,
+        author: { id: user.id },
+        createdAt: MoreThan(tenSecondsAgo),
+      },
+    });
+
+    if (existingPost) {
+      throw new BadRequestException('동일한 제목의 게시글을 너무 빠르게 생성할 수 없습니다. 잠시 후 다시 시도해주세요.');
     }
 
     // 하이브리드 저장 시스템: 마크다운과 HTML 모두 저장
@@ -78,6 +93,10 @@ export class PostsService {
       attachedFiles = await this.filesRepository.find({
         where: { id: In(createPostDto.attachedFileIds), userId: user.id },
       });
+      
+      // 포스트당 총 파일 용량 검증
+      await this.validatePostTotalSize(attachedFiles);
+      
       post.attachedFiles = attachedFiles;
       await this.postsRepository.save(post);
     }
@@ -511,7 +530,7 @@ export class PostsService {
   }
 
   // 조회수 증가 (로그인 유저만)
-  private async incrementViewCount(post: Post, user: User) {
+  private async incrementViewCountForUser(post: Post, user: User) {
     if (!user?.id) return;
     post.viewCount = (post.viewCount || 0) + 1;
     await this.postsRepository.save(post);
@@ -520,6 +539,19 @@ export class PostsService {
   // 조회수 증가 (모든 사용자)
   private async incrementViewCountForAll(postId: string): Promise<void> {
     await this.postsRepository.increment({ id: postId }, 'viewCount', 1);
+  }
+
+  // 공개 API: 조회수 증가 (모든 사용자)
+  async incrementViewCount(postId: string): Promise<void> {
+    const post = await this.postsRepository.findOne({
+      where: { id: postId, isPublished: true }
+    });
+    
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+    
+    await this.incrementViewCountForAll(postId);
   }
 
   async getCategories(): Promise<string[]> {
@@ -613,57 +645,27 @@ export class PostsService {
   }
 
   // 사용되지 않는 이미지 파일 정리 (S3 + DB)
+  // @deprecated 자동 삭제 비활성화 - 사용자가 수동으로 관리하도록 변경
   private async cleanupUnusedImages(postId: string, oldContent: string, newContent: string, userId: string): Promise<void> {
+    // 자동 이미지 삭제 비활성화
+    // 이유: 사용자가 나중에 재사용할 수 있는 이미지를 보존하기 위함
+    // 추후 사용자 대시보드에서 수동 관리 기능 제공 예정
+    this.logger.log('[Image Cleanup] Auto-cleanup disabled - preserving all uploaded images');
+    
+    // 분석용 로깅만 수행 (실제 삭제는 하지 않음)
     try {
-      // 기존 콘텐츠와 새 콘텐츠에서 이미지 URL 추출
       const oldImageUrls = this.extractImageUrlsFromContent(oldContent);
       const newImageUrls = this.extractImageUrlsFromContent(newContent);
-
-      // 제거된 이미지 URL 찾기
       const removedImageUrls = oldImageUrls.filter(url => !newImageUrls.includes(url));
-
-      if (removedImageUrls.length === 0) {
-        this.logger.log(`No images removed from post ${postId}`);
-        return;
+      
+      if (removedImageUrls.length > 0) {
+        this.logger.log(`[Image Cleanup] ${removedImageUrls.length} images removed from post ${postId} (not deleted):`, removedImageUrls);
       }
-
-      this.logger.log(`Found ${removedImageUrls.length} removed images from post ${postId}:`, removedImageUrls);
-
-      // S3 키 추출
-      const s3Keys = removedImageUrls
-        .map(url => this.extractS3KeyFromUrl(url))
-        .filter(Boolean) as string[];
-
-      if (s3Keys.length === 0) {
-        this.logger.warn(`No valid S3 keys extracted from removed images in post ${postId}`);
-        return;
-      }
-
-      // DB에서 해당 파일들 찾기
-      const filesToDelete = await this.filesRepository.find({
-        where: {
-          fileKey: In(s3Keys),
-          userId: userId,
-        },
-      });
-
-      this.logger.log(`Found ${filesToDelete.length} files to delete from DB`);
-
-      // 각 파일을 S3와 DB에서 삭제
-      for (const file of filesToDelete) {
-        try {
-          // S3에서 파일 삭제 - 임시 타입 캐스팅
-          await this.filesService.deleteFile(file.id, userId);
-          this.logger.log(`✅ Deleted file: ${file.fileKey} (ID: ${file.id})`);
-        } catch (error) {
-          this.logger.error(`❌ Failed to delete file ${file.fileKey}:`, error.message);
-        }
-      }
-
-      this.logger.log(`🧹 Cleanup completed for post ${postId}: ${filesToDelete.length} files deleted`);
     } catch (error) {
-      this.logger.error(`Failed to cleanup unused images for post ${postId}:`, error.message);
+      this.logger.error('[Image Cleanup] Analysis failed:', error.message);
     }
+    
+    return;
   }
 
   // 콘텐츠에서 이미지 URL 추출 (img 태그의 src 속성)
@@ -698,6 +700,83 @@ export class PostsService {
     }
 
     return null;
+  }
+
+  /**
+   * 포스트당 총 파일 용량 검증
+   * @param files 업로드할 파일들
+   * @param existingPostId 기존 포스트 ID (수정 시)
+   */
+  async validatePostTotalSize(files: File[], existingPostId?: string): Promise<void> {
+    let totalSize = 0;
+
+    // 신규 파일들의 총 크기 계산
+    for (const file of files) {
+      totalSize += file.fileSize || 0;
+    }
+
+    // 기존 포스트 수정인 경우, 이미 업로드된 파일들의 크기도 포함
+    if (existingPostId) {
+      // Post와 연관된 파일들을 찾기 위해 FileContext를 통해 조회
+      const existingPost = await this.postsRepository.findOne({
+        where: { id: existingPostId },
+        relations: ['attachedFiles'],
+      });
+      
+      if (existingPost?.attachedFiles) {
+        for (const existingFile of existingPost.attachedFiles) {
+          // 새로 추가되는 파일과 중복되지 않는 경우만 계산
+          if (!files.some(f => f.id === existingFile.id)) {
+            totalSize += existingFile.fileSize || 0;
+          }
+        }
+      }
+    }
+
+    // 30MB 제한 체크
+    if (totalSize > this.MAX_POST_TOTAL_SIZE) {
+      const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+      const limitMB = (this.MAX_POST_TOTAL_SIZE / (1024 * 1024)).toFixed(0);
+      
+      throw new BadRequestException({
+        error: 'POST_SIZE_LIMIT_EXCEEDED',
+        message: `포스트당 최대 ${limitMB}MB까지 업로드 가능합니다. 현재 크기: ${totalSizeMB}MB`,
+        current: totalSize,
+        limit: this.MAX_POST_TOTAL_SIZE,
+      });
+    }
+  }
+
+  /**
+   * 신규 파일 업로드 시 포스트 용량 체크
+   */
+  async validateNewFileForPost(postId: string, newFileSize: number): Promise<void> {
+    // Post와 연관된 파일들을 찾기
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+      relations: ['attachedFiles'],
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const existingFiles = post.attachedFiles || [];
+    const totalSize = existingFiles.reduce((sum, file) => sum + (file.fileSize || 0), 0);
+
+    if (totalSize + newFileSize > this.MAX_POST_TOTAL_SIZE) {
+      const currentSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+      const newSizeMB = (newFileSize / (1024 * 1024)).toFixed(2);
+      const limitMB = (this.MAX_POST_TOTAL_SIZE / (1024 * 1024)).toFixed(0);
+      
+      throw new BadRequestException({
+        error: 'POST_SIZE_LIMIT_EXCEEDED',
+        message: `포스트당 최대 ${limitMB}MB까지 업로드 가능합니다. 현재: ${currentSizeMB}MB, 추가하려는 파일: ${newSizeMB}MB`,
+        current: totalSize,
+        limit: this.MAX_POST_TOTAL_SIZE,
+        requested: newFileSize,
+      });
+    }
   }
 
   // 마크다운 콘텐츠인지 확인하는 헬퍼 메소드
@@ -735,4 +814,5 @@ export class PostsService {
     
     await this.postsRepository.save(post);
   }
+
 } 

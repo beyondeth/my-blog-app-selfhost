@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Image from '@tiptap/extension-image';
@@ -10,21 +10,56 @@ import { Color } from '@tiptap/extension-color';
 import Placeholder from '@tiptap/extension-placeholder';
 import TextAlign from '@tiptap/extension-text-align';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
+import Heading from '@tiptap/extension-heading';
+import Highlight from '@tiptap/extension-highlight';
+import Underline from '@tiptap/extension-underline';
+import Subscript from '@tiptap/extension-subscript';
+import Superscript from '@tiptap/extension-superscript';
+import { Extension } from '@tiptap/core';
+import Suggestion from '@tiptap/suggestion';
 import { common, createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
 
 // 리팩토링된 훅들 사용
 import { useUploadFile } from '@/hooks/useFiles';
+import { usePostImageTracker } from '@/hooks/usePostImageTracker';
 import { validateImageFile } from '@/utils/imageUtils';
 import { getProxyImageUrl, normalizeImageUrl, debugLog } from '@/utils/imageUtils';
 import { getErrorMessage } from '@/utils/queryHelpers';
-import EditorToolbar from './EditorToolbar';
+import EnhancedEditorToolbar from './EnhancedEditorToolbar';
 import { stripUnderline } from '@/utils/stripUnderline';
+import { toast } from 'sonner';
+import { suggestion } from './SlashCommands';
 
 // lowlight 인스턴스 생성 및 언어 등록 - Context7 권장사항
 const lowlight = createLowlight(common);
 lowlight.register({ javascript, typescript, js: javascript, ts: typescript });
+
+// 슬래시 커맨드 Extension
+const SlashCommands = Extension.create({
+  name: 'slashCommands',
+  
+  addOptions() {
+    return {
+      suggestion,
+    };
+  },
+  
+  addProseMirrorPlugins() {
+    return [
+      Suggestion({
+        editor: this.editor,
+        char: '/',
+        startOfLine: false,
+        command: ({ editor, range, props }) => {
+          props.command({ editor, range });
+        },
+        ...this.options.suggestion,
+      }),
+    ];
+  },
+});
 
 // 커스텀 이미지 확장 - 리사이징 지원
 const ResizableImage = Image.extend({
@@ -181,12 +216,15 @@ const ResizableImage = Image.extend({
   },
 });
 
+
 interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   onFilesChange?: (fileIds: string[]) => void;
   placeholder?: string;
   className?: string;
+  // 포스트 작성 취소시 cleanup 사용 여부
+  enableCleanupOnUnmount?: boolean;
 }
 
 export default function BlogRichTextEditor({ 
@@ -194,20 +232,25 @@ export default function BlogRichTextEditor({
   onChange, 
   onFilesChange,
   placeholder = "내용을 입력하세요...",
-  className = ""
+  className = "",
+  enableCleanupOnUnmount = false
 }: RichTextEditorProps) {
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const editorRef = useRef<any>(null);
 
   // 리팩토링된 파일 업로드 훅 사용
   const uploadMutation = useUploadFile();
+  
+  // 포스트 이미지 용량 추적
+  const imageTracker = usePostImageTracker();
 
   // onChange 핸들러를 useCallback으로 메모이제이션
   const handleEditorUpdate = useCallback((html: string) => {
     onChange(html);
   }, [onChange]);
 
-  // 파일 업로드 핸들러
+  // 파일 업로드 핸들러 - 즉시 업로드 방식 (원래 로직)
   const handleImageUpload = useCallback(async (file: File): Promise<string> => {
     try {
       setIsUploading(true);
@@ -218,6 +261,12 @@ export default function BlogRichTextEditor({
         throw new Error(validation.error);
       }
 
+      // 포스트 총 용량 체크
+      if (!imageTracker.canAddFile(file.size)) {
+        throw new Error('포스트 용량 초과');
+      }
+
+      // 즉시 업로드 수행
       const result = await uploadMutation.mutateAsync({ 
         file, 
         fileType: 'image' 
@@ -227,18 +276,31 @@ export default function BlogRichTextEditor({
       const fileId = result.id.toString();
       setUploadedFiles(prev => {
         const newFiles = [...prev, fileId];
-        onFilesChange?.(newFiles);
+        // useEffect에서 호출하도록 지연
+        setTimeout(() => {
+          onFilesChange?.(newFiles);
+        }, 0);
         return newFiles;
       });
       
-      // 프록시 URL 생성
-      const proxyUrl = result.fileKey 
+      // 이미지 트래커에 파일 추가 (useEffect에서 호출하도록 지연)
+      setTimeout(() => {
+        imageTracker.addFile({
+          id: fileId,
+          size: file.size,
+          name: file.name
+        });
+      }, 0);
+      
+      // 백엔드에서 반환한 accessUrl 사용 (백엔드 권한 존중)
+      const proxyUrl = result.accessUrl || (result.fileKey 
         ? getProxyImageUrl(result.fileKey)
-        : getProxyImageUrl(result.fileUrl);
+        : getProxyImageUrl(result.fileUrl));
       
       debugLog('Image upload completed', {
         originalUrl: result.fileUrl,
         fileKey: result.fileKey,
+        accessUrl: result.accessUrl,
         proxyUrl: proxyUrl,
       });
       
@@ -248,21 +310,27 @@ export default function BlogRichTextEditor({
       
       // 사용자 친화적인 에러 처리
       const errorMessage = getErrorMessage(error);
-      if (typeof window !== 'undefined') {
-        alert(errorMessage);
+      
+      // 401 에러인 경우 로그인 안내
+      if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 401) {
+        toast.error('로그인이 필요합니다. 다시 로그인해주세요.');
+      } else {
+        toast.error(`이미지 업로드 실패: ${errorMessage}`);
       }
+      
       throw error;
     } finally {
       setIsUploading(false);
     }
-  }, [uploadMutation, onFilesChange]);
+  }, [uploadMutation, onFilesChange, imageTracker]);
 
   // TipTap 에디터 설정 - onChange 의존성 제거로 성능 최적화
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // StarterKit의 기본 codeBlock을 비활성화하여 CodeBlockLowlight와 충돌 방지
+        // StarterKit의 기본 codeBlock과 heading을 비활성화
         codeBlock: false,
+        heading: false,
       }),
       // 이미지 확장 - TipTap 공식 문서 권장 설정
       ResizableImage.configure({
@@ -284,8 +352,27 @@ export default function BlogRichTextEditor({
       // 텍스트 스타일과 색상
       TextStyle,
       Color.configure({
-        types: [TextStyle.name],
+        types: ['textStyle'],
       }),
+      // 제목 레벨
+      Heading.configure({
+        levels: [1, 2, 3, 4, 5, 6],
+        HTMLAttributes: {
+          class: 'editor-heading',
+        },
+      }),
+      // 하이라이트 (배경색)
+      Highlight.configure({
+        multicolor: true,
+        HTMLAttributes: {
+          class: 'editor-highlight',
+        },
+      }),
+      // 밑줄
+      Underline,
+      // 위 첨자, 아래 첨자
+      Subscript,
+      Superscript,
       // 플레이스홀더
       Placeholder.configure({
         placeholder: placeholder,
@@ -303,6 +390,8 @@ export default function BlogRichTextEditor({
           class: 'hljs',
         },
       }),
+      // 슬래시 커맨드
+      SlashCommands,
     ],
     content: '',
     // TipTap 공식 문서 권장: parseOptions 설정
@@ -324,12 +413,14 @@ export default function BlogRichTextEditor({
             try {
               const imageUrl = await handleImageUpload(file);
               
-              // TipTap 공식 문서 권장: setImage 명령어 사용
-              editor?.chain().focus().setImage({ 
-                src: imageUrl, 
-                alt: file.name,
-                title: file.name
-              }).run();
+              // 업로드 완료 후 즉시 이미지 삽입
+              if (editor && !editor.isDestroyed) {
+                editor.chain().focus().setImage({ 
+                  src: imageUrl, 
+                  alt: file.name,
+                  title: file.name
+                }).run();
+              }
             } catch (error) {
               console.error('Failed to upload dropped image:', error);
             }
@@ -351,12 +442,14 @@ export default function BlogRichTextEditor({
             try {
               const imageUrl = await handleImageUpload(file);
               
-              // TipTap 공식 문서 권장: setImage 명령어 사용
-              editor?.chain().focus().setImage({ 
-                src: imageUrl, 
-                alt: file.name,
-                title: file.name
-              }).run();
+              // 업로드 완료 후 즉시 이미지 삽입
+              if (editor && !editor.isDestroyed) {
+                editor.chain().focus().setImage({ 
+                  src: imageUrl, 
+                  alt: file.name,
+                  title: file.name
+                }).run();
+              }
             } catch (error) {
               console.error('Failed to upload pasted image:', error);
             }
@@ -379,19 +472,126 @@ export default function BlogRichTextEditor({
       const html = editor.getHTML();
       handleEditorUpdate(html);
     },
+    onCreate: ({ editor }) => {
+      // 커스텀 uploadImage 커맨드 추가
+      editor.commands.uploadImage = async (file: File) => {
+        try {
+          const imageUrl = await handleImageUpload(file);
+          editor.chain().focus().setImage({ 
+            src: imageUrl, 
+            alt: file.name,
+            title: file.name
+          }).run();
+        } catch (error) {
+          console.error('Failed to upload image via command:', error);
+        }
+      };
+    },
   }, []); // 의존성 배열을 빈 배열로 변경하여 성능 최적화
 
-  // onChange 핸들러 업데이트를 위한 별도 useEffect
+  // editor ref 업데이트 및 onChange 핸들러 설정
   useEffect(() => {
     if (editor) {
+      editorRef.current = editor;
       // 기존 onUpdate 핸들러 제거 후 새로운 핸들러 등록
       editor.off('update');
       editor.on('update', ({ editor }) => {
         const html = editor.getHTML();
         handleEditorUpdate(html);
       });
+      
+      // 커스텀 uploadImage 커맨드 추가 (onCreate에서 설정했지만 useEffect에서도 확실히 설정)
+      if (!editor.commands.uploadImage) {
+        editor.commands.uploadImage = async (file: File) => {
+          try {
+            const imageUrl = await handleImageUpload(file);
+            editor.chain().focus().setImage({ 
+              src: imageUrl, 
+              alt: file.name,
+              title: file.name
+            }).run();
+          } catch (error) {
+            console.error('Failed to upload image via command:', error);
+          }
+        };
+      }
     }
-  }, [editor, handleEditorUpdate]);
+  }, [editor, handleEditorUpdate, handleImageUpload]);
+
+  // 컴포넌트 unmount 시 cleanup (포스트 작성 취소시)
+  // @deprecated 자동 삭제 비활성화
+  useEffect(() => {
+    return () => {
+      // 이미지 자동 삭제 비활성화
+      // 사용자가 나중에 재사용할 수 있도록 보존
+      if (enableCleanupOnUnmount) {
+        console.log('[Editor] Cleanup disabled - images preserved for reuse');
+      }
+    };
+  }, [enableCleanupOnUnmount]);
+
+  // 글로벌 cleanup 이벤트 수신 (취소 버튼 클릭시)
+  // @deprecated 자동 삭제 비활성화
+  useEffect(() => {
+    const handleCleanupEvent = (event: CustomEvent) => {
+      // 이미지 자동 삭제 비활성화
+      console.log('[Editor] Cleanup event received but ignored - images preserved');
+    };
+
+    window.addEventListener('cleanup-uploaded-files', handleCleanupEvent as EventListener);
+    
+    return () => {
+      window.removeEventListener('cleanup-uploaded-files', handleCleanupEvent as EventListener);
+    };
+  }, []);
+
+  // 슬래시 커맨드 이미지 업로드 이벤트 수신
+  useEffect(() => {
+    const handleSlashImageUpload = async (event: CustomEvent) => {
+      const { file, editor: eventEditor } = event.detail;
+      if (file && eventEditor === editor) {
+        try {
+          const imageUrl = await handleImageUpload(file);
+          
+          // 업로드 완료 후 즉시 이미지 삽입
+          if (editor && !editor.isDestroyed) {
+            editor.chain().focus().setImage({ 
+              src: imageUrl, 
+              alt: file.name,
+              title: file.name
+            }).run();
+          }
+        } catch (error) {
+          console.error('슬래시 커맨드 이미지 업로드 실패:', error);
+        }
+      }
+    };
+
+    window.addEventListener('editorImageUpload', handleSlashImageUpload as EventListener);
+    return () => {
+      window.removeEventListener('editorImageUpload', handleSlashImageUpload as EventListener);
+    };
+  }, [editor, handleImageUpload]);
+
+  // 페이지 이탈 시 경고 (포스트 작성 취소시)
+  useEffect(() => {
+    if (!enableCleanupOnUnmount) return;
+
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      // 업로드된 파일이 있으면 경고 메시지만 표시 (삭제하지 않음)
+      if (imageTracker.trackedFiles.length > 0) {
+        event.preventDefault();
+        // 이미지는 삭제하지 않고 보존
+        console.log('[Editor] Page unload - images preserved for future use');
+        return (event.returnValue = '입력한 내용이 저장되지 않습니다. 정말 떠나시겠습니까?');
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [enableCleanupOnUnmount, imageTracker]);
 
   // 에디터 초기 콘텐츠 설정
   useEffect(() => {
@@ -413,18 +613,22 @@ export default function BlogRichTextEditor({
       if (file) {
         try {
           const imageUrl = await handleImageUpload(file);
-          editor?.chain().focus().setImage({ 
-            src: imageUrl, 
-            alt: file.name,
-            title: file.name
-          }).run();
+          
+          // 업로드 완료 후 즉시 이미지 삽입
+          if (editor && !editor.isDestroyed) {
+            editor.chain().focus().setImage({ 
+              src: imageUrl, 
+              alt: file.name,
+              title: file.name
+            }).run();
+          }
         } catch (error) {
           console.error('Failed to upload image:', error);
         }
       }
     };
     input.click();
-  }, [editor, handleImageUpload]);
+  }, [handleImageUpload, editor]);
 
   if (!editor) {
     return (
@@ -436,12 +640,41 @@ export default function BlogRichTextEditor({
 
   return (
     <div className={`border border-gray-300 rounded-md ${className}`}>
-      <EditorToolbar 
+      <EnhancedEditorToolbar 
         editor={editor} 
         onImageUpload={triggerImageUpload}
         isUploading={isUploading}
       />
       <EditorContent editor={editor} />
+      
+      {/* 용량 표시 바 */}
+      {imageTracker.totalSize > 0 && (
+        <div className="p-3 bg-gray-50 border-t border-gray-300">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">
+              이미지 용량: {imageTracker.formatFileSize(imageTracker.totalSize)} / 30MB
+            </span>
+            <span className={`font-medium ${
+              imageTracker.percentage >= 80 ? 'text-orange-600' : 
+              imageTracker.percentage >= 60 ? 'text-yellow-600' : 
+              'text-green-600'
+            }`}>
+              {imageTracker.percentage.toFixed(0)}% 사용
+            </span>
+          </div>
+          <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className={`h-2 rounded-full transition-all ${
+                imageTracker.percentage >= 80 ? 'bg-orange-500' : 
+                imageTracker.percentage >= 60 ? 'bg-yellow-500' : 
+                'bg-green-500'
+              }`}
+              style={{ width: `${Math.min(imageTracker.percentage, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+      
       {isUploading && (
         <div className="p-2 bg-blue-50 border-t border-gray-300">
           <div className="flex items-center text-sm text-blue-600">

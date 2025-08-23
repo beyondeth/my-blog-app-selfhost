@@ -12,15 +12,24 @@ import { AdminUsersService } from './users/admin-users.service';
 // Posts Management
 import { AdminPostsService } from './posts/admin-posts.service';
 
+// Files Management
+import { AdminFilesController } from './admin-files.controller';
+
+// Debug
+import { AdminDebugController } from './debug/admin-debug.controller';
+
 // Entities
 import { User } from '../users/entities/user.entity';
 import { Post } from '../posts/entities/post.entity';
 import { Comment } from '../comments/entities/comment.entity';
 import { Report } from '../reports/entities/report.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
+import { File } from '../files/entities/file.entity';
 
 // Modules
 import { AuditModule } from '../audit/audit.module';
+import { FilesModule } from '../files/files.module';
+import { UsersModule } from '../users/users.module';
 
 @Module({
   imports: [
@@ -30,12 +39,17 @@ import { AuditModule } from '../audit/audit.module';
       Comment,
       Report,
       AuditLog,
+      File,
     ]),
     AuditModule,
+    FilesModule,
+    UsersModule,
   ],
   controllers: [
     AdminDashboardController,
     AdminUsersController,
+    AdminFilesController,
+    AdminDebugController,
   ],
   providers: [
     AdminDashboardService,

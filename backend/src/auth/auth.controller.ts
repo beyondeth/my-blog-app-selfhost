@@ -408,14 +408,26 @@ export class AuthController {
     @Body() dto: DeleteAccountDto,
     @Response() res
   ) {
-    // 비밀번호 재확인
-    const validUser = await this.authService.validateUser(user.email, dto.password);
-    if (!validUser) {
-      return res.status(401).json({
-        success: false,
-        message: '비밀번호가 일치하지 않습니다.'
-      });
+    // 로컬 인증 사용자의 경우에만 비밀번호 확인
+    if (user.authProvider === 'local' || !user.authProvider) {
+      // 비밀번호가 제공되지 않은 경우
+      if (!dto.password) {
+        return res.status(400).json({
+          success: false,
+          message: '비밀번호를 입력해주세요.'
+        });
+      }
+
+      // 비밀번호 재확인
+      const validUser = await this.authService.validateUser(user.email, dto.password);
+      if (!validUser) {
+        return res.status(401).json({
+          success: false,
+          message: '비밀번호가 일치하지 않습니다.'
+        });
+      }
     }
+    // OAuth 사용자의 경우 비밀번호 확인 건너뛰기
 
     try {
       // 계정 삭제 실행

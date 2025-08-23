@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserBlog } from '@/hooks/useUserBlog';
-import { FiKey, FiCopy, FiTrash2, FiPlus, FiToggleLeft, FiToggleRight, FiClock, FiActivity, FiAlertCircle, FiInfo } from 'react-icons/fi';
+import { FiKey, FiCopy, FiTrash2, FiPlus, FiToggleLeft, FiToggleRight, FiClock, FiActivity, FiAlertCircle, FiInfo, FiChevronDown, FiChevronUp, FiCheckCircle } from 'react-icons/fi';
 import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -29,6 +29,8 @@ export default function ApiKeysPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newKey, setNewKey] = useState<{ plainKey: string } | null>(null);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
+  const [showMcpGuide, setShowMcpGuide] = useState(true);
+  const [copiedConfig, setCopiedConfig] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -165,6 +167,31 @@ export default function ApiKeysPage() {
     }
   };
 
+  const copyMcpConfig = async () => {
+    const config = `{
+  "mcp": {
+    "servers": {
+      "blog-mcp": {
+        "type": "stdio",
+        "command": "node",
+        "args": ["/path/to/mcp-blog-server/index.js"],
+        "env": {
+          "BLOG_API_KEY": "여기에_생성한_API_키를_넣으세요",
+          "BLOG_API_URL": "${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}"
+        }
+      }
+    }
+  }
+}`;
+    try {
+      await navigator.clipboard.writeText(config);
+      setCopiedConfig(true);
+      setTimeout(() => setCopiedConfig(false), 3000);
+    } catch (err) {
+      console.error('Failed to copy config:', err);
+    }
+  };
+
   if (loading) {
     return (
       <div className="p-8 text-center">
@@ -221,23 +248,79 @@ export default function ApiKeysPage() {
         </div>
       </div>
 
-      {/* MCP Configuration Guide */}
-      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-        <div className="flex items-start">
-          <FiInfo className="h-5 w-5 text-blue-600 mt-0.5 mr-2 flex-shrink-0" />
-          <div className="text-sm">
-            <p className="font-medium text-blue-900 mb-1">MCP 서버 설정 방법</p>
-            <p className="text-blue-700 mb-2">Claude Desktop의 MCP 설정에 API 키를 추가하세요:</p>
-            <div className="space-y-2">
-              <code className="block bg-white px-3 py-2 rounded border border-blue-200 font-mono text-xs">
-                {`// ~/Library/Application Support/Claude/claude_desktop_config.json
-{
+      {/* MCP Configuration Guide - Improved */}
+      <div className="mb-6">
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 overflow-hidden">
+          <button
+            onClick={() => setShowMcpGuide(!showMcpGuide)}
+            className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-100/50 transition-colors"
+          >
+            <div className="flex items-center">
+              <FiInfo className="h-5 w-5 text-blue-600 mr-2" />
+              <span className="font-medium text-blue-900">MCP 서버 설정 가이드</span>
+            </div>
+            {showMcpGuide ? (
+              <FiChevronUp className="h-5 w-5 text-blue-600" />
+            ) : (
+              <FiChevronDown className="h-5 w-5 text-blue-600" />
+            )}
+          </button>
+          
+          {showMcpGuide && (
+            <div className="px-4 pb-4 border-t border-blue-200/50">
+              <div className="mt-4 space-y-4">
+                {/* Step 1 */}
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                    1
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium text-gray-900">API 키 생성</p>
+                    <p className="text-sm text-gray-600 mt-1">위의 "새 API 키" 버튼을 클릭하여 API 키를 생성하세요.</p>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                    2
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium text-gray-900">설정 파일 수정</p>
+                    <p className="text-sm text-gray-600 mt-1 mb-2">
+                      Claude Desktop 설정 파일에 아래 구성을 추가하세요:
+                    </p>
+                    <div className="relative">
+                      <div className="absolute top-2 right-2 z-10">
+                        <button
+                          onClick={copyMcpConfig}
+                          className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                            copiedConfig
+                              ? 'bg-green-600 text-white'
+                              : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {copiedConfig ? (
+                            <>
+                              <FiCheckCircle className="inline-block mr-1" />
+                              복사됨!
+                            </>
+                          ) : (
+                            <>
+                              <FiCopy className="inline-block mr-1" />
+                              복사
+                            </>
+                          )}
+                        </button>
+                      </div>
+                      <pre className="bg-gray-900 text-gray-100 p-4 rounded-lg overflow-x-auto text-xs">
+                        <code>{`{
   "mcp": {
     "servers": {
       "blog-mcp": {
         "type": "stdio",
         "command": "node",
-        "args": ["/Users/sihyungpark/Desktop/code/mcp-blog-server/index.js"],
+        "args": ["/path/to/mcp-blog-server/index.js"],
         "env": {
           "BLOG_API_KEY": "여기에_생성한_API_키를_넣으세요",
           "BLOG_API_URL": "${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}"
@@ -245,16 +328,47 @@ export default function ApiKeysPage() {
       }
     }
   }
-}`}
-              </code>
-              <div className="flex items-start mt-2">
-                <FiAlertCircle className="h-4 w-4 text-amber-500 mt-0.5 mr-1 flex-shrink-0" />
-                <p className="text-xs text-amber-700">
-                  MCP 서버는 로그인 인증과 API 키 인증 모두 필요합니다
-                </p>
+}`}</code>
+                      </pre>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                    3
+                  </div>
+                  <div className="ml-3 flex-1">
+                    <p className="text-sm font-medium text-gray-900">설정 파일 경로</p>
+                    <div className="mt-1 space-y-1">
+                      <p className="text-sm text-gray-600">
+                        • <span className="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">macOS</span>: ~/Library/Application Support/Claude/claude_desktop_config.json
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        • <span className="font-mono text-xs bg-gray-100 px-1 py-0.5 rounded">Windows</span>: %APPDATA%\Claude\claude_desktop_config.json
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Important Notes */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-start">
+                    <FiAlertCircle className="h-4 w-4 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+                    <div className="text-sm">
+                      <p className="font-medium text-amber-900 mb-1">중요 사항</p>
+                      <ul className="text-amber-700 space-y-0.5">
+                        <li>• MCP 서버는 로그인 인증과 API 키 인증이 모두 필요합니다</li>
+                        <li>• args 경로를 실제 MCP 서버 경로로 변경하세요</li>
+                        <li>• Claude Desktop을 재시작해야 변경사항이 적용됩니다</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
 

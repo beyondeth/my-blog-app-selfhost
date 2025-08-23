@@ -46,7 +46,7 @@ export default function NotificationsSettingsPage() {
       ...prev,
       [type]: {
         ...prev[type],
-        [setting]: !prev[type][setting as keyof typeof prev.email],
+        [setting]: !(prev[type] as any)[setting],
       },
     }));
   };

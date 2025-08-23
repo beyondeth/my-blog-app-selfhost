@@ -41,7 +41,7 @@ export default function HomePage() {
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
-    postId: number | null;
+    postId: string | null;
     postTitle: string;
   }>({
     isOpen: false,
@@ -143,7 +143,7 @@ export default function HomePage() {
   }, [router]);
 
   // 삭제 다이얼로그 열기
-  const handleDeletePost = useCallback((id: number) => {
+  const handleDeletePost = useCallback((id: string) => {
     const post = allPosts.find(p => p.id === id);
     setDeleteDialog({
       isOpen: true,

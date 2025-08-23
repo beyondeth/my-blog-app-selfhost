@@ -217,7 +217,7 @@ export default function PostsManagement() {
     }
   };
 
-  const categories = Array.from(new Set(allPosts.map(p => p.category).filter(Boolean)));
+  const categories = Array.from(new Set(allPosts.map(p => p.category).filter(Boolean))) as string[];
 
   return (
     <div>

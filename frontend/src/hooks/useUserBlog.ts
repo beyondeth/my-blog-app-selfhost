@@ -3,22 +3,21 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { blogLogger } from '@/utils/logger';
-
-interface Blog {
-  id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  userId: string;
-}
+import { Blog } from '@/types';
 
 export function useUserBlog() {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const fetchUserBlog = useCallback(async () => {
+    // 인증 상태가 로딩 중이면 대기
+    if (authLoading) {
+      blogLogger.debug('[useUserBlog] Auth still loading, waiting...');
+      return;
+    }
+
     if (!user) {
       blogLogger.debug('[useUserBlog] No user, clearing blog state');
       setBlog(null);
@@ -64,7 +63,7 @@ export function useUserBlog() {
     } finally {
       setLoading(false);
     }
-  }, [user]);
+  }, [user, authLoading]);
 
   useEffect(() => {
     fetchUserBlog();
@@ -82,6 +81,10 @@ export function useUserBlog() {
   }, [fetchUserBlog]);
 
   const checkAndRedirect = async (): Promise<string> => {
+    if (authLoading) {
+      return '/'; // 로딩 중이면 홈으로
+    }
+
     if (!user) {
       return '/login';
     }

@@ -61,7 +61,7 @@ export default function BlogPage() {
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
-    postId: number | null;
+    postId: string | null;
     postTitle: string;
   }>({
     isOpen: false,
@@ -119,7 +119,7 @@ export default function BlogPage() {
 
   // 블로그 소유자 여부 확인
   const isBlogOwner = useMemo(() => {
-    return blog && user && blog.owner?.id === user.id;
+    return blog && user && String(blog.owner?.id) === String(user.id);
   }, [blog, user]);
 
   // 모든 포스트 플래튼
@@ -173,7 +173,7 @@ export default function BlogPage() {
   }, [router]);
 
   // 삭제 다이얼로그 열기
-  const handleDeletePost = useCallback((id: number) => {
+  const handleDeletePost = useCallback((id: string) => {
     const post = allPosts.find(p => p.id === id);
     setDeleteDialog({
       isOpen: true,

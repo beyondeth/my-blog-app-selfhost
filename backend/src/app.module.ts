@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { CacheModule } from '@nestjs/cache-manager';
+import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 // Configuration imports
 import databaseConfig from './config/database.config';
@@ -58,6 +59,16 @@ import { RolesGuard } from './common/guards/roles.guard';
     JwtModule.registerAsync({
       global: true,
       useFactory: jwtConfig,
+    }),
+
+    // Rate limiting configuration
+    ThrottlerModule.forRoot({
+      throttlers: [
+        {
+          ttl: 3600000, // 1 hour in milliseconds
+          limit: 15,    // 15 posts per hour per user
+        }
+      ]
     }),
 
     // Feature modules

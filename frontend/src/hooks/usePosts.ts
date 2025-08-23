@@ -11,7 +11,7 @@ export const postQueryKeys = {
   list: (filters: { search?: string; category?: string; blogSlug?: string }) => 
     [...postQueryKeys.lists(), filters] as const,
   details: () => [...postQueryKeys.all, 'detail'] as const,
-  detail: (slugOrId: string | number) => [...postQueryKeys.details(), slugOrId] as const,
+  detail: (slugOrId: string) => [...postQueryKeys.details(), slugOrId] as const,
 };
 
 // 공통 쿼리 옵션
@@ -53,10 +53,10 @@ export function useInfinitePosts(options: {
 }
 
 // 단일 포스트 조회 훅 (상세)
-export function usePost(slugOrId: string | number) {
+export function usePost(slugOrId: string) {
   return useQuery({
     queryKey: postQueryKeys.detail(slugOrId),
-    queryFn: () => postsAPI.getPostBySlug(slugOrId.toString()),
+    queryFn: () => postsAPI.getPostBySlug(slugOrId),
     enabled: !!slugOrId,
     ...commonQueryOptions,
     refetchOnMount: false, // SSR/Prefetch 활용 시 false가 더 효율적
@@ -96,13 +96,9 @@ export function useCreatePost() {
         }
       );
       
-      // 3. 생성된 게시글의 개별 캐시도 설정
-      if (newPost.id) {
-        queryClient.setQueryData(postQueryKeys.detail(newPost.id), newPost);
-      }
-      if (newPost.slug) {
-        queryClient.setQueryData(postQueryKeys.detail(newPost.slug), newPost);
-      }
+      // 3. 생성된 게시글의 개별 캐시는 설정하지 않음
+      // 생성 직후 상세 페이지로 이동할 때 서버에서 완전한 데이터를 다시 가져오도록 함
+      // (create endpoint 응답과 findOne/findBySlug 응답 구조가 다를 수 있음)
     },
     retry: 1,
   });
@@ -113,7 +109,7 @@ export function useUpdatePost() {
   const queryClient = useQueryClient();
   
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: any }) => 
+    mutationFn: ({ id, data }: { id: string; data: any }) => 
       postsAPI.updatePost(id, data),
     onSuccess: (updatedPost) => {
       // 개별 포스트 캐시 업데이트
@@ -145,12 +141,12 @@ export function useDeletePost() {
 }
 
 // 포스트 좋아요 토글 뮤테이션 훅 (권장: 로그인 체크/낙관적 업데이트/롤백 일원화)
-export function useTogglePostLike(slug: string | number, onRequireLogin?: () => void) {
+export function useTogglePostLike(slug: string, onRequireLogin?: () => void) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
   return useMutation({
-    mutationFn: (postId: number) => {
+    mutationFn: (postId: string) => {
       if (!user) {
         if (onRequireLogin) onRequireLogin();
         return Promise.reject(new Error('로그인이 필요합니다.'));
@@ -199,10 +195,10 @@ export function useTogglePostLike(slug: string | number, onRequireLogin?: () => 
 // 포스트 프리페치 유틸리티
 export function usePrefetchPost() {
   const queryClient = useQueryClient();
-  return (slugOrId: string | number) => {
+  return (slugOrId: string) => {
     queryClient.prefetchQuery({
       queryKey: postQueryKeys.detail(slugOrId),
-      queryFn: () => postsAPI.getPostBySlug(slugOrId.toString()),
+      queryFn: () => postsAPI.getPostBySlug(slugOrId),
       ...commonQueryOptions,
     });
   };
@@ -212,7 +208,7 @@ export function usePrefetchPost() {
 // (debounce: 10분, 여러 포스트 동시 지원)
 export function useBatchLikeManager() {
   // { [postId]: liked }
-  const pendingLikesRef = useRef<Record<number, boolean>>({});
+  const pendingLikesRef = useRef<Record<string, boolean>>({});
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   // 서버로 배치 전송 (여러 포스트 동시)
@@ -226,7 +222,7 @@ export function useBatchLikeManager() {
   }, []);
 
   // 좋아요 상태 변경 시 호출
-  const updateLike = useCallback((postId: number, liked: boolean) => {
+  const updateLike = useCallback((postId: string, liked: boolean) => {
     pendingLikesRef.current[postId] = liked;
     // 기존 타이머 초기화
     if (timerRef.current) clearTimeout(timerRef.current);

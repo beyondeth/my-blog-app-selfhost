@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiEdit3 } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
+import type { Blog } from '@/types';
 
 export default function BlogSettingsPage() {
   const { user } = useAuth();

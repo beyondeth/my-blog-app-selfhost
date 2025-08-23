@@ -48,6 +48,60 @@ body {
 }
 
 /* 더 구체적인 선택자로 강제 적용 */
+
+/* Image Upload Placeholder Animations */
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse-bg {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+/* Image upload placeholder styles */
+.image-upload-placeholder {
+  animation: pulse-bg 2s ease-in-out infinite;
+  transition: all 0.3s ease;
+  position: relative;
+  user-select: none;
+  pointer-events: none;
+}
+
+.upload-spinner {
+  animation: spin 1s linear infinite;
+}
+
+/* Success animation when image loads */
+.image-upload-success {
+  animation: fadeIn 0.5s ease-in;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Editor image 스타일 개선 */
+.editor-image {
+  transition: all 0.3s ease;
+  animation: fadeIn 0.5s ease-in;
+}
 html *, body *, div, span, applet, object, iframe,
 h1, h2, h3, h4, h5, h6, p, blockquote, pre,
 a, abbr, acronym, address, big, cite, code,
@@ -167,14 +221,19 @@ time, mark, audio, video {
 }
 
 .blog-content a {
-  color: #d97706 !important;
+  color: #0EA5E9 !important; /* sky-500 */
   text-decoration: none !important;
   font-size: 14px !important;
   word-break: break-all;
+  background-color: #F0F9FF; /* sky-50 */
+  padding: 0 2px;
+  border-radius: 2px;
+  transition: all 0.2s ease;
 }
 
 .blog-content a:hover {
-  color: #92400e !important;
+  color: #0284C7 !important; /* sky-600 */
+  background-color: #E0F2FE; /* sky-100 */
 }
 
 .blog-content img {
@@ -247,14 +306,16 @@ time, mark, audio, video {
 }
 
 .blog-content blockquote {
-  border-left: 4px solid #d97706;
+  border-left: 4px solid #6B7280;
   padding-left: 1rem;
   margin: 1rem 0;
   font-style: italic;
-  color: #333 !important;
+  color: #6B7280 !important;
+  background-color: #F9FAFB;
   font-family: var(--font-pretendard) !important;
   font-size: 14px !important;
   word-break: break-word;
+  border-radius: 0 4px 4px 0;
 }
 
 @media (max-width: 640px) {
@@ -270,6 +331,30 @@ time, mark, audio, video {
   margin: 1rem 0;
 }
 
+.blog-content ul {
+  list-style-type: disc !important;
+}
+
+.blog-content ul ul {
+  list-style-type: circle !important;
+}
+
+.blog-content ul ul ul {
+  list-style-type: square !important;
+}
+
+.blog-content ol {
+  list-style-type: decimal !important;
+}
+
+.blog-content ol ol {
+  list-style-type: lower-alpha !important;
+}
+
+.blog-content ol ol ol {
+  list-style-type: lower-roman !important;
+}
+
 @media (max-width: 640px) {
   .blog-content ul,
   .blog-content ol {
@@ -279,12 +364,17 @@ time, mark, audio, video {
 }
 
 .blog-content li {
+  display: list-item !important;
   margin: 0.25rem 0;
   font-family: var(--font-pretendard) !important;
   color: #333 !important;
   font-size: 14px !important;
   line-height: 1.5 !important;
   word-break: break-word;
+}
+
+.blog-content li::marker {
+  color: #4b5563;
 }
 
 /* 텍스트 클램프 유틸리티 - 모바일 최적화 */
@@ -364,6 +454,47 @@ img {
   color: #333 !important;
   max-width: 100%;
   overflow-x: auto;
+}
+
+/* 에디터 내 텍스트 선택 색상 - 하늘색 */
+.ProseMirror ::selection {
+  background-color: #7DD3FC !important; /* sky-300 */
+  color: #0C4A6E !important; /* sky-900 */
+}
+
+.ProseMirror ::-moz-selection {
+  background-color: #7DD3FC !important; /* sky-300 */
+  color: #0C4A6E !important; /* sky-900 */
+}
+
+/* 에디터 자체의 선택 색상 */
+.ProseMirror.ProseMirror-focused ::selection {
+  background-color: #7DD3FC !important; /* sky-300 */
+  color: #0C4A6E !important; /* sky-900 */
+}
+
+.ProseMirror.ProseMirror-focused ::-moz-selection {
+  background-color: #7DD3FC !important; /* sky-300 */
+  color: #0C4A6E !important; /* sky-900 */
+}
+
+/* 에디터 내 링크 스타일 - 하늘색, 밑줄 제거 */
+.ProseMirror a {
+  color: #0EA5E9 !important; /* sky-500 */
+  text-decoration: none !important;
+  background-color: #F0F9FF; /* sky-50 */
+  padding: 0 2px;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.ProseMirror a:hover {
+  color: #0284C7 !important; /* sky-600 */
+  background-color: #E0F2FE; /* sky-100 */
+}
+
+.ProseMirror a.ProseMirror-selectednode {
+  background-color: #BAE6FD; /* sky-200 */
 }
 
 /* 이미지 리사이저 스타일 */
@@ -453,6 +584,39 @@ img {
   margin: 1rem 0;
 }
 
+.ProseMirror ul {
+  list-style-type: disc !important;
+}
+
+.ProseMirror ul ul {
+  list-style-type: circle !important;
+}
+
+.ProseMirror ul ul ul {
+  list-style-type: square !important;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal !important;
+}
+
+.ProseMirror ol ol {
+  list-style-type: lower-alpha !important;
+}
+
+.ProseMirror ol ol ol {
+  list-style-type: lower-roman !important;
+}
+
+.ProseMirror li {
+  display: list-item !important;
+  margin: 0.25rem 0;
+}
+
+.ProseMirror li::marker {
+  color: #4b5563;
+}
+
 @media (max-width: 640px) {
   .ProseMirror ul, .ProseMirror ol {
     padding-left: 1.25rem;
@@ -460,12 +624,17 @@ img {
 }
 
 .ProseMirror blockquote {
-  border-left: 4px solid #d97706;
+  border-left: 4px solid #6B7280;
   padding-left: 1rem;
+  padding-right: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
   margin: 1rem 0;
   font-style: italic;
-  color: #666 !important;
+  color: #6B7280 !important;
+  background-color: #F9FAFB;
   word-break: break-word;
+  border-radius: 0 4px 4px 0;
 }
 
 @media (max-width: 640px) {
@@ -530,6 +699,45 @@ img {
   .ProseMirror pre code {
     font-size: 12px !important;
   }
+}
+
+/* ProseMirror 구분선 스타일 */
+.ProseMirror hr {
+  border: none !important;
+  border-top: 2px solid #E5E7EB !important;
+  margin: 1.5rem 0 !important;
+  width: 100% !important;
+}
+
+/* ProseMirror 하이라이트 스타일 - 하늘색 */
+.ProseMirror mark {
+  background-color: #7DD3FC !important; /* sky-300 */
+  color: #0C4A6E !important; /* sky-900 */
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* ProseMirror 위/아래 첨자 스타일 */
+.ProseMirror sub,
+.ProseMirror sup {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.ProseMirror sub {
+  bottom: -0.25em;
+}
+
+.ProseMirror sup {
+  top: -0.5em;
+}
+
+/* ProseMirror 취소선 스타일 */
+.ProseMirror s {
+  text-decoration: line-through !important;
+  opacity: 0.7;
 }
 
 /* 폼 요소 모바일 최적화 */
@@ -752,6 +960,103 @@ input, textarea, button, select {
   max-width: 100% !important;
   height: auto !important;
   border-radius: 0.5rem !important;
+}
+
+/* ContentRenderer 링크 스타일 - 하늘색 테마 */
+.prose a,
+.prose .content-link,
+.content-link {
+  color: #0EA5E9 !important; /* sky-500 */
+  text-decoration: none !important;
+  background-color: #F0F9FF; /* sky-50 */
+  padding: 2px 4px;
+  border-radius: 3px;
+  transition: all 0.2s ease;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  border-bottom: 2px solid transparent;
+}
+
+.prose a:hover,
+.prose .content-link:hover,
+.content-link:hover {
+  color: #0284C7 !important; /* sky-600 */
+  background-color: #E0F2FE; /* sky-100 */
+  border-bottom-color: #0EA5E9; /* sky-500 */
+}
+
+/* 외부 링크 아이콘 스타일 */
+.prose a svg,
+.prose .content-link svg,
+.content-link svg {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+.prose a:hover svg,
+.prose .content-link:hover svg,
+.content-link:hover svg {
+  opacity: 1;
+}
+
+/* ContentRenderer 구분선 스타일 */
+.prose hr {
+  border: none !important;
+  border-top: 2px solid #E5E7EB !important;
+  margin: 2rem 0 !important;
+  width: 100% !important;
+  height: 0 !important;
+}
+
+/* ContentRenderer 인용구 스타일 */
+.prose blockquote {
+  border-left: 4px solid #6B7280 !important;
+  padding: 1rem !important;
+  margin: 1rem 0 !important;
+  font-style: italic !important;
+  color: #6B7280 !important;
+  background-color: #F9FAFB !important;
+  border-radius: 0 4px 4px 0 !important;
+}
+
+/* ContentRenderer 하이라이트(mark) 스타일 */
+.prose mark {
+  background-color: #7DD3FC !important; /* sky-300 */
+  color: #0C4A6E !important; /* sky-900 */
+  padding: 0 2px;
+  border-radius: 2px;
+}
+
+/* ContentRenderer 위/아래 첨자 스타일 */
+.prose sub,
+.prose sup {
+  font-size: 0.75em;
+  line-height: 0;
+  position: relative;
+  vertical-align: baseline;
+}
+
+.prose sub {
+  bottom: -0.25em;
+}
+
+.prose sup {
+  top: -0.5em;
+}
+
+/* ContentRenderer 취소선 스타일 */
+.prose del,
+.prose s {
+  text-decoration: line-through !important;
+  opacity: 0.7;
+}
+
+/* ContentRenderer 삽입 텍스트 스타일 */
+.prose ins {
+  text-decoration: underline !important;
+  text-decoration-style: wavy !important;
+  text-decoration-color: #0EA5E9 !important;
 }
 
 /* ContentRenderer 코드 블록 스타일 강화 */

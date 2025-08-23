@@ -54,9 +54,18 @@ export class S3Service {
     try {
       // MIME 타입 검증
       this.validateMimeType(mimeType, fileType);
-      // WebP만 허용 (이미지 업로드의 경우)
-      if (fileType === 'image' && mimeType !== 'image/webp') {
-        throw new BadRequestException('이미지 업로드는 WebP 형식만 허용됩니다.');
+      
+      // 스마트 WebP 변환 규칙 적용 (이미지 업로드의 경우)
+      // - 100KB 이상 JPG/PNG는 WebP로 변환 권장
+      // - 로고/아이콘류 PNG, SVG, ICO는 원본 형식 유지
+      // - 현재는 클라이언트에서 WebP 변환 후 업로드
+      if (fileType === 'image') {
+        // WebP, PNG, SVG, GIF는 허용 (선택적 변환)
+        const allowedFormats = ['image/webp', 'image/png', 'image/svg+xml', 'image/gif'];
+        if (!allowedFormats.includes(mimeType)) {
+          // JPG는 클라이언트에서 WebP로 변환 후 업로드 권장
+          this.logger.warn(`Non-optimized format uploaded: ${mimeType}. Consider converting to WebP for better performance.`);
+        }
       }
 
       // PutObject 명령 생성

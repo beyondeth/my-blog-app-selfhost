@@ -42,6 +42,29 @@ const filterSafeClasses = (classNames: string): string => {
     .join(' ');
 };
 
+// 링크 처리 - 하늘색 스타일과 아이콘 추가
+const processLinks = (html: string): string => {
+  return html.replace(
+    /<a([^>]*?)href=["']([^"']+)["']([^>]*?)>([^<]+)<\/a>/gi,
+    (match, beforeHref, href, afterHref, linkText) => {
+      try {
+        // target="_blank" 추가 (외부 링크의 경우)
+        const isExternal = href.startsWith('http') || href.startsWith('//');
+        const targetAttr = isExternal ? 'target="_blank" rel="noopener noreferrer"' : '';
+        
+        // 링크 아이콘 추가 (외부 링크의 경우)
+        const linkIcon = isExternal ? 
+          '<svg class="inline-block w-3 h-3 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' : '';
+        
+        return `<a ${beforeHref} href="${href}" ${afterHref} ${targetAttr} class="content-link">${linkText}${linkIcon}</a>`;
+      } catch (error) {
+        console.error('Error processing link:', error);
+        return match;
+      }
+    }
+  );
+};
+
 // 이미지 URL 처리 (클릭 가능하게 수정)
 const processImageUrls = (html: string): string => {
   return html.replace(
@@ -141,25 +164,32 @@ export default function ContentRenderer({ content, className = '' }: ContentRend
         ALLOWED_TAGS: [
           'p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
           'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'code', 'pre', 'span', 'div',
+          // 구분선, 위/아래 첨자, 마크 등 추가
+          'hr', 'mark', 'sub', 'sup', 'del', 'ins', 'kbd', 'samp', 'var',
           // 테이블 관련 태그 추가 (안전한 구조적 태그들)
           'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col'
         ],
-        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'data-*', 'width', 'height', 'class', 'style'],
+        ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'data-*', 'width', 'height', 'class', 'style', 'data-text-align'],
         ALLOW_DATA_ATTR: true,
-        FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover'],
+        FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover']
         // style 속성은 테이블 스타일링을 위해 허용하되, 위험한 내용은 DOMPurify가 자동 필터링
-        ALLOWED_ATTR_IN_STYLE: ['border', 'padding', 'background-color', 'text-align', 'width', 'border-collapse', 'margin']
       });
       // 2. sanitize 후에도 혹시 남은 밑줄 제거
       let processedHtml = stripUnderline(cleanHtml);
-      // 3. 이미지 URL 처리 (클릭 가능하게)
+      // 3. 링크 처리 (하늘색 스타일과 아이콘 추가)
+      processedHtml = processLinks(processedHtml);
+      // 4. 이미지 URL 처리 (클릭 가능하게)
       processedHtml = processImageUrls(processedHtml);
-      // 4. 안전한 클래스만 유지
+      // 5. 안전한 클래스만 유지
       processedHtml = processedHtml.replace(/class=["']([^"']*?)["']/gi, (match, classNames) => {
+        // content-link 클래스는 유지
+        if (classNames.includes('content-link')) {
+          return `class="content-link"`;
+        }
         const safeClasses = filterSafeClasses(classNames);
-        return safeClasses ? `class=\"${safeClasses}\"` : '';
+        return safeClasses ? `class="${safeClasses}"` : '';
       });
-      // 5. 신택스 하이라이팅 적용
+      // 6. 신택스 하이라이팅 적용
       processedHtml = applySyntaxHighlighting(processedHtml);
       return processedHtml;
     } catch (error) {

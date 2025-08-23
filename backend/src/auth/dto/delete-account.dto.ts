@@ -1,14 +1,15 @@
-import { IsString, IsOptional, IsBoolean, MinLength } from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class DeleteAccountDto {
   @ApiProperty({
-    description: '계정 삭제 확인을 위한 비밀번호',
+    description: '계정 삭제 확인을 위한 비밀번호 (로컬 인증 사용자만 필요)',
     example: 'currentPassword123!',
+    required: false,
   })
   @IsString()
-  @MinLength(8, { message: 'Password must be at least 8 characters long' })
-  password: string;
+  @IsOptional()
+  password?: string;
 
   @ApiProperty({
     description: 'Soft delete 여부 (true: 30일 후 삭제, false: 즉시 삭제)',
