@@ -139,8 +139,18 @@ export class MarkdownRendererService {
     // 취소선
     text = text.replace(/~~([^~]+)~~/g, '<s>$1</s>');
     
-    // 링크
-    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    // 링크 (외부 링크 아이콘 추가)
+    text = text.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, linkText, href) => {
+      // 외부 링크인지 확인
+      const isExternal = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//');
+      const targetAttr = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
+      
+      // 외부 링크 아이콘 SVG (인라인으로 포함)
+      const externalIcon = isExternal ? 
+        ' <svg style="display: inline-block; width: 0.75rem; height: 0.75rem; margin-left: 0.125rem; vertical-align: baseline;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' : '';
+      
+      return `<a href="${href}"${targetAttr} style="color: #0EA5E9; text-decoration: none; background-color: #F0F9FF; padding: 2px 4px; border-radius: 3px; transition: all 0.2s ease; border-bottom: 2px solid transparent; display: inline; white-space: nowrap;">${linkText}${externalIcon}</a>`;
+    });
     
     // 이미지
     text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;">');

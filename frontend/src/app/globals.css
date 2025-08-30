@@ -973,9 +973,9 @@ input, textarea, button, select {
   border-radius: 3px;
   transition: all 0.2s ease;
   position: relative;
-  display: inline-flex;
-  align-items: center;
+  display: inline; /* inline-flex에서 inline으로 변경 */
   border-bottom: 2px solid transparent;
+  white-space: nowrap; /* 링크 텍스트가 줄바꿈되지 않도록 */
 }
 
 .prose a:hover,
@@ -990,6 +990,11 @@ input, textarea, button, select {
 .prose a svg,
 .prose .content-link svg,
 .content-link svg {
+  display: inline-block;
+  width: 0.75rem;
+  height: 0.75rem;
+  margin-left: 0.125rem;
+  vertical-align: baseline;
   opacity: 0.7;
   transition: opacity 0.2s ease;
 }
@@ -998,6 +1003,20 @@ input, textarea, button, select {
 .prose .content-link:hover svg,
 .content-link:hover svg {
   opacity: 1;
+}
+
+/* 리스트 내 링크 스타일 조정 */
+.prose li a,
+.prose li .content-link {
+  display: inline; /* 리스트 내에서는 inline으로 유지 */
+  white-space: normal; /* 리스트에서는 줄바꿈 허용 */
+}
+
+/* 리스트 아이템 간격 조정 */
+.prose ul li,
+.prose ol li {
+  margin-bottom: 0.5rem;
+  line-height: 1.7;
 }
 
 /* ContentRenderer 구분선 스타일 */

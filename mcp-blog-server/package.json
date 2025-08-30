@@ -1,0 +1,30 @@
+{
+  "name": "@your-org/mcp-blog-server",
+  "version": "1.0.0",
+  "description": "MCP Blog Server - AI-powered blog posting automation",
+  "main": "src/fastmcp_blog_server.py",
+  "files": [
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "start": "python3 src/fastmcp_blog_server.py"
+  },
+  "keywords": [
+    "mcp",
+    "blog",
+    "automation",
+    "claude",
+    "ai"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/your-org/mcp-blog-server"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-FastMCP 기반 블로그 서버 - 기존 로직 이식
+FastMCP 기반 블로그 서버 - 마크다운을 백엔드 API로 전송
+백엔드에서 HTML 렌더링 처리 (중앙화된 렌더링 로직)
 """
 import os
 import json
@@ -10,7 +11,6 @@ from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
-import unicodedata
 
 # FastMCP imports
 from fastmcp import FastMCP
@@ -29,242 +29,52 @@ if env_file.exists():
 # FastMCP 서버 생성
 mcp = FastMCP(
     name="blog-mcp-fastmcp",
-    instructions="FastMCP 기반 블로그 포스트 자동 생성 서버. 2단계 인증을 통해 안전하게 마크다운을 HTML로 변환하여 블로그에 포스팅합니다."
+    instructions="FastMCP 기반 블로그 포스트 자동 생성 서버. 2단계 인증을 통해 안전하게 마크다운을 백엔드 API로 전송하여 블로그에 포스팅합니다."
 )
 
 
-class MarkdownRenderer:
-    """기존 마크다운 렌더러 그대로 이식"""
+def parse_markdown_metadata(content: str) -> Tuple[Dict, str]:
+    """마크다운 파싱 및 메타데이터 추출"""
+    metadata = {
+        'title': 'Untitled',
+        'category': 'general',
+        'tags': []
+    }
+    body = content
     
-    def convert_to_html(self, text: str) -> str:
-        """마크다운을 HTML로 변환 (기존 로직 유지)"""
-        
-        # 보호된 섹션을 저장할 딕셔너리
-        protected_blocks = {}
-        protected_inline = {}
-        protected_tables = {}
-        
-        # 테이블을 먼저 처리 (코드 블록보다 먼저 처리해야 함)
-        def protect_table(match):
-            key = f"[[TABLE{len(protected_tables)}]]"
-            lines = match.group(0).strip().split('\n')
-            if len(lines) < 3:
-                return match.group(0)
+    # Front matter 파싱
+    if content.startswith('---'):
+        parts = content.split('---', 2)
+        if len(parts) >= 3:
+            front = parts[1].strip()
+            body = parts[2].strip()
             
-            html = '<table style="border-collapse: collapse; width: 100%; margin: 1em 0;">'
-            html += '<thead><tr>'
-            
-            # 헤더 처리 - 파이프로 구분하되 양끝 파이프는 선택적
-            header_line = lines[0].strip()
-            if header_line.startswith('|'):
-                header_line = header_line[1:]
-            if header_line.endswith('|'):
-                header_line = header_line[:-1]
-            
-            headers = [cell.strip() for cell in header_line.split('|')]
-            for header in headers:
-                if header:  # 빈 문자열 제외
-                    html += f'<th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">{header}</th>'
-            html += '</tr></thead><tbody>'
-            
-            # 바디 처리 - 구분선(두 번째 줄) 이후부터
-            for line in lines[2:]:
-                line = line.strip()
-                if not line or not '|' in line:
-                    continue
+            for line in front.split('\n'):
+                if ':' in line:
+                    key, value = line.split(':', 1)
+                    key = key.strip().lower()
+                    value = value.strip()
                     
-                # 양끝 파이프 제거
-                if line.startswith('|'):
-                    line = line[1:]
-                if line.endswith('|'):
-                    line = line[:-1]
-                    
-                cells = [cell.strip() for cell in line.split('|')]
-                if cells:  # 빈 행 제외
-                    html += '<tr>'
-                    for cell in cells:
-                        if cell:  # 빈 셀도 포함 (공백 유지)
-                            html += f'<td style="border: 1px solid #ddd; padding: 8px;">{cell if cell else "&nbsp;"}</td>'
-                    html += '</tr>'
-            
-            html += '</tbody></table>'
-            protected_tables[key] = html
-            return key
-        
-        # 테이블 패턴 매칭 및 보호 (더 유연한 패턴)
-        # 패턴 설명:
-        # - 줄 시작에 있지 않아도 매치 (^ 제거)
-        # - 파이프 사이에 최소 1개 이상의 문자가 있어야 함
-        # - 구분선은 -, :, | 와 공백으로 구성
-        text = re.sub(
-            r'(?:^|\n)(\|[^\n]+\|)\s*\n(\|[\s\-:|]+\|)\s*\n((?:\|[^\n]+\|\s*\n?)+)',
-            lambda m: '\n' + protect_table(m),
-            text,
-            flags=re.MULTILINE
-        )
-        
-        # 코드 블록 보호 (```...```)
-        def protect_code_block(match):
-            key = f"[[CODEBLOCK{len(protected_blocks)}]]"
-            language = match.group(1).strip() if match.group(1) else ''
-            code = match.group(2)
-            
-            # HTML 특수문자 이스케이프
-            code = code.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            
-            # 백틱 이스케이프 (코드 내부의 백틱을 HTML 엔티티로 변환)
-            code = code.replace('`', '&#96;')
-            
-            if language:
-                protected_blocks[key] = f'''<pre style="background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto;"><code class="language-{language}">{code}</code></pre>'''
-            else:
-                protected_blocks[key] = f'''<pre style="background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>{code}</code></pre>'''
-            return key
-        
-        # 더 정확한 코드 블록 매칭 (줄 시작에서만 매칭)
-        text = re.sub(r'^```([^\n]*)\n(.*?)\n```', protect_code_block, text, flags=re.DOTALL | re.MULTILINE)
-        
-        # 인라인 코드 보호 (`...`)
-        def protect_inline_code(match):
-            key = f"[[INLINE{len(protected_inline)}]]"
-            code = match.group(1)
-            # HTML 특수문자 이스케이프
-            code = code.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            protected_inline[key] = f'<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-family: monospace;">{code}</code>'
-            return key
-        
-        text = re.sub(r'`([^`]+)`', protect_inline_code, text)
-        
-        # 제목 변환 (h1-h6)
-        for level in range(6, 0, -1):
-            pattern = r'^' + '#' * level + r'\s+(.+)$'
-            text = re.sub(pattern, f'<h{level}>\\1</h{level}>', text, flags=re.MULTILINE)
-        
-        # 굵은 글씨
-        text = re.sub(r'\*\*([^*]+)\*\*', r'<strong>\1</strong>', text)
-        text = re.sub(r'__([^_]+)__', r'<strong>\1</strong>', text)
-        
-        # 기울임
-        text = re.sub(r'\*([^*]+)\*', r'<em>\1</em>', text)
-        text = re.sub(r'_([^_]+)_', r'<em>\1</em>', text)
-        
-        # 취소선
-        text = re.sub(r'~~([^~]+)~~', r'<s>\1</s>', text)
-        
-        # 링크
-        text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', r'<a href="\2" target="_blank">\1</a>', text)
-        
-        # 이미지
-        text = re.sub(r'!\[([^\]]*)\]\(([^)]+)\)', r'<img src="\2" alt="\1" style="max-width: 100%; height: auto;">', text)
-        
-        # 수평선
-        text = re.sub(r'^---+$', '<hr style="border: none; border-top: 1px solid #ccc; margin: 2em 0;">', text, flags=re.MULTILINE)
-        
-        # 인용문
-        text = re.sub(r'^>\s+(.+)$', r'<blockquote style="border-left: 4px solid #ddd; margin: 1em 0; padding-left: 1em; color: #666;">\1</blockquote>', text, flags=re.MULTILINE)
-        
-        # 리스트 처리
-        lines = text.split('\n')
-        result_lines = []
-        in_ul = False
-        in_ol = False
-        
-        for line in lines:
-            if re.match(r'^\s*[-*+]\s+', line):
-                if not in_ul:
-                    result_lines.append('<ul>')
-                    in_ul = True
-                content = re.sub(r'^\s*[-*+]\s+', '', line.strip())
-                result_lines.append(f'<li>{content}</li>')
-            elif re.match(r'^\s*\d+\.\s+', line):
-                if not in_ol:
-                    result_lines.append('<ol>')
-                    in_ol = True
-                content = re.sub(r'^\d+\.\s+', '', line.strip())
-                result_lines.append(f'<li>{content}</li>')
-            else:
-                if in_ul:
-                    result_lines.append('</ul>')
-                    in_ul = False
-                if in_ol:
-                    result_lines.append('</ol>')
-                    in_ol = False
-                result_lines.append(line)
-        
-        if in_ul:
-            result_lines.append('</ul>')
-        if in_ol:
-            result_lines.append('</ol>')
-        
-        text = '\n'.join(result_lines)
-        
-        # 보호된 요소들 복원 (테이블, 코드 블록, 인라인 코드)
-        for key, value in protected_tables.items():
-            text = text.replace(key, value)
-        
-        for key, value in protected_blocks.items():
-            text = text.replace(key, value)
-        
-        for key, value in protected_inline.items():
-            text = text.replace(key, value)
-        
-        # 단락 처리
-        paragraphs = text.split('\n\n')
-        formatted = []
-        
-        for para in paragraphs:
-            para = para.strip()
-            if para:
-                # HTML 태그로 시작하지 않으면 p 태그로 감싸기
-                if not re.match(r'^<(?:h[1-6]|ul|ol|pre|blockquote|table|hr)', para):
-                    para = para.replace('\n', '<br>')
-                    para = f'<p style="line-height: 1.6;">{para}</p>'
-            formatted.append(para)
-        
-        return '\n'.join(formatted)
+                    if key == 'title':
+                        metadata['title'] = value.strip('"\'')
+                    elif key == 'category':
+                        metadata['category'] = value.strip('"\'')
+                    elif key == 'tags':
+                        # tags: [tag1, tag2] 형식 파싱
+                        value = value.strip('[]')
+                        metadata['tags'] = [t.strip().strip('"\'') for t in value.split(',')]
     
-    def parse_markdown(self, content: str) -> Tuple[Dict, str]:
-        """마크다운 파싱 및 메타데이터 추출 (기존 로직 유지)"""
-        metadata = {
-            'title': 'Untitled',
-            'category': 'general',
-            'tags': []
-        }
-        body = content
-        
-        # Front matter 파싱
-        if content.startswith('---'):
-            parts = content.split('---', 2)
-            if len(parts) >= 3:
-                front = parts[1].strip()
-                body = parts[2].strip()
-                
-                for line in front.split('\n'):
-                    if ':' in line:
-                        key, value = line.split(':', 1)
-                        key = key.strip().lower()
-                        value = value.strip()
-                        
-                        if key == 'title':
-                            metadata['title'] = value.strip('"\'')
-                        elif key == 'category':
-                            metadata['category'] = value.strip('"\'')
-                        elif key == 'tags':
-                            # tags: [tag1, tag2] 형식 파싱
-                            value = value.strip('[]')
-                            metadata['tags'] = [t.strip().strip('"\'') for t in value.split(',')]
-        
-        # 제목이 없으면 첫 번째 h1에서 추출
-        if metadata['title'] == 'Untitled':
-            h1_match = re.search(r'^#\s+(.+)$', body, re.MULTILINE)
-            if h1_match:
-                metadata['title'] = h1_match.group(1)
-        
-        return metadata, body
+    # 제목이 없으면 첫 번째 h1에서 추출
+    if metadata['title'] == 'Untitled':
+        h1_match = re.search(r'^#\s+(.+)$', body, re.MULTILINE)
+        if h1_match:
+            metadata['title'] = h1_match.group(1)
+    
+    return metadata, body
 
 
 class TwoFactorAuth:
-    """기존 2단계 인증 클래스 이식"""
+    """2단계 인증 클래스"""
     
     def __init__(self):
         self.base_url = os.getenv('BLOG_API_URL', 'http://localhost:3000')
@@ -317,7 +127,7 @@ class TwoFactorAuth:
             return False
     
     async def _get_jwt_token(self):
-        """JWT 토큰 획득 (기존 로직 유지)"""
+        """JWT 토큰 획득"""
         async with httpx.AsyncClient() as client:
             response = await client.post(
                 f"{self.api_url}/auth/login",
@@ -334,7 +144,6 @@ class TwoFactorAuth:
 
 # 전역 인스턴스
 auth = TwoFactorAuth()
-renderer = MarkdownRenderer()
 
 
 # FastMCP 리소스
@@ -396,7 +205,7 @@ async def create_post(
     file_path: str = None,
     tags: List[str] = None
 ) -> str:
-    """블로그 포스트 생성 (마크다운 → HTML 자동 변환)
+    """블로그 포스트 생성 (마크다운을 백엔드로 전송, 백엔드에서 HTML 변환)
     
     Args:
         title: 포스트 제목 (선택, 마크다운에서 추출 가능)
@@ -421,8 +230,8 @@ async def create_post(
     elif not content:
         return "❌ content 또는 file_path가 필요합니다."
     
-    # 마크다운 파싱 (HTML 변환은 백엔드에서 처리)
-    metadata, body = renderer.parse_markdown(content)
+    # 마크다운 메타데이터 파싱
+    metadata, body = parse_markdown_metadata(content)
     
     # 제목과 태그 결정
     final_title = title or metadata['title']
@@ -469,12 +278,12 @@ date: {datetime.now().isoformat()}
     # 포스트 생성 API 호출
     try:
         async with httpx.AsyncClient() as client:
-            # 하이브리드 저장: 마크다운 원본 전송 (60% 토큰 절약)
+            # 백엔드로 마크다운 전송 (백엔드에서 HTML 변환 처리)
             response = await client.post(
                 f"{auth.api_url}/posts",
                 json={
                     "title": final_title,
-                    "content_markdown": body,  # 마크다운 원본 전송
+                    "content_markdown": body,  # 마크다운 원본 전송 (백엔드에서 렌더링)
                     "tags": final_tags
                 },
                 headers={
@@ -528,8 +337,8 @@ async def create_post_from_file(file_path: str) -> str:
     except Exception as e:
         return f"❌ 파일 읽기 실패: {str(e)}"
     
-    # 마크다운 파싱 (HTML 변환은 백엔드에서 처리)
-    metadata, body = renderer.parse_markdown(content)
+    # 마크다운 메타데이터 파싱
+    metadata, body = parse_markdown_metadata(content)
     
     # 제목과 태그 결정
     final_title = metadata['title']
@@ -577,12 +386,12 @@ source: {Path(file_path).name}
     # 포스트 생성 API 호출
     try:
         async with httpx.AsyncClient() as client:
-            # 하이브리드 저장: 마크다운 원본 전송 (60% 토큰 절약)
+            # 백엔드로 마크다운 전송 (백엔드에서 HTML 변환 처리)
             response = await client.post(
                 f"{auth.api_url}/posts",
                 json={
                     "title": final_title,
-                    "content_markdown": body,  # 마크다운 원본 전송
+                    "content_markdown": body,  # 마크다운 원본 전송 (백엔드에서 렌더링)
                     "tags": final_tags
                 },
                 headers={
