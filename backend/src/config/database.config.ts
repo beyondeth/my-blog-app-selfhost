@@ -22,10 +22,13 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
 
   // DB_URL이 있는 경우 (AWS RDS 등)
   if (dbUrl) {
+    // 로컬 데이터베이스인 경우 SSL 비활성화
+    const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+    
     return {
       ...baseConfig,
       url: dbUrl,
-      ssl: { rejectUnauthorized: false },
+      ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
       extra: {
         // Connection Pool 설정
         max: parseInt(process.env.DB_POOL_SIZE || '100', 10), // 동시 요청 처리를 위해 증가
@@ -34,7 +37,7 @@ export default registerAs('database', (): TypeOrmModuleOptions => {
         allowExitOnIdle: true,
         statement_timeout: parseInt(process.env.DB_STATEMENT_TIMEOUT || '30000', 10),
         query_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || '30000', 10),
-        ssl: { rejectUnauthorized: false },
+        ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
       },
     };
   }

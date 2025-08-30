@@ -21,15 +21,18 @@ export const createDataSourceOptions = (): DataSourceOptions => {
   };
 
   if (dbUrl) {
+    // 로컬 데이터베이스인 경우 SSL 비활성화
+    const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
+    
     return {
       ...baseConfig,
       url: dbUrl,
-      ssl: { rejectUnauthorized: false },
+      ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
       extra: {
         // Connection Pool 설정 (migrations에서도 동일하게 적용)
         max: parseInt(process.env.DB_POOL_SIZE || '5', 10), // migration은 적은 연결로 충분
         connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '3000', 10),
-        ssl: { rejectUnauthorized: false },
+        ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
       },
     };
   }
