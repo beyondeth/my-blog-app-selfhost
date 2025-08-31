@@ -16,10 +16,16 @@ export class Blog {
   @Column({ nullable: true })
   description: string; // 블로그 설명
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'thumbnailUrl' })
   thumbnailUrl: string; // 블로그 썸네일
 
-  @Column({ type: 'uuid', nullable: true, unique: true })
+  @Column({ default: true, name: 'isPublic' })
+  isPublic: boolean; // 블로그 공개 여부
+
+  @Column({ default: true, name: 'allowComments' })
+  allowComments: boolean; // 댓글 허용 여부
+
+  @Column({ type: 'uuid', nullable: true, unique: true, name: 'userId' })
   userId: string;
 
   @ManyToOne(() => User, { onDelete: 'CASCADE' })
@@ -29,9 +35,9 @@ export class Blog {
   @OneToMany(() => Post, post => post.blog)
   posts: Post[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
 }

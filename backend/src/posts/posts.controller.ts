@@ -5,6 +5,7 @@ import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
@@ -92,18 +93,20 @@ export class PostsController {
 
   @Get(':id')
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: '게시글 상세 조회' })
   findOne(@Param('id') id: string, @Request() req: any) {
-    // @Public()과 함께 사용할 때는 req.user를 직접 사용
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
     return this.postsService.findOne(id, user);
   }
 
   @Get('slug/:slug')
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: 'Slug로 게시글 조회' })
   findBySlug(@Param('slug') slug: string, @Request() req: any) {
-    // @Public()과 함께 사용할 때는 req.user를 직접 사용
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
     return this.postsService.findBySlug(slug, user);
   }

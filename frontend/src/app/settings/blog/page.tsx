@@ -87,7 +87,7 @@ export default function BlogSettingsPage() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="inline-flex items-center px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800"
+            className="inline-flex items-center px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800"
           >
             새로고침
           </button>
@@ -225,7 +225,7 @@ export default function BlogSettingsPage() {
                 href={`/blog/${blog.slug}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="ml-2 text-amber-700 hover:text-amber-800"
+                className="ml-2 text-gray-700 hover:text-black"
               >
                 {window.location.origin}/blog/{blog.slug}
               </a>
@@ -250,7 +250,7 @@ export default function BlogSettingsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? '저장 중...' : '변경사항 저장'}
           </button>

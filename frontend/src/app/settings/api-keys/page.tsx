@@ -4,14 +4,15 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserBlog } from '@/hooks/useUserBlog';
 import { FiKey, FiCopy, FiTrash2, FiPlus, FiToggleLeft, FiToggleRight, FiClock, FiActivity, FiAlertCircle, FiInfo, FiChevronDown, FiChevronUp, FiCheckCircle } from 'react-icons/fi';
-import { formatDistanceToNow } from 'date-fns';
+import { formatDistanceToNow, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 interface ApiKey {
   id: string;
+  keyId?: string; // API Key ID (공개 가능)
   name: string;
   description?: string;
-  key?: string; // Optional since backend doesn't return it
+  key?: string; // Deprecated, for backward compatibility
   keyPrefix?: string; // For display purposes
   blogId: string;
   isActive: boolean;
@@ -27,10 +28,11 @@ export default function ApiKeysPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [newKey, setNewKey] = useState<{ plainKey: string } | null>(null);
+  const [newKey, setNewKey] = useState<{ keyId?: string; keySecret?: string; plainKey?: string } | null>(null);
   const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
   const [showMcpGuide, setShowMcpGuide] = useState(true);
   const [copiedConfig, setCopiedConfig] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -60,7 +62,7 @@ export default function ApiKeysPage() {
       // Add key prefix for display
       const keysWithPrefix = data.map((key: ApiKey) => ({
         ...key,
-        keyPrefix: `sk_${key.id.substring(0, 8)}` // Use ID prefix for display
+        keyPrefix: key.keyId ? key.keyId.substring(0, 20) : `sk_${key.id.substring(0, 8)}` // Use keyId if available
       }));
       setApiKeys(keysWithPrefix);
     } catch (err: any) {
@@ -78,6 +80,7 @@ export default function ApiKeysPage() {
       return;
     }
 
+    setIsCreating(true);
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/api-keys`,
@@ -89,7 +92,7 @@ export default function ApiKeysPage() {
           credentials: 'include',
           body: JSON.stringify({
             name: formData.name,
-            description: formData.description,
+            description: '',
             blogId: blog.id,
           }),
         }
@@ -100,7 +103,11 @@ export default function ApiKeysPage() {
       }
 
       const data = await response.json();
-      if (data.plainKey) {
+      if (data.keyId && data.keySecret) {
+        // New format with separated ID/Secret
+        setNewKey({ keyId: data.keyId, keySecret: data.keySecret });
+      } else if (data.plainKey) {
+        // Backward compatibility
         setNewKey({ plainKey: data.plainKey });
       }
       setShowCreateModal(false);
@@ -108,6 +115,8 @@ export default function ApiKeysPage() {
       await fetchApiKeys();
     } catch (err: any) {
       setError(err.message);
+    } finally {
+      setIsCreating(false);
     }
   };
 
@@ -176,7 +185,8 @@ export default function ApiKeysPage() {
         "command": "node",
         "args": ["/path/to/mcp-blog-server/index.js"],
         "env": {
-          "BLOG_API_KEY": "여기에_생성한_API_키를_넣으세요",
+          "BLOG_API_KEY_ID": "여기에_API_Key_ID를_넣으세요 (akid_xxx)",
+          "BLOG_API_KEY_SECRET": "여기에_API_Key_Secret을_넣으세요 (aks_xxx)",
           "BLOG_API_URL": "${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}"
         }
       }
@@ -219,7 +229,7 @@ export default function ApiKeysPage() {
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="inline-flex items-center px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800"
+            className="inline-flex items-center px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800"
           >
             새로고침
           </button>
@@ -235,22 +245,45 @@ export default function ApiKeysPage() {
           <div>
             <h2 className="text-xl font-semibold text-gray-900">API 키 관리</h2>
             <p className="text-sm text-gray-600 mt-1">
-              블로그 API에 접근할 수 있는 키를 관리하세요
+              블로그 API에 접근할 수 있는 키를 관리하세요 ({apiKeys.length}/3개 사용 중)
             </p>
           </div>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800 transition-colors"
+            className="inline-flex items-center px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={apiKeys.length >= 3}
           >
             <FiPlus className="mr-2" />
-            새 API 키
+            API-KEY 발급
           </button>
         </div>
       </div>
 
+      {/* Security Warning Banner */}
+      <div className="mb-6 bg-red-50 border-l-4 border-red-500 rounded-lg p-4">
+        <div className="flex items-start">
+          <FiAlertCircle className="h-5 w-5 text-red-600 mt-0.5 mr-3 flex-shrink-0" />
+          <div className="text-sm text-red-700">
+            <strong>절대 Secret을 공개하지 마세요</strong> - GitHub, 블로그, 공개 저장소에 업로드 금지
+          </div>
+        </div>
+      </div>
+
+      {/* API Key Limit Warning */}
+      {apiKeys.length >= 3 && (
+        <div className="mb-6 bg-amber-50 border-l-4 border-amber-500 rounded-lg p-4">
+          <div className="flex items-start">
+            <FiInfo className="h-5 w-5 text-amber-600 mt-0.5 mr-3 flex-shrink-0" />
+            <div className="text-sm text-amber-700">
+              API 키 생성 한도(3개)에 도달했습니다. 새 키를 생성하려면 기존 키를 삭제해주세요.
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* MCP Configuration Guide - Improved */}
       <div className="mb-6">
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200 overflow-hidden">
+        <div className="bg-gray-50 rounded-lg border border-gray-200 overflow-hidden">
           <button
             onClick={() => setShowMcpGuide(!showMcpGuide)}
             className="w-full px-4 py-3 flex items-center justify-between hover:bg-blue-100/50 transition-colors"
@@ -322,7 +355,8 @@ export default function ApiKeysPage() {
         "command": "node",
         "args": ["/path/to/mcp-blog-server/index.js"],
         "env": {
-          "BLOG_API_KEY": "여기에_생성한_API_키를_넣으세요",
+          "BLOG_API_KEY_ID": "여기에_API_Key_ID를_넣으세요 (akid_xxx)",
+          "BLOG_API_KEY_SECRET": "여기에_API_Key_Secret을_넣으세요 (aks_xxx)",
           "BLOG_API_URL": "${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}"
         }
       }
@@ -353,12 +387,12 @@ export default function ApiKeysPage() {
                 </div>
 
                 {/* Important Notes */}
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
                   <div className="flex items-start">
-                    <FiAlertCircle className="h-4 w-4 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+                    <FiAlertCircle className="h-4 w-4 text-gray-600 mt-0.5 mr-2 flex-shrink-0" />
                     <div className="text-sm">
-                      <p className="font-medium text-amber-900 mb-1">중요 사항</p>
-                      <ul className="text-amber-700 space-y-0.5">
+                      <p className="font-medium text-gray-900 mb-1">중요 사항</p>
+                      <ul className="text-gray-700 space-y-0.5">
                         <li>• MCP 서버는 로그인 인증과 API 키 인증이 모두 필요합니다</li>
                         <li>• args 경로를 실제 MCP 서버 경로로 변경하세요</li>
                         <li>• Claude Desktop을 재시작해야 변경사항이 적용됩니다</li>
@@ -373,31 +407,75 @@ export default function ApiKeysPage() {
       </div>
 
       {/* New Key Alert */}
-      {newKey && newKey.plainKey && (
-        <div className="mb-6 p-4 bg-amber-50 border-l-4 border-amber-500 rounded-lg">
+      {newKey && (newKey.keySecret || newKey.plainKey) && (
+        <div className="mb-6 p-4 bg-green-50 border-l-4 border-green-500 rounded-lg">
           <div className="flex items-start">
-            <FiAlertCircle className="h-5 w-5 text-amber-600 mt-0.5 mr-2 flex-shrink-0" />
+            <FiAlertCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2 flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-semibold text-amber-900 mb-1">
+              <p className="text-sm font-semibold text-green-900 mb-1">
                 API 키가 생성되었습니다
               </p>
-              <p className="text-sm text-amber-700 mb-3">
-                이 키는 지금만 볼 수 있습니다. 안전한 곳에 복사해서 저장하세요.
+              <p className="text-sm text-green-700 mb-3">
+                ⚠️ Secret은 지금만 볼 수 있습니다. 안전한 곳에 복사해서 저장하세요.
               </p>
-              <div className="flex items-center space-x-2 bg-white p-3 rounded border border-amber-200">
-                <code className="flex-1 text-xs font-mono break-all select-all">
-                  {newKey.plainKey}
-                </code>
-                <button
-                  onClick={() => {
-                    copyToClipboard(newKey.plainKey);
-                    setNewKey(null); // Clear after copy
-                  }}
-                  className="px-3 py-1 bg-amber-600 text-white text-sm font-medium rounded hover:bg-amber-700 transition-colors"
-                >
-                  복사하고 닫기
-                </button>
-              </div>
+              
+              {newKey.keyId && newKey.keySecret ? (
+                // New format with ID/Secret separation
+                <div className="space-y-3">
+                  <div className="bg-white p-3 rounded border border-amber-200">
+                    <label className="block text-xs font-medium text-gray-700 mb-1">
+                      API Key ID (공개 가능)
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <code className="flex-1 text-xs font-mono break-all select-all">
+                        {newKey.keyId}
+                      </code>
+                      <button
+                        onClick={() => copyToClipboard(newKey.keyId!)}
+                        className="px-2 py-1 bg-gray-600 text-white text-xs font-medium rounded hover:bg-gray-700 transition-colors"
+                      >
+                        복사
+                      </button>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-red-50 p-3 rounded border border-red-200">
+                    <label className="block text-xs font-medium text-red-700 mb-1">
+                      API Key Secret (비밀 - 1회만 표시)
+                    </label>
+                    <div className="flex items-center space-x-2">
+                      <code className="flex-1 text-xs font-mono break-all select-all text-red-800">
+                        {newKey.keySecret}
+                      </code>
+                      <button
+                        onClick={() => {
+                          copyToClipboard(newKey.keySecret!);
+                          setNewKey(null); // Clear after copy
+                        }}
+                        className="px-2 py-1 bg-red-600 text-white text-xs font-medium rounded hover:bg-red-700 transition-colors"
+                      >
+                        복사하고 닫기
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                // Backward compatibility with old format
+                <div className="flex items-center space-x-2 bg-white p-3 rounded border border-amber-200">
+                  <code className="flex-1 text-xs font-mono break-all select-all">
+                    {newKey.plainKey}
+                  </code>
+                  <button
+                    onClick={() => {
+                      copyToClipboard(newKey.plainKey!);
+                      setNewKey(null); // Clear after copy
+                    }}
+                    className="px-3 py-1 bg-amber-600 text-white text-sm font-medium rounded hover:bg-amber-700 transition-colors"
+                  >
+                    복사하고 닫기
+                  </button>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -438,7 +516,34 @@ export default function ApiKeysPage() {
                   <div className="mt-2 space-y-1">
                     <div className="flex items-center text-xs text-gray-500">
                       <FiClock className="mr-1" />
-                      생성: {formatDistanceToNow(new Date(key.createdAt), { addSuffix: true, locale: ko })}
+                      생성: {(() => {
+                        const date = new Date(key.createdAt);
+                        const now = new Date();
+                        const diffInMinutes = (now.getTime() - date.getTime()) / (1000 * 60);
+                        
+                        // 1분 미만: "방금 전"
+                        if (diffInMinutes < 1) return '방금 전';
+                        
+                        // 1시간 미만: "N분 전"
+                        if (diffInMinutes < 60) {
+                          return `${Math.floor(diffInMinutes)}분 전`;
+                        }
+                        
+                        // 24시간 미만: "N시간 전"
+                        const diffInHours = diffInMinutes / 60;
+                        if (diffInHours < 24) {
+                          return `${Math.floor(diffInHours)}시간 전`;
+                        }
+                        
+                        // 7일 미만: "N일 전"
+                        const diffInDays = diffInHours / 24;
+                        if (diffInDays < 7) {
+                          return `${Math.floor(diffInDays)}일 전`;
+                        }
+                        
+                        // 그 이상: 정확한 날짜
+                        return format(date, 'yyyy년 MM월 dd일 HH:mm', { locale: ko });
+                      })()}
                     </div>
                     {key.lastUsedAt && (
                       <div className="flex items-center text-xs text-gray-500">
@@ -448,21 +553,30 @@ export default function ApiKeysPage() {
                     )}
                   </div>
                   <div className="mt-3 flex items-center space-x-2">
-                    <code className="px-3 py-1 bg-gray-100 text-sm font-mono rounded text-gray-600">
-                      {key.keyPrefix}...****
-                    </code>
+                    {key.keyId ? (
+                      <>
+                        <span className="text-xs text-gray-500">Key ID:</span>
+                        <code className="px-3 py-1 bg-gray-100 text-sm font-mono rounded text-gray-600">
+                          {key.keyId}
+                        </code>
+                      </>
+                    ) : (
+                      <code className="px-3 py-1 bg-gray-100 text-sm font-mono rounded text-gray-600">
+                        {key.keyPrefix}...****
+                      </code>
+                    )}
                     {copiedKeyId === key.id && (
                       <span className="text-xs text-green-600 font-medium">
-                        ID 복사됨!
+                        복사됨!
                       </span>
                     )}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2 ml-4">
                   <button
-                    onClick={() => copyToClipboard(key.id, key.id)}
+                    onClick={() => copyToClipboard(key.keyId || key.id, key.id)}
                     className="p-2 text-gray-500 hover:text-gray-700 transition-colors"
-                    title="ID 복사"
+                    title="Key ID 복사"
                   >
                     <FiCopy className="w-4 h-4" />
                   </button>
@@ -503,20 +617,9 @@ export default function ApiKeysPage() {
                     id="name"
                     value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-black"
                     required
-                  />
-                </div>
-                <div>
-                  <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                    설명
-                  </label>
-                  <textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    disabled={isCreating}
                   />
                 </div>
               </div>
@@ -524,15 +627,24 @@ export default function ApiKeysPage() {
                 <button
                   type="button"
                   onClick={() => setShowCreateModal(false)}
-                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50"
+                  className="px-4 py-2 text-gray-700 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={isCreating}
                 >
                   취소
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800"
+                  className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  disabled={isCreating}
                 >
-                  생성
+                  {isCreating ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      생성 중...
+                    </>
+                  ) : (
+                    '생성'
+                  )}
                 </button>
               </div>
             </form>

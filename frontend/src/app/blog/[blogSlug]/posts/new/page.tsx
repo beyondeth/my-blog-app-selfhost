@@ -46,7 +46,10 @@ export default function BlogNewPostPage() {
     const fetchBlog = async () => {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`,
+          {
+            credentials: 'include'
+          }
         );
 
         if (!response.ok) {
@@ -56,10 +59,18 @@ export default function BlogNewPostPage() {
         }
 
         const blogData = await response.json();
+        console.log('Blog data received:', blogData);
+        console.log('Current user:', user);
+        console.log('Blog owner:', blogData.owner);
         setBlog(blogData);
 
         // Check if user is the blog owner
-        if (blogData.owner?.id !== user.id) {
+        if (!blogData.owner || blogData.owner?.id !== user.id) {
+          console.error('Permission check failed:', {
+            blogOwnerId: blogData.owner?.id,
+            userId: user.id,
+            match: blogData.owner?.id === user.id
+          });
           toast.error('이 블로그에 글을 작성할 권한이 없습니다.');
           router.push(`/blog/${blogSlug}`);
           return;

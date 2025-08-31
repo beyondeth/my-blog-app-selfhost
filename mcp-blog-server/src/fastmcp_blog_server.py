@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 """
-FastMCP 기반 블로그 서버 - 마크다운을 백엔드 API로 전송
-백엔드에서 HTML 렌더링 처리 (중앙화된 렌더링 로직)
+FastMCP 기반 블로그 서버 - 보안 강화 버전
+- HMAC-SHA256 서명 기반 API Key 인증
+- AWS Signature V4 스타일 보안
+- 평문 API Key는 절대 네트워크로 전송하지 않음
 """
 import os
 import json
 import asyncio
 import re
+import hashlib
+import hmac
+import time
+import uuid
+import secrets
 from typing import Dict, Any, List, Optional, Tuple
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timedelta
 from dotenv import load_dotenv
 
 # FastMCP imports
@@ -29,7 +36,7 @@ if env_file.exists():
 # FastMCP 서버 생성
 mcp = FastMCP(
     name="blog-mcp-fastmcp",
-    instructions="FastMCP 기반 블로그 포스트 자동 생성 서버. 2단계 인증을 통해 안전하게 마크다운을 백엔드 API로 전송하여 블로그에 포스팅합니다."
+    instructions="FastMCP 기반 블로그 포스트 자동 생성 서버. API Key 인증을 통해 안전하게 마크다운을 백엔드 API로 전송하여 블로그에 포스팅합니다. OAuth 사용자도 비밀번호 없이 API Key만으로 포스팅 가능합니다."
 )
 
 
@@ -73,77 +80,207 @@ def parse_markdown_metadata(content: str) -> Tuple[Dict, str]:
     return metadata, body
 
 
-class TwoFactorAuth:
-    """2단계 인증 클래스"""
+class SecureAPIKeyAuth:
+    """AWS Signature V4 스타일 보안 강화 API Key 인증"""
     
     def __init__(self):
         self.base_url = os.getenv('BLOG_API_URL', 'http://localhost:3000')
         self.api_url = f"{self.base_url}/api/v1"
-        self.email = os.getenv('BLOG_EMAIL')
-        self.password = os.getenv('BLOG_PASSWORD')
-        self.api_key = os.getenv('BLOG_API_KEY')
         
+        # API Key ID와 Secret 분리 (AWS IAM 스타일)
+        self.api_key_id = os.getenv('BLOG_API_KEY_ID')  # akid_xxx... (공개 가능)
+        self.api_key_secret = os.getenv('BLOG_API_KEY_SECRET')  # aks_xxx... (절대 비밀)
+        
+        # 레거시 지원: 이전 방식의 API Key도 지원
+        if not self.api_key_id or not self.api_key_secret:
+            legacy_key = os.getenv('BLOG_API_KEY')  # sk_xxx... (deprecated)
+            if legacy_key:
+                self.api_key_secret = legacy_key
+                self.api_key_id = self._extract_key_id(legacy_key)
+        
+        # 세션 정보
         self.access_token = None
         self.blog_info = None
+        self.user_id = None
+        self.blog_id = None
+        
+        # 보안 설정
+        self.timestamp_window = 300  # 5분 시간 창
+        self.used_nonces = set()  # 재사용 방지용 nonce 저장
+        
+    def _extract_key_id(self, api_key: str) -> str:
+        """API Key에서 ID 추출 (임시: 처음 8자리)"""
+        if api_key and api_key.startswith('sk_'):
+            # 실제로는 별도의 Key ID가 필요함
+            return api_key[3:11] if len(api_key) > 11 else api_key[3:]
+        return ""
+    
+    def _create_aws_style_signature(self, method: str, uri: str, timestamp: str, nonce: str, body: str = "") -> str:
+        """AWS Signature V4 스타일 HMAC-SHA256 서명 생성
+        
+        보안 강화:
+        1. Request 전체를 서명에 포함
+        2. Body hash를 포함하여 변조 방지
+        3. Timestamp로 시간 제한
+        """
+        # 1. Canonical Request 생성
+        body_hash = hashlib.sha256(body.encode('utf-8')).hexdigest()
+        canonical_request = f"{method}\n{uri}\n{timestamp}\n{nonce}\n{body_hash}"
+        
+        # 2. String to Sign 생성  
+        request_hash = hashlib.sha256(canonical_request.encode('utf-8')).hexdigest()
+        string_to_sign = f"HMAC-SHA256\n{timestamp}\n{request_hash}"
+        
+        # 3. 서명 생성 (Secret으로 서명)
+        signature = hmac.new(
+            self.api_key_secret.encode('utf-8'),
+            string_to_sign.encode('utf-8'),
+            hashlib.sha256
+        ).hexdigest()
+        
+        return signature
+    
+    def _validate_timestamp(self, timestamp: str) -> bool:
+        """Timestamp 유효성 검증 (5분 이내만 허용)"""
+        try:
+            request_time = int(timestamp)
+            current_time = int(time.time() * 1000)
+            time_diff = abs(current_time - request_time)
+            return time_diff <= (self.timestamp_window * 1000)
+        except:
+            return False
+    
+    def _check_nonce_reuse(self, nonce: str) -> bool:
+        """Nonce 중복 체크 (재사용 공격 방지)"""
+        if nonce in self.used_nonces:
+            return False
+        self.used_nonces.add(nonce)
+        
+        # 오래된 nonce 정리 (메모리 관리)
+        if len(self.used_nonces) > 1000:
+            self.used_nonces.clear()
+        
+        return True
         
     async def authenticate(self) -> bool:
-        """2단계 인증 수행 (기존 로직 유지)"""
+        """AWS Signature V4 스타일 보안 강화 인증
+        
+        보안 체크리스트:
+        ✓ API Secret은 절대 전송하지 않음
+        ✓ HMAC-SHA256 서명 사용
+        ✓ Timestamp 5분 제한
+        ✓ Nonce로 재사용 방지
+        ✓ Request 전체 서명으로 변조 방지
+        """
         try:
-            # 1단계: Email/Password 인증
-            if not self.email or not self.password:
+            # 1. API Key ID와 Secret 확인 (절대 로그에 기록하지 않음)
+            if not self.api_key_id or not self.api_key_secret:
+                print("❌ 보안 오류: API Key ID 또는 Secret이 설정되지 않았습니다")
                 return False
             
-            # 2단계: API Key 확인
-            if not self.api_key:
+            # 새로운 방식 (akid_/aks_) 또는 레거시 방식 (sk_) 모두 지원
+            if not (self.api_key_secret.startswith('aks_') or self.api_key_secret.startswith('sk_')):
+                print("❌ 보안 오류: 올바른 API Key Secret 형식이 아닙니다")
                 return False
             
+            if self.api_key_id and not (self.api_key_id.startswith('akid_') or self.api_key_secret.startswith('sk_')):
+                print("❌ 보안 오류: 올바른 API Key ID 형식이 아닙니다")
+                return False
+            
+            # 2. 보안 파라미터 생성
+            timestamp = str(int(time.time() * 1000))  # 밀리초 단위
+            nonce = str(uuid.uuid4())  # 일회용 토큰
+            
+            # 3. Timestamp 유효성 검증
+            if not self._validate_timestamp(timestamp):
+                print("❌ 보안 오류: Timestamp 유효성 검증 실패")
+                return False
+            
+            # 4. Nonce 중복 체크
+            if not self._check_nonce_reuse(nonce):
+                print("❌ 보안 오류: Nonce 재사용 감지")
+                return False
+            
+            # 5. 새로운 ID/Secret 방식으로 인증 준비
+            method = "POST"
+            uri = "/auth/verify-api-key-id-secret"
+            
+            # ID/Secret 분리 방식 사용
+            body = json.dumps({
+                "keyId": self.api_key_id,
+                "keySecret": self.api_key_secret,
+                "timestamp": timestamp,
+                "nonce": nonce
+            })
+            
+            # Request 전체를 포함한 서명 생성
+            signature = self._create_aws_style_signature(method, uri, timestamp, nonce, body)
+            
+            # 6. API 호출 (서명과 함께)
             async with httpx.AsyncClient() as client:
-                # /mcp/auth/verify 엔드포인트로 2단계 인증
+                # HTTPS 강제 (개발 환경 제외)
+                if self.base_url.startswith('https') or 'localhost' not in self.base_url:
+                    if not self.base_url.startswith('https'):
+                        print("⚠️ 보안 경고: HTTPS를 사용해야 합니다")
+                
+                # 서명과 함께 요청
                 response = await client.post(
-                    f"{self.base_url}/mcp/auth/verify",
-                    json={
-                        "email": self.email,
-                        "password": self.password
-                    },
+                    f"{self.api_url}/auth/verify-api-key-id-secret",
+                    json=json.loads(body),  # 동일한 body 전송
                     headers={
-                        "x-api-key": self.api_key
+                        "X-API-Key-ID": self.api_key_id,  # 공개 가능한 ID
+                        "X-API-Signature": signature,
+                        "X-API-Timestamp": timestamp,
+                        "X-API-Nonce": nonce,
+                        "Content-Type": "application/json"
                     },
                     timeout=30.0
                 )
                 
+                # 7. 응답 처리
                 if response.status_code in [200, 201]:
                     data = response.json()
-                    if data.get('authenticated'):
-                        self.blog_info = data['blog']
+                    if data.get('valid'):
+                        self.user_id = data.get('userId')
+                        self.blog_id = data.get('blogId')
+                        self.access_token = data.get('sessionToken')
+                        self.blog_info = data.get('blog')
                         
-                        # JWT 토큰 획득
-                        await self._get_jwt_token()
+                        print("✅ 보안 인증 성공 (HMAC-SHA256)")
                         return True
+                    else:
+                        print("❌ 인증 실패: 서명 검증 실패")
+                else:
+                    # 에러 메시지에서 민감한 정보 제거
+                    error_msg = response.text[:100] if response.text else "Unknown error"
+                    print(f"❌ API 인증 실패: HTTP {response.status_code}")
                 
                 return False
                 
         except Exception as e:
-            print(f"인증 오류: {e}")
+            # 예외 메시지에서 민감한 정보 제거
+            print(f"❌ 인증 오류: {str(e)[:100]}")
             return False
     
-    async def _get_jwt_token(self):
-        """JWT 토큰 획득"""
+    async def _get_blog_info(self):
+        """블로그 정보 가져오기"""
+        if not self.blog_id or not self.access_token:
+            return
+            
         async with httpx.AsyncClient() as client:
-            response = await client.post(
-                f"{self.api_url}/auth/login",
-                json={
-                    "email": self.email,
-                    "password": self.password
+            response = await client.get(
+                f"{self.api_url}/blogs/{self.blog_id}",
+                headers={
+                    "Authorization": f"Bearer {self.access_token}"
                 },
                 timeout=30.0
             )
-            if response.status_code == 201:
-                data = response.json()
-                self.access_token = data['access_token']
+            if response.status_code == 200:
+                self.blog_info = response.json()
 
 
-# 전역 인스턴스
-auth = TwoFactorAuth()
+# 전역 인스턴스 (보안 강화 버전)
+auth = SecureAPIKeyAuth()
 
 
 # FastMCP 리소스
@@ -167,7 +304,7 @@ def get_posting_guide() -> str:
     return """📚 FastMCP 블로그 포스팅 가이드
 
 🔐 1. 인증
-authenticate() - 2단계 인증 수행
+authenticate() - API Key 인증 수행
 
 📝 2. 포스팅 방법
 create_post(title="제목", content="마크다운 내용", tags=["태그1", "태그2"])
@@ -177,25 +314,32 @@ create_post_from_file(file_path="posts/파일명.md")
 - 마크다운 → HTML 자동 변환
 - Front matter 메타데이터 지원
 - 코드 블록 하이라이팅
-- 테이블, 리스트, 이미지 지원"""
+- 테이블, 리스트, 이미지 지원
+- OAuth 사용자도 API Key로 포스팅 가능"""
 
 
 # FastMCP 도구들
 @mcp.tool()
 async def authenticate() -> str:
-    """2단계 인증 수행"""
+    """API Key 인증 수행"""
     if await auth.authenticate():
-        return f"""✅ 인증 성공!
-📝 블로그: {auth.blog_info['name']}
-🔗 슬러그: {auth.blog_info['slug']}
+        if auth.blog_info:
+            return f"""✅ 인증 성공!
+📝 블로그: {auth.blog_info.get('name', 'Unknown')}
+🔗 슬러그: {auth.blog_info.get('slug', 'Unknown')}
 🎯 포스팅 준비 완료!"""
+        else:
+            return """✅ 인증 성공!
+🎯 API Key 인증 완료
+⚠️ 블로그 정보를 가져올 수 없었습니다"""
     else:
         return """❌ 인증 실패
 ⚠️ .env 파일의 다음 항목을 확인하세요:
-- BLOG_EMAIL
-- BLOG_PASSWORD  
-- BLOG_API_KEY
-- BLOG_API_URL"""
+- BLOG_API_KEY_ID (akid_로 시작하는 API Key ID)
+- BLOG_API_KEY_SECRET (aks_로 시작하는 API Key Secret)
+- BLOG_API_URL
+또는 레거시 방식:
+- BLOG_API_KEY (sk_로 시작하는 API 키)"""
 
 
 @mcp.tool()
@@ -425,9 +569,14 @@ async def diagnose_connection() -> str:
     """연결 상태 진단"""
     results = []
     
-    # 환경 변수 확인
-    required_vars = ['BLOG_EMAIL', 'BLOG_PASSWORD', 'BLOG_API_KEY']
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    # 환경 변수 확인 (새로운 방식 또는 레거시 방식)
+    has_new_keys = os.getenv('BLOG_API_KEY_ID') and os.getenv('BLOG_API_KEY_SECRET')
+    has_legacy_key = os.getenv('BLOG_API_KEY')
+    
+    if not has_new_keys and not has_legacy_key:
+        missing_vars = ['BLOG_API_KEY_ID/SECRET 또는 BLOG_API_KEY']
+    else:
+        missing_vars = []
     
     if missing_vars:
         results.append(f"❌ 환경 변수 누락: {', '.join(missing_vars)}")

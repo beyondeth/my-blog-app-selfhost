@@ -4,6 +4,8 @@ import React from 'react';
 import Link from 'next/link';
 import { Post } from '@/types';
 import OptimizedImage from '@/components/ui/OptimizedImage';
+import UserAvatar from '@/components/ui/UserAvatar';
+import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import { FiHeart, FiMessageCircle } from 'react-icons/fi';
 
 interface PostArticleProps {
@@ -59,6 +61,30 @@ const PostArticle = React.memo(function PostArticle({
       <div className={`flex ${post.thumbnail ? 'flex-row gap-6 sm:gap-12' : 'flex-col'}`}>
         {/* Content */}
         <div className="flex-1 min-w-0 flex flex-col">
+          {/* Author Info - 제목 위에 배치 */}
+          {post.author && (
+            <div className="flex items-center gap-2 mb-3">
+              <UserLinkWithTooltip 
+                userId={post.author.id} 
+                username={post.author.username}
+                blogSlug={post.blog?.slug}
+              >
+                <div className="flex items-center gap-2">
+                  {/* Profile Image - 공통 UserAvatar 사용 */}
+                  <UserAvatar
+                    profileImage={post.author.profileImage}
+                    username={post.author.username}
+                    size="xs"
+                  />
+                  {/* Author Name */}
+                  <span className="text-sm text-gray-700 font-medium">
+                    {post.author.username}
+                  </span>
+                </div>
+              </UserLinkWithTooltip>
+            </div>
+          )}
+          
           <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
             <Link 
               href={`/posts/${post.slug || post.id}`}
@@ -74,7 +100,7 @@ const PostArticle = React.memo(function PostArticle({
           
           {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
           <div>
-            {/* 메타 정보 (날짜,조회,좋아요,댓글,작성자) - 고정 위치 */}
+            {/* 메타 정보 (날짜,조회,좋아요,댓글) - 작성자 정보 제거 */}
             <div className="flex flex-wrap items-center text-xs text-gray-500 gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
                 {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
@@ -88,9 +114,6 @@ const PostArticle = React.memo(function PostArticle({
                 <FiMessageCircle className="w-3 h-3" />
                 {post.commentCount || 0}
               </span>
-              {post.author && (
-                <span className="whitespace-nowrap">by {post.author.username}</span>
-              )}
             </div>
             
             {/* 버튼들 - 메타 정보 바로 아래 */}

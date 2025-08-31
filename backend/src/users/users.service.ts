@@ -74,10 +74,17 @@ export class UsersService {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    return this.usersRepository.findOne({ 
+    const user = await this.usersRepository.findOne({ 
       where: { username },
-      select: ['id', 'username', 'email']
+      select: ['id', 'username', 'email', 'bio', 'profileImage', 'createdAt', 'isActive']
     });
+    
+    // Transform profile image for public access
+    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
+      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+    }
+    
+    return user;
   }
 
   async findByProviderId(providerId: string, provider: AuthProvider): Promise<User | null> {
@@ -209,4 +216,5 @@ export class UsersService {
       refreshTokenExpiresAt: null
     });
   }
+
 } 

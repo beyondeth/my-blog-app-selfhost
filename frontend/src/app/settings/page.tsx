@@ -330,7 +330,7 @@ export default function ProfileSettingsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? '저장 중...' : '변경사항 저장'}
           </button>

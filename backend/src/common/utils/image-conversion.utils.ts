@@ -65,13 +65,15 @@ export const CONTEXT_CONVERSION_RULES = {
 /**
  * 이미지 타입 분류
  */
-export enum ImageType {
-  PHOTO = 'photo',        // 사진 (JPEG 계열)
-  GRAPHIC = 'graphic',    // 그래픽/로고 (PNG 계열)
-  ICON = 'icon',          // 아이콘 (작은 PNG/SVG)
-  VECTOR = 'vector',      // 벡터 (SVG)
-  ANIMATED = 'animated',  // 애니메이션 (GIF/APNG)
-}
+export const ImageType = {
+  PHOTO: 'photo',
+  GRAPHIC: 'graphic',
+  ICON: 'icon',
+  VECTOR: 'vector',
+  ANIMATED: 'animated'
+} as const;
+
+export type ImageType = typeof ImageType[keyof typeof ImageType];
 
 /**
  * 파일이 이미지인지 확인

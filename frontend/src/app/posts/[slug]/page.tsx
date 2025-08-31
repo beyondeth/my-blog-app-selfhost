@@ -181,6 +181,26 @@ export default function PostDetailPage() {
     );
   }
 
+  // 비공개 블로그 체크
+  if (post && (post as any).isPrivate) {
+    return (
+      <div className="flex items-center justify-center py-32">
+        <div className="text-center">
+          <p className="text-gray-600 mb-8 text-lg">비공개 블로그입니다</p>
+          <button
+            onClick={() => router.push('/')}
+            className="inline-flex items-center px-6 py-3 bg-gray-900 text-white text-sm font-medium rounded hover:bg-gray-800 transition-colors"
+          >
+            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            홈으로 돌아가기
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // 에러 상태
   if (isError || !post) {
     return (

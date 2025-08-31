@@ -11,10 +11,9 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
 import LoadMoreSection from '@/components/posts/LoadMoreSection';
-import SearchSection from '@/components/layout/SearchSection';
 import RecentPostsSection from '@/components/layout/RecentPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
-import ProfileSection from '@/components/layout/ProfileSection';
+import FollowingListSection from '@/components/FollowingListSection';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 
 // 클라이언트 사이드 체크 훅 - Context7 모범 사례 적용
@@ -51,7 +50,6 @@ export default function HomePage() {
   
   // URL에서 검색 파라미터 파싱
   const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
-  const [searchQuery, setSearchQuery] = useState(currentParams.search || '');
 
   // 커스텀 훅 사용
   const {
@@ -110,33 +108,17 @@ export default function HomePage() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // 검색 처리 (URL 업데이트 포함)
-  const handleSearch = useCallback((query: string) => {
+  // 태그 클릭 처리 (검색으로 이동)
+  const handleTagClick = useCallback((tag: string) => {
+    // 태그를 검색어로 사용하여 URL 업데이트
     const newParams = {
-      search: query || undefined,
+      search: tag,
       page: 1,
     };
     
     const newUrl = createSearchUrl(newParams);
     router.push(newUrl);
   }, [router]);
-
-  // 태그 클릭 처리
-  const handleTagClick = useCallback((tag: string) => {
-    // 태그를 검색어로 사용
-    setSearchQuery(tag);
-    handleSearch(tag);
-  }, [handleSearch]);
-
-  // 검색어 변경 시 URL 파라미터와 동기화 - Context7 모범 사례: 조건부 실행
-  useEffect(() => {
-    if (!isClient) return;
-    
-    const urlSearch = currentParams.search || '';
-    if (searchQuery !== urlSearch) {
-      setSearchQuery(urlSearch);
-    }
-  }, [currentParams.search, isClient]); // searchQuery 의존성 제거로 무한 루프 방지
 
   const handleEditPost = useCallback((slug: string) => {
     router.push(`/posts/edit/${slug}`);
@@ -230,17 +212,13 @@ export default function HomePage() {
 
           {/* Sidebar */}
         <aside className="w-full lg:w-80 lg:min-w-[320px] space-y-4 sm:space-y-6">
-          <SearchSection
-            searchQuery={searchQuery}
-            onSearchQueryChange={setSearchQuery}
-            onSearch={handleSearch}
-          />
-          
           <RecentPostsSection posts={recentPosts} />
           
           <TagsSection tags={tags} onTagClick={handleTagClick} />
           
-          <ProfileSection />
+          {user && (
+            <FollowingListSection userId={user.id} />
+          )}
           </aside>
       </div>
 

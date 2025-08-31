@@ -18,7 +18,11 @@ type SortType = 'popular' | 'latest';
 
 function CommentSectionContent({ postId, postAuthorId }: CommentSectionProps) {
   const [sortType, setSortType] = useState<SortType>('latest');
-  const { data: comments, isLoading, error, isError } = useComments(postId);
+  
+  // postId가 없으면 댓글을 로드하지 않음
+  const { data: comments, isLoading, error, isError } = useComments(postId, {
+    enabled: !!postId && postId !== 'undefined'
+  });
   const { setRepliesExpanded } = useCommentStore();
   
   const handleReplyAdded = (parentId: string) => {

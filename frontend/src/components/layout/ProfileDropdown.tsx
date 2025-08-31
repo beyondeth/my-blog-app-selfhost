@@ -22,7 +22,8 @@ import {
   FiBarChart2,
   FiShield,
   FiBell,
-  FiHelpCircle
+  FiHelpCircle,
+  FiUsers
 } from 'react-icons/fi';
 
 interface ProfileDropdownProps {
@@ -51,7 +52,7 @@ export default function ProfileDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center space-x-2 px-3 py-2 text-sm rounded-md hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2">
+        <button className="flex items-center space-x-2 px-3 py-2 text-sm rounded-md hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
           <div className="flex items-center space-x-2">
             <Avatar 
               src={user.profileImage} 
@@ -112,6 +113,15 @@ export default function ProfileDropdown({
         >
           <FiUser className="mr-2 h-4 w-4" />
           <span>프로필 설정</span>
+        </DropdownMenuItem>
+
+        {/* Relationships */}
+        <DropdownMenuItem 
+          onClick={() => handleNavigation('/settings/relationships')}
+          className="cursor-pointer"
+        >
+          <FiUsers className="mr-2 h-4 w-4" />
+          <span>관계 설정</span>
         </DropdownMenuItem>
 
         {/* API Keys */}

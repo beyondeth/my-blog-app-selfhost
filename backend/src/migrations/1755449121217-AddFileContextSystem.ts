@@ -4,8 +4,12 @@ export class AddFileContextSystem1755449121217 implements MigrationInterface {
   name = 'AddFileContextSystem1755449121217';
 
   public async up(queryRunner: QueryRunner): Promise<void> {
-    // 1. Create file_contexts table
-    await queryRunner.createTable(
+    // Check if file_contexts table already exists
+    const hasFileContextsTable = await queryRunner.hasTable('file_contexts');
+    
+    if (!hasFileContextsTable) {
+      // 1. Create file_contexts table
+      await queryRunner.createTable(
       new Table({
         name: 'file_contexts',
         columns: [
@@ -85,14 +89,15 @@ export class AddFileContextSystem1755449121217 implements MigrationInterface {
       true,
     );
 
-    // 2. Create indexes on file_contexts
-    await queryRunner.query(`
-      CREATE INDEX "IDX_FILE_CONTEXT_TYPE" ON "file_contexts" ("context_type", "context_id")
-    `);
+      // 2. Create indexes on file_contexts
+      await queryRunner.query(`
+        CREATE INDEX "IDX_FILE_CONTEXT_TYPE" ON "file_contexts" ("context_type", "context_id")
+      `);
 
-    await queryRunner.query(`
-      CREATE INDEX "IDX_FILE_CONTEXT_PURPOSE" ON "file_contexts" ("purpose")
-    `);
+      await queryRunner.query(`
+        CREATE INDEX "IDX_FILE_CONTEXT_PURPOSE" ON "file_contexts" ("purpose")
+      `);
+    }
 
     // 3. Add new columns to files table
     await queryRunner.query(`

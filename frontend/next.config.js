@@ -15,6 +15,7 @@ const nextConfig = {
       'd1y66zmnw3oigo.cloudfront.net', // CloudFront CDN
       'myblogdata84.s3.amazonaws.com', // S3 글로벌 도메인
       'myblogdata84.s3.us-east-1.amazonaws.com', // S3 리전 도메인 (추가)
+      'lh3.googleusercontent.com', // Google 프로필 이미지
       'localhost'
     ],
     remotePatterns: [
@@ -29,6 +30,12 @@ const nextConfig = {
         hostname: 's3.us-east-1.amazonaws.com',
         port: '',
         pathname: '/myblogdata84/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'lh3.googleusercontent.com',
+        port: '',
+        pathname: '/**',
       },
     ],
     formats: ['image/webp', 'image/avif'],

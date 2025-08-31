@@ -2,10 +2,12 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDa
 import { User } from '../../users/entities/user.entity';
 import { Comment } from './comment.entity';
 
-export enum LikeType {
-  LIKE = 'like',
-  DISLIKE = 'dislike',
-}
+export const LikeType = {
+  LIKE: 'like',
+  DISLIKE: 'dislike'
+} as const;
+
+export type LikeType = typeof LikeType[keyof typeof LikeType];
 
 @Entity('comment_likes')
 @Unique(['userId', 'commentId'])
@@ -13,10 +15,10 @@ export class CommentLike {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'userId' })
   userId: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'commentId' })
   commentId: string;
 
   @Column({

@@ -6,15 +6,17 @@ import { File } from '../entities/file.entity';
 import { FileContext, FileContextType } from '../entities/file-context.entity';
 import { S3Service } from './s3.service';
 
-export enum FileLifecycleEvent {
-  UPLOADED = 'uploaded',
-  OPTIMIZED = 'optimized',
-  ATTACHED = 'attached',
-  DETACHED = 'detached',
-  ARCHIVED = 'archived',
-  DELETED = 'deleted',
-  EXPIRED = 'expired',
-}
+export const FileLifecycleEvent = {
+  UPLOADED: 'uploaded',
+  OPTIMIZED: 'optimized',
+  ATTACHED: 'attached',
+  DETACHED: 'detached',
+  ARCHIVED: 'archived',
+  DELETED: 'deleted',
+  EXPIRED: 'expired'
+} as const;
+
+export type FileLifecycleEvent = typeof FileLifecycleEvent[keyof typeof FileLifecycleEvent];
 
 export interface CleanupResult {
   orphanedFiles: number;

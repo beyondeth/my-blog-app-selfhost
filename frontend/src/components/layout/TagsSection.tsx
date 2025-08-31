@@ -28,7 +28,7 @@ const TagsSection = React.memo(function TagsSection({ tags, onTagClick }: TagsSe
                 handleTagClick(tag);
               }
             }}
-            className="px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs bg-gray-100 text-gray-700 hover:bg-amber-100 hover:text-amber-800 cursor-pointer rounded-md sm:rounded-none transition-colors min-h-[44px] sm:min-h-auto flex items-center"
+            className="px-3 py-2 sm:px-2 sm:py-1 text-sm sm:text-xs bg-gray-100 text-gray-700 hover:bg-gray-100 hover:text-gray-800 cursor-pointer rounded-md sm:rounded-none transition-colors min-h-[44px] sm:min-h-auto flex items-center"
             role="button"
             tabIndex={0}
             aria-label={`${tag} 태그`}

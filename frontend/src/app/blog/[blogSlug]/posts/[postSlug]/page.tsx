@@ -21,6 +21,8 @@ interface Blog {
   slug: string;
   name: string;
   description?: string;
+  allowComments?: boolean;
+  isPublic?: boolean;
   owner?: {
     id: string;
     username: string;
@@ -34,6 +36,7 @@ export default function BlogPostDetailPage() {
   const { user, isAdmin } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [blog, setBlog] = useState<Blog | null>(null);
+  const [blogError, setBlogError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const hasViewed = useRef(false);
 
@@ -47,19 +50,29 @@ export default function BlogPostDetailPage() {
     const fetchBlog = async () => {
       try {
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`,
+          {
+            credentials: 'include'
+          }
         );
         if (response.ok) {
           const blogData = await response.json();
           setBlog(blogData);
+          setBlogError(null);
+          
+        } else if (response.status === 404) {
+          setBlogError('블로그를 찾을 수 없습니다.');
+        } else {
+          setBlogError('블로그 정보를 불러오는데 실패했습니다.');
         }
       } catch (error) {
         console.error('Error fetching blog:', error);
+        setBlogError('블로그 정보를 불러오는데 실패했습니다.');
       }
     };
 
     fetchBlog();
-  }, [blogSlug]);
+  }, [blogSlug, user]);
 
   // Fetch post details
   const { data: post, isLoading, error, isError } = usePost(postSlug);
@@ -67,6 +80,7 @@ export default function BlogPostDetailPage() {
   const likeMutation = useTogglePostLike(postSlug, () => {
     alert('로그인이 필요합니다.\n로그인 후 좋아요를 누를 수 있습니다.');
   });
+
 
   const handleEdit = useCallback(() => {
     if (post && blog) {
@@ -174,7 +188,9 @@ export default function BlogPostDetailPage() {
     return <LoadingSpinner message="게시글을 불러오는 중..." />;
   }
 
-  if (isError || !post) {
+
+  if (isError || !post || !post.title) {
+    // 실제 에러인 경우 (404 등)
     return (
       <ErrorMessage 
         message={error?.message || '게시글을 찾을 수 없습니다.'}
@@ -231,11 +247,13 @@ export default function BlogPostDetailPage() {
 
         <AuthorInfo author={post.author} />
 
-        {/* 댓글 섹션 */}
-        <CommentSection 
-          postId={String(post.id)}
-          postAuthorId={post.author?.id?.toString()}
-        />
+        {/* 댓글 섹션 - 블로그가 댓글을 허용하는 경우에만 표시 */}
+        {blog && blog.allowComments === true && post.id && (
+          <CommentSection 
+            postId={String(post.id)}
+            postAuthorId={post.author?.id?.toString()}
+          />
+        )}
       </article>
       
       <DeleteConfirmDialog

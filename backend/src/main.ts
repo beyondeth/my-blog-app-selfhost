@@ -8,6 +8,9 @@ import * as compression from 'compression';
 import * as cookieParser from 'cookie-parser';
 
 async function bootstrap() {
+  // 서버 시작 시 타임존을 한국 시간으로 설정
+  process.env.TZ = 'Asia/Seoul';
+  
   const logger = new Logger('Bootstrap');
   
   const app = await NestFactory.create(AppModule, {

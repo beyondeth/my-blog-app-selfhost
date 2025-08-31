@@ -17,7 +17,7 @@ import { FileMonitoringService } from '../services/file-monitoring.service';
 import { FileLifecycleService } from '../services/file-lifecycle.service';
 
 @ApiTags('File Migration')
-@Controller('api/v1/files/migration')
+@Controller('files/migration')
 @UseGuards(JwtAuthGuard, RolesGuard)
 @ApiBearerAuth()
 export class FileMigrationController {

@@ -29,6 +29,8 @@ import { AdminModule } from './admin/admin.module';
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
+import { FollowsModule } from './follows/follows.module';
+import { NotificationsModule } from './notifications/notifications.module';
 
 @Module({
   imports: [
@@ -49,8 +51,8 @@ import { RolesGuard } from './common/guards/roles.guard';
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
         ...configService.get('database'),
-        synchronize: true,
-        logging: true,
+        synchronize: false,
+        logging: false,
       }),
       inject: [ConfigService],
     }),
@@ -84,6 +86,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     ReportsModule,
     AuditModule,
     AdminModule,
+    FollowsModule,
+    NotificationsModule,
     // AnalyticsModule,
   ],
   providers: [

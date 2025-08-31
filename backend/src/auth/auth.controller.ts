@@ -2,6 +2,7 @@ import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete 
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { AuthApiKeyService } from './auth-api-key.service';
+import { ApiKeysService } from '../api-keys/api-keys.service';
 import { EmailService } from '../email/email.service';
 import { UserDeletionService } from '../users/services/user-deletion.service';
 import { SendCodeDto } from '../email/dto/send-code.dto';
@@ -17,6 +18,7 @@ import { RegisterDto } from './dto/register.dto';
 import { VerifyApiKeyDto } from './dto/verify-api-key.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { User } from '../users/entities/user.entity';
+import * as crypto from 'crypto';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -24,6 +26,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly authApiKeyService: AuthApiKeyService,
+    private readonly apiKeysService: ApiKeysService,
     private readonly emailService: EmailService,
     private readonly userDeletionService: UserDeletionService,
   ) {}
@@ -294,6 +297,15 @@ export class AuthController {
     });
   }
 
+  @Post('check-auth-method')
+  @Public()
+  @ApiOperation({ summary: '이메일의 인증 방법 확인' })
+  @ApiResponse({ status: 200, description: '인증 방법 반환' })
+  async checkAuthMethod(@Body() dto: { email: string }, @Response() res) {
+    const result = await this.authService.checkAuthMethod(dto.email);
+    return res.json(result);
+  }
+
   @Get('me')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '현재 사용자 정보 조회' })
@@ -363,6 +375,98 @@ export class AuthController {
       userId: result.userId,
       blogId: result.blogId,
       sessionToken,
+      message: 'API key verified successfully'
+    });
+  }
+
+  @Post('verify-api-key-with-plain')
+  @Public()
+  @ApiOperation({ summary: '평문 API 키를 사용한 HMAC 서명 검증 (MCP 서버용)' })
+  @ApiResponse({ status: 200, description: 'API 키 검증 성공' })
+  @ApiResponse({ status: 401, description: 'API 키 검증 실패' })
+  async verifyApiKeyWithPlain(
+    @Body() body: { 
+      plainKey: string;
+      timestamp: string;
+      nonce: string;
+      signature: string;
+    }, 
+    @Response() res
+  ) {
+    // 평문 키로 HMAC 서명 검증
+    const result = await this.authApiKeyService.verifyWithPlainKey(
+      body.plainKey,
+      body.timestamp,
+      body.nonce,
+      body.signature
+    );
+    
+    if (!result.valid || !result.apiKey) {
+      return res.status(401).json({ 
+        message: 'Invalid API key signature',
+        valid: false 
+      });
+    }
+
+    // 검증 성공 시 세션 토큰 생성
+    const sessionToken = await this.authService.createSessionToken(result.apiKey.userId);
+
+    return res.json({
+      valid: true,
+      userId: result.apiKey.userId,
+      blogId: result.apiKey.blogId,
+      sessionToken,
+      blog: result.apiKey.blog,
+      message: 'API key verified successfully'
+    });
+  }
+
+  @Post('verify-api-key-id-secret')
+  @Public()
+  @ApiOperation({ summary: 'ID/Secret 방식 API 키 검증 (새로운 방식)' })
+  @ApiResponse({ status: 200, description: 'API 키 검증 성공' })
+  @ApiResponse({ status: 401, description: 'API 키 검증 실패' })
+  async verifyApiKeyIdSecret(
+    @Body() body: { 
+      keyId: string;
+      keySecret: string;
+      timestamp: string;
+      nonce: string;
+      signature?: string;
+    }, 
+    @Response() res
+  ) {
+    // 서명 생성 (클라이언트가 보내지 않은 경우 서버에서 생성)
+    const signature = body.signature || crypto
+      .createHmac('sha256', body.keySecret)
+      .update(`${body.timestamp}:${body.nonce}:${body.keyId}`)
+      .digest('hex');
+    
+    // ID/Secret으로 API 키 검증
+    const result = await this.authApiKeyService.verifyWithIdAndSecret(
+      body.keyId,
+      body.keySecret,
+      body.timestamp,
+      body.nonce,
+      signature
+    );
+    
+    if (!result.valid || !result.apiKey) {
+      return res.status(401).json({ 
+        message: 'Invalid API key',
+        valid: false 
+      });
+    }
+
+    // 검증 성공 시 세션 토큰 생성
+    const sessionToken = await this.authService.createSessionToken(result.apiKey.userId);
+
+    return res.json({
+      valid: true,
+      userId: result.apiKey.userId,
+      blogId: result.apiKey.blogId,
+      sessionToken,
+      blog: result.apiKey.blog,
       message: 'API key verified successfully'
     });
   }

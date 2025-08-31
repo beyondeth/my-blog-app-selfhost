@@ -5,6 +5,7 @@ import {
   CreateDateColumn, 
   UpdateDateColumn, 
   OneToMany,
+  OneToOne,
   Index,
   BeforeInsert,
   BeforeUpdate
@@ -15,12 +16,17 @@ import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { CommentLike } from '../../comments/entities/comment-like.entity';
 import { Role } from '../../common/enums/role.enum';
+import { Follow } from '../../follows/entities/follow.entity';
+import { Notification } from '../../notifications/entities/notification.entity';
+import { Blog } from '../../blogs/entities/blog.entity';
 
-export enum AuthProvider {
-  LOCAL = 'local',
-  GOOGLE = 'google',
-  KAKAO = 'kakao',
-}
+export const AuthProvider = {
+  LOCAL: 'local',
+  GOOGLE: 'google',
+  KAKAO: 'kakao',
+} as const;
+
+export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
 
 @Entity('users')
 @Index(['email'])
@@ -63,31 +69,34 @@ export class User {
   @Column({ nullable: true, length: 255 })
   providerId: string;
 
-  @Column({ default: false })
+  @Column({ default: false, name: 'isEmailVerified' })
   isEmailVerified: boolean;
 
-  @Column({ default: true })
+  @Column({ default: true, name: 'isActive' })
   isActive: boolean;
 
   @Column({ nullable: true })
   lastLoginAt: Date;
 
   // Refresh Token 관련 필드 추가
-  @Column({ nullable: true, length: 500 })
+  @Column({ nullable: true, length: 500, name: 'refreshToken' })
   @Exclude({ toPlainOnly: true })
   refreshToken: string;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'refreshTokenExpiresAt' })
   @Exclude({ toPlainOnly: true })
   refreshTokenExpiresAt: Date;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
 
   // 관계 설정 - UUID 참조로 변경 필요
+  @OneToOne(() => Blog, blog => blog.owner, { eager: true })
+  blog: Blog;
+
   @OneToMany(() => Post, post => post.author, { lazy: true })
   posts: Promise<Post[]>;
 
@@ -96,6 +105,20 @@ export class User {
 
   @OneToMany(() => CommentLike, commentLike => commentLike.user, { lazy: true })
   commentLikes: Promise<CommentLike[]>;
+
+  // Follow relationships
+  @OneToMany(() => Follow, follow => follow.follower, { lazy: true })
+  following: Promise<Follow[]>;
+
+  @OneToMany(() => Follow, follow => follow.following, { lazy: true })
+  followers: Promise<Follow[]>;
+
+  // Notification relationships
+  @OneToMany(() => Notification, notification => notification.recipient, { lazy: true })
+  receivedNotifications: Promise<Notification[]>;
+
+  @OneToMany(() => Notification, notification => notification.issuer, { lazy: true })
+  issuedNotifications: Promise<Notification[]>;
 
   @BeforeInsert()
   @BeforeUpdate()
@@ -117,6 +140,7 @@ export class User {
       id: this.id,
       username: this.username,
       profileImage: this.profileImage,
+      bio: this.bio,
       role: this.role,
       isEmailVerified: this.isEmailVerified,
       createdAt: this.createdAt,

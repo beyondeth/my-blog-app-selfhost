@@ -151,6 +151,13 @@ export class AuthService {
             
             user = await this.usersService.update(existingUser.id, existingUser);
             
+            // 블로그가 없으면 자동 생성
+            const userBlogs = await this.blogsService.findByUserId(user.id);
+            if (!userBlogs || userBlogs.length === 0) {
+              await this.createUserBlog(user);
+              this.logger.log(`Blog automatically created for existing user during OAuth link: ${email}`);
+            }
+            
             // 계정 병합 알림 이메일 (선택적)
             try {
               await this.emailService.sendAccountLinkNotification(
@@ -199,6 +206,13 @@ export class AuthService {
           user = await this.usersService.update(user.id, { email });
         }
         
+        // 블로그가 없으면 자동 생성 (기존 OAuth 사용자)
+        const userBlogs = await this.blogsService.findByUserId(user.id);
+        if (!userBlogs || userBlogs.length === 0) {
+          await this.createUserBlog(user);
+          this.logger.log(`Blog automatically created for returning OAuth user: ${user.email}`);
+        }
+        
         // 마지막 로그인 시간 업데이트
         await this.usersService.updateLastLogin(user.id);
       }
@@ -244,6 +258,40 @@ export class AuthService {
     // Refresh Token 무효화
     await this.usersService.clearRefreshToken(userId);
     this.logger.log(`User ${userId} logged out`);
+  }
+
+  async checkAuthMethod(email: string): Promise<any> {
+    const user = await this.usersService.findByEmail(email);
+    
+    if (!user) {
+      return { 
+        exists: false,
+        authProvider: null,
+        message: '등록되지 않은 이메일입니다.'
+      };
+    }
+    
+    // 민감한 정보는 제외하고 인증 방법만 반환
+    return {
+      exists: true,
+      authProvider: user.authProvider,
+      hasPassword: !!user.password,
+      isEmailVerified: user.isEmailVerified,
+      // 사용자에게 친화적인 메시지 제공
+      message: this.getAuthMethodMessage(user.authProvider)
+    };
+  }
+
+  private getAuthMethodMessage(authProvider: string): string {
+    switch (authProvider) {
+      case 'kakao':
+        return '카카오 계정으로 로그인하세요';
+      case 'google':
+        return '구글 계정으로 로그인하세요';
+      case 'local':
+      default:
+        return '이메일과 비밀번호로 로그인하세요';
+    }
   }
 
   async createSessionToken(userId: string): Promise<string> {

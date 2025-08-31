@@ -1,8 +1,9 @@
-import { Injectable, ConflictException, NotFoundException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Blog } from './entities/blog.entity';
 import { CreateBlogDto } from './dto/create-blog.dto';
+import { UpdateBlogDto } from './dto/update-blog.dto';
 import { User } from '../users/entities/user.entity';
 
 @Injectable()
@@ -33,8 +34,7 @@ export class BlogsService {
 
     const blog = this.blogRepository.create({
       ...createBlogDto,
-      userId: user.id,
-      owner: user
+      userId: user.id
     });
 
     return await this.blogRepository.save(blog);
@@ -53,7 +53,9 @@ export class BlogsService {
     return blog;
   }
 
-  async findOneBySlug(slug: string): Promise<Blog> {
+  async findOneBySlug(slug: string, user?: any): Promise<Blog> {
+    console.log(`[BlogsService] findOneBySlug - slug: ${slug}, user: ${user?.id || 'none'}`);
+    
     const blog = await this.blogRepository.findOne({
       where: { slug },
       relations: ['owner']
@@ -63,6 +65,24 @@ export class BlogsService {
       throw new NotFoundException('블로그를 찾을 수 없습니다.');
     }
 
+    console.log(`[BlogsService] Blog found - id: ${blog.id}, userId: ${blog.userId}, isPublic: ${blog.isPublic}`);
+    console.log(`[BlogsService] User check - user.id: ${user?.id}, blog.userId: ${blog.userId}, match: ${user?.id === blog.userId}`);
+
+    // 비공개 블로그인 경우, 소유자가 아니면 특별한 응답 반환
+    // userId와 user.id 타입을 명시적으로 비교
+    const isOwner = user && String(user.id) === String(blog.userId);
+    
+    if (!blog.isPublic && !isOwner) {
+      console.log(`[BlogsService] Private blog, not owner - returning limited info`);
+      return {
+        id: blog.id,
+        slug: blog.slug,
+        isPrivate: true,
+        message: '비공개 블로그입니다'
+      } as any;
+    }
+
+    console.log(`[BlogsService] Returning full blog info - owner: ${isOwner}`);
     return blog;
   }
 
@@ -78,5 +98,27 @@ export class BlogsService {
       where: { slug }
     });
     return count === 0;
+  }
+
+  async update(id: string, updateBlogDto: UpdateBlogDto): Promise<Blog> {
+    const blog = await this.findOne(id);
+    
+    // isPublic과 allowComments 필드가 없는 경우 기본값 설정
+    // 데이터베이스에 필드가 아직 없을 수 있으므로 임시로 처리
+    const updatedBlog = {
+      ...blog,
+      ...updateBlogDto
+    };
+    
+    // isPublic과 allowComments가 undefined인 경우 기본값 설정
+    if (updateBlogDto.isPublic !== undefined) {
+      updatedBlog.isPublic = updateBlogDto.isPublic;
+    }
+    if (updateBlogDto.allowComments !== undefined) {
+      updatedBlog.allowComments = updateBlogDto.allowComments;
+    }
+    
+    await this.blogRepository.save(updatedBlog);
+    return await this.findOne(id);
   }
 }

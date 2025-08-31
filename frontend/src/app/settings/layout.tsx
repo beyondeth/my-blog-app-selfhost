@@ -2,13 +2,18 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { FiUser, FiKey, FiBook, FiShield, FiBell } from 'react-icons/fi';
+import { FiUser, FiKey, FiBook, FiShield, FiBell, FiUsers } from 'react-icons/fi';
 
 const settingsNav = [
   {
     title: '프로필',
     href: '/settings',
     icon: FiUser,
+  },
+  {
+    title: '관계 설정',
+    href: '/settings/relationships',
+    icon: FiUsers,
   },
   {
     title: 'API 키',
@@ -63,12 +68,12 @@ export default function SettingsLayout({
                   className={`
                     flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors
                     ${isActive 
-                      ? 'bg-amber-50 text-amber-700' 
+                      ? 'bg-blue-50 text-blue-700' 
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                     }
                   `}
                 >
-                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-amber-600' : 'text-gray-400'}`} />
+                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
                   {item.title}
                 </Link>
               );

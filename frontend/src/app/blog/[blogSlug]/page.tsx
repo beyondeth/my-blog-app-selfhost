@@ -15,7 +15,10 @@ import SearchSection from '@/components/layout/SearchSection';
 import RecentPostsSection from '@/components/layout/RecentPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
 import ProfileSection from '@/components/layout/ProfileSection';
+import BlogRecommendations from '@/components/layout/BlogRecommendations';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
+import FollowButton from '@/components/FollowButton';
+import useFollowInfo from '@/hooks/useFollowInfo';
 
 // 클라이언트 사이드 체크 훅
 function useIsClient() {
@@ -37,6 +40,8 @@ interface Blog {
   name: string;
   description?: string;
   thumbnailUrl?: string;
+  isPublic?: boolean;
+  allowComments?: boolean;
   owner?: {
     id: string;
     username: string;
@@ -80,7 +85,9 @@ export default function BlogPage() {
     const fetchBlog = async () => {
       try {
         setBlogLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`);
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`, {
+          credentials: 'include'
+        });
         if (!response.ok) {
           if (response.status === 404) {
             setBlogError('블로그를 찾을 수 없습니다.');
@@ -229,6 +236,7 @@ export default function BlogPage() {
     );
   }
 
+
   if (error) {
     return (
       <ErrorMessage 
@@ -256,18 +264,33 @@ export default function BlogPage() {
           </p>
         )}
         
-        {/* Write button for blog owner */}
-        {isBlogOwner && (
-          <button
-            onClick={() => router.push(`/blog/${blogSlug}/posts/new`)}
-            className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-amber-700 hover:bg-amber-800 rounded-md transition-colors"
-          >
-            <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            새 글 작성
-          </button>
-        )}
+        {/* Follow button and Write button */}
+        <div className="flex items-center gap-2">
+          {/* Follow button for non-owners */}
+          {blog.owner && !isBlogOwner && isAuthenticated && (
+            <FollowButton
+              userId={blog.owner.id}
+              initialState={{
+                followersCount: 0,
+                followingCount: 0,
+                isFollowedByUser: false,
+              }}
+            />
+          )}
+          
+          {/* Write button for blog owner */}
+          {isBlogOwner && (
+            <button
+              onClick={() => router.push(`/blog/${blogSlug}/posts/new`)}
+              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-md transition-colors"
+            >
+              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              새 글 작성
+            </button>
+          )}
+        </div>
       </div>
       
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
@@ -326,7 +349,15 @@ export default function BlogPage() {
             
             <TagsSection tags={tags} />
             
-            <ProfileSection />
+            <ProfileSection 
+              name={blog.owner?.username || blog.owner?.email || blog.name}
+              description={blog.description}
+              profileImage={blog.thumbnailUrl}
+              userId={blog.owner?.id}
+              isOwner={isBlogOwner}
+            />
+            
+            <BlogRecommendations />
           </aside>
       </div>
 

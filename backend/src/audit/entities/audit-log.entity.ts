@@ -9,42 +9,31 @@ import {
 } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 
-export enum AuditAction {
-  // User actions
-  USER_CREATED = 'user_created',
-  USER_UPDATED = 'user_updated',
-  USER_DELETED = 'user_deleted',
-  USER_SUSPENDED = 'user_suspended',
-  USER_BANNED = 'user_banned',
-  USER_ACTIVATED = 'user_activated',
-  USER_ROLE_CHANGED = 'user_role_changed',
-  
-  // Post actions
-  POST_CREATED = 'post_created',
-  POST_UPDATED = 'post_updated',
-  POST_DELETED = 'post_deleted',
-  POST_PUBLISHED = 'post_published',
-  POST_UNPUBLISHED = 'post_unpublished',
-  
-  // Comment actions
-  COMMENT_CREATED = 'comment_created',
-  COMMENT_UPDATED = 'comment_updated',
-  COMMENT_DELETED = 'comment_deleted',
-  
-  // Report actions
-  REPORT_CREATED = 'report_created',
-  REPORT_REVIEWED = 'report_reviewed',
-  REPORT_RESOLVED = 'report_resolved',
-  REPORT_DISMISSED = 'report_dismissed',
-  REPORT_ESCALATED = 'report_escalated',
-  
-  // Admin actions
-  ADMIN_LOGIN = 'admin_login',
-  ADMIN_LOGOUT = 'admin_logout',
-  ADMIN_ACCESS_DENIED = 'admin_access_denied',
-  SETTINGS_UPDATED = 'settings_updated',
-  BULK_ACTION_PERFORMED = 'bulk_action_performed',
-}
+export const AuditAction = {
+  USER_CREATED: 'user_created',
+  USER_UPDATED: 'user_updated',
+  USER_DELETED: 'user_deleted',
+  USER_SUSPENDED: 'user_suspended',
+  USER_BANNED: 'user_banned',
+  USER_ACTIVATED: 'user_activated',
+  USER_ROLE_CHANGED: 'user_role_changed',
+  POST_UPDATED: 'post_updated',
+  POST_DELETED: 'post_deleted',
+  POST_PUBLISHED: 'post_published',
+  POST_UNPUBLISHED: 'post_unpublished',
+  COMMENT_UPDATED: 'comment_updated',
+  COMMENT_DELETED: 'comment_deleted',
+  REPORT_REVIEWED: 'report_reviewed',
+  REPORT_RESOLVED: 'report_resolved',
+  REPORT_DISMISSED: 'report_dismissed',
+  REPORT_ESCALATED: 'report_escalated',
+  ADMIN_LOGOUT: 'admin_logout',
+  ADMIN_ACCESS_DENIED: 'admin_access_denied',
+  SETTINGS_UPDATED: 'settings_updated',
+  BULK_ACTION_PERFORMED: 'bulk_action_performed'
+} as const;
+
+export type AuditAction = typeof AuditAction[keyof typeof AuditAction];
 
 @Entity('audit_logs')
 @Index(['action'])

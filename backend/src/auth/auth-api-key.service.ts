@@ -113,7 +113,57 @@ export class AuthApiKeyService {
   }
 
   /**
-   * 실제 API 키로 HMAC 서명 검증 (평문 키를 가진 경우)
+   * 새로운 ID/Secret 방식으로 API 키 검증
+   */
+  async verifyWithIdAndSecret(
+    keyId: string,
+    keySecret: string,
+    timestamp: string,
+    nonce: string,
+    signature: string,
+  ): Promise<{ valid: boolean; apiKey?: ApiKey }> {
+    try {
+      // 1. 타임스탬프 검증
+      const requestTime = parseInt(timestamp);
+      const currentTime = Date.now();
+      
+      if (isNaN(requestTime) || Math.abs(currentTime - requestTime) > this.TIMESTAMP_WINDOW) {
+        return { valid: false };
+      }
+
+      // 2. 논스 중복 체크
+      if (this.usedNonces.has(nonce)) {
+        return { valid: false };
+      }
+      this.usedNonces.set(nonce, requestTime);
+
+      // 3. API 키 검증 (새로운 ID/Secret 방식)
+      const validation = await this.apiKeysService.validateApiKey(keyId, keySecret);
+      if (!validation.valid || !validation.apiKey) {
+        return { valid: false };
+      }
+
+      // 4. HMAC 서명 생성 및 검증 (Secret으로 서명)
+      const message = `${timestamp}:${nonce}:${keyId}`;
+      const expectedSignature = crypto
+        .createHmac('sha256', keySecret)
+        .update(message)
+        .digest('hex');
+
+      if (!this.timingSafeEqual(signature, expectedSignature)) {
+        return { valid: false };
+      }
+
+      return { valid: true, apiKey: validation.apiKey };
+
+    } catch (error) {
+      this.logger.error('ID/Secret verification error:', error);
+      return { valid: false };
+    }
+  }
+
+  /**
+   * 실제 API 키로 HMAC 서명 검증 (평문 키를 가진 경우) - 레거시 지원
    */
   async verifyWithPlainKey(
     plainKey: string,

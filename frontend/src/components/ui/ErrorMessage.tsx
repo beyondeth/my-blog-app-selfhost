@@ -24,7 +24,7 @@ export default function ErrorMessage({
   return (
     <div className="flex items-center justify-center py-32">
       <div className="text-center">
-        <h1 className="text-6xl font-light text-gray-900 mb-4">{title}</h1>
+        {title && <h1 className="text-6xl font-light text-gray-900 mb-4">{title}</h1>}
         <p className="text-gray-600 mb-8">{message}</p>
         {showBackButton && (
           <button

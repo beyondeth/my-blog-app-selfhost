@@ -28,7 +28,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    const cacheKey = `user_validate_${payload.sub}`;
+    // JWT payload has 'id' field, not 'sub'
+    const userId = payload.id || payload.sub;
+    const cacheKey = `user_validate_${userId}`;
     
     // 1. 캐시에서 사용자 정보 조회
     const cachedUser = await this.cacheManager.get(cacheKey);
@@ -37,7 +39,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // 2. 캐시에 없으면 DB에서 조회
-    const user = await this.usersService.findById(payload.sub);
+    const user = await this.usersService.findById(userId);
     
     // 3. DB 조회 결과를 캐시에 저장 (2초)
     if (user) {

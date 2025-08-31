@@ -22,56 +22,56 @@ export class Post {
   @Column('text')
   content: string;
 
-  @Column('text', { nullable: true })
+  @Column('text', { nullable: true, name: 'content_markdown' })
   content_markdown: string;  // 마크다운 원본 (편집용)
 
   @Column({ 
-    type: 'enum', 
-    enum: ['markdown', 'html'], 
-    default: 'html'
+    type: 'varchar',
+    default: 'html',
+    nullable: true
   })
-  content_type: 'markdown' | 'html';
+  content_type: string;
 
   @Column({ type: 'timestamp', nullable: true })
   content_rendered_at: Date;  // 렌더링 시점
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'thumbnail' })
   thumbnail: string;
 
-  @Column({ default: false })
+  @Column({ default: false, name: 'isPublished' })
   isPublished: boolean;
 
-  @Column({ default: 0 })
+  @Column({ default: 0, name: 'viewCount' })
   viewCount: number;
 
-  @Column({ default: 0 })
+  @Column({ default: 0, name: 'likeCount' })
   likeCount: number;
 
-  @Column({ default: 0 })
+  @Column({ default: 0, name: 'commentCount' })
   commentCount: number;
 
-  @Column('simple-array', { nullable: true })
+  @Column('simple-array', { nullable: true, name: 'tags' })
   tags: string[];
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'category' })
   category: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'authorId' })
   authorId: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'uuid', nullable: true, name: 'blogId' })
   blogId: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ name: 'createdAt' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ name: 'updatedAt' })
   updatedAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ nullable: true, name: 'publishedAt' })
   publishedAt: Date;
 
-  @VersionColumn()
+  @VersionColumn({ name: 'version' })
   version: number;
 
   @ManyToOne(() => User, user => user.posts, { onDelete: 'CASCADE' })

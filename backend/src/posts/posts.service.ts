@@ -192,13 +192,15 @@ export class PostsService {
     const qb = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'file')
+      .leftJoinAndSelect('post.blog', 'blog')
       .leftJoinAndSelect('post.likedBy', 'likedBy')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
-        'author.id', 'author.username', 'author.profileImage', 'author.role',
+        'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileUrl', 'file.fileType',
+        'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
         'likedBy.id',
       ])
       .where('post.id = :id', { id });
@@ -206,6 +208,21 @@ export class PostsService {
     if (!post) {
       this.logger.warn(`Post not found for ID: ${id}`);
       throw new NotFoundException('Post not found');
+    }
+    
+    // 블로그가 비공개인 경우, 소유자가 아니면 특별한 응답 반환
+    if (!post.blog.isPublic) {
+      this.logger.log(`Private blog check - User ID: ${user?.id}, Blog userId: ${post.blog.userId}, Post Author ID: ${post.author?.id}`);
+      // 블로그 소유자 또는 포스트 작성자인 경우 접근 허용
+      const isOwner = user && (String(user.id) === String(post.blog.userId) || String(user.id) === String(post.author?.id));
+      if (!isOwner) {
+        this.logger.log(`Access denied to private blog for user ${user?.id}`);
+        return {
+          isPrivate: true,
+          message: '비공개 블로그입니다'
+        };
+      }
+      this.logger.log(`Access granted to private blog for owner/author ${user?.id}`);
     }
     
     // 사용자 좋아요 상태 확인
@@ -235,9 +252,9 @@ export class PostsService {
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
-        'author.id', 'author.username', 'author.profileImage', 'author.role',
+        'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileUrl', 'file.fileType',
-        'blog.id', 'blog.slug', 'blog.name',
+        'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
         'likedBy.id',
       ])
       .where('post.slug = :slug', { slug })
@@ -245,6 +262,21 @@ export class PostsService {
     const post = await qb.getOne();
     if (!post) {
       throw new NotFoundException('Post not found');
+    }
+    
+    // 블로그가 비공개인 경우, 소유자가 아니면 특별한 응답 반환
+    if (!post.blog.isPublic) {
+      this.logger.log(`Private blog check - User ID: ${user?.id}, Blog userId: ${post.blog.userId}, Post Author ID: ${post.author?.id}`);
+      // 블로그 소유자 또는 포스트 작성자인 경우 접근 허용
+      const isOwner = user && (String(user.id) === String(post.blog.userId) || String(user.id) === String(post.author?.id));
+      if (!isOwner) {
+        this.logger.log(`Access denied to private blog for user ${user?.id}`);
+        return {
+          isPrivate: true,
+          message: '비공개 블로그입니다'
+        };
+      }
+      this.logger.log(`Access granted to private blog for owner/author ${user?.id}`);
     }
     
     // 조회수 증가 (모든 사용자)
@@ -622,6 +654,20 @@ export class PostsService {
       post.slug = finalSlug;
       await this.postsRepository.save(post);
     }
+  }
+
+  // 포스트 ID로 블로그 정보 가져오기
+  async getBlogByPostId(postId: string): Promise<any> {
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+      relations: ['blog'],
+    });
+    
+    if (!post || !post.blog) {
+      throw new NotFoundException('Post or blog not found');
+    }
+    
+    return post.blog;
   }
 
   // 기존 게시글들의 파일 연결 재처리 (UUID 기반)

@@ -9,24 +9,28 @@ import {
 } from 'typeorm';
 import { File } from './file.entity';
 
-export enum FileContextType {
-  PROFILE = 'profile',
-  POST = 'post',
-  BLOG = 'blog',
-  SYSTEM = 'system',
-}
+export const FileContextType = {
+  PROFILE: 'profile',
+  POST: 'post',
+  BLOG: 'blog',
+  SYSTEM: 'system'
+} as const;
 
-export enum FilePurpose {
-  AVATAR = 'avatar',
-  COVER = 'cover',
-  THUMBNAIL = 'thumbnail',
-  CONTENT = 'content',
-  ATTACHMENT = 'attachment',
-  LOGO = 'logo',
-  BANNER = 'banner',
-  FAVICON = 'favicon',
-  GENERAL = 'general',
-}
+export type FileContextType = typeof FileContextType[keyof typeof FileContextType];
+
+export const FilePurpose = {
+  AVATAR: 'avatar',
+  COVER: 'cover',
+  THUMBNAIL: 'thumbnail',
+  CONTENT: 'content',
+  ATTACHMENT: 'attachment',
+  LOGO: 'logo',
+  BANNER: 'banner',
+  FAVICON: 'favicon',
+  GENERAL: 'general'
+} as const;
+
+export type FilePurpose = typeof FilePurpose[keyof typeof FilePurpose];
 
 /**
  * 파일 컨텍스트 엔티티

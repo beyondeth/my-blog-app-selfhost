@@ -19,8 +19,14 @@ export class CommentsService {
   async create(createCommentDto: any, user: User): Promise<Comment> {
     const { postId, parentCommentId, ...commentData } = createCommentDto;
     
-    // 게시글 존재 확인
-    await this.postsService.findOne(postId);
+    // 게시글 존재 확인 및 블로그 정보 가져오기
+    const post = await this.postsService.findOne(postId);
+    
+    // 블로그의 댓글 허용 여부 확인
+    const blog = await this.postsService.getBlogByPostId(postId);
+    if (!blog.allowComments) {
+      throw new ForbiddenException('이 블로그는 댓글을 허용하지 않습니다.');
+    }
 
     const comment = this.commentsRepository.create({
       ...commentData,

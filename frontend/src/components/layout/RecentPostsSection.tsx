@@ -18,7 +18,7 @@ const RecentPostsSection = React.memo(function RecentPostsSection({ posts }: Rec
           <div key={post.id} className="pb-3 sm:pb-3 border-b border-gray-100 last:border-b-0">
             <Link 
               href={`/posts/${post.slug || post.id}`}
-              className="block text-sm sm:text-xs text-gray-900 hover:text-amber-800 leading-relaxed line-clamp-2 break-words mb-2 transition-colors"
+              className="block text-sm sm:text-xs text-gray-900 hover:text-gray-800 leading-relaxed line-clamp-2 break-words mb-2 transition-colors"
             >
               {post.title}
             </Link>

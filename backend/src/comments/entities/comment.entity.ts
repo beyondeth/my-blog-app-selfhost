@@ -20,13 +20,13 @@ export class Comment {
   @Column({ type: 'int', default: 0 })
   dislikesCount: number;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'authorId' })
   authorId: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', name: 'postId' })
   postId: string;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: 'uuid', nullable: true, name: 'parentCommentId' })
   parentCommentId: string;
 
   @CreateDateColumn()

@@ -1,10 +1,12 @@
-import { Controller, Get, Post, Body, Param, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
 import { BlogsService } from './blogs.service';
 import { CreateBlogDto } from './dto/create-blog.dto';
+import { UpdateBlogDto } from './dto/update-blog.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
+import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 
 @Controller('blogs')
 export class BlogsController {
@@ -29,13 +31,29 @@ export class BlogsController {
 
   @Get('slug/:slug')
   @Public()
-  async findOneBySlug(@Param('slug') slug: string) {
-    return await this.blogsService.findOneBySlug(slug);
+  @UseGuards(OptionalJwtAuthGuard)
+  async findOneBySlug(@Param('slug') slug: string, @CurrentUser() user?: User) {
+    console.log(`[BlogsController] findOneBySlug - slug: ${slug}, user: ${user?.id || 'none'}`);
+    return await this.blogsService.findOneBySlug(slug, user);
   }
 
   @Get(':id')
   @Public()
   async findOne(@Param('id') id: string) {
     return await this.blogsService.findOne(id);
+  }
+
+  @Put(':id')
+  async update(
+    @Param('id') id: string,
+    @Body() updateBlogDto: UpdateBlogDto,
+    @CurrentUser() user: User
+  ) {
+    // 블로그 소유자 확인
+    const blog = await this.blogsService.findOne(id);
+    if (blog.userId !== user.id) {
+      throw new UnauthorizedException('블로그를 수정할 권한이 없습니다.');
+    }
+    return await this.blogsService.update(id, updateBlogDto);
   }
 }

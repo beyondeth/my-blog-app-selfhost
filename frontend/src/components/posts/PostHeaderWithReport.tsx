@@ -76,7 +76,7 @@ export default function PostHeaderWithReport({
         
         {/* Title - 전체 너비 차지 */}
         <h1 className="text-base font-bold text-gray-900 mb-5 leading-[23px]">
-          {post.title}
+          {post.title || ''}
         </h1>
 
         {/* Meta Information with Like/Share and Action Buttons */}
@@ -95,15 +95,15 @@ export default function PostHeaderWithReport({
             </div>
             <div className="flex items-center">
               <FiCalendar className="mr-2 w-4 h-4" />
-              <span>{new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR', {
+              <span>{(post.publishedAt || post.createdAt) ? new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR', {
                 year: 'numeric',
                 month: 'long',
                 day: 'numeric'
-              })}</span>
+              }) : ''}</span>
             </div>
             <div className="flex items-center">
               <FiEye className="mr-2 w-4 h-4" />
-              <span>{post.viewCount.toLocaleString()} views</span>
+              <span>{(post.viewCount || 0).toLocaleString()} views</span>
             </div>
             
             {/* Like and Share Buttons - 뷰 바로 옆에 붙임 */}

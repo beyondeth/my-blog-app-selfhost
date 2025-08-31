@@ -6,12 +6,13 @@ import type { Comment, CommentForm } from '@/types';
 import { useAuth } from '@/hooks/useAuth';
 
 // 댓글 조회 훅
-export function useComments(postId: string) {
+export function useComments(postId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['comments', postId],
     queryFn: () => apiClient.getComments(postId),
     staleTime: 1000 * 60 * 5, // 5분
     gcTime: 1000 * 60 * 10,   // 10분
+    enabled: options?.enabled !== false && !!postId && postId !== 'undefined',
   });
 }
 

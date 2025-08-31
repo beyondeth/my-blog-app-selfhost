@@ -1,6 +1,5 @@
-import { DataSource, DataSourceOptions } from 'typeorm';
+import { DataSource } from 'typeorm';
 import { config } from 'dotenv';
-import { join } from 'path';
 
 // Load environment variables
 config();
@@ -9,13 +8,13 @@ config();
  * Migration 전용 DataSource 생성 함수
  * NestJS 애플리케이션은 TypeORM 모듈을 통해 연결 관리
  */
-export const createDataSourceOptions = (): DataSourceOptions => {
+export const createDataSourceOptions = (): any => {
   const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
   
-  const baseConfig: DataSourceOptions = {
+  const baseConfig = {
     type: 'postgres',
-    entities: [join(__dirname, '**/*.entity{.ts,.js}')],
-    migrations: [join(__dirname, 'migrations/*{.ts,.js}')],
+    entities: ['src/**/*.entity{.ts,.js}'],
+    migrations: ['src/migrations/*{.ts,.js}'],
     synchronize: false,
     logging: process.env.NODE_ENV === 'development',
   };

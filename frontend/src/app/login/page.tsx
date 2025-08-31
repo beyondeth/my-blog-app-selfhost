@@ -17,6 +17,10 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loginError, setLoginError] = useState(''); // 로컬 에러 상태
+  const [authMethodHint, setAuthMethodHint] = useState<{
+    provider?: string;
+    message?: string;
+  } | null>(null);
   const [validationErrors, setValidationErrors] = useState<{
     email?: string;
     password?: string;
@@ -67,6 +71,38 @@ export default function LoginPage() {
         [name]: undefined
       }));
     }
+    
+    // 이메일 입력 시 힌트 초기화
+    if (name === 'email') {
+      setAuthMethodHint(null);
+      setLoginError('');
+    }
+  };
+
+  // 이메일 입력 완료 시 인증 방법 확인
+  const handleEmailBlur = async () => {
+    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      try {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-auth-method`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email: formData.email }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.exists && data.authProvider !== 'local') {
+          setAuthMethodHint({
+            provider: data.authProvider,
+            message: data.message
+          });
+        }
+      } catch (error) {
+        // 에러 무시 (선택적 기능)
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -83,8 +119,34 @@ export default function LoginPage() {
       await login(formData);
       // 성공 시 useEffect에서 리다이렉트 처리
     } catch (error: any) {
-      // 로컬 에러 상태에 저장
-      setLoginError(error.message || '로그인에 실패했습니다.');
+      // 로그인 실패 시 인증 방법 확인
+      if (error.message?.includes('Invalid credentials') || error.message?.includes('Unauthorized')) {
+        try {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-auth-method`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email: formData.email }),
+          });
+          
+          const data = await response.json();
+          
+          if (data.exists && data.authProvider !== 'local') {
+            setAuthMethodHint({
+              provider: data.authProvider,
+              message: data.message
+            });
+            setLoginError(`이 계정은 ${data.authProvider === 'kakao' ? '카카오' : '구글'} 계정으로 가입되었습니다.`);
+          } else {
+            setLoginError('이메일 또는 비밀번호가 올바르지 않습니다.');
+          }
+        } catch {
+          setLoginError(error.message || '로그인에 실패했습니다.');
+        }
+      } else {
+        setLoginError(error.message || '로그인에 실패했습니다.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -142,6 +204,7 @@ export default function LoginPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
+                  onBlur={handleEmailBlur}
                   className={`w-full pl-10 pr-4 py-3 border rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
                     validationErrors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
                   }`}
@@ -151,6 +214,9 @@ export default function LoginPage() {
               </div>
               {validationErrors.email && (
                 <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+              )}
+              {authMethodHint && !validationErrors.email && (
+                <p className="mt-1 text-sm text-blue-600">💡 {authMethodHint.message}</p>
               )}
             </div>
 
@@ -210,7 +276,11 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/google'}
-              className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+              className={`w-full flex items-center justify-center px-4 py-3 border rounded-md shadow-sm text-sm font-medium transition-all ${
+                authMethodHint?.provider === 'google' 
+                  ? 'border-blue-500 bg-blue-50 text-blue-700 hover:bg-blue-100 animate-pulse'
+                  : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+              }`}
             >
               <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -224,7 +294,11 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/kakao'}
-              className="w-full flex items-center justify-center px-4 py-3 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-yellow-400 hover:bg-yellow-500 transition-colors"
+              className={`w-full flex items-center justify-center px-4 py-3 border rounded-md shadow-sm text-sm font-medium transition-all ${
+                authMethodHint?.provider === 'kakao'
+                  ? 'border-yellow-600 bg-yellow-500 text-gray-900 hover:bg-yellow-600 animate-pulse'
+                  : 'border-gray-300 text-gray-700 bg-yellow-400 hover:bg-yellow-500'
+              }`}
             >
               <span className="mr-2 text-lg">💬</span>
               카카오로 로그인

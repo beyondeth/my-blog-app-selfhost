@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { FiLock, FiEye, FiEyeOff, FiSmartphone, FiShield, FiAlertTriangle, FiCheck } from 'react-icons/fi';
+import { FiLock, FiEye, FiEyeOff, FiShield, FiCheck } from 'react-icons/fi';
 
 export default function SecuritySettingsPage() {
   const { user } = useAuth();
@@ -17,7 +17,6 @@ export default function SecuritySettingsPage() {
     newPassword: '',
     confirmPassword: '',
   });
-  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,21 +70,6 @@ export default function SecuritySettingsPage() {
     }
   };
 
-  const handleToggle2FA = async () => {
-    setLoading(true);
-    setError('');
-    
-    try {
-      // TODO: Implement 2FA toggle API
-      setTwoFactorEnabled(!twoFactorEnabled);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
-    } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   if (!user) {
     return (
@@ -198,43 +182,12 @@ export default function SecuritySettingsPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-amber-700 text-white font-medium rounded-md hover:bg-amber-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? '변경 중...' : '비밀번호 변경'}
               </button>
             </div>
           </form>
-        </div>
-
-        {/* 2FA Section */}
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">2단계 인증</h3>
-          <div className="bg-gray-50 rounded-lg p-4">
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <FiSmartphone className="h-6 w-6 text-gray-400" />
-              </div>
-              <div className="ml-3 flex-1">
-                <h4 className="text-sm font-medium text-gray-900">인증 앱 사용</h4>
-                <p className="mt-1 text-sm text-gray-600">
-                  Google Authenticator 또는 Authy와 같은 앱을 사용하여 추가 보안 계층을 활성화하세요
-                </p>
-                <div className="mt-3">
-                  <button
-                    onClick={handleToggle2FA}
-                    disabled={loading}
-                    className={`inline-flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      twoFactorEnabled
-                        ? 'bg-red-100 text-red-700 hover:bg-red-200'
-                        : 'bg-amber-100 text-amber-700 hover:bg-amber-200'
-                    } disabled:opacity-50 disabled:cursor-not-allowed`}
-                  >
-                    {twoFactorEnabled ? '2단계 인증 비활성화' : '2단계 인증 설정'}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         {/* Security Status */}
@@ -244,19 +197,6 @@ export default function SecuritySettingsPage() {
             <div className="flex items-center">
               <FiCheck className="h-5 w-5 text-green-500 mr-2" />
               <span className="text-sm text-gray-700">이메일 인증 완료</span>
-            </div>
-            <div className="flex items-center">
-              {twoFactorEnabled ? (
-                <>
-                  <FiCheck className="h-5 w-5 text-green-500 mr-2" />
-                  <span className="text-sm text-gray-700">2단계 인증 활성화됨</span>
-                </>
-              ) : (
-                <>
-                  <FiAlertTriangle className="h-5 w-5 text-yellow-500 mr-2" />
-                  <span className="text-sm text-gray-700">2단계 인증이 비활성화되어 있습니다</span>
-                </>
-              )}
             </div>
             <div className="flex items-center">
               <FiShield className="h-5 w-5 text-green-500 mr-2" />
