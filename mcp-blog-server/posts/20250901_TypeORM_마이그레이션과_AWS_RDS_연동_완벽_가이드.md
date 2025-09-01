@@ -101,9 +101,7 @@ TypeORM이 데이터베이스와 연결하기 위한 설정 파일입니다. 이
 ### 현재 프로젝트 구조
 
 ```
-.env 파일:
-DB_URL=postgresql://postgres:postgres@myblog.cqbcg2aqsrdx.us-east-1.rds.amazonaws.com:5432/blog-db
-```
+
 
 ### 작동 방식
 
