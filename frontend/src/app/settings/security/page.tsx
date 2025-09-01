@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { FiLock, FiEye, FiEyeOff, FiShield, FiCheck } from 'react-icons/fi';
+import { FiLock, FiEye, FiEyeOff, FiShield, FiCheck, FiAlertCircle } from 'react-icons/fi';
 
 export default function SecuritySettingsPage() {
   const { user } = useAuth();
@@ -79,6 +79,52 @@ export default function SecuritySettingsPage() {
     );
   }
 
+  // 인증 제공자별 아이콘과 이름 매핑
+  const getAuthProviderInfo = () => {
+    // authProvider가 없거나 null인 경우 처리
+    const provider = user.authProvider || 'local';
+    
+    switch (provider.toLowerCase()) {
+      case 'google':
+        return {
+          icon: (
+            <img 
+              src="/assets/auth_icons/google/web_light_rd_na.svg" 
+              alt="Google" 
+              width={24} 
+              height={24}
+              className="rounded-full"
+            />
+          ),
+          name: 'Google',
+          color: 'text-[#4285F4]'
+        };
+      case 'kakao':
+        return {
+          icon: (
+            <img 
+              src="/assets/auth_icons/kakao/kakaologin.png" 
+              alt="Kakao" 
+              width={24} 
+              height={24}
+              className="rounded-full"
+            />
+          ),
+          name: 'Kakao',
+          color: 'text-[#3A1D1D]'
+        };
+      case 'local':
+      default:
+        return {
+          icon: <FiLock className="h-5 w-5 text-gray-600" />,
+          name: '이메일/비밀번호',
+          color: 'text-gray-600'
+        };
+    }
+  };
+
+  const authInfo = getAuthProviderInfo();
+
   return (
     <div className="p-8">
       <div className="mb-8">
@@ -89,9 +135,26 @@ export default function SecuritySettingsPage() {
       </div>
 
       <div className="space-y-8">
-        {/* Password Change Section */}
-        <div>
-          <h3 className="text-lg font-medium text-gray-900 mb-4">비밀번호 변경</h3>
+        {/* Authentication Info Section */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">인증 정보</h3>
+          <div className="flex items-center space-x-3">
+            {authInfo.icon}
+            <div>
+              <p className="text-sm font-medium text-gray-900">
+                {authInfo.name} 계정 사용 중
+              </p>
+              <p className="text-xs text-gray-500">
+                {user.email}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Password Change Section - Only for local users */}
+        {(!user.authProvider || user.authProvider === 'local') ? (
+          <div>
+            <h3 className="text-lg font-medium text-gray-900 mb-4">비밀번호 변경</h3>
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             {/* Current Password */}
             <div>
@@ -104,7 +167,7 @@ export default function SecuritySettingsPage() {
                   id="currentPassword"
                   value={passwordForm.currentPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
                   required
                 />
                 <button
@@ -132,7 +195,7 @@ export default function SecuritySettingsPage() {
                   id="newPassword"
                   value={passwordForm.newPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
                   required
                 />
                 <button
@@ -161,7 +224,7 @@ export default function SecuritySettingsPage() {
                   id="confirmPassword"
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
                   required
                 />
                 <button
@@ -189,6 +252,31 @@ export default function SecuritySettingsPage() {
             </div>
           </form>
         </div>
+        ) : (
+          /* OAuth Users Security Info */
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+            <div className="flex items-start space-x-3">
+              <FiAlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <div className="flex-1">
+                <h3 className="text-sm font-medium text-blue-900 mb-2">
+                  소셜 로그인 사용 중
+                </h3>
+                <p className="text-sm text-blue-700 mb-3">
+                  {authInfo.name} 계정으로 로그인하셨습니다. 
+                  비밀번호는 {authInfo.name}에서 관리됩니다.
+                </p>
+                <div className="space-y-2">
+                  <p className="text-xs text-blue-600 font-medium">보안 강화 팁:</p>
+                  <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
+                    <li>{authInfo.name} 계정에서 2단계 인증을 활성화하세요</li>
+                    <li>정기적으로 {authInfo.name} 보안 설정을 검토하세요</li>
+                    <li>의심스러운 로그인 활동이 있는지 확인하세요</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Security Status */}
         <div className="pt-6 border-t border-gray-200">
@@ -202,6 +290,12 @@ export default function SecuritySettingsPage() {
               <FiShield className="h-5 w-5 text-green-500 mr-2" />
               <span className="text-sm text-gray-700">활성 세션: 1개</span>
             </div>
+            {user.authProvider && user.authProvider !== 'local' && (
+              <div className="flex items-center">
+                {authInfo.icon}
+                <span className="text-sm text-gray-700 ml-2">{authInfo.name} 계정 연결됨</span>
+              </div>
+            )}
           </div>
         </div>
 

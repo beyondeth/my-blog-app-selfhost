@@ -133,6 +133,15 @@ export default function ProfileDropdown({
           <span>API 키</span>
         </DropdownMenuItem>
 
+        {/* Blog Settings */}
+        <DropdownMenuItem 
+          onClick={() => handleNavigation('/settings/blog')}
+          className="cursor-pointer"
+        >
+          <FiSettings className="mr-2 h-4 w-4" />
+          <span>블로그 설정</span>
+        </DropdownMenuItem>
+
         {/* Security */}
         <DropdownMenuItem 
           onClick={() => handleNavigation('/settings/security')}

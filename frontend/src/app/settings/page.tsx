@@ -35,10 +35,25 @@ export default function ProfileSettingsPage() {
       });
       if (user.profileImage) {
         console.log('User profileImage:', user.profileImage);
-        // 백엔드에서 프록시 URL로 올 수 있음
-        const imageUrl = user.profileImage.startsWith('/api/') 
-          ? `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage.replace('/api/v1', '')}`
-          : user.profileImage;
+        let imageUrl = user.profileImage;
+        
+        // 절대 URL이 아닌 경우 처리
+        if (!user.profileImage.startsWith('http://') && !user.profileImage.startsWith('https://')) {
+          // /api/로 시작하는 경우
+          if (user.profileImage.startsWith('/api/')) {
+            imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage.replace('/api/v1', '')}`;
+          } 
+          // /로 시작하는 경우
+          else if (user.profileImage.startsWith('/')) {
+            imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage}`;
+          }
+          // v2/users/... 같은 상대 경로인 경우 (S3 키)
+          else {
+            // proxy 엔드포인트 사용
+            imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${user.profileImage}`;
+          }
+        }
+        
         setProfileImageUrl(imageUrl);
       }
     }
@@ -184,14 +199,14 @@ export default function ProfileSettingsPage() {
             프로필 이미지
           </label>
           <div className="flex items-center space-x-4">
-            <div className="relative w-20 h-20 rounded-full bg-gray-200 overflow-hidden">
+            <div className="relative w-20 h-20 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
               {profileImageUrl ? (
                 <Image
                   src={profileImageUrl}
                   alt="Profile"
                   fill
                   sizes="80px"
-                  className="object-cover w-full h-full"
+                  className="object-contain"
                   priority
                   unoptimized
                 />
@@ -280,11 +295,20 @@ export default function ProfileSettingsPage() {
           <textarea
             id="bio"
             value={formData.bio}
-            onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+            onChange={(e) => {
+              if (e.target.value.length <= 1000) {
+                setFormData({ ...formData, bio: e.target.value });
+              }
+            }}
             rows={4}
+            maxLength={1000}
             className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
             placeholder="자신을 소개해주세요..."
           />
+          <div className="mt-1 flex justify-between text-xs text-gray-500">
+            <span>자신을 소개하는 글을 작성해주세요</span>
+            <span>{formData.bio.length}/1000</span>
+          </div>
         </div>
 
         {/* Account Info */}
@@ -339,15 +363,14 @@ export default function ProfileSettingsPage() {
 
       {/* 회원 탈퇴 섹션 */}
       <div className="mt-12 pt-8 border-t border-gray-200">
-        <h3 className="text-lg font-medium text-red-600 mb-4">위험 구역</h3>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
           <h4 className="text-base font-medium text-gray-900 mb-2">계정 삭제</h4>
           <p className="text-sm text-gray-600 mb-4">
             계정을 삭제하면 모든 블로그 게시물, 댓글, 파일이 영구적으로 삭제되며 복구할 수 없습니다.
           </p>
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 transition-colors"
+            className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 transition-colors"
           >
             계정 삭제
           </button>

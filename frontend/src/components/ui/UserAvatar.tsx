@@ -46,6 +46,24 @@ export default function UserAvatar({
 }: UserAvatarProps) {
   const sizeClass = sizeClasses[size];
 
+  // 이미지 URL 처리
+  let imageUrl = profileImage || '';
+  if (profileImage && !profileImage.startsWith('http://') && !profileImage.startsWith('https://')) {
+    // /api/로 시작하는 경우
+    if (profileImage.startsWith('/api/')) {
+      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${profileImage.replace('/api/v1', '')}`;
+    } 
+    // /로 시작하는 경우
+    else if (profileImage.startsWith('/')) {
+      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${profileImage}`;
+    }
+    // v2/users/... 같은 상대 경로인 경우 (S3 키)
+    else {
+      // proxy 엔드포인트 사용
+      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${profileImage}`;
+    }
+  }
+
   return (
     <div
       className={cn(
@@ -54,12 +72,12 @@ export default function UserAvatar({
         className
       )}
     >
-      {profileImage ? (
+      {imageUrl ? (
         <Image
-          src={profileImage}
+          src={imageUrl}
           alt={username || 'User'}
           fill
-          className="object-cover"
+          className="object-contain"
           sizes={
             size === 'xs' ? '24px' :
             size === 'sm' ? '32px' :

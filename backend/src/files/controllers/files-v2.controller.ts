@@ -64,6 +64,8 @@ export class FilesV2Controller {
     );
     
     // 사용자 프로필에 이미지 URL 업데이트
+    // s3Key를 그대로 저장 (예: v2/users/xxx/profile/avatar/xxx.png)
+    // 프론트엔드에서 /api/v1/files/{s3Key} 형태로 접근
     await this.usersService.update(user.id, {
       profileImage: result.s3Key,
     });

@@ -4,18 +4,19 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserBlog } from '@/hooks/useUserBlog';
 import { useRouter } from 'next/navigation';
-import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiEdit3 } from 'react-icons/fi';
+import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiEdit3, FiCopy } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Blog } from '@/types';
 
 export default function BlogSettingsPage() {
   const { user } = useAuth();
-  const { blog, refresh: refreshBlog } = useUserBlog();
+  const { blog, loading: blogLoading, refresh: refreshBlog } = useUserBlog();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -76,7 +77,34 @@ export default function BlogSettingsPage() {
     );
   }
 
-  if (!blog) {
+  // 블로그 데이터 로딩 중일 때 스켈레톤 UI 표시
+  if (blogLoading) {
+    return (
+      <div className="p-8">
+        <div className="mb-8">
+          <div className="h-7 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-64 bg-gray-100 rounded animate-pulse"></div>
+        </div>
+        <div className="space-y-6">
+          <div>
+            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="h-10 w-full bg-gray-100 rounded animate-pulse"></div>
+          </div>
+          <div>
+            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="h-24 w-full bg-gray-100 rounded animate-pulse"></div>
+          </div>
+          <div>
+            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
+            <div className="h-10 w-full bg-gray-100 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 로딩이 완료되었는데 블로그가 없을 때만 에러 표시
+  if (!blogLoading && !blog) {
     return (
       <div className="p-8">
         <div className="text-center py-8">
@@ -136,25 +164,47 @@ export default function BlogSettingsPage() {
           />
         </div>
 
-        {/* Blog URL */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            블로그 주소
-          </label>
-          <div className="flex items-center">
-            <span className="px-3 py-2 bg-gray-50 border border-r-0 border-gray-300 rounded-l-md text-gray-500">
-              {window.location.origin}/blog/
-            </span>
-            <input
-              type="text"
-              value={blog.slug}
-              disabled
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-r-md bg-gray-50 text-gray-500"
-            />
+        {/* Blog Info */}
+        <div className="pt-6 border-t border-gray-200">
+          <h3 className="text-sm font-medium text-gray-900 mb-4">블로그 정보</h3>
+          <div className="space-y-3">
+            <div className="flex items-center text-sm">
+              <FiCalendar className="mr-2 text-gray-400" />
+              <span className="text-gray-600">생성일:</span>
+              <span className="ml-2 text-gray-900">
+                {blog.createdAt && format(new Date(blog.createdAt), 'yyyy년 MM월 dd일', { locale: ko })}
+              </span>
+            </div>
+            <div className="flex items-center justify-between text-sm">
+              <div className="flex items-center">
+                <FiLink className="mr-2 text-gray-400" />
+                <span className="text-gray-600">전체 URL:</span>
+                <a 
+                  href={`/blog/${blog.slug}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ml-2 text-gray-700 hover:text-black"
+                >
+                  {window.location.origin}/blog/{blog.slug}
+                </a>
+              </div>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/blog/${blog.slug}`);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                title="주소 복사"
+              >
+                {copied ? (
+                  <span className="text-xs text-green-600">복사됨!</span>
+                ) : (
+                  <FiCopy className="w-4 h-4" />
+                )}
+              </button>
+            </div>
           </div>
-          <p className="mt-1 text-xs text-gray-500">
-            블로그 주소는 변경할 수 없습니다
-          </p>
         </div>
 
         {/* Privacy Settings */}
@@ -179,7 +229,7 @@ export default function BlogSettingsPage() {
                   onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
               </label>
             </div>
 
@@ -201,37 +251,12 @@ export default function BlogSettingsPage() {
                   onChange={(e) => setFormData({ ...formData, allowComments: e.target.checked })}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-amber-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-600"></div>
+                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
               </label>
             </div>
           </div>
         </div>
 
-        {/* Blog Info */}
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">블로그 정보</h3>
-          <div className="space-y-3">
-            <div className="flex items-center text-sm">
-              <FiCalendar className="mr-2 text-gray-400" />
-              <span className="text-gray-600">생성일:</span>
-              <span className="ml-2 text-gray-900">
-                {blog.createdAt && format(new Date(blog.createdAt), 'yyyy년 MM월 dd일', { locale: ko })}
-              </span>
-            </div>
-            <div className="flex items-center text-sm">
-              <FiLink className="mr-2 text-gray-400" />
-              <span className="text-gray-600">전체 URL:</span>
-              <a 
-                href={`/blog/${blog.slug}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="ml-2 text-gray-700 hover:text-black"
-              >
-                {window.location.origin}/blog/{blog.slug}
-              </a>
-            </div>
-          </div>
-        </div>
 
         {/* Error/Success Messages */}
         {error && (

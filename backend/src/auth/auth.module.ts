@@ -11,6 +11,7 @@ import { BlogsModule } from '../blogs/blogs.module';
 import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { EmailModule } from '../email/email.module';
 import { ApiKey } from '../api-keys/entities/api-key.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { KakaoStrategy } from './strategies/kakao.strategy';
@@ -22,7 +23,7 @@ import { KakaoStrategy } from './strategies/kakao.strategy';
     ApiKeysModule,
     EmailModule,
     PassportModule,
-    TypeOrmModule.forFeature([ApiKey]),
+    TypeOrmModule.forFeature([ApiKey, PasswordResetToken]),
     JwtModule.registerAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({

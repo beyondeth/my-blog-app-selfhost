@@ -55,51 +55,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!mounted) return;
 
     try {
-      setIsLoading(true);
-      
-      // 쿠키 기반 인증이므로 localStorage 토큰 확인 제거
-      // 대신 직접 API를 호출하여 인증 상태 확인
+      // API 호출로 실제 인증 상태 확인
       try {
         const userData = await apiClient.getProfile();
         setUser(userData);
         
-        // 사용자 정보만 localStorage에 저장 (UI 성능을 위해)
-        if (mounted) {
-          localStorage.setItem('user', JSON.stringify(userData));
-        }
+        // 사용자 정보는 메모리에만 저장 (보안)
       } catch (apiError: any) {
-        // 401 에러면 인증되지 않은 상태 (정상적인 상황)
+        // 401 에러면 인증되지 않은 상태
         if (apiError.statusCode === 401) {
           setUser(null);
           if (mounted) {
-            localStorage.removeItem('user');
-            // localStorage에 저장된 기존 토큰들도 제거
-            localStorage.removeItem('access_token');
-            localStorage.removeItem('token');
-          }
-          // 401 에러는 로그하지 않음 (정상적인 로그아웃 상태)
-        } else {
-          // 다른 에러면 저장된 사용자 정보로 복원 시도
-          console.error('Auth check failed with non-401 error:', apiError);
-          const storedUser = localStorage.getItem('user');
-          if (storedUser) {
-            try {
-              const userData = JSON.parse(storedUser);
-              setUser(userData);
-            } catch (parseError) {
-              console.error('Failed to parse stored user data:', parseError);
-              setUser(null);
+            // 기존 토큰 정리 (legacy)
+            if (mounted && typeof window !== 'undefined') {
+              localStorage.removeItem('access_token');
+              localStorage.removeItem('token');
+              localStorage.removeItem('user');
             }
+          }
+        } else {
+          // 네트워크 에러 등의 경우 localStorage 데이터 유지
+          console.error('Auth check failed with non-401 error:', apiError);
+          // 이미 user 상태가 있으면 유지 (localStorage에서 로드한 상태)
+          // 없을 때만 null로 설정
+          if (!user) {
+            setUser(null);
           }
         }
       }
     } catch (error) {
       console.error('Auth check failed:', error);
-      setUser(null);
+      // 네트워크 에러시 기존 상태 유지
+      if (!user) {
+        setUser(null);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [mounted]);
+  }, [mounted, user]);
 
   useEffect(() => {
     checkAuth();
@@ -113,10 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await apiClient.login(credentials);
       setUser(response.user);
       
-      // 사용자 정보만 localStorage에 저장 (쿠키는 백엔드에서 자동 설정)
-      if (mounted) {
-        localStorage.setItem('user', JSON.stringify(response.user));
-      }
+      // 로그인 성공 - 메모리에만 저장
       
       // 로그인 성공 후 블로그 정보 새로고침을 위한 이벤트 발생
       setTimeout(() => {
@@ -137,10 +127,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const response = await apiClient.register(userData);
       setUser(response.user);
       
-      // 사용자 정보만 localStorage에 저장
-      if (mounted) {
-        localStorage.setItem('user', JSON.stringify(response.user));
-      }
+      // 로그인 성공 - 메모리에만 저장
       
       // 회원가입 성공 후 블로그 정보 새로고침을 위한 이벤트 발생
       // 약간의 지연을 두어 블로그 생성이 완료되도록 함
@@ -162,9 +149,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } finally {
       setUser(null);
       if (mounted) {
-        localStorage.removeItem('user');
-        localStorage.removeItem('access_token'); // 기존 토큰 제거
-        localStorage.removeItem('token'); // 기존 토큰 제거
+        // 기존 데이터 정리
+        if (mounted && typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
         if (redirectTo) {
           window.location.href = redirectTo;
         }
@@ -177,9 +167,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userData = await apiClient.getProfile();
       setUser(userData);
       
-      if (mounted) {
-        localStorage.setItem('user', JSON.stringify(userData));
-      }
+      // 메모리에만 저장
     } catch (error) {
       console.error('Failed to refresh user:', error);
       await logout();

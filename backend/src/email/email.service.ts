@@ -569,21 +569,177 @@ export class EmailService {
   }
 
   /**
+   * 비밀번호 재설정 이메일 발송
+   */
+  async sendPasswordResetEmail(email: string, username: string, resetUrl: string): Promise<void> {
+    const html = this.getPasswordResetTemplate(username, resetUrl);
+
+    try {
+      await this.mailerService.sendMail({
+        to: email,
+        subject: '[codebase.blog] 비밀번호 재설정',
+        html,
+      });
+    } catch (error) {
+      console.error('Password reset email sending error:', error);
+      throw new BadRequestException('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+    }
+  }
+
+  /**
+   * 비밀번호 재설정 이메일 템플릿
+   */
+  private getPasswordResetTemplate(username: string, resetUrl: string): string {
+    return `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+          body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8f8f8;
+            color: #333333;
+          }
+          .container {
+            max-width: 560px;
+            margin: 0 auto;
+            padding: 40px 20px;
+          }
+          .card {
+            background: #ffffff;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
+            overflow: hidden;
+          }
+          .header {
+            background: #000000;
+            padding: 24px;
+            text-align: center;
+          }
+          .logo {
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            margin: 0;
+          }
+          .content {
+            padding: 32px;
+          }
+          .title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #000000;
+            margin: 0 0 16px;
+          }
+          .text {
+            font-size: 15px;
+            color: #555555;
+            line-height: 1.6;
+            margin: 0 0 24px;
+          }
+          .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #000000;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 6px;
+            font-weight: 500;
+            font-size: 15px;
+          }
+          .button:hover {
+            background: #333333;
+          }
+          .divider {
+            border-top: 1px solid #e5e5e5;
+            margin: 24px 0;
+          }
+          .info-box {
+            background: #f8f8f8;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 24px 0;
+          }
+          .info-text {
+            font-size: 14px;
+            color: #666666;
+            line-height: 1.6;
+            margin: 0;
+          }
+          .link-text {
+            font-size: 13px;
+            color: #999999;
+            word-break: break-all;
+            margin: 16px 0;
+          }
+          .footer {
+            padding: 24px 32px;
+            text-align: center;
+            border-top: 1px solid #e5e5e5;
+          }
+          .footer-text {
+            font-size: 13px;
+            color: #999999;
+            margin: 0;
+            line-height: 1.6;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="card">
+            <div class="header">
+              <div class="logo">codebase.blog</div>
+            </div>
+            <div class="content">
+              <h1 class="title">비밀번호 재설정</h1>
+              <p class="text">
+                안녕하세요, ${username || '사용자'}님<br><br>
+                비밀번호 재설정을 요청하셨습니다.
+                아래 버튼을 클릭하여 새로운 비밀번호를 설정해주세요.
+              </p>
+              <a href="${resetUrl}" class="button">
+                비밀번호 재설정하기
+              </a>
+              <div class="divider"></div>
+              <div class="info-box">
+                <p class="info-text">
+                  <strong>보안 안내</strong><br>
+                  • 이 링크는 15분간만 유효합니다<br>
+                  • 한 번만 사용 가능합니다<br>
+                  • 본인이 요청하지 않은 경우 이 이메일을 무시하세요
+                </p>
+              </div>
+              <p class="link-text">
+                버튼이 작동하지 않는 경우, 아래 링크를 복사하여 브라우저에 붙여넣으세요:<br>
+                ${resetUrl}
+              </p>
+            </div>
+            <div class="footer">
+              <p class="footer-text">
+                비밀번호 재설정을 요청하지 않으셨다면 이 이메일을 무시하셔도 됩니다.<br>
+                © 2025 codebase.blog. All rights reserved.
+              </p>
+            </div>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+  }
+
+  /**
    * 계정 연결 이메일 템플릿
    */
   private getAccountLinkTemplate(message: string): string {
     // Provider 이름 추출 (예: "Google 로그인이 계정에 연결되었습니다")
     const providerMatch = message.match(/(Google|Kakao|github)/i);
     const provider = providerMatch ? providerMatch[0] : 'OAuth';
-    
-    // Provider별 아이콘
-    const providerIcons = {
-      'Google': '🔷',
-      'Kakao': '💬',
-      'github': '🐙',
-      'OAuth': '🔗'
-    };
-    const icon = providerIcons[provider] || '🔗';
 
     return `
       <!DOCTYPE html>
@@ -592,209 +748,138 @@ export class EmailService {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-          * {
+          body {
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-          }
-          body {
-            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Inter', 'Segoe UI', system-ui, sans-serif;
-            background-color: #ffffff;
-            color: #1a1a1a;
-            line-height: 1.6;
-          }
-          .wrapper {
-            width: 100%;
-            table-layout: fixed;
-            background-color: #f8f9fa;
-            padding: 40px 20px;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f8f8f8;
+            color: #333333;
           }
           .container {
-            max-width: 480px;
+            max-width: 560px;
             margin: 0 auto;
-            background-color: #ffffff;
-            border-radius: 16px;
+            padding: 40px 20px;
+          }
+          .card {
+            background: #ffffff;
+            border: 1px solid #e5e5e5;
+            border-radius: 8px;
             overflow: hidden;
-            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
           }
           .header {
-            padding: 32px;
+            background: #000000;
+            padding: 24px;
             text-align: center;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
           }
           .logo {
             color: #ffffff;
-            font-size: 24px;
-            font-weight: 700;
-            letter-spacing: -0.5px;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-          }
-          .logo-icon {
-            display: inline-block;
-            width: 32px;
-            height: 32px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 8px;
-            position: relative;
-          }
-          .logo-icon::before {
-            content: "</>";
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 14px;
-            font-weight: 700;
-            color: white;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            margin: 0;
           }
           .content {
-            padding: 40px 32px;
-            text-align: center;
-          }
-          .emoji {
-            font-size: 48px;
-            margin-bottom: 24px;
+            padding: 32px;
           }
           .title {
             font-size: 24px;
-            font-weight: 700;
-            color: #1a1a1a;
-            margin-bottom: 12px;
-            letter-spacing: -0.5px;
+            font-weight: 600;
+            color: #000000;
+            margin: 0 0 16px;
           }
-          .description {
+          .text {
             font-size: 15px;
-            color: #6b7280;
-            margin-bottom: 24px;
-            line-height: 1.8;
+            color: #555555;
+            line-height: 1.6;
+            margin: 0 0 24px;
           }
-          .provider-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            padding: 12px 24px;
-            background: #f3f4f6;
-            border-radius: 12px;
-            margin-bottom: 24px;
-          }
-          .provider-icon {
-            font-size: 24px;
+          .provider-box {
+            display: inline-block;
+            padding: 8px 16px;
+            background: #f8f8f8;
+            border-radius: 6px;
+            margin: 0 0 24px;
           }
           .provider-name {
             font-size: 16px;
             font-weight: 600;
-            color: #1a1a1a;
+            color: #000000;
           }
-          .alert-box {
-            background: #fef3c7;
-            border: 1px solid #fbbf24;
-            border-radius: 12px;
+          .info-box {
+            background: #f8f8f8;
+            border-radius: 6px;
             padding: 16px;
-            margin-bottom: 24px;
+            margin: 24px 0;
           }
-          .alert-text {
+          .info-text {
             font-size: 14px;
-            color: #92400e;
+            color: #666666;
             line-height: 1.6;
+            margin: 0;
           }
-          .security-info {
-            background: #f3f4f6;
-            border-radius: 12px;
+          .warning-box {
+            background: #fff5f5;
+            border: 1px solid #ffdddd;
+            border-radius: 6px;
             padding: 16px;
-            margin-bottom: 24px;
-            text-align: left;
+            margin: 24px 0;
           }
-          .security-item {
-            font-size: 13px;
-            color: #4b5563;
-            margin-bottom: 8px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-          }
-          .button {
-            display: inline-block;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: #ffffff;
-            text-decoration: none;
-            border-radius: 8px;
-            font-weight: 600;
-            font-size: 15px;
+          .warning-text {
+            font-size: 14px;
+            color: #cc0000;
+            line-height: 1.6;
+            margin: 0;
           }
           .footer {
             padding: 24px 32px;
             text-align: center;
-            background-color: #f8f9fa;
-            border-top: 1px solid #e5e7eb;
+            border-top: 1px solid #e5e5e5;
           }
           .footer-text {
             font-size: 13px;
-            color: #9ca3af;
-            margin-bottom: 8px;
-          }
-          .footer-link {
-            color: #667eea;
-            text-decoration: none;
-            font-weight: 500;
+            color: #999999;
+            margin: 0;
+            line-height: 1.6;
           }
         </style>
       </head>
       <body>
-        <div class="wrapper">
-          <div class="container">
+        <div class="container">
+          <div class="card">
             <div class="header">
-              <div class="logo">
-                <span class="logo-icon"></span>
-                codebase.blog
-              </div>
+              <div class="logo">codebase.blog</div>
             </div>
             <div class="content">
-              <div class="emoji">🔐</div>
               <h1 class="title">새로운 로그인 방법 추가</h1>
               
-              <div class="provider-badge">
-                <span class="provider-icon">${icon}</span>
-                <span class="provider-name">${provider}</span>
+              <div class="provider-box">
+                <span class="provider-name">${provider} 연결됨</span>
               </div>
               
-              <p class="description">
-                ${message}<br>
-                이제 여러 방법으로 로그인할 수 있습니다
+              <p class="text">
+                ${message}
               </p>
               
-              <div class="alert-box">
-                <p class="alert-text">
-                  ⚠️ <strong>본인이 아닌 경우</strong><br>
-                  즉시 계정 설정에서 연결을 해제하고<br>
-                  비밀번호를 변경해 주세요
+              <div class="info-box">
+                <p class="info-text">
+                  <strong>연결 정보</strong><br>
+                  • 시간: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}<br>
+                  • 위치: Seoul, KR<br>
+                  • 장치: Web Browser
                 </p>
               </div>
               
-              <div class="security-info">
-                <div class="security-item">
-                  📍 위치: Seoul, KR
-                </div>
-                <div class="security-item">
-                  🕐 시간: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
-                </div>
-                <div class="security-item">
-                  💻 장치: Web Browser
-                </div>
+              <div class="warning-box">
+                <p class="warning-text">
+                  <strong>⚠️ 본인이 아닌 경우</strong><br>
+                  즉시 계정 설정에서 연결을 해제하고 비밀번호를 변경해 주세요.
+                </p>
               </div>
-              
-              <a href="https://codebase.blog/settings/security" class="button">
-                보안 설정 확인
-              </a>
             </div>
             <div class="footer">
               <p class="footer-text">
-                이 메일은 보안 알림입니다
-              </p>
-              <p class="footer-text">
-                © 2024 <a href="https://codebase.blog" class="footer-link">codebase.blog</a>
+                이 메일은 보안 알림입니다.<br>
+                © 2025 codebase.blog. All rights reserved.
               </p>
             </div>
           </div>

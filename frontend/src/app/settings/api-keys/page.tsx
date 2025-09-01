@@ -23,7 +23,7 @@ interface ApiKey {
 
 export default function ApiKeysPage() {
   const { user } = useAuth();
-  const { blog } = useUserBlog();
+  const { blog, loading: blogLoading } = useUserBlog();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -218,7 +218,24 @@ export default function ApiKeysPage() {
     );
   }
 
-  if (!blog) {
+  // 블로그 데이터 로딩 중일 때 스켈레톤 UI 표시
+  if (blogLoading) {
+    return (
+      <div className="p-8">
+        <div className="mb-8">
+          <div className="h-7 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-64 bg-gray-100 rounded animate-pulse"></div>
+        </div>
+        <div className="space-y-4">
+          <div className="h-32 w-full bg-gray-100 rounded-lg animate-pulse"></div>
+          <div className="h-20 w-full bg-gray-100 rounded-lg animate-pulse"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // 로딩이 완료되었는데 블로그가 없을 때만 에러 표시
+  if (!blogLoading && !blog) {
     return (
       <div className="p-8">
         <div className="text-center py-8">

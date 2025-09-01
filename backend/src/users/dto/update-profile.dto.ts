@@ -24,12 +24,12 @@ export class UpdateProfileDto {
 
   @ApiPropertyOptional({
     description: 'User bio',
-    maxLength: 500,
+    maxLength: 1000,
     example: 'A passionate developer who loves coding',
   })
   @IsOptional()
   @IsString()
-  @MaxLength(500, { message: 'Bio must not exceed 500 characters' })
+  @MaxLength(1000, { message: 'Bio must not exceed 1000 characters' })
   bio?: string;
 
   @ApiPropertyOptional({

@@ -14,7 +14,7 @@ import { blogLogger } from '@/utils/logger';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 
 export default function Header() {
-  const { user, isAdmin, logout } = useAuth();
+  const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
   const { blog, loading: blogLoading, checkAndRedirect } = useUserBlog();
   
   // Debug logging
@@ -204,7 +204,12 @@ export default function Header() {
             
             {/* Desktop Auth Section */}
             <div className="flex items-center space-x-4">
-              {user ? (
+              {authLoading ? (
+                // 로딩 중일 때는 아무것도 표시하지 않거나 스켈레톤 UI
+                <div className="flex items-center space-x-4">
+                  <div className="w-20 h-8 bg-gray-100 rounded animate-pulse"></div>
+                </div>
+              ) : user ? (
                 <>
                   {/* My Blog Button */}
                   {!blogLoading && blog && (
@@ -312,7 +317,12 @@ export default function Header() {
 
               {/* Mobile Auth Section */}
               <div className="pt-4 border-t border-gray-100">
-                {user ? (
+                {authLoading ? (
+                  // 모바일 로딩 UI
+                  <div className="space-y-3">
+                    <div className="w-full h-10 bg-gray-100 rounded animate-pulse"></div>
+                  </div>
+                ) : user ? (
                   <div className="space-y-3">
                     <div className="flex items-center space-x-2 px-2 py-2">
                       <span className="text-sm text-gray-600">

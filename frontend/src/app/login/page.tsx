@@ -4,266 +4,234 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
-import { LoginForm } from '@/types/index';
-import { FiEye, FiEyeOff, FiMail, FiLock, FiArrowLeft } from 'react-icons/fi';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Shield, AlertCircle, Eye, EyeOff } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, isLoading, isAuthenticated, clearError } = useAuth();
-  const [formData, setFormData] = useState<LoginForm>({
-    email: '',
-    password: '',
-  });
-  const [showPassword, setShowPassword] = useState(false);
+  const { login } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loginError, setLoginError] = useState(''); // 로컬 에러 상태
-  const [authMethodHint, setAuthMethodHint] = useState<{
-    provider?: string;
-    message?: string;
-  } | null>(null);
-  const [validationErrors, setValidationErrors] = useState<{
-    email?: string;
-    password?: string;
-  }>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [authMethodHint, setAuthMethodHint] = useState<any>(null);
+  const [loginAttempts, setLoginAttempts] = useState(0);
+  const MAX_LOGIN_ATTEMPTS = 5;
 
-  // 이미 로그인된 사용자는 홈으로 리다이렉트 - Context7 모범 사례: 조건부 실행
-  useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      router.replace('/');
-    }
-  }, [isAuthenticated, isLoading]); // router 의존성 제거 (안정적인 함수)
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  });
 
-  // 컴포넌트 마운트 시 전역 에러 상태 초기화
-  useEffect(() => {
-    clearError();
-  }, [clearError]);
+  const [validationErrors, setValidationErrors] = useState({
+    email: '',
+    password: ''
+  });
 
-  const validateForm = (): boolean => {
-    const errors: { email?: string; password?: string } = {};
-
-    if (!formData.email) {
-      errors.email = '이메일을 입력해주세요.';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = '올바른 이메일 형식을 입력해주세요.';
+  // Check auth method when email loses focus
+  const handleEmailBlur = async () => {
+    if (!formData.email || !validateEmail(formData.email)) {
+      return;
     }
 
-    if (!formData.password) {
-      errors.password = '비밀번호를 입력해주세요.';
-    } else if (formData.password.length < 6) {
-      errors.password = '비밀번호는 최소 6자 이상이어야 합니다.';
-    }
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-method`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: formData.email })
+        }
+      );
 
-    setValidationErrors(errors);
-    return Object.keys(errors).length === 0;
+      if (response.ok) {
+        const data = await response.json();
+        if (data.exists) {
+          setAuthMethodHint({
+            exists: true,
+            provider: data.authProvider,
+            message: data.message,
+            hasPassword: data.hasPassword
+          });
+          
+          // If user should use OAuth, highlight that button
+          if (data.authProvider !== 'local' && !data.hasPassword) {
+            // User registered with OAuth and has no password
+            toast.info(data.message);
+          }
+        } else {
+          setAuthMethodHint({
+            exists: false,
+            message: '계정이 없습니다. 회원가입을 진행해주세요.'
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Failed to check auth method:', error);
+    }
+  };
+
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    setFormData(prev => ({ ...prev, [name]: value }));
     
-    // 입력 시 해당 필드의 유효성 검사 에러 제거
+    // Clear validation error when user starts typing
     if (validationErrors[name as keyof typeof validationErrors]) {
-      setValidationErrors(prev => ({
-        ...prev,
-        [name]: undefined
-      }));
-    }
-    
-    // 이메일 입력 시 힌트 초기화
-    if (name === 'email') {
-      setAuthMethodHint(null);
-      setLoginError('');
-    }
-  };
-
-  // 이메일 입력 완료 시 인증 방법 확인
-  const handleEmailBlur = async () => {
-    if (formData.email && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-auth-method`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ email: formData.email }),
-        });
-        
-        const data = await response.json();
-        
-        if (data.exists && data.authProvider !== 'local') {
-          setAuthMethodHint({
-            provider: data.authProvider,
-            message: data.message
-          });
-        }
-      } catch (error) {
-        // 에러 무시 (선택적 기능)
-      }
+      setValidationErrors(prev => ({ ...prev, [name]: '' }));
     }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!validateForm()) {
+
+    // Check for too many failed attempts
+    if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      toast.error('Too many failed attempts. Please try again later.');
+      return;
+    }
+
+    // Validation
+    const errors = {
+      email: '',
+      password: ''
+    };
+
+    if (!formData.email) {
+      errors.email = '이메일을 입력해주세요';
+    } else if (!validateEmail(formData.email)) {
+      errors.email = '올바른 이메일 형식이 아닙니다';
+    }
+
+    if (!formData.password) {
+      errors.password = '비밀번호를 입력해주세요';
+    }
+
+    if (errors.email || errors.password) {
+      setValidationErrors(errors);
       return;
     }
 
     setIsSubmitting(true);
-    setLoginError(''); // 이전 에러 초기화
-    
+
     try {
       await login(formData);
-      // 성공 시 useEffect에서 리다이렉트 처리
+      toast.success('로그인 성공!');
+      
+      // Navigate based on user role or preference
+      const redirectTo = sessionStorage.getItem('redirectAfterLogin') || '/';
+      sessionStorage.removeItem('redirectAfterLogin');
+      router.push(redirectTo);
     } catch (error: any) {
-      // 로그인 실패 시 인증 방법 확인
-      if (error.message?.includes('Invalid credentials') || error.message?.includes('Unauthorized')) {
-        try {
-          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-auth-method`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ email: formData.email }),
-          });
-          
-          const data = await response.json();
-          
-          if (data.exists && data.authProvider !== 'local') {
-            setAuthMethodHint({
-              provider: data.authProvider,
-              message: data.message
-            });
-            setLoginError(`이 계정은 ${data.authProvider === 'kakao' ? '카카오' : '구글'} 계정으로 가입되었습니다.`);
-          } else {
-            setLoginError('이메일 또는 비밀번호가 올바르지 않습니다.');
-          }
-        } catch {
-          setLoginError(error.message || '로그인에 실패했습니다.');
-        }
+      console.error('Login failed:', error);
+      
+      // Increment failed login attempts
+      setLoginAttempts(prev => prev + 1);
+      
+      // Clear password on failed login
+      setFormData(prev => ({ ...prev, password: '' }));
+      
+      const errorMessage = error.message || '로그인에 실패했습니다';
+      toast.error(errorMessage);
+      
+      if (errorMessage.includes('비밀번호')) {
+        setValidationErrors(prev => ({ ...prev, password: errorMessage }));
       } else {
-        setLoginError(error.message || '로그인에 실패했습니다.');
+        setValidationErrors(prev => ({ ...prev, email: errorMessage }));
       }
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="animate-spin rounded-full h-8 w-8 border-2 border-gray-300 border-t-gray-900"></div>
-      </div>
-    );
-  }
-
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-100">
-        <div className="max-w-4xl mx-auto px-6 py-4">
-          <button
-            onClick={() => router.back()}
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors text-sm font-medium"
-          >
-            <FiArrowLeft className="mr-2 w-4 h-4" />
-            Back
-          </button>
-        </div>
-      </header>
+    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+      <Card className="w-full max-w-md">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            로그인
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3 px-5 py-5">
+          {loginAttempts >= MAX_LOGIN_ATTEMPTS && (
+            <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
+              <div className="text-sm text-red-800">
+                로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.
+              </div>
+            </div>
+          )}
+          {loginAttempts > 2 && loginAttempts < MAX_LOGIN_ATTEMPTS && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
+              <div className="text-sm text-yellow-800">
+                {MAX_LOGIN_ATTEMPTS - loginAttempts}회 시도 가능합니다.
+              </div>
+            </div>
+          )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center px-6 py-16">
-        <div className="w-full max-w-md">
-          {/* Logo */}
-          <div className="text-center mb-12">
-            <p className="mt-4 text-gray-600">로그인하여 계속하세요</p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              이메일
+            </label>
+            <Input
+              type="email"
+              value={formData.email}
+              onChange={handleChange}
+              onBlur={handleEmailBlur}
+              name="email"
+              placeholder="이메일을 입력하세요"
+            />
+            {authMethodHint && !validationErrors.email && (
+              <p className="mt-1 text-sm text-blue-600">💡 {authMethodHint.message}</p>
+            )}
           </div>
 
-          {/* Login Form */}
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {loginError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md text-sm">
-                {loginError}
-              </div>
-            )}
-
-            {/* Email Field */}
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                이메일
-              </label>
-              <div className="relative">
-                <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="email"
-                  id="email"
-                  name="email"
-                  value={formData.email}
-                  onChange={handleChange}
-                  onBlur={handleEmailBlur}
-                  className={`w-full pl-10 pr-4 py-3 border rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
-                    validationErrors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                  }`}
-                  placeholder="이메일을 입력하세요"
-                  required
-                />
-              </div>
-              {validationErrors.email && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
-              )}
-              {authMethodHint && !validationErrors.email && (
-                <p className="mt-1 text-sm text-blue-600">💡 {authMethodHint.message}</p>
-              )}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              비밀번호
+            </label>
+            <div className="relative">
+              <Input
+                type={showPassword ? 'text' : 'password'}
+                value={formData.password}
+                onChange={handleChange}
+                name="password"
+                placeholder="비밀번호를 입력하세요"
+                className="pr-10"
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSubmit(e as any);
+                  }
+                }}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              >
+                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
             </div>
+          </div>
 
-            {/* Password Field */}
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                비밀번호
-              </label>
-              <div className="relative">
-                <FiLock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  id="password"
-                  name="password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  className={`w-full pl-10 pr-12 py-3 border rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
-                    validationErrors.password ? 'border-red-300 bg-red-50' : 'border-gray-300'
-                  }`}
-                  placeholder="비밀번호를 입력하세요"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? <FiEyeOff className="w-4 h-4" /> : <FiEye className="w-4 h-4" />}
-                </button>
-              </div>
-              {validationErrors.password && (
-                <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
-              )}
-            </div>
+          <button
+            onClick={handleSubmit}
+            disabled={isSubmitting || !formData.email || !formData.password || loginAttempts >= MAX_LOGIN_ATTEMPTS}
+            className="w-full flex items-center justify-center px-5 py-3 bg-black hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-full text-sm font-semibold text-white transition-all shadow-sm"
+          >
+            {isSubmitting ? '로그인 중...' : '로그인'}
+          </button>
 
-            {/* Submit Button */}
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-gray-900 text-white py-3 px-4 rounded-md hover:bg-gray-800 focus:ring-2 focus:ring-gray-900 focus:ring-offset-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed font-medium"
-            >
-              {isSubmitting ? '로그인 중...' : '로그인'}
-            </button>
-          </form>
-
-          {/* OAuth Buttons */}
-          <div className="mt-6 space-y-3">
+          {/* OAuth Section */}
+          <div className="space-y-3">
+            {/* Divider */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-gray-300" />
@@ -272,60 +240,60 @@ export default function LoginPage() {
                 <span className="px-2 bg-white text-gray-500">또는</span>
               </div>
             </div>
-            
-            <button
-              type="button"
-              onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/google'}
-              className={`w-full flex items-center justify-center px-4 py-3 border rounded-md shadow-sm text-sm font-medium transition-all ${
-                authMethodHint?.provider === 'google' 
-                  ? 'border-blue-500 bg-blue-50 text-blue-700 hover:bg-blue-100 animate-pulse'
-                  : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
-              }`}
-            >
-              <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
-                <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-                <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-                <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
-                <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
-              </svg>
-              Google로 로그인
-            </button>
-            
-            <button
-              type="button"
-              onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/kakao'}
-              className={`w-full flex items-center justify-center px-4 py-3 border rounded-md shadow-sm text-sm font-medium transition-all ${
-                authMethodHint?.provider === 'kakao'
-                  ? 'border-yellow-600 bg-yellow-500 text-gray-900 hover:bg-yellow-600 animate-pulse'
-                  : 'border-gray-300 text-gray-700 bg-yellow-400 hover:bg-yellow-500'
-              }`}
-            >
-              <span className="mr-2 text-lg">💬</span>
-              카카오로 로그인
-            </button>
+
+            {/* OAuth Buttons */}
+            <div className="space-y-2.5">
+              {/* Google Login */}
+              <button
+                type="button"
+                onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/google'}
+                className="w-full flex items-center justify-center px-5 py-3 bg-white hover:bg-gray-50 rounded-full border border-gray-300 text-sm font-medium text-gray-700 transition-all shadow-sm"
+              >
+                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                구글로 로그인
+              </button>
+
+              {/* Kakao Login */}
+              <button
+                type="button"
+                onClick={() => window.location.href = 'http://localhost:3000/api/v1/auth/kakao'}
+                className="w-full flex items-center justify-center px-5 py-3 bg-[#FEE500] hover:bg-[#FDD835] rounded-full text-sm font-semibold text-black/85 transition-all shadow-sm"
+              >
+                <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24" fill="none">
+                  <path d="M12 3C6.48 3 2 6.32 2 10.5c0 2.66 1.82 5 4.57 6.32l-.72 2.68c-.07.26.18.5.44.37l3.13-1.57c.52.07 1.05.1 1.58.1 5.52 0 10-3.32 10-7.4S17.52 3 12 3z" fill="black"/>
+                </svg>
+                카카오로 로그인
+              </button>
+            </div>
           </div>
 
+
           {/* Links */}
-          <div className="mt-8 text-center space-y-4">
+          <div className="text-center pt-3 border-t">
             <p className="text-sm text-gray-600">
               계정이 없으신가요?{' '}
               <Link 
                 href="/register" 
                 className="text-gray-900 font-medium hover:underline"
-                onClick={(e) => {
-                  // 회원가입 페이지로 이동 시 상태 완전 초기화를 위해 강제 새로고침
-                  if (window.location.pathname === '/register') {
-                    e.preventDefault();
-                    window.location.href = '/register';
-                  }
-                }}
               >
                 회원가입
               </Link>
+              {' / '}
+              <Link 
+                href="/forgot-password" 
+                className="text-gray-900 font-medium hover:underline"
+              >
+                비밀번호 찾기
+              </Link>
             </p>
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
     </div>
   );
-} 
+}

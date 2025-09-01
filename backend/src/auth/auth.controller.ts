@@ -501,6 +501,91 @@ export class AuthController {
     });
   }
 
+  @Post('forgot-password')
+  @Public()
+  @ApiOperation({ summary: '비밀번호 재설정 요청' })
+  @ApiResponse({ status: 200, description: '재설정 이메일 발송 성공' })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  async forgotPassword(
+    @Body() dto: { email: string },
+    @Request() req,
+    @Response() res
+  ) {
+    try {
+      const ipAddress = req.ip || req.connection.remoteAddress;
+      const userAgent = req.headers['user-agent'];
+      
+      await this.authService.forgotPassword(dto.email, ipAddress, userAgent);
+      
+      // 보안: 계정 존재 여부와 관계없이 동일한 응답
+      return res.json({
+        success: true,
+        message: '이메일이 등록되어 있다면 비밀번호 재설정 링크가 발송됩니다.'
+      });
+    } catch (error) {
+      if (error.message?.includes('소셜 로그인')) {
+        return res.status(400).json({
+          success: false,
+          message: error.message
+        });
+      }
+      
+      // 다른 에러도 보안상 동일한 메시지
+      return res.json({
+        success: true,
+        message: '이메일이 등록되어 있다면 비밀번호 재설정 링크가 발송됩니다.'
+      });
+    }
+  }
+
+  @Post('validate-reset-token')
+  @Public()
+  @ApiOperation({ summary: '비밀번호 재설정 토큰 검증' })
+  @ApiResponse({ status: 200, description: '토큰 유효' })
+  @ApiResponse({ status: 400, description: '토큰 무효' })
+  async validateResetToken(
+    @Body() dto: { token: string },
+    @Response() res
+  ) {
+    const isValid = await this.authService.validateResetToken(dto.token);
+    
+    if (!isValid) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired token'
+      });
+    }
+    
+    return res.json({
+      success: true,
+      valid: true
+    });
+  }
+
+  @Post('reset-password')
+  @Public()
+  @ApiOperation({ summary: '비밀번호 재설정' })
+  @ApiResponse({ status: 200, description: '비밀번호 재설정 성공' })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  async resetPassword(
+    @Body() dto: { token: string; newPassword: string },
+    @Response() res
+  ) {
+    try {
+      await this.authService.resetPassword(dto.token, dto.newPassword);
+      
+      return res.json({
+        success: true,
+        message: '비밀번호가 성공적으로 변경되었습니다.'
+      });
+    } catch (error) {
+      return res.status(400).json({
+        success: false,
+        message: error.message || '비밀번호 재설정에 실패했습니다.'
+      });
+    }
+  }
+
   @Delete('account')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '계정 탈퇴' })

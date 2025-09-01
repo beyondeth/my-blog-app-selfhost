@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcrypt';
 import { User, AuthProvider } from './entities/user.entity';
 import { Role } from '../common/enums/role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -42,7 +43,7 @@ export class UsersService {
   async findOne(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({ 
       where: { id },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive', 'bio']
+      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive', 'bio', 'authProvider', 'providerId']
     });
     
     if (!user) {
@@ -212,6 +213,24 @@ export class UsersService {
   // Refresh Token 삭제 (로그아웃시)
   async clearRefreshToken(id: string): Promise<void> {
     await this.usersRepository.update(id, { 
+      refreshToken: null,
+      refreshTokenExpiresAt: null
+    });
+  }
+
+  // 비밀번호 업데이트 (비밀번호 재설정)
+  async updatePassword(userId: number | string, newPassword: string): Promise<void> {
+    const user = await this.findById(String(userId));
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // 비밀번호 해싱
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    
+    await this.usersRepository.update(userId, {
+      password: hashedPassword,
+      // 보안: 비밀번호 변경 시 모든 refresh token 무효화
       refreshToken: null,
       refreshTokenExpiresAt: null
     });

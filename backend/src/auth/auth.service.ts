@@ -7,21 +7,27 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository, LessThan, MoreThan, Not } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { BlogsService } from '../blogs/blogs.service';
 import { EmailService } from '../email/email.service';
 import { User, AuthProvider } from '../users/entities/user.entity';
+import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { AuthResponse } from './interfaces/auth-response.interface';
 import * as crypto from 'crypto';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
 
   constructor(
+    @InjectRepository(PasswordResetToken)
+    private readonly passwordResetTokenRepository: Repository<PasswordResetToken>,
     private readonly usersService: UsersService,
     private readonly blogsService: BlogsService,
     private readonly emailService: EmailService,
@@ -134,22 +140,26 @@ export class AuthService {
             // ✅ OAuth 로그인은 이메일 검증을 보장하므로 자동 병합
             // Google/Kakao OAuth는 이미 이메일 소유권을 확인했음
             
-            // 기존 계정에 OAuth 정보 추가 및 이메일 검증 처리
-            existingUser.providerId = profile.id;
-            existingUser.authProvider = provider;
+            // 명시적으로 업데이트할 필드만 전달
+            const updateData: any = {
+              providerId: profile.id,
+              authProvider: provider,
+              isEmailVerified: true
+            };
             
             // OAuth 로그인 시 이메일을 자동으로 검증 처리
             if (!existingUser.isEmailVerified) {
-              existingUser.isEmailVerified = true;
               this.logger.log(`Email automatically verified through OAuth ${provider} for: ${email}`);
             }
             
             // 프로필 이미지가 없다면 OAuth에서 가져온 것으로 업데이트
             if (!existingUser.profileImage && profile.photos?.[0]?.value) {
-              existingUser.profileImage = profile.photos[0].value;
+              updateData.profileImage = profile.photos[0].value;
             }
             
-            user = await this.usersService.update(existingUser.id, existingUser);
+            user = await this.usersService.update(existingUser.id, updateData);
+            
+            this.logger.log(`OAuth account merged - authProvider updated from ${existingUser.authProvider} to ${provider} for: ${email}`);
             
             // 블로그가 없으면 자동 생성
             const userBlogs = await this.blogsService.findByUserId(user.id);
@@ -438,5 +448,122 @@ export class AuthService {
       // 블로그 생성 실패는 회원가입을 막지 않음 (로그만 남김)
       this.logger.error(`Failed to create blog for user ${user.email}:`, error.message);
     }
+  }
+
+  // Password Reset Methods
+  async forgotPassword(email: string, ipAddress?: string, userAgent?: string): Promise<void> {
+    const user = await this.usersService.findByEmail(email);
+    
+    // Security: Don't reveal if email exists
+    if (!user) {
+      this.logger.log(`Password reset attempted for non-existent email: ${email}`);
+      return;
+    }
+
+    // Check if OAuth user
+    if (user.authProvider !== AuthProvider.LOCAL) {
+      this.logger.log(`Password reset attempted for OAuth user: ${email}`);
+      throw new BadRequestException('소셜 로그인 계정은 비밀번호 재설정이 필요하지 않습니다');
+    }
+
+    // Clean up expired tokens
+    await this.passwordResetTokenRepository.delete({
+      userId: user.id,
+      expiresAt: LessThan(new Date()),
+    });
+
+    // Check for recent requests (rate limiting)
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentToken = await this.passwordResetTokenRepository.findOne({
+      where: {
+        userId: user.id,
+        createdAt: MoreThan(fiveMinutesAgo), // Fixed: MoreThan to check recent tokens
+      },
+    });
+
+    if (recentToken) {
+      this.logger.warn(`Too many password reset requests for user: ${email}`);
+      return; // Silently ignore to prevent email bombing
+    }
+
+    // Generate secure token
+    const token = uuidv4();
+    const hashedToken = crypto
+      .createHmac('sha256', this.configService.get('JWT_SECRET'))
+      .update(token)
+      .digest('hex');
+
+    // Save token with 15 minutes expiry
+    const resetToken = this.passwordResetTokenRepository.create({
+      token: hashedToken,
+      userId: user.id,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000), // 15 minutes
+      ipAddress,
+      userAgent,
+    });
+
+    await this.passwordResetTokenRepository.save(resetToken);
+
+    // Send email (implementation in EmailService)
+    const resetUrl = `${this.configService.get('FRONTEND_URL')}/reset-password?token=${token}`;
+    await this.emailService.sendPasswordResetEmail(user.email, user.username, resetUrl);
+
+    this.logger.log(`Password reset email sent to: ${email}`);
+  }
+
+  async validateResetToken(token: string): Promise<boolean> {
+    const hashedToken = crypto
+      .createHmac('sha256', this.configService.get('JWT_SECRET'))
+      .update(token)
+      .digest('hex');
+
+    const resetToken = await this.passwordResetTokenRepository.findOne({
+      where: {
+        token: hashedToken,
+        used: false,
+        expiresAt: MoreThan(new Date()), // Fixed: MoreThan instead of LessThan
+      },
+    });
+
+    return !!resetToken;
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const hashedToken = crypto
+      .createHmac('sha256', this.configService.get('JWT_SECRET'))
+      .update(token)
+      .digest('hex');
+
+    const resetToken = await this.passwordResetTokenRepository.findOne({
+      where: {
+        token: hashedToken,
+        used: false,
+      },
+      relations: ['user'],
+    });
+
+    if (!resetToken) {
+      throw new BadRequestException('Invalid or expired reset token');
+    }
+
+    if (resetToken.expiresAt < new Date()) {
+      throw new BadRequestException('Reset token has expired');
+    }
+
+    // Update password
+    await this.usersService.updatePassword(resetToken.userId, newPassword);
+
+    // Mark token as used
+    resetToken.used = true;
+    resetToken.usedAt = new Date();
+    await this.passwordResetTokenRepository.save(resetToken);
+
+    // Clear all other tokens for this user
+    await this.passwordResetTokenRepository.delete({
+      userId: resetToken.userId,
+      id: resetToken.id, // Exclude current token
+    });
+
+    this.logger.log(`Password reset successful for user: ${resetToken.user.email}`);
   }
 } 

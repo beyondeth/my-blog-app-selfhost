@@ -561,6 +561,64 @@ class ApiClient {
     });
   }
 
+  // Blogs API
+  async getBlogs(params?: { 
+    page?: number; 
+    limit?: number; 
+    search?: string; 
+  }): Promise<PaginatedResponse<any>> {
+    return this.request<PaginatedResponse<any>>({
+      method: 'GET',
+      url: '/blogs',
+      params,
+    });
+  }
+
+  async createBlog(data: { 
+    name: string; 
+    slug: string; 
+    description?: string; 
+  }): Promise<any> {
+    return this.request<any>({
+      method: 'POST',
+      url: '/blogs',
+      data,
+    });
+  }
+
+  async getMyBlogs(): Promise<any[]> {
+    return this.request<any[]>({
+      method: 'GET',
+      url: '/blogs/my-blogs',
+    });
+  }
+
+  async getBlogBySlug(slug: string): Promise<any> {
+    return this.request<any>({
+      method: 'GET',
+      url: `/blogs/slug/${slug}`,
+    });
+  }
+
+  async updateBlog(id: string, data: Partial<{ 
+    name: string; 
+    slug: string; 
+    description?: string; 
+  }>): Promise<any> {
+    return this.request<any>({
+      method: 'PATCH',
+      url: `/blogs/${id}`,
+      data,
+    });
+  }
+
+  async deleteBlog(id: string): Promise<void> {
+    return this.request<void>({
+      method: 'DELETE',
+      url: `/blogs/${id}`,
+    });
+  }
+
   // OAuth methods
   googleAuth(): void {
     if (typeof window !== 'undefined') {
@@ -596,7 +654,7 @@ export const login = (...args: Parameters<typeof apiClient.login>) => apiClient.
 export const register = (...args: Parameters<typeof apiClient.register>) => apiClient.register(...args);
 export const logout = (...args: Parameters<typeof apiClient.logout>) => apiClient.logout(...args);
 export const getProfile = (...args: Parameters<typeof apiClient.getProfile>) => apiClient.getProfile(...args);
-export const refreshAuthToken = (...args: Parameters<typeof apiClient.refreshToken>) => apiClient.refreshToken(...args);
+// refreshToken is private and should not be exported
 export const getPosts = (...args: Parameters<typeof apiClient.getPosts>) => apiClient.getPosts(...args);
 export const getPost = (...args: Parameters<typeof apiClient.getPost>) => apiClient.getPost(...args);
 export const getPostBySlug = (...args: Parameters<typeof apiClient.getPostBySlug>) => apiClient.getPostBySlug(...args);

@@ -104,6 +104,19 @@ if (!response.ok) {
 }
 ```
 
+### UI 색상 가이드라인
+```css
+/* ❌ 사용 금지 */
+.amber-* / .orange-* / bg-amber-* / text-amber-*
+
+/* ✅ 권장 색상 */
+- Primary: bg-black, hover:bg-gray-800
+- Secondary: bg-gray-*, border-gray-*
+- Success: bg-green-*, text-green-*
+- Error: bg-red-*, text-red-*
+- Disabled: disabled:opacity-50 disabled:cursor-not-allowed
+```
+
 ---
 
 ## 🔒 Vibe Coding Security Guidelines
@@ -185,6 +198,32 @@ if (!response.ok) {
 - Slug 중복 확인
 - 필수 필드 확인 (name, slug)
 
+### 4. 비공개 블로그 접근 문제
+- **문제**: 블로그 소유자도 자신의 비공개 블로그에 접근 불가
+- **해결**: 
+  - Backend: `@UseGuards(OptionalJwtAuthGuard)` 적용
+  - Frontend: `credentials: 'include'` 추가
+  - 소유자 확인: `String(user.id) === String(blog.userId)`
+
+### 5. API 키 시간대 문제 (9시간 차이)
+- **문제**: 방금 생성한 API 키가 "9시간 전"으로 표시
+- **원인**: 서버가 UTC로 저장, 클라이언트가 KST로 표시
+- **해결**:
+  1. `TimezoneInterceptor` 생성 및 적용
+  2. `process.env.TZ = 'Asia/Seoul'` 설정
+  3. Entity에 `timestamptz` 타입 사용
+
+### 6. 댓글 섹션 깜빡임 문제
+- **문제**: 댓글 비활성화된 포스트에서 댓글 섹션이 잠깐 보였다가 사라짐
+- **해결**: 조건문 수정
+  ```javascript
+  // ❌ 잘못된 조건
+  {blog?.allowComments !== false && ...}
+  
+  // ✅ 올바른 조건  
+  {blog && blog.allowComments === true && ...}
+  ```
+
 ---
 
 ## 🚀 개발 서버 실행
@@ -207,25 +246,67 @@ pnpm dev
 
 ---
 
-## 📅 최근 작업 내역 (2025-08-22)
+## 📅 최근 작업 내역 (2025-09-01)
 
-### Admin Dashboard UI 개선
-1. **통계 카드 정렬 개선**
-   - 전체 신고 카드: "처리완료 / 전체" 형식으로 변경
-   - 처리 완료 퍼센트 표시 (초록색)
-   - 모든 카드의 검색창 위치 통일
-   - 검색창과 퍼센트 사이 여백 증가 (mt-3)
+### 🔐 Private 블로그 접근 권한 개선
+1. **OptionalJwtAuthGuard 패턴**
+   ```typescript
+   // blogs.controller.ts
+   @Get('slug/:slug')
+   @Public()
+   @UseGuards(OptionalJwtAuthGuard)  // 인증 선택적 적용
+   async findOneBySlug(@Param('slug') slug: string, @CurrentUser() user?: User) {
+     // 비공개 블로그도 소유자는 접근 가능
+   }
+   ```
+   - 공개 엔드포인트에서도 인증 정보 활용 가능
+   - 비공개 블로그 소유자 확인: `String(user.id) === String(blog.userId)`
 
-2. **차트 개선**
-   - 주간 동향: 범례를 좌측 상단으로 이동, 툴바와 겹침 해결
-   - 사용자 분포: 3D 효과 추가 (그라데이션, 드롭쉐도우, 중앙에 실제 전체 사용자 수 표시)
-   - 성능 메트릭: 사용자 활성도 표시 (DAU/MAU 비율)
+2. **프론트엔드 인증 쿠키 전달**
+   ```javascript
+   // 반드시 credentials: 'include' 추가
+   fetch(`${API_URL}/blogs/slug/${slug}`, {
+     credentials: 'include'  // 중요!
+   });
+   ```
 
-3. **UI 디테일**
-   - Admin Panel 아이콘: Shield에 fill-indigo-200 + shimmer 애니메이션 추가
-   - 인기 포스트 카드: 고정 높이(h-32) + flexbox로 하단 정보 고정
-   - 사이드바 타이틀: "관리자 패널" → "Admin Panel"로 변경
+### ⏰ API 키 시간대 문제 해결
+1. **TimezoneInterceptor 구현**
+   - UTC → KST 자동 변환 (+9시간)
+   - `createdAt`, `updatedAt` 등 날짜 필드 자동 처리
+   - Controller에 `@UseInterceptors(TimezoneInterceptor)` 적용
 
-4. **데이터 검증**
-   - DAU/MAU: lastLoginAt 필드 기반으로 정확히 계산
-   - 통계 정확성: 포스트/사용자 평균 9.4, 댓글/포스트 평균 0.6 확인
+2. **서버 타임존 설정**
+   ```typescript
+   // main.ts
+   process.env.TZ = 'Asia/Seoul';
+   ```
+
+3. **Entity 타임스탬프 타입**
+   ```typescript
+   @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
+   createdAt: Date;
+   ```
+
+### 🔑 API 키 관리 개선
+- **개수 제한**: 사용자당 최대 3개
+- **UI 단순화**: 설명 필드 제거, 이름만 필수
+- **로딩 상태**: 생성 중 버튼 비활성화 및 스피너 표시
+- **시간 표시**: 24시간 이내는 상대 시간, 이후는 절대 시간
+
+### 🎨 UI/UX 표준화
+1. **색상 체계 변경**
+   - ❌ Amber/Orange 색상 사용 금지
+   - ✅ Black/Gray 색상 체계 사용
+   - 버튼: `bg-black hover:bg-gray-800`
+   - 비활성화: `disabled:opacity-50`
+
+2. **컴포넌트 표준**
+   - 알림 아이콘: `h-6 w-6` (기존 h-5 w-5에서 변경)
+   - 툴팁: Followers만 표시 (Following 제거)
+   - 댓글 섹션: `blog && blog.allowComments === true` 조건 사용
+
+### 🌐 RDS 연결 상태
+- **호스트**: `myblog.cqbcg2aqsrdx.us-east-1.rds.amazonaws.com`
+- **데이터베이스**: `blog-db`
+- **마이그레이션**: 최신 상태 (AddBlogPublicFields1756641791150)

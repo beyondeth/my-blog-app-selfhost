@@ -14,11 +14,9 @@ import LoadMoreSection from '@/components/posts/LoadMoreSection';
 import SearchSection from '@/components/layout/SearchSection';
 import RecentPostsSection from '@/components/layout/RecentPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
-import ProfileSection from '@/components/layout/ProfileSection';
+import BlogOwnerCard from '@/components/layout/BlogOwnerCard';
 import BlogRecommendations from '@/components/layout/BlogRecommendations';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
-import FollowButton from '@/components/FollowButton';
-import useFollowInfo from '@/hooks/useFollowInfo';
 
 // 클라이언트 사이드 체크 훅
 function useIsClient() {
@@ -62,6 +60,7 @@ export default function BlogPage() {
   const [blog, setBlog] = useState<Blog | null>(null);
   const [blogLoading, setBlogLoading] = useState(true);
   const [blogError, setBlogError] = useState<string | null>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
   
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -98,6 +97,24 @@ export default function BlogPage() {
         }
         const data = await response.json();
         setBlog(data);
+        
+        // 블로그 owner의 상세 프로필 정보 가져오기
+        if (data.owner?.id) {
+          try {
+            const profileResponse = await fetch(
+              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${data.owner.id}`,
+              {
+                credentials: 'include'
+              }
+            );
+            if (profileResponse.ok) {
+              const profileData = await profileResponse.json();
+              setUserProfile(profileData);
+            }
+          } catch (error) {
+            console.error('Failed to fetch user profile:', error);
+          }
+        }
       } catch (error) {
         setBlogError('블로그 정보를 불러오는데 실패했습니다.');
       } finally {
@@ -248,51 +265,6 @@ export default function BlogPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
-      {/* Blog Header Section */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">
-          {blog.name}
-        </h1>
-        {blog.description && (
-          <p className="text-gray-600 mb-2">
-            {blog.description}
-          </p>
-        )}
-        {blog.owner && (
-          <p className="text-sm text-gray-500 mb-4">
-            by {blog.owner.username || blog.owner.email}
-          </p>
-        )}
-        
-        {/* Follow button and Write button */}
-        <div className="flex items-center gap-2">
-          {/* Follow button for non-owners */}
-          {blog.owner && !isBlogOwner && isAuthenticated && (
-            <FollowButton
-              userId={blog.owner.id}
-              initialState={{
-                followersCount: 0,
-                followingCount: 0,
-                isFollowedByUser: false,
-              }}
-            />
-          )}
-          
-          {/* Write button for blog owner */}
-          {isBlogOwner && (
-            <button
-              onClick={() => router.push(`/blog/${blogSlug}/posts/new`)}
-              className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-black hover:bg-gray-800 rounded-md transition-colors"
-            >
-              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              새 글 작성
-            </button>
-          )}
-        </div>
-      </div>
-      
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
           {/* Main Content Area */}
           <main className="flex-1 lg:max-w-[calc(100%-380px)] min-w-0">
@@ -339,6 +311,16 @@ export default function BlogPage() {
 
           {/* Sidebar */}
           <aside className="w-full lg:w-80 lg:min-w-[320px] space-y-4 sm:space-y-6">
+            {/* Blog Owner Card at the top */}
+            <BlogOwnerCard
+              name={blog.owner?.username || blog.owner?.email || blog.name}
+              username={blog.owner?.username}
+              description={userProfile?.bio || blog.description}
+              profileImage={userProfile?.profileImage || blog.thumbnailUrl}
+              userId={blog.owner?.id}
+              isOwner={isBlogOwner}
+            />
+            
             <SearchSection
               searchQuery={searchQuery}
               onSearchQueryChange={setSearchQuery}
@@ -348,14 +330,6 @@ export default function BlogPage() {
             <RecentPostsSection posts={recentPosts} />
             
             <TagsSection tags={tags} />
-            
-            <ProfileSection 
-              name={blog.owner?.username || blog.owner?.email || blog.name}
-              description={blog.description}
-              profileImage={blog.thumbnailUrl}
-              userId={blog.owner?.id}
-              isOwner={isBlogOwner}
-            />
             
             <BlogRecommendations />
           </aside>
