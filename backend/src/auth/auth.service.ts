@@ -12,7 +12,9 @@ import { Repository, LessThan, MoreThan, Not } from 'typeorm';
 import { UsersService } from '../users/users.service';
 import { BlogsService } from '../blogs/blogs.service';
 import { EmailService } from '../email/email.service';
+import { IdentityService } from '../users/services/identity.service';
 import { User, AuthProvider } from '../users/entities/user.entity';
+import { IdentityProvider } from '../users/entities/user-identity.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -31,6 +33,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly blogsService: BlogsService,
     private readonly emailService: EmailService,
+    private readonly identityService: IdentityService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
   ) {}
@@ -117,117 +120,135 @@ export class AuthService {
 
   async validateOAuthUser(profile: any, provider: AuthProvider): Promise<AuthResponse> {
     try {
-      let user = await this.usersService.findByProviderId(profile.id, provider);
+      const identityProvider = provider as unknown as IdentityProvider;
+      const email = profile.email || profile.emails?.[0]?.value;
+      
+      // OAuth에서 이메일을 반드시 가져와야 함
+      if (!email) {
+        this.logger.error(`OAuth ${provider} failed to get email from profile`);
+        throw new BadRequestException(
+          `${provider} 계정에서 이메일을 가져올 수 없습니다. ` +
+          `${provider} 계정 설정에서 이메일 공개를 허용해주세요.`
+        );
+      }
 
-      if (!user) {
-        // 이메일로 기존 사용자 확인
-        const email = profile.emails?.[0]?.value;
-        
-        // OAuth에서 이메일을 반드시 가져와야 함
-        if (!email) {
-          this.logger.error(`OAuth ${provider} failed to get email from profile`);
-          throw new BadRequestException(
-            `${provider} 계정에서 이메일을 가져올 수 없습니다. ` +
-            `${provider} 계정 설정에서 이메일 공개를 허용해주세요.`
-          );
-        }
-        
-        this.logger.log(`OAuth ${provider} email from profile:`, email);
-        
-        const existingUser = await this.usersService.findByEmail(email);
-          
-          if (existingUser) {
-            // ✅ OAuth 로그인은 이메일 검증을 보장하므로 자동 병합
-            // Google/Kakao OAuth는 이미 이메일 소유권을 확인했음
-            
-            // 명시적으로 업데이트할 필드만 전달
-            const updateData: any = {
-              providerId: profile.id,
-              authProvider: provider,
-              isEmailVerified: true
-            };
-            
-            // OAuth 로그인 시 이메일을 자동으로 검증 처리
-            if (!existingUser.isEmailVerified) {
-              this.logger.log(`Email automatically verified through OAuth ${provider} for: ${email}`);
-            }
-            
-            // 프로필 이미지가 없다면 OAuth에서 가져온 것으로 업데이트
-            if (!existingUser.profileImage && profile.photos?.[0]?.value) {
-              updateData.profileImage = profile.photos[0].value;
-            }
-            
-            user = await this.usersService.update(existingUser.id, updateData);
-            
-            this.logger.log(`OAuth account merged - authProvider updated from ${existingUser.authProvider} to ${provider} for: ${email}`);
-            
-            // 블로그가 없으면 자동 생성
-            const userBlogs = await this.blogsService.findByUserId(user.id);
-            if (!userBlogs || userBlogs.length === 0) {
-              await this.createUserBlog(user);
-              this.logger.log(`Blog automatically created for existing user during OAuth link: ${email}`);
-            }
-            
-            // 계정 병합 알림 이메일 (선택적)
-            try {
-              await this.emailService.sendAccountLinkNotification(
-                email,
-                `${provider} 로그인이 계정에 연결되었습니다.`
-              );
-            } catch (emailError) {
-              // 이메일 실패는 무시하고 계속 진행
-              this.logger.warn(`Failed to send account link notification: ${emailError.message}`);
-            }
-            
-            this.logger.log(`OAuth ${provider} linked to existing account: ${email}`);
-            
-            // 마지막 로그인 시간 업데이트
-            await this.usersService.updateLastLogin(user.id);
-            return this.generateTokenResponse(user);
-          }
+      // 1. Provider ID로 기존 identity 찾기
+      const existingIdentity = await this.identityService.findByProviderId(
+        profile.id,
+        identityProvider
+      );
 
-        // 새 사용자 생성 (이메일은 이미 위에서 검증됨)
-        const userData = {
-          email: email, // email은 반드시 존재함
-          username: this.generateUsernameFromEmail(email),
-          profileImage: profile.photos?.[0]?.value,
-          authProvider: provider,
-          providerId: profile.id,
-          isEmailVerified: true,
-        };
-
-        user = await this.usersService.create(userData);
+      if (existingIdentity) {
+        // 기존 identity로 로그인
+        this.logger.log(`Existing ${provider} identity found for user ${existingIdentity.userId}`);
         
-        // 자동으로 블로그 생성
-        await this.createUserBlog(user);
+        await this.identityService.updateLastUsed(existingIdentity.id);
+        const user = await this.usersService.findById(existingIdentity.userId);
         
-        this.logger.log(`New OAuth user created with blog: ${user.email} via ${provider}`);
-      } else {
-        // 기존 OAuth 사용자 - 이메일이 providerId로 생성된 임시 이메일인 경우에만 업데이트
-        const email = profile.emails?.[0]?.value;
-        
-        // providerId@provider.com 형식의 임시 이메일인지 확인
-        const isTempEmail = user.email === `${profile.id}@${provider}.com`;
-        
-        if (email && isTempEmail) {
-          // 임시 이메일을 실제 이메일로 업데이트
-          this.logger.log(`Updating temporary email ${user.email} to ${email}`);
-          user.email = email;
-          user = await this.usersService.update(user.id, { email });
-        }
-        
-        // 블로그가 없으면 자동 생성 (기존 OAuth 사용자)
+        // 블로그가 없으면 자동 생성
         const userBlogs = await this.blogsService.findByUserId(user.id);
         if (!userBlogs || userBlogs.length === 0) {
           await this.createUserBlog(user);
           this.logger.log(`Blog automatically created for returning OAuth user: ${user.email}`);
         }
         
-        // 마지막 로그인 시간 업데이트
         await this.usersService.updateLastLogin(user.id);
+        return this.generateTokenResponse(user);
       }
 
-      return this.generateTokenResponse(user);
+      // 2. 이메일로 기존 사용자 찾기
+      const existingUser = await this.usersService.findByEmail(email);
+
+      if (existingUser) {
+        // Multi-Identity: 기존 사용자에 새 identity 연결
+        if (existingUser.isEmailVerified || this.identityService.isTrustedProvider(identityProvider)) {
+          // 자동 링킹 가능
+          await this.identityService.linkIdentity(existingUser.id, {
+            provider: identityProvider,
+            providerId: profile.id,
+            email,
+            providerData: {
+              name: profile.displayName || profile.username,
+              picture: profile.profileImage || profile.photos?.[0]?.value,
+              bio: profile.bio,
+            }
+          });
+
+          // 이메일 미인증 사용자는 자동 인증 처리
+          if (!existingUser.isEmailVerified) {
+            await this.usersService.update(existingUser.id, {
+              isEmailVerified: true,
+              accountVerifiedAt: new Date(),
+            });
+            this.logger.log(`Email automatically verified through ${provider} OAuth for: ${email}`);
+          }
+
+          // 프로필 이미지 업데이트 (없는 경우)
+          if (!existingUser.profileImage && profile.profileImage) {
+            await this.usersService.update(existingUser.id, {
+              profileImage: profile.profileImage,
+            });
+          }
+
+          // 블로그가 없으면 자동 생성
+          const userBlogs = await this.blogsService.findByUserId(existingUser.id);
+          if (!userBlogs || userBlogs.length === 0) {
+            await this.createUserBlog(existingUser);
+            this.logger.log(`Blog automatically created for existing user during OAuth link: ${email}`);
+          }
+
+          // 계정 연결 알림
+          try {
+            await this.emailService.sendAccountLinkNotification(
+              email,
+              `${provider} 계정이 성공적으로 연결되었습니다.`
+            );
+          } catch (emailError) {
+            this.logger.warn(`Failed to send account link notification: ${emailError.message}`);
+          }
+
+          this.logger.log(`${provider} identity linked to existing account: ${email}`);
+          await this.usersService.updateLastLogin(existingUser.id);
+          return this.generateTokenResponse(existingUser);
+        } else {
+          // 수동 링킹 필요
+          throw new ConflictException({
+            code: 'MANUAL_LINK_REQUIRED',
+            message: `이 이메일은 이미 등록되어 있습니다. 기존 방법으로 로그인 후 ${provider} 계정을 연결해주세요.`,
+            existingProvider: existingUser.authProvider || 'email'
+          });
+        }
+      }
+
+      // 3. 새 사용자 생성
+      const newUser = await this.usersService.create({
+        email,
+        username: profile.username || this.generateUsernameFromEmail(email),
+        profileImage: profile.profileImage || profile.photos?.[0]?.value,
+        bio: profile.bio,
+        authProvider: provider,
+        providerId: profile.id,
+        isEmailVerified: true,
+        accountVerifiedAt: new Date(),
+      });
+
+      // Identity 생성
+      await this.identityService.linkIdentity(newUser.id, {
+        provider: identityProvider,
+        providerId: profile.id,
+        email,
+        providerData: {
+          name: profile.displayName || profile.username,
+          picture: profile.profileImage || profile.photos?.[0]?.value,
+          bio: profile.bio,
+        }
+      });
+
+      // 블로그 자동 생성
+      await this.createUserBlog(newUser);
+      
+      this.logger.log(`New OAuth user created with blog: ${newUser.email} via ${provider}`);
+      return this.generateTokenResponse(newUser);
     } catch (error) {
       this.logger.error(`OAuth validation failed for ${provider}:`, error.message);
       throw error;
@@ -430,10 +451,12 @@ export class AuthService {
       
       // slug 중복 확인 및 고유하게 만들기
       let finalSlug = slug;
-      let counter = 1;
       while (!(await this.blogsService.checkSlugAvailability(finalSlug))) {
-        finalSlug = `${slug}-${counter}`;
-        counter++;
+        // 알파벳 랜덤 4자리 생성 (a-z)
+        const randomSuffix = Array.from({ length: 4 }, () => 
+          String.fromCharCode(97 + Math.floor(Math.random() * 26))
+        ).join('');
+        finalSlug = `${slug}-${randomSuffix}`;
       }
       
       // 블로그 생성

@@ -72,4 +72,19 @@ export class CreateUserDto {
   })
   @IsOptional()
   isEmailVerified?: boolean;
+
+  @ApiPropertyOptional({
+    description: 'User bio',
+    example: 'Software developer passionate about web technologies',
+  })
+  @IsOptional()
+  @IsString()
+  bio?: string;
+
+  @ApiPropertyOptional({
+    description: 'Account verification timestamp',
+    example: new Date().toISOString(),
+  })
+  @IsOptional()
+  accountVerifiedAt?: Date;
 } 

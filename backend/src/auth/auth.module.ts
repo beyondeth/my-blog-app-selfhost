@@ -15,6 +15,16 @@ import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { GoogleStrategy } from './strategies/google.strategy';
 import { KakaoStrategy } from './strategies/kakao.strategy';
+import { GitHubStrategy } from './strategies/github.strategy';
+
+const providers: any[] = [
+  AuthService,
+  AuthApiKeyService,
+  JwtStrategy,
+  GoogleStrategy,
+  KakaoStrategy,
+  GitHubStrategy,
+];
 
 @Module({
   imports: [
@@ -33,7 +43,7 @@ import { KakaoStrategy } from './strategies/kakao.strategy';
       inject: [ConfigService],
     }),
   ],
-  providers: [AuthService, AuthApiKeyService, JwtStrategy, GoogleStrategy, KakaoStrategy],
+  providers,
   controllers: [AuthController],
   exports: [AuthService, AuthApiKeyService],
 })

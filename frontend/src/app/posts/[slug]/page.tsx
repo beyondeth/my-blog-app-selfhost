@@ -12,6 +12,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { shareUrl, copyUrlToClipboard } from '@/utils/navigation';
 import LikeButton from '@/components/ui/LikeButton';
 import CommentSection from '@/components/comments/CommentSection';
 import { toast } from 'sonner';

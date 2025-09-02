@@ -19,11 +19,13 @@ import { Role } from '../../common/enums/role.enum';
 import { Follow } from '../../follows/entities/follow.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
+import { UserIdentity } from './user-identity.entity';
 
 export const AuthProvider = {
   LOCAL: 'local',
   GOOGLE: 'google',
   KAKAO: 'kakao',
+  GITHUB: 'github',
 } as const;
 
 export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
@@ -119,6 +121,22 @@ export class User {
 
   @OneToMany(() => Notification, notification => notification.issuer, { lazy: true })
   issuedNotifications: Promise<Notification[]>;
+
+  // Identity relationships for Multi-Identity Architecture
+  @OneToMany(() => UserIdentity, identity => identity.user, { cascade: true })
+  identities: UserIdentity[];
+
+  @Column({ nullable: true })
+  primaryIdentityId: string;
+
+  @Column({ nullable: true, length: 50 })
+  lastLoginProvider: string;
+
+  @Column({ nullable: true })
+  accountVerifiedAt: Date;
+
+  @Column({ nullable: true, length: 20, default: 'basic' })
+  accountSecurityLevel: string;
 
   @BeforeInsert()
   @BeforeUpdate()

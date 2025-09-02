@@ -620,15 +620,30 @@ class ApiClient {
   }
 
   // OAuth methods
+  /**
+   * @deprecated Use useOAuth hook or SocialLoginButton component instead
+   */
   googleAuth(): void {
     if (typeof window !== 'undefined') {
       window.location.href = `${API_BASE_URL}/auth/google`;
     }
   }
 
+  /**
+   * @deprecated Use useOAuth hook or SocialLoginButton component instead
+   */
   kakaoAuth(): void {
     if (typeof window !== 'undefined') {
       window.location.href = `${API_BASE_URL}/auth/kakao`;
+    }
+  }
+
+  /**
+   * @deprecated Use useOAuth hook or SocialLoginButton component instead
+   */
+  githubAuth(): void {
+    if (typeof window !== 'undefined') {
+      window.location.href = `${API_BASE_URL}/auth/github`;
     }
   }
 }

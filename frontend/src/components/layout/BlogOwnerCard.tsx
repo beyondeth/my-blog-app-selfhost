@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import UserAvatar from '@/components/ui/UserAvatar';
 import FollowButton from '@/components/FollowButton';
@@ -30,6 +31,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
   userId,
   isOwner = false
 }: BlogOwnerCardProps) {
+  const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   
   // 팔로우 정보 조회
@@ -116,7 +118,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
         {/* Edit Profile for Owner */}
         {isOwner && (
           <button
-            onClick={() => window.location.href = '/settings'}
+            onClick={() => router.push('/settings')}
             className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors"
           >
             프로필 편집

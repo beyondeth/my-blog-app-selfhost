@@ -1,5 +1,6 @@
 import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthApiKeyService } from './auth-api-key.service';
 import { ApiKeysService } from '../api-keys/api-keys.service';
@@ -10,6 +11,7 @@ import { VerifyCodeDto } from '../email/dto/verify-code.dto';
 import { LocalAuthGuard } from './guards/local-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { KakaoAuthGuard } from './guards/kakao-auth.guard';
+import { GitHubAuthGuard } from './guards/github-auth.guard';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -29,6 +31,7 @@ export class AuthController {
     private readonly apiKeysService: ApiKeysService,
     private readonly emailService: EmailService,
     private readonly userDeletionService: UserDeletionService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Public()
@@ -150,6 +153,47 @@ export class AuthController {
   @UseGuards(KakaoAuthGuard)
   @ApiOperation({ summary: '카카오 로그인 콜백' })
   kakaoAuthRedirect(@Request() req, @Res() res) {
+    // HttpOnly 쿠키로 토큰들 설정
+    res.cookie('access_token', req.user.access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 15 * 60 * 1000, // 15분
+      path: '/',
+    });
+
+    res.cookie('refresh_token', req.user.refresh_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+      path: '/',
+    });
+
+    // 프론트엔드로 리다이렉트 (토큰 없이)
+    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
+  }
+
+  @Public()
+  @Get('github')
+  @UseGuards(GitHubAuthGuard)
+  @ApiOperation({ summary: 'GitHub 로그인' })
+  async githubAuth() {
+    // GitHub OAuth redirect will be handled by Passport
+  }
+
+  @Public()
+  @Get('github/callback')
+  @UseGuards(GitHubAuthGuard)
+  @ApiOperation({ summary: 'GitHub 로그인 콜백' })
+  async githubAuthRedirect(@Request() req, @Res() res) {
+    if (!req.user) {
+      return res.status(401).json({
+        statusCode: 401,
+        message: 'GitHub authentication failed',
+      });
+    }
+
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie('access_token', req.user.access_token, {
       httpOnly: true,

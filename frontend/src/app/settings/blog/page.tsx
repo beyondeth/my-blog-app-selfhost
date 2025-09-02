@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useUserBlog } from '@/hooks/useUserBlog';
 import { useRouter } from 'next/navigation';
-import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiEdit3, FiCopy } from 'react-icons/fi';
+import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiSettings, FiCopy } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Blog } from '@/types';
@@ -108,7 +108,7 @@ export default function BlogSettingsPage() {
     return (
       <div className="p-8">
         <div className="text-center py-8">
-          <FiEdit3 className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <FiSettings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 mb-2">블로그가 없습니다</h3>
           <p className="text-sm text-gray-600 mb-4">
             블로그를 찾을 수 없습니다. 새로고침을 시도해보세요.
