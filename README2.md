@@ -347,3 +347,5 @@ pnpm start
 4. 네트워크 탭에서 API 요청 확인 
 
 cd frontend && pnpm add @tiptap/react @tiptap/starter-kit @tiptap/extension-image @tiptap/extension-link @tiptap/extension-text-style @tiptap/extension-color @tiptap/extension-placeholder
+
+임시 파일 저장 로직

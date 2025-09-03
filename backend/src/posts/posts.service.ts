@@ -1,12 +1,13 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In, SelectQueryBuilder, MoreThan } from 'typeorm';
+import { Repository, Like, In, SelectQueryBuilder, MoreThan, DataSource, EntityManager } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { User } from '../users/entities/user.entity';
 import { File } from '../files/entities/file.entity';
 import { Blog } from '../blogs/entities/blog.entity';
 import { Role } from '../common/enums/role.enum';
 import { CreatePostDto } from './dto/create-post.dto';
+import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { FilesService } from '../files/files.service';
 import { formatDate, extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
@@ -25,7 +26,148 @@ export class PostsService {
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
     private markdownRenderer: MarkdownRendererService,
+    private dataSource: DataSource,
   ) {}
+
+  /**
+   * 게시글 썸네일 설정/제거
+   */
+  async setThumbnail(postId: string, userId: string, setThumbnailDto: SetThumbnailDto) {
+    const { thumbnailFileId } = setThumbnailDto;
+
+    try {
+      // 게시글 소유권 확인
+      const post = await this.postsRepository.findOne({
+        where: { id: postId, authorId: userId },
+        relations: ['thumbnailImage'],
+      });
+
+      if (!post) {
+        throw new NotFoundException('게시글을 찾을 수 없거나 권한이 없습니다.');
+      }
+
+      // 썸네일 제거
+      if (!thumbnailFileId || thumbnailFileId === null) {
+        post.thumbnailImageId = null;
+        await this.postsRepository.save(post);
+        
+        this.logger.log(`Thumbnail removed for post ${postId}`);
+        return {
+          message: '썸네일이 제거되었습니다.',
+          postId,
+          thumbnailImageId: null,
+        };
+      }
+
+      // 썸네일 파일 존재 및 소유권 확인
+      const thumbnailFile = await this.filesRepository.findOne({
+        where: { id: thumbnailFileId, userId },
+      });
+
+      if (!thumbnailFile) {
+        throw new NotFoundException('썸네일 파일을 찾을 수 없거나 권한이 없습니다.');
+      }
+
+      // 이미지 파일인지 확인
+      if (!thumbnailFile.mimeType.startsWith('image/')) {
+        throw new BadRequestException('썸네일은 이미지 파일만 설정할 수 있습니다.');
+      }
+
+      // 썸네일 설정
+      post.thumbnailImageId = thumbnailFileId;
+      await this.postsRepository.save(post);
+
+      this.logger.log(`Thumbnail set for post ${postId}, file: ${thumbnailFileId}`);
+      
+      return {
+        message: '썸네일이 설정되었습니다.',
+        postId,
+        thumbnailImageId: thumbnailFileId,
+        thumbnailFile: {
+          id: thumbnailFile.id,
+          fileName: thumbnailFile.fileName,
+          fileKey: thumbnailFile.fileKey,
+          mimeType: thumbnailFile.mimeType,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to set thumbnail: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * 게시글의 이미지 목록 조회 (순서 포함)
+   */
+  async getPostImages(postId: string) {
+    try {
+      // 게시글이 존재하는지 확인
+      const post = await this.postsRepository.findOne({ where: { id: postId } });
+      if (!post) {
+        throw new NotFoundException('게시글을 찾을 수 없습니다.');
+      }
+
+      // 게시글에 연결된 이미지 파일들을 순서대로 조회
+      const images = await this.filesRepository
+        .createQueryBuilder('file')
+        .innerJoin('post_files', 'pf', 'pf."fileId" = file.id')
+        .where('pf."postId" = :postId', { postId })
+        .andWhere('file.mimeType LIKE :imageType', { imageType: 'image/%' })
+        .select([
+          'file.id',
+          'file.fileName', 
+          'file.originalName',
+          'file.fileKey',
+          'file.mimeType',
+          'file.fileSize',
+          'file.createdAt',
+          'pf.image_order as imageOrder',
+        ])
+        .orderBy('COALESCE(pf.image_order, 999)', 'ASC') // 순서가 없는 경우 마지막에 배치
+        .addOrderBy('pf.created_at', 'ASC') // 동일 순서인 경우 생성 순서
+        .getRawMany();
+
+      // 각 이미지에 대해 액세스 URL 생성
+      const imagesWithUrls = await Promise.all(
+        images.map(async (image) => {
+          try {
+            const accessUrl = await this.filesService.getDownloadUrl(image.file_id);
+            return {
+              id: image.file_id,
+              fileName: image.file_fileName,
+              originalName: image.file_originalName,
+              fileKey: image.file_fileKey,
+              mimeType: image.file_mimeType,
+              fileSize: image.file_fileSize,
+              imageOrder: image.imageorder || null,
+              accessUrl,
+              createdAt: image.file_createdAt,
+            };
+          } catch (error) {
+            this.logger.warn(`Failed to generate access URL for image ${image.file_id}: ${error.message}`);
+            return {
+              id: image.file_id,
+              fileName: image.file_fileName,
+              originalName: image.file_originalName,
+              fileKey: image.file_fileKey,
+              mimeType: image.file_mimeType,
+              fileSize: image.file_fileSize,
+              imageOrder: image.imageorder || null,
+              accessUrl: null,
+              createdAt: image.file_createdAt,
+            };
+          }
+        })
+      );
+
+      this.logger.log(`Retrieved ${imagesWithUrls.length} images for post ${postId}`);
+      
+      return imagesWithUrls;
+    } catch (error) {
+      this.logger.error(`Failed to get post images: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 
   async create(createPostDto: CreatePostDto, user: User): Promise<any> {
     // 사용자의 블로그를 찾음 (한 사용자당 하나의 블로그)
@@ -374,7 +516,16 @@ export class PostsService {
       throw new ForbiddenException('You can only delete your own posts');
     }
 
+    // post_tags는 CASCADE가 없으므로 먼저 삭제
+    await this.dataSource.query(
+      'DELETE FROM post_tags WHERE post_id = $1',
+      [id]
+    );
+
+    // 포스트 삭제 (CASCADE로 나머지 관련 데이터 자동 삭제)
     await this.postsRepository.remove(post);
+    
+    this.logger.log(`Post ${id} and all related data successfully deleted`);
   }
 
   // 관리자용 메소드들

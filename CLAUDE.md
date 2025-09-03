@@ -310,3 +310,278 @@ pnpm dev
 - **호스트**: `myblog.cqbcg2aqsrdx.us-east-1.rds.amazonaws.com`
 - **데이터베이스**: `blog-db`
 - **마이그레이션**: 최신 상태 (AddBlogPublicFields1756641791150)
+
+---
+
+## 🏛️ 프로젝트 아키텍처 원칙
+
+### 📱 Frontend 설계 원칙
+
+#### 1. **OCP (Open-Closed Principle) 준수**
+```typescript
+// ❌ 나쁜 예: 기존 컴포넌트를 계속 수정
+function Button({ type, onClick, children }) {
+  if (type === 'primary') { /* ... */ }
+  if (type === 'secondary') { /* ... */ }
+  if (type === 'danger') { /* 새로 추가... */ } // OCP 위반
+}
+
+// ✅ 좋은 예: 확장 가능한 구조
+const ButtonVariants = {
+  primary: PrimaryButton,
+  secondary: SecondaryButton,
+  danger: DangerButton, // 새 컴포넌트 추가만으로 확장
+};
+```
+
+#### 2. **Container/Presentational 컴포넌트 분리**
+```typescript
+// 📦 Container Component (로직 담당)
+// containers/PostListContainer.tsx
+export function PostListContainer() {
+  const { data, isLoading } = useQuery(['posts']);
+  const handleDelete = useMutation(deletePost);
+  
+  return <PostList posts={data} onDelete={handleDelete} loading={isLoading} />;
+}
+
+// 🎨 Presentational Component (UI만 담당)
+// components/PostList.tsx
+export function PostList({ posts, onDelete, loading }) {
+  if (loading) return <Spinner />;
+  return posts.map(post => <PostCard key={post.id} {...post} />);
+}
+```
+
+#### 3. **상태 관리 규칙**
+- **데이터 패칭**: 반드시 `@tanstack/react-query` 사용
+- **전역 상태**: Zustand 사용 (Redux 금지)
+- **로컬 상태**: useState 최소화, useReducer 복잡한 상태
+- **Side Effects**: useEffect 최소화, 커스텀 훅으로 추상화
+
+#### 4. **페이지 컴포넌트 역할 제한**
+```typescript
+// app/blog/[slug]/page.tsx
+export default function BlogPage({ params }) {
+  // 페이지는 오직 레이아웃과 컴포넌트 조합만!
+  return (
+    <Layout>
+      <BlogHeaderContainer slug={params.slug} />
+      <PostListContainer blogSlug={params.slug} />
+    </Layout>
+  );
+  // 비즈니스 로직 금지!
+}
+```
+
+#### 5. **공용 함수 체계**
+```typescript
+// services/api/blog.service.ts
+/**
+ * 블로그 관련 API 서비스
+ * @description 모든 블로그 CRUD 작업 처리
+ */
+export const blogService = {
+  /**
+   * 블로그 목록 조회
+   * @param page - 페이지 번호
+   * @returns 블로그 목록과 페이지네이션 정보
+   */
+  async getBlogs(page = 1) { /* ... */ },
+  
+  async createBlog(data: CreateBlogDto) { /* ... */ },
+  async updateBlog(id: string, data: UpdateBlogDto) { /* ... */ },
+};
+```
+
+#### 6. **폴더 구조 표준**
+```
+src/
+├── app/                    # Next.js App Router (페이지만)
+├── components/             
+│   ├── ui/                # 재사용 가능한 Presentational 컴포넌트
+│   ├── layout/            # 레이아웃 컴포넌트
+│   └── features/          # 도메인별 컴포넌트
+├── containers/            # Container 컴포넌트 (로직)
+├── hooks/                 # 커스텀 훅
+├── services/              # API 서비스 레이어
+│   ├── api/              # API 호출 함수
+│   └── utils/            # 유틸리티 함수
+├── stores/               # 전역 상태 (Zustand)
+└── types/                # TypeScript 타입 정의
+```
+
+---
+
+### ⚙️ Backend 설계 원칙
+
+#### 1. **도메인 주도 설계 (DDD)**
+```typescript
+// src/domains/user/
+├── entities/
+│   └── user.entity.ts      // 엔티티
+├── repositories/
+│   └── user.repository.ts  // DB 접근 레이어
+├── services/
+│   └── user.service.ts     // 비즈니스 로직
+├── controllers/
+│   └── user.controller.ts  // API 엔드포인트
+└── dto/
+    ├── create-user.dto.ts
+    └── update-user.dto.ts
+```
+
+#### 2. **API 응답 표준화**
+```typescript
+// common/interfaces/api-response.interface.ts
+interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+  meta?: {
+    page: number;
+    total: number;
+    limit: number;
+  };
+}
+
+// 모든 컨트롤러에서 일관된 응답
+return {
+  success: true,
+  data: users,
+  meta: { page: 1, total: 100, limit: 10 }
+};
+```
+
+#### 3. **레이어 책임 분리**
+```typescript
+// ❌ 나쁜 예: Service에서 직접 DB 쿼리
+class UserService {
+  async getUser(id: string) {
+    return this.dataSource.query('SELECT * FROM users WHERE id = ?', [id]); // 금지!
+  }
+}
+
+// ✅ 좋은 예: Repository 패턴 사용
+class UserRepository {
+  async findById(id: string) {
+    return this.repository.findOne({ where: { id } });
+  }
+}
+
+class UserService {
+  async getUser(id: string) {
+    const user = await this.userRepository.findById(id);
+    // 비즈니스 로직만 처리
+    return this.enrichUserData(user);
+  }
+}
+```
+
+#### 4. **단방향 의존성**
+```
+Controller → Service → Repository → Entity
+    ↓           ↓           ↓
+   DTO        Domain      Database
+
+절대 역방향 참조 금지!
+```
+
+#### 5. **트랜잭션 관리**
+```typescript
+@Injectable()
+export class PostService {
+  async createPostWithNotification(data: CreatePostDto) {
+    return this.dataSource.transaction(async manager => {
+      // 트랜잭션 내에서 모든 작업 수행
+      const post = await manager.save(Post, data);
+      await manager.save(Notification, { 
+        type: 'NEW_POST',
+        postId: post.id 
+      });
+      return post;
+    });
+  }
+}
+```
+
+#### 6. **에러 처리 표준**
+```typescript
+// common/exceptions/business.exception.ts
+export class BusinessException extends HttpException {
+  constructor(
+    private readonly errorCode: string,
+    message: string,
+    statusCode: HttpStatus = HttpStatus.BAD_REQUEST
+  ) {
+    super({ code: errorCode, message }, statusCode);
+  }
+}
+
+// 사용
+throw new BusinessException('USER_NOT_FOUND', '사용자를 찾을 수 없습니다');
+```
+
+#### 7. **보안 체크리스트**
+- [ ] 모든 엔드포인트에 적절한 Guard 적용
+- [ ] DTO로 입력 검증 (class-validator)
+- [ ] SQL Injection 방지 (파라미터화된 쿼리)
+- [ ] 민감 정보 로깅 금지
+- [ ] Rate Limiting 적용
+- [ ] CORS 설정 검증
+
+#### 8. **성능 최적화 가이드**
+```typescript
+// N+1 쿼리 방지
+@Get()
+async getPosts() {
+  return this.postRepository.find({
+    relations: ['author', 'comments'], // JOIN으로 한 번에 로드
+  });
+}
+
+// 캐싱 적용
+@CacheTTL(300) // 5분 캐시
+@Get('popular')
+async getPopularPosts() {
+  return this.postService.getPopularPosts();
+}
+
+// 페이지네이션 필수
+@Get()
+async getUsers(
+  @Query('page', ParseIntPipe) page = 1,
+  @Query('limit', ParseIntPipe) limit = 20,
+) {
+  return this.userService.paginate(page, Math.min(limit, 100));
+}
+```
+
+---
+
+## 🤖 코드 생성 가이드라인
+
+### Frontend
+1. **컴포넌트 생성 시**: Container/Presentational 분리 필수
+2. **상태 관리**: React Query + Zustand만 사용
+3. **페이지**: 로직 없이 컴포넌트 조합만
+4. **스타일**: Tailwind CSS 클래스만 사용
+5. **타입**: 모든 props와 리턴 타입 명시
+
+### Backend
+1. **도메인별 폴더 구조** 유지
+2. **API 응답 표준 포맷** 준수
+3. **Repository 패턴** 필수
+4. **트랜잭션 처리** 명시적으로
+5. **에러는 BusinessException** 사용
+6. **N+1 쿼리 방지** 체크
+
+### 공통
+- **주석**: 복잡한 로직에만 추가
+- **네이밍**: 명확하고 일관된 규칙
+- **테스트**: 핵심 로직은 테스트 코드 포함
+- **문서화**: API는 Swagger, 함수는 JSDoc

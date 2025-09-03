@@ -25,6 +25,8 @@ import { FilesService } from './files.service';
 import { S3Service } from './services/s3.service';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { UploadCompleteDto } from './dto/upload-complete.dto';
+import { CreateBatchUploadUrlDto, BatchUploadCompleteDto } from './dto/batch-upload.dto';
+import { UpdateImageOrderDto } from './dto/update-image-order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
@@ -75,6 +77,50 @@ export class FilesController {
     @Body() uploadCompleteDto: UploadCompleteDto,
   ) {
     return this.filesService.uploadComplete(userId as any, uploadCompleteDto);
+  }
+
+  @Post('batch-upload-url')
+  @ApiOperation({ summary: '배치 파일 업로드용 Presigned URL 생성 (최대 5개)' })
+  @ApiResponse({ 
+    status: 201, 
+    description: '배치 Presigned URL 생성 성공',
+    schema: {
+      type: 'object',
+      properties: {
+        uploads: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              uploadUrl: { type: 'string', description: '파일 업로드용 URL' },
+              fileKey: { type: 'string', description: 'S3 파일 키' },
+              expiresIn: { type: 'number', description: '만료 시간(초)' },
+              tempId: { type: 'string', description: '임시 ID' },
+              fileName: { type: 'string', description: '원본 파일명' },
+            },
+          },
+        },
+        batchId: { type: 'string', description: '배치 ID' },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  async createBatchUploadUrl(
+    @CurrentUser('id') userId: string,
+    @Body() createBatchUploadUrlDto: CreateBatchUploadUrlDto,
+  ) {
+    return this.filesService.createBatchUploadUrl(userId as any, createBatchUploadUrlDto);
+  }
+
+  @Post('batch-upload-complete')
+  @ApiOperation({ summary: '배치 파일 업로드 완료 처리' })
+  @ApiResponse({ status: 201, description: '배치 파일 업로드 완료' })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  async batchUploadComplete(
+    @CurrentUser('id') userId: string,
+    @Body() batchUploadCompleteDto: BatchUploadCompleteDto,
+  ) {
+    return this.filesService.batchUploadComplete(userId as any, batchUploadCompleteDto);
   }
 
   @Get()
@@ -129,6 +175,23 @@ export class FilesController {
   ) {
     const downloadUrl = await this.filesService.getDownloadUrl(fileId as any, userId as any);
     return { downloadUrl };
+  }
+
+  @Get(':id/download')
+  @Public()
+  @ApiOperation({ summary: '파일 다운로드 (Public)' })
+  @ApiResponse({ status: 302, description: 'S3 파일로 리다이렉트' })
+  @ApiResponse({ status: 404, description: '파일을 찾을 수 없음' })
+  async downloadFile(
+    @Param('id') fileId: string,
+    @Res() res: Response,
+  ) {
+    try {
+      const downloadUrl = await this.filesService.getPublicDownloadUrl(fileId as any);
+      return res.redirect(downloadUrl);
+    } catch (error) {
+      return res.status(404).json({ message: 'File not found' });
+    }
   }
 
   @Options('proxy/*')
@@ -249,6 +312,18 @@ export class FilesController {
         fileKey: fileKey
       });
     }
+  }
+
+  @Post(':id/update-order')
+  @ApiOperation({ summary: '이미지 순서 업데이트' })
+  @ApiResponse({ status: 200, description: '이미지 순서 업데이트 성공' })
+  @ApiResponse({ status: 404, description: '파일을 찾을 수 없음' })
+  async updateImageOrder(
+    @Param('id') postId: string,
+    @CurrentUser('id') userId: string,
+    @Body() updateImageOrderDto: UpdateImageOrderDto,
+  ) {
+    return this.filesService.updateImageOrder(postId, userId, updateImageOrderDto);
   }
 
   @Delete(':id')

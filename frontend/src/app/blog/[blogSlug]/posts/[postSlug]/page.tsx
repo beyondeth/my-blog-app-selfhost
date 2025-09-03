@@ -15,6 +15,7 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface Blog {
   id: string;
@@ -35,6 +36,7 @@ export default function BlogPostDetailPage() {
   const router = useRouter();
   const { user, isAdmin } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [blog, setBlog] = useState<Blog | null>(null);
   const [blogError, setBlogError] = useState<string | null>(null);
   const queryClient = useQueryClient();
@@ -93,24 +95,32 @@ export default function BlogPostDetailPage() {
   }, []);
 
   const handleConfirmDelete = useCallback(async () => {
-    if (!post) return;
+    if (!post || deletePostMutation.isPending) return;
     
-    deletePostMutation.mutate(post.id, {
-      onSuccess: () => {
-        setDeleteDialogOpen(false);
+    setIsDeleting(true);
+    
+    try {
+      await deletePostMutation.mutateAsync(post.id);
+      // 애니메이션 후 리다이렉트
+      setTimeout(() => {
         router.push(`/blog/${blogSlug}`);
-      },
-      onError: () => {
-        // Keep dialog open on error for retry
-      }
-    });
+      }, 300);
+    } catch (error: any) {
+      setIsDeleting(false);
+      // 상세한 에러 메시지 처리
+      const errorMessage = error?.response?.data?.message || 
+                          error?.message || 
+                          '게시글 삭제 중 오류가 발생했습니다';
+      toast.error(errorMessage);
+      console.error('Delete error:', error);
+    }
   }, [post, deletePostMutation, router, blogSlug]);
 
   const handleCloseDeleteDialog = useCallback(() => {
-    if (!deletePostMutation.isPending) {
+    if (!deletePostMutation.isPending && !isDeleting) {
       setDeleteDialogOpen(false);
     }
-  }, [deletePostMutation.isPending]);
+  }, [deletePostMutation.isPending, isDeleting]);
 
   const handleLike = useCallback(() => {
     if (!post) return;
@@ -204,8 +214,29 @@ export default function BlogPostDetailPage() {
 
   return (
     <>
-      {/* Article Content - /posts/[slug] 스타일 적용 */}
-      <article className="max-w-3xl mx-auto px-6 py-16">
+      {/* Article Content with deletion effect */}
+      <article 
+        className={cn(
+          "max-w-3xl mx-auto px-6 py-16 transition-all duration-500 relative",
+          isDeleting && "opacity-30 blur-sm pointer-events-none scale-[0.98]"
+        )}
+      >
+        {/* Deletion Overlay */}
+        {isDeleting && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <div className="bg-white/90 backdrop-blur-sm rounded-xl p-6 shadow-2xl">
+              <div className="flex flex-col items-center">
+                <div className="relative">
+                  <div className="h-12 w-12 rounded-full border-4 border-gray-200 animate-pulse" />
+                  <div className="absolute inset-0 h-12 w-12 rounded-full border-4 border-t-red-500 animate-spin" />
+                </div>
+                <p className="mt-4 text-sm font-medium text-gray-900">게시글을 삭제하는 중...</p>
+                <p className="mt-1 text-xs text-gray-500">잠시만 기다려주세요</p>
+              </div>
+            </div>
+          </div>
+        )}
+        
         <PostHeaderWithReport 
           post={post}
           canEdit={canEditDelete}
@@ -258,9 +289,9 @@ export default function BlogPostDetailPage() {
       
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}
-        onClose={handleCloseDeleteDialog}
+        onClose={isDeleting ? undefined : handleCloseDeleteDialog}
         onConfirm={handleConfirmDelete}
-        isLoading={deletePostMutation.isPending}
+        isLoading={deletePostMutation.isPending || isDeleting}
         itemName={`"${post.title}" 게시글`}
         title="게시글을 삭제하시겠습니까?"
         description={`"${post.title}" 게시글이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}

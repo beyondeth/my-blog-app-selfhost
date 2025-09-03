@@ -104,9 +104,16 @@ const processImageUrls = (html: string): string => {
 // 신택스 하이라이팅 적용
 const applySyntaxHighlighting = (html: string): string => {
   return html.replace(
-    /<pre class="hljs"><code class="language-(typescript|javascript|ts|js)">([\s\S]*?)<\/code><\/pre>/gi,
+    /<pre[^>]*><code class="language-([\w]+)">([\s\S]*?)<\/code><\/pre>/gi,
     (match, language, codeContent) => {
       try {
+        // 지원하는 언어 확장
+        const supportedLanguages = ['typescript', 'javascript', 'ts', 'js', 'python', 'bash', 'json', 'yaml', 'sql'];
+        if (!supportedLanguages.includes(language)) {
+          // 지원하지 않는 언어는 그대로 반환
+          return `<pre class="hljs"><code class="language-${language}">${codeContent}</code></pre>`;
+        }
+        
         // 코드 블록 내용은 HTML 엔티티를 디코딩하지 않음 - 보안 및 표시 문제 방지
         const mappedLanguage = language === 'ts' ? 'typescript' : language === 'js' ? 'javascript' : language;
         

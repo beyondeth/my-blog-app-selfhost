@@ -1,4 +1,4 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -6,6 +6,8 @@ import { File } from './entities/file.entity';
 import { S3Service, PresignedUrlResponse } from './services/s3.service';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { UploadCompleteDto } from './dto/upload-complete.dto';
+import { CreateBatchUploadUrlDto, BatchUploadCompleteDto } from './dto/batch-upload.dto';
+import { UpdateImageOrderDto } from './dto/update-image-order.dto';
 import { 
   generateUuidFileName, 
   generateS3Key, 
@@ -24,6 +26,201 @@ export class FilesService {
     private s3Service: S3Service,
     private configService: ConfigService,
   ) {}
+
+  /**
+   * 배치 파일 업로드용 Presigned URL 생성 (최대 5개)
+   */
+  async createBatchUploadUrl(
+    userId: string,
+    createBatchUploadUrlDto: CreateBatchUploadUrlDto
+  ) {
+    const { files, context } = createBatchUploadUrlDto;
+
+    try {
+      // 배치 ID 생성
+      const batchId = `batch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // 각 파일에 대해 업로드 URL 생성
+      const uploads = await Promise.all(
+        files.map(async (file, index) => {
+          const { fileName, mimeType, fileSize, fileType = 'image' } = file;
+
+          // 이미지 파일인 경우 WebP만 허용
+          if (fileType === 'image' && mimeType !== 'image/webp') {
+            throw new Error(`이미지 업로드는 WebP 형식만 허용됩니다: ${fileName}`);
+          }
+
+          // 파일 크기 검증
+          const maxFileSize = this.configService.get<number>('MAX_FILE_SIZE', 10485760);
+          if (fileSize > maxFileSize) {
+            throw new Error(`파일 크기 초과: ${fileName}`);
+          }
+
+          // UUID 기반 파일명 생성
+          const uuidFileName = generateUuidFileName(fileName, mimeType, fileType);
+          const s3Key = generateS3Key(uuidFileName, fileType);
+
+          // S3 Presigned URL 생성
+          const presignedData = await this.s3Service.generatePresignedUploadUrl(
+            s3Key,
+            mimeType,
+            fileSize,
+            fileType
+          );
+
+          // 임시 ID 생성 (배치 ID + 인덱스)
+          const tempId = `${batchId}_${index}`;
+
+          return {
+            ...presignedData,
+            tempId,
+            fileName,
+            originalFileName: fileName,
+            uuidFileName,
+            s3Key,
+          };
+        })
+      );
+
+      this.logger.log(`Batch upload URLs created for user ${userId}, batch: ${batchId}, files: ${files.length}`);
+
+      return {
+        uploads,
+        batchId,
+        context,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to create batch upload URLs: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * 배치 파일 업로드 완료 처리
+   */
+  async batchUploadComplete(
+    userId: string,
+    batchUploadCompleteDto: BatchUploadCompleteDto
+  ) {
+    const { fileKeys, context } = batchUploadCompleteDto;
+
+    try {
+      this.logger.log(`Batch upload complete request received:`, {
+        userId,
+        fileKeys,
+        context,
+        count: fileKeys.length
+      });
+
+      // 각 파일에 대해 업로드 완료 처리
+      const completedFiles = await Promise.all(
+        fileKeys.map(async (fileKey, index) => {
+          // S3 키 검증
+          if (!fileKey || !fileKey.includes('uploads/')) {
+            throw new Error(`Invalid S3 key format: ${fileKey}`);
+          }
+
+          // S3에서 파일 정보 가져오기 (메타데이터 포함)
+          const fileMetadata = await this.s3Service.getObjectMetadata(fileKey);
+          if (!fileMetadata) {
+            throw new Error(`File metadata not found: ${fileKey}`);
+          }
+
+          // Presigned URL 생성
+          const accessUrl = await this.s3Service.generatePresignedDownloadUrl(fileKey);
+
+          // 파일 정보 DB에 저장
+          const file = this.fileRepository.create({
+            originalName: fileMetadata.originalName || fileKey.split('/').pop(),
+            fileName: fileKey.split('/').pop(),
+            fileKey,
+            fileUrl: fileKey,
+            fileSize: fileMetadata.contentLength || 0,
+            mimeType: fileMetadata.contentType || 'image/webp',
+            fileType: 'image',
+            userId,
+            // context is a string describing the upload context, not an ID
+            // contextId would be set if we had a FileContext entity reference
+          });
+
+          const savedFile = await this.fileRepository.save(file);
+          
+          return {
+            ...savedFile,
+            accessUrl,
+          };
+        })
+      );
+
+      this.logger.log(`Batch upload completed for user ${userId}, files: ${completedFiles.length}`);
+      
+      return {
+        files: completedFiles,
+        batchId: `batch_${Date.now()}`,
+        context,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to complete batch upload: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
+   * 이미지 순서 업데이트
+   */
+  async updateImageOrder(
+    postId: string,
+    userId: string,
+    updateImageOrderDto: UpdateImageOrderDto
+  ) {
+    const { imageOrder } = updateImageOrderDto;
+
+    try {
+      // 포스트 소유권 확인 (Post 엔티티를 직접 주입하지 않으므로 raw query 사용)
+      const postOwnerCheck = await this.fileRepository.query(
+        'SELECT author_id FROM posts WHERE id = $1',
+        [postId]
+      );
+      
+      if (!postOwnerCheck.length || postOwnerCheck[0].author_id !== userId) {
+        throw new ForbiddenException('포스트에 대한 권한이 없습니다.');
+      }
+
+      // 트랜잭션으로 순서 업데이트
+      await this.fileRepository.manager.transaction(async (manager) => {
+        for (const orderInfo of imageOrder) {
+          const { fileId, order } = orderInfo;
+          
+          // 파일이 해당 포스트에 연결되어 있는지 확인
+          const fileExists = await manager.query(
+            'SELECT 1 FROM post_files WHERE "postId" = $1 AND "fileId" = $2',
+            [postId, fileId]
+          );
+          
+          if (!fileExists.length) {
+            throw new NotFoundException(`파일 ${fileId}가 포스트 ${postId}에 연결되어 있지 않습니다.`);
+          }
+
+          // 순서 업데이트
+          await manager.query(
+            'UPDATE post_files SET image_order = $1 WHERE "postId" = $2 AND "fileId" = $3',
+            [order, postId, fileId]
+          );
+        }
+      });
+
+      this.logger.log(`Image order updated for post ${postId}, images: ${imageOrder.length}`);
+      
+      return {
+        message: '이미지 순서가 업데이트되었습니다.',
+        postId,
+        updatedCount: imageOrder.length,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to update image order: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
 
   /**
    * 파일 업로드용 Presigned URL 생성 (UUID 기반)
@@ -248,6 +445,29 @@ export class FilesService {
       this.logger.error(`Failed to generate download URL: ${error.message}`, error.stack);
       throw error;
     }
+  }
+
+  /**
+   * 파일 다운로드 URL 생성 (Public)
+   */
+  async getPublicDownloadUrl(fileId: string): Promise<string> {
+    const file = await this.fileRepository.findOne({
+      where: { id: fileId }
+    });
+
+    if (!file) {
+      throw new NotFoundException('File not found');
+    }
+
+    // S3 키가 저장되어 있다면 사용
+    const s3Key = file.fileKey || file.fileUrl;
+    
+    if (!s3Key || !s3Key.includes('uploads/')) {
+      throw new BadRequestException('Invalid file reference');
+    }
+
+    // Presigned URL 생성 (1시간 유효)
+    return this.s3Service.generatePresignedDownloadUrl(s3Key);
   }
 
   /**

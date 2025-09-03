@@ -28,6 +28,8 @@ import { validateImageFile } from '@/utils/imageUtils';
 import { getProxyImageUrl, normalizeImageUrl, debugLog } from '@/utils/imageUtils';
 import { getErrorMessage } from '@/utils/queryHelpers';
 import EnhancedEditorToolbar from './EnhancedEditorToolbar';
+import ImageUploadManager, { UploadedImageInfo } from './ImageUploadManager';
+import { useImageUploadManager } from '@/hooks/useImageUploadManager';
 import { stripUnderline } from '@/utils/stripUnderline';
 import { toast } from 'sonner';
 import { suggestion } from './SlashCommands';
@@ -61,7 +63,7 @@ const SlashCommands = Extension.create({
   },
 });
 
-// 커스텀 이미지 확장 - 리사이징 지원
+// 커스텀 이미지 확장 - 리사이징 지원 + 이미지 ID 추적
 const ResizableImage = Image.extend({
   addAttributes() {
     return {
@@ -80,6 +82,14 @@ const ResizableImage = Image.extend({
         renderHTML: attributes => {
           if (!attributes.height) return {};
           return { height: attributes.height };
+        },
+      },
+      'data-image-id': {
+        default: null,
+        parseHTML: element => element.getAttribute('data-image-id'),
+        renderHTML: attributes => {
+          if (!attributes['data-image-id']) return {};
+          return { 'data-image-id': attributes['data-image-id'] };
         },
       },
     };
@@ -101,6 +111,10 @@ const ResizableImage = Image.extend({
       img.src = node.attrs.src;
       img.alt = node.attrs.alt || '';
       img.title = node.attrs.title || '';
+      // Add data-image-id for tracking
+      if (node.attrs['data-image-id']) {
+        img.setAttribute('data-image-id', node.attrs['data-image-id']);
+      }
       img.className = 'editor-image';
       img.style.cssText = `
         max-width: 100%;
@@ -221,8 +235,13 @@ interface RichTextEditorProps {
   content: string;
   onChange: (content: string) => void;
   onFilesChange?: (fileIds: string[]) => void;
+  onThumbnailSelect?: (thumbnailId: string) => void;
   placeholder?: string;
   className?: string;
+  // Enable enhanced image upload manager
+  enableImageManager?: boolean;
+  // Maximum number of images allowed
+  maxImages?: number;
   // 포스트 작성 취소시 cleanup 사용 여부
   enableCleanupOnUnmount?: boolean;
 }
@@ -231,13 +250,20 @@ export default function BlogRichTextEditor({
   content, 
   onChange, 
   onFilesChange,
+  onThumbnailSelect,
   placeholder = "내용을 입력하세요...",
   className = "",
+  enableImageManager = false,
+  maxImages = 5,
   enableCleanupOnUnmount = false
 }: RichTextEditorProps) {
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const editorRef = useRef<any>(null);
+  
+  // Internal state for image management (encapsulation)
+  const [images, setImages] = useState<UploadedImageInfo[]>([]);
+  const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
 
   // 리팩토링된 파일 업로드 훅 사용
   const uploadMutation = useUploadFile();
@@ -245,87 +271,9 @@ export default function BlogRichTextEditor({
   // 포스트 이미지 용량 추적
   const imageTracker = usePostImageTracker();
 
-  // onChange 핸들러를 useCallback으로 메모이제이션
-  const handleEditorUpdate = useCallback((html: string) => {
-    onChange(html);
-  }, [onChange]);
-
-  // 파일 업로드 핸들러 - 즉시 업로드 방식 (원래 로직)
-  const handleImageUpload = useCallback(async (file: File): Promise<string> => {
-    try {
-      setIsUploading(true);
-      
-      // 파일 검증
-      const validation = validateImageFile(file);
-      if (!validation.valid) {
-        throw new Error(validation.error);
-      }
-
-      // 포스트 총 용량 체크
-      if (!imageTracker.canAddFile(file.size)) {
-        throw new Error('포스트 용량 초과');
-      }
-
-      // 즉시 업로드 수행
-      const result = await uploadMutation.mutateAsync({ 
-        file, 
-        fileType: 'image' 
-      });
-      
-      // 성공 시 파일 ID 추가
-      const fileId = result.id.toString();
-      setUploadedFiles(prev => {
-        const newFiles = [...prev, fileId];
-        // useEffect에서 호출하도록 지연
-        setTimeout(() => {
-          onFilesChange?.(newFiles);
-        }, 0);
-        return newFiles;
-      });
-      
-      // 이미지 트래커에 파일 추가 (useEffect에서 호출하도록 지연)
-      setTimeout(() => {
-        imageTracker.addFile({
-          id: fileId,
-          size: file.size,
-          name: file.name
-        });
-      }, 0);
-      
-      // 백엔드에서 반환한 accessUrl 사용 (백엔드 권한 존중)
-      const proxyUrl = result.accessUrl || (result.fileKey 
-        ? getProxyImageUrl(result.fileKey)
-        : getProxyImageUrl(result.fileUrl));
-      
-      debugLog('Image upload completed', {
-        originalUrl: result.fileUrl,
-        fileKey: result.fileKey,
-        accessUrl: result.accessUrl,
-        proxyUrl: proxyUrl,
-      });
-      
-      return proxyUrl || result.fileUrl;
-    } catch (error) {
-      debugLog('Image upload failed', error);
-      
-      // 사용자 친화적인 에러 처리
-      const errorMessage = getErrorMessage(error);
-      
-      // 401 에러인 경우 로그인 안내
-      if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 401) {
-        toast.error('로그인이 필요합니다. 다시 로그인해주세요.');
-      } else {
-        toast.error(`이미지 업로드 실패: ${errorMessage}`);
-      }
-      
-      throw error;
-    } finally {
-      setIsUploading(false);
-    }
-  }, [uploadMutation, onFilesChange, imageTracker]);
-
-  // TipTap 에디터 설정 - onChange 의존성 제거로 성능 최적화
+  // Initialize the editor first (moved from later in the file)
   const editor = useEditor({
+    immediatelyRender: false, // Prevent SSR hydration mismatch warning
     extensions: [
       StarterKit.configure({
         // StarterKit의 기본 codeBlock과 heading을 비활성화
@@ -474,7 +422,7 @@ export default function BlogRichTextEditor({
     },
     onCreate: ({ editor }) => {
       // 커스텀 uploadImage 커맨드 추가
-      editor.commands.uploadImage = async (file: File) => {
+      (editor.commands as any).uploadImage = async (file: File) => {
         try {
           const imageUrl = await handleImageUpload(file);
           editor.chain().focus().setImage({ 
@@ -489,6 +437,109 @@ export default function BlogRichTextEditor({
     },
   }, []); // 의존성 배열을 빈 배열로 변경하여 성능 최적화
 
+  // Image Upload Manager integration (optional)
+  const imageUploadManager = useImageUploadManager({
+    editor: editor,
+    images,
+    onImagesChange: (newImages) => {
+      setImages(newImages);
+      // Extract file IDs for parent component if needed
+      if (onFilesChange) {
+        const fileIds = newImages.map(img => img.id);
+        onFilesChange(fileIds);
+      }
+    },
+    selectedThumbnailId,
+    onThumbnailSelect: (thumbnailId) => {
+      setSelectedThumbnailId(thumbnailId);
+      // Notify parent if callback provided
+      if (onThumbnailSelect) {
+        onThumbnailSelect(thumbnailId);
+      }
+    },
+  });
+
+  
+
+  // onChange 핸들러를 useCallback으로 메모이제이션
+  const handleEditorUpdate = useCallback((html: string) => {
+    onChange(html);
+  }, [onChange]);
+
+  // 파일 업로드 핸들러 - 즉시 업로드 방식 (원래 로직)
+  const handleImageUpload = useCallback(async (file: File): Promise<string> => {
+    try {
+      setIsUploading(true);
+      
+      // 파일 검증
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+
+      // 포스트 총 용량 체크
+      if (!imageTracker.canAddFile(file.size)) {
+        throw new Error('포스트 용량 초과');
+      }
+
+      // 즉시 업로드 수행
+      const result = await uploadMutation.mutateAsync({ 
+        file, 
+        fileType: 'image' 
+      });
+      
+      // 성공 시 파일 ID 추가
+      const fileId = result.id.toString();
+      setUploadedFiles(prev => {
+        const newFiles = [...prev, fileId];
+        // useEffect에서 호출하도록 지연
+        setTimeout(() => {
+          onFilesChange?.(newFiles);
+        }, 0);
+        return newFiles;
+      });
+      
+      // 이미지 트래커에 파일 추가 (useEffect에서 호출하도록 지연)
+      setTimeout(() => {
+        imageTracker.addFile({
+          id: fileId,
+          size: file.size,
+          name: file.name
+        });
+      }, 0);
+      
+      // 백엔드에서 반환한 URL 사용
+      const proxyUrl = result.fileKey 
+        ? getProxyImageUrl(result.fileKey)
+        : getProxyImageUrl(result.fileUrl);
+      
+      debugLog('Image upload completed', {
+        originalUrl: result.fileUrl,
+        fileKey: result.fileKey,
+        proxyUrl: proxyUrl,
+      });
+      
+      return proxyUrl || result.fileUrl;
+    } catch (error) {
+      debugLog('Image upload failed', error);
+      
+      // 사용자 친화적인 에러 처리
+      const errorMessage = getErrorMessage(error);
+      
+      // 401 에러인 경우 로그인 안내
+      if (error && typeof error === 'object' && 'statusCode' in error && error.statusCode === 401) {
+        toast.error('로그인이 필요합니다. 다시 로그인해주세요.');
+      } else {
+        toast.error(`이미지 업로드 실패: ${errorMessage}`);
+      }
+      
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [uploadMutation, onFilesChange, imageTracker]);
+
+
   // editor ref 업데이트 및 onChange 핸들러 설정
   useEffect(() => {
     if (editor) {
@@ -501,8 +552,8 @@ export default function BlogRichTextEditor({
       });
       
       // 커스텀 uploadImage 커맨드 추가 (onCreate에서 설정했지만 useEffect에서도 확실히 설정)
-      if (!editor.commands.uploadImage) {
-        editor.commands.uploadImage = async (file: File) => {
+      if (!(editor.commands as any).uploadImage) {
+        (editor.commands as any).uploadImage = async (file: File) => {
           try {
             const imageUrl = await handleImageUpload(file);
             editor.chain().focus().setImage({ 
@@ -517,6 +568,14 @@ export default function BlogRichTextEditor({
       }
     }
   }, [editor, handleEditorUpdate, handleImageUpload]);
+
+  // Update image upload manager when editor changes
+  useEffect(() => {
+    if (enableImageManager && editor) {
+      // Update the image upload manager with the current editor instance
+      // This allows the manager to insert images directly into the editor
+    }
+  }, [editor, enableImageManager]);
 
   // 컴포넌트 unmount 시 cleanup (포스트 작성 취소시)
   // @deprecated 자동 삭제 비활성화
@@ -567,9 +626,9 @@ export default function BlogRichTextEditor({
       }
     };
 
-    window.addEventListener('editorImageUpload', handleSlashImageUpload as EventListener);
+    window.addEventListener('editorImageUpload', handleSlashImageUpload as any);
     return () => {
-      window.removeEventListener('editorImageUpload', handleSlashImageUpload as EventListener);
+      window.removeEventListener('editorImageUpload', handleSlashImageUpload as any);
     };
   }, [editor, handleImageUpload]);
 
@@ -644,8 +703,37 @@ export default function BlogRichTextEditor({
         editor={editor} 
         onImageUpload={triggerImageUpload}
         isUploading={isUploading}
+        hideImageButton={enableImageManager}
       />
       <EditorContent editor={editor} />
+      
+      {/* Enhanced Image Upload Manager */}
+      {enableImageManager && (
+        <div className="border-t border-gray-200">
+          {/* Sync status indicator */}
+          {imageUploadManager.syncSource && (
+            <div className="px-4 py-2 bg-blue-50 border-b border-gray-200">
+              <div className="flex items-center text-sm text-blue-600">
+                <div className="animate-spin rounded-full h-3 w-3 border-b-2 border-blue-600 mr-2"></div>
+                {imageUploadManager.syncSource === 'editor' 
+                  ? '에디터에서 변경 사항 동기화 중...' 
+                  : '갤러리에서 변경 사항 동기화 중...'}
+              </div>
+            </div>
+          )}
+          <div className="p-4">
+            <ImageUploadManager
+              images={images}
+              maxImages={maxImages}
+              onImagesChange={imageUploadManager.handleGalleryImageChange}
+              onImagesUploaded={imageUploadManager.handleImagesUploaded}
+              onThumbnailSelect={imageUploadManager.handleThumbnailSelect}
+              selectedThumbnailId={selectedThumbnailId}
+              className=""
+            />
+          </div>
+        </div>
+      )}
       
       {/* 용량 표시 바 */}
       {imageTracker.totalSize > 0 && (

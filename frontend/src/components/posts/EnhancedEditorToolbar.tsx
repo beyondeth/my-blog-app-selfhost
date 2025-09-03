@@ -33,6 +33,7 @@ interface EnhancedEditorToolbarProps {
   editor: Editor | null;
   onImageUpload: () => void;
   isUploading?: boolean;
+  hideImageButton?: boolean;
 }
 
 // 색상 프리셋
@@ -90,7 +91,8 @@ const HEADING_LEVELS = [
 export default function EnhancedEditorToolbar({ 
   editor, 
   onImageUpload, 
-  isUploading = false 
+  isUploading = false,
+  hideImageButton = false 
 }: EnhancedEditorToolbarProps) {
   const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
@@ -515,13 +517,15 @@ export default function EnhancedEditorToolbar({
           <div className="w-px h-6 bg-gray-300 mx-1" />
 
           {/* 삽입 버튼들 */}
-          <ToolbarButton
-            onClick={onImageUpload}
-            disabled={isUploading}
-            title="이미지 업로드"
-          >
-            <FiImage className="w-4 h-4" />
-          </ToolbarButton>
+          {!hideImageButton && (
+            <ToolbarButton
+              onClick={onImageUpload}
+              disabled={isUploading}
+              title="이미지 업로드"
+            >
+              <FiImage className="w-4 h-4" />
+            </ToolbarButton>
+          )}
 
           <ToolbarButton
             onClick={handleInsertLink}

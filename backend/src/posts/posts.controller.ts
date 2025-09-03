@@ -4,6 +4,7 @@ import { Throttle } from '@nestjs/throttler';
 import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -89,6 +90,45 @@ export class PostsController {
     const pageNumber = page ? parseInt(page, 10) : 1;
     const limitNumber = limit ? parseInt(limit, 10) : 10;
     return this.postsService.getPostsByCategory(category, pageNumber, limitNumber);
+  }
+
+  @Post(':id/thumbnail')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '게시글 썸네일 설정/제거' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: '썸네일 설정/제거 성공' })
+  @ApiResponse({ status: 404, description: '게시글 또는 파일을 찾을 수 없음' })
+  async setThumbnail(
+    @Param('id') postId: string,
+    @CurrentUser() user: User,
+    @Body() setThumbnailDto: SetThumbnailDto,
+  ) {
+    return this.postsService.setThumbnail(postId, user.id, setThumbnailDto);
+  }
+
+  @Get(':id/images')
+  @Public()
+  @ApiOperation({ summary: '게시글의 이미지 목록 조회 (순서포함)' })
+  @ApiResponse({ 
+    status: 200, 
+    description: '이미지 목록 조회 성공',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          id: { type: 'string', description: '파일 ID' },
+          fileName: { type: 'string', description: '파일명' },
+          fileKey: { type: 'string', description: 'S3 파일 키' },
+          accessUrl: { type: 'string', description: '액세스 URL' },
+          imageOrder: { type: 'number', description: '이미지 순서' },
+          createdAt: { type: 'string', format: 'date-time' },
+        },
+      },
+    },
+  })
+  async getPostImages(@Param('id') postId: string) {
+    return this.postsService.getPostImages(postId);
   }
 
   @Get(':id')

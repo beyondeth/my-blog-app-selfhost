@@ -38,6 +38,14 @@ export class Post {
   @Column({ nullable: true, name: 'thumbnail' })
   thumbnail: string;
 
+  // New thumbnail image reference
+  @Column({ type: 'uuid', nullable: true, name: 'thumbnail_image_id' })
+  thumbnailImageId: string;
+
+  @ManyToOne(() => File, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'thumbnail_image_id' })
+  thumbnailImage: File;
+
   @Column({ default: false, name: 'isPublished' })
   isPublished: boolean;
 
@@ -100,6 +108,9 @@ export class Post {
     inverseJoinColumn: { name: 'fileId', referencedColumnName: 'id' },
   })
   attachedFiles: File[];
+
+  // Helper method to get ordered images
+  getOrderedImages?: () => Promise<(File & { imageOrder?: number })[]>;
 
   @BeforeInsert()
   @BeforeUpdate()

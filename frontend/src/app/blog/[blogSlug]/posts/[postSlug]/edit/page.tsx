@@ -28,6 +28,7 @@ export default function BlogEditPostPage() {
   const [category, setCategory] = useState('');
   const [error, setError] = useState('');
   const [attachedFileIds, setAttachedFileIds] = useState<string[]>([]);
+  const [thumbnailId, setThumbnailId] = useState<string>('');
   const [blog, setBlog] = useState<Blog | null>(null);
   const [loading, setLoading] = useState(true);
   
@@ -81,6 +82,11 @@ export default function BlogEditPostPage() {
       if (post.attachedFiles && post.attachedFiles.length > 0) {
         setAttachedFileIds(post.attachedFiles.map((file: any) => file.id));
       }
+      
+      // Set thumbnail if exists
+      if (post.thumbnailFileId) {
+        setThumbnailId(post.thumbnailFileId);
+      }
     }
   }, [post]);
 
@@ -114,6 +120,7 @@ export default function BlogEditPostPage() {
           content,
           category: category || undefined,
           attachedFileIds: attachedFileIds.length > 0 ? attachedFileIds : undefined,
+          thumbnailFileId: thumbnailId || undefined,
         }
       });
       
@@ -130,6 +137,10 @@ export default function BlogEditPostPage() {
 
   const handleFilesChange = (fileIds: string[]) => {
     setAttachedFileIds(fileIds);
+  };
+
+  const handleThumbnailSelect = (fileId: string) => {
+    setThumbnailId(fileId);
   };
 
   if (loading || postLoading) {
@@ -222,7 +233,11 @@ export default function BlogEditPostPage() {
                 content={content}
                 onChange={handleContentChange}
                 onFilesChange={handleFilesChange}
+                onThumbnailSelect={handleThumbnailSelect}
+                enableImageManager={true}
+                maxImages={5}
                 className="min-h-[500px]"
+                enableCleanupOnUnmount={false}
               />
               
               <div className="mt-2 text-sm text-gray-500 dark:text-gray-400 flex items-center space-x-4">
@@ -233,6 +248,11 @@ export default function BlogEditPostPage() {
                 {attachedFileIds.length > 0 && (
                   <span className="text-blue-600 dark:text-blue-400">
                     첨부된 파일: {attachedFileIds.length}개
+                  </span>
+                )}
+                {thumbnailId && (
+                  <span className="text-green-600 dark:text-green-400">
+                    썸네일 설정됨
                   </span>
                 )}
               </div>

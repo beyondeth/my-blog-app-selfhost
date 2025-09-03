@@ -9,9 +9,9 @@ export class MarkdownRendererService {
      */
     
     // 보호된 섹션을 저장할 맵들
-    const protectedBlocks: Map<string, string> = new Map();
     const protectedInline: Map<string, string> = new Map();
     const protectedTables: Map<string, string> = new Map();
+    const codeBlockStore: Map<string, string> = new Map();
     
     // 테이블을 먼저 처리 (코드 블록보다 먼저 처리해야 함)
     const protectTable = (match: string): string => {
@@ -74,15 +74,10 @@ export class MarkdownRendererService {
       return key;
     };
     
-    // 테이블 패턴 매칭 및 보호 (더 유연한 패턴)
-    text = text.replace(
-      /(?:^|\n)(\|[^\n]+\|)\s*\n(\|[\s\-:|]+\|)\s*\n((?:\|[^\n]+\|\s*\n?)+)/gm,
-      (match) => '\n' + protectTable(match)
-    );
-    
-    // 코드 블록 보호 (```...```)
-    const protectCodeBlock = (match: string, language: string, code: string): string => {
-      const key = `[[CODEBLOCK${protectedBlocks.size}]]`;
+    // 가장 먼저 코드 블록을 보호 (단락 처리 전에!)
+    // 코드 블록 내부의 빈 줄이 단락 처리로 깨지는 것을 방지
+    text = text.replace(/```([^\n]*)\n([\s\S]*?)```/gm, (_match, language, code) => {
+      const key = `[[CODEBLOCK${codeBlockStore.size}]]`;
       const lang = language?.trim() || '';
       
       // HTML 특수문자 이스케이프
@@ -90,21 +85,27 @@ export class MarkdownRendererService {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')
-        .replace(/`/g, '&#96;'); // 백틱 이스케이프
+        // 이미 이스케이프된 백틱은 건드리지 않고, 일반 백틱만 이스케이프
+        .replace(/\\`/g, '[[ESCAPED_BACKTICK]]') // 임시 보호
+        .replace(/`/g, '&#96;') // 일반 백틱 이스케이프
+        .replace(/\[\[ESCAPED_BACKTICK\]\]/g, '`'); // 이스케이프된 백틱 복원
       
       let html: string;
       if (lang) {
-        html = `<pre style="background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto;"><code class="language-${lang}">${escapedCode}</code></pre>`;
+        html = `<pre style="background: #1e1e1e !important; color: #d4d4d4 !important; padding: 1em; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace;"><code class="language-${lang}" style="color: #d4d4d4 !important; background: transparent !important;">${escapedCode}</code></pre>`;
       } else {
-        html = `<pre style="background: #f4f4f4; padding: 1em; border-radius: 4px; overflow-x: auto;"><code>${escapedCode}</code></pre>`;
+        html = `<pre style="background: #1e1e1e !important; color: #d4d4d4 !important; padding: 1em; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace;"><code style="color: #d4d4d4 !important; background: transparent !important;">${escapedCode}</code></pre>`;
       }
       
-      protectedBlocks.set(key, html);
+      codeBlockStore.set(key, html);
       return key;
-    };
+    });
     
-    // 더 정확한 코드 블록 매칭 (줄 시작에서만 매칭)
-    text = text.replace(/^```([^\n]*)\n(.*?)\n```/gms, protectCodeBlock);
+    // 테이블 패턴 매칭 및 보호 (더 유연한 패턴)
+    text = text.replace(
+      /(?:^|\n)(\|[^\n]+\|)\s*\n(\|[\s\-:|]+\|)\s*\n((?:\|[^\n]+\|\s*\n?)+)/gm,
+      (match) => '\n' + protectTable(match)
+    );
     
     // 인라인 코드 보호 (`...`)
     const protectInlineCode = (match: string, code: string): string => {
@@ -204,12 +205,8 @@ export class MarkdownRendererService {
     
     text = resultLines.join('\n');
     
-    // 보호된 요소들 복원 (테이블, 코드 블록, 인라인 코드)
+    // 테이블과 인라인 코드만 먼저 복원 (코드 블록은 나중에)
     for (const [key, value] of protectedTables) {
-      text = text.replace(key, value);
-    }
-    
-    for (const [key, value] of protectedBlocks) {
       text = text.replace(key, value);
     }
     
@@ -217,23 +214,36 @@ export class MarkdownRendererService {
       text = text.replace(key, value);
     }
     
-    // 단락 처리
+    // 단락 처리 (코드 블록 플레이스홀더는 아직 유지)
     const paragraphs = text.split('\n\n');
     const formatted: string[] = [];
     
     for (let para of paragraphs) {
       para = para.trim();
       if (para) {
-        // HTML 태그로 시작하지 않으면 p 태그로 감싸기
-        if (!/^<(?:h[1-6]|ul|ol|pre|blockquote|table|hr)/.test(para)) {
+        // 코드 블록 플레이스홀더인지 확인
+        const isCodeBlockPlaceholder = /^\[\[CODEBLOCK\d+\]\]$/.test(para);
+        const isTablePlaceholder = /^\[\[TABLE\d+\]\]$/.test(para);
+        
+        // HTML 태그로 시작하지 않고, 플레이스홀더도 아닌 경우에만 p 태그로 감싸기
+        if (!isCodeBlockPlaceholder && !isTablePlaceholder && 
+            !/^<(?:h[1-6]|ul|ol|pre|blockquote|table|hr)/.test(para)) {
           para = para.replace(/\n/g, '<br>');
           para = `<p style="line-height: 1.6;">${para}</p>`;
         }
+        formatted.push(para);
       }
-      formatted.push(para);
     }
     
-    return formatted.join('\n');
+    // 최종 텍스트 조합
+    let finalText = formatted.filter(p => p.length > 0).join('\n');
+    
+    // 마지막에 코드 블록 복원 (단락 처리 후)
+    for (const [key, value] of codeBlockStore) {
+      finalText = finalText.replace(key, value);
+    }
+    
+    return finalText;
   }
 
   parseMarkdown(content: string): { metadata: any; body: string } {

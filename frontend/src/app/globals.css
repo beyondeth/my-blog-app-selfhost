@@ -1079,16 +1079,30 @@ input, textarea, button, select {
 }
 
 /* ContentRenderer 코드 블록 스타일 강화 */
-.prose pre.hljs {
+.prose pre.hljs,
+.prose pre {
   background: #1e1e1e !important;
   color: #d4d4d4 !important;
   padding: 1rem !important;
   border-radius: 0.5rem !important;
   overflow-x: auto !important;
-  margin: 1rem 0 !important;
+  margin: 1.5rem 0 !important;
   font-size: 13px !important;
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
   line-height: 1.4 !important;
+  display: block !important;
+}
+
+/* 코드 블록 직후 단락 간격 조정 */
+.prose pre + p,
+.prose pre.hljs + p {
+  margin-top: 1.5rem !important;
+}
+
+/* 단락 직후 코드 블록 간격 조정 */
+.prose p + pre,
+.prose p + pre.hljs {
+  margin-top: 1.5rem !important;
 }
 
 .prose pre.hljs code {

@@ -226,6 +226,35 @@ export class S3Service {
   }
 
   /**
+   * S3 객체 메타데이터 조회
+   */
+  async getObjectMetadata(fileKey: string): Promise<{
+    contentType?: string;
+    contentLength?: number;
+    lastModified?: Date;
+    originalName?: string;
+  } | null> {
+    try {
+      const headCommand = new HeadObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+      });
+
+      const response = await this.s3Client.send(headCommand);
+      
+      return {
+        contentType: response.ContentType,
+        contentLength: response.ContentLength,
+        lastModified: response.LastModified,
+        originalName: response.Metadata?.['original-name'],
+      };
+    } catch (error) {
+      this.logger.warn(`Failed to get object metadata: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
    * 다중 파일 삭제
    */
   async deleteMultipleFiles(fileKeys: string[]): Promise<void> {
