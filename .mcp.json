@@ -1,9 +1,9 @@
 {
   "mcpServers": {
-    "my-blog": {
+    "codebase_blog": {
       "type": "stdio",
       "command": "bash",
-      "args": ["mcp-blog-server/run_server.sh"],
+      "args": ["mcp-blog-server-ts/run.sh"],
       "cwd": "/Users/sihyungpark/Desktop/code/my-blog-app",
       "env": {}
     }

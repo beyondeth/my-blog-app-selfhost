@@ -141,6 +141,36 @@ export class ApiKeysService {
   }
 
   /**
+   * API Key ID로 API 키 찾기
+   */
+  async findByKeyId(keyId: string): Promise<ApiKey | null> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { keyId },
+      relations: ['blog', 'user'],
+    });
+    
+    return apiKey;
+  }
+
+  /**
+   * API Key Secret 가져오기 (HMAC 서명 검증용)
+   */
+  async getApiKeySecret(keyId: string): Promise<string | null> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { keyId },
+      select: ['signingSecret'],
+    });
+    
+    if (!apiKey || !apiKey.signingSecret) {
+      return null;
+    }
+    
+    // signingSecret을 복호화하여 원본 시크릿 반환
+    const decrypted = this.decryptSigningSecret(apiKey.signingSecret);
+    return decrypted;
+  }
+
+  /**
    * API 키 검증 (keyId와 keySecret으로)
    * 하위 호환성을 위해 단일 매개변수도 지원
    */

@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "codebase_blog": {
+      "command": "node",
+      "args": [
+        "/path/to/mcp-blog-server-ts/dist/index.js",
+        "--transport",
+        "stdio"
+      ],
+      "cwd": "/path/to/mcp-blog-server-ts",
+      "env": {
+        "BLOG_API_KEY_ID": "your_api_key_id",
+        "BLOG_API_KEY_SECRET": "your_api_key_secret",
+        "BLOG_API_URL": "http://localhost:3000/api/v1",
+        "BLOG_POSTS_DIR": "/path/to/mcp-blog-server-ts/posts"
+      }
+    }
+  }
+}

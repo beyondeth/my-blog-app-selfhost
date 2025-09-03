@@ -71,12 +71,11 @@ const CLI_PORT = (() => {
 // Store SSE transports by session ID
 const sseTransports: Record<string, SSEServerTransport> = {};
 
-// Global instances
-const auth = new SecureAPIKeyAuth();
-const apiClient = new BlogAPIClient(auth);
-
 // Function to create a new server instance with all tools registered
 function createServerInstance(_clientIp?: string, _apiKey?: string) {
+  // Create new instances for each server instance to ensure fresh environment variables
+  const auth = new SecureAPIKeyAuth();
+  const apiClient = new BlogAPIClient(auth);
   const server = new McpServer(
     {
       name: "blog-mcp-typescript",
@@ -147,8 +146,13 @@ function createServerInstance(_clientIp?: string, _apiKey?: string) {
       },
     },
     async ({ title, content, file_path, tags }) => {
+      // Log start for debugging (visible in server logs)
+      console.error("🚀 Starting blog post creation...");
+      
       // Check authentication
+      console.error("📋 Step 1/5: Checking authentication...");
       if (!auth.accessToken || !auth.blogInfo) {
+        console.error("🔑 Authenticating with API...");
         const authResult = await auth.authenticate();
         if (!authResult) {
           return {
@@ -161,12 +165,15 @@ function createServerInstance(_clientIp?: string, _apiKey?: string) {
           };
         }
       }
+      console.error("✅ Authentication verified");
 
       // Get markdown content
+      console.error("📋 Step 2/5: Processing markdown content...");
       let markdownContent: string;
       if (file_path) {
         const fs = await import("fs/promises");
         try {
+          console.error(`📂 Reading file: ${file_path}`);
           markdownContent = await fs.readFile(file_path, "utf-8");
         } catch (error) {
           return {
@@ -190,21 +197,29 @@ function createServerInstance(_clientIp?: string, _apiKey?: string) {
           ],
         };
       }
+      console.error(`✅ Content processed (${markdownContent.length} characters)`);
 
       // Parse markdown metadata
+      console.error("📋 Step 3/5: Parsing metadata...");
       const { metadata, body } = parseMarkdownMetadata(markdownContent);
       const finalTitle = title || metadata.title;
       const finalTags = tags || metadata.tags;
+      console.error(`✅ Title: "${finalTitle}", Tags: ${finalTags?.length || 0}`);
 
       // Save to file
+      console.error("📋 Step 4/5: Saving to local file...");
       const savedFilePath = await savePostToFile(finalTitle, body, finalTags);
       const savedMessage = savedFilePath
         ? `💾 MD file saved: ${path.basename(savedFilePath)}`
         : "⚠️ MD file save failed";
+      console.error(savedMessage);
 
       // Create post via API
+      console.error("📋 Step 5/5: Creating post via API...");
       try {
+        console.error(`🌐 Sending to: ${auth.baseUrl}`);
         const post = await apiClient.createPost(finalTitle, body, finalTags);
+        console.error("✅ Post created successfully!");
         const blogSlug = post.blogSlug || auth.blogInfo?.slug;
         const postUrl = `${auth.baseUrl}/blog/${blogSlug}/posts/${post.slug}`;
 

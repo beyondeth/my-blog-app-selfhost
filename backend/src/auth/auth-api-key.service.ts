@@ -113,14 +113,16 @@ export class AuthApiKeyService {
   }
 
   /**
-   * 새로운 ID/Secret 방식으로 API 키 검증
+   * AWS V4 스타일로 API 키 검증 (Secret은 전송되지 않음)
    */
   async verifyWithIdAndSecret(
     keyId: string,
-    keySecret: string,
+    keySecret: string | undefined,  // keySecret이 없을 수 있음 (AWS V4 스타일)
     timestamp: string,
     nonce: string,
     signature: string,
+    headers?: any,
+    body?: string
   ): Promise<{ valid: boolean; apiKey?: ApiKey }> {
     try {
       // 1. 타임스탬프 검증
@@ -128,33 +130,78 @@ export class AuthApiKeyService {
       const currentTime = Date.now();
       
       if (isNaN(requestTime) || Math.abs(currentTime - requestTime) > this.TIMESTAMP_WINDOW) {
+        this.logger.warn('Timestamp validation failed');
         return { valid: false };
       }
 
       // 2. 논스 중복 체크
       if (this.usedNonces.has(nonce)) {
+        this.logger.warn('Nonce already used');
         return { valid: false };
       }
       this.usedNonces.set(nonce, requestTime);
 
-      // 3. API 키 검증 (새로운 ID/Secret 방식)
-      const validation = await this.apiKeysService.validateApiKey(keyId, keySecret);
-      if (!validation.valid || !validation.apiKey) {
+      // 3. API Key ID로 데이터베이스에서 조회
+      const apiKey = await this.apiKeyRepository.findOne({
+        where: { 
+          keyId: keyId,
+          isActive: true 
+        },
+        relations: ['user', 'blog']
+      });
+
+      if (!apiKey) {
+        this.logger.warn(`API key not found or inactive: ${keyId}`);
         return { valid: false };
       }
 
-      // 4. HMAC 서명 생성 및 검증 (Secret으로 서명)
-      const message = `${timestamp}:${nonce}:${keyId}`;
-      const expectedSignature = crypto
-        .createHmac('sha256', keySecret)
-        .update(message)
-        .digest('hex');
+      // 4. AWS V4 스타일 서명 검증
+      // keySecret이 제공되지 않은 경우 (AWS V4 스타일)
+      if (!keySecret) {
+        // 데이터베이스에서 저장된 Signing Secret 조회 (복호화된 평문)
+        const signingSecret = await this.apiKeysService.getSigningSecret(apiKey.id);
+        if (!signingSecret) {
+          this.logger.warn(`No signing secret found for API key: ${keyId}`);
+          return { valid: false };
+        }
 
-      if (!this.timingSafeEqual(signature, expectedSignature)) {
-        return { valid: false };
+        // 보안 서명 생성 (Secret 미전송 방식)
+        const method = "POST";
+        const uri = "/auth/verify-api-key-id-secret";
+        const expectedSignature = this.createSecureSignature(
+          method,
+          uri,
+          timestamp,
+          nonce,
+          keyId,
+          signingSecret,  // 복호화된 평문 시크릿 사용
+          body || ""
+        );
+
+        // 서명 비교 (타이밍 공격 방지)
+        if (!this.timingSafeEqual(signature, expectedSignature)) {
+          this.logger.warn('Signature verification failed', {
+            receivedSignature: signature.substring(0, 32),
+            expectedSignature: expectedSignature.substring(0, 32),
+            keyId,
+            timestamp,
+            nonce
+          });
+          return { valid: false };
+        }
+      } else {
+        // 레거시 방식 (keySecret이 제공된 경우) - 향후 deprecated
+        const validation = await this.apiKeysService.validateApiKey(keyId, keySecret);
+        if (!validation.valid || !validation.apiKey) {
+          return { valid: false };
+        }
       }
 
-      return { valid: true, apiKey: validation.apiKey };
+      // 5. 마지막 사용 시간 업데이트
+      apiKey.lastUsedAt = new Date();
+      await this.apiKeyRepository.save(apiKey);
+
+      return { valid: true, apiKey };
 
     } catch (error) {
       this.logger.error('ID/Secret verification error:', error);
@@ -251,6 +298,52 @@ export class AuthApiKeyService {
       this.logger.error('Request signature verification error:', error);
       return false;
     }
+  }
+
+  /**
+   * 보안 서명 생성 (서버측) - Secret 미전송 방식
+   */
+  private createSecureSignature(
+    method: string,
+    uri: string,
+    timestamp: string,
+    nonce: string,
+    keyId: string,
+    keySecret: string,
+    body: string = ""
+  ): string {
+    // Create message to sign (includes all critical request elements)
+    const bodyHash = crypto.createHash("sha256").update(body).digest("hex");
+    const message = [
+      method,
+      uri,
+      keyId,
+      timestamp,
+      nonce,
+      bodyHash
+    ].join(':');
+
+    // Sign with secret (secret never transmitted)
+    const signature = crypto
+      .createHmac("sha256", keySecret)
+      .update(message)
+      .digest("hex");
+
+    // Debug logging
+    this.logger.warn('Secure Signature Debug:', {
+      method,
+      uri,
+      keyId,
+      timestamp,
+      nonce,
+      body: body.substring(0, 200),
+      bodyHash: bodyHash,
+      message: message,
+      signature: signature,
+      keySecret: keySecret.substring(0, 10) + '...'
+    });
+
+    return signature;
   }
 
   /**

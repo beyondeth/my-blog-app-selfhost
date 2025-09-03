@@ -467,37 +467,62 @@ export class AuthController {
 
   @Post('verify-api-key-id-secret')
   @Public()
-  @ApiOperation({ summary: 'ID/Secret 방식 API 키 검증 (새로운 방식)' })
+  @ApiOperation({ summary: 'AWS V4 스타일 API 키 검증 (Secret 미전송)' })
   @ApiResponse({ status: 200, description: 'API 키 검증 성공' })
   @ApiResponse({ status: 401, description: 'API 키 검증 실패' })
   async verifyApiKeyIdSecret(
     @Body() body: { 
       keyId: string;
-      keySecret: string;
+      keySecret?: string;  // Optional - AWS V4에서는 사용하지 않음
       timestamp: string;
       nonce: string;
-      signature?: string;
-    }, 
+      signature?: string;  // 레거시 지원
+    },
+    @Request() req,
     @Response() res
   ) {
-    // 서명 생성 (클라이언트가 보내지 않은 경우 서버에서 생성)
-    const signature = body.signature || crypto
-      .createHmac('sha256', body.keySecret)
-      .update(`${body.timestamp}:${body.nonce}:${body.keyId}`)
-      .digest('hex');
+    // 헤더에서 서명 정보 추출
+    const signature = req.headers['x-api-signature'] || body.signature;
+    const timestamp = req.headers['x-api-timestamp'] || body.timestamp;
+    const nonce = req.headers['x-api-nonce'] || body.nonce;
     
-    // ID/Secret으로 API 키 검증
+    console.log('Auth Controller - Received request:', {
+      keyId: body.keyId,
+      hasKeySecret: !!body.keySecret,
+      signature: signature?.substring(0, 32),
+      timestamp,
+      nonce: nonce?.substring(0, 16),
+      headers: Object.keys(req.headers).filter(h => h.startsWith('x-api')),
+    });
+    
+    if (!signature) {
+      return res.status(401).json({ 
+        message: 'Missing signature',
+        valid: false 
+      });
+    }
+
+    // AWS V4 스타일 검증 (keySecret 없이)
+    // 서명 검증을 위한 정규화된 body 생성 (signature 필드 제외)
+    const normalizedBody = JSON.stringify({
+      keyId: body.keyId,
+      timestamp: body.timestamp,
+      nonce: body.nonce,
+    });
+    
     const result = await this.authApiKeyService.verifyWithIdAndSecret(
       body.keyId,
-      body.keySecret,
-      body.timestamp,
-      body.nonce,
-      signature
+      body.keySecret,  // undefined일 수 있음 (AWS V4 스타일)
+      timestamp,
+      nonce,
+      signature,
+      req.headers,
+      normalizedBody
     );
     
     if (!result.valid || !result.apiKey) {
       return res.status(401).json({ 
-        message: 'Invalid API key',
+        message: 'Invalid API key signature',
         valid: false 
       });
     }
@@ -511,7 +536,7 @@ export class AuthController {
       blogId: result.apiKey.blogId,
       sessionToken,
       blog: result.apiKey.blog,
-      message: 'API key verified successfully'
+      message: 'API key verified successfully (AWS V4)'
     });
   }
 

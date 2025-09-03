@@ -1,20 +1,20 @@
 import fs from "fs/promises";
 import path from "path";
-import { fileURLToPath } from "url";
 import { generateSafeFilename } from "./markdown.js";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export async function savePostToFile(
   title: string,
   body: string,
   tags?: string[]
 ): Promise<string | null> {
-  /** Save markdown post to file in posts directory */
+  /** Save markdown post to file in .codebase_blog/posts directory in user's current working directory */
   try {
-    // Create posts directory
-    const postsDir = path.join(__dirname, "../../../posts");
+    // Get the base directory from environment variable or use current working directory
+    // This allows users to specify a different base directory if needed
+    const baseDir = process.env['BLOG_POSTS_DIR'] || process.cwd();
+    
+    // Create .codebase_blog/posts directory in the base directory
+    const postsDir = path.join(baseDir, ".codebase_blog", "posts");
     await fs.mkdir(postsDir, { recursive: true });
 
     // Generate filename: YYYYMMDD_title.md

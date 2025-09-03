@@ -8,6 +8,7 @@ import { AuthService } from '../auth/auth.service';
 import { McpAuthGuard } from './mcp-auth.guard';
 import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpLoggingInterceptor } from './mcp-logging.interceptor';
+import * as crypto from 'crypto';
 
 @Controller('mcp')
 @Public() // Bypass JWT auth, we'll use API key auth instead
@@ -42,60 +43,123 @@ export class McpController {
   }
 
   /**
-   * MCP 2단계 인증 엔드포인트
-   * 1차: 사용자 로그인 확인
-   * 2차: API 키 확인
+   * HMAC-SHA256 서명 검증 헬퍼 메서드
+   */
+  private verifyHmacSignature(
+    method: string,
+    uri: string,
+    timestamp: string,
+    nonce: string,
+    body: string,
+    signature: string,
+    apiKeySecret: string,
+  ): boolean {
+    try {
+      // 1. Create Canonical Request
+      const bodyHash = crypto.createHash('sha256').update(body).digest('hex');
+      const canonicalRequest = `${method}\n${uri}\n${timestamp}\n${nonce}\n${bodyHash}`;
+      
+      // 2. Create String to Sign
+      const requestHash = crypto.createHash('sha256').update(canonicalRequest).digest('hex');
+      const stringToSign = `HMAC-SHA256\n${timestamp}\n${requestHash}`;
+      
+      // 3. Create signature with Secret
+      const expectedSignature = crypto
+        .createHmac('sha256', apiKeySecret)
+        .update(stringToSign)
+        .digest('hex');
+      
+      // 4. Compare signatures
+      return crypto.timingSafeEqual(
+        Buffer.from(signature),
+        Buffer.from(expectedSignature),
+      );
+    } catch (error) {
+      this.logger.error(`HMAC verification error: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * MCP HMAC 서명 기반 인증 엔드포인트
+   * OAuth 사용자도 비밀번호 없이 API Key로만 인증 가능
    */
   @Post('auth/verify')
   async verifyMcpAuth(
-    @Body() body: { email: string; password: string },
+    @Body() body: { apiKeyId: string; timestamp: string; nonce: string },
     @Headers() headers,
   ) {
     try {
-      // Step 1: Verify user credentials
-      const user = await this.authService.validateUser(body.email, body.password);
-      if (!user) {
-        this.logger.warn(`MCP auth failed: Invalid credentials for ${body.email}`);
-        throw new UnauthorizedException('사용자 인증에 실패했습니다.');
+      // Extract headers
+      const apiKeyId = headers['x-api-key-id'];
+      const signature = headers['x-api-signature'];
+      const timestamp = headers['x-api-timestamp'];
+      const nonce = headers['x-api-nonce'];
+
+      if (!apiKeyId || !signature || !timestamp || !nonce) {
+        this.logger.warn(`MCP auth failed: Missing required headers`);
+        throw new UnauthorizedException('필수 인증 헤더가 누락되었습니다.');
       }
 
-      // Step 2: Verify API key
-      const apiKey = headers['x-api-key'] || headers['authorization']?.replace('Bearer ', '');
+      // Validate timestamp (5 minute window)
+      const currentTime = Date.now();
+      const requestTime = parseInt(timestamp);
+      if (Math.abs(currentTime - requestTime) > 5 * 60 * 1000) {
+        this.logger.warn(`MCP auth failed: Timestamp expired for ${apiKeyId}`);
+        throw new UnauthorizedException('요청 시간이 만료되었습니다.');
+      }
+
+      // Find API key by ID
+      const apiKey = await this.apiKeysService.findByKeyId(apiKeyId);
       if (!apiKey) {
-        this.logger.warn(`MCP auth failed: No API key provided for ${body.email}`);
-        throw new UnauthorizedException('API 키가 필요합니다.');
-      }
-
-      const validation = await this.apiKeysService.validateApiKey(apiKey);
-      if (!validation.valid) {
-        this.logger.warn(`MCP auth failed: Invalid API key for ${body.email}`);
+        this.logger.warn(`MCP auth failed: API key not found for ${apiKeyId}`);
         throw new UnauthorizedException('유효하지 않은 API 키입니다.');
       }
 
-      // Step 3: Verify API key belongs to the authenticated user
-      if (validation.apiKey.userId !== user.id) {
-        this.logger.warn(`MCP auth failed: API key mismatch for ${body.email}`);
-        throw new UnauthorizedException('API 키가 사용자와 일치하지 않습니다.');
+      // Get the API key secret (hashed version)
+      const apiKeySecret = await this.apiKeysService.getApiKeySecret(apiKeyId);
+      if (!apiKeySecret) {
+        this.logger.warn(`MCP auth failed: API key secret not found for ${apiKeyId}`);
+        throw new UnauthorizedException('API 키 시크릿을 찾을 수 없습니다.');
+      }
+
+      // Verify HMAC signature
+      const method = 'POST';
+      const uri = '/mcp/auth/verify';
+      const bodyString = JSON.stringify(body);
+      
+      const isValid = this.verifyHmacSignature(
+        method,
+        uri,
+        timestamp,
+        nonce,
+        bodyString,
+        signature,
+        apiKeySecret,
+      );
+
+      if (!isValid) {
+        this.logger.warn(`MCP auth failed: Invalid signature for ${apiKeyId}`);
+        throw new UnauthorizedException('서명 검증에 실패했습니다.');
+      }
+
+      // Check if API key is active
+      if (!apiKey.isActive) {
+        this.logger.warn(`MCP auth failed: API key inactive for ${apiKeyId}`);
+        throw new UnauthorizedException('비활성화된 API 키입니다.');
       }
 
       // Success: Log and return auth status
-      this.logger.log(`MCP auth successful for ${body.email}, blog: ${validation.apiKey.blog.slug}`);
+      this.logger.log(`MCP auth successful for API key: ${apiKeyId}, blog: ${apiKey.blog.slug}`);
       
       return {
-        authenticated: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          username: user.username,
-        },
+        valid: true,
+        userId: apiKey.userId,
+        blogId: apiKey.blogId,
         blog: {
-          id: validation.apiKey.blog.id,
-          slug: validation.apiKey.blog.slug,
-          name: validation.apiKey.blog.name,
-        },
-        apiKey: {
-          id: validation.apiKey.id,
-          name: validation.apiKey.name,
+          id: apiKey.blog.id,
+          slug: apiKey.blog.slug,
+          name: apiKey.blog.name,
         },
         timestamp: new Date().toISOString(),
       };

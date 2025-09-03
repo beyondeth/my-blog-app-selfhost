@@ -23,6 +23,9 @@
 *.swp
 *.swo
 
+# Claude personal settings
+.claude/settings.local.json
+
 # OS
 .DS_Store
 **/.DS_Store

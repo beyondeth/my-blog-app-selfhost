@@ -1,5 +1,4 @@
 import crypto from "crypto";
-import { v4 as uuidv4 } from "uuid";
 
 export interface BlogInfo {
   id: string;
@@ -21,8 +20,9 @@ export class SecureAPIKeyAuth {
   private usedNonces = new Set<string>();
 
   constructor() {
-    this.baseUrl = process.env["BLOG_API_URL"] || "http://localhost:3000";
-    this.apiUrl = `${this.baseUrl}/api/v1`;
+    // BLOG_API_URL already includes /api/v1
+    this.apiUrl = process.env["BLOG_API_URL"] || "http://localhost:3000/api/v1";
+    this.baseUrl = this.apiUrl.replace(/\/api\/v1$/, '');
 
     // AWS-style API Key ID and Secret separation
     this.apiKeyId = process.env["BLOG_API_KEY_ID"];
@@ -46,30 +46,6 @@ export class SecureAPIKeyAuth {
     return "";
   }
 
-  private createAwsStyleSignature(
-    method: string,
-    uri: string,
-    timestamp: string,
-    nonce: string,
-    body: string = ""
-  ): string {
-    /** Create AWS Signature V4 style HMAC-SHA256 signature */
-    // 1. Create Canonical Request
-    const bodyHash = crypto.createHash("sha256").update(body).digest("hex");
-    const canonicalRequest = `${method}\n${uri}\n${timestamp}\n${nonce}\n${bodyHash}`;
-
-    // 2. Create String to Sign
-    const requestHash = crypto.createHash("sha256").update(canonicalRequest).digest("hex");
-    const stringToSign = `HMAC-SHA256\n${timestamp}\n${requestHash}`;
-
-    // 3. Create signature with Secret
-    const signature = crypto
-      .createHmac("sha256", this.apiKeySecret!)
-      .update(stringToSign)
-      .digest("hex");
-
-    return signature;
-  }
 
   private validateTimestamp(timestamp: string): boolean {
     /** Validate timestamp (allow within 5 minutes) */
@@ -136,7 +112,7 @@ export class SecureAPIKeyAuth {
 
       // 2. Generate security parameters
       const timestamp = Date.now().toString();
-      const nonce = uuidv4();
+      const nonce = crypto.randomBytes(16).toString("hex");
 
       // 3. Validate timestamp
       if (!this.validateTimestamp(timestamp)) {
@@ -150,21 +126,34 @@ export class SecureAPIKeyAuth {
         return false;
       }
 
-      // 5. Prepare authentication with new ID/Secret method
+      // 5. Prepare authentication - Using secure AWS V4 style method
       const method = "POST";
       const uri = "/auth/verify-api-key-id-secret";
 
+      // Secure method - NO secret in body
       const body = JSON.stringify({
         keyId: this.apiKeyId,
-        keySecret: this.apiKeySecret,
         timestamp,
         nonce,
       });
 
-      // Generate signature for entire request
-      const signature = this.createAwsStyleSignature(method, uri, timestamp, nonce, body);
+      // Generate AWS V4 style signature
+      const bodyHash = crypto.createHash("sha256").update(body).digest("hex");
+      const message = [
+        method,
+        uri,
+        this.apiKeyId,
+        timestamp,
+        nonce,
+        bodyHash
+      ].join(':');
+      
+      const signature = crypto
+        .createHmac("sha256", this.apiKeySecret!)
+        .update(message)
+        .digest("hex");
 
-      // 6. Make API call with signature
+      // 6. Make API call with signature (AWS V4 style - no secret in body)
       const response = await fetch(`${this.apiUrl}/auth/verify-api-key-id-secret`, {
         method: "POST",
         headers: {
@@ -186,7 +175,7 @@ export class SecureAPIKeyAuth {
           this.accessToken = data.sessionToken;
           this.blogInfo = data.blog;
 
-          console.log("✅ Secure authentication successful (HMAC-SHA256)");
+          console.log("✅ AWS V4 secure authentication successful (Secret never transmitted)");
           return true;
         } else {
           console.error("❌ Authentication failed: Signature verification failed");
