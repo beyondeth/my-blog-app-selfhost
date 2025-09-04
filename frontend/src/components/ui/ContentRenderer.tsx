@@ -6,13 +6,85 @@ import { normalizeImageUrl } from '@/utils/imageUtils';
 import { createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
+import python from 'highlight.js/lib/languages/python';
+import bash from 'highlight.js/lib/languages/bash';
+import json from 'highlight.js/lib/languages/json';
+import sql from 'highlight.js/lib/languages/sql';
+import xml from 'highlight.js/lib/languages/xml';
+import css from 'highlight.js/lib/languages/css';
+import markdown from 'highlight.js/lib/languages/markdown';
+import yaml from 'highlight.js/lib/languages/yaml';
+// 모바일 개발 언어
+import swift from 'highlight.js/lib/languages/swift';
+import kotlin from 'highlight.js/lib/languages/kotlin';
+import dart from 'highlight.js/lib/languages/dart';
+import objectivec from 'highlight.js/lib/languages/objectivec';
+// 백엔드 언어
+import go from 'highlight.js/lib/languages/go';
+import ruby from 'highlight.js/lib/languages/ruby';
+import java from 'highlight.js/lib/languages/java';
+import csharp from 'highlight.js/lib/languages/csharp';
+import php from 'highlight.js/lib/languages/php';
+import rust from 'highlight.js/lib/languages/rust';
+// 기타 언어
+import dockerfile from 'highlight.js/lib/languages/dockerfile';
+import nginx from 'highlight.js/lib/languages/nginx';
+import graphql from 'highlight.js/lib/languages/graphql';
 import { stripUnderline } from '@/utils/stripUnderline';
 import { useImageModal } from '@/hooks/useImageModal';
 import ImageModal from './ImageModal';
 
-// lowlight 인스턴스 생성
+// lowlight 인스턴스 생성 및 언어 등록
 const lowlight = createLowlight();
-lowlight.register({ javascript, typescript, js: javascript, ts: typescript });
+lowlight.register({ 
+  // 웹 개발
+  javascript, 
+  typescript, 
+  css,
+  xml,
+  json,
+  graphql,
+  
+  // 모바일 개발
+  swift,      // iOS
+  kotlin,     // Android
+  dart,       // Flutter
+  objectivec, // iOS (Objective-C)
+  java,       // Android/Spring
+  
+  // 백엔드 개발
+  python,
+  go,         // Golang
+  ruby,       // Ruby on Rails
+  php,
+  rust,
+  csharp,     // C#/.NET
+  
+  // DevOps & 기타
+  bash,
+  sql,
+  yaml,
+  dockerfile,
+  nginx,
+  markdown,
+  
+  // 별칭 등록
+  js: javascript, 
+  ts: typescript,
+  jsx: javascript,
+  tsx: typescript,
+  sh: bash,
+  shell: bash,
+  html: xml,
+  yml: yaml,
+  golang: go,
+  objc: objectivec,
+  'c#': csharp,
+  cs: csharp,
+  docker: dockerfile,
+  gql: graphql,
+  rb: ruby
+});
 
 interface ContentRendererProps {
   content: string;
@@ -29,7 +101,7 @@ const decodeHtmlEntities = (text: string): string => {
     .replace(/&#x27;/g, "'");
 };
 
-// 안전한 클래스 필터링
+// 안전한 클래스 필터링 - 마크다운 클래스 포함
 const filterSafeClasses = (classNames: string): string => {
   return classNames
     .split(/\s+/)
@@ -37,6 +109,8 @@ const filterSafeClasses = (classNames: string): string => {
       className.startsWith('hljs') ||
       className.startsWith('language-') ||
       className.startsWith('editor-') ||
+      className.startsWith('markdown-') ||
+      className.startsWith('content-') ||
       ['code-block', 'code', 'pre'].includes(className)
     )
     .join(' ');
@@ -103,19 +177,66 @@ const processImageUrls = (html: string): string => {
 
 // 신택스 하이라이팅 적용
 const applySyntaxHighlighting = (html: string): string => {
+  // 백엔드에서 이미 렌더링된 HTML에 하이라이팅 적용
   return html.replace(
-    /<pre[^>]*><code class="language-([\w]+)">([\s\S]*?)<\/code><\/pre>/gi,
+    /<pre[^>]*><code(?:\s+class="language-([\w#\-]+)")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
     (match, language, codeContent) => {
       try {
         // 지원하는 언어 확장
-        const supportedLanguages = ['typescript', 'javascript', 'ts', 'js', 'python', 'bash', 'json', 'yaml', 'sql'];
-        if (!supportedLanguages.includes(language)) {
-          // 지원하지 않는 언어는 그대로 반환
+        const supportedLanguages = [
+          // 웹 개발
+          'typescript', 'javascript', 'ts', 'js', 'jsx', 'tsx',
+          'html', 'xml', 'css', 'json', 'graphql', 'gql',
+          
+          // 모바일 개발
+          'swift', 'kotlin', 'dart', 'flutter',
+          'objectivec', 'objc', 'java',
+          
+          // 백엔드 개발
+          'python', 'go', 'golang', 'ruby', 'rb', 'rails',
+          'php', 'rust', 'csharp', 'c#', 'cs', 'dotnet',
+          
+          // DevOps & 기타
+          'bash', 'sh', 'shell', 'sql', 
+          'yaml', 'yml', 'dockerfile', 'docker',
+          'nginx', 'markdown', 'md'
+        ];
+        if (!supportedLanguages.includes(language.toLowerCase())) {
+          // 지원하지 않는 언어는 기본 스타일로 반환
           return `<pre class="hljs"><code class="language-${language}">${codeContent}</code></pre>`;
         }
         
-        // 코드 블록 내용은 HTML 엔티티를 디코딩하지 않음 - 보안 및 표시 문제 방지
-        const mappedLanguage = language === 'ts' ? 'typescript' : language === 'js' ? 'javascript' : language;
+        // 언어 별칭 매핑
+        const languageMap: Record<string, string> = {
+          // 웹 개발
+          'ts': 'typescript',
+          'js': 'javascript',
+          'jsx': 'javascript',
+          'tsx': 'typescript',
+          'html': 'xml',
+          'gql': 'graphql',
+          
+          // 모바일 개발
+          'flutter': 'dart',
+          'objc': 'objectivec',
+          
+          // 백엔드 개발
+          'golang': 'go',
+          'rb': 'ruby',
+          'rails': 'ruby',
+          'c#': 'csharp',
+          'cs': 'csharp',
+          'dotnet': 'csharp',
+          
+          // DevOps
+          'sh': 'bash',
+          'shell': 'bash',
+          'yml': 'yaml',
+          'docker': 'dockerfile',
+          'md': 'markdown'
+        };
+        
+        const mappedLanguage = languageMap[language.toLowerCase()] || language.toLowerCase();
         
         const result = lowlight.highlight(mappedLanguage, codeContent);
         
@@ -187,12 +308,8 @@ export default function ContentRenderer({ content, className = '' }: ContentRend
       processedHtml = processLinks(processedHtml);
       // 4. 이미지 URL 처리 (클릭 가능하게)
       processedHtml = processImageUrls(processedHtml);
-      // 5. 안전한 클래스만 유지
-      processedHtml = processedHtml.replace(/class=["']([^"']*?)["']/gi, (match, classNames) => {
-        // content-link 클래스는 유지
-        if (classNames.includes('content-link')) {
-          return `class="content-link"`;
-        }
+      // 5. 안전한 클래스만 유지 (마크다운 클래스 포함)
+      processedHtml = processedHtml.replace(/class=["']([^"']*?)["']/gi, (_, classNames) => {
         const safeClasses = filterSafeClasses(classNames);
         return safeClasses ? `class="${safeClasses}"` : '';
       });

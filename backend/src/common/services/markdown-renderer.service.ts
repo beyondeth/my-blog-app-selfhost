@@ -21,7 +21,7 @@ export class MarkdownRendererService {
         return match;
       }
       
-      let html = '<table style="border-collapse: collapse; width: 100%; margin: 1em 0;">';
+      let html = '<table class="markdown-table">';
       html += '<thead><tr>';
       
       // 헤더 처리 - 파이프로 구분하되 양끝 파이프는 선택적
@@ -36,7 +36,7 @@ export class MarkdownRendererService {
       const headers = headerLine.split('|').map(cell => cell.trim());
       for (const header of headers) {
         if (header) { // 빈 문자열 제외
-          html += `<th style="border: 1px solid #ddd; padding: 8px; background-color: #f2f2f2; text-align: left;">${header}</th>`;
+          html += `<th class="markdown-table-header">${header}</th>`;
         }
       }
       html += '</tr></thead><tbody>';
@@ -62,7 +62,7 @@ export class MarkdownRendererService {
           for (const cell of cells) {
             // Python 로직과 일치: 빈 셀도 포함하되 올바른 조건 적용
             if (cell) {
-              html += `<td style="border: 1px solid #ddd; padding: 8px;">${cell}</td>`;
+              html += `<td class="markdown-table-cell">${cell}</td>`;
             }
           }
           html += '</tr>';
@@ -92,9 +92,10 @@ export class MarkdownRendererService {
       
       let html: string;
       if (lang) {
-        html = `<pre style="background: #1e1e1e !important; color: #d4d4d4 !important; padding: 1em; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace;"><code class="language-${lang}" style="color: #d4d4d4 !important; background: transparent !important;">${escapedCode}</code></pre>`;
+        // hljs 클래스 추가하여 프론트엔드에서 하이라이팅 적용 가능하도록 함
+        html = `<pre class="hljs markdown-code-block"><code class="language-${lang}">${escapedCode}</code></pre>`;
       } else {
-        html = `<pre style="background: #1e1e1e !important; color: #d4d4d4 !important; padding: 1em; border-radius: 4px; overflow-x: auto; font-family: 'Courier New', monospace;"><code style="color: #d4d4d4 !important; background: transparent !important;">${escapedCode}</code></pre>`;
+        html = `<pre class="hljs markdown-code-block"><code>${escapedCode}</code></pre>`;
       }
       
       codeBlockStore.set(key, html);
@@ -116,7 +117,7 @@ export class MarkdownRendererService {
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
       
-      const html = `<code style="background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-family: monospace;">${escapedCode}</code>`;
+      const html = `<code class="markdown-inline-code">${escapedCode}</code>`;
       protectedInline.set(key, html);
       return key;
     };
@@ -126,7 +127,7 @@ export class MarkdownRendererService {
     // 제목 변환 (h1-h6)
     for (let level = 6; level >= 1; level--) {
       const pattern = new RegExp(`^${'#'.repeat(level)}\\s+(.+)$`, 'gm');
-      text = text.replace(pattern, `<h${level}>$1</h${level}>`);
+      text = text.replace(pattern, `<h${level} class="markdown-h${level}">$1</h${level}>`);
     }
     
     // 굵은 글씨
@@ -148,19 +149,21 @@ export class MarkdownRendererService {
       
       // 외부 링크 아이콘 SVG (인라인으로 포함)
       const externalIcon = isExternal ? 
-        ' <svg style="display: inline-block; width: 0.75rem; height: 0.75rem; margin-left: 0.125rem; vertical-align: baseline;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' : '';
+        ' <svg class="markdown-external-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>' : '';
       
-      return `<a href="${href}"${targetAttr} style="color: #0EA5E9; text-decoration: none; background-color: #F0F9FF; padding: 2px 4px; border-radius: 3px; transition: all 0.2s ease; border-bottom: 2px solid transparent; display: inline; white-space: nowrap;">${linkText}${externalIcon}</a>`;
+      const linkClass = isExternal ? 'markdown-external-link' : 'markdown-link';
+      
+      return `<a href="${href}"${targetAttr} class="${linkClass}">${linkText}${externalIcon}</a>`;
     });
     
     // 이미지
-    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;">');
+    text = text.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" class="markdown-image">');
     
     // 수평선
-    text = text.replace(/^---+$/gm, '<hr style="border: none; border-top: 1px solid #ccc; margin: 2em 0;">');
+    text = text.replace(/^---+$/gm, '<hr class="markdown-hr">');
     
     // 인용문
-    text = text.replace(/^>\s+(.+)$/gm, '<blockquote style="border-left: 4px solid #ddd; margin: 1em 0; padding-left: 1em; color: #666;">$1</blockquote>');
+    text = text.replace(/^>\s+(.+)$/gm, '<blockquote class="markdown-blockquote">$1</blockquote>');
     
     // 리스트 처리
     const lines = text.split('\n');
@@ -171,18 +174,18 @@ export class MarkdownRendererService {
     for (const line of lines) {
       if (/^\s*[-*+]\s+/.test(line)) {
         if (!inUl) {
-          resultLines.push('<ul>');
+          resultLines.push('<ul class="markdown-ul">');
           inUl = true;
         }
         const content = line.replace(/^\s*[-*+]\s+/, '').trim();
-        resultLines.push(`<li>${content}</li>`);
+        resultLines.push(`<li class="markdown-li">${content}</li>`);
       } else if (/^\s*\d+\.\s+/.test(line)) {
         if (!inOl) {
-          resultLines.push('<ol>');
+          resultLines.push('<ol class="markdown-ol">');
           inOl = true;
         }
         const content = line.replace(/^\d+\.\s+/, '').trim();
-        resultLines.push(`<li>${content}</li>`);
+        resultLines.push(`<li class="markdown-li">${content}</li>`);
       } else {
         if (inUl) {
           resultLines.push('</ul>');
@@ -229,7 +232,7 @@ export class MarkdownRendererService {
         if (!isCodeBlockPlaceholder && !isTablePlaceholder && 
             !/^<(?:h[1-6]|ul|ol|pre|blockquote|table|hr)/.test(para)) {
           para = para.replace(/\n/g, '<br>');
-          para = `<p style="line-height: 1.6;">${para}</p>`;
+          para = `<p class="markdown-p">${para}</p>`;
         }
         formatted.push(para);
       }

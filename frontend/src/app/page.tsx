@@ -10,11 +10,13 @@ import { useNavigationCache } from '@/hooks/useNavigationCache';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
-import LoadMoreSection from '@/components/posts/LoadMoreSection';
+import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
+import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
 import RecentPostsSection from '@/components/layout/RecentPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
 import FollowingListSection from '@/components/FollowingListSection';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
+import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
 
 // 클라이언트 사이드 체크 훅 - Context7 모범 사례 적용
 function useIsClient() {
@@ -36,6 +38,9 @@ export default function HomePage() {
   const isClient = useIsClient();
   const searchParams = useSearchParams();
   const { getCacheStatus } = useNavigationCache();
+  
+  // 스크롤 위치 복원
+  useScrollRestoration('home-page');
   
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -171,14 +176,12 @@ export default function HomePage() {
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
-          {/* Main Content Area */}
+        {/* Main Content Area */}
         <main className="flex-1 lg:max-w-[calc(100%-380px)] min-w-0">
           <div className="space-y-0">
             {isLoading && allPosts.length === 0 ? (
-              <div className="flex justify-center items-center py-12 sm:py-16">
-                <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-amber-600"></div>
-                <span className="ml-2 text-sm text-gray-600">게시글을 불러오는 중...</span>
-              </div>
+              // 초기 로딩 시 스켈레톤 UI 표시
+              <PostSkeletonWithShimmer count={5} />
             ) : allPosts.length > 0 ? (
               <>
                 {allPosts.map((post) => (
@@ -194,12 +197,15 @@ export default function HomePage() {
                   />
                 ))}
                 
-                <LoadMoreSection
+                {/* 무한 스크롤 트리거 */}
+                <InfiniteScrollTrigger
                   hasNextPage={hasNextPage}
                   isFetchingNextPage={isFetchingNextPage}
                   totalPosts={totalPosts}
-                  allPostsCount={allPosts.length}
+                  currentPostsCount={allPosts.length}
                   onLoadMore={loadMorePosts}
+                  error={error}
+                  onRetry={() => fetchNextPage()}
                 />
               </>
             ) : (
@@ -210,15 +216,48 @@ export default function HomePage() {
           </div>
           </main>
 
-          {/* Sidebar */}
-        <aside className="w-full lg:w-80 lg:min-w-[320px] space-y-4 sm:space-y-6">
-          <RecentPostsSection posts={recentPosts} />
-          
-          <TagsSection tags={tags} onTagClick={handleTagClick} />
-          
-          {user && (
-            <FollowingListSection userId={user.id} />
-          )}
+          {/* Sidebar - sticky with matched top position */}
+        <aside className="w-full lg:w-80 lg:min-w-[320px]">
+          <div className="lg:sticky lg:top-8 space-y-4 sm:space-y-6 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-2">
+            {/* Custom scrollbar styles inline */}
+            <style jsx>{`
+              @media (min-width: 1024px) {
+                aside > div::-webkit-scrollbar {
+                  width: 6px;
+                }
+                aside > div::-webkit-scrollbar-track {
+                  background: transparent;
+                }
+                aside > div::-webkit-scrollbar-thumb {
+                  background-color: #d1d5db;
+                  border-radius: 3px;
+                }
+                aside > div::-webkit-scrollbar-thumb:hover {
+                  background-color: #9ca3af;
+                }
+                /* Hide scrollbar by default, show on hover */
+                aside > div {
+                  scrollbar-width: none;
+                }
+                aside > div:hover {
+                  scrollbar-width: thin;
+                }
+                aside > div::-webkit-scrollbar {
+                  display: none;
+                }
+                aside > div:hover::-webkit-scrollbar {
+                  display: block;
+                }
+              }
+            `}</style>
+            <RecentPostsSection posts={recentPosts} />
+            
+            <TagsSection tags={tags} onTagClick={handleTagClick} />
+            
+            {user && (
+              <FollowingListSection userId={user.id} />
+            )}
+          </div>
           </aside>
       </div>
 

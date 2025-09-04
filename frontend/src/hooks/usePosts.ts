@@ -35,14 +35,14 @@ export function useInfinitePosts(options: {
     queryKey: postQueryKeys.list({ search, category, blogSlug }),
     queryFn: ({ pageParam = 1 }) => postsAPI.getPosts({ 
       page: pageParam, 
-      limit: 10,
+      limit: 20,  // 한 번에 20개씩 로드하여 스크롤 빈도 감소
       search: search || undefined,
       category: category || undefined,
       blogSlug: blogSlug || undefined,
     }),
     getNextPageParam: (lastPage, allPages) => {
       const currentPage = allPages.length;
-      const totalPages = Math.ceil(lastPage.total / 10);
+      const totalPages = Math.ceil(lastPage.total / 20);  // limit과 동일하게 변경
       return currentPage < totalPages ? currentPage + 1 : undefined;
     },
     initialPageParam: 1,

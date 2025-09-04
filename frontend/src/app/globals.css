@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+/* 디자인 시스템 및 마크다운 스타일 import */
+@import '../styles/design-system.css';
+@import '../styles/markdown.css';
+
 /* 폰트 직접 정의 */
 @font-face {
   font-family: 'GeistMono';
@@ -12,17 +16,147 @@
 }
 
 :root {
+  /* === 색상 디자인 토큰 === */
+  /* Primary Colors - 브랜드 메인 색상 */
+  --color-primary-50: #f8fafc;
+  --color-primary-100: #f1f5f9;
+  --color-primary-200: #e2e8f0;
+  --color-primary-300: #cbd5e1;
+  --color-primary-400: #94a3b8;
+  --color-primary-500: #64748b;
+  --color-primary-600: #475569;
+  --color-primary-700: #334155;
+  --color-primary-800: #1e293b;
+  --color-primary-900: #0f172a;
+  
+  /* Accent Colors - 강조 색상 (Sky Blue) */
+  --color-accent-50: #f0f9ff;
+  --color-accent-100: #e0f2fe;
+  --color-accent-200: #bae6fd;
+  --color-accent-300: #7dd3fc;
+  --color-accent-400: #38bdf8;
+  --color-accent-500: #0ea5e9;
+  --color-accent-600: #0284c7;
+  --color-accent-700: #0369a1;
+  --color-accent-800: #075985;
+  --color-accent-900: #0c4a6e;
+  
+  /* Semantic Colors */
+  --color-success-50: #f0fdf4;
+  --color-success-500: #10b981;
+  --color-success-600: #059669;
+  --color-warning-50: #fefce8;
+  --color-warning-500: #eab308;
+  --color-warning-600: #ca8a04;
+  --color-danger-50: #fef2f2;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  
+  /* Code Block Colors */
+  --color-code-bg: #1e1e1e;
+  --color-code-text: #d4d4d4;
+  --color-code-border: #333333;
+  --color-inline-code-bg: #f1f5f9;
+  --color-inline-code-text: #334155;
+  
+  /* === 타이포그래피 토큰 === */
+  --font-family-sans: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-family-mono: 'GeistMono', 'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace;
+  
+  /* Font Sizes - Mobile First */
+  --text-xs: 0.75rem;    /* 12px */
+  --text-sm: 0.875rem;   /* 14px */
+  --text-base: 1rem;     /* 16px */
+  --text-lg: 1.125rem;   /* 18px */
+  --text-xl: 1.25rem;    /* 20px */
+  --text-2xl: 1.5rem;    /* 24px */
+  --text-3xl: 1.875rem;  /* 30px */
+  --text-4xl: 2.25rem;   /* 36px */
+  
+  /* Line Heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.625;
+  --leading-loose: 1.75;
+  
+  /* === 간격 시스템 === */
+  --space-xs: 0.25rem;   /* 4px */
+  --space-sm: 0.5rem;    /* 8px */
+  --space-md: 0.75rem;   /* 12px */
+  --space-lg: 1rem;      /* 16px */
+  --space-xl: 1.5rem;    /* 24px */
+  --space-2xl: 2rem;     /* 32px */
+  --space-3xl: 3rem;     /* 48px */
+  --space-4xl: 4rem;     /* 64px */
+  
+  /* === 보더 시스템 === */
+  --border-width-thin: 1px;
+  --border-width-thick: 2px;
+  --border-width-heavy: 4px;
+  
+  --border-radius-sm: 0.25rem;   /* 4px */
+  --border-radius-md: 0.375rem;  /* 6px */
+  --border-radius-lg: 0.5rem;    /* 8px */
+  --border-radius-xl: 0.75rem;   /* 12px */
+  --border-radius-2xl: 1rem;     /* 16px */
+  
+  /* === 그림자 시스템 === */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  
+  /* === 애니메이션 토큰 === */
+  --duration-fast: 0.15s;
+  --duration-normal: 0.2s;
+  --duration-slow: 0.3s;
+  --easing-ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --easing-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* === 컴포넌트별 토큰 === */
+  /* Markdown Content */
+  --markdown-max-width: 65ch;
+  --markdown-paragraph-spacing: var(--space-lg);
+  --markdown-heading-spacing: var(--space-2xl);
+  --markdown-list-indent: var(--space-xl);
+  
+  /* Code Block */
+  --code-block-padding: var(--space-lg);
+  --code-block-margin: var(--space-xl);
+  --code-block-font-size: var(--text-sm);
+  --code-block-line-height: var(--leading-relaxed);
+  
+  /* Legacy support */
   --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
+  --background-start-rgb: 248, 250, 252;
   --background-end-rgb: 255, 255, 255;
-  --font-pretendard: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+  --font-pretendard: var(--font-family-sans);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
+    /* 다크모드 색상 토큰 오버라이드 */
+    --color-primary-50: #0f172a;
+    --color-primary-100: #1e293b;
+    --color-primary-200: #334155;
+    --color-primary-300: #475569;
+    --color-primary-400: #64748b;
+    --color-primary-500: #94a3b8;
+    --color-primary-600: #cbd5e1;
+    --color-primary-700: #e2e8f0;
+    --color-primary-800: #f1f5f9;
+    --color-primary-900: #f8fafc;
+    
+    /* 코드 블록은 다크모드에서도 동일하게 유지 */
+    --color-code-bg: #1e1e1e;
+    --color-code-text: #d4d4d4;
+    --color-inline-code-bg: #334155;
+    --color-inline-code-text: #e2e8f0;
+    
+    /* Legacy support */
     --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+    --background-start-rgb: 15, 23, 42;
+    --background-end-rgb: 30, 41, 59;
   }
 }
 
@@ -31,12 +165,13 @@ html {
 }
 
 body {
-  color: #333;
-  background: white;
-  font-family: var(--font-pretendard) !important;
-  font-size: 14px;
-  line-height: 1.5;
+  color: rgb(var(--color-primary-800));
+  background: rgb(var(--color-primary-50));
+  font-family: var(--font-family-sans) !important;
+  font-size: var(--text-sm);
+  line-height: var(--leading-normal);
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   /* 모바일에서 가로 스크롤 방지 */
   overflow-x: hidden;
 }
@@ -145,236 +280,62 @@ time, mark, audio, video {
   }
 }
 
-/* 블로그 콘텐츠 스타일 - Pretendard 폰트 적용 */
+/* 블로그 콘텐츠 스타일 - 마크다운 스타일 적용 */
 .blog-content {
-  line-height: 1.5;
+  line-height: 1.7;
   color: #333;
   font-family: var(--font-pretendard) !important;
-  font-size: 14px !important;
+  font-size: 16px !important;
   -webkit-font-smoothing: antialiased;
   /* 모바일에서 콘텐츠 오버플로우 방지 */
   max-width: 100%;
   overflow-x: auto;
+  /* 마크다운 클래스들이 적용되도록 상속 허용 */
 }
 
-.blog-content * {
+/* 기존 blog-content * 스타일을 제거하여 마크다운 스타일이 우선 적용되도록 함 */
+/* 마크다운 클래스 스타일을 상속받지 않는 요소들만 기본 스타일 적용 */
+.blog-content :not([class*="markdown-"]) {
   font-family: var(--font-pretendard) !important;
-  color: #333 !important;
-  font-size: 14px !important;
-  line-height: 1.5 !important;
-  /* 모바일에서 텍스트 오버플로우 방지 */
   max-width: 100%;
   word-break: break-word;
 }
 
+/* 헤딩 스타일은 markdown.css에서 관리 - 필요 시에만 폰트 강제 적용 */
 .blog-content h1,
 .blog-content h2,
 .blog-content h3,
 .blog-content h4,
 .blog-content h5,
 .blog-content h6 {
-  margin: 2rem 0 1rem 0;
-  font-weight: bold;
-  line-height: 1.3;
-  color: #222 !important;
   font-family: var(--font-pretendard) !important;
-  word-break: break-word;
 }
 
-.blog-content h1 {
-  font-size: 20px !important;
-}
+/* 헤딩 크기는 markdown.css에서 관리 */
 
-@media (max-width: 640px) {
-  .blog-content h1 {
-    font-size: 18px !important;
-  }
-}
-
-.blog-content h2 {
-  font-size: 18px !important;
-}
-
-@media (max-width: 640px) {
-  .blog-content h2 {
-    font-size: 16px !important;
-  }
-}
-
-.blog-content h3 {
-  font-size: 16px !important;
-}
-
-@media (max-width: 640px) {
-  .blog-content h3 {
-    font-size: 15px !important;
-  }
-}
-
+/* 단락 스타일은 markdown.css에서 관리 - 폰트만 강제 적용 */
 .blog-content p {
-  margin: 1rem 0;
-  line-height: 1.5;
   font-family: var(--font-pretendard) !important;
-  color: #333 !important;
-  font-size: 14px !important;
-  word-break: break-word;
 }
 
-.blog-content a {
-  color: #0EA5E9 !important; /* sky-500 */
-  text-decoration: none !important;
-  font-size: 14px !important;
-  word-break: break-all;
-  background-color: #F0F9FF; /* sky-50 */
-  padding: 0 2px;
-  border-radius: 2px;
-  transition: all 0.2s ease;
-}
+/* 링크 스타일은 markdown.css에서 관리 */
 
-.blog-content a:hover {
-  color: #0284C7 !important; /* sky-600 */
-  background-color: #E0F2FE; /* sky-100 */
-}
+/* 이미지 스타일은 markdown.css에서 관리 */
 
-.blog-content img {
-  max-width: 100%;
-  height: auto;
-  margin: 1.5rem 0;
-  border-radius: 0.25rem;
-  /* 모바일에서 이미지가 컨테이너를 벗어나지 않도록 */
-  object-fit: contain;
-}
+/* 코드 블록 스타일은 syntax-highlighting.css에서 관리 */
 
-@media (max-width: 640px) {
-  .blog-content img {
-    margin: 1rem 0;
-    max-height: 60vh;
-  }
-}
+/* 인라인 코드 스타일은 markdown.css에서 관리 */
 
-.blog-content pre {
-  background: #f3f4f6;
-  padding: 1rem;
-  border-radius: 0.375rem;
-  overflow-x: auto;
-  margin: 1rem 0;
-  font-size: 13px !important;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
-  color: #333 !important;
-  line-height: 1.4 !important;
-  /* 모바일에서 코드 블록 스크롤 개선 */
-  max-width: 100%;
-}
-
-@media (max-width: 640px) {
-  .blog-content pre {
-    padding: 0.75rem;
-    font-size: 12px !important;
-    margin: 0.75rem 0;
-  }
-}
-
-.blog-content code {
-  background: #f3f4f6;
-  padding: 0.125rem 0.25rem;
-  border-radius: 0.25rem;
-  font-size: 13px !important;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
-  color: #333 !important;
-  word-break: break-all;
-}
-
-@media (max-width: 640px) {
-  .blog-content code {
-    font-size: 12px !important;
-  }
-}
-
-.blog-content pre code {
-  background: transparent;
-  padding: 0;
-  font-family: 'Consolas', 'Monaco', 'Courier New', monospace !important;
-  color: #333 !important;
-  font-size: 13px !important;
-  word-break: normal;
-}
-
-@media (max-width: 640px) {
-  .blog-content pre code {
-    font-size: 12px !important;
-  }
-}
-
+/* 블록인용 스타일은 markdown.css에서 관리 - 폰트만 강제 적용 */
 .blog-content blockquote {
-  border-left: 4px solid #6B7280;
-  padding-left: 1rem;
-  margin: 1rem 0;
-  font-style: italic;
-  color: #6B7280 !important;
-  background-color: #F9FAFB;
   font-family: var(--font-pretendard) !important;
-  font-size: 14px !important;
-  word-break: break-word;
-  border-radius: 0 4px 4px 0;
 }
 
-@media (max-width: 640px) {
-  .blog-content blockquote {
-    padding-left: 0.75rem;
-    margin: 0.75rem 0;
-  }
-}
-
+/* 리스트 스타일은 markdown.css에서 관리 - 폰트만 강제 적용 */
 .blog-content ul,
-.blog-content ol {
-  padding-left: 1.5rem;
-  margin: 1rem 0;
-}
-
-.blog-content ul {
-  list-style-type: disc !important;
-}
-
-.blog-content ul ul {
-  list-style-type: circle !important;
-}
-
-.blog-content ul ul ul {
-  list-style-type: square !important;
-}
-
-.blog-content ol {
-  list-style-type: decimal !important;
-}
-
-.blog-content ol ol {
-  list-style-type: lower-alpha !important;
-}
-
-.blog-content ol ol ol {
-  list-style-type: lower-roman !important;
-}
-
-@media (max-width: 640px) {
-  .blog-content ul,
-  .blog-content ol {
-    padding-left: 1.25rem;
-    margin: 0.75rem 0;
-  }
-}
-
+.blog-content ol,
 .blog-content li {
-  display: list-item !important;
-  margin: 0.25rem 0;
   font-family: var(--font-pretendard) !important;
-  color: #333 !important;
-  font-size: 14px !important;
-  line-height: 1.5 !important;
-  word-break: break-word;
-}
-
-.blog-content li::marker {
-  color: #4b5563;
 }
 
 /* 텍스트 클램프 유틸리티 - 모바일 최적화 */
@@ -791,82 +752,7 @@ input, textarea, button, select {
   }
 }
 
-/* 코드 블록 하이라이팅 스타일 - Context7 권장사항 */
-.hljs {
-  display: block;
-  overflow-x: auto;
-  padding: 1rem;
-  background: #1e1e1e !important;
-  color: #dcdcdc !important;
-  border-radius: 0.5rem;
-  font-family: 'GeistMono', 'Fira Code', 'Monaco', 'Menlo', monospace !important;
-  font-size: 13px !important;
-  line-height: 1.5 !important;
-  margin: 1.5rem 0;
-}
-
-@media (max-width: 640px) {
-  .hljs {
-    padding: 0.75rem;
-    font-size: 12px !important;
-    margin: 1rem 0;
-  }
-}
-
-/* 하이라이트 색상 정의 */
-.hljs-keyword,
-.hljs-selector-tag,
-.hljs-built_in,
-.hljs-name,
-.hljs-tag {
-  color: #569cd6 !important;
-}
-
-.hljs-string,
-.hljs-title,
-.hljs-section,
-.hljs-attribute,
-.hljs-literal,
-.hljs-template-tag,
-.hljs-template-variable,
-.hljs-type,
-.hljs-addition {
-  color: #ce9178 !important;
-}
-
-.hljs-comment,
-.hljs-quote,
-.hljs-deletion,
-.hljs-meta {
-  color: #6a9955 !important;
-}
-
-.hljs-number,
-.hljs-regexp,
-.hljs-symbol,
-.hljs-variable,
-.hljs-subst,
-.hljs-link {
-  color: #b5cea8 !important;
-}
-
-.hljs-function,
-.hljs-class .hljs-title {
-  color: #dcdcaa !important;
-}
-
-.hljs-attr,
-.hljs-selector-attr,
-.hljs-selector-pseudo {
-  color: #92c5f8 !important;
-}
-
-/* 에디터 내 코드 블록 스타일 */
-.ProseMirror .hljs {
-  background: #1e1e1e !important;
-  color: #dcdcdc !important;
-  border: none;
-}
+/* 하이라이팅 스타일은 syntax-highlighting.css에서 관리 */
 
 /* 텍스트 정렬 스타일 - 에디터용 */
 .ProseMirror [data-text-align="left"] {
@@ -978,37 +864,9 @@ input, textarea, button, select {
   white-space: nowrap; /* 링크 텍스트가 줄바꿈되지 않도록 */
 }
 
-.prose a:hover,
-.prose .content-link:hover,
-.content-link:hover {
-  color: #0284C7 !important; /* sky-600 */
-  background-color: #E0F2FE; /* sky-100 */
-  border-bottom-color: #0EA5E9; /* sky-500 */
-}
-
-/* 외부 링크 아이콘 스타일 */
-.prose a svg,
-.prose .content-link svg,
-.content-link svg {
-  display: inline-block;
-  width: 0.75rem;
-  height: 0.75rem;
-  margin-left: 0.125rem;
-  vertical-align: baseline;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-}
-
-.prose a:hover svg,
-.prose .content-link:hover svg,
-.content-link:hover svg {
-  opacity: 1;
-}
-
 /* 리스트 내 링크 스타일 조정 */
 .prose li a,
 .prose li .content-link {
-  display: inline; /* 리스트 내에서는 inline으로 유지 */
   white-space: normal; /* 리스트에서는 줄바꿈 허용 */
 }
 
@@ -1078,7 +936,7 @@ input, textarea, button, select {
   text-decoration-color: #0EA5E9 !important;
 }
 
-/* ContentRenderer 코드 블록 스타일 강화 */
+/* ContentRenderer 코드 블록 스타일 - 디자인 시스템 기반 */
 .prose pre.hljs,
 .prose pre {
   background: #1e1e1e !important;
@@ -1093,16 +951,12 @@ input, textarea, button, select {
   display: block !important;
 }
 
-/* 코드 블록 직후 단락 간격 조정 */
+/* 코드 블록 간격 조정 */
 .prose pre + p,
-.prose pre.hljs + p {
-  margin-top: 1.5rem !important;
-}
-
-/* 단락 직후 코드 블록 간격 조정 */
+.prose pre.hljs + p,
 .prose p + pre,
 .prose p + pre.hljs {
-  margin-top: 1.5rem !important;
+  margin-top: var(--space-xl) !important;
 }
 
 .prose pre.hljs code {
@@ -1113,22 +967,11 @@ input, textarea, button, select {
   font-family: inherit !important;
 }
 
-/* ContentRenderer 텍스트 정렬 강화 */
-.prose [data-text-align="left"] {
-  text-align: left !important;
-}
-
-.prose [data-text-align="center"] {
-  text-align: center !important;
-}
-
-.prose [data-text-align="right"] {
-  text-align: right !important;
-}
-
-.prose [data-text-align="justify"] {
-  text-align: justify !important;
-}
+/* ContentRenderer 텍스트 정렬 - 디자인 시스템 기반 */
+.prose [data-text-align="left"] { text-align: left !important; }
+.prose [data-text-align="center"] { text-align: center !important; }
+.prose [data-text-align="right"] { text-align: right !important; }
+.prose [data-text-align="justify"] { text-align: justify !important; }
 
 /* ContentRenderer 이미지 정렬 */
 .prose [data-text-align="center"] .editor-image,
@@ -1152,37 +995,41 @@ input, textarea, button, select {
   display: block !important;
 }
 
-/* ContentRenderer 신택스 하이라이팅 색상 - VS Code 테마 */
+/* ContentRenderer 신택스 하이라이팅 색상 - VSCode Dark+ 테마 */
 .prose .hljs-keyword,
 .prose .hljs-selector-tag,
+.prose .hljs-built_in,
 .prose .hljs-literal,
 .prose .hljs-section,
 .prose .hljs-link {
-  color: #569cd6 !important; /* 파란색 - 키워드 */
+  color: #569cd6 !important; /* 파란색 - 키워드 (if, else, return, function, const, let, var) */
 }
 
 .prose .hljs-string,
 .prose .hljs-attr,
 .prose .hljs-symbol,
 .prose .hljs-bullet,
-.prose .hljs-addition {
+.prose .hljs-addition,
+.prose .hljs-template-string {
   color: #ce9178 !important; /* 주황색 - 문자열 */
 }
 
 .prose .hljs-title,
-.prose .hljs-section,
+.prose .hljs-title.function_,
+.prose .hljs-title.class_,
 .prose .hljs-attribute {
-  color: #dcdcaa !important; /* 노란색 - 함수명 */
+  color: #dcdcaa !important; /* 노란색 - 함수명, 클래스명 */
 }
 
 .prose .hljs-variable,
-.prose .hljs-template-variable {
-  color: #9cdcfe !important; /* 하늘색 - 변수 */
+.prose .hljs-template-variable,
+.prose .hljs-property {
+  color: #9cdcfe !important; /* 하늘색 - 변수, 프로퍼티 */
 }
 
 .prose .hljs-comment,
 .prose .hljs-quote,
-.prose .hljs-deletion {
+.prose .hljs-doctag {
   color: #6a9955 !important; /* 초록색 - 주석 */
   font-style: italic !important;
 }
@@ -1195,29 +1042,229 @@ input, textarea, button, select {
 
 .prose .hljs-type,
 .prose .hljs-class,
-.prose .hljs-params {
-  color: #4ec9b0 !important; /* 청록색 - 타입 */
+.prose .hljs-params,
+.prose .hljs-built_in {
+  color: #4ec9b0 !important; /* 청록색 - 타입, 내장 객체 */
 }
 
 .prose .hljs-meta,
 .prose .hljs-meta-keyword {
-  color: #c586c0 !important; /* 보라색 - 메타 */
+  color: #c586c0 !important; /* 보라색 - import, export 등 */
 }
 
 .prose .hljs-tag {
-  color: #569cd6 !important; /* 파란색 - HTML 태그 */
+  color: #569cd6 !important; /* 파란색 - HTML/JSX 태그 */
 }
 
-.prose .hljs-name {
-  color: #92c5f8 !important; /* 연한 파란색 - 태그명 */
+.prose .hljs-name,
+.prose .hljs-selector-class,
+.prose .hljs-selector-id {
+  color: #d7ba7d !important; /* 베이지색 - 태그명, 클래스명 */
 }
 
-.prose .hljs-operator {
-  color: #d4d4d4 !important; /* 기본 색상 - 연산자 */
-}
-
+.prose .hljs-operator,
 .prose .hljs-punctuation {
-  color: #cccccc !important; /* 회색 - 구두점 */
+  color: #f0f0f0 !important; /* 더 밝은 회색 - 연산자, 구두점 */
+}
+
+/* TypeScript/JavaScript 특화 스타일 */
+.prose .language-typescript .hljs-keyword,
+.prose .language-javascript .hljs-keyword,
+.prose .language-ts .hljs-keyword,
+.prose .language-js .hljs-keyword {
+  color: #c586c0 !important; /* 보라색 - async, await, import, export */
+}
+
+.prose .language-typescript .hljs-built_in,
+.prose .language-javascript .hljs-built_in,
+.prose .language-ts .hljs-built_in,
+.prose .language-js .hljs-built_in {
+  color: #4fc1ff !important; /* 밝은 파란색 - console, Promise, Array 등 */
+}
+
+/* React/JSX 특화 스타일 */
+.prose .language-jsx .hljs-tag,
+.prose .language-tsx .hljs-tag {
+  color: #4ec9b0 !important; /* 청록색 - React 컴포넌트 */
+}
+
+.prose .language-jsx .hljs-attr,
+.prose .language-tsx .hljs-attr {
+  color: #9cdcfe !important; /* 하늘색 - props */
+}
+
+/* Python 특화 스타일 */
+.prose .language-python .hljs-keyword {
+  color: #c586c0 !important; /* 보라색 - def, class, import */
+}
+
+.prose .language-python .hljs-built_in {
+  color: #dcdcaa !important; /* 노란색 - print, len, range */
+}
+
+/* SQL 특화 스타일 */
+.prose .language-sql .hljs-keyword {
+  color: #569cd6 !important; /* 파란색 - SELECT, FROM, WHERE */
+  text-transform: uppercase;
+}
+
+/* JSON 특화 스타일 */
+.prose .language-json .hljs-attr {
+  color: #9cdcfe !important; /* 하늘색 - 키 */
+}
+
+.prose .language-json .hljs-string {
+  color: #ce9178 !important; /* 주황색 - 값 */
+}
+
+/* Swift (iOS) 특화 스타일 */
+.prose .language-swift .hljs-keyword {
+  color: #fc5fa3 !important; /* 핑크색 - func, var, let */
+}
+
+.prose .language-swift .hljs-built_in {
+  color: #a167e6 !important; /* 보라색 - String, Int, Array */
+}
+
+.prose .language-swift .hljs-params {
+  color: #41a1c0 !important; /* 청록색 - 파라미터 */
+}
+
+/* Kotlin (Android) 특화 스타일 */
+.prose .language-kotlin .hljs-keyword {
+  color: #cf68e1 !important; /* 보라색 - fun, val, var */
+}
+
+.prose .language-kotlin .hljs-built_in {
+  color: #6897bb !important; /* 파란색 - 내장 타입 */
+}
+
+/* Dart/Flutter 특화 스타일 */
+.prose .language-dart .hljs-keyword,
+.prose .language-flutter .hljs-keyword {
+  color: #00b4ab !important; /* 민트색 - Flutter 테마 */
+}
+
+.prose .language-dart .hljs-built_in,
+.prose .language-flutter .hljs-built_in {
+  color: #54c5f8 !important; /* 하늘색 - Widget, State */
+}
+
+/* Go 특화 스타일 */
+.prose .language-go .hljs-keyword,
+.prose .language-golang .hljs-keyword {
+  color: #00acd7 !important; /* Go 블루 - func, package */
+}
+
+.prose .language-go .hljs-built_in,
+.prose .language-golang .hljs-built_in {
+  color: #ce9178 !important; /* 주황색 - fmt, string */
+}
+
+/* Ruby/Rails 특화 스타일 */
+.prose .language-ruby .hljs-keyword,
+.prose .language-rails .hljs-keyword {
+  color: #cc342d !important; /* Ruby 레드 - def, class */
+}
+
+.prose .language-ruby .hljs-symbol,
+.prose .language-rails .hljs-symbol {
+  color: #9876aa !important; /* 보라색 - :symbol */
+}
+
+/* Java 특화 스타일 */
+.prose .language-java .hljs-keyword {
+  color: #569cd6 !important; /* 밝은 파란색 - public, class */
+}
+
+.prose .language-java .hljs-type {
+  color: #4ec9b0 !important; /* 밝은 청록색 - String, Integer */
+}
+
+.prose .language-java .hljs-meta {
+  color: #dcdcaa !important; /* 밝은 노란색 - @Override, @Autowired */
+}
+
+/* C#/.NET 특화 스타일 */
+.prose .language-csharp .hljs-keyword,
+.prose .language-cs .hljs-keyword {
+  color: #8a2be2 !important; /* 보라색 - async, await */
+}
+
+.prose .language-csharp .hljs-built_in,
+.prose .language-cs .hljs-built_in {
+  color: #2b91af !important; /* 청록색 - int, string */
+}
+
+/* PHP 특화 스타일 */
+.prose .language-php .hljs-variable {
+  color: #ff6b6b !important; /* 빨간색 - $variable */
+}
+
+.prose .language-php .hljs-keyword {
+  color: #4ecdc4 !important; /* 민트색 - echo, function */
+}
+
+/* Rust 특화 스타일 */
+.prose .language-rust .hljs-keyword {
+  color: #dea584 !important; /* Rust 오렌지 - fn, let, mut */
+}
+
+.prose .language-rust .hljs-type {
+  color: #4ec9b0 !important; /* 청록색 - i32, String */
+}
+
+/* Dockerfile 특화 스타일 */
+.prose .language-dockerfile .hljs-keyword,
+.prose .language-docker .hljs-keyword {
+  color: #0db7ed !important; /* Docker 블루 - FROM, RUN, COPY */
+}
+
+.prose .language-dockerfile .hljs-string,
+.prose .language-docker .hljs-string {
+  color: #98d982 !important; /* 밝은 초록색 - 경로명, 파일명 */
+}
+
+.prose .language-dockerfile,
+.prose .language-docker {
+  color: #f0f0f0 !important; /* 밝은 회색 - 일반 텍스트 */
+}
+
+/* GraphQL 특화 스타일 */
+.prose .language-graphql .hljs-keyword,
+.prose .language-gql .hljs-keyword {
+  color: #e10098 !important; /* GraphQL 핑크 - query, mutation */
+}
+
+/* Markdown 특화 스타일 */
+.prose .language-markdown .hljs-section,
+.prose .language-md .hljs-section {
+  color: #4ec9b0 !important; /* 밝은 청록색 - 헤딩 */
+}
+
+.prose .language-markdown .hljs-bullet,
+.prose .language-md .hljs-bullet {
+  color: #dcdcaa !important; /* 밝은 노란색 - 리스트 마커 */
+}
+
+.prose .language-markdown .hljs-code,
+.prose .language-md .hljs-code {
+  color: #ce9178 !important; /* 주황색 - 인라인 코드 */
+}
+
+.prose .language-markdown .hljs-link,
+.prose .language-md .hljs-link {
+  color: #569cd6 !important; /* 밝은 파란색 - 링크 */
+}
+
+.prose .language-markdown .hljs-quote,
+.prose .language-md .hljs-quote {
+  color: #98d982 !important; /* 밝은 초록색 - 인용문 */
+}
+
+.prose .language-markdown,
+.prose .language-md {
+  color: #f0f0f0 !important; /* 밝은 회색 - 일반 텍스트 */
 }
 
 
