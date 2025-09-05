@@ -218,38 +218,7 @@ export default function HomePage() {
 
           {/* Sidebar - sticky with matched top position */}
         <aside className="w-full lg:w-80 lg:min-w-[320px]">
-          <div className="lg:sticky lg:top-8 space-y-4 sm:space-y-6 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:pr-2">
-            {/* Custom scrollbar styles inline */}
-            <style jsx>{`
-              @media (min-width: 1024px) {
-                aside > div::-webkit-scrollbar {
-                  width: 6px;
-                }
-                aside > div::-webkit-scrollbar-track {
-                  background: transparent;
-                }
-                aside > div::-webkit-scrollbar-thumb {
-                  background-color: #d1d5db;
-                  border-radius: 3px;
-                }
-                aside > div::-webkit-scrollbar-thumb:hover {
-                  background-color: #9ca3af;
-                }
-                /* Hide scrollbar by default, show on hover */
-                aside > div {
-                  scrollbar-width: none;
-                }
-                aside > div:hover {
-                  scrollbar-width: thin;
-                }
-                aside > div::-webkit-scrollbar {
-                  display: none;
-                }
-                aside > div:hover::-webkit-scrollbar {
-                  display: block;
-                }
-              }
-            `}</style>
+          <div className="lg:sticky lg:top-8 space-y-4 sm:space-y-6">
             <RecentPostsSection posts={recentPosts} />
             
             <TagsSection tags={tags} onTagClick={handleTagClick} />

@@ -92,7 +92,7 @@ export class MarkdownRendererService {
       
       let html: string;
       if (lang) {
-        // hljs 클래스 추가하여 프론트엔드에서 하이라이팅 적용 가능하도록 함
+        // hljs 클래스와 language 클래스만 추가, 스타일은 프론트엔드에서 처리
         html = `<pre class="hljs markdown-code-block"><code class="language-${lang}">${escapedCode}</code></pre>`;
       } else {
         html = `<pre class="hljs markdown-code-block"><code>${escapedCode}</code></pre>`;

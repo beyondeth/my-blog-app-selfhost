@@ -13,21 +13,21 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Posts 테이블 - 공개된 포스트의 발행일 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_posts_published_at 
-      ON posts(publishedAt DESC) 
-      WHERE isPublished = true
+      CREATE INDEX IF NOT EXISTS idx_posts_published_at 
+      ON posts("publishedAt" DESC) 
+      WHERE "isPublished" = true
     `);
 
     // Posts 테이블 - 블로그별 공개 포스트 복합 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_posts_blog_published 
-      ON posts(blogId, isPublished, publishedAt DESC)
+      CREATE INDEX IF NOT EXISTS idx_posts_blog_published 
+      ON posts("blogId", "isPublished", "publishedAt" DESC)
     `);
 
     // Posts 테이블 - 생성일 기반 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_posts_created_at 
-      ON posts(createdAt DESC)
+      CREATE INDEX IF NOT EXISTS idx_posts_created_at 
+      ON posts("createdAt" DESC)
     `);
 
     // ====================================
@@ -37,15 +37,15 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Users 테이블 - 마지막 로그인 시간 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_last_login 
-      ON users(lastLoginAt DESC) 
-      WHERE isActive = true
+      CREATE INDEX IF NOT EXISTS idx_users_last_login 
+      ON users("lastLoginAt" DESC) 
+      WHERE "isActive" = true
     `);
 
     // Users 테이블 - OAuth 제공자별 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_users_auth_provider 
-      ON users(authProvider, email)
+      CREATE INDEX IF NOT EXISTS idx_users_auth_provider 
+      ON users("authProvider", email)
     `);
 
     // ====================================
@@ -55,15 +55,15 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Notifications 테이블 - 읽지 않은 알림 부분 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notifications_unread 
-      ON notifications(recipientId, createdAt DESC) 
+      CREATE INDEX IF NOT EXISTS idx_notifications_unread 
+      ON notifications(recipient_id, "createdAt" DESC) 
       WHERE read = false
     `);
 
     // Notifications 테이블 - 타입별 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_notifications_type 
-      ON notifications(type, recipientId, createdAt DESC)
+      CREATE INDEX IF NOT EXISTS idx_notifications_type 
+      ON notifications(type, recipient_id, "createdAt" DESC)
     `);
 
     // ====================================
@@ -73,21 +73,21 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Comments 테이블 - 포스트별 댓글 정렬 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_comments_post_created 
-      ON comments(postId, createdAt)
+      CREATE INDEX IF NOT EXISTS idx_comments_post_created 
+      ON comments("postId", "createdAt")
     `);
 
     // Comments 테이블 - 사용자별 댓글 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_comments_author 
-      ON comments(authorId, createdAt DESC)
+      CREATE INDEX IF NOT EXISTS idx_comments_author 
+      ON comments("authorId", "createdAt" DESC)
     `);
 
     // Comments 테이블 - 대댓글 조회 최적화
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_comments_parent 
-      ON comments(parentCommentId) 
-      WHERE parentCommentId IS NOT NULL
+      CREATE INDEX IF NOT EXISTS idx_comments_parent 
+      ON comments("parentCommentId") 
+      WHERE "parentCommentId" IS NOT NULL
     `);
 
     // ====================================
@@ -97,21 +97,21 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Files 테이블 - 사용자별 파일 타입 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_files_user_type_created 
-      ON files(userId, fileType, createdAt DESC)
+      CREATE INDEX IF NOT EXISTS idx_files_user_type_created 
+      ON files(user_id, file_type, created_at DESC)
     `);
 
     // Files 테이블 - MIME 타입별 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_files_mime_type 
-      ON files(mimeType, createdAt DESC)
+      CREATE INDEX IF NOT EXISTS idx_files_mime_type 
+      ON files(mime_type, created_at DESC)
     `);
 
     // Files 테이블 - 최적화된 파일 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_files_optimized 
-      ON files(isOptimized, createdAt DESC) 
-      WHERE isOptimized = false
+      CREATE INDEX IF NOT EXISTS idx_files_optimized 
+      ON files("isOptimized", created_at DESC) 
+      WHERE "isOptimized" = false
     `);
 
     // ====================================
@@ -121,8 +121,8 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Follows 테이블 - 팔로워 수 집계용 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_follows_following_created 
-      ON follows(following_id, createdAt DESC)
+      CREATE INDEX IF NOT EXISTS idx_follows_following_created 
+      ON follows(following_id, "createdAt" DESC)
     `);
 
     // ====================================
@@ -132,16 +132,16 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // API Keys 테이블 - 활성 키 조회 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_api_keys_active 
-      ON api_keys(blogId, isActive) 
-      WHERE isActive = true
+      CREATE INDEX IF NOT EXISTS idx_api_keys_active 
+      ON api_keys("blogId", "isActive") 
+      WHERE "isActive" = true
     `);
 
     // API Keys 테이블 - 마지막 사용 시간 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_api_keys_last_used 
-      ON api_keys(lastUsedAt DESC) 
-      WHERE isActive = true
+      CREATE INDEX IF NOT EXISTS idx_api_keys_last_used 
+      ON api_keys("lastUsedAt" DESC) 
+      WHERE "isActive" = true
     `);
 
     // ====================================
@@ -151,8 +151,8 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Audit Logs 테이블 - 시간 범위 조회 최적화
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_audit_logs_time_range 
-      ON audit_logs(createdAt DESC, action)
+      CREATE INDEX IF NOT EXISTS idx_audit_logs_time_range 
+      ON audit_logs("createdAt" DESC, action)
     `);
 
     // ====================================
@@ -162,8 +162,8 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Reports 테이블 - 상태별 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_reports_status 
-      ON reports(status, createdAt DESC) 
+      CREATE INDEX IF NOT EXISTS idx_reports_status 
+      ON reports(status, "createdAt" DESC) 
       WHERE status != 'resolved'
     `);
 
@@ -174,9 +174,9 @@ export class GlobalOptimizationIndexes1757000000000 implements MigrationInterfac
     
     // Posts 테이블 - 목록 조회용 커버링 인덱스
     await queryRunner.query(`
-      CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_posts_list_covering 
-      ON posts(blogId, isPublished, publishedAt DESC) 
-      INCLUDE (title, thumbnail, viewCount, likeCount, commentCount)
+      CREATE INDEX IF NOT EXISTS idx_posts_list_covering 
+      ON posts("blogId", "isPublished", "publishedAt" DESC) 
+      INCLUDE (title, thumbnail, "viewCount", "likeCount", "commentCount")
     `);
 
     // ====================================
