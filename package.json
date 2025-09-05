@@ -10,6 +10,8 @@
 		"zod": "^3.25.67"
 	},
 	"devDependencies": {
-		"marked": "^16.1.2"
+		"markdown-pdf": "^11.0.0",
+		"marked": "^16.1.2",
+		"puppeteer": "^24.19.0"
 	}
 }
