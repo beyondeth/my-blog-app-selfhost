@@ -175,7 +175,7 @@ export class Post {
       
       this.thumbnail = imageUrl;
     } else {
-      // 콘텐츠에 이미지가 없으면 썸네일 제거
+      // 콘텐츠에 이미지가 없으면 썸네일 제거2
       this.thumbnail = null;
     }
   }
