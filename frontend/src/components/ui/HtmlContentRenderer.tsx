@@ -93,7 +93,7 @@ export default function HtmlContentRenderer({ content, className = '' }: HtmlCon
     <>
       <div 
         ref={contentRef}
-        className={`prose prose-lg max-w-none ${className}`}
+        className={`prose prose-sm max-w-none ${className}`}
         dangerouslySetInnerHTML={{ __html: processedContent }}
         onClick={handleImageClick}
       />

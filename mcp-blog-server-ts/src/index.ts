@@ -85,25 +85,25 @@ function createServerInstance(_clientIp?: string, _apiKey?: string) {
     {
       instructions: `TypeScript-based MCP server for HIGH-QUALITY blog post creation.
 
+🔴 AUTHENTICATION FIRST RULE (필수 인증 우선 규칙):
+⚠️ ALWAYS call authenticate() BEFORE creating any content or files!
+⚠️ 반드시 authenticate() 호출 후 성공 확인 후에만 콘텐츠 작성!
+Never waste time creating markdown before authentication succeeds.
+인증 없이 콘텐츠 작성 금지 - 시간 낭비 방지를 위한 필수 규칙
+
 🌐 언어 설정 (LANGUAGE SETTINGS):
 - 기본 언어: 한국어 (Korean)
 - 특별 요청 시: 영어 또는 다른 언어 사용
 - Default: Write in KOREAN unless specifically requested otherwise
 
-⚠️ AI 어시스턴트를 위한 중요 지침 (CRITICAL INSTRUCTIONS FOR AI ASSISTANTS):
-1. 항상 상세하고 포괄적인 포스트 작성 (최소 2000자, 이상적으로 3000-5000자)
-2. 항상 auto_enhance: true 사용하여 품질 개선
-3. 항상 의미있는 제목 생성 - "Untitled" 절대 금지
-4. 항상 여러 섹션, 코드 예제, 상세한 설명 포함
-5. 항상 포스팅 전에 마크다운 파일을 로컬에 저장
-6. 기본적으로 한국어로 작성, 요청 시에만 다른 언어 사용
+⚠️ AI 어시스턴트 핵심 규칙 (CORE RULES FOR AI ASSISTANTS):
+1. 최소 2000자, 이상적으로 3000-5000자
+2. auto_enhance: true 항상 사용
+3. 의미있는 제목 필수 ("Untitled" 금지)
+4. 기본 한국어, 영어는 요청시만
 
-콘텐츠 분석 시 제공해야 할 내용:
-- 여러 개의 상세한 섹션 (최소 5-7개)
-- 설명과 함께 제공되는 코드 예제
-- 시각적 요소 (이모지, 볼드, 이탤릭 등)
-- 주제에 대한 포괄적인 커버리지
-- markdown_quality_guidelines에 따른 전문적인 포맷팅
+📝 콘텐츠 작성은 create_post 도구의 상세 가이드라인 참조
+🎨 스타일 가이드는 markdown_quality_guidelines 프롬프트 참조
 
 Remember: Quality over speed. Generate rich, valuable content that readers will appreciate.`,
     }
@@ -166,65 +166,36 @@ Create a professional blog post (Default: KOREAN, use English only if requested)
 - 기본: 한국어로 작성
 - 영어는 명시적 요청 시에만 사용
 
+📝 자연스러운 글쓰기 가이드 (NATURAL WRITING GUIDELINES):
+1. 스토리텔링 우선 - 실제 경험이나 사례로 시작하세요
+2. 코드블록은 최소화 (전체의 20% 이하) - 꼭 필요한 경우만
+3. 설명은 대화체로 자연스럽게 - 독자와 대화하듯이
+4. 개인적 의견과 감정 표현 포함 - "제 생각에는", "흥미롭게도"
+5. 자연스러운 전환구 사용 - "그런데", "하지만", "예를 들어"
+6. ⚠️ 제목과 첫 문장 차별화 - 제목을 그대로 반복하지 말고 다른 표현으로 시작
+
+❌ 피해야 할 것들 (AVOID):
+- 과도한 코드블록 (정보 전달용 코드블록 절대 금지)
+- 기계적인 나열식 설명
+- 감정 없는 딱딱한 문체
+- "다음과 같습니다", "아래와 같습니다" 같은 틀에 박힌 표현
+- 불필요한 기술 용어 나열
+- 제목을 첫 문장에서 그대로 반복 (예: 제목 "React 시작하기" → 첫문장 "React 시작하기에 대해 알아보겠습니다" ❌)
+
 ⚠️ AI 어시스턴트 필수 요구사항:
 - 최소 길이: 2000자 이상 (목표: 3000-5000자)
 - auto_enhance: true 항상 사용
 - 포스팅 전 마크다운 파일 생성 필수
 - "Untitled" 제목 절대 금지 - 의미있는 제목 생성
 
-콘텐츠 작성 워크플로우:
-1. 주제를 철저히 분석
-2. 상세하고 포괄적인 콘텐츠 작성 (요약 금지)
-3. 다양한 섹션과 풍부한 설명 포함
-4. 코드 예제, 다이어그램, 상세 설명 추가
-5. markdown_quality_guidelines 따르기
+✅ 작성 체크리스트:
+- 스토리텔링으로 시작했는가?
+- 코드블록이 20% 이하인가?
+- 대화체와 감정 표현을 사용했는가?
+- 최소 2000자 이상인가?
 
-MARKDOWN QUALITY GUIDELINES:
-1. Structure Requirements:
-   - Use ## for main title (H2 level)
-   - Use ### for sections (H3 level)
-   - Use #### for subsections (H4 level)
-   - Include at least 5-7 major sections
-   
-2. Visual Enhancement:
-   - Start each major section with relevant emoji (🚀, 📋, 💡, etc.)
-   - Use **bold** for important terms and key concepts
-   - Use *italic* for emphasis
-   - Add horizontal rules (---) between major sections
-
-3. Code Blocks:
-   - ALWAYS specify language: \`\`\`javascript, \`\`\`python, \`\`\`typescript
-   - Include descriptive comments in code examples
-   - Keep code examples concise and relevant
-
-4. Content Quality:
-   - Include engaging introduction
-   - Add "Key Takeaways" or summary section
-   - End with conclusion and call-to-action
-   - Use conversational but professional tone
-
-5. Lists & Tables:
-   - Use - for unordered lists (not * or +)
-   - Use numbered lists for sequential steps
-   - Format tables with proper alignment
-
-EXAMPLE STRUCTURE:
-## 🚀 [Your Title Here]
-
-### 📋 Introduction
-[Engaging opening that sets context]
-
-### 💡 Main Content
-[Core information with examples]
-
-### 🔍 Key Points
-- Important point 1
-- Important point 2
-
-### 🎯 Conclusion
-[Summary and call-to-action]
-
-Note: Content will be automatically enhanced if quality score is below 70/100.`,
+📚 상세 가이드라인은 'markdown_quality_guidelines' 프롬프트 참조
+Note: Quality score 70점 미만시 자동 개선됨`,
       inputSchema: {
         title: z.string().optional().describe("Post title (optional, can be extracted from markdown)"),
         content: z.string().optional().describe("Markdown content following quality guidelines"),
@@ -514,74 +485,102 @@ Note: Content will be automatically enhanced if quality score is below 70/100.`,
           role: "user",
           content: {
             type: "text",
-            text: `# Professional Markdown Writing Guidelines
+            text: `# Professional Markdown Writing Guidelines for Natural Blog Posts
 
-When creating markdown content for blog posts, follow these essential quality standards:
+When creating markdown content for blog posts, focus on natural, engaging writing that connects with readers.
 
-## 📋 Structure Requirements
+## 📝 자연스러운 글쓰기 원칙 (Natural Writing Principles)
 
-### Title Format
-- Use descriptive, SEO-friendly titles
-- Keep titles between 30-60 characters when possible
-- Include keywords naturally
+### 스토리텔링과 경험 공유
+- 실제 경험이나 사례로 시작하여 독자의 관심을 끌기
+- "제가 처음 이 문제를 만났을 때..." 같은 개인적 이야기 활용
+- 기술적 내용도 스토리로 풀어서 설명
+- 독자가 공감할 수 있는 상황 제시
 
-### Section Organization
-1. **Introduction** (소개/개요): Start with a brief overview or hook
-2. **Main Content**: Organize with clear H2 (##) and H3 (###) headings
-3. **Conclusion** (결론/마무리): End with a summary or call-to-action
+### 대화체와 감정 표현
+- 독자와 대화하듯 자연스러운 문체 사용
+- "흥미롭게도", "놀랍게도", "재미있는 것은" 같은 감정 표현
+- 질문을 통한 독자 참여 유도: "어떻게 생각하시나요?"
+- 개인적 의견 표현: "제 생각에는", "개인적으로 선호하는 방법은"
 
-### Heading Hierarchy
-- Use H2 (##) for main sections with descriptive emojis
-- Use H3 (###) for subsections
-- Never skip heading levels (don't go from H2 to H4)
+### 자연스러운 전환구 사용
+- "그런데", "하지만", "예를 들어" 등으로 문단 연결
+- "여기서 중요한 점은", "그래서 결론적으로" 같은 연결 표현
+- 딱딱한 나열 대신 흐름있는 설명
 
-## 🎨 Formatting Standards
+## ⚠️ 코드블록 사용 가이드 (Code Block Guidelines)
 
-### Emoji Usage
-- Add ONE relevant emoji at the start of each H2 heading
-- Examples: 📋 Overview, 🚀 Getting Started, 💡 Key Concepts, ⚙️ Configuration
-- Korean section emojis: 📋 개요, 🔍 분석, 💡 핵심 개념, 🎯 결론
+### 코드블록 최소화 원칙
+- **전체 콘텐츠의 20% 이하로 제한**
+- 꼭 필요한 코드 예제만 포함
+- 코드보다는 설명에 중점
 
-### Code Blocks
-- ALWAYS specify the language after three backticks
-- Languages: javascript, typescript, python, bash, sql, json, yaml, etc.
-- Example format: [triple-backtick]javascript[newline]code[newline][triple-backtick]
-- Never leave language identifier empty
+### 코드 대신 설명 우선
+- 코드로 보여주기보다 말로 설명하기
+- 개념 설명은 텍스트로, 구현만 코드로
+- 코드 블록 전후에 충분한 설명 추가
 
-### Text Emphasis
-- Use **bold** for important terms and key concepts
-- Use *italics* sparingly for emphasis
-- Use \`inline code\` for technical terms, commands, file names
+### 올바른 코드블록 사용
+\`\`\`javascript
+// 꼭 필요한 예제만 간단하게
+const example = "필수적인 코드만";
+\`\`\`
 
-## ✅ Quality Checklist
+## ❌ 피해야 할 것들 (Things to Avoid)
 
-### Must Have
-- [ ] Clear introduction explaining the topic
-- [ ] Logical flow with proper headings
-- [ ] Code blocks with language specification
-- [ ] At least 3-5 **bold** important terms
-- [ ] Section dividers (---) between major sections
-- [ ] Proper conclusion or summary
+### 기계적인 표현
+- "다음과 같습니다", "아래와 같습니다" → "살펴보죠", "예를 들면"
+- "상기 내용을 정리하면" → "지금까지 이야기한 것을 정리하면"
+- 번호 나열식 설명 → 스토리텔링으로 연결
 
-### Best Practices
-- Keep paragraphs concise (3-5 sentences)
-- Use bullet points or numbered lists for clarity
-- Include practical examples in code blocks
-- Add context and explanations for technical concepts
+### 과도한 기술 용어
+- 전문 용어 남발 자제
+- 어려운 개념은 쉬운 비유로 설명
+- 독자 수준을 고려한 설명
 
-## 🌐 Bilingual Considerations
+### 감정 없는 문체
+- 단순 정보 전달 → 경험과 감정을 담은 설명
+- 객관적 서술만 → 주관적 의견도 포함
+- 형식적 문장 → 친근한 대화체
 
-For Korean content:
-- Maintain professional tone (합쇼체)
-- Use appropriate technical terms in English when clearer
-- Include both Korean and English keywords for SEO
+## 🎨 구조와 형식 (Structure & Format)
 
-## 📊 Content Length Guidelines
-- Minimum: 500 words for substance
-- Optimal: 1000-2000 words for detailed coverage
-- Maximum: 3000 words to maintain reader engagement
+### 제목과 섹션
+- H2 (##)에는 이모지 1개와 설명적 제목
+- H3 (###)로 하위 섹션 구성
+- 섹션 간 자연스러운 연결
 
-Remember: Quality over quantity. Every section should provide value to the reader.`
+### 강조와 포맷팅
+- **중요한 용어**는 굵게 표시 (3-5개 정도)
+- *감정 표현*은 이탤릭으로
+- \`기술 용어\`는 인라인 코드로
+
+### 길이와 구성
+- 최소 2000자, 이상적으로 3000-5000자
+- 도입부: 흥미 유발과 문제 제시
+- 본문: 경험과 해결 과정
+- 결론: 핵심 정리와 독자 행동 유도
+
+## 💡 좋은 블로그 포스트 예시
+
+### 도입부 예시 (제목과 다르게 시작)
+제목: "React 성능 최적화 완벽 가이드"
+❌ 나쁜 시작: "React 성능 최적화 완벽 가이드에 대해 알아보겠습니다."
+✅ 좋은 시작: "최근 프로젝트에서 렌더링이 너무 느려져서 고민이 많았습니다. 
+사용자가 버튼을 클릭하면 2초나 기다려야 했죠. 
+이 문제를 해결하면서 배운 최적화 기법들을 공유하려고 합니다."
+
+### 본문 예시
+"그런데 흥미로운 점을 발견했습니다. 
+제가 처음 시도한 방법은 완전히 틀렸더라고요. 
+하지만 실패를 통해 더 나은 해결책을 찾을 수 있었습니다."
+
+### 결론 예시
+"이 경험을 통해 배운 것은 간단합니다. 
+때로는 돌아가는 길이 가장 빠른 길일 수 있다는 거죠. 
+여러분의 경험은 어떠신가요? 댓글로 공유해주세요!"
+
+Remember: 독자와 소통하는 따뜻한 글쓰기를 지향하세요. 정보 전달보다 경험 공유가 더 가치있습니다.`
           }
         }
       ]

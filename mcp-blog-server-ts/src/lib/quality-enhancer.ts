@@ -11,6 +11,10 @@ export interface QualityMetrics {
   hasIntroduction: boolean;
   hasConclusion: boolean;
   hasSectionDividers: boolean;
+  hasNaturalFlow: boolean;           // 자연스러운 흐름
+  codeBlockRatio: number;             // 코드블록 비율 (퍼센트)
+  hasPersonalTouch: boolean;          // 개인적 의견/경험
+  hasConversationalTone: boolean;     // 대화체 사용
   score: number;
 }
 
@@ -79,18 +83,26 @@ export class MarkdownQualityEnhancer {
       hasIntroduction: this.checkIntroduction(markdown),
       hasConclusion: this.checkConclusion(markdown),
       hasSectionDividers: this.checkSectionDividers(markdown),
+      hasNaturalFlow: this.checkNaturalFlow(markdown),
+      codeBlockRatio: this.checkCodeBlockRatio(markdown),
+      hasPersonalTouch: this.checkPersonalTouch(markdown),
+      hasConversationalTone: this.checkConversationalTone(markdown),
       score: 0
     };
 
-    // 점수 계산 (각 항목 14.3점, 총 100점)
+    // 점수 계산 (11개 항목, 각 9점, 총 100점)
     let score = 0;
-    if (metrics.hasEmojis) score += 14.3;
-    if (metrics.hasBoldText) score += 14.3;
-    if (metrics.hasCodeBlocksWithLanguage) score += 14.3;
-    if (metrics.hasProperStructure) score += 14.3;
-    if (metrics.hasIntroduction) score += 14.3;
-    if (metrics.hasConclusion) score += 14.3;
-    if (metrics.hasSectionDividers) score += 14.3;
+    if (metrics.hasEmojis) score += 9;
+    if (metrics.hasBoldText) score += 9;
+    if (metrics.hasCodeBlocksWithLanguage) score += 9;
+    if (metrics.hasProperStructure) score += 9;
+    if (metrics.hasIntroduction) score += 9;
+    if (metrics.hasConclusion) score += 9;
+    if (metrics.hasSectionDividers) score += 9;
+    if (metrics.hasNaturalFlow) score += 9;
+    if (metrics.codeBlockRatio <= 20) score += 9;  // 20% 이하면 점수
+    if (metrics.hasPersonalTouch) score += 9;
+    if (metrics.hasConversationalTone) score += 9;
     
     metrics.score = Math.round(score);
     return metrics;
@@ -176,6 +188,60 @@ export class MarkdownQualityEnhancer {
 
   private checkSectionDividers(markdown: string): boolean {
     return /^---$/m.test(markdown);
+  }
+
+  private checkNaturalFlow(markdown: string): boolean {
+    // 자연스러운 전환구 체크
+    const transitions = [
+      '그런데', '하지만', '예를 들어', '제 경험상', '개인적으로',
+      '흥미롭게도', '사실', '놀랍게도', '재미있는 것은', '그래서',
+      '이렇게', '그리고', '그렇다면', '여기서', '먼저'
+    ];
+    const transitionCount = transitions.filter(t => markdown.includes(t)).length;
+    return transitionCount >= 3;  // 최소 3개 이상의 전환구 사용
+  }
+
+  private checkCodeBlockRatio(markdown: string): number {
+    const totalLength = markdown.length;
+    if (totalLength === 0) return 0;
+    
+    const codeBlockMatches = markdown.match(/```[\s\S]*?```/g) || [];
+    const codeBlockLength = codeBlockMatches.join('').length;
+    
+    return Math.round((codeBlockLength / totalLength) * 100);
+  }
+
+  private checkPersonalTouch(markdown: string): boolean {
+    // 개인적 의견이나 경험을 나타내는 표현 체크
+    const personalExpressions = [
+      '제 생각에는', '제 경험상', '저는', '제가', '우리는', '우리가',
+      '개인적으로', '저의 경우', '제 의견으로는', '경험해보니',
+      '느꼈습니다', '생각합니다', '보입니다', '같습니다'
+    ];
+    const personalCount = personalExpressions.filter(expr => markdown.includes(expr)).length;
+    return personalCount >= 2;  // 최소 2개 이상의 개인적 표현
+  }
+
+  private checkConversationalTone(markdown: string): boolean {
+    // 대화체와 질문형 표현 체크
+    const conversationalPatterns = [
+      /\?/g,  // 질문 표시
+      /어떻게/g,
+      /왜/g,
+      /무엇/g,
+      /~요[.!?\s]/g,  // 존댓말 종결어미
+      /~죠[.!?\s]/g,
+      /~네요[.!?\s]/g,
+      /~는데요[.!?\s]/g
+    ];
+    
+    let matchCount = 0;
+    conversationalPatterns.forEach(pattern => {
+      const matches = markdown.match(pattern);
+      if (matches) matchCount += matches.length;
+    });
+    
+    return matchCount >= 5;  // 최소 5개 이상의 대화체 표현
   }
 
   private addEmojisToHeadings(markdown: string): string {
@@ -363,9 +429,17 @@ export class MarkdownQualityEnhancer {
     report += `- 도입부: ${metrics.hasIntroduction ? '✅' : '❌'}\n`;
     report += `- 결론: ${metrics.hasConclusion ? '✅' : '❌'}\n`;
     report += `- 섹션 구분선: ${metrics.hasSectionDividers ? '✅' : '❌'}\n`;
+    report += `- 자연스러운 흐름: ${metrics.hasNaturalFlow ? '✅' : '❌'}\n`;
+    report += `- 코드블록 비율: ${metrics.codeBlockRatio}% ${metrics.codeBlockRatio <= 20 ? '✅' : '❌ (20% 이하 권장)'}\n`;
+    report += `- 개인적 의견/경험: ${metrics.hasPersonalTouch ? '✅' : '❌'}\n`;
+    report += `- 대화체 사용: ${metrics.hasConversationalTone ? '✅' : '❌'}\n`;
     
     if (metrics.score < 70) {
       report += '\n**권장사항**: 자동 개선 기능을 사용하여 품질을 향상시킬 수 있습니다.';
+    }
+    
+    if (metrics.codeBlockRatio > 20) {
+      report += '\n⚠️ **주의**: 코드블록 비율이 너무 높습니다. 설명 위주로 변경해주세요.';
     }
     
     return report;

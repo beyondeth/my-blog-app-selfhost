@@ -75,7 +75,7 @@ export default function PostHeaderWithReport({
         )}
         
         {/* Title - 전체 너비 차지 */}
-        <h1 className="text-base font-bold text-gray-900 mb-5 leading-[23px]">
+        <h1 className="text-xl font-bold text-gray-900 mb-5 leading-tight">
           {post.title || ''}
         </h1>
 
