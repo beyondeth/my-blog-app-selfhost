@@ -19,6 +19,7 @@ import { CommentsModule } from './comments/comments.module';
 import { FilesModule } from './files/files.module';
 import { BlogsModule } from './blogs/blogs.module';
 import { ApiKeysModule } from './api-keys/api-keys.module';
+import { TagsModule } from './tags/tags.module';
 import { McpModule } from './mcp/mcp.module';
 import { EmailModule } from './email/email.module';
 import { ReportsModule } from './reports/reports.module';
@@ -77,6 +78,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AuthModule,
     UsersModule,
     PostsModule,
+    TagsModule,
     CommentsModule,
     FilesModule,
     BlogsModule,

@@ -10,22 +10,15 @@ import { useCreatePost } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
 import { UploadedImageInfo } from '@/components/posts/ImageUploadManager';
 import BlogRichTextEditor from '@/components/posts/RichTextEditor';
-
-// PostStatus enum definition
-enum PostStatus {
-  DRAFT = 'DRAFT',
-  PUBLISHED = 'PUBLISHED',
-}
+import Spinner from '@/components/ui/Spinner';
 
 // Zod 스키마 정의
 const postSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요.'),
   content: z.string().min(1, '내용을 입력해주세요.'),
-  status: z.nativeEnum(PostStatus).default(PostStatus.DRAFT),
   category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   fileIds: z.array(z.string()).optional(),
-  thumbnailId: z.string().optional(),
 });
 
 type PostFormData = z.infer<typeof postSchema>;
@@ -53,13 +46,12 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
     defaultValues: {
       title: '',
       content: '',
-      status: PostStatus.DRAFT,
       tags: [],
       fileIds: [],
     },
   });
   
-  // 이미지 목록이 변경될 때마다 form의 fileIds와 thumbnailId를 업데이트
+  // 이미지 목록이 변경될 때마다 form의 fileIds를 업데이트
   useEffect(() => {
     const fileIds = images.filter(img => !img.isUploading).map(img => img.id);
     setValue('fileIds', fileIds);
@@ -67,19 +59,23 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
     // 썸네일이 유효한지 확인
     if (selectedThumbnailId && !fileIds.includes(selectedThumbnailId)) {
       setSelectedThumbnailId(''); // 썸네일이 삭제되었으면 초기화
-      setValue('thumbnailId', '');
-    } else {
-      setValue('thumbnailId', selectedThumbnailId);
     }
   }, [images, selectedThumbnailId, setValue]);
 
   // 폼 제출 핸들러
   const onSubmit = async (data: PostFormData) => {
     try {
-      const result = await createPostMutation.mutateAsync({
-        blogId: blog!.id,
-        ...data,
-      });
+      // 백엔드 DTO에 맞게 데이터 변환
+      const postData = {
+        title: data.title,
+        content: data.content,
+        tags: data.tags,
+        category: data.category,
+        attachedFileIds: data.fileIds, // fileIds를 attachedFileIds로 변경
+        // thumbnailId는 별도 처리가 필요할 수 있음
+      };
+      
+      const result = await createPostMutation.mutateAsync(postData);
       
       router.push(`/blog/${blogSlug}/posts/${result.slug}`);
     } catch (error) {
@@ -89,7 +85,11 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
 
   // Loading states
   if (isBlogLoading || isUserLoading) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Spinner size="lg" />
+      </div>
+    );
   }
 
   if (!blog) {

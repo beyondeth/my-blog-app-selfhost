@@ -6,28 +6,33 @@ import { Blog } from '../blogs/entities/blog.entity';
 import { CreatePostDto } from '../posts/dto/create-post.dto';
 import { UpdatePostDto } from '../posts/dto/update-post.dto';
 import { formatDate, generateSlug } from '../posts/utils/post.utils';
+import { TagsService } from '../tags/tags.service';
 
 @Injectable()
 export class McpService {
   constructor(
     @InjectRepository(Post)
     private postRepository: Repository<Post>,
-    @InjectRepository(Blog)
-    private blogRepository: Repository<Blog>,
+    private tagsService: TagsService,
   ) {}
 
   /**
    * MCP를 통한 포스트 생성
    */
   async createPost(createPostDto: CreatePostDto, blog: Blog, user: any): Promise<Post> {
+    // tags는 Entity의 Promise<Tag[]> 타입과 충돌하므로 제거
+    const { tags, ...postDataWithoutTags } = createPostDto;
+    const tagNames = tags || [];
+    
     const post = this.postRepository.create({
-      ...createPostDto,
+      ...postDataWithoutTags,
       blogId: blog.id,
       blog: blog,
       authorId: user.id,
       author: user,
       isPublished: true,
       publishedAt: new Date(),
+      tagNames: tagNames, // 빠른 조회용 캐시
     });
 
     // slug 생성
@@ -37,6 +42,18 @@ export class McpService {
 
     // slug 유니크 체크
     await this.ensureUniqueSlug(post);
+
+    // 태그 처리 (정규화된 테이블에도 저장)
+    if (tagNames.length > 0) {
+      const normalizedTags = await this.tagsService.findOrCreateTags(tagNames);
+      post.tags = Promise.resolve(normalizedTags);
+      const savedPost = await this.postRepository.save(post);
+      
+      // 태그 카운트 증가
+      await this.tagsService.incrementPostCount(normalizedTags.map(tag => tag.id));
+      
+      return savedPost;
+    }
 
     return await this.postRepository.save(post);
   }
@@ -76,7 +93,30 @@ export class McpService {
       throw new Error('Post not found or access denied');
     }
 
-    Object.assign(post, updateData);
+    // tags는 Entity의 Promise<Tag[]> 타입과 충돌하므로 분리 처리
+    const { tags, ...updateDataWithoutTags } = updateData;
+    Object.assign(post, updateDataWithoutTags);
+
+    // 태그가 업데이트되는 경우
+    if (tags !== undefined) {
+      const tagNames = tags || [];
+      post.tagNames = tagNames;
+
+      // 기존 태그 가져오기
+      const oldTags = await post.tags;
+      if (oldTags && oldTags.length > 0) {
+        await this.tagsService.decrementPostCount(oldTags.map(tag => tag.id));
+      }
+
+      // 새 태그 설정
+      if (tagNames.length > 0) {
+        const normalizedTags = await this.tagsService.findOrCreateTags(tagNames);
+        post.tags = Promise.resolve(normalizedTags);
+        await this.tagsService.incrementPostCount(normalizedTags.map(tag => tag.id));
+      } else {
+        post.tags = Promise.resolve([]);
+      }
+    }
 
     if (updateData.title && !updateData.slug) {
       post.slug = generateSlug(updateData.title);
@@ -96,6 +136,12 @@ export class McpService {
 
     if (!post) {
       throw new Error('Post not found or access denied');
+    }
+
+    // 태그 카운트 감소
+    const tags = await post.tags;
+    if (tags && tags.length > 0) {
+      await this.tagsService.decrementPostCount(tags.map(tag => tag.id));
     }
 
     await this.postRepository.remove(post);

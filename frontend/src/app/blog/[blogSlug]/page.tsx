@@ -11,12 +11,12 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
 import LoadMoreSection from '@/components/posts/LoadMoreSection';
-import SearchSection from '@/components/layout/SearchSection';
 import RecentPostsSection from '@/components/layout/RecentPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
 import BlogOwnerCard from '@/components/layout/BlogOwnerCard';
 import BlogRecommendations from '@/components/layout/BlogRecommendations';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
+import Spinner from '@/components/ui/Spinner';
 
 // 클라이언트 사이드 체크 훅
 function useIsClient() {
@@ -75,7 +75,6 @@ export default function BlogPage() {
   
   // URL에서 검색 파라미터 파싱
   const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
-  const [searchQuery, setSearchQuery] = useState(currentParams.search || '');
 
   // 블로그 정보 가져오기
   useEffect(() => {
@@ -171,27 +170,6 @@ export default function BlogPage() {
     }
   }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // 검색 처리 (URL 업데이트 포함)
-  const handleSearch = useCallback((query: string) => {
-    const newParams = {
-      search: query || undefined,
-      page: 1,
-    };
-    
-    const newUrl = `/blog/${blogSlug}${createSearchUrl(newParams)}`;
-    router.push(newUrl);
-  }, [router, blogSlug]);
-
-  // 검색어 변경 시 URL 파라미터와 동기화
-  useEffect(() => {
-    if (!isClient) return;
-    
-    const urlSearch = currentParams.search || '';
-    if (searchQuery !== urlSearch) {
-      setSearchQuery(urlSearch);
-    }
-  }, [currentParams.search, isClient]);
-
   const handleEditPost = useCallback((slug: string) => {
     router.push(`/posts/edit/${slug}`);
   }, [router]);
@@ -271,8 +249,7 @@ export default function BlogPage() {
             <div className="space-y-0">
               {isLoading && allPosts.length === 0 ? (
                 <div className="flex justify-center items-center py-12 sm:py-16">
-                  <div className="animate-spin rounded-full h-6 w-6 sm:h-8 sm:w-8 border-b-2 border-amber-600"></div>
-                  <span className="ml-2 text-sm text-gray-600">게시글을 불러오는 중...</span>
+                  <Spinner size="lg" />
                 </div>
               ) : allPosts.length > 0 ? (
                 <>
@@ -319,12 +296,6 @@ export default function BlogPage() {
               profileImage={userProfile?.profileImage || blog.thumbnailUrl}
               userId={blog.owner?.id}
               isOwner={isBlogOwner}
-            />
-            
-            <SearchSection
-              searchQuery={searchQuery}
-              onSearchQueryChange={setSearchQuery}
-              onSearch={handleSearch}
             />
             
             <RecentPostsSection posts={recentPosts} />

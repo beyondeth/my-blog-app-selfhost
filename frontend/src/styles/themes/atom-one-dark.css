@@ -1,0 +1,167 @@
+/* 
+ * Atom One Dark Theme for highlight.js
+ * Based on Atom One Dark syntax theme
+ */
+
+/* Base */
+.hljs {
+  color: #abb2bf;
+  background: #282c34;
+}
+
+/* Comment */
+.hljs-comment,
+.hljs-quote {
+  color: #5c6370;
+  font-style: italic;
+}
+
+/* Variables */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-tag,
+.hljs-name,
+.hljs-selector-id,
+.hljs-selector-class,
+.hljs-regexp,
+.hljs-deletion {
+  color: #e06c75;
+}
+
+/* Numbers */
+.hljs-number,
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-literal,
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-link {
+  color: #d19a66;
+}
+
+/* Strings */
+.hljs-string,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  color: #98c379;
+}
+
+/* Keywords */
+.hljs-keyword,
+.hljs-selector-tag {
+  color: #c678dd;
+}
+
+/* Functions */
+.hljs-title,
+.hljs-section {
+  color: #61aeee;
+}
+
+/* Attributes */
+.hljs-attr {
+  color: #d19a66;
+}
+
+/* CSS/SCSS */
+.hljs-attribute,
+.hljs-doctag {
+  color: #c678dd;
+}
+
+/* Strong */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+/* Additional language-specific styles */
+
+/* JavaScript/TypeScript */
+.language-javascript .hljs-keyword,
+.language-typescript .hljs-keyword,
+.language-jsx .hljs-keyword,
+.language-tsx .hljs-keyword {
+  color: #c678dd;
+}
+
+.language-javascript .hljs-built_in,
+.language-typescript .hljs-built_in {
+  color: #e5c07b;
+}
+
+.language-javascript .hljs-function,
+.language-typescript .hljs-function {
+  color: #61aeee;
+}
+
+/* Python */
+.language-python .hljs-built_in {
+  color: #e5c07b;
+}
+
+.language-python .hljs-decorator {
+  color: #e5c07b;
+}
+
+/* Go */
+.language-go .hljs-built_in {
+  color: #e5c07b;
+}
+
+/* Ruby */
+.language-ruby .hljs-symbol {
+  color: #e06c75;
+}
+
+/* Shell/Bash */
+.language-bash .hljs-variable,
+.language-shell .hljs-variable {
+  color: #e06c75;
+}
+
+/* SQL */
+.language-sql .hljs-keyword {
+  color: #c678dd;
+  text-transform: uppercase;
+}
+
+/* YAML */
+.language-yaml .hljs-attr {
+  color: #e06c75;
+}
+
+/* JSON */
+.language-json .hljs-attr {
+  color: #e06c75;
+}
+
+/* Markdown */
+.language-markdown .hljs-section {
+  color: #e06c75;
+}
+
+.language-markdown .hljs-code {
+  color: #98c379;
+}
+
+/* Dockerfile */
+.language-dockerfile .hljs-keyword {
+  color: #c678dd;
+  text-transform: uppercase;
+}
+
+/* Override for our prose container */
+.prose pre {
+  background: #282c34;
+}
+
+.prose pre code.hljs {
+  background: transparent;
+  padding: 0;
+}

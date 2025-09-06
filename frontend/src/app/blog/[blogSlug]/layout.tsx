@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
+import Spinner from '@/components/ui/Spinner';
 
 interface Blog {
   id: string;
@@ -68,10 +69,7 @@ export default function BlogLayout({
   if (loading) {
     return (
       <div className="flex items-center justify-center py-32">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">로딩 중...</p>
-        </div>
+        <Spinner size="lg" />
       </div>
     );
   }

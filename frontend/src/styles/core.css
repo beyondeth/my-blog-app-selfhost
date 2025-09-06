@@ -1,0 +1,16 @@
+/* 
+ * Core Styles Entry Point
+ * 모든 CSS를 올바른 순서로 import
+ */
+
+/* 1. CSS 변수 정의 */
+@import './core/variables.css';
+
+/* 2. 기본 스타일 및 리셋 */
+@import './core/base.css';
+
+/* 3. 컴포넌트 스타일 */
+@import './components/markdown.css';
+
+/* 4. 테마 스타일 */
+@import './themes/atom-one-dark.css';

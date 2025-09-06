@@ -72,7 +72,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
   };
 
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-5 shadow-sm">
+    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
       <div className="space-y-4">
         {/* Profile Image - Left aligned */}
         <div className="flex justify-start">

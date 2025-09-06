@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Shield, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
+import Spinner from '@/components/ui/Spinner';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -192,6 +193,9 @@ export default function LoginPage() {
             {authMethodHint && !validationErrors.email && (
               <p className="mt-1 text-sm text-blue-600">💡 {authMethodHint.message}</p>
             )}
+            {validationErrors.email && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+            )}
           </div>
 
           <div>
@@ -220,12 +224,19 @@ export default function LoginPage() {
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {validationErrors.password && (
+              <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
+            )}
           </div>
 
           <button
             onClick={handleSubmit}
             disabled={isSubmitting || !formData.email || !formData.password || loginAttempts >= MAX_LOGIN_ATTEMPTS}
-            className="w-full flex items-center justify-center px-5 py-3 bg-black hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed rounded-full text-sm font-semibold text-white transition-all shadow-sm"
+            className={`w-full flex items-center justify-center px-5 py-3 rounded-full text-sm font-medium transition-all ${
+              formData.email && formData.password && !isSubmitting && loginAttempts < MAX_LOGIN_ATTEMPTS
+                ? 'bg-black hover:bg-gray-800 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 disabled:bg-gray-100 disabled:cursor-not-allowed'
+            }`}
           >
             {isSubmitting ? '로그인 중...' : '로그인'}
           </button>

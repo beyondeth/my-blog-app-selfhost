@@ -225,9 +225,9 @@ export default function Header() {
                   <button 
                     onClick={handleWriteClick}
                     disabled={isCheckingBlog}
-                    className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    <FiEdit3 className="mr-1 w-4 h-4" />
+                    <FiEdit3 className="mr-1.5 w-4 h-4" />
                     {isCheckingBlog ? '확인 중...' : '글쓰기'}
                   </button>
                   
@@ -345,7 +345,7 @@ export default function Header() {
                     <button 
                       onClick={handleWriteClick}
                       disabled={isCheckingBlog}
-                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-md transition-all w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full transition-all w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FiEdit3 className="mr-2 w-4 h-4" />
                       {isCheckingBlog ? '확인 중...' : '글쓰기'}

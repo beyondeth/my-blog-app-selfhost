@@ -188,6 +188,8 @@ async remove(id: string, user: User): Promise<void> {
         // 다른 포스트에서 사용 중인지 확인
         const usageCount = await manager.query(
           'SELECT COUNT(*) as count FROM post_files WHERE "fileId" = $1',
+
+          
           [file.id]
         );
         

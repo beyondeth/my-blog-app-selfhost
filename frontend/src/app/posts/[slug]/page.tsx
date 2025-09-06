@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { FiArrowLeft } from 'react-icons/fi';
-import ContentRenderer from '@/components/ui/ContentRenderer';
+import HtmlContentRenderer from '@/components/ui/HtmlContentRenderer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';
@@ -240,7 +240,7 @@ export default function PostDetailPage() {
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}
         <div className="blog-content">
-          <ContentRenderer content={post.content} />
+          <HtmlContentRenderer content={post.content} />
         </div>
 
         {/* Tags */}

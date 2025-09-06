@@ -8,18 +8,19 @@ import { ApiKeysModule } from '../api-keys/api-keys.module';
 import { PostsModule } from '../posts/posts.module';
 import { BlogsModule } from '../blogs/blogs.module';
 import { AuthModule } from '../auth/auth.module';
+import { TagsModule } from '../tags/tags.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Post } from '../posts/entities/post.entity';
-import { Blog } from '../blogs/entities/blog.entity';
 import { User } from '../users/entities/user.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, Blog, User]),
+    TypeOrmModule.forFeature([Post, User]),
     ApiKeysModule,
     PostsModule,
     BlogsModule,
     AuthModule,
+    TagsModule,
   ],
   controllers: [McpController],
   providers: [
