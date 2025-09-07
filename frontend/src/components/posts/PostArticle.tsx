@@ -87,7 +87,7 @@ const PostArticle = React.memo(function PostArticle({
           
           <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
             <Link 
-              href={`/posts/${post.slug || post.id}`}
+              href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
               className="hover:text-amber-800 transition-colors block"
             >
               {post.title}
@@ -119,7 +119,7 @@ const PostArticle = React.memo(function PostArticle({
             {/* 버튼들 - 메타 정보 바로 아래 */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link 
-                href={`/posts/${post.slug || post.id}`}
+                href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
                 className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
               >
                 더보기

@@ -5,5 +5,5 @@
 /* 새로운 통합 스타일 시스템 import */
 @import '../styles/core.css';
 
-/* highlight.js Atom One Dark 테마 직접 import */
+/* Highlight.js Atom One Dark Theme - 코드 블록 하이라이팅 */
 @import 'highlight.js/styles/atom-one-dark.css';

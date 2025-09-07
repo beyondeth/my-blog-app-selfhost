@@ -28,16 +28,18 @@ export default function PostDetailPage() {
   const slug = params.slug as string;
 
   // 상세 fetch는 여기서 한 번만
-  const { data: post, isLoading, error, isError } = usePost(slug);
+  const { data: post, error, isError } = usePost(slug);
   const deletePostMutation = useDeletePost();
   const likeMutation = useTogglePostLike(slug, () => {
     alert('로그인이 필요합니다.\n로그인 후 좋아요를 누를 수 있습니다.');
     // TODO: toast/모달/로그인 라우팅 등으로 대체 가능
   });
 
-  // 포스트 데이터가 로드되면 블로그 URL로 리다이렉트
+  // 포스트 데이터가 로드되면 블로그 URL로 리다이렉트 (레거시 URL 처리용)
+  // 최신 링크는 이미 /blog/[blogSlug]/posts/[postSlug] 형태로 직접 연결됨
   useEffect(() => {
-    if (post && post.blog?.slug) {
+    // blog 정보가 있지만 현재 /posts/[slug] 경로인 경우에만 리다이렉트
+    if (post && post.blog?.slug && window.location.pathname.startsWith('/posts/')) {
       // 올바른 블로그 URL로 리다이렉트
       router.replace(`/blog/${post.blog.slug}/posts/${post.slug || post.id}`);
     }
@@ -155,33 +157,6 @@ export default function PostDetailPage() {
     return () => clearTimeout(timer);
   }, [post, queryClient, slug]);
 
-  // 로딩 상태 - 최소 높이 보장으로 헤더 안정화
-  if (isLoading) {
-    return (
-      <div className="min-h-screen">
-        {/* 로딩 컨텐츠 */}
-        <article className="max-w-3xl mx-auto px-6 py-16">
-          <div className="animate-pulse">
-            {/* 제목 스켈레톤 */}
-            <div className="h-6 bg-gray-200 rounded mb-8"></div>
-            {/* 메타 정보 스켈레톤 */}
-            <div className="flex space-x-4 mb-8">
-              <div className="h-4 bg-gray-200 rounded w-20"></div>
-              <div className="h-4 bg-gray-200 rounded w-24"></div>
-              <div className="h-4 bg-gray-200 rounded w-16"></div>
-            </div>
-            {/* 본문 스켈레톤 */}
-            <div className="space-y-4">
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded"></div>
-              <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-            </div>
-          </div>
-        </article>
-      </div>
-    );
-  }
-
   // 비공개 블로그 체크
   if (post && (post as any).isPrivate) {
     return (
@@ -203,7 +178,7 @@ export default function PostDetailPage() {
   }
 
   // 에러 상태
-  if (isError || !post) {
+  if (isError) {
     return (
       <div className="min-h-screen">
         <ErrorMessage 
@@ -212,6 +187,11 @@ export default function PostDetailPage() {
         />
       </div>
     );
+  }
+  
+  // 아직 로딩 중이면 아무것도 표시하지 않음
+  if (!post) {
+    return null;
   }
 
   const canEdit = isAdmin || post.author?.id === user?.id;
