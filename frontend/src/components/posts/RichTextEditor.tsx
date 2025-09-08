@@ -20,6 +20,7 @@ import Suggestion from '@tiptap/suggestion';
 import { common, createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
+import { ReactNodeViewRenderer } from '@tiptap/react';
 
 // 리팩토링된 훅들 사용
 import { useUploadFile } from '@/hooks/useFiles';
@@ -33,6 +34,8 @@ import { useImageUploadManager } from '@/hooks/useImageUploadManager';
 import { stripUnderline } from '@/utils/stripUnderline';
 import { toast } from 'sonner';
 import { suggestion } from './SlashCommands';
+import { ResizableImageComponent } from './ResizableImageNode';
+import '@/styles/editor.css';
 
 // lowlight 인스턴스 생성 및 언어 등록 - Context7 권장사항
 const lowlight = createLowlight(common);
@@ -96,137 +99,7 @@ const ResizableImage = Image.extend({
   },
 
   addNodeView() {
-    return ({ node, HTMLAttributes, getPos, editor }) => {
-      const container = document.createElement('div');
-      container.className = 'image-resizer';
-      container.style.cssText = `
-        position: relative;
-        display: inline-block;
-        max-width: 100%;
-        margin: 8px 0;
-      `;
-
-      const img = document.createElement('img');
-      Object.assign(img, HTMLAttributes);
-      img.src = node.attrs.src;
-      img.alt = node.attrs.alt || '';
-      img.title = node.attrs.title || '';
-      // Add data-image-id for tracking
-      if (node.attrs['data-image-id']) {
-        img.setAttribute('data-image-id', node.attrs['data-image-id']);
-      }
-      img.className = 'editor-image';
-      img.style.cssText = `
-        max-width: 100%;
-        height: auto;
-        border-radius: 4px;
-        cursor: pointer;
-        ${node.attrs.width ? `width: ${node.attrs.width}px;` : ''}
-        ${node.attrs.height ? `height: ${node.attrs.height}px;` : ''}
-      `;
-
-      // 리사이즈 핸들
-      const resizeHandle = document.createElement('div');
-      resizeHandle.className = 'resize-handle';
-      resizeHandle.style.cssText = `
-        position: absolute;
-        bottom: 0;
-        right: 0;
-        width: 12px;
-        height: 12px;
-        background: #3b82f6;
-        cursor: se-resize;
-        border-radius: 2px;
-        opacity: 0;
-        transition: opacity 0.2s;
-      `;
-
-      // 마우스 호버 시 리사이즈 핸들 표시
-      container.addEventListener('mouseenter', () => {
-        resizeHandle.style.opacity = '1';
-      });
-      container.addEventListener('mouseleave', () => {
-        resizeHandle.style.opacity = '0';
-      });
-
-      // 리사이즈 기능
-      let isResizing = false;
-      let startX = 0;
-      let startY = 0;
-      let startWidth = 0;
-      let startHeight = 0;
-
-      resizeHandle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        isResizing = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        startWidth = img.offsetWidth;
-        startHeight = img.offsetHeight;
-        
-        document.addEventListener('mousemove', handleResize);
-        document.addEventListener('mouseup', stopResize);
-      });
-
-      const handleResize = (e: MouseEvent) => {
-        if (!isResizing) return;
-        
-        const deltaX = e.clientX - startX;
-        const deltaY = e.clientY - startY;
-        
-        const newWidth = Math.max(100, startWidth + deltaX);
-        const aspectRatio = startHeight / startWidth;
-        const newHeight = newWidth * aspectRatio;
-        
-        img.style.width = `${newWidth}px`;
-        img.style.height = `${newHeight}px`;
-      };
-
-      const stopResize = () => {
-        if (!isResizing) return;
-        isResizing = false;
-        
-        const newWidth = img.offsetWidth;
-        const newHeight = img.offsetHeight;
-        
-        // TipTap 노드 업데이트
-        if (typeof getPos === 'function') {
-          editor.chain()
-            .setNodeSelection(getPos())
-            .updateAttributes('image', {
-              width: newWidth,
-              height: newHeight,
-            })
-            .run();
-        }
-        
-        document.removeEventListener('mousemove', handleResize);
-        document.removeEventListener('mouseup', stopResize);
-      };
-
-      container.appendChild(img);
-      container.appendChild(resizeHandle);
-
-      return {
-        dom: container,
-        update: (updatedNode) => {
-          if (updatedNode.type.name !== 'image') return false;
-          
-          img.src = updatedNode.attrs.src;
-          img.alt = updatedNode.attrs.alt || '';
-          img.title = updatedNode.attrs.title || '';
-          
-          if (updatedNode.attrs.width) {
-            img.style.width = `${updatedNode.attrs.width}px`;
-          }
-          if (updatedNode.attrs.height) {
-            img.style.height = `${updatedNode.attrs.height}px`;
-          }
-          
-          return true;
-        },
-      };
-    };
+    return ReactNodeViewRenderer(ResizableImageComponent);
   },
 });
 

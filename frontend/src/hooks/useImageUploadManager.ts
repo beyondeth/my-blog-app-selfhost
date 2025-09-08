@@ -152,11 +152,14 @@ export function useImageUploadManager({
   
   // Handle newly uploaded images (insert to editor)
   const handleImagesUploaded = useCallback((newlyUploaded: UploadedImageInfo[]) => {
-    if (editor) {
+    if (editor && newlyUploaded.length > 0) {
       // 새로운 이미지를 기존 목록에 추가
       const updatedImages = [...images, ...newlyUploaded];
       onImagesChange(updatedImages);
 
+      // Build a chain of commands to insert all images at once
+      let chain = editor.chain().focus();
+      
       newlyUploaded.forEach((image, index) => {
         if (!image.isUploading && image.url) {
           let imageUrl = image.url;
@@ -164,19 +167,29 @@ export function useImageUploadManager({
             imageUrl = `https://myblogdata84.s3.us-east-1.amazonaws.com/${image.url}`;
           }
           
+          // Add spacing before image (except for the first one when no existing images)
           if (index > 0 || images.length > 0) {
-            editor.chain().insertContent('<br/>').run();
+            chain = chain.insertContent('<br/>');
           }
           
           console.log('[handleImagesUploaded] Inserting image with ID:', image.id);
-          editor.chain().focus().setImage({
+          // Add the image
+          chain = chain.setImage({
             src: imageUrl,
             alt: image.name,
             title: image.name,
             'data-image-id': image.id,
-          }).run();
+          });
+          
+          // Add spacing after each image (for separation)
+          if (index < newlyUploaded.length - 1) {
+            chain = chain.insertContent('<br/>');
+          }
         }
       });
+      
+      // Execute all commands at once
+      chain.run();
     }
   }, [editor, images, onImagesChange]);
 
