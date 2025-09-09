@@ -187,6 +187,20 @@ export function useImageUploadManager({
     // 부모 상태 업데이트
     onImagesChange(newImages);
     
+    // Auto-select first image as thumbnail
+    // 1. 선택된 썸네일이 없거나
+    // 2. 선택된 썸네일이 삭제되었거나
+    // 3. 새 이미지가 추가되어 첫 번째가 바뀌었을 때
+    if (newImages.length > 0) {
+      const currentSelectionValid = selectedThumbnailId && 
+        newImages.some(img => img.id === selectedThumbnailId);
+      
+      if (!currentSelectionValid) {
+        // 현재 선택이 유효하지 않으면 첫 번째 이미지 선택
+        onThumbnailSelect(newImages[0].id);
+      }
+    }
+    
     // Release lock after short delay
     setTimeout(() => {
       if (syncSourceRef.current === 'gallery') {

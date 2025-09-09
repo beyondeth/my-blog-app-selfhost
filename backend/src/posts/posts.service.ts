@@ -17,6 +17,7 @@ import { MarkdownRendererService } from '../common/services/markdown-renderer.se
 export class PostsService {
   private readonly logger = new Logger(PostsService.name);
   private readonly MAX_POST_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
+  private readonly MAX_FILES_PER_POST = 10; // Maximum 10 files per post
 
   constructor(
     @InjectRepository(Post)
@@ -251,6 +252,11 @@ export class PostsService {
 
     let attachedFiles: File[] = [];
     if (createPostDto.attachedFileIds?.length) {
+      // 파일 개수 검증
+      if (createPostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
+        throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+      }
+      
       attachedFiles = await this.filesRepository.find({
         where: { id: In(createPostDto.attachedFileIds), userId: user.id },
       });
@@ -337,6 +343,8 @@ export class PostsService {
       commentCount: post.commentCount || 0,
       // 태그 필드 추가 (프론트엔드 호환성)
       tags: post.tagNames || [],
+      // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원)
+      thumbnail: post.thumbnail || null,
     }));
 
     const totalPages = Math.ceil(total / limit);
@@ -550,9 +558,18 @@ export class PostsService {
     }
 
     if (updatePostDto.attachedFileIds !== undefined) {
+      // 파일 개수 검증
+      if (updatePostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
+        throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+      }
+      
       const files = await this.filesRepository.find({
         where: { id: In(updatePostDto.attachedFileIds), userId: user.id },
       });
+      
+      // 포스트당 총 파일 용량 검증
+      await this.validatePostTotalSize(files, post.id);
+      
       post.attachedFiles = files;
       await this.postsRepository.save(post);
     }

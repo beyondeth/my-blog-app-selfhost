@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -32,6 +33,9 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
   // 상태를 여기서 중앙 관리 (Single Source of Truth)
   const [images, setImages] = useState<UploadedImageInfo[]>([]);
   const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
+  const [isUploadValid, setIsUploadValid] = useState<boolean>(true);
+  const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const {
     register,
@@ -52,18 +56,52 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
   
   // 이미지 목록이 변경될 때마다 form의 fileIds를 업데이트
   useEffect(() => {
-    const fileIds = images.filter(img => !img.isUploading).map(img => img.id);
+    // YouTube 썸네일(yt_thumb_로 시작)은 실제 파일이 아니므로 제외
+    const fileIds = images
+      .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
+      .map(img => img.id);
     setValue('fileIds', fileIds);
 
-    // 썸네일이 유효한지 확인
-    if (selectedThumbnailId && !fileIds.includes(selectedThumbnailId)) {
-      setSelectedThumbnailId(''); // 썸네일이 삭제되었으면 초기화
+    // 썸네일 자동 선택 및 유효성 체크
+    const allImageIds = images.filter(img => !img.isUploading).map(img => img.id);
+    
+    if (allImageIds.length > 0) {
+      // 현재 선택이 유효한지 확인
+      const currentSelectionValid = selectedThumbnailId && allImageIds.includes(selectedThumbnailId);
+      
+      if (!currentSelectionValid) {
+        // 유효하지 않으면 첫 번째 이미지 자동 선택
+        setSelectedThumbnailId(allImageIds[0]);
+      }
+    } else if (selectedThumbnailId) {
+      // 이미지가 없으면 선택 초기화
+      setSelectedThumbnailId('');
     }
   }, [images, selectedThumbnailId, setValue]);
 
+  // Upload validation handler
+  const handleUploadValidationChange = (isValid: boolean, reason?: string) => {
+    setIsUploadValid(isValid);
+    setUploadValidationReason(reason);
+  };
+  
   // 폼 제출 핸들러
   const onSubmit = async (data: PostFormData) => {
+    // Prevent submission if upload limits exceeded
+    if (!isUploadValid) {
+      toast.error(`업로드 제한 초과: ${uploadValidationReason}`);
+      return;
+    }
+    
+    // Prevent duplicate submissions
+    if (isSubmitting) {
+      return;
+    }
+    
+    setIsSubmitting(true);
+    
     try {
+      
       // 백엔드 DTO에 맞게 데이터 변환
       const postData: any = {
         title: data.title,
@@ -79,12 +117,15 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
           // YouTube 썸네일인 경우 URL을 찾아서 thumbnail 필드로 전송
           const selectedImage = images.find(img => img.id === selectedThumbnailId);
           if (selectedImage) {
+            // YouTube 썸네일 URL을 그대로 저장 (YouTube 도메인 포함)
             postData.thumbnail = selectedImage.url;
+          } else {
           }
         } else {
           // 일반 업로드된 이미지인 경우 파일 프록시 URL로 전송
           postData.thumbnail = `/api/v1/files/${selectedThumbnailId}/download`;
         }
+      } else {
       }
       
       const result = await createPostMutation.mutateAsync(postData);
@@ -92,6 +133,9 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
       router.push(`/blog/${blogSlug}/posts/${result.slug}`);
     } catch (error) {
       console.error('Failed to create post:', error);
+      toast.error('포스트 저장에 실패했습니다.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -184,6 +228,9 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
                   // File IDs are handled via images state
                 }}
                 onThumbnailSelect={setSelectedThumbnailId}
+                selectedThumbnailId={selectedThumbnailId}
+                onImagesChange={setImages}  // Add this to get images from editor
+                onValidationChange={handleUploadValidationChange}
                 enableImageManager={true}
                 maxImages={10}
                 placeholder="내용을 입력하세요..."
@@ -205,10 +252,11 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
           </button>
           <button
             type="submit"
-            disabled={createPostMutation.isLoading}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50"
+            disabled={!isUploadValid || isSubmitting || createPostMutation.isLoading}
+            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            title={!isUploadValid ? uploadValidationReason : undefined}
           >
-            {createPostMutation.isLoading ? '저장 중...' : '저장'}
+            {isSubmitting || createPostMutation.isLoading ? '저장중...' : '저장'}
           </button>
         </div>
       </form>

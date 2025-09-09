@@ -13,6 +13,7 @@ interface UseImageGallerySyncProps {
   enableImageManager?: boolean;
   onFilesChange?: (fileIds: string[]) => void;
   onThumbnailSelect?: (thumbnailId: string) => void;
+  selectedThumbnailId?: string;  // Parent에서 전달받은 값
 }
 
 export function useImageGallerySync({
@@ -20,23 +21,21 @@ export function useImageGallerySync({
   enableImageManager,
   onFilesChange,
   onThumbnailSelect,
+  selectedThumbnailId = '',  // Parent에서 전달받은 값 사용
 }: UseImageGallerySyncProps) {
   const [images, setImages] = useState<UploadedImageInfo[]>([]);
-  const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
+  // 로컬 selectedThumbnailId 상태 제거
 
   // Image upload manager hook 사용
   const imageUploadManager = useImageUploadManager({
     editor,
     images,
     onImagesChange: (newImages) => {
-      console.log('[useImageGallerySync] onImagesChange called with', newImages.length, 'images');
-      console.log('[useImageGallerySync] New images:', newImages.map(img => ({ id: img.id, name: img.name })));
       setImages(newImages);
     },
     selectedThumbnailId,
     onThumbnailSelect: (thumbnailId: string) => {
-      setSelectedThumbnailId(thumbnailId);
-      onThumbnailSelect?.(thumbnailId);
+      onThumbnailSelect?.(thumbnailId);  // Parent의 상태만 업데이트
     },
   });
 
@@ -52,7 +51,7 @@ export function useImageGallerySync({
     images,
     setImages,
     selectedThumbnailId,
-    setSelectedThumbnailId,
+    // setSelectedThumbnailId 제거 - parent에서 관리
     imageUploadManager,
   };
 }

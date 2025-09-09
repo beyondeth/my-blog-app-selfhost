@@ -56,30 +56,88 @@ const PostArticle = React.memo(function PostArticle({
     ? cleanContent.substring(0, maxLength) + '...' 
     : cleanContent || '';
   
-  // YouTube 썸네일인지 확인하고 비디오 ID 추출
-  const isYouTubeThumbnail = post.thumbnail && (
-    post.thumbnail.includes('img.youtube.com') || 
-    post.thumbnail.includes('ytimg.com')
-  );
-  
+  // YouTube 썸네일인지 확인하고 비디오 ID 추출 (개선된 감지 로직)
+  let isYouTubeThumbnail = false;
   let youtubeVideoId = null;
-  if (isYouTubeThumbnail && post.thumbnail) {
-    // URL에서 비디오 ID 추출: https://img.youtube.com/vi/{videoId}/maxresdefault.jpg
-    const match = post.thumbnail.match(/\/vi\/([a-zA-Z0-9_-]+)\//);
-    if (match) {
-      youtubeVideoId = match[1];
+  
+  // 디버깅: 포스트 데이터 확인
+  console.log('[PostArticle] Post data:', {
+    id: post.id,
+    title: post.title,
+    thumbnail: post.thumbnail,
+    hasContent: !!post.content,
+    contentLength: post.content?.length
+  });
+  
+  // thumbnail URL에서 YouTube 패턴 확인
+  if (post.thumbnail) {
+    // 디버깅용 로그
+    console.log('[PostArticle] Analyzing thumbnail URL:', post.thumbnail);
+    
+    // YouTube 썸네일 URL 패턴들 (우선순위 순서)
+    const youtubePatterns = [
+      // 1. 표준 YouTube 썸네일 URL 패턴
+      /(?:https?:\/\/)?img\.youtube\.com\/vi\/([a-zA-Z0-9_-]{11})\/(?:maxresdefault|hqdefault|mqdefault|sddefault|default)\.jpg/,
+      /(?:https?:\/\/)?i\.ytimg\.com\/vi\/([a-zA-Z0-9_-]{11})\/(?:maxresdefault|hqdefault|mqdefault|sddefault|default)\.jpg/,
+      
+      // 2. 짧은 형식
+      /(?:https?:\/\/)?(?:img\.)?youtube\.com\/vi\/([a-zA-Z0-9_-]{11})/,
+      /(?:https?:\/\/)?(?:www\.)?ytimg\.com\/vi\/([a-zA-Z0-9_-]{11})/,
+      
+      // 3. webp 형식 포함
+      /(?:https?:\/\/)?i\d*\.ytimg\.com\/vi(?:_webp)?\/([a-zA-Z0-9_-]{11})/,
+      
+      // 4. 다양한 품질 지정자
+      /\/vi\/([a-zA-Z0-9_-]{11})\/(?:maxresdefault|hqdefault|mqdefault|sddefault|default|0|1|2|3)/
+    ];
+    
+    // 각 패턴으로 테스트
+    for (const pattern of youtubePatterns) {
+      const match = post.thumbnail.match(pattern);
+      if (match && match[1]) {
+        isYouTubeThumbnail = true;
+        youtubeVideoId = match[1];
+        console.log('[PostArticle] ✅ YouTube video DETECTED! Pattern matched:', pattern.source);
+        console.log('[PostArticle] Video ID extracted:', youtubeVideoId);
+        break;
+      }
     }
+    
+    // 패턴 매칭 실패 시 도메인 체크 + 11자리 ID 추출
+    if (!isYouTubeThumbnail) {
+      const isYouTubeDomain = post.thumbnail.includes('youtube.com') || 
+                              post.thumbnail.includes('ytimg.com') ||
+                              post.thumbnail.includes('youtu.be');
+      
+      if (isYouTubeDomain) {
+        console.log('[PostArticle] YouTube domain detected, trying to extract video ID...');
+        // YouTube 비디오 ID는 정확히 11자리
+        const idMatch = post.thumbnail.match(/([a-zA-Z0-9_-]{11})/);
+        if (idMatch) {
+          isYouTubeThumbnail = true;
+          youtubeVideoId = idMatch[1];
+          console.log('[PostArticle] ✅ YouTube video DETECTED via domain+ID! Video ID:', youtubeVideoId);
+        } else {
+          console.log('[PostArticle] ❌ YouTube domain found but no valid 11-char ID');
+        }
+      } else {
+        console.log('[PostArticle] ❌ Not a YouTube thumbnail URL');
+      }
+    }
+  } else {
+    console.log('[PostArticle] No thumbnail set for this post');
   }
   
   // YouTube 비디오인 경우 Reddit 스타일 레이아웃
   if (youtubeVideoId) {
     return (
-      <article className="border-b border-gray-200 py-6 sm:py-4 first:pt-0">
+      <article className="border-b border-gray-200 py-6 sm:py-8 first:pt-0">
         <div className="flex flex-col">
-          {/* Author Info와 제목 */}
+          {/* Header - Author Info와 제목 */}
           <div className="mb-4">
+            {/* Author Info */}
             {post.author && (
-              <div className="flex items-center gap-2 mb-3">
+              <div className="flex items-center gap-2 mb-2">
                 <UserLinkWithTooltip 
                   userId={post.author.id} 
                   username={post.author.username}
@@ -91,41 +149,48 @@ const PostArticle = React.memo(function PostArticle({
                       username={post.author.username}
                       size="xs"
                     />
-                    <span className="text-sm text-gray-700 font-medium">
+                    <span className="text-sm text-gray-600">
                       {post.author.username}
                     </span>
                   </div>
                 </UserLinkWithTooltip>
+                <span className="text-xs text-gray-400">•</span>
+                <span className="text-xs text-gray-500">
+                  {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
+                </span>
               </div>
             )}
             
-            <h2 className="text-base sm:text-lg font-bold text-gray-900 leading-tight">
+            {/* 제목 - YouTube 포스트는 더 큰 제목 */}
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight mb-1">
               <Link 
                 href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
-                className="hover:text-amber-800 transition-colors"
+                className="hover:text-black transition-colors"
               >
                 {post.title}
               </Link>
             </h2>
           </div>
           
-          {/* YouTube 비디오 플레이어 - 480x480 고정 크기 */}
-          <div className="w-full flex justify-center mb-4">
-            <div className="relative" style={{ width: '480px', maxWidth: '100%', height: '480px' }}>
-              <iframe
-                src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
-                title={post.title}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                allowFullScreen
-                className="absolute inset-0 w-full h-full rounded-lg"
-                style={{ aspectRatio: '1/1' }}
-              />
+          {/* YouTube 비디오 플레이어 - 16:9 비율, 최대 너비 제한 */}
+          <div className="w-full mb-4">
+            <div className="relative w-full" style={{ maxWidth: '640px', margin: '0 auto' }}>
+              <div className="relative" style={{ paddingBottom: '56.25%' /* 16:9 비율 */ }}>
+                <iframe
+                  src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
+                  title={post.title}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full rounded-lg shadow-sm"
+                />
+              </div>
             </div>
           </div>
           
-          {/* 메타 정보와 버튼들 */}
+          {/* 하단 고정 영역 - 일반 포스트와 동일한 구조 */}
           <div>
+            {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
             <div className="flex flex-wrap items-center text-xs text-gray-500 gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
                 {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
@@ -141,6 +206,7 @@ const PostArticle = React.memo(function PostArticle({
               </span>
             </div>
             
+            {/* 버튼들 - 메타 정보 바로 아래 */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link 
                 href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}

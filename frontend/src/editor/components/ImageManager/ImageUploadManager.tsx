@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useState, useRef, useEffect } from 'react';
+import React, { useCallback, useState, useRef, useMemo } from 'react';
 import { 
   DndContext, 
   closestCenter, 
@@ -21,7 +21,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { FiX, FiImage, FiUpload, FiCheck, FiMove, FiMenu } from 'react-icons/fi';
+import { FiImage, FiUpload, FiCheck, FiMove, FiMenu } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { validateImageFile } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
@@ -36,6 +36,10 @@ export interface UploadedImageInfo {
   position?: number;
 }
 
+// Upload limits constants
+const MAX_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+
 interface ImageUploadManagerProps {
   images?: UploadedImageInfo[]; // Optional controlled mode
   maxImages?: number;
@@ -45,6 +49,7 @@ interface ImageUploadManagerProps {
   onThumbnailSelect?: (imageId: string) => void;
   selectedThumbnailId?: string;
   className?: string;
+  onValidationChange?: (isValid: boolean, reason?: string) => void; // Validation state callback
 }
 
 // Sortable Image Item Component
@@ -75,9 +80,14 @@ function SortableImageItem({ image, isSelected, onRemove, onSelect }: SortableIm
     <div
       ref={setNodeRef}
       style={style}
-      className={`relative group bg-white border-2 rounded-lg overflow-hidden ${
+      {...attributes}
+      {...listeners}
+      className={`relative group bg-white border-2 rounded-lg overflow-hidden flex flex-col cursor-grab active:cursor-grabbing ${
         isSelected ? 'border-blue-500' : 'border-gray-200'
       } hover:border-gray-300 transition-colors`}
+      onClick={() => {
+        onSelect(image.id);
+      }}
     >
       {/* Drag Handle Icon - Visual indicator only */}
       <div
@@ -87,21 +97,20 @@ function SortableImageItem({ image, isSelected, onRemove, onSelect }: SortableIm
         <FiMenu className="w-3 h-3" />
       </div>
 
-      {/* Remove Button */}
-      <button
-        onClick={() => onRemove(image.id)}
-        className="absolute top-1 right-1 z-10 p-1.5 bg-red-500 text-white rounded-full opacity-90 hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
-        title="이미지 제거"
-      >
-        <FiX className="w-4 h-4" />
-      </button>
+      {/* Image Preview Container - 고정 높이 */}
+      <div className="aspect-square relative flex-shrink-0">
+        {/* Remove Button - 이미지 영역의 오른쪽 상단 */}
+        <button
+          onClick={(e) => {
+            e.stopPropagation(); // 클릭 이벤트 전파 방지
+            onRemove(image.id);
+          }}
+          className="absolute top-2 right-2 z-10 px-2 py-1 bg-red-500 text-white rounded text-xs font-medium opacity-90 hover:opacity-100 transition-opacity hover:bg-red-600 shadow-md"
+          title="이미지 제거"
+        >
+          삭제
+        </button>
 
-      {/* Image Preview - Entire area is draggable */}
-      <div 
-        {...attributes}
-        {...listeners}
-        className="aspect-square relative cursor-grab active:cursor-grabbing"
-      >
         {image.isUploading ? (
           <div className="w-full h-full flex items-center justify-center bg-gray-100">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
@@ -110,8 +119,7 @@ function SortableImageItem({ image, isSelected, onRemove, onSelect }: SortableIm
           <img
             src={image.preview || image.url || `/api/v1/files/${image.id}/download`}
             alt={image.name}
-            className="w-full h-full object-cover cursor-pointer select-none"
-            onClick={() => onSelect(image.id)}
+            className="w-full h-full object-cover select-none"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               console.error('Image load error:', target.src);
@@ -122,22 +130,21 @@ function SortableImageItem({ image, isSelected, onRemove, onSelect }: SortableIm
             }}
           />
         )}
-        
-        {/* Thumbnail Badge */}
+      </div>
+
+      {/* Image Info - 항상 하단에 고정 */}
+      <div className="p-2 bg-gray-50 border-t mt-auto relative">
+        {/* Thumbnail Badge - 정보 영역의 왼쪽 하단 */}
         {isSelected && (
-          <div className="absolute bottom-1 left-1 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium">
+          <div className="absolute bottom-1 left-1 bg-blue-500 text-white px-2 py-1 rounded text-xs font-medium z-10">
             썸네일
           </div>
         )}
-      </div>
-
-      {/* Image Info */}
-      <div className="p-2 bg-gray-50 border-t">
         <p className="text-xs text-gray-600 truncate" title={image.name}>
           {image.name}
         </p>
         <p className="text-xs text-gray-500">
-          {(image.size / 1024 / 1024).toFixed(1)} MB
+          {image.size ? `${(image.size / 1024 / 1024).toFixed(1)} MB` : ''}
         </p>
       </div>
     </div>
@@ -177,6 +184,7 @@ export default function ImageUploadManager({
   onThumbnailSelect,
   selectedThumbnailId,
   className = '',
+  onValidationChange,
 }: ImageUploadManagerProps) {
   const [internalImages, setInternalImages] = useState<UploadedImageInfo[]>([]);
   const [uploadingCount, setUploadingCount] = useState(0);
@@ -185,6 +193,25 @@ export default function ImageUploadManager({
   
   // Use controlled images if provided, otherwise use internal state
   const images = controlledImages ?? internalImages;
+  
+  // Calculate total size of uploaded images
+  const totalSize = useMemo(() => {
+    return images.reduce((total, img) => total + (img.size || 0), 0);
+  }, [images]);
+  
+  // Check if limits are exceeded
+  const isOverImageLimit = images.length > maxImages;
+  const isOverSizeLimit = totalSize > MAX_TOTAL_SIZE;
+  const sizePercentage = (totalSize / MAX_TOTAL_SIZE) * 100;
+  
+  // Notify parent about validation state
+  React.useEffect(() => {
+    if (onValidationChange) {
+      const isValid = !isOverImageLimit && !isOverSizeLimit;
+      const reason = isOverImageLimit ? '이미지 개수 초과' : isOverSizeLimit ? '용량 초과' : undefined;
+      onValidationChange(isValid, reason);
+    }
+  }, [isOverImageLimit, isOverSizeLimit, onValidationChange]);
   
   // Wrapper for setImages to handle both controlled and uncontrolled mode
   const setImages = useCallback((newImages: UploadedImageInfo[] | ((prev: UploadedImageInfo[]) => UploadedImageInfo[])) => {
@@ -251,7 +278,19 @@ export default function ImageUploadManager({
       return;
     }
 
-    // Validate files
+    // Calculate total size after adding new files
+    const newFilesSize = fileArray.reduce((sum, file) => sum + file.size, 0);
+    const totalSizeAfterUpload = totalSize + newFilesSize;
+    
+    // Check total size limit
+    if (totalSizeAfterUpload > MAX_TOTAL_SIZE) {
+      const remainingSize = MAX_TOTAL_SIZE - totalSize;
+      const remainingSizeMB = (remainingSize / 1024 / 1024).toFixed(1);
+      toast.error(`총 용량 30MB 초과! 남은 용량: ${remainingSizeMB}MB`);
+      return;
+    }
+
+    // Validate individual files
     for (const file of fileArray) {
       const validation = validateImageFile(file);
       if (!validation.valid) {
@@ -262,7 +301,7 @@ export default function ImageUploadManager({
 
     // Start batch upload
     uploadFiles(fileArray);
-  }, [images, maxImages]);
+  }, [images, maxImages, totalSize]);
 
   // Upload multiple files
   const uploadFiles = useCallback(async (files: File[]) => {
@@ -350,9 +389,14 @@ export default function ImageUploadManager({
           onImagesUploaded(successful);
         }
         
-        // Auto-select first image as thumbnail if none selected
-        if (!selectedThumbnailId && finalImages.length > 0 && onThumbnailSelect) {
-          onThumbnailSelect(finalImages[0].id);
+        // Auto-select first image as thumbnail if current selection is invalid
+        if (finalImages.length > 0 && onThumbnailSelect) {
+          const currentSelectionValid = selectedThumbnailId && 
+            finalImages.some(img => img.id === selectedThumbnailId);
+          
+          if (!currentSelectionValid) {
+            onThumbnailSelect(finalImages[0].id);
+          }
         }
         
         toast.success(`${successful.length}개의 이미지가 업로드되었습니다.`);
@@ -466,11 +510,39 @@ export default function ImageUploadManager({
             </SortableContext>
           </DndContext>
 
-          {/* 이미지 관리 가이드 */}
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <p className="text-xs text-gray-600">
-              💡 <span className="font-medium">Tip:</span> 드래그하여 순서 변경 • 클릭하여 썸네일 설정 • X 버튼으로 삭제
-            </p>
+          {/* Upload Limits Display */}
+          <div className="mt-3 flex items-start gap-4">
+            <div className="flex-1 p-3 bg-gray-50 rounded-lg">
+              <p className="text-sm text-gray-600">
+                💡 <span className="font-medium">Tip:</span> 드래그하여 순서 변경 • 클릭하여 썸네일 설정 • 삭제 버튼으로 제거
+              </p>
+            </div>
+            
+            {/* Upload Stats - tip과 동일한 스타일 */}
+            <div className="p-3 bg-gray-50 rounded-lg">
+              <div className="flex items-center space-x-4 text-sm">
+                <div className={`flex items-center ${
+                  isOverImageLimit ? 'text-red-600 font-medium' : 
+                  images.length >= maxImages * 0.8 ? 'text-orange-600' : 'text-gray-600'
+                }`}>
+                  <span>이미지: {images.length}/{maxImages}</span>
+                </div>
+                <div className="text-gray-400">|</div>
+                <div className={`flex items-center ${
+                  isOverSizeLimit ? 'text-red-600 font-medium' : 
+                  sizePercentage >= 80 ? 'text-orange-600' : 'text-gray-600'
+                }`}>
+                  <span>용량: {(totalSize / 1024 / 1024).toFixed(1)} MB / 30 MB</span>
+                </div>
+              </div>
+              {(isOverImageLimit || isOverSizeLimit) && (
+                <p className="text-xs text-red-600 mt-1">
+                  {isOverImageLimit && '이미지 개수 초과'}
+                  {isOverImageLimit && isOverSizeLimit && ' • '}
+                  {isOverSizeLimit && '용량 초과'}
+                </p>
+              )}
+            </div>
           </div>
         </div>
       )}

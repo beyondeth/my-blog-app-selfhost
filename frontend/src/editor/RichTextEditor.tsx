@@ -32,6 +32,9 @@ interface RichTextEditorProps {
   onChange: (content: string) => void;
   onFilesChange?: (fileIds: string[]) => void;
   onThumbnailSelect?: (thumbnailId: string) => void;
+  selectedThumbnailId?: string;  // Add this to pass selected thumbnail
+  onImagesChange?: (images: UploadedImageInfo[]) => void;  // Add this to expose images
+  onValidationChange?: (isValid: boolean, reason?: string) => void;  // Validation callback
   placeholder?: string;
   className?: string;
   enableImageManager?: boolean;
@@ -44,6 +47,9 @@ export default function BlogRichTextEditor({
   onChange, 
   onFilesChange,
   onThumbnailSelect,
+  selectedThumbnailId: parentSelectedThumbnailId,
+  onImagesChange,
+  onValidationChange,
   placeholder = "내용을 입력하세요...",
   className = "",
   enableImageManager = false,
@@ -132,15 +138,22 @@ export default function BlogRichTextEditor({
   const {
     images: galleryImages,
     setImages: setGalleryImages,
-    selectedThumbnailId,
-    setSelectedThumbnailId,
+    selectedThumbnailId: localSelectedThumbnailId,  // Hook에서 반환하는 값 (parent의 값)
     imageUploadManager,
   } = useImageGallerySync({
     editor: editorInstance, // 에디터 인스턴스를 동적으로 전달
     enableImageManager,
     onFilesChange,
     onThumbnailSelect,
+    selectedThumbnailId: parentSelectedThumbnailId,  // Parent의 값 전달
   });
+  
+  // Call onImagesChange whenever galleryImages changes
+  useEffect(() => {
+    if (onImagesChange) {
+      onImagesChange(galleryImages);
+    }
+  }, [galleryImages, onImagesChange]);
   
   console.log('[RichTextEditor] galleryImages:', galleryImages);
   console.log('[RichTextEditor] setGalleryImages 타입:', typeof setGalleryImages);
@@ -164,7 +177,7 @@ export default function BlogRichTextEditor({
         imageUploadManager.handleGalleryImageChange(newImages);
       }
     },
-    setSelectedThumbnailId,
+    setSelectedThumbnailId: onThumbnailSelect, // Parent의 setter 사용
     onThumbnailSelect,
     setUploadedFiles,
     onFilesChange,
@@ -329,7 +342,8 @@ export default function BlogRichTextEditor({
               onImagesUploaded={imageUploadManager.handleImagesUploaded}
               onImagesReordered={imageUploadManager.handleImageReorder}
               onThumbnailSelect={imageUploadManager.handleThumbnailSelect}
-              selectedThumbnailId={selectedThumbnailId}
+              selectedThumbnailId={parentSelectedThumbnailId || localSelectedThumbnailId}
+              onValidationChange={onValidationChange}
               className=""
             />
           </div>
