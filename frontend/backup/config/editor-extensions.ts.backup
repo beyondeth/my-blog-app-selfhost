@@ -1,0 +1,145 @@
+/**
+ * TipTap Editor Extensions Configuration
+ * 에디터 확장 기능 설정
+ */
+
+import StarterKit from '@tiptap/starter-kit';
+import Underline from '@tiptap/extension-underline';
+import TextAlign from '@tiptap/extension-text-align';
+import Link from '@tiptap/extension-link';
+import Placeholder from '@tiptap/extension-placeholder';
+import Image from '@tiptap/extension-image';
+import Youtube from '@tiptap/extension-youtube';
+import ListItem from '@tiptap/extension-list-item';
+import BulletList from '@tiptap/extension-bullet-list';
+import OrderedList from '@tiptap/extension-ordered-list';
+import CodeBlock from '@tiptap/extension-code-block';
+import { EDITOR_DOCUMENT_CONFIG, YOUTUBE_CONFIG } from '@/constants/editor.constants';
+
+/**
+ * 기본 에디터 확장 기능 설정
+ */
+export const getEditorExtensions = (placeholder?: string) => [
+  // 기본 스타터 킷
+  StarterKit.configure({
+    heading: {
+      levels: [1, 2, 3],
+    },
+    bulletList: false,
+    orderedList: false,
+    listItem: false,
+  }),
+  
+  // 텍스트 포맷팅
+  Underline,
+  TextAlign.configure({
+    types: ['heading', 'paragraph'],
+  }),
+  
+  // 링크
+  Link.configure({
+    openOnClick: false,
+    HTMLAttributes: {
+      target: '_blank',
+      rel: 'noopener noreferrer',
+    },
+  }),
+  
+  // 플레이스홀더
+  Placeholder.configure({
+    placeholder: placeholder || EDITOR_DOCUMENT_CONFIG.PLACEHOLDER,
+  }),
+  
+  // 이미지
+  Image.configure({
+    inline: false,
+    allowBase64: false,
+    HTMLAttributes: {
+      class: 'max-w-full h-auto rounded-lg',
+    },
+  }),
+  
+  // YouTube
+  Youtube.configure({
+    addPasteHandler: false, // 커스텀 paste 핸들러 사용
+    width: YOUTUBE_CONFIG.DEFAULT_WIDTH,
+    height: YOUTUBE_CONFIG.DEFAULT_HEIGHT,
+    nocookie: true,
+    HTMLAttributes: {
+      class: 'youtube-video rounded-lg overflow-hidden',
+    },
+  }),
+  
+  // 리스트
+  ListItem,
+  BulletList.configure({
+    HTMLAttributes: {
+      class: 'list-disc pl-5 space-y-1',
+    },
+  }),
+  OrderedList.configure({
+    HTMLAttributes: {
+      class: 'list-decimal pl-5 space-y-1',
+    },
+  }),
+  
+  // 코드 블록
+  CodeBlock.configure({
+    HTMLAttributes: {
+      class: 'bg-gray-100 rounded p-4 font-mono text-sm',
+    },
+  }),
+];
+
+/**
+ * 읽기 전용 에디터 확장 기능 설정
+ */
+export const getReadOnlyExtensions = () => [
+  StarterKit.configure({
+    heading: {
+      levels: [1, 2, 3],
+    },
+  }),
+  Underline,
+  TextAlign.configure({
+    types: ['heading', 'paragraph'],
+  }),
+  Link.configure({
+    openOnClick: true,
+    HTMLAttributes: {
+      target: '_blank',
+      rel: 'noopener noreferrer',
+    },
+  }),
+  Image.configure({
+    inline: false,
+    allowBase64: false,
+    HTMLAttributes: {
+      class: 'max-w-full h-auto rounded-lg',
+    },
+  }),
+  Youtube.configure({
+    width: YOUTUBE_CONFIG.DEFAULT_WIDTH,
+    height: YOUTUBE_CONFIG.DEFAULT_HEIGHT,
+    nocookie: true,
+    HTMLAttributes: {
+      class: 'youtube-video rounded-lg overflow-hidden',
+    },
+  }),
+  ListItem,
+  BulletList.configure({
+    HTMLAttributes: {
+      class: 'list-disc pl-5 space-y-1',
+    },
+  }),
+  OrderedList.configure({
+    HTMLAttributes: {
+      class: 'list-decimal pl-5 space-y-1',
+    },
+  }),
+  CodeBlock.configure({
+    HTMLAttributes: {
+      class: 'bg-gray-100 rounded p-4 font-mono text-sm',
+    },
+  }),
+];

@@ -227,6 +227,7 @@ export class PostsService {
       content_markdown: markdownContent, // 마크다운 원본 (편집용)
       content_type: contentType,
       content_rendered_at: contentType === 'markdown' ? new Date() : null,
+      thumbnail: createPostDto.thumbnail, // YouTube 썸네일 또는 일반 이미지 URL
       author: user,
       blog: blog,
       blogId: blog.id,
@@ -515,7 +516,11 @@ export class PostsService {
 
     // Title 변경 시 slug는 변경하지 않음 (이미 고유한 UUID 포함)
     // SEO를 위해 기존 slug 유지가 더 좋음
-    if (processedContent) {
+    
+    // thumbnail이 명시적으로 제공된 경우 사용, 그렇지 않으면 content에서 추출
+    if (updatePostDto.thumbnail !== undefined) {
+      post.thumbnail = updatePostDto.thumbnail;
+    } else if (processedContent) {
       post.thumbnail = this.extractThumbnailFromContent(processedContent);
     }
 

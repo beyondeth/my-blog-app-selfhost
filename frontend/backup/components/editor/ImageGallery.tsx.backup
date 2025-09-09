@@ -1,0 +1,190 @@
+/**
+ * Image Gallery Component
+ * 이미지 갤러리 컴포넌트
+ */
+
+import React, { useCallback } from 'react';
+import { X, GripVertical } from 'lucide-react';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from '@dnd-kit/core';
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { isYouTubeThumbnailId } from '@/utils/youtube.utils';
+
+export interface MediaItem {
+  id: string;
+  url: string;
+  name?: string;
+  size?: number;
+}
+
+interface ImageGalleryProps {
+  items: MediaItem[];
+  onReorder: (items: MediaItem[]) => void;
+  onRemove: (id: string) => void;
+  title?: string;
+}
+
+// 개별 아이템 컴포넌트
+const SortableItem: React.FC<{
+  item: MediaItem;
+  onRemove: (id: string) => void;
+}> = ({ item, onRemove }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  const isYouTube = isYouTubeThumbnailId(item.id);
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`
+        flex items-center justify-between p-2 bg-white rounded-lg border
+        ${isDragging ? 'border-blue-500 shadow-lg' : 'border-gray-200'}
+        hover:border-gray-300 transition-all
+      `}
+    >
+      <div className="flex items-center gap-2">
+        {/* 드래그 핸들 */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="cursor-move text-gray-400 hover:text-gray-600"
+        >
+          <GripVertical className="w-4 h-4" />
+        </div>
+        
+        {/* 썸네일 */}
+        <div className="relative w-16 h-16 bg-gray-100 rounded overflow-hidden">
+          <img
+            src={item.url}
+            alt={item.name || (isYouTube ? 'YouTube Video' : 'Image')}
+            className="w-full h-full object-cover"
+          />
+          {isYouTube && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-30">
+              <div className="w-8 h-8 bg-red-600 rounded-sm flex items-center justify-center">
+                <div className="w-0 h-0 border-l-[6px] border-l-white border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent ml-1" />
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* 정보 */}
+        <div className="flex-1">
+          <p className="text-sm font-medium text-gray-900 truncate">
+            {isYouTube ? 'YouTube 동영상' : (item.name || '이미지')}
+          </p>
+          {item.size && !isYouTube && (
+            <p className="text-xs text-gray-500">
+              {(item.size / 1024).toFixed(1)} KB
+            </p>
+          )}
+        </div>
+      </div>
+      
+      {/* 삭제 버튼 */}
+      <button
+        type="button"
+        onClick={() => onRemove(item.id)}
+        className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+        title="삭제"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  );
+};
+
+export const ImageGallery: React.FC<ImageGalleryProps> = ({
+  items,
+  onReorder,
+  onRemove,
+  title = '업로드된 미디어',
+}) => {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  const handleDragEnd = useCallback((event: DragEndEvent) => {
+    const { active, over } = event;
+
+    if (over && active.id !== over.id) {
+      const oldIndex = items.findIndex((item) => item.id === active.id);
+      const newIndex = items.findIndex((item) => item.id === over.id);
+      
+      if (oldIndex !== -1 && newIndex !== -1) {
+        const newItems = arrayMove(items, oldIndex, newIndex);
+        onReorder(newItems);
+      }
+    }
+  }, [items, onReorder]);
+
+  if (items.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
+      <h3 className="text-sm font-semibold text-gray-700 mb-3">{title}</h3>
+      
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragEnd={handleDragEnd}
+      >
+        <SortableContext
+          items={items.map(item => item.id)}
+          strategy={verticalListSortingStrategy}
+        >
+          <div className="space-y-2">
+            {items.map((item) => (
+              <SortableItem
+                key={item.id}
+                item={item}
+                onRemove={onRemove}
+              />
+            ))}
+          </div>
+        </SortableContext>
+      </DndContext>
+      
+      <div className="mt-3 text-xs text-gray-500">
+        드래그하여 순서를 변경할 수 있습니다
+      </div>
+    </div>
+  );
+};

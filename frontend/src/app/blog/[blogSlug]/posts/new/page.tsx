@@ -8,8 +8,7 @@ import { z } from 'zod';
 import { useAuth } from '@/hooks/useAuth';
 import { useCreatePost } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
-import { UploadedImageInfo } from '@/components/posts/ImageUploadManager';
-import BlogRichTextEditor from '@/components/posts/RichTextEditor';
+import { UploadedImageInfo, BlogRichTextEditor } from '@/editor';
 import Spinner from '@/components/ui/Spinner';
 
 // Zod 스키마 정의
@@ -66,14 +65,27 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
   const onSubmit = async (data: PostFormData) => {
     try {
       // 백엔드 DTO에 맞게 데이터 변환
-      const postData = {
+      const postData: any = {
         title: data.title,
         content: data.content,
         tags: data.tags,
         category: data.category,
         attachedFileIds: data.fileIds, // fileIds를 attachedFileIds로 변경
-        // thumbnailId는 별도 처리가 필요할 수 있음
       };
+      
+      // 썸네일 처리 - YouTube든 일반 이미지든 thumbnail 필드로 전송
+      if (selectedThumbnailId) {
+        if (selectedThumbnailId.startsWith('yt_thumb_')) {
+          // YouTube 썸네일인 경우 URL을 찾아서 thumbnail 필드로 전송
+          const selectedImage = images.find(img => img.id === selectedThumbnailId);
+          if (selectedImage) {
+            postData.thumbnail = selectedImage.url;
+          }
+        } else {
+          // 일반 업로드된 이미지인 경우 파일 프록시 URL로 전송
+          postData.thumbnail = `/api/v1/files/${selectedThumbnailId}/download`;
+        }
+      }
       
       const result = await createPostMutation.mutateAsync(postData);
       

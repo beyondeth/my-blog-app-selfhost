@@ -217,7 +217,7 @@ export default function BlogPostDetailPage() {
       {/* Article Content with deletion effect */}
       <article 
         className={cn(
-          "max-w-3xl mx-auto px-6 py-16 transition-all duration-500 relative",
+          "max-w-5xl mx-auto px-6 py-16 transition-all duration-500 relative",
           isDeleting && "opacity-30 blur-sm pointer-events-none scale-[0.98]"
         )}
       >

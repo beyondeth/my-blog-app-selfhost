@@ -1,0 +1,128 @@
+/**
+ * YouTube URL 관련 유틸리티 함수들
+ */
+
+/**
+ * YouTube URL에서 Video ID 추출
+ * @param url YouTube URL
+ * @returns Video ID 또는 null
+ */
+export function extractYouTubeVideoId(url: string): string | null {
+  const patterns = [
+    // 일반 YouTube URL (watch?v=...)
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|\S*?[?&]v=)|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
+    // YouTube Shorts URL
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]{11})/,
+    // YouTube embed URL
+    /(?:https?:\/\/)?(?:www\.)?youtube\.com\/embed\/([a-zA-Z0-9_-]{11})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * URL이 YouTube URL인지 확인
+ * @param url 확인할 URL
+ * @returns YouTube URL 여부
+ */
+export function isYouTubeUrl(url: string): boolean {
+  return extractYouTubeVideoId(url) !== null;
+}
+
+/**
+ * YouTube Video ID를 embed URL로 변환
+ * @param videoId YouTube Video ID
+ * @param options 옵션
+ * @returns YouTube embed URL
+ */
+export function getYouTubeEmbedUrl(
+  videoId: string,
+  options: {
+    nocookie?: boolean;
+    autoplay?: boolean;
+    controls?: boolean;
+    modestbranding?: boolean;
+    loop?: boolean;
+    start?: number;
+    end?: number;
+  } = {}
+): string {
+  const {
+    nocookie = true,
+    autoplay = false,
+    controls = true,
+    modestbranding = true,
+    loop = false,
+    start,
+    end,
+  } = options;
+
+  const domain = nocookie ? 'youtube-nocookie.com' : 'youtube.com';
+  const params = new URLSearchParams();
+  
+  if (autoplay) params.append('autoplay', '1');
+  if (!controls) params.append('controls', '0');
+  if (modestbranding) params.append('modestbranding', '1');
+  if (loop) {
+    params.append('loop', '1');
+    params.append('playlist', videoId); // loop를 위해서는 playlist 파라미터 필요
+  }
+  if (start) params.append('start', start.toString());
+  if (end) params.append('end', end.toString());
+  
+  const queryString = params.toString();
+  return `https://www.${domain}/embed/${videoId}${queryString ? '?' + queryString : ''}`;
+}
+
+/**
+ * YouTube URL을 완전한 형태로 정규화
+ * @param url YouTube URL 또는 Video ID
+ * @returns 정규화된 YouTube URL
+ */
+export function normalizeYouTubeUrl(url: string): string {
+  // 이미 완전한 URL인 경우
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  
+  // Video ID만 있는 경우
+  if (/^[a-zA-Z0-9_-]{11}$/.test(url)) {
+    return `https://www.youtube.com/watch?v=${url}`;
+  }
+  
+  // youtu.be 형태인 경우
+  if (url.startsWith('youtu.be/')) {
+    return `https://${url}`;
+  }
+  
+  // 기타 경우
+  return `https://www.youtube.com/watch?v=${url}`;
+}
+
+/**
+ * YouTube 썸네일 URL 가져오기
+ * @param videoId YouTube Video ID
+ * @param quality 썸네일 품질
+ * @returns 썸네일 URL
+ */
+export function getYouTubeThumbnailUrl(
+  videoId: string,
+  quality: 'default' | 'medium' | 'high' | 'standard' | 'maxres' = 'high'
+): string {
+  const qualityMap = {
+    default: 'default',      // 120x90
+    medium: 'mqdefault',     // 320x180
+    high: 'hqdefault',        // 480x360
+    standard: 'sddefault',    // 640x480
+    maxres: 'maxresdefault',  // 1280x720
+  };
+  
+  return `https://img.youtube.com/vi/${videoId}/${qualityMap[quality]}.jpg`;
+}

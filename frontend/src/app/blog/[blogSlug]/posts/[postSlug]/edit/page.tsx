@@ -5,7 +5,7 @@ import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { usePost, useUpdatePost } from '@/hooks/usePosts';
 import { FiEdit3, FiType, FiAlignLeft, FiImage, FiArrowLeft } from 'react-icons/fi';
-import BlogRichTextEditor from '@/components/posts/RichTextEditor';
+import { BlogRichTextEditor } from '@/editor';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import { toast } from 'sonner';
@@ -113,15 +113,31 @@ export default function BlogEditPostPage() {
     }
 
     try {
+      const updateData: any = {
+        title,
+        content,
+        category: category || undefined,
+        attachedFileIds: attachedFileIds.length > 0 ? attachedFileIds : undefined,
+      };
+
+      // 썸네일 처리 - YouTube든 일반 이미지든 thumbnail 필드로 전송
+      if (thumbnailId) {
+        if (thumbnailId.startsWith('yt_thumb_')) {
+          // YouTube 썸네일인 경우 URL 직접 사용
+          // thumbnailId가 실제로는 URL이 저장되어 있을 수 있음
+          updateData.thumbnail = thumbnailId.replace('yt_thumb_', '');
+        } else if (thumbnailId.startsWith('http')) {
+          // 이미 URL인 경우 그대로 사용
+          updateData.thumbnail = thumbnailId;
+        } else {
+          // 일반 파일 ID인 경우 프록시 URL로 변환
+          updateData.thumbnail = `/api/v1/files/${thumbnailId}/download`;
+        }
+      }
+
       await updatePostMutation.mutateAsync({
         id: post.id,
-        data: {
-          title,
-          content,
-          category: category || undefined,
-          attachedFileIds: attachedFileIds.length > 0 ? attachedFileIds : undefined,
-          thumbnailFileId: thumbnailId || undefined,
-        }
+        data: updateData
       });
       
       toast.success('글이 성공적으로 수정되었습니다!');

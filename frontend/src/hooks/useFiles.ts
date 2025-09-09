@@ -82,7 +82,7 @@ export function useDeleteFile() {
   
   return useMutation({
     mutationFn: (fileId: string | number) => {
-      const id = typeof fileId === 'string' ? parseInt(fileId, 10) : fileId;
+      const id = typeof fileId === 'string' ? fileId : fileId.toString();
       return apiClient.deleteFile(id);
     },
     onSuccess: (_, deletedFileId) => {

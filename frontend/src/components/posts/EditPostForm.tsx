@@ -19,7 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Save, ArrowLeft, FileText, Type, FolderOpen } from 'lucide-react';
-import BlogRichTextEditor from './RichTextEditor';
+import { BlogRichTextEditor } from '@/editor';
 
 // 폼 스키마 정의
 const postFormSchema = z.object({

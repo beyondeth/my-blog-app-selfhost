@@ -1,0 +1,286 @@
+/**
+ * Editor Toolbar Component
+ * 에디터 툴바 컴포넌트
+ */
+
+import React, { useRef } from 'react';
+import {
+  Bold,
+  Italic,
+  Underline,
+  Strikethrough,
+  Code,
+  Heading1,
+  Heading2,
+  Heading3,
+  List,
+  ListOrdered,
+  AlignLeft,
+  AlignCenter,
+  AlignRight,
+  Link,
+  Unlink,
+  Undo,
+  Redo,
+  FileCode,
+  Type,
+  Image,
+} from 'lucide-react';
+import { EDITOR_MENU_CONFIG } from '@/constants/editor.constants';
+
+interface EditorToolbarProps {
+  commands: {
+    toggleBold: () => void;
+    toggleItalic: () => void;
+    toggleUnderline: () => void;
+    toggleStrike: () => void;
+    toggleCode: () => void;
+    setHeading: (level: 1 | 2 | 3) => void;
+    setParagraph: () => void;
+    toggleBulletList: () => void;
+    toggleOrderedList: () => void;
+    setTextAlign: (align: 'left' | 'center' | 'right') => void;
+    toggleCodeBlock: () => void;
+    setLink: (url: string) => void;
+    unsetLink: () => void;
+    undo: () => void;
+    redo: () => void;
+  };
+  isActive: {
+    bold: boolean;
+    italic: boolean;
+    underline: boolean;
+    strike: boolean;
+    code: boolean;
+    heading: (level: number) => boolean;
+    bulletList: boolean;
+    orderedList: boolean;
+    codeBlock: boolean;
+    link: boolean;
+    textAlign: (align: string) => boolean;
+  };
+  onImageUpload?: () => void;
+}
+
+export const EditorToolbar: React.FC<EditorToolbarProps> = ({
+  commands,
+  isActive,
+  onImageUpload,
+}) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleLinkClick = () => {
+    if (isActive.link) {
+      commands.unsetLink();
+    } else {
+      const url = window.prompt('Enter URL:');
+      if (url) {
+        commands.setLink(url);
+      }
+    }
+  };
+
+  const ToolbarButton: React.FC<{
+    onClick: () => void;
+    isActive?: boolean;
+    children: React.ReactNode;
+    title?: string;
+  }> = ({ onClick, isActive = false, children, title }) => (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      className={`
+        ${EDITOR_MENU_CONFIG.DEFAULT_CLASS}
+        ${EDITOR_MENU_CONFIG.HOVER_CLASS}
+        ${isActive ? EDITOR_MENU_CONFIG.ACTIVE_CLASS : ''}
+      `}
+    >
+      {children}
+    </button>
+  );
+
+  const Separator = () => (
+    <div className="w-px h-6 bg-gray-300 mx-1" />
+  );
+
+  return (
+    <div className="border-b border-gray-200 bg-white">
+      <div className="flex flex-wrap items-center gap-1 p-2">
+        {/* 텍스트 포맷팅 */}
+        <ToolbarButton
+          onClick={commands.toggleBold}
+          isActive={isActive.bold}
+          title="Bold"
+        >
+          <Bold className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={commands.toggleItalic}
+          isActive={isActive.italic}
+          title="Italic"
+        >
+          <Italic className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={commands.toggleUnderline}
+          isActive={isActive.underline}
+          title="Underline"
+        >
+          <Underline className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={commands.toggleStrike}
+          isActive={isActive.strike}
+          title="Strikethrough"
+        >
+          <Strikethrough className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={commands.toggleCode}
+          isActive={isActive.code}
+          title="Inline Code"
+        >
+          <Code className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <Separator />
+        
+        {/* 제목 레벨 */}
+        <ToolbarButton
+          onClick={commands.setParagraph}
+          isActive={!isActive.heading(1) && !isActive.heading(2) && !isActive.heading(3)}
+          title="Paragraph"
+        >
+          <Type className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={() => commands.setHeading(1)}
+          isActive={isActive.heading(1)}
+          title="Heading 1"
+        >
+          <Heading1 className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={() => commands.setHeading(2)}
+          isActive={isActive.heading(2)}
+          title="Heading 2"
+        >
+          <Heading2 className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={() => commands.setHeading(3)}
+          isActive={isActive.heading(3)}
+          title="Heading 3"
+        >
+          <Heading3 className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <Separator />
+        
+        {/* 리스트 */}
+        <ToolbarButton
+          onClick={commands.toggleBulletList}
+          isActive={isActive.bulletList}
+          title="Bullet List"
+        >
+          <List className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={commands.toggleOrderedList}
+          isActive={isActive.orderedList}
+          title="Ordered List"
+        >
+          <ListOrdered className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <Separator />
+        
+        {/* 정렬 */}
+        <ToolbarButton
+          onClick={() => commands.setTextAlign('left')}
+          isActive={isActive.textAlign('left')}
+          title="Align Left"
+        >
+          <AlignLeft className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={() => commands.setTextAlign('center')}
+          isActive={isActive.textAlign('center')}
+          title="Align Center"
+        >
+          <AlignCenter className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={() => commands.setTextAlign('right')}
+          isActive={isActive.textAlign('right')}
+          title="Align Right"
+        >
+          <AlignRight className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <Separator />
+        
+        {/* 링크 및 코드 블록 */}
+        <ToolbarButton
+          onClick={handleLinkClick}
+          isActive={isActive.link}
+          title={isActive.link ? "Remove Link" : "Add Link"}
+        >
+          {isActive.link ? (
+            <Unlink className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+          ) : (
+            <Link className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+          )}
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={commands.toggleCodeBlock}
+          isActive={isActive.codeBlock}
+          title="Code Block"
+        >
+          <FileCode className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        {onImageUpload && (
+          <>
+            <Separator />
+            <ToolbarButton
+              onClick={onImageUpload}
+              title="Upload Image"
+            >
+              <Image className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+            </ToolbarButton>
+          </>
+        )}
+        
+        <Separator />
+        
+        {/* 실행 취소/재실행 */}
+        <ToolbarButton
+          onClick={commands.undo}
+          title="Undo"
+        >
+          <Undo className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+        
+        <ToolbarButton
+          onClick={commands.redo}
+          title="Redo"
+        >
+          <Redo className={EDITOR_MENU_CONFIG.ICON_SIZE} />
+        </ToolbarButton>
+      </div>
+    </div>
+  );
+};

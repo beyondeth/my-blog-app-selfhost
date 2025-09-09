@@ -73,6 +73,16 @@ export function normalizeImageUrl(url: string): string {
   if (!url) return '';
 
   try {
+    // YouTube 썸네일 URL은 직접 사용 (프록시 불필요)
+    if (url.includes('img.youtube.com') || url.includes('ytimg.com')) {
+      return url;
+    }
+
+    // 외부 HTTPS URL은 그대로 사용
+    if (url.startsWith('https://') && !url.includes('amazonaws.com')) {
+      return url;
+    }
+
     // 이미 완전한 프록시 URL인 경우
     if (url.includes('/api/v1/files/proxy/')) {
       // 이미 정확한 형식이면 그대로 반환
@@ -85,6 +95,11 @@ export function normalizeImageUrl(url: string): string {
 
     // S3 직접 URL인 경우
     if (url.includes('.s3.') && url.includes('amazonaws.com')) {
+      // 서명된 URL (쿼리 파라미터가 있는 경우)은 그대로 사용
+      if (url.includes('X-Amz-Signature') || url.includes('?')) {
+        return url;
+      }
+      // 서명이 없는 경우만 프록시 사용
       return getProxyImageUrl(url);
     }
 

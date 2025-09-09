@@ -135,16 +135,20 @@ export default function HtmlContentRenderer({ content, className = '' }: HtmlCon
           'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'code', 'pre', 'span', 'div',
           'hr', 'mark', 'sub', 'sup', 'del', 'ins', 'kbd', 'samp', 'var',
           'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
-          'button', 'svg', 'rect', 'path', 'polyline' // 복사 버튼 관련 태그 추가
+          'button', 'svg', 'rect', 'path', 'polyline', // 복사 버튼 관련 태그 추가
+          'iframe' // YouTube iframe 지원 추가
         ],
         ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'data-*', 'width', 'height', 'class', 'style',
-          'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'points', 'x', 'y', 'rx', 'ry', 'd' // SVG 속성 추가
+          'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'points', 'x', 'y', 'rx', 'ry', 'd', // SVG 속성 추가
+          'frameborder', 'allow', 'allowfullscreen', 'loading' // iframe 속성 추가
         ],
         ALLOW_DATA_ATTR: true,
         FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover'],
         KEEP_CONTENT: true,
-        ADD_TAGS: ['span'], // highlight.js가 생성하는 span 태그 허용
-        ADD_ATTR: ['class'] // highlight.js 클래스 유지
+        ADD_TAGS: ['span', 'iframe'], // highlight.js가 생성하는 span 태그와 iframe 허용
+        ADD_ATTR: ['class', 'frameborder', 'allow', 'allowfullscreen'], // highlight.js 클래스와 iframe 속성 유지
+        // 모든 HTTPS URL 허용 (S3, YouTube 등)
+        ALLOWED_URI_REGEXP: /^https?:\/\//i
       });
       
       // 4. 이미지 URL 처리

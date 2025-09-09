@@ -142,15 +142,27 @@ export class Post {
       this.slug = `${baseSlug}-${uniqueId}`;
     }
 
-    // 콘텐츠가 있을 때마다 썸네일 재생성 (이미지가 추가/제거될 수 있으므로)
-    if (this.content) {
+    // thumbnail이 명시적으로 설정되지 않은 경우에만 content에서 추출
+    // YouTube 썸네일 등 외부 URL이 설정된 경우 유지
+    if (this.content && !this.thumbnail) {
       this.extractThumbnailFromContent();
     }
   }
 
   // 콘텐츠에서 썸네일 추출
   private extractThumbnailFromContent() {
-    // HTML에서 첫 번째 img 태그 찾기
+    // 먼저 YouTube 비디오가 있는지 확인
+    const youtubeRegex = /<iframe[^>]+class="youtube-video"[^>]+src="[^"]*\/embed\/([a-zA-Z0-9_-]+)/i;
+    const youtubeMatch = this.content.match(youtubeRegex);
+    
+    if (youtubeMatch && youtubeMatch[1]) {
+      // YouTube 비디오 ID가 있으면 YouTube 썸네일 URL 생성
+      const videoId = youtubeMatch[1];
+      this.thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+      return;
+    }
+    
+    // YouTube가 없으면 HTML에서 첫 번째 img 태그 찾기
     const imgRegex = /<img[^>]+src="([^">]+)"/i;
     const match = this.content.match(imgRegex);
     

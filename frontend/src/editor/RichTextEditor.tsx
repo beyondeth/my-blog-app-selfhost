@@ -1,0 +1,390 @@
+"use client";
+
+import React, { useCallback, useState, useEffect } from 'react';
+import { EditorContent } from '@tiptap/react';
+import { toast } from 'sonner';
+
+// Hooks
+import { useUploadFile } from '@/hooks/useFiles';
+import {
+  useEditorSetup,
+  useEditorEventManager,
+  useYouTubeEmbed,
+  useImageGallerySync,
+  usePostImageTracker,
+} from './hooks';
+
+// Components
+import EnhancedEditorToolbar from './components/Toolbar/EnhancedEditorToolbar';
+import ImageUploadManager, { UploadedImageInfo } from './components/ImageManager/ImageUploadManager';
+
+// Utils
+import { validateImageFile } from '@/utils/imageUtils';
+import { getProxyImageUrl, normalizeImageUrl, debugLog } from '@/utils/imageUtils';
+import { getErrorMessage } from '@/utils/queryHelpers';
+import { stripUnderline } from '@/utils/stripUnderline';
+
+// Styles
+import './styles/editor.css';
+
+interface RichTextEditorProps {
+  content: string;
+  onChange: (content: string) => void;
+  onFilesChange?: (fileIds: string[]) => void;
+  onThumbnailSelect?: (thumbnailId: string) => void;
+  placeholder?: string;
+  className?: string;
+  enableImageManager?: boolean;
+  maxImages?: number;
+  enableCleanupOnUnmount?: boolean;
+}
+
+export default function BlogRichTextEditor({ 
+  content, 
+  onChange, 
+  onFilesChange,
+  onThumbnailSelect,
+  placeholder = "내용을 입력하세요...",
+  className = "",
+  enableImageManager = false,
+  maxImages = 5,
+  enableCleanupOnUnmount = false
+}: RichTextEditorProps) {
+  const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [images, setImages] = useState<any[]>([]);
+  const [editorInstance, setEditorInstance] = useState<any>(null);
+  
+  // 파일 업로드 및 트래커 훅
+  const uploadMutation = useUploadFile();
+  const imageTracker = usePostImageTracker();
+
+  // 이미지 업로드 핸들러 - URL과 ID를 모두 반환
+  const handleImageUpload = useCallback(async (file: File) => {
+    try {
+      setIsUploading(true);
+      
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        throw new Error(validation.error);
+      }
+
+      const result = await uploadMutation.mutateAsync({ file });
+      const imageUrl = (result as any).url || (result as any).accessUrl;
+      
+      const normalizedUrl = normalizeImageUrl(imageUrl);
+      const finalUrl = getProxyImageUrl(normalizedUrl) || normalizedUrl;
+      const imageId = String(result.id);
+      
+      debugLog('image-upload', '이미지 업로드 성공');
+
+      // 파일 ID 업데이트
+      setUploadedFiles(prev => {
+        const newFiles = [...prev, imageId];
+        setTimeout(() => onFilesChange?.(newFiles), 0);
+        return newFiles;
+      });
+
+      // 이미지 트래커에 파일 추가
+      setTimeout(() => imageTracker.addFile({
+        id: imageId,
+        size: (result as any).size || file.size,
+        name: (result as any).name || file.name
+      }), 0);
+
+      // 갤러리에 이미지 추가 (중요!) - setGalleryImages 사용
+      const newImage = {
+        id: imageId,
+        url: finalUrl,
+        name: file.name,
+        size: file.size,
+        isUploading: false,
+      };
+      
+      // 갤러리 이미지 상태 업데이트 (동기화를 위해 setGalleryImages 사용)
+      if (setGalleryImages) {
+        setGalleryImages(prev => [...prev, newImage]);
+      } else {
+        setImages(prev => [...prev, newImage]);
+      }
+
+      toast.success('이미지가 업로드되었습니다');
+      return { url: finalUrl, id: imageId };
+
+    } catch (error) {
+      const errorMessage = getErrorMessage(error);
+      toast.error(errorMessage);
+      throw error;
+    } finally {
+      setIsUploading(false);
+    }
+  }, [uploadMutation, onFilesChange, imageTracker]);
+
+  // 에디터 업데이트 핸들러
+  const handleEditorUpdate = useCallback((newContent: string) => {
+    const strippedContent = stripUnderline(newContent);
+    if (strippedContent !== content) {
+      onChange(strippedContent);
+    }
+  }, [content, onChange]);
+
+  // 이미지 갤러리 동기화 - 먼저 선언해야 함
+  const {
+    images: galleryImages,
+    setImages: setGalleryImages,
+    selectedThumbnailId,
+    setSelectedThumbnailId,
+    imageUploadManager,
+  } = useImageGallerySync({
+    editor: editorInstance, // 에디터 인스턴스를 동적으로 전달
+    enableImageManager,
+    onFilesChange,
+    onThumbnailSelect,
+  });
+  
+  console.log('[RichTextEditor] galleryImages:', galleryImages);
+  console.log('[RichTextEditor] setGalleryImages 타입:', typeof setGalleryImages);
+  console.log('[RichTextEditor] imageUploadManager.handleGalleryImageChange:', !!imageUploadManager.handleGalleryImageChange);
+
+  // YouTube 임베드 훅 - imageUploadManager의 handleGalleryImageChange를 사용
+  const { addYouTubeThumbnail, clearProcessedYouTubeId } = useYouTubeEmbed({
+    enableImageManager,
+    images: galleryImages,
+    setImages: (newImages) => {
+      console.log('[RichTextEditor] YouTube calling setImages with', 
+        typeof newImages === 'function' ? 'function' : newImages);
+      
+      if (typeof newImages === 'function') {
+        // 함수형 업데이트인 경우
+        const updated = newImages(galleryImages);
+        console.log('[RichTextEditor] Function update result:', updated);
+        imageUploadManager.handleGalleryImageChange(updated);
+      } else {
+        // 직접 값인 경우
+        imageUploadManager.handleGalleryImageChange(newImages);
+      }
+    },
+    setSelectedThumbnailId,
+    onThumbnailSelect,
+    setUploadedFiles,
+    onFilesChange,
+  });
+  
+  console.log('[RichTextEditor] addYouTubeThumbnail 함수:', !!addYouTubeThumbnail);
+
+  // 에디터에서 YouTube가 삭제되었을 때 이벤트 리스너
+  useEffect(() => {
+    const handleYouTubeDeletedFromEditor = (event: CustomEvent) => {
+      const { videoId } = event.detail;
+      console.log('[RichTextEditor] 🎯 YouTube deleted from editor event received, videoId:', videoId);
+      clearProcessedYouTubeId(videoId);
+    };
+
+    window.addEventListener('youtubeDeletedFromEditor', handleYouTubeDeletedFromEditor as EventListener);
+    
+    return () => {
+      window.removeEventListener('youtubeDeletedFromEditor', handleYouTubeDeletedFromEditor as EventListener);
+    };
+  }, [clearProcessedYouTubeId]);
+
+  // YouTube가 추가되었을 때 처리 (이제 CustomYoutube extension에서 직접 처리)
+  // 이벤트는 갤러리 동기화를 위해 여전히 필요함
+
+  // YouTube 삭제 감지를 위한 래퍼 함수
+  const handleGalleryImageChangeWithYouTubeCleanup = useCallback((newImages: UploadedImageInfo[]) => {
+    // 삭제된 YouTube 썸네일 찾기
+    const deletedYouTubeIds = galleryImages
+      .filter(oldImg => 
+        oldImg.id.startsWith('yt_thumb_') && 
+        !newImages.some(newImg => newImg.id === oldImg.id)
+      )
+      .map(img => img.id.replace('yt_thumb_', ''));
+    
+    // 삭제된 YouTube ID들을 processedVideoIds에서 제거
+    deletedYouTubeIds.forEach(videoId => {
+      console.log('[RichTextEditor] YouTube 썸네일 삭제 감지, processedVideoIds에서 제거:', videoId);
+      clearProcessedYouTubeId(videoId);
+    });
+    
+    // 원래 함수 호출
+    imageUploadManager.handleGalleryImageChange(newImages);
+  }, [galleryImages, clearProcessedYouTubeId, imageUploadManager]);
+
+  // 에디터 설정
+  const { editor, editorRef } = useEditorSetup({
+    content,
+    placeholder,
+    onChange: handleEditorUpdate,
+    handleImageUpload,
+    addYouTubeThumbnail,
+  });
+
+  // 에디터가 생성되면 editorInstance 상태 업데이트
+  useEffect(() => {
+    if (editor) {
+      setEditorInstance(editor);
+    }
+  }, [editor]);
+
+  // 갤러리 이미지와 로컬 이미지 동기화 - enableImageManager가 활성화된 경우만
+  useEffect(() => {
+    if (enableImageManager && galleryImages) {
+      // 배열 내용이 실제로 다른지 확인 (참조 비교가 아닌 내용 비교)
+      const galleryIds = galleryImages.map(img => img.id).join(',');
+      const localIds = images.map(img => img.id).join(',');
+      
+      console.log('[RichTextEditor] Gallery sync - galleryIds:', galleryIds);
+      console.log('[RichTextEditor] Gallery sync - localIds:', localIds);
+      
+      if (galleryIds !== localIds) {
+        console.log('[RichTextEditor] Syncing gallery to local images');
+        setImages(galleryImages);
+      }
+    }
+  }, [enableImageManager, galleryImages]);
+
+  useEffect(() => {
+    if (enableImageManager && images && setGalleryImages) {
+      // 배열 내용이 실제로 다른지 확인 (참조 비교가 아닌 내용 비교)
+      const localIds = images.map(img => img.id).join(',');
+      const galleryIds = galleryImages ? galleryImages.map(img => img.id).join(',') : '';
+      
+      if (localIds !== galleryIds) {
+        setGalleryImages(images);
+      }
+    }
+  }, [enableImageManager, images, setGalleryImages]);
+
+  // 이벤트 매니저
+  useEditorEventManager(editor, {
+    onImageUpload: handleImageUpload,
+    onYouTubeEmbed: addYouTubeThumbnail,
+    imageTracker,
+    enableCleanupOnUnmount,
+  });
+
+  // 이미지 업로드 트리거 (툴바에서 사용)
+  const triggerImageUpload = useCallback(() => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    input.multiple = true;
+    
+    input.onchange = async (e) => {
+      const files = Array.from((e.target as HTMLInputElement).files || []);
+      
+      for (const file of files) {
+        try {
+          const result = await handleImageUpload(file);
+          
+          if (editor && !editor.isDestroyed) {
+            // 이미지 삽입시 data-image-id 추가 (동기화를 위해)
+            const attrs: any = {
+              src: result.url, 
+              alt: file.name,
+              title: file.name
+            };
+            attrs['data-image-id'] = result.id; // 동기화를 위한 ID 추가
+            
+            console.log('[triggerImageUpload] Inserting image with attributes:', attrs);
+            
+            editor
+              .chain()
+              .focus()
+              .setImage(attrs)
+              .insertContent('<p></p>') // 새 단락 추가
+              .focus('end') // 커서를 끝으로 이동
+              .run();
+          }
+        } catch (error) {
+          console.error('Failed to upload image:', error);
+        }
+      }
+    };
+    
+    input.click();
+  }, [editor, handleImageUpload]);
+
+  if (!editor) {
+    return null;
+  }
+
+  return (
+    <div className={`editor-container ${className}`}>
+      <EnhancedEditorToolbar 
+        editor={editor} 
+        onImageUpload={triggerImageUpload}
+      />
+      
+      <EditorContent editor={editor} />
+      
+      {/* Enhanced Image Upload Manager */}
+      {enableImageManager && (
+        <div className="border-t border-gray-200">
+          <div className="p-4">
+            <ImageUploadManager
+              images={galleryImages}  // galleryImages를 사용해야 함!
+              maxImages={maxImages}
+              onImagesChange={handleGalleryImageChangeWithYouTubeCleanup}
+              onImagesUploaded={imageUploadManager.handleImagesUploaded}
+              onImagesReordered={imageUploadManager.handleImageReorder}
+              onThumbnailSelect={imageUploadManager.handleThumbnailSelect}
+              selectedThumbnailId={selectedThumbnailId}
+              className=""
+            />
+          </div>
+        </div>
+      )}
+      
+      {/* 용량 표시 바 */}
+      {imageTracker.totalSize > 0 && (
+        <div className="p-3 bg-gray-50 border-t border-gray-300">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-gray-600">
+              이미지 용량: {imageTracker.formatFileSize(imageTracker.totalSize)} / 30MB
+            </span>
+            <span className={`font-medium ${
+              imageTracker.percentage >= 80 ? 'text-orange-600' : 
+              imageTracker.percentage >= 60 ? 'text-yellow-600' : 
+              'text-green-600'
+            }`}>
+              {imageTracker.percentage.toFixed(0)}% 사용
+            </span>
+          </div>
+          <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
+            <div 
+              className={`h-2 rounded-full transition-all ${
+                imageTracker.percentage >= 80 ? 'bg-orange-500' : 
+                imageTracker.percentage >= 60 ? 'bg-yellow-500' : 
+                'bg-green-500'
+              }`}
+              style={{ width: `${Math.min(imageTracker.percentage, 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
+      
+      {isUploading && (
+        <div className="p-2 bg-blue-50 border-t border-gray-300">
+          <div className="flex items-center text-sm text-blue-600">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600 mr-2"></div>
+            이미지를 업로드하는 중...
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 컨텐츠에서 파일 ID 추출 함수
+export const extractFileIdsFromContent = (htmlContent: string): string[] => {
+  const fileIds: string[] = [];
+  const imgRegex = /<img[^>]+src="[^"]*\/files\/([^"/]+)"/g;
+  let match;
+  
+  while ((match = imgRegex.exec(htmlContent)) !== null) {
+    fileIds.push(match[1]);
+  }
+  
+  return fileIds;
+};

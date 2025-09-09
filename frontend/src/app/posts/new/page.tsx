@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/hooks/useAuth';
 import { useCreatePost } from '@/hooks/usePosts';
 import { FiEdit3, FiType, FiAlignLeft, FiImage } from 'react-icons/fi';
-import BlogRichTextEditor from '@/components/posts/RichTextEditor';
+import { BlogRichTextEditor } from '@/editor';
 
 export default function NewPostPage() {
   const [title, setTitle] = useState('');
