@@ -151,7 +151,26 @@ export default function HtmlContentRenderer({ content, className = '' }: HtmlCon
         ALLOWED_URI_REGEXP: /^https?:\/\//i
       });
       
-      // 4. 이미지 URL 처리
+      // 4. YouTube iframe 크기 조정 (640x360 -> 685x540)
+      processedHtml = processedHtml.replace(
+        /(<div[^>]*data-youtube-video[^>]*>)([\s\S]*?)(<iframe[^>]*>)/gi,
+        (match, divStart, middle, iframeTag) => {
+          // div 태그의 스타일 속성 업데이트
+          const updatedDiv = divStart.replace(
+            /style="[^"]*"/,
+            'style="position: relative; width: 685px; height: 540px; max-width: 100%; margin: 0 auto;"'
+          );
+          
+          // iframe에서 width와 height 속성 제거 (CSS로 처리)
+          const updatedIframe = iframeTag
+            .replace(/width="[^"]*"/gi, 'width="100%"')
+            .replace(/height="[^"]*"/gi, 'height="100%"');
+          
+          return updatedDiv + middle + updatedIframe;
+        }
+      );
+      
+      // 5. 이미지 URL 처리
       processedHtml = processedHtml.replace(
         /<img([^>]*?)src=["']([^"']+)["']([^>]*?)>/gi,
         (match, beforeSrc, originalSrc, afterSrc) => {

@@ -49,8 +49,8 @@ export const YoutubeAutoEmbed = Extension.create({
               type: 'youtube',
               attrs: {
                 src: url, // 원본 URL 사용 (TipTap이 자동으로 embed URL로 변환)
-                width: 640,
-                height: 360, // 16:9 비율
+                width: 685,
+                height: 540, // 16:9 비율
               }
             })
             .insertContent('<p></p>') // 새 단락 추가
@@ -104,8 +104,8 @@ export const YoutubeAutoEmbed = Extension.create({
               type: 'youtube',
               attrs: {
                 src: lineText, // 원본 URL 사용 (TipTap이 자동으로 embed URL로 변환)
-                width: 640,
-                height: 360,
+                width: 685,
+                height: 540,
               }
             })
             .insertContent('<p></p>')

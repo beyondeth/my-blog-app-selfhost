@@ -59,8 +59,8 @@ export const getEditorExtensions = (placeholder?: string) => [
   // YouTube 임베드 (커스텀 extension 사용)
   CustomYoutube.configure({
     inline: false,
-    width: 640,
-    height: 360,
+    width: 685,
+    height: 540,
     controls: true,
     allowFullscreen: true,
     addPasteHandler: true, // paste handler 활성화

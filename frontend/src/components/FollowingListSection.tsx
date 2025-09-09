@@ -114,7 +114,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <div className="w-8 h-8 bg-gray-300 rounded-full opacity-50"></div>
             </div>
-            <p className="text-sm text-gray-500">No users following yet.</p>
+            <p className="text-sm text-gray-500">“아무도 안 따라가면 길을 잃을지도?”</p>
           </div>
         )}
       </div>
@@ -178,7 +178,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
             <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <div className="w-8 h-8 bg-gray-300 rounded-full opacity-50"></div>
             </div>
-            <p className="text-sm text-gray-500">No followers yet.</p>
+            <p className="text-sm text-gray-500">"첫 팬은 언제나 특별하죠. 곧 찾아올 거예요!"</p>
           </div>
         )}
       </div>

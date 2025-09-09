@@ -5,8 +5,8 @@
 
 // YouTube 관련 상수
 export const YOUTUBE_CONFIG = {
-  DEFAULT_WIDTH: 640,
-  DEFAULT_HEIGHT: 360,
+  DEFAULT_WIDTH: 685,
+  DEFAULT_HEIGHT: 540,
   THUMBNAIL_PREFIX: 'yt_thumb_',
   EMBED_URL_PATTERN: /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([a-zA-Z0-9_-]+)/,
   WATCH_URL_PATTERN: /(?:embed\/|watch\?v=|youtu\.be\/)([a-zA-Z0-9_-]+)/,

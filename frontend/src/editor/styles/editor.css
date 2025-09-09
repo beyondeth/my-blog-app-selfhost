@@ -307,14 +307,14 @@
 /* YouTube iframe 스타일 - TipTap YouTube Extension */
 .ProseMirror div[data-youtube-video] {
   position: relative;
-  width: 100%;
-  max-width: 640px;
-  height: 360px;
+  width: 685px;
+  height: 540px;
+  max-width: 100%;
   margin: 1.5rem auto;
   border-radius: 8px;
   overflow: hidden;
   display: block !important;
-  background: #f0f0f0;
+  background: transparent;
 }
 
 .ProseMirror div[data-youtube-video] iframe {
@@ -336,17 +336,20 @@
 /* 기본 YouTube 클래스 스타일 */
 .youtube-video {
   position: relative;
-  width: 100%;
-  max-width: 640px;
-  height: 360px;
+  width: 685px;
+  height: 540px;
+  max-width: 100%;
   margin: 1.5rem auto;
   display: block;
   border-radius: 8px;
   overflow: hidden;
-  background: #f0f0f0;
+  background: transparent;
 }
 
 .youtube-video iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 100%;
   height: 100%;
   border: none;
@@ -357,10 +360,10 @@
 /* 반응형 처리 */
 @media (max-width: 768px) {
   .ProseMirror .youtube-video,
-  .ProseMirror [data-youtube-video] {
-    max-width: 100%;
-    height: 0;
-    padding-bottom: 56.25%; /* 모바일에서는 반응형 비율 사용 */
+  .ProseMirror div[data-youtube-video] {
+    width: 100%;
+    height: auto;
+    aspect-ratio: 685 / 540; /* 비율 유지 */
   }
 }
 

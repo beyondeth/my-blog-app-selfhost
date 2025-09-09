@@ -101,7 +101,7 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
       disableKBcontrols: false,
       enableIFrameApi: false,
       endTime: 0,
-      height: 360,
+      height: 540,
       ivLoadPolicy: 0,
       loop: false,
       modestBranding: false,
@@ -111,7 +111,7 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
       origin: '',
       playlist: '',
       startAt: 0,
-      width: 640,
+      width: 685,
     };
   },
 
@@ -200,7 +200,7 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
     // Include data-original-url in the rendered HTML
     const divAttrs: any = {
       'data-youtube-video': true,
-      style: `position: relative; width: 100%; max-width: ${width}px;`,
+      style: `position: relative; width: ${width}px; height: ${height}px; max-width: 100%; margin: 0 auto;`,
     };
     
     // Preserve original URL in data attribute
@@ -216,22 +216,16 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
         HTMLAttributes
       ),
       [
-        'div',
+        'iframe',
         {
-          style: `position: relative; padding-bottom: ${(height / width * 100).toFixed(2)}%; height: 0; overflow: hidden;`,
+          src: embedUrl,
+          width: '100%',
+          height: '100%',
+          frameborder: '0',
+          allowfullscreen: this.options.allowFullscreen ? 'true' : 'false',
+          allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
+          style: 'position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;',
         },
-        [
-          'iframe',
-          {
-            src: embedUrl,
-            width: '100%',
-            height: '100%',
-            frameborder: '0',
-            allowfullscreen: this.options.allowFullscreen ? 'true' : 'false',
-            allow: 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share',
-            style: 'position: absolute; top: 0; left: 0; width: 100%; height: 100%;',
-          },
-        ],
       ],
     ];
   },

@@ -286,6 +286,30 @@
   box-shadow: var(--shadow-lg);
 }
 
+/* YouTube iframe 컨테이너 - 685x540 고정 크기 */
+.prose div[data-youtube-video] {
+  position: relative;
+  width: 685px;
+  height: 540px;
+  max-width: 100%;
+  margin: var(--space-xl) auto;
+  display: block;
+  background: transparent;
+}
+
+/* YouTube iframe */
+.prose div[data-youtube-video] iframe,
+.prose iframe[src*="youtube.com/embed"] {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: none;
+}
+
 /* 테이블 */
 .prose table {
   margin-top: var(--space-xl);

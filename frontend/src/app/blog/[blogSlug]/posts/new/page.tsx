@@ -192,7 +192,7 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
             {...register('title')}
             type="text"
             id="title"
-            className="w-full px-3 py-2 border rounded-md"
+            className="w-full px-3 py-2 border rounded-lg"
             placeholder="제목을 입력하세요"
           />
           {errors.title && (
@@ -208,7 +208,7 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
             {...register('category')}
             type="text"
             id="category"
-            className="w-full px-3 py-2 border rounded-md"
+            className="w-full px-3 py-2 border rounded-lg"
             placeholder="카테고리 (선택사항)"
           />
         </div>
@@ -246,14 +246,14 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-4 py-2 border rounded-md hover:bg-gray-50"
+            className="px-4 py-2 border rounded-lg hover:bg-gray-50"
           >
             취소
           </button>
           <button
             type="submit"
             disabled={!isUploadValid || isSubmitting || createPostMutation.isLoading}
-            className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title={!isUploadValid ? uploadValidationReason : undefined}
           >
             {isSubmitting || createPostMutation.isLoading ? '저장중...' : '저장'}

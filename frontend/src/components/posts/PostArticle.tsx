@@ -135,7 +135,7 @@ const PostArticle = React.memo(function PostArticle({
         <div className="flex flex-col">
           {/* Header - Author Info와 제목 */}
           <div className="mb-4">
-            {/* Author Info */}
+            {/* Author Info - 날짜 제거 */}
             {post.author && (
               <div className="flex items-center gap-2 mb-2">
                 <UserLinkWithTooltip 
@@ -149,15 +149,11 @@ const PostArticle = React.memo(function PostArticle({
                       username={post.author.username}
                       size="xs"
                     />
-                    <span className="text-sm text-gray-600">
+                    <span className="text-sm text-gray-700 font-medium">
                       {post.author.username}
                     </span>
                   </div>
                 </UserLinkWithTooltip>
-                <span className="text-xs text-gray-400">•</span>
-                <span className="text-xs text-gray-500">
-                  {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
-                </span>
               </div>
             )}
             
@@ -172,19 +168,17 @@ const PostArticle = React.memo(function PostArticle({
             </h2>
           </div>
           
-          {/* YouTube 비디오 플레이어 - 16:9 비율, 최대 너비 제한 */}
-          <div className="w-full mb-4">
-            <div className="relative w-full" style={{ maxWidth: '640px', margin: '0 auto' }}>
-              <div className="relative" style={{ paddingBottom: '56.25%' /* 16:9 비율 */ }}>
-                <iframe
-                  src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
-                  title={post.title}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  className="absolute inset-0 w-full h-full rounded-lg shadow-sm"
-                />
-              </div>
+          {/* YouTube 비디오 플레이어 - 685x540 고정 크기 */}
+          <div className="w-full mb-7">
+            <div className="relative" style={{ width: '685px', height: '540px', maxWidth: '100%', margin: '0 auto' }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
+                title={post.title}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+                className="w-full h-full rounded-lg shadow-sm"
+              />
             </div>
           </div>
           

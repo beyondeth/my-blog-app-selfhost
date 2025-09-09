@@ -107,6 +107,7 @@
      ============================ */
   
   /* Border Radius */
+  --radius: 0.5rem; /* Tailwind에서 참조하는 기본 radius 값 */
   --radius-none: 0;
   --radius-sm: 0.125rem;
   --radius-md: 0.375rem;

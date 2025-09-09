@@ -534,8 +534,8 @@ export default function EnhancedEditorToolbar({
               if (url) {
                 editor.commands.setYoutubeVideo({
                   src: url,
-                  width: 640,
-                  height: 360, // 16:9 비율로 변경
+                  width: 685,
+                  height: 540,
                 });
                 
                 // YouTube 썸네일 추가 이벤트 발생
