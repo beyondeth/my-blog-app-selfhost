@@ -18,8 +18,8 @@ export class RegisterDto {
   @IsString()
   @MinLength(3, { message: '사용자명은 최소 3자 이상이어야 합니다' })
   @MaxLength(20, { message: '사용자명은 20자를 초과할 수 없습니다' })
-  @Matches(/^[a-zA-Z0-9_]+$/, {
-    message: '사용자명은 영문자, 숫자, 언더스코어(_)만 사용할 수 있습니다',
+  @Matches(/^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ_\s]+$/, {
+    message: '사용자명은 한글, 영문자, 숫자, 언더스코어(_), 공백만 사용할 수 있습니다',
   })
   username: string;
 

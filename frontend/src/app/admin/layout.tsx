@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -10,12 +11,14 @@ import { Shield, AlertCircle } from 'lucide-react';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const MAX_LOGIN_ATTEMPTS = 5;
+  const router = useRouter();
 
   useEffect(() => {
     checkAuth();
@@ -32,16 +35,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.role === 'admin') {
-          setIsAuthenticated(true);
-        } else {
-          setIsAuthenticated(false);
-        }
-      } else {
+        // Admin이어도 재인증 필요 (2중 보안)
+        // 항상 로그인 화면을 보여줌
         setIsAuthenticated(false);
+        setIsAdmin(false);
+      } else {
+        // 로그인 안 된 경우 - 로그인 화면 표시
+        setIsAuthenticated(false);
+        setIsAdmin(false);
       }
     } catch (error) {
+      console.error('Auth check error:', error);
       setIsAuthenticated(false);
+      setIsAdmin(false);
     } finally {
       setLoading(false);
     }
@@ -90,14 +96,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       
       // Server should verify admin role
       if (data.user.role !== 'admin') {
-        throw new Error('Admin access required');
+        toast.error('관리자 권한이 필요합니다. 일반 사용자는 접근할 수 없습니다.');
+        // 일반 사용자는 홈으로 리다이렉트
+        setTimeout(() => {
+          router.push('/');
+        }, 1500);
+        return;
       }
       
       // Do NOT store sensitive data in localStorage
       // Session is managed via HttpOnly cookies
       
-      toast.success('Login successful!');
+      toast.success('관리자 로그인 성공!');
       setIsAuthenticated(true);
+      setIsAdmin(true);
       
       // Clear form data after successful login
       setEmail('');

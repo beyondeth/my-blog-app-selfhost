@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { EmailVerification } from './entities/email-verification.entity';
 import { User } from '../users/entities/user.entity';
 import * as crypto from 'crypto';
+import { getAWSStyleEmailTemplate, getAWSStylePasswordResetTemplate } from './email-templates';
 
 @Injectable()
 export class EmailService {
@@ -151,7 +152,7 @@ export class EmailService {
    * 이메일 실제 발송
    */
   private async sendEmail(email: string, code: string): Promise<void> {
-    const html = this.getEmailTemplate(code);
+    const html = getAWSStyleEmailTemplate(code);
 
     try {
       await this.mailerService.sendMail({
@@ -262,97 +263,87 @@ export class EmailService {
             margin: 0;
             padding: 0;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f5f5f5;
+            background-color: #f8f8f8;
             color: #333333;
           }
           .container {
-            max-width: 600px;
+            max-width: 560px;
             margin: 0 auto;
             padding: 40px 20px;
           }
           .card {
             background: #ffffff;
+            border: 1px solid #e5e5e5;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
             overflow: hidden;
           }
           .header {
+            background: #000000;
+            padding: 24px;
             text-align: center;
-            padding: 48px 40px 40px;
-            background: #ffffff;
           }
           .logo {
-            font-size: 32px;
-            font-weight: 700;
-            color: #7c3aed;
-            margin-bottom: 8px;
-          }
-          .tagline {
-            font-size: 14px;
-            color: #9ca3af;
-            letter-spacing: 2px;
-            text-transform: uppercase;
+            color: #ffffff;
+            font-size: 20px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+            margin: 0;
           }
           .content {
-            padding: 40px;
-            text-align: center;
-            background: #ffffff;
+            padding: 32px;
           }
           .title {
-            font-size: 28px;
+            font-size: 24px;
             font-weight: 600;
-            color: #111827;
+            color: #000000;
             margin: 0 0 16px;
           }
-          .description {
-            font-size: 16px;
-            color: #6b7280;
-            margin: 0 0 40px;
-            line-height: 1.5;
+          .text {
+            font-size: 15px;
+            color: #555555;
+            line-height: 1.6;
+            margin: 0 0 24px;
           }
-          .code-container {
-            background: #f3f4f6;
-            border-radius: 12px;
-            padding: 32px;
-            margin: 0 0 32px;
+          .code-box {
+            background: #f0f0f0;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 24px 0;
+            text-align: center;
           }
           .code {
-            font-size: 40px;
+            font-size: 36px;
             font-weight: 700;
-            letter-spacing: 12px;
-            color: #7c3aed;
+            letter-spacing: 8px;
+            color: #000000;
             font-family: 'Courier New', monospace;
-            margin-left: 12px;
           }
-          .warning {
-            font-size: 14px;
-            color: #6b7280;
-            margin: 0 0 8px;
+          .divider {
+            border-top: 1px solid #e5e5e5;
+            margin: 24px 0;
           }
-          .note {
+          .info-box {
+            background: #f8f8f8;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 24px 0;
+          }
+          .info-text {
             font-size: 14px;
-            color: #111827;
-            font-weight: 600;
+            color: #666666;
+            line-height: 1.6;
+            margin: 0;
           }
           .footer {
-            padding: 40px;
+            padding: 24px 32px;
             text-align: center;
-            background: #fafafa;
-            border-top: 1px solid #e5e7eb;
+            border-top: 1px solid #e5e5e5;
           }
           .footer-text {
             font-size: 13px;
-            color: #9ca3af;
-            margin: 0 0 16px;
-            line-height: 1.5;
-          }
-          .footer-links {
-            font-size: 13px;
-            color: #6b7280;
-          }
-          .footer-links a {
-            color: #7c3aed;
-            text-decoration: none;
+            color: #999999;
+            margin: 0;
+            line-height: 1.6;
           }
         </style>
       </head>
@@ -361,32 +352,32 @@ export class EmailService {
           <div class="card">
             <div class="header">
               <div class="logo">codebase.blog</div>
-              <div class="tagline">Build. Share. Grow.</div>
             </div>
             <div class="content">
-              <h1 class="title">이메일 인증 코드</h1>
-              <p class="description">
-                아래 인증 코드를 입력하여 회원가입을 완료해주세요:
+              <h1 class="title">이메일 인증</h1>
+              <p class="text">
+                안녕하세요!<br><br>
+                codebase.blog 회원가입을 위한 이메일 인증 코드입니다.
+                아래 코드를 입력하여 회원가입을 완료해주세요.
               </p>
-              <div class="code-container">
+              <div class="code-box">
                 <div class="code">${code}</div>
               </div>
-              <p class="warning">
-                이 코드를 다른 사람과 공유하지 마세요.
-              </p>
-              <p class="note">
-                ⚠️ 코드는 5분 후 만료됩니다.
-              </p>
+              <div class="divider"></div>
+              <div class="info-box">
+                <p class="info-text">
+                  <strong>보안 안내</strong><br>
+                  • 이 코드는 5분간만 유효합니다<br>
+                  • 다른 사람과 공유하지 마세요<br>
+                  • 최대 3회까지 입력 가능합니다<br>
+                  • 본인이 요청하지 않은 경우 이 이메일을 무시하세요
+                </p>
+              </div>
             </div>
             <div class="footer">
               <p class="footer-text">
-                codebase.blog에 등록하셨기 때문에 이 이메일을 받으셨습니다.
-              </p>
-              <div class="footer-links">
-                <a href="https://codebase.blog/privacy">개인정보 처리방침</a>
-              </div>
-              <p class="footer-text" style="margin-top: 24px;">
-                © 2025 codebase.blog. All rights reserved.
+                © 2025 codebase.blog. All rights reserved.<br>
+                이 이메일은 codebase.blog 회원가입을 위해 발송되었습니다.
               </p>
             </div>
           </div>
@@ -572,7 +563,7 @@ export class EmailService {
    * 비밀번호 재설정 이메일 발송
    */
   async sendPasswordResetEmail(email: string, username: string, resetUrl: string): Promise<void> {
-    const html = this.getPasswordResetTemplate(username, resetUrl);
+    const html = getAWSStylePasswordResetTemplate(username, resetUrl);
 
     try {
       await this.mailerService.sendMail({

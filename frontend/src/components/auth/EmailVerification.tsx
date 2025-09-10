@@ -96,7 +96,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               maxLength={6}
               disabled={state.isLoading}
-              className={`flex-1 px-4 py-3 border rounded-md text-center text-lg font-mono tracking-wider focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
+              className={`flex-1 px-3 py-3 border rounded-md text-center text-lg font-mono tracking-wider focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
                 state.error ? 'border-red-300 bg-red-50' : 'border-gray-300'
               }`}
               placeholder="인증 코드 6자리"
@@ -106,15 +106,15 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               type="button"
               onClick={handleVerifyCode}
               disabled={state.isLoading || code.length !== 6}
-              className="px-6 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              className="px-5 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
             >
-              {state.isLoading ? '확인 중...' : '인증'}
+              {state.isLoading ? '확인중...' : '인증'}
             </button>
             <button
               type="button"
               onClick={handleResendCode}
               disabled={state.isLoading}
-              className="px-6 py-3 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              className="px-5 py-3 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
             >
               재발급
             </button>

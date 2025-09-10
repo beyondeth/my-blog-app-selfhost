@@ -46,8 +46,16 @@ export class AuthService {
         return null;
       }
 
-      if (user.authProvider !== AuthProvider.LOCAL) {
-        throw new BadRequestException('Please use OAuth login for this account');
+      // 비밀번호가 없는 경우 (소셜 로그인만 사용 중)
+      if (!user.password) {
+        // Identity 확인하여 더 명확한 안내 제공
+        const identities = await this.identityService.findByUserId(user.id);
+        const providers = identities.map(i => i.getProviderDisplayName()).join(', ');
+        
+        throw new BadRequestException(
+          `이 계정은 ${providers || '소셜'} 로그인으로만 접속 가능합니다. ` +
+          `비밀번호로 로그인하려면 먼저 소셜 로그인 후 계정 설정에서 비밀번호를 추가하세요.`
+        );
       }
 
       const isPasswordValid = await user.validatePassword(password);
@@ -61,6 +69,10 @@ export class AuthService {
       return user;
     } catch (error) {
       this.logger.error(`Validation failed for email ${email}:`, error.message);
+      // BadRequestException은 그대로 throw, 다른 에러는 null 반환
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
       return null;
     }
   }
@@ -179,6 +191,8 @@ export class AuthService {
             await this.usersService.update(existingUser.id, {
               isEmailVerified: true,
               accountVerifiedAt: new Date(),
+              // 중요: password는 절대 건드리지 않음
+              // authProvider도 변경하지 않음 (최초 가입 방법 유지)
             });
             this.logger.log(`Email automatically verified through ${provider} OAuth for: ${email}`);
           }
@@ -187,6 +201,7 @@ export class AuthService {
           if (!existingUser.profileImage && profile.profileImage) {
             await this.usersService.update(existingUser.id, {
               profileImage: profile.profileImage,
+              // 중요: password는 절대 건드리지 않음
             });
           }
 
@@ -297,32 +312,53 @@ export class AuthService {
     if (!user) {
       return { 
         exists: false,
-        authProvider: null,
+        authProviders: [],
         message: '등록되지 않은 이메일입니다.'
       };
     }
     
+    // 사용 가능한 모든 인증 방법 확인
+    const identities = await this.identityService.findByUserId(user.id);
+    const availableProviders = identities.map(i => i.provider);
+    
     // 민감한 정보는 제외하고 인증 방법만 반환
     return {
       exists: true,
-      authProvider: user.authProvider,
+      authProvider: user.authProvider, // 최초 가입 방법 (호환성 유지)
+      availableProviders, // 사용 가능한 모든 인증 방법
       hasPassword: !!user.password,
       isEmailVerified: user.isEmailVerified,
       // 사용자에게 친화적인 메시지 제공
-      message: this.getAuthMethodMessage(user.authProvider)
+      message: this.getAuthMethodMessage(user, identities)
     };
   }
 
-  private getAuthMethodMessage(authProvider: string): string {
-    switch (authProvider) {
-      case 'kakao':
-        return '카카오 계정으로 로그인하세요';
-      case 'google':
-        return '구글 계정으로 로그인하세요';
-      case 'local':
-      default:
-        return '이메일과 비밀번호로 로그인하세요';
+  private getAuthMethodMessage(user: User, identities: any[]): string {
+    const hasPassword = !!user.password;
+    const providers = identities
+      .filter(i => i.provider !== 'local')
+      .map(i => {
+        switch (i.provider) {
+          case 'kakao': return '카카오';
+          case 'google': return '구글';
+          case 'github': return '깃헙';
+          default: return i.provider;
+        }
+      });
+    
+    const methods = [];
+    if (hasPassword) {
+      methods.push('이메일/비밀번호');
     }
+    if (providers.length > 0) {
+      methods.push(...providers);
+    }
+    
+    if (methods.length === 0) {
+      return '로그인 방법을 설정해주세요';
+    }
+    
+    return `${methods.join(', ')} 로그인이 가능합니다`;
   }
 
   async createSessionToken(userId: string): Promise<string> {

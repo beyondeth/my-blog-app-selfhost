@@ -336,12 +336,14 @@ export class IdentityService {
       throw new BadRequestException('Cannot reclaim verified account');
     }
 
-    // Clear any existing password (was unverified anyway)
+    // 중요: 미인증 계정이라도 password는 유지해야 함
+    // 사용자가 나중에 이메일 인증을 완료하면 로컬 로그인도 가능해야 함
     await this.userRepository.update(user.id, {
-      password: null,
+      // password: null, // 제거 - 비밀번호는 절대 삭제하지 않음
       isEmailVerified: true,
       accountVerifiedAt: new Date(),
-      authProvider: provider as any,
+      // authProvider는 최초 가입 방법 유지
+      lastLoginProvider: provider,  // 마지막 로그인 방법만 업데이트
       providerId: providerId,
     });
 
