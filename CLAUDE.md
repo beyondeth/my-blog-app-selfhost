@@ -243,8 +243,31 @@ pnpm dev
 ## 📚 추가 문서
 - [Multi-User Blog Implementation](./MULTI_USER_BLOG_IMPLEMENTATION.md)
 - [Blog System Design](./BLOG_SYSTEM_DESIGN.md)
+- [Rich Text Editor & YouTube Integration](./frontend/src/editor/EDITOR_ARCHITECTURE.md)
 
 ---
+
+## 📅 최근 작업 내역 (2025-09-10)
+
+### 🎥 YouTube 통합 및 에디터 개선
+1. **YouTube 크기 표준화 (685x540)**
+   - 모든 위치에서 동일한 크기 적용
+   - 홈화면, 슬러그 페이지, 에디터 통일
+   - HtmlContentRenderer에서 자동 크기 변환
+
+2. **에디터 UI/UX 개선**
+   - 모든 입력 필드 `rounded-lg` 적용
+   - Tip 컨테이너와 통계 컨테이너 스타일 통일
+   - YouTube 영상과 메타데이터 간격 조정 (`mb-7`)
+
+3. **CSS Variable 문제 해결**
+   - `--radius: 0.5rem` 정의 추가
+   - Tailwind 설정과 CSS 변수 연동 수정
+
+4. **문서화**
+   - [에디터 아키텍처 문서](./frontend/src/editor/EDITOR_ARCHITECTURE.md) 작성
+   - YouTube 통합 시스템 상세 설명
+   - 핵심 컴포넌트 및 데이터 플로우 문서화
 
 ## 📅 최근 작업 내역 (2025-09-01)
 
