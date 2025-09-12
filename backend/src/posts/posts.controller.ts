@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, UseInterceptors } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
@@ -18,7 +18,11 @@ import { Repository } from 'typeorm';
 import { Post as PostEntity } from './entities/post.entity';
 import { File as FileEntity } from '../files/entities/file.entity';
 import { S3Service } from '../files/services/s3.service';
+import { ViewCountService } from './view-count.service';
+import { CacheInterceptor } from '@nestjs/cache-manager';
 import { FilesService } from '../files/files.service';
+import { CacheTTL } from '../cache/cache.decorator';
+import { CacheService } from '../cache/cache.service';
 
 @ApiTags('posts')
 @Controller('posts')
@@ -31,15 +35,68 @@ export class PostsController {
     private filesRepository: Repository<FileEntity>,
     private readonly s3Service: S3Service,
     private readonly filesService: FilesService,
+    private readonly viewCountService: ViewCountService,
+    private readonly cacheService: CacheService,
   ) {}
+
+  /**
+   * 캐시 키 생성 헬퍼 메서드
+   * 일관된 캐시 키 생성을 보장하고, 캐시 관리를 쉽게 만듦
+   */
+  private generateCacheKey(params: {
+    page: number;
+    limit: number;
+    blogSlug?: string;
+    isPublished?: boolean;
+  }): string {
+    const { page, limit, blogSlug, isPublished } = params;
+    let key = `feed:page:${page}:limit:${limit}`;
+    
+    if (blogSlug) {
+      key += `:blog:${blogSlug}`;
+    }
+    
+    if (isPublished !== undefined) {
+      key += `:published:${isPublished}`;
+    }
+    
+    return key;
+  }
 
   @Post()
   @UseGuards(JwtAuthGuard, PostsThrottlerGuard)
   @Throttle({ default: { limit: 15, ttl: 3600000 } }) // 시간당 15개 제한
   @ApiOperation({ summary: '게시글 작성 (시간당 15개 제한)' })
   @ApiBearerAuth()
-  create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: User) {
-    return this.postsService.create(createPostDto, user);
+  async create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: User) {
+    const newPost = await this.postsService.create(createPostDto, user);
+    
+    // 첫 페이지 캐시 무효화 및 재생성 (Cache Warming)
+    try {
+      // 1. 기존 캐시 삭제
+      await this.cacheService.deletePattern('feed:page:1:*');
+      console.log('✅ First page cache invalidated after post creation');
+      
+      // 2. 캐시 워밍: 1페이지 데이터를 미리 로드하여 캐시 생성
+      const pageNumber = 1;
+      const limitNumber = 20;
+      const cacheKey = this.generateCacheKey({ 
+        page: pageNumber, 
+        limit: limitNumber 
+      });
+      
+      // 새 데이터 조회
+      const freshData = await this.postsService.findAll(pageNumber, limitNumber, null, null, null, undefined);
+      
+      // 캐시에 저장 (TTL: 2분)
+      await this.cacheService.set(cacheKey, freshData, 120);
+      console.log('🔥 Cache warmed: First page pre-cached with new post');
+    } catch (error) {
+      console.error('❌ Failed to invalidate/warm first page cache:', error);
+      // 캐시 무효화 실패해도 포스트 생성은 성공
+    }
+    
+    return newPost;
   }
 
   @Get()
@@ -50,7 +107,7 @@ export class PostsController {
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'blogSlug', required: false, type: String })
   @ApiQuery({ name: 'isPublished', required: false, type: Boolean })
-  findAll(
+  async findAll(
     @Request() req: any,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
@@ -59,7 +116,7 @@ export class PostsController {
     @Query('isPublished') isPublished?: string,
   ) {
     const pageNumber = page ? parseInt(page, 10) : 1;
-    const limitNumber = limit ? parseInt(limit, 10) : 10;
+    const limitNumber = limit ? parseInt(limit, 10) : 20; // 기본값 20으로 변경
     const user = req.user || null;
     
     // isPublished 파라미터 파싱
@@ -67,7 +124,62 @@ export class PostsController {
     if (isPublished === 'true') publishedFilter = true;
     else if (isPublished === 'false') publishedFilter = false;
     
-    return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug, user, publishedFilter);
+    // 검색 쿼리는 캐싱하지 않음
+    if (search) {
+      return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug, user, publishedFilter);
+    }
+    
+    // 캐시 키 생성
+    const cacheKey = this.generateCacheKey({
+      page: pageNumber,
+      limit: limitNumber,
+      blogSlug,
+      isPublished: publishedFilter,
+    });
+    
+    // 캐시 확인
+    try {
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        console.log(`✅ Cache hit for ${cacheKey}`);
+        return cached;
+      }
+    } catch (error) {
+      console.error('Cache get error:', error);
+    }
+    
+    // DB 조회
+    const result = await this.postsService.findAll(pageNumber, limitNumber, null, blogSlug, user, publishedFilter);
+    
+    // 페이지별 차등 TTL 적용 (1페이지 2분, 나머지 10분)
+    const ttl = pageNumber === 1 ? 120 : 600;
+    
+    // 캐싱
+    try {
+      await this.cacheService.set(cacheKey, result, ttl);
+      console.log(`📦 Cached ${cacheKey} with TTL ${ttl}s`);
+    } catch (error) {
+      console.error('Cache set error:', error);
+    }
+    
+    return result;
+  }
+
+  @Get('popular/:period')
+  @Public()
+  @UseInterceptors(CacheInterceptor)
+  @ApiOperation({ summary: '인기 게시글 조회 (기간별)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '조회할 개수 (기본: 5)' })
+  async getPopularPosts(
+    @Param('period') period: 'daily' | 'weekly' | 'monthly',
+    @Query('limit') limit?: string,
+  ) {
+    const limitNumber = limit ? parseInt(limit, 10) : 5;
+    
+    // 기간별 캐시 TTL 설정
+    const ttl = period === 'daily' ? 3600 : period === 'weekly' ? 10800 : 21600;
+    
+    return this.postsService.findPopularPosts(period, limitNumber);
   }
 
   @Get('categories')
@@ -156,8 +268,18 @@ export class PostsController {
   @Roles(Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '게시글 수정' })
   @ApiBearerAuth()
-  update(@Param('id') id: string, @Body() updatePostDto: any, @CurrentUser() user: User) {
-    return this.postsService.update(id, updatePostDto, user);
+  async update(@Param('id') id: string, @Body() updatePostDto: any, @CurrentUser() user: User) {
+    const updated = await this.postsService.update(id, updatePostDto, user);
+    
+    // 모든 페이지 캐시 무효화 (순서 변경 가능성)
+    try {
+      await this.cacheService.deletePattern('feed:page:*');
+      console.log('✅ All feed cache invalidated after post update');
+    } catch (error) {
+      console.error('❌ Failed to invalidate feed cache:', error);
+    }
+    
+    return updated;
   }
 
   @Delete(':id')
@@ -165,8 +287,18 @@ export class PostsController {
   @Roles(Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '게시글 삭제' })
   @ApiBearerAuth()
-  remove(@Param('id') id: string, @CurrentUser() user: User) {
-    return this.postsService.remove(id, user);
+  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+    const result = await this.postsService.remove(id, user);
+    
+    // 모든 페이지 캐시 무효화 (페이지 재정렬 필요)
+    try {
+      await this.cacheService.deletePattern('feed:page:*');
+      console.log('✅ All feed cache invalidated after post deletion');
+    } catch (error) {
+      console.error('❌ Failed to invalidate feed cache:', error);
+    }
+    
+    return result;
   }
 
   @Post(':id/like')
@@ -204,11 +336,21 @@ export class PostsController {
 
   @Post(':id/view')
   @Public()
-  @ApiOperation({ summary: '게시글 조회수 증가' })
-  @ApiResponse({ status: 200, description: '조회수 증가 성공' })
+  @ApiOperation({ summary: '게시글 조회수 증가 (배치 처리)' })
+  @ApiResponse({ status: 200, description: '조회수 증가 성공 (배치 대기중)' })
   @ApiResponse({ status: 404, description: '게시글을 찾을 수 없음' })
   async incrementViewCount(@Param('id') id: string) {
-    await this.postsService.incrementViewCount(id);
-    return { message: 'View count incremented' };
+    // 배치 서비스로 조회수 증가 (메모리에 임시 저장)
+    await this.viewCountService.incrementViewCount(id);
+    return { message: 'View count queued for batch update' };
+  }
+
+  @Get('view-stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: '조회수 배치 처리 상태 확인 (관리자)' })
+  @ApiBearerAuth()
+  async getViewCountStats() {
+    return this.viewCountService.getViewCountStats();
   }
 } 

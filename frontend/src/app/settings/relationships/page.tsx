@@ -192,8 +192,9 @@ export default function RelationshipsPage() {
             className="flex items-center gap-3 flex-1 group"
           >
             <UserAvatar
-              user={user}
-              className="w-10 h-10"
+              profileImage={user.profileImage}
+              username={user.username}
+              size="md"
             />
             <div className="flex-1 min-w-0">
               <p className="font-medium text-gray-900 group-hover:text-gray-700">

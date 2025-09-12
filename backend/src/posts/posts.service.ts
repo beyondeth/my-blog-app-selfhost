@@ -332,7 +332,7 @@ export class PostsService {
       .take(limit)
       .getManyAndCount();
 
-    // 날짜를 YYYY-MM-DD로 변환
+    // 날짜를 YYYY-MM-DD로 변환 및 이미지 URL 최적화
     const postsWithFormattedDates = posts.map(post => ({
       ...post,
       publishedAt: formatDate(post.publishedAt),
@@ -343,8 +343,13 @@ export class PostsService {
       commentCount: post.commentCount || 0,
       // 태그 필드 추가 (프론트엔드 호환성)
       tags: post.tagNames || [],
-      // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원)
-      thumbnail: post.thumbnail || null,
+      // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
+      thumbnail: this.optimizeImageUrl(post.thumbnail),
+      // 작성자 프로필 이미지 최적화
+      author: post.author ? {
+        ...post.author,
+        profileImage: this.optimizeImageUrl(post.author.profileImage),
+      } : null,
     }));
 
     const totalPages = Math.ceil(total / limit);
@@ -354,6 +359,67 @@ export class PostsService {
       total,
       page,
       totalPages 
+    };
+  }
+
+  async findPopularPosts(
+    period: 'daily' | 'weekly' | 'monthly',
+    limit: number = 5
+  ): Promise<any> {
+    const query = this.postsRepository.createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.blog', 'blog')
+      .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('blog.isPublic = :isPublic', { isPublic: true });
+
+    // 기간별 필터링
+    const now = new Date();
+    let dateFilter: Date;
+    
+    switch (period) {
+      case 'daily':
+        dateFilter = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        break;
+      case 'weekly':
+        dateFilter = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        break;
+      case 'monthly':
+        dateFilter = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        break;
+    }
+    
+    query.andWhere('post.publishedAt >= :dateFilter', { dateFilter });
+
+    // 인기도 점수 계산 (viewCount + likeCount*3 + commentCount*2)
+    query
+      .addSelect('(post.viewCount + post.likeCount * 3 + post.commentCount * 2)', 'popularity_score')
+      .orderBy('popularity_score', 'DESC')
+      .addOrderBy('post.publishedAt', 'DESC')
+      .limit(limit);
+
+    const posts = await query.getMany();
+
+    // 날짜 포맷팅 및 썸네일 URL 처리 (최적화 적용)
+    const postsWithFormattedData = posts.map(post => ({
+      ...post,
+      createdAt: formatDate(post.createdAt),
+      updatedAt: formatDate(post.updatedAt),
+      publishedAt: post.publishedAt ? formatDate(post.publishedAt) : null,
+      tags: post.tagNames || [],
+      thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
+      // 작성자 프로필 이미지 최적화
+      author: post.author ? {
+        ...post.author,
+        profileImage: this.optimizeImageUrl(post.author.profileImage),
+      } : null,
+      // 인기도 점수 포함
+      popularityScore: post.viewCount + (post.likeCount * 3) + (post.commentCount * 2)
+    }));
+
+    return {
+      posts: postsWithFormattedData,
+      period,
+      count: posts.length
     };
   }
 
@@ -1088,6 +1154,32 @@ export class PostsService {
     post.thumbnail = this.extractThumbnailFromContent(post.content);
     
     await this.postsRepository.save(post);
+  }
+
+  /**
+   * 이미지 URL 최적화
+   * - YouTube 썸네일은 그대로 반환 (외부 CDN 활용)
+   * - S3 URL은 CloudFront CDN URL로 변환 (있는 경우)
+   * - 나머지는 프록시 URL 유지
+   */
+  private optimizeImageUrl(url: string | null): string | null {
+    if (!url) return null;
+
+    // YouTube 썸네일은 YouTube CDN 활용
+    if (url.includes('youtube.com') || url.includes('ytimg.com')) {
+      return url;
+    }
+
+    // CloudFront CDN URL이 설정된 경우 사용
+    const cdnUrl = process.env.AWS_CLOUDFRONT_URL;
+    if (cdnUrl && url.includes('s3.amazonaws.com')) {
+      const key = url.split('.com/')[1];
+      if (key) {
+        return `${cdnUrl}/${key}`;
+      }
+    }
+
+    return url;
   }
 
 } 

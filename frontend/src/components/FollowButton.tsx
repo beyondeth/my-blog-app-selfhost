@@ -252,7 +252,7 @@ export default function FollowButton({
 
   // Variant별 렌더링
   if (variant === 'icon-only') {
-    const IconComponent = buttonConfig.icon;
+    const IconComponent = buttonConfig.icon as React.ComponentType<{ className?: string }>;
     
     return (
       <button

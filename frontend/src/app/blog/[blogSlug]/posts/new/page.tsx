@@ -6,11 +6,28 @@ import { useRouter, useParams } from 'next/navigation';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import dynamic from 'next/dynamic';
 import { useAuth } from '@/hooks/useAuth';
 import { useCreatePost } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
-import { UploadedImageInfo, BlogRichTextEditor } from '@/editor';
+import type { UploadedImageInfo } from '@/editor';
 import Spinner from '@/components/ui/Spinner';
+
+// Dynamic import for editor - 초기 로딩 속도 개선
+const BlogRichTextEditor = dynamic(
+  () => import('@/editor').then(mod => mod.BlogRichTextEditor),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-[400px] border rounded-lg bg-gray-50">
+        <div className="text-center">
+          <Spinner size="lg" />
+          <p className="mt-2 text-sm text-gray-500">에디터 로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+);
 
 // Zod 스키마 정의
 const postSchema = z.object({
@@ -252,11 +269,11 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
           </button>
           <button
             type="submit"
-            disabled={!isUploadValid || isSubmitting || createPostMutation.isLoading}
+            disabled={!isUploadValid || isSubmitting || createPostMutation.isPending}
             className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             title={!isUploadValid ? uploadValidationReason : undefined}
           >
-            {isSubmitting || createPostMutation.isLoading ? '저장중...' : '저장'}
+            {isSubmitting || createPostMutation.isPending ? '저장중...' : '저장'}
           </button>
         </div>
       </form>

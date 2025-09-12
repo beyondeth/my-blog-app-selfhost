@@ -289,7 +289,7 @@ export default function BlogPostDetailPage() {
       
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}
-        onClose={isDeleting ? undefined : handleCloseDeleteDialog}
+        onClose={handleCloseDeleteDialog}
         onConfirm={handleConfirmDelete}
         isLoading={deletePostMutation.isPending || isDeleting}
         itemName={`"${post.title}" 게시글`}

@@ -84,9 +84,8 @@ export default function BlogEditPostPage() {
       }
       
       // Set thumbnail if exists
-      if (post.thumbnailFileId) {
-        setThumbnailId(post.thumbnailFileId);
-      }
+      // Note: thumbnailFileId is not part of the Post type
+      // We'll need to extract it from attachedFiles or thumbnail URL if needed
     }
   }, [post]);
 

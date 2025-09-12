@@ -142,7 +142,7 @@ export default function BlogPage() {
 
   // 블로그 소유자 여부 확인
   const isBlogOwner = useMemo(() => {
-    return blog && user && String(blog.owner?.id) === String(user.id);
+    return !!(blog && user && String(blog.owner?.id) === String(user.id));
   }, [blog, user]);
 
   // 모든 포스트 플래튼

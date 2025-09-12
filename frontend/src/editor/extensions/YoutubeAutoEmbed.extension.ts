@@ -4,6 +4,7 @@
  */
 
 import { Extension } from '@tiptap/core';
+import { TextSelection } from 'prosemirror-state';
 import { isYouTubeUrl, isEmbeddableYouTubeUrl, getYouTubeUrlType, extractYouTubeVideoId } from '../utils/youtube.utils';
 import { toast } from 'sonner';
 
@@ -41,21 +42,48 @@ export const YoutubeAutoEmbed = Extension.create({
             return false; // 일반 스페이스 입력 계속
           }
           
-          // URL을 YouTube 임베드로 교체하고 커서를 다음 줄로 이동
-          this.editor
+          // URL을 YouTube 임베드로 교체
+          const editor = this.editor;
+          
+          // YouTube와 paragraph를 삽입
+          editor
             .chain()
             .deleteRange({ from: urlStart, to: from })
             .insertContent({
               type: 'youtube',
               attrs: {
-                src: url, // 원본 URL 사용 (TipTap이 자동으로 embed URL로 변환)
+                src: url,
                 width: 685,
-                height: 540, // 16:9 비율
+                height: 540,
               }
             })
-            .insertContent('<p></p>') // 새 단락 추가
-            .focus('end') // 커서를 끝으로 이동
+            .insertContent({
+              type: 'paragraph',
+              content: []
+            })
             .run();
+          
+          // 즉시 커서를 YouTube 다음으로 이동
+          setTimeout(() => {
+            const { state } = editor;
+            const { doc } = state;
+            
+            // 방금 삽입한 YouTube 노드 찾기
+            let youtubeEndPos: number | null = null;
+            doc.descendants((node, pos) => {
+              if (node.type.name === 'youtube' && node.attrs.src === url) {
+                youtubeEndPos = pos + node.nodeSize;
+                return false;
+              }
+            });
+            
+            if (youtubeEndPos !== null) {
+              console.log('[YoutubeAutoEmbed] YouTube 변환 완료, 커서 강제 이동:', youtubeEndPos);
+              // 커서를 YouTube 블록 바로 다음으로 이동
+              editor.commands.setTextSelection(youtubeEndPos);
+              editor.commands.focus();
+            }
+          }, 10); // 매우 짧은 지연만 사용
           
           // YouTube 썸네일 추가 이벤트 발생
           window.dispatchEvent(new CustomEvent('youtubeEmbedAdded', { 
@@ -96,21 +124,48 @@ export const YoutubeAutoEmbed = Extension.create({
           }
           
           // URL을 YouTube 임베드로 교체
-          this.editor
+          const editor = this.editor;
+          
+          // YouTube와 paragraph를 삽입
+          editor
             .chain()
             .setTextSelection({ from: start, to: end })
             .deleteSelection()
             .insertContent({
               type: 'youtube',
               attrs: {
-                src: lineText, // 원본 URL 사용 (TipTap이 자동으로 embed URL로 변환)
+                src: lineText,
                 width: 685,
                 height: 540,
               }
             })
-            .insertContent('<p></p>')
-            .focus('end')
+            .insertContent({
+              type: 'paragraph',
+              content: []
+            })
             .run();
+          
+          // 즉시 커서를 YouTube 다음으로 이동
+          setTimeout(() => {
+            const { state } = editor;
+            const { doc } = state;
+            
+            // 방금 삽입한 YouTube 노드 찾기
+            let youtubeEndPos: number | null = null;
+            doc.descendants((node, pos) => {
+              if (node.type.name === 'youtube' && node.attrs.src === lineText) {
+                youtubeEndPos = pos + node.nodeSize;
+                return false;
+              }
+            });
+            
+            if (youtubeEndPos !== null) {
+              console.log('[YoutubeAutoEmbed Enter] YouTube 변환 완료, 커서 강제 이동:', youtubeEndPos);
+              // 커서를 YouTube 블록 바로 다음으로 이동
+              editor.commands.setTextSelection(youtubeEndPos);
+              editor.commands.focus();
+            }
+          }, 10); // 매우 짧은 지연만 사용
           
           // YouTube 썸네일 추가 이벤트 발생
           window.dispatchEvent(new CustomEvent('youtubeEmbedAdded', { 

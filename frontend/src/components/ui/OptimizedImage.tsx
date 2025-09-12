@@ -35,6 +35,20 @@ export default function OptimizedImage({
   aspectRatio,
 }: OptimizedImageProps) {
   const normalizedSrc = src ? normalizeImageUrl(src) : null;
+  
+  // 디버깅: 이미지 URL 변환 과정 로그
+  React.useEffect(() => {
+    if (src && !src.includes('youtube') && !src.includes('ytimg')) {
+      console.log('[OptimizedImage] Image URL processing:', {
+        original: src,
+        normalized: normalizedSrc,
+        alt: alt,
+        isDownloadUrl: src.includes('/download'),
+        isProxyUrl: src.includes('/proxy/')
+      });
+    }
+  }, [src, normalizedSrc, alt]);
+  
   const { isLoading, error, loadedUrl } = useImageLoader(normalizedSrc);
 
   // 콜백 메모이제이션으로 불필요한 재렌더링 방지

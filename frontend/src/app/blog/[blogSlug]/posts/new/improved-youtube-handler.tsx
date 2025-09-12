@@ -42,14 +42,14 @@ const preparePostData = (formData: any, selectedThumbnailId: string, images: any
   return postData;
 };
 
-// In PostArticle component, check for mediaType:
-const PostArticleImproved = ({ post }: any) => {
-  // Much simpler and more reliable check
-  if (post.mediaType === 'youtube' && post.youtubeVideoId) {
-    // Render YouTube player layout
-    return <YouTubePostLayout videoId={post.youtubeVideoId} post={post} />;
-  }
-  
-  // Render regular post layout
-  return <RegularPostLayout post={post} />;
-};
+// Example implementation (not used)
+// const PostArticleImproved = ({ post }: any) => {
+//   // Much simpler and more reliable check
+//   if (post.mediaType === 'youtube' && post.youtubeVideoId) {
+//     // Render YouTube player layout
+//     return <YouTubePostLayout videoId={post.youtubeVideoId} post={post} />;
+//   }
+//   
+//   // Render regular post layout
+//   return <RegularPostLayout post={post} />;
+// };

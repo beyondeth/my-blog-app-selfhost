@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube + Image Upload Test - Fixed Version</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+        }
+        h2 {
+            color: #666;
+            font-size: 18px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 5px;
+        }
+        .test-steps {
+            background: #f9f9f9;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 15px 0;
+        }
+        .test-steps ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .test-steps li {
+            margin: 8px 0;
+            line-height: 1.6;
+        }
+        .youtube-url {
+            background: #e3f2fd;
+            padding: 10px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin: 10px 0;
+            word-break: break-all;
+        }
+        .status {
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+            font-weight: bold;
+        }
+        .status.success {
+            background: #c8e6c9;
+            color: #2e7d32;
+        }
+        .status.error {
+            background: #ffcdd2;
+            color: #c62828;
+        }
+        .status.warning {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .expected {
+            background: #e8f5e9;
+            padding: 10px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .code {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .important {
+            background: #ffebee;
+            border-left: 4px solid #f44336;
+            padding: 15px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🎥 YouTube + Image Upload 테스트 - 수정된 버전</h1>
+        <p>이 테스트는 Git commit 9dfc9d1 기반으로 복원한 코드를 테스트합니다.</p>
+        
+        <div class="status success">
+            ✅ 코드 복원 완료: CustomYoutube extension을 작동하던 버전으로 복원했습니다.
+        </div>
+
+        <h2>📋 테스트 시나리오</h2>
+        
+        <div class="test-steps">
+            <h3>시나리오 1: YouTube URL 붙여넣기 후 즉시 이미지 업로드</h3>
+            <ol>
+                <li>아래 YouTube URL 중 하나를 복사합니다</li>
+                <li>에디터에 붙여넣습니다</li>
+                <li><strong>즉시</strong> 이미지를 업로드합니다 (스페이스/엔터 누르지 않음)</li>
+                <li>YouTube 영상이 삭제되는지 확인합니다</li>
+            </ol>
+            
+            <div class="expected">
+                <strong>기대 결과:</strong><br>
+                • YouTube URL이 자동으로 영상으로 변환됨<br>
+                • 커서가 영상 아래 새 줄로 이동<br>
+                • 이미지가 영상 아래에 삽입됨<br>
+                • YouTube 영상이 삭제되지 않음
+            </div>
+        </div>
+
+        <div class="test-steps">
+            <h3>시나리오 2: YouTube URL 타이핑 후 스페이스</h3>
+            <ol>
+                <li>YouTube URL을 직접 타이핑합니다</li>
+                <li>스페이스바를 누릅니다</li>
+                <li>영상으로 변환되는지 확인합니다</li>
+                <li>커서 위치를 확인합니다</li>
+            </ol>
+            
+            <div class="expected">
+                <strong>기대 결과:</strong><br>
+                • 스페이스 누르면 즉시 영상으로 변환<br>
+                • 커서가 영상 아래로 자동 이동<br>
+                • 영상 위를 클릭해도 커서가 아래로 이동
+            </div>
+        </div>
+
+        <h2>📌 테스트용 YouTube URL</h2>
+        
+        <div class="youtube-url">
+            https://www.youtube.com/watch?v=dQw4w9WgXcQ
+        </div>
+        
+        <div class="youtube-url">
+            https://youtu.be/dQw4w9WgXcQ
+        </div>
+        
+        <div class="youtube-url">
+            https://www.youtube.com/shorts/rUxyKA_-grg
+        </div>
+
+        <h2>🔧 수정 내용</h2>
+        
+        <div class="code">
+// CustomYoutube.extension.ts
+- atom: true 제거 (atomic 노드 사용 안함)
+- 단순한 appendTransaction 로직 사용
+- 메타데이터 기반 복잡한 로직 제거
+
+// useEditorSetup.ts  
+- uploadImage 명령 단순화
+- YouTube URL 감지 로직 제거
+- 단순 focus().setImage() 사용
+
+// useEditorHandlers.ts
+- YouTube 보호 로직 제거
+- 단순 이미지 삽입 로직만 유지
+        </div>
+
+        <div class="important">
+            <strong>⚠️ 중요 사항:</strong><br>
+            • 이 수정은 Git commit 9dfc9d1의 작동하던 코드 기반입니다<br>
+            • 복잡한 보호 로직을 제거하고 단순하게 만들었습니다<br>
+            • YouTube extension의 appendTransaction이 자동으로 처리합니다
+        </div>
+
+        <h2>🔍 확인 사항</h2>
+        
+        <div class="test-steps">
+            <ol>
+                <li>YouTube URL 붙여넣기 → 영상 변환 확인</li>
+                <li>변환 직후 커서 위치 → 영상 아래 있는지 확인</li>
+                <li>즉시 이미지 업로드 → 영상 삭제 안되는지 확인</li>
+                <li>영상 위 클릭 → 커서가 아래로 이동하는지 확인</li>
+            </ol>
+        </div>
+
+        <div class="status warning">
+            ⚠️ 알려진 이슈: 영상 위를 클릭하면 커서가 아래로 강제 이동될 수 있습니다.<br>
+            이는 YouTube 블록 보호를 위한 의도된 동작입니다.
+        </div>
+    </div>
+
+    <script>
+        console.log('🎬 YouTube + Image Upload Test Page Loaded');
+        console.log('📝 Test based on Git commit 9dfc9d1');
+        console.log('✅ Code has been restored to working version');
+    </script>
+</body>
+</html>

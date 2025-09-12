@@ -117,7 +117,7 @@ export const getEditorExtensions = (placeholder?: string) => [
   
   // 텍스트 정렬
   TextAlign.configure({
-    types: ['heading', 'paragraph'],
+    types: ['heading', 'paragraph', 'listItem'],
     alignments: ['left', 'center', 'right', 'justify'],
     defaultAlignment: null,
   }),

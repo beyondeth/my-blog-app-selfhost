@@ -399,70 +399,48 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
           
           const { tr } = newState;
           let modified = false;
-          let newParagraphPos: number | null = null;
           
           // 새로 추가된 YouTube 노드를 찾아서 바로 뒤에 단락 추가
           newState.doc.descendants((node: any, pos: number) => {
             if (node.type.name === 'youtube') {
               const nextPos = pos + node.nodeSize;
+              const nextNode = newState.doc.nodeAt(nextPos);
               
-              // nextPos가 문서 범위 내에 있는지 확인
-              if (nextPos <= newState.doc.content.size) {
-                const nextNode = newState.doc.nodeAt(nextPos);
-                
-                // YouTube 노드 다음에 아무것도 없거나 단락이 아닌 경우
-                if (!nextNode || nextNode.type.name !== 'paragraph') {
-                  // 이전 상태에서 같은 위치에 노드가 있는지 안전하게 확인
-                  let isNewYouTube = true;
+              // YouTube 노드 다음에 아무것도 없거나 단락이 아닌 경우
+              if (!nextNode || nextNode.type.name !== 'paragraph') {
+                // 이전 상태에 이 YouTube 노드가 없었다면 (새로 추가된 경우)
+                const oldNode = oldState.doc.nodeAt(pos);
+                if (!oldNode || oldNode.type.name !== 'youtube') {
+                  tr.insert(nextPos, newState.schema.nodes.paragraph.create());
+                  modified = true;
                   
-                  // oldState의 문서 크기 확인
-                  if (pos < oldState.doc.content.size) {
-                    const oldNode = oldState.doc.nodeAt(pos);
-                    if (oldNode && oldNode.type.name === 'youtube') {
-                      isNewYouTube = false;
-                    }
-                  }
+                  // 새로 추가된 YouTube 노드일 때만 커서 이동
+                  // 트랜잭션에 YouTube 추가 관련 정보가 있는지 확인
+                  const hasYoutubeInsert = transactions.some((t: Transaction) => {
+                    let found = false;
+                    t.steps.forEach((step: any) => {
+                      if (step.slice && step.slice.content && step.slice.content.content) {
+                        step.slice.content.content.forEach((n: any) => {
+                          if (n.type && n.type.name === 'youtube') {
+                            found = true;
+                          }
+                        });
+                      }
+                    });
+                    return found;
+                  });
                   
-                  if (isNewYouTube) {
-                    tr.insert(nextPos, newState.schema.nodes.paragraph.create());
-                    newParagraphPos = nextPos;
-                    modified = true;
-                  }
-                } else if (nextNode && nextNode.type.name === 'paragraph') {
-                  // YouTube 노드 다음에 paragraph가 이미 있는 경우
-                  let isNewYouTube = true;
-                  
-                  // oldState의 문서 크기 확인
-                  if (pos < oldState.doc.content.size) {
-                    const oldNode = oldState.doc.nodeAt(pos);
-                    if (oldNode && oldNode.type.name === 'youtube') {
-                      isNewYouTube = false;
-                    }
-                  }
-                  
-                  if (isNewYouTube) {
-                    // 새로 추가된 YouTube인 경우 커서를 paragraph로 이동
-                    newParagraphPos = nextPos;
-                    modified = true;
+                  // YouTube가 방금 삽입되었을 때만 커서 이동
+                  if (hasYoutubeInsert) {
+                    const selection = newState.selection.constructor.near(
+                      tr.doc.resolve(nextPos + 1)
+                    );
+                    tr.setSelection(selection);
                   }
                 }
               }
             }
           });
-          
-          // 새 paragraph가 추가되었거나 YouTube 다음 paragraph가 있으면 커서 이동
-          if (newParagraphPos !== null && newParagraphPos < tr.doc.content.size) {
-            try {
-              // 커서를 새 paragraph의 시작 위치로 이동
-              const resolvePos = Math.min(newParagraphPos + 1, tr.doc.content.size);
-              const selection = newState.selection.constructor.near(
-                tr.doc.resolve(resolvePos)
-              );
-              tr.setSelection(selection);
-            } catch (error) {
-              console.warn('[CustomYoutube] Failed to set selection:', error);
-            }
-          }
           
           return modified ? tr : null;
         },

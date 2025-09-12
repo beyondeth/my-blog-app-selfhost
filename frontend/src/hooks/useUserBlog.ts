@@ -90,7 +90,7 @@ export function useUserBlog() {
     }
 
     if (blog) {
-      return `/blog/${blog.slug}/posts/new`;
+      return `/new-story`;
     }
 
     // If no blog exists (shouldn't happen for new users), redirect to home

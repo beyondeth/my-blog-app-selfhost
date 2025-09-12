@@ -46,15 +46,15 @@ const ProfileSection = React.memo(function ProfileSection({
         </div>
         
         {/* Follow Stats */}
-        {followInfo?.data && (
+        {followInfo?.followInfo && (
           <div className="flex items-center justify-between text-sm text-gray-600 pt-2 border-t">
             <div className="flex gap-4">
               <div>
-                <span className="font-medium">{followInfo.data.followersCount}</span>
+                <span className="font-medium">{followInfo.followInfo.followersCount}</span>
                 <span className="ml-1 text-gray-500">Followers</span>
               </div>
               <div>
-                <span className="font-medium">{followInfo.data.followingCount}</span>
+                <span className="font-medium">{followInfo.followInfo.followingCount}</span>
                 <span className="ml-1 text-gray-500">Following</span>
               </div>
             </div>
@@ -63,7 +63,7 @@ const ProfileSection = React.memo(function ProfileSection({
             {userId && !isOwner && isAuthenticated && (
               <FollowButton
                 userId={userId}
-                initialState={followInfo.data}
+                initialState={followInfo.followInfo}
               />
             )}
           </div>

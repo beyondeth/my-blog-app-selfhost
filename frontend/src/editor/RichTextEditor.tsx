@@ -177,7 +177,7 @@ export default function BlogRichTextEditor({
         imageUploadManager.handleGalleryImageChange(newImages);
       }
     },
-    setSelectedThumbnailId: onThumbnailSelect, // Parent의 setter 사용
+    setSelectedThumbnailId: onThumbnailSelect as React.Dispatch<React.SetStateAction<string>> || (() => {}), // Parent의 setter 사용
     onThumbnailSelect,
     setUploadedFiles,
     onFilesChange,
@@ -235,7 +235,10 @@ export default function BlogRichTextEditor({
   // 에디터가 생성되면 editorInstance 상태 업데이트
   useEffect(() => {
     if (editor) {
+      console.log('[RichTextEditor] 🎯 Editor 인스턴스 설정됨');
       setEditorInstance(editor);
+    } else {
+      console.log('[RichTextEditor] ⚠️ Editor가 아직 없음');
     }
   }, [editor]);
 
@@ -301,13 +304,86 @@ export default function BlogRichTextEditor({
             
             console.log('[triggerImageUpload] Inserting image with attributes:', attrs);
             
-            editor
-              .chain()
-              .focus()
-              .setImage(attrs)
-              .insertContent('<p></p>') // 새 단락 추가
-              .focus('end') // 커서를 끝으로 이동
-              .run();
+            // 현재 줄의 전체 텍스트 확인 (YouTube URL 체크)
+            const { state } = editor;
+            const { selection, doc } = state;
+            const $pos = doc.resolve(selection.from);
+            const start = $pos.start($pos.depth);
+            const end = $pos.end($pos.depth); // 줄 끝까지 가져오기
+            const lineText = doc.textBetween(start, end, '', '').trim();
+            
+            // YouTube URL 패턴 체크
+            const youtubeRegex = /^(https?:\/\/)?(www\.|m\.|music\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)(\/(watch\?v=|embed\/|v\/|shorts\/)?)([\w-]+)(&\S+)?$/;
+            
+            if (lineText && youtubeRegex.test(lineText)) {
+              // YouTube URL이 있으면 먼저 변환
+              console.log('[triggerImageUpload] YouTube URL 감지, 먼저 변환 후 이미지 삽입:', lineText);
+              
+              // 현재 줄 전체를 YouTube로 변환하고 이미지 추가
+              editor
+                .chain()
+                .setTextSelection({ from: start, to: end })
+                .deleteSelection()
+                .insertContent([
+                  {
+                    type: 'youtube',
+                    attrs: {
+                      src: lineText,
+                      width: 685,
+                      height: 540,
+                    }
+                  },
+                  { type: 'paragraph' },
+                  {
+                    type: 'image',
+                    attrs
+                  },
+                  { type: 'paragraph' }
+                ])
+                .focus('end')
+                .run();
+            } else {
+              // YouTube 블록 보호 로직
+              const currentPos = selection.from;
+              let isInYouTube = false;
+              let youtubeEndPos: number | null = null;
+              
+              doc.descendants((node, pos) => {
+                if (node.type.name === 'youtube') {
+                  const nodeEnd = pos + node.nodeSize;
+                  if (pos <= currentPos && currentPos <= nodeEnd) {
+                    isInYouTube = true;
+                    youtubeEndPos = nodeEnd;
+                    return false;
+                  }
+                }
+              });
+              
+              if (isInYouTube && youtubeEndPos !== null) {
+                // YouTube 블록 내부에 있으면 블록 다음에 삽입
+                console.log('[triggerImageUpload] YouTube 블록 감지, 안전한 위치에 삽입');
+                editor
+                  .chain()
+                  .setTextSelection(youtubeEndPos)
+                  .focus()
+                  .insertContent([
+                    { type: 'paragraph' },
+                    { type: 'image', attrs },
+                    { type: 'paragraph' }
+                  ])
+                  .focus('end')
+                  .run();
+              } else {
+                // 안전한 경우 기존 방식대로
+                editor
+                  .chain()
+                  .focus()
+                  .setImage(attrs)
+                  .insertContent('<p></p>') // 새 단락 추가
+                  .focus('end') // 커서를 끝으로 이동
+                  .run();
+              }
+            }
           }
         } catch (error) {
           console.error('Failed to upload image:', error);
@@ -331,8 +407,8 @@ export default function BlogRichTextEditor({
       
       <EditorContent editor={editor} />
       
-      {/* Enhanced Image Upload Manager */}
-      {enableImageManager && (
+      {/* Enhanced Image Upload Manager - 에디터가 준비된 후에만 렌더링 */}
+      {enableImageManager && editorInstance && (
         <div className="border-t border-gray-200">
           <div className="p-4">
             <ImageUploadManager

@@ -9,11 +9,12 @@ import { UsersModule } from '../users/users.module';
 import { FilesModule } from '../files/files.module';
 import { TagsModule } from '../tags/tags.module';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
+import { ViewCountService } from './view-count.service';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Post, File, Blog]), UsersModule, FilesModule, TagsModule],
-  providers: [PostsService, MarkdownRendererService],
+  providers: [PostsService, MarkdownRendererService, ViewCountService],
   controllers: [PostsController],
-  exports: [PostsService],
+  exports: [PostsService, ViewCountService],
 })
 export class PostsModule {} 

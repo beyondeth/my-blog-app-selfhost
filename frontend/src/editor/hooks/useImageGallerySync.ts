@@ -25,6 +25,8 @@ export function useImageGallerySync({
 }: UseImageGallerySyncProps) {
   const [images, setImages] = useState<UploadedImageInfo[]>([]);
   // 로컬 selectedThumbnailId 상태 제거
+  
+  console.log('[useImageGallerySync] 🔍 Editor 상태:', !!editor, editor?.isDestroyed);
 
   // Image upload manager hook 사용
   const imageUploadManager = useImageUploadManager({

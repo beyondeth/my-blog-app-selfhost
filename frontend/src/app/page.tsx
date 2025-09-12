@@ -12,7 +12,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
-import RecentPostsSection from '@/components/layout/RecentPostsSection';
+import PopularPostsSection from '@/components/layout/PopularPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
 import FollowingListSection from '@/components/FollowingListSection';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
@@ -79,11 +79,6 @@ export default function HomePage() {
   const totalPosts = useMemo(() => {
     return data?.pages[0]?.total || 0;
   }, [data?.pages]);
-
-  // 최근 포스트 (처음 5개) - 메모이제이션
-  const recentPosts = useMemo(() => {
-    return allPosts.slice(0, 5);
-  }, [allPosts]);
 
   // 실제 포스트에서 태그 추출 - 메모이제이션
   const tags = useMemo(() => {
@@ -219,7 +214,7 @@ export default function HomePage() {
           {/* Sidebar - sticky with matched top position */}
         <aside className="w-full lg:w-80 lg:min-w-[320px]">
           <div className="lg:sticky lg:top-8 space-y-4 sm:space-y-6">
-            <RecentPostsSection posts={recentPosts} />
+            <PopularPostsSection />
             
             <TagsSection tags={tags} onTagClick={handleTagClick} />
             

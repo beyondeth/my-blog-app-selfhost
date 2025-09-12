@@ -172,7 +172,7 @@ export default function BlogSettingsPage() {
               <FiCalendar className="mr-2 text-gray-400" />
               <span className="text-gray-600">생성일:</span>
               <span className="ml-2 text-gray-900">
-                {blog.createdAt && format(new Date(blog.createdAt), 'yyyy년 MM월 dd일', { locale: ko })}
+                {blog?.createdAt && format(new Date(blog.createdAt), 'yyyy년 MM월 dd일', { locale: ko })}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
@@ -180,17 +180,17 @@ export default function BlogSettingsPage() {
                 <FiLink className="mr-2 text-gray-400" />
                 <span className="text-gray-600">전체 URL:</span>
                 <a 
-                  href={`/blog/${blog.slug}`}
+                  href={`/blog/${blog?.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-2 text-gray-700 hover:text-black"
                 >
-                  {window.location.origin}/blog/{blog.slug}
+                  {window.location.origin}/blog/{blog?.slug}
                 </a>
               </div>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/blog/${blog.slug}`);
+                  navigator.clipboard.writeText(`${window.location.origin}/blog/${blog?.slug}`);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}

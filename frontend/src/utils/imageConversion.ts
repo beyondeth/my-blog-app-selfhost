@@ -117,11 +117,11 @@ export async function convertToWebP(
     const startTime = Date.now();
     
     // browser-image-compression으로 변환
-    const options: imageCompression.Options = {
+    const options = {
       maxSizeMB: preset.maxSizeMB || 2,
-      maxWidthOrHeight: preset.maxWidthOrHeight || 2400,
+      maxWidthOrHeight: ('maxWidthOrHeight' in preset ? preset.maxWidthOrHeight : null) || 2400,
       useWebWorker: true,
-      fileType: preset.preserveOriginalFormat ? file.type : 'image/webp',
+      fileType: ('preserveOriginalFormat' in preset && preset.preserveOriginalFormat) ? file.type : 'image/webp',
       initialQuality: preset.quality || 0.85,
       alwaysKeepResolution: false,
     };
@@ -129,7 +129,7 @@ export async function convertToWebP(
     const compressedFile = await imageCompression(file, options);
     
     // 새 파일명 생성 (확장자를 .webp로 변경)
-    const newFileName = preset.preserveOriginalFormat 
+    const newFileName = ('preserveOriginalFormat' in preset && preset.preserveOriginalFormat)
       ? file.name 
       : file.name.replace(/\.[^/.]+$/, '.webp');
     
@@ -195,7 +195,7 @@ export async function resizeImage(
   quality: number = 0.85
 ): Promise<File> {
   try {
-    const options: imageCompression.Options = {
+    const options = {
       maxWidthOrHeight: Math.max(maxWidth, maxHeight),
       useWebWorker: true,
       fileType: file.type,

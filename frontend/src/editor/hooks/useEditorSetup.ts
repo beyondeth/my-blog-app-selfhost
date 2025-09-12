@@ -138,7 +138,8 @@ export function useEditorSetup({
             };
             attrs['data-image-id'] = result.id;
             
-            editor.chain()
+            editor
+              .chain()
               .focus()
               .setImage(attrs)
               .insertContent('<p></p>') // 새 단락 추가

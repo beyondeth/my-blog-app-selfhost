@@ -79,8 +79,18 @@ export function normalizeImageUrl(url: string): string {
     }
 
     // 외부 HTTPS URL은 그대로 사용
-    if (url.startsWith('https://') && !url.includes('amazonaws.com')) {
+    if (url.startsWith('https://') && !url.includes('amazonaws.com') && !url.includes('/api/v1/files/')) {
       return url;
+    }
+
+    // /api/v1/files/{uuid}/download 형식인 경우 그대로 사용
+    if (url.includes('/api/v1/files/') && url.includes('/download')) {
+      // 이미 절대 URL인 경우
+      if (url.startsWith('http')) {
+        return url;
+      }
+      // 상대 경로인 경우 절대 경로로 변환
+      return `${BACKEND_URL}${url.startsWith('/') ? url : '/' + url}`;
     }
 
     // 이미 완전한 프록시 URL인 경우
@@ -324,8 +334,9 @@ export function useImageLoader(imageUrl: string | null | undefined) {
     }
         };
         
-        img.onerror = () => {
+        img.onerror = (e) => {
           if (!cancelled) {
+            console.error('[useImageLoader] Failed to load image:', imageUrl, e);
             setError('Failed to load image');
             setIsLoading(false);
           }

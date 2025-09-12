@@ -122,9 +122,6 @@ importers:
       '@tiptap/suggestion':
         specifier: ^2.26.1
         version: 2.26.1(@tiptap/core@2.22.3(@tiptap/pm@2.22.3))(@tiptap/pm@2.22.3)
-      '@types/dompurify':
-        specifier: ^3.2.0
-        version: 3.2.0
       '@types/highlight.js':
         specifier: ^10.1.0
         version: 10.1.0
@@ -234,6 +231,9 @@ importers:
         specifier: ^5.0.8
         version: 5.0.8(@types/react@18.3.23)(immer@10.1.1)(react@18.3.1)(use-sync-external-store@1.5.0(react@18.3.1))
     devDependencies:
+      '@types/dompurify':
+        specifier: ^3.2.0
+        version: 3.2.0
       '@types/node':
         specifier: ^20.10.0
         version: 20.19.1

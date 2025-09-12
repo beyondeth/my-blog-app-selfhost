@@ -8,7 +8,7 @@ import {
   FiUnderline, 
   FiList, 
   FiImage, 
-  FiLink, 
+ 
   FiCode,
   FiAlignLeft,
   FiAlignCenter,
@@ -18,7 +18,6 @@ import {
   FiMoreHorizontal,
   FiChevronDown,
   FiCheck,
-  FiYoutube
 } from 'react-icons/fi';
 import { 
   MdFormatListNumbered, 
@@ -28,7 +27,6 @@ import {
   MdFormatColorText,
   MdFormatColorFill
 } from 'react-icons/md';
-import LinkDialog from './LinkDialog';
 
 interface EnhancedEditorToolbarProps {
   editor: Editor | null;
@@ -54,17 +52,26 @@ const COLOR_PRESETS = [
   { value: '#DB2777', label: '분홍' },
 ];
 
-// 배경색 프리셋 - 하늘색 기본
+// 배경색 프리셋 - 더 많은 색상 추가
 const BG_COLOR_PRESETS = [
   { value: null, label: '기본' },
-  { value: '#7DD3FC', label: '하늘색' },  // 기본 하늘색 (sky-300)
+  // 하늘색 계열
+  { value: '#7DD3FC', label: '하늘색' },  // sky-300
   { value: '#38BDF8', label: '진한 하늘' }, // sky-400
   { value: '#BAE6FD', label: '연한 하늘' }, // sky-200
+  // 회색 계열
+  { value: '#F3F4F6', label: '연회색' }, // gray-100
+  { value: '#E5E7EB', label: '회색' }, // gray-200
+  { value: '#D1D5DB', label: '진회색' }, // gray-300
+  // 파스텔 계열
   { value: '#FEF3C7', label: '노랑' },
   { value: '#D1FAE5', label: '민트' },
   { value: '#FED7E2', label: '분홍' },
   { value: '#E9D5FF', label: '보라' },
   { value: '#FEE2E2', label: '연빨강' },
+  { value: '#DBEAFE', label: '연파랑' }, // blue-100
+  { value: '#D1FAE5', label: '연초록' }, // green-100
+  { value: '#FFF7ED', label: '연주황' }, // orange-50
 ];
 
 // 글꼴 크기 옵션
@@ -95,7 +102,6 @@ export default function EnhancedEditorToolbar({
   isUploading = false,
   hideImageButton = false 
 }: EnhancedEditorToolbarProps) {
-  const [showLinkDialog, setShowLinkDialog] = useState(false);
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showBgColorPicker, setShowBgColorPicker] = useState(false);
   const [showFontSizeMenu, setShowFontSizeMenu] = useState(false);
@@ -146,9 +152,9 @@ export default function EnhancedEditorToolbar({
       }}
       disabled={disabled}
       title={title}
-      className={`p-2 rounded transition-colors ${
+      className={`p-2 rounded transition-all duration-150 ${
         isActive 
-          ? 'bg-sky-100 text-sky-800' 
+          ? 'bg-gray-200 text-gray-800' 
           : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
     >
@@ -228,17 +234,7 @@ export default function EnhancedEditorToolbar({
     setShowHeadingMenu(false);
   };
 
-  const handleInsertLink = () => {
-    setShowLinkDialog(true);
-  };
 
-  const handleLinkConfirm = (url: string) => {
-    if (url === '') {
-      editor.chain().focus().unsetLink().run();
-    } else {
-      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run();
-    }
-  };
 
   return (
     <>
@@ -350,36 +346,56 @@ export default function EnhancedEditorToolbar({
 
           {/* 텍스트 색상 */}
           <div className="relative">
-            <ToolbarButton
-              onClick={() => {
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setShowTextColorPicker(!showTextColorPicker);
                 setShowBgColorPicker(false);
                 setShowFontSizeMenu(false);
                 setShowHeadingMenu(false);
               }}
               title="텍스트 색상"
+              className="p-2 rounded transition-all duration-150 relative"
+              style={{
+                backgroundColor: editor.getAttributes('textStyle').color ? 
+                  `${editor.getAttributes('textStyle').color}20` : 'transparent',
+                color: editor.getAttributes('textStyle').color || '#4B5563'
+              }}
             >
               <MdFormatColorText className="w-4 h-4" />
-            </ToolbarButton>
+            </button>
             {showTextColorPicker && (
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
                 <div className="grid grid-cols-5 gap-1">
-                  {COLOR_PRESETS.map((color) => (
-                    <button
-                      key={color.value || 'default'}
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSetColor(color.value);
-                      }}
-                      className="w-8 h-8 rounded border border-gray-300 hover:scale-110 transition-transform"
-                      style={{ backgroundColor: color.value || '#ffffff' }}
-                      title={color.label}
-                    >
-                      {!color.value && <span className="text-xs">×</span>}
-                    </button>
-                  ))}
+                  {COLOR_PRESETS.map((color) => {
+                    const currentColor = editor.getAttributes('textStyle').color;
+                    const isSelected = color.value === currentColor || (!color.value && !currentColor);
+                    return (
+                      <button
+                        key={color.value || 'default'}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSetColor(color.value);
+                        }}
+                        className={`w-8 h-8 rounded hover:scale-110 transition-transform ${
+                          isSelected 
+                            ? 'ring-2 ring-blue-500 ring-offset-2 scale-110' 
+                            : 'border border-gray-300'
+                        }`}
+                        style={{ backgroundColor: color.value || '#ffffff' }}
+                        title={color.label}
+                      >
+                        {!color.value && <span className="text-xs">×</span>}
+                        {isSelected && color.value && (
+                          <FiCheck className="w-3 h-3 text-white drop-shadow" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -387,37 +403,55 @@ export default function EnhancedEditorToolbar({
 
           {/* 배경색 (하이라이트) */}
           <div className="relative">
-            <ToolbarButton
-              onClick={() => {
+            <button
+              type="button"
+              onMouseDown={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
                 setShowBgColorPicker(!showBgColorPicker);
                 setShowTextColorPicker(false);
                 setShowFontSizeMenu(false);
                 setShowHeadingMenu(false);
               }}
-              isActive={editor.isActive('highlight')}
               title="배경색"
+              className="p-2 rounded transition-all duration-150 relative"
+              style={{
+                backgroundColor: editor.getAttributes('highlight').color || 'transparent',
+                color: editor.isActive('highlight') ? '#1F2937' : '#4B5563'
+              }}
             >
               <MdFormatColorFill className="w-4 h-4" />
-            </ToolbarButton>
+            </button>
             {showBgColorPicker && (
               <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
-                <div className="grid grid-cols-3 gap-1">
-                  {BG_COLOR_PRESETS.map((color) => (
-                    <button
-                      key={color.value || 'default'}
-                      type="button"
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        handleSetHighlight(color.value);
-                      }}
-                      className="w-8 h-8 rounded border border-gray-300 hover:scale-110 transition-transform"
-                      style={{ backgroundColor: color.value || '#ffffff' }}
-                      title={color.label}
-                    >
-                      {!color.value && <span className="text-xs">×</span>}
-                    </button>
-                  ))}
+                <div className="grid grid-cols-4 gap-1">
+                  {BG_COLOR_PRESETS.map((color) => {
+                    const currentHighlight = editor.getAttributes('highlight').color;
+                    const isSelected = color.value === currentHighlight || (!color.value && !currentHighlight);
+                    return (
+                      <button
+                        key={color.value || 'default'}
+                        type="button"
+                        onMouseDown={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          handleSetHighlight(color.value);
+                        }}
+                        className={`w-8 h-8 rounded hover:scale-110 transition-transform ${
+                          isSelected 
+                            ? 'ring-2 ring-blue-500 ring-offset-2 scale-110' 
+                            : 'border border-gray-300'
+                        }`}
+                        style={{ backgroundColor: color.value || '#ffffff' }}
+                        title={color.label}
+                      >
+                        {!color.value && <span className="text-xs">×</span>}
+                        {isSelected && color.value && (
+                          <FiCheck className="w-3 h-3 text-gray-700 drop-shadow" />
+                        )}
+                      </button>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -528,34 +562,7 @@ export default function EnhancedEditorToolbar({
             </ToolbarButton>
           )}
 
-          <ToolbarButton
-            onClick={() => {
-              const url = window.prompt('YouTube URL을 입력하세요:');
-              if (url) {
-                editor.commands.setYoutubeVideo({
-                  src: url,
-                  width: 685,
-                  height: 540,
-                });
-                
-                // YouTube 썸네일 추가 이벤트 발생
-                window.dispatchEvent(new CustomEvent('youtubeEmbedAdded', { 
-                  detail: { url, editor } 
-                }));
-              }
-            }}
-            title="YouTube 비디오 삽입"
-          >
-            <FiYoutube className="w-4 h-4" />
-          </ToolbarButton>
 
-          <ToolbarButton
-            onClick={handleInsertLink}
-            isActive={editor.isActive('link')}
-            title="링크"
-          >
-            <FiLink className="w-4 h-4" />
-          </ToolbarButton>
 
           <ToolbarButton
             onClick={() => editor.chain().focus().setHorizontalRule().run()}
@@ -576,13 +583,6 @@ export default function EnhancedEditorToolbar({
         </div>
       </div>
       
-      {/* Link Dialog */}
-      <LinkDialog
-        isOpen={showLinkDialog}
-        onClose={() => setShowLinkDialog(false)}
-        onConfirm={handleLinkConfirm}
-        initialUrl={editor.getAttributes('link').href || ''}
-      />
     </>
   );
 }

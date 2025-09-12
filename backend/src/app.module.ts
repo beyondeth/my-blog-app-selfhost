@@ -3,7 +3,6 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
-import { CacheModule } from '@nestjs/cache-manager';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 
 // Configuration imports
@@ -25,6 +24,7 @@ import { EmailModule } from './email/email.module';
 import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
 import { AdminModule } from './admin/admin.module';
+import { CacheModule } from './cache/cache.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
 
 // Guards
@@ -36,10 +36,6 @@ import { NotificationsModule } from './notifications/notifications.module';
 @Module({
   imports: [
     // Global configuration
-    CacheModule.register({
-      isGlobal: true,
-      ttl: 2000,
-    }),
     ConfigModule.forRoot({
       isGlobal: true,
       load: [databaseConfig, jwtConfig, s3Config],
@@ -75,6 +71,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     }),
 
     // Feature modules
+    CacheModule, // Global cache module with Redis support
     AuthModule,
     UsersModule,
     PostsModule,

@@ -214,29 +214,47 @@ export function useImageUploadManager({
   
   // Handle newly uploaded images (insert to editor)
   const handleImagesUploaded = useCallback((newlyUploaded: UploadedImageInfo[]) => {
-    console.log('[handleImagesUploaded] 호출됨 - 새 이미지:', newlyUploaded.length, '개, editor:', !!editor);
+    console.log('[handleImagesUploaded] 🚨 호출됨 - 새 이미지:', newlyUploaded.length, '개');
+    console.log('[handleImagesUploaded] 🚨 Editor 상태:', !!editor, editor?.isDestroyed);
+    console.log('[handleImagesUploaded] 🚨 받은 이미지들:', newlyUploaded);
     
-    if (editor && newlyUploaded.length > 0) {
+    if (!editor) {
+      console.error('[handleImagesUploaded] ❌ Editor가 없습니다!');
+      return;
+    }
+    
+    if (newlyUploaded.length > 0) {
       // 새로운 이미지를 기존 목록에 추가
       const updatedImages = [...images, ...newlyUploaded];
       onImagesChange(updatedImages);
 
       // Filter out YouTube thumbnails - they're already in the editor as iframes
       const actualImages = newlyUploaded.filter(img => !img.id.startsWith('yt_thumb_'));
-      console.log('[handleImagesUploaded] 실제 이미지:', actualImages.length, '개');
+      console.log('[handleImagesUploaded] 🎯 실제 이미지:', actualImages.length, '개');
       
       if (actualImages.length > 0) {
-        // 에디터가 준비될 때까지 약간의 지연 추가
+        // 즉시 포커스 설정하고 이미지 삽입
+        console.log('[handleImagesUploaded] 🔥 포커스 설정 및 이미지 삽입 시작');
+        
+        // 포커스가 없으면 먼저 포커스 설정
+        if (!editor.isFocused) {
+          console.log('[handleImagesUploaded] 📍 포커스 없음 - 설정 중...');
+          editor.chain().focus('end').run();
+        }
+        
+        // 약간의 지연 후 이미지 삽입
         setTimeout(() => {
           if (!editor || editor.isDestroyed) {
-            console.warn('[handleImagesUploaded] Editor not available after timeout');
+            console.error('[handleImagesUploaded] ❌ Editor가 사라졌습니다!');
             return;
           }
-
+          
+          console.log('[handleImagesUploaded] 🎨 이미지 삽입 시작');
+          
           // Build a chain of commands to insert all actual images at once
           const chain = editor.chain();
           
-          // Focus first to ensure editor is ready
+          // Ensure focus
           chain.focus();
           
           actualImages.forEach((image, index) => {
@@ -266,8 +284,10 @@ export function useImageUploadManager({
           });
           
           // Execute all commands at once
-          console.log('[handleImagesUploaded] Executing chain with', actualImages.length, 'images');
+          console.log('[handleImagesUploaded] 🚀 Executing chain with', actualImages.length, 'images');
           chain.run();
+          
+          console.log('[handleImagesUploaded] ✅ 이미지 삽입 완료!');
         }, 100); // 100ms delay to ensure editor is ready
       }
     }

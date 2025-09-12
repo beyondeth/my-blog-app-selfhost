@@ -7,6 +7,7 @@
   outline: none;
 }
 
+/* 에디터 포커스 상태 */
 .ProseMirror:focus {
   outline: none;
 }
@@ -126,6 +127,21 @@
   margin: 0.25rem 0;
 }
 
+/* 기본 글머리기호 스타일 통일 */
+.ProseMirror ul li {
+  list-style-type: none;
+  position: relative;
+}
+
+/* 모든 ul li에 대해 일관된 글머리기호 */
+.ProseMirror ul li::before {
+  content: "•";
+  position: absolute;
+  left: -1.2em;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
 /* 링크 스타일 */
 .ProseMirror a {
   color: #3b82f6;
@@ -165,6 +181,73 @@
 .ProseMirror p[style*="text-align: justify"] {
   text-align: justify;
 }
+
+/* 리스트 아이템 정렬 - 가운데 정렬 */
+.ProseMirror li[style*="text-align: center"] {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  list-style: none;
+  position: relative;
+}
+
+.ProseMirror ul li[style*="text-align: center"]::before {
+  content: "•";
+  position: static;
+  margin-right: 0.5em;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.ProseMirror ol {
+  counter-reset: list-counter;
+}
+
+.ProseMirror ol li {
+  counter-increment: list-counter;
+}
+
+.ProseMirror ol li[style*="text-align: center"]::before {
+  content: counter(list-counter) ".";
+  margin-right: 0.5em;
+  font-size: 1em;
+  line-height: 1;
+}
+
+/* 리스트 아이템 정렬 - 오른쪽 정렬 */
+.ProseMirror li[style*="text-align: right"] {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  list-style: none;
+  position: relative;
+}
+
+.ProseMirror ul li[style*="text-align: right"]::before {
+  content: "•";
+  position: static;
+  margin-right: 0.5em;
+  font-size: 1.2em;
+  line-height: 1;
+}
+
+.ProseMirror ol li[style*="text-align: right"]::before {
+  content: counter(list-counter) ".";
+  margin-right: 0.5em;
+  font-size: 1em;
+  line-height: 1;
+}
+
+/* 리스트 아이템 정렬 - 왼쪽 정렬 */
+.ProseMirror li[style*="text-align: left"] {
+  text-align: left;
+}
+
+/* 리스트 아이템 정렬 - 양쪽 정렬 */
+.ProseMirror li[style*="text-align: justify"] {
+  text-align: justify;
+}
+
 
 /* 슬래시 커맨드 메뉴 */
 .slash-command-menu {
