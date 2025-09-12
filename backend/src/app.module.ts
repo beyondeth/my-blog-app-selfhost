@@ -25,6 +25,7 @@ import { ReportsModule } from './reports/reports.module';
 import { AuditModule } from './audit/audit.module';
 import { AdminModule } from './admin/admin.module';
 import { CacheModule } from './cache/cache.module';
+import { MonitoringModule } from './monitoring/monitoring.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
 
 // Guards
@@ -72,6 +73,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 
     // Feature modules
     CacheModule, // Global cache module with Redis support
+    MonitoringModule, // Global monitoring module for suspicious requests
     AuthModule,
     UsersModule,
     PostsModule,

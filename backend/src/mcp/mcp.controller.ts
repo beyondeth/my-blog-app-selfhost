@@ -9,6 +9,8 @@ import { McpAuthGuard } from './mcp-auth.guard';
 import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpLoggingInterceptor } from './mcp-logging.interceptor';
 import * as crypto from 'crypto';
+import { PaginationHelper } from '../common/dto/pagination.dto';
+import { MonitoringService } from '../monitoring/monitoring.service';
 
 @Controller('mcp')
 @Public() // Bypass JWT auth, we'll use API key auth instead
@@ -21,6 +23,7 @@ export class McpController {
     private readonly mcpService: McpService,
     private readonly apiKeysService: ApiKeysService,
     private readonly authService: AuthService,
+    private readonly monitoringService: MonitoringService,
   ) {}
 
   private async validateApiKey(headers: any) {
@@ -195,9 +198,35 @@ export class McpController {
     @Query('limit') limit?: string,
   ) {
     const apiKey = await this.validateApiKey(headers);
-    const pageNumber = page ? parseInt(page, 10) : 1;
-    const limitNumber = limit ? parseInt(limit, 10) : 10;
+    const pageNumber = PaginationHelper.getSafePage(page);
+    const limitNumber = PaginationHelper.getSafeLimit(limit, 20); // 최대 20개
     const blogId = apiKey.blog.id;
+    
+    // 비정상적인 요청 모니터링 및 데이터베이스 저장
+    if (limit && parseInt(limit, 10) > 20) {
+      const attemptedLimit = parseInt(limit, 10);
+      this.logger.warn(`MCP suspicious limit request: API Key=${apiKey.keyId}, limit=${attemptedLimit}`);
+      
+      // 모니터링 서비스에 기록
+      this.monitoringService.logSuspiciousRequest({
+        requestType: 'MCP_EXCESSIVE_LIMIT',
+        ipAddress: headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
+        endpoint: '/api/v1/mcp/posts',
+        userId: apiKey.user.id,
+        userEmail: apiKey.user.email,
+        requestDetails: {
+          method: 'GET',
+          query: { limit: attemptedLimit },
+          attemptedLimit,
+          actualLimit: limitNumber,
+          apiKeyId: apiKey.keyId,
+        },
+        reason: `MCP API attempted to request ${attemptedLimit} items (max allowed: ${limitNumber})`,
+        severity: attemptedLimit > 1000 ? 'HIGH' : attemptedLimit > 100 ? 'MEDIUM' : 'LOW',
+      }).catch(err => {
+        this.logger.error('Failed to log MCP suspicious request:', err);
+      });
+    }
     
     return await this.mcpService.getPosts(blogId, pageNumber, limitNumber);
   }

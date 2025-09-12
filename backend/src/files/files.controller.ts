@@ -32,6 +32,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Response, Request } from 'express';
 import { Logger } from '@nestjs/common';
+import { PaginationHelper } from '../common/dto/pagination.dto';
 
 @ApiTags('Files')
 @Controller('files')
@@ -135,7 +136,11 @@ export class FilesController {
     @Query('page', new ParseIntPipe({ optional: true })) page = 1,
     @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
   ) {
-    return this.filesService.getUserFiles(userId as any, fileType, page, limit);
+    // 안전한 limit 값 처리
+    const safeLimit = Math.min(Math.max(limit, 1), 20); // 최대 20개
+    const safePage = Math.max(page, 1);
+    
+    return this.filesService.getUserFiles(userId as any, fileType, safePage, safeLimit);
   }
 
   @Get('stats')

@@ -44,6 +44,7 @@ export default function PostHeaderWithReport({
   const isAuthor = user?.id === post.author?.id;
 
   const handleReport = () => {
+    if (!user) return; // 로그인하지 않은 경우 실행 안 함
     openReportModal('post', post.id, post.title);
     setShowDropdown(false);
   };
@@ -174,7 +175,10 @@ export default function PostHeaderWithReport({
             {!isAuthor && (
               <div className="relative">
                 <button
-                  onClick={() => setShowDropdown(!showDropdown)}
+                  onClick={() => {
+                    if (!user) return; // 로그인하지 않은 경우 실행 안 함
+                    setShowDropdown(!showDropdown);
+                  }}
                   className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
                   title="더보기"
                 >

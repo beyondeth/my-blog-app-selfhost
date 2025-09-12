@@ -15,7 +15,8 @@ import {
   Shield,
   Image,
   Bug,
-  Database
+  Database,
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -27,6 +28,7 @@ const navigation = [
   { name: t.navigation.users, href: '/admin/users', icon: Users },
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
+  { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: '메모리 관리', href: '/admin/memory', icon: Database, adminOnly: true },

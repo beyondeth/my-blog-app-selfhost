@@ -127,6 +127,7 @@ export default function CommentItem({
   };
 
   const handleReport = () => {
+    if (!user) return; // 로그인하지 않은 경우 실행 안 함
     const contentPreview = comment.content.length > 100 
       ? comment.content.substring(0, 100) + '...' 
       : comment.content;
@@ -202,7 +203,10 @@ export default function CommentItem({
             {!isAuthor && (
               <div className="relative">
                 <button
-                  onClick={() => setShowDropdown(!showDropdown)}
+                  onClick={() => {
+                    if (!user) return; // 로그인하지 않은 경우 실행 안 함
+                    setShowDropdown(!showDropdown);
+                  }}
                   className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                   title="더보기"
                 >

@@ -45,6 +45,7 @@ export default function CommentItemWithReport({
   const isAuthor = currentUserId === comment.author.id;
 
   const handleReport = () => {
+    if (!currentUserId) return; // 로그인하지 않은 경우 실행 안 함
     const contentPreview = comment.content.length > 100 
       ? comment.content.substring(0, 100) + '...' 
       : comment.content;
@@ -101,7 +102,10 @@ export default function CommentItemWithReport({
               {/* More Options Menu */}
               <div className="relative">
                 <button
-                  onClick={() => setShowDropdown(!showDropdown)}
+                  onClick={() => {
+                    if (!currentUserId) return; // 로그인하지 않은 경우 실행 안 함
+                    setShowDropdown(!showDropdown);
+                  }}
                   className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                 >
                   <FiMoreVertical className="w-4 h-4" />

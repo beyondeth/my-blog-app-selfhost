@@ -123,9 +123,9 @@ export default function BlogPostDetailPage() {
   }, [deletePostMutation.isPending, isDeleting]);
 
   const handleLike = useCallback(() => {
-    if (!post) return;
+    if (!post || !user) return; // 로그인하지 않은 경우 실행 안 함
     likeMutation.mutate(post.id);
-  }, [post, likeMutation]);
+  }, [post, user, likeMutation]);
 
   const handleShare = useCallback(async () => {
     if (navigator.share && post) {
@@ -248,7 +248,6 @@ export default function BlogPostDetailPage() {
               liked={post.liked || false}
               likeCount={post.likeCount || 0}
               onClick={handleLike}
-              tooltip={!user ? '로그인 후 좋아요 가능' : undefined}
             />
           }
           onShare={handleShare}

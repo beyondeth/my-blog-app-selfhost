@@ -74,13 +74,8 @@ export default function HtmlContentRenderer({ content, className = '' }: HtmlCon
           copyButton.className = 'copy-code-btn';
           copyButton.setAttribute('data-code', originalCode);
           copyButton.innerHTML = `
-            <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            <svg class="check-icon" style="display:none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="20 6 9 17 4 12"></polyline>
-            </svg>
+            <span class="copy-text" style="color: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 500;">Copy</span>
+            <span class="check-text" style="display:none; color: #4ade80; font-size: 12px; font-weight: 500;">Copied!</span>
           `;
           
           preElement.parentNode?.insertBefore(wrapper, preElement);
@@ -112,13 +107,8 @@ export default function HtmlContentRenderer({ content, className = '' }: HtmlCon
         copyButton.className = 'copy-code-btn';
         copyButton.setAttribute('data-code', originalText);
         copyButton.innerHTML = `
-          <svg class="copy-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-          </svg>
-          <svg class="check-icon" style="display:none" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
+          <span class="copy-text" style="color: rgba(255, 255, 255, 0.6); font-size: 12px; font-weight: 500;">Copy</span>
+          <span class="check-text" style="display:none; color: #4ade80; font-size: 12px; font-weight: 500;">Copied!</span>
         `;
         
         element.parentNode?.insertBefore(wrapper, element);
@@ -135,18 +125,18 @@ export default function HtmlContentRenderer({ content, className = '' }: HtmlCon
           'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'code', 'pre', 'span', 'div',
           'hr', 'mark', 'sub', 'sup', 'del', 'ins', 'kbd', 'samp', 'var',
           'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
-          'button', 'svg', 'rect', 'path', 'polyline', // 복사 버튼 관련 태그 추가
+          'button', 'svg', 'rect', 'path', 'polyline', 'use', 'g', 'defs', 'symbol', // 모든 SVG 태그 추가
           'iframe' // YouTube iframe 지원 추가
         ],
         ALLOWED_ATTR: ['href', 'src', 'alt', 'title', 'target', 'rel', 'data-*', 'width', 'height', 'class', 'style',
-          'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'points', 'x', 'y', 'rx', 'ry', 'd', // SVG 속성 추가
+          'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin', 'points', 'x', 'y', 'rx', 'ry', 'd', 'xmlns', 'transform', // 모든 SVG 속성 추가
           'frameborder', 'allow', 'allowfullscreen', 'loading' // iframe 속성 추가
         ],
         ALLOW_DATA_ATTR: true,
         FORBID_ATTR: ['onclick', 'onload', 'onerror', 'onmouseover'],
         KEEP_CONTENT: true,
         ADD_TAGS: ['span', 'iframe'], // highlight.js가 생성하는 span 태그와 iframe 허용
-        ADD_ATTR: ['class', 'frameborder', 'allow', 'allowfullscreen'], // highlight.js 클래스와 iframe 속성 유지
+        ADD_ATTR: ['class', 'frameborder', 'allow', 'allowfullscreen', 'xmlns'], // highlight.js 클래스와 iframe, SVG 속성 유지
         // 모든 HTTPS URL 허용 (S3, YouTube 등)
         ALLOWED_URI_REGEXP: /^https?:\/\//i
       });
@@ -208,18 +198,18 @@ export default function HtmlContentRenderer({ content, className = '' }: HtmlCon
       try {
         await navigator.clipboard.writeText(codeText);
         
-        // 아이콘 변경 (복사 → 체크)
-        const copyIcon = button.querySelector('.copy-icon') as HTMLElement;
-        const checkIcon = button.querySelector('.check-icon') as HTMLElement;
+        // 텍스트 변경 (Copy → Copied!)
+        const copyText = button.querySelector('.copy-text') as HTMLElement;
+        const checkText = button.querySelector('.check-text') as HTMLElement;
         
-        if (copyIcon && checkIcon) {
-          copyIcon.style.display = 'none';
-          checkIcon.style.display = 'block';
+        if (copyText && checkText) {
+          copyText.style.display = 'none';
+          checkText.style.display = 'inline';
           
           // 2초 후 원래대로 복구
           setTimeout(() => {
-            copyIcon.style.display = 'block';
-            checkIcon.style.display = 'none';
+            copyText.style.display = 'inline';
+            checkText.style.display = 'none';
           }, 2000);
         }
       } catch (err) {

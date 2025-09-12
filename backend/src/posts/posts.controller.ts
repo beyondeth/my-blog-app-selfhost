@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, UseInterceptors } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, UseInterceptors, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
@@ -23,10 +23,14 @@ import { CacheInterceptor } from '@nestjs/cache-manager';
 import { FilesService } from '../files/files.service';
 import { CacheTTL } from '../cache/cache.decorator';
 import { CacheService } from '../cache/cache.service';
+import { PaginationHelper } from '../common/dto/pagination.dto';
+import { MonitoringService } from '../monitoring/monitoring.service';
 
 @ApiTags('posts')
 @Controller('posts')
 export class PostsController {
+  private readonly logger = new Logger(PostsController.name);
+
   constructor(
     private readonly postsService: PostsService,
     @InjectRepository(PostEntity)
@@ -37,6 +41,7 @@ export class PostsController {
     private readonly filesService: FilesService,
     private readonly viewCountService: ViewCountService,
     private readonly cacheService: CacheService,
+    private readonly monitoringService: MonitoringService,
   ) {}
 
   /**
@@ -48,9 +53,11 @@ export class PostsController {
     limit: number;
     blogSlug?: string;
     isPublished?: boolean;
+    isPublicOnly?: boolean;
   }): string {
-    const { page, limit, blogSlug, isPublished } = params;
-    let key = `feed:page:${page}:limit:${limit}`;
+    const { page, limit, blogSlug, isPublished, isPublicOnly = true } = params;
+    // 공개 데이터만 캐시하므로 public 프리픽스 추가
+    let key = `feed:public:page:${page}:limit:${limit}`;
     
     if (blogSlug) {
       key += `:blog:${blogSlug}`;
@@ -82,11 +89,20 @@ export class PostsController {
       const limitNumber = 20;
       const cacheKey = this.generateCacheKey({ 
         page: pageNumber, 
-        limit: limitNumber 
+        limit: limitNumber,
+        isPublicOnly: true 
       });
       
-      // 새 데이터 조회
-      const freshData = await this.postsService.findAll(pageNumber, limitNumber, null, null, null, undefined);
+      // 새 데이터 조회 (캐시용 - liked 필드 제외, 공개 블로그만)
+      const freshData = await this.postsService.findAll(
+        pageNumber, 
+        limitNumber, 
+        null, 
+        null, 
+        null,  // user를 null로 - liked 필드 제외
+        undefined,
+        true   // isForCache: true - 공개 블로그만
+      );
       
       // 캐시에 저장 (TTL: 2분)
       await this.cacheService.set(cacheKey, freshData, 120);
@@ -103,7 +119,7 @@ export class PostsController {
   @Public()
   @ApiOperation({ summary: '게시글 목록 조회' })
   @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '최대 20' })
   @ApiQuery({ name: 'search', required: false, type: String })
   @ApiQuery({ name: 'blogSlug', required: false, type: String })
   @ApiQuery({ name: 'isPublished', required: false, type: Boolean })
@@ -115,26 +131,46 @@ export class PostsController {
     @Query('blogSlug') blogSlug?: string,
     @Query('isPublished') isPublished?: string,
   ) {
-    const pageNumber = page ? parseInt(page, 10) : 1;
-    const limitNumber = limit ? parseInt(limit, 10) : 20; // 기본값 20으로 변경
+    // 안전한 페이지네이션 값 처리
+    const pageNumber = PaginationHelper.getSafePage(page);
+    const limitNumber = PaginationHelper.getSafeLimit(limit, 20); // 최대 20개
     const user = req.user || null;
+    
+    // 비정상적인 limit 요청 모니터링 및 데이터베이스 저장
+    if (limit && parseInt(limit, 10) > 20) {
+      const attemptedLimit = parseInt(limit, 10);
+      this.logger.warn(`Suspicious limit request: IP=${req.ip}, limit=${attemptedLimit}, user=${user?.id || 'anonymous'}`);
+      
+      // 모니터링 서비스에 기록
+      this.monitoringService.logExcessiveLimitRequest(
+        req.ip || 'unknown',
+        '/api/v1/posts',
+        attemptedLimit,
+        limitNumber,
+        user?.id,
+        user?.email,
+      ).catch(err => {
+        this.logger.error('Failed to log suspicious request:', err);
+      });
+    }
     
     // isPublished 파라미터 파싱
     let publishedFilter: boolean | undefined = undefined;
     if (isPublished === 'true') publishedFilter = true;
     else if (isPublished === 'false') publishedFilter = false;
     
-    // 검색 쿼리는 캐싱하지 않음
-    if (search) {
-      return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug, user, publishedFilter);
+    // 검색 쿼리나 로그인 유저는 캐싱하지 않음
+    if (search || user) {
+      return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug, user, publishedFilter, false);
     }
     
-    // 캐시 키 생성
+    // 캐시 키 생성 (공개 데이터만)
     const cacheKey = this.generateCacheKey({
       page: pageNumber,
       limit: limitNumber,
       blogSlug,
       isPublished: publishedFilter,
+      isPublicOnly: true,
     });
     
     // 캐시 확인
@@ -148,8 +184,16 @@ export class PostsController {
       console.error('Cache get error:', error);
     }
     
-    // DB 조회
-    const result = await this.postsService.findAll(pageNumber, limitNumber, null, blogSlug, user, publishedFilter);
+    // DB 조회 (캐시용 - liked 필드 제외, 공개 블로그만)
+    const result = await this.postsService.findAll(
+      pageNumber, 
+      limitNumber, 
+      null, 
+      blogSlug, 
+      null,  // user를 null로 - liked 필드 제외
+      publishedFilter,
+      true   // isForCache: true - 공개 블로그만
+    );
     
     // 페이지별 차등 TTL 적용 (1페이지 2분, 나머지 10분)
     const ttl = pageNumber === 1 ? 120 : 600;
@@ -169,12 +213,12 @@ export class PostsController {
   @Public()
   @UseInterceptors(CacheInterceptor)
   @ApiOperation({ summary: '인기 게시글 조회 (기간별)' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: '조회할 개수 (기본: 5)' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '조회할 개수 (기본: 5, 최대: 10)' })
   async getPopularPosts(
     @Param('period') period: 'daily' | 'weekly' | 'monthly',
     @Query('limit') limit?: string,
   ) {
-    const limitNumber = limit ? parseInt(limit, 10) : 5;
+    const limitNumber = PaginationHelper.getSafeLimit(limit, 10); // 인기 게시글은 최대 10개
     
     // 기간별 캐시 TTL 설정
     const ttl = period === 'daily' ? 3600 : period === 'weekly' ? 10800 : 21600;
@@ -193,14 +237,14 @@ export class PostsController {
   @Public()
   @ApiOperation({ summary: '카테고리별 게시글 조회' })
   @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '최대 20' })
   getPostsByCategory(
     @Param('category') category: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const pageNumber = page ? parseInt(page, 10) : 1;
-    const limitNumber = limit ? parseInt(limit, 10) : 10;
+    const pageNumber = PaginationHelper.getSafePage(page);
+    const limitNumber = PaginationHelper.getSafeLimit(limit, 20); // 최대 20개
     return this.postsService.getPostsByCategory(category, pageNumber, limitNumber);
   }
 
@@ -303,12 +347,13 @@ export class PostsController {
 
   @Post(':id/like')
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: '게시글 좋아요 토글 (로그인/비로그인 모두 지원)' })
   async toggleLike(
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    // @Public()과 함께 사용할 때는 req.user를 직접 사용
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
     console.log('toggleLike called with user:', user ? `${user.username} (${user.id})` : 'null');
     return this.postsService.toggleLike(id, user);

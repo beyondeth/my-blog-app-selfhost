@@ -8,11 +8,12 @@ import { Blog } from '../blogs/entities/blog.entity';
 import { UsersModule } from '../users/users.module';
 import { FilesModule } from '../files/files.module';
 import { TagsModule } from '../tags/tags.module';
+import { MonitoringModule } from '../monitoring/monitoring.module';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ViewCountService } from './view-count.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Post, File, Blog]), UsersModule, FilesModule, TagsModule],
+  imports: [TypeOrmModule.forFeature([Post, File, Blog]), UsersModule, FilesModule, TagsModule, MonitoringModule],
   providers: [PostsService, MarkdownRendererService, ViewCountService],
   controllers: [PostsController],
   exports: [PostsService, ViewCountService],

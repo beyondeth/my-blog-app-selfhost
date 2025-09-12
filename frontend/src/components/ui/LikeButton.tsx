@@ -5,6 +5,7 @@ interface LikeButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   liked: boolean;
   likeCount: number;
   tooltip?: string;
+  disabled?: boolean;
 }
 
 export default function LikeButton({

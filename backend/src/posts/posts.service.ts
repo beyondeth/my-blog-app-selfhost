@@ -298,22 +298,32 @@ export class PostsService {
     search?: string, 
     blogSlug?: string,
     user?: User,
-    isPublished?: boolean
+    isPublished?: boolean,
+    isForCache: boolean = false
   ): Promise<{ posts: any[]; total: number; page: number; totalPages: number }> {
+    // 서비스 레이어에서도 이중 검증 (보안 강화)
+    const safeLimit = Math.min(Math.max(limit, 1), 20); // 최대 20개
+    const safePage = Math.max(page, 1);
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'files')
       .leftJoinAndSelect('post.blog', 'blog');
 
-    // Admin can see all posts, regular users only see published posts
-    if (user?.role === Role.ADMIN) {
-      // Admin: filter by isPublished only if explicitly requested
-      if (isPublished !== undefined) {
-        query.where('post.isPublished = :isPublished', { isPublished });
-      }
+    // 캐시용이면 비공개 블로그 제외
+    if (isForCache) {
+      query.where('blog.isPublic = :isPublic', { isPublic: true })
+        .andWhere('post.isPublished = :isPublished', { isPublished: true });
     } else {
-      // Regular users: always show only published posts
-      query.where('post.isPublished = :isPublished', { isPublished: true });
+      // Admin can see all posts, regular users only see published posts
+      if (user?.role === Role.ADMIN) {
+        // Admin: filter by isPublished only if explicitly requested
+        if (isPublished !== undefined) {
+          query.where('post.isPublished = :isPublished', { isPublished });
+        }
+      } else {
+        // Regular users: always show only published posts
+        query.where('post.isPublished = :isPublished', { isPublished: true });
+      }
     }
 
     if (blogSlug) {
@@ -326,38 +336,58 @@ export class PostsService {
       });
     }
 
+    // 캐시용이 아니고 유저가 있으면 likedBy JOIN (liked 필드용)
+    if (!isForCache && user) {
+      query.leftJoinAndSelect('post.likedBy', 'likedBy');
+    }
+
     const [posts, total] = await query
       .orderBy('post.publishedAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
       .getManyAndCount();
 
     // 날짜를 YYYY-MM-DD로 변환 및 이미지 URL 최적화
-    const postsWithFormattedDates = posts.map(post => ({
-      ...post,
-      publishedAt: formatDate(post.publishedAt),
-      createdAt: formatDate(post.createdAt),
-      updatedAt: formatDate(post.updatedAt),
-      // 첨부된 이미지 파일들
-      images: post.attachedFiles?.filter(file => file.fileType === 'image') || [],
-      commentCount: post.commentCount || 0,
-      // 태그 필드 추가 (프론트엔드 호환성)
-      tags: post.tagNames || [],
-      // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
-      thumbnail: this.optimizeImageUrl(post.thumbnail),
-      // 작성자 프로필 이미지 최적화
-      author: post.author ? {
-        ...post.author,
-        profileImage: this.optimizeImageUrl(post.author.profileImage),
-      } : null,
-    }));
+    const postsWithFormattedDates = posts.map(post => {
+      const result: any = {
+        ...post,
+        publishedAt: formatDate(post.publishedAt),
+        createdAt: formatDate(post.createdAt),
+        updatedAt: formatDate(post.updatedAt),
+        // 첨부된 이미지 파일들
+        images: post.attachedFiles?.filter(file => file.fileType === 'image') || [],
+        commentCount: post.commentCount || 0,
+        // 태그 필드 추가 (프론트엔드 호환성)
+        tags: post.tagNames || [],
+        // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
+        thumbnail: this.optimizeImageUrl(post.thumbnail),
+        // 작성자 프로필 이미지 최적화
+        author: post.author ? {
+          ...post.author,
+          profileImage: this.optimizeImageUrl(post.author.profileImage),
+        } : null,
+        // 좋아요 수는 항상 포함 (공개 데이터)
+        likeCount: post.likeCount || 0,
+        viewCount: post.viewCount || 0,
+      };
 
-    const totalPages = Math.ceil(total / limit);
+      // 캐시용이 아니고 유저가 있으면 liked 필드 추가
+      if (!isForCache && user && post.likedBy) {
+        result.liked = post.likedBy.some(likedUser => likedUser.id === user.id) || false;
+      }
+
+      // likedBy 배열은 항상 제거 (민감한 정보)
+      delete result.likedBy;
+
+      return result;
+    });
+
+    const totalPages = Math.ceil(total / safeLimit);
 
     return { 
       posts: postsWithFormattedDates, 
       total,
-      page,
+      page: safePage,
       totalPages 
     };
   }
@@ -366,6 +396,8 @@ export class PostsService {
     period: 'daily' | 'weekly' | 'monthly',
     limit: number = 5
   ): Promise<any> {
+    // 서비스 레이어에서도 이중 검증
+    const safeLimit = Math.min(Math.max(limit, 1), 10); // 인기 게시글은 최대 10개
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.blog', 'blog')
@@ -395,7 +427,7 @@ export class PostsService {
       .addSelect('(post.viewCount + post.likeCount * 3 + post.commentCount * 2)', 'popularity_score')
       .orderBy('popularity_score', 'DESC')
       .addOrderBy('post.publishedAt', 'DESC')
-      .limit(limit);
+      .limit(safeLimit);
 
     const posts = await query.getMany();
 
@@ -893,6 +925,9 @@ export class PostsService {
   }
 
   async getPostsByCategory(category: string, page: number = 1, limit: number = 10): Promise<{ posts: Post[]; total: number }> {
+    // 서비스 레이어에서도 이중 검증
+    const safeLimit = Math.min(Math.max(limit, 1), 20); // 최대 20개
+    const safePage = Math.max(page, 1);
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .where('post.isPublished = :isPublished', { isPublished: true })
@@ -900,8 +935,8 @@ export class PostsService {
 
     const [posts, total] = await query
       .orderBy('post.publishedAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
+      .skip((safePage - 1) * safeLimit)
+      .take(safeLimit)
       .getManyAndCount();
 
     return { posts, total };
