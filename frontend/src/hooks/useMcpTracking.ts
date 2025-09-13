@@ -27,7 +27,9 @@ export const useMcpStats = (days: number = 7) => {
       
       return response.json();
     },
-    refetchInterval: 30000, // Auto-refresh every 30 seconds
+    refetchInterval: 60000, // Auto-refresh every 60 seconds
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
   });
 };
 
@@ -69,7 +71,9 @@ export const useMcpPopularPosts = (days: number = 7, limit: number = 10) => {
       
       return response.json();
     },
-    refetchInterval: 60000, // Auto-refresh every minute
+    refetchInterval: 2 * 60000, // Auto-refresh every 2 minutes
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
   });
 };
 
@@ -91,7 +95,9 @@ export const useMcpHourlyActivity = (hours: number = 24) => {
       
       return response.json();
     },
-    refetchInterval: 60000, // Auto-refresh every minute
+    refetchInterval: 2 * 60000, // Auto-refresh every 2 minutes
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시 유지
   });
 };
 
@@ -174,11 +180,8 @@ export const transformStatsToChartData = (stats: McpStats) => {
 // Transform hourly data for time series chart
 export const transformHourlyToTimeSeries = (hourlyData: McpHourlyActivity[]) => {
   if (!hourlyData || !Array.isArray(hourlyData)) {
-    console.log('No hourly data to transform');
     return [];
   }
-
-  console.log('Transforming hourly data:', hourlyData.length, 'items');
 
   const transformed = hourlyData.map(item => {
     // Ensure byClient exists with all required properties
@@ -200,7 +203,6 @@ export const transformHourlyToTimeSeries = (hourlyData: McpHourlyActivity[]) => 
     return result;
   });
 
-  console.log('Transformed data sample:', transformed[0]);
   return transformed;
 };
 

@@ -40,10 +40,6 @@ export default function McpTrackingPage() {
   const chartData = stats ? transformStatsToChartData(stats) : { clientData: [], actionData: [] };
   const timeSeriesData = hourlyActivity ? transformHourlyToTimeSeries(hourlyActivity) : [];
 
-  // Debug logging for chart data
-  console.log('Hourly Activity Data:', hourlyActivity);
-  console.log('Transformed Time Series Data:', timeSeriesData);
-
   // Calculate trends
   const trend = stats ? calculateTrend(stats.todayCount, stats.weekCount / 7) : 'stable';
 

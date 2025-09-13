@@ -41,11 +41,25 @@ export interface McpStats {
 @Injectable()
 export class McpTrackingService {
   private readonly logger = new Logger(McpTrackingService.name);
+  private statsCache = new Map<string, { data: any; expiry: number }>();
+  private readonly cacheExpiry = 5 * 60 * 1000; // 5분 캐시
 
   constructor(
     @InjectRepository(McpUserLog)
     private mcpUserLogRepository: Repository<McpUserLog>,
-  ) {}
+  ) {
+    // 10분마다 만료된 캐시 정리
+    setInterval(() => this.cleanExpiredCache(), 10 * 60 * 1000);
+  }
+
+  private cleanExpiredCache() {
+    const now = Date.now();
+    for (const [key, value] of this.statsCache.entries()) {
+      if (value.expiry < now) {
+        this.statsCache.delete(key);
+      }
+    }
+  }
 
   /**
    * Log MCP activity
@@ -87,12 +101,24 @@ export class McpTrackingService {
   }
 
   /**
-   * Get statistics for a specific period
+   * Get statistics for a specific period with caching
    */
   async getStats(startDate: Date, endDate: Date): Promise<McpStats> {
+    // 캐시 키 생성
+    const cacheKey = `stats_${startDate.getTime()}_${endDate.getTime()}`;
+
+    // 캐시 확인
+    const cached = this.statsCache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data;
+    }
     const logs = await this.mcpUserLogRepository.find({
       where: {
         timestamp: Between(startDate, endDate),
+      },
+      take: 10000, // 최대 10000개로 제한
+      order: {
+        timestamp: 'DESC',
       },
     });
 
@@ -124,13 +150,21 @@ export class McpTrackingService {
       .sort((a, b) => b.accessCount - a.accessCount)
       .slice(0, 10);
 
-    return {
+    const result = {
       totalActions: logs.length,
       uniqueUsers: uniqueUsers.size,
       actionBreakdown,
       clientBreakdown,
       popularResources,
     };
+
+    // 결과 캐싱
+    this.statsCache.set(cacheKey, {
+      data: result,
+      expiry: Date.now() + this.cacheExpiry,
+    });
+
+    return result;
   }
 
   /**
@@ -149,6 +183,7 @@ export class McpTrackingService {
       order: {
         timestamp: 'DESC',
       },
+      take: 1000, // 최대 1000개로 제한
     });
 
     return {
@@ -186,7 +221,7 @@ export class McpTrackingService {
       .groupBy('log.resource_slug')
       .addGroupBy('log.resource_id')
       .orderBy('"lastCreatedAt"', 'DESC')  // 최근 생성 순
-      .limit(limit)
+      .limit(Math.min(limit, 20)) // 최대 20개로 제한
       .getRawMany();
 
     // For each post, get the AI clients that created it
@@ -226,9 +261,17 @@ export class McpTrackingService {
   }
 
   /**
-   * Get hourly activity pattern
+   * Get hourly activity pattern with caching
    */
   async getHourlyActivity(days: number = 7): Promise<any[]> {
+    // 캐시 키 생성
+    const cacheKey = `hourly_${days}_${Math.floor(Date.now() / (15 * 60 * 1000))}`; // 15분 단위로 캐싱
+
+    // 캐시 확인
+    const cached = this.statsCache.get(cacheKey);
+    if (cached && cached.expiry > Date.now()) {
+      return cached.data;
+    }
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
     const endDate = new Date();
@@ -307,7 +350,11 @@ export class McpTrackingService {
     const result = Array.from(hourlyMap.values())
       .sort((a, b) => new Date(a.hour).getTime() - new Date(b.hour).getTime());
 
-    this.logger.log(`Hourly activity data: ${result.length} hours, total activities: ${result.reduce((sum, h) => sum + h.activities, 0)}`);
+    // 결과 캐싱
+    this.statsCache.set(cacheKey, {
+      data: result,
+      expiry: Date.now() + this.cacheExpiry,
+    });
 
     return result;
   }
@@ -327,6 +374,7 @@ export class McpTrackingService {
       order: {
         timestamp: 'DESC',
       },
+      take: 500, // 최대 500개로 제한
     });
 
     const clientUsage: { [key: string]: number } = {};
