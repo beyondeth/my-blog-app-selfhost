@@ -1,12 +1,13 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Like, Or } from 'typeorm';
 import { Post } from '../posts/entities/post.entity';
 import { Blog } from '../blogs/entities/blog.entity';
 import { CreatePostDto } from '../posts/dto/create-post.dto';
 import { UpdatePostDto } from '../posts/dto/update-post.dto';
 import { formatDate, generateSlug } from '../posts/utils/post.utils';
 import { TagsService } from '../tags/tags.service';
+import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 
 @Injectable()
 export class McpService {
@@ -14,6 +15,7 @@ export class McpService {
     @InjectRepository(Post)
     private postRepository: Repository<Post>,
     private tagsService: TagsService,
+    private markdownRenderer: MarkdownRendererService,
   ) {}
 
   /**
@@ -23,9 +25,20 @@ export class McpService {
     // tags는 Entity의 Promise<Tag[]> 타입과 충돌하므로 제거
     const { tags, ...postDataWithoutTags } = createPostDto;
     const tagNames = tags || [];
-    
+
+    // content_markdown이 있으면 HTML로 변환
+    let processedContent = postDataWithoutTags.content;
+    let markdownContent = null;
+
+    if (createPostDto.content_markdown) {
+      markdownContent = createPostDto.content_markdown;
+      processedContent = this.markdownRenderer.convertToHtml(markdownContent);
+    }
+
     const post = this.postRepository.create({
       ...postDataWithoutTags,
+      content: processedContent || '',
+      content_markdown: markdownContent,
       blogId: blog.id,
       blog: blog,
       authorId: user.id,
@@ -145,6 +158,78 @@ export class McpService {
     }
 
     await this.postRepository.remove(post);
+  }
+
+  /**
+   * 읽기 가능한 포스트 목록 조회 (공개 포스트 + 본인 비공개 포스트)
+   */
+  async getReadablePosts(
+    userBlogId: string,
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+  ): Promise<{ posts: any[]; total: number }> {
+    const queryBuilder = this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.blog', 'blog')
+      .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('(post.isPublic = :isPublic OR post.blogId = :userBlogId)', {
+        isPublic: true,
+        userBlogId,
+      });
+
+    // Add search conditions if provided
+    if (search) {
+      queryBuilder.andWhere(
+        '(post.title ILIKE :search OR post.content ILIKE :search OR post.tagNames::text ILIKE :search)',
+        { search: `%${search}%` }
+      );
+    }
+
+    queryBuilder
+      .orderBy('post.publishedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [posts, total] = await queryBuilder.getManyAndCount();
+
+    const postsWithFormattedDates = posts.map(post => ({
+      ...post,
+      publishedAt: formatDate(post.publishedAt),
+      createdAt: formatDate(post.createdAt),
+      updatedAt: formatDate(post.updatedAt),
+    }));
+
+    return { posts: postsWithFormattedDates, total };
+  }
+
+  /**
+   * 특정 포스트 조회 (공개 포스트 또는 본인 포스트)
+   */
+  async getPostBySlug(slug: string, userBlogId: string): Promise<Post> {
+    const post = await this.postRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('post.blog', 'blog')
+      .where('post.slug = :slug', { slug })
+      .andWhere('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('(post.isPublic = :isPublic OR post.blogId = :userBlogId)', {
+        isPublic: true,
+        userBlogId,
+      })
+      .getOne();
+
+    if (!post) {
+      throw new NotFoundException('Post not found or access denied');
+    }
+
+    return {
+      ...post,
+      publishedAt: formatDate(post.publishedAt),
+      createdAt: formatDate(post.createdAt),
+      updatedAt: formatDate(post.updatedAt),
+    } as any;
   }
 
   /**

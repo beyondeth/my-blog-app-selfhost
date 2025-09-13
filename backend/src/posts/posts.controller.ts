@@ -262,6 +262,52 @@ export class PostsController {
     return this.postsService.setThumbnail(postId, user.id, setThumbnailDto);
   }
 
+  @Get('read')
+  @Public()
+  @ApiOperation({ summary: 'MCP용 포스트 읽기 (공개 포스트 검색)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  async readPosts(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
+  ) {
+    // MCP 전용 읽기 엔드포인트 - 공개 포스트만 검색
+    const pageNumber = PaginationHelper.getSafePage(page);
+    const limitNumber = PaginationHelper.getSafeLimit(limit, 20);
+    
+    // 공개 포스트만 검색
+    return this.postsService.findAll(
+      pageNumber,
+      limitNumber,
+      search,
+      undefined, // blogSlug
+      null,      // user (로그인 정보 없음)
+      true,      // isPublished
+      false      // isForCache
+    );
+  }
+
+  @Get('slug/:slug')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: 'Slug로 게시글 조회' })
+  findBySlug(@Param('slug') slug: string, @Request() req: any) {
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
+    const user = req.user || null;
+    return this.postsService.findBySlug(slug, user);
+  }
+
+  @Get('view-stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: '조회수 배치 처리 상태 확인 (관리자)' })
+  @ApiBearerAuth()
+  async getViewCountStats() {
+    return this.viewCountService.getViewCountStats();
+  }
+
   @Get(':id/images')
   @Public()
   @ApiOperation({ summary: '게시글의 이미지 목록 조회 (순서포함)' })
@@ -295,16 +341,6 @@ export class PostsController {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
     return this.postsService.findOne(id, user);
-  }
-
-  @Get('slug/:slug')
-  @Public()
-  @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: 'Slug로 게시글 조회' })
-  findBySlug(@Param('slug') slug: string, @Request() req: any) {
-    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
-    const user = req.user || null;
-    return this.postsService.findBySlug(slug, user);
   }
 
   @Patch(':id')
@@ -388,14 +424,5 @@ export class PostsController {
     // 배치 서비스로 조회수 증가 (메모리에 임시 저장)
     await this.viewCountService.incrementViewCount(id);
     return { message: 'View count queued for batch update' };
-  }
-
-  @Get('view-stats')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiOperation({ summary: '조회수 배치 처리 상태 확인 (관리자)' })
-  @ApiBearerAuth()
-  async getViewCountStats() {
-    return this.viewCountService.getViewCountStats();
   }
 } 

@@ -1,7 +1,7 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Query, UseGuards, UseInterceptors, Request, Headers, UnauthorizedException, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, UseGuards, UseInterceptors, Request, Headers, UnauthorizedException, Logger } from '@nestjs/common';
 import { McpService } from './mcp.service';
+import { McpTrackingService } from './mcp-tracking.service';
 import { CreatePostDto } from '../posts/dto/create-post.dto';
-import { UpdatePostDto } from '../posts/dto/update-post.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { ApiKeysService } from '../api-keys/api-keys.service';
 import { AuthService } from '../auth/auth.service';
@@ -21,6 +21,7 @@ export class McpController {
 
   constructor(
     private readonly mcpService: McpService,
+    private readonly mcpTrackingService: McpTrackingService,
     private readonly apiKeysService: ApiKeysService,
     private readonly authService: AuthService,
     private readonly monitoringService: MonitoringService,
@@ -176,15 +177,69 @@ export class McpController {
   }
 
   /**
-   * 포스트 생성
+   * 포스트 생성 (with AI tracking)
    */
   @Post('posts')
   @UseGuards(McpAuthGuard)
-  async createPost(@Body() createPostDto: CreatePostDto, @Headers() headers) {
-    const apiKey = await this.validateApiKey(headers);
-    const blog = apiKey.blog;
-    const user = apiKey.user;
-    return await this.mcpService.createPost(createPostDto, blog, user);
+  async createPost(@Body() createPostDto: CreatePostDto, @Headers() headers, @Request() req) {
+    const startTime = Date.now();
+    // McpAuthGuard already validated and attached the info to request
+    const apiKey = req.apiKey;
+    const blog = req.blog;
+    const user = req.user;
+
+    // Debug logging
+    if (!apiKey || !blog || !user) {
+      this.logger.error('Missing required data from McpAuthGuard', {
+        hasApiKey: !!apiKey,
+        hasBlog: !!blog,
+        hasUser: !!user,
+      });
+      throw new UnauthorizedException('Authentication data missing');
+    }
+    
+    // Extract AI type from tags
+    const aiTag = createPostDto.tags?.find(tag => tag.startsWith('ai:'));
+    const clientType = aiTag ? aiTag.replace('ai:', '') : 'unknown';
+
+    // Log warning if AI tag is missing
+    if (!aiTag) {
+      this.logger.warn(`Post created without AI identification tag by user: ${user.email}`);
+    } else {
+      this.logger.log(`Post created by ${clientType} AI for user: ${user.email}`);
+    }
+
+    // Create the post first to get the slug
+    const createdPost = await this.mcpService.createPost(createPostDto, blog, user);
+
+    // Log activity after post creation with slug
+    await this.mcpTrackingService.logActivity({
+      userId: user.id,
+      apiKeyId: apiKey.id,
+      actionType: 'write',
+      actionCategory: 'post_creation',
+      resourceType: 'post',
+      resourceId: createdPost.id,
+      resourceSlug: createdPost.slug,
+      clientType,
+      requestEndpoint: '/mcp/posts',
+      requestMethod: 'POST',
+      ipAddress: req.ip || headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
+      userAgent: headers['user-agent'],
+      metadata: {
+        title: createdPost.title,
+        tags: createPostDto.tags,
+        aiTag,
+        postId: createdPost.id,
+        slug: createdPost.slug,
+      },
+      responseTimeMs: Date.now() - startTime,
+    }).catch(error => {
+      // Don't fail the request if tracking fails
+      this.logger.error(`Failed to log MCP activity: ${error.message}`);
+    });
+
+    return createdPost;
   }
 
   /**
@@ -193,11 +248,12 @@ export class McpController {
   @Get('posts')
   @UseGuards(McpAuthGuard)
   async getPosts(
+    @Request() req,
     @Headers() headers,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    const apiKey = await this.validateApiKey(headers);
+    const apiKey = req.apiKey;
     const pageNumber = PaginationHelper.getSafePage(page);
     const limitNumber = PaginationHelper.getSafeLimit(limit, 20); // 최대 20개
     const blogId = apiKey.blog.id;
@@ -208,7 +264,7 @@ export class McpController {
       this.logger.warn(`MCP suspicious limit request: API Key=${apiKey.keyId}, limit=${attemptedLimit}`);
       
       // 모니터링 서비스에 기록
-      this.monitoringService.logSuspiciousRequest({
+      await this.monitoringService.logSuspiciousRequest({
         requestType: 'MCP_EXCESSIVE_LIMIT',
         ipAddress: headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
         endpoint: '/api/v1/mcp/posts',
@@ -232,30 +288,82 @@ export class McpController {
   }
 
   /**
-   * 포스트 수정
+   * 공개 포스트 읽기 (with tracking)
    */
-  @Put('posts/:id')
+  @Get('posts/read')
   @UseGuards(McpAuthGuard)
-  async updatePost(
-    @Param('id') id: string,
-    @Body() updateData: UpdatePostDto,
+  async getReadablePosts(
     @Headers() headers,
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('search') search?: string,
   ) {
-    const apiKey = await this.validateApiKey(headers);
-    const blogId = apiKey.blog.id;
-    return await this.mcpService.updatePost(id, updateData, blogId);
+    const startTime = Date.now();
+    const apiKey = req.apiKey; // Already validated by McpAuthGuard
+    const pageNumber = PaginationHelper.getSafePage(page);
+    const limitNumber = PaginationHelper.getSafeLimit(limit, 20);
+    
+    // Extract client type from headers or default
+    const clientType = headers['x-mcp-client'] || 'unknown';
+    
+    // Log read activity
+    await this.mcpTrackingService.logActivity({
+      userId: apiKey.user.id,
+      apiKeyId: apiKey.id,
+      actionType: search ? 'search' : 'read',
+      actionCategory: 'post_list',
+      resourceType: 'post',
+      clientType,
+      requestEndpoint: '/mcp/posts/read',
+      requestMethod: 'GET',
+      ipAddress: req.ip || headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
+      userAgent: headers['user-agent'],
+      metadata: {
+        page: pageNumber,
+        limit: limitNumber,
+        search,
+      },
+      responseTimeMs: Date.now() - startTime,
+    });
+    
+    // Get public posts + user's own private posts
+    return await this.mcpService.getReadablePosts(apiKey.blog.id, pageNumber, limitNumber, search);
   }
 
   /**
-   * 포스트 삭제
+   * 특정 포스트 읽기 (with tracking)
    */
-  @Delete('posts/:id')
+  @Get('posts/read/:slug')
   @UseGuards(McpAuthGuard)
-  async deletePost(@Param('id') id: string, @Headers() headers) {
-    const apiKey = await this.validateApiKey(headers);
-    const blogId = apiKey.blog.id;
-    await this.mcpService.deletePost(id, blogId);
-    return { message: '포스트가 삭제되었습니다.' };
+  async readPost(
+    @Param('slug') slug: string,
+    @Headers() headers,
+    @Request() req,
+  ) {
+    const startTime = Date.now();
+    const apiKey = req.apiKey; // Already validated by McpAuthGuard
+    
+    // Extract client type
+    const clientType = headers['x-mcp-client'] || 'unknown';
+    
+    // Log read activity
+    await this.mcpTrackingService.logActivity({
+      userId: apiKey.user.id,
+      apiKeyId: apiKey.id,
+      actionType: 'read',
+      actionCategory: 'post_detail',
+      resourceType: 'post',
+      resourceSlug: slug,
+      clientType,
+      requestEndpoint: `/mcp/posts/read/${slug}`,
+      requestMethod: 'GET',
+      ipAddress: req.ip || headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
+      userAgent: headers['user-agent'],
+      responseTimeMs: Date.now() - startTime,
+    });
+    
+    return await this.mcpService.getPostBySlug(slug, apiKey.blog.id);
   }
 
   /**
@@ -263,8 +371,8 @@ export class McpController {
    */
   @Get('blog')
   @UseGuards(McpAuthGuard)
-  async getBlogInfo(@Headers() headers) {
-    const apiKey = await this.validateApiKey(headers);
+  async getBlogInfo(@Request() req) {
+    const apiKey = req.apiKey; // Already validated by McpAuthGuard
     const blog = apiKey.blog;
     return {
       id: blog.id,
@@ -279,8 +387,8 @@ export class McpController {
    */
   @Get('status')
   @UseGuards(McpAuthGuard)
-  async getStatus(@Headers() headers) {
-    const apiKey = await this.validateApiKey(headers);
+  async getStatus(@Request() req) {
+    const apiKey = req.apiKey; // Already validated by McpAuthGuard
     return {
       status: 'ok',
       blog: apiKey.blog.slug,

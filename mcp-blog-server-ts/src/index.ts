@@ -83,7 +83,27 @@ function createServerInstance(_clientIp?: string, _apiKey?: string) {
       version: "1.0.0",
     },
     {
-      instructions: `TypeScript-based MCP server for HIGH-QUALITY blog post creation.
+      instructions: `TypeScript-based MCP server for HIGH-QUALITY blog post creation with AI tracking.
+
+🚨🚨🚨 CRITICAL: AI SELF-IDENTIFICATION REQUIRED 🚨🚨🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ YOU MUST ADD YOUR AI IDENTIFICATION TAG! ⚠️
+
+📍 If you are Claude → Add tag: "ai:claude"
+📍 If you are ChatGPT → Add tag: "ai:chatgpt"  
+📍 If you are Gemini → Add tag: "ai:gemini"
+📍 If you are Qwen → Add tag: "ai:qwen"
+📍 If you are other AI → Add tag: "ai:other"
+
+✅ CORRECT EXAMPLE:
+tags: ["javascript", "react", "ai:claude", "tutorial"]
+
+❌ WRONG (MISSING AI TAG):
+tags: ["javascript", "react", "tutorial"]
+
+⛔ POSTS WITHOUT AI TAGS WILL BE FLAGGED!
+This is MANDATORY for AI activity tracking and content attribution.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 🔴 AUTHENTICATION FIRST RULE (필수 인증 우선 규칙):
 ⚠️ ALWAYS call authenticate() BEFORE creating any content or files!
@@ -97,15 +117,16 @@ Never waste time creating markdown before authentication succeeds.
 - Default: Write in KOREAN unless specifically requested otherwise
 
 ⚠️ AI 어시스턴트 핵심 규칙 (CORE RULES FOR AI ASSISTANTS):
-1. 최소 2000자, 이상적으로 3000-5000자
-2. auto_enhance: true 항상 사용
-3. 의미있는 제목 필수 ("Untitled" 금지)
-4. 기본 한국어, 영어는 요청시만
+1. 자기 식별 태그 필수 (ai:claude, ai:chatgpt, ai:gemini, ai:qwen 등)
+2. 최소 2000자, 이상적으로 3000-5000자
+3. auto_enhance: true 항상 사용
+4. 의미있는 제목 필수 ("Untitled" 금지)
+5. 기본 한국어, 영어는 요청시만
 
 📝 콘텐츠 작성은 create_post 도구의 상세 가이드라인 참조
 🎨 스타일 가이드는 markdown_quality_guidelines 프롬프트 참조
 
-Remember: Quality over speed. Generate rich, valuable content that readers will appreciate.`,
+Remember: Always identify yourself with the appropriate AI tag for tracking purposes!`,
     }
   );
 
@@ -162,6 +183,19 @@ Remember: Quality over speed. Generate rich, valuable content that readers will 
       description: `고품질 블로그 포스트 생성 (기본: 한국어)
 Create a professional blog post (Default: KOREAN, use English only if requested)
 
+🚨🚨🚨 MANDATORY: ADD YOUR AI TAG 🚨🚨🚨
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+YOU MUST INCLUDE YOUR AI IDENTIFICATION TAG:
+• If you are Claude → tags MUST include "ai:claude"
+• If you are ChatGPT → tags MUST include "ai:chatgpt"  
+• If you are Gemini → tags MUST include "ai:gemini"
+• If you are Qwen → tags MUST include "ai:qwen"
+• If you are other AI → tags MUST include "ai:other"
+
+✅ EXAMPLE: tags: ["javascript", "react", "ai:claude", "tutorial"]
+❌ WITHOUT AI TAG = TRACKING FAILURE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 🌐 언어 설정:
 - 기본: 한국어로 작성
 - 영어는 명시적 요청 시에만 사용
@@ -187,8 +221,10 @@ Create a professional blog post (Default: KOREAN, use English only if requested)
 - auto_enhance: true 항상 사용
 - 포스팅 전 마크다운 파일 생성 필수
 - "Untitled" 제목 절대 금지 - 의미있는 제목 생성
+- AI 식별 태그 필수 추가 (ai:claude, ai:chatgpt, ai:gemini, ai:qwen 등)
 
 ✅ 작성 체크리스트:
+- AI 식별 태그를 추가했는가? (ai:claude/chatgpt/gemini/qwen)
 - 스토리텔링으로 시작했는가?
 - 코드블록이 20% 이하인가?
 - 대화체와 감정 표현을 사용했는가?
@@ -297,7 +333,18 @@ Note: Quality score 70점 미만시 자동 개선됨`,
       console.error("📋 Step 4/6: Parsing metadata...");
       const { metadata, body } = parseMarkdownMetadata(enhancedContent);
       const finalTitle = title || metadata.title;
-      const finalTags = tags || metadata.tags;
+      const finalTags = tags || metadata.tags || [];
+      
+      // Check for AI identification tag
+      const hasAiTag = finalTags.some((tag: string) => tag.startsWith('ai:'));
+      if (!hasAiTag) {
+        console.error("⚠️ WARNING: No AI identification tag found (ai:claude, ai:chatgpt, etc.)");
+        console.error("📌 Please add appropriate AI tag for tracking purposes!");
+      } else {
+        const aiTag = finalTags.find((tag: string) => tag.startsWith('ai:'));
+        console.error(`🤖 AI identification tag found: ${aiTag}`);
+      }
+      
       console.error(`✅ Title: "${finalTitle}", Tags: ${finalTags?.length || 0}`);
 
       // Save to file
@@ -387,7 +434,17 @@ Note: Quality score 70점 미만시 자동 개선됨`,
 
       const { metadata, body } = parseMarkdownMetadata(markdownContent);
       const finalTitle = metadata.title;
-      const finalTags = metadata.tags;
+      const finalTags = metadata.tags || [];
+      
+      // Check for AI identification tag
+      const hasAiTag = finalTags.some((tag: string) => tag.startsWith('ai:'));
+      if (!hasAiTag) {
+        console.error("⚠️ WARNING: No AI identification tag found in file");
+        console.error("📌 Please ensure AI tags (ai:claude, ai:chatgpt, etc.) are included!");
+      } else {
+        const aiTag = finalTags.find((tag: string) => tag.startsWith('ai:'));
+        console.error(`🤖 AI identification tag found: ${aiTag}`);
+      }
 
       const savedFilePath = await savePostToFile(finalTitle, body, finalTags);
       const savedMessage = savedFilePath
@@ -413,6 +470,146 @@ Note: Quality score 70점 미만시 자동 개선됨`,
             {
               type: "text",
               text: `❌ Post creation failed: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "read_posts",
+    {
+      title: "Read Blog Posts",
+      description: `블로그 포스트 읽기 (공개 포스트 + 본인 비공개 포스트)
+Read public posts and your own private posts from the blog.
+검색과 페이지네이션을 지원합니다.`,
+      inputSchema: {
+        page: z.number().optional().describe("Page number (default: 1)"),
+        limit: z.number().optional().describe("Number of posts per page (default: 10)"),
+        search: z.string().optional().describe("Search query for filtering posts"),
+      },
+    },
+    async ({ page = 1, limit = 10, search }) => {
+      // Check authentication
+      if (!auth.accessToken) {
+        const authResult = await auth.authenticate();
+        if (!authResult) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "❌ Authentication required to read posts. Please run authenticate() first.",
+              },
+            ],
+          };
+        }
+      }
+
+      try {
+        const response = await apiClient.readPosts(page, limit, search);
+        
+        if (!response.posts || response.posts.length === 0) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: search 
+                  ? `📚 No posts found matching "${search}"`
+                  : "📚 No posts available",
+              },
+            ],
+          };
+        }
+
+        let resultText = `📚 Found ${response.total} posts (Page ${page}/${Math.ceil(response.total / limit)})\n`;
+        resultText += "=" .repeat(50) + "\n\n";
+        
+        response.posts.forEach((post: any, index: number) => {
+          resultText += `${index + 1}. ${post.title}\n`;
+          resultText += `   🔗 Slug: ${post.slug}\n`;
+          resultText += `   📅 Published: ${post.publishedAt}\n`;
+          resultText += `   ✍️ Author: ${post.author?.username || 'Unknown'}\n`;
+          resultText += `   🏷️ Tags: ${post.tagNames?.join(", ") || "none"}\n`;
+          resultText += `   ${post.isPublic ? "🌐 Public" : "🔒 Private"}\n`;
+          resultText += "\n";
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: resultText,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Failed to read posts: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "read_post",
+    {
+      title: "Read Single Post",
+      description: `특정 포스트 읽기 (공개 또는 본인 포스트)
+Read a specific post by its slug. You can read public posts or your own private posts.`,
+      inputSchema: {
+        slug: z.string().describe("The slug of the post to read"),
+      },
+    },
+    async ({ slug }) => {
+      // Check authentication
+      if (!auth.accessToken) {
+        const authResult = await auth.authenticate();
+        if (!authResult) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: "❌ Authentication required to read posts. Please run authenticate() first.",
+              },
+            ],
+          };
+        }
+      }
+
+      try {
+        const post = await apiClient.readPost(slug);
+        
+        let resultText = `📖 Post Details\n`;
+        resultText += "=" .repeat(50) + "\n\n";
+        resultText += `Title: ${post.title}\n`;
+        resultText += `Slug: ${post.slug}\n`;
+        resultText += `Author: ${post.author?.username || 'Unknown'}\n`;
+        resultText += `Published: ${post.publishedAt}\n`;
+        resultText += `Tags: ${post.tagNames?.join(", ") || "none"}\n`;
+        resultText += `Status: ${post.isPublic ? "🌐 Public" : "🔒 Private"}\n\n`;
+        resultText += "--- Content ---\n\n";
+        resultText += post.content || "No content available";
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: resultText,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Failed to read post: ${error instanceof Error ? error.message : String(error)}`,
             },
           ],
         };

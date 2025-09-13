@@ -13,7 +13,13 @@ import { MarkdownRendererService } from '../common/services/markdown-renderer.se
 import { ViewCountService } from './view-count.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Post, File, Blog]), UsersModule, FilesModule, TagsModule, MonitoringModule],
+  imports: [
+    TypeOrmModule.forFeature([Post, File, Blog]), 
+    UsersModule, 
+    FilesModule, 
+    TagsModule, 
+    MonitoringModule,  // No more forwardRef needed
+  ],
   providers: [PostsService, MarkdownRendererService, ViewCountService],
   controllers: [PostsController],
   exports: [PostsService, ViewCountService],

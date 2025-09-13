@@ -55,7 +55,7 @@ export class AuthApiKeyService {
 
       // 3. API 키 ID로 직접 조회
       const apiKey = await this.apiKeyRepository.findOne({
-        where: { id: keyId, isActive: true },
+        where: { keyId: keyId, isActive: true },
         relations: ['user', 'blog']
       });
 

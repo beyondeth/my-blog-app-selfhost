@@ -9,9 +9,12 @@ import { PostsModule } from '../posts/posts.module';
 import { BlogsModule } from '../blogs/blogs.module';
 import { AuthModule } from '../auth/auth.module';
 import { TagsModule } from '../tags/tags.module';
+import { MonitoringModule } from '../monitoring/monitoring.module';
+import { SharedTrackingModule } from '../shared/shared-tracking.module';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Post } from '../posts/entities/post.entity';
 import { User } from '../users/entities/user.entity';
+import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 
 @Module({
   imports: [
@@ -21,6 +24,8 @@ import { User } from '../users/entities/user.entity';
     BlogsModule,
     AuthModule,
     TagsModule,
+    MonitoringModule,
+    SharedTrackingModule,  // Import the shared module instead
   ],
   controllers: [McpController],
   providers: [
@@ -28,6 +33,8 @@ import { User } from '../users/entities/user.entity';
     McpAuthGuard,
     McpRateLimitGuard,
     McpLoggingInterceptor,
+    MarkdownRendererService,  // Add this for markdown conversion
   ],
+  // No longer need to export McpTrackingService as it's now in SharedTrackingModule
 })
 export class McpModule {}

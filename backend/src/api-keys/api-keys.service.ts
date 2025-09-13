@@ -153,11 +153,29 @@ export class ApiKeysService {
   }
 
   /**
-   * API Key Secret 가져오기 (HMAC 서명 검증용)
+   * API Key Secret 가져오기 (HMAC 서명 검증용) - keyId로 조회
    */
   async getApiKeySecret(keyId: string): Promise<string | null> {
     const apiKey = await this.apiKeyRepository.findOne({
       where: { keyId },
+      select: ['signingSecret'],
+    });
+    
+    if (!apiKey || !apiKey.signingSecret) {
+      return null;
+    }
+    
+    // signingSecret을 복호화하여 원본 시크릿 반환
+    const decrypted = this.decryptSigningSecret(apiKey.signingSecret);
+    return decrypted;
+  }
+  
+  /**
+   * API Key Secret 가져오기 by UUID (내부 ID)
+   */
+  async getApiKeySecretById(id: string): Promise<string | null> {
+    const apiKey = await this.apiKeyRepository.findOne({
+      where: { id },
       select: ['signingSecret'],
     });
     
@@ -333,5 +351,14 @@ export class ApiKeysService {
     });
 
     return apiKey;
+  }
+
+  /**
+   * 마지막 사용 시간 업데이트
+   */
+  async updateLastUsed(id: string): Promise<void> {
+    await this.apiKeyRepository.update(id, {
+      lastUsedAt: new Date()
+    });
   }
 }

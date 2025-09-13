@@ -263,14 +263,31 @@ export default function BlogPostDetailPage() {
         {post.tags && post.tags.length > 0 && (
           <div className="mt-16 pt-8 border-t border-gray-100">
             <div className="flex flex-wrap gap-2">
-              {post.tags.map((tag, index) => (
-                <span
-                  key={index}
-                  className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gray-100 text-gray-900 rounded-full hover:bg-gray-200 cursor-pointer transition-colors"
-                >
-                  #{tag}
-                </span>
-              ))}
+              {(() => {
+                // AI 태그를 맨 앞으로 정렬
+                const sortedTags = [...post.tags];
+                const aiIndex = sortedTags.findIndex(tag => tag.toLowerCase().startsWith('ai:'));
+                if (aiIndex > -1) {
+                  const [aiTag] = sortedTags.splice(aiIndex, 1);
+                  sortedTags.unshift(aiTag);
+                }
+                
+                return sortedTags.map((tag, index) => {
+                  const isAITag = tag.toLowerCase().startsWith('ai:');
+                  return (
+                    <span
+                      key={index}
+                      className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full cursor-pointer transition-colors ${
+                        isAITag
+                          ? 'bg-pink-100 text-pink-900 hover:bg-pink-200'
+                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                      }`}
+                    >
+                      #{tag}
+                    </span>
+                  );
+                });
+              })()}
             </div>
           </div>
         )}

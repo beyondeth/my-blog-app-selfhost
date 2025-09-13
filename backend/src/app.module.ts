@@ -26,6 +26,7 @@ import { AuditModule } from './audit/audit.module';
 import { AdminModule } from './admin/admin.module';
 import { CacheModule } from './cache/cache.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
+import { SharedTrackingModule } from './shared/shared-tracking.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
 
 // Guards
@@ -74,6 +75,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     // Feature modules
     CacheModule, // Global cache module with Redis support
     MonitoringModule, // Global monitoring module for suspicious requests
+    SharedTrackingModule, // Shared module for MCP tracking functionality
     AuthModule,
     UsersModule,
     PostsModule,
