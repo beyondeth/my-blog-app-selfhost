@@ -174,17 +174,34 @@ export const transformStatsToChartData = (stats: McpStats) => {
 // Transform hourly data for time series chart
 export const transformHourlyToTimeSeries = (hourlyData: McpHourlyActivity[]) => {
   if (!hourlyData || !Array.isArray(hourlyData)) {
+    console.log('No hourly data to transform');
     return [];
   }
-  
-  return hourlyData.map(item => ({
-    time: new Date(item.hour).toLocaleTimeString('ko-KR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    }),
-    ...item.byClient,
-    total: item.activities,
-  }));
+
+  console.log('Transforming hourly data:', hourlyData.length, 'items');
+
+  const transformed = hourlyData.map(item => {
+    // Ensure byClient exists with all required properties
+    const byClient = item.byClient || {};
+
+    const result = {
+      time: new Date(item.hour).toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit'
+      }),
+      claude: byClient.claude || 0,
+      chatgpt: byClient.chatgpt || 0,
+      gemini: byClient.gemini || 0,
+      qwen: byClient.qwen || 0,
+      unknown: byClient.unknown || 0,
+      total: item.activities || 0,
+    };
+
+    return result;
+  });
+
+  console.log('Transformed data sample:', transformed[0]);
+  return transformed;
 };
 
 // Format large numbers

@@ -1,5 +1,4 @@
-import { Controller, Get, Post, Body, Param, Query, UseGuards, UseInterceptors, Request, Headers, UnauthorizedException, Logger } from '@nestjs/common';
-import { McpService } from './mcp.service';
+import { Controller, Post, Body, UseGuards, UseInterceptors, Request, Headers, UnauthorizedException, Logger } from '@nestjs/common';
 import { McpTrackingService } from './mcp-tracking.service';
 import { CreatePostDto } from '../posts/dto/create-post.dto';
 import { Public } from '../common/decorators/public.decorator';
@@ -9,8 +8,7 @@ import { McpAuthGuard } from './mcp-auth.guard';
 import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpLoggingInterceptor } from './mcp-logging.interceptor';
 import * as crypto from 'crypto';
-import { PaginationHelper } from '../common/dto/pagination.dto';
-import { MonitoringService } from '../monitoring/monitoring.service';
+import { PostsService } from '../posts/posts.service';
 
 @Controller('mcp')
 @Public() // Bypass JWT auth, we'll use API key auth instead
@@ -20,11 +18,10 @@ export class McpController {
   private readonly logger = new Logger(McpController.name);
 
   constructor(
-    private readonly mcpService: McpService,
     private readonly mcpTrackingService: McpTrackingService,
     private readonly apiKeysService: ApiKeysService,
     private readonly authService: AuthService,
-    private readonly monitoringService: MonitoringService,
+    private readonly postsService: PostsService,
   ) {}
 
   private async validateApiKey(headers: any) {
@@ -177,7 +174,8 @@ export class McpController {
   }
 
   /**
-   * 포스트 생성 (with AI tracking)
+   * 포스트 생성 (자동 포스팅 전용)
+   * MCP는 오직 포스트 생성만 가능 - 조회/수정/삭제 불가
    */
   @Post('posts')
   @UseGuards(McpAuthGuard)
@@ -197,7 +195,7 @@ export class McpController {
       });
       throw new UnauthorizedException('Authentication data missing');
     }
-    
+
     // Extract AI type from tags
     const aiTag = createPostDto.tags?.find(tag => tag.startsWith('ai:'));
     const clientType = aiTag ? aiTag.replace('ai:', '') : 'unknown';
@@ -209,8 +207,9 @@ export class McpController {
       this.logger.log(`Post created by ${clientType} AI for user: ${user.email}`);
     }
 
-    // Create the post first to get the slug
-    const createdPost = await this.mcpService.createPost(createPostDto, blog, user);
+    // Create the post using the standard posts service for consistency
+    // This ensures MCP posts follow the same logic as regular posts
+    const createdPost = await this.postsService.create(createPostDto, user);
 
     // Log activity after post creation with slug
     await this.mcpTrackingService.logActivity({
@@ -240,160 +239,5 @@ export class McpController {
     });
 
     return createdPost;
-  }
-
-  /**
-   * 포스트 목록 조회
-   */
-  @Get('posts')
-  @UseGuards(McpAuthGuard)
-  async getPosts(
-    @Request() req,
-    @Headers() headers,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-  ) {
-    const apiKey = req.apiKey;
-    const pageNumber = PaginationHelper.getSafePage(page);
-    const limitNumber = PaginationHelper.getSafeLimit(limit, 20); // 최대 20개
-    const blogId = apiKey.blog.id;
-    
-    // 비정상적인 요청 모니터링 및 데이터베이스 저장
-    if (limit && parseInt(limit, 10) > 20) {
-      const attemptedLimit = parseInt(limit, 10);
-      this.logger.warn(`MCP suspicious limit request: API Key=${apiKey.keyId}, limit=${attemptedLimit}`);
-      
-      // 모니터링 서비스에 기록
-      await this.monitoringService.logSuspiciousRequest({
-        requestType: 'MCP_EXCESSIVE_LIMIT',
-        ipAddress: headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
-        endpoint: '/api/v1/mcp/posts',
-        userId: apiKey.user.id,
-        userEmail: apiKey.user.email,
-        requestDetails: {
-          method: 'GET',
-          query: { limit: attemptedLimit },
-          attemptedLimit,
-          actualLimit: limitNumber,
-          apiKeyId: apiKey.keyId,
-        },
-        reason: `MCP API attempted to request ${attemptedLimit} items (max allowed: ${limitNumber})`,
-        severity: attemptedLimit > 1000 ? 'HIGH' : attemptedLimit > 100 ? 'MEDIUM' : 'LOW',
-      }).catch(err => {
-        this.logger.error('Failed to log MCP suspicious request:', err);
-      });
-    }
-    
-    return await this.mcpService.getPosts(blogId, pageNumber, limitNumber);
-  }
-
-  /**
-   * 공개 포스트 읽기 (with tracking)
-   */
-  @Get('posts/read')
-  @UseGuards(McpAuthGuard)
-  async getReadablePosts(
-    @Headers() headers,
-    @Request() req,
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-  ) {
-    const startTime = Date.now();
-    const apiKey = req.apiKey; // Already validated by McpAuthGuard
-    const pageNumber = PaginationHelper.getSafePage(page);
-    const limitNumber = PaginationHelper.getSafeLimit(limit, 20);
-    
-    // Extract client type from headers or default
-    const clientType = headers['x-mcp-client'] || 'unknown';
-    
-    // Log read activity
-    await this.mcpTrackingService.logActivity({
-      userId: apiKey.user.id,
-      apiKeyId: apiKey.id,
-      actionType: search ? 'search' : 'read',
-      actionCategory: 'post_list',
-      resourceType: 'post',
-      clientType,
-      requestEndpoint: '/mcp/posts/read',
-      requestMethod: 'GET',
-      ipAddress: req.ip || headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
-      userAgent: headers['user-agent'],
-      metadata: {
-        page: pageNumber,
-        limit: limitNumber,
-        search,
-      },
-      responseTimeMs: Date.now() - startTime,
-    });
-    
-    // Get public posts + user's own private posts
-    return await this.mcpService.getReadablePosts(apiKey.blog.id, pageNumber, limitNumber, search);
-  }
-
-  /**
-   * 특정 포스트 읽기 (with tracking)
-   */
-  @Get('posts/read/:slug')
-  @UseGuards(McpAuthGuard)
-  async readPost(
-    @Param('slug') slug: string,
-    @Headers() headers,
-    @Request() req,
-  ) {
-    const startTime = Date.now();
-    const apiKey = req.apiKey; // Already validated by McpAuthGuard
-    
-    // Extract client type
-    const clientType = headers['x-mcp-client'] || 'unknown';
-    
-    // Log read activity
-    await this.mcpTrackingService.logActivity({
-      userId: apiKey.user.id,
-      apiKeyId: apiKey.id,
-      actionType: 'read',
-      actionCategory: 'post_detail',
-      resourceType: 'post',
-      resourceSlug: slug,
-      clientType,
-      requestEndpoint: `/mcp/posts/read/${slug}`,
-      requestMethod: 'GET',
-      ipAddress: req.ip || headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
-      userAgent: headers['user-agent'],
-      responseTimeMs: Date.now() - startTime,
-    });
-    
-    return await this.mcpService.getPostBySlug(slug, apiKey.blog.id);
-  }
-
-  /**
-   * 블로그 정보 조회
-   */
-  @Get('blog')
-  @UseGuards(McpAuthGuard)
-  async getBlogInfo(@Request() req) {
-    const apiKey = req.apiKey; // Already validated by McpAuthGuard
-    const blog = apiKey.blog;
-    return {
-      id: blog.id,
-      slug: blog.slug,
-      name: blog.name,
-      description: blog.description,
-    };
-  }
-
-  /**
-   * API 상태 확인
-   */
-  @Get('status')
-  @UseGuards(McpAuthGuard)
-  async getStatus(@Request() req) {
-    const apiKey = req.apiKey; // Already validated by McpAuthGuard
-    return {
-      status: 'ok',
-      blog: apiKey.blog.slug,
-      user: apiKey.user.email,
-      timestamp: new Date().toISOString(),
-    };
   }
 }

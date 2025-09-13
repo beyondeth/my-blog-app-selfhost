@@ -30,7 +30,7 @@ const navigation = [
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
   { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
-  { name: 'MCP AI 트래킹', href: '/admin/mcp-tracking', icon: Bot, adminOnly: true },
+  { name: 'AI 포스팅 트래킹', href: '/admin/mcp-tracking', icon: Bot, adminOnly: true },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: '메모리 관리', href: '/admin/memory', icon: Database, adminOnly: true },

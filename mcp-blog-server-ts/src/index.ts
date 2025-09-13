@@ -83,7 +83,8 @@ function createServerInstance(_clientIp?: string, _apiKey?: string) {
       version: "1.0.0",
     },
     {
-      instructions: `TypeScript-based MCP server for HIGH-QUALITY blog post creation with AI tracking.
+      instructions: `TypeScript-based MCP server for WRITE-ONLY blog post creation with AI tracking.
+🔒 SECURITY: Only supports auto-posting - no read/update/delete functionality.
 
 🚨🚨🚨 CRITICAL: AI SELF-IDENTIFICATION REQUIRED 🚨🚨🚨
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -477,145 +478,6 @@ Note: Quality score 70점 미만시 자동 개선됨`,
     }
   );
 
-  server.registerTool(
-    "read_posts",
-    {
-      title: "Read Blog Posts",
-      description: `블로그 포스트 읽기 (공개 포스트 + 본인 비공개 포스트)
-Read public posts and your own private posts from the blog.
-검색과 페이지네이션을 지원합니다.`,
-      inputSchema: {
-        page: z.number().optional().describe("Page number (default: 1)"),
-        limit: z.number().optional().describe("Number of posts per page (default: 10)"),
-        search: z.string().optional().describe("Search query for filtering posts"),
-      },
-    },
-    async ({ page = 1, limit = 10, search }) => {
-      // Check authentication
-      if (!auth.accessToken) {
-        const authResult = await auth.authenticate();
-        if (!authResult) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "❌ Authentication required to read posts. Please run authenticate() first.",
-              },
-            ],
-          };
-        }
-      }
-
-      try {
-        const response = await apiClient.readPosts(page, limit, search);
-        
-        if (!response.posts || response.posts.length === 0) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: search 
-                  ? `📚 No posts found matching "${search}"`
-                  : "📚 No posts available",
-              },
-            ],
-          };
-        }
-
-        let resultText = `📚 Found ${response.total} posts (Page ${page}/${Math.ceil(response.total / limit)})\n`;
-        resultText += "=" .repeat(50) + "\n\n";
-        
-        response.posts.forEach((post: any, index: number) => {
-          resultText += `${index + 1}. ${post.title}\n`;
-          resultText += `   🔗 Slug: ${post.slug}\n`;
-          resultText += `   📅 Published: ${post.publishedAt}\n`;
-          resultText += `   ✍️ Author: ${post.author?.username || 'Unknown'}\n`;
-          resultText += `   🏷️ Tags: ${post.tagNames?.join(", ") || "none"}\n`;
-          resultText += `   ${post.isPublic ? "🌐 Public" : "🔒 Private"}\n`;
-          resultText += "\n";
-        });
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: resultText,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `❌ Failed to read posts: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
-    }
-  );
-
-  server.registerTool(
-    "read_post",
-    {
-      title: "Read Single Post",
-      description: `특정 포스트 읽기 (공개 또는 본인 포스트)
-Read a specific post by its slug. You can read public posts or your own private posts.`,
-      inputSchema: {
-        slug: z.string().describe("The slug of the post to read"),
-      },
-    },
-    async ({ slug }) => {
-      // Check authentication
-      if (!auth.accessToken) {
-        const authResult = await auth.authenticate();
-        if (!authResult) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "❌ Authentication required to read posts. Please run authenticate() first.",
-              },
-            ],
-          };
-        }
-      }
-
-      try {
-        const post = await apiClient.readPost(slug);
-        
-        let resultText = `📖 Post Details\n`;
-        resultText += "=" .repeat(50) + "\n\n";
-        resultText += `Title: ${post.title}\n`;
-        resultText += `Slug: ${post.slug}\n`;
-        resultText += `Author: ${post.author?.username || 'Unknown'}\n`;
-        resultText += `Published: ${post.publishedAt}\n`;
-        resultText += `Tags: ${post.tagNames?.join(", ") || "none"}\n`;
-        resultText += `Status: ${post.isPublic ? "🌐 Public" : "🔒 Private"}\n\n`;
-        resultText += "--- Content ---\n\n";
-        resultText += post.content || "No content available";
-
-        return {
-          content: [
-            {
-              type: "text",
-              text: resultText,
-            },
-          ],
-        };
-      } catch (error) {
-        return {
-          content: [
-            {
-              type: "text",
-              text: `❌ Failed to read post: ${error instanceof Error ? error.message : String(error)}`,
-            },
-          ],
-        };
-      }
-    }
-  );
 
   server.registerTool(
     "diagnose_connection",

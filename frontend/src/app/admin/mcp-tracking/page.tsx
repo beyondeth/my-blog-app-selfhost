@@ -1,22 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { 
-  Bot, 
-  Activity, 
-  TrendingUp, 
-  Clock, 
+import {
+  Bot,
+  Activity,
+  TrendingUp,
+  Clock,
   FileText,
-  Search,
   PenTool,
-  BookOpen,
   RefreshCw,
   Calendar,
   Trash2,
 } from 'lucide-react';
 import {
   useMcpStats,
-  useMcpPopularPosts,
   useMcpHourlyActivity,
   useMcpCleanLogs,
   transformStatsToChartData,
@@ -26,8 +23,8 @@ import {
 import McpStatsCard from '@/components/admin/mcp/McpStatsCard';
 import McpActivityChart from '@/components/admin/mcp/McpActivityChart';
 import McpClientDistribution from '@/components/admin/mcp/McpClientDistribution';
-import McpPopularPosts from '@/components/admin/mcp/McpPopularPosts';
-import { AI_CLIENT_COLORS, AI_CLIENT_LABELS, ACTION_TYPE_LABELS } from '@/types/mcp';
+import McpPopularAIPosts from '@/components/admin/mcp/McpPopularAIPosts';
+import { AI_CLIENT_COLORS, AI_CLIENT_LABELS } from '@/types/mcp';
 import { toast } from 'sonner';
 
 export default function McpTrackingPage() {
@@ -36,13 +33,16 @@ export default function McpTrackingPage() {
 
   // Fetch data
   const { data: stats, isLoading: statsLoading, refetch: refetchStats } = useMcpStats(timeRange);
-  const { data: popularPosts, isLoading: postsLoading, refetch: refetchPosts } = useMcpPopularPosts(timeRange, 10);
   const { data: hourlyActivity, isLoading: hourlyLoading, refetch: refetchHourly } = useMcpHourlyActivity(24);
   const cleanLogsMutation = useMcpCleanLogs();
 
   // Transform data for charts
   const chartData = stats ? transformStatsToChartData(stats) : { clientData: [], actionData: [] };
   const timeSeriesData = hourlyActivity ? transformHourlyToTimeSeries(hourlyActivity) : [];
+
+  // Debug logging for chart data
+  console.log('Hourly Activity Data:', hourlyActivity);
+  console.log('Transformed Time Series Data:', timeSeriesData);
 
   // Calculate trends
   const trend = stats ? calculateTrend(stats.todayCount, stats.weekCount / 7) : 'stable';
@@ -51,7 +51,6 @@ export default function McpTrackingPage() {
     setIsRefreshing(true);
     await Promise.all([
       refetchStats(),
-      refetchPosts(),
       refetchHourly(),
     ]);
     setIsRefreshing(false);
@@ -69,7 +68,7 @@ export default function McpTrackingPage() {
     }
   };
 
-  if (statsLoading || postsLoading || hourlyLoading) {
+  if (statsLoading || hourlyLoading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <RefreshCw className="h-8 w-8 animate-spin text-gray-500" />
@@ -85,9 +84,26 @@ export default function McpTrackingPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
               <Bot className="h-8 w-8" />
-              MCP AI 트래킹 대시보드
+              AI 포스팅 트래킹
             </h1>
             <p className="text-gray-600 mt-2">AI 클라이언트 활동을 실시간으로 모니터링합니다</p>
+            {/* AI 자동 식별 시스템 */}
+            <div className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 bg-gradient-to-r from-blue-50 to-purple-50 rounded-lg border border-blue-200">
+              <Bot className="h-3.5 w-3.5 text-blue-600" />
+              <span className="text-xs font-medium text-blue-900">AI 자동 식별:</span>
+              <div className="flex gap-1">
+                {Object.entries(AI_CLIENT_LABELS).map(([key, label]) => (
+                  <span
+                    key={key}
+                    className="px-1.5 py-0.5 text-xs font-medium text-white rounded"
+                    style={{ backgroundColor: AI_CLIENT_COLORS[key as keyof typeof AI_CLIENT_COLORS] }}
+                    title={`ai:${key}`}
+                  >
+                    {label}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
           
           <div className="flex items-center gap-3">
@@ -128,7 +144,7 @@ export default function McpTrackingPage() {
 
       {/* Stats Cards */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
           <McpStatsCard
             title="전체 활동"
             value={stats.totalActivities}
@@ -154,20 +170,18 @@ export default function McpTrackingPage() {
             bgColor="bg-purple-50"
             color="text-purple-600"
           />
-          
-          <McpStatsCard
-            title="포스트 읽기"
-            value={stats.byAction?.read || 0}
-            icon={<BookOpen className="h-6 w-6 text-orange-500" />}
-            bgColor="bg-orange-50"
-            color="text-orange-600"
-          />
         </div>
       )}
 
       {/* AI Client Stats */}
       {stats && stats.byClient && (
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+        <div className={`grid gap-4 mb-8 ${
+          Object.entries(stats.byClient).length <= 3
+            ? 'grid-cols-1 md:grid-cols-3'
+            : Object.entries(stats.byClient).length === 4
+            ? 'grid-cols-2 md:grid-cols-4'
+            : 'grid-cols-2 sm:grid-cols-3 md:grid-cols-5'
+        }`}>
           {Object.entries(stats.byClient).map(([client, count]) => (
             <div
               key={client}
@@ -201,66 +215,79 @@ export default function McpTrackingPage() {
         </div>
       </div>
 
-      {/* Action Type Distribution */}
-      {stats && stats.byAction && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      {/* Popular AI Posts and Recent Activity */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+        {/* Popular AI Posts */}
+        <McpPopularAIPosts />
+
+          {/* Recent AI Activities */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h3 className="text-lg font-semibold mb-4">활동 유형별 통계</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">최근 AI 활동 요약</h3>
+              <Activity className="h-5 w-5 text-gray-400" />
+            </div>
+
             <div className="space-y-4">
-              {Object.entries(stats.byAction).map(([action, count]) => {
-                const total = stats.totalActivities || 1;
-                const percentage = Math.round((count / total) * 100);
-                
-                return (
-                  <div key={action}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-gray-700">
-                        {ACTION_TYPE_LABELS[action as keyof typeof ACTION_TYPE_LABELS]}
-                      </span>
-                      <span className="text-sm text-gray-600">
-                        {count} ({percentage}%)
-                      </span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div
-                        className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                        style={{ width: `${percentage}%` }}
-                      />
-                    </div>
+              {/* Today's Activity Summary */}
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="text-sm font-medium text-gray-700 mb-2">오늘의 활동</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">오늘 활동:</span>
+                    <span className="font-medium">{stats?.todayCount || 0}건</span>
                   </div>
-                );
-              })}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">전체 포스트 작성:</span>
+                    <span className="font-medium">{stats?.byAction?.write || 0}개</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Weekly Trend */}
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <h4 className="text-sm font-medium text-blue-700 mb-2">주간 트렌드</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-blue-600">이번 주 총 활동</span>
+                    <span className="text-sm font-bold text-blue-900">{stats?.weekCount || 0}</span>
+                  </div>
+                  {trend !== 'stable' && (
+                    <div className="flex items-center gap-2">
+                      <TrendingUp className={`h-4 w-4 ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`} />
+                      <span className={`text-sm font-medium ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
+                        {trend === 'up' ? '증가 추세' : '감소 추세'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Most Active AI */}
+              {stats && stats.byClient && (
+                <div className="p-4 bg-purple-50 rounded-lg">
+                  <h4 className="text-sm font-medium text-purple-700 mb-2">가장 활발한 AI</h4>
+                  <div className="space-y-2">
+                    {Object.entries(stats.byClient)
+                      .sort(([,a], [,b]) => b - a)
+                      .slice(0, 3)
+                      .map(([client, count]) => (
+                        <div key={client} className="flex items-center justify-between">
+                          <span
+                            className="text-sm font-medium"
+                            style={{ color: AI_CLIENT_COLORS[client as keyof typeof AI_CLIENT_COLORS] }}
+                          >
+                            {AI_CLIENT_LABELS[client as keyof typeof AI_CLIENT_LABELS]}
+                          </span>
+                          <span className="text-sm font-bold text-purple-900">{count}</span>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
           </div>
-
-          {/* Popular Posts */}
-          {popularPosts && <McpPopularPosts posts={popularPosts} />}
-        </div>
-      )}
-
-      {/* Info Box */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-8">
-        <div className="flex items-start gap-3">
-          <Bot className="h-5 w-5 text-blue-600 mt-0.5" />
-          <div className="flex-1">
-            <h4 className="text-sm font-medium text-blue-900">AI 자동 식별 시스템</h4>
-            <p className="text-sm text-blue-700 mt-1">
-              각 AI는 포스트 작성 시 자동으로 태그를 추가하여 자신을 식별합니다:
-            </p>
-            <div className="mt-2 flex flex-wrap gap-2">
-              {Object.entries(AI_CLIENT_LABELS).map(([key, label]) => (
-                <span
-                  key={key}
-                  className="px-2 py-1 text-xs font-medium text-white rounded-full"
-                  style={{ backgroundColor: AI_CLIENT_COLORS[key as keyof typeof AI_CLIENT_COLORS] }}
-                >
-                  ai:{key} → {label}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
       </div>
+
     </div>
   );
 }

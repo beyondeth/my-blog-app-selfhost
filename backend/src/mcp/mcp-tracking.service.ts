@@ -6,7 +6,7 @@ import { McpUserLog } from './entities/mcp-user-log.entity';
 export interface LogActivityParams {
   userId: string;
   apiKeyId: string;
-  actionType: 'read' | 'write' | 'search';
+  actionType: 'write';  // MCP는 오직 쓰기만 지원
   actionCategory?: string;
   resourceType?: string;
   resourceId?: string;
@@ -27,9 +27,7 @@ export interface McpStats {
   totalActions: number;
   uniqueUsers: number;
   actionBreakdown: {
-    read: number;
-    write: number;
-    search: number;
+    write: number;  // 쓰기만 추적
   };
   clientBreakdown: {
     [key: string]: number;
@@ -99,11 +97,9 @@ export class McpTrackingService {
     });
 
     const uniqueUsers = new Set(logs.map(log => log.userId));
-    
+
     const actionBreakdown = {
-      read: logs.filter(log => log.actionType === 'read').length,
-      write: logs.filter(log => log.actionType === 'write').length,
-      search: logs.filter(log => log.actionType === 'search').length,
+      write: logs.filter(log => log.actionType === 'write').length,  // 쓰기만 카운트
     };
 
     const clientBreakdown: { [key: string]: number } = {};
@@ -158,9 +154,7 @@ export class McpTrackingService {
     return {
       total: logs.length,
       actions: {
-        read: logs.filter(log => log.actionType === 'read').length,
-        write: logs.filter(log => log.actionType === 'write').length,
-        search: logs.filter(log => log.actionType === 'search').length,
+        write: logs.filter(log => log.actionType === 'write').length,  // 쓰기만 카운트
       },
       recentActivity: logs.slice(0, 10).map(log => ({
         actionType: log.actionType,
@@ -171,37 +165,39 @@ export class McpTrackingService {
   }
 
   /**
-   * Get popular posts accessed via MCP
+   * Get recently created posts via MCP (쓰기 전용 - 최근 생성된 포스트)
    */
   async getPopularPosts(days: number = 7, limit: number = 10): Promise<any[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
-    // First get the popular posts with basic stats
-    const popularPosts = await this.mcpUserLogRepository
+    // MCP는 쓰기만 지원하므로 최근 생성된 포스트를 조회
+    const recentPosts = await this.mcpUserLogRepository
       .createQueryBuilder('log')
       .select('log.resource_slug', 'postSlug')
       .addSelect('log.resource_id', 'postId')
-      .addSelect('COUNT(*)', 'readCount')
-      .addSelect('COUNT(DISTINCT log.user_id)', 'uniqueClients')
-      .addSelect('MAX(log.timestamp)', 'lastAccessedAt')
+      .addSelect('COUNT(*)', 'createdCount')  // 생성 횟수
+      .addSelect('COUNT(DISTINCT log.client_type)', 'uniqueClients')
+      .addSelect('MAX(log.timestamp)', 'lastCreatedAt')
       .where('log.resource_type = :type', { type: 'post' })
+      .andWhere('log.action_type = :action', { action: 'write' })  // 쓰기 액션만
       .andWhere('log.resource_slug IS NOT NULL')
       .andWhere('log.timestamp > :startDate', { startDate })
       .groupBy('log.resource_slug')
       .addGroupBy('log.resource_id')
-      .orderBy('"readCount"', 'DESC')
+      .orderBy('"lastCreatedAt"', 'DESC')  // 최근 생성 순
       .limit(limit)
       .getRawMany();
 
-    // For each popular post, get the AI clients that accessed it
+    // For each post, get the AI clients that created it
     const enrichedPosts = await Promise.all(
-      popularPosts.map(async (post) => {
+      recentPosts.map(async (post) => {
         // Get unique AI clients for this post
         const clientsResult = await this.mcpUserLogRepository
           .createQueryBuilder('log')
           .select('DISTINCT log.client_type', 'clientType')
           .where('log.resource_slug = :slug', { slug: post.postslug })
+          .andWhere('log.action_type = :action', { action: 'write' })
           .andWhere('log.timestamp > :startDate', { startDate })
           .getRawMany();
 
@@ -218,10 +214,10 @@ export class McpTrackingService {
           postSlug: post.postslug,
           postTitle: post.postslug || 'Untitled', // Use slug as title fallback
           blogSlug: blogSlug,
-          readCount: parseInt(post.readcount) || 0,
+          createdCount: parseInt(post.createdcount) || 0,  // 생성 횟수로 변경
           uniqueClients: parseInt(post.uniqueclients) || 0,
           aiClients: aiClients || [],
-          lastAccessedAt: post.lastaccessedat,
+          lastCreatedAt: post.lastcreatedat,  // 마지막 생성 시간
         };
       })
     );
@@ -235,17 +231,83 @@ export class McpTrackingService {
   async getHourlyActivity(days: number = 7): Promise<any[]> {
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
+    const endDate = new Date();
 
-    const result = await this.mcpUserLogRepository
+    // Get raw hourly data grouped by hour and client type
+    const rawData = await this.mcpUserLogRepository
       .createQueryBuilder('log')
-      .select('EXTRACT(HOUR FROM log.timestamp)', 'hour')
+      .select('DATE_TRUNC(\'hour\', log.timestamp)', 'hour')
       .addSelect('log.client_type', 'clientType')
       .addSelect('COUNT(*)', 'count')
       .where('log.timestamp > :startDate', { startDate })
+      .andWhere('log.timestamp <= :endDate', { endDate })
       .groupBy('hour')
       .addGroupBy('log.client_type')
       .orderBy('hour', 'ASC')
       .getRawMany();
+
+    // Transform raw data into the expected format
+    const hourlyMap = new Map<string, any>();
+
+    // Initialize all hours in the last 24 hours with zero counts
+    const now = new Date();
+    for (let i = 23; i >= 0; i--) {
+      const hourDate = new Date(now);
+      hourDate.setHours(now.getHours() - i, 0, 0, 0);
+      const hourKey = hourDate.toISOString();
+
+      hourlyMap.set(hourKey, {
+        hour: hourKey,
+        activities: 0,
+        byClient: {
+          claude: 0,
+          chatgpt: 0,
+          gemini: 0,
+          qwen: 0,
+          unknown: 0,
+        },
+      });
+    }
+
+    // Fill in actual data from database
+    rawData.forEach(row => {
+      if (row.hour) {
+        const hourDate = new Date(row.hour);
+        hourDate.setMinutes(0, 0, 0);
+        const hourKey = hourDate.toISOString();
+
+        if (!hourlyMap.has(hourKey)) {
+          hourlyMap.set(hourKey, {
+            hour: hourKey,
+            activities: 0,
+            byClient: {
+              claude: 0,
+              chatgpt: 0,
+              gemini: 0,
+              qwen: 0,
+              unknown: 0,
+            },
+          });
+        }
+
+        const hourData = hourlyMap.get(hourKey);
+        const clientType = row.clienttype || row.clientType || 'unknown';
+        const count = parseInt(row.count) || 0;
+
+        hourData.activities += count;
+        if (hourData.byClient[clientType] !== undefined) {
+          hourData.byClient[clientType] += count;
+        } else {
+          hourData.byClient.unknown += count;
+        }
+      }
+    });
+
+    // Convert to array and sort by hour
+    const result = Array.from(hourlyMap.values())
+      .sort((a, b) => new Date(a.hour).getTime() - new Date(b.hour).getTime());
+
+    this.logger.log(`Hourly activity data: ${result.length} hours, total activities: ${result.reduce((sum, h) => sum + h.activities, 0)}`);
 
     return result;
   }
@@ -276,9 +338,7 @@ export class McpTrackingService {
     return {
       totalActions: logs.length,
       actionBreakdown: {
-        read: logs.filter(log => log.actionType === 'read').length,
-        write: logs.filter(log => log.actionType === 'write').length,
-        search: logs.filter(log => log.actionType === 'search').length,
+        write: logs.filter(log => log.actionType === 'write').length,  // 쓰기만 카운트
       },
       clientUsage,
       recentActivity: logs.slice(0, 20),
