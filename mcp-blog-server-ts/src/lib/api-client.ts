@@ -1,5 +1,5 @@
 import { SecureAPIKeyAuth } from "./auth.js";
-import * as crypto from "crypto";
+import crypto from "crypto"; // Still needed for randomBytes
 
 export interface BlogPost {
   id: string;
@@ -15,69 +15,13 @@ export interface BlogPost {
 export class BlogAPIClient {
   constructor(private auth: SecureAPIKeyAuth) {}
 
-  /**
-   * Generate HMAC-SHA256 signature for MCP endpoints (Complex/Secure method)
-   * API Secret is never transmitted - only the signature
-   * Must match backend's createSecureSignature exactly
-   */
-  private generateHmacSignature(
-    method: string,
-    uri: string,
-    timestamp: string,
-    nonce: string,
-    body: string
-  ): string {
-    // Get API key ID and secret from environment
-    const apiKeyId = process.env["BLOG_API_KEY_ID"];
-    const apiKeySecret = process.env["BLOG_API_KEY_SECRET"];
-    if (!apiKeyId || !apiKeySecret) {
-      throw new Error("API key ID or secret not configured");
-    }
-
-    // 1. Create body hash (same as backend)
-    const bodyHash = crypto.createHash("sha256").update(body).digest("hex");
-    
-    // 2. Create message to sign - MUST match backend exactly
-    // Backend format: method:uri:keyId:timestamp:nonce:bodyHash
-    const message = [
-      method,
-      uri,
-      apiKeyId,
-      timestamp,
-      nonce,
-      bodyHash
-    ].join(':');
-    
-    // 3. Generate HMAC signature with Secret
-    const signature = crypto
-      .createHmac("sha256", apiKeySecret)
-      .update(message)
-      .digest("hex");
-    
-    // Enhanced debug logging for troubleshooting
-    console.log('MCP Client Signature Debug (DETAILED):', {
-      method,
-      uri,
-      keyId: apiKeyId,
-      timestamp,
-      nonce,
-      body: body.substring(0, 200),
-      bodyHash,
-      fullMessage: message,
-      signature,
-      secretPrefix: apiKeySecret.substring(0, 10) + '...',
-    });
-    
-    return signature;
-  }
-
   public async createPost(
     title: string,
     markdownContent: string,
     tags?: string[]
   ): Promise<BlogPost> {
     /** Create a new blog post via MCP endpoint with HMAC authentication for AI tracking */
-    const apiKeyId = process.env["BLOG_API_KEY_ID"];
+    const apiKeyId = this.auth.getApiKeyId();
     if (!apiKeyId) {
       throw new Error("API key ID not configured");
     }
@@ -95,9 +39,8 @@ export class BlogAPIClient {
     const timestamp = Date.now().toString();
     const nonce = crypto.randomBytes(16).toString("hex");
 
-    // Generate HMAC signature using complex AWS V4 style
-    // IMPORTANT: Use full URI path that backend will receive
-    const signature = this.generateHmacSignature(method, fullUri, timestamp, nonce, body);
+    // Generate HMAC signature using auth's unified method
+    const signature = this.auth.generateHmacSignature(method, fullUri, timestamp, nonce, body);
 
     const response = await fetch(`${this.auth.apiUrl}${urlPath}`, {
       method: "POST",

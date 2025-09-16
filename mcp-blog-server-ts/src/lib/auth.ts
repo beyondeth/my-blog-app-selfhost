@@ -137,21 +137,8 @@ export class SecureAPIKeyAuth {
         nonce,
       });
 
-      // Generate AWS V4 style signature
-      const bodyHash = crypto.createHash("sha256").update(body).digest("hex");
-      const message = [
-        method,
-        uri,
-        this.apiKeyId,
-        timestamp,
-        nonce,
-        bodyHash
-      ].join(':');
-      
-      const signature = crypto
-        .createHmac("sha256", this.apiKeySecret!)
-        .update(message)
-        .digest("hex");
+      // Generate AWS V4 style signature using unified method
+      const signature = this.generateHmacSignature(method, uri, timestamp, nonce, body);
 
       // 6. Make API call with signature (AWS V4 style - no secret in body)
       const response = await fetch(`${this.apiUrl}/auth/verify-api-key-id-secret`, {
@@ -191,24 +178,48 @@ export class SecureAPIKeyAuth {
     }
   }
 
-  public async getBlogInfo(): Promise<void> {
-    /** Fetch blog information */
-    if (!this.blogId || !this.accessToken) {
-      return;
+  /**
+   * Generate HMAC-SHA256 signature (unified method)
+   * Used by both authentication and API client
+   */
+  public generateHmacSignature(
+    method: string,
+    uri: string,
+    timestamp: string,
+    nonce: string,
+    body: string
+  ): string {
+    if (!this.apiKeyId || !this.apiKeySecret) {
+      throw new Error("API key ID or secret not configured");
     }
 
-    try {
-      const response = await fetch(`${this.apiUrl}/blogs/${this.blogId}`, {
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`,
-        },
-      });
+    // 1. Create body hash
+    const bodyHash = crypto.createHash("sha256").update(body).digest("hex");
 
-      if (response.ok) {
-        this.blogInfo = await response.json() as BlogInfo;
-      }
-    } catch (error) {
-      console.error("Failed to fetch blog info:", error);
-    }
+    // 2. Create message to sign - MUST match backend exactly
+    const message = [
+      method,
+      uri,
+      this.apiKeyId,
+      timestamp,
+      nonce,
+      bodyHash
+    ].join(':');
+
+    // 3. Generate HMAC signature with Secret
+    const signature = crypto
+      .createHmac("sha256", this.apiKeySecret)
+      .update(message)
+      .digest("hex");
+
+    return signature;
+  }
+
+  public getApiKeyId(): string | undefined {
+    return this.apiKeyId;
+  }
+
+  public getApiKeySecret(): string | undefined {
+    return this.apiKeySecret;
   }
 }

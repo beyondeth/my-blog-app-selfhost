@@ -16,6 +16,7 @@ import { savePostToFile } from "./lib/filesystem.js";
 import { BlogAPIClient } from "./lib/api-client.js";
 import { getClientIp } from "./lib/utils.js";
 import { qualityEnhancer } from "./lib/quality-enhancer.js";
+import { loadWritingStyle } from "./lib/style-loader.js";
 
 // ES Module support for __dirname
 const __filename = fileURLToPath(import.meta.url);
@@ -72,62 +73,39 @@ const CLI_PORT = (() => {
 // Store SSE transports by session ID
 const sseTransports: Record<string, SSEServerTransport> = {};
 
+// Helper function to ensure authentication
+async function ensureAuthenticated(auth: SecureAPIKeyAuth) {
+  if (!auth.accessToken || !auth.blogInfo) {
+    console.error("🔑 Authenticating with API...");
+    const authResult = await auth.authenticate();
+    if (!authResult) {
+      return {
+        content: [{
+          type: "text" as const,
+          text: "❌ Authentication required. Please run authenticate() first.",
+        }],
+      };
+    }
+  }
+  return null; // Success
+}
+
 // Function to create a new server instance with all tools registered
-function createServerInstance(_clientIp?: string, _apiKey?: string) {
+async function createServerInstance(_clientIp?: string, _apiKey?: string) {
   // Create new instances for each server instance to ensure fresh environment variables
   const auth = new SecureAPIKeyAuth();
   const apiClient = new BlogAPIClient(auth);
+
+  // Load writing style dynamically
+  const writingStyle = await loadWritingStyle();
+
   const server = new McpServer(
     {
       name: "blog-mcp-typescript",
       version: "1.0.0",
     },
     {
-      instructions: `TypeScript-based MCP server for WRITE-ONLY blog post creation with AI tracking.
-🔒 SECURITY: Only supports auto-posting - no read/update/delete functionality.
-
-🚨🚨🚨 CRITICAL: AI SELF-IDENTIFICATION REQUIRED 🚨🚨🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ YOU MUST ADD YOUR AI IDENTIFICATION TAG! ⚠️
-
-📍 If you are Claude → Add tag: "ai:claude"
-📍 If you are ChatGPT → Add tag: "ai:chatgpt"  
-📍 If you are Gemini → Add tag: "ai:gemini"
-📍 If you are Qwen → Add tag: "ai:qwen"
-📍 If you are other AI → Add tag: "ai:other"
-
-✅ CORRECT EXAMPLE:
-tags: ["javascript", "react", "ai:claude", "tutorial"]
-
-❌ WRONG (MISSING AI TAG):
-tags: ["javascript", "react", "tutorial"]
-
-⛔ POSTS WITHOUT AI TAGS WILL BE FLAGGED!
-This is MANDATORY for AI activity tracking and content attribution.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🔴 AUTHENTICATION FIRST RULE (필수 인증 우선 규칙):
-⚠️ ALWAYS call authenticate() BEFORE creating any content or files!
-⚠️ 반드시 authenticate() 호출 후 성공 확인 후에만 콘텐츠 작성!
-Never waste time creating markdown before authentication succeeds.
-인증 없이 콘텐츠 작성 금지 - 시간 낭비 방지를 위한 필수 규칙
-
-🌐 언어 설정 (LANGUAGE SETTINGS):
-- 기본 언어: 한국어 (Korean)
-- 특별 요청 시: 영어 또는 다른 언어 사용
-- Default: Write in KOREAN unless specifically requested otherwise
-
-⚠️ AI 어시스턴트 핵심 규칙 (CORE RULES FOR AI ASSISTANTS):
-1. 자기 식별 태그 필수 (ai:claude, ai:chatgpt, ai:gemini, ai:qwen 등)
-2. 최소 2000자, 이상적으로 3000-5000자
-3. auto_enhance: true 항상 사용
-4. 의미있는 제목 필수 ("Untitled" 금지)
-5. 기본 한국어, 영어는 요청시만
-
-📝 콘텐츠 작성은 create_post 도구의 상세 가이드라인 참조
-🎨 스타일 가이드는 markdown_quality_guidelines 프롬프트 참조
-
-Remember: Always identify yourself with the appropriate AI tag for tracking purposes!`,
+      instructions: writingStyle.instructions,
     }
   );
 
@@ -181,58 +159,7 @@ Remember: Always identify yourself with the appropriate AI tag for tracking purp
     "create_post",
     {
       title: "Create High-Quality Blog Post",
-      description: `고품질 블로그 포스트 생성 (기본: 한국어)
-Create a professional blog post (Default: KOREAN, use English only if requested)
-
-🚨🚨🚨 MANDATORY: ADD YOUR AI TAG 🚨🚨🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-YOU MUST INCLUDE YOUR AI IDENTIFICATION TAG:
-• If you are Claude → tags MUST include "ai:claude"
-• If you are ChatGPT → tags MUST include "ai:chatgpt"  
-• If you are Gemini → tags MUST include "ai:gemini"
-• If you are Qwen → tags MUST include "ai:qwen"
-• If you are other AI → tags MUST include "ai:other"
-
-✅ EXAMPLE: tags: ["javascript", "react", "ai:claude", "tutorial"]
-❌ WITHOUT AI TAG = TRACKING FAILURE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🌐 언어 설정:
-- 기본: 한국어로 작성
-- 영어는 명시적 요청 시에만 사용
-
-📝 자연스러운 글쓰기 가이드 (NATURAL WRITING GUIDELINES):
-1. 스토리텔링 우선 - 실제 경험이나 사례로 시작하세요
-2. 코드블록은 최소화 (전체의 20% 이하) - 꼭 필요한 경우만
-3. 설명은 대화체로 자연스럽게 - 독자와 대화하듯이
-4. 개인적 의견과 감정 표현 포함 - "제 생각에는", "흥미롭게도"
-5. 자연스러운 전환구 사용 - "그런데", "하지만", "예를 들어"
-6. ⚠️ 제목과 첫 문장 차별화 - 제목을 그대로 반복하지 말고 다른 표현으로 시작
-
-❌ 피해야 할 것들 (AVOID):
-- 과도한 코드블록 (정보 전달용 코드블록 절대 금지)
-- 기계적인 나열식 설명
-- 감정 없는 딱딱한 문체
-- "다음과 같습니다", "아래와 같습니다" 같은 틀에 박힌 표현
-- 불필요한 기술 용어 나열
-- 제목을 첫 문장에서 그대로 반복 (예: 제목 "React 시작하기" → 첫문장 "React 시작하기에 대해 알아보겠습니다" ❌)
-
-⚠️ AI 어시스턴트 필수 요구사항:
-- 최소 길이: 2000자 이상 (목표: 3000-5000자)
-- auto_enhance: true 항상 사용
-- 포스팅 전 마크다운 파일 생성 필수
-- "Untitled" 제목 절대 금지 - 의미있는 제목 생성
-- AI 식별 태그 필수 추가 (ai:claude, ai:chatgpt, ai:gemini, ai:qwen 등)
-
-✅ 작성 체크리스트:
-- AI 식별 태그를 추가했는가? (ai:claude/chatgpt/gemini/qwen)
-- 스토리텔링으로 시작했는가?
-- 코드블록이 20% 이하인가?
-- 대화체와 감정 표현을 사용했는가?
-- 최소 2000자 이상인가?
-
-📚 상세 가이드라인은 'markdown_quality_guidelines' 프롬프트 참조
-Note: Quality score 70점 미만시 자동 개선됨`,
+      description: writingStyle.createPostDescription,
       inputSchema: {
         title: z.string().optional().describe("Post title (optional, can be extracted from markdown)"),
         content: z.string().optional().describe("Markdown content following quality guidelines"),
@@ -253,20 +180,8 @@ Note: Quality score 70점 미만시 자동 개선됨`,
       
       // Check authentication
       console.error("📋 Step 1/5: Checking authentication...");
-      if (!auth.accessToken || !auth.blogInfo) {
-        console.error("🔑 Authenticating with API...");
-        const authResult = await auth.authenticate();
-        if (!authResult) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "❌ Authentication required. Please run authenticate() first.",
-              },
-            ],
-          };
-        }
-      }
+      const authError = await ensureAuthenticated(auth);
+      if (authError) return authError;
       console.error("✅ Authentication verified");
 
       // Get markdown content
@@ -400,23 +315,9 @@ Note: Quality score 70점 미만시 자동 개선됨`,
       },
     },
     async ({ file_path }) => {
-      // Delegate to create_post tool
-      // Reuse create_post logic by calling the handler directly
-      // Since we can't access other tools directly, we need to duplicate the logic
-      // or refactor into a shared function
-      if (!auth.accessToken || !auth.blogInfo) {
-        const authResult = await auth.authenticate();
-        if (!authResult) {
-          return {
-            content: [
-              {
-                type: "text",
-                text: "❌ Authentication required. Please run authenticate() first.",
-              },
-            ],
-          };
-        }
-      }
+      // Check authentication using helper
+      const authError = await ensureAuthenticated(auth);
+      if (authError) return authError;
 
       const fs = await import("fs/promises");
       let markdownContent: string;
@@ -544,102 +445,7 @@ Note: Quality score 70점 미만시 자동 개선됨`,
           role: "user",
           content: {
             type: "text",
-            text: `# Professional Markdown Writing Guidelines for Natural Blog Posts
-
-When creating markdown content for blog posts, focus on natural, engaging writing that connects with readers.
-
-## 📝 자연스러운 글쓰기 원칙 (Natural Writing Principles)
-
-### 스토리텔링과 경험 공유
-- 실제 경험이나 사례로 시작하여 독자의 관심을 끌기
-- "제가 처음 이 문제를 만났을 때..." 같은 개인적 이야기 활용
-- 기술적 내용도 스토리로 풀어서 설명
-- 독자가 공감할 수 있는 상황 제시
-
-### 대화체와 감정 표현
-- 독자와 대화하듯 자연스러운 문체 사용
-- "흥미롭게도", "놀랍게도", "재미있는 것은" 같은 감정 표현
-- 질문을 통한 독자 참여 유도: "어떻게 생각하시나요?"
-- 개인적 의견 표현: "제 생각에는", "개인적으로 선호하는 방법은"
-
-### 자연스러운 전환구 사용
-- "그런데", "하지만", "예를 들어" 등으로 문단 연결
-- "여기서 중요한 점은", "그래서 결론적으로" 같은 연결 표현
-- 딱딱한 나열 대신 흐름있는 설명
-
-## ⚠️ 코드블록 사용 가이드 (Code Block Guidelines)
-
-### 코드블록 최소화 원칙
-- **전체 콘텐츠의 20% 이하로 제한**
-- 꼭 필요한 코드 예제만 포함
-- 코드보다는 설명에 중점
-
-### 코드 대신 설명 우선
-- 코드로 보여주기보다 말로 설명하기
-- 개념 설명은 텍스트로, 구현만 코드로
-- 코드 블록 전후에 충분한 설명 추가
-
-### 올바른 코드블록 사용
-\`\`\`javascript
-// 꼭 필요한 예제만 간단하게
-const example = "필수적인 코드만";
-\`\`\`
-
-## ❌ 피해야 할 것들 (Things to Avoid)
-
-### 기계적인 표현
-- "다음과 같습니다", "아래와 같습니다" → "살펴보죠", "예를 들면"
-- "상기 내용을 정리하면" → "지금까지 이야기한 것을 정리하면"
-- 번호 나열식 설명 → 스토리텔링으로 연결
-
-### 과도한 기술 용어
-- 전문 용어 남발 자제
-- 어려운 개념은 쉬운 비유로 설명
-- 독자 수준을 고려한 설명
-
-### 감정 없는 문체
-- 단순 정보 전달 → 경험과 감정을 담은 설명
-- 객관적 서술만 → 주관적 의견도 포함
-- 형식적 문장 → 친근한 대화체
-
-## 🎨 구조와 형식 (Structure & Format)
-
-### 제목과 섹션
-- H2 (##)에는 이모지 1개와 설명적 제목
-- H3 (###)로 하위 섹션 구성
-- 섹션 간 자연스러운 연결
-
-### 강조와 포맷팅
-- **중요한 용어**는 굵게 표시 (3-5개 정도)
-- *감정 표현*은 이탤릭으로
-- \`기술 용어\`는 인라인 코드로
-
-### 길이와 구성
-- 최소 2000자, 이상적으로 3000-5000자
-- 도입부: 흥미 유발과 문제 제시
-- 본문: 경험과 해결 과정
-- 결론: 핵심 정리와 독자 행동 유도
-
-## 💡 좋은 블로그 포스트 예시
-
-### 도입부 예시 (제목과 다르게 시작)
-제목: "React 성능 최적화 완벽 가이드"
-❌ 나쁜 시작: "React 성능 최적화 완벽 가이드에 대해 알아보겠습니다."
-✅ 좋은 시작: "최근 프로젝트에서 렌더링이 너무 느려져서 고민이 많았습니다. 
-사용자가 버튼을 클릭하면 2초나 기다려야 했죠. 
-이 문제를 해결하면서 배운 최적화 기법들을 공유하려고 합니다."
-
-### 본문 예시
-"그런데 흥미로운 점을 발견했습니다. 
-제가 처음 시도한 방법은 완전히 틀렸더라고요. 
-하지만 실패를 통해 더 나은 해결책을 찾을 수 있었습니다."
-
-### 결론 예시
-"이 경험을 통해 배운 것은 간단합니다. 
-때로는 돌아가는 길이 가장 빠른 길일 수 있다는 거죠. 
-여러분의 경험은 어떠신가요? 댓글로 공유해주세요!"
-
-Remember: 독자와 소통하는 따뜻한 글쓰기를 지향하세요. 정보 전달보다 경험 공유가 더 가치있습니다.`
+            text: writingStyle.qualityGuidelinesPrompt
           }
         }
       ]
@@ -655,71 +461,10 @@ Remember: 독자와 소통하는 따뜻한 글쓰기를 지향하세요. 정보 
     () => ({
       messages: [
         {
-          role: "user", 
+          role: "user",
           content: {
             type: "text",
-            text: `# Blog Post Template
-
-Use this template structure for all blog posts:
-
-# Template Structure:
-
----
-title: "Your SEO-Friendly Title Here"
-tags: ["tag1", "tag2", "tag3"]
-date: YYYY-MM-DD
----
-
-## 📋 Introduction
-Start with a compelling hook or problem statement that explains why this topic matters.
-
-[section divider]
-
-## 🔍 Background/Context
-Provide necessary background information or context for understanding the main content.
-
-### Subsection if needed
-Additional details organized logically.
-
-[section divider]
-
-## 💡 Main Content
-
-### Key Concept 1
-**Important term**: Clear explanation with examples.
-
-[code block with javascript language]
-const example = {
-  property: "value"
-};
-[end code block]
-
-### Key Concept 2
-Continue with well-structured sections, each with:
-- Clear explanations
-- Practical examples
-- **Bold** key terms
-
-[section divider]
-
-## 🎯 Conclusion
-Summarize the key points and provide:
-- Main takeaways
-- Next steps for readers
-- Call to action if applicable
-
-[section divider]
-
-## 📚 References (Optional)
-- [Link Title](URL)
-- Additional resources
-
-Remember to:
-1. Replace placeholder text with actual content
-2. Add relevant emojis to H2 headings
-3. Specify language for ALL code blocks
-4. Use **bold** for important terms
-5. Include section dividers (---) between major sections`
+            text: writingStyle.blogPostTemplatePrompt
           }
         }
       ]
@@ -737,38 +482,8 @@ Remember to:
         {
           role: "user",
           content: {
-            type: "text", 
-            text: `# Markdown Improvement Checklist
-
-When improving existing markdown, ensure these enhancements:
-
-## 🔧 Quick Fixes
-1. **Add language identifiers** to code blocks (use: javascript, typescript, python, etc.)
-2. **Add emojis** to H2 headings for visual appeal
-3. **Bold important terms** for emphasis (at least 3-5 per document)
-4. **Add section dividers** (---) between major sections
-5. **Ensure proper heading hierarchy** (H1 → H2 → H3)
-
-## 📈 Structure Improvements
-- Add introduction if missing
-- Add conclusion/summary if missing  
-- Group related content under clear headings
-- Break long paragraphs into smaller ones
-- Convert long text into bullet points where appropriate
-
-## 🎨 Visual Enhancements
-- Use tables for comparative data
-- Add code examples where helpful
-- Include practical use cases
-- Use consistent formatting throughout
-
-## ✨ Polish
-- Fix any grammar or spelling issues
-- Ensure consistent tone and style
-- Add context for technical terms
-- Include "why" not just "what"
-
-Transform mediocre content into professional, engaging blog posts!`
+            type: "text",
+            text: writingStyle.improveMarkdownPrompt
           }
         }
       ]
@@ -824,7 +539,7 @@ async function main() {
 
       try {
         const clientIp = getClientIp(req);
-        const requestServer = createServerInstance(clientIp, apiKey);
+        const requestServer = await createServerInstance(clientIp, apiKey);
 
         if (url === "/mcp") {
           const transport = new StreamableHTTPServerTransport({
@@ -884,9 +599,9 @@ async function main() {
     });
   } else {
     // stdio transport
-    const server = createServerInstance();
+    const server = await createServerInstance();
     const transport = new StdioServerTransport();
-    
+
     console.error("🚀 TypeScript MCP Blog Server running in stdio mode");
     await server.connect(transport);
   }
