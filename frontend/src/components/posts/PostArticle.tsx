@@ -6,6 +6,7 @@ import { Post } from '@/types';
 import OptimizedImage from '@/components/ui/OptimizedImage';
 import UserAvatar from '@/components/ui/UserAvatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
+import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
 import { FiHeart, FiMessageCircle } from 'react-icons/fi';
 
 interface PostArticleProps {
@@ -47,6 +48,14 @@ const PostArticle = React.memo(function PostArticle({
   onDelete,
   isDeleting = false,
 }: PostArticleProps) {
+  // 디버깅: 관리자 권한 및 품질점수 확인
+  console.log('[PostArticle Debug]', {
+    postTitle: post.title,
+    isAdmin: isAdmin,
+    qualityScore: post.qualityScore,
+    hasQualityScore: post.qualityScore != null,
+    shouldShowScore: isAdmin && post.qualityScore != null
+  });
   // HTML 태그를 제거한 순수 텍스트
   const cleanContent = stripHtmlTags(post.content || '');
   
@@ -198,6 +207,13 @@ const PostArticle = React.memo(function PostArticle({
                 <FiMessageCircle className="w-3 h-3" />
                 {post.commentCount || 0}
               </span>
+              {isAdmin && post.qualityScore != null && (
+                <QualityScoreBadge
+                  score={post.qualityScore}
+                  aiType={post.tags?.find(tag => tag.startsWith('ai:'))?.replace('ai:', '') || 'unknown'}
+                  className="inline-block"
+                />
+              )}
             </div>
             
             {/* 버튼들 - 메타 정보 바로 아래 */}
@@ -292,6 +308,13 @@ const PostArticle = React.memo(function PostArticle({
                 <FiMessageCircle className="w-3 h-3" />
                 {post.commentCount || 0}
               </span>
+              {isAdmin && post.qualityScore != null && (
+                <QualityScoreBadge
+                  score={post.qualityScore}
+                  aiType={post.tags?.find(tag => tag.startsWith('ai:'))?.replace('ai:', '') || 'unknown'}
+                  className="inline-block"
+                />
+              )}
             </div>
             
             {/* 버튼들 - 메타 정보 바로 아래 */}

@@ -234,6 +234,7 @@ export class PostsService {
       isPublished: true, // Multi-user blog system - all posts are published
       publishedAt: new Date(),
       tagList: tagList, // JSONB 태그 배열 저장
+      qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적)
     });
 
     // Entity의 @BeforeInsert에서 UUID로 고유 slug 생성됨
@@ -428,6 +429,7 @@ export class PostsService {
       publishedAt: post.publishedAt ? formatDate(post.publishedAt) : null,
       tags: post.tagList || [],
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
+      qualityScore: post.qualityScore || null, // 품질 점수 (null 가능)
       // 작성자 프로필 이미지 최적화
       author: post.author ? {
         ...post.author,

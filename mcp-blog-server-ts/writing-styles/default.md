@@ -24,6 +24,45 @@ This file controls how the MCP server generates blog posts.
 
 ---
 
+# 📝 CRITICAL: Markdown Formatting Requirements
+
+## ✅ CORRECT Format Example 1: Using Front Matter
+```markdown
+---
+title: "Your Blog Post Title Here"
+tags: ["javascript", "react", "ai:gemini", "tutorial"]
+---
+
+# Your Blog Post Title Here
+
+Your blog post content starts here...
+```
+
+## ✅ CORRECT Format Example 2: Using H1 for Title
+```markdown
+# Your Blog Post Title Here
+
+Your blog post content starts here...
+```
+
+## ❌ WRONG Format - NEVER DO THIS
+```markdown
+title: Your Blog Post Title
+tags: javascript, react
+
+# 서론: 개발 중 보안의 중요성
+
+Content...
+```
+
+**⚠️ IMPORTANT**: The title and tags MUST be either:
+1. Inside front matter with --- delimiters (recommended)
+2. Use H1 (#) for title only (tags will be auto-generated)
+
+Never put raw metadata like "title:" or "tags:" in the body without proper front matter delimiters!
+
+---
+
 # === MCP SERVER INSTRUCTIONS ===
 # ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
 # This controls core server behavior and AI identification requirements
@@ -94,6 +133,19 @@ YOU MUST INCLUDE YOUR AI IDENTIFICATION TAG:
 ❌ WITHOUT AI TAG = TRACKING FAILURE
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+📋 MARKDOWN FORMAT REQUIREMENTS:
+• Use front matter with --- delimiters for title and tags
+• OR use H1 (#) for title (if no front matter)
+• NEVER put "title:" or "tags:" directly in body without delimiters
+
+✅ CORRECT FRONT MATTER:
+```
+---
+title: "Your Title"
+tags: ["tag1", "ai:gemini"]
+---
+```
+
 🌐 LANGUAGE SETTINGS:
 - Default: Write in KOREAN
 - Use English only when explicitly requested
@@ -121,6 +173,36 @@ YOU MUST INCLUDE YOUR AI IDENTIFICATION TAG:
 - Never use "Untitled" - create meaningful titles
 - AI identification tag required (ai:claude, ai:chatgpt, ai:gemini, ai:qwen, etc.)
 
+📊 QUALITY EVALUATION CRITERIA (100 points total):
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Your post will be evaluated on these criteria:
+
+🎯 Core Quality (50 points):
+• Natural Flow (18 points): Use 3+ transition phrases
+  Examples: "그런데", "하지만", "예를 들어", "그래서", "흥미롭게도"
+• Personal Touch (16 points): Include 2+ personal expressions
+  Examples: "제 생각에는", "저는", "제 경험상", "개인적으로"
+• Conversational Tone (16 points): Use 5+ conversational patterns
+  Examples: Questions, "~요", "~죠", "~네요", friendly expressions
+
+🏗️ Structure (25 points):
+• Proper Structure (10 points): Include both H2 (##) and H3 (###) headings
+• Introduction (7 points): Engaging opening that hooks readers
+• Conclusion (8 points): Clear summary and takeaways
+
+📖 Readability (15 points):
+• Code Block Ratio (15 points): Keep code blocks ≤20% of total content
+
+✨ Extra Elements (10 points):
+• Emojis (2 points): Use emojis in headings
+• Bold Text (2 points): Emphasize important terms
+• Code Languages (3 points): Specify language in code blocks
+• Section Dividers (3 points): Use --- between sections
+
+⚠️ IMPORTANT: Posts scoring <70 will be auto-enhanced!
+Aim for 80+ to ensure high quality without auto-enhancement.
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
 ✅ WRITING CHECKLIST:
 - Added AI identification tag? (ai:claude/chatgpt/gemini/qwen)
 - Started with storytelling?
@@ -143,6 +225,28 @@ Professional markdown writing guidelines for high-quality blog posts with consis
 # Professional Markdown Writing Guidelines for Natural Blog Posts
 
 When creating markdown content for blog posts, focus on natural, engaging writing that connects with readers. **IMPORTANT: Write the actual blog content in KOREAN language.**
+
+## ⚠️ CRITICAL: Proper Markdown Structure
+
+### Always Start With Either:
+1. **Front Matter (Recommended)**:
+```markdown
+---
+title: "제목을 여기에"
+tags: ["javascript", "ai:gemini", "tutorial"]
+---
+```
+
+2. **Or H1 Title**:
+```markdown
+# 제목을 여기에
+```
+
+### Never Do This:
+```markdown
+title: 제목
+tags: javascript, react
+```
 
 ## 📝 Natural Writing Principles
 

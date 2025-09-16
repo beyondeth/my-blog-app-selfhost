@@ -276,7 +276,7 @@ async function createServerInstance(_clientIp?: string, _apiKey?: string) {
       console.error("📋 Step 6/6: Creating post via API...");
       try {
         console.error(`🌐 Sending to: ${auth.baseUrl}`);
-        const post = await apiClient.createPost(finalTitle, body, finalTags);
+        const post = await apiClient.createPost(finalTitle, body, finalTags, finalQualityScore);
         console.error("✅ Post created successfully!");
         const blogSlug = post.blogSlug || auth.blogInfo?.slug;
         const postUrl = `${auth.baseUrl}/blog/${blogSlug}/posts/${post.slug}`;
@@ -352,13 +352,18 @@ async function createServerInstance(_clientIp?: string, _apiKey?: string) {
         console.error(`🤖 AI identification tag found: ${aiTag}`);
       }
 
+      // Analyze quality score for the markdown content
+      const qualityMetrics = qualityEnhancer.analyzeQuality(body);
+      const finalQualityScore = qualityMetrics.score;
+      console.error(`📊 Quality score for file: ${finalQualityScore}/100`);
+
       const savedFilePath = await savePostToFile(finalTitle, body, finalTags);
       const savedMessage = savedFilePath
         ? `💾 MD file saved: ${path.basename(savedFilePath)}`
         : "⚠️ MD file save failed";
 
       try {
-        const post = await apiClient.createPost(finalTitle, body, finalTags);
+        const post = await apiClient.createPost(finalTitle, body, finalTags, finalQualityScore);
         const blogSlug = post.blogSlug || auth.blogInfo?.slug;
         const postUrl = `${auth.baseUrl}/blog/${blogSlug}/posts/${post.slug}`;
 
@@ -366,7 +371,7 @@ async function createServerInstance(_clientIp?: string, _apiKey?: string) {
           content: [
             {
               type: "text",
-              text: `✅ Post created successfully!\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}`,
+              text: `✅ Post created successfully! (Quality: ${finalQualityScore}/100)\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📊 Quality Score: ${finalQualityScore}/100\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}`,
             },
           ],
         };

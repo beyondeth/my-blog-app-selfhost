@@ -18,7 +18,8 @@ export class BlogAPIClient {
   public async createPost(
     title: string,
     markdownContent: string,
-    tags?: string[]
+    tags?: string[],
+    qualityScore?: number
   ): Promise<BlogPost> {
     /** Create a new blog post via MCP endpoint with HMAC authentication for AI tracking */
     const apiKeyId = this.auth.getApiKeyId();
@@ -29,11 +30,17 @@ export class BlogAPIClient {
     const urlPath = `/mcp/posts`;
     const fullUri = `/api/v1${urlPath}`; // Backend expects full path including /api/v1
     const method = "POST";
-    const body = JSON.stringify({
+    const bodyData = {
       title,
       content_markdown: markdownContent, // Backend handles HTML conversion
       tags: tags || [],
-    });
+      qualityScore: qualityScore !== undefined ? qualityScore : undefined, // 품질 점수 (선택적, 0도 유효한 값)
+    };
+
+    // Debug log to check what we're sending
+    console.error(`🔍 Sending to backend: qualityScore = ${bodyData.qualityScore}`);
+
+    const body = JSON.stringify(bodyData);
 
     // Generate security parameters
     const timestamp = Date.now().toString();

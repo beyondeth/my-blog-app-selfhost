@@ -96,6 +96,7 @@ export interface Post {
   comments?: Comment[];
   likedBy?: User[];
   attachedFiles?: FileUpload[];
+  qualityScore?: number | null;
 }
 
 // 댓글 관련 타입

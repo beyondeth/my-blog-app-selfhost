@@ -119,6 +119,21 @@ export default function McpPopularAIPosts() {
                       {AI_CLIENT_LABELS[aiType]}
                     </span>
 
+                    {post.qualityScore != null && (
+                      <span
+                        className={`px-2 py-0.5 text-xs font-medium rounded-full ${
+                          post.qualityScore >= 80
+                            ? 'bg-green-100 text-green-700'
+                            : post.qualityScore >= 60
+                            ? 'bg-blue-100 text-blue-700'
+                            : 'bg-gray-100 text-gray-600'
+                        }`}
+                        title="콘텐츠 품질 점수"
+                      >
+                        {post.qualityScore}점
+                      </span>
+                    )}
+
                     <div className="flex items-center gap-3 text-xs text-gray-500">
                       <div className="flex items-center gap-1">
                         <Eye className="h-3 w-3" />

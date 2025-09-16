@@ -9,6 +9,7 @@ import { McpRateLimitGuard } from './mcp-rate-limit.guard';
 import { McpLoggingInterceptor } from './mcp-logging.interceptor';
 import * as crypto from 'crypto';
 import { PostsService } from '../posts/posts.service';
+import { CacheService } from '../cache/cache.service';
 
 @Controller('mcp')
 @Public() // Bypass JWT auth, we'll use API key auth instead
@@ -22,7 +23,32 @@ export class McpController {
     private readonly apiKeysService: ApiKeysService,
     private readonly authService: AuthService,
     private readonly postsService: PostsService,
+    private readonly cacheService: CacheService,
   ) {}
+
+  /**
+   * 캐시 키 생성 헬퍼 메서드 (posts.controller.ts와 동일)
+   */
+  private generateCacheKey(params: {
+    page: number;
+    limit: number;
+    blogSlug?: string;
+    isPublished?: boolean;
+    isPublicOnly?: boolean;
+  }): string {
+    const { page, limit, blogSlug, isPublished, isPublicOnly = true } = params;
+    let key = `feed:public:page:${page}:limit:${limit}`;
+
+    if (blogSlug) {
+      key += `:blog:${blogSlug}`;
+    }
+
+    if (isPublished !== undefined) {
+      key += `:published:${isPublished}`;
+    }
+
+    return key;
+  }
 
   private async validateApiKey(headers: any) {
     const apiKey = headers['x-api-key'] || headers['authorization']?.replace('Bearer ', '');
@@ -210,6 +236,40 @@ export class McpController {
     // Create the post using the standard posts service for consistency
     // This ensures MCP posts follow the same logic as regular posts
     const createdPost = await this.postsService.create(createPostDto, user);
+
+    // 캐시 무효화 및 재생성 (posts.controller.ts와 동일한 로직)
+    try {
+      // 1. 기존 캐시 삭제
+      await this.cacheService.deletePattern('feed:page:1:*');
+      this.logger.log('✅ First page cache invalidated after MCP post creation');
+
+      // 2. 캐시 워밍: 1페이지 데이터를 미리 로드하여 캐시 생성
+      const pageNumber = 1;
+      const limitNumber = 20;
+      const cacheKey = this.generateCacheKey({
+        page: pageNumber,
+        limit: limitNumber,
+        isPublicOnly: true
+      });
+
+      // 새 데이터 조회 (캐시용 - liked 필드 제외, 공개 블로그만)
+      const freshData = await this.postsService.findAll(
+        pageNumber,
+        limitNumber,
+        null,
+        null,
+        null,  // user를 null로 - liked 필드 제외
+        undefined,
+        true   // isForCache: true - 공개 블로그만
+      );
+
+      // 캐시에 저장 (TTL: 2분)
+      await this.cacheService.set(cacheKey, freshData, 120);
+      this.logger.log('🔥 Cache warmed: First page pre-cached with new MCP post');
+    } catch (error) {
+      this.logger.error(`❌ Failed to invalidate/warm first page cache after MCP post: ${error.message}`);
+      // 캐시 무효화 실패해도 포스트 생성은 성공
+    }
 
     // Log activity after post creation with slug
     await this.mcpTrackingService.logActivity({

@@ -58,6 +58,9 @@ export class Post {
   @Column({ default: 0, name: 'commentCount' })
   commentCount: number;
 
+  @Column({ type: 'integer', nullable: true, default: null, name: 'qualityScore' })
+  qualityScore: number;
+
   // JSONB 컬럼으로 태그 저장 (단순화)
   @Column('jsonb', { default: [], name: 'tagList' })
   tagList: string[];

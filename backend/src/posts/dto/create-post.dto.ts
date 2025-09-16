@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, Min, Max } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePostDto {
@@ -58,4 +58,16 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   content_markdown?: string;
+
+  @ApiPropertyOptional({
+    description: '콘텐츠 품질 점수 (0-100, MCP 서버에서 자동 계산)',
+    example: 75,
+    minimum: 0,
+    maximum: 100,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
+  @Max(100)
+  qualityScore?: number;
 } 

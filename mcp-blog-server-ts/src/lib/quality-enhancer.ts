@@ -90,19 +90,27 @@ export class MarkdownQualityEnhancer {
       score: 0
     };
 
-    // 점수 계산 (11개 항목, 각 9점, 총 100점)
+    // 점수 계산 (100점 만점, 카테고리별 차등 가중치)
     let score = 0;
-    if (metrics.hasEmojis) score += 9;
-    if (metrics.hasBoldText) score += 9;
-    if (metrics.hasCodeBlocksWithLanguage) score += 9;
-    if (metrics.hasProperStructure) score += 9;
-    if (metrics.hasIntroduction) score += 9;
-    if (metrics.hasConclusion) score += 9;
-    if (metrics.hasSectionDividers) score += 9;
-    if (metrics.hasNaturalFlow) score += 9;
-    if (metrics.codeBlockRatio <= 20) score += 9;  // 20% 이하면 점수
-    if (metrics.hasPersonalTouch) score += 9;
-    if (metrics.hasConversationalTone) score += 9;
+
+    // 🎯 핵심 품질 (50점)
+    if (metrics.hasNaturalFlow) score += 18;           // 자연스러운 흐름
+    if (metrics.hasPersonalTouch) score += 16;         // 개인적 터치
+    if (metrics.hasConversationalTone) score += 16;    // 대화체 톤
+
+    // 🏗️ 구조 (25점)
+    if (metrics.hasProperStructure) score += 10;       // 적절한 구조
+    if (metrics.hasIntroduction) score += 7;           // 도입부
+    if (metrics.hasConclusion) score += 8;             // 결론부
+
+    // 📖 가독성 (15점)
+    if (metrics.codeBlockRatio <= 20) score += 15;     // 적절한 코드 비율
+
+    // ✨ 부가 요소 (10점)
+    if (metrics.hasEmojis) score += 2;                 // 이모지
+    if (metrics.hasBoldText) score += 2;               // 굵은 텍스트
+    if (metrics.hasCodeBlocksWithLanguage) score += 3; // 코드 언어 지정
+    if (metrics.hasSectionDividers) score += 3;        // 섹션 구분선
     
     metrics.score = Math.round(score);
     return metrics;
