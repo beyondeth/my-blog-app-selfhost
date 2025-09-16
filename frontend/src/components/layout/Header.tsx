@@ -245,9 +245,9 @@ export default function Header() {
                   />
                 </>
               ) : (
-                <Link 
+                <Link
                   href={routes.login()}
-                  className="text-sm text-gray-900 hover:text-gray-800"
+                  className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-black hover:bg-gray-800 text-white rounded-full transition-all"
                   onClick={(e) => {
                     // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
                     if (pathname === '/register') {
@@ -363,7 +363,7 @@ export default function Header() {
                     </button>
                   </div>
                 ) : (
-                  <Link 
+                  <Link
                     href={routes.login()}
                     onClick={(e) => {
                       closeMobileMenu();
@@ -377,7 +377,7 @@ export default function Header() {
                         }, 100);
                       }
                     }}
-                    className="block text-base text-gray-900 hover:text-gray-800 py-2 px-2 rounded-md hover:bg-gray-50 transition-colors"
+                    className="inline-flex items-center justify-center w-full px-4 py-3 text-sm font-medium bg-black hover:bg-gray-800 text-white rounded-full transition-all"
                   >
                     로그인
                   </Link>
