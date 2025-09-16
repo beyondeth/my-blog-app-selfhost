@@ -211,13 +211,13 @@ export default function HomePage() {
           </div>
           </main>
 
-          {/* Sidebar - sticky with matched top position */}
+          {/* Sidebar - sticky with independent scrolling */}
         <aside className="w-full lg:w-80 lg:min-w-[320px]">
-          <div className="lg:sticky lg:top-8 space-y-4 sm:space-y-6">
+          <div className="lg:sticky lg:top-8 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto space-y-4 sm:space-y-6 sidebar-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
             <PopularPostsSection />
-            
+
             <TagsSection tags={tags} onTagClick={handleTagClick} />
-            
+
             {user && (
               <FollowingListSection userId={user.id} />
             )}

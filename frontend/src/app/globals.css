@@ -7,3 +7,8 @@
 
 /* Highlight.js Atom One Dark Theme - 코드 블록 하이라이팅 */
 @import 'highlight.js/styles/atom-one-dark.css';
+
+/* 사이드바 스크롤바 숨기기 */
+.sidebar-scroll::-webkit-scrollbar {
+  display: none;
+}
