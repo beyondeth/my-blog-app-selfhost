@@ -7,17 +7,16 @@ import { File } from '../files/entities/file.entity';
 import { Blog } from '../blogs/entities/blog.entity';
 import { UsersModule } from '../users/users.module';
 import { FilesModule } from '../files/files.module';
-import { TagsModule } from '../tags/tags.module';
+// TagsModule removed - using JSONB tags
 import { MonitoringModule } from '../monitoring/monitoring.module';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ViewCountService } from './view-count.service';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, File, Blog]), 
-    UsersModule, 
-    FilesModule, 
-    TagsModule, 
+    TypeOrmModule.forFeature([Post, File, Blog]),
+    UsersModule,
+    FilesModule,
     MonitoringModule,  // No more forwardRef needed
   ],
   providers: [PostsService, MarkdownRendererService, ViewCountService],

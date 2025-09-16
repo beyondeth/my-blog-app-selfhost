@@ -4,7 +4,6 @@ import { User } from '../../users/entities/user.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { File } from '../../files/entities/file.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
-import { Tag } from '../../tags/entities/tag.entity';
 
 @Entity('posts')
 @Index(['isPublished'])
@@ -59,21 +58,9 @@ export class Post {
   @Column({ default: 0, name: 'commentCount' })
   commentCount: number;
 
-  // Hybrid Approach: Simple array for fast reads (cache)
-  @Column('simple-array', { nullable: true, name: 'tags' })
-  tagNames: string[];  // 빠른 조회용 캐시
-
-  // Normalized relationship for search/statistics (lazy loading)
-  @ManyToMany(() => Tag, tag => tag.posts, { 
-    lazy: true,  // 필요할 때만 로드
-    cascade: ['insert', 'update']  // 삭제는 cascade 하지 않음
-  })
-  @JoinTable({
-    name: 'post_tags',
-    joinColumn: { name: 'postId', referencedColumnName: 'id' },
-    inverseJoinColumn: { name: 'tagId', referencedColumnName: 'id' },
-  })
-  tags: Promise<Tag[]>;  // Lazy loading으로 Promise 타입
+  // JSONB 컬럼으로 태그 저장 (단순화)
+  @Column('jsonb', { default: [], name: 'tagList' })
+  tagList: string[];
 
   @Column({ nullable: true, name: 'category' })
   category: string;

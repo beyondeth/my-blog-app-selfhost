@@ -285,7 +285,7 @@ export class ApiKeysService {
   private encryptSigningSecret(secret: string): string {
     const algorithm = 'aes-256-gcm';
     const key = crypto.scryptSync(
-      process.env.ENCRYPTION_KEY || 'default-encryption-key-for-dev',
+      process.env.ENCRYPTION_KEY,
       'salt',
       32
     );
@@ -307,7 +307,7 @@ export class ApiKeysService {
   decryptSigningSecret(encryptedSecret: string): string {
     const algorithm = 'aes-256-gcm';
     const key = crypto.scryptSync(
-      process.env.ENCRYPTION_KEY || 'default-encryption-key-for-dev',
+      process.env.ENCRYPTION_KEY,
       'salt',
       32
     );

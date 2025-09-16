@@ -7,14 +7,13 @@ export async function savePostToFile(
   body: string,
   tags?: string[]
 ): Promise<string | null> {
-  /** Save markdown post to file in .codebase_blog/posts directory in user's current working directory */
+  /** Save markdown post to file in BLOG_POSTS_DIR directory */
   try {
-    // Get the base directory from environment variable or use current working directory
-    // This allows users to specify a different base directory if needed
-    const baseDir = process.env['BLOG_POSTS_DIR'] || process.cwd();
-    
-    // Create .codebase_blog/posts directory in the base directory
-    const postsDir = path.join(baseDir, ".codebase_blog", "posts");
+    // Get the directory from environment variable or use current working directory
+    // This allows users to specify the exact directory where posts should be saved
+    const postsDir = process.env['BLOG_POSTS_DIR'] || process.cwd();
+
+    // Create posts directory if it doesn't exist
     await fs.mkdir(postsDir, { recursive: true });
 
     // Generate filename: YYYYMMDD_title.md

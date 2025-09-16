@@ -1,5 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToMany, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
-import { Post } from '../../posts/entities/post.entity';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, Index } from 'typeorm';
 
 @Entity('tags')
 @Index(['name'], { unique: true })
@@ -23,6 +22,6 @@ export class Tag {
   @UpdateDateColumn()
   updatedAt: Date;
 
-  @ManyToMany(() => Post, post => post.tags)
-  posts: Post[];
+  // ManyToMany 관계 제거 - JSONB로 단순화
+  // posts 배열은 더 이상 사용하지 않음
 }

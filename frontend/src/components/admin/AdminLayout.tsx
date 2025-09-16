@@ -17,7 +17,8 @@ import {
   Bug,
   Database,
   AlertTriangle,
-  Bot
+  Bot,
+  Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
@@ -34,6 +35,7 @@ const navigation = [
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: '메모리 관리', href: '/admin/memory', icon: Database, adminOnly: true },
+  { name: '논스 관리', href: '/admin/nonce', icon: Key, adminOnly: true },
   { name: t.navigation.settings, href: '/admin/settings', icon: Settings },
 ];
 

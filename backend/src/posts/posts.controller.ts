@@ -425,4 +425,15 @@ export class PostsController {
     await this.viewCountService.incrementViewCount(id);
     return { message: 'View count queued for batch update' };
   }
+
+  @Get('popular-tags')
+  @Public()
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(3600) // 1시간 캐시
+  @ApiOperation({ summary: '인기 태그 목록 조회' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '반환할 태그 수 (기본값: 20)' })
+  @ApiResponse({ status: 200, description: '인기 태그 목록 반환' })
+  async getPopularTags(@Query('limit') limit: number = 20) {
+    return this.postsService.getPopularTags(Number(limit));
+  }
 } 

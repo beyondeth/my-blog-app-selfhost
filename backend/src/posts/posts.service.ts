@@ -9,7 +9,7 @@ import { Role } from '../common/enums/role.enum';
 import { CreatePostDto } from './dto/create-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { FilesService } from '../files/files.service';
-import { TagsService } from '../tags/tags.service';
+// TagsService removed - using JSONB tags
 import { formatDate, extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 
@@ -27,7 +27,6 @@ export class PostsService {
     @InjectRepository(Blog)
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
-    private tagsService: TagsService,
     private markdownRenderer: MarkdownRendererService,
     private dataSource: DataSource,
   ) {}
@@ -217,11 +216,11 @@ export class PostsService {
       throw new BadRequestException('게시글 내용이 필요합니다.');
     }
 
-    // 하이브리드 태그 처리
-    const tagNames = createPostDto.tags || [];
-    
+    // 태그를 JSONB로 저장
+    const tagList = createPostDto.tags || [];
+
     const { tags, ...postDataWithoutTags } = createPostDto;
-    
+
     const post = this.postsRepository.create({
       ...postDataWithoutTags,
       content: processedContent, // HTML 버전 (디스플레이용)
@@ -234,21 +233,11 @@ export class PostsService {
       blogId: blog.id,
       isPublished: true, // Multi-user blog system - all posts are published
       publishedAt: new Date(),
-      tagNames: tagNames, // 빠른 조회용 캐시
+      tagList: tagList, // JSONB 태그 배열 저장
     });
 
     // Entity의 @BeforeInsert에서 UUID로 고유 slug 생성됨
     await this.postsRepository.save(post);
-    
-    // 정규화된 태그 엔티티 생성/연결
-    if (tagNames.length > 0) {
-      const tags = await this.tagsService.findOrCreateTags(tagNames);
-      post.tags = Promise.resolve(tags);
-      await this.postsRepository.save(post);
-      
-      // 태그 카운트 증가
-      await this.tagsService.incrementPostCount(tags.map(tag => tag.id));
-    }
 
     let attachedFiles: File[] = [];
     if (createPostDto.attachedFileIds?.length) {
@@ -331,7 +320,7 @@ export class PostsService {
     }
 
     if (search) {
-      query.andWhere('(post.title LIKE :search OR post.content LIKE :search OR post.tagNames LIKE :search)', {
+      query.andWhere('(post.title LIKE :search OR post.content LIKE :search OR post.tagList LIKE :search)', {
         search: `%${search}%`,
       });
     }
@@ -358,7 +347,7 @@ export class PostsService {
         images: post.attachedFiles?.filter(file => file.fileType === 'image') || [],
         commentCount: post.commentCount || 0,
         // 태그 필드 추가 (프론트엔드 호환성)
-        tags: post.tagNames || [],
+        tags: post.tagList || [],
         // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
         thumbnail: this.optimizeImageUrl(post.thumbnail),
         // 작성자 프로필 이미지 최적화
@@ -437,7 +426,7 @@ export class PostsService {
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
       publishedAt: post.publishedAt ? formatDate(post.publishedAt) : null,
-      tags: post.tagNames || [],
+      tags: post.tagList || [],
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
       // 작성자 프로필 이미지 최적화
       author: post.author ? {
@@ -465,7 +454,7 @@ export class PostsService {
       .leftJoinAndSelect('post.likedBy', 'likedBy')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagNames', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileUrl', 'file.fileType',
@@ -502,7 +491,7 @@ export class PostsService {
       ...post,
       liked, // 사용자 좋아요 상태 추가
       likedBy: undefined, // 민감한 정보 제거
-      tags: post.tagNames || [], // 태그 필드 추가 (프론트엔드 호환성)
+      tags: post.tagList || [], // 태그 필드 추가 (프론트엔드 호환성)
       publishedAt: formatDate(post.publishedAt),
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
@@ -520,7 +509,7 @@ export class PostsService {
       .leftJoinAndSelect('post.likedBy', 'likedBy')
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagNames', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileUrl', 'file.fileType',
@@ -560,7 +549,7 @@ export class PostsService {
       ...post,
       liked, // 사용자 좋아요 상태 추가
       likedBy: undefined, // 민감한 정보 제거
-      tags: post.tagNames || [], // 태그 필드 추가 (프론트엔드 호환성)
+      tags: post.tagList || [], // 태그 필드 추가 (프론트엔드 호환성)
       publishedAt: formatDate(post.publishedAt),
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
@@ -605,24 +594,23 @@ export class PostsService {
       await this.cleanupUnusedImages(post.id, post.content, processedContent, user.id);
     }
 
-    // 태그 업데이트 준비
-    const oldTagNames = post.tagNames || [];
-    const newTagNames = updatePostDto.tags || [];
-    
-    // tags는 Entity와 충돌하므로 제거하고 tagNames로만 처리
+    // 태그 업데이트 (JSONB로 단순 저장)
+    const newTagList = updatePostDto.tags || post.tagList || [];
+
+    // tags는 DTO에서 온 것이므로 제거
     const { tags, ...updateDataWithoutTags } = updatePostDto;
-    
+
     // 업데이트 적용
     Object.assign(post, {
       ...updateDataWithoutTags,
       content: processedContent,
       content_markdown: markdownContent,
-      tagNames: newTagNames, // 빠른 조회용 캐시 업데이트
+      tagList: newTagList, // JSONB 태그 배열 업데이트
     });
 
     // Title 변경 시 slug는 변경하지 않음 (이미 고유한 UUID 포함)
     // SEO를 위해 기존 slug 유지가 더 좋음
-    
+
     // thumbnail이 명시적으로 제공된 경우 사용, 그렇지 않으면 content에서 추출
     if (updatePostDto.thumbnail !== undefined) {
       post.thumbnail = updatePostDto.thumbnail;
@@ -631,29 +619,6 @@ export class PostsService {
     }
 
     await this.postsRepository.save(post);
-    
-    // 태그가 변경된 경우 정규화된 태그 업데이트
-    if (JSON.stringify(oldTagNames.sort()) !== JSON.stringify(newTagNames.sort())) {
-      // 기존 태그 카운트 감소
-      if (oldTagNames.length > 0) {
-        const oldTags = await this.tagsService.findByPost(post.id);
-        if (oldTags.length > 0) {
-          await this.tagsService.decrementPostCount(oldTags.map(tag => tag.id));
-        }
-      }
-      
-      // 새 태그 생성/연결 및 카운트 증가
-      if (newTagNames.length > 0) {
-        const newTags = await this.tagsService.findOrCreateTags(newTagNames);
-        post.tags = Promise.resolve(newTags);
-        await this.postsRepository.save(post);
-        await this.tagsService.incrementPostCount(newTags.map(tag => tag.id));
-      } else {
-        // 태그가 모두 제거된 경우
-        post.tags = Promise.resolve([]);
-        await this.postsRepository.save(post);
-      }
-    }
 
     if (updatePostDto.attachedFileIds !== undefined) {
       // 파일 개수 검증
@@ -689,13 +654,8 @@ export class PostsService {
       throw new ForbiddenException('You can only delete your own posts');
     }
 
-    // 태그 카운트 감소 (정규화된 태그)
-    if (post.tagNames && post.tagNames.length > 0) {
-      const tags = await this.tagsService.findByPost(post.id);
-      if (tags.length > 0) {
-        await this.tagsService.decrementPostCount(tags.map(tag => tag.id));
-      }
-    }
+    // JSONB 기반 태그는 카운트 관리가 불필요함
+    // 태그 통계는 필요시 집계 쿼리로 처리
     
     // 포스트 삭제 (CASCADE로 관련 데이터 자동 삭제)
     // post_tags, post_likes, post_files는 @JoinTable로 자동 처리됨
@@ -710,7 +670,7 @@ export class PostsService {
       .leftJoinAndSelect('post.author', 'author');
 
     if (search) {
-      query.where('(post.title LIKE :search OR post.content LIKE :search OR post.tagNames LIKE :search)', {
+      query.where('(post.title LIKE :search OR post.content LIKE :search OR post.tagList LIKE :search)', {
         search: `%${search}%`,
       });
     }
@@ -1217,4 +1177,27 @@ export class PostsService {
     return url;
   }
 
+  /**
+   * 인기 태그 조회 (JSONB 컬럼에서 집계)
+   * 캐시를 통해 성능 최적화 (1시간)
+   */
+  async getPopularTags(limit: number = 20): Promise<{ tag: string; count: number }[]> {
+    // PostgreSQL JSONB 배열을 풀어서 집계하는 쿼리
+    const result = await this.postsRepository
+      .createQueryBuilder('post')
+      .select('jsonb_array_elements_text(post.tagList) as tag')
+      .addSelect('COUNT(*)', 'count')
+      .where('post.isPublished = true')
+      .andWhere('jsonb_array_length(post.tagList) > 0')
+      .groupBy('tag')
+      .orderBy('count', 'DESC')
+      .limit(limit)
+      .getRawMany();
+
+    // 결과 포맷팅
+    return result.map(row => ({
+      tag: row.tag,
+      count: parseInt(row.count, 10),
+    }));
+  }
 } 
