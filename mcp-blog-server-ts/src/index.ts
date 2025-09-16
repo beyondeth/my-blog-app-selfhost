@@ -228,21 +228,22 @@ async function createServerInstance(_clientIp?: string, _apiKey?: string) {
       console.error("📋 Step 3/6: Analyzing and enhancing content quality...");
       let enhancedContent = markdownContent;
       let qualityReportText = "";
-      
-      if (auto_enhance || quality_report) {
-        const beforeMetrics = qualityEnhancer.analyzeQuality(markdownContent);
-        console.error(`📊 Original quality score: ${beforeMetrics.score}/100`);
-        
-        if (auto_enhance && beforeMetrics.score < 70) {
-          console.error("🔧 Enhancing markdown quality...");
-          enhancedContent = qualityEnhancer.enhance(markdownContent);
-          const afterMetrics = qualityEnhancer.analyzeQuality(enhancedContent);
-          console.error(`✨ Enhanced quality score: ${afterMetrics.score}/100 (improved by ${afterMetrics.score - beforeMetrics.score} points)`);
-        }
-        
-        if (quality_report) {
-          qualityReportText = qualityEnhancer.generateReport(enhancedContent);
-        }
+
+      // Always analyze quality to get the score
+      const beforeMetrics = qualityEnhancer.analyzeQuality(markdownContent);
+      console.error(`📊 Original quality score: ${beforeMetrics.score}/100`);
+      let finalQualityScore = beforeMetrics.score;
+
+      if (auto_enhance && beforeMetrics.score < 70) {
+        console.error("🔧 Enhancing markdown quality...");
+        enhancedContent = qualityEnhancer.enhance(markdownContent);
+        const afterMetrics = qualityEnhancer.analyzeQuality(enhancedContent);
+        console.error(`✨ Enhanced quality score: ${afterMetrics.score}/100 (improved by ${afterMetrics.score - beforeMetrics.score} points)`);
+        finalQualityScore = afterMetrics.score;
+      }
+
+      if (quality_report) {
+        qualityReportText = qualityEnhancer.generateReport(enhancedContent);
       }
 
       // Parse markdown metadata
@@ -280,9 +281,12 @@ async function createServerInstance(_clientIp?: string, _apiKey?: string) {
         const blogSlug = post.blogSlug || auth.blogInfo?.slug;
         const postUrl = `${auth.baseUrl}/blog/${blogSlug}/posts/${post.slug}`;
 
+        // Debug log for quality score
+        console.error(`🔍 DEBUG: finalQualityScore = ${finalQualityScore}`);
+
         const responseText = quality_report && qualityReportText
-          ? `✅ Post created successfully!\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}\n\n${qualityReportText}`
-          : `✅ Post created successfully!\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}`;
+          ? `✅ Post created successfully! (Quality: ${finalQualityScore}/100)\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📊 Quality Score: ${finalQualityScore}/100\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}\n\n${qualityReportText}`
+          : `✅ Post created successfully! (Quality: ${finalQualityScore}/100)\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📊 Quality Score: ${finalQualityScore}/100\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}`;
         
         return {
           content: [

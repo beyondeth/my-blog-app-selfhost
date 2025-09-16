@@ -46,11 +46,18 @@ export function parseMarkdownMetadata(content: string): {
     }
   }
 
-  // If no title, extract from first h1
+  // If no title, extract from first h1 or h2
   if (metadata.title === "Untitled") {
+    // Try h1 first
     const h1Match = /^#\s+(.+)$/m.exec(body);
     if (h1Match && h1Match[1]) {
       metadata.title = h1Match[1];
+    } else {
+      // If no h1, try h2
+      const h2Match = /^##\s+(.+)$/m.exec(body);
+      if (h2Match && h2Match[1]) {
+        metadata.title = h2Match[1];
+      }
     }
   }
 
