@@ -1,5 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { CacheService } from '../cache/cache.service';
+import { Injectable, Logger, Inject } from '@nestjs/common';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import { Redis } from 'ioredis';
 
 export interface RateLimitResult {
   allowed: boolean;
@@ -27,7 +28,7 @@ export class McpRateLimitService {
     blockDuration: 300, // 5분 차단
   };
 
-  constructor(private readonly cacheService: CacheService) {}
+  constructor(@InjectRedis() private readonly redis: Redis) {}
 
   /**
    * Rate Limit 체크 (IP + API Key 조합)
@@ -41,13 +42,13 @@ export class McpRateLimitService {
 
     // 1. 연속 실패로 인한 차단 확인
     const blockKey = `mcp:block:${ip}:${apiKeyId}`;
-    const blockUntil = await this.cacheService.get<number>(blockKey);
-    if (blockUntil && now < blockUntil) {
+    const blockUntil = await this.redis.get(blockKey);
+    if (blockUntil && now < parseInt(blockUntil)) {
       return {
         allowed: false,
         remaining: 0,
-        resetTime: blockUntil,
-        retryAfter: blockUntil - now,
+        resetTime: parseInt(blockUntil),
+        retryAfter: parseInt(blockUntil) - now,
       };
     }
 
@@ -104,7 +105,7 @@ export class McpRateLimitService {
     const windowStart = Math.floor(now / seconds) * seconds;
     const windowKey = `${key}:${windowStart}`;
 
-    const current = await this.cacheService.get<number>(windowKey) || 0;
+    const current = parseInt(await this.redis.get(windowKey) || '0');
     const remaining = limit - current;
     const resetTime = windowStart + seconds;
 
@@ -142,8 +143,8 @@ export class McpRateLimitService {
     const windowStart = Math.floor(now / seconds) * seconds;
     const windowKey = `${key}:${windowStart}`;
 
-    const current = await this.cacheService.get<number>(windowKey) || 0;
-    await this.cacheService.set(windowKey, current + 1, seconds + 10); // 약간의 여유 TTL
+    const current = parseInt(await this.redis.get(windowKey) || '0');
+    await this.redis.setex(windowKey, seconds + 10, String(current + 1)); // 약간의 여유 TTL
   }
 
   /**
@@ -151,24 +152,24 @@ export class McpRateLimitService {
    */
   async recordFailure(ip: string, apiKeyId: string): Promise<void> {
     const failureKey = `mcp:failures:${ip}:${apiKeyId}`;
-    const failures = await this.cacheService.get<number>(failureKey) || 0;
+    const failures = parseInt(await this.redis.get(failureKey) || '0');
 
     const newFailures = failures + 1;
-    await this.cacheService.set(failureKey, newFailures, 3600); // 1시간 TTL
+    await this.redis.setex(failureKey, 3600, String(newFailures)); // 1시간 TTL
 
     // 연속 3회 실패 시 5분 차단
     if (newFailures >= 3) {
       const blockKey = `mcp:block:${ip}:${apiKeyId}`;
       const blockUntil = Math.floor(Date.now() / 1000) + this.DEFAULT_CONFIG.blockDuration;
 
-      await this.cacheService.set(blockKey, blockUntil, this.DEFAULT_CONFIG.blockDuration);
+      await this.redis.setex(blockKey, this.DEFAULT_CONFIG.blockDuration, String(blockUntil));
 
       this.logger.warn(
         `Blocking IP ${ip} with API Key ${apiKeyId} for ${this.DEFAULT_CONFIG.blockDuration}s due to ${newFailures} failures`
       );
 
       // 실패 카운터 리셋
-      await this.cacheService.del(failureKey);
+      await this.redis.del(failureKey);
     }
   }
 
@@ -177,7 +178,7 @@ export class McpRateLimitService {
    */
   async recordSuccess(ip: string, apiKeyId: string): Promise<void> {
     const failureKey = `mcp:failures:${ip}:${apiKeyId}`;
-    await this.cacheService.del(failureKey);
+    await this.redis.del(failureKey);
   }
 
   /**
@@ -189,23 +190,40 @@ export class McpRateLimitService {
     topIPs: Array<{ ip: string; requests: number }>;
   }> {
     try {
-      const stats = await this.cacheService.getStats();
-      const rateLimitKeys = stats.patterns?.['mcp'] || 0;
+      // Redis에서 직접 rate limit 관련 키 조회
+      const [rateLimitKeys, blockKeys] = await Promise.all([
+        this.redis.keys('mcp:rate:*'),
+        this.redis.keys('mcp:block:*'),
+      ]);
 
-      // 대략적인 통계 (실제로는 더 정확한 구현 필요)
+      // 상위 IP 통계 (간단한 구현)
+      const ipCounts: Record<string, number> = {};
+      for (const key of rateLimitKeys) {
+        const parts = key.split(':');
+        if (parts[2]) { // IP 부분 추출
+          const ip = parts[2];
+          const value = await this.redis.get(key);
+          ipCounts[ip] = (ipCounts[ip] || 0) + parseInt(value || '0');
+        }
+      }
+
+      const topIPs = Object.entries(ipCounts)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([ip, requests]) => ({ ip, requests }));
+
       return {
-        activeRateLimits: rateLimitKeys,
-        blockedIPs: Math.floor(rateLimitKeys * 0.1), // 추정값
-        topIPs: [
-          { ip: '127.0.0.1', requests: 8 },
-          { ip: '::1', requests: 5 },
+        activeRateLimits: rateLimitKeys.length,
+        blockedIPs: blockKeys.length,
+        topIPs: topIPs.length > 0 ? topIPs : [
+          { ip: '127.0.0.1', requests: 0 },
         ],
       };
     } catch (error) {
       this.logger.error('Failed to get rate limit stats:', error);
       return {
-        activeRateLimits: -1,
-        blockedIPs: -1,
+        activeRateLimits: 0,
+        blockedIPs: 0,
         topIPs: [],
       };
     }

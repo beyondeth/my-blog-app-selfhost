@@ -1,7 +1,8 @@
 export const ReportType = {
   POST: 'post',
   COMMENT: 'comment',
-  USER: 'user'
+  USER: 'user',
+  MESSAGE: 'message'
 } as const;
 
 export type ReportType = typeof ReportType[keyof typeof ReportType];

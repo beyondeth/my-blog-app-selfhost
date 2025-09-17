@@ -90,6 +90,30 @@ module.exports = {
   			lg: 'var(--radius)',
   			md: 'calc(var(--radius) - 2px)',
   			sm: 'calc(var(--radius) - 4px)'
+  		},
+  		keyframes: {
+  			'fade-in': {
+  				'0%': { opacity: '0', transform: 'translateY(10px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'slide-in-bottom': {
+  				'0%': { opacity: '0', transform: 'translateY(16px)' },
+  				'100%': { opacity: '1', transform: 'translateY(0)' }
+  			},
+  			'pulse-typing': {
+  				'0%, 100%': { opacity: '1' },
+  				'50%': { opacity: '0.5' }
+  			},
+  			'bounce-typing': {
+  				'0%, 80%, 100%': { transform: 'scale(0)' },
+  				'40%': { transform: 'scale(1)' }
+  			}
+  		},
+  		animation: {
+  			'fade-in': 'fade-in 0.3s ease-out',
+  			'slide-in-bottom': 'slide-in-bottom 0.3s ease-out',
+  			'pulse-typing': 'pulse-typing 1.4s infinite',
+  			'bounce-typing': 'bounce-typing 1.4s infinite'
   		}
   	}
   },

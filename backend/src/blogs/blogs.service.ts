@@ -1,43 +1,68 @@
-import { Injectable, ConflictException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, ConflictException, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Blog } from './entities/blog.entity';
 import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
 import { User } from '../users/entities/user.entity';
+import { RedisLockService } from '../redis/redis-lock.service';
 
 @Injectable()
 export class BlogsService {
+  private readonly logger = new Logger(BlogsService.name);
+
   constructor(
     @InjectRepository(Blog)
     private blogRepository: Repository<Blog>,
+    private redisLockService: RedisLockService,
   ) {}
 
   async create(createBlogDto: CreateBlogDto, user: User): Promise<Blog> {
-    // 사용자가 이미 블로그를 가지고 있는지 확인 (한 사용자당 하나의 블로그만)
-    const userBlog = await this.blogRepository.findOne({
-      where: { userId: user.id }
-    });
+    // 분산 락을 사용하여 중복 생성 방지
+    const lockKey = `blog:create:user:${user.id}`;
+    const lockTtl = 10000; // 10초
 
-    if (userBlog) {
-      throw new ConflictException('이미 블로그를 보유하고 있습니다. 한 계정당 하나의 블로그만 생성할 수 있습니다.');
+    try {
+      // 분산 락 사용하여 동시성 제어
+      return await this.redisLockService.executeWithLock(
+        lockKey,
+        lockTtl,
+        async () => {
+          // 사용자가 이미 블로그를 가지고 있는지 확인 (한 사용자당 하나의 블로그만)
+          const userBlog = await this.blogRepository.findOne({
+            where: { userId: user.id }
+          });
+
+          if (userBlog) {
+            throw new ConflictException('이미 블로그를 보유하고 있습니다. 한 계정당 하나의 블로그만 생성할 수 있습니다.');
+          }
+
+          // slug 중복 확인
+          const existingBlog = await this.blogRepository.findOne({
+            where: { slug: createBlogDto.slug }
+          });
+
+          if (existingBlog) {
+            throw new ConflictException('이미 사용 중인 블로그 주소입니다.');
+          }
+
+          const blog = this.blogRepository.create({
+            ...createBlogDto,
+            userId: user.id
+          });
+
+          const savedBlog = await this.blogRepository.save(blog);
+          this.logger.log(`Blog created successfully for user ${user.id} with slug ${createBlogDto.slug}`);
+
+          return savedBlog;
+        }
+      );
+    } catch (error) {
+      if (error.message?.includes('Failed to acquire lock')) {
+        throw new ConflictException('블로그 생성 중입니다. 잠시 후 다시 시도해주세요.');
+      }
+      throw error;
     }
-
-    // slug 중복 확인
-    const existingBlog = await this.blogRepository.findOne({
-      where: { slug: createBlogDto.slug }
-    });
-
-    if (existingBlog) {
-      throw new ConflictException('이미 사용 중인 블로그 주소입니다.');
-    }
-
-    const blog = this.blogRepository.create({
-      ...createBlogDto,
-      userId: user.id
-    });
-
-    return await this.blogRepository.save(blog);
   }
 
   async findOne(id: string): Promise<Blog> {

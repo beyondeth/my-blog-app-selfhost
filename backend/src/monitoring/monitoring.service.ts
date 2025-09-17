@@ -1,8 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, MoreThan } from 'typeorm';
 import { SuspiciousRequest } from './entities/suspicious-request.entity';
 import { Cron, CronExpression } from '@nestjs/schedule';
+import { Queue, Worker, Job } from 'bullmq';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import { Redis } from 'ioredis';
 
 export interface SuspiciousRequestDto {
   requestType: string;
@@ -17,52 +20,142 @@ export interface SuspiciousRequestDto {
 }
 
 @Injectable()
-export class MonitoringService {
+export class MonitoringService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = new Logger(MonitoringService.name);
-  private requestQueue: SuspiciousRequestDto[] = [];
-  private readonly BATCH_SIZE = 10;
-  private readonly FLUSH_INTERVAL = 5000; // 5 seconds
+  private suspiciousQueue: Queue<SuspiciousRequestDto>;
+  private worker: Worker<SuspiciousRequestDto>;
 
   constructor(
     @InjectRepository(SuspiciousRequest)
     private suspiciousRequestRepository: Repository<SuspiciousRequest>,
-  ) {
-    // Flush queue periodically
-    setInterval(() => this.flushQueue(), this.FLUSH_INTERVAL);
+    @InjectRedis() private readonly redis: Redis,
+  ) {}
+
+  async onModuleInit() {
+    // BullMQ Queue 초기화
+    this.suspiciousQueue = new Queue('suspicious-requests', {
+      connection: this.redis.duplicate(),
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 2000,
+        },
+        removeOnComplete: true,
+        removeOnFail: false,
+      },
+    });
+
+    // Worker 초기화 - Queue 처리
+    this.worker = new Worker(
+      'suspicious-requests',
+      async (job: Job<SuspiciousRequestDto>) => {
+        await this.processSuspiciousRequest(job.data);
+      },
+      {
+        connection: this.redis.duplicate(),
+        concurrency: 10, // 동시 처리 개수
+        limiter: {
+          max: 100,
+          duration: 1000, // 초당 최대 100개 처리
+        },
+      },
+    );
+
+    // Worker 이벤트 핸들러
+    this.worker.on('completed', (job) => {
+      this.logger.debug(`Job ${job.id} completed`);
+    });
+
+    this.worker.on('failed', (job, err) => {
+      this.logger.error(`Job ${job?.id} failed:`, err);
+    });
+
+    this.logger.log('MonitoringService initialized with BullMQ');
+  }
+
+  async onModuleDestroy() {
+    // Graceful shutdown
+    await this.worker?.close();
+    await this.suspiciousQueue?.close();
+    this.logger.log('MonitoringService shutdown completed');
   }
 
   /**
-   * Log a suspicious request
+   * Process a single suspicious request (배치 처리에서 호출)
+   */
+  private async processSuspiciousRequest(data: SuspiciousRequestDto): Promise<void> {
+    try {
+      await this.suspiciousRequestRepository.save(data);
+      this.logger.debug(`Processed suspicious request: ${data.requestType}`);
+    } catch (error) {
+      this.logger.error('Failed to save suspicious request:', error);
+      throw error; // BullMQ가 재시도 처리
+    }
+  }
+
+  /**
+   * Log a suspicious request (Queue에 추가)
    */
   async logSuspiciousRequest(data: SuspiciousRequestDto): Promise<void> {
-    this.requestQueue.push(data);
-    
-    // Log immediately for debugging
-    this.logger.warn(`Suspicious request: ${data.requestType} from ${data.ipAddress} - ${data.reason}`);
-    
-    // Flush if queue is full
-    if (this.requestQueue.length >= this.BATCH_SIZE) {
-      await this.flushQueue();
+    try {
+      // Queue에 추가
+      await this.suspiciousQueue.add('suspicious-request', data, {
+        priority: this.getPriorityBySeverity(data.severity),
+      });
+
+      // 즉시 로깅 (디버깅용)
+      this.logger.warn(
+        `Suspicious request queued: ${data.requestType} from ${data.ipAddress} - ${data.reason}`,
+      );
+    } catch (error) {
+      this.logger.error('Failed to queue suspicious request:', error);
+      // 큐 추가 실패 시 직접 저장 (fallback)
+      try {
+        await this.suspiciousRequestRepository.save(data);
+      } catch (saveError) {
+        this.logger.error('Failed to save suspicious request directly:', saveError);
+      }
     }
   }
 
   /**
-   * Batch insert suspicious requests
+   * Get priority based on severity
    */
-  private async flushQueue(): Promise<void> {
-    if (this.requestQueue.length === 0) return;
-
-    const requests = [...this.requestQueue];
-    this.requestQueue = [];
-
-    try {
-      await this.suspiciousRequestRepository.save(requests);
-      this.logger.log(`Flushed ${requests.length} suspicious requests to database`);
-    } catch (error) {
-      this.logger.error('Failed to save suspicious requests:', error);
-      // Re-add to queue for retry
-      this.requestQueue.unshift(...requests);
+  private getPriorityBySeverity(severity?: string): number {
+    switch (severity) {
+      case 'CRITICAL':
+        return 1;
+      case 'HIGH':
+        return 2;
+      case 'MEDIUM':
+        return 3;
+      case 'LOW':
+        return 4;
+      case 'WARNING':
+      default:
+        return 5;
     }
+  }
+
+  /**
+   * Get queue statistics
+   */
+  async getQueueStats() {
+    const waiting = await this.suspiciousQueue.getWaitingCount();
+    const active = await this.suspiciousQueue.getActiveCount();
+    const completed = await this.suspiciousQueue.getCompletedCount();
+    const failed = await this.suspiciousQueue.getFailedCount();
+    const delayed = await this.suspiciousQueue.getDelayedCount();
+
+    return {
+      waiting,
+      active,
+      completed,
+      failed,
+      delayed,
+      total: waiting + active + delayed,
+    };
   }
 
   /**
@@ -170,14 +263,14 @@ export class MonitoringService {
       LOW: 0,
       WARNING: 0,
     };
-    
+
     severityStats.forEach(stat => {
       if (stat.severity in severityCounts) {
         severityCounts[stat.severity] = parseInt(stat.count);
       }
     });
 
-    // 상위 IP 주소 (topOffenders를 topIPs로 변경)
+    // 상위 IP 주소
     const topIPs = await this.suspiciousRequestRepository
       .createQueryBuilder('sr')
       .select('sr.ipAddress', 'ip')
@@ -188,7 +281,7 @@ export class MonitoringService {
       .limit(5)
       .getRawMany();
 
-    // 상위 엔드포인트 추가
+    // 상위 엔드포인트
     const topEndpoints = await this.suspiciousRequestRepository
       .createQueryBuilder('sr')
       .select('sr.endpoint', 'endpoint')
@@ -209,6 +302,9 @@ export class MonitoringService {
       .orderBy('hour', 'ASC')
       .getRawMany();
 
+    // Queue 통계 추가
+    const queueStats = await this.getQueueStats();
+
     return {
       totalRequests,
       unresolvedCount,
@@ -218,6 +314,7 @@ export class MonitoringService {
       topEndpoints,
       summary: severityStats,
       hourlyTrend,
+      queueStats, // BullMQ 큐 통계 추가
     };
   }
 
@@ -247,6 +344,9 @@ export class MonitoringService {
       .execute();
 
     this.logger.log(`Cleaned up ${result.affected} old suspicious request records`);
+
+    // BullMQ 큐에서도 오래된 완료된 작업 정리
+    await this.suspiciousQueue.clean(30 * 24 * 60 * 60 * 1000, 100); // 30일 이상 된 작업 100개씩 삭제
   }
 
   /**

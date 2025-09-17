@@ -56,43 +56,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     try {
       // API 호출로 실제 인증 상태 확인
-      try {
-        const userData = await apiClient.getProfile();
-        setUser(userData);
-        
-        // 사용자 정보는 메모리에만 저장 (보안)
-      } catch (apiError: any) {
-        // 401 에러면 인증되지 않은 상태
-        if (apiError.statusCode === 401) {
-          setUser(null);
-          if (mounted) {
-            // 기존 토큰 정리 (legacy)
-            if (mounted && typeof window !== 'undefined') {
-              localStorage.removeItem('access_token');
-              localStorage.removeItem('token');
-              localStorage.removeItem('user');
-            }
-          }
-        } else {
-          // 네트워크 에러 등의 경우 localStorage 데이터 유지
-          console.error('Auth check failed with non-401 error:', apiError);
-          // 이미 user 상태가 있으면 유지 (localStorage에서 로드한 상태)
-          // 없을 때만 null로 설정
-          if (!user) {
-            setUser(null);
-          }
+      const userData = await apiClient.getProfile();
+      setUser(userData);
+    } catch (apiError: any) {
+      // 401 에러일 때만 로그아웃 처리
+      if (apiError.statusCode === 401) {
+        setUser(null);
+        // 기존 토큰 정리 (legacy)
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
         }
       }
-    } catch (error) {
-      console.error('Auth check failed:', error);
-      // 네트워크 에러시 기존 상태 유지
-      if (!user) {
-        setUser(null);
-      }
+      // 다른 에러(네트워크 등)는 무시하고 현재 상태 유지
     } finally {
       setIsLoading(false);
     }
-  }, [mounted, user]);
+  }, [mounted]);
 
   useEffect(() => {
     checkAuth();

@@ -25,13 +25,22 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { t } from '@/constants/adminTranslations';
 
-const navigation = [
+interface NavigationItem {
+  name: string;
+  href: string;
+  icon: any;
+  adminOnly?: boolean;
+  badge?: string;
+}
+
+const navigation: NavigationItem[] = [
   { name: t.navigation.dashboard, href: '/admin', icon: LayoutDashboard },
   { name: t.navigation.users, href: '/admin/users', icon: Users },
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
   { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
   { name: 'AI 포스팅 트래킹', href: '/admin/mcp-tracking', icon: Bot, adminOnly: true },
+  { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true, badge: 'New' },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: '메모리 관리', href: '/admin/memory', icon: Database, adminOnly: true },
@@ -145,18 +154,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <Link
                 key={item.name}
                 href={item.href}
-                className={`group flex items-center px-3 py-2 text-sm font-medium rounded-md transition-colors ${
+                className={`group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                   isActive
                     ? 'bg-indigo-50 text-indigo-600'
                     : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
                 }`}
               >
-                <Icon
-                  className={`mr-3 h-5 w-5 ${
-                    isActive ? 'text-indigo-600' : 'text-gray-400 group-hover:text-gray-500'
-                  }`}
-                />
-                {item.name}
+                <div className="flex items-center">
+                  <Icon
+                    className={`mr-3 h-5 w-5 ${
+                      isActive ? 'text-indigo-600' : 'text-gray-400 group-hover:text-gray-500'
+                    }`}
+                  />
+                  {item.name}
+                </div>
+                {item.badge && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                    {item.badge}
+                  </span>
+                )}
               </Link>
             );
           })}

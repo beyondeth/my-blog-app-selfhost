@@ -41,7 +41,7 @@ export default function McpPopularPosts({ posts }: McpPopularPostsProps) {
                 <div className="mt-1 flex items-center gap-4 text-xs text-gray-500">
                   <span className="flex items-center gap-1">
                     <Eye className="h-3 w-3" />
-                    {post.readCount}회 읽음
+                    {post.createdCount}회 읽음
                   </span>
                   <span className="flex items-center gap-1">
                     <Bot className="h-3 w-3" />
@@ -67,7 +67,7 @@ export default function McpPopularPosts({ posts }: McpPopularPostsProps) {
               
               <div className="ml-4 text-right">
                 <p className="text-xs text-gray-500">
-                  {new Date(post.lastAccessedAt).toLocaleDateString('ko-KR')}
+                  {new Date(post.lastCreatedAt).toLocaleDateString('ko-KR')}
                 </p>
               </div>
             </div>

@@ -10,6 +10,7 @@ import { PostsModule } from '../posts/posts.module';
 import { AuthModule } from '../auth/auth.module';
 import { SharedTrackingModule } from '../shared/shared-tracking.module';
 import { CacheModule } from '../cache/cache.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
@@ -17,7 +18,8 @@ import { CacheModule } from '../cache/cache.module';
     PostsModule,  // PostsService를 사용하기 위해 필요
     AuthModule,
     SharedTrackingModule,  // McpTrackingService를 위해 필요
-    CacheModule,  // Redis 캐시 서비스를 위해 필요
+    CacheModule,  // 캐시 서비스를 위해 필요
+    RedisModule,  // Redis 직접 접근을 위해 필요
   ],
   controllers: [McpController],
   providers: [

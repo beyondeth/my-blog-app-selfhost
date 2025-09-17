@@ -6,7 +6,8 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiKeysService } from '../api-keys/api-keys.service';
-import { CacheService } from '../cache/cache.service';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import { Redis } from 'ioredis';
 import { McpRateLimitService } from './mcp-rate-limit.service';
 import * as crypto from 'crypto';
 
@@ -18,13 +19,22 @@ export class McpAuthGuard implements CanActivate {
 
   constructor(
     private readonly apiKeysService: ApiKeysService,
-    private readonly cacheService: CacheService,
+    @InjectRedis() private readonly redis: Redis,
     private readonly rateLimitService: McpRateLimitService,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
     const headers = request.headers;
+
+    // 디버깅: 실제 받은 헤더 확인
+    this.logger.log('=== MCP Auth Headers Received ===');
+    this.logger.log(`x-api-key-id: ${headers['x-api-key-id']}`);
+    this.logger.log(`x-timestamp: ${headers['x-timestamp']}`);
+    this.logger.log(`x-nonce: ${headers['x-nonce']}`);
+    this.logger.log(`x-signature: ${headers['x-signature']}`);
+    this.logger.log(`x-api-key: ${headers['x-api-key'] ? 'Present' : 'Not present'}`);
+    this.logger.log('=================================');
 
     // 클라이언트 IP 추출
     const clientIP = this.getClientIP(request);
@@ -112,15 +122,20 @@ export class McpAuthGuard implements CanActivate {
         }
         
         if (sigBuffer1.length !== sigBuffer2.length || !crypto.timingSafeEqual(sigBuffer1, sigBuffer2)) {
-          // this.logger.warn('Invalid HMAC signature - MISMATCH DETAILS', {
-          //   keyId,
-          //   receivedSignature: signature,
-          //   expectedSignature: expectedSignature,
-          //   receivedLength: sigBuffer1.length,
-          //   expectedLength: sigBuffer2.length,
-          //   secretPrefix: signingSecret.substring(0, 10) + '...',
-          //   message,
-          // });
+          this.logger.warn('Invalid HMAC signature - MISMATCH DETAILS', {
+            keyId,
+            receivedSignature: signature,
+            expectedSignature: expectedSignature,
+            receivedLength: sigBuffer1.length,
+            expectedLength: sigBuffer2.length,
+            secretPrefix: signingSecret.substring(0, 10) + '...',
+            message,
+            method,
+            uri,
+            timestamp,
+            nonce,
+            bodyHash,
+          });
           throw new UnauthorizedException('유효하지 않은 서명입니다.');
         }
 
@@ -169,47 +184,11 @@ export class McpAuthGuard implements CanActivate {
       }
     }
 
-    // 기존 방식 (평문 API 키) - 하위 호환성을 위해 유지
-    const apiKey = 
-      headers['x-api-key'] || 
-      headers['authorization']?.replace('Bearer ', '');
-
-    if (!apiKey) {
-      this.logger.warn('MCP request without API key or signature');
-      throw new UnauthorizedException('API 키 또는 서명이 필요합니다.');
-    }
-
-    // Validate API key
-    const validation = await this.apiKeysService.validateApiKey(apiKey);
-    
-    if (!validation.valid) {
-      this.logger.warn(`Invalid API key attempted: ${apiKey.substring(0, 10)}...`);
-      throw new UnauthorizedException('유효하지 않은 API 키입니다.');
-    }
-
-    // Check if API key is active
-    if (!validation.apiKey.isActive) {
-      this.logger.warn(`Inactive API key used: ${validation.apiKey.id}`);
-      throw new UnauthorizedException('비활성화된 API 키입니다.');
-    }
-
-    // Check expiration
-    if (validation.apiKey.expiresAt && validation.apiKey.expiresAt < new Date()) {
-      this.logger.warn(`Expired API key used: ${validation.apiKey.id}`);
-      throw new UnauthorizedException('만료된 API 키입니다.');
-    }
-
-    // Attach API key data to request for use in controllers
-    request.apiKey = validation.apiKey;
-    request.blog = validation.apiKey.blog;
-    request.user = validation.apiKey.user;
-
-    // Log successful authentication
-    this.logger.log(
-      `MCP auth successful (Plain) - User: ${validation.apiKey.user.email}, Blog: ${validation.apiKey.blog.slug}`,
+    // 하위 호환 방식 완전 제거 - HMAC 인증만 허용
+    this.logger.warn('MCP request without HMAC signature - Access Denied');
+    throw new UnauthorizedException(
+      'HMAC 서명 인증이 필요합니다. x-api-key-id, x-timestamp, x-nonce, x-signature 헤더를 포함해주세요.'
     );
-
-    return true;
   }
 
   /**
@@ -217,7 +196,7 @@ export class McpAuthGuard implements CanActivate {
    */
   private async isNonceUsed(nonce: string): Promise<boolean> {
     const key = `mcp:nonce:${nonce}`;
-    const result = await this.cacheService.get(key);
+    const result = await this.redis.get(key);
     return result !== null;
   }
 
@@ -226,7 +205,7 @@ export class McpAuthGuard implements CanActivate {
    */
   private async markNonceAsUsed(nonce: string, timestamp: number): Promise<void> {
     const key = `mcp:nonce:${nonce}`;
-    await this.cacheService.set(key, timestamp, this.NONCE_TTL);
+    await this.redis.setex(key, this.NONCE_TTL, String(timestamp));
 
     this.logger.debug(`Nonce marked as used: ${nonce} (TTL: ${this.NONCE_TTL}s)`);
   }
@@ -241,11 +220,15 @@ export class McpAuthGuard implements CanActivate {
   }> {
     try {
       // 현재 활성 논스 개수 조회 (Redis pattern scan)
-      const stats = await this.cacheService.getStats();
-      const nonceCount = stats.patterns?.['mcp'] || 0;
+      const keys = await this.redis.keys('mcp:nonce:*');
+      const nonceCount = keys.length;
 
-      // 메모리 사용량 조회
-      const memoryUsage = await this.cacheService.getMemoryUsage();
+      // Redis INFO 명령으로 메모리 사용량 조회
+      const info = await this.redis.info('memory');
+      const memoryUsage = {
+        estimatedSize: this.parseRedisInfo(info, 'used_memory_human'),
+        hitRate: 0
+      };
 
       return {
         activeNonces: nonceCount,
@@ -262,7 +245,20 @@ export class McpAuthGuard implements CanActivate {
   }
 
   /**
-   * 클라이언트 IP 추출 (프록시, 로드밸런서 고려)
+   * Redis INFO 파싱 헬퍼
+   */
+  private parseRedisInfo(info: string, key: string): string {
+    const lines = info.split('\r\n');
+    for (const line of lines) {
+      if (line.startsWith(key + ':')) {
+        return line.split(':')[1];
+      }
+    }
+    return 'N/A';
+  }
+
+  /**
+   * 클라이언트 IP 추출 (프록시, 로드번런서 고려)
    */
   private getClientIP(request: any): string {
     const forwarded = request.headers['x-forwarded-for'];

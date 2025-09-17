@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import FollowButton from '../FollowButton';
+import { DMButton } from '../dm/DMButton';
 import UserAvatar from './UserAvatar';
 import { User, FollowInfo } from '@/types/api';
 
@@ -42,12 +43,17 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
           />
         </Link>
         {loggedInUser && loggedInUser.id !== user.id && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 flex flex-col gap-2">
             <FollowButton
               userId={user.id}
               initialState={followerState}
               variant="minimal"
               className="mt-1"
+            />
+            <DMButton
+              userId={user.id}
+              username={user.username}
+              size="sm"
             />
           </div>
         )}

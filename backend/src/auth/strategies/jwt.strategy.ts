@@ -17,7 +17,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       jwtFromRequest: ExtractJwt.fromExtractors([
         // 쿠키에서 토큰 추출
         (request: Request) => {
-          return request?.cookies?.access_token;
+          const token = request?.cookies?.access_token;
+          console.log('[JWT Extract] Cookies:', Object.keys(request?.cookies || {}));
+          console.log('[JWT Extract] Token found:', !!token);
+          return token;
         },
         // 백업으로 Authorization 헤더도 지원 (API 테스트용)
         ExtractJwt.fromAuthHeaderAsBearerToken(),
@@ -28,8 +31,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(payload: any) {
-    // JWT payload has 'id' field, not 'sub'
-    const userId = payload.id || payload.sub;
+    // JWT payload has 'sub' field (standard claim)
+    const userId = payload.sub || payload.id;
+    console.log('[JWT Validate] Payload:', { sub: payload.sub, id: payload.id, email: payload.email });
+
+    if (!userId) {
+      console.error('[JWT Validate] No userId found in payload');
+      return null;
+    }
+
     const cacheKey = `user_validate_${userId}`;
     
     // 1. 캐시에서 사용자 정보 조회

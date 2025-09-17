@@ -11,11 +11,11 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar } from '@/components/ui/avatar';
-import { 
-  FiUser, 
-  FiSettings, 
-  FiKey, 
-  FiLogOut, 
+import {
+  FiUser,
+  FiSettings,
+  FiKey,
+  FiLogOut,
   FiChevronDown,
   FiEdit3,
   FiBookOpen,
@@ -23,7 +23,8 @@ import {
   FiShield,
   FiBell,
   FiHelpCircle,
-  FiUsers
+  FiUsers,
+  FiMessageSquare
 } from 'react-icons/fi';
 
 interface ProfileDropdownProps {
@@ -116,12 +117,21 @@ export default function ProfileDropdown({
         </DropdownMenuItem>
 
         {/* Relationships */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => handleNavigation('/settings/relationships')}
           className="cursor-pointer"
         >
           <FiUsers className="mr-2 h-4 w-4" />
           <span>관계 설정</span>
+        </DropdownMenuItem>
+
+        {/* DM Management */}
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/settings/dm')}
+          className="cursor-pointer"
+        >
+          <FiMessageSquare className="mr-2 h-4 w-4" />
+          <span>DM 관리</span>
         </DropdownMenuItem>
 
         {/* API Keys */}
