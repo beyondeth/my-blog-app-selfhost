@@ -51,9 +51,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 2. 캐시에 없으면 DB에서 조회
     const user = await this.usersService.findById(userId);
     
-    // 3. DB 조회 결과를 캐시에 저장 (2초)
+    // 3. DB 조회 결과를 캐시에 저장 (환경변수로 설정, 기본 5초)
     if (user) {
-      await this.cacheManager.set(cacheKey, user, 2000);
+      await this.cacheManager.set(
+        cacheKey,
+        user,
+        this.configService.get<number>('JWT_CACHE_TTL', 5000)
+      );
     }
 
     return user;

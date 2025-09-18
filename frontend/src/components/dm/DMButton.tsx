@@ -5,7 +5,7 @@ import { MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useChat } from '@/hooks/useChat';
 import { useState } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import toast from 'react-hot-toast';
 
 interface DMButtonProps {

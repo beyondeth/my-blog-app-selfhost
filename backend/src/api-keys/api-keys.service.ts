@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, ForbiddenException, ConflictException } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ApiKey } from './entities/api-key.entity';
@@ -10,12 +11,19 @@ import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class ApiKeysService {
+  private readonly encryptionSalt: string;
+
   constructor(
     @InjectRepository(ApiKey)
     private apiKeyRepository: Repository<ApiKey>,
     @InjectRepository(Blog)
     private blogRepository: Repository<Blog>,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    // constructor에서 한 번만 salt 결정 (일관성 보장)
+    this.encryptionSalt = this.configService.get<string>('ENCRYPTION_SALT') ||
+      crypto.randomBytes(16).toString('hex');
+  }
 
   /**
    * API 키 생성
@@ -284,9 +292,13 @@ export class ApiKeysService {
    */
   private encryptSigningSecret(secret: string): string {
     const algorithm = 'aes-256-gcm';
+    const encryptionKey = this.configService.get<string>('ENCRYPTION_KEY');
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY is not defined in environment variables');
+    }
     const key = crypto.scryptSync(
-      process.env.ENCRYPTION_KEY,
-      'salt',
+      encryptionKey,
+      this.encryptionSalt,  // 클래스 레벨에서 관리되는 salt 사용
       32
     );
     const iv = crypto.randomBytes(16);
@@ -306,9 +318,13 @@ export class ApiKeysService {
    */
   decryptSigningSecret(encryptedSecret: string): string {
     const algorithm = 'aes-256-gcm';
+    const encryptionKey = this.configService.get<string>('ENCRYPTION_KEY');
+    if (!encryptionKey) {
+      throw new Error('ENCRYPTION_KEY is not defined in environment variables');
+    }
     const key = crypto.scryptSync(
-      process.env.ENCRYPTION_KEY,
-      'salt',
+      encryptionKey,
+      this.encryptionSalt,  // 클래스 레벨에서 관리되는 salt 사용 (일관성 보장)
       32
     );
     

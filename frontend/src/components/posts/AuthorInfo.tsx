@@ -10,7 +10,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { queryKeys } from '@/lib/query-keys';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { Post } from '@/types';
 
 interface AuthorInfoProps {

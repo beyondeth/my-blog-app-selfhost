@@ -3,7 +3,7 @@
 import { FollowInfo } from '@/types/api';
 import { UserCheck } from 'lucide-react';
 import useFollowInfo from '@/hooks/useFollowInfo';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 interface FollowIndicatorProps {
   userId: string;

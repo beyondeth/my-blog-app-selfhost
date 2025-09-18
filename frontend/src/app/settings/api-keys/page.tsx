@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserBlog } from '@/hooks/useUserBlog';
+import { useAuth } from '@/providers/AuthProviderV2';
+import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
 import { FiKey, FiCopy, FiTrash2, FiPlus, FiToggleLeft, FiToggleRight, FiClock, FiActivity, FiAlertCircle, FiInfo, FiChevronDown, FiChevronUp, FiCheckCircle } from 'react-icons/fi';
 import { formatDistanceToNow, format } from 'date-fns';
 import { ko } from 'date-fns/locale';
@@ -23,7 +23,7 @@ interface ApiKey {
 
 export default function ApiKeysPage() {
   const { user } = useAuth();
-  const { blog, loading: blogLoading } = useUserBlog();
+  const { blog, loading: blogLoading } = useUserBlogV2();
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');

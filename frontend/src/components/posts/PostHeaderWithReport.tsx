@@ -7,7 +7,7 @@ import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui/avatar';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 interface PostHeaderWithReportProps {
   post: Post;

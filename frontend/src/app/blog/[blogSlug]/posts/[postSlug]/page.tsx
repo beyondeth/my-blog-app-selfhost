@@ -9,7 +9,7 @@ import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';
 import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import CommentSection from '@/components/comments/CommentSection';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';

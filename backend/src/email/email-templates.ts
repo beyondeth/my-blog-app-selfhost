@@ -37,7 +37,7 @@ export const getAWSStyleEmailTemplate = (code: string): string => {
           </p>
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center;">
             <p style="font-size: 12px; color: #687078; margin: 0; line-height: 1.6;">
-              © 2025 codebase.blog. All rights reserved.<br>
+              © ${process.env.EMAIL_COPYRIGHT_YEAR || '2025'} codebase.blog. All rights reserved.<br>
               이 메시지는 codebase.blog에서 전송되었습니다.
             </p>
           </div>
@@ -87,7 +87,7 @@ export const getAWSStylePasswordResetTemplate = (username: string, resetUrl: str
           </p>
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center;">
             <p style="font-size: 12px; color: #687078; margin: 0; line-height: 1.6;">
-              © 2025 codebase.blog. All rights reserved.<br>
+              © ${process.env.EMAIL_COPYRIGHT_YEAR || '2025'} codebase.blog. All rights reserved.<br>
               이 메시지는 codebase.blog에서 전송되었습니다.
             </p>
           </div>

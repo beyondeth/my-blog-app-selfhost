@@ -5,7 +5,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronDown, FiUser, FiMoreVertical, FiFlag } from 'react-icons/fi';
 import type { Comment } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { Button } from '@/components/ui/button';
 import { Avatar } from '@/components/ui/avatar';
 import CommentForm from './CommentForm';

@@ -378,7 +378,7 @@ export class AuthService {
 
     // 세션 토큰은 2시간 유효 (GitHub 스타일)
     return this.jwtService.sign(payload, {
-      expiresIn: '2h',
+      expiresIn: this.configService.get<string>('JWT_SESSION_EXPIRES_IN', '2h'),
     });
   }
 

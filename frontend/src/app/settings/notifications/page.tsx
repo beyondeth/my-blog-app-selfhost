@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { FiBell, FiMail, FiSmartphone, FiMessageSquare, FiHeart, FiUserPlus, FiTrendingUp, FiDollarSign, FiAlertCircle } from 'react-icons/fi';
 
 interface NotificationSettings {

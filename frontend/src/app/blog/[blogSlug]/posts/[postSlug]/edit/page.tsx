@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter, useParams } from 'next/navigation';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost, useUpdatePost } from '@/hooks/usePosts';
 import { FiEdit3, FiType, FiAlignLeft, FiImage, FiArrowLeft } from 'react-icons/fi';
 import { BlogRichTextEditor } from '@/editor';

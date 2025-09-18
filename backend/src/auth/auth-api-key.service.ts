@@ -10,7 +10,7 @@ import * as bcrypt from 'bcrypt';
 @Injectable()
 export class AuthApiKeyService {
   private readonly logger = new Logger(AuthApiKeyService.name);
-  private readonly TIMESTAMP_WINDOW = 300000; // 5분 시간 윈도우
+  private readonly TIMESTAMP_WINDOW: number;
   private readonly usedNonces = new Map<string, number>(); // 논스 저장 (메모리)
   private readonly NONCE_CLEANUP_INTERVAL = 600000; // 10분마다 정리
 
@@ -20,6 +20,9 @@ export class AuthApiKeyService {
     @InjectRepository(ApiKey)
     private readonly apiKeyRepository: Repository<ApiKey>,
   ) {
+    // constructor에서 환경 변수 로드
+    this.TIMESTAMP_WINDOW = this.configService.get<number>('API_KEY_TIMESTAMP_WINDOW', 300000);
+
     // 주기적으로 오래된 논스 정리
     setInterval(() => this.cleanupNonces(), this.NONCE_CLEANUP_INTERVAL);
   }

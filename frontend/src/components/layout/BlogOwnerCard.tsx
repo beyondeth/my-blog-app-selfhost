@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import UserAvatar from '@/components/ui/UserAvatar';
 import FollowButton from '@/components/FollowButton';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { queryKeys } from '@/lib/query-keys';
 
 interface BlogOwnerCardProps {

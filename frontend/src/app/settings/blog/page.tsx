@@ -1,8 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { useUserBlog } from '@/hooks/useUserBlog';
+import { useAuth } from '@/providers/AuthProviderV2';
+import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
 import { useRouter } from 'next/navigation';
 import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiSettings, FiCopy } from 'react-icons/fi';
 import { format } from 'date-fns';
@@ -11,7 +11,7 @@ import type { Blog } from '@/types';
 
 export default function BlogSettingsPage() {
   const { user } = useAuth();
-  const { blog, loading: blogLoading, refresh: refreshBlog } = useUserBlog();
+  const { blog, loading: blogLoading, refresh: refreshBlog } = useUserBlogV2();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);

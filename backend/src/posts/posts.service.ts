@@ -321,7 +321,7 @@ export class PostsService {
     }
 
     if (search) {
-      query.andWhere('(post.title LIKE :search OR post.content LIKE :search OR post.tagList LIKE :search)', {
+      query.andWhere('(post.title LIKE :search OR post.content LIKE :search OR post."tagList"::text LIKE :search)', {
         search: `%${search}%`,
       });
     }

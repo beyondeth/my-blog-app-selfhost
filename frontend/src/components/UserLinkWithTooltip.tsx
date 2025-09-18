@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { PropsWithChildren } from 'react';
 import UserTooltip from './UserTooltip';
 import { queryKeys } from '@/lib/query-keys';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 interface UserLinkWithTooltipProps extends PropsWithChildren {
   userId: string;

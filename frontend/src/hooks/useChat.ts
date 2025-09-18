@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from './useSocket';
-import { useAuth } from './useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import toast from 'react-hot-toast';
 
 export interface Message {
@@ -191,15 +191,22 @@ export function useChat(conversationId?: string) {
       const message = await response.json();
 
       // Replace optimistic message with real message
-      setMessages(prev => prev.map(msg =>
-        msg.id === optimisticMessage.id ? message : msg
-      ));
+      // Only update if the message content or important fields changed
+      setMessages(prev => prev.map(msg => {
+        if (msg.id === optimisticMessage.id) {
+          // Preserve the UI state while updating the actual data
+          return {
+            ...message,
+            // Keep the same created date to avoid re-rendering
+            createdAt: optimisticMessage.createdAt,
+          };
+        }
+        return msg;
+      }));
 
-      // Emit through socket for real-time update to other users
-      socket.emit('send-message', {
-        conversationId,
-        content
-      });
+      // Note: No need to emit through socket here
+      // The backend will handle broadcasting the message through WebSocket
+      // after it's saved to the database via the HTTP POST request
 
       return message;
     } catch (error) {
@@ -264,7 +271,26 @@ export function useChat(conversationId?: string) {
     // Listen for new messages
     socket.on('new-message', (message: Message) => {
       if (message.conversationId === conversationId) {
-        // Prevent duplicates by checking if message already exists
+        // Skip if this is our own message (we already have it from optimistic update)
+        if (message.senderId === user?.id) {
+          // Just update the message with server data if needed
+          setMessages(prev => prev.map(msg => {
+            // Find temp message by content and time proximity
+            if (msg.id.startsWith('temp-') &&
+                msg.content === message.content &&
+                msg.senderId === message.senderId) {
+              return message;
+            }
+            // Or if it's already the same message
+            if (msg.id === message.id) {
+              return message;
+            }
+            return msg;
+          }));
+          return;
+        }
+
+        // For messages from other users, add them
         setMessages(prev => {
           const exists = prev.some(msg => msg.id === message.id);
           if (exists) return prev;
@@ -272,9 +298,7 @@ export function useChat(conversationId?: string) {
         });
 
         // Mark as read if it's from other user
-        if (message.senderId !== user?.id) {
-          markAsRead(message.id);
-        }
+        markAsRead(message.id);
       }
     });
 

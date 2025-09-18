@@ -1,7 +1,7 @@
 "use client";
 
 import Link from 'next/link';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import FollowButton from '../FollowButton';
 import { DMButton } from '../dm/DMButton';
 import UserAvatar from './UserAvatar';

@@ -5,6 +5,7 @@ import {
   UnauthorizedException,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { ApiKeysService } from '../api-keys/api-keys.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
@@ -14,14 +15,18 @@ import * as crypto from 'crypto';
 @Injectable()
 export class McpAuthGuard implements CanActivate {
   private readonly logger = new Logger(McpAuthGuard.name);
-  private readonly TIMESTAMP_WINDOW = 300000; // 5분 시간 윈도우
+  private readonly TIMESTAMP_WINDOW: number;
   private readonly NONCE_TTL = 300; // 5분 TTL (초 단위)
 
   constructor(
+    private readonly configService: ConfigService,
     private readonly apiKeysService: ApiKeysService,
     @InjectRedis() private readonly redis: Redis,
     private readonly rateLimitService: McpRateLimitService,
-  ) {}
+  ) {
+    // constructor에서 환경 변수 로드
+    this.TIMESTAMP_WINDOW = this.configService.get<number>('MCP_TIMESTAMP_WINDOW', 300000);
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();

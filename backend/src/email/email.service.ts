@@ -23,7 +23,9 @@ export class EmailService {
    * 6자리 숫자 인증 코드 생성
    */
   generateVerificationCode(): string {
-    return Math.floor(100000 + Math.random() * 900000).toString();
+    const min = parseInt(process.env.EMAIL_CODE_MIN || '100000');
+    const max = parseInt(process.env.EMAIL_CODE_MAX || '999999');
+    return Math.floor(min + Math.random() * (max - min + 1)).toString();
   }
 
   /**

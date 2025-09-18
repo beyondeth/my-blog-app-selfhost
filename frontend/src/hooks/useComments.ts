@@ -3,7 +3,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import type { Comment, CommentForm } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 // 댓글 조회 훅
 export function useComments(postId: string, options?: { enabled?: boolean }) {

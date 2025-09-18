@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useCallback } from 'react';
-import { useUserBlog } from '@/hooks/useUserBlog';
+import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
 
 interface Blog {
   id: string;
@@ -16,13 +16,13 @@ interface UserBlogContextType {
   loading: boolean;
   error: string | null;
   checkAndRedirect: () => Promise<string>;
-  refresh: () => Promise<void>;
+  refresh: () => Promise<any>; // Changed to match TanStack Query return type
 }
 
 const UserBlogContext = createContext<UserBlogContextType | undefined>(undefined);
 
 export function UserBlogProvider({ children }: { children: React.ReactNode }) {
-  const userBlogData = useUserBlog();
+  const userBlogData = useUserBlogV2();
 
   return (
     <UserBlogContext.Provider value={userBlogData}>

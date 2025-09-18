@@ -88,7 +88,7 @@ export class ReportsService {
     status?: ReportStatus,
     type?: ReportType,
     page = 1,
-    limit = 20,
+    limit = parseInt(process.env.DEFAULT_PAGE_LIMIT || '20'),
   ) {
     const where: FindOptionsWhere<Report> = {};
     

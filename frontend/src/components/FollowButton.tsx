@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { FollowInfo } from '@/types/api';

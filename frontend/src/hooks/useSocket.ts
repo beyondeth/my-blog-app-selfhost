@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import io, { Socket } from 'socket.io-client';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 export function useSocket() {
   const socketRef = useRef<Socket | null>(null);

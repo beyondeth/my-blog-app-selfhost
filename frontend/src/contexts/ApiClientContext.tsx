@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { ApiClient, createApiClient, defaultApiClient } from '@/lib/api-client-factory';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 interface ApiClientContextType {
   apiClient: ApiClient;

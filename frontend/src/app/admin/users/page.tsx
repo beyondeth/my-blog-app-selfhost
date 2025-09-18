@@ -48,7 +48,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { t } from '@/constants/adminTranslations';
 import { useAdminUsers, useUpdateUserRole, useToggleUserStatus } from '@/hooks/useAdmin';
 

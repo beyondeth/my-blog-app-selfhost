@@ -145,7 +145,7 @@ export class CdnService {
       this.logger.log(`Invalidating CDN cache for ${paths.length} paths`);
       
       // 배치 처리 (CloudFront는 한 번에 최대 3000개 경로)
-      const batchSize = 3000;
+      const batchSize = parseInt(process.env.CDN_BATCH_SIZE || '3000');
       for (let i = 0; i < paths.length; i += batchSize) {
         const batch = paths.slice(i, i + batchSize);
         await this.createInvalidation(distributionId, batch);

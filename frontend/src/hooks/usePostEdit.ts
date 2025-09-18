@@ -1,7 +1,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { useImageProcessor } from '@/hooks/useImageProcessor';
 import { apiClient } from '@/lib/api';
 

@@ -43,11 +43,15 @@ async function bootstrap() {
   // CORS configuration
   app.enableCors({
     origin: (origin, callback) => {
-      const allowedOrigins = [
-        'http://localhost:3000',
-        'http://localhost:3001',
-        configService.get('CORS_ORIGIN', 'http://localhost:3001'),
-      ];
+      // 환경 변수에서 허용된 origin 목록 가져오기 (콤마로 구분)
+      const corsOrigins = configService.get('CORS_ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:3001');
+      const allowedOrigins = corsOrigins.split(',').map((o: string) => o.trim());
+
+      // CORS_ORIGIN 환경 변수가 있으면 추가 (하위 호환성)
+      const additionalOrigin = configService.get('CORS_ORIGIN');
+      if (additionalOrigin && !allowedOrigins.includes(additionalOrigin)) {
+        allowedOrigins.push(additionalOrigin);
+      }
       
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
@@ -139,7 +143,7 @@ async function bootstrap() {
     });
   });
 
-  const port = configService.get('PORT', 3000);
+  const port = configService.get<number>('PORT', 3000);
   
   await app.listen(port, '0.0.0.0');
   

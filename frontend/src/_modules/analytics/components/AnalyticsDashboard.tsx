@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { FiActivity, FiClock, FiEye, FiTrendingUp, FiSearch, FiBookOpen, FiDownload, FiTrash2, FiX, FiUsers, FiFileText, FiCalendar } from 'react-icons/fi';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { formatDuration, formatReadingSpeed, formatRelativeTime, getEngagementLevel } from '../utils/formatters';
 
 interface DashboardProps {

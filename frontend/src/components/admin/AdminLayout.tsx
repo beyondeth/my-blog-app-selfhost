@@ -21,7 +21,7 @@ import {
   Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { toast } from 'sonner';
 import { t } from '@/constants/adminTranslations';
 

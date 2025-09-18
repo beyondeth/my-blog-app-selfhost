@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { FollowInfo } from '@/types/api';
 import { queryKeys } from '@/lib/query-keys';
-import { useAuth } from './useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 /**
  * 사용자의 팔로우 정보를 조회하는 커스텀 훅

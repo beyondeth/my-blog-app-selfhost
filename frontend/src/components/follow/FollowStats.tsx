@@ -3,7 +3,7 @@
 import { queryKeys } from '@/lib/query-keys';
 import { FollowInfo } from '@/types/api';
 import { Users, UserCheck } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import useFollowInfo from '@/hooks/useFollowInfo';
 
 interface FollowStatsProps {

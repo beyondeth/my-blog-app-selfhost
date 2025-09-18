@@ -5,7 +5,7 @@ import UserAvatar from '@/components/ui/UserAvatar';
 import SidebarSection from './SidebarSection';
 import useFollowInfo from '@/hooks/useFollowInfo';
 import FollowButton from '@/components/FollowButton';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 interface ProfileSectionProps {
   name?: string;

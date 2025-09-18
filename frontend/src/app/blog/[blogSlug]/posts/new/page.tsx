@@ -7,7 +7,7 @@ import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { useCreatePost } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
 import type { UploadedImageInfo } from '@/editor';

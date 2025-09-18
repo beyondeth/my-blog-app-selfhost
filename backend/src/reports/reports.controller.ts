@@ -59,7 +59,7 @@ export class ReportsController {
     @Query('status', new DefaultValuePipe(null)) status?: ReportStatus,
     @Query('type', new DefaultValuePipe(null)) type?: ReportType,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+    @Query('limit', new DefaultValuePipe(parseInt(process.env.DEFAULT_PAGE_LIMIT || '20')), ParseIntPipe) limit?: number,
   ) {
     return await this.reportsService.findAll(status, type, page, limit);
   }
@@ -87,7 +87,7 @@ export class ReportsController {
   async getMyReports(
     @Request() req,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+    @Query('limit', new DefaultValuePipe(parseInt(process.env.DEFAULT_PAGE_LIMIT || '20')), ParseIntPipe) limit?: number,
   ) {
     return await this.reportsService.findByUser(req.user.id, page, limit);
   }

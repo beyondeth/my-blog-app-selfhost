@@ -1,7 +1,7 @@
 'use client';
 
 import { useChat } from '@/hooks/useChat';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';

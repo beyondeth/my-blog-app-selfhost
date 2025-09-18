@@ -148,7 +148,8 @@ export class Post {
     if (youtubeMatch && youtubeMatch[1]) {
       // YouTube 비디오 ID가 있으면 YouTube 썸네일 URL 생성
       const videoId = youtubeMatch[1];
-      this.thumbnail = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
+      const youtubeUrlPattern = process.env.YOUTUBE_THUMBNAIL_URL || 'https://img.youtube.com/vi/{id}/maxresdefault.jpg';
+      this.thumbnail = youtubeUrlPattern.replace('{id}', videoId);
       return;
     }
     

@@ -3,7 +3,8 @@
 import { QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
-import { AuthProvider } from '@/hooks/useAuth';
+import { AuthProviderV2 } from '@/providers/AuthProviderV2';
+import { MigrationProvider } from '@/providers/MigrationProvider';
 import { createQueryClient } from '@/utils/queryHelpers';
 
 export default function ClientProviders({
@@ -16,9 +17,11 @@ export default function ClientProviders({
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        {children}
-      </AuthProvider>
+      <MigrationProvider>
+        <AuthProviderV2>
+          {children}
+        </AuthProviderV2>
+      </MigrationProvider>
       {/* 개발 환경에서만 React Query DevTools 표시 */}
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>

@@ -6,6 +6,7 @@ import {
   HttpStatus,
   Logger,
 } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 
 interface RateLimitEntry {
   count: number;
@@ -17,11 +18,16 @@ interface RateLimitEntry {
 export class McpRateLimitGuard implements CanActivate {
   private readonly logger = new Logger(McpRateLimitGuard.name);
   private readonly attempts = new Map<string, RateLimitEntry>();
-  
+
   // Configuration
   private readonly MAX_ATTEMPTS = 10; // Max requests per window
   private readonly WINDOW_MS = 60000; // 1 minute window
-  private readonly BLOCK_DURATION_MS = 300000; // 5 minute block after exceeding
+  private readonly BLOCK_DURATION_MS: number;
+
+  constructor(private readonly configService: ConfigService) {
+    // constructor에서 환경 변수 로드
+    this.BLOCK_DURATION_MS = this.configService.get<number>('MCP_RATE_LIMIT_BLOCK_DURATION', 300000);
+  }
 
   canActivate(context: ExecutionContext): boolean {
     const request = context.switchToHttp().getRequest();

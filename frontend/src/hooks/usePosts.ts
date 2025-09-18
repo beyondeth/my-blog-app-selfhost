@@ -1,7 +1,7 @@
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { postsAPI } from '@/lib/api';
 import { Post } from '@/types';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/providers/AuthProviderV2';
 import { useRef, useCallback } from 'react';
 
 // Query 키 팩토리 패턴
@@ -127,14 +127,40 @@ export function useUpdatePost() {
 // 포스트 삭제 뮤테이션 훅
 export function useDeletePost() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: postsAPI.deletePost,
     onSuccess: (_, deletedId) => {
-      // 삭제된 포스트 캐시 제거
+      // 1. 삭제된 포스트 상세 캐시 제거
       queryClient.removeQueries({ queryKey: postQueryKeys.detail(deletedId) });
-      // 목록 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: postQueryKeys.lists() });
+
+      // 2. 무한 스크롤 목록에서 즉시 제거 (낙관적 업데이트)
+      queryClient.setQueriesData(
+        { queryKey: postQueryKeys.lists() },
+        (oldData: any) => {
+          if (!oldData || !oldData.pages) return oldData;
+
+          // 모든 페이지에서 삭제된 포스트 필터링
+          const newPages = oldData.pages.map((page: any) => ({
+            ...page,
+            posts: page.posts.filter((post: any) => post.id !== deletedId),
+            total: page.posts.some((post: any) => post.id === deletedId)
+              ? page.total - 1
+              : page.total
+          }));
+
+          return {
+            ...oldData,
+            pages: newPages,
+          };
+        }
+      );
+
+      // 3. 서버와 동기화를 위해 백그라운드에서 무효화
+      queryClient.invalidateQueries({
+        queryKey: postQueryKeys.lists(),
+        refetchType: 'none' // 즉시 refetch하지 않음 (이미 UI는 업데이트됨)
+      });
     },
     retry: 1,
   });
