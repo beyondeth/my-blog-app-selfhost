@@ -9,7 +9,10 @@ import {
   UseGuards,
   ParseIntPipe,
   ForbiddenException,
+  Sse,
+  MessageEvent,
 } from '@nestjs/common';
+import { Observable, interval, map, merge } from 'rxjs';
 import { ChatService } from './chat.service';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -24,6 +27,14 @@ export class ChatController {
   @Get('conversations')
   async getConversations(@CurrentUser() user: User) {
     return this.chatService.getConversations(user.id);
+  }
+
+  @Get('conversation/by-id/:conversationId')
+  async getConversationById(
+    @Param('conversationId') conversationId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.chatService.getConversationForUser(conversationId, user.id);
   }
 
   @Get('conversation/:userId')
@@ -62,6 +73,15 @@ export class ChatController {
     @CurrentUser() user: User,
   ) {
     await this.chatService.markAsRead(messageId, user.id);
+    return { success: true };
+  }
+
+  @Post('conversation/:conversationId/mark-all-read')
+  async markAllAsRead(
+    @Param('conversationId') conversationId: string,
+    @CurrentUser() user: User,
+  ) {
+    await this.chatService.markAllAsRead(conversationId, user.id);
     return { success: true };
   }
 
@@ -110,5 +130,19 @@ export class ChatController {
   async getUnreadCount(@CurrentUser() user: User) {
     const count = await this.chatService.getUnreadCount(user.id);
     return { count };
+  }
+
+  @Sse('notifications')
+  notifications(@CurrentUser() user: User): Observable<MessageEvent> {
+    // Create notification stream for the user
+    const notifications$ = this.chatService.getUserNotificationStream(user.id);
+
+    // Keep-alive ping every 30 seconds
+    const keepAlive$ = interval(30000).pipe(
+      map(() => ({ data: ':ping' } as MessageEvent))
+    );
+
+    // Merge notification stream with keep-alive
+    return merge(notifications$, keepAlive$);
   }
 }

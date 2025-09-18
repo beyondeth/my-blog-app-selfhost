@@ -1,0 +1,253 @@
+'use client';
+
+import React, { useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { useDMStore } from '@/stores/dmStore';
+import DMLayout from './DMLayout/DMLayout';
+import { useWindowSize } from '@/hooks/useWindowSize';
+
+interface DMModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  mode?: 'modal' | 'fullscreen';
+}
+
+const DMModal: React.FC<DMModalProps> = ({
+  isOpen,
+  onClose,
+  mode = 'modal'
+}) => {
+  const { isMobile } = useWindowSize();
+  const modalRef = useRef<HTMLDivElement>(null);
+  const [isFullscreen, setIsFullscreen] = React.useState(false);
+  const [isAnimating, setIsAnimating] = React.useState(false);
+  const [isMinimized, setIsMinimized] = React.useState(false);
+  const [isVisible, setIsVisible] = React.useState(false);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
+
+  // ESC key handler removed - modal should not close on ESC
+
+  // Handle outside click
+  const handleOutsideClick = useCallback((e: MouseEvent) => {
+    if (modalRef.current && !modalRef.current.contains(e.target as Node) && !isFullscreen) {
+      onClose();
+    }
+  }, [onClose, isFullscreen]);
+
+  // Toggle fullscreen mode
+  const toggleFullscreen = () => {
+    setIsAnimating(true);
+    setIsFullscreen(!isFullscreen);
+    setIsMinimized(false);
+    setTimeout(() => setIsAnimating(false), 300);
+  };
+
+  // Toggle minimize
+  const toggleMinimize = () => {
+    setIsAnimating(true);
+    setIsMinimized(!isMinimized);
+    setTimeout(() => setIsAnimating(false), 300);
+  };
+
+  // Handle drag start
+  const handleDragStart = useCallback((e: React.MouseEvent) => {
+    // Only allow dragging from the header bar
+    if (isFullscreen || isMobile) return;
+
+    setIsDragging(true);
+    setDragStart({
+      x: e.clientX - position.x,
+      y: e.clientY - position.y
+    });
+    e.preventDefault();
+  }, [isFullscreen, isMobile, position]);
+
+  // Handle drag
+  const handleDrag = useCallback((e: MouseEvent) => {
+    if (!isDragging) return;
+
+    const newX = e.clientX - dragStart.x;
+    const newY = e.clientY - dragStart.y;
+
+    // Keep modal within viewport bounds
+    const maxX = window.innerWidth - 900;
+    const maxY = window.innerHeight - 600;
+
+    setPosition({
+      x: Math.max(-450, Math.min(maxX / 2, newX)),
+      y: Math.max(0, Math.min(maxY, newY))
+    });
+  }, [isDragging, dragStart]);
+
+  // Handle drag end
+  const handleDragEnd = useCallback(() => {
+    setIsDragging(false);
+  }, []);
+
+  // Add/remove event listeners
+  useEffect(() => {
+    if (isOpen) {
+      // Small delay for animation
+      setTimeout(() => setIsVisible(true), 10);
+      document.addEventListener('mousedown', handleOutsideClick);
+      // Prevent body scroll when modal is open
+      document.body.style.overflow = 'hidden';
+    } else {
+      setIsVisible(false);
+      setPosition({ x: 0, y: 0 }); // Reset position when closing
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.body.style.overflow = '';
+    };
+  }, [isOpen, handleOutsideClick]);
+
+  // Drag event listeners
+  useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDrag);
+      document.addEventListener('mouseup', handleDragEnd);
+      // Disable text selection while dragging
+      document.body.style.userSelect = 'none';
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleDrag);
+      document.removeEventListener('mouseup', handleDragEnd);
+      document.body.style.userSelect = '';
+    };
+  }, [isDragging, handleDrag, handleDragEnd]);
+
+  // Don't render if not open
+  if (!isOpen) return null;
+
+  // Modal content
+  const modalContent = (
+    <div
+      className={`
+        fixed inset-0 z-[9999]
+        flex items-center justify-center
+        transition-all duration-300 ease-in-out
+        ${isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
+      `}
+    >
+      {/* Backdrop */}
+      <div
+        className={`
+          absolute inset-0
+          ${isFullscreen ? 'bg-white dark:bg-gray-900' : 'bg-black/30 backdrop-blur-sm'}
+          transition-all duration-300 ease-in-out
+          ${isVisible ? 'opacity-100' : 'opacity-0'}
+        `}
+        onClick={!isFullscreen ? onClose : undefined}
+      />
+
+      {/* Modal Container */}
+      <div
+        ref={modalRef}
+        className={`
+          ${isFullscreen ? 'fixed inset-0' : 'relative'}
+          bg-white dark:bg-gray-800
+          overflow-hidden
+          transition-all duration-300 ease-out
+          ${isVisible && !isDragging ? 'scale-100 opacity-100' : ''}
+          ${!isVisible ? 'translate-y-8 scale-90 opacity-0' : ''}
+          ${isAnimating ? 'scale-98' : ''}
+          ${isDragging ? 'transition-none' : ''}
+          ${isFullscreen
+            ? 'w-screen h-screen rounded-none shadow-none'
+            : isMobile
+              ? 'w-full h-full rounded-none shadow-none'
+              : isMinimized
+                ? 'w-[400px] h-[60px] rounded-xl dm-modal-shadow'
+                : 'w-[900px] h-[600px] rounded-xl dm-modal-shadow'
+          }
+          ${!isFullscreen && !isMobile ? 'ring-1 ring-black/5' : ''}
+          ${isDragging ? 'cursor-move' : ''}
+        `}
+        style={{
+          ...((!isFullscreen && !isMobile) ? {
+            transform: `translate(${position.x}px, ${position.y}px)`
+          } : {})
+        }}
+      >
+        {/* macOS-style Header Bar */}
+        {!isMobile && (
+          <div
+            className="absolute top-0 left-0 right-0 z-10 h-[38px] bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 rounded-t-xl flex items-center justify-between px-4 select-none"
+            onMouseDown={handleDragStart}
+            style={{ cursor: isFullscreen ? 'default' : 'move' }}
+          >
+            {/* Traffic Light Buttons */}
+            <div className="flex items-center gap-2" onMouseDown={(e) => e.stopPropagation()}>
+              <button
+                onClick={onClose}
+                className="w-3 h-3 rounded-full traffic-light-close hover:brightness-95 transition-all group relative"
+                aria-label="Close"
+              >
+                <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <X className="w-2 h-2 text-red-900/60" strokeWidth={3} />
+                </span>
+              </button>
+              <button
+                onClick={toggleMinimize}
+                className="w-3 h-3 rounded-full traffic-light-minimize hover:brightness-95 transition-all group relative"
+                aria-label="Minimize"
+              >
+                <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <span className="block w-2 h-[2px] bg-yellow-900/60 rounded-full" />
+                </span>
+              </button>
+              <button
+                onClick={toggleFullscreen}
+                className="w-3 h-3 rounded-full traffic-light-maximize hover:brightness-95 transition-all group relative"
+                aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
+              >
+                <span className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  {isFullscreen ? (
+                    <Minimize2 className="w-2 h-2 text-green-900/60" strokeWidth={3} />
+                  ) : (
+                    <Maximize2 className="w-2 h-2 text-green-900/60" strokeWidth={3} />
+                  )}
+                </span>
+              </button>
+            </div>
+
+            {/* Title */}
+            <div className="absolute left-1/2 -translate-x-1/2 text-sm font-medium text-gray-700 dark:text-gray-300">
+              Messages
+            </div>
+
+            {/* Empty space for balance */}
+            <div className="w-[52px]" />
+          </div>
+        )}
+
+        {/* DM Layout */}
+        <div className={`${!isMobile ? 'h-[calc(100%-38px)] mt-[38px]' : 'h-full'} ${isMinimized ? 'hidden' : ''}`}>
+          <DMLayout isModal={true} />
+        </div>
+
+        {/* Minimized View */}
+        {isMinimized && !isMobile && (
+          <div className="flex items-center justify-center h-full">
+            <span className="text-sm text-gray-500 dark:text-gray-400">Messages (Minimized)</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  // Use portal to render modal at root level
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+
+  return null;
+};
+
+export default DMModal;

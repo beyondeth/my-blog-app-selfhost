@@ -1,5 +1,94 @@
 # CLAUDE.md - 프로젝트 규칙 및 주의사항
 
+## 🚨 프레임워크별 핵심 개발 원칙
+
+### 📱 Next.js (Frontend) - 함수형 컴포넌트 필수
+
+#### ✅ 반드시 지켜야 할 규칙
+
+1. **함수형 컴포넌트 + Hooks만 사용**
+```typescript
+// ❌ 금지: 클래스 컴포넌트
+class MyComponent extends React.Component {}
+
+// ✅ 올바른 방법: 함수형 컴포넌트
+export default function UserCard({ name }: { name: string }) {
+  const [state, setState] = useState();
+  return <div className="p-4">{name}</div>;
+}
+```
+
+2. **DOM 직접 조작 금지**
+```typescript
+// ❌ 금지: document.querySelector, getElementById
+document.querySelector('.button')
+
+// ✅ 올바른 방법: React state, useRef 활용
+const buttonRef = useRef<HTMLButtonElement>(null);
+```
+
+3. **무한 루프 방지**
+```typescript
+// ❌ 위험: 의존성 배열 없음
+useEffect(() => {
+  fetchData();
+});
+
+// ✅ 안전: 의존성 배열 명시
+useEffect(() => {
+  fetchData();
+}, [dependency]);
+```
+
+4. **컴포넌트 독립성 유지**
+- 전역 변수 사용 금지
+- props와 state로만 데이터 전달
+- API 호출 로직 분리 (React Query 활용)
+
+### ⚙️ NestJS (Backend) - 클래스 기반 아키텍처
+
+#### ✅ 반드시 지켜야 할 규칙
+
+1. **클래스 + 데코레이터 패턴**
+```typescript
+// ✅ 올바른 NestJS 구조
+@Controller('users')
+export class UsersController {
+  constructor(private readonly usersService: UsersService) {}
+
+  @Get()
+  async findAll() {
+    return await this.usersService.findAll();
+  }
+}
+```
+
+2. **의존성 주입(DI) 활용**
+```typescript
+@Injectable()
+export class UsersService {
+  constructor(
+    @InjectRepository(User)
+    private usersRepository: Repository<User>,
+  ) {}
+}
+```
+
+3. **보안 필수 사항**
+- 비밀번호: bcrypt로 해싱
+- 민감 데이터: .env + ConfigService 사용
+- 입력 검증: DTO + class-validator
+
+4. **모듈 구조**
+- 기능별 모듈 분리 (AuthModule, UserModule, PostModule)
+- 멀티 테넌시 고려: userId 스코프 철저히 적용
+
+### 🎯 핵심 요약
+- **Next.js**: 함수형 & 선언적 스타일 (React 18+ Hooks)
+- **NestJS**: 클래스 기반 & 구조적 스타일 (DI + 데코레이터)
+
+---
+
 ## 🚨 중요한 API 경로 규칙
 
 ### ❌ 자주 발생하는 실수: API 경로 중복
@@ -226,7 +315,7 @@ if (!response.ok) {
 
 ---
 
-## 🚀 개발 서버 실행
+## 🚀 개발 서버 실행 (필요시만 실행. 사용자가 이미 터미널에서 실행중일 확률이 높음)
 
 ```bash
 # Backend (포트 3000)
@@ -241,9 +330,7 @@ pnpm dev
 ---
 
 ## 📚 추가 문서
-- [Multi-User Blog Implementation](./MULTI_USER_BLOG_IMPLEMENTATION.md)
-- [Blog System Design](./BLOG_SYSTEM_DESIGN.md)
-- [Rich Text Editor & YouTube Integration](./frontend/src/editor/EDITOR_ARCHITECTURE.md)
+
 
 ---
 
@@ -269,72 +356,6 @@ pnpm dev
    - YouTube 통합 시스템 상세 설명
    - 핵심 컴포넌트 및 데이터 플로우 문서화
 
-## 📅 최근 작업 내역 (2025-09-01)
-
-### 🔐 Private 블로그 접근 권한 개선
-1. **OptionalJwtAuthGuard 패턴**
-   ```typescript
-   // blogs.controller.ts
-   @Get('slug/:slug')
-   @Public()
-   @UseGuards(OptionalJwtAuthGuard)  // 인증 선택적 적용
-   async findOneBySlug(@Param('slug') slug: string, @CurrentUser() user?: User) {
-     // 비공개 블로그도 소유자는 접근 가능
-   }
-   ```
-   - 공개 엔드포인트에서도 인증 정보 활용 가능
-   - 비공개 블로그 소유자 확인: `String(user.id) === String(blog.userId)`
-
-2. **프론트엔드 인증 쿠키 전달**
-   ```javascript
-   // 반드시 credentials: 'include' 추가
-   fetch(`${API_URL}/blogs/slug/${slug}`, {
-     credentials: 'include'  // 중요!
-   });
-   ```
-
-### ⏰ API 키 시간대 문제 해결
-1. **TimezoneInterceptor 구현**
-   - UTC → KST 자동 변환 (+9시간)
-   - `createdAt`, `updatedAt` 등 날짜 필드 자동 처리
-   - Controller에 `@UseInterceptors(TimezoneInterceptor)` 적용
-
-2. **서버 타임존 설정**
-   ```typescript
-   // main.ts
-   process.env.TZ = 'Asia/Seoul';
-   ```
-
-3. **Entity 타임스탬프 타입**
-   ```typescript
-   @CreateDateColumn({ type: 'timestamptz', default: () => 'CURRENT_TIMESTAMP' })
-   createdAt: Date;
-   ```
-
-### 🔑 API 키 관리 개선
-- **개수 제한**: 사용자당 최대 3개
-- **UI 단순화**: 설명 필드 제거, 이름만 필수
-- **로딩 상태**: 생성 중 버튼 비활성화 및 스피너 표시
-- **시간 표시**: 24시간 이내는 상대 시간, 이후는 절대 시간
-
-### 🎨 UI/UX 표준화
-1. **색상 체계 변경**
-   - ❌ Amber/Orange 색상 사용 금지
-   - ✅ Black/Gray 색상 체계 사용
-   - 버튼: `bg-black hover:bg-gray-800`
-   - 비활성화: `disabled:opacity-50`
-
-2. **컴포넌트 표준**
-   - 알림 아이콘: `h-6 w-6` (기존 h-5 w-5에서 변경)
-   - 툴팁: Followers만 표시 (Following 제거)
-   - 댓글 섹션: `blog && blog.allowComments === true` 조건 사용
-
-### 🌐 RDS 연결 상태
-- **호스트**: `myblog.cqbcg2aqsrdx.us-east-1.rds.amazonaws.com`
-- **데이터베이스**: `blog-db`
-- **마이그레이션**: 최신 상태 (AddBlogPublicFields1756641791150)
-
----
 
 ## 🏛️ 프로젝트 아키텍처 원칙
 

@@ -1,0 +1,91 @@
+'use client';
+
+import React, { useEffect } from 'react';
+import { useChat } from '@/hooks/useChat';
+import { useAuth } from '@/providers/AuthProviderV2';
+import { useMessageManagement } from '@/hooks/useMessageManagement';
+import ChatHeader from './ChatHeader';
+import MessageList from './MessageList';
+import MessageInput from './MessageInput';
+
+interface DMChatAreaProps {
+  conversationId: string;
+}
+
+const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
+  const { user } = useAuth();
+  const { currentConversation, typingUser } = useChat(conversationId);
+  const {
+    groupedMessages,
+    isLoading,
+    isSending,
+    hasMore,
+    sendMessage,
+    retryMessage,
+    loadMoreMessages,
+    markAsRead,
+    messageContainerRef,
+    scrollToBottom,
+  } = useMessageManagement(conversationId);
+
+  // Get the other user
+  const otherUser = currentConversation?.user1Id === user?.id
+    ? currentConversation?.user2
+    : currentConversation?.user1;
+
+  // Mark messages as read when conversation opens
+  useEffect(() => {
+    if (!groupedMessages.length) return;
+
+    groupedMessages.forEach(group => {
+      group.messages.forEach(message => {
+        if (message.senderId !== user?.id && !message.isRead) {
+          markAsRead(message.id);
+        }
+      });
+    });
+  }, [conversationId]);
+
+  if (isLoading && groupedMessages.length === 0) {
+    return (
+      <div className="flex flex-col h-full">
+        <ChatHeader otherUser={otherUser} isLoading conversationId={conversationId} />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="text-center">
+            <div className="w-12 h-12 border-4 border-blue-200 border-t-blue-600 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-gray-500">대화를 불러오는 중...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col h-full">
+      {/* Header */}
+      <ChatHeader otherUser={otherUser} conversationId={conversationId} />
+
+      {/* Messages */}
+      <MessageList
+        groupedMessages={groupedMessages}
+        currentUserId={user?.id || ''}
+        otherUser={otherUser}
+        hasMore={hasMore}
+        isLoading={isLoading}
+        onLoadMore={loadMoreMessages}
+        onRetry={retryMessage}
+        messageContainerRef={messageContainerRef}
+        typingUser={typingUser}
+      />
+
+      {/* Input */}
+      <MessageInput
+        onSendMessage={sendMessage}
+        isSending={isSending}
+        disabled={!otherUser}
+      />
+    </div>
+  );
+};
+
+export default DMChatArea;

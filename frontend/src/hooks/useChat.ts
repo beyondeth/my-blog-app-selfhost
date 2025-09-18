@@ -2,42 +2,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from './useSocket';
 import { useAuth } from '@/providers/AuthProviderV2';
 import toast from 'react-hot-toast';
+import type { Message, Conversation, MessageStatus } from '@/components/dm/DMLayout/DMLayout.types';
 
-export interface Message {
-  id: string;
-  conversationId: string;
-  senderId: string;
-  content: string;
-  isRead: boolean;
-  readAt?: Date;
-  isEdited: boolean;
-  editedAt?: Date;
-  isDeleted: boolean;
-  deletedAt?: Date;
-  createdAt: Date;
-  sender?: {
-    id: string;
-    username: string;
-    profileImage?: string;
-  };
-}
-
-export interface Conversation {
-  id: string;
-  user1Id: string;
-  user2Id: string;
-  lastMessageAt?: Date;
-  user1?: {
-    id: string;
-    username: string;
-    profileImage?: string;
-  };
-  user2?: {
-    id: string;
-    username: string;
-    profileImage?: string;
-  };
-}
+// Re-export types for backward compatibility
+export type { Message, Conversation, MessageStatus };
 
 export function useChat(conversationId?: string) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -72,17 +40,20 @@ export function useChat(conversationId?: string) {
   const fetchConversationById = useCallback(async (convId: string) => {
     try {
       setLoading(true);
-      const response = await fetch(`${API_URL}/chat/conversations`, {
+      // 새 엔드포인트 사용 - 대화방 ID로 직접 조회
+      const response = await fetch(`${API_URL}/chat/conversation/by-id/${convId}`, {
         credentials: 'include'
       });
 
       if (response.ok) {
-        const conversations = await response.json();
-        const conversation = conversations.find((c: Conversation) => c.id === convId);
-        if (conversation) {
-          setCurrentConversation(conversation);
-          return conversation;
-        }
+        const conversation = await response.json();
+        console.log('[useChat] Fetched conversation by ID:', conversation.id,
+          'user1:', conversation.user1?.username,
+          'user2:', conversation.user2?.username);
+        setCurrentConversation(conversation);
+        return conversation;
+      } else {
+        console.error('Error fetching conversation by ID:', response.status);
       }
     } catch (error) {
       console.error('Error fetching conversation:', error);
@@ -101,6 +72,9 @@ export function useChat(conversationId?: string) {
 
       if (response.ok) {
         const conversation = await response.json();
+        console.log('[useChat] Got/created conversation:', conversation.id,
+          'user1DeletedAt:', conversation.user1DeletedAt,
+          'user2DeletedAt:', conversation.user2DeletedAt);
         setCurrentConversation(conversation);
         return conversation;
       } else {
@@ -131,6 +105,7 @@ export function useChat(conversationId?: string) {
 
       if (response.ok) {
         const data = await response.json();
+        console.log('[useChat] Fetched messages:', data.messages.length, 'messages for conversation', convId);
         if (page === 1) {
           setMessages(data.messages);
         } else {
@@ -164,7 +139,8 @@ export function useChat(conversationId?: string) {
           id: user.id,
           username: user.username,
           profileImage: user.profileImage
-        } : undefined
+        } : undefined,
+        status: 'sending' // Mark as sending
       };
 
       // Add optimistic message immediately
@@ -183,20 +159,24 @@ export function useChat(conversationId?: string) {
       });
 
       if (!response.ok) {
-        // Remove optimistic message on failure
-        setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
+        // Mark message as failed instead of removing
+        setMessages(prev => prev.map(msg =>
+          msg.id === optimisticMessage.id
+            ? { ...msg, status: 'failed' as MessageStatus }
+            : msg
+        ));
         throw new Error('Failed to send message');
       }
 
       const message = await response.json();
 
-      // Replace optimistic message with real message
-      // Only update if the message content or important fields changed
+      // Replace optimistic message with real message and mark as sent
       setMessages(prev => prev.map(msg => {
         if (msg.id === optimisticMessage.id) {
           // Preserve the UI state while updating the actual data
           return {
             ...message,
+            status: 'sent' as MessageStatus, // Mark as sent
             // Keep the same created date to avoid re-rendering
             createdAt: optimisticMessage.createdAt,
           };
@@ -279,22 +259,22 @@ export function useChat(conversationId?: string) {
             if (msg.id.startsWith('temp-') &&
                 msg.content === message.content &&
                 msg.senderId === message.senderId) {
-              return message;
+              return { ...message, status: 'sent' as MessageStatus };
             }
             // Or if it's already the same message
             if (msg.id === message.id) {
-              return message;
+              return { ...message, status: 'sent' as MessageStatus };
             }
             return msg;
           }));
           return;
         }
 
-        // For messages from other users, add them
+        // For messages from other users, add them (they're always 'sent')
         setMessages(prev => {
           const exists = prev.some(msg => msg.id === message.id);
           if (exists) return prev;
-          return [...prev, message];
+          return [...prev, { ...message, status: 'sent' as MessageStatus }];
         });
 
         // Mark as read if it's from other user
@@ -339,8 +319,28 @@ export function useChat(conversationId?: string) {
       setMessages([]);
       fetchMessages(conversationId);
       fetchConversationById(conversationId);
+
+      // Mark all messages as read when entering conversation
+      fetch(`${API_URL}/chat/conversation/${conversationId}/mark-all-read`, {
+        method: 'POST',
+        credentials: 'include'
+      }).catch(error => {
+        console.error('Error marking messages as read:', error);
+      });
     }
-  }, [conversationId, fetchMessages, fetchConversationById]);
+  }, [conversationId, fetchMessages, fetchConversationById, API_URL]);
+
+  // Retry failed message
+  const retryMessage = useCallback(async (messageId: string) => {
+    const failedMessage = messages.find(msg => msg.id === messageId && msg.status === 'failed');
+    if (!failedMessage) return;
+
+    // Remove the failed message
+    setMessages(prev => prev.filter(msg => msg.id !== messageId));
+
+    // Resend the message
+    await sendMessage(failedMessage.content);
+  }, [messages, sendMessage]);
 
   return {
     messages,
@@ -350,6 +350,7 @@ export function useChat(conversationId?: string) {
     hasMore,
     typingUser,
     sendMessage,
+    retryMessage,
     markAsRead,
     handleTyping,
     blockUser,

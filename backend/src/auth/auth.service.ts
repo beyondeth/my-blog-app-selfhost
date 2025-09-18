@@ -278,24 +278,37 @@ export class AuthService {
       });
 
       if (payload.tokenType !== 'refresh') {
+        this.logger.warn('Invalid token type in refresh token');
         throw new UnauthorizedException('Invalid token type');
       }
 
       const user = await this.usersService.findById(payload.sub);
       if (!user || !user.isActive) {
+        this.logger.warn(`User not found or inactive: ${payload.sub}`);
         throw new UnauthorizedException('User not found or inactive');
       }
 
       // 저장된 refresh token과 비교
-      if (user.refreshToken !== refreshToken || 
-          !user.refreshTokenExpiresAt || 
-          user.refreshTokenExpiresAt < new Date()) {
-        throw new UnauthorizedException('Invalid or expired refresh token');
+      if (user.refreshToken !== refreshToken) {
+        this.logger.warn(`Refresh token mismatch for user: ${user.id}`);
+        throw new UnauthorizedException('Invalid refresh token');
       }
 
+      // 만료 시간 체크 (더 관대하게 처리)
+      if (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt < new Date()) {
+        this.logger.warn(`Refresh token expired for user: ${user.id}, expired at: ${user.refreshTokenExpiresAt}`);
+        // DB의 refresh token 정리
+        await this.usersService.clearRefreshToken(user.id);
+        throw new UnauthorizedException('Refresh token has expired');
+      }
+
+      this.logger.log(`Token refreshed successfully for user: ${user.id}`);
       return this.generateTokenResponse(user);
     } catch (error) {
       this.logger.error('Refresh token validation failed:', error.message);
+      if (error instanceof UnauthorizedException) {
+        throw error;
+      }
       throw new UnauthorizedException('Invalid refresh token');
     }
   }
@@ -412,8 +425,11 @@ export class AuthService {
       expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
     });
 
-    // Refresh Token을 DB에 저장
-    const refreshExpiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7일
+    // Refresh Token을 DB에 저장 (만료 시간을 정확히 계산)
+    const refreshExpiresIn = this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d');
+    const refreshExpiresAt = new Date(Date.now() + this.parseExpiresIn(refreshExpiresIn) * 1000);
+
+    this.logger.log(`Saving refresh token for user ${user.id}, expires at: ${refreshExpiresAt}`);
     await this.usersService.updateRefreshToken(user.id, refreshToken, refreshExpiresAt);
 
     return {
@@ -459,6 +475,10 @@ export class AuthService {
 
   private getTokenExpiresIn(configKey: string, defaultValue: string): number {
     const expiresIn = this.configService.get<string>(configKey, defaultValue);
+    return this.parseExpiresIn(expiresIn);
+  }
+
+  private parseExpiresIn(expiresIn: string): number {
     // 간단한 파싱 (1d = 86400초, 15m = 900초)
     if (expiresIn.includes('d')) {
       return parseInt(expiresIn) * 24 * 60 * 60;
@@ -468,6 +488,9 @@ export class AuthService {
     }
     if (expiresIn.includes('m')) {
       return parseInt(expiresIn) * 60;
+    }
+    if (expiresIn.includes('s')) {
+      return parseInt(expiresIn);
     }
     return parseInt(expiresIn) || 900;
   }

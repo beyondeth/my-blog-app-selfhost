@@ -4,6 +4,7 @@ import Header from '@/components/layout/Header';
 import ClientProviders from '@/components/ClientProviders';
 import { Toaster } from 'sonner';
 import { PerformanceMonitor } from '@/components/PerformanceMonitor';
+import { DMModalProvider } from '@/components/dm/DMModalProvider';
 
 export const metadata: Metadata = {
   title: "My Blog",
@@ -30,10 +31,12 @@ export default function RootLayout({
         suppressHydrationWarning={true}
       >
         <ClientProviders>
-          <Header />
-          {children}
-          <Toaster position="top-center" richColors />
-          <PerformanceMonitor />
+          <DMModalProvider>
+            <Header />
+            {children}
+            <Toaster position="top-center" richColors />
+            <PerformanceMonitor />
+          </DMModalProvider>
         </ClientProviders>
       </body>
     </html>

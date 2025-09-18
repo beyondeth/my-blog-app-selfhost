@@ -6,19 +6,25 @@ import { useRouter } from 'next/navigation';
 import { useChat } from '@/hooks/useChat';
 import { useState } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
+import { useDMModal } from '@/hooks/useDMModal';
 import toast from 'react-hot-toast';
 
 interface DMButtonProps {
   userId: string;
   username?: string;
   size?: 'sm' | 'default' | 'lg';
+  mode?: 'modal' | 'page';
 }
 
-export function DMButton({ userId, username, size = 'default' }: DMButtonProps) {
+export function DMButton({ userId, username, size = 'default', mode }: DMButtonProps) {
   const router = useRouter();
   const { user } = useAuth();
   const { getOrCreateConversation } = useChat();
+  const { openModal, mode: defaultMode } = useDMModal();
   const [loading, setLoading] = useState(false);
+
+  // Use provided mode or default from store
+  const viewMode = mode || defaultMode;
 
   const handleClick = async () => {
     if (!user) {
@@ -36,7 +42,13 @@ export function DMButton({ userId, username, size = 'default' }: DMButtonProps) 
       setLoading(true);
       const conversation = await getOrCreateConversation(userId);
       if (conversation) {
-        router.push(`/dm/${conversation.id}`);
+        if (viewMode === 'modal') {
+          // Open as modal
+          openModal(conversation.id);
+        } else {
+          // Navigate to DM page
+          router.push(`/dm?conversation=${conversation.id}`);
+        }
       }
     } catch (error) {
       console.error('Error starting conversation:', error);

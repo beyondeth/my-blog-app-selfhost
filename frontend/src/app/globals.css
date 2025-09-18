@@ -28,3 +28,28 @@
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
 }
+
+/* macOS-style window traffic lights */
+.traffic-light-close {
+  background: linear-gradient(to bottom, #ff5f57, #ff3b30);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.traffic-light-minimize {
+  background: linear-gradient(to bottom, #ffbd2e, #ff9500);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+}
+
+.traffic-light-maximize {
+  background: linear-gradient(to bottom, #28ca42, #00c932);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), inset 0 -1px 0 rgba(0, 0, 0, 0.12);
+}
+
+/* Window shadow for floating effect */
+.dm-modal-shadow {
+  box-shadow:
+    0 0 1px 0 rgba(0, 0, 0, 0.17),
+    0 2px 4px 0 rgba(0, 0, 0, 0.08),
+    0 12px 24px 0 rgba(0, 0, 0, 0.09),
+    0 24px 48px 0 rgba(0, 0, 0, 0.10);
+}

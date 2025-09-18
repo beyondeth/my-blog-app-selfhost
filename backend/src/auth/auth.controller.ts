@@ -45,16 +45,16 @@ export class AuthController {
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie('access_token', authResponse.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15분
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
 
     res.cookie('refresh_token', authResponse.refresh_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: false,
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: '/',
     });
@@ -81,16 +81,16 @@ export class AuthController {
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie('access_token', authResponse.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15분
+      secure: false,
+      sameSite: 'lax',
+      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
 
     res.cookie('refresh_token', authResponse.refresh_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      secure: false,
+      sameSite: 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: '/',
     });
@@ -124,7 +124,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15분
+      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
 
@@ -158,7 +158,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15분
+      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
 
@@ -199,7 +199,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15분
+      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
 
@@ -323,7 +323,7 @@ export class AuthController {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15분
+      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
 

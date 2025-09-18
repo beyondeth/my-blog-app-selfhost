@@ -1,11 +1,17 @@
 'use client';
 
-import { useParams } from 'next/navigation';
-import { DMChat } from '@/components/dm/DMChat';
+import { useEffect } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 
 export default function DMConversationPage() {
+  const router = useRouter();
   const params = useParams();
   const conversationId = params.conversationId as string;
 
-  return <DMChat conversationId={conversationId} />;
+  // Redirect to new DM page with conversation ID as query param
+  useEffect(() => {
+    router.replace(`/dm?conversation=${conversationId}`);
+  }, [conversationId, router]);
+
+  return null;
 }

@@ -1,0 +1,194 @@
+/* KakaoTalk Message Bubble Styles */
+
+.kakao-bubble {
+  position: relative;
+  max-width: 280px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+  border-radius: 18px;
+  word-wrap: break-word;
+  z-index: 1;
+}
+
+.kakao-bubble-sender {
+  background-color: #FAE100;
+  color: #000;
+  margin-left: auto;
+  margin-right: 12px;
+}
+
+.kakao-bubble-receiver {
+  background-color: #3d3d3d;
+  color: #fff;
+  margin-right: auto;
+  margin-left: 12px;
+}
+
+/* Sender tail (top-right) */
+.kakao-bubble-sender::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: -6px;
+  width: 12px;
+  height: 12px;
+  background-color: #FAE100;
+  border-radius: 0 0 0 12px;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+/* Alternative sender tail using clip-path for more precise shape */
+.kakao-bubble-sender-v2 {
+  background-color: #FAE100;
+  color: #000;
+  margin-left: auto;
+  margin-right: 12px;
+  clip-path: polygon(
+    0% 15px,
+    15px 0%,
+    calc(100% - 15px) 0%,
+    100% 15px,
+    100% calc(100% - 15px),
+    calc(100% - 15px) 100%,
+    15px 100%,
+    0% calc(100% - 15px),
+    0% 15px,
+    calc(100% + 8px) -2px,
+    calc(100% + 2px) 8px
+  );
+}
+
+/* Receiver tail (top-left) */
+.kakao-bubble-receiver::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -6px;
+  width: 12px;
+  height: 12px;
+  background-color: #3d3d3d;
+  border-radius: 0 0 12px 0;
+  transform: rotate(-45deg);
+  z-index: -1;
+}
+
+/* SVG-based approach for perfect curves */
+.kakao-bubble-svg {
+  position: relative;
+  display: inline-block;
+}
+
+.kakao-bubble-svg-content {
+  position: relative;
+  z-index: 2;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+/* Tailwind-compatible version */
+@layer components {
+  .kakao-sender {
+    @apply relative max-w-xs px-4 py-3 text-sm ml-auto mr-3 text-black;
+    background-color: #FAE100;
+    border-radius: 18px;
+  }
+
+  .kakao-sender::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: -6px;
+    width: 12px;
+    height: 12px;
+    background-color: #FAE100;
+    border-radius: 0 0 0 12px;
+    transform: rotate(45deg);
+    z-index: -1;
+  }
+
+  .kakao-receiver {
+    @apply relative max-w-xs px-4 py-3 text-sm mr-auto ml-3 text-white;
+    background-color: #3d3d3d;
+    border-radius: 18px;
+  }
+
+  .kakao-receiver::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -6px;
+    width: 12px;
+    height: 12px;
+    background-color: #3d3d3d;
+    border-radius: 0 0 12px 0;
+    transform: rotate(-45deg);
+    z-index: -1;
+  }
+}
+
+/* Enhanced version with better tail positioning */
+.kakao-bubble-enhanced {
+  position: relative;
+  max-width: 280px;
+  padding: 12px 16px;
+  font-size: 14px;
+  line-height: 1.4;
+  border-radius: 18px;
+  word-wrap: break-word;
+  overflow: visible;
+}
+
+.kakao-bubble-enhanced.sender {
+  background-color: #FAE100;
+  color: #000;
+  margin-left: auto;
+  margin-right: 16px;
+}
+
+.kakao-bubble-enhanced.receiver {
+  background-color: #3d3d3d;
+  color: #fff;
+  margin-right: auto;
+  margin-left: 16px;
+}
+
+.kakao-bubble-enhanced.sender::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: -8px;
+  width: 16px;
+  height: 16px;
+  background-color: #FAE100;
+  border-radius: 0 0 16px 0;
+  transform: rotate(45deg);
+  z-index: -1;
+}
+
+.kakao-bubble-enhanced.receiver::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: -8px;
+  width: 16px;
+  height: 16px;
+  background-color: #3d3d3d;
+  border-radius: 0 16px 0 0;
+  transform: rotate(-45deg);
+  z-index: -1;
+}
+
+/* Chat container styles */
+.kakao-chat-container {
+  padding: 16px;
+  max-width: 400px;
+  margin: 0 auto;
+  background-color: #f9f9f9;
+  min-height: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}

@@ -41,6 +41,8 @@ export class ChatGateway
 
   afterInit(server: Server) {
     console.log('WebSocket Gateway initialized');
+    // Register this gateway with ChatService for bidirectional communication
+    this.chatService.setChatGateway(this);
   }
 
   async handleConnection(client: Socket) {
