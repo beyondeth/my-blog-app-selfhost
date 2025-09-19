@@ -8,7 +8,8 @@ import {
   useMutation,
   useQueryClient,
   useInfiniteQuery,
-  UseQueryOptions
+  UseQueryOptions,
+  InfiniteData
 } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import {
@@ -23,16 +24,69 @@ import {
 } from '@/constants/chat';
 import toast from 'react-hot-toast';
 
+// Type definitions for infinite query
+export interface MessagePage {
+  messages: Message[];
+  hasMore: boolean;
+  page: number;
+}
+
+export type MessagesInfiniteData = InfiniteData<MessagePage>;
+
 // Query Keys
 export const CHAT_QUERY_KEYS = {
   all: ['chat'] as const,
   conversations: () => [...CHAT_QUERY_KEYS.all, 'conversations'] as const,
   conversation: (id: string) => [...CHAT_QUERY_KEYS.all, 'conversation', id] as const,
+  conversationById: (id: string) => [...CHAT_QUERY_KEYS.all, 'conversation-by-id', id] as const,
   messages: (conversationId: string) => [...CHAT_QUERY_KEYS.all, 'messages', conversationId] as const,
   messagesByPage: (conversationId: string, page: number) =>
     [...CHAT_QUERY_KEYS.messages(conversationId), 'page', page] as const,
   unreadCount: () => [...CHAT_QUERY_KEYS.all, 'unreadCount'] as const,
   blockedUsers: () => [...CHAT_QUERY_KEYS.all, 'blockedUsers'] as const,
+};
+
+// Utility functions for working with infinite query cache
+export const updateMessagesInfiniteCache = (
+  oldData: MessagesInfiniteData | undefined,
+  updater: (messages: Message[]) => Message[]
+): MessagesInfiniteData | undefined => {
+  if (!oldData?.pages) return oldData;
+
+  return {
+    ...oldData,
+    pages: oldData.pages.map((page, index) => ({
+      ...page,
+      messages: index === 0 ? updater(page.messages) : page.messages
+    }))
+  };
+};
+
+export const addMessageToInfiniteCache = (
+  oldData: MessagesInfiniteData | undefined,
+  message: Message
+): MessagesInfiniteData | undefined => {
+  if (!oldData?.pages || oldData.pages.length === 0) {
+    // Create first page if no pages exist
+    return {
+      pages: [{
+        messages: [message],
+        hasMore: false,
+        page: 1
+      }],
+      pageParams: [1]
+    };
+  }
+
+  // Add to first page (most recent messages)
+  return {
+    ...oldData,
+    pages: oldData.pages.map((page, index) =>
+      index === 0
+        ? { ...page, messages: [...page.messages, message] }
+        : page
+    )
+  };
 };
 
 /**
@@ -43,11 +97,33 @@ export const useConversationsQuery = (options?: UseQueryOptions<Conversation[]>)
     queryKey: CHAT_QUERY_KEYS.conversations(),
     queryFn: async () => {
       const data = await apiClient.getConversations();
-      return data;
+      // API 타입을 프론트엔드 타입으로 변환
+      return data as unknown as Conversation[];
     },
     staleTime: CACHE_TIMES.CONVERSATIONS,
     refetchInterval: REFETCH_INTERVALS.CONVERSATIONS_ACTIVE,
     refetchIntervalInBackground: false,
+    ...options,
+  });
+};
+
+/**
+ * Fetch single conversation by ID
+ */
+export const useConversationByIdQuery = (
+  conversationId: string | undefined,
+  options?: UseQueryOptions<Conversation>
+) => {
+  return useQuery({
+    queryKey: CHAT_QUERY_KEYS.conversationById(conversationId || ''),
+    queryFn: async () => {
+      if (!conversationId) throw new Error('Conversation ID is required');
+      const data = await apiClient.getConversationById(conversationId);
+      // API 타입을 프론트엔드 타입으로 변환
+      return data as unknown as Conversation;
+    },
+    enabled: !!conversationId,
+    staleTime: CACHE_TIMES.CONVERSATIONS,
     ...options,
   });
 };
@@ -74,29 +150,69 @@ export const useMessagesQuery = (
 };
 
 /**
- * Infinite query for messages - Real infinite pagination
+ * Infinite query for messages - Real infinite pagination with defensive programming
  */
 export const useMessagesInfiniteQuery = (conversationId: string | undefined) => {
   return useInfiniteQuery({
     queryKey: CHAT_QUERY_KEYS.messages(conversationId || ''),
-    queryFn: async ({ pageParam = 1 }) => {
-      if (!conversationId) throw new Error('Conversation ID is required');
+    queryFn: async ({ pageParam }) => {
+      // Always use pageParam with default fallback
+      const page = pageParam || 1;
 
-      const data = await apiClient.getMessages(conversationId, pageParam);
-      return {
-        messages: data.messages,
-        hasMore: data.hasMore,
-        page: pageParam
-      };
+      if (!conversationId) {
+        // Return empty structure instead of throwing
+        return {
+          messages: [],
+          hasMore: false,
+          page: page
+        };
+      }
+
+      try {
+        const data = await apiClient.getMessages(conversationId, page);
+
+        // Ensure data structure is valid
+        return {
+          messages: Array.isArray(data?.messages) ? data.messages : [],
+          hasMore: Boolean(data?.hasMore),
+          page: page
+        };
+      } catch (error) {
+        console.error('[useMessagesInfiniteQuery] Error fetching messages:', error);
+        // Return empty structure on error
+        return {
+          messages: [],
+          hasMore: false,
+          page: page
+        };
+      }
     },
-    getNextPageParam: (lastPage) => {
-      // Return next page number if there are more messages
-      return lastPage.hasMore ? lastPage.page + 1 : undefined;
-    },
-    enabled: !!conversationId,
-    staleTime: CACHE_TIMES.MESSAGES,
-    // Start from latest messages (page 1)
     initialPageParam: 1,
+    getNextPageParam: (lastPage) => {
+      // Simplified: Only check lastPage, don't use allPages
+      try {
+        if (!lastPage) return undefined;
+
+        const hasMore = Boolean(lastPage?.hasMore);
+        const currentPage = Number(lastPage?.page) || 1;
+
+        return hasMore ? currentPage + 1 : undefined;
+      } catch (error) {
+        console.error('[getNextPageParam] Error:', error);
+        return undefined;
+      }
+    },
+    enabled: Boolean(conversationId),
+    staleTime: CACHE_TIMES.MESSAGES,
+    gcTime: CACHE_TIMES.MESSAGES * 2, // Add garbage collection time
+    retry: (failureCount, error: any) => {
+      // Don't retry on 404 or 403
+      if (error?.response?.status === 404 || error?.response?.status === 403) {
+        return false;
+      }
+      // Retry up to 2 times for other errors
+      return failureCount < 2;
+    }
   });
 };
 
@@ -114,7 +230,8 @@ export const useCreateConversationMutation = () => {
       // Update conversations cache
       queryClient.setQueryData<Conversation[]>(
         CHAT_QUERY_KEYS.conversations(),
-        (old = []) => {
+        (old) => {
+          if (!old || !Array.isArray(old)) return [conversation];
           const exists = old.find(c => c.id === conversation.id);
           if (exists) return old;
           return [conversation, ...old];
@@ -149,18 +266,18 @@ export const useSendMessageMutation = (conversationId: string, userId?: string) 
         queryKey: CHAT_QUERY_KEYS.messages(conversationId)
       });
 
-      // Snapshot previous messages
-      const previousMessages = queryClient.getQueryData<Message[]>(
+      // Snapshot previous messages for rollback
+      const previousData = queryClient.getQueryData<MessagesInfiniteData>(
         CHAT_QUERY_KEYS.messages(conversationId)
       );
 
-      // Optimistically update messages
+      // Create optimistic message
       const optimisticMessage: Message = {
         id: tempId,
         tempId,
         conversationId,
         content,
-        senderId: userId || '', // Use actual user ID passed from component
+        senderId: userId || '',
         createdAt: new Date(),
         isRead: true,
         readAt: new Date(),
@@ -169,34 +286,37 @@ export const useSendMessageMutation = (conversationId: string, userId?: string) 
         status: 'sending',
       };
 
-      queryClient.setQueryData<Message[]>(
+      // Optimistically update messages using infinite query structure
+      queryClient.setQueryData<MessagesInfiniteData>(
         CHAT_QUERY_KEYS.messages(conversationId),
-        (old = []) => [...old, optimisticMessage]
+        (oldData) => addMessageToInfiniteCache(oldData, optimisticMessage)
       );
 
       // Return context for rollback
-      return { previousMessages };
+      return { previousData };
     },
     onError: (error, variables, context) => {
       // Rollback on error
-      if (context?.previousMessages) {
+      if (context?.previousData) {
         queryClient.setQueryData(
           CHAT_QUERY_KEYS.messages(conversationId),
-          context.previousMessages
+          context.previousData
         );
       }
       toast.error('Failed to send message');
     },
     onSuccess: (sentMessage, { tempId }) => {
-      // Only update the message list - conversation list will be updated by WebSocket
-      queryClient.setQueryData<Message[]>(
+      // Update the optimistic message with real data from server
+      queryClient.setQueryData<MessagesInfiniteData>(
         CHAT_QUERY_KEYS.messages(conversationId),
-        (old = []) => old.map(msg =>
-          msg.tempId === tempId ? sentMessage : msg
+        (oldData) => updateMessagesInfiniteCache(oldData, (messages) =>
+          messages.map(msg =>
+            msg.tempId === tempId ? { ...sentMessage, status: 'sent' } : msg
+          )
         )
       );
 
-      // Skip conversation update here - let WebSocket handle it to reduce duplication
+      // Conversation list will be updated by WebSocket
     },
   });
 };
@@ -212,25 +332,30 @@ export const useMarkAsReadMutation = () => {
       return await apiClient.markAsRead(messageId);
     },
     onSuccess: (_, { conversationId, messageId }) => {
-      // Update message in cache
-      queryClient.setQueryData<Message[]>(
+      // Update message in infinite query cache
+      queryClient.setQueryData<MessagesInfiniteData>(
         CHAT_QUERY_KEYS.messages(conversationId),
-        (old = []) => old.map(msg =>
-          msg.id === messageId
-            ? { ...msg, isRead: true, readAt: new Date() }
-            : msg
+        (oldData) => updateMessagesInfiniteCache(oldData, (messages) =>
+          messages.map(msg =>
+            msg.id === messageId
+              ? { ...msg, isRead: true, readAt: new Date() }
+              : msg
+          )
         )
       );
 
       // Update unread count in conversations
       queryClient.setQueryData<Conversation[]>(
         CHAT_QUERY_KEYS.conversations(),
-        (old = []) => old.map(conv => {
-          if (conv.id === conversationId && conv.unreadCount > 0) {
-            return { ...conv, unreadCount: conv.unreadCount - 1 };
-          }
-          return conv;
-        })
+        (old) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.map(conv => {
+            if (conv.id === conversationId && conv.unreadCount > 0) {
+              return { ...conv, unreadCount: conv.unreadCount - 1 };
+            }
+            return conv;
+          });
+        }
       );
     },
   });
@@ -247,24 +372,38 @@ export const useMarkAllAsReadMutation = () => {
       return await apiClient.markAllAsRead(conversationId);
     },
     onSuccess: (_, conversationId) => {
-      // Update all messages in cache
-      queryClient.setQueryData<Message[]>(
+      // Update all messages in infinite query cache
+      queryClient.setQueryData<MessagesInfiniteData>(
         CHAT_QUERY_KEYS.messages(conversationId),
-        (old = []) => old.map(msg => ({
-          ...msg,
-          isRead: true,
-          readAt: msg.readAt || new Date()
-        }))
+        (oldData) => {
+          if (!oldData?.pages) return oldData;
+
+          // Update all messages across all pages
+          return {
+            ...oldData,
+            pages: oldData.pages.map(page => ({
+              ...page,
+              messages: page.messages.map(msg => ({
+                ...msg,
+                isRead: true,
+                readAt: msg.readAt || new Date()
+              }))
+            }))
+          };
+        }
       );
 
       // Reset unread count
       queryClient.setQueryData<Conversation[]>(
         CHAT_QUERY_KEYS.conversations(),
-        (old = []) => old.map(conv =>
-          conv.id === conversationId
-            ? { ...conv, unreadCount: 0 }
-            : conv
-        )
+        (old) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.map(conv =>
+            conv.id === conversationId
+              ? { ...conv, unreadCount: 0 }
+              : conv
+          );
+        }
       );
     },
   });
@@ -284,7 +423,10 @@ export const useDeleteConversationMutation = () => {
       // Remove from conversations list
       queryClient.setQueryData<Conversation[]>(
         CHAT_QUERY_KEYS.conversations(),
-        (old = []) => old.filter(conv => conv.id !== conversationId)
+        (old) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.filter(conv => conv.id !== conversationId);
+        }
       );
 
       // Invalidate messages cache
@@ -314,15 +456,21 @@ export const useBlockUserMutation = () => {
       // Update blocked users cache
       queryClient.setQueryData<string[]>(
         CHAT_QUERY_KEYS.blockedUsers(),
-        (old = []) => [...old, userId]
+        (old) => {
+          if (!old || !Array.isArray(old)) return [userId];
+          return [...old, userId];
+        }
       );
 
       // Remove conversations with blocked user
       queryClient.setQueryData<Conversation[]>(
         CHAT_QUERY_KEYS.conversations(),
-        (old = []) => old.filter(conv =>
-          conv.user1Id !== userId && conv.user2Id !== userId
-        )
+        (old) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.filter(conv =>
+            conv.user1Id !== userId && conv.user2Id !== userId
+          );
+        }
       );
 
       toast.success('User blocked');
@@ -347,7 +495,10 @@ export const useUnblockUserMutation = () => {
       // Update blocked users cache
       queryClient.setQueryData<string[]>(
         CHAT_QUERY_KEYS.blockedUsers(),
-        (old = []) => old.filter(id => id !== userId)
+        (old) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.filter(id => id !== userId);
+        }
       );
 
       // Refetch conversations to include unblocked user

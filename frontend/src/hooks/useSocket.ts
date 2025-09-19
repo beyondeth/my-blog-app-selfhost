@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { useAuth } from '@/providers/AuthProviderV2';
 import toast from 'react-hot-toast';
-import { authEvents } from '@/lib/auth-events';
+import { authEvents } from '@/lib/auth/events';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 

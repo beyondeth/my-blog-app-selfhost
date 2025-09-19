@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import UserAvatar from '@/components/ui/UserAvatar';
 import FollowButton from '@/components/FollowButton';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { queryKeys } from '@/lib/query-keys';
+import { queryKeys } from '@/lib/queries/keys';
 
 interface BlogOwnerCardProps {
   name?: string;

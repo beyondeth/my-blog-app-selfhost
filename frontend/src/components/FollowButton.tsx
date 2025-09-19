@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import { FollowInfo } from '@/types/api';
 import { Loader2, UserPlus, UserMinus, UserCheck } from 'lucide-react';
 import { toast } from 'sonner';
-import { queryKeys } from '@/lib/query-keys';
+import { queryKeys } from '@/lib/queries/keys';
 
 interface FollowButtonProps {
   userId: string;

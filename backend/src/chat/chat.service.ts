@@ -160,6 +160,14 @@ export class ChatService {
       throw new ForbiddenException('Access denied to this conversation');
     }
 
+    // 디버그 로그 추가
+    console.log('[ChatService] getConversationForUser:', {
+      conversationId,
+      userId,
+      user1: conversation.user1 ? { id: conversation.user1.id, username: conversation.user1.username } : null,
+      user2: conversation.user2 ? { id: conversation.user2.id, username: conversation.user2.username } : null,
+    });
+
     // deletedAt과 상관없이 대화방 정보 반환
     // (메시지는 getMessages에서 이미 deletedAt 기준으로 필터링됨)
     return conversation;
@@ -727,6 +735,11 @@ export class ChatService {
       throw new ForbiddenException('Not authorized to leave this conversation');
     }
 
+    // Determine the other user
+    const otherUserId = conversation.user1Id === userId
+      ? conversation.user2Id
+      : conversation.user1Id;
+
     // Soft delete for the user (mark as deleted)
     // This preserves the conversation data for audit purposes
     if (conversation.user1Id === userId) {
@@ -741,9 +754,32 @@ export class ChatService {
       console.log(`[ChatService] User ${userId} left conversation ${conversationId} (as user2)`);
     }
 
-    // Clear any cached data for this conversation and user
+    // Clear any cached data for this conversation and both users
     await this.cacheManager.del(`conversation:${conversationId}:messages`);
     await this.cacheManager.del(`conversations:${userId}`);
+    await this.cacheManager.del(`conversations:${otherUserId}`);
+
+    // Emit WebSocket event to notify the other user
+    if (this.chatGateway && this.chatGateway.server) {
+      // Notify the conversation room that a user has left
+      this.chatGateway.server
+        .to(`conversation:${conversationId}`)
+        .emit('user-left', {
+          conversationId,
+          userId: userId
+        });
+
+      // Notify the other user to refresh their conversation list
+      this.chatGateway.server
+        .to(`user:${otherUserId}`)
+        .emit('conversation-state-changed', {
+          conversationId,
+          action: 'user-left',
+          userId: userId
+        });
+
+      console.log(`[ChatService] Emitted user-left event for conversation ${conversationId}`);
+    }
   }
 
   getUserNotificationStream(userId: string): Observable<MessageEvent> {

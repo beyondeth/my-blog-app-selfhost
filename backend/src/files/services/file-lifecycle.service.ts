@@ -105,13 +105,14 @@ export class FileLifecycleService {
    * 참조되지 않는 파일 찾기 및 정리
    */
   async cleanupOrphanedFiles(): Promise<number> {
-    // 24시간 이상 컨텍스트가 없는 파일
+    // 24시간 이상 컨텍스트가 없는 파일 중 아직 처리되지 않은 파일만
     const orphanedFiles = await this.fileRepository
       .createQueryBuilder('file')
       .where('file.contextId IS NULL')
       .andWhere('file.createdAt < :date', {
         date: new Date(Date.now() - 24 * 60 * 60 * 1000),
       })
+      .andWhere('file.expiresAt IS NULL') // 이미 처리된 파일은 제외
       .getMany();
 
     let cleaned = 0;
@@ -121,11 +122,17 @@ export class FileLifecycleService {
         file.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         await this.fileRepository.save(file);
         cleaned++;
-        
-        this.logger.log(`Scheduled orphaned file ${file.id} for deletion`);
+
+        // 개별 파일 로그 대신 debug 레벨로 변경 - 로그 스팸 방지를 위해 주석 처리
+        // this.logger.debug(`Scheduled orphaned file ${file.id} for deletion`);
       } catch (error) {
         this.logger.error(`Failed to process orphaned file ${file.id}:`, error);
       }
+    }
+
+    // 처리 결과를 한 번만 로그로 출력
+    if (cleaned > 0) {
+      this.logger.log(`Scheduled ${cleaned} orphaned files for deletion`);
     }
 
     return cleaned;

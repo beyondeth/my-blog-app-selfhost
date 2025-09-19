@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import { authEvents } from '@/lib/auth-events';
+import { authEvents } from '@/lib/auth/events';
 
 export type SidebarView = 'chats' | 'settings';
 export type ModalView = 'settings' | null;

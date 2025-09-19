@@ -9,7 +9,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { queryKeys } from '@/lib/query-keys';
+import { queryKeys } from '@/lib/queries/keys';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Post } from '@/types';
 

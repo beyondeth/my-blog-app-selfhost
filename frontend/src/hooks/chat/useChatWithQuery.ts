@@ -8,6 +8,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProviderV2';
 import {
   useConversationsQuery,
+  useConversationByIdQuery,
   useMessagesInfiniteQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
@@ -19,6 +20,9 @@ import {
   usePrefetchMessages,
   useInvalidateChat,
   CHAT_QUERY_KEYS,
+  MessagesInfiniteData,
+  addMessageToInfiniteCache,
+  updateMessagesInfiniteCache,
 } from './useChatsQuery';
 import { useSocketManager } from './useSocketManager';
 import { useChatPerformance } from './useChatPerformance';
@@ -77,6 +81,13 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
     refetch: refetchConversations,
   } = useConversationsQuery();
 
+  // Fetch specific conversation by ID
+  const {
+    data: conversationById,
+    isLoading: isLoadingConversationById,
+    error: conversationByIdError,
+  } = useConversationByIdQuery(conversationId);
+
   const {
     data: messagesData,
     isLoading: isLoadingMessages,
@@ -90,7 +101,11 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
   // Flatten messages from all pages
   const messages = useMemo(() => {
     if (!messagesData?.pages) return [];
-    return messagesData.pages.flatMap(page => page.messages);
+    return messagesData.pages.flatMap(page => {
+      // Add safety check for page structure
+      if (!page || !Array.isArray(page.messages)) return [];
+      return page.messages;
+    });
   }, [messagesData]);
 
   // Mutations
@@ -102,11 +117,14 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
   const blockUserMutation = useBlockUserMutation();
   const unblockUserMutation = useUnblockUserMutation();
 
-  // Get current conversation
+  // Get current conversation - prefer directly fetched conversation over list
   const currentConversation = useMemo(() => {
     if (!conversationId) return null;
+    // Use directly fetched conversation if available
+    if (conversationById) return conversationById;
+    // Fallback to conversation from list
     return conversations.find(c => c.id === conversationId) || null;
-  }, [conversations, conversationId]);
+  }, [conversationById, conversations, conversationId]);
 
   // Track if other user is in the room
   const [otherUserInRoom, setOtherUserInRoom] = useState(false);
@@ -118,11 +136,14 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
     // Reset unread count to 0 when entering the chat room
     queryClient.setQueryData<Conversation[]>(
       CHAT_QUERY_KEYS.conversations(),
-      (old = []) => old.map(conv =>
-        conv.id === conversationId
-          ? { ...conv, unreadCount: 0 }
-          : conv
-      )
+      (old) => {
+        if (!old || !Array.isArray(old)) return [];
+        return old.map(conv =>
+          conv.id === conversationId
+            ? { ...conv, unreadCount: 0 }
+            : conv
+        );
+      }
     );
 
     // Mark all messages as read on backend
@@ -165,36 +186,29 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
       if (message.senderId === user?.id) return;
 
       measurePerformance('handleNewMessage', async () => {
-        // Update messages cache for infinite query
-        queryClient.setQueryData(
+        // Update messages cache for infinite query using utility function
+        queryClient.setQueryData<MessagesInfiniteData>(
           CHAT_QUERY_KEYS.messages(message.conversationId),
-          (oldData: any) => {
-            if (!oldData?.pages?.length) return oldData;
-
-            // Add new message to the first page (most recent)
-            const newPages = [...oldData.pages];
-            const firstPage = newPages[0];
+          (oldData) => {
+            if (!oldData?.pages || oldData.pages.length === 0) return oldData;
 
             // Check for duplicate
-            const exists = firstPage.messages.find((m: Message) => m.id === message.id);
+            const exists = oldData.pages.some(page =>
+              page.messages.some((m: Message) => m.id === message.id)
+            );
             if (exists) return oldData;
 
-            newPages[0] = {
-              ...firstPage,
-              messages: [...firstPage.messages, message]
-            };
-
-            return {
-              ...oldData,
-              pages: newPages
-            };
+            // Add message to cache
+            return addMessageToInfiniteCache(oldData, message);
           }
         );
 
         // Update conversation's last message and keep unread at 0 (we're in the room)
         queryClient.setQueryData<Conversation[]>(
           CHAT_QUERY_KEYS.conversations(),
-          (old = []) => old.map(conv =>
+          (old) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.map(conv =>
             conv.id === message.conversationId
               ? {
                   ...conv,
@@ -203,8 +217,9 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
                   unreadCount: 0  // Keep at 0 since we're actively in the conversation
                 }
               : conv
-          )
-        );
+          );
+        }
+      );
       });
     };
 
@@ -220,25 +235,31 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
     }) => {
       // Only update if the reader is not the current user
       if (readBy !== user?.id) {
-        queryClient.setQueryData<Message[]>(
+        // Update message in infinite query cache
+        queryClient.setQueryData<MessagesInfiniteData>(
           CHAT_QUERY_KEYS.messages(msgConvId),
-          (old = []) => old.map(msg =>
-            msg.id === messageId
-              ? { ...msg, isRead: true, readAt: new Date() }
-              : msg
+          (oldData) => updateMessagesInfiniteCache(oldData, (messages) =>
+            messages.map(msg =>
+              msg.id === messageId
+                ? { ...msg, isRead: true, readAt: new Date() }
+                : msg
+            )
           )
         );
 
         // Update unread count in conversation list
         queryClient.setQueryData<Conversation[]>(
           CHAT_QUERY_KEYS.conversations(),
-          (old = []) => old.map(conv => {
-            if (conv.id === msgConvId) {
-              const newUnreadCount = Math.max(0, (conv.unreadCount || 0) - 1);
-              return { ...conv, unreadCount: newUnreadCount };
-            }
-            return conv;
-          })
+          (old) => {
+            if (!old || !Array.isArray(old)) return [];
+            return old.map(conv => {
+              if (conv.id === msgConvId) {
+                const newUnreadCount = Math.max(0, (conv.unreadCount || 0) - 1);
+                return { ...conv, unreadCount: newUnreadCount };
+              }
+              return conv;
+            });
+          }
         );
       }
     };
@@ -253,26 +274,25 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
     }) => {
       // Only update if the reader is not the current user
       if (readBy !== user?.id) {
-        queryClient.setQueryData(
+        // Update all messages in infinite query cache
+        queryClient.setQueryData<MessagesInfiniteData>(
           CHAT_QUERY_KEYS.messages(msgConvId),
-          (oldData: any) => {
-            if (!oldData?.pages?.length) return oldData;
+          (oldData) => {
+            if (!oldData?.pages) return oldData;
 
             // Update all messages in all pages
-            const newPages = oldData.pages.map((page: any) => ({
-              ...page,
-              messages: page.messages.map((msg: Message) => {
-                // Mark all messages from current user as read
-                if (msg.senderId === user?.id) {
-                  return { ...msg, isRead: true, readAt: new Date() };
-                }
-                return msg;
-              })
-            }));
-
             return {
               ...oldData,
-              pages: newPages
+              pages: oldData.pages.map(page => ({
+                ...page,
+                messages: page.messages.map(msg => {
+                  // Mark all messages from current user as read
+                  if (msg.senderId === user?.id) {
+                    return { ...msg, isRead: true, readAt: new Date() };
+                  }
+                  return msg;
+                })
+              }))
             };
           }
         );
@@ -280,12 +300,15 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
         // Clear unread count in conversation list
         queryClient.setQueryData<Conversation[]>(
           CHAT_QUERY_KEYS.conversations(),
-          (old = []) => old.map(conv => {
-            if (conv.id === msgConvId) {
-              return { ...conv, unreadCount: 0 };
-            }
-            return conv;
-          })
+          (old) => {
+            if (!old || !Array.isArray(old)) return [];
+            return old.map(conv => {
+              if (conv.id === msgConvId) {
+                return { ...conv, unreadCount: 0 };
+              }
+              return conv;
+            });
+          }
         );
       }
     };
@@ -356,11 +379,14 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
       queryClient.setQueryData(
         CHAT_QUERY_KEYS.messages(msgConvId),
         (oldData: any) => {
-          if (!oldData?.pages?.length) return oldData;
+          if (!oldData?.pages || !Array.isArray(oldData.pages) || oldData.pages.length === 0) return oldData;
 
           // Add new message to the first page
           const newPages = [...oldData.pages];
           const firstPage = newPages[0];
+
+          // Ensure firstPage has messages array
+          if (!firstPage || !Array.isArray(firstPage.messages)) return oldData;
 
           // Check for duplicate
           const exists = firstPage.messages.find((m: Message) => m.id === message.id);
@@ -381,7 +407,9 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
       // Update conversation's last message and unread count for OTHER conversations only
       queryClient.setQueryData<Conversation[]>(
         CHAT_QUERY_KEYS.conversations(),
-        (old = []) => old.map(conv =>
+        (old) => {
+          if (!old || !Array.isArray(old)) return [];
+          return old.map(conv =>
           conv.id === msgConvId
             ? {
                 ...conv,
@@ -392,7 +420,8 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
                   : conv.unreadCount
               }
             : conv
-        )
+          );
+        }
       );
     };
 
@@ -417,6 +446,23 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
       }
     };
 
+    // Handle conversation list refresh (when a left conversation gets new message)
+    const handleConversationListRefresh = () => {
+      console.log('[Chat] Conversation list refresh event received');
+      // Invalidate conversations query to fetch updated list
+      queryClient.invalidateQueries({
+        queryKey: CHAT_QUERY_KEYS.conversations()
+      });
+
+      // Also invalidate current conversation messages if needed
+      if (conversationId) {
+        queryClient.invalidateQueries({
+          queryKey: CHAT_QUERY_KEYS.messages(conversationId),
+          refetchType: 'none' // Don't auto-refetch, let user trigger it
+        });
+      }
+    };
+
     // Register event listeners
     socket.on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);
     socket.on(SOCKET_EVENTS.MESSAGE_READ, handleMessageRead);
@@ -426,6 +472,7 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
     socket.on(SOCKET_EVENTS.CONVERSATION_REACTIVATED, handleConversationReactivated);
     socket.on(SOCKET_EVENTS.USER_JOINED, handleUserJoined);
     socket.on(SOCKET_EVENTS.USER_LEFT, handleUserLeft);
+    socket.on(SOCKET_EVENTS.CONVERSATION_LIST_REFRESH, handleConversationListRefresh);
 
     // Cleanup - only remove event listeners, don't emit leave-conversation here
     return () => {
@@ -437,6 +484,7 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
       socket.off(SOCKET_EVENTS.CONVERSATION_REACTIVATED, handleConversationReactivated);
       socket.off(SOCKET_EVENTS.USER_JOINED, handleUserJoined);
       socket.off(SOCKET_EVENTS.USER_LEFT, handleUserLeft);
+      socket.off(SOCKET_EVENTS.CONVERSATION_LIST_REFRESH, handleConversationListRefresh);
 
       // Clear typing timeouts
       typingTimeouts.forEach(timeout => clearTimeout(timeout));
@@ -527,12 +575,14 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
       queryClient.setQueryData(
         CHAT_QUERY_KEYS.messages(conversationId),
         (oldData: any) => {
-          if (!oldData?.pages?.length) return oldData;
+          if (!oldData?.pages || !Array.isArray(oldData.pages) || oldData.pages.length === 0) return oldData;
 
           // Remove failed message from all pages
           const newPages = oldData.pages.map((page: any) => ({
             ...page,
-            messages: page.messages.filter((m: Message) => m.tempId !== tempId)
+            messages: Array.isArray(page?.messages)
+              ? page.messages.filter((m: Message) => m.tempId !== tempId)
+              : []
           }));
 
           return {

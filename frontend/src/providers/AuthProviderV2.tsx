@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthV2 } from '@/hooks/useAuthV2';
-import { prefetchAuth } from '@/lib/auth-queries';
+import { prefetchAuth } from '@/lib/auth/queries';
 import type { AuthContextType } from '@/types';
 
 /**

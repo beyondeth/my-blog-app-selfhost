@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { FollowInfo } from '@/types/api';
-import { queryKeys } from '@/lib/query-keys';
+import { queryKeys } from '@/lib/queries/keys';
 import { useAuth } from '@/providers/AuthProviderV2';
 
 /**

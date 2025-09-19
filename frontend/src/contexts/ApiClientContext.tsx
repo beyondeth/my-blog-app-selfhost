@@ -1,11 +1,14 @@
 'use client';
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { ApiClient, createApiClient, defaultApiClient } from '@/lib/api-client-factory';
+import { createApiClient } from '@/lib/api';
+
+// 기본 API 클라이언트 (싱글톤)
+const defaultApiClient = createApiClient();
 import { useAuth } from '@/providers/AuthProviderV2';
 
 interface ApiClientContextType {
-  apiClient: ApiClient;
+  apiClient: ReturnType<typeof createApiClient>;
   isUserSpecific: boolean;
 }
 
@@ -20,14 +23,14 @@ const ApiClientContext = createContext<ApiClientContextType>({
  */
 export function ApiClientProvider({ children }: { children: ReactNode }) {
   const { user, isLoading } = useAuth();
-  const [apiClient, setApiClient] = useState<ApiClient>(defaultApiClient);
+  const [apiClient, setApiClient] = useState<ReturnType<typeof createApiClient>>(defaultApiClient);
   const [isUserSpecific, setIsUserSpecific] = useState(false);
 
   useEffect(() => {
     if (!isLoading) {
       if (user?.id) {
         // 로그인한 사용자 - 전용 인스턴스 생성
-        const userApiClient = createApiClient(user.id);
+        const userApiClient = createApiClient({ userId: user.id });
         setApiClient(userApiClient);
         setIsUserSpecific(true);
       } else {
@@ -63,7 +66,7 @@ export function useApiClient(): ApiClientContextType {
  * 편의 함수 - ApiClient 인스턴스만 반환
  * @returns {ApiClient} ApiClient 인스턴스
  */
-export function useApi(): ApiClient {
+export function useApi(): ReturnType<typeof createApiClient> {
   const { apiClient } = useApiClient();
   return apiClient;
 }

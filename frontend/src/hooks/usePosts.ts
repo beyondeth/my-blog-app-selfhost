@@ -41,6 +41,7 @@ export function useInfinitePosts(options: {
       blogSlug: blogSlug || undefined,
     }),
     getNextPageParam: (lastPage, allPages) => {
+      if (!lastPage || !allPages) return undefined;
       const currentPage = allPages.length;
       const totalPages = Math.ceil(lastPage.total / 20);  // limit과 동일하게 변경
       return currentPage < totalPages ? currentPage + 1 : undefined;

@@ -5,7 +5,7 @@ import FollowButton from './FollowButton';
 import UserAvatar from './ui/UserAvatar';
 import UserLinkWithTooltip from './UserLinkWithTooltip';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { queryKeys } from '@/lib/query-keys';
+import { queryKeys } from '@/lib/queries/keys';
 
 interface FollowingListSectionProps {
   userId: string;

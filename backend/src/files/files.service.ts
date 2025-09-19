@@ -3,17 +3,18 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { File } from './entities/file.entity';
+import { FileContext, FileContextType, FilePurpose } from './entities/file-context.entity';
 import { S3Service, PresignedUrlResponse } from './services/s3.service';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { UploadCompleteDto } from './dto/upload-complete.dto';
 import { CreateBatchUploadUrlDto, BatchUploadCompleteDto } from './dto/batch-upload.dto';
 import { UpdateImageOrderDto } from './dto/update-image-order.dto';
-import { 
-  generateUuidFileName, 
-  generateS3Key, 
-  isImageMimeType, 
+import {
+  generateUuidFileName,
+  generateS3Key,
+  isImageMimeType,
   validateMimeType,
-  formatFileSize 
+  formatFileSize
 } from '../common/utils/file.utils';
 
 @Injectable()
@@ -23,9 +24,27 @@ export class FilesService {
   constructor(
     @InjectRepository(File)
     private fileRepository: Repository<File>,
+    @InjectRepository(FileContext)
+    private contextRepository: Repository<FileContext>,
     private s3Service: S3Service,
     private configService: ConfigService,
   ) {}
+
+  /**
+   * 임시 FileContext 생성
+   * 파일 업로드 시 사용되는 임시 컨텍스트
+   * 나중에 포스트 저장 시 정식 컨텍스트로 전환됨
+   */
+  private async createTemporaryContext(userId: string): Promise<FileContext> {
+    const context = this.contextRepository.create({
+      contextType: FileContextType.SYSTEM,
+      contextId: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      purpose: FilePurpose.CONTENT, // 기존 enum 사용
+      ownerId: userId,
+      isActive: true,
+    });
+    return await this.contextRepository.save(context);
+  }
 
   /**
    * 배치 파일 업로드용 Presigned URL 생성 (최대 5개)
@@ -112,6 +131,9 @@ export class FilesService {
         count: fileKeys.length
       });
 
+      // 배치용 임시 context 하나 생성
+      const tempContext = await this.createTemporaryContext(userId);
+
       // 각 파일에 대해 업로드 완료 처리
       const completedFiles = await Promise.all(
         fileKeys.map(async (fileKey, index) => {
@@ -139,8 +161,7 @@ export class FilesService {
             mimeType: fileMetadata.contentType || 'image/webp',
             fileType: 'image',
             userId,
-            // context is a string describing the upload context, not an ID
-            // contextId would be set if we had a FileContext entity reference
+            contextId: tempContext.id, // 임시 context 추가
           });
 
           const savedFile = await this.fileRepository.save(file);
@@ -309,9 +330,12 @@ export class FilesService {
         throw new Error('Invalid S3 key format');
       }
 
+      // 임시 FileContext 생성
+      const tempContext = await this.createTemporaryContext(userId);
+
       // 이미지 파일인 경우 Presigned URL 생성 (1시간 유효)
       const accessUrl = await this.s3Service.generatePresignedDownloadUrl(fileKey);
-      
+
       this.logger.log(`Generated access URL for S3 key: ${fileKey}`);
 
       // 파일 정보 DB에 저장 - fileUrl에는 S3 키를 저장
@@ -324,6 +348,7 @@ export class FilesService {
         mimeType,
         fileType: fileType || 'general',
         userId,
+        contextId: tempContext.id, // 임시 context 추가
       });
 
       const savedFile = await this.fileRepository.save(file);

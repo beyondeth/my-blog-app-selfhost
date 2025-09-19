@@ -10,7 +10,7 @@ import {
   useRefreshUser,
   useIsAuthenticated,
   useIsAdmin,
-} from '@/lib/auth-queries';
+} from '@/lib/auth/queries';
 import type { LoginForm, RegisterForm, AuthContextType } from '@/types';
 
 /**

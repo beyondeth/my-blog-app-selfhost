@@ -4,7 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import { PropsWithChildren } from 'react';
 import UserTooltip from './UserTooltip';
-import { queryKeys } from '@/lib/query-keys';
+import { queryKeys } from '@/lib/queries/keys';
 import { useAuth } from '@/providers/AuthProviderV2';
 
 interface UserLinkWithTooltipProps extends PropsWithChildren {

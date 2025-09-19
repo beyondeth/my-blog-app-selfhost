@@ -4,6 +4,7 @@ import { Repository, Like, In, SelectQueryBuilder, MoreThan, DataSource, EntityM
 import { Post } from './entities/post.entity';
 import { User } from '../users/entities/user.entity';
 import { File } from '../files/entities/file.entity';
+import { FileContext, FileContextType, FilePurpose } from '../files/entities/file-context.entity';
 import { Blog } from '../blogs/entities/blog.entity';
 import { Role } from '../common/enums/role.enum';
 import { CreatePostDto } from './dto/create-post.dto';
@@ -24,6 +25,8 @@ export class PostsService {
     private postsRepository: Repository<Post>,
     @InjectRepository(File)
     private filesRepository: Repository<File>,
+    @InjectRepository(FileContext)
+    private fileContextRepository: Repository<FileContext>,
     @InjectRepository(Blog)
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
@@ -749,6 +752,25 @@ export class PostsService {
         const existingFileIds = post.attachedFiles?.map(f => f.id) || [];
         const newFiles = files.filter(f => !existingFileIds.includes(f.id));
         if (newFiles.length > 0) {
+          // 임시 context를 POST context로 변환
+          for (const file of newFiles) {
+            if (file.contextId) {
+              const context = await this.fileContextRepository.findOne({
+                where: { id: file.contextId }
+              });
+
+              if (context && context.contextId.startsWith('temp_')) {
+                // 임시 context를 POST context로 변환
+                context.contextType = FileContextType.POST;
+                context.contextId = post.id;
+                context.purpose = FilePurpose.CONTENT;
+                await this.fileContextRepository.save(context);
+
+                this.logger.log(`Converted temporary context ${context.id} to POST context for post ${post.id}`);
+              }
+            }
+          }
+
           post.attachedFiles = [...(post.attachedFiles || []), ...newFiles];
           await this.postsRepository.save(post);
         }

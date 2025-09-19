@@ -1,6 +1,6 @@
 "use client";
 
-import { queryKeys } from '@/lib/query-keys';
+import { queryKeys } from '@/lib/queries/keys';
 import { FollowInfo } from '@/types/api';
 import { Users, UserCheck } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProviderV2';

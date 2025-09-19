@@ -7,6 +7,8 @@ import { useChat } from '@/hooks/useChat';
 import { useState } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useDMModal } from '@/hooks/useDMModal';
+import { useQueryClient } from '@tanstack/react-query';
+import { CHAT_QUERY_KEYS } from '@/hooks/chat/useChatsQuery';
 import toast from 'react-hot-toast';
 
 interface DMButtonProps {
@@ -21,6 +23,7 @@ export function DMButton({ userId, username, size = 'default', mode }: DMButtonP
   const { user } = useAuth();
   const { getOrCreateConversation } = useChat();
   const { openModal, mode: defaultMode } = useDMModal();
+  const queryClient = useQueryClient();
   const [loading, setLoading] = useState(false);
 
   // Use provided mode or default from store
@@ -42,6 +45,17 @@ export function DMButton({ userId, username, size = 'default', mode }: DMButtonP
       setLoading(true);
       const conversation = await getOrCreateConversation(userId);
       if (conversation) {
+        // Update React Query cache with the conversation data
+        queryClient.setQueryData(
+          CHAT_QUERY_KEYS.conversationById(conversation.id),
+          conversation
+        );
+
+        // Also invalidate conversations list to ensure it's up to date
+        queryClient.invalidateQueries({
+          queryKey: CHAT_QUERY_KEYS.conversations()
+        });
+
         if (viewMode === 'modal') {
           // Open as modal
           openModal(conversation.id);

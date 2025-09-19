@@ -8,7 +8,7 @@ import { User } from '../DMLayout/DMLayout.types';
 import { useDMStore } from '@/stores/dmStore';
 
 interface ChatHeaderProps {
-  otherUser?: User;
+  otherUser?: User | null;
   isLoading?: boolean;
   conversationId?: string;
 }
