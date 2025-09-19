@@ -646,6 +646,136 @@ class ApiClient {
       window.location.href = `${API_BASE_URL}/auth/github`;
     }
   }
+
+  // ==================== Chat API Methods ====================
+
+  /**
+   * Get all conversations for the current user
+   * Optimized with backend EXISTS query
+   */
+  async getConversations(signal?: AbortSignal): Promise<any[]> {
+    const response = await this.client.get('/chat/conversations', { signal });
+    return response.data;
+  }
+
+  /**
+   * Get conversation by ID
+   */
+  async getConversationById(conversationId: string, signal?: AbortSignal): Promise<any> {
+    const response = await this.client.get(`/chat/conversation/by-id/${conversationId}`, { signal });
+    return response.data;
+  }
+
+  /**
+   * Get or create conversation with a specific user
+   */
+  async getOrCreateConversation(userId: string, signal?: AbortSignal): Promise<any> {
+    const response = await this.client.get(`/chat/conversation/${userId}`, { signal });
+    return response.data;
+  }
+
+  /**
+   * Get messages for a conversation with pagination
+   */
+  async getMessages(
+    conversationId: string,
+    page: number = 1,
+    signal?: AbortSignal
+  ): Promise<{ messages: any[]; hasMore: boolean }> {
+    const response = await this.client.get(
+      `/chat/messages/${conversationId}?page=${page}`,
+      { signal }
+    );
+    return response.data;
+  }
+
+  /**
+   * Send a message with tempId for reliable optimistic updates
+   */
+  async sendMessage(
+    conversationId: string,
+    content: string,
+    tempId: string
+  ): Promise<any> {
+    const response = await this.client.post('/chat/message', {
+      conversationId,
+      content,
+      tempId
+    });
+    return response.data;
+  }
+
+  /**
+   * Mark a message as read
+   */
+  async markMessageAsRead(messageId: string): Promise<void> {
+    await this.client.post(`/chat/message/${messageId}/read`);
+  }
+
+  /**
+   * Mark all messages in a conversation as read
+   */
+  async markAllMessagesAsRead(conversationId: string): Promise<void> {
+    await this.client.post(`/chat/conversation/${conversationId}/mark-all-read`);
+  }
+
+  /**
+   * Mark a message as read
+   */
+  async markAsRead(messageId: string): Promise<void> {
+    await this.client.post(`/chat/message/${messageId}/read`);
+  }
+
+  /**
+   * Mark all messages in a conversation as read
+   */
+  async markAllAsRead(conversationId: string): Promise<void> {
+    await this.client.post(`/chat/conversation/${conversationId}/mark-all-read`);
+  }
+
+  /**
+   * Block a user
+   */
+  async blockUser(userId: string): Promise<void> {
+    await this.client.post(`/chat/block/${userId}`);
+  }
+
+  /**
+   * Unblock a user
+   */
+  async unblockUser(userId: string): Promise<void> {
+    await this.client.delete(`/chat/block/${userId}`);
+  }
+
+  /**
+   * Get blocked users list
+   */
+  async getBlockedUsers(signal?: AbortSignal): Promise<any[]> {
+    const response = await this.client.get('/chat/blocked-users', { signal });
+    return response.data;
+  }
+
+  /**
+   * Delete (leave) a conversation
+   */
+  async deleteConversation(conversationId: string): Promise<void> {
+    await this.client.delete(`/chat/conversation/${conversationId}`);
+  }
+
+  /**
+   * Get unread messages count
+   */
+  async getUnreadCount(signal?: AbortSignal): Promise<number> {
+    const response = await this.client.get('/chat/unread-count', { signal });
+    return response.data.count;
+  }
+
+  /**
+   * Delete a message (soft delete)
+   */
+  async deleteMessage(messageId: string): Promise<void> {
+    await this.client.delete(`/chat/message/${messageId}`);
+  }
 }
 
 // WARNING: This file exports a singleton instance for backward compatibility only

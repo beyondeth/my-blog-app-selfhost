@@ -144,7 +144,15 @@ export class ChatGateway
     @MessageBody() conversationId: string,
     @ConnectedSocket() client: Socket,
   ) {
+    const userId = client.data.userId;
     client.join(`conversation:${conversationId}`);
+
+    // Notify other users in the conversation that this user joined
+    client.broadcast
+      .to(`conversation:${conversationId}`)
+      .emit('user-joined', { conversationId, userId });
+
+    console.log(`User ${userId} joined conversation ${conversationId}`);
     return { success: true };
   }
 
@@ -153,7 +161,15 @@ export class ChatGateway
     @MessageBody() conversationId: string,
     @ConnectedSocket() client: Socket,
   ) {
+    const userId = client.data.userId;
     client.leave(`conversation:${conversationId}`);
+
+    // Notify other users in the conversation that this user left
+    client.broadcast
+      .to(`conversation:${conversationId}`)
+      .emit('user-left', { conversationId, userId });
+
+    console.log(`User ${userId} left conversation ${conversationId}`);
     return { success: true };
   }
 
@@ -171,8 +187,8 @@ export class ChatGateway
       // Save message
       const message = await this.chatService.sendMessage(userId, dto);
 
-      // Emit to conversation room
-      this.server
+      // Emit to conversation room (excluding sender)
+      client.broadcast
         .to(`conversation:${dto.conversationId}`)
         .emit('new-message', message);
 
@@ -239,10 +255,50 @@ export class ChatGateway
     }
 
     try {
-      await this.chatService.markAsRead(messageId, userId);
+      // Mark the message as read
+      const message = await this.chatService.markAsRead(messageId, userId);
 
-      // Notify sender that message was read
-      this.server.emit('message-read', { messageId, userId });
+      // Get the conversation ID from the message
+      const conversationId = message.conversationId;
+
+      // Emit to all users in the conversation room
+      this.server
+        .to(`conversation:${conversationId}`)
+        .emit('message-read', {
+          messageId,
+          conversationId,
+          readBy: userId,
+          readAt: new Date()
+        });
+
+      return { success: true };
+    } catch (error) {
+      throw new WsException(error.message);
+    }
+  }
+
+  @SubscribeMessage('mark-all-read')
+  async handleMarkAllRead(
+    @MessageBody() conversationId: string,
+    @ConnectedSocket() client: Socket,
+  ) {
+    const userId = client.data.userId;
+    if (!userId) {
+      throw new WsException('Unauthorized');
+    }
+
+    try {
+      // Mark all messages as read
+      await this.chatService.markAllMessagesAsRead(conversationId, userId);
+
+      // Emit to all users in the conversation room
+      this.server
+        .to(`conversation:${conversationId}`)
+        .emit('all-messages-read', {
+          conversationId,
+          readBy: userId,
+          readAt: new Date()
+        });
 
       return { success: true };
     } catch (error) {

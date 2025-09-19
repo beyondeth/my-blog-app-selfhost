@@ -4,10 +4,18 @@ import React, { memo, useMemo, useState } from 'react';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Avatar } from '@/components/ui/avatar';
-import { ConversationItemProps } from '../DMLayout/DMLayout.types';
 import { LogOut } from 'lucide-react';
 import { useDMStore } from '@/stores/dmStore';
 import ConfirmModal from '../ConfirmModal';
+import { Conversation } from '@/types/chat';
+
+interface ConversationItemProps {
+  conversation: Conversation;
+  currentUserId: string;
+  isActive: boolean;
+  onClick: (conversationId: string) => void;
+  onLeaveConversation?: (conversationId: string) => Promise<void>;
+}
 
 const ConversationItem: React.FC<ConversationItemProps> = memo(({
   conversation,
@@ -93,13 +101,14 @@ const ConversationItem: React.FC<ConversationItemProps> = memo(({
         flex
         items-center
         gap-3
-        p-3
-        rounded-xl
+        px-4
+        py-3
         cursor-pointer
         transition-all
         duration-200
+        w-full
         ${isActive
-          ? 'bg-blue-50 border-l-4 border-blue-500'
+          ? 'bg-blue-50 border-l-4 border-blue-500 pl-3'
           : 'hover:bg-gray-50'
         }
       `}

@@ -92,10 +92,6 @@ export function useSocket() {
       reconnectionAttempts: maxReconnectAttempts,
       reconnectionDelay: 2000,
       reconnectionDelayMax: 5000,
-
-      // 연결 유지 설정 (Socket.IO가 자동 관리)
-      pingInterval: 25000,  // 25초마다 ping
-      pingTimeout: 60000,   // 60초 응답 없으면 연결 종료
     });
 
     socket.on('connect', () => {

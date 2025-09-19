@@ -13,6 +13,8 @@ interface MessageItemProps {
   showAvatar: boolean;
   isFirstInGroup: boolean;
   isLastInGroup: boolean;
+  isLastMessage?: boolean;  // Whether this is the very last message in conversation
+  isOtherUserInRoom?: boolean;  // Whether other user is actively in the room
   otherUser?: User;
   onRetry?: (messageId: string) => void;
 }
@@ -23,25 +25,14 @@ const MessageItem: React.FC<MessageItemProps> = memo(({
   showAvatar,
   isFirstInGroup,
   isLastInGroup,
+  isLastMessage = false,
+  isOtherUserInRoom = false,
   otherUser,
   onRetry,
 }) => {
 
-  // Get message status icon based on status field
-  const getStatusIcon = () => {
-    if (!isOwnMessage) return null;
-
-    // Use status field if available
-    if (message.status === 'sending') {
-      return <Clock className="w-3 h-3 text-gray-400" />;
-    } else if (message.status === 'failed') {
-      return <AlertCircle className="w-3 h-3 text-red-500" />;
-    } else if (message.isRead) {
-      return <CheckCheck className="w-3 h-3 text-blue-500" />;
-    } else {
-      return <Check className="w-3 h-3 text-gray-400" />;
-    }
-  };
+  // Only show "읽음" text for the last message when other user is in room
+  const shouldShowReadText = isOwnMessage && isLastMessage && isOtherUserInRoom && message.isRead;
 
   // Format time
   const formatTime = (date: Date) => {
@@ -145,12 +136,12 @@ const MessageItem: React.FC<MessageItemProps> = memo(({
             )}
           </div>
 
-          {/* Time and status - only for last message in group */}
+          {/* Time and read status - only for last message in group */}
           {isLastInGroup && (
-            <div className="flex flex-col items-start gap-0.5">
-              {/* Unread count for own messages */}
-              {isOwnMessage && !message.status && !message.isRead && (
-                <span className="text-xs font-bold text-yellow-500">1</span>
+            <div className="flex flex-col items-end gap-0.5">
+              {/* Show "읽음" for last message when other user is in room */}
+              {shouldShowReadText && (
+                <span className="text-xs text-blue-500">읽음</span>
               )}
               {/* Time */}
               <span className={`text-xs text-gray-500 ${message.status === 'failed' ? 'text-red-500' : ''}`}>

@@ -7,11 +7,12 @@ import {
   MessageEvent,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, Brackets } from 'typeorm';
 import { Observable, Subject, filter, map } from 'rxjs';
 import { Conversation } from './entities/conversation.entity';
 import { Message } from './entities/message.entity';
 import { UserBlock } from './entities/user-block.entity';
+import { User } from '../users/entities/user.entity';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { CreateConversationDto } from './dto/create-conversation.dto';
 import { ConversationWithUnread } from './dto/conversation-with-unread.dto';
@@ -32,6 +33,8 @@ export class ChatService {
     private messageRepository: Repository<Message>,
     @InjectRepository(UserBlock)
     private userBlockRepository: Repository<UserBlock>,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {}
 
@@ -163,36 +166,60 @@ export class ChatService {
   }
 
   async getConversations(userId: string): Promise<ConversationWithUnread[]> {
-    console.log('[ChatService] getConversations called for userId:', userId);
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[ChatService] getConversations called for userId:', userId);
+    }
+
+    // Check cache first
+    const cacheKey = `conversations:${userId}`;
+    const cached = await this.cacheManager.get<ConversationWithUnread[]>(cacheKey);
+    if (cached) {
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ChatService] Returning cached conversations for user:', userId);
+      }
+      return cached;
+    }
 
     // Get all conversations where the user is a participant
-    // Only exclude if the CURRENT USER has left (not the other user)
+    // Include conversations the user has left if there are new messages after they left
+    // Using EXISTS subquery for better performance instead of LEFT JOIN
     const conversations = await this.conversationRepository
       .createQueryBuilder('conversation')
       .leftJoinAndSelect('conversation.user1', 'user1')
       .leftJoinAndSelect('conversation.user2', 'user2')
       .where(
-        '((conversation.user1Id = :userId AND conversation.user1DeletedAt IS NULL) OR ' +
-        '(conversation.user2Id = :userId AND conversation.user2DeletedAt IS NULL))',
-        { userId }
+        new Brackets((qb) => {
+          // User hasn't left the conversation
+          qb.where('conversation.user1Id = :userId AND conversation.user1DeletedAt IS NULL')
+            .orWhere('conversation.user2Id = :userId AND conversation.user2DeletedAt IS NULL')
+          // User left but there are new messages after they left (using EXISTS for better performance)
+            .orWhere(
+              new Brackets((qb2) => {
+                qb2.where('conversation.user1Id = :userId AND conversation.user1DeletedAt IS NOT NULL')
+                  .andWhere(
+                    'EXISTS (SELECT 1 FROM messages m WHERE m."conversationId" = conversation.id AND m."createdAt" > conversation.user1DeletedAt)'
+                  );
+              })
+            )
+            .orWhere(
+              new Brackets((qb2) => {
+                qb2.where('conversation.user2Id = :userId AND conversation.user2DeletedAt IS NOT NULL')
+                  .andWhere(
+                    'EXISTS (SELECT 1 FROM messages m WHERE m."conversationId" = conversation.id AND m."createdAt" > conversation.user2DeletedAt)'
+                  );
+              })
+            );
+        })
       )
+      .setParameters({ userId })
       .orderBy('conversation.lastMessageAt', 'DESC', 'NULLS LAST')
       .getMany();
 
-    // Log each conversation to debug
-    console.log(`[ChatService] Found ${conversations.length} conversations for user ${userId}:`);
-    conversations.forEach((conv, index) => {
-      const isUser1 = conv.user1Id === userId;
-      const isUser2 = conv.user2Id === userId;
-      console.log(`  [${index + 1}] Conversation ${conv.id}:`);
-      console.log(`    - user1: ${conv.user1Id} (${conv.user1?.username}) ${isUser1 ? '← YOU' : ''}`);
-      console.log(`    - user2: ${conv.user2Id} (${conv.user2?.username}) ${isUser2 ? '← YOU' : ''}`);
-      console.log(`    - User is part of conversation: ${isUser1 || isUser2}`);
-
-      if (!isUser1 && !isUser2) {
-        console.error(`    ⚠️ WARNING: User ${userId} is NOT part of this conversation!`);
-      }
-    });
+    // Log each conversation to debug (only in development)
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`[ChatService] Found ${conversations.length} conversations for user ${userId}`);
+    }
 
     // Filter out any conversations where user is not a participant (safety check)
     const validConversations = conversations.filter(conv =>
@@ -206,13 +233,22 @@ export class ChatService {
     // Get unread count for each conversation
     const conversationsWithUnreadCount = await Promise.all(
       validConversations.map(async (conv) => {
+        // Only count messages FROM the OTHER user that current user hasn't read
         const unreadCount = await this.messageRepository
           .createQueryBuilder('message')
           .where('message.conversationId = :conversationId', { conversationId: conv.id })
-          .andWhere('message.senderId != :userId', { userId })
+          .andWhere('message.senderId != :userId', { userId })  // Messages NOT from current user
           .andWhere('message.isRead = false')
           .andWhere('message.isDeleted = false')
           .getCount();
+
+        if (process.env.NODE_ENV === 'development' && unreadCount > 0) {
+          console.log('[ChatService] Unread count for conversation:', {
+            conversationId: conv.id,
+            currentUserId: userId,
+            unreadCount,
+          });
+        }
 
         // Get last message
         const lastMessage = await this.messageRepository.findOne({
@@ -233,6 +269,12 @@ export class ChatService {
       })
     );
 
+    // Cache the result for 10 seconds
+    await this.cacheManager.set(cacheKey, conversationsWithUnreadCount, 10000);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[ChatService] Cached conversations for user:', userId);
+    }
+
     return conversationsWithUnreadCount;
   }
 
@@ -240,7 +282,7 @@ export class ChatService {
     conversationId: string,
     userId: string,
     page = 1,
-    limit = 20,
+    limit = 10,
   ): Promise<{ messages: Message[]; hasMore: boolean }> {
     console.log('[ChatService] getMessages called:', {
       conversationId,
@@ -335,12 +377,14 @@ export class ChatService {
     senderId: string,
     dto: CreateMessageDto,
   ): Promise<Message> {
-    console.log('[ChatService] sendMessage called:', {
-      senderId,
-      senderIdType: typeof senderId,
-      conversationId: dto.conversationId,
-      contentLength: dto.content?.length
-    });
+    // Only log in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[ChatService] sendMessage called:', {
+        senderId,
+        conversationId: dto.conversationId,
+        contentLength: dto.content?.length
+      });
+    }
 
     // Verify conversation exists and user is part of it
     const conversation = await this.conversationRepository.findOne({
@@ -349,7 +393,9 @@ export class ChatService {
     });
 
     if (!conversation) {
-      console.error('[ChatService] Conversation not found:', dto.conversationId);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ChatService] Conversation not found:', dto.conversationId);
+      }
       throw new NotFoundException('Conversation not found');
     }
 
@@ -359,7 +405,9 @@ export class ChatService {
       (conversation.user2Id === senderId && conversation.user2DeletedAt);
 
     if (senderHadLeft) {
-      console.log('[ChatService] Sender is re-entering conversation, resetting deletedAt');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[ChatService] Sender is re-entering conversation, resetting deletedAt');
+      }
       // Reset the deletedAt field for the sender to reactivate the conversation
       if (conversation.user1Id === senderId) {
         await this.conversationRepository.update(dto.conversationId, {
@@ -372,40 +420,15 @@ export class ChatService {
       }
     }
 
-    console.log('[ChatService] Conversation found:', {
-      conversationId: conversation.id,
-      user1Id: conversation.user1Id,
-      user1IdType: typeof conversation.user1Id,
-      user2Id: conversation.user2Id,
-      user2IdType: typeof conversation.user2Id,
-      senderId,
-      senderIdType: typeof senderId,
-      senderIsUser1: conversation.user1Id === senderId,
-      senderIsUser2: conversation.user2Id === senderId
-    });
-
     // Convert IDs to strings for comparison (handling potential UUID type mismatch)
     const user1IdStr = String(conversation.user1Id).toLowerCase();
     const user2IdStr = String(conversation.user2Id).toLowerCase();
     const senderIdStr = String(senderId).toLowerCase();
 
-    console.log('[ChatService] After string conversion:', {
-      user1IdStr,
-      user2IdStr,
-      senderIdStr,
-      user1Match: user1IdStr === senderIdStr,
-      user2Match: user2IdStr === senderIdStr
-    });
-
     if (user1IdStr !== senderIdStr && user2IdStr !== senderIdStr) {
-      console.error('[ChatService] User not part of conversation - FORBIDDEN:', {
-        user1IdStr,
-        user2IdStr,
-        senderIdStr,
-        user1Username: conversation.user1?.username,
-        user2Username: conversation.user2?.username,
-        conversationId: conversation.id
-      });
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ChatService] User not part of conversation - FORBIDDEN');
+      }
       throw new ForbiddenException('Not authorized to send message in this conversation');
     }
 
@@ -414,25 +437,36 @@ export class ChatService {
       ? conversation.user2Id
       : conversation.user1Id;
 
-    console.log('[ChatService] Checking block status:', {
-      senderId,
-      recipientId,
-      senderUsername: user1IdStr === senderIdStr ? conversation.user1?.username : conversation.user2?.username,
-      recipientUsername: user1IdStr === senderIdStr ? conversation.user2?.username : conversation.user1?.username
-    });
-
     const isBlocked = await this.checkBlock(senderId, recipientId);
     if (isBlocked) {
-      console.error('[ChatService] Message blocked - users have blocked each other');
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[ChatService] Message blocked - users have blocked each other');
+      }
       throw new ForbiddenException('Cannot send message to blocked user');
     }
 
-    // Create and save message
-    const message = await this.messageRepository.save({
+    // Create message with sender relation loaded
+    const message = this.messageRepository.create({
       conversationId: dto.conversationId,
       senderId,
       content: dto.content,
     });
+
+    // Save message and get sender info in one operation
+    const savedMessage = await this.messageRepository.save(message);
+
+    // Load sender relation efficiently
+    const sender = await this.userRepository.findOne({
+      where: { id: senderId },
+      select: ['id', 'username', 'email', 'profileImage'],
+    });
+
+    // Combine message with sender info
+    const fullMessage = {
+      ...savedMessage,
+      sender,
+      tempId: dto.tempId || undefined,
+    };
 
     // Update conversation's last message time
     await this.conversationRepository.update(
@@ -440,25 +474,25 @@ export class ChatService {
       { lastMessageAt: new Date() }
     );
 
-    // If the recipient has left, we might want to notify them differently
-    // But the message is still saved for the sender's view
+    // If the recipient has left, reactivate the conversation for them
+    // so they can see new messages
     // recipientId already declared above, just check if they've left
     const recipientHasLeft =
       (conversation.user1Id === recipientId && conversation.user1DeletedAt) ||
       (conversation.user2Id === recipientId && conversation.user2DeletedAt);
 
-    if (recipientHasLeft) {
-      console.log('[ChatService] Recipient has left this conversation, message saved but they won\'t see it');
+    if (recipientHasLeft && process.env.NODE_ENV === 'development') {
+      console.log('[ChatService] Recipient had left this conversation, but new message will make it reappear for them');
+      // Note: We do NOT reset their deletedAt here - they'll see the conversation
+      // in the list due to the new message, but only see messages after they left
     }
 
-    // Get message with sender info
-    const fullMessage = await this.messageRepository.findOne({
-      where: { id: message.id },
-      relations: ['sender'],
-    });
-
-    // Clear cache
-    await this.cacheManager.del(`conversation:${dto.conversationId}:messages`);
+    // Clear cache for both sender and recipient in parallel
+    await Promise.all([
+      this.cacheManager.del(`conversation:${dto.conversationId}:messages`),
+      this.cacheManager.del(`conversations:${senderId}`),
+      this.cacheManager.del(`conversations:${recipientId}`),
+    ]);
 
     // Broadcast message via WebSocket to conversation room
     if (this.chatGateway && this.chatGateway.server) {
@@ -466,14 +500,21 @@ export class ChatService {
         .to(`conversation:${dto.conversationId}`)
         .emit('new-message', fullMessage);
 
-      // Also emit notification to recipient's user room if they haven't left
-      if (!recipientHasLeft) {
+      // Also emit notification to recipient's user room (even if they've left,
+      // so the conversation can reappear in their list)
+      this.chatGateway.server
+        .to(`user:${recipientId}`)
+        .emit('message-notification', {
+          conversationId: dto.conversationId,
+          message: fullMessage,
+        });
+
+      // If recipient had left, also send event to refresh their conversation list
+      if (recipientHasLeft) {
         this.chatGateway.server
           .to(`user:${recipientId}`)
-          .emit('message-notification', {
-            conversationId: dto.conversationId,
-            message: fullMessage,
-          });
+          .emit('conversation-list-refresh');
+        console.log('[ChatService] Sent conversation-list-refresh event to recipient who had left');
       }
 
       console.log('[ChatService] Message broadcasted via WebSocket:', {
@@ -485,14 +526,13 @@ export class ChatService {
     }
 
     // Emit SSE notification for the recipient (for idle reconnection)
-    if (!recipientHasLeft) {
-      this.emitNotification(recipientId, {
-        type: 'new-message',
-        conversationId: dto.conversationId,
-        message: fullMessage,
-      });
-      console.log('[ChatService] SSE notification emitted to recipient:', recipientId);
-    }
+    // Send even if they've left so the conversation can reappear
+    this.emitNotification(recipientId, {
+      type: 'new-message',
+      conversationId: dto.conversationId,
+      message: fullMessage,
+    });
+    console.log('[ChatService] SSE notification emitted to recipient:', recipientId);
 
     return fullMessage;
   }
@@ -500,7 +540,7 @@ export class ChatService {
   async markAsRead(
     messageId: string,
     userId: string,
-  ): Promise<void> {
+  ): Promise<Message> {
     const message = await this.messageRepository.findOne({
       where: { id: messageId },
       relations: ['conversation'],
@@ -512,7 +552,7 @@ export class ChatService {
 
     // Only recipient can mark as read
     if (message.senderId === userId) {
-      return; // Sender's own message
+      return message; // Sender's own message
     }
 
     // Verify user is part of conversation
@@ -526,9 +566,14 @@ export class ChatService {
       isRead: true,
       readAt: new Date(),
     });
+
+    // Return updated message
+    message.isRead = true;
+    message.readAt = new Date();
+    return message;
   }
 
-  async markAllAsRead(
+  async markAllMessagesAsRead(
     conversationId: string,
     userId: string,
   ): Promise<void> {
@@ -696,8 +741,9 @@ export class ChatService {
       console.log(`[ChatService] User ${userId} left conversation ${conversationId} (as user2)`);
     }
 
-    // Clear any cached data for this conversation
+    // Clear any cached data for this conversation and user
     await this.cacheManager.del(`conversation:${conversationId}:messages`);
+    await this.cacheManager.del(`conversations:${userId}`);
   }
 
   getUserNotificationStream(userId: string): Observable<MessageEvent> {

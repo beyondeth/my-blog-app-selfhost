@@ -81,7 +81,7 @@ export class ChatController {
     @Param('conversationId') conversationId: string,
     @CurrentUser() user: User,
   ) {
-    await this.chatService.markAllAsRead(conversationId, user.id);
+    await this.chatService.markAllMessagesAsRead(conversationId, user.id);
     return { success: true };
   }
 

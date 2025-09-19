@@ -44,6 +44,7 @@ export interface ConversationItemProps {
   currentUserId: string;
   isActive: boolean;
   onClick: (conversationId: string) => void;
+  onLeaveConversation?: (conversationId: string) => Promise<void>;
 }
 
 export interface MessageItemProps {

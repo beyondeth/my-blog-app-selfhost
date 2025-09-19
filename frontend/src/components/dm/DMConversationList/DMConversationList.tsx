@@ -79,9 +79,9 @@ const DMConversationList: React.FC = () => {
   }, [conversationListVersion, refreshConversations]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="p-4 border-b border-gray-200">
+      <div className="px-4 py-4 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-800">메시지</h2>
           <button
@@ -116,7 +116,7 @@ const DMConversationList: React.FC = () => {
       {/* Conversation List */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto"
+        className="flex-1 overflow-y-auto bg-white"
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: '#CBD5E0 #F7FAFC',
@@ -167,7 +167,7 @@ const DMConversationList: React.FC = () => {
           </div>
         ) : (
           // Conversation items
-          <div className="space-y-1 p-2">
+          <div className="bg-white">
             {filteredConversations.map((conversation) => (
               <ConversationItem
                 key={conversation.id}

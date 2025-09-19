@@ -19,8 +19,10 @@ interface MessageListProps {
   hasMore: boolean;
   isLoading: boolean;
   onLoadMore: () => Promise<void>;
+  onRetry?: (messageId: string) => Promise<void>;
   messageContainerRef: React.RefObject<HTMLDivElement>;
   typingUser: string | null;
+  isOtherUserInRoom?: boolean; // Track if other user is in the conversation
 }
 
 const MessageList: React.FC<MessageListProps> = ({
@@ -33,6 +35,7 @@ const MessageList: React.FC<MessageListProps> = ({
   onRetry,
   messageContainerRef,
   typingUser,
+  isOtherUserInRoom = false,
 }) => {
   const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
 
@@ -137,6 +140,14 @@ const MessageList: React.FC<MessageListProps> = ({
         const previousGroup = groupIndex > 0 ? groupedMessages[groupIndex - 1] : undefined;
         const showDateDivider = shouldShowDateDivider(group, previousGroup);
 
+        // Show read divider when other user is NOT in room
+        // Show after the last message from other user (where they stopped reading)
+        const shouldShowReadDivider = !isOtherUserInRoom &&
+          !isOwnMessage &&
+          (groupIndex === groupedMessages.length - 1 ||
+           (groupIndex < groupedMessages.length - 1 &&
+            groupedMessages[groupIndex + 1]?.senderId === currentUserId));
+
         return (
           <div key={`group-${groupIndex}`}>
             {/* Date divider */}
@@ -155,21 +166,41 @@ const MessageList: React.FC<MessageListProps> = ({
               <div className={`flex items-end gap-2 max-w-[70%] ${isOwnMessage ? 'flex-row-reverse' : ''}`}>
                 {/* Messages */}
                 <div className="space-y-1">
-                  {group.messages.map((message, messageIndex) => (
-                    <MessageItem
-                      key={message.id}
-                      message={message}
-                      isOwnMessage={isOwnMessage}
-                      onRetry={onRetry}
-                      showAvatar={!isOwnMessage && messageIndex === 0}
-                      isFirstInGroup={messageIndex === 0}
-                      isLastInGroup={messageIndex === group.messages.length - 1}
-                      otherUser={otherUser}
-                    />
-                  ))}
+                  {group.messages.map((message, messageIndex) => {
+                    // Check if this is the very last message in the entire conversation
+                    const isLastMessageInConversation =
+                      groupIndex === groupedMessages.length - 1 &&
+                      messageIndex === group.messages.length - 1;
+
+                    return (
+                      <MessageItem
+                        key={message.id}
+                        message={message}
+                        isOwnMessage={isOwnMessage}
+                        onRetry={onRetry}
+                        showAvatar={!isOwnMessage && messageIndex === 0}
+                        isFirstInGroup={messageIndex === 0}
+                        isLastInGroup={messageIndex === group.messages.length - 1}
+                        isLastMessage={isLastMessageInConversation}
+                        isOtherUserInRoom={isOtherUserInRoom}
+                        otherUser={otherUser}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             </div>
+
+            {/* Read divider - shows where other user last read */}
+            {shouldShowReadDivider && (
+              <div className="flex items-center my-3">
+                <div className="flex-1 h-px bg-gray-300" />
+                <span className="px-3 text-xs text-gray-500 font-medium">
+                  여기까지 읽으셨습니다
+                </span>
+                <div className="flex-1 h-px bg-gray-300" />
+              </div>
+            )}
           </div>
         );
       })}

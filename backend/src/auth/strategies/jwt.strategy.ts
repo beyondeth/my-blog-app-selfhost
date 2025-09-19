@@ -20,12 +20,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           const token = request?.cookies?.access_token;
           const hasCookies = request?.cookies && Object.keys(request.cookies).length > 0;
 
-          if (!hasCookies) {
-            console.log('[JWT Extract] No cookies found in request');
-          } else {
-            console.log('[JWT Extract] Available cookies:', Object.keys(request.cookies));
-            console.log('[JWT Extract] Access token found:', !!token);
-            if (token) {
+          // Only log in development mode
+          if (process.env.NODE_ENV === 'development') {
+            if (!hasCookies) {
+              console.log('[JWT Extract] No cookies found in request');
+            } else if (token) {
               // 토큰의 첫 20자와 마지막 10자만 로그 (보안)
               const tokenPreview = token.length > 30
                 ? `${token.substring(0, 20)}...${token.substring(token.length - 10)}`
@@ -51,14 +50,17 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const issuedAt = payload.iat ? new Date(payload.iat * 1000) : null;
     const expiresAt = payload.exp ? new Date(payload.exp * 1000) : null;
 
-    console.log('[JWT Validate] Payload details:', {
-      userId,
-      email: payload.email,
-      tokenType,
-      issuedAt: issuedAt?.toISOString(),
-      expiresAt: expiresAt?.toISOString(),
-      remainingTime: expiresAt ? Math.floor((expiresAt.getTime() - Date.now()) / 1000) + ' seconds' : 'unknown'
-    });
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[JWT Validate] Payload details:', {
+        userId,
+        email: payload.email,
+        tokenType,
+        issuedAt: issuedAt?.toISOString(),
+        expiresAt: expiresAt?.toISOString(),
+        remainingTime: expiresAt ? Math.floor((expiresAt.getTime() - Date.now()) / 1000) + ' seconds' : 'unknown'
+      });
+    }
 
     if (!userId) {
       console.error('[JWT Validate] No userId found in payload');
@@ -75,12 +77,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 1. 캐시에서 사용자 정보 조회
     const cachedUser = await this.cacheManager.get(cacheKey);
     if (cachedUser) {
-      console.log('[JWT Validate] User found in cache:', userId);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[JWT Validate] User found in cache:', userId);
+      }
       return cachedUser;
     }
 
     // 2. 캐시에 없으면 DB에서 조회
-    console.log('[JWT Validate] Fetching user from database:', userId);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[JWT Validate] Fetching user from database:', userId);
+    }
     const user = await this.usersService.findById(userId);
 
     if (!user) {

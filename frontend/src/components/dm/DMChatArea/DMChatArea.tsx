@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { useChat } from '@/hooks/useChat';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useMessageManagement } from '@/hooks/useMessageManagement';
+import { useChatWithQuery } from '@/hooks/chat/useChatWithQuery';
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
@@ -14,7 +14,7 @@ interface DMChatAreaProps {
 
 const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
   const { user } = useAuth();
-  const { currentConversation, typingUser } = useChat(conversationId);
+  const { currentConversation, typingUser, otherUserInRoom } = useChatWithQuery(conversationId);
   const {
     groupedMessages,
     isLoading,
@@ -33,18 +33,11 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
     ? currentConversation?.user2
     : currentConversation?.user1;
 
-  // Mark messages as read when conversation opens
+  // Track last read message position (no backend calls)
   useEffect(() => {
-    if (!groupedMessages.length) return;
-
-    groupedMessages.forEach(group => {
-      group.messages.forEach(message => {
-        if (message.senderId !== user?.id && !message.isRead) {
-          markAsRead(message.id);
-        }
-      });
-    });
-  }, [conversationId]);
+    // Simply track that user has seen messages, no need to persist
+    // The UI will handle display logic based on user presence
+  }, [groupedMessages, conversationId]);
 
   if (isLoading && groupedMessages.length === 0) {
     return (
@@ -76,6 +69,7 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
         onRetry={retryMessage}
         messageContainerRef={messageContainerRef}
         typingUser={typingUser}
+        isOtherUserInRoom={otherUserInRoom}
       />
 
       {/* Input */}

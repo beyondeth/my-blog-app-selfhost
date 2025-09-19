@@ -47,7 +47,7 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
         {/* Left Sidebar */}
         <div
           className={`
-            ${isSidebarCollapsed ? 'w-16' : 'w-20'}
+            ${isSidebarCollapsed ? 'w-14' : 'w-16'}
             flex-shrink-0
             bg-gradient-to-b from-gray-900 to-gray-800
             border-r border-gray-700
@@ -60,10 +60,10 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
         {/* Conversation List */}
         <div
           className={`
-            ${isConversationListVisible ? 'w-80 lg:w-96' : 'w-0'}
+            ${isConversationListVisible ? 'w-64 lg:w-72' : 'w-0'}
             ${activeConversationId && isMobile ? 'hidden' : 'flex'}
             flex-shrink-0
-            bg-white/95
+            bg-white
             border-r border-gray-200
             transition-all duration-300 ease-in-out
             overflow-hidden

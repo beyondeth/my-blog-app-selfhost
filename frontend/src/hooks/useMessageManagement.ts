@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { useChat } from './useChat';
-import { Message } from '@/components/dm/DMLayout/DMLayout.types';
+import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { useChatWithQuery } from './chat/useChatWithQuery';
+import { Message } from '@/types/chat';
 
 interface MessageGroup {
   senderId: string;
@@ -14,6 +14,7 @@ interface UseMessageManagementReturn {
   isSending: boolean;
   hasMore: boolean;
   sendMessage: (content: string) => Promise<void>;
+  retryMessage: (messageId: string) => Promise<void>;
   loadMoreMessages: () => Promise<void>;
   markAsRead: (messageId: string) => void;
   deleteMessage: (messageId: string) => Promise<void>;
@@ -23,21 +24,22 @@ interface UseMessageManagementReturn {
 }
 
 export function useMessageManagement(conversationId: string): UseMessageManagementReturn {
+  // Use React Query based hook
   const {
     messages,
-    loading,
-    hasMore,
-    sendMessage: sendChatMessage,
-    retryMessage: retryChatMessage,
-    markAsRead: markChatAsRead,
-    fetchMessages,
-  } = useChat(conversationId);
+    hasMoreMessages,
+    isLoadingMessages,
+    isFetchingNextPage,
+    sendMessage: sendMsg,
+    retryMessage: retryMsg,
+    markAsRead: markRead,
+    loadMoreMessages: loadMore,
+  } = useChatWithQuery(conversationId);
 
-  const [isSending, setIsSending] = useState(false);
-  const [page, setPage] = useState(1);
   const messageContainerRef = useRef<HTMLDivElement>(null);
   const isAutoScrollingRef = useRef(true);
   const lastMessageCountRef = useRef(0);
+  const prevScrollHeightRef = useRef(0);
 
   // Group consecutive messages from the same sender
   const groupedMessages = useMemo((): MessageGroup[] => {
@@ -86,9 +88,13 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
     container.scrollTo(scrollOptions);
   }, []);
 
-  // Auto scroll on new messages
+  // Initial scroll to bottom when messages are first loaded
   useEffect(() => {
-    if (messages.length > lastMessageCountRef.current && isAutoScrollingRef.current) {
+    if (messages.length > 0 && lastMessageCountRef.current === 0) {
+      // First load - scroll to bottom instantly
+      scrollToBottom(false);
+    } else if (messages.length > lastMessageCountRef.current && isAutoScrollingRef.current) {
+      // New messages - smooth scroll
       scrollToBottom();
     }
     lastMessageCountRef.current = messages.length;
@@ -109,36 +115,40 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
     return () => container.removeEventListener('scroll', handleScroll);
   }, []);
 
-  // Send message with optimistic update
+  // Send message wrapper
   const sendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isSending) return;
+    if (!content.trim()) return;
+    await sendMsg(content);
+    scrollToBottom();
+  }, [sendMsg, scrollToBottom]);
 
-    setIsSending(true);
-    try {
-      await sendChatMessage(content);
-      scrollToBottom();
-    } catch (error) {
-      console.error('Failed to send message:', error);
-    } finally {
-      setIsSending(false);
-    }
-  }, [sendChatMessage, isSending, scrollToBottom]);
-
-  // Load more messages
+  // Load more messages with scroll position preservation
   const loadMoreMessages = useCallback(async () => {
-    if (!hasMore || loading) return;
+    if (!messageContainerRef.current || isFetchingNextPage) return;
 
-    const nextPage = page + 1;
-    await fetchMessages(conversationId, nextPage);
-    setPage(nextPage);
-  }, [conversationId, fetchMessages, hasMore, loading, page]);
+    // Save current scroll position
+    const container = messageContainerRef.current;
+    prevScrollHeightRef.current = container.scrollHeight;
+    const prevScrollTop = container.scrollTop;
+
+    // Load more messages
+    await loadMore();
+
+    // Restore scroll position after messages are loaded
+    requestAnimationFrame(() => {
+      if (!messageContainerRef.current) return;
+      const newScrollHeight = messageContainerRef.current.scrollHeight;
+      const scrollDiff = newScrollHeight - prevScrollHeightRef.current;
+      messageContainerRef.current.scrollTop = prevScrollTop + scrollDiff;
+    });
+  }, [loadMore, isFetchingNextPage]);
 
   // Mark message as read
   const markAsRead = useCallback((messageId: string) => {
-    markChatAsRead(messageId);
-  }, [markChatAsRead]);
+    markRead(messageId);
+  }, [markRead]);
 
-  // Delete message
+  // Delete message (placeholder - needs backend implementation)
   const deleteMessage = useCallback(async (messageId: string) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -150,15 +160,13 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
       if (!response.ok) {
         throw new Error('Failed to delete message');
       }
-
-      // Message will be removed through socket events
     } catch (error) {
       console.error('Failed to delete message:', error);
       throw error;
     }
   }, []);
 
-  // Edit message
+  // Edit message (placeholder - needs backend implementation)
   const editMessage = useCallback(async (messageId: string, newContent: string) => {
     try {
       const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -174,8 +182,6 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
       if (!response.ok) {
         throw new Error('Failed to edit message');
       }
-
-      // Message will be updated through socket events
     } catch (error) {
       console.error('Failed to edit message:', error);
       throw error;
@@ -184,15 +190,15 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
 
   // Retry failed message
   const retryMessage = useCallback(async (messageId: string) => {
-    await retryChatMessage(messageId);
+    await retryMsg(messageId);
     scrollToBottom();
-  }, [retryChatMessage, scrollToBottom]);
+  }, [retryMsg, scrollToBottom]);
 
   return {
     groupedMessages,
-    isLoading: loading,
-    isSending,
-    hasMore,
+    isLoading: isLoadingMessages || isFetchingNextPage,
+    isSending: false, // React Query handles this internally
+    hasMore: hasMoreMessages,
     sendMessage,
     retryMessage,
     loadMoreMessages,

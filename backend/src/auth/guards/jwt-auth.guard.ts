@@ -5,20 +5,31 @@ import { AuthGuard } from '@nestjs/passport';
 export class JwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
-    console.log('[JwtAuthGuard] Checking authentication for:', request.url);
-    console.log('[JwtAuthGuard] Cookies present:', Object.keys(request.cookies || {}));
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[JwtAuthGuard] Checking authentication for:', request.url);
+    }
     return super.canActivate(context);
   }
 
   handleRequest(err, user, info, context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
-    console.log('[JwtAuthGuard] handleRequest - User:', user?.id, 'Error:', err?.message, 'Info:', info?.message);
+
+    // Only log in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[JwtAuthGuard] handleRequest - User:', user?.id, 'Error:', err?.message, 'Info:', info?.message);
+    }
 
     if (err || !user) {
-      console.log('[JwtAuthGuard] Authentication failed for:', request.url);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[JwtAuthGuard] Authentication failed for:', request.url);
+      }
       throw err || new UnauthorizedException('Authentication required');
     }
-    console.log('[JwtAuthGuard] Authentication successful for user:', user.id);
+
+    if (process.env.NODE_ENV === 'development') {
+      console.log('[JwtAuthGuard] Authentication successful for user:', user.id);
+    }
     return user;
   }
 } 

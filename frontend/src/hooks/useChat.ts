@@ -198,12 +198,14 @@ export function useChat(conversationId?: string) {
   // Mark message as read
   const markAsRead = useCallback(async (messageId: string) => {
     try {
-      await fetch(`${API_URL}/chat/message/${messageId}/read`, {
+      // Call API to mark as read in database
+      const response = await fetch(`${API_URL}/chat/message/${messageId}/read`, {
         method: 'POST',
         credentials: 'include'
       });
 
-      if (socket) {
+      // Emit WebSocket event to notify other users in real-time
+      if (response.ok && socket) {
         socket.emit('mark-read', messageId);
       }
     } catch (error) {
@@ -277,8 +279,7 @@ export function useChat(conversationId?: string) {
           return [...prev, { ...message, status: 'sent' as MessageStatus }];
         });
 
-        // Mark as read if it's from other user
-        markAsRead(message.id);
+        // No need to mark as read - UI handles display
       }
     });
 
@@ -290,12 +291,35 @@ export function useChat(conversationId?: string) {
     });
 
     // Listen for read receipts
-    socket.on('message-read', (data: { messageId: string; userId: string }) => {
-      setMessages(prev => prev.map(msg =>
-        msg.id === data.messageId
-          ? { ...msg, isRead: true, readAt: new Date() }
-          : msg
-      ));
+    socket.on('message-read', (data: { messageId: string; conversationId: string; readBy: string; readAt: Date }) => {
+      // Only update if the reader is not the current user
+      if (data.readBy !== user?.id) {
+        setMessages(prev => prev.map(msg =>
+          msg.id === data.messageId
+            ? { ...msg, isRead: true, readAt: new Date(data.readAt) }
+            : msg
+        ));
+      }
+    });
+
+    // Listen for all messages read
+    socket.on('all-messages-read', (data: { conversationId: string; readBy: string; readAt: Date }) => {
+      // Only update if the reader is not the current user
+      if (data.readBy !== user?.id && data.conversationId === conversationId) {
+        setMessages(prev => prev.map(msg => {
+          // Mark all messages from current user as read
+          if (msg.senderId === user?.id) {
+            return { ...msg, isRead: true, readAt: new Date(data.readAt) };
+          }
+          return msg;
+        }));
+      }
+    });
+
+    // Listen for conversation list refresh event (when a left conversation gets new message)
+    socket.on('conversation-list-refresh', () => {
+      console.log('[useChat] Received conversation-list-refresh event, fetching conversations...');
+      fetchConversations();
     });
 
     return () => {
@@ -305,6 +329,8 @@ export function useChat(conversationId?: string) {
       socket.off('new-message');
       socket.off('user-typing');
       socket.off('message-read');
+      socket.off('all-messages-read');
+      socket.off('conversation-list-refresh');
     };
   }, [socket, conversationId, user?.id, markAsRead]);
 
@@ -324,11 +350,16 @@ export function useChat(conversationId?: string) {
       fetch(`${API_URL}/chat/conversation/${conversationId}/mark-all-read`, {
         method: 'POST',
         credentials: 'include'
+      }).then(response => {
+        if (response.ok && socket) {
+          // Emit WebSocket event to notify other users
+          socket.emit('mark-all-read', conversationId);
+        }
       }).catch(error => {
         console.error('Error marking messages as read:', error);
       });
     }
-  }, [conversationId, fetchMessages, fetchConversationById, API_URL]);
+  }, [conversationId, fetchMessages, fetchConversationById, API_URL, socket]);
 
   // Retry failed message
   const retryMessage = useCallback(async (messageId: string) => {
