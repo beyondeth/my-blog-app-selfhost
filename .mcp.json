@@ -15,7 +15,6 @@
         "-i",
         "--rm",
         "crystaldba/postgres-mcp",
-        "postgresql://postgres:postgres@codebase.cqbcg2aqsrdx.us-east-1.rds.amazonaws.com:5432/blog-db",
         "--access-mode=unrestricted"
       ]
     },
