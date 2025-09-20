@@ -6,6 +6,29 @@
       "args": ["mcp-blog-server-ts/run.sh"],
       "cwd": "/Users/sihyungpark/Desktop/code/my-blog-app",
       "env": {}
+    },
+    "postgres": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "crystaldba/postgres-mcp",
+        "postgresql://postgres:postgres@codebase.cqbcg2aqsrdx.us-east-1.rds.amazonaws.com:5432/blog-db",
+        "--access-mode=unrestricted"
+      ]
+    },
+    "redis-mcp-server": {
+      "type": "stdio",
+      "command": "/opt/homebrew/bin/uvx",
+      "args": [
+        "--from",
+        "redis-mcp-server@latest",
+        "redis-mcp-server",
+        "--url",
+        "redis://localhost:6379/0"
+      ]
     }
   }
 }

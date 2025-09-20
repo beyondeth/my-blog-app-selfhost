@@ -1,8 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
+import { plainToInstance } from 'class-transformer';
 import { Comment } from './entities/comment.entity';
 import { CommentLike, LikeType } from './entities/comment-like.entity';
+import { CommentResponseDto } from './dto/comment-response.dto';
 import { User } from '../users/entities/user.entity';
 import { PostsService } from '../posts/posts.service';
 
@@ -15,6 +17,30 @@ export class CommentsService {
     private commentLikesRepository: Repository<CommentLike>,
     private postsService: PostsService,
   ) {}
+
+  /**
+   * Comment Entity를 CommentResponseDto로 변환
+   *
+   * @description
+   * Entity spread 연산자로 인한 lazy loading 방지를 위해
+   * plainToInstance를 사용하여 안전하게 DTO로 변환
+   *
+   * @param comment - 변환할 Comment entity
+   * @param additionalData - 추가로 설정할 필드들
+   * @returns CommentResponseDto 인스턴스
+   */
+  private toCommentDto(comment: Comment, additionalData?: Partial<CommentResponseDto>): CommentResponseDto {
+    const dto = plainToInstance(CommentResponseDto, comment, {
+      excludeExtraneousValues: true, // @Expose가 없는 필드 제외
+    });
+
+    // 추가 데이터가 있으면 설정
+    if (additionalData) {
+      Object.assign(dto, additionalData);
+    }
+
+    return dto;
+  }
 
   async create(createCommentDto: any, user: User): Promise<Comment> {
     const { postId, parentCommentId, ...commentData } = createCommentDto;
@@ -43,7 +69,7 @@ export class CommentsService {
     return savedComment;
   }
 
-  async findAllByPost(postId: string, user?: User): Promise<Comment[]> {
+  async findAllByPost(postId: string, user?: User): Promise<CommentResponseDto[]> {
     // 모든 댓글을 가져온 후 프론트엔드에서 트리 구조로 변환하는 방식
     // 더 깊은 중첩과 무제한 답글을 지원
     const allComments = await this.commentsRepository.find({
@@ -67,16 +93,22 @@ export class CommentsService {
       }, {});
     }
 
-    // 트리 구조로 변환하면서 사용자 상태 포함
-    const buildTree = (comments: Comment[], parentId: string | null = null): Comment[] => {
+    // 트리 구조로 변환하면서 사용자 상태 포함 (spread 연산자 사용 금지)
+    const buildTree = (comments: Comment[], parentId: string | null = null): CommentResponseDto[] => {
       return comments
         .filter(comment => comment.parentCommentId === parentId)
-        .map(comment => ({
-          ...comment,
-          userLiked: userLikes[comment.id] === 'like',
-          userDisliked: userLikes[comment.id] === 'dislike',
-          replies: buildTree(comments, comment.id)
-        }));
+        .map(comment => {
+          // DTO로 변환하면서 추가 필드 설정
+          const dto = this.toCommentDto(comment, {
+            userLiked: userLikes[comment.id] === 'like',
+            userDisliked: userLikes[comment.id] === 'dislike',
+          });
+
+          // 재귀적으로 답글 트리 구성
+          dto.replies = buildTree(comments, comment.id);
+
+          return dto;
+        });
     };
 
     return buildTree(allComments);

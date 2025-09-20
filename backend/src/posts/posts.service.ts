@@ -13,6 +13,10 @@ import { FilesService } from '../files/files.service';
 // TagsService removed - using JSONB tags
 import { formatDate, extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
+import { plainToInstance } from 'class-transformer';
+import { PostResponseDto } from './dto/post-response.dto';
+import { UserResponseDto } from '../users/dto/user-response.dto';
+import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
 
 @Injectable()
 export class PostsService {
@@ -33,6 +37,103 @@ export class PostsService {
     private markdownRenderer: MarkdownRendererService,
     private dataSource: DataSource,
   ) {}
+
+  /**
+   * DTO 변환 헬퍼 메서드들
+   * @description
+   * Entity를 Response DTO로 안전하게 변환
+   * spread operator 사용 금지로 lazy loading 방지
+   * class-transformer의 plainToInstance 활용
+   */
+
+  /**
+   * Post Entity를 PostResponseDto로 변환
+   * @param post - Post 엔티티
+   * @param options - 추가 옵션 (liked 상태, tags 등)
+   * @returns PostResponseDto
+   */
+  private toPostDto(
+    post: Post,
+    options?: {
+      liked?: boolean;
+      user?: User;
+      blog?: Blog;
+    }
+  ): PostResponseDto {
+    // plainToInstance로 자동 변환 (@Expose 필드만 포함됨)
+    const dto = plainToInstance(PostResponseDto, post, {
+      excludeExtraneousValues: true, // @Expose가 없는 필드 제외
+    });
+
+    // 추가 필드 설정
+    if (options) {
+      if (options.liked !== undefined) {
+        dto.liked = options.liked;
+      }
+      if (options.user) {
+        dto.author = this.toUserDto(options.user);
+      }
+      if (options.blog) {
+        dto.blog = this.toBlogDto(options.blog);
+      }
+    }
+
+    // 날짜 포맷팅 (기존 로직 유지)
+    if (dto.publishedAt) {
+      dto.publishedAt = formatDate(dto.publishedAt) as any;
+    }
+    if (dto.createdAt) {
+      dto.createdAt = formatDate(dto.createdAt) as any;
+    }
+    if (dto.updatedAt) {
+      dto.updatedAt = formatDate(dto.updatedAt) as any;
+    }
+
+    // 태그 필드 호환성 (tagList → tags)
+    if (post.tagList) {
+      dto.tags = post.tagList;
+    }
+
+    // 썸네일 URL 최적화
+    if (dto.thumbnail) {
+      dto.thumbnail = this.optimizeImageUrl(dto.thumbnail);
+    }
+
+    return dto;
+  }
+
+  /**
+   * User Entity를 UserResponseDto로 변환
+   * @param user - User 엔티티
+   * @returns UserResponseDto
+   */
+  private toUserDto(user: User): UserResponseDto {
+    if (!user) return null;
+
+    const dto = plainToInstance(UserResponseDto, user, {
+      excludeExtraneousValues: true,
+    });
+
+    // 프로필 이미지 URL 최적화
+    if (dto.profileImage) {
+      dto.profileImage = this.optimizeImageUrl(dto.profileImage);
+    }
+
+    return dto;
+  }
+
+  /**
+   * Blog Entity를 BlogResponseDto로 변환
+   * @param blog - Blog 엔티티
+   * @returns BlogResponseDto
+   */
+  private toBlogDto(blog: Blog): BlogResponseDto {
+    if (!blog) return null;
+
+    return plainToInstance(BlogResponseDto, blog, {
+      excludeExtraneousValues: true,
+    });
+  }
 
   /**
    * 게시글 썸네일 설정/제거
@@ -222,10 +323,10 @@ export class PostsService {
     // 태그를 JSONB로 저장
     const tagList = createPostDto.tags || [];
 
-    const { tags, ...postDataWithoutTags } = createPostDto;
-
+    // spread 연산자 대신 명시적 필드 설정
     const post = this.postsRepository.create({
-      ...postDataWithoutTags,
+      title: createPostDto.title,
+      category: createPostDto.category,
       content: processedContent, // HTML 버전 (디스플레이용)
       content_markdown: markdownContent, // 마크다운 원본 (편집용)
       content_type: contentType,
@@ -263,13 +364,14 @@ export class PostsService {
 
     await this.linkFilesFromContent(post);
 
-    // DB 재조회 없이 메모리에서 조합
-    return {
-      ...post,
-      author: user,
-      blog: blog, // 블로그 정보 포함
-      attachedFiles: post.attachedFiles || attachedFiles,
-    };
+    /**
+     * DTO 변환으로 spread operator 제거
+     * lazy loading 방지 및 성능 최적화
+     */
+    return this.toPostDto(post, {
+      user: user,
+      blog: blog,
+    });
   }
 
   private async findPostById(id: string): Promise<Post> {
@@ -331,10 +433,17 @@ export class PostsService {
       });
     }
 
-    // 캐시용이 아니고 유저가 있으면 likedBy 조인
-    // 하지만 최적화를 위해 COUNT 서브쿼리로 대체 가능
+    // 캐시용이 아니고 유저가 있으면 좋아요 상태를 서브쿼리로 확인 (최적화)
+    // leftJoin 대신 서브쿼리를 사용하여 N+1 문제와 UUID IN 절 문제 해결
     if (!isForCache && user) {
-      query.leftJoin('post.likedBy', 'likedBy', 'likedBy.id = :userId', { userId: user.id });
+      // likedBy 조인 대신 서브쿼리로 좋아요 상태 확인
+      query.addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(1)')
+          .from('post_likes', 'pl')
+          .where('pl.postId = post.id')
+          .andWhere('pl.userId = :userId', { userId: user.id });
+      }, 'userLikedCount');
     }
 
     const [posts, total] = await query
@@ -345,38 +454,66 @@ export class PostsService {
 
     // 날짜를 YYYY-MM-DD로 변환 및 이미지 URL 최적화
     const postsWithFormattedDates = posts.map(post => {
+      // 중요: ...post 스프레드 연산자를 사용하면 lazy loading이 발생하므로
+      // 필요한 필드만 명시적으로 선택
       const result: any = {
-        ...post,
+        id: post.id,
+        title: post.title,
+        slug: post.slug,
+        content: post.content,
+        content_markdown: post.content_markdown,
+        content_type: post.content_type,
+        isPublished: post.isPublished,
+        category: post.category,
+        blogId: post.blogId,
+        authorId: post.authorId,
+        qualityScore: post.qualityScore,
+        version: post.version,
+        // 날짜 포맷팅
         publishedAt: formatDate(post.publishedAt),
         createdAt: formatDate(post.createdAt),
         updatedAt: formatDate(post.updatedAt),
-        // 이미지 파일 정보는 별도 로드 시에만 포함
-        images: [],
+        // 카운트 필드들
         commentCount: post.commentCount || 0,
+        likeCount: post.likeCount || 0,
+        viewCount: post.viewCount || 0,
         // 태그 필드 추가 (프론트엔드 호환성)
         tags: post.tagList || [],
         // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
         thumbnail: this.optimizeImageUrl(post.thumbnail),
-        // 작성자 프로필 이미지 최적화
+        // 블로그 정보 (있으면)
+        blog: post.blog || null,
+        // 작성자 정보는 필요한 필드만 선택
         author: post.author ? {
-          ...post.author,
+          id: post.author.id,
+          username: post.author.username,
+          email: post.author.email,
+          bio: post.author.bio,
+          role: post.author.role,
           profileImage: this.optimizeImageUrl(post.author.profileImage),
         } : null,
-        // 좋아요 수는 항상 포함 (공개 데이터)
-        likeCount: post.likeCount || 0,
-        viewCount: post.viewCount || 0,
+        // 이미지 파일 정보는 별도 로드 시에만 포함
+        images: [],
       };
 
       // 캐시용이 아니고 유저가 있으면 liked 필드 추가
-      // likedBy가 조인된 경우 확인
+      // 서브쿼리로 가져온 좋아요 상태 확인
       if (!isForCache && user) {
-        result.liked = false; // 기본값
-        // 실제 좋아요 여부는 별도 쿼리로 확인 가능
+        // userLikedCount 서브쿼리 결과로 좋아요 여부 판단
+        const userLikedCount = (post as any).userLikedCount;
+        result.liked = userLikedCount > 0;
+      } else {
+        result.liked = false;
       }
 
-      // 불필요한 필드 제거
-      delete result.likedBy;
-      delete result.attachedFiles;
+      // 중요: likedBy, attachedFiles 같은 lazy loading 대상 속성은 절대 접근하지 않음
+      // delete result.likedBy; // ❌ 이렇게 하면 lazy loading 발생
+      // delete result.attachedFiles; // ❌ 이것도 lazy loading 발생
+
+      // userLikedCount는 서브쿼리 결과이므로 안전하게 제거 가능
+      if ('userLikedCount' in result) {
+        delete (result as any).userLikedCount;
+      }
 
       return result;
     });
@@ -431,17 +568,40 @@ export class PostsService {
     const posts = await query.getMany();
 
     // 날짜 포맷팅 및 썸네일 URL 처리 (최적화 적용)
+    // 중요: ...post 스프레드를 사용하면 lazy loading 발생하므로 필요한 필드만 명시
     const postsWithFormattedData = posts.map(post => ({
-      ...post,
+      // 필요한 필드만 명시적으로 선택
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      content: post.content,
+      content_markdown: post.content_markdown,
+      content_type: post.content_type,
+      isPublished: post.isPublished,
+      category: post.category,
+      blogId: post.blogId,
+      authorId: post.authorId,
+      viewCount: post.viewCount || 0,
+      likeCount: post.likeCount || 0,
+      commentCount: post.commentCount || 0,
+      qualityScore: post.qualityScore || null, // 품질 점수 (null 가능) - 유지됨!
+      version: post.version,
+      // 날짜 포맷팅
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
       publishedAt: post.publishedAt ? formatDate(post.publishedAt) : null,
+      // 태그와 썸네일
       tags: post.tagList || [],
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
-      qualityScore: post.qualityScore || null, // 품질 점수 (null 가능)
-      // 작성자 프로필 이미지 최적화
+      // 블로그 정보
+      blog: post.blog || null,
+      // 작성자 프로필 (필요한 필드만)
       author: post.author ? {
-        ...post.author,
+        id: post.author.id,
+        username: post.author.username,
+        email: post.author.email,
+        bio: post.author.bio,
+        role: post.author.role,
         profileImage: this.optimizeImageUrl(post.author.profileImage),
       } : null,
       // 인기도 점수 포함
@@ -462,7 +622,7 @@ export class PostsService {
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'file')
       .leftJoinAndSelect('post.blog', 'blog')
-      .leftJoinAndSelect('post.likedBy', 'likedBy')
+      // likedBy JOIN을 제거하고 서브쿼리로 대체
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
@@ -470,9 +630,19 @@ export class PostsService {
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
-        'likedBy.id',
       ])
       .where('post.id = :id', { id });
+
+    // 사용자가 있는 경우에만 좋아요 상태를 서브쿼리로 확인
+    if (user) {
+      qb.addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(1)')
+          .from('post_likes', 'pl')
+          .where('pl.postId = post.id')
+          .andWhere('pl.userId = :userId', { userId: user.id });
+      }, 'userLikedCount');
+    }
     const post = await qb.getOne();
     if (!post) {
       this.logger.warn(`Post not found for ID: ${id}`);
@@ -494,20 +664,23 @@ export class PostsService {
       this.logger.log(`Access granted to private blog for owner/author ${user?.id}`);
     }
     
-    // 사용자 좋아요 상태 확인
-    const liked = user ? post.likedBy?.some(likedUser => likedUser.id === user.id) || false : false;
-    
-    // 날짜 포맷 등 기존 가공 유지
-    const result = {
-      ...post,
-      liked, // 사용자 좋아요 상태 추가
-      likedBy: undefined, // 민감한 정보 제거
-      tags: post.tagList || [], // 태그 필드 추가 (프론트엔드 호환성)
-      publishedAt: formatDate(post.publishedAt),
-      createdAt: formatDate(post.createdAt),
-      updatedAt: formatDate(post.updatedAt),
-    };
-    this.logger.log(`Returning post data with ${result.attachedFiles?.length || 0} attached files`);
+    // 사용자 좋아요 상태 확인 (서브쿼리 결과 사용)
+    const liked = user && post['userLikedCount'] ? Number(post['userLikedCount']) > 0 : false;
+
+    /**
+     * DTO 변환으로 spread operator 제거
+     * lazy loading 방지 및 성능 최적화
+     */
+    const result = this.toPostDto(post, {
+      liked: liked,
+      user: post.author,
+      blog: post.blog,
+    });
+
+    // 조회수 증가 반영 (기존 로직 유지)
+    result.viewCount = post.viewCount;
+
+    this.logger.log(`Returning post data with ${post.attachedFiles?.length || 0} attached files`);
     return result;
   }
 
@@ -517,7 +690,7 @@ export class PostsService {
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'file')
       .leftJoinAndSelect('post.blog', 'blog')
-      .leftJoinAndSelect('post.likedBy', 'likedBy')
+      // likedBy JOIN을 제거하고 서브쿼리로 대체
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
@@ -525,10 +698,20 @@ export class PostsService {
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
-        'likedBy.id',
       ])
       .where('post.slug = :slug', { slug })
       .andWhere('post.isPublished = :isPublished', { isPublished: true });
+
+    // 사용자가 있는 경우에만 좋아요 상태를 서브쿼리로 확인
+    if (user) {
+      qb.addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(1)')
+          .from('post_likes', 'pl')
+          .where('pl.postId = post.id')
+          .andWhere('pl.userId = :userId', { userId: user.id });
+      }, 'userLikedCount');
+    }
     const post = await qb.getOne();
     if (!post) {
       throw new NotFoundException('Post not found');
@@ -552,22 +735,28 @@ export class PostsService {
     // 조회수 증가 (모든 사용자)
     await this.incrementViewCountForAll(post.id);
     
-    // 사용자 좋아요 상태 확인
-    const liked = user ? post.likedBy?.some(likedUser => likedUser.id === user.id) || false : false;
+    // 사용자 좋아요 상태 확인 (서브쿼리 결과 사용)
+    const liked = user && post['userLikedCount'] ? Number(post['userLikedCount']) > 0 : false;
     
-    // 날짜 포맷 등 기존 가공 유지
-    const result = {
-      ...post,
-      liked, // 사용자 좋아요 상태 추가
-      likedBy: undefined, // 민감한 정보 제거
-      tags: post.tagList || [], // 태그 필드 추가 (프론트엔드 호환성)
-      publishedAt: formatDate(post.publishedAt),
-      createdAt: formatDate(post.createdAt),
-      updatedAt: formatDate(post.updatedAt),
-      viewCount: post.viewCount + 1, // 증가된 조회수 반영
-    };
-    this.logger.log(`Returning post data with ${result.attachedFiles?.length || 0} attached files`);
-    return result;
+    // DTO 변환으로 안전하게 처리 (spread 연산자 사용 금지)
+    // 날짜 포맷팅은 DTO 변환 후 별도 처리
+    const postDto = this.toPostDto(post, {
+      user: post.author,
+      blog: post.blog
+    });
+
+    // 추가 필드 설정
+    postDto.liked = liked; // 사용자 좋아요 상태
+    postDto.tags = post.tagList || []; // 태그 필드 추가 (프론트엔드 호환성)
+    postDto.viewCount = post.viewCount + 1; // 증가된 조회수 반영
+
+    // 날짜 포맷 적용
+    postDto.publishedAt = formatDate(post.publishedAt) as any;
+    postDto.createdAt = formatDate(post.createdAt) as any;
+    postDto.updatedAt = formatDate(post.updatedAt) as any;
+
+    this.logger.log(`Returning post data with ${post.attachedFiles?.length || 0} attached files`);
+    return postDto;
   }
 
   async update(id: string, updatePostDto: any, user: User): Promise<any> {
@@ -608,16 +797,19 @@ export class PostsService {
     // 태그 업데이트 (JSONB로 단순 저장)
     const newTagList = updatePostDto.tags || post.tagList || [];
 
-    // tags는 DTO에서 온 것이므로 제거
-    const { tags, ...updateDataWithoutTags } = updatePostDto;
+    // tags는 DTO에서 온 것이므로 별도로 처리
 
-    // 업데이트 적용
-    Object.assign(post, {
-      ...updateDataWithoutTags,
-      content: processedContent,
-      content_markdown: markdownContent,
-      tagList: newTagList, // JSONB 태그 배열 업데이트
-    });
+    // 업데이트 적용 (spread 연산자 대신 명시적 필드 설정)
+    // updatePostDto의 필드들을 명시적으로 설정 (tags 제외)
+    if (updatePostDto.title !== undefined) post.title = updatePostDto.title;
+    if (updatePostDto.isPublished !== undefined) post.isPublished = updatePostDto.isPublished;
+    if (updatePostDto.category !== undefined) post.category = updatePostDto.category;
+    if (updatePostDto.qualityScore !== undefined) post.qualityScore = updatePostDto.qualityScore;
+
+    // 컨텐츠 관련 필드 업데이트
+    post.content = processedContent;
+    post.content_markdown = markdownContent;
+    post.tagList = newTagList; // JSONB 태그 배열 업데이트
 
     // Title 변경 시 slug는 변경하지 않음 (이미 고유한 UUID 포함)
     // SEO를 위해 기존 slug 유지가 더 좋음
@@ -650,12 +842,11 @@ export class PostsService {
 
     await this.linkFilesFromContent(post);
 
-    // DB 재조회 없이 메모리에서 조합
-    return {
-      ...post,
-      author: post.author,
-      attachedFiles: post.attachedFiles,
-    };
+    // DTO 변환으로 안전하게 반환 (spread 연산자 사용 금지)
+    return this.toPostDto(post, {
+      user: post.author,
+      // attachedFiles는 이미 post에 포함되어 있음
+    });
   }
 
   async remove(id: string, user: User): Promise<void> {
