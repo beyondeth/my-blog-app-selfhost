@@ -200,15 +200,15 @@ export const logout = () => apiClient.logout();
 export const getProfile = () => apiClient.getProfile();
 export const getPosts = (params?: any) => apiClient.getPosts(params);
 export const getPost = (id: string) => apiClient.getPost(id);
-export const getPostBySlug = (blogSlug: string, postSlug: string) => apiClient.getPostBySlug(blogSlug, postSlug);
+export const getPostBySlug = (slug: string) => apiClient.getPostBySlug(slug);
 export const createPost = (data: any) => apiClient.createPost(data);
 export const updatePost = (id: string, data: any) => apiClient.updatePost(id, data);
 export const deletePost = (id: string) => apiClient.deletePost(id);
 export const toggleLike = (postId: string) => apiClient.toggleLike(postId);
-export const batchUpdateLikes = (postIds: string[]) => apiClient.batchUpdateLikes(postIds);
+export const batchUpdateLikes = (batch: Record<string, boolean>) => apiClient.batchUpdateLikes(batch);
 export const getComments = (postId: string) => apiClient.getComments(postId);
-export const createComment = (postId: string, data: any) => apiClient.createComment(postId, data);
-export const updateComment = (commentId: string, data: any) => apiClient.updateComment(commentId, data);
+export const createComment = (data: any) => apiClient.createComment(data);
+export const updateComment = (commentId: string, content: string) => apiClient.updateComment(commentId, content);
 export const deleteComment = (commentId: string) => apiClient.deleteComment(commentId);
 export const toggleCommentLike = (commentId: string) => apiClient.toggleCommentLike(commentId);
 export const getBlogs = (params?: any) => apiClient.getBlogs(params);
@@ -224,8 +224,8 @@ export const deleteFile = (fileId: string) => apiClient.deleteFile(fileId);
 export const createApiKey = (data: any) => apiClient.createApiKey(data);
 export const getApiKeys = () => apiClient.getApiKeys();
 export const deleteApiKey = (keyId: string) => apiClient.deleteApiKey(keyId);
-export const googleAuth = (token: string) => apiClient.googleAuth(token);
-export const kakaoAuth = (code: string) => apiClient.kakaoAuth(code);
+export const googleAuth = () => apiClient.googleAuth();
+export const kakaoAuth = () => apiClient.kakaoAuth();
 
 // postsAPI 객체 (레거시 호환)
 export const postsAPI = {

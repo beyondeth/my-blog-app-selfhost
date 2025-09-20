@@ -12,7 +12,6 @@ import { Conversation } from './conversation.entity';
 
 @Entity('messages')
 @Index(['conversationId', 'createdAt'])
-@Index(['conversationId', 'isRead'])
 export class Message {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -25,12 +24,6 @@ export class Message {
 
   @Column({ type: 'text' })
   content: string;
-
-  @Column({ default: false })
-  isRead: boolean;
-
-  @Column({ type: 'timestamptz', nullable: true })
-  readAt: Date;
 
   @Column({ default: false })
   isEdited: boolean;

@@ -1,0 +1,57 @@
+# Prometheus 설정 파일
+# 채팅 큐 시스템 메트릭 수집 설정
+
+global:
+  # 메트릭 수집 주기
+  scrape_interval: 15s
+  # 규칙 평가 주기
+  evaluation_interval: 15s
+  # 외부 시스템에 첨부할 레이블
+  external_labels:
+    monitor: 'chat-queue-monitor'
+    environment: 'development'
+
+# Alertmanager 설정 (선택사항)
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+          # - 'alertmanager:9093'
+
+# Alert 규칙 파일 로드
+rule_files:
+  - "alerts.yml"
+
+# 메트릭 수집 대상 설정
+scrape_configs:
+  # NestJS 애플리케이션 메트릭
+  - job_name: 'nestjs-chat-app'
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+    metrics_path: '/internal/health-check-2f4a8b9c'
+    scrape_interval: 10s
+    scrape_timeout: 5s
+    # 메트릭 엔드포인트가 없을 경우 무시
+    honor_timestamps: true
+
+  # Redis 메트릭
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 10s
+
+  # Node Exporter (시스템 메트릭)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
+
+  # Prometheus 자체 메트릭
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Grafana 메트릭
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']

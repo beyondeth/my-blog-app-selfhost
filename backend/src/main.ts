@@ -100,7 +100,12 @@ async function bootstrap() {
 
   // API prefix
   app.setGlobalPrefix('api/v1', {
-    exclude: ['/', '/health', '/api-docs'],
+    exclude: [
+      '/',
+      '/health',
+      '/api-docs',
+      process.env.METRICS_PATH || '/internal/health-check-2f4a8b9c'
+    ],
   });
 
   // Swagger documentation

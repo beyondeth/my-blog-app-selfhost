@@ -14,11 +14,16 @@ interface DMChatAreaProps {
 
 const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
   const { user } = useAuth();
-  const { currentConversation, typingUser, otherUserInRoom } = useChatWithQuery(conversationId);
+  const {
+    currentConversation,
+    typingUser,
+    otherUserInRoom
+  } = useChatWithQuery(conversationId);
   const {
     groupedMessages,
     isLoading,
     isSending,
+    isFetchingNextPage,
     hasMore,
     sendMessage,
     retryMessage,
@@ -80,6 +85,7 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
         otherUser={otherUser}
         hasMore={hasMore}
         isLoading={isLoading}
+        isFetchingNextPage={isFetchingNextPage}
         onLoadMore={loadMoreMessages}
         onRetry={retryMessage}
         messageContainerRef={messageContainerRef}

@@ -18,6 +18,7 @@ interface MessageListProps {
   otherUser?: User;
   hasMore: boolean;
   isLoading: boolean;
+  isFetchingNextPage?: boolean; // Add prop for infinite scroll state
   onLoadMore: () => Promise<void>;
   onRetry?: (messageId: string) => Promise<void>;
   messageContainerRef: React.RefObject<HTMLDivElement>;
@@ -31,6 +32,7 @@ const MessageList: React.FC<MessageListProps> = ({
   otherUser,
   hasMore,
   isLoading,
+  isFetchingNextPage = false,
   onLoadMore,
   onRetry,
   messageContainerRef,
@@ -66,15 +68,20 @@ const MessageList: React.FC<MessageListProps> = ({
 
   // Intersection observer for infinite scroll
   useEffect(() => {
-    if (!hasMore || isLoading) return;
+    // Prevent loading if already loading or no more messages
+    if (!hasMore || isLoading || isFetchingNextPage) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting) {
+        // Only load if intersecting AND not currently fetching
+        if (entries[0].isIntersecting && !isFetchingNextPage) {
           onLoadMore();
         }
       },
-      { threshold: 0.1 }
+      {
+        threshold: 0.1,
+        rootMargin: '100px' // Start loading 100px before reaching the trigger
+      }
     );
 
     if (loadMoreTriggerRef.current) {
@@ -82,7 +89,7 @@ const MessageList: React.FC<MessageListProps> = ({
     }
 
     return () => observer.disconnect();
-  }, [hasMore, isLoading, onLoadMore]);
+  }, [hasMore, isLoading, isFetchingNextPage, onLoadMore]);
 
   return (
     <div
@@ -140,14 +147,6 @@ const MessageList: React.FC<MessageListProps> = ({
         const previousGroup = groupIndex > 0 ? groupedMessages[groupIndex - 1] : undefined;
         const showDateDivider = shouldShowDateDivider(group, previousGroup);
 
-        // Show read divider when other user is NOT in room
-        // Show after the last message from other user (where they stopped reading)
-        const shouldShowReadDivider = !isOtherUserInRoom &&
-          !isOwnMessage &&
-          (groupIndex === groupedMessages.length - 1 ||
-           (groupIndex < groupedMessages.length - 1 &&
-            groupedMessages[groupIndex + 1]?.senderId === currentUserId));
-
         return (
           <div key={`group-${groupIndex}`}>
             {/* Date divider */}
@@ -190,17 +189,6 @@ const MessageList: React.FC<MessageListProps> = ({
                 </div>
               </div>
             </div>
-
-            {/* Read divider - shows where other user last read */}
-            {shouldShowReadDivider && (
-              <div className="flex items-center my-3">
-                <div className="flex-1 h-px bg-gray-300" />
-                <span className="px-3 text-xs text-gray-500 font-medium">
-                  여기까지 읽으셨습니다
-                </span>
-                <div className="flex-1 h-px bg-gray-300" />
-              </div>
-            )}
           </div>
         );
       })}

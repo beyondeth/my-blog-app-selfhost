@@ -25,8 +25,6 @@ export interface Message {
   content: string;
   createdAt: Date;
   updatedAt?: Date;
-  isRead: boolean;
-  readAt?: Date;
   isEdited: boolean;
   editedAt?: Date;
   isDeleted: boolean;
@@ -46,6 +44,8 @@ export interface Conversation {
   lastMessage?: Message;
   lastMessageAt?: Date;
   unreadCount: number;
+  user1LastReadAt?: Date | null;
+  user2LastReadAt?: Date | null;
   user1DeletedAt?: Date | null;
   user2DeletedAt?: Date | null;
   createdAt: Date;

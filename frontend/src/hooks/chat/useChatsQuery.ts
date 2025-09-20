@@ -23,6 +23,12 @@ import {
   UI_CONSTANTS
 } from '@/constants/chat';
 import toast from 'react-hot-toast';
+import {
+  convertApiConversation,
+  convertApiMessage,
+  convertConversations,
+  convertMessagesResponse
+} from '@/lib/api/converters/chat.converter';
 
 // Type definitions for infinite query
 export interface MessagePage {
@@ -97,12 +103,14 @@ export const useConversationsQuery = (options?: UseQueryOptions<Conversation[]>)
     queryKey: CHAT_QUERY_KEYS.conversations(),
     queryFn: async () => {
       const data = await apiClient.getConversations();
-      // API 타입을 프론트엔드 타입으로 변환
-      return data as unknown as Conversation[];
+      // Convert API response to frontend types
+      return convertConversations(data);
     },
     staleTime: CACHE_TIMES.CONVERSATIONS,
     refetchInterval: REFETCH_INTERVALS.CONVERSATIONS_ACTIVE,
     refetchIntervalInBackground: false,
+    refetchOnMount: true, // DM 열 때마다 최신 대화 목록 확인
+    refetchOnWindowFocus: true, // 창 포커스 시 refetch
     ...options,
   });
 };
@@ -119,8 +127,8 @@ export const useConversationByIdQuery = (
     queryFn: async () => {
       if (!conversationId) throw new Error('Conversation ID is required');
       const data = await apiClient.getConversationById(conversationId);
-      // API 타입을 프론트엔드 타입으로 변환
-      return data as unknown as Conversation;
+      // Convert API response to frontend types
+      return convertApiConversation(data);
     },
     enabled: !!conversationId,
     staleTime: CACHE_TIMES.CONVERSATIONS,
@@ -141,7 +149,7 @@ export const useMessagesQuery = (
     queryFn: async () => {
       if (!conversationId) throw new Error('Conversation ID is required');
       const data = await apiClient.getMessages(conversationId, page);
-      return data;
+      return convertMessagesResponse(data);
     },
     enabled: !!conversationId,
     staleTime: CACHE_TIMES.MESSAGES,
@@ -170,11 +178,12 @@ export const useMessagesInfiniteQuery = (conversationId: string | undefined) => 
 
       try {
         const data = await apiClient.getMessages(conversationId, page);
+        const converted = convertMessagesResponse(data);
 
         // Ensure data structure is valid
         return {
-          messages: Array.isArray(data?.messages) ? data.messages : [],
-          hasMore: Boolean(data?.hasMore),
+          messages: Array.isArray(converted?.messages) ? converted.messages : [],
+          hasMore: Boolean(converted?.hasMore),
           page: page
         };
       } catch (error) {
@@ -188,6 +197,11 @@ export const useMessagesInfiniteQuery = (conversationId: string | undefined) => 
       }
     },
     initialPageParam: 1,
+    // Smart cache management: 짧은 staleTime으로 DM 열 때마다 최신 확인
+    staleTime: 10 * 1000, // 10초 - 짧게 설정해서 자주 최신 확인
+    gcTime: 5 * 60 * 1000, // 5분 - 캐시는 오래 유지
+    refetchOnMount: true, // 마운트 시 refetch
+    refetchOnReconnect: true, // 재연결 시 refetch
     getNextPageParam: (lastPage) => {
       // Simplified: Only check lastPage, don't use allPages
       try {
@@ -203,8 +217,6 @@ export const useMessagesInfiniteQuery = (conversationId: string | undefined) => 
       }
     },
     enabled: Boolean(conversationId),
-    staleTime: CACHE_TIMES.MESSAGES,
-    gcTime: CACHE_TIMES.MESSAGES * 2, // Add garbage collection time
     retry: (failureCount, error: any) => {
       // Don't retry on 404 or 403
       if (error?.response?.status === 404 || error?.response?.status === 403) {
@@ -224,7 +236,8 @@ export const useCreateConversationMutation = () => {
 
   return useMutation({
     mutationFn: async (userId: string) => {
-      return await apiClient.getOrCreateConversation(userId);
+      const data = await apiClient.getOrCreateConversation(userId);
+      return convertApiConversation(data);
     },
     onSuccess: (conversation) => {
       // Update conversations cache
@@ -258,7 +271,8 @@ export const useSendMessageMutation = (conversationId: string, userId?: string) 
 
   return useMutation({
     mutationFn: async ({ content, tempId }: { content: string; tempId: string }) => {
-      return await apiClient.sendMessage(conversationId, content, tempId);
+      const data = await apiClient.sendMessage(conversationId, content, tempId);
+      return convertApiMessage(data);
     },
     onMutate: async ({ content, tempId }) => {
       // Cancel outgoing refetches

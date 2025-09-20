@@ -17,11 +17,18 @@ import type {
  */
 export interface Conversation {
   id: string;
-  participants: Array<{
+  user1Id: string;
+  user2Id: string;
+  user1?: {
     id: string;
     username: string;
     profileImage?: string;
-  }>;
+  };
+  user2?: {
+    id: string;
+    username: string;
+    profileImage?: string;
+  };
   lastMessage?: {
     content: string;
     createdAt: string;
@@ -30,9 +37,6 @@ export interface Conversation {
   unreadCount: number;
   createdAt: string;
   updatedAt: string;
-  // 프론트엔드 타입과 호환을 위한 필드
-  user1Id?: string;
-  user2Id?: string;
 }
 
 /**

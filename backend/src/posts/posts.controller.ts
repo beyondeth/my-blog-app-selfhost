@@ -19,7 +19,7 @@ import { Post as PostEntity } from './entities/post.entity';
 import { File as FileEntity } from '../files/entities/file.entity';
 import { S3Service } from '../files/services/s3.service';
 import { ViewCountService } from './view-count.service';
-import { CacheInterceptor } from '@nestjs/cache-manager';
+import { CacheInterceptor } from '../cache/cache.interceptor';
 import { FilesService } from '../files/files.service';
 import { CacheTTL } from '../cache/cache.decorator';
 import { CacheService } from '../cache/cache.service';

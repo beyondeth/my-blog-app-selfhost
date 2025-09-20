@@ -23,6 +23,7 @@ export function useDMModal(): UseDMModalReturn {
     dmViewMode,
     setDMViewMode,
     setActiveConversation,
+    closeDMModal,
   } = useDMStore();
 
   // Open modal with optional conversation
@@ -43,10 +44,10 @@ export function useDMModal(): UseDMModalReturn {
 
   // Close modal
   const closeModal = useCallback(() => {
-    setDMModalOpen(false);
-    // Optionally clear active conversation
-    // setActiveConversation(null);
-  }, [setDMModalOpen]);
+    // 중요: closeDMModal을 사용해서 activeConversationId도 함께 리셋
+    // DM 모달을 닫을 때 현재 대화 상태도 초기화해야 함
+    closeDMModal();
+  }, [closeDMModal]);
 
   // Toggle modal
   const toggleModal = useCallback(() => {

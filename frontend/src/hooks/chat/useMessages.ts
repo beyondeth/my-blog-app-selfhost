@@ -10,6 +10,7 @@ import { chatReducer, initialChatState } from '@/reducers/chatReducer';
 import { useSocketManager } from './useSocketManager';
 import { SOCKET_EVENTS, ERROR_MESSAGES, UI_CONSTANTS } from '@/constants/chat';
 import { Message, MessageStatus } from '@/types/chat';
+import { convertMessagesResponse, convertApiMessage } from '@/lib/api/converters/chat.converter';
 import toast from 'react-hot-toast';
 
 export interface UseMessagesReturn {
@@ -54,11 +55,12 @@ export function useMessages(conversationId?: string): UseMessagesReturn {
     dispatch({ type: 'FETCH_MESSAGES_START' });
 
     try {
-      const data = await apiClient.getMessages(
+      const apiData = await apiClient.getMessages(
         conversationId,
         page,
         abortControllerRef.current?.signal
       );
+      const data = convertMessagesResponse(apiData);
 
       dispatch({
         type: 'FETCH_MESSAGES_SUCCESS',
@@ -114,7 +116,8 @@ export function useMessages(conversationId?: string): UseMessagesReturn {
 
     try {
       // Send to server with tempId
-      const message = await apiClient.sendMessage(conversationId, content, tempId);
+      const apiMessage = await apiClient.sendMessage(conversationId, content, tempId);
+      const message = convertApiMessage(apiMessage);
 
       // Replace optimistic message with real one
       dispatch({

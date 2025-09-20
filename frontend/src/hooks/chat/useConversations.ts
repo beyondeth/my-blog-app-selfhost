@@ -10,6 +10,7 @@ import { chatReducer, initialChatState } from '@/reducers/chatReducer';
 import { useSocketManager } from './useSocketManager';
 import { SOCKET_EVENTS, ERROR_MESSAGES } from '@/constants/chat';
 import { Conversation, NewMessagePayload } from '@/types/chat';
+import { convertConversations, convertApiConversation } from '@/lib/api/converters/chat.converter';
 import toast from 'react-hot-toast';
 
 export interface UseConversationsReturn {
@@ -44,9 +45,10 @@ export function useConversations(): UseConversationsReturn {
     dispatch({ type: 'FETCH_CONVERSATIONS_START' });
 
     try {
-      const conversations = await apiClient.getConversations(
+      const data = await apiClient.getConversations(
         abortControllerRef.current.signal
       );
+      const conversations = convertConversations(data);
 
       dispatch({
         type: 'FETCH_CONVERSATIONS_SUCCESS',
@@ -68,7 +70,8 @@ export function useConversations(): UseConversationsReturn {
     dispatch({ type: 'SET_LOADING', payload: { key: 'conversations', value: true } });
 
     try {
-      const conversation = await apiClient.getOrCreateConversation(userId);
+      const data = await apiClient.getOrCreateConversation(userId);
+      const conversation = convertApiConversation(data);
 
       dispatch({
         type: 'SET_CURRENT_CONVERSATION',

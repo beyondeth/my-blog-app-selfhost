@@ -6,6 +6,7 @@ import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { Report } from '../../reports/entities/report.entity';
 import { AuditLog } from '../../audit/entities/audit-log.entity';
+import { UnifiedRedisService } from '../../redis/unified-redis.service';
 import { ReportStatus } from '../../reports/enums/report.enum';
 
 export interface DashboardStats {
@@ -73,6 +74,7 @@ export class AdminDashboardService {
     private reportRepository: Repository<Report>,
     @InjectRepository(AuditLog)
     private auditLogRepository: Repository<AuditLog>,
+    private readonly unifiedRedisService: UnifiedRedisService,
   ) {}
 
   /**
@@ -371,24 +373,108 @@ export class AdminDashboardService {
   }
 
   /**
-   * Get system health metrics
+   * 시스템 상태 메트릭 조회 - 실제 Redis 상태 포함
    */
   async getSystemHealth() {
-    // This would integrate with actual monitoring systems
-    // For now, return mock data
-    return {
-      status: 'healthy',
-      services: {
-        database: { status: 'operational', responseTime: 15 },
-        cache: { status: 'operational', hitRate: 0.92 },
-        storage: { status: 'operational', usage: 0.45 },
-      },
-      metrics: {
-        avgResponseTime: 120, // ms
-        errorRate: 0.001, // 0.1%
-        uptime: 99.99, // percentage
-      },
+    try {
+      // Redis 통계 조회
+      const redisStats = await this.unifiedRedisService.getCacheStatistics();
+      const redisInfo = await this.unifiedRedisService.getInfo();
+
+      // Redis 상태 및 응답시간 계산
+      const startTime = Date.now();
+      await this.unifiedRedisService.getCache('temp', 'health-check');
+      const redisResponseTime = Date.now() - startTime;
+
+      // Redis 메모리 사용량 계산 (메모리 문자열을 숫자로 변환)
+      const memoryUsage = redisStats.memoryUsage;
+      const memoryBytes = this.parseRedisMemory(memoryUsage);
+      const maxMemory = redisInfo?.memory?.maxmemory || '0';
+      const maxMemoryBytes = parseInt(maxMemory) || 8589934592; // 기본 8GB
+      const memoryUsageRatio = maxMemoryBytes > 0 ? memoryBytes / maxMemoryBytes : 0;
+
+      // 데이터베이스 응답시간 체크 (간단한 쿼리 실행)
+      const dbStartTime = Date.now();
+      await this.userRepository.count();
+      const dbResponseTime = Date.now() - dbStartTime;
+
+      // 스토리지 사용량 (파일 시스템 체크 - 실제 구현 필요)
+      const storageUsage = 0.45; // 임시 값, 실제로는 fs 모듈로 체크
+
+      // 전체 시스템 상태 판단
+      const isHealthy =
+        redisResponseTime < 100 &&
+        dbResponseTime < 100 &&
+        memoryUsageRatio < 0.9 &&
+        redisStats.hitRate > 0.5;
+
+      return {
+        status: isHealthy ? 'healthy' : 'degraded',
+        services: {
+          database: {
+            status: dbResponseTime < 100 ? 'operational' : 'slow',
+            responseTime: dbResponseTime,
+          },
+          cache: {
+            status: redisResponseTime < 50 ? 'operational' : 'slow',
+            hitRate: redisStats.hitRate,
+            responseTime: redisResponseTime,
+            keys: redisStats.totalKeys,
+            memory: redisStats.memoryUsage,
+            patterns: redisStats.patterns,
+          },
+          storage: {
+            status: storageUsage < 0.8 ? 'operational' : 'warning',
+            usage: storageUsage,
+          },
+        },
+        metrics: {
+          avgResponseTime: Math.round((dbResponseTime + redisResponseTime) / 2),
+          errorRate: 0.001, // TODO: 실제 에러율 계산 구현
+          uptime: 99.99, // TODO: 실제 업타임 계산 구현
+          cacheHitRate: Math.round(redisStats.hitRate * 100) / 100,
+          totalCacheKeys: redisStats.totalKeys,
+        },
+      };
+    } catch (error) {
+      // 에러 발생 시 기본값 반환
+      console.error('시스템 상태 조회 실패:', error);
+      return {
+        status: 'error',
+        services: {
+          database: { status: 'unknown', responseTime: null },
+          cache: { status: 'unknown', hitRate: null },
+          storage: { status: 'unknown', usage: null },
+        },
+        metrics: {
+          avgResponseTime: null,
+          errorRate: null,
+          uptime: null,
+        },
+      };
+    }
+  }
+
+  /**
+   * Redis 메모리 문자열을 바이트로 변환
+   * 예: "1.5M" -> 1572864, "2G" -> 2147483648
+   */
+  private parseRedisMemory(memory: string): number {
+    if (!memory || memory === 'N/A') return 0;
+
+    const units = {
+      'K': 1024,
+      'M': 1024 * 1024,
+      'G': 1024 * 1024 * 1024,
     };
+
+    const match = memory.match(/^([\d.]+)([KMG])?/);
+    if (!match) return 0;
+
+    const value = parseFloat(match[1]);
+    const unit = match[2] as keyof typeof units;
+
+    return Math.floor(value * (units[unit] || 1));
   }
 
   // Private helper methods

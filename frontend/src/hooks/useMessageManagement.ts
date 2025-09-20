@@ -12,6 +12,7 @@ interface UseMessageManagementReturn {
   groupedMessages: MessageGroup[];
   isLoading: boolean;
   isSending: boolean;
+  isFetchingNextPage: boolean;
   hasMore: boolean;
   sendMessage: (content: string) => Promise<void>;
   retryMessage: (messageId: string) => Promise<void>;
@@ -100,19 +101,35 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
     lastMessageCountRef.current = messages.length;
   }, [messages.length, scrollToBottom]);
 
-  // Track scroll position for auto-scroll
+  // Track scroll position for auto-scroll with improved accuracy
   useEffect(() => {
     const container = messageContainerRef.current;
     if (!container) return;
 
+    let userScrolling = false;
+    let scrollTimeout: NodeJS.Timeout;
+
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = container;
-      const isNearBottom = scrollHeight - scrollTop - clientHeight < 100;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+
+      // More accurate check: user is near bottom if within 100px
+      const isNearBottom = distanceFromBottom < 100;
       isAutoScrollingRef.current = isNearBottom;
+
+      // Mark as user scrolling and clear after scrolling stops
+      userScrolling = true;
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        userScrolling = false;
+      }, 150);
     };
 
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => {
+      container.removeEventListener('scroll', handleScroll);
+      clearTimeout(scrollTimeout);
+    };
   }, []);
 
   // Send message wrapper
@@ -126,21 +143,34 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
   const loadMoreMessages = useCallback(async () => {
     if (!messageContainerRef.current || isFetchingNextPage) return;
 
-    // Save current scroll position
     const container = messageContainerRef.current;
-    prevScrollHeightRef.current = container.scrollHeight;
-    const prevScrollTop = container.scrollTop;
+    const oldScrollHeight = container.scrollHeight;
+    const oldScrollTop = container.scrollTop;
 
     // Load more messages
     await loadMore();
 
-    // Restore scroll position after messages are loaded
-    requestAnimationFrame(() => {
-      if (!messageContainerRef.current) return;
-      const newScrollHeight = messageContainerRef.current.scrollHeight;
-      const scrollDiff = newScrollHeight - prevScrollHeightRef.current;
-      messageContainerRef.current.scrollTop = prevScrollTop + scrollDiff;
+    // Use MutationObserver to detect when DOM is updated
+    const observer = new MutationObserver(() => {
+      const newScrollHeight = container.scrollHeight;
+      const heightDiff = newScrollHeight - oldScrollHeight;
+
+      // Only adjust if height actually increased (new messages added)
+      if (heightDiff > 0) {
+        // Preserve scroll position by adding the height difference
+        container.scrollTop = oldScrollTop + heightDiff;
+        observer.disconnect();
+      }
     });
+
+    // Observe changes to the message container
+    observer.observe(container, {
+      childList: true,
+      subtree: true
+    });
+
+    // Cleanup observer after 1 second to prevent memory leak
+    setTimeout(() => observer.disconnect(), 1000);
   }, [loadMore, isFetchingNextPage]);
 
   // Mark message as read
@@ -196,8 +226,9 @@ export function useMessageManagement(conversationId: string): UseMessageManageme
 
   return {
     groupedMessages,
-    isLoading: isLoadingMessages || isFetchingNextPage,
+    isLoading: isLoadingMessages,
     isSending: false, // React Query handles this internally
+    isFetchingNextPage,
     hasMore: hasMoreMessages,
     sendMessage,
     retryMessage,

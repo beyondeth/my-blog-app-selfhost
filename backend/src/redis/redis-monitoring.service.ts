@@ -305,4 +305,44 @@ export class RedisMonitoringService {
       return false;
     }
   }
+
+  /**
+   * Check Redis connection status
+   */
+  async isConnected(): Promise<boolean> {
+    try {
+      const result = await this.redis.ping();
+      return result === 'PONG';
+    } catch (error) {
+      this.logger.error('Redis connection check failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Get Redis connection details
+   */
+  async getConnectionStatus(): Promise<{
+    connected: boolean;
+    latency: number;
+    error?: string;
+  }> {
+    try {
+      const start = Date.now();
+      const result = await this.redis.ping();
+      const latency = Date.now() - start;
+
+      return {
+        connected: result === 'PONG',
+        latency,
+      };
+    } catch (error) {
+      this.logger.error('Failed to get connection status:', error);
+      return {
+        connected: false,
+        latency: -1,
+        error: error.message,
+      };
+    }
+  }
 }

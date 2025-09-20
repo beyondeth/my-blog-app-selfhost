@@ -13,16 +13,20 @@ import {
   MessageEvent,
 } from '@nestjs/common';
 import { Observable, interval, map, merge } from 'rxjs';
-import { ChatService } from './chat.service';
-import { CreateMessageDto } from './dto/create-message.dto';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { User } from '../users/entities/user.entity';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ChatService } from '../services/chat.service';
+import { ChatBatchService } from '../services/chat-batch.service';
+import { CreateMessageDto } from '../dto/create-message.dto';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { User } from '../../users/entities/user.entity';
+import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
 export class ChatController {
-  constructor(private readonly chatService: ChatService) {}
+  constructor(
+    private readonly chatService: ChatService,
+    private readonly batchService: ChatBatchService,
+  ) {}
 
   @Get('conversations')
   async getConversations(@CurrentUser() user: User) {
@@ -144,5 +148,27 @@ export class ChatController {
 
     // Merge notification stream with keep-alive
     return merge(notifications$, keepAlive$);
+  }
+
+  // Monitoring endpoints
+  @Get('queue/metrics')
+  async getQueueMetrics() {
+    return this.batchService.getQueueMetrics();
+  }
+
+  @Get('queue/health')
+  async getQueueHealth() {
+    return this.batchService.checkHealth();
+  }
+
+  @Post('queue/recover-dlq')
+  async recoverDeadLetterQueue(@Query('limit', ParseIntPipe) limit: number = 10) {
+    const recovered = await this.batchService.recoverDeadLetterQueue(limit);
+    return { recovered };
+  }
+
+  @Post('queue/process-immediate')
+  async processImmediate() {
+    return this.batchService.processImmediate();
   }
 }

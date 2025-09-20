@@ -19,11 +19,12 @@ export class FollowsService {
   ) {}
 
   async follow(followerId: string, followingId: string): Promise<void> {
-    console.log(`[FollowService] Attempting to follow - followerId: ${followerId}, followingId: ${followingId}`);
-    
+    // 팔로우 시도 로그 제거 - 너무 빈번함
+
     // Check if user is trying to follow themselves
     if (followerId === followingId) {
-      console.log('[FollowService] Error: User trying to follow themselves');
+      // 자기 자신 팔로우 시도는 중요한 오류이므로 로그 유지
+      console.error('[FollowService] Error: User trying to follow themselves');
       throw new BadRequestException('You cannot follow yourself');
     }
 
@@ -35,10 +36,11 @@ export class FollowsService {
         manager.exists(User, { where: { id: followingId } }),
       ]);
 
-      console.log(`[FollowService] User existence check - follower: ${followerExists}, following: ${followingExists}`);
+      // 사용자 존재 확인 로그 제거 - 너무 빈번함
 
       if (!followerExists || !followingExists) {
-        console.log('[FollowService] Error: User not found');
+        // 사용자 미발견은 중요한 오류이므로 로그 유지
+        console.error('[FollowService] Error: User not found');
         throw new NotFoundException('User not found');
       }
 
@@ -51,10 +53,10 @@ export class FollowsService {
         lock: { mode: 'pessimistic_write' },
       });
 
-      console.log(`[FollowService] Existing follow check: ${existingFollow ? 'Found' : 'Not found'}`);
+      // 기존 팔로우 확인 로그 제거 - 너무 빈번함
 
       if (existingFollow) {
-        console.log('[FollowService] Error: Already following this user');
+        // 중복 팔로우는 일반적인 상황이므로 로그 제거
         throw new BadRequestException('You are already following this user');
       }
 
@@ -65,20 +67,14 @@ export class FollowsService {
       });
 
       const savedFollow = await manager.save(Follow, follow);
-      console.log(`[FollowService] Follow created successfully with id: ${savedFollow.id}`);
-      
-      // Verify the follow was actually saved
-      const verifyFollow = await manager.findOne(Follow, {
-        where: { id: savedFollow.id }
-      });
-      console.log(`[FollowService] Verification - Follow exists in DB:`, verifyFollow ? 'Yes' : 'No');
-      if (verifyFollow) {
-        console.log(`[FollowService] Saved follow details:`, {
-          id: verifyFollow.id,
-          followerId: verifyFollow.followerId,
-          followingId: verifyFollow.followingId,
-          createdAt: verifyFollow.createdAt
+      // 팔로우 생성 성공 로그 제거 - 너무 빈번함
+
+      // 검증 로그 제거 - 개발 환경에서만 필요
+      if (process.env.NODE_ENV === 'development' && process.env.DEBUG_FOLLOW === 'true') {
+        const verifyFollow = await manager.findOne(Follow, {
+          where: { id: savedFollow.id }
         });
+        console.log(`[FollowService] Follow verification:`, verifyFollow ? 'Success' : 'Failed');
       }
 
       // Create notification within the same transaction
@@ -91,19 +87,20 @@ export class FollowsService {
             type: NotificationType.FOLLOW,
           },
         );
-        console.log('[FollowService] Notification created successfully');
+        // 알림 생성 성공 로그 제거 - 너무 빈번함
       } catch (error) {
+        // 알림 생성 실패는 중요한 문제이므로 로그 유지
         console.error('[FollowService] Error creating notification:', error);
         // Don't throw - notification is not critical for follow operation
       }
     });
 
-    console.log('[FollowService] Follow operation completed successfully');
+    // 팔로우 완료 로그 제거 - 너무 빈번함
   }
 
   async unfollow(followerId: string, followingId: string): Promise<void> {
-    console.log(`[FollowService] Attempting to unfollow - followerId: ${followerId}, followingId: ${followingId}`);
-    
+    // 언팔로우 시도 로그 제거 - 너무 빈번함
+
     await this.dataSource.transaction(async (manager: EntityManager) => {
       const follow = await manager.findOne(Follow, {
         where: {
@@ -113,18 +110,18 @@ export class FollowsService {
         lock: { mode: 'pessimistic_write' },
       });
 
-      console.log(`[FollowService] Follow relationship search result: ${follow ? `Found (id: ${follow.id})` : 'Not found'}`);
+      // 팔로우 관계 검색 결과 로그 제거 - 너무 빈번함
 
       if (!follow) {
-        console.log('[FollowService] Error: Follow relationship not found');
+        // 팔로우 관계 미발견은 일반적인 상황이므로 로그 제거
         throw new NotFoundException('Follow relationship not found');
       }
 
       await manager.remove(follow);
-      console.log('[FollowService] Follow relationship removed successfully');
+      // 팔로우 제거 성공 로그 제거 - 너무 빈번함
     });
 
-    console.log('[FollowService] Unfollow operation completed successfully');
+    // 언팔로우 완료 로그 제거 - 너무 빈번함
   }
 
   async getFollowers(userId: string, page = 1, limit = 20): Promise<PaginatedResponseDto<User>> {
@@ -164,15 +161,17 @@ export class FollowsService {
   }
 
   async getFollowInfo(userId: string, currentUserId?: string): Promise<FollowInfoDto> {
-    console.log(`[FollowService] Getting follow info - userId: ${userId}, currentUserId: ${currentUserId || 'none'}`);
-    
-    // Add raw query for debugging
-    if (currentUserId && currentUserId !== userId) {
-      const rawResult = await this.followRepository.query(
-        `SELECT * FROM follows WHERE follower_id = $1 AND following_id = $2`,
-        [currentUserId, userId]
-      );
-      console.log(`[FollowService] Raw query result:`, rawResult);
+    // 팔로우 정보 조회 로그 제거 - 매 요청마다 출력되어 너무 많음
+
+    // 디버깅용 raw query 제거 - 개발 환경에서만 필요
+    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_FOLLOW === 'true') {
+      if (currentUserId && currentUserId !== userId) {
+        const rawResult = await this.followRepository.query(
+          `SELECT * FROM follows WHERE follower_id = $1 AND following_id = $2`,
+          [currentUserId, userId]
+        );
+        console.log(`[FollowService] Debug - Raw query result:`, rawResult);
+      }
     }
     
     const [followersCount, followingCount] = await Promise.all([
@@ -180,35 +179,26 @@ export class FollowsService {
       this.followRepository.count({ where: { followerId: userId } }),
     ]);
 
-    console.log(`[FollowService] Counts - followers: ${followersCount}, following: ${followingCount}`);
+    // 팔로우 카운트 로그 제거 - 너무 빈번함
 
     let isFollowedByUser = false;
     if (currentUserId && currentUserId !== userId) {
-      // Use more explicit query with logging
+      // Use more explicit query
       const queryBuilder = this.followRepository
         .createQueryBuilder('follow')
         .where('follow.followerId = :followerId', { followerId: currentUserId })
         .andWhere('follow.followingId = :followingId', { followingId: userId });
-      
-      const sql = queryBuilder.getSql();
-      console.log(`[FollowService] Query SQL:`, sql);
-      console.log(`[FollowService] Query params:`, { followerId: currentUserId, followingId: userId });
-      
-      const follow = await queryBuilder.getOne();
-      
-      isFollowedByUser = !!follow;
-      console.log(`[FollowService] Is ${currentUserId} following ${userId}? ${isFollowedByUser}`);
-      console.log(`[FollowService] Follow record:`, follow ? { 
-        id: follow.id, 
-        followerId: follow.followerId, 
-        followingId: follow.followingId,
-        createdAt: follow.createdAt 
-      } : 'not found');
-    } else {
-      console.log(`[FollowService] Not checking follow status - currentUserId: ${currentUserId}, userId: ${userId}`);
-      if (currentUserId === userId) {
-        console.log(`[FollowService] Reason: User cannot follow themselves`);
+
+      // SQL 로그 제거 - 개발 환경에서만 필요
+      if (process.env.NODE_ENV === 'development' && process.env.DEBUG_FOLLOW === 'true') {
+        const sql = queryBuilder.getSql();
+        console.log(`[FollowService] Debug - Query SQL:`, sql);
       }
+
+      const follow = await queryBuilder.getOne();
+
+      isFollowedByUser = !!follow;
+      // 팔로우 상태 확인 로그 제거 - 너무 빈번함
     }
 
     const result = {
@@ -216,23 +206,23 @@ export class FollowsService {
       followingCount,
       isFollowedByUser,
     };
-    
-    console.log('[FollowService] Returning follow info:', JSON.stringify(result));
+
+    // 결과 반환 로그 제거 - 너무 빈번함
     return result;
   }
 
   async isFollowing(followerId: string, followingId: string): Promise<boolean> {
-    console.log(`[FollowService] Checking if ${followerId} is following ${followingId}`);
-    
+    // 팔로우 확인 로그 제거 - 매 요청마다 출력되어 너무 많음
+
     const follow = await this.followRepository.findOne({
       where: {
         followerId,
         followingId,
       },
     });
-    
+
     const result = !!follow;
-    console.log(`[FollowService] Result: ${result} (follow record: ${follow ? `exists (id: ${follow.id})` : 'not found'})`);
+    // 결과 로그 제거 - 너무 빈번함
     return result;
   }
 }

@@ -203,6 +203,7 @@ export class AdminPostsService {
 
   /**
    * Bulk action on posts
+   * 대량 작업 최적화 - IN 절 쿼리 성능 개선
    */
   async bulkAction(
     bulkActionDto: BulkActionDto,
@@ -211,9 +212,13 @@ export class AdminPostsService {
   ) {
     const { postIds, action } = bulkActionDto;
 
-    const posts = await this.postRepository.findByIds(postIds);
-    
-    if (posts.length !== postIds.length) {
+    // findByIds 대신 단순 카운트 쿼리로 존재 여부만 확인
+    // 관계(relations)를 로드하지 않아 성능 대폭 향상
+    const postCount = await this.postRepository.count({
+      where: { id: In(postIds) }
+    });
+
+    if (postCount !== postIds.length) {
       throw new NotFoundException('Some posts not found');
     }
 

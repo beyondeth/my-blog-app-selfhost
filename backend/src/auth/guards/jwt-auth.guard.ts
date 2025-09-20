@@ -4,32 +4,24 @@ import { AuthGuard } from '@nestjs/passport';
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
   canActivate(context: ExecutionContext) {
-    const request = context.switchToHttp().getRequest();
-    // Only log in development mode
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[JwtAuthGuard] Checking authentication for:', request.url);
-    }
+    // 로그 제거 - 매 요청마다 출력되어 너무 많음
     return super.canActivate(context);
   }
 
   handleRequest(err, user, info, context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
 
-    // Only log in development mode
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[JwtAuthGuard] handleRequest - User:', user?.id, 'Error:', err?.message, 'Info:', info?.message);
-    }
-
     if (err || !user) {
-      if (process.env.NODE_ENV === 'development') {
-        console.log('[JwtAuthGuard] Authentication failed for:', request.url);
-      }
+      // 실패한 경우만 로그 (중요 이벤트)
+      console.error('[JwtAuthGuard] Authentication failed:', {
+        url: request.url,
+        error: err?.message || 'No user found',
+        info: info?.message
+      });
       throw err || new UnauthorizedException('Authentication required');
     }
 
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[JwtAuthGuard] Authentication successful for user:', user.id);
-    }
+    // 성공 로그 제거 - 너무 빈번함
     return user;
   }
 } 

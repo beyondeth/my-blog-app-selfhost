@@ -1,6 +1,5 @@
-import { Injectable, Inject, Logger } from '@nestjs/common';
-import { CACHE_MANAGER } from '@nestjs/cache-manager';
-import { Cache } from 'cache-manager';
+import { Injectable, Logger } from '@nestjs/common';
+import { UnifiedRedisService } from '../redis/unified-redis.service';
 
 // 캐시 TTL 상수 (초 단위)
 export enum CacheTTL {
@@ -58,24 +57,24 @@ export const CacheKeys = {
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
-  
-  // 캐시 통계 추적을 위한 Shadow Map
-  private readonly cacheTracker = new Map<string, { size: number; setAt: Date }>();
+
+  // 캐시 통계 추적 (UnifiedRedisService에서 관리되지만 호환성을 위해 유지)
   private cacheHits = 0;
   private cacheMisses = 0;
   private cacheSets = 0;
   private cacheDeletes = 0;
 
   constructor(
-    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+    private readonly unifiedRedisService: UnifiedRedisService,
   ) {}
 
   /**
-   * 캐시에서 값 가져오기
+   * 캐시에서 값 가져오기 - UnifiedRedisService 사용
    */
   async get<T>(key: string): Promise<T | null> {
     try {
-      const cached = await this.cacheManager.get<T>(key);
+      // 기본 네임스페이스를 'cache'로 사용
+      const cached = await this.unifiedRedisService.getCache<T>('cache', key);
       if (cached) {
         this.cacheHits++;
         this.logger.debug(`Cache HIT: ${key}`);
@@ -91,39 +90,29 @@ export class CacheService {
   }
 
   /**
-   * 캐시에 값 저장
+   * 캐시에 값 저장 - UnifiedRedisService 사용
    */
   async set<T>(key: string, value: T, ttl?: number): Promise<void> {
     try {
-      await this.cacheManager.set(key, value, ttl);
-      
-      // Shadow Map에 추적 정보 저장
-      try {
-        const size = JSON.stringify(value).length;
-        this.cacheTracker.set(key, { size, setAt: new Date() });
-        this.cacheSets++;
-      } catch {
-        // 직렬화 실패 시 기본값
-        this.cacheTracker.set(key, { size: 1000, setAt: new Date() });
-      }
-      
-      this.logger.debug(`Cache SET: ${key} (TTL: ${ttl || 'default'}s)`);
+      // TTL이 없으면 기본값 사용 (5분)
+      const finalTtl = ttl || CacheTTL.MEDIUM;
+      await this.unifiedRedisService.setCache('cache', key, value, finalTtl);
+
+      this.cacheSets++;
+      this.logger.debug(`Cache SET: ${key} (TTL: ${finalTtl}s)`);
     } catch (error) {
       this.logger.error(`Cache SET error for key ${key}:`, error);
     }
   }
 
   /**
-   * 캐시에서 값 삭제
+   * 캐시에서 값 삭제 - UnifiedRedisService 사용
    */
   async del(key: string): Promise<void> {
     try {
-      await this.cacheManager.del(key);
-      
-      // Shadow Map에서도 제거
-      this.cacheTracker.delete(key);
+      await this.unifiedRedisService.deleteCache('cache', key);
+
       this.cacheDeletes++;
-      
       this.logger.debug(`Cache DEL: ${key}`);
     } catch (error) {
       this.logger.error(`Cache DEL error for key ${key}:`, error);
@@ -131,112 +120,36 @@ export class CacheService {
   }
 
   /**
-   * 패턴에 매칭되는 모든 키 삭제
-   * 주의: Redis에서만 작동, 개발 환경에서는 무시됨
+   * 패턴에 매칭되는 모든 키 삭제 - UnifiedRedisService 사용
    * SCAN 명령어 사용으로 성능 개선
    */
   async deletePattern(pattern: string): Promise<void> {
     try {
-      // cache-manager v5 이상에서는 store 구조가 다름
-      const store = (this.cacheManager as any).store || this.cacheManager;
-      
-      // Redis store인 경우에만 패턴 삭제 지원
-      if (store && store.client) {
-        const keys: string[] = [];
-        let cursor = '0';
-        
-        // SCAN 명령어로 키 조회 (블로킹 방지)
-        do {
-          const result = await new Promise<[string, string[]]>((resolve, reject) => {
-            store.client.scan(
-              cursor,
-              'MATCH',
-              pattern,
-              'COUNT',
-              100, // 한 번에 100개씩 스캔
-              (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-              }
-            );
-          });
-          
-          cursor = result[0];
-          keys.push(...result[1]);
-        } while (cursor !== '0');
-        
-        // 찾은 키들 삭제
-        if (keys.length > 0) {
-          // 배치로 삭제 (파이프라인 사용)
-          const pipeline = store.client.pipeline();
-          keys.forEach(key => pipeline.del(key));
-          await pipeline.exec();
-          
-          this.logger.debug(`Cache DEL pattern: ${pattern} (${keys.length} keys via SCAN)`);
-        }
-      } else if (store && store.keys) {
-        // Fallback: keys 명령어 사용 (개발 환경)
-        const keys = await store.keys(pattern);
-        if (keys && keys.length > 0) {
-          await Promise.all(keys.map(key => this.del(key)));
-          this.logger.debug(`Cache DEL pattern: ${pattern} (${keys.length} keys)`);
-        }
-      } else {
-        // 메모리 캐시 사용 시 - 전체 키 순회
-        try {
-          const cache = (store as any).getCache ? (store as any).getCache() : store;
-          if (cache && cache.keys) {
-            const allKeys = Array.from(cache.keys()) as string[];
-            // 패턴을 정규식으로 변환 (* -> .*)
-            const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
-            const matchingKeys = allKeys.filter((key: string) => regex.test(key));
-            
-            if (matchingKeys.length > 0) {
-              await Promise.all(matchingKeys.map((key: string) => this.del(key)));
-              this.logger.debug(`Cache DEL pattern (memory): ${pattern} (${matchingKeys.length} keys)`);
-            }
-          }
-        } catch (err) {
-          this.logger.debug('Memory cache pattern deletion not supported');
-        }
-      }
+      // cache 네임스페이스를 prefix로 추가
+      const fullPattern = `cache:${pattern}`;
+      await this.unifiedRedisService.invalidatePattern(fullPattern);
+
+      this.logger.debug(`Cache DEL pattern: ${pattern}`);
     } catch (error) {
       this.logger.error(`Cache DEL pattern error for ${pattern}:`, error);
     }
   }
 
   /**
-   * 캐시 초기화
+   * 캐시 초기화 - cache 네임스페이스만 초기화
    */
   async reset(): Promise<void> {
     try {
-      // cache-manager v5에서는 reset 메서드가 없을 수 있음
-      if (typeof (this.cacheManager as any).reset === 'function') {
-        await (this.cacheManager as any).reset();
-      } else {
-        // Redis store 직접 접근
-        const store = (this.cacheManager as any).store || this.cacheManager;
-        if (store && store.client && store.client.flushdb) {
-          await new Promise((resolve, reject) => {
-            store.client.flushdb((err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          });
-        } else {
-          // 메모리 캐시의 경우 모든 키 삭제
-          await this.deletePattern('*');
-        }
-      }
-      
-      // Shadow Map도 초기화
-      this.cacheTracker.clear();
+      // cache 네임스페이스만 초기화
+      await this.unifiedRedisService.clearNamespace('cache');
+
+      // 통계 초기화
       this.cacheHits = 0;
       this.cacheMisses = 0;
       this.cacheSets = 0;
       this.cacheDeletes = 0;
-      
-      this.logger.warn('Cache RESET: All cache cleared');
+
+      this.logger.warn('Cache RESET: cache namespace cleared');
     } catch (error) {
       this.logger.error('Cache RESET error:', error);
     }
@@ -324,7 +237,7 @@ export class CacheService {
   }
 
   /**
-   * 메모리 사용량 조회
+   * 메모리 사용량 조회 - UnifiedRedisService 사용
    */
   async getMemoryUsage(): Promise<{
     itemCount: number;
@@ -340,170 +253,28 @@ export class CacheService {
     hitRate?: number;
   }> {
     try {
-      const store = (this.cacheManager as any).store || this.cacheManager;
-      
-      // Redis 사용 중인 경우
-      if (store && store.client) {
-        const info = await new Promise<string>((resolve, reject) => {
-          store.client.info('memory', (err, result) => {
-            if (err) reject(err);
-            else resolve(result);
-          });
-        });
-        
-        // Redis 메모리 정보 파싱
-        const usedMemory = info.match(/used_memory_human:(.+)/)?.[1] || 'N/A';
-        const maxMemory = info.match(/maxmemory_human:(.+)/)?.[1] || 'N/A';
-        
-        return {
-          itemCount: -1, // Redis에서는 정확한 개수 파악 어려움
-          estimatedSize: usedMemory,
-          maxItems: -1,
-          maxSize: maxMemory,
-          usagePercent: -1,
-          cacheType: 'redis',
-        };
-      }
-      
-      // 메모리 캐시 사용 중인 경우
-      // CustomMemoryStore를 사용하는 경우
-      try {
-        let allKeys: string[] = [];
-        let totalSize = 0;
-        let itemCount = 0;
-        
-        // CustomMemoryStore의 dump() 메서드 사용
-        if (store && typeof store.dump === 'function') {
-          const dump = store.dump();
-          if (Array.isArray(dump)) {
-            itemCount = dump.length;
-            dump.forEach(([key, entry]) => {
-              allKeys.push(key);
-              // CustomMemoryStore는 { value, size } 형태로 반환
-              if (entry && entry.value) {
-                try {
-                  // size가 이미 계산되어 있으면 사용, 없으면 계산
-                  const size = entry.size || JSON.stringify(entry.value).length;
-                  totalSize += size;
-                } catch {
-                  totalSize += 1000;
-                }
-              }
-            });
-          }
-        } else if (store && typeof store.keys === 'function') {
-          // keys() 메서드가 있는 경우
-          try {
-            // LRUCache의 keys()는 Generator를 반환
-            const keysGen = store.keys();
-            for (const key of keysGen) {
-              allKeys.push(key);
-              itemCount++;
-            }
-            
-            // 각 키에 대해 값 가져오기
-            for (const key of allKeys) {
-              try {
-                const value = await this.get(key);
-                if (value) {
-                  const size = JSON.stringify(value).length;
-                  totalSize += size;
-                }
-              } catch {
-                totalSize += 1000;
-              }
-            }
-          } catch (e) {
-            this.logger.debug('Failed to iterate keys:', e);
-          }
-        } else if (store && typeof store.size === 'number') {
-          // LRUCache는 size 속성을 가짐
-          itemCount = store.size;
-          
-          // forEach 메서드로 시도
-          if (typeof store.forEach === 'function') {
-            store.forEach((value, key) => {
-              allKeys.push(key);
-              try {
-                const size = JSON.stringify(value).length;
-                totalSize += size;
-              } catch {
-                totalSize += 1000;
-              }
-            });
-          }
-        }
-        
-        // Shadow Map을 사용하여 통계 제공
-        if (itemCount === 0 && this.cacheTracker.size > 0) {
-          // Shadow Map에서 데이터 가져오기
-          itemCount = this.cacheTracker.size;
-          totalSize = 0;
-          
-          // 현재 시간
-          const now = new Date();
-          const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-          
-          // 1시간 이상 오래된 항목 제거 (만료된 것으로 추정)
-          for (const [key, data] of this.cacheTracker.entries()) {
-            if (data.setAt < oneHourAgo) {
-              this.cacheTracker.delete(key);
-            } else {
-              totalSize += data.size;
-            }
-          }
-          
-          // 다시 카운트
-          itemCount = this.cacheTracker.size;
-        }
-        
-        const maxSize = 200 * 1024 * 1024; // 200MB
-        const usagePercent = totalSize > 0 ? (totalSize / maxSize) * 100 : 0;
-        
-        // 80% 이상 사용 시 경고
-        if (usagePercent > 80) {
-          this.logger.warn(`Memory cache usage high: ${usagePercent.toFixed(2)}%`);
-        }
-        
-        // Hit rate 계산
-        const totalRequests = this.cacheHits + this.cacheMisses;
-        const hitRate = totalRequests > 0 ? (this.cacheHits / totalRequests) * 100 : 0;
-        
-        return {
-          itemCount,
-          estimatedSize: totalSize > 0 ? this.formatBytes(totalSize) : 'Unknown',
-          maxItems: 5000,
-          maxSize: '200 MB',
-          usagePercent: parseFloat(usagePercent.toFixed(2)),
-          cacheType: itemCount > 0 ? 'memory (tracked)' : 'memory',
-          hits: this.cacheHits,
-          misses: this.cacheMisses,
-          sets: this.cacheSets,
-          deletes: this.cacheDeletes,
-          hitRate: parseFloat(hitRate.toFixed(2)),
-        };
-      } catch (error) {
-        this.logger.debug('Memory cache inspection failed:', error);
-      }
-      
-      // Shadow Map 데이터를 사용하여 기본 통계 제공
-      let totalSize = 0;
-      for (const data of this.cacheTracker.values()) {
-        totalSize += data.size;
-      }
-      
-      const maxSize = 200 * 1024 * 1024;
-      const usagePercent = totalSize > 0 ? (totalSize / maxSize) * 100 : 0;
+      // UnifiedRedisService에서 Redis 통계 조회
+      const stats = await this.unifiedRedisService.getCacheStatistics();
+
+      // Hit rate 계산
       const totalRequests = this.cacheHits + this.cacheMisses;
       const hitRate = totalRequests > 0 ? (this.cacheHits / totalRequests) * 100 : 0;
-      
+
+      // 메모리 사용률 계산 (약 8GB 기준)
+      const memoryBytes = this.parseRedisMemory(stats.memoryUsage);
+      const maxMemory = 8 * 1024 * 1024 * 1024; // 8GB
+      const usagePercent = memoryBytes / maxMemory * 100;
+
+      // cache 네임스페이스의 키 개수만 추출
+      const cacheKeys = stats.patterns['cache'] || stats.totalKeys;
+
       return {
-        itemCount: this.cacheTracker.size,
-        estimatedSize: totalSize > 0 ? this.formatBytes(totalSize) : '0 B',
-        maxItems: 5000,
-        maxSize: '200 MB',
+        itemCount: cacheKeys,
+        estimatedSize: stats.memoryUsage,
+        maxItems: 100000, // Redis는 더 많은 키 허용
+        maxSize: '8 GB',
         usagePercent: parseFloat(usagePercent.toFixed(2)),
-        cacheType: 'memory (tracked)',
+        cacheType: 'redis',
         hits: this.cacheHits,
         misses: this.cacheMisses,
         sets: this.cacheSets,
@@ -528,148 +299,64 @@ export class CacheService {
    */
   private formatBytes(bytes: number): string {
     if (bytes === 0) return '0 B';
-    
+
     const sizes = ['B', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     const size = bytes / Math.pow(1024, i);
-    
+
     return `${size.toFixed(2)} ${sizes[i]}`;
   }
 
   /**
-   * 캐시 통계 조회 (디버깅용)
-   * Shadow Map을 사용하여 통계 제공
+   * Redis 메모리 문자열을 바이트로 변환
+   * 예: "1.5M" -> 1572864, "2G" -> 2147483648
+   */
+  private parseRedisMemory(memory: string): number {
+    if (!memory || memory === 'N/A') return 0;
+
+    const units = {
+      'K': 1024,
+      'M': 1024 * 1024,
+      'G': 1024 * 1024 * 1024,
+    };
+
+    const match = memory.match(/^([\d.]+)([KMG])?/);
+    if (!match) return 0;
+
+    const value = parseFloat(match[1]);
+    const unit = match[2] as keyof typeof units;
+
+    return Math.floor(value * (units[unit] || 1));
+  }
+
+  /**
+   * 캐시 통계 조회 - UnifiedRedisService 사용
    */
   async getStats(): Promise<any> {
     try {
-      const store = (this.cacheManager as any).store || this.cacheManager;
-      
-      if (store && store.client) {
-        // Redis SCAN 사용
-        const keys: string[] = [];
-        let cursor = '0';
-        
-        // SCAN으로 모든 키 조회
-        do {
-          const result = await new Promise<[string, string[]]>((resolve, reject) => {
-            store.client.scan(
-              cursor,
-              'COUNT',
-              100, // 한 번에 100개씩
-              (err, result) => {
-                if (err) reject(err);
-                else resolve(result);
-              }
-            );
-          });
-          
-          cursor = result[0];
-          keys.push(...result[1]);
-        } while (cursor !== '0');
-        
-        const stats = {
-          totalKeys: keys.length,
-          patterns: {},
-        };
-        
-        // 패턴별 키 수 계산
-        keys.forEach((key: string) => {
-          const pattern = key.split(':')[0];
-          stats.patterns[pattern] = (stats.patterns[pattern] || 0) + 1;
-        });
-        
-        return stats;
-      }
-      
-      // 메모리 캐시의 경우 - cache-manager v7 (LRUCache)
-      let allKeys: string[] = [];
-      
-      try {
-        // cache-manager v7에서 메모리 캐시는 LRUCache
-        if (store && typeof store.dump === 'function') {
-          // LRUCache의 dump() 메서드 사용
-          const dump = store.dump();
-          if (Array.isArray(dump)) {
-            dump.forEach(([key]) => {
-              allKeys.push(key);
-            });
-          }
-        } else if (store && typeof store.keys === 'function') {
-          // keys() 메서드가 있는 경우 (Generator)
-          try {
-            const keysGen = store.keys();
-            for (const key of keysGen) {
-              allKeys.push(key);
-            }
-          } catch (e) {
-            this.logger.debug('Failed to iterate keys in stats:', e);
-          }
-        } else if (store && typeof store.forEach === 'function') {
-          // forEach 메서드로 시도
-          store.forEach((value, key) => {
-            allKeys.push(key);
-          });
-        }
-        
-        const stats = {
-          totalKeys: allKeys.length,
-          patterns: {},
-        };
-        
-        // 패턴별 키 수 계산
-        allKeys.forEach((key: string) => {
-          const pattern = String(key).split(':')[0];
-          stats.patterns[pattern] = (stats.patterns[pattern] || 0) + 1;
-        });
-        
-        // Shadow Map에서 보충 데이터 추가
-        if (stats.totalKeys === 0 && this.cacheTracker.size > 0) {
-          stats.totalKeys = this.cacheTracker.size;
-          
-          // Shadow Map에서 패턴 분석
-          for (const key of this.cacheTracker.keys()) {
-            const pattern = String(key).split(':')[0];
-            stats.patterns[pattern] = (stats.patterns[pattern] || 0) + 1;
-          }
-        }
-        
-        // 추가 통계 정보
-        const extendedStats = {
-          ...stats,
-          hits: this.cacheHits,
-          misses: this.cacheMisses,
-          sets: this.cacheSets,
-          deletes: this.cacheDeletes,
-          hitRate: this.cacheHits + this.cacheMisses > 0 
-            ? ((this.cacheHits / (this.cacheHits + this.cacheMisses)) * 100).toFixed(2) + '%'
-            : '0%',
-        };
-        
-        return extendedStats;
-      } catch (error) {
-        this.logger.debug('Failed to get memory cache stats, using shadow map:', error);
-        
-        // Shadow Map에서 통계 생성
-        const stats = {
-          totalKeys: this.cacheTracker.size,
-          patterns: {},
-          hits: this.cacheHits,
-          misses: this.cacheMisses,
-          sets: this.cacheSets,
-          deletes: this.cacheDeletes,
-          hitRate: this.cacheHits + this.cacheMisses > 0 
-            ? ((this.cacheHits / (this.cacheHits + this.cacheMisses)) * 100).toFixed(2) + '%'
-            : '0%',
-        };
-        
-        // 패턴 분석
-        for (const key of this.cacheTracker.keys()) {
-          const pattern = String(key).split(':')[0];
-          stats.patterns[pattern] = (stats.patterns[pattern] || 0) + 1;
-        }
-        
-        return stats;
-      }
+      // UnifiedRedisService에서 통계 조회
+      const redisStats = await this.unifiedRedisService.getCacheStatistics();
+
+      // cache 네임스페이스 키만 필터링
+      const cacheKeys = redisStats.patterns['cache'] || 0;
+
+      // Hit rate 계산
+      const totalRequests = this.cacheHits + this.cacheMisses;
+      const hitRatePercent = totalRequests > 0
+        ? ((this.cacheHits / totalRequests) * 100).toFixed(2) + '%'
+        : '0%';
+
+      return {
+        totalKeys: cacheKeys,
+        patterns: redisStats.patterns,
+        hits: this.cacheHits,
+        misses: this.cacheMisses,
+        sets: this.cacheSets,
+        deletes: this.cacheDeletes,
+        hitRate: hitRatePercent,
+        redisHitRate: (redisStats.hitRate * 100).toFixed(2) + '%',
+        memoryUsage: redisStats.memoryUsage,
+      };
     } catch (error) {
       this.logger.error('Failed to get cache stats:', error);
       return { 

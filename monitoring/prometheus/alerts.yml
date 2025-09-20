@@ -1,0 +1,116 @@
+# Prometheus Alert 규칙
+# 채팅 큐 시스템 알림 설정
+
+groups:
+  - name: chat_queue_alerts
+    interval: 30s
+    rules:
+      # 큐 크기 경고
+      - alert: HighQueueSize
+        expr: chat_queue_size > 500
+        for: 5m
+        labels:
+          severity: warning
+          component: chat-queue
+        annotations:
+          summary: "채팅 큐 크기가 높습니다"
+          description: "큐 크기가 {{ $value }}개로 500개를 초과했습니다. (인스턴스: {{ $labels.instance }})"
+
+      # 큐 크기 위험
+      - alert: CriticalQueueSize
+        expr: chat_queue_size > 1000
+        for: 2m
+        labels:
+          severity: critical
+          component: chat-queue
+        annotations:
+          summary: "채팅 큐 크기가 위험 수준입니다"
+          description: "큐 크기가 {{ $value }}개로 1000개를 초과했습니다. 즉시 조치가 필요합니다."
+
+      # DLQ 크기 경고
+      - alert: HighDLQSize
+        expr: chat_dlq_size > 50
+        for: 5m
+        labels:
+          severity: warning
+          component: chat-dlq
+        annotations:
+          summary: "Dead Letter Queue에 메시지가 쌓이고 있습니다"
+          description: "DLQ 크기가 {{ $value }}개입니다. 실패한 메시지를 확인하세요."
+
+      # DLQ 크기 위험
+      - alert: CriticalDLQSize
+        expr: chat_dlq_size > 100
+        for: 2m
+        labels:
+          severity: critical
+          component: chat-dlq
+        annotations:
+          summary: "Dead Letter Queue가 위험 수준입니다"
+          description: "DLQ 크기가 {{ $value }}개로 100개를 초과했습니다. 시스템에 문제가 있을 수 있습니다."
+
+      # 배치 처리 실패
+      - alert: BatchProcessingFailure
+        expr: rate(chat_messages_failed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          component: batch-processor
+        annotations:
+          summary: "배치 처리 실패율이 높습니다"
+          description: "5분간 평균 실패율이 {{ $value | humanizePercentage }}입니다."
+
+      # 연속 실패
+      - alert: ConsecutiveFailures
+        expr: chat_consecutive_failures > 3
+        for: 1m
+        labels:
+          severity: critical
+          component: batch-processor
+        annotations:
+          summary: "배치 처리가 연속으로 실패하고 있습니다"
+          description: "연속 {{ $value }}회 실패했습니다. 배치 처리가 중단될 수 있습니다."
+
+      # 처리 속도 저하
+      - alert: SlowProcessing
+        expr: chat_batch_duration_seconds > 5
+        for: 10m
+        labels:
+          severity: warning
+          component: batch-processor
+        annotations:
+          summary: "배치 처리 속도가 느립니다"
+          description: "평균 처리 시간이 {{ $value }}초입니다."
+
+      # Redis 연결 실패
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: redis
+        annotations:
+          summary: "Redis 서버가 다운되었습니다"
+          description: "Redis 서버에 연결할 수 없습니다. 채팅 큐가 작동하지 않습니다."
+
+      # NestJS 앱 다운
+      - alert: NestJSDown
+        expr: up{job="nestjs-chat-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: nestjs
+        annotations:
+          summary: "NestJS 애플리케이션이 다운되었습니다"
+          description: "NestJS 앱에 연결할 수 없습니다."
+
+      # 메모리 사용량 경고
+      - alert: HighMemoryUsage
+        expr: process_resident_memory_bytes{job="nestjs-chat-app"} > 1073741824
+        for: 5m
+        labels:
+          severity: warning
+          component: nestjs
+        annotations:
+          summary: "NestJS 앱 메모리 사용량이 높습니다"
+          description: "메모리 사용량이 {{ $value | humanize1024 }}B입니다."

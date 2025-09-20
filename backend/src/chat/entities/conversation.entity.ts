@@ -29,6 +29,12 @@ export class Conversation {
   lastMessageAt: Date;
 
   @Column({ type: 'timestamptz', nullable: true })
+  user1LastReadAt: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
+  user2LastReadAt: Date;
+
+  @Column({ type: 'timestamptz', nullable: true })
   user1DeletedAt: Date;
 
   @Column({ type: 'timestamptz', nullable: true })

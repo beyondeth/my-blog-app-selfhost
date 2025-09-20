@@ -4,6 +4,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
+import { BullModule } from '@nestjs/bullmq';
 
 // Configuration imports
 import databaseConfig from './config/database.config';
@@ -29,6 +30,7 @@ import { MonitoringModule } from './monitoring/monitoring.module';
 import { SharedTrackingModule } from './shared/shared-tracking.module';
 import { RedisModule } from './redis/redis.module';
 import { ChatModule } from './chat/chat.module';
+import { MetricsModule } from './metrics/metrics.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
 
 // Guards
@@ -74,11 +76,20 @@ import { NotificationsModule } from './notifications/notifications.module';
       ]
     }),
 
+    // BullMQ configuration for Redis connection
+    BullModule.forRoot({
+      connection: {
+        host: process.env.REDIS_HOST || 'localhost',
+        port: parseInt(process.env.REDIS_PORT || '6379'),
+      },
+    }),
+
     // Feature modules
     RedisModule, // Global Redis module for distributed state management
     CacheModule, // Global cache module with Redis support
     MonitoringModule, // Global monitoring module for suspicious requests
     SharedTrackingModule, // Shared module for MCP tracking functionality
+    MetricsModule, // Prometheus metrics module
     AuthModule,
     UsersModule,
     PostsModule,

@@ -4,6 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { RedisLockService } from './redis-lock.service';
 import { RedisMonitoringService } from './redis-monitoring.service';
 import { RedisController } from './redis.controller';
+import { UnifiedRedisService } from './unified-redis.service';
 
 @Global()
 @Module({
@@ -29,7 +30,7 @@ import { RedisController } from './redis.controller';
     }),
   ],
   controllers: [RedisController],
-  providers: [RedisLockService, RedisMonitoringService],
-  exports: [NestRedisModule, RedisLockService, RedisMonitoringService],
+  providers: [RedisLockService, RedisMonitoringService, UnifiedRedisService],
+  exports: [NestRedisModule, RedisLockService, RedisMonitoringService, UnifiedRedisService],
 })
 export class RedisModule {}

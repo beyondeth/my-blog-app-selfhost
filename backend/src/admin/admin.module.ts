@@ -34,6 +34,7 @@ import { AuditModule } from '../audit/audit.module';
 import { FilesModule } from '../files/files.module';
 import { UsersModule } from '../users/users.module';
 import { McpModule } from '../mcp/mcp.module';
+import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { McpModule } from '../mcp/mcp.module';
     FilesModule,
     UsersModule,
     McpModule,  // MCP 논스 관리를 위해 필요
+    RedisModule,  // Redis 상태 모니터링을 위해 필요
   ],
   controllers: [
     AdminDashboardController,

@@ -43,6 +43,17 @@ const DMConversationList: React.FC = () => {
     setIsRefreshing(false);
   }, [refreshConversations]);
 
+  // Periodically refresh conversations to sync unreadCount with backend
+  // This ensures the lastReadAt-based unreadCount is accurate
+  useEffect(() => {
+    const interval = setInterval(() => {
+      console.log('[DMConversationList] Auto-refreshing conversations to sync unreadCount');
+      refreshConversations();
+    }, 10000); // Refresh every 10 seconds (reduced from 30 seconds for better accuracy)
+
+    return () => clearInterval(interval);
+  }, [refreshConversations]);
+
   // Handle leave conversation
   const handleLeaveConversation = useCallback(async (conversationId: string) => {
     await leaveConversation(conversationId);

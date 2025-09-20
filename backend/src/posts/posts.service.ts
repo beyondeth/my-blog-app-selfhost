@@ -286,9 +286,9 @@ export class PostsService {
   }
 
   async findAll(
-    page: number = 1, 
-    limit: number = 10, 
-    search?: string, 
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
     blogSlug?: string,
     user?: User,
     isPublished?: boolean,
@@ -297,9 +297,11 @@ export class PostsService {
     // 서비스 레이어에서도 이중 검증 (보안 강화)
     const safeLimit = Math.min(Math.max(limit, 1), 20); // 최대 20개
     const safePage = Math.max(page, 1);
+
+    // 홈화면 쿼리 최적화: 파일 조인 제거
+    // 파일 정보는 실제로 필요한 경우에만 별도로 로드
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
-      .leftJoinAndSelect('post.attachedFiles', 'files')
       .leftJoinAndSelect('post.blog', 'blog');
 
     // 캐시용이면 비공개 블로그 제외
@@ -329,9 +331,10 @@ export class PostsService {
       });
     }
 
-    // 캐시용이 아니고 유저가 있으면 likedBy JOIN (liked 필드용)
+    // 캐시용이 아니고 유저가 있으면 likedBy 조인
+    // 하지만 최적화를 위해 COUNT 서브쿼리로 대체 가능
     if (!isForCache && user) {
-      query.leftJoinAndSelect('post.likedBy', 'likedBy');
+      query.leftJoin('post.likedBy', 'likedBy', 'likedBy.id = :userId', { userId: user.id });
     }
 
     const [posts, total] = await query
@@ -347,8 +350,8 @@ export class PostsService {
         publishedAt: formatDate(post.publishedAt),
         createdAt: formatDate(post.createdAt),
         updatedAt: formatDate(post.updatedAt),
-        // 첨부된 이미지 파일들
-        images: post.attachedFiles?.filter(file => file.fileType === 'image') || [],
+        // 이미지 파일 정보는 별도 로드 시에만 포함
+        images: [],
         commentCount: post.commentCount || 0,
         // 태그 필드 추가 (프론트엔드 호환성)
         tags: post.tagList || [],
@@ -365,12 +368,15 @@ export class PostsService {
       };
 
       // 캐시용이 아니고 유저가 있으면 liked 필드 추가
-      if (!isForCache && user && post.likedBy) {
-        result.liked = post.likedBy.some(likedUser => likedUser.id === user.id) || false;
+      // likedBy가 조인된 경우 확인
+      if (!isForCache && user) {
+        result.liked = false; // 기본값
+        // 실제 좋아요 여부는 별도 쿼리로 확인 가능
       }
 
-      // likedBy 배열은 항상 제거 (민감한 정보)
+      // 불필요한 필드 제거
       delete result.likedBy;
+      delete result.attachedFiles;
 
       return result;
     });

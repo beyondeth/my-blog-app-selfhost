@@ -1,0 +1,14 @@
+# Grafana 대시보드 자동 프로비저닝 설정
+
+apiVersion: 1
+
+providers:
+  - name: 'Chat Queue Monitoring'
+    orgId: 1
+    folder: 'Chat System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards

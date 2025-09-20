@@ -1,0 +1,33 @@
+# Grafana 데이터소스 자동 설정
+# Prometheus를 기본 데이터소스로 추가
+
+apiVersion: 1
+
+# 삭제 가능 여부
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+# 데이터소스 설정
+datasources:
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    editable: true
+    orgId: 1
+    version: 1
+    jsonData:
+      httpMethod: POST
+      # 메트릭 이름 자동 완성
+      prometheusType: Prometheus
+      prometheusVersion: 2.40.0
+      # 타임아웃 설정
+      timeout: 60
+      # 쿼리 타임아웃
+      queryTimeout: 60s
+      # 증분 쿼리 활성화
+      incrementalQuerying: true
+      # 메트릭 조회 활성화
+      manageAlerts: true
