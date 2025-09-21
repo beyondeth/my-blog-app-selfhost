@@ -3,7 +3,7 @@
  * 기본 HTML 요소 스타일링
  */
 
-/* 폰트 정의 */
+/* 폰트 정의 - Geist 폰트는 next/font로 로드하거나 CDN 사용 권장 */
 @font-face {
   font-family: 'GeistMono';
   src: url('/fonts/GeistMonoVF.woff') format('woff');

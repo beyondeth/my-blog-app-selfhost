@@ -47,6 +47,21 @@ interface MemoryUsage {
   sets?: number;
   deletes?: number;
   hitRate?: number;
+  namespaces?: Record<string, number>; // Redis 네임스페이스별 통계
+  patternAnalysis?: {
+    mostUsed: { pattern: string; count: number };
+    recommendations: string[];
+    inefficientPatterns: string[];
+  };
+  uptimeHuman?: string;
+  hitsPerHour?: number;
+  missesPerHour?: number;
+  redisInfo?: {
+    version?: string;
+    connectedClients?: number;
+    uptime?: number;
+    memoryRss?: string;
+  };
 }
 
 interface CacheStats {
@@ -68,7 +83,9 @@ export default function AdminMemoryPage() {
   const [autoRefresh, setAutoRefresh] = useState(false);
   const [resetDialogOpen, setResetDialogOpen] = useState(false);
   const [patternToDelete, setPatternToDelete] = useState<string | null>(null);
+  const [namespaceToDelete, setNamespaceToDelete] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [redisInfo, setRedisInfo] = useState<any>(null);
   const router = useRouter();
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -118,13 +135,29 @@ export default function AdminMemoryPage() {
     }
   }, [API_URL]);
 
+  // Redis 정보 조회
+  const fetchRedisInfo = useCallback(async () => {
+    try {
+      const response = await fetch(`${API_URL}/cache/redis-info`, {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRedisInfo(data);
+      }
+    } catch (error) {
+      console.error('Error fetching Redis info:', error);
+    }
+  }, [API_URL]);
+
   // 데이터 로드
   const loadData = useCallback(async () => {
     setLoading(true);
-    await Promise.all([fetchMemoryUsage(), fetchCacheStats()]);
+    await Promise.all([fetchMemoryUsage(), fetchCacheStats(), fetchRedisInfo()]);
     setLoading(false);
     setRefreshing(false);
-  }, [fetchMemoryUsage, fetchCacheStats]);
+  }, [fetchMemoryUsage, fetchCacheStats, fetchRedisInfo]);
 
   // 초기 로드
   useEffect(() => {
@@ -185,6 +218,27 @@ export default function AdminMemoryPage() {
     }
   };
 
+  // 네임스페이스별 캐시 삭제
+  const handleDeleteNamespace = async (namespace: string) => {
+    try {
+      const response = await fetch(`${API_URL}/cache/namespace/${encodeURIComponent(namespace)}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to delete namespace');
+      }
+
+      toast.success(`네임스페이스 '${namespace}' 캐시가 삭제되었습니다`);
+      setNamespaceToDelete(null);
+      await loadData();
+    } catch (error) {
+      console.error('Error deleting namespace:', error);
+      toast.error('네임스페이스 삭제에 실패했습니다');
+    }
+  };
+
   // 수동 새로고침
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -216,8 +270,8 @@ export default function AdminMemoryPage() {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">메모리 관리</h1>
-        <p className="text-gray-600 mt-1">캐시 메모리 사용량 모니터링 및 관리</p>
+        <h1 className="text-2xl font-bold text-gray-900">Redis 캐시 관리</h1>
+        <p className="text-gray-600 mt-1">Redis 캐시 메모리 사용량 모니터링 및 관리</p>
       </div>
 
       {/* 상단 통계 카드 */}
@@ -278,7 +332,7 @@ export default function AdminMemoryPage() {
                 {memoryUsage?.cacheType || 'unknown'}
               </p>
               <p className="text-xs text-gray-500 mt-1">
-                {memoryUsage?.cacheType === 'redis' ? 'Redis 서버' : '메모리 캐시'}
+                {memoryUsage?.cacheType === 'redis' ? 'Redis 서버' : memoryUsage?.cacheType === 'error' ? '연결 오류' : '메모리 캐시'}
               </p>
             </div>
             <Server className="w-8 h-8 text-gray-400" />
@@ -388,12 +442,137 @@ export default function AdminMemoryPage() {
         </div>
       </div>
 
+      {/* 패턴 분석 및 권장사항 */}
+      {memoryUsage?.patternAnalysis && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">캐시 패턴 분석</h2>
+
+          {/* 가장 많이 사용되는 패턴 */}
+          {memoryUsage.patternAnalysis.mostUsed.pattern && (
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-1">가장 많이 사용되는 패턴</p>
+              <p className="text-lg font-semibold">
+                {memoryUsage.patternAnalysis.mostUsed.pattern}
+                <span className="text-sm text-gray-500 ml-2">
+                  ({memoryUsage.patternAnalysis.mostUsed.count}개)
+                </span>
+              </p>
+            </div>
+          )}
+
+          {/* 권장사항 */}
+          {memoryUsage.patternAnalysis.recommendations.length > 0 && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+              <p className="text-sm font-medium text-blue-900 mb-2">개선 권장사항</p>
+              <ul className="text-sm text-blue-700 space-y-1">
+                {memoryUsage.patternAnalysis.recommendations.map((rec, idx) => (
+                  <li key={idx}>• {rec}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* 비효율적 패턴 */}
+          {memoryUsage.patternAnalysis.inefficientPatterns.length > 0 && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+              <p className="text-sm font-medium text-yellow-900 mb-2">비효율적 패턴 감지</p>
+              <div className="text-sm text-yellow-700">
+                {memoryUsage.patternAnalysis.inefficientPatterns.join(', ')}
+              </div>
+            </div>
+          )}
+
+          {/* 성능 지표 */}
+          <div className="grid grid-cols-3 gap-4 mt-4">
+            {memoryUsage.uptimeHuman && (
+              <div className="text-center">
+                <p className="text-sm text-gray-600">가동 시간</p>
+                <p className="text-lg font-semibold">{memoryUsage.uptimeHuman}</p>
+              </div>
+            )}
+            {memoryUsage.hitsPerHour && (
+              <div className="text-center">
+                <p className="text-sm text-gray-600">시간당 히트</p>
+                <p className="text-lg font-semibold">{memoryUsage.hitsPerHour.toLocaleString()}</p>
+              </div>
+            )}
+            {memoryUsage.missesPerHour && (
+              <div className="text-center">
+                <p className="text-sm text-gray-600">시간당 미스</p>
+                <p className="text-lg font-semibold">{memoryUsage.missesPerHour.toLocaleString()}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Redis 네임스페이스별 통계 */}
+      {memoryUsage?.namespaces && Object.keys(memoryUsage.namespaces).length > 0 && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Redis 네임스페이스별 통계</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {Object.entries(memoryUsage.namespaces).map(([namespace, count]) => (
+              <div key={namespace} className="border rounded-lg p-3 relative group">
+                <p className="text-sm text-gray-600 capitalize">{namespace}</p>
+                <p className="text-xl font-bold">{count}</p>
+                <p className="text-xs text-gray-500 mt-1">
+                  {memoryUsage.itemCount > 0
+                    ? `${((count / memoryUsage.itemCount) * 100).toFixed(1)}%`
+                    : '0%'
+                  }
+                </p>
+                <button
+                  onClick={() => setNamespaceToDelete(namespace)}
+                  className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity text-red-600 hover:text-red-800"
+                  title={`${namespace} 네임스페이스 삭제`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Redis 서버 정보 */}
+      {redisInfo && (
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Redis 서버 정보</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {redisInfo.redis_version && (
+              <div>
+                <p className="text-sm text-gray-600">Redis 버전</p>
+                <p className="text-lg font-semibold">{redisInfo.redis_version}</p>
+              </div>
+            )}
+            {redisInfo.connected_clients && (
+              <div>
+                <p className="text-sm text-gray-600">연결된 클라이언트</p>
+                <p className="text-lg font-semibold">{redisInfo.connected_clients}</p>
+              </div>
+            )}
+            {redisInfo.uptime_in_days && (
+              <div>
+                <p className="text-sm text-gray-600">가동 시간</p>
+                <p className="text-lg font-semibold">{redisInfo.uptime_in_days} 일</p>
+              </div>
+            )}
+            {redisInfo.used_memory_human && (
+              <div>
+                <p className="text-sm text-gray-600">메모리 사용량</p>
+                <p className="text-lg font-semibold">{redisInfo.used_memory_human}</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* 캐시 통계 테이블 */}
       {cacheStats && (
         <div className="bg-white rounded-lg shadow overflow-hidden">
           <div className="px-6 py-4 border-b">
             <h2 className="text-lg font-semibold">캐시 패턴별 통계</h2>
-            <p className="text-sm text-gray-600 mt-1">총 {cacheStats.totalKeys || 0}개 키</p>
+            <p className="text-sm text-gray-600 mt-1">총 {cacheStats.totalKeys || memoryUsage?.itemCount || 0}개 키</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full">
@@ -497,6 +676,28 @@ export default function AdminMemoryPage() {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => patternToDelete && handleDeletePattern(patternToDelete)}
+              className="bg-red-600 hover:bg-red-700"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 네임스페이스 삭제 확인 대화상자 */}
+      <AlertDialog open={!!namespaceToDelete} onOpenChange={(open) => !open && setNamespaceToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>네임스페이스 캐시 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              '{namespaceToDelete}' 네임스페이스의 모든 캐시를 삭제하시겠습니까?
+              이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => namespaceToDelete && handleDeleteNamespace(namespaceToDelete)}
               className="bg-red-600 hover:bg-red-700"
             >
               삭제

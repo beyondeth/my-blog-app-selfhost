@@ -1,5 +1,5 @@
 import { NestFactory } from '@nestjs/core';
-import { ValidationPipe, Logger } from '@nestjs/common';
+import { ValidationPipe, Logger, LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
@@ -13,8 +13,16 @@ async function bootstrap() {
   
   const logger = new Logger('Bootstrap');
   
+  // 환경에 따른 로그 레벨 설정
+  // 프로덕션: ERROR, WARN, LOG만 출력 (DEBUG, VERBOSE 제외)
+  // 개발환경: 모든 레벨 출력
+  const isDevelopment = process.env.NODE_ENV !== 'production';
+  const logLevels: LogLevel[] = isDevelopment
+    ? ['error', 'warn', 'log', 'debug', 'verbose']
+    : ['error', 'warn', 'log'];
+
   const app = await NestFactory.create(AppModule, {
-    logger: ['error', 'warn', 'log', 'debug', 'verbose'],
+    logger: logLevels,
   });
 
   const configService = app.get(ConfigService);

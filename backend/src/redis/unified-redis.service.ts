@@ -59,7 +59,10 @@ export class UnifiedRedisService {
         ttl,
         JSON.stringify(value),
       );
-      this.logger.debug(`캐시 저장: ${fullKey}, TTL: ${ttl}초`);
+      // 개발 환경에서만 디버그 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`캐시 저장: ${fullKey}, TTL: ${ttl}초`);
+      }
     } catch (error) {
       this.logger.error(`캐시 저장 실패: ${fullKey}`, error);
       throw error;
@@ -93,7 +96,10 @@ export class UnifiedRedisService {
 
     try {
       await this.redis.del(fullKey);
-      this.logger.debug(`캐시 삭제: ${fullKey}`);
+      // 개발 환경에서만 디버그 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`캐시 삭제: ${fullKey}`);
+      }
     } catch (error) {
       this.logger.error(`캐시 삭제 실패: ${fullKey}`, error);
       throw error;
@@ -149,7 +155,10 @@ export class UnifiedRedisService {
       const exists = await this.redis.exists(fullKey);
       if (exists) {
         await this.redis.expire(fullKey, ttl);
-        this.logger.debug(`TTL 갱신: ${fullKey}, 새 TTL: ${ttl}초`);
+        // 개발 환경에서만 디버그 로그 출력
+        if (process.env.NODE_ENV === 'development') {
+          this.logger.debug(`TTL 갱신: ${fullKey}, 새 TTL: ${ttl}초`);
+        }
         return true;
       }
       return false;
@@ -202,6 +211,34 @@ export class UnifiedRedisService {
   }
 
   /**
+   * Redis 서버 정보 조회
+   * - INFO 명령어를 통해 서버 상태 확인
+   */
+  async getRedisInfo(section: string = 'default'): Promise<any> {
+    try {
+      const info = await this.redis.info(section);
+
+      // INFO 명령어 결과를 파싱
+      const lines = info.split('\r\n');
+      const result: Record<string, any> = {};
+
+      for (const line of lines) {
+        if (line && !line.startsWith('#')) {
+          const [key, value] = line.split(':');
+          if (key && value) {
+            result[key] = value;
+          }
+        }
+      }
+
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to get Redis info: ${error.message}`);
+      return {};
+    }
+  }
+
+  /**
    * 캐시 통계 조회
    */
   async getCacheStatistics(): Promise<{
@@ -209,6 +246,9 @@ export class UnifiedRedisService {
     memoryUsage: string;
     hitRate: number;
     patterns: Record<string, number>;
+    hits: number;  // Redis의 실제 히트 수
+    misses: number;  // Redis의 실제 미스 수
+    uptime?: number;  // Redis 서버 가동 시간 (초)
   }> {
     try {
       const info = await this.getInfo();
@@ -228,6 +268,9 @@ export class UnifiedRedisService {
       const total = hits + misses;
       const hitRate = total > 0 ? (hits / total) : 0;
 
+      // 서버 가동 시간
+      const uptime = parseInt(info.server?.uptime_in_seconds || '0');
+
       // 네임스페이스별 키 개수 조회
       const patterns = await this.getKeyPatternCounts();
 
@@ -236,6 +279,9 @@ export class UnifiedRedisService {
         memoryUsage,
         hitRate,
         patterns,
+        hits,  // Redis의 실제 히트 수 반환
+        misses,  // Redis의 실제 미스 수 반환
+        uptime,  // Redis 서버 가동 시간 (초)
       };
     } catch (error) {
       this.logger.error('캐시 통계 조회 실패', error);
@@ -244,6 +290,9 @@ export class UnifiedRedisService {
         memoryUsage: 'N/A',
         hitRate: 0,
         patterns: {},
+        hits: 0,
+        misses: 0,
+        uptime: 0,
       };
     }
   }
@@ -372,7 +421,10 @@ export class UnifiedRedisService {
         );
 
         if (result === 'OK') {
-          this.logger.debug(`락 획득 성공: ${resource}`);
+          // 개발 환경에서만 디버그 로그 출력
+          if (process.env.NODE_ENV === 'development') {
+            this.logger.debug(`락 획득 성공: ${resource}`);
+          }
           return true;
         }
 
@@ -397,9 +449,51 @@ export class UnifiedRedisService {
 
     try {
       await this.redis.del(lockKey);
-      this.logger.debug(`락 해제: ${resource}`);
+      // 개발 환경에서만 디버그 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`락 해제: ${resource}`);
+      }
     } catch (error) {
       this.logger.error(`락 해제 실패: ${resource}`, error);
+    }
+  }
+
+  /**
+   * Redis 통계 리셋
+   * - keyspace_hits, keyspace_misses 등 누적 통계 초기화
+   */
+  async resetStats(): Promise<boolean> {
+    try {
+      // CONFIG RESETSTAT 명령으로 Redis 통계 리셋
+      const result = await this.redis.config('RESETSTAT');
+      this.logger.log('Redis 통계가 리셋되었습니다');
+      return true;
+    } catch (error) {
+      this.logger.error('Redis 통계 리셋 실패:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Redis 서버 가동 시간 조회
+   * - 서버가 시작된 이후 경과 시간(초)
+   */
+  async getUptime(): Promise<number> {
+    try {
+      const info = await this.redis.info('server');
+      const lines = info.split('\r\n');
+
+      for (const line of lines) {
+        if (line.startsWith('uptime_in_seconds:')) {
+          const uptime = parseInt(line.split(':')[1]);
+          return uptime;
+        }
+      }
+
+      return 0;
+    } catch (error) {
+      this.logger.error('Redis uptime 조회 실패:', error);
+      return 0;
     }
   }
 }

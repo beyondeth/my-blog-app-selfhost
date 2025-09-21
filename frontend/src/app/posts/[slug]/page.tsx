@@ -2,7 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import { FiArrowLeft } from 'react-icons/fi';
-import HtmlContentRenderer from '@/components/ui/HtmlContentRenderer';
+import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';

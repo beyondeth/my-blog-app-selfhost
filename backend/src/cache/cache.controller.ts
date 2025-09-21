@@ -1,16 +1,20 @@
-import { Controller, Get, Delete, Param, UseGuards } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Delete, Post, Param, UseGuards, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { CacheService } from './cache.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { Public } from '../common/decorators/public.decorator';
+import { UnifiedRedisService } from '../redis/unified-redis.service';
 
 @ApiTags('cache')
 @Controller('cache')
 export class CacheController {
-  constructor(private readonly cacheService: CacheService) {}
+  constructor(
+    private readonly cacheService: CacheService,
+    private readonly unifiedRedisService: UnifiedRedisService,
+  ) {}
 
   /**
    * 캐시 상태 확인 (헬스체크)
@@ -165,8 +169,8 @@ export class CacheController {
   @Get('test-connection')
   @Public()
   @ApiOperation({ summary: 'Redis 연결 테스트' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: 'Redis 연결 상태',
     schema: {
       type: 'object',
@@ -179,23 +183,13 @@ export class CacheController {
   })
   async testConnection() {
     try {
-      const cacheManager = (this.cacheService as any).cacheManager;
-      const store = cacheManager?.store || cacheManager;
-      const isRedis = store && (store.client || store.name === 'redis');
-      
-      if (isRedis) {
-        // Redis ping 테스트
-        await new Promise((resolve, reject) => {
-          if (store.client && store.client.ping) {
-            store.client.ping((err, result) => {
-              if (err) reject(err);
-              else resolve(result);
-            });
-          } else {
-            resolve('no ping method');
-          }
-        });
-        
+      // UnifiedRedisService를 통해 Redis 연결 확인
+      const testKey = 'test:connection:' + Date.now();
+      await this.unifiedRedisService.setCache('cache', testKey, 'test', 1);
+      const result = await this.unifiedRedisService.getCache('cache', testKey);
+      await this.unifiedRedisService.deleteCache('cache', testKey);
+
+      if (result === 'test') {
         return {
           connected: true,
           type: 'redis',
@@ -203,9 +197,9 @@ export class CacheController {
         };
       } else {
         return {
-          connected: true,
-          type: 'memory',
-          message: 'Using memory cache (Redis not configured or not available)'
+          connected: false,
+          type: 'redis',
+          message: 'Redis connection test failed'
         };
       }
     } catch (error) {
@@ -215,5 +209,97 @@ export class CacheController {
         message: `Connection test failed: ${error.message}`
       };
     }
+  }
+
+  /**
+   * 네임스페이스별 캐시 삭제 (관리자 전용)
+   */
+  @Delete('namespace/:namespace')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: '네임스페이스별 캐시 삭제' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: '네임스페이스 캐시 삭제 완료' })
+  async deleteNamespace(@Param('namespace') namespace: string) {
+    await this.unifiedRedisService.clearNamespace(namespace);
+    return {
+      message: `Namespace '${namespace}' cache cleared`,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  /**
+   * Redis 서버 정보 조회 (관리자 전용)
+   */
+  @Get('redis-info')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Redis 서버 정보 조회' })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: 200,
+    description: 'Redis 서버 정보',
+    schema: {
+      type: 'object',
+      properties: {
+        version: { type: 'string' },
+        uptime: { type: 'number' },
+        connectedClients: { type: 'number' },
+        memoryUsage: { type: 'string' },
+        keyCount: { type: 'number' }
+      }
+    }
+  })
+  @ApiQuery({ name: 'section', required: false, description: 'Redis INFO 섹션 (server, memory, stats 등)' })
+  async getRedisInfo(@Query('section') section?: string) {
+    try {
+      // Redis 서버 정보 조회
+      const info = await this.unifiedRedisService.getRedisInfo(section || 'default');
+      const stats = await this.unifiedRedisService.getCacheStatistics();
+
+      return {
+        ...info,
+        totalKeys: stats.totalKeys,
+        memoryUsage: stats.memoryUsage,
+        namespaces: stats.patterns,
+      };
+    } catch (error) {
+      return {
+        error: `Failed to get Redis info: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Redis 통계 리셋 (관리자 전용)
+   * - keyspace_hits, keyspace_misses 등 누적 통계 초기화
+   */
+  @Post('reset-stats')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Redis 통계 리셋 (누적 카운터 초기화)' })
+  @ApiBearerAuth()
+  @ApiResponse({
+    status: 200,
+    description: '통계 리셋 성공',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean' },
+        message: { type: 'string' },
+        timestamp: { type: 'string' }
+      }
+    }
+  })
+  async resetStats() {
+    const result = await this.unifiedRedisService.resetStats();
+
+    return {
+      success: result,
+      message: result
+        ? 'Redis 통계가 성공적으로 리셋되었습니다'
+        : 'Redis 통계 리셋에 실패했습니다',
+      timestamp: new Date().toISOString()
+    };
   }
 }

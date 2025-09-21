@@ -71,8 +71,9 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return null;
     }
 
-    // 3. DB 조회 결과를 캐시에 저장 (환경변수로 설정, 기본 5초)
-    const cacheTTL = this.configService.get<number>('JWT_CACHE_TTL', 5);
+    // 3. DB 조회 결과를 캐시에 저장
+    // TTL 개선: 5초에서 30분으로 연장 (토큰 만료 시 자동 갱신)
+    const cacheTTL = this.configService.get<number>('JWT_CACHE_TTL', 1800); // 30분
     await this.unifiedRedisService.setCache(
       'sessions',
       cacheKey,

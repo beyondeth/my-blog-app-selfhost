@@ -3,9 +3,21 @@
 apiVersion: 1
 
 providers:
+  # 채팅 시스템 대시보드
   - name: 'Chat Queue Monitoring'
     orgId: 1
     folder: 'Chat System'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+
+  # Redis 전체 모니터링 대시보드
+  - name: 'Redis Monitoring'
+    orgId: 1
+    folder: 'Infrastructure'
     type: file
     disableDeletion: false
     updateIntervalSeconds: 10

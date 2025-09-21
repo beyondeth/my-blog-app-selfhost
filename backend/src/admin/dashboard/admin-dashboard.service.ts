@@ -390,7 +390,7 @@ export class AdminDashboardService {
       const memoryUsage = redisStats.memoryUsage;
       const memoryBytes = this.parseRedisMemory(memoryUsage);
       const maxMemory = redisInfo?.memory?.maxmemory || '0';
-      const maxMemoryBytes = parseInt(maxMemory) || 8589934592; // 기본 8GB
+      const maxMemoryBytes = parseInt(maxMemory) || 6442450944; // 기본 6GB
       const memoryUsageRatio = maxMemoryBytes > 0 ? memoryBytes / maxMemoryBytes : 0;
 
       // 데이터베이스 응답시간 체크 (간단한 쿼리 실행)

@@ -13,6 +13,7 @@ import { FilesService } from '../files/files.service';
 // TagsService removed - using JSONB tags
 import { formatDate, extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
+import { ContentProcessingService } from '../content-processing/services/content-processing.service';
 import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
@@ -35,6 +36,7 @@ export class PostsService {
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
     private markdownRenderer: MarkdownRendererService,
+    private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
   ) {}
 
@@ -308,12 +310,28 @@ export class PostsService {
     if (createPostDto.content_markdown) {
       // MCP에서 content_markdown만 보낸 경우
       markdownContent = createPostDto.content_markdown;
-      processedContent = this.markdownRenderer.convertToHtml(markdownContent);
+      const htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      // 백엔드에서 콘텐츠 처리 파이프라인 적용
+      const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+        sanitize: true,
+        processCode: true,
+        processImages: true,
+        preserveMermaid: true,
+      });
+      processedContent = processed.html;
       contentType = 'markdown';
     } else if (createPostDto.content && this.isMarkdownContent(createPostDto.content)) {
       // content가 마크다운인 경우
       markdownContent = createPostDto.content;
-      processedContent = this.markdownRenderer.convertToHtml(markdownContent);
+      const htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      // 백엔드에서 콘텐츠 처리 파이프라인 적용
+      const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+        sanitize: true,
+        processCode: true,
+        processImages: true,
+        preserveMermaid: true,
+      });
+      processedContent = processed.html;
       contentType = 'markdown';
     } else if (!createPostDto.content && !createPostDto.content_markdown) {
       // content와 content_markdown 둘 다 없는 경우
@@ -777,7 +795,15 @@ export class PostsService {
     // 마크다운이 업데이트된 경우
     if (updatePostDto.content_markdown && updatePostDto.content_markdown !== post.content_markdown) {
       markdownContent = updatePostDto.content_markdown;
-      processedContent = this.markdownRenderer.convertToHtml(markdownContent);
+      const htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      // 백엔드에서 콘텐츠 처리 파이프라인 적용
+      const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+        sanitize: true,
+        processCode: true,
+        processImages: true,
+        preserveMermaid: true,
+      });
+      processedContent = processed.html;
       post.content_type = 'markdown';
       post.content_rendered_at = new Date();
     }
@@ -1365,7 +1391,15 @@ export class PostsService {
       throw new NotFoundException('Post with markdown content not found');
     }
     
-    post.content = this.markdownRenderer.convertToHtml(post.content_markdown);
+    const htmlContent = this.markdownRenderer.convertToHtml(post.content_markdown);
+    // 백엔드에서 콘텐츠 처리 파이프라인 적용
+    const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+      sanitize: true,
+      processCode: true,
+      processImages: true,
+      preserveMermaid: true,
+    });
+    post.content = processed.html;
     post.content_rendered_at = new Date();
     post.thumbnail = this.extractThumbnailFromContent(post.content);
     

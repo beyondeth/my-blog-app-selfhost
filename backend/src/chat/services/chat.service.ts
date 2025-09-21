@@ -209,19 +209,19 @@ export class ChatService {
     }
 
     // 1. 모든 대화방의 마지막 메시지를 한 번에 조회
+    // PostgreSQL의 DISTINCT ON을 사용하여 각 대화방별 최신 메시지 조회
     const lastMessagesQuery = await this.messageRepository
       .createQueryBuilder('message')
-      .select([
-        'DISTINCT ON (message."conversationId") message."conversationId"',
-        'message.id',
-        'message.content',
-        'message."createdAt"',
-        'message."senderId"'
-      ])
-      .where('message."conversationId" IN (:...conversationIds)', { conversationIds })
-      .andWhere('message."isDeleted" = false')
-      .orderBy('message."conversationId"', 'ASC')
-      .addOrderBy('message."createdAt"', 'DESC')
+      .distinctOn(['message.conversationId'])  // TypeORM의 distinctOn 메서드 사용
+      .select('message.conversationId', 'conversationId')
+      .addSelect('message.id', 'id')
+      .addSelect('message.content', 'content')
+      .addSelect('message.createdAt', 'createdAt')
+      .addSelect('message.senderId', 'senderId')
+      .where('message.conversationId IN (:...conversationIds)', { conversationIds })
+      .andWhere('message.isDeleted = false')
+      .orderBy('message.conversationId', 'ASC')
+      .addOrderBy('message.createdAt', 'DESC')
       .getRawMany();
 
     // conversationId를 키로 하는 맵 생성
@@ -278,11 +278,11 @@ export class ChatService {
     );
 
     /**
-     * 결과 캐싱 (1초)
-     * - 짧은 캐시 시간으로 실시간 정확도 향상
-     * - 서버 부하는 최소화 (API 호출 간 1초 간격 제한)
+     * 대화 목록 캐싱 개선
+     * 기존 1초에서 5분으로 연장 (캐시 히트율 향상)
+     * 메시지 전송 시 캐시 자동 무효화되므로 문제 없음
      */
-    await this.unifiedRedisService.setCache('chat', cacheKey, conversationsWithUnreadCount, 1);
+    await this.unifiedRedisService.setCache('chat', cacheKey, conversationsWithUnreadCount, 300); // 5분
 
     return conversationsWithUnreadCount;
   }

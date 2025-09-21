@@ -43,6 +43,15 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['sharp'],
   },
+  transpilePackages: ['mermaid'],
+  webpack: (config) => {
+    // Mermaid와 cytoscape 관련 문제 해결
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      'cytoscape': require.resolve('cytoscape'),
+    };
+    return config;
+  },
   // assetPrefix: process.env.NODE_ENV === 'production' ? 'https://d1y66zmnw3oigo.cloudfront.net' : undefined,
 };
 

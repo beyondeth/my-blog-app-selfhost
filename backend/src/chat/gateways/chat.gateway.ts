@@ -89,13 +89,16 @@ export class ChatGateway
       // Check for existing connection and clean it up
       const existingSocketId = await this.unifiedRedisService.getCache<string>('chat', `online:${userId}`);
       if (existingSocketId && existingSocketId !== client.id) {
-        const existingSocket = this.server.sockets.sockets.get(existingSocketId);
-        if (existingSocket) {
-          // 중복 연결 처리 - 중요 이벤트이므로 로그 유지
-          if (process.env.NODE_ENV === 'development') {
-            console.log(`[Chat Gateway] Disconnecting duplicate connection for user ${userId}`);
+        // WebSocket 서버가 초기화되었는지 확인
+        if (this.server?.sockets?.sockets) {
+          const existingSocket = this.server.sockets.sockets.get(existingSocketId);
+          if (existingSocket) {
+            // 중복 연결 처리 - 중요 이벤트이므로 로그 유지
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`[Chat Gateway] Disconnecting duplicate connection for user ${userId}`);
+            }
+            existingSocket.disconnect(true);
           }
-          existingSocket.disconnect(true);
         }
       }
 

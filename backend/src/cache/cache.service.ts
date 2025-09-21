@@ -120,6 +120,14 @@ export class CacheService {
   }
 
   /**
+   * 단일 캐시 키 삭제 (del의 별칭)
+   * posts.controller에서 사용하는 delete 메서드
+   */
+  async delete(key: string): Promise<void> {
+    return this.del(key);
+  }
+
+  /**
    * 패턴에 매칭되는 모든 키 삭제 - UnifiedRedisService 사용
    * SCAN 명령어 사용으로 성능 개선
    */
@@ -251,45 +259,93 @@ export class CacheService {
     sets?: number;
     deletes?: number;
     hitRate?: number;
+    namespaces?: Record<string, number>; // 네임스페이스별 키 개수 추가
+    patternAnalysis?: {
+      mostUsed: { pattern: string; count: number };
+      recommendations: string[];
+      inefficientPatterns: string[];
+    };
+    uptime?: number;  // Redis 서버 가동 시간 (초)
+    uptimeHuman?: string;  // 사람이 읽기 쉬운 형태의 가동 시간
+    hitsPerHour?: number;  // 시간당 히트 수
+    missesPerHour?: number;  // 시간당 미스 수
+    redisInfo?: {
+      version?: string;
+      connectedClients?: number;
+      uptime?: number;
+      memoryRss?: string;
+    };
   }> {
     try {
       // UnifiedRedisService에서 Redis 통계 조회
       const stats = await this.unifiedRedisService.getCacheStatistics();
 
-      // Hit rate 계산
-      const totalRequests = this.cacheHits + this.cacheMisses;
-      const hitRate = totalRequests > 0 ? (this.cacheHits / totalRequests) * 100 : 0;
+      // Redis의 실제 히트/미스 값 사용
+      const redisHits = stats.hits || 0;
+      const redisMisses = stats.misses || 0;
 
-      // 메모리 사용률 계산 (약 8GB 기준)
+      // Hit rate 계산 - Redis의 실제 통계 사용
+      const totalRequests = redisHits + redisMisses;
+      const hitRate = totalRequests > 0 ? (redisHits / totalRequests) * 100 : 0;
+
+      // 메모리 사용률 계산 (6GB 기준)
       const memoryBytes = this.parseRedisMemory(stats.memoryUsage);
-      const maxMemory = 8 * 1024 * 1024 * 1024; // 8GB
+      const maxMemory = 6 * 1024 * 1024 * 1024; // 6GB
       const usagePercent = memoryBytes / maxMemory * 100;
 
       // cache 네임스페이스의 키 개수만 추출
-      const cacheKeys = stats.patterns['cache'] || stats.totalKeys;
+      const cacheKeys = stats.patterns['cache'] || 0;
+
+      // 전체 키 개수 (모든 네임스페이스 포함)
+      const totalKeys = stats.totalKeys || 0;
+
+      // 서버 가동 시간 및 시간당 통계 계산
+      const uptime = stats.uptime || 0;
+      const uptimeHours = uptime / 3600;
+      const hitsPerHour = uptimeHours > 0 ? Math.round(redisHits / uptimeHours) : 0;
+      const missesPerHour = uptimeHours > 0 ? Math.round(redisMisses / uptimeHours) : 0;
+
+      // 사람이 읽기 쉬운 가동 시간 포맷
+      const uptimeHuman = this.formatUptime(uptime);
+
+      // 패턴별 통계 분석 (캐시 히트율 개선을 위한 인사이트)
+      const patternStats = this.analyzePatternStatistics(stats.patterns);
 
       return {
-        itemCount: cacheKeys,
-        estimatedSize: stats.memoryUsage,
+        itemCount: totalKeys, // 전체 키 개수 표시
+        estimatedSize: stats.memoryUsage || '0 B',
         maxItems: 100000, // Redis는 더 많은 키 허용
-        maxSize: '8 GB',
+        maxSize: '6 GB',
         usagePercent: parseFloat(usagePercent.toFixed(2)),
+        cacheType: 'redis',
+        hits: redisHits,  // Redis의 실제 히트 수 사용
+        misses: redisMisses,  // Redis의 실제 미스 수 사용
+        sets: this.cacheSets,  // 애플리케이션 레벨 SET 작업 수
+        deletes: this.cacheDeletes,  // 애플리케이션 레벨 DELETE 작업 수
+        hitRate: parseFloat(hitRate.toFixed(2)),
+        patternAnalysis: patternStats, // 패턴별 분석 추가
+        namespaces: stats.patterns, // 네임스페이스별 통계 추가
+        uptime,  // Redis 서버 가동 시간 (초)
+        uptimeHuman,  // 사람이 읽기 쉬운 형태
+        hitsPerHour,  // 시간당 히트 수
+        missesPerHour,  // 시간당 미스 수
+      };
+    } catch (error) {
+      this.logger.error('Failed to get memory usage:', error);
+      // Redis 연결 실패 시에도 기본값 반환
+      return {
+        itemCount: 0,
+        estimatedSize: '0 B',
+        maxItems: 100000,
+        maxSize: '6 GB',
+        usagePercent: 0,
         cacheType: 'redis',
         hits: this.cacheHits,
         misses: this.cacheMisses,
         sets: this.cacheSets,
         deletes: this.cacheDeletes,
-        hitRate: parseFloat(hitRate.toFixed(2)),
-      };
-    } catch (error) {
-      this.logger.error('Failed to get memory usage:', error);
-      return {
-        itemCount: -1,
-        estimatedSize: 'Error',
-        maxItems: 5000,
-        maxSize: '200 MB',
-        usagePercent: -1,
-        cacheType: 'error',
+        hitRate: 0,
+        namespaces: {},
       };
     }
   }
@@ -330,6 +386,72 @@ export class CacheService {
   }
 
   /**
+   * 가동 시간을 사람이 읽기 쉬운 형태로 변환
+   * 예: 3661 -> "1시간 1분 1초"
+   */
+  private formatUptime(seconds: number): string {
+    if (!seconds || seconds === 0) return '0초';
+
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+
+    const parts = [];
+    if (days > 0) parts.push(`${days}일`);
+    if (hours > 0) parts.push(`${hours}시간`);
+    if (minutes > 0) parts.push(`${minutes}분`);
+    if (secs > 0) parts.push(`${secs}초`);
+
+    return parts.join(' ') || '0초';
+  }
+
+  /**
+   * 패턴별 캐시 통계 분석
+   * 어떤 패턴이 효율적인지 분석하여 캐시 히트율 개선 인사이트 제공
+   */
+  private analyzePatternStatistics(patterns: Record<string, number>) {
+    const analysis = {
+      mostUsed: { pattern: '', count: 0 },
+      recommendations: [] as string[],
+      inefficientPatterns: [] as string[],
+    };
+
+    // 가장 많이 사용되는 패턴 찾기
+    for (const [pattern, count] of Object.entries(patterns || {})) {
+      if (count > analysis.mostUsed.count) {
+        analysis.mostUsed = { pattern, count };
+      }
+
+      // 비효율적인 패턴 식별
+      if (pattern.includes('socket') || pattern.includes('msg')) {
+        analysis.inefficientPatterns.push(pattern);
+      }
+    }
+
+    // 개선 권장사항 생성
+    if (analysis.inefficientPatterns.length > 0) {
+      analysis.recommendations.push(
+        '일회성 키(socket, msg)가 많습니다. TTL을 더 짧게 설정하거나 제거를 고려하세요.'
+      );
+    }
+
+    if (patterns['cache'] < patterns['chat']) {
+      analysis.recommendations.push(
+        '채팅 캐시가 일반 캐시보다 많습니다. 채팅 TTL을 검토하세요.'
+      );
+    }
+
+    if (!patterns['feed']) {
+      analysis.recommendations.push(
+        '피드 캐시가 없습니다. 캐시 워밍이 제대로 작동하는지 확인하세요.'
+      );
+    }
+
+    return analysis;
+  }
+
+  /**
    * 캐시 통계 조회 - UnifiedRedisService 사용
    */
   async getStats(): Promise<any> {
@@ -340,19 +462,23 @@ export class CacheService {
       // cache 네임스페이스 키만 필터링
       const cacheKeys = redisStats.patterns['cache'] || 0;
 
-      // Hit rate 계산
-      const totalRequests = this.cacheHits + this.cacheMisses;
+      // Redis의 실제 히트/미스 값 사용
+      const redisHits = redisStats.hits || 0;
+      const redisMisses = redisStats.misses || 0;
+
+      // Hit rate 계산 - Redis의 실제 통계 사용
+      const totalRequests = redisHits + redisMisses;
       const hitRatePercent = totalRequests > 0
-        ? ((this.cacheHits / totalRequests) * 100).toFixed(2) + '%'
+        ? ((redisHits / totalRequests) * 100).toFixed(2) + '%'
         : '0%';
 
       return {
         totalKeys: cacheKeys,
         patterns: redisStats.patterns,
-        hits: this.cacheHits,
-        misses: this.cacheMisses,
-        sets: this.cacheSets,
-        deletes: this.cacheDeletes,
+        hits: redisHits,  // Redis의 실제 히트 수 사용
+        misses: redisMisses,  // Redis의 실제 미스 수 사용
+        sets: this.cacheSets,  // 애플리케이션 레벨 SET 작업 수
+        deletes: this.cacheDeletes,  // 애플리케이션 레벨 DELETE 작업 수
         hitRate: hitRatePercent,
         redisHitRate: (redisStats.hitRate * 100).toFixed(2) + '%',
         memoryUsage: redisStats.memoryUsage,
