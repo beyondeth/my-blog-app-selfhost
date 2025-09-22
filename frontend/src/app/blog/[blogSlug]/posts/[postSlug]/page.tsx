@@ -16,6 +16,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { downloadPostAsPdf } from '@/utils/pdf';
 
 interface Blog {
   id: string;
@@ -147,12 +148,12 @@ export default function BlogPostDetailPage() {
 
   const handleCopyContent = useCallback(async () => {
     if (!post) return;
-    
+
     try {
       // HTML을 텍스트로 변환하면서 코드 블록 처리
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = post.content;
-      
+
       // 코드 블록들을 보기 좋게 포맷팅
       const codeBlocks = tempDiv.querySelectorAll('pre code');
       codeBlocks.forEach((block) => {
@@ -160,17 +161,17 @@ export default function BlogPostDetailPage() {
         const language = block.className.match(/language-(\w+)/)?.[1] || 'code';
         block.textContent = `\n[${language}]\n${codeText}\n`;
       });
-      
+
       // pre 태그만 있는 경우도 처리
       const preBlocks = tempDiv.querySelectorAll('pre:not(:has(code))');
       preBlocks.forEach((block) => {
         const text = block.textContent || '';
         block.textContent = `\n[code]\n${text}\n`;
       });
-      
+
       const textContent = tempDiv.textContent || tempDiv.innerText || '';
       const fullText = `${post.title}\n\n${textContent}`;
-      
+
       await navigator.clipboard.writeText(fullText);
       toast.success('포스트가 클립보드에 복사되었습니다', {
         duration: 3000,
@@ -182,6 +183,20 @@ export default function BlogPostDetailPage() {
         duration: 3000,
         position: 'bottom-right',
       });
+    }
+  }, [post]);
+
+  // PDF 다운로드 핸들러 - 에러 시 조용히 실패
+  const handlePdfDownload = useCallback(async () => {
+    if (!post) return;
+
+    try {
+      // PDF 생성 - 진행 상태 콜백 제거 (조용히 처리)
+      await downloadPostAsPdf(post.title);
+      // 성공해도 특별히 알리지 않음 (다운로드가 시작되면 사용자가 알 수 있음)
+    } catch (error) {
+      // 에러 완전 무시 - 로그만 남기고 사용자에게 알리지 않음
+      console.error('PDF 다운로드 실패:', error);
     }
   }, [post]);
 
@@ -215,7 +230,8 @@ export default function BlogPostDetailPage() {
   return (
     <>
       {/* Article Content with deletion effect */}
-      <article 
+      <article
+        id="post-content"
         className={cn(
           "max-w-5xl mx-auto px-6 py-16 transition-all duration-500 relative",
           isDeleting && "opacity-30 blur-sm pointer-events-none scale-[0.98]"
@@ -237,7 +253,7 @@ export default function BlogPostDetailPage() {
           </div>
         )}
         
-        <PostHeaderWithReport 
+        <PostHeaderWithReport
           post={post}
           canEdit={canEditDelete}
           onBack={() => router.push(`/blog/${blogSlug}`)}
@@ -252,6 +268,7 @@ export default function BlogPostDetailPage() {
           }
           onShare={handleShare}
           onCopy={handleCopyContent}
+          onPdfDownload={handlePdfDownload}
         />
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}

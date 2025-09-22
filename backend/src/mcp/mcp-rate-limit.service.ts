@@ -23,8 +23,8 @@ export class McpRateLimitService {
   // MCP 자동포스팅 특화 제한값
   private readonly DEFAULT_CONFIG: RateLimitConfig = {
     perMinute: 3,    // 분당 3회
-    perHour: 10,     // 시간당 10회
-    perDay: 10,      // 일일 10회
+    perHour: 15,     // 시간당 10회
+    perDay: 15,      // 일일 10회
     blockDuration: 300, // 5분 차단
   };
 
