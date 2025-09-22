@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import DOMPurify from 'isomorphic-dompurify';
-import sanitizeHtml from 'sanitize-html';
+import * as DOMPurify from 'isomorphic-dompurify';
+import * as sanitizeHtml from 'sanitize-html';
 
 /**
  * HTML Sanitizer 서비스
@@ -40,8 +40,6 @@ export class HtmlSanitizerService {
       'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
       // 버튼 (코드 복사 버튼용)
       'button',
-      // YouTube iframe (특별 처리)
-      'iframe',
       // 주석 (Mermaid placeholder용)
       '#comment',
     ],
@@ -51,18 +49,11 @@ export class HtmlSanitizerService {
       'width', 'height',
       'class', 'style', // 스타일링
       'id', // 요소 식별
-      // iframe 속성 (YouTube용)
-      'frameborder', 'allow', 'allowfullscreen', 'loading',
       // 이미지 최적화
       'loading', 'decoding',
     ],
     ALLOW_DATA_ATTR: true,
     KEEP_CONTENT: true,
-    // iframe은 YouTube만 허용
-    ADD_TAGS: ['iframe'],
-    ADD_ATTR: ['frameborder', 'allow', 'allowfullscreen', 'loading'],
-    // YouTube URL만 허용
-    ALLOWED_URI_REGEXP: /^https?:\/\/(www\.)?(youtube\.com|youtu\.be)\//i,
     ALLOW_COMMENTS: true, // Mermaid placeholder 주석 허용
   };
 
@@ -84,38 +75,18 @@ export class HtmlSanitizerService {
       'hr',
       'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
       'button',
-      'iframe',
     ],
     allowedAttributes: {
       '*': ['class', 'style', 'data-*', 'id'],
       'a': ['href', 'target', 'rel', 'title'],
       'img': ['src', 'alt', 'title', 'width', 'height', 'loading', 'decoding'],
-      'iframe': ['src', 'width', 'height', 'frameborder', 'allow', 'allowfullscreen', 'loading'],
       'button': ['data-code'],
     },
-    allowedIframeHostnames: ['www.youtube.com', 'youtube.com', 'youtu.be'],
     allowedSchemes: ['http', 'https'],
     allowedSchemesByTag: {
       img: ['http', 'https', 'data'],
     },
     allowCommentTag: true,
-    transformTags: {
-      // iframe을 YouTube만 허용하도록 필터링
-      iframe: (tagName: string, attribs: any) => {
-        const src = attribs.src || '';
-        if (this.isYouTubeUrl(src)) {
-          return {
-            tagName: 'iframe',
-            attribs: {
-              ...attribs,
-              loading: 'lazy',
-            },
-          };
-        }
-        // YouTube가 아닌 iframe은 제거
-        return false;
-      },
-    },
   };
 
   /**
@@ -161,25 +132,8 @@ export class HtmlSanitizerService {
       // DOMPurify로 살균
       const config = { ...this.domPurifyConfig };
 
-      if (!allowIframes) {
-        config.ALLOWED_TAGS = config.ALLOWED_TAGS.filter(tag => tag !== 'iframe');
-      }
-
       if (!allowComments) {
         config.ALLOW_COMMENTS = false;
-      }
-
-      // iframe src 필터링을 위한 후크 추가
-      if (typeof window !== 'undefined' && DOMPurify.isSupported) {
-        DOMPurify.addHook('afterSanitizeAttributes', (node) => {
-          // iframe은 YouTube만 허용
-          if (node.tagName === 'IFRAME') {
-            const src = node.getAttribute('src');
-            if (src && !this.isYouTubeUrl(src)) {
-              node.remove();
-            }
-          }
-        });
       }
 
       let sanitized = DOMPurify.sanitize(processedHtml, config);
@@ -226,38 +180,11 @@ export class HtmlSanitizerService {
 
     const config = { ...this.sanitizeHtmlConfig };
 
-    if (!allowIframes) {
-      config.allowedTags = config.allowedTags.filter(tag => tag !== 'iframe');
-    }
-
     if (!allowComments) {
       config.allowCommentTag = false;
     }
 
     return sanitizeHtml(html, config);
-  }
-
-  /**
-   * URL이 YouTube URL인지 확인합니다.
-   *
-   * @param url - 확인할 URL
-   * @returns YouTube URL 여부
-   */
-  private isYouTubeUrl(url: string): boolean {
-    if (!url) return false;
-
-    try {
-      const urlObj = new URL(url);
-      const hostname = urlObj.hostname.toLowerCase();
-      return (
-        hostname === 'www.youtube.com' ||
-        hostname === 'youtube.com' ||
-        hostname === 'youtu.be' ||
-        hostname === 'www.youtube-nocookie.com'
-      );
-    } catch {
-      return false;
-    }
   }
 
   /**

@@ -18,6 +18,8 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../users/entities/user.entity';
+import { Express } from 'express';
+import 'multer';
 import { ContextualFileService } from '../services/contextual-file.service';
 import { FileContextType, FilePurpose } from '../entities/file-context.entity';
 import { UsersService } from '../../users/users.service';

@@ -239,9 +239,11 @@ export class McpController {
 
     // 캐시 무효화 및 재생성 (posts.controller.ts와 동일한 로직)
     try {
-      // 1. 기존 캐시 삭제
-      await this.cacheService.deletePattern('feed:page:1:*');
-      this.logger.log('✅ First page cache invalidated after MCP post creation');
+      // 1. 메인 피드 1-3페이지만 무효화 (전체 삭제 대신)
+      await this.cacheService.delete('feed:main:p1');
+      await this.cacheService.delete('feed:main:p2');
+      await this.cacheService.delete('feed:main:p3');
+      this.logger.log('✅ Smart cache invalidation: cleared pages 1-3 only after MCP post creation');
 
       // 2. 캐시 워밍: 1페이지 데이터를 미리 로드하여 캐시 생성
       const pageNumber = 1;
@@ -263,8 +265,8 @@ export class McpController {
         true   // isForCache: true - 공개 블로그만
       );
 
-      // 캐시에 저장 (TTL: 2분)
-      await this.cacheService.set(cacheKey, freshData, 120);
+      // 캐시에 저장 (TTL: 10분으로 연장 - posts.controller.ts와 동일)
+      await this.cacheService.set('feed:main:p1', freshData, 600);
       this.logger.log('🔥 Cache warmed: First page pre-cached with new MCP post');
     } catch (error) {
       this.logger.error(`❌ Failed to invalidate/warm first page cache after MCP post: ${error.message}`);
