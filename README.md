@@ -59,6 +59,7 @@ my-blog-app/
 - Node.js 18+
 - pnpm
 - PostgreSQL
+- Redis
 - AWS S3 계정
 - Gmail 계정 (이메일 인증용)
 
@@ -90,7 +91,33 @@ pnpm install
 pnpm run dev
 ```
 
-4. **Gmail SMTP 설정 (이메일 인증용)**
+4. **Redis 설정**
+
+Redis는 캐싱 및 세션 관리에 사용됩니다.
+
+- **로컬 개발 환경 (권장)**:
+  ```bash
+  # macOS
+  brew install redis
+  redis-server  # 포트 6379에서 실행
+
+  # Linux
+  sudo apt-get install redis-server
+  redis-server
+  ```
+
+- **Docker 사용 시**:
+  ```bash
+  # Docker Compose로 Redis 실행
+  docker-compose up redis -d
+  ```
+
+- **주의사항**:
+  - 로컬과 Docker Redis를 동시에 실행하지 마세요 (포트 충돌)
+  - 개발 환경에서는 주로 로컬 Redis 사용을 권장합니다
+  - `dump.rdb` 파일은 Redis 데이터 파일로 git에서 제외됩니다
+
+5. **Gmail SMTP 설정 (이메일 인증용)**
    
    Gmail 계정에서 앱 비밀번호 생성:
    1. Google 계정 설정 접속
@@ -107,9 +134,10 @@ pnpm run dev
    SMTP_FROM=your-email@gmail.com
    ```
 
-5. **접속**
+6. **접속**
 - Frontend: http://localhost:3001
 - Backend API: http://localhost:3000
+- Redis Monitor: `redis-cli monitor` (디버깅용)
 
 ## 🔧 주요 해결 과제
 

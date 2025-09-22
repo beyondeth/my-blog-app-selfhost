@@ -99,6 +99,12 @@ backend/cookies.txt
 **/*.sqlite
 **/*.db
 
+# Redis persistence files
+*.rdb
+*.aof
+dump.rdb
+appendonly.aof
+
 # Uploads (if storing locally)
 **/uploads/
 

@@ -90,13 +90,11 @@ export class PostsController {
   async create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: User) {
     const newPost = await this.postsService.create(createPostDto, user);
     
-    // 스마트 캐시 무효화: 1-3페이지만 무효화 (대부분 사용자가 보는 범위)
+    // 스마트 캐시 무효화: 1페이지만 무효화 (새 포스트는 첫 페이지에만 영향)
     try {
-      // 1. 메인 피드 1-3페이지만 무효화 (전체 삭제 대신)
+      // 1. 메인 피드 1페이지만 무효화 (새 포스트는 항상 최상단에 추가됨)
       await this.cacheService.delete('feed:main:p1');
-      await this.cacheService.delete('feed:main:p2');
-      await this.cacheService.delete('feed:main:p3');
-      console.log('✅ Smart cache invalidation: cleared pages 1-3 only');
+      console.log('✅ Cache invalidated: page 1 only (new posts always appear on first page)');
       
       // 2. 캐시 워밍: 1페이지 데이터를 미리 로드하여 캐시 생성
       const pageNumber = 1;

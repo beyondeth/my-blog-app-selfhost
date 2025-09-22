@@ -16,9 +16,9 @@ export const postQueryKeys = {
 
 // 공통 쿼리 옵션
 const commonQueryOptions = {
-  gcTime: 10 * 60 * 1000, // 10분
-  staleTime: 5 * 60 * 1000, // 5분
-  refetchOnWindowFocus: false,
+  gcTime: 10 * 60 * 1000, // 10분 (가비지 컬렉션 - 메모리에서 제거되는 시간)
+  staleTime: 30 * 1000, // 30초 (5분에서 30초로 단축 - 더 자주 신선한 데이터 확인)
+  refetchOnWindowFocus: true, // 탭 전환시 자동 갱신 (사용자가 탭으로 돌아올 때 최신 데이터 보장)
   retry: 1,
 };
 
@@ -71,8 +71,13 @@ export function useCreatePost() {
   return useMutation({
     mutationFn: postsAPI.createPost,
     onSuccess: (newPost) => {
-      // 1. 모든 목록 쿼리 무효화 (검색, 카테고리 등 모든 필터 조건)
-      queryClient.invalidateQueries({ queryKey: postQueryKeys.lists() });
+      // 1. 첫 페이지만 무효화 (새 포스트는 항상 첫 페이지에만 나타남)
+      // 검색이나 필터가 없는 기본 목록만 무효화하여 성능 최적화
+      queryClient.invalidateQueries({
+        queryKey: postQueryKeys.list({}), // 필터 없는 기본 목록
+        exact: false,
+        refetchType: 'active' // 현재 활성화된 쿼리만 refetch
+      });
       
       // 2. 무한 스크롤 쿼리의 첫 번째 페이지에 새 게시글 추가 (낙관적 업데이트)
       queryClient.setQueriesData(

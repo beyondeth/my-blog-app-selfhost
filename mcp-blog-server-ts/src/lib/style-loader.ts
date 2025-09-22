@@ -123,7 +123,14 @@ function getDefaultWritingStyle(): WritingStyle {
 export async function loadWritingStyle(filePath?: string): Promise<WritingStyle> {
   try {
     // Determine file path
-    const styleFile = filePath || process.env['WRITING_STYLE_FILE'] || 'writing-styles/default.md';
+    // 환경변수에서 스타일 파일을 가져오거나 filePath 파라미터를 사용
+    const styleFile = filePath || process.env['WRITING_STYLE_FILE'];
+
+    // 스타일 파일이 지정되지 않았으면 에러 발생
+    if (!styleFile) {
+      throw new Error('No writing style file specified. Please set WRITING_STYLE_FILE environment variable or provide a file path.');
+    }
+
     const fullPath = path.resolve(styleFile);
 
     console.error(`📝 Loading writing style from: ${fullPath}`);
