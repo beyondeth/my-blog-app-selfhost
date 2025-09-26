@@ -132,6 +132,8 @@ function extractMermaidBlocks(html: string): {
     standard: /<pre[^>]*><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
     // data-language 속성 사용하는 경우
     dataLang: /<pre[^>]*data-language="mermaid"[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+    // data-diagram 속성 사용하는 경우 (백엔드에서 생성된 형태)
+    dataDiagram: /<pre[^>]*data-diagram="mermaid"[^>]*><code[^>]*(?:class="[^"]*language-mermaid[^"]*")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
   };
 
   // 각 패턴으로 추출 시도

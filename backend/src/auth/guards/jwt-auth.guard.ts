@@ -1,10 +1,26 @@
 import { Injectable, ExecutionContext, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Reflector } from '@nestjs/core';
+import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  constructor(private reflector: Reflector) {
+    super();
+  }
+
   canActivate(context: ExecutionContext) {
-    // 로그 제거 - 매 요청마다 출력되어 너무 많음
+    // Public 데코레이터가 적용된 경우 JWT 인증 우회
+    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+      context.getHandler(),
+      context.getClass(),
+    ]);
+
+    if (isPublic) {
+      console.log('[JwtAuthGuard] Public route detected, bypassing JWT auth');
+      return true;
+    }
+
     return super.canActivate(context);
   }
 
@@ -12,16 +28,18 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     const request = context.switchToHttp().getRequest();
 
     if (err || !user) {
-      // 실패한 경우만 로그 (중요 이벤트)
-      console.error('[JwtAuthGuard] Authentication failed:', {
-        url: request.url,
-        error: err?.message || 'No user found',
-        info: info?.message
-      });
-      throw err || new UnauthorizedException('Authentication required');
+      // 중요한 OAuth 요청인 경우만 로그
+      if (request.url?.includes('oauth')) {
+        console.error('[JwtAuthGuard] OAuth Authentication failed:', {
+          url: request.url,
+          error: err?.message || 'No user found',
+          info: info?.message
+        });
+      }
+
+      throw new UnauthorizedException('Authentication required');
     }
 
-    // 성공 로그 제거 - 너무 빈번함
     return user;
   }
 } 

@@ -38,6 +38,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { OauthModule } from './oauth/oauth.module';
 
 @Module({
   imports: [
@@ -106,6 +107,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     FollowsModule,
     NotificationsModule,
     ChatModule,
+    OauthModule,
     // AnalyticsModule,
   ],
   providers: [

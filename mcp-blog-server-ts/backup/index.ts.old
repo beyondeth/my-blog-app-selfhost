@@ -1,0 +1,787 @@
+#!/usr/bin/env node
+
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { createServer, IncomingMessage, ServerResponse } from "http";
+import { Command } from "commander";
+import { z } from "zod";
+import dotenv from "dotenv";
+import path from "path";
+import { fileURLToPath } from "url";
+import { SessionBasedAuth } from "./lib/auth-session.js";
+import { parseMarkdownMetadata } from "./lib/markdown.js";
+import { savePostToFile } from "./lib/filesystem.js";
+import { BlogAPIClient } from "./lib/api-client.js";
+import { getClientIp } from "./lib/utils.js";
+import { qualityEnhancer } from "./lib/quality-enhancer.js";
+import { loadWritingStyle } from "./lib/style-loader.js";
+import { SessionService } from "./services/SessionService.js";
+import { OAuthRouter } from "./routes/oauth.js";
+
+// ES Module support for __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Load environment variables
+dotenv.config();
+dotenv.config({ path: path.join(__dirname, "../../.env") });
+
+// Parse CLI arguments
+const program = new Command()
+  .option("--transport <stdio|http>", "transport type", "stdio")
+  .option("--port <number>", "port for HTTP transport", "3000")
+  .option("--api-key <key>", "API key for authentication")
+  .allowUnknownOption()
+  .parse(process.argv);
+
+const cliOptions = program.opts<{
+  transport: string;
+  port: string;
+  apiKey?: string;
+}>();
+
+// Validate transport option
+const allowedTransports = ["stdio", "http"];
+if (!allowedTransports.includes(cliOptions.transport)) {
+  console.error(
+    `Invalid --transport value: '${cliOptions.transport}'. Must be one of: stdio, http.`
+  );
+  process.exit(1);
+}
+
+const TRANSPORT_TYPE = (cliOptions.transport || "stdio") as "stdio" | "http";
+
+// Validate incompatible flags
+if (TRANSPORT_TYPE === "http" && process.argv.includes("--api-key")) {
+  console.error(
+    "The --api-key flag is not allowed when using --transport http. Use header-based auth at the HTTP layer instead."
+  );
+  process.exit(1);
+}
+
+if (TRANSPORT_TYPE === "stdio" && process.argv.includes("--port")) {
+  console.error("The --port flag is not allowed when using --transport stdio.");
+  process.exit(1);
+}
+
+// HTTP port configuration
+const CLI_PORT = (() => {
+  const parsed = parseInt(cliOptions.port, 10);
+  return isNaN(parsed) ? undefined : parsed;
+})();
+
+// Store SSE transports by session ID
+const sseTransports: Record<string, SSEServerTransport> = {};
+
+// Helper function to ensure authentication - 인증 상태 메시지 반환 포함
+async function ensureAuthenticated(auth: SessionBasedAuth) {
+  // 디버깅 정보 출력
+  console.error("🔍 인증 상태 확인 중...");
+  console.error(`   세션 ID: ${auth.hasSession() ? '있음' : '없음'}`);
+  console.error(`   블로그 정보: ${auth.blogInfo ? `${auth.blogInfo.name} (${auth.blogInfo.slug})` : '없음'}`);
+
+  // 인증 상태만 체크 - 자동 인증 시도 제거
+  if (!auth.isAuthenticated()) {
+    console.error("❌ 인증이 필요합니다. 'authenticate' 도구를 먼저 호출해주세요.");
+    return {
+      error: true,
+      content: [{
+        type: "text" as const,
+        text: `❌ 인증이 필요합니다.\n\n🔐 다음 순서로 진행해주세요:\n\n1️⃣ 먼저 'authenticate' 도구를 호출하세요\n   - 브라우저가 자동으로 열립니다\n   - 블로그에 로그인합니다\n   - MCP 클라이언트 권한을 승인합니다\n\n2️⃣ 인증 완료 후 'create_post'를 다시 호출하세요\n   - 세션이 유지되는 동안 재인증 불필요\n   - 한 번 인증하면 계속 사용 가능\n\n💡 팁: 인증 상태는 'diagnose_connection' 도구로 확인할 수 있습니다.`,
+      }],
+    };
+  }
+
+  // 인증됨 - 성공 반환
+  console.error("✅ 인증 확인 완료.");
+  if (auth.blogInfo) {
+    const authStatusMessage = `🔐 OAuth2 인증 확인!\n📝 블로그: ${auth.blogInfo.name}\n🔗 슬러그: ${auth.blogInfo.slug}\n👤 사용자 ID: ${auth.userId}\n🎯 포스팅 준비 완료!`;
+    return {
+      success: true,
+      message: authStatusMessage
+    };
+  }
+
+  return {
+    success: true
+  };
+}
+
+// Function to create a new server instance with all tools registered
+async function createServerInstance(_clientIp?: string, _apiKey?: string, sessionId?: string) {
+  // Create new instances for each server instance to ensure fresh environment variables
+  // OAuth2 인증 초기화 - Redis SessionService와 sessionId를 전달
+  console.log("🔐 세션 기반 OAuth2 인증 모드로 실행 중... (Proxy Server 경유)");
+
+  // SessionService 인스턴스 생성 (Redis 연결)
+  const sessionService = new SessionService();
+
+  // sessionId가 있으면 기존 세션 복원, 없으면 새 세션
+  const auth = new SessionBasedAuth(sessionService, sessionId);
+  const apiClient = new BlogAPIClient(auth);
+
+  // Load writing style dynamically
+  const writingStyle = await loadWritingStyle();
+
+  const server = new McpServer(
+    {
+      name: "blog-mcp-typescript",
+      version: "1.0.0",
+    },
+    {
+      instructions: writingStyle.instructions,
+    }
+  );
+
+  // Note: Resources are not used in this implementation
+  // All functionality is exposed through tools
+
+  // Register tools
+  server.registerTool(
+    "authenticate",
+    {
+      title: "OAuth2 Authentication",
+      description: "Authenticate using OAuth2 authorization flow with browser authentication",
+      inputSchema: {},
+    },
+    async () => {
+      console.error("🔐 세션 기반 OAuth2 인증 확인...");
+
+      // 이미 인증된 상태인지 먼저 확인
+      if (auth.isAuthenticated()) {
+        console.error("✅ 이미 인증된 상태입니다.");
+        const sessionId = auth.getSessionId();
+        return {
+          content: [
+            {
+              type: "text",
+              text: `✅ 이미 인증된 상태입니다!\n📝 블로그: ${auth.blogInfo?.name}\n🔗 슬러그: ${auth.blogInfo?.slug}\n👤 사용자 ID: ${auth.userId}\n🆔 세션 ID: ${sessionId ? sessionId.substring(0, 8) + '...' : 'N/A'}\n🎯 포스팅 준비 완료!\n\n💡 HTTP 요청 시 X-MCP-Session-ID 헤더에 세션 ID를 포함하면 세션이 유지됩니다.`,
+            },
+          ],
+        };
+      }
+
+      console.error("🔐 새로운 세션 기반 OAuth2 인증 시작...");
+
+      // OAuth2 인증 시도
+      const result = await auth.authenticate();
+
+      if (result) {
+        const sessionId = auth.getSessionId();
+        if (auth.blogInfo) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `✅ 세션 기반 OAuth2 인증 성공!\n📝 블로그: ${auth.blogInfo.name}\n🔗 슬러그: ${auth.blogInfo.slug}\n👤 사용자 ID: ${auth.userId}\n🆔 세션 ID: ${sessionId ? sessionId.substring(0, 8) + '...' : 'N/A'}\n🎯 포스팅 준비 완료!\n\n💡 HTTP 요청 시 X-MCP-Session-ID 헤더에 세션 ID를 포함하면 세션이 유지됩니다.`,
+              },
+            ],
+          };
+        } else {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `✅ OAuth2 인증 성공!\n🎯 토큰 인증됨\n🆔 세션 ID: ${sessionId ? sessionId.substring(0, 8) + '...' : 'N/A'}\n⚠️ 블로그 정보를 가져올 수 없습니다`,
+              },
+            ],
+          };
+        }
+      } else {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ OAuth2 인증 실패\n\n⚠️ 다음 사항을 확인해주세요:\n\n1. OAuth 클라이언트 설정 (.env 파일):\n   - OAUTH_CLIENT_ID (mcp_로 시작)\n   - OAUTH_CLIENT_SECRET\n   - OAUTH_REDIRECT_URI (기본: http://localhost:7777/callback)\n   - API_URL (기본: http://localhost:3000/api/v1)\n\n2. OAuth 클라이언트 생성:\n   - 웹 브라우저에서 블로그 설정 > OAuth 클라이언트 관리\n   - 새 클라이언트 생성 (리다이렉트 URI: http://localhost:7777/callback)\n\n3. 브라우저 인증:\n   - 인증 시 브라우저가 자동으로 열립니다\n   - 로그인 후 MCP 클라이언트 권한을 승인해주세요`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "create_post",
+    {
+      title: "Create High-Quality Blog Post",
+      description: writingStyle.createPostDescription,
+      inputSchema: {
+        title: z.string().optional().describe("Post title (optional, can be extracted from markdown)"),
+        content: z.string().optional().describe("Markdown content following quality guidelines"),
+        file_path: z.string().optional().describe("Path to markdown file (either content or file_path required)"),
+        tags: z.array(z.string()).optional().describe("List of tags for the post (5-10 recommended)"),
+        auto_enhance: z.boolean().optional().default(true).describe("Automatically enhance markdown quality (STRONGLY RECOMMENDED - default: true)"),
+        quality_report: z.boolean().optional().describe("Include quality analysis report (default: false)"),
+      },
+    },
+    async ({ title, content, file_path, tags, auto_enhance = true, quality_report = false }) => {
+      // 🔍 DEBUG: 전달받은 content가 base64인지 확인
+      if (content) {
+        console.error("🔍 DEBUG - Received content first 200 chars:", content.substring(0, 200));
+        console.error("🔍 DEBUG - Is received content base64?:", /^[A-Za-z0-9+/]+=*$/.test(content) ? "YES - LLM이 base64로 전송!" : "NO - 정상 마크다운");
+      }
+
+      // Force auto_enhance to true if not explicitly set to false
+      if (auto_enhance === undefined || auto_enhance === null) {
+        auto_enhance = true;
+        console.error("📌 Auto-enhance enabled by default for quality content");
+      }
+      // Log start for debugging (visible in server logs)
+      console.error("🚀 Starting blog post creation...");
+
+      // Check authentication - 인증 상태 메시지 표시
+      console.error("📋 Step 1/5: Checking authentication...");
+      const authResult = await ensureAuthenticated(auth);
+      if (authResult.error) {
+        return authResult; // 인증 실패 메시지 반환
+      }
+      console.error("✅ Authentication verified");
+
+      // 인증 상태 메시지를 먼저 표시
+      let authStatusMessage = "";
+      if (authResult.message) {
+        authStatusMessage = authResult.message + "\n\n";
+      }
+
+      // Get markdown content
+      console.error("📋 Step 2/5: Processing markdown content...");
+      let markdownContent: string;
+      if (file_path) {
+        const fs = await import("fs/promises");
+        try {
+          console.error(`📂 Reading file: ${file_path}`);
+          markdownContent = await fs.readFile(file_path, "utf-8");
+        } catch (error) {
+          return {
+            content: [
+              {
+                type: "text",
+                text: `❌ File not found: ${file_path}`,
+              },
+            ],
+          };
+        }
+      } else if (content) {
+        // HTTP transport 디버깅 로그 추가
+        console.error(`🔍 Transport Type: ${TRANSPORT_TYPE}`);
+        console.error(`📏 Content Length: ${content.length} chars`);
+        console.error(`📝 Content Type: ${typeof content}`);
+
+        // Content-Length 헤더 크기 예상치 출력 (JSON 직렬화 시)
+        const jsonSize = JSON.stringify({ content }).length;
+        console.error(`📦 예상 JSON 크기: ${jsonSize} bytes`);
+
+        // Base64 패턴 감지 (디버깅용)
+        const looksLikeBase64 = !content.includes('\n') &&
+                                content.length > 100 &&
+                                /^[A-Za-z0-9+/]+=*$/.test(content.replace(/\s/g, ''));
+        if (looksLikeBase64) {
+          console.error("⚠️ 경고: 콘텐츠가 Base64로 인코딩된 것으로 보입니다!");
+          console.error("   -> HTTP transport 사용 권장");
+        }
+
+        markdownContent = content;
+      } else {
+        return {
+          content: [
+            {
+              type: "text",
+              text: "❌ Either content or file_path is required.",
+            },
+          ],
+        };
+      }
+      console.error(`✅ Content processed (${markdownContent.length} characters)`);
+      
+      // Check minimum content length
+      if (markdownContent.length < 2000) {
+        console.error(`⚠️ WARNING: Content is only ${markdownContent.length} characters. Minimum recommended: 2000`);
+        console.error("📝 AI Assistants: Please generate more detailed, comprehensive content!");
+        // Add warning to the content
+        markdownContent = `<!-- WARNING: This content is below minimum quality standards (${markdownContent.length} chars) -->\n\n${markdownContent}`;
+      }
+
+      // Quality enhancement (NEW)
+      console.error("📋 Step 3/6: Analyzing and enhancing content quality...");
+      let enhancedContent = markdownContent;
+      let qualityReportText = "";
+
+      // Always analyze quality to get the score
+      const beforeMetrics = qualityEnhancer.analyzeQuality(markdownContent);
+      console.error(`📊 Original quality score: ${beforeMetrics.score}/100`);
+      let finalQualityScore = beforeMetrics.score;
+
+      if (auto_enhance && beforeMetrics.score < 70) {
+        console.error("🔧 Enhancing markdown quality...");
+        enhancedContent = qualityEnhancer.enhance(markdownContent);
+        const afterMetrics = qualityEnhancer.analyzeQuality(enhancedContent);
+        console.error(`✨ Enhanced quality score: ${afterMetrics.score}/100 (improved by ${afterMetrics.score - beforeMetrics.score} points)`);
+        finalQualityScore = afterMetrics.score;
+      }
+
+      if (quality_report) {
+        qualityReportText = qualityEnhancer.generateReport(enhancedContent);
+      }
+
+      // Parse markdown metadata
+      console.error("📋 Step 4/6: Parsing metadata...");
+      const { metadata, body } = parseMarkdownMetadata(enhancedContent);
+
+      // 🔍 DEBUG: body가 base64인지 확인
+      console.error("🔍 DEBUG - body first 100 chars:", body.substring(0, 100));
+      console.error("🔍 DEBUG - Is body base64?:", /^[A-Za-z0-9+/]+=*$/.test(body) ? "YES - 문제 발견!" : "NO - 정상");
+
+      const finalTitle = title || metadata.title;
+      const finalTags = tags || metadata.tags || [];
+
+      // Check for AI identification tag
+      const hasAiTag = finalTags.some((tag: string) => tag.startsWith('ai:'));
+      if (!hasAiTag) {
+        console.error("⚠️ WARNING: No AI identification tag found (ai:claude, ai:chatgpt, etc.)");
+        console.error("📌 Please add appropriate AI tag for tracking purposes!");
+      } else {
+        const aiTag = finalTags.find((tag: string) => tag.startsWith('ai:'));
+        console.error(`🤖 AI identification tag found: ${aiTag}`);
+      }
+      
+      console.error(`✅ Title: "${finalTitle}", Tags: ${finalTags?.length || 0}`);
+
+      // Save to file
+      console.error("📋 Step 5/6: Saving to local file...");
+      const savedFilePath = await savePostToFile(finalTitle, body, finalTags);
+      const savedMessage = savedFilePath
+        ? `💾 MD file saved: ${path.basename(savedFilePath)}`
+        : "⚠️ MD file save failed";
+      console.error(savedMessage);
+
+      // Create post via API
+      console.error("📋 Step 6/6: Creating post via API...");
+      try {
+        console.error(`🌐 Sending to: ${auth.baseUrl}`);
+        const post = await apiClient.createPost(finalTitle, body, finalTags, finalQualityScore);
+        console.error("✅ Post created successfully!");
+        const blogSlug = post.blogSlug || auth.blogInfo?.slug;
+        const postUrl = `${auth.baseUrl}/blog/${blogSlug}/posts/${post.slug}`;
+
+        // Debug log for quality score
+        console.error(`🔍 DEBUG: finalQualityScore = ${finalQualityScore}`);
+
+        const responseText = quality_report && qualityReportText
+          ? `${authStatusMessage}✅ Post created successfully! (Quality: ${finalQualityScore}/100)\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📊 Quality Score: ${finalQualityScore}/100\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}\n\n${qualityReportText}`
+          : `${authStatusMessage}✅ Post created successfully! (Quality: ${finalQualityScore}/100)\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📊 Quality Score: ${finalQualityScore}/100\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}`;
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: responseText,
+            },
+          ],
+        };
+      } catch (error) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Post creation failed: ${error instanceof Error ? error.message : String(error)}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+  server.registerTool(
+    "create_post_from_file",
+    {
+      title: "Create Post from File",
+      description: "마크다운 파일로부터 블로그 포스트 생성 (기본: 한국어) / Create a blog post from a markdown file (Default: Korean)",
+      inputSchema: {
+        file_path: z.string().describe("Path to the markdown file"),
+      },
+    },
+    async ({ file_path }) => {
+      console.error("\n=================================================");
+      console.error("📝 create_post_from_file 도구 실행 시작");
+      console.error(`   파일 경로: ${file_path}`);
+      console.error("=================================================\n");
+
+      // Check authentication using helper - 인증 상태 메시지 표시
+      console.error("📋 Step 1: 인증 상태 확인...");
+      const authResult = await ensureAuthenticated(auth);
+      if (authResult.error) {
+        console.error("❌ 인증 실패! 포스팅을 중단합니다.");
+        return authResult; // 인증 실패 메시지 반환
+      }
+      console.error("✅ 인증 성공! 포스팅을 계속합니다.");
+
+      // 인증 상태 메시지를 변수에 저장
+      let authStatusMessage = "";
+      if (authResult.message) {
+        authStatusMessage = authResult.message + "\n\n";
+      }
+
+      const fs = await import("fs/promises");
+      let markdownContent: string;
+
+      console.error("📋 Step 2: 파일 읽기...");
+      try {
+        markdownContent = await fs.readFile(file_path, "utf-8");
+        console.error(`✅ 파일 읽기 성공 (${markdownContent.length} 문자)`);
+      } catch (error) {
+        console.error(`❌ 파일 읽기 실패: ${error}`);
+        return {
+          content: [
+            {
+                type: "text",
+                text: `❌ File not found: ${file_path}\n\n에러: ${error}`,
+            },
+          ],
+        };
+      }
+
+      console.error("📋 Step 3: 메타데이터 파싱...");
+      const { metadata, body } = parseMarkdownMetadata(markdownContent);
+      const finalTitle = metadata.title;
+      const finalTags = metadata.tags || [];
+      console.error(`   제목: ${finalTitle}`);
+      console.error(`   태그: ${finalTags.join(", ") || "없음"}`);
+
+      // Check for AI identification tag
+      const hasAiTag = finalTags.some((tag: string) => tag.startsWith('ai:'));
+      if (!hasAiTag) {
+        console.error("⚠️ WARNING: No AI identification tag found in file");
+        console.error("📌 Please ensure AI tags (ai:claude, ai:chatgpt, etc.) are included!");
+      } else {
+        const aiTag = finalTags.find((tag: string) => tag.startsWith('ai:'));
+        console.error(`🤖 AI identification tag found: ${aiTag}`);
+      }
+
+      // Analyze quality score for the markdown content
+      console.error("📋 Step 4: 품질 점수 분석...");
+      const qualityMetrics = qualityEnhancer.analyzeQuality(body);
+      const finalQualityScore = qualityMetrics.score;
+      console.error(`📊 Quality score for file: ${finalQualityScore}/100`);
+
+      console.error("📋 Step 5: 로컬 파일 저장...");
+      const savedFilePath = await savePostToFile(finalTitle, body, finalTags);
+      const savedMessage = savedFilePath
+        ? `💾 MD file saved: ${path.basename(savedFilePath)}`
+        : "⚠️ MD file save failed";
+      console.error(savedMessage);
+
+      console.error("📋 Step 6: API를 통한 포스트 생성...");
+      console.error(`   API URL: ${auth.baseUrl}`);
+      console.error(`   블로그 슬러그: ${auth.blogInfo?.slug}`);
+
+      try {
+        const post = await apiClient.createPost(finalTitle, body, finalTags, finalQualityScore);
+        const blogSlug = post.blogSlug || auth.blogInfo?.slug;
+        const postUrl = `${auth.baseUrl}/blog/${blogSlug}/posts/${post.slug}`;
+
+        console.error("\n=================================================");
+        console.error("✅ 포스트 생성 성공!");
+        console.error(`   URL: ${postUrl}`);
+        console.error("=================================================\n");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `${authStatusMessage}✅ Post created successfully! (Quality: ${finalQualityScore}/100)\n${savedMessage}\n📝 Title: ${post.title}\n🔗 Slug: ${post.slug}\n🏷️ Tags: ${finalTags?.join(", ") || "none"}\n📊 Quality Score: ${finalQualityScore}/100\n📅 Created: ${post.createdAt}\n🌐 URL: ${postUrl}`,
+            },
+          ],
+        };
+      } catch (error) {
+        console.error("\n=================================================");
+        console.error("❌ 포스트 생성 실패!");
+        console.error(`   에러: ${error}`);
+        console.error("=================================================\n");
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: `❌ Post creation failed: ${error instanceof Error ? error.message : String(error)}\n\n디버깅 정보:\n- 세션 상태: ${auth.hasSession() ? '있음' : '없음'}\n- 블로그 정보: ${auth.blogInfo ? '있음' : '없음'}\n- API URL: ${auth.baseUrl}`,
+            },
+          ],
+        };
+      }
+    }
+  );
+
+
+  server.registerTool(
+    "diagnose_connection",
+    {
+      title: "Diagnose OAuth2 Connection",
+      description: "Check OAuth2 connection status and diagnose authentication issues",
+      inputSchema: {},
+    },
+    async () => {
+      const results: string[] = [];
+
+      // Check MCP Proxy Server configuration
+      const hasProxyUrl = process.env["MCP_PROXY_URL"];
+      const hasApiUrl = process.env["API_URL"] || process.env["BLOG_API_URL"];
+      const hasRedirectUri = process.env["OAUTH_REDIRECT_URI"];
+
+      if (!hasProxyUrl) {
+        results.push("⚠️ Using default MCP Proxy Server URL: http://localhost:8080");
+      } else {
+        results.push(`✅ MCP Proxy Server configured: ${process.env["MCP_PROXY_URL"]}`);
+      }
+
+      if (!hasApiUrl) {
+        results.push("❌ Missing API_URL environment variable");
+      } else {
+        results.push(`✅ API URL configured: ${auth.apiUrl}`);
+      }
+
+      if (!hasRedirectUri) {
+        results.push("⚠️ Using default redirect URI: http://localhost:7777/callback");
+      } else {
+        results.push(`✅ Redirect URI configured: ${process.env["OAUTH_REDIRECT_URI"]}`);
+      }
+
+      // Test API connection
+      try {
+        const response = await fetch(`${auth.apiUrl}/health`);
+        if (response.ok) {
+          results.push("✅ API server connection successful");
+        } else {
+          results.push(`⚠️ API server response abnormal: ${response.status}`);
+        }
+      } catch (error) {
+        results.push(`❌ API server connection failed: ${String(error)}`);
+      }
+
+      // Check Session-based authentication status
+      const isAuthenticated = auth.isAuthenticated();
+      if (isAuthenticated && auth.blogInfo) {
+        results.push("✅ 세션 기반 OAuth2 인증 상태: Active");
+        results.push(`📝 Blog: ${auth.blogInfo.name}`);
+        results.push(`🔗 Slug: ${auth.blogInfo.slug}`);
+        results.push(`👤 User ID: ${auth.userId}`);
+        results.push(`🔄 Proxy Server: ${(auth as any).mcpSessionUrl || 'http://localhost:8080'}`);
+        results.push("🔒 토큰 관리: Proxy Server에서 자동 처리");
+      } else if (isAuthenticated) {
+        results.push("⚠️ 세션은 있지만 블로그 정보가 없음");
+      } else {
+        results.push("⚠️ 세션 기반 OAuth2 인증 상태: Not authenticated");
+        results.push("💡 Run 'authenticate' to start OAuth2 flow");
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `🔍 Connection Status Diagnostic Report\n${'='.repeat(30)}\n${results.join('\n')}`,
+          },
+        ],
+      };
+    }
+  );
+
+  // Register prompts for markdown quality guidelines
+  // These prompts will be available to LLMs BEFORE they generate content
+  server.registerPrompt(
+    "markdown_quality_guidelines",
+    {
+      title: "Markdown Quality Guidelines for Blog Posts",
+      description: "Professional markdown writing guidelines for high-quality blog posts with consistent formatting and structure"
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: writingStyle.qualityGuidelinesPrompt
+          }
+        }
+      ]
+    })
+  );
+
+  server.registerPrompt(
+    "blog_post_template",
+    {
+      title: "Blog Post Markdown Template",
+      description: "A structured template for creating consistent, high-quality blog posts"
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: writingStyle.blogPostTemplatePrompt
+          }
+        }
+      ]
+    })
+  );
+
+  server.registerPrompt(
+    "improve_markdown",
+    {
+      title: "Improve Existing Markdown",
+      description: "Guidelines for enhancing and standardizing existing markdown content"
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: writingStyle.improveMarkdownPrompt
+          }
+        }
+      ]
+    })
+  );
+
+  return server;
+}
+
+// Initialize global services for OAuth2 (통합된 OAuth2 서비스)
+const sessionService = new SessionService();
+const oauthRouter = new OAuthRouter(sessionService);
+
+async function main() {
+  if (TRANSPORT_TYPE === "http") {
+    const initialPort = CLI_PORT ?? 3002;  // 포트를 3002로 변경 (통합된 서버)
+    let actualPort = initialPort;
+
+    const httpServer = createServer(async (req: IncomingMessage, res: ServerResponse) => {
+      const url = new URL(req.url || "", `http://${req.headers.host}`).pathname;
+
+      // Handle OAuth2 routes first (통합된 OAuth2 라우터 처리)
+      if (url.startsWith('/api/v1/mcp/sessions')) {
+        await oauthRouter.handle(req, res, url);
+        return;
+      }
+
+      // Set CORS headers
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS,DELETE");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, MCP-Session-Id, MCP-Protocol-Version, X-API-Key, Authorization, x-mcp-session-id"
+      );
+      res.setHeader("Access-Control-Expose-Headers", "MCP-Session-Id");
+
+      // Handle preflight OPTIONS requests
+      if (req.method === "OPTIONS") {
+        res.writeHead(200);
+        res.end();
+        return;
+      }
+
+      // Extract API key from headers
+      const extractHeaderValue = (value: string | string[] | undefined): string | undefined => {
+        if (!value) return undefined;
+        return typeof value === "string" ? value : value[0];
+      };
+
+      const extractBearerToken = (authHeader: string | string[] | undefined): string | undefined => {
+        const header = extractHeaderValue(authHeader);
+        if (!header) return undefined;
+        if (header.startsWith("Bearer ")) {
+          return header.substring(7).trim();
+        }
+        return header;
+      };
+
+      const apiKey =
+        extractBearerToken(req.headers.authorization) ||
+        extractHeaderValue(req.headers["x-api-key"]) ||
+        extractHeaderValue(req.headers["X-API-Key"]);
+
+      // X-MCP-Session-ID 헤더에서 세션 ID 추출
+      const sessionId =
+        extractHeaderValue(req.headers["x-mcp-session-id"]) ||
+        extractHeaderValue(req.headers["X-MCP-Session-ID"]);
+
+      try {
+        const clientIp = getClientIp(req);
+        const requestServer = await createServerInstance(clientIp, apiKey, sessionId);
+
+        if (url === "/mcp") {
+          const transport = new StreamableHTTPServerTransport({
+            sessionIdGenerator: undefined,
+          });
+          await requestServer.connect(transport);
+          await transport.handleRequest(req, res);
+        } else if (url === "/sse" && req.method === "GET") {
+          const sseTransport = new SSEServerTransport("/messages", res);
+          sseTransports[sseTransport.sessionId] = sseTransport;
+          res.on("close", () => {
+            delete sseTransports[sseTransport.sessionId];
+          });
+          await requestServer.connect(sseTransport);
+        } else if (url === "/messages" && req.method === "POST") {
+          const sessionId =
+            new URL(req.url || "", `http://${req.headers.host}`).searchParams.get("sessionId") || "";
+
+          if (!sessionId) {
+            res.writeHead(400);
+            res.end("Missing sessionId parameter");
+            return;
+          }
+
+          const sseTransport = sseTransports[sessionId];
+          if (!sseTransport) {
+            res.writeHead(400);
+            res.end(`No transport found for sessionId: ${sessionId}`);
+            return;
+          }
+
+          await sseTransport.handlePostMessage(req, res);
+        } else {
+          res.writeHead(404);
+          res.end("Not found");
+        }
+      } catch (error) {
+        console.error("HTTP server error:", error);
+        res.writeHead(500);
+        res.end("Internal server error");
+      }
+    });
+
+    httpServer.listen(actualPort, () => {
+      console.log(`🚀 TypeScript MCP Blog Server running on http://localhost:${actualPort}`);
+      console.log(`📍 Endpoints:`);
+      console.log(`  - /mcp (streamable HTTP)`);
+      console.log(`  - /sse (Server-Sent Events)`);
+      console.log(`  - /api/v1/mcp/sessions/* (OAuth2 인증)`);
+      console.log(`\n✨ 통합 완료: 모든 MCP 기능이 포트 ${actualPort}에서 실행 중!`);
+    });
+
+    httpServer.on("error", (error: any) => {
+      if (error.code === "EADDRINUSE") {
+        console.error(`❌ Port ${actualPort} is already in use`);
+        process.exit(1);
+      } else {
+        console.error("❌ HTTP server error:", error);
+        process.exit(1);
+      }
+    });
+  } else {
+    // stdio transport
+    const server = await createServerInstance();
+    const transport = new StdioServerTransport();
+
+    console.error("🚀 TypeScript MCP Blog Server running in stdio mode");
+    await server.connect(transport);
+  }
+}
+
+// Run the server
+main().catch((error) => {
+  console.error("Fatal error:", error);
+  process.exit(1);
+});

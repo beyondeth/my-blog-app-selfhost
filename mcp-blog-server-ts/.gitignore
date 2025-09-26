@@ -41,3 +41,6 @@ coverage/
 
 # Posts directory (contains user data)
 posts/
+
+# MCP session file (sensitive data)
+.mcp-session

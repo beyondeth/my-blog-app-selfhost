@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
@@ -8,7 +8,6 @@ import { EmailService } from '../email/email.service';
 import { UserDeletionService } from '../users/services/user-deletion.service';
 import { SendCodeDto } from '../email/dto/send-code.dto';
 import { VerifyCodeDto } from '../email/dto/verify-code.dto';
-import { LocalAuthGuard } from './guards/local-auth.guard';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { KakaoAuthGuard } from './guards/kakao-auth.guard';
 import { GitHubAuthGuard } from './guards/github-auth.guard';
@@ -20,11 +19,13 @@ import { RegisterDto } from './dto/register.dto';
 import { VerifyApiKeyDto } from './dto/verify-api-key.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { User } from '../users/entities/user.entity';
-import * as crypto from 'crypto';
+import { UnifiedRedisService } from '../redis/unified-redis.service';
 
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
+  private readonly logger = new Logger(AuthController.name);
+
   constructor(
     private readonly authService: AuthService,
     private readonly authApiKeyService: AuthApiKeyService,
@@ -32,7 +33,40 @@ export class AuthController {
     private readonly emailService: EmailService,
     private readonly userDeletionService: UserDeletionService,
     private readonly configService: ConfigService,
+    private readonly redisService: UnifiedRedisService,
   ) {}
+
+  /**
+   * 웹 로그인 시 MCP 세션과 동기화를 위한 헬퍼 메서드
+   * 웹에서 로그인하면 MCP 세션도 활성화 상태로 만들어 통일성 유지
+   */
+  private async createWebSessionInRedis(userId: number | string): Promise<void> {
+    try {
+      // userId를 숫자로 변환 (string인 경우)
+      const userIdNumber = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+
+      // 웹 세션을 Redis에 저장 (MCP 세션 검증에 사용)
+      const sessionData = {
+        userId: userIdNumber,
+        isActive: true,
+        loginAt: Date.now(),
+        lastAccessAt: Date.now(),
+      };
+
+      // 24시간 TTL로 세션 저장
+      await this.redisService.setCache(
+        'sessions',
+        `user:${userIdNumber}`,
+        sessionData,
+        24 * 60 * 60, // 24시간
+      );
+
+      this.logger.debug(`웹 세션 생성: userId=${userIdNumber}`);
+    } catch (error) {
+      this.logger.error(`웹 세션 생성 실패: ${error.message}`);
+      // 세션 생성 실패해도 로그인은 진행
+    }
+  }
 
   @Public()
   @Post('login')
@@ -41,7 +75,7 @@ export class AuthController {
   @ApiResponse({ status: 401, description: '인증 실패' })
   async login(@Body() loginDto: LoginDto, @Response() res) {
     const authResponse = await this.authService.login(loginDto);
-    
+
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie('access_token', authResponse.access_token, {
       httpOnly: true,
@@ -59,7 +93,10 @@ export class AuthController {
       path: '/',
     });
 
-    // 토큰 제외하고 사용자 정보만 반환 (개발 환경에서는 토큰도 포함)
+    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+    await this.createWebSessionInRedis(authResponse.user.id);
+
+    // 항상 JSON 응답 반환 (프론트엔드에서 리다이렉트 처리)
     return res.json({
       user: authResponse.user,
       message: '로그인 성공',
@@ -95,6 +132,9 @@ export class AuthController {
       path: '/',
     });
 
+    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+    await this.createWebSessionInRedis(authResponse.user.id);
+
     // 토큰 제외하고 사용자 정보만 반환 (개발 환경에서는 토큰도 포함)
     return res.json({
       user: authResponse.user,
@@ -118,7 +158,7 @@ export class AuthController {
   @Get('google/callback')
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: '구글 로그인 콜백' })
-  googleAuthRedirect(@Request() req, @Res() res) {
+  async googleAuthRedirect(@Request() req, @Res() res) {
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie('access_token', req.user.access_token, {
       httpOnly: true,
@@ -135,6 +175,9 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: '/',
     });
+
+    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+    await this.createWebSessionInRedis(req.user.user.id);
 
     // 프론트엔드로 리다이렉트 (토큰 없이)
     res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
@@ -152,7 +195,7 @@ export class AuthController {
   @Get('kakao/callback')
   @UseGuards(KakaoAuthGuard)
   @ApiOperation({ summary: '카카오 로그인 콜백' })
-  kakaoAuthRedirect(@Request() req, @Res() res) {
+  async kakaoAuthRedirect(@Request() req, @Res() res) {
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie('access_token', req.user.access_token, {
       httpOnly: true,
@@ -169,6 +212,9 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: '/',
     });
+
+    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+    await this.createWebSessionInRedis(req.user.user.id);
 
     // 프론트엔드로 리다이렉트 (토큰 없이)
     res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
@@ -210,6 +256,9 @@ export class AuthController {
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: '/',
     });
+
+    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+    await this.createWebSessionInRedis(req.user.user.id);
 
     // 프론트엔드로 리다이렉트 (토큰 없이)
     res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
@@ -372,7 +421,21 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '로그아웃 성공' })
   async logout(@CurrentUser() user: any, @Response() res) {
     await this.authService.logout(user.id);
-    
+
+    // 웹 세션 삭제 (MCP 세션도 무효화되도록)
+    try {
+      // 웹 세션 삭제
+      await this.redisService.deleteCache('sessions', `user:${user.id}`);
+
+      // 해당 사용자의 모든 MCP 세션 찾아서 삭제
+      // MCP 세션은 mcp:sessions:* 패턴으로 저장되어 있고, 세션 데이터에 userId가 포함됨
+      // 여기서는 간단히 웹 세션만 삭제하고, MCP 세션은 검증 시 자동으로 무효화됨
+      this.logger.debug(`웹 세션 삭제: userId=${user.id}`);
+    } catch (error) {
+      this.logger.error(`세션 삭제 실패: ${error.message}`);
+      // 세션 삭제 실패해도 로그아웃은 진행
+    }
+
     // 모든 쿠키 제거
     res.clearCookie('access_token', {
       httpOnly: true,

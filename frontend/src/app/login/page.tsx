@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,6 +14,7 @@ import Spinner from '@/components/ui/Spinner';
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { login } = useAuth();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -122,11 +123,21 @@ export default function LoginPage() {
     setIsSubmitting(true);
 
     try {
+      // returnUrl 파라미터 확인 (OAuth 콜백 대기 중인 경우)
+      const returnUrl = searchParams.get('returnUrl');
+
+      // 로그인 요청 - returnUrl을 보내지 않음 (프론트엔드에서만 처리)
       await login(formData);
       toast.success('로그인 성공!');
-      
-      // Navigate based on user role or preference
-      const redirectTo = sessionStorage.getItem('redirectAfterLogin') || '/';
+
+      // OAuth 콜백 URL인 경우 직접 리다이렉트 (localhost:7777/callback)
+      if (returnUrl && returnUrl.includes('localhost:7777/callback')) {
+        window.location.href = returnUrl;
+        return;
+      }
+
+      // 일반적인 경우 기존 로직 사용
+      const redirectTo = returnUrl || sessionStorage.getItem('redirectAfterLogin') || '/';
       sessionStorage.removeItem('redirectAfterLogin');
       router.push(redirectTo);
     } catch (error: any) {

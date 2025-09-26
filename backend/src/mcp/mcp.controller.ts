@@ -10,6 +10,7 @@ import { McpLoggingInterceptor } from './mcp-logging.interceptor';
 import * as crypto from 'crypto';
 import { PostsService } from '../posts/posts.service';
 import { CacheService } from '../cache/cache.service';
+import { UnifiedRedisService } from '../redis/unified-redis.service';
 
 @Controller('mcp')
 @Public() // Bypass JWT auth, we'll use API key auth instead
@@ -24,6 +25,7 @@ export class McpController {
     private readonly authService: AuthService,
     private readonly postsService: PostsService,
     private readonly cacheService: CacheService,
+    private readonly redisService: UnifiedRedisService,
   ) {}
 
   /**
@@ -299,5 +301,97 @@ export class McpController {
     });
 
     return createdPost;
+  }
+
+  /**
+   * MCP 세션 검증 엔드포인트
+   * MCP 세션이 웹 로그인 세션과 동기화되어 있는지 확인
+   *
+   * POST /mcp/validate-session
+   */
+  @Post('validate-session')
+  async validateSession(
+    @Body() body: { sessionId: string; userId?: number },
+    @Headers('x-mcp-internal') internalHeader: string,
+  ) {
+    // 내부 호출인지 확인 (Proxy Server에서만 호출 가능)
+    if (internalHeader !== 'true') {
+      throw new UnauthorizedException('이 엔드포인트는 내부 호출용입니다.');
+    }
+
+    const { sessionId, userId } = body;
+
+    if (!sessionId) {
+      return {
+        valid: false,
+        message: '세션 ID가 필요합니다.',
+      };
+    }
+
+    try {
+      // MCP 세션 정보를 Redis에서 조회
+      // mcp:sessions:{sessionId} 형식으로 저장
+      const mcpSessionKey = `mcp:sessions:${sessionId}`;
+      const sessionData = await this.redisService.getCache<any>('mcp', `sessions:${sessionId}`);
+
+      if (!sessionData) {
+        this.logger.debug(`MCP 세션이 Redis에 없음: ${sessionId.substring(0, 8)}...`);
+        return {
+          valid: false,
+          message: 'MCP 세션이 없습니다.',
+        };
+      }
+
+      // userId가 제공되었으면 매칭 확인
+      if (userId && sessionData.userId !== userId) {
+        this.logger.debug(`MCP 세션의 사용자 ID 불일치: 세션=${sessionData.userId}, 요청=${userId}`);
+        return {
+          valid: false,
+          message: '세션이 다른 사용자와 연결되어 있습니다.',
+        };
+      }
+
+      // 웹 세션 확인 (access_token이나 refresh_token 쿠키와 연동된 세션)
+      // 여기서는 MCP 세션이 웹 로그인 상태와 연동되어 있는지 확인
+      const webSessionKey = `sessions:user:${sessionData.userId}`;
+      const webSession = await this.redisService.getCache<any>('sessions', `user:${sessionData.userId}`);
+
+      if (!webSession || !webSession.isActive) {
+        this.logger.debug(`웹 세션이 없거나 비활성: userId=${sessionData.userId}`);
+        // 웹에서 로그아웃했으면 MCP 세션도 무효화
+        await this.redisService.deleteCache('mcp', `sessions:${sessionId}`);
+        return {
+          valid: false,
+          message: '웹 로그아웃으로 MCP 세션이 무효화되었습니다.',
+        };
+      }
+
+      // 세션 유효 시간 체크 (24시간)
+      const sessionAge = Date.now() - sessionData.createdAt;
+      const maxAge = 24 * 60 * 60 * 1000; // 24시간
+
+      if (sessionAge > maxAge) {
+        this.logger.debug(`MCP 세션 만료: ${sessionId.substring(0, 8)}...`);
+        await this.redisService.deleteCache('mcp', `sessions:${sessionId}`);
+        return {
+          valid: false,
+          message: 'MCP 세션이 만료되었습니다.',
+        };
+      }
+
+      // 세션 유효
+      this.logger.debug(`MCP 세션 유효: ${sessionId.substring(0, 8)}... (userId: ${sessionData.userId})`);
+      return {
+        valid: true,
+        userId: sessionData.userId,
+        message: '세션이 유효합니다.',
+      };
+    } catch (error) {
+      this.logger.error('MCP 세션 검증 오류:', error);
+      return {
+        valid: false,
+        message: '세션 검증 중 오류가 발생했습니다.',
+      };
+    }
   }
 }

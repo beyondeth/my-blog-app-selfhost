@@ -18,7 +18,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         // 쿠키에서 토큰 추출
         (request: Request) => {
           const token = request?.cookies?.access_token;
-          // 로그 제거 - 매 요청마다 출력되어 너무 많음
           return token;
         },
         // 백업으로 Authorization 헤더도 지원 (API 테스트용)

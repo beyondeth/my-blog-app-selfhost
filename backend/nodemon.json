@@ -1,0 +1,6 @@
+{
+  "watch": ["src"],
+  "ext": "ts,hbs",
+  "ignore": ["src/**/*.spec.ts"],
+  "exec": "npm run copy:views && ts-node -r tsconfig-paths/register src/main.ts"
+}

@@ -1,37 +1,31 @@
 import { Module } from '@nestjs/common';
-import { McpController } from './mcp.controller';
-import { McpService } from './mcp.service';
-import { McpAuthGuard } from './mcp-auth.guard';
-import { McpRateLimitService } from './mcp-rate-limit.service';
-import { McpRateLimitGuard } from './mcp-rate-limit.guard';
-import { McpLoggingInterceptor } from './mcp-logging.interceptor';
-import { ApiKeysModule } from '../api-keys/api-keys.module';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { McpProxyController } from './controllers/mcp-proxy.controller';
+import { OauthModule } from '../oauth/oauth.module';
 import { PostsModule } from '../posts/posts.module';
-import { AuthModule } from '../auth/auth.module';
-import { SharedTrackingModule } from '../shared/shared-tracking.module';
-import { CacheModule } from '../cache/cache.module';
 import { RedisModule } from '../redis/redis.module';
+import { User } from '../users/entities/user.entity';
 
+/**
+ * MCP (Model Context Protocol) 모듈
+ * OAuth2 기반 인증으로 완전히 전환
+ * MCP 서버가 OAuth2 인증을 통해 블로그에 포스트를 생성할 수 있도록 하는 프록시 모듈
+ *
+ * 기존 HMAC 인증 관련 컴포넌트들은 제거됨:
+ * - McpController (레거시)
+ * - McpService (레거시)
+ * - McpAuthGuard (HMAC 기반)
+ * - ApiKeysModule (HMAC 기반)
+ */
 @Module({
   imports: [
-    ApiKeysModule,
+    TypeOrmModule.forFeature([User]),  // User 엔티티 접근을 위해 필요
+    OauthModule,  // OAuth2 인증을 위해 필요
     PostsModule,  // PostsService를 사용하기 위해 필요
-    AuthModule,
-    SharedTrackingModule,  // McpTrackingService를 위해 필요
-    CacheModule,  // 캐시 서비스를 위해 필요
     RedisModule,  // Redis 직접 접근을 위해 필요
   ],
-  controllers: [McpController],
-  providers: [
-    McpService,
-    McpAuthGuard,
-    McpRateLimitService,  // 새 Rate Limiting 서비스
-    McpRateLimitGuard,
-    McpLoggingInterceptor,
-  ],
-  exports: [
-    McpAuthGuard,  // Admin 모듈에서 사용하기 위해 export
-    McpRateLimitService,  // Admin 모듈에서 사용하기 위해 export
-  ],
+  controllers: [McpProxyController],
+  providers: [],
+  exports: [],
 })
 export class McpModule {}

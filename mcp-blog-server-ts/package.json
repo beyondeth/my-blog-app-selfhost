@@ -1,14 +1,13 @@
 {
-  "name": "@codebase/mcp-blog-server",
-  "version": "1.0.0",
-  "description": "TypeScript MCP server for codebase blog posting with HMAC authentication",
-  "type": "module",
+  "name": "@codebase/mcp-blog-client",
+  "version": "2.0.0",
+  "description": "Lightweight MCP client for blog posting via proxy server",
   "main": "dist/index.js",
   "bin": {
     "mcp-blog-server": "dist/index.js"
   },
   "scripts": {
-    "build": "tsc && chmod +x dist/index.js",
+    "build": "tsc",
     "dev": "tsx watch src/index.ts",
     "start": "node dist/index.js",
     "start:stdio": "node dist/index.js --transport stdio",
@@ -34,8 +33,6 @@
     "commander": "^14.0.0",
     "dotenv": "^16.4.5",
     "marked": "^14.1.2",
-    "undici": "^6.6.3",
-    "uuid": "^11.0.5",
     "zod": "^3.24.2"
   },
   "devDependencies": {
@@ -55,7 +52,7 @@
     "mcp",
     "modelcontextprotocol",
     "blog",
-    "hmac",
+    "oauth2",
     "authentication"
   ],
   "author": "Your Name",

@@ -349,6 +349,43 @@ export class UnifiedRedisService {
   }
 
   /**
+   * 값 설정 (TTL 포함) - OAuth State 저장용
+   */
+  async setWithExpiry(key: string, value: string, ttl: number): Promise<void> {
+    try {
+      await this.redis.setex(key, ttl, value);
+      this.logger.debug(`Key set with expiry: ${key}, TTL: ${ttl}s`);
+    } catch (error) {
+      this.logger.error(`Failed to set key with expiry: ${key}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 값 가져오기 - OAuth State 검증용
+   */
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.redis.get(key);
+    } catch (error) {
+      this.logger.error(`Failed to get key: ${key}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * 키 삭제 - OAuth State 사용 후 삭제용
+   */
+  async del(key: string): Promise<void> {
+    try {
+      await this.redis.del(key);
+      this.logger.debug(`Key deleted: ${key}`);
+    } catch (error) {
+      this.logger.error(`Failed to delete key: ${key}`, error);
+    }
+  }
+
+  /**
    * Rate Limiting 구현
    */
   async checkRateLimit(

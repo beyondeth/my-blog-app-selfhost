@@ -1,4 +1,5 @@
 import { NestFactory } from '@nestjs/core';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { ValidationPipe, Logger, LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -6,6 +7,9 @@ import { AppModule } from './app.module';
 import helmet from 'helmet';
 import * as compression from 'compression';
 import * as cookieParser from 'cookie-parser';
+import * as session from 'express-session';
+import { join } from 'path';
+import * as hbs from 'hbs';
 
 async function bootstrap() {
   // 서버 시작 시 타임존을 한국 시간으로 설정
@@ -21,11 +25,31 @@ async function bootstrap() {
     ? ['error', 'warn', 'log', 'debug', 'verbose']
     : ['error', 'warn', 'log'];
 
-  const app = await NestFactory.create(AppModule, {
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: logLevels,
   });
 
   const configService = app.get(ConfigService);
+
+  // Handlebars 뷰 엔진 설정
+  app.setViewEngine('hbs');
+  // 개발 환경과 프로덕션 환경 모두에서 작동하도록 수정
+  const viewsPath = isDevelopment
+    ? join(__dirname, '..', 'src', 'views')  // 개발: src/views
+    : join(__dirname, 'views');              // 프로덕션: dist/views
+  app.setBaseViewsDir(viewsPath);
+  console.log('📁 Views directory:', viewsPath);
+
+  // Handlebars 헬퍼 등록 (조건부 렌더링 등을 위해)
+  hbs.registerHelper('eq', (a, b) => a === b);
+  hbs.registerHelper('gt', (a, b) => a > b);
+  hbs.registerHelper('includes', (array, value) => {
+    return Array.isArray(array) && array.includes(value);
+  });
+  // URL 인코딩 헬퍼 추가
+  hbs.registerHelper('encodeURIComponent', (value) => {
+    return encodeURIComponent(value || '');
+  });
 
   // Security middleware
   app.use(helmet({
@@ -33,9 +57,10 @@ async function bootstrap() {
       directives: {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
-        scriptSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"], // OAuth 페이지의 인라인 스크립트를 위해 추가
         imgSrc: ["'self'", "data:", "https:", "http://localhost:*", "*.s3.amazonaws.com", "*.cloudfront.net"],
         connectSrc: ["'self'", "http://localhost:*", "https:", "*.s3.amazonaws.com", "*.cloudfront.net"],
+        formAction: ["'self'", "http://localhost:*"], // OAuth 폼 제출을 위해 추가
       },
     },
     crossOriginEmbedderPolicy: false,
@@ -47,6 +72,22 @@ async function bootstrap() {
 
   // Cookie parser middleware
   app.use(cookieParser());
+
+  // Session middleware (CSRF 토큰용)
+  app.use(
+    session({
+      secret: configService.get('SESSION_SECRET', 'csrf-secret-key-2024'),
+      resave: false,
+      saveUninitialized: false,
+      cookie: {
+        maxAge: 60 * 60 * 1000, // 1시간
+        httpOnly: true,
+        sameSite: 'strict', // CSRF 방지
+        secure: process.env.NODE_ENV === 'production',
+      },
+      name: 'session-id', // 세션 쿠키 이름
+    }),
+  );
 
   // CORS configuration
   app.enableCors({
@@ -63,7 +104,12 @@ async function bootstrap() {
       
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
+
+      // OAuth 인증 페이지를 위해 null origin 허용 (file:// 프로토콜 등)
+      if (origin === 'null') {
+        return callback(null, true);
+      }
+
       if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       } else {
@@ -148,7 +194,7 @@ async function bootstrap() {
   }
 
   // Health check endpoint
-  app.getHttpAdapter().get('/health', (req, res) => {
+  app.getHttpAdapter().get('/health', (req: any, res: any) => {
     res.status(200).json({
       status: 'ok',
       timestamp: new Date().toISOString(),

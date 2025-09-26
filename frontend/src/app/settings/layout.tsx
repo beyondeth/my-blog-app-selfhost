@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { FiUser, FiKey, FiBook, FiShield, FiBell, FiUsers } from 'react-icons/fi';
+import { FiUser, FiKey, FiBook, FiShield, FiBell, FiUsers, FiGrid, FiLink } from 'react-icons/fi';
 
 const settingsNav = [
   {
@@ -19,6 +19,16 @@ const settingsNav = [
     title: 'API 키',
     href: '/settings/api-keys',
     icon: FiKey,
+  },
+  {
+    title: 'OAuth 앱',
+    href: '/settings/oauth-clients',
+    icon: FiGrid,
+  },
+  {
+    title: '연결된 앱',
+    href: '/settings/connected-apps',
+    icon: FiLink,
   },
   {
     title: '블로그 설정',

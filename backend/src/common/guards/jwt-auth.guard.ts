@@ -50,6 +50,37 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       return true;
     }
 
+    // OAuth 엔드포인트는 선택적 JWT 인증 처리
+    // 토큰이 있으면 사용, 없으면 통과 (컨트롤러에서 처리)
+    const oauthPaths = [
+      '/api/v1/oauth/authorize-data',
+      '/api/v1/oauth/authorize'
+    ];
+
+    // URL에서 쿼리 파라미터 제거하고 경로만 비교
+    const requestPath = request.path || request.url.split('?')[0];
+
+    console.log('🔍 JwtAuthGuard - Request path:', requestPath);
+    console.log('🔍 JwtAuthGuard - Request method:', request.method);
+
+    if (oauthPaths.includes(requestPath)) {
+      console.log('✅ OAuth 경로 감지 - 선택적 JWT 처리');
+      // OAuth 엔드포인트는 JWT 검증을 시도하되, 실패해도 통과
+      // OptionalJwtAuthGuard가 실제 처리를 담당
+      const result = super.canActivate(context);
+
+      // Promise인 경우 에러를 catch하고, 아닌 경우 그대로 반환
+      if (result instanceof Promise) {
+        return result.catch((err) => {
+          console.log('⚠️ JWT 검증 실패했지만 OAuth 경로이므로 통과:', err?.message);
+          return true;
+        });
+      }
+
+      // Observable이나 boolean인 경우
+      return result;
+    }
+
     // Check if the route is marked as public
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
@@ -65,7 +96,26 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     return super.canActivate(context);
   }
 
-  handleRequest(err, user, info, context: ExecutionContext) {
+  handleRequest(err: any, user: any, info: any, context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+
+    // OAuth 엔드포인트 확인
+    const oauthPaths = [
+      '/api/v1/oauth/authorize-data',
+      '/api/v1/oauth/authorize'
+    ];
+    const requestPath = request.path || request.url.split('?')[0];
+
+    console.log('🔍 JwtAuthGuard.handleRequest - Path:', requestPath);
+    console.log('🔍 JwtAuthGuard.handleRequest - User:', user ? 'exists' : 'null');
+    console.log('🔍 JwtAuthGuard.handleRequest - Error:', err?.message);
+
+    // OAuth 엔드포인트는 사용자가 없어도 통과 (컨트롤러에서 처리)
+    if (oauthPaths.includes(requestPath)) {
+      console.log('✅ OAuth 경로에서 handleRequest - user 또는 null 반환');
+      return user || null;
+    }
+
     const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
       context.getHandler(),
       context.getClass(),

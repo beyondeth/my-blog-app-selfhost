@@ -18,8 +18,8 @@ import { AdminFilesController } from './admin-files.controller';
 // Debug
 import { AdminDebugController } from './debug/admin-debug.controller';
 
-// Nonce Management
-import { AdminNonceController } from './nonce/admin-nonce.controller';
+// Nonce Management - 임시 제거 (McpAuthGuard 의존성 문제)
+// import { AdminNonceController } from './nonce/admin-nonce.controller';
 
 // Entities
 import { User } from '../users/entities/user.entity';
@@ -57,7 +57,7 @@ import { RedisModule } from '../redis/redis.module';
     AdminUsersController,
     AdminFilesController,
     AdminDebugController,
-    AdminNonceController,  // 논스 관리 컨트롤러
+    // AdminNonceController,  // 논스 관리 컨트롤러 - 임시 제거
   ],
   providers: [
     AdminDashboardService,
