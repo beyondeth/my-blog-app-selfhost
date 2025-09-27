@@ -73,13 +73,16 @@ export function createMcpRoutes(sessionService: SessionService): Router {
     const sessionId = req.headers['x-mcp-session-id'] as string;
 
     // 세션이 이미 있고 유효한 경우
+    console.log(`🔍 인증 요청 받음: sessionId=${sessionId?.substring(0, 8)}...`);
     if (sessionId) {
       const session = await sessionService.getSession(sessionId);
+      console.log(`📝 세션 조회 결과: ${session ? 'found' : 'not found'}, hasToken=${!!session?.accessToken}`);
       if (session && session.accessToken) {
         // 토큰 유효성 확인을 위해 Backend API 호출
+        console.log(`🔐 토큰 검증 시작: /auth/me 호출`);
         try {
           const response = await axios.get(
-            `${config.BACKEND_API_URL}/auth/profile`,
+            `${config.BACKEND_API_URL}/auth/me`,
             {
               headers: {
                 Authorization: `Bearer ${session.accessToken}`,
@@ -124,7 +127,11 @@ export function createMcpRoutes(sessionService: SessionService): Router {
           }
         } catch (error: any) {
           // 토큰이 유효하지 않으면 세션 삭제 후 재인증 필요
-          console.log(`❌ 토큰 유효성 검증 실패 (${error.response?.status || 'unknown'}), 세션 삭제 후 재인증 필요`);
+          console.log(`❌ 토큰 유효성 검증 실패`);
+          console.log(`  - Status: ${error.response?.status}`);
+          console.log(`  - Message: ${error.response?.data?.message || error.message}`);
+          console.log(`  - URL: ${error.config?.url}`);
+          console.log(`  세션 삭제 후 재인증 필요`);
           await sessionService.deleteSession(sessionId);
         }
       }

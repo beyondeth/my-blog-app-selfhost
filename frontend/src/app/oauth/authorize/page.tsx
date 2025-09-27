@@ -36,6 +36,7 @@ export default function OAuthAuthorizePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [submitAction, setSubmitAction] = useState<'approve' | 'deny' | null>(null); // 어떤 버튼을 눌렀는지 추적
 
   // URL 파라미터 추출
   const clientId = searchParams.get('client_id');
@@ -100,6 +101,7 @@ export default function OAuthAuthorizePage() {
     }
 
     setSubmitting(true);
+    setSubmitAction('approve'); // 승인 버튼을 눌렀음을 표시
     try {
       // API Route Handler를 사용하여 쿠키 전달
       const response = await fetch('/api/oauth/authorize', {
@@ -141,6 +143,7 @@ export default function OAuthAuthorizePage() {
       setError('승인 처리 중 오류가 발생했습니다.');
     } finally {
       setSubmitting(false);
+      setSubmitAction(null);
     }
   };
 
@@ -149,6 +152,7 @@ export default function OAuthAuthorizePage() {
    */
   const handleDeny = async () => {
     setSubmitting(true);
+    setSubmitAction('deny'); // 거부 버튼을 눌렀음을 표시
     try {
       // API Route Handler를 사용하여 쿠키 전달
       const response = await fetch('/api/oauth/authorize', {
@@ -191,6 +195,9 @@ export default function OAuthAuthorizePage() {
       console.error('Error denying:', err);
       // 에러 발생 시 홈으로 리다이렉트
       window.location.href = '/';
+    } finally {
+      setSubmitting(false);
+      setSubmitAction(null);
     }
   };
 
@@ -306,7 +313,7 @@ export default function OAuthAuthorizePage() {
             </div>
             <button
               onClick={handleSwitchAccount}
-              className="text-sm text-blue-600 hover:underline"
+              className="text-sm text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={submitting}
             >
               계정 전환
@@ -318,21 +325,43 @@ export default function OAuthAuthorizePage() {
         <div className="flex flex-col gap-2">
           <Button
             onClick={handleApprove}
-            className="w-full py-3"
+            className="w-full py-3 relative"
             size="lg"
             disabled={submitting || !selectedBlogId}
           >
-            <CheckCircle className="h-5 w-5 mr-2" />
-            승인
+            {submitting && submitAction === 'approve' ? (
+              <>
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10 rounded-md">
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                </div>
+                <span className="opacity-50">승인 처리 중...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle className="h-5 w-5 mr-2" />
+                승인
+              </>
+            )}
           </Button>
           <Button
             onClick={handleDeny}
             variant="outline"
-            className="w-full py-2"
+            className="w-full py-2 relative"
             disabled={submitting}
           >
-            <XCircle className="h-4 w-4 mr-2" />
-            거부
+            {submitting && submitAction === 'deny' ? (
+              <>
+                <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-10 rounded-md">
+                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600"></div>
+                </div>
+                <span className="opacity-50">거부 처리 중...</span>
+              </>
+            ) : (
+              <>
+                <XCircle className="h-4 w-4 mr-2" />
+                거부
+              </>
+            )}
           </Button>
         </div>
 

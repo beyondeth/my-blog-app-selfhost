@@ -69,8 +69,8 @@ ${writingStyle.instructions}`,
   server.registerTool(
     "authenticate",
     {
-      title: "OAuth2 Authentication (via Proxy)",
-      description: "Authenticate through MCP Proxy Server",
+      title: "Check Authentication Status & Login",
+      description: "Check current authentication status and login if needed. Always call this first to ensure session is valid before creating posts.",
     },
     async () => {
       console.error("🔐 인증 상태 확인 중...");
@@ -89,7 +89,7 @@ ${writingStyle.instructions}`,
             content: [
               {
                 type: "text",
-                text: `✅ 인증 상태가 확인되었습니다.\n\n이제 create_post 도구를 사용하여 포스팅이 가능합니다.`,
+                text: `✅ 인증 상태가 확인되었습니다!\n\n🆔 세션: ${result.sessionId?.substring(0, 8)}...\n⏱️ 유효 기간: 24시간\n📝 상태: 포스팅 가능\n\n이제 create_post 도구를 사용하여 블로그 포스팅을 할 수 있습니다.`,
               },
             ],
           };
@@ -268,7 +268,7 @@ ${writingStyle.instructions}`,
           content: [
             {
               type: "text",
-              text: `❌ 인증이 필요합니다.\n\n세션이 없습니다.\n먼저 'authenticate' 도구를 사용하여 로그인해주세요.\n\n💡 Tip: 인증 후 24시간 동안 재인증 없이 사용 가능합니다.`,
+              text: `❌ 인증이 필요합니다.\n\n현재 세션이 없습니다.\n포스트를 생성하려면 먼저 인증이 필요합니다.\n\n✅ 해결 방법:\n1. 'authenticate' 도구를 실행하여 인증 상태를 확인하세요\n2. 필요시 브라우저에서 로그인이 진행됩니다\n3. 인증 완료 후 다시 포스트 생성을 시도하세요\n\n💡 Tip: 한 번 인증하면 24시간 동안 유효합니다.`,
             },
           ],
         };
@@ -284,7 +284,7 @@ ${writingStyle.instructions}`,
           content: [
             {
               type: "text",
-              text: `❌ 세션이 만료되었습니다.\n\n다시 인증이 필요합니다.\n'authenticate' 도구를 사용하여 로그인해주세요.\n\n💡 Tip: 세션은 24시간 후 만료됩니다.`,
+              text: `❌ 세션이 만료되었습니다.\n\n기존 세션이 만료되어 재인증이 필요합니다.\n\n✅ 해결 방법:\n1. 'authenticate' 도구를 실행하여 다시 로그인하세요\n2. 브라우저에서 인증을 완료하세요\n3. 인증 후 포스트 생성을 다시 시도하세요\n\n💡 Tip: 세션은 24시간마다 갱신이 필요합니다.`,
             },
           ],
         };

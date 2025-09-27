@@ -117,19 +117,54 @@ export class SessionService {
   }
 
   /**
-   * PKCE verifier 조회 및 삭제
+   * PKCE verifier 조회 (삭제하지 않음)
    */
   async getPkceVerifier(sessionId: string): Promise<string | null> {
     const key = `${this.PKCE_PREFIX}${sessionId}`;
     const verifier = await this.redis.get(key);
 
     if (verifier) {
-      // 사용 후 즉시 삭제 (일회용)
-      await this.redis.del(key);
-      console.log(`🔓 PKCE verifier 조회 및 삭제: 세션 ${sessionId.substring(0, 8)}...`);
+      console.log(`🔓 PKCE verifier 조회: 세션 ${sessionId.substring(0, 8)}...`);
     }
 
     return verifier;
+  }
+
+  /**
+   * PKCE verifier 삭제
+   */
+  async deletePkceVerifier(sessionId: string): Promise<void> {
+    const key = `${this.PKCE_PREFIX}${sessionId}`;
+    await this.redis.del(key);
+    console.log(`🗑️ PKCE verifier 삭제: 세션 ${sessionId.substring(0, 8)}...`);
+  }
+
+  /**
+   * 세션 업데이트 (토큰 등 추가)
+   */
+  async updateSession(sessionId: string, updates: Partial<McpSession>): Promise<void> {
+    const session = await this.getSession(sessionId);
+
+    if (!session) {
+      throw new Error(`세션을 찾을 수 없습니다: ${sessionId}`);
+    }
+
+    // 세션 업데이트
+    const updatedSession: McpSession = {
+      ...session,
+      ...updates,
+      lastAccessedAt: Date.now(),
+    };
+
+    const key = `${this.SESSION_PREFIX}${sessionId}`;
+    await this.redis.set(
+      key,
+      JSON.stringify(updatedSession),
+      'EX',
+      this.SESSION_TTL
+    );
+
+    console.log(`📝 세션 업데이트: ${sessionId.substring(0, 8)}...`);
   }
 
   /**

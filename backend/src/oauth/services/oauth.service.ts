@@ -331,9 +331,43 @@ export class OAuthService {
     authCode.usedAt = new Date();
     await this.codeRepository.save(authCode);
 
-    // 액세스 토큰 생성 (JWT 대신 랜덤 토큰 사용)
-    const accessToken = crypto.randomBytes(32).toString('hex');
-    const refreshToken = crypto.randomBytes(32).toString('hex');
+    // JWT 토큰 생성 (AuthService와 동일한 방식)
+    const now = Math.floor(Date.now() / 1000);
+
+    // Access Token 생성
+    const accessPayload = {
+      sub: authCode.userId,
+      email: authCode.user.email,
+      role: authCode.user.role,
+      tokenType: 'access',
+      iat: now,
+      // OAuth 특정 필드 추가
+      clientId: client.id,
+      scopes: authCode.scopes,
+      blogId: authCode.blogId,
+    };
+
+    const accessToken = this.jwtService.sign(accessPayload, {
+      expiresIn: this.configService.get<string>('JWT_ACCESS_EXPIRES_IN', '1d'),
+    });
+
+    // Refresh Token 생성
+    const refreshPayload = {
+      sub: authCode.userId,
+      email: authCode.user.email,
+      role: authCode.user.role,
+      tokenType: 'refresh',
+      iat: now,
+      // OAuth 특정 필드 추가
+      clientId: client.id,
+      scopes: authCode.scopes,
+      blogId: authCode.blogId,
+    };
+
+    const refreshToken = this.jwtService.sign(refreshPayload, {
+      secret: this.configService.get<string>('JWT_REFRESH_SECRET'),
+      expiresIn: this.configService.get<string>('JWT_REFRESH_EXPIRES_IN', '7d'),
+    });
 
     // 토큰 해시 생성 (DB 저장용)
     const tokenHash = crypto

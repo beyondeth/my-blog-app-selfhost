@@ -411,7 +411,11 @@ export class OAuthController {
       return { active: false };
     }
 
-    return tokenInfo;
+    // OAuth 2.0 Token Introspection 표준 형식으로 반환
+    return {
+      active: true,
+      ...tokenInfo,
+    };
   }
 
   /**

@@ -204,9 +204,10 @@ export class McpController {
   /**
    * 포스트 생성 (자동 포스팅 전용)
    * MCP는 오직 포스트 생성만 가능 - 조회/수정/삭제 불가
+   *
+   * OAuth 토큰 또는 API Key로 인증 가능
    */
   @Post('posts')
-  @UseGuards(McpAuthGuard)
   async createPost(@Body() createPostDto: CreatePostDto, @Headers() headers, @Request() req) {
     const startTime = Date.now();
     // McpAuthGuard already validated and attached the info to request
