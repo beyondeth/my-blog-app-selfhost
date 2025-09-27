@@ -143,13 +143,13 @@ export function errorHandler(
   // 개발 환경 여부
   const isDevelopment = config.NODE_ENV === 'development';
 
-  // 에러 로깅 (나중에 Pino로 대체)
-  console.error(`❌ [${new Date().toISOString()}] 에러 발생:`, {
-    method: req.method,
-    path: req.path,
-    error: error.message,
-    stack: isDevelopment ? error.stack : undefined,
-  });
+  // 에러 로깅 간소화
+  // POST 생성 실패 시 간단한 로그만 출력
+  if (req.path === '/create-post' || req.path === '/api/v1/mcp/create-post') {
+    console.error('[CREATE_POST] FAILED:', error.message || 'Unknown error');
+  } else {
+    console.error(`[ERROR] ${req.method} ${req.path}:`, error.message || 'Unknown error');
+  }
 
   // 상태 코드 결정
   let statusCode = 500;

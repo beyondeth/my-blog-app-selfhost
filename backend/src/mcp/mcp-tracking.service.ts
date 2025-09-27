@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In } from 'typeorm';
 import { McpUserLog } from './entities/mcp-user-log.entity';
+import { DateUtils } from '../common/utils/date.utils';
 
 export interface LogActivityParams {
   userId: string;
@@ -203,8 +204,8 @@ export class McpTrackingService {
    * Get recently created posts via MCP (쓰기 전용 - 최근 생성된 포스트)
    */
   async getPopularPosts(days: number = 7, limit: number = 10): Promise<any[]> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    // DateUtils를 사용한 일수 기반 계산
+    const startDate = DateUtils.fromNowSubtractDays(days);
 
     // MCP는 쓰기만 지원하므로 최근 생성된 포스트를 조회
     const recentPosts = await this.mcpUserLogRepository
@@ -272,8 +273,8 @@ export class McpTrackingService {
     if (cached && cached.expiry > Date.now()) {
       return cached.data;
     }
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    // DateUtils를 사용한 일수 기반 계산
+    const startDate = DateUtils.fromNowSubtractDays(days);
     const endDate = new Date();
 
     // Get raw hourly data grouped by hour and client type
@@ -295,8 +296,9 @@ export class McpTrackingService {
     // Initialize all hours in the last 24 hours with zero counts
     const now = new Date();
     for (let i = 23; i >= 0; i--) {
-      const hourDate = new Date(now);
-      hourDate.setHours(now.getHours() - i, 0, 0, 0);
+      // DateUtils를 사용한 시간 계산 (분, 초, 밀리초는 0으로 설정)
+      const hourDate = DateUtils.subtractHours(now, i);
+      hourDate.setMinutes(0, 0, 0);
       const hourKey = hourDate.toISOString();
 
       hourlyMap.set(hourKey, {
@@ -363,8 +365,8 @@ export class McpTrackingService {
    * Get user activity summary
    */
   async getUserActivity(userId: string, days: number = 30): Promise<any> {
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - days);
+    // DateUtils를 사용한 일수 기반 계산
+    const startDate = DateUtils.fromNowSubtractDays(days);
 
     const logs = await this.mcpUserLogRepository.find({
       where: {
@@ -397,8 +399,8 @@ export class McpTrackingService {
    * Clean old logs (retention policy)
    */
   async cleanOldLogs(daysToKeep: number = 90): Promise<number> {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
+    // DateUtils를 사용한 일수 기반 계산
+    const cutoffDate = DateUtils.fromNowSubtractDays(daysToKeep);
 
     const result = await this.mcpUserLogRepository
       .createQueryBuilder()

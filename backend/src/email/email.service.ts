@@ -7,6 +7,7 @@ import { EmailVerification } from './entities/email-verification.entity';
 import { User } from '../users/entities/user.entity';
 import * as crypto from 'crypto';
 import { getAWSStyleEmailTemplate, getAWSStylePasswordResetTemplate } from './email-templates';
+import { DateUtils } from '../common/utils/date.utils';
 
 @Injectable()
 export class EmailService {
@@ -65,8 +66,8 @@ export class EmailService {
     // 새 인증 코드 생성
     const code = this.generateVerificationCode();
     const expiresIn = this.configService.get('EMAIL_VERIFICATION_EXPIRES_IN', 5);
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + expiresIn);
+    // DateUtils를 사용한 만료 시간 계산 (5분 후)
+    const expiresAt = DateUtils.fromNowAddMinutes(expiresIn);
 
     // DB에 저장
     const verification = this.verificationRepository.create({
@@ -182,8 +183,8 @@ export class EmailService {
    * Rate limiting 체크 (간단한 구현)
    */
   private async checkRateLimit(email: string): Promise<void> {
-    const oneMinuteAgo = new Date();
-    oneMinuteAgo.setMinutes(oneMinuteAgo.getMinutes() - 1);
+    // DateUtils를 사용한 1분 전 시간 계산
+    const oneMinuteAgo = DateUtils.fromNowSubtractMinutes(1);
 
     const recentAttempts = await this.verificationRepository.count({
       where: {
@@ -197,7 +198,7 @@ export class EmailService {
       throw new BadRequestException('너무 많은 요청입니다. 1분 후 다시 시도해주세요.');
     }
 
-    // 일일 제한 체크
+    // 일일 제한 체크 - 오늘 시작 시간 (00:00:00)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
 

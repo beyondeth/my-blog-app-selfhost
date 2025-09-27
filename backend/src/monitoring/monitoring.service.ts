@@ -6,6 +6,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import { Queue, Worker, Job } from 'bullmq';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import { Redis } from 'ioredis';
+import { DateUtils } from '../common/utils/date.utils';
 
 export interface SuspiciousRequestDto {
   requestType: string;
@@ -227,8 +228,7 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
    * Get statistics for dashboard
    */
   async getStatistics(hours: number = 24) {
-    const since = new Date();
-    since.setHours(since.getHours() - hours);
+    const since = DateUtils.fromNowSubtractHours(hours);
 
     const today = new Date();
     today.setHours(0, 0, 0, 0);
@@ -334,8 +334,7 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
    */
   @Cron(CronExpression.EVERY_DAY_AT_3AM)
   async cleanupOldRecords(): Promise<void> {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const thirtyDaysAgo = DateUtils.fromNowSubtractDays(30);
 
     const result = await this.suspiciousRequestRepository
       .createQueryBuilder()

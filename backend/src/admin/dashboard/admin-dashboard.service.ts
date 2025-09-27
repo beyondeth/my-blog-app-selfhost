@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
+import { DateUtils } from '../../common/utils/date.utils';
 import { User } from '../../users/entities/user.entity';
 import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
@@ -81,14 +82,13 @@ export class AdminDashboardService {
    * Get dashboard statistics
    */
   async getStats(): Promise<DashboardStats> {
+    // 오늘 시작 시간 (00:00:00.000)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    // DateUtils를 사용한 일수 기반 계산
+    const thirtyDaysAgo = DateUtils.fromNowSubtractDays(30);
+    const sevenDaysAgo = DateUtils.fromNowSubtractDays(7);
 
     const [
       totalUsers,
@@ -278,12 +278,13 @@ export class AdminDashboardService {
    */
   async getTrendData(days = 7): Promise<TrendData[]> {
     const trends: TrendData[] = [];
+    // 오늘 끝 시간 (23:59:59.999)
     const today = new Date();
     today.setHours(23, 59, 59, 999);
 
     for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
+      // DateUtils를 사용한 일수 기반 계산
+      const date = DateUtils.subtractDays(today, i);
       date.setHours(23, 59, 59, 999);
 
       // Get cumulative counts up to each date
@@ -480,6 +481,7 @@ export class AdminDashboardService {
   // Private helper methods
 
   private async getDailyActiveUsers(): Promise<number> {
+    // 오늘 시작 시간 (00:00:00.000)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
@@ -492,8 +494,8 @@ export class AdminDashboardService {
   }
 
   private async getMonthlyActiveUsers(): Promise<number> {
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // DateUtils를 사용한 일수 기반 계산 (30일 전)
+    const thirtyDaysAgo = DateUtils.fromNowSubtractDays(30);
 
     // Count users who have logged in in the last 30 days
     return await this.userRepository.count({

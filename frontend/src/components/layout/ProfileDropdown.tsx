@@ -14,7 +14,6 @@ import { Avatar } from '@/components/ui/avatar';
 import {
   FiUser,
   FiSettings,
-  FiKey,
   FiLogOut,
   FiChevronDown,
   FiEdit3,
@@ -134,14 +133,6 @@ export default function ProfileDropdown({
           <span>DM 관리</span>
         </DropdownMenuItem>
 
-        {/* API Keys */}
-        <DropdownMenuItem 
-          onClick={() => handleNavigation('/settings/api-keys')}
-          className="cursor-pointer"
-        >
-          <FiKey className="mr-2 h-4 w-4" />
-          <span>API 키</span>
-        </DropdownMenuItem>
 
         {/* Blog Settings */}
         <DropdownMenuItem 

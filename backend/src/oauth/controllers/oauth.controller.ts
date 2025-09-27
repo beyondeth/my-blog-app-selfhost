@@ -9,18 +9,14 @@ import {
   Res,
   HttpCode,
   HttpStatus,
-  Param,
-  Delete,
   BadRequestException,
   HttpException,
   UnauthorizedException,
   Ip,
   Headers,
-  Logger,
 } from '@nestjs/common';
 import { Response } from 'express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { OptionalJwtAuthGuard } from '../../auth/guards/optional-jwt-auth.guard';
 import { OAuthGuard } from '../guards/oauth.guard';
 import { RequireScopes } from '../decorators/scopes.decorator';
@@ -29,7 +25,6 @@ import { OAuthService } from '../services/oauth.service';
 import { BlogsService } from '../../blogs/blogs.service';
 import { UsersService } from '../../users/users.service';
 import { UnifiedRedisService } from '../../redis/unified-redis.service';
-import { CreateClientDto } from '../dto/create-client.dto';
 import { AuthorizeDto } from '../dto/authorize.dto';
 import { TokenExchangeDto } from '../dto/token-exchange.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
@@ -42,7 +37,6 @@ import * as crypto from 'crypto';
 @ApiTags('OAuth2')
 @Controller('oauth')
 export class OAuthController {
-  private readonly logger = new Logger(OAuthController.name);
 
   constructor(
     private readonly oauthService: OAuthService,
@@ -51,59 +45,6 @@ export class OAuthController {
     private readonly redisService: UnifiedRedisService,
   ) {}
 
-  /**
-   * OAuth 클라이언트 생성
-   * 개발자가 새 OAuth 클라이언트를 등록
-   */
-  @Post('clients')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'OAuth 클라이언트 생성',
-    description: '새로운 OAuth 클라이언트를 등록합니다.'
-  })
-  async createClient(@Req() req: any, @Body() dto: CreateClientDto) {
-    const userId = req.user.id;
-    const client = await this.oauthService.createClient(
-      userId,
-      dto.clientName,
-      dto.redirectUris,
-      dto.description,
-      dto.allowedScopes,
-    );
-
-    return {
-      client_id: client.clientId,
-      client_secret: client.clientSecret,
-      client_name: client.clientName,
-      redirect_uris: client.redirectUris,
-    };
-  }
-
-  /**
-   * 사용자의 OAuth 클라이언트 목록 조회
-   */
-  @Get('clients')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'OAuth 클라이언트 목록 조회',
-    description: '현재 사용자가 생성한 OAuth 클라이언트 목록을 조회합니다.'
-  })
-  async getMyClients(@Req() req: any) {
-    const userId = req.user.id;
-    const clients = await this.oauthService.getUserClients(userId);
-
-    return clients.map(client => ({
-      client_id: client.clientId,
-      client_name: client.clientName,
-      redirect_uris: client.redirectUris,
-      allowed_scopes: client.allowedScopes,
-      is_active: client.isActive,
-      last_used_at: client.lastUsedAt,
-      created_at: client.createdAt,
-    }));
-  }
 
   /**
    * OAuth 인증 데이터 API
@@ -364,9 +305,9 @@ export class OAuthController {
       );
     } else if (body.grant_type === 'refresh_token') {
       return await this.oauthService.refreshAccessToken(
-        body.client_id,
-        body.client_secret,
-        '', // refresh_token은 기본값 사용
+        body.refresh_token,   // 첫 번째: refresh_token from body
+        body.client_id,       // 두 번째: client_id
+        body.client_secret,   // 세 번째: client_secret
       );
     } else {
       throw new BadRequestException('Unsupported grant_type');
@@ -418,50 +359,6 @@ export class OAuthController {
     };
   }
 
-  /**
-   * 승인된 OAuth 앱 목록 조회
-   */
-  @Get('authorized-apps')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: '승인된 OAuth 앱 목록',
-    description: '사용자가 승인한 OAuth 앱 목록을 조회합니다.'
-  })
-  async getAuthorizedApps(@Req() req: any) {
-    const userId = req.user.id;
-    const apps = await this.oauthService.getAuthorizedApps(userId);
-
-    return apps.map(app => ({
-      client_id: app.client.clientId,
-      client_name: app.client.clientName,
-      scopes: app.scopes,
-      authorized_at: app.client.createdAt,
-      last_used_at: app.lastUsed,
-    }));
-  }
-
-  /**
-   * OAuth 앱 승인 취소
-   */
-  @Delete('authorized-apps/:clientId')
-  @UseGuards(JwtAuthGuard)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'OAuth 앱 승인 취소',
-    description: '특정 OAuth 앱에 대한 승인을 취소합니다.'
-  })
-  async revokeApp(@Req() req: any, @Param('clientId') clientId: string) {
-    const userId = req.user.id;
-
-    // 해당 클라이언트의 모든 토큰을 실제로 취소 처리
-    // revokeAllClientTokens 메서드를 사용하여 DB에서 모든 토큰을 revoked 상태로 변경
-    await this.oauthService.revokeAllClientTokens(userId, clientId);
-
-    this.logger.log(`✅ OAuth 앱 승인 취소: userId=${userId}, clientId=${clientId}`);
-
-    return { message: 'Authorization revoked successfully' };
-  }
 
   /**
    * Token 취소 (Revocation)

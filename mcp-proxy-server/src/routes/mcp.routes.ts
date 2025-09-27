@@ -217,7 +217,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
    */
   router.post('/create-post', asyncHandler(async (req, res) => {
     const sessionId = req.headers['x-mcp-session-id'] as string;
-    console.log('받은 body:', JSON.stringify(req.body, null, 2));
+    // Body 로그 제거 - 불필요한 정보 노출 방지
     const { title, content, tags, qualityScore }: CreatePostRequest = req.body;
 
     if (!sessionId) {
@@ -255,12 +255,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
       qualityScore: qualityScore !== undefined ? qualityScore : undefined,
     };
 
-    console.log(`📝 MCP 포스트 생성 요청:`, {
-      sessionId: sessionId.substring(0, 8),
-      title,
-      tags,
-      contentLength: content ? content.length : 0,
-    });
+    // 최소한의 로그만 기록
 
     // Backend API로 포스트 생성 요청
     const response = await axios.post(
@@ -274,7 +269,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
       }
     );
 
-    console.log(`✅ 포스트 생성 성공: ${response.data.slug}`);
+    console.log('[CREATE_POST] OK');
 
     // 간소화된 응답 (태그 정보 제거)
     const apiResponse: ApiResponse = {

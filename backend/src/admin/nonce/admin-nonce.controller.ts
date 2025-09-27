@@ -4,7 +4,6 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
-import { McpAuthGuard } from '../../mcp/mcp-auth.guard';
 import { McpRateLimitService } from '../../mcp/mcp-rate-limit.service';
 
 @ApiTags('Admin - Nonce Management')
@@ -14,7 +13,6 @@ import { McpRateLimitService } from '../../mcp/mcp-rate-limit.service';
 @ApiBearerAuth()
 export class AdminNonceController {
   constructor(
-    private readonly mcpAuthGuard: McpAuthGuard,
     private readonly rateLimitService: McpRateLimitService,
   ) {}
 
@@ -67,19 +65,16 @@ export class AdminNonceController {
   })
   async getNonceStats() {
     try {
-      const [nonceStats, rateLimitStats] = await Promise.all([
-        this.mcpAuthGuard.getNonceStats(),
-        this.rateLimitService.getRateLimitStats(),
-      ]);
+      const rateLimitStats = await this.rateLimitService.getRateLimitStats();
 
       return {
         success: true,
         data: {
-          nonce: nonceStats,
+          // OAuth2 사용으로 nonce 통계 제거
           rateLimit: rateLimitStats,
           systemInfo: {
             redisConnected: true, // TODO: 실제 Redis 연결 상태 확인
-            cacheType: nonceStats.totalMemoryUsage !== 'Unknown' ? 'redis' : 'memory',
+            cacheType: 'redis',
             uptime: Math.floor(process.uptime()),
           },
         },

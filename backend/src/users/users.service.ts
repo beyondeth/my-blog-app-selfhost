@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { DateUtils } from '../common/utils/date.utils';
 import * as bcrypt from 'bcrypt';
 import { User, AuthProvider } from './entities/user.entity';
 import { Role } from '../common/enums/role.enum';
@@ -163,9 +164,8 @@ export class UsersService {
     const activeUsers = await this.usersRepository.count({ where: { isActive: true } });
     const adminUsers = await this.usersRepository.count({ where: { role: Role.ADMIN } });
     
-    // 최근 30일 가입자
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // 최근 30일 가입자 - DateUtils를 사용한 일수 기반 계산
+    const thirtyDaysAgo = DateUtils.fromNowSubtractDays(30);
     
     const recentUsers = await this.usersRepository.count({
       where: { createdAt: { $gte: thirtyDaysAgo } as any }

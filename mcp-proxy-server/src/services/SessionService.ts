@@ -49,7 +49,7 @@ export class SessionService {
     });
 
     this.redis.on('error', (err) => {
-      console.error('❌ Redis 오류:', err);
+      console.error('[REDIS] Connection error:', err.message || 'Unknown');
     });
   }
 
@@ -190,8 +190,12 @@ export class SessionService {
       session.refreshToken = refreshToken;
     }
     if (expiresIn) {
+      // expires_in 디버깅 로그
+      console.log(`[TOKEN] expires_in received: ${expiresIn} seconds (${expiresIn / 3600} hours)`);
       // 5분 여유 두고 만료 시간 설정
       session.tokenExpiresAt = Date.now() + ((expiresIn - 300) * 1000);
+      const expiresAt = new Date(session.tokenExpiresAt);
+      console.log(`[TOKEN] Token will expire at: ${expiresAt.toLocaleString()}`);
     }
     if (userId) {
       session.userId = userId;
@@ -262,7 +266,7 @@ export class SessionService {
         return access_token;
 
       } catch (error: any) {
-        console.error(`❌ 토큰 갱신 실패: ${error.message}`);
+        console.error('[TOKEN_REFRESH] Failed:', error.message || 'Unknown');
 
         // 갱신 실패 시 세션 삭제
         await this.deleteSession(sessionId);
@@ -271,7 +275,7 @@ export class SessionService {
     }
 
     // 리프레시 토큰도 없으면 재인증 필요
-    console.warn(`⚠️ 리프레시 토큰 없음: ${sessionId.substring(0, 8)}...`);
+    // 리프레시 토큰 없음 - 재인증 필요
     return null;
   }
 
@@ -302,13 +306,13 @@ export class SessionService {
     if (process.env.SESSION_STRICT_MODE === 'true') {
       // User-Agent 검증
       if (session.userAgent && userAgent && session.userAgent !== userAgent) {
-        console.warn(`⚠️ User-Agent 불일치: ${sessionId.substring(0, 8)}...`);
+        // User-Agent 불일치 감지
         return false;
       }
 
       // IP 주소 검증
       if (session.ipAddress && ipAddress && session.ipAddress !== ipAddress) {
-        console.warn(`⚠️ IP 주소 변경: ${sessionId.substring(0, 8)}...`);
+        // IP 주소 변경 감지
         return false;
       }
     }
@@ -345,7 +349,7 @@ export class SessionService {
   async cleanupPkceKeys(): Promise<void> {
     const keys = await this.redis.keys(`${this.PKCE_PREFIX}*`);
     if (keys.length > 0) {
-      console.log(`🧹 만료된 PKCE 키 ${keys.length}개 정리`);
+      // 만료된 PKCE 키 정리
       // TTL이 있으므로 자동 삭제되지만, 수동 정리도 가능
     }
   }

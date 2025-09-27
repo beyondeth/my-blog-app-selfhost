@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
+import { DateUtils } from '../../common/utils/date.utils';
 import * as bcrypt from 'bcrypt';
 import * as crypto from 'crypto';
 import { OAuthClient } from '../entities/oauth-client.entity';
@@ -34,109 +35,26 @@ export class OAuthService {
     private readonly jwtService: JwtService,
   ) {}
 
-  /**
-   * OAuth 클라이언트 생성
-   * MCP 클라이언트 앱 등록시 사용
-   */
-  async createClient(
-    userId: string,
-    clientName: string,
-    redirectUris: string[],
-    description?: string,
-    allowedScopes?: string[],
-  ): Promise<OAuthClient> {
-    // 사용자당 최대 10개 클라이언트 제한
-    const existingClients = await this.clientRepository.count({
-      where: { userId },
-    });
-
-    if (existingClients >= 10) {
-      throw new BadRequestException('최대 10개까지 OAuth 클라이언트를 생성할 수 있습니다');
-    }
-
-    // 클라이언트 ID와 시크릿 생성
-    const clientId = `mcp_${crypto.randomBytes(16).toString('hex')}`;
-    const rawSecret = crypto.randomBytes(32).toString('hex');
-    const hashedSecret = await bcrypt.hash(rawSecret, 10);
-
-    // 스코프 설정 (기본값 또는 전달된 값 사용, MCP 관련 스코프만 허용)
-    const scopes = allowedScopes?.filter(scope => scope.startsWith('mcp:')) || ['mcp:post:create'];
-
-    const client = this.clientRepository.create({
-      clientId,
-      clientSecret: hashedSecret,
-      clientName,
-      redirectUris,
-      allowedScopes: scopes.length > 0 ? scopes : ['mcp:post:create'], // 최소한 mcp:post:create는 포함
-      grantTypes: 'authorization_code',
-      userId,
-      description,
-      isActive: true,
-      isTrusted: false, // 기본적으로 신뢰하지 않음 (동의 화면 필요)
-    });
-
-    await this.clientRepository.save(client);
-
-    // 처음 생성시에만 평문 시크릿 반환 (이후 조회 불가)
-    return {
-      ...client,
-      clientSecret: rawSecret, // 평문 시크릿 (1회만 제공)
-    } as OAuthClient;
-  }
 
   /**
    * 클라이언트 검증
    * 클라이언트 ID와 시크릿이 유효한지 확인
    */
   async validateClient(clientId: string, clientSecret?: string): Promise<OAuthClient> {
-    // 디버그 로깅 추가
-    console.log('🔍 OAuth 클라이언트 검증 시작:', {
-      clientId,
-      hasSecret: !!clientSecret,
-      secretLength: clientSecret?.length,
-    });
 
     const client = await this.clientRepository.findOne({
       where: { clientId, isActive: true },
     });
 
     if (!client) {
-      console.error('❌ 클라이언트를 찾을 수 없음:', clientId);
       throw new UnauthorizedException('유효하지 않은 클라이언트입니다');
     }
 
-    console.log('✅ 클라이언트 발견:', {
-      id: client.id,
-      clientId: client.clientId,
-      clientName: client.clientName,
-      hashedSecretLength: client.clientSecret?.length,
-    });
-
     // 시크릿이 제공된 경우 검증
     if (clientSecret) {
-      console.log('🔑 시크릿 검증 디버깅:', {
-        providedSecret: clientSecret,
-        providedLength: clientSecret.length,
-        storedHash: client.clientSecret,
-        storedHashLength: client.clientSecret.length,
-        isHashFormat: client.clientSecret.startsWith('$2b$') || client.clientSecret.startsWith('$2a$'),
-      });
-
       const isValidSecret = await bcrypt.compare(clientSecret, client.clientSecret);
-      console.log('🔐 bcrypt 검증 결과:', isValidSecret);
-
-      // 추가 테스트: 알려진 시크릿으로 직접 테스트
-      if (clientSecret === 'mcp-secret-key-2024' && !isValidSecret) {
-        console.log('⚠️ 알려진 시크릿이지만 검증 실패. 해시 재생성 테스트:');
-        const testHash = await bcrypt.hash('mcp-secret-key-2024', 10);
-        console.log('  - 새로운 해시:', testHash);
-        console.log('  - 저장된 해시:', client.clientSecret);
-        const testCompare = await bcrypt.compare('mcp-secret-key-2024', testHash);
-        console.log('  - 새 해시로 테스트:', testCompare);
-      }
 
       if (!isValidSecret) {
-        console.error('❌ 시크릿 검증 실패');
         throw new UnauthorizedException('클라이언트 시크릿이 올바르지 않습니다');
       }
     }
@@ -145,7 +63,6 @@ export class OAuthService {
     client.lastUsedAt = new Date();
     await this.clientRepository.save(client);
 
-    console.log('✅ 클라이언트 검증 성공');
     return client;
   }
 
@@ -212,9 +129,8 @@ export class OAuthService {
       }), 300); // 5분 TTL
     }
 
-    // 5분 후 만료
-    const expiresAt = new Date();
-    expiresAt.setMinutes(expiresAt.getMinutes() + 5);
+    // 5분 후 만료 - DateUtils를 사용한 밀리초 기반 계산
+    const expiresAt = DateUtils.fromNowAddMinutes(5);
 
     const authCode = this.codeRepository.create({
       code,
@@ -255,14 +171,6 @@ export class OAuthService {
     scope: string;
     refresh_token?: string;
   }> {
-    // 디버깅: 토큰 교환 시작
-    console.log('🔄 토큰 교환 시작:', {
-      code: code?.substring(0, 10) + '...',
-      clientId,
-      clientSecret: clientSecret?.substring(0, 10) + '...',
-      redirectUri,
-      hasVerifier: !!codeVerifier,
-    });
 
     // 클라이언트 검증
     const client = await this.validateClient(clientId, clientSecret);
@@ -380,12 +288,12 @@ export class OAuthService {
       .update(refreshToken)
       .digest('hex');
 
-    // 토큰 만료 시간 설정
-    const accessExpiresAt = new Date();
-    accessExpiresAt.setHours(accessExpiresAt.getHours() + 1); // 1시간
-
-    const refreshExpiresAt = new Date();
-    refreshExpiresAt.setDate(refreshExpiresAt.getDate() + 30); // 30일
+    // 토큰 만료 시간 설정 - DateUtils를 사용한 밀리초 기반 계산
+    // 환경 변수는 초 단위이므로 fromSecondsToDate 사용
+    const accessTokenSeconds = this.configService.get<number>('OAUTH_ACCESS_TOKEN_EXPIRES_IN', 86400);
+    const refreshTokenSeconds = this.configService.get<number>('OAUTH_REFRESH_TOKEN_EXPIRES_IN', 2592000);
+    const accessExpiresAt = DateUtils.fromSecondsToDate(accessTokenSeconds);
+    const refreshExpiresAt = DateUtils.fromSecondsToDate(refreshTokenSeconds);
 
     // DB에 토큰 정보 저장
     const token = this.tokenRepository.create({
@@ -431,13 +339,13 @@ export class OAuthService {
         userId: authCode.userId,
         clientId: client.id,
       },
-      30 * 24 * 60 * 60, // 30일
+      this.configService.get<number>('OAUTH_REFRESH_TOKEN_EXPIRES_IN', 2592000), // 환경 변수에서 읽기
     );
 
     return {
       access_token: accessToken,
       token_type: 'Bearer',
-      expires_in: 3600, // 1시간 (초 단위)
+      expires_in: this.configService.get<number>('OAUTH_ACCESS_TOKEN_EXPIRES_IN', 86400), // 환경 변수에서 읽기
       scope: authCode.scopes.join(' '),
       refresh_token: refreshToken,
     };
@@ -453,32 +361,16 @@ export class OAuthService {
     clientId: string;
     scopes: string[];
   }> {
-    // 디버깅: 토큰 검증 시작
-    console.log('🔍 토큰 검증 시작:', {
-      token: accessToken.substring(0, 10) + '...',
-      timestamp: new Date().toISOString(),
-    });
 
     // 먼저 Redis에서 확인 (빠른 검증)
     const cachedData = await this.redisService.getCache<any>('oauth:token', accessToken);
 
-    console.log('📦 Redis 조회 결과:', {
-      found: !!cachedData,
-      data: cachedData ? JSON.stringify(cachedData).substring(0, 100) : null,
-    });
 
     if (cachedData) {
       const tokenData = cachedData;  // 이미 JSON으로 파싱됨
 
-      console.log('⏰ 만료 체크:', {
-        expiresAt: tokenData.expiresAt,
-        now: new Date().toISOString(),
-        isValid: new Date(tokenData.expiresAt) > new Date(),
-      });
-
       // 만료 확인
       if (new Date(tokenData.expiresAt) > new Date()) {
-        console.log('✅ 토큰 유효함');
         return tokenData;
       }
 
@@ -578,8 +470,9 @@ export class OAuthService {
       .update(newAccessToken)
       .digest('hex');
 
-    const expiresAt = new Date();
-    expiresAt.setHours(expiresAt.getHours() + 1); // 1시간
+    // 만료 시간 설정 - DateUtils를 사용한 밀리초 기반 계산
+    const accessTokenSeconds = this.configService.get<number>('OAUTH_ACCESS_TOKEN_EXPIRES_IN', 86400);
+    const expiresAt = DateUtils.fromSecondsToDate(accessTokenSeconds);
 
     // 새 토큰 DB 저장
     const newToken = this.tokenRepository.create({
@@ -615,7 +508,7 @@ export class OAuthService {
     return {
       access_token: newAccessToken,
       token_type: 'Bearer',
-      expires_in: 3600,
+      expires_in: this.configService.get<number>('OAUTH_ACCESS_TOKEN_EXPIRES_IN', 86400), // 환경 변수에서 읽기
       scope: oldToken.scopes.join(' '),
     };
   }
@@ -649,85 +542,8 @@ export class OAuthService {
     }
   }
 
-  /**
-   * 클라이언트의 모든 토큰 취소
-   * OAuth 앱 연결 해제시 사용
-   */
-  async revokeAllClientTokens(
-    userId: string,
-    clientId: string,
-  ): Promise<void> {
-    // 해당 클라이언트의 모든 활성 토큰 조회
-    const tokens = await this.tokenRepository.find({
-      where: {
-        userId,
-        clientId,
-        isRevoked: false,
-      },
-    });
 
-    // 모든 토큰 취소 처리
-    for (const token of tokens) {
-      // DB에서 취소 처리
-      token.isRevoked = true;
-      token.revokedAt = new Date();
-      token.revokeReason = 'Client authorization revoked';
-    }
 
-    await this.tokenRepository.save(tokens);
-
-    // 참고: Redis에 캐시된 토큰들은 TTL로 자동 만료되므로
-    // 여기서는 DB 업데이트만 처리. 다음 검증시 DB 확인하여 거부됨
-  }
-
-  /**
-   * 사용자의 OAuth 클라이언트 목록 조회
-   */
-  async getUserClients(userId: string): Promise<OAuthClient[]> {
-    return this.clientRepository.find({
-      where: { userId },
-      order: { createdAt: 'DESC' },
-    });
-  }
-
-  /**
-   * 사용자가 인증한 OAuth 앱 목록 조회
-   */
-  async getAuthorizedApps(userId: string): Promise<{
-    client: OAuthClient;
-    lastUsed: Date;
-    scopes: string[];
-  }[]> {
-    // 활성 토큰이 있는 클라이언트 조회
-    const tokens = await this.tokenRepository
-      .createQueryBuilder('token')
-      .where('token.userId = :userId', { userId })
-      .andWhere('token.isRevoked = false')
-      .andWhere('token.expiresAt > :now', { now: new Date() })
-      .leftJoinAndSelect('token.client', 'client')
-      .orderBy('token.lastUsedAt', 'DESC')
-      .getMany();
-
-    // 클라이언트별로 그룹화
-    const clientMap = new Map<string, {
-      client: OAuthClient;
-      lastUsed: Date;
-      scopes: string[];
-    }>();
-
-    for (const token of tokens) {
-      const existing = clientMap.get(token.clientId);
-      if (!existing || token.lastUsedAt > existing.lastUsed) {
-        clientMap.set(token.clientId, {
-          client: token.client,
-          lastUsed: token.lastUsedAt || token.createdAt,
-          scopes: token.scopes,
-        });
-      }
-    }
-
-    return Array.from(clientMap.values());
-  }
 
   /**
    * JWT 토큰 검증

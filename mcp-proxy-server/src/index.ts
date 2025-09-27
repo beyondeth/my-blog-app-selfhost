@@ -49,8 +49,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// HTTP 요청 로깅
-app.use(httpLogger);
+// HTTP 요청 로깅 - 개발 환경 또는 info 레벨 이상에서만 활성화
+if (config.NODE_ENV === 'development' || config.LOG_LEVEL === 'info' || config.LOG_LEVEL === 'debug') {
+  app.use(httpLogger);
+}
 
 // 헬스 체크 (루트 레벨)
 app.get('/health', (req, res) => {

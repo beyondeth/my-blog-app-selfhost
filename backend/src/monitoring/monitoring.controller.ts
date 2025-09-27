@@ -15,6 +15,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@ne
 import { MonitoringService } from './monitoring.service';
 import { McpTrackingService } from '../mcp/mcp-tracking.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { DateUtils } from '../common/utils/date.utils';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
@@ -167,19 +168,20 @@ export class MonitoringController {
     @Query('days', new DefaultValuePipe(7), ParseIntPipe) days: number,
   ) {
     const safeDays = Math.min(days, 30); // 최대 30일
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - safeDays);
+    // DateUtils를 사용한 일수 기반 계산
+    const startDate = DateUtils.fromNowSubtractDays(safeDays);
     const endDate = new Date();
 
     const stats = await this.mcpTrackingService.getStats(startDate, endDate);
 
     // Transform to match frontend expectations
+    // 오늘 시작 시간 (00:00:00.000)
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
     const todayStats = await this.mcpTrackingService.getStats(todayStart, endDate);
 
-    const weekStart = new Date();
-    weekStart.setDate(weekStart.getDate() - 7);
+    // DateUtils를 사용한 일수 기반 계산 (7일 전)
+    const weekStart = DateUtils.fromNowSubtractDays(7);
     const weekStats = await this.mcpTrackingService.getStats(weekStart, endDate);
 
     return {
@@ -206,8 +208,8 @@ export class MonitoringController {
     @Query('days', new DefaultValuePipe(7), ParseIntPipe) days: number,
   ) {
     const safeDays = Math.min(days, 30); // 최대 30일
-    const startDate = new Date();
-    startDate.setDate(startDate.getDate() - safeDays);
+    // DateUtils를 사용한 일수 기반 계산
+    const startDate = DateUtils.fromNowSubtractDays(safeDays);
     const endDate = new Date();
 
     return this.mcpTrackingService.getStatsByClient(clientType, startDate, endDate);

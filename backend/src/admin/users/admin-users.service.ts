@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, Between, FindOptionsWhere, Not } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { DateUtils } from '../../common/utils/date.utils';
 import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { Role } from '../../common/enums/role.enum';
@@ -533,8 +534,8 @@ export class AdminUsersService {
   }
 
   private async getRecentSignups(days = 7) {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
+    // DateUtils를 사용한 일수 기반 계산
+    const since = DateUtils.fromNowSubtractDays(days);
 
     return await this.userRepository.count({
       where: {

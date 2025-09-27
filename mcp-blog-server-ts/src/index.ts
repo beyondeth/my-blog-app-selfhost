@@ -75,21 +75,46 @@ ${writingStyle.instructions}`,
     async () => {
       console.error("🔐 인증 상태 확인 중...");
 
-      // 항상 Proxy Server를 통해 인증 상태를 확인
-      // 웹사이트에서 로그아웃했을 수 있으므로 세션 파일만 믿지 않음
+      // 1. 먼저 로컬 세션이 있고 유효한지 확인
+      if (proxyClient.getSessionId()) {
+        console.error("📂 로컬 세션 발견, 유효성 검증 중...");
+
+        try {
+          const isValid = await proxyClient.isAuthenticated();
+          if (isValid) {
+            console.error("✅ 기존 세션이 유효합니다! (인증 성공)\n📝 자동포스팅 생성중 입니다. 잠시만 기다려주세요...");
+            return {
+              content: [
+                {
+                  type: "text",
+                  text: `✅ 기존 세션이 유효합니다! (인증 성공)\n🆔 세션: xxxxxxxx...\n📝 자동포스팅 생성중 입니다. 잠시만 기다려주세요...\n\n이제 create_post 도구를 사용하여 블로그 포스팅을 할 수 있습니다.`,
+                },
+              ],
+            };
+          } else {
+            console.error("❌ 세션이 만료되었습니다. 재인증 필요");
+            proxyClient.setSessionId(undefined); // 만료된 세션 삭제
+          }
+        } catch (error) {
+          console.error("⚠️ 세션 검증 실패:", error);
+        }
+      }
+
+      // 2. 세션이 없거나 만료된 경우에만 새 인증 시작
+      console.error("🔄 새로운 인증 프로세스 시작...");
       console.error("🔍 백엔드 서버와 인증 상태 동기화 중...");
 
       try {
         const result = await proxyClient.authenticate();
 
         if (result.success && result.authenticated) {
-          // 이미 인증된 상태
-          console.error("✅ 인증 확인됨");
+          // 이미 인증된 상태 (드물지만 가능한 경우)
+          console.error("✅ 인증 상태가 확인되었습니다! (인증 성공)\n📝 자동포스팅 생성중 입니다. 잠시만 기다려주세요...");
           return {
             content: [
               {
                 type: "text",
-                text: `✅ 인증 상태가 확인되었습니다!\n\n🆔 세션: ${result.sessionId?.substring(0, 8)}...\n⏱️ 유효 기간: 24시간\n📝 상태: 포스팅 가능\n\n이제 create_post 도구를 사용하여 블로그 포스팅을 할 수 있습니다.`,
+                text: `✅ 인증 상태가 확인되었습니다! (인증 성공)\n🆔 세션: xxxxxxxx...\n📝 자동포스팅 생성중 입니다. 잠시만 기다려주세요...\n\n이제 create_post 도구를 사용하여 블로그 포스팅을 할 수 있습니다.`,
               },
             ],
           };
@@ -157,7 +182,7 @@ ${writingStyle.instructions}`,
                       content: [
                         {
                           type: "text",
-                          text: `✅ OAuth2 인증 성공!\n🆔 세션 ID: ${state?.substring(0, 8)}...\n🎯 포스팅 준비 완료!`,
+                          text: `✅ OAuth2 인증 성공! (로그인 완료)\n🆔 세션 ID: xxxxxxxx...\n📝 자동포스팅 생성중 입니다. 잠시만 기다려주세요...\n\n🎯 포스팅 준비 완료!`,
                         },
                       ],
                     });

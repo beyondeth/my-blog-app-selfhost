@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, FindOptionsWhere } from 'typeorm';
 import { AuditLog, AuditAction } from './entities/audit-log.entity';
+import { DateUtils } from '../common/utils/date.utils';
 
 export interface AuditContext {
   userId: string;
@@ -265,8 +266,8 @@ export class AuditService {
    * Clean up old audit logs (retention policy)
    */
   async cleanupOldLogs(retentionDays = 90) {
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - retentionDays);
+    // DateUtils를 사용한 일수 기반 계산
+    const cutoffDate = DateUtils.fromNowSubtractDays(retentionDays);
 
     const result = await this.auditLogRepository
       .createQueryBuilder()
