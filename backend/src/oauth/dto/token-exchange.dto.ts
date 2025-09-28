@@ -2,16 +2,17 @@ import { IsString, IsEnum, IsUrl, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
- * 토큰 교환 요청 DTO (Authorization Code & Refresh Token)
+ * 토큰 교환 요청 DTO (Authorization Code 전용)
+ * Refresh Token은 RefreshTokenDto 사용
  */
 export class TokenExchangeDto {
   @ApiProperty({
-    description: 'Grant 타입',
+    description: 'Grant 타입 (authorization_code 고정)',
     example: 'authorization_code',
-    enum: ['authorization_code', 'refresh_token'],
+    enum: ['authorization_code'],
   })
-  @IsEnum(['authorization_code', 'refresh_token'])
-  grant_type: 'authorization_code' | 'refresh_token';
+  @IsEnum(['authorization_code'])
+  grant_type: 'authorization_code';
 
   @ApiProperty({
     description: '인증 코드',
@@ -48,13 +49,4 @@ export class TokenExchangeDto {
   @IsOptional()
   @IsString()
   code_verifier?: string;
-
-  @ApiProperty({
-    description: 'Refresh token (grant_type이 refresh_token일 때 사용)',
-    example: 'refresh_xyz789...',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  refresh_token?: string;
 }

@@ -2,19 +2,21 @@ import { IsString, IsEnum } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 /**
- * 리프레시 토큰 요청 DTO
+ * Refresh Token 요청 DTO
+ * grant_type이 refresh_token일 때 사용
  */
 export class RefreshTokenDto {
   @ApiProperty({
-    description: 'Grant 타입',
+    description: 'Grant 타입 (refresh_token 고정)',
     example: 'refresh_token',
+    enum: ['refresh_token'],
   })
   @IsEnum(['refresh_token'])
   grant_type: 'refresh_token';
 
   @ApiProperty({
-    description: '리프레시 토큰',
-    example: 'refresh_abc123...',
+    description: 'Refresh token',
+    example: 'refresh_xyz789...',
   })
   @IsString()
   refresh_token: string;

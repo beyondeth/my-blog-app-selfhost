@@ -2,8 +2,6 @@ import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete,
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
-import { AuthApiKeyService } from './auth-api-key.service';
-import { ApiKeysService } from '../api-keys/api-keys.service';
 import { EmailService } from '../email/email.service';
 import { UserDeletionService } from '../users/services/user-deletion.service';
 import { SendCodeDto } from '../email/dto/send-code.dto';
@@ -16,7 +14,6 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
-import { VerifyApiKeyDto } from './dto/verify-api-key.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { User } from '../users/entities/user.entity';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
@@ -28,8 +25,6 @@ export class AuthController {
 
   constructor(
     private readonly authService: AuthService,
-    private readonly authApiKeyService: AuthApiKeyService,
-    private readonly apiKeysService: ApiKeysService,
     private readonly emailService: EmailService,
     private readonly userDeletionService: UserDeletionService,
     private readonly configService: ConfigService,
@@ -452,185 +447,6 @@ export class AuthController {
     });
 
     return res.json({ message: '로그아웃되었습니다.' });
-  }
-
-  @Post('verify-api-key')
-  @Public()
-  @ApiOperation({ summary: 'API 키 HMAC 서명 검증' })
-  @ApiResponse({ status: 200, description: 'API 키 검증 성공' })
-  @ApiResponse({ status: 401, description: 'API 키 검증 실패' })
-  async verifyApiKey(@Body() verifyDto: VerifyApiKeyDto, @Response() res) {
-    const result = await this.authApiKeyService.verifyApiKeySignature(
-      verifyDto.timestamp,
-      verifyDto.nonce,
-      verifyDto.signature,
-      verifyDto.keyId,
-    );
-
-    if (!result.valid) {
-      return res.status(401).json({ 
-        message: 'Invalid API key signature',
-        valid: false 
-      });
-    }
-
-    // 검증 성공 시 세션 토큰 생성 (선택적)
-    const sessionToken = await this.authService.createSessionToken(result.userId);
-
-    return res.json({
-      valid: true,
-      userId: result.userId,
-      blogId: result.blogId,
-      sessionToken,
-      message: 'API key verified successfully'
-    });
-  }
-
-  @Post('verify-api-key-with-plain')
-  @Public()
-  @ApiOperation({ summary: '평문 API 키를 사용한 HMAC 서명 검증 (MCP 서버용)' })
-  @ApiResponse({ status: 200, description: 'API 키 검증 성공' })
-  @ApiResponse({ status: 401, description: 'API 키 검증 실패' })
-  async verifyApiKeyWithPlain(
-    @Body() body: { 
-      plainKey: string;
-      timestamp: string;
-      nonce: string;
-      signature: string;
-    }, 
-    @Response() res
-  ) {
-    // 평문 키로 HMAC 서명 검증
-    const result = await this.authApiKeyService.verifyWithPlainKey(
-      body.plainKey,
-      body.timestamp,
-      body.nonce,
-      body.signature
-    );
-    
-    if (!result.valid || !result.apiKey) {
-      return res.status(401).json({ 
-        message: 'Invalid API key signature',
-        valid: false 
-      });
-    }
-
-    // 검증 성공 시 세션 토큰 생성
-    const sessionToken = await this.authService.createSessionToken(result.apiKey.userId);
-
-    return res.json({
-      valid: true,
-      userId: result.apiKey.userId,
-      blogId: result.apiKey.blogId,
-      sessionToken,
-      blog: result.apiKey.blog,
-      message: 'API key verified successfully'
-    });
-  }
-
-  @Post('verify-api-key-id-secret')
-  @Public()
-  @ApiOperation({ summary: 'AWS V4 스타일 API 키 검증 (Secret 미전송)' })
-  @ApiResponse({ status: 200, description: 'API 키 검증 성공' })
-  @ApiResponse({ status: 401, description: 'API 키 검증 실패' })
-  async verifyApiKeyIdSecret(
-    @Body() body: { 
-      keyId: string;
-      keySecret?: string;  // Optional - AWS V4에서는 사용하지 않음
-      timestamp: string;
-      nonce: string;
-      signature?: string;  // 레거시 지원
-    },
-    @Request() req,
-    @Response() res
-  ) {
-    // 헤더에서 서명 정보 추출
-    const signature = req.headers['x-api-signature'] || body.signature;
-    const timestamp = req.headers['x-api-timestamp'] || body.timestamp;
-    const nonce = req.headers['x-api-nonce'] || body.nonce;
-    
-    console.log('Auth Controller - Received request:', {
-      keyId: body.keyId,
-      hasKeySecret: !!body.keySecret,
-      signature: signature?.substring(0, 32),
-      timestamp,
-      nonce: nonce?.substring(0, 16),
-      headers: Object.keys(req.headers).filter(h => h.startsWith('x-api')),
-    });
-    
-    if (!signature) {
-      return res.status(401).json({ 
-        message: 'Missing signature',
-        valid: false 
-      });
-    }
-
-    // AWS V4 스타일 검증 (keySecret 없이)
-    // 서명 검증을 위한 정규화된 body 생성 (signature 필드 제외)
-    const normalizedBody = JSON.stringify({
-      keyId: body.keyId,
-      timestamp: body.timestamp,
-      nonce: body.nonce,
-    });
-    
-    const result = await this.authApiKeyService.verifyWithIdAndSecret(
-      body.keyId,
-      body.keySecret,  // undefined일 수 있음 (AWS V4 스타일)
-      timestamp,
-      nonce,
-      signature,
-      req.headers,
-      normalizedBody
-    );
-    
-    if (!result.valid || !result.apiKey) {
-      return res.status(401).json({ 
-        message: 'Invalid API key signature',
-        valid: false 
-      });
-    }
-
-    // 검증 성공 시 세션 토큰 생성
-    const sessionToken = await this.authService.createSessionToken(result.apiKey.userId);
-
-    return res.json({
-      valid: true,
-      userId: result.apiKey.userId,
-      blogId: result.apiKey.blogId,
-      sessionToken,
-      blog: result.apiKey.blog,
-      message: 'API key verified successfully (AWS V4)'
-    });
-  }
-
-  @Post('verify-request')
-  @Public()
-  @ApiOperation({ summary: 'API 요청 서명 검증' })
-  @ApiResponse({ status: 200, description: '요청 서명 검증 성공' })
-  @ApiResponse({ status: 401, description: '요청 서명 검증 실패' })
-  async verifyRequest(@Body() body: any, @Response() res) {
-    const { method, endpoint, timestamp, nonce, signature, apiKey } = body;
-    
-    const isValid = await this.authApiKeyService.verifyRequestSignature(
-      method,
-      endpoint,
-      timestamp,
-      nonce,
-      signature,
-      apiKey,
-    );
-
-    if (!isValid) {
-      return res.status(401).json({ 
-        message: 'Invalid request signature',
-        valid: false 
-      });
-    }
-
-    return res.json({
-      valid: true,
-      message: 'Request signature verified successfully'
-    });
   }
 
   @Post('forgot-password')

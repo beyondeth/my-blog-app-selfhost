@@ -29,6 +29,8 @@ import { AuthorizeDto } from '../dto/authorize.dto';
 import { TokenExchangeDto } from '../dto/token-exchange.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import * as crypto from 'crypto';
+import { plainToClass } from 'class-transformer';
+import { validate } from 'class-validator';
 
 /**
  * OAuth2 인증 컨트롤러
@@ -279,35 +281,55 @@ export class OAuthController {
   }
 
   /**
-   * Access Token 발급 (Authorization Code 교환)
+   * Access Token 발급 (Authorization Code 교환 및 Refresh Token)
    */
   @Post('token')
   @Public()
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
     summary: 'Access Token 발급',
-    description: 'Authorization Code를 Access Token으로 교환합니다.'
+    description: 'Authorization Code를 Access Token으로 교환하거나 Refresh Token으로 갱신합니다.'
   })
-  async exchangeToken(@Body() body: TokenExchangeDto, @Headers() headers: any) {
+  async exchangeToken(@Body() body: any, @Headers() headers: any) {
     console.log('🔄 Token exchange 요청:', {
       grant_type: body.grant_type,
       client_id: body.client_id,
       hasCode: !!body.code,
+      hasRefreshToken: !!body.refresh_token,
     });
 
+    // grant_type에 따라 다른 DTO로 검증
     if (body.grant_type === 'authorization_code') {
+      // Authorization Code DTO 검증
+      const dto = plainToClass(TokenExchangeDto, body);
+      const errors = await validate(dto);
+
+      if (errors.length > 0) {
+        const messages = errors.map(err => Object.values(err.constraints || {}).join(', ')).join('; ');
+        throw new BadRequestException(`Validation failed: ${messages}`);
+      }
+
       return await this.oauthService.exchangeCodeForToken(
-        body.code,           // 인증 코드가 첫 번째 파라미터
-        body.client_id,      // 클라이언트 ID가 두 번째
-        body.client_secret,  // 클라이언트 시크릿이 세 번째
-        body.redirect_uri,   // 리다이렉트 URI가 네 번째
-        body.code_verifier,  // PKCE 검증자가 다섯 번째
+        dto.code,           // 인증 코드가 첫 번째 파라미터
+        dto.client_id,      // 클라이언트 ID가 두 번째
+        dto.client_secret,  // 클라이언트 시크릿이 세 번째
+        dto.redirect_uri,   // 리다이렉트 URI가 네 번째
+        dto.code_verifier,  // PKCE 검증자가 다섯 번째
       );
     } else if (body.grant_type === 'refresh_token') {
+      // Refresh Token DTO 검증
+      const dto = plainToClass(RefreshTokenDto, body);
+      const errors = await validate(dto);
+
+      if (errors.length > 0) {
+        const messages = errors.map(err => Object.values(err.constraints || {}).join(', ')).join('; ');
+        throw new BadRequestException(`Validation failed: ${messages}`);
+      }
+
       return await this.oauthService.refreshAccessToken(
-        body.refresh_token,   // 첫 번째: refresh_token from body
-        body.client_id,       // 두 번째: client_id
-        body.client_secret,   // 세 번째: client_secret
+        dto.refresh_token,   // 첫 번째: refresh_token
+        dto.client_id,       // 두 번째: client_id
+        dto.client_secret,   // 세 번째: client_secret
       );
     } else {
       throw new BadRequestException('Unsupported grant_type');

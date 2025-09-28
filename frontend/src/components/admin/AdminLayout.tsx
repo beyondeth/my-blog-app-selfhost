@@ -16,9 +16,7 @@ import {
   Image,
   Bug,
   Database,
-  AlertTriangle,
-  Bot,
-  Key
+  AlertTriangle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -39,12 +37,9 @@ const navigation: NavigationItem[] = [
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
   { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
-  { name: 'AI 포스팅 트래킹', href: '/admin/mcp-tracking', icon: Bot, adminOnly: true },
   { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true, badge: 'New' },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
-  { name: '메모리 관리', href: '/admin/memory', icon: Database, adminOnly: true },
-  { name: '논스 관리', href: '/admin/nonce', icon: Key, adminOnly: true },
   { name: t.navigation.settings, href: '/admin/settings', icon: Settings },
 ];
 

@@ -1,5 +1,4 @@
 import { Controller, Post, Body, UseGuards, UseInterceptors, Request, Headers, UnauthorizedException, Logger } from '@nestjs/common';
-import { McpTrackingService } from './mcp-tracking.service';
 import { CreatePostDto } from '../posts/dto/create-post.dto';
 import { Public } from '../common/decorators/public.decorator';
 import { OAuthGuard } from '../oauth/guards/oauth.guard';
@@ -18,7 +17,6 @@ export class McpController {
   private readonly logger = new Logger(McpController.name);
 
   constructor(
-    private readonly mcpTrackingService: McpTrackingService,
     private readonly postsService: PostsService,
     private readonly cacheService: CacheService,
     private readonly redisService: UnifiedRedisService,
@@ -126,33 +124,8 @@ export class McpController {
       // 캐시 무효화 실패해도 포스트 생성은 성공
     }
 
-    // Log activity after post creation with slug
-    await this.mcpTrackingService.logActivity({
-      userId: user.id,
-      apiKeyId: null, // OAuth2 사용 시 API Key 없음
-      actionType: 'write',
-      actionCategory: 'post_creation',
-      resourceType: 'post',
-      resourceId: createdPost.id,
-      resourceSlug: createdPost.slug,
-      clientType,
-      requestEndpoint: '/mcp/posts',
-      requestMethod: 'POST',
-      ipAddress: req.ip || headers['x-forwarded-for'] || headers['x-real-ip'] || 'unknown',
-      userAgent: headers['user-agent'],
-      metadata: {
-        title: createdPost.title,
-        tags: createPostDto.tags,
-        aiTag,
-        postId: createdPost.id,
-        slug: createdPost.slug,
-        authType: 'oauth2',
-      },
-      responseTimeMs: Date.now() - startTime,
-    }).catch(error => {
-      // Don't fail the request if tracking fails
-      this.logger.error(`Failed to log MCP activity: ${error.message}`);
-    });
+    // MCP 트래킹 제거됨 - 나중에 재구현 예정
+    // TODO: MCP tracking을 다시 구현할 때 OAuth2 기반으로 추가
 
     return createdPost;
   }

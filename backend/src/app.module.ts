@@ -18,7 +18,6 @@ import { PostsModule } from './posts/posts.module';
 import { CommentsModule } from './comments/comments.module';
 import { FilesModule } from './files/files.module';
 import { BlogsModule } from './blogs/blogs.module';
-import { ApiKeysModule } from './api-keys/api-keys.module';
 import { TagsModule } from './tags/tags.module';
 import { McpModule } from './mcp/mcp.module';
 import { EmailModule } from './email/email.module';
@@ -27,7 +26,6 @@ import { AuditModule } from './audit/audit.module';
 import { AdminModule } from './admin/admin.module';
 import { CacheModule } from './cache/cache.module';
 import { MonitoringModule } from './monitoring/monitoring.module';
-import { SharedTrackingModule } from './shared/shared-tracking.module';
 import { RedisModule } from './redis/redis.module';
 import { ChatModule } from './chat/chat.module';
 import { MetricsModule } from './metrics/metrics.module';
@@ -89,7 +87,6 @@ import { OauthModule } from './oauth/oauth.module';
     RedisModule, // Global Redis module for distributed state management
     CacheModule, // Global cache module with Redis support
     MonitoringModule, // Global monitoring module for suspicious requests
-    SharedTrackingModule, // Shared module for MCP tracking functionality
     MetricsModule, // Prometheus metrics module
     AuthModule,
     UsersModule,
@@ -98,7 +95,6 @@ import { OauthModule } from './oauth/oauth.module';
     CommentsModule,
     FilesModule,
     BlogsModule,
-    ApiKeysModule,
     McpModule,
     EmailModule,
     ReportsModule,
