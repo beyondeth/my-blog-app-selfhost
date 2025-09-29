@@ -30,6 +30,11 @@ import { RedisModule } from './redis/redis.module';
 import { ChatModule } from './chat/chat.module';
 import { MetricsModule } from './metrics/metrics.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { PaymentModule } from './payment/payment.module';
+import { UsageModule } from './usage/usage.module';
+import { PaymentEventsModule } from './payment/payment-events.module';
+import { SharedSubscriptionModule } from './shared/shared-subscription.module';
 
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -88,8 +93,9 @@ import { OauthModule } from './oauth/oauth.module';
     CacheModule, // Global cache module with Redis support
     MonitoringModule, // Global monitoring module for suspicious requests
     MetricsModule, // Prometheus metrics module
+    PaymentEventsModule, // Global payment events module (Event-Driven Architecture)
     AuthModule,
-    UsersModule,
+    UsersModule, // 먼저 로드 - 다른 모듈들이 의존
     PostsModule,
     TagsModule,
     CommentsModule,
@@ -105,6 +111,10 @@ import { OauthModule } from './oauth/oauth.module';
     ChatModule,
     OauthModule,
     // AnalyticsModule,
+    SubscriptionModule, // UsersModule 이후에 로드
+    UsageModule, // SubscriptionModule과 UsersModule 이후에 로드
+    SharedSubscriptionModule, // UsageModule 이후에 로드 (UsageLimitGuard 제공)
+    PaymentModule, // 마지막에 로드 (이벤트 기반으로 다른 모듈과 통신)
   ],
   providers: [
     // Global guards

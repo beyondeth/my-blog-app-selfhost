@@ -10,8 +10,11 @@ import dynamic from 'next/dynamic';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useCreatePost } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
+import { useCheckUsageLimit } from '@/hooks/useSubscription';
+import { ResourceType } from '@/types/subscription';
 import type { UploadedImageInfo } from '@/editor';
 import Spinner from '@/components/ui/Spinner';
+import Link from 'next/link';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogRichTextEditor = dynamic(
@@ -46,6 +49,9 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
   const { data: blog, isLoading: isBlogLoading } = useBlogBySlug(blogSlug);
   const { user, isLoading: isUserLoading } = useAuth();
   const createPostMutation = useCreatePost();
+
+  // 포스트 생성 제한 체크
+  const { data: usageLimit, isLoading: isUsageLimitLoading } = useCheckUsageLimit(ResourceType.POST);
   
   // 상태를 여기서 중앙 관리 (Single Source of Truth)
   const [images, setImages] = useState<UploadedImageInfo[]>([]);
@@ -157,7 +163,7 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
   };
 
   // Loading states
-  if (isBlogLoading || isUserLoading) {
+  if (isBlogLoading || isUserLoading || isUsageLimitLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Spinner size="lg" />
@@ -191,6 +197,57 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
           <p className="text-sm text-red-600 mt-2">
             블로그 소유자만 포스트를 작성할 수 있습니다.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  // 포스트 생성 제한 체크
+  if (usageLimit && !usageLimit.allowed) {
+    return (
+      <div className="max-w-4xl mx-auto p-6">
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6">
+          <h2 className="text-xl font-semibold text-yellow-900 mb-3">
+            포스트 생성 한도 초과
+          </h2>
+          <p className="text-yellow-800 mb-4">
+            {usageLimit.reason || '이번 달 포스트 생성 한도에 도달했습니다.'}
+          </p>
+          <div className="bg-white rounded-lg p-4 mb-4">
+            <p className="text-sm text-gray-600 mb-2">현재 사용량:</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                <span className="text-2xl font-bold text-gray-900">
+                  {usageLimit.currentUsage}
+                </span>
+                <span className="text-gray-500">/</span>
+                <span className="text-xl font-medium text-gray-700">
+                  {usageLimit.limit}
+                </span>
+                <span className="text-sm text-gray-600">포스트</span>
+              </div>
+              <div className="text-right">
+                <div className="text-xs text-gray-500">이번 달 한도</div>
+                <div className="text-sm font-medium text-red-600">
+                  100% 사용
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <Link
+              href="/pricing"
+              className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              플랜 업그레이드
+            </Link>
+            <button
+              onClick={() => router.back()}
+              className="inline-flex items-center px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              돌아가기
+            </button>
+          </div>
         </div>
       </div>
     );

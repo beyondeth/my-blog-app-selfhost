@@ -24,7 +24,8 @@
     "migration:revert": "ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d ./src/data-source.ts",
     "migrate:files": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts",
     "migrate:files:dry": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --dry-run",
-    "migrate:files:execute": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --execute"
+    "migrate:files:execute": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --execute",
+    "seed:subscription-plans": "ts-node -r tsconfig-paths/register src/commands/seed-subscription-plans.command.ts"
   },
   "keywords": [],
   "packageManager": "pnpm@9.0.0",
@@ -39,6 +40,7 @@
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^3.0.0",
     "@nestjs/core": "^10.0.0",
+    "@nestjs/event-emitter": "^3.0.1",
     "@nestjs/jwt": "^10.1.0",
     "@nestjs/passport": "^10.0.0",
     "@nestjs/platform-express": "^10.0.0",

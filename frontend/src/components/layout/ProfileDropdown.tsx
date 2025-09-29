@@ -23,7 +23,9 @@ import {
   FiBell,
   FiHelpCircle,
   FiUsers,
-  FiMessageSquare
+  FiMessageSquare,
+  FiCreditCard,
+  FiTrendingUp
 } from 'react-icons/fi';
 
 interface ProfileDropdownProps {
@@ -96,12 +98,33 @@ export default function ProfileDropdown({
         )}
 
         {/* Analytics */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => handleNavigation('/analytics')}
           className="cursor-pointer"
         >
           <FiBarChart2 className="mr-2 h-4 w-4" />
           <span>분석</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
+
+        {/* 구독 관련 메뉴 추가 */}
+        {/* 구독 관리 */}
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/account/subscription')}
+          className="cursor-pointer"
+        >
+          <FiCreditCard className="mr-2 h-4 w-4" />
+          <span>구독 관리</span>
+        </DropdownMenuItem>
+
+        {/* 요금제 */}
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/pricing')}
+          className="cursor-pointer"
+        >
+          <FiTrendingUp className="mr-2 h-4 w-4" />
+          <span>요금제</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

@@ -36,11 +36,10 @@ export class RegisterDto {
   password: string;
 
   @ApiProperty({
-    description: 'Email verification session token',
+    description: 'Email verification session token (필수)',
     example: 'abc123def456...',
-    required: false,
+    required: true,
   })
   @IsString()
-  @IsOptional()
-  emailVerificationToken?: string;
+  emailVerificationToken: string;
 } 

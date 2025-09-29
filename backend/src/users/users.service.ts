@@ -17,6 +17,19 @@ export class UsersService {
     private readonly usersRepository: Repository<User>,
   ) {}
 
+  /**
+   * 사용자의 블로그 개수 조회
+   */
+  async getUserBlogCount(userId: string): Promise<number> {
+    // 현재 사용자는 블로그를 1개만 가질 수 있음
+    const user = await this.usersRepository.findOne({
+      where: { id: userId },
+      relations: ['blog'],
+    });
+
+    return user?.blog ? 1 : 0;
+  }
+
   async create(createUserDto: CreateUserDto): Promise<User> {
     try {
       const user = this.usersRepository.create(createUserDto);

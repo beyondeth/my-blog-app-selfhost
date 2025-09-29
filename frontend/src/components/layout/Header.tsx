@@ -10,6 +10,7 @@ import { FiEdit3, FiLogOut, FiMenu, FiX, FiSearch } from 'react-icons/fi';
 import { routes, navigation } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import NotificationIcon from '../notifications/NotificationIcon';
+import SubscriptionBadge from '../subscription/SubscriptionBadge';
 import { blogLogger } from '@/utils/logger';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useDMModal } from '@/hooks/useDMModal';
@@ -201,9 +202,9 @@ export default function Header() {
                 </div>
               </form>
             </div>
-            
+
             <div className="flex-1"></div>
-            
+
             {/* Desktop Auth Section */}
             <div className="flex items-center space-x-4">
               {authLoading ? (
@@ -215,16 +216,16 @@ export default function Header() {
                 <>
                   {/* My Blog Button */}
                   {!blogLoading && blog && (
-                    <Link 
+                    <Link
                       href={`/blog/${blog.slug}`}
                       className="text-sm text-gray-900 hover:text-gray-800"
                     >
                       내 블로그
                     </Link>
                   )}
-                  
+
                   {/* Write Button - All logged in users can write */}
-                  <button 
+                  <button
                     onClick={handleWriteClick}
                     disabled={isCheckingBlog}
                     className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
@@ -232,7 +233,7 @@ export default function Header() {
                     <FiEdit3 className="mr-1.5 w-4 h-4" />
                     {isCheckingBlog ? '확인 중...' : '글쓰기'}
                   </button>
-                  
+
                   {/* DM Button */}
                   <button
                     onClick={() => openModal()}
@@ -256,7 +257,7 @@ export default function Header() {
 
                   {/* Notification Icon */}
                   <NotificationIcon />
-                  
+
                   {/* Profile Dropdown */}
                   <ProfileDropdown
                     user={user}
@@ -266,6 +267,9 @@ export default function Header() {
                     onWriteClick={handleWriteClick}
                     isCheckingBlog={isCheckingBlog}
                   />
+
+                  {/* Subscription Badge - 프로필 오른쪽으로 이동 */}
+                  <SubscriptionBadge />
                 </>
               ) : (
                 <Link
@@ -347,10 +351,12 @@ export default function Header() {
                   </div>
                 ) : user ? (
                   <div className="space-y-3">
-                    <div className="flex items-center space-x-2 px-2 py-2">
+                    <div className="flex items-center justify-between px-2 py-2">
                       <span className="text-sm text-gray-600">
                         {user.username}님
                       </span>
+                      {/* Mobile Subscription Badge */}
+                      <SubscriptionBadge />
                     </div>
                     
                     {/* My Blog Button for Mobile */}

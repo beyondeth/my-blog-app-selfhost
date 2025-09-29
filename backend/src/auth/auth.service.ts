@@ -91,12 +91,16 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
     const { email, username, password, emailVerificationToken } = registerDto;
 
-    // 이메일 인증 확인 (선택적)
-    if (emailVerificationToken) {
-      const isVerified = await this.emailService.checkVerificationStatus(email, emailVerificationToken);
-      if (!isVerified) {
-        throw new BadRequestException('Invalid or expired email verification token');
-      }
+    // 이메일 인증 확인 (필수)
+    // curl 등 직접 API 호출을 통한 회원가입 방지
+    if (!emailVerificationToken) {
+      throw new BadRequestException('이메일 인증이 필요합니다. 이메일 인증을 완료해주세요.');
+    }
+
+    // 이메일 인증 토큰 검증
+    const isVerified = await this.emailService.checkVerificationStatus(email, emailVerificationToken);
+    if (!isVerified) {
+      throw new BadRequestException('유효하지 않거나 만료된 이메일 인증 토큰입니다.');
     }
 
     // 이메일 중복 체크

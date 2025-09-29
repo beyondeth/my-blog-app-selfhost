@@ -1,9 +1,9 @@
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
-  CreateDateColumn, 
-  UpdateDateColumn, 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
   OneToMany,
   OneToOne,
   Index,
@@ -20,6 +20,7 @@ import { Follow } from '../../follows/entities/follow.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
 import { UserIdentity } from './user-identity.entity';
+import { SubscriptionTier, SubscriptionStatus } from '../../common/enums/subscription.enum';
 
 export const AuthProvider = {
   LOCAL: 'local',
@@ -47,6 +48,9 @@ export class User {
 
   @Column({ nullable: true, length: 100 })
   username: string;
+
+  @Column({ nullable: true, length: 100 }) //payment 에 사용 예정
+  name: string;
 
   @Column({ nullable: true, length: 500 })
   profileImage: string;
@@ -138,6 +142,43 @@ export class User {
   @Column({ nullable: true, length: 20, default: 'basic' })
   accountSecurityLevel: string;
 
+  // 구독 관련 필드 추가
+  @Column({
+    type: 'enum',
+    enum: SubscriptionTier,
+    default: SubscriptionTier.FREE
+  })
+  subscriptionTier: SubscriptionTier;
+
+  @Column({
+    type: 'enum',
+    enum: SubscriptionStatus,
+    nullable: true
+  })
+  subscriptionStatus: SubscriptionStatus;
+
+  @Column({ type: 'timestamp', nullable: true })
+  subscriptionStartDate: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  subscriptionEndDate: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  trialEndDate: Date;
+
+  // 결제 관련 필드
+  @Column({ nullable: true })
+  paymentCustomerId: string; // Stripe/Toss 등의 Customer ID
+
+  @Column({ nullable: true })
+  stripeCustomerId: string; // Stripe Customer ID (호환성을 위해 추가)
+
+  @Column({ nullable: true })
+  paymentSubscriptionId: string; // 결제 시스템의 구독 ID
+
+  @Column({ nullable: true })
+  paymentMethodId: string; // 저장된 결제 수단 ID
+
   @BeforeInsert()
   @BeforeUpdate()
   async hashPassword() {
@@ -161,8 +202,29 @@ export class User {
       bio: this.bio,
       role: this.role,
       isEmailVerified: this.isEmailVerified,
+      subscriptionTier: this.subscriptionTier, // 구독 티어는 공개
       createdAt: this.createdAt,
     };
+  }
+
+  // 구독 관련 헬퍼 메서드
+  isSubscriptionActive(): boolean {
+    return this.subscriptionStatus === SubscriptionStatus.ACTIVE &&
+           (!this.subscriptionEndDate || this.subscriptionEndDate > new Date());
+  }
+
+  isInTrial(): boolean {
+    return this.subscriptionStatus === SubscriptionStatus.TRIAL &&
+           this.trialEndDate &&
+           this.trialEndDate > new Date();
+  }
+
+  canUpgrade(): boolean {
+    return this.subscriptionTier !== SubscriptionTier.PRO;
+  }
+
+  isPaidUser(): boolean {
+    return this.subscriptionTier !== SubscriptionTier.FREE && this.isSubscriptionActive();
   }
 
   toJSON() {
