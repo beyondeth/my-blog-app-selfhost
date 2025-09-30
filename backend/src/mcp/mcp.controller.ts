@@ -8,6 +8,7 @@ import { McpLoggingInterceptor } from './mcp-logging.interceptor';
 import { PostsService } from '../posts/posts.service';
 import { CacheService } from '../cache/cache.service';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
+import { UsageService } from '../usage/usage.service';
 
 @Controller('mcp')
 @Public() // Bypass JWT auth, we'll use API key auth instead
@@ -20,6 +21,7 @@ export class McpController {
     private readonly postsService: PostsService,
     private readonly cacheService: CacheService,
     private readonly redisService: UnifiedRedisService,
+    private readonly usageService: UsageService,
   ) {}
 
   /**
@@ -74,6 +76,10 @@ export class McpController {
       });
       throw new UnauthorizedException('OAuth authentication data missing');
     }
+
+    // MCP 자동포스팅 사용량 체크 및 추적
+    // 일일 및 월간 제한을 초과하면 ForbiddenException 발생
+    await this.usageService.trackMcpPost(userId);
 
     // Extract AI type from tags
     const aiTag = createPostDto.tags?.find(tag => tag.startsWith('ai:'));

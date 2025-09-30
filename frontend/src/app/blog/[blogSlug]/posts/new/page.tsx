@@ -152,11 +152,26 @@ export default function BlogNewPostPage({ params }: { params: { blogSlug: string
       }
       
       const result = await createPostMutation.mutateAsync(postData);
-      
+
       router.push(`/blog/${blogSlug}/posts/${result.slug}`);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Failed to create post:', error);
-      toast.error('포스트 저장에 실패했습니다.');
+
+      // 백엔드 에러 메시지 추출
+      const errorMessage = error?.response?.data?.message || error?.message || '포스트 저장에 실패했습니다.';
+
+      // 제한량 관련 에러는 더 명확하게 표시
+      if (errorMessage.includes('제한') || errorMessage.includes('한도') || errorMessage.includes('도달')) {
+        toast.error(errorMessage, {
+          duration: 5000,
+          action: {
+            label: '플랜 업그레이드',
+            onClick: () => router.push('/pricing'),
+          },
+        });
+      } else {
+        toast.error(errorMessage);
+      }
     } finally {
       setIsSubmitting(false);
     }

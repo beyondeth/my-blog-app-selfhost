@@ -54,30 +54,23 @@ export default function SubscriptionManagementPage() {
 
   // 구독 정보
   const subscription = subscriptionData?.subscription;
-  // usage를 항상 배열로 변환
+  // MCP 사용량만 추출 (일반 포스트는 무제한이므로 제외)
   const rawUsage = subscriptionData?.usage;
   let usage: any[] = [];
 
   if (rawUsage) {
     if (Array.isArray(rawUsage)) {
-      usage = rawUsage;
+      // 배열 형태인 경우 MCP_POST만 필터링
+      usage = rawUsage.filter((stat: any) => stat.resourceType === 'mcp_post');
     } else {
-      // 객체 형태인 경우 배열로 변환
+      // 객체 형태인 경우 MCP_POST만 추출
       const usageObj = rawUsage as any;
-      if (usageObj.usage?.post !== undefined) {
+      if (usageObj.usage?.mcp_post !== undefined) {
         usage.push({
-          resourceType: 'post',
-          currentUsage: usageObj.usage.post || 0,
-          limit: usageObj.limits?.post || 0,
-          percentage: usageObj.percentages?.post || 0
-        });
-      }
-      if (usageObj.usage?.blogs !== undefined) {
-        usage.push({
-          resourceType: 'blogs',
-          currentUsage: usageObj.usage.blogs || 0,
-          limit: usageObj.limits?.blogs || 0,
-          percentage: usageObj.percentages?.blogs || 0
+          resourceType: 'mcp_post',
+          currentUsage: usageObj.usage.mcp_post || 0,
+          limit: usageObj.limits?.mcp_post || 0,
+          percentage: usageObj.percentages?.mcp_post || 0
         });
       }
     }
@@ -260,26 +253,13 @@ export default function SubscriptionManagementPage() {
                 <div className="bg-gray-50 rounded-lg p-4">
                   <p className="text-sm font-medium text-gray-900 mb-3">플랜 기능</p>
                   <ul className="space-y-2">
-                    <li className="flex items-center text-sm text-gray-700">
-                      <FiCheck className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                      월 {subscription.plan?.features.maxPostsPerMonth === -1 ? '무제한' : subscription.plan?.features.maxPostsPerMonth} 포스트
-                    </li>
-                    <li className="flex items-center text-sm text-gray-700">
-                      <FiCheck className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                      {subscription.plan?.features.maxBlogCount}개 블로그
-                    </li>
-                    {subscription.plan?.features.removeAds && (
-                      <li className="flex items-center text-sm text-gray-700">
-                        <FiCheck className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                        광고 제거
+                    {/* highlights 필드 사용 (pricing 페이지와 동일) */}
+                    {subscription.plan?.highlights?.map((feature: string, index: number) => (
+                      <li key={index} className="flex items-start text-sm text-gray-700">
+                        <FiCheck className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
+                        <span>{feature}</span>
                       </li>
-                    )}
-                    {subscription.plan?.features.analytics !== 'none' && (
-                      <li className="flex items-center text-sm text-gray-700">
-                        <FiCheck className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                        {subscription.plan?.features.analytics === 'advanced' ? '고급' : '기본'} 분석
-                      </li>
-                    )}
+                    ))}
                   </ul>
                 </div>
               </div>
@@ -337,8 +317,8 @@ export default function SubscriptionManagementPage() {
               {usage.map((stat: any) => (
                 <div key={stat.resourceType} className="bg-gray-50 rounded-lg p-4">
                   <div className="flex items-center justify-between mb-3">
-                    <p className="font-medium text-gray-900 capitalize">
-                      {stat.resourceType === 'post' ? '포스트' : stat.resourceType}
+                    <p className="font-medium text-gray-900">
+                      MCP 자동포스팅
                     </p>
                     <FiTrendingUp className="w-5 h-5 text-gray-400" />
                   </div>
@@ -372,10 +352,6 @@ export default function SubscriptionManagementPage() {
                       </p>
                     </>
                   )}
-
-                  <p className="text-xs text-gray-500 mt-2">
-                    리셋: {formatDate(stat.resetDate)}
-                  </p>
                 </div>
               ))}
             </div>

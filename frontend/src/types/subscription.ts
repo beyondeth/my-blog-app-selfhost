@@ -45,18 +45,23 @@ export enum PaymentStatus {
  * 리소스 타입
  */
 export enum ResourceType {
-  POST = 'post',
-  BLOG = 'blog',
-  COMMENT = 'comment',
-  FILE = 'file',
+  POST = 'post',                 // 일반 사용자 작성 포스트 (무제한)
+  MCP_POST = 'mcp_post',         // MCP 자동포스팅 (제한 적용)
+  BLOG = 'blog',                 // 블로그 (모든 플랜 1개)
+  STORAGE = 'storage',
+  VIEWS = 'views',
+  API_CALLS = 'api_calls',
+  AI_CREDITS = 'ai_credits',
 }
 
 /**
  * 구독 플랜 기능
  */
 export interface SubscriptionFeatures {
-  maxPostsPerMonth: number;
-  maxBlogCount: number;
+  // MCP 자동포스팅 제한 (일반 사용자 작성 포스트는 무제한)
+  maxMcpPostsPerDay: number;     // MCP 자동포스팅 일 제한
+  maxMcpPostsPerMonth: number;   // MCP 자동포스팅 월 제한
+  maxBlogCount: number;          // 블로그 개수 제한 (모든 플랜 1개)
   analytics: 'none' | 'basic' | 'advanced';
   removeAds: boolean;
   exportData: boolean;
@@ -76,8 +81,11 @@ export interface SubscriptionPlan {
   yearlyPrice: number;
   billingCycle?: BillingCycle;
   features: SubscriptionFeatures;
-  highlights: string[];
+  highlights: string[];  // Mapped from metadata.highlights in service layer
   limitations: string[];
+  metadata?: {           // Raw metadata from backend
+    highlights?: string[];
+  };
   isPopular: boolean;
   isActive: boolean;
   sortOrder: number;

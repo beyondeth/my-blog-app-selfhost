@@ -9,7 +9,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { FiCheck, FiX } from 'react-icons/fi';
+import { FiCheck } from 'react-icons/fi';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useMySubscription, useSubscriptionPlans, useCreateCheckout } from '@/hooks/useSubscription';
 import { SubscriptionTier, BillingCycle, SubscriptionPlan } from '@/types/subscription';
@@ -240,21 +240,8 @@ export default function PricingPage() {
                   <div className="mt-8 space-y-4">
                     <h4 className="font-semibold text-gray-900">주요 기능</h4>
                     <ul className="space-y-3">
-                      {/* highlights 필드가 없을 경우 features 기반으로 생성 */}
-                      {(plan.highlights || [
-                        plan.features?.maxPostsPerMonth === -1
-                          ? '무제한 포스트 작성'
-                          : `월 ${plan.features?.maxPostsPerMonth || 10}개 포스트 작성`,
-                        `최대 ${plan.features?.maxBlogCount || 1}개 블로그 운영`,
-                        plan.features?.analytics === 'advanced'
-                          ? '고급 분석 기능'
-                          : plan.features?.analytics === 'basic'
-                            ? '기본 분석 기능'
-                            : null,
-                        plan.features?.removeAds ? '광고 제거' : null,
-                        plan.features?.exportData ? '데이터 내보내기' : null,
-                        plan.features?.scheduledPosts ? '예약 포스팅' : null,
-                      ].filter(Boolean)).map((feature: string, index: number) => (
+                      {/* highlights 필드 사용 (백엔드 seeder에서 정의된 값) */}
+                      {plan.highlights?.map((feature: string, index: number) => (
                         <li key={index} className="flex items-start">
                           <FiCheck className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" />
                           <span className="text-gray-700 text-sm">{feature}</span>
@@ -262,37 +249,20 @@ export default function PricingPage() {
                       ))}
                     </ul>
                   </div>
-
-                  {/* 제한 사항 - FREE 플랜에만 표시 */}
-                  {plan.tier === SubscriptionTier.FREE && (
-                    <div className="mt-6 space-y-4">
-                      <h4 className="font-semibold text-gray-900">제한 사항</h4>
-                      <ul className="space-y-3">
-                        {(plan.limitations || [
-                          '광고 표시',
-                          '기본 템플릿만 사용 가능',
-                          '분석 기능 미제공',
-                        ]).map((limitation: string, index: number) => (
-                          <li key={index} className="flex items-start">
-                            <FiX className="w-5 h-5 text-red-500 mt-0.5 mr-3 flex-shrink-0" />
-                            <span className="text-gray-500 text-sm">{limitation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  )}
                 </div>
 
                 {/* 리소스 제한 정보 - 항상 카드 하단에 위치 */}
                 <div className="mt-6 pt-6 border-t border-gray-200">
                   <div className="space-y-2 text-sm text-gray-600">
                     <div className="flex justify-between">
-                      <span>월 포스트 수</span>
+                      <span>MCP 자동포스팅</span>
                       <span className="font-medium text-gray-900">
-                        {plan.features?.maxPostsPerMonth === -1
-                          ? '무제한'
-                          : `${plan.features?.maxPostsPerMonth || 10}개`}
+                        일 {plan.features?.maxMcpPostsPerDay}건 / 월 {plan.features?.maxMcpPostsPerMonth}건
                       </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>일반 포스트</span>
+                      <span className="font-medium text-gray-900">무제한</span>
                     </div>
                     <div className="flex justify-between">
                       <span>블로그 수</span>
@@ -301,14 +271,14 @@ export default function PricingPage() {
                       </span>
                     </div>
                     <div className="flex justify-between">
-                      <span>분석 기능</span>
+                      <span>통계 분석</span>
                       <span className="font-medium text-gray-900">
                         {plan.features?.analytics === 'none'
                           ? '미제공'
                           : plan.features?.analytics === 'basic'
-                          ? '기본'
+                          ? '예정'
                           : plan.features?.analytics === 'advanced'
-                          ? '고급'
+                          ? '예정'
                           : '미제공'}
                       </span>
                     </div>

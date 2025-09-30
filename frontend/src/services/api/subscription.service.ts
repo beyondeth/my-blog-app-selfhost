@@ -29,10 +29,12 @@ export async function getSubscriptionPlans() {
   const plans = result.data || result;
 
   // pricing 객체를 monthlyPrice와 yearlyPrice로 매핑
+  // metadata.highlights를 highlights로 매핑
   return plans.map((plan: any) => ({
     ...plan,
     monthlyPrice: plan.pricing?.monthly || 0,
     yearlyPrice: plan.pricing?.yearly || 0,
+    highlights: plan.metadata?.highlights || [],
   }));
 }
 
@@ -81,7 +83,14 @@ export async function getMySubscription() {
 
   const result = await response.json();
   // API가 { success: true, data: {...} } 형식으로 응답하므로 data 필드 추출
-  return result.data || result;
+  const data = result.data || result;
+
+  // subscription.plan이 있으면 metadata.highlights를 highlights로 매핑
+  if (data?.subscription?.plan?.metadata?.highlights) {
+    data.subscription.plan.highlights = data.subscription.plan.metadata.highlights;
+  }
+
+  return data;
 }
 
 /**
@@ -218,7 +227,9 @@ export async function getPaymentHistory(limit: number = 10) {
     throw new Error('Failed to fetch payment history');
   }
 
-  return response.json();
+  const result = await response.json();
+  // API가 { success: true, data: [...] } 형식으로 응답하므로 data 필드 추출
+  return result.data || result;
 }
 
 /**

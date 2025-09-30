@@ -40,29 +40,29 @@ export default function SubscriptionBadge() {
   const config = tierConfig[currentTier];
 
   // usage는 객체 형태 { limits, usage, percentages } 또는 배열
-  // 포스트 관련 사용량 가져오기
-  let postLimit = 0;
-  let postUsage = 0;
-  let postPercentage = 0;
+  // MCP 자동포스팅 관련 사용량 가져오기 (일반 포스트는 무제한이므로 표시하지 않음)
+  let mcpPostLimit = 0;
+  let mcpPostUsage = 0;
+  let mcpPostPercentage = 0;
 
   if (subscription.usage) {
     if (Array.isArray(subscription.usage)) {
       // 배열 형태인 경우 (UsageStats[])
-      const postStats = subscription.usage.find((stat: any) => stat.resourceType === ResourceType.POST);
-      postLimit = postStats?.limit || 0;
-      postUsage = postStats?.currentUsage || 0;
-      postPercentage = postStats?.percentage || 0;
+      const mcpPostStats = subscription.usage.find((stat: any) => stat.resourceType === ResourceType.MCP_POST);
+      mcpPostLimit = mcpPostStats?.limit || 0;
+      mcpPostUsage = mcpPostStats?.currentUsage || 0;
+      mcpPostPercentage = mcpPostStats?.percentage || 0;
     } else {
       // 객체 형태인 경우 (UsageStatsResponse)
       const usage = subscription.usage as any;
-      postLimit = usage.limits?.post || usage.limits?.[ResourceType.POST] || 0;
-      postUsage = usage.usage?.post || usage.usage?.[ResourceType.POST] || 0;
-      postPercentage = usage.percentages?.post || usage.percentages?.[ResourceType.POST] || 0;
+      mcpPostLimit = usage.limits?.mcp_post || usage.limits?.[ResourceType.MCP_POST] || 0;
+      mcpPostUsage = usage.usage?.mcp_post || usage.usage?.[ResourceType.MCP_POST] || 0;
+      mcpPostPercentage = usage.percentages?.mcp_post || usage.percentages?.[ResourceType.MCP_POST] || 0;
     }
   }
 
-  // Free 플랜이 아닌 경우 또는 사용량이 있는 경우에만 표시
-  const shouldShowUsage = currentTier !== SubscriptionTier.FREE || postUsage > 0;
+  // MCP 포스트 제한이 있는 경우에만 사용량 표시
+  const shouldShowUsage = mcpPostLimit > 0;
 
   // 구독 티어에 따라 다른 링크로 이동
   // FREE 플랜은 pricing으로 (업그레이드 유도)
@@ -81,22 +81,20 @@ export default function SubscriptionBadge() {
         <span>{config.label}</span>
       </Link>
 
-      {/* 사용량 표시 (Free 플랜이거나 사용량이 있을 때) */}
+      {/* MCP 포스트 사용량 표시 (제한이 있을 때만) */}
       {shouldShowUsage && (
         <div className="flex items-center space-x-1.5 text-xs text-gray-500">
           <span className="font-medium">
-            {postUsage}
-            {postLimit && postLimit > 0 && `/${postLimit}`}
-            {postLimit === -1 && ' (무제한)'}
+            {mcpPostUsage}/{mcpPostLimit}
           </span>
-          <span>포스트</span>
+          <span>MCP</span>
 
           {/* 사용량 경고 (80% 이상 사용 시) */}
-          {postPercentage >= 80 && postLimit > 0 && (
+          {mcpPostPercentage >= 80 && mcpPostLimit > 0 && (
             <Link
               href="/account/subscription"
               className="ml-1 text-orange-500 hover:text-orange-600"
-              title="사용량 한도에 근접했습니다"
+              title="MCP 포스팅 한도에 근접했습니다"
             >
               <FiTrendingUp className="w-3 h-3" />
             </Link>

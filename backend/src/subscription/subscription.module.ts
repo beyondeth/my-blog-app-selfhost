@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { SubscriptionService } from './subscription.service';
 // import { SubscriptionController } from './subscription.controller';
 import { SubscriptionBasicController } from './subscription-basic.controller';
@@ -17,6 +18,7 @@ import { SubscriptionPlanSeeder } from './seeders/subscription-plan.seeder';
  * PaymentModule과 UsageModule과의 순환 의존성 제거
  * SharedSubscriptionModule의 SubscriptionFacadeService를 통해 통합 관리
  * SubscriptionController는 SharedSubscriptionModule로 이동 (SubscriptionFacadeService 의존성 때문)
+ * EventEmitterModule 추가: 구독 변경 이벤트를 UsageService에 전달하여 캐시 무효화
  */
 @Module({
   imports: [
@@ -27,6 +29,7 @@ import { SubscriptionPlanSeeder } from './seeders/subscription-plan.seeder';
       User,
     ]),
     ScheduleModule.forRoot(),
+    EventEmitterModule, // EventEmitter 모듈 추가
     // PaymentModule과 UsageModule은 제거
     // SubscriptionController는 SharedSubscriptionModule로 이동됨
   ],

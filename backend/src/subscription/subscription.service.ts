@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
-import { OnEvent } from '@nestjs/event-emitter';
+import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
 import { Subscription } from './entities/subscription.entity';
 import { SubscriptionPlan } from './entities/subscription-plan.entity';
 import { PaymentHistory } from './entities/payment-history.entity';
@@ -32,6 +32,7 @@ export class SubscriptionService {
     @InjectRepository(User)
     private userRepository: Repository<User>,
     private dataSource: DataSource,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -422,9 +423,11 @@ export class SubscriptionService {
     });
     await this.paymentHistoryRepository.save(paymentHistory);
 
-    // 사용량 초기화는 UsageService에 메서드가 없으므로 주석 처리
-    // TODO: UsageService에 resetUsage 메서드 추가 필요
-    // await this.usageService.resetUsage(userId);
+    // 구독 변경 이벤트 발생 (UsageService 캐시 무효화)
+    this.eventEmitter.emit('subscription.updated', {
+      userId,
+      tier,
+    });
 
     return subscription;
   }

@@ -35,7 +35,8 @@ export class SubscriptionPlanSeeder {
           currency: 'KRW',
         },
         features: {
-          maxPostsPerMonth: 5,
+          maxMcpPostsPerDay: 5,
+          maxMcpPostsPerMonth: 30,
           maxBlogCount: 1,
           analytics: 'none' as const,
           removeAds: false,
@@ -44,15 +45,10 @@ export class SubscriptionPlanSeeder {
         },
         metadata: {
           highlights: [
-            '매월 5개 포스트 작성',
-            '1개 블로그',
-            '기본 기능 제공',
-            '커뮤니티 지원',
-          ],
-          limitations: [
-            '광고 표시',
-            '기본 통계만 제공',
-            '데이터 내보내기 불가',
+            'MCP 자동포스팅 일 5건 / 월 30건',
+            '무제한 일반 포스트 작성',
+            '팔로우 기능',
+            '블로그 미공개 기능',
           ],
         },
         isPopular: false,
@@ -67,13 +63,14 @@ export class SubscriptionPlanSeeder {
         displayName: '스타터 플랜',
         description: '개인 크리에이터와 소규모 팀을 위한 플랜',
         pricing: {
-          monthly: 9000, // ₩9,000
-          yearly: 90000, // ₩90,000 (연간 결제 시 17% 할인)
+          monthly: 990, // ₩990
+          yearly: 9860, // ₩9,860 (연간 결제 시 17% 할인: 990 × 12 × 0.83)
           currency: 'KRW',
           discountPercentage: 17,
         },
         features: {
-          maxPostsPerMonth: 30,
+          maxMcpPostsPerDay: 10,
+          maxMcpPostsPerMonth: 200,
           maxBlogCount: 1,
           analytics: 'basic' as const,
           removeAds: true,
@@ -82,16 +79,11 @@ export class SubscriptionPlanSeeder {
         },
         metadata: {
           highlights: [
-            '매월 30개 포스트 작성',
-            '1개 블로그',
-            '기본 분석 통계',
-            '광고 제거',
-            '데이터 내보내기',
-            '이메일 지원',
-          ],
-          limitations: [
-            '예약 발행 불가',
-            '고급 통계 미제공',
+            'MCP 자동포스팅 일 10건 / 월 200건',
+            '무제한 일반 포스트 작성',
+            '팔로우 기능',
+            '블로그 미공개 기능',
+            'DM 채팅 기능',
           ],
         },
         isPopular: true,
@@ -106,14 +98,15 @@ export class SubscriptionPlanSeeder {
         displayName: '프로 플랜',
         description: '전문 블로거와 기업을 위한 프리미엄 플랜',
         pricing: {
-          monthly: 19000, // ₩19,000
-          yearly: 190000, // ₩190,000 (연간 결제 시 17% 할인)
+          monthly: 1500, // ₩1,500
+          yearly: 14940, // ₩14,940 (연간 결제 시 17% 할인: 1500 × 12 × 0.83)
           currency: 'KRW',
           discountPercentage: 17,
         },
         features: {
-          maxPostsPerMonth: -1, // 무제한
-          maxBlogCount: 3,
+          maxMcpPostsPerDay: 20,
+          maxMcpPostsPerMonth: 400,
+          maxBlogCount: 1,
           analytics: 'advanced' as const,
           removeAds: true,
           exportData: true,
@@ -121,16 +114,12 @@ export class SubscriptionPlanSeeder {
         },
         metadata: {
           highlights: [
-            '무제한 포스트 작성',
-            '최대 3개 블로그',
-            '고급 분석 통계',
-            '광고 제거',
-            '데이터 내보내기',
-            '예약 발행',
-            '우선 지원',
-            'API 액세스',
+            'MCP 자동포스팅 일 20건 / 월 400건',
+            '무제한 일반 포스트 작성',
+            '팔로우 기능',
+            '블로그 미공개 기능',
+            'DM 채팅 기능',
           ],
-          limitations: [],
         },
         isPopular: false,
         isActive: true,

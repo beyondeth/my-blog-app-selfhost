@@ -67,7 +67,9 @@ export class UsageLimitGuard implements CanActivate {
    */
   private getResourceDisplayName(resourceType: ResourceType): string {
     const names = {
-      [ResourceType.POSTS]: '포스트',
+      [ResourceType.POST]: '일반 포스트',
+      [ResourceType.MCP_POST]: 'MCP 자동포스팅',
+      [ResourceType.BLOG]: '블로그',
       [ResourceType.STORAGE]: '저장공간',
       [ResourceType.VIEWS]: '조회수',
       [ResourceType.API_CALLS]: 'API 호출',

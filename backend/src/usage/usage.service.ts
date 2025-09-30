@@ -6,29 +6,36 @@ import { UsageTracking } from './entities/usage-tracking.entity';
 import { UsersService } from '../users/users.service';
 import { ResourceType, SubscriptionTier } from '../common/enums/subscription.enum';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { Subscription } from '../subscription/entities/subscription.entity';
 
 // 플랜별 제한 설정
 const PLAN_LIMITS = {
   [SubscriptionTier.FREE]: {
-    [ResourceType.POSTS]: 5,         // 월 5개 포스트
-    [ResourceType.STORAGE]: 100,     // 100MB (사용 안 함)
-    [ResourceType.VIEWS]: 1000,      // 월 1000 뷰 (사용 안 함)
-    [ResourceType.API_CALLS]: 100,   // 월 100회 API 호출 (사용 안 함)
-    maxBlogCount: 1,                 // 블로그 1개
+    [ResourceType.POST]: -1,              // 일반 포스트 무제한
+    [ResourceType.MCP_POST]: 30,          // MCP 자동포스팅 월 30개
+    mcpPostsPerDay: 5,                    // MCP 자동포스팅 일 5개
+    [ResourceType.BLOG]: 1,               // 블로그 1개
+    [ResourceType.STORAGE]: 100,          // 100MB (사용 안 함)
+    [ResourceType.VIEWS]: 1000,           // 월 1000 뷰 (사용 안 함)
+    [ResourceType.API_CALLS]: 100,        // 월 100회 API 호출 (사용 안 함)
   },
   [SubscriptionTier.STARTER]: {
-    [ResourceType.POSTS]: 30,        // 월 30개 포스트
-    [ResourceType.STORAGE]: 1000,    // 1GB (사용 안 함)
-    [ResourceType.VIEWS]: 10000,     // 월 10000 뷰 (사용 안 함)
-    [ResourceType.API_CALLS]: 1000,  // 월 1000회 API 호출 (사용 안 함)
-    maxBlogCount: 1,                 // 블로그 1개
+    [ResourceType.POST]: -1,              // 일반 포스트 무제한
+    [ResourceType.MCP_POST]: 200,         // MCP 자동포스팅 월 200개
+    mcpPostsPerDay: 10,                   // MCP 자동포스팅 일 10개
+    [ResourceType.BLOG]: 1,               // 블로그 1개
+    [ResourceType.STORAGE]: 1000,         // 1GB (사용 안 함)
+    [ResourceType.VIEWS]: 10000,          // 월 10000 뷰 (사용 안 함)
+    [ResourceType.API_CALLS]: 1000,       // 월 1000회 API 호출 (사용 안 함)
   },
   [SubscriptionTier.PRO]: {
-    [ResourceType.POSTS]: -1,        // 무제한
-    [ResourceType.STORAGE]: 10000,   // 10GB (사용 안 함)
-    [ResourceType.VIEWS]: -1,        // 무제한 (사용 안 함)
-    [ResourceType.API_CALLS]: -1,    // 무제한 (사용 안 함)
-    maxBlogCount: 3,                 // 블로그 3개
+    [ResourceType.POST]: -1,              // 일반 포스트 무제한
+    [ResourceType.MCP_POST]: 400,         // MCP 자동포스팅 월 400개
+    mcpPostsPerDay: 20,                   // MCP 자동포스팅 일 20개
+    [ResourceType.BLOG]: 1,               // 블로그 1개
+    [ResourceType.STORAGE]: 10000,        // 10GB (사용 안 함)
+    [ResourceType.VIEWS]: -1,             // 무제한 (사용 안 함)
+    [ResourceType.API_CALLS]: -1,         // 무제한 (사용 안 함)
   },
 };
 
@@ -41,6 +48,8 @@ export class UsageService {
   constructor(
     @InjectRepository(UsageTracking)
     private usageTrackingRepository: Repository<UsageTracking>,
+    @InjectRepository(Subscription)
+    private subscriptionRepository: Repository<Subscription>,
     private usersService: UsersService,
     private eventEmitter: EventEmitter2,
   ) {
@@ -119,6 +128,70 @@ export class UsageService {
   }
 
   /**
+   * MCP 자동포스팅 일간 제한 체크
+   * 일간 제한과 월간 제한을 모두 체크
+   */
+  async checkMcpPostLimit(userId: string): Promise<{ canPost: boolean; reason?: string }> {
+    const tier = await this.getUserSubscriptionTier(userId);
+    const limits = PLAN_LIMITS[tier];
+
+    // 월간 제한 체크
+    const monthlyLimit = limits[ResourceType.MCP_POST];
+    const monthlyUsage = await this.getCurrentMonthUsage(userId, ResourceType.MCP_POST);
+
+    if (monthlyLimit !== -1) {
+      const monthlyCount = monthlyUsage?.count || 0;
+      if (monthlyCount >= monthlyLimit) {
+        return {
+          canPost: false,
+          reason: `월간 MCP 자동포스팅 제한(${monthlyLimit}건)에 도달했습니다. 현재 ${monthlyCount}/${monthlyLimit}건 사용 중입니다.`,
+        };
+      }
+    }
+
+    // 일간 제한 체크
+    const dailyLimit = limits.mcpPostsPerDay;
+    if (dailyLimit !== -1) {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      // 오늘 작성한 MCP 포스트 수 조회
+      const dailyCount = await this.usageTrackingRepository
+        .createQueryBuilder('usage')
+        .where('usage.userId = :userId', { userId })
+        .andWhere('usage.resourceType = :resourceType', { resourceType: ResourceType.MCP_POST })
+        .andWhere('usage.recordedAt >= :today', { today })
+        .andWhere('usage.recordedAt < :tomorrow', { tomorrow })
+        .getCount();
+
+      if (dailyCount >= dailyLimit) {
+        return {
+          canPost: false,
+          reason: `일간 MCP 자동포스팅 제한(${dailyLimit}건)에 도달했습니다. 현재 ${dailyCount}/${dailyLimit}건 사용 중입니다.`,
+        };
+      }
+    }
+
+    return { canPost: true };
+  }
+
+  /**
+   * MCP 자동포스팅 사용량 추적
+   */
+  async trackMcpPost(userId: string): Promise<UsageTracking> {
+    // 제한 체크
+    const limitCheck = await this.checkMcpPostLimit(userId);
+    if (!limitCheck.canPost) {
+      throw new BadRequestException(limitCheck.reason);
+    }
+
+    // 사용량 추적
+    return this.trackUsage(userId, ResourceType.MCP_POST, 1);
+  }
+
+  /**
    * 사용량 감소 (삭제 시)
    */
   async decrementUsage(
@@ -166,7 +239,7 @@ export class UsageService {
     const tier = await this.getUserSubscriptionTier(userId);
     const limits = PLAN_LIMITS[tier];
 
-    return currentBlogCount < limits.maxBlogCount;
+    return currentBlogCount < limits[ResourceType.BLOG];
   }
 
   /**
@@ -217,9 +290,10 @@ export class UsageService {
       percentages: {},
     };
 
-    // 각 리소스별 통계 생성
+    // 각 리소스별 통계 생성 (mcpPostsPerDay 제외)
     for (const [resourceType, limit] of Object.entries(limits)) {
-      if (typeof limit !== 'number') continue;
+      // mcpPostsPerDay는 일일 제한이므로 월간 통계에서 제외
+      if (resourceType === 'mcpPostsPerDay' || typeof limit !== 'number') continue;
 
       const usage = currentUsages.find(u => u.resourceType === resourceType as ResourceType);
       const currentCount = usage?.count || 0;
@@ -232,9 +306,9 @@ export class UsageService {
 
     // 블로그 수는 별도 처리
     const blogCount = await this.usersService.getUserBlogCount(userId);
-    stats.limits['blogs'] = limits.maxBlogCount;
-    stats.usage['blogs'] = blogCount;
-    stats.percentages['blogs'] = Math.round((blogCount / limits.maxBlogCount) * 100);
+    stats.limits[ResourceType.BLOG] = limits[ResourceType.BLOG];
+    stats.usage[ResourceType.BLOG] = blogCount;
+    stats.percentages[ResourceType.BLOG] = Math.round((blogCount / limits[ResourceType.BLOG]) * 100);
 
     return stats;
   }
@@ -293,7 +367,7 @@ export class UsageService {
 
   /**
    * 사용자의 구독 티어 조회
-   * 캐시를 사용하거나 DB에서 직접 조회
+   * Subscription 테이블에서 직접 조회하여 항상 최신 tier 반환
    */
   private async getUserSubscriptionTier(userId: string): Promise<SubscriptionTier> {
     // 캐시 확인
@@ -302,10 +376,14 @@ export class UsageService {
       return cached.tier;
     }
 
-    // DB에서 사용자 조회하여 구독 티어 확인
-    // 기본값으로 FREE 티어 반환 (사용자가 구독 정보가 없을 경우)
-    const user = await this.usersService.findById(userId);
-    const tier = user?.subscriptionTier || SubscriptionTier.FREE;
+    // Subscription 테이블에서 직접 조회 (User 테이블 대신)
+    // 이렇게 하면 구독 변경 시 즉시 반영됨
+    const subscription = await this.subscriptionRepository.findOne({
+      where: { userId },
+      order: { createdAt: 'DESC' },  // 최신 구독 정보 조회
+    });
+
+    const tier = subscription?.tier || SubscriptionTier.FREE;
 
     // 캐시 업데이트
     this.userSubscriptionCache.set(userId, { tier, timestamp: Date.now() });
@@ -369,7 +447,9 @@ export class UsageService {
    */
   private getResourceDisplayName(resourceType: ResourceType): string {
     const names = {
-      [ResourceType.POSTS]: '포스트',
+      [ResourceType.POST]: '일반 포스트',
+      [ResourceType.MCP_POST]: 'MCP 자동포스팅',
+      [ResourceType.BLOG]: '블로그',
       [ResourceType.STORAGE]: '저장공간',
       [ResourceType.VIEWS]: '조회수',
       [ResourceType.API_CALLS]: 'API 호출',

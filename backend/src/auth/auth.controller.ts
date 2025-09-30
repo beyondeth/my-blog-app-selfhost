@@ -406,6 +406,8 @@ export class AuthController {
       role: user.role,
       profileImage: user.profileImage,
       isEmailVerified: user.isEmailVerified,
+      subscriptionTier: user.subscriptionTier,        // 구독 티어 추가
+      subscriptionStatus: user.subscriptionStatus,    // 구독 상태 추가
       createdAt: user.createdAt,
     };
   }

@@ -37,6 +37,7 @@ export class SubscriptionBasicController {
         description: plan.description,
         pricing: plan.pricing,
         features: plan.features,
+        metadata: plan.metadata,  // metadata 추가 (highlights 포함)
         isActive: plan.isActive,
       })),
     };
