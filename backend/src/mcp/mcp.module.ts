@@ -5,6 +5,7 @@ import { OauthModule } from '../oauth/oauth.module';
 import { PostsModule } from '../posts/posts.module';
 import { RedisModule } from '../redis/redis.module';
 import { CacheModule } from '../cache/cache.module';
+import { UsageModule } from '../usage/usage.module';
 import { User } from '../users/entities/user.entity';
 
 /**
@@ -25,6 +26,7 @@ import { User } from '../users/entities/user.entity';
     PostsModule,  // PostsService를 사용하기 위해 필요
     RedisModule,  // Redis 직접 접근을 위해 필요
     CacheModule,  // CacheService를 통한 Redis 캐시 무효화를 위해 필요
+    UsageModule,  // UsageService를 통한 MCP 포스트 사용량 추적을 위해 필요
   ],
   controllers: [McpProxyController],
   providers: [],

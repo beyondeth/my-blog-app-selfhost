@@ -257,7 +257,7 @@ export default function PricingPage() {
                     <div className="flex justify-between">
                       <span>MCP 자동포스팅</span>
                       <span className="font-medium text-gray-900">
-                        일 {plan.features?.maxMcpPostsPerDay}건 / 월 {plan.features?.maxMcpPostsPerMonth}건
+                        월 {plan.features?.maxMcpPostsPerMonth}건
                       </span>
                     </div>
                     <div className="flex justify-between">

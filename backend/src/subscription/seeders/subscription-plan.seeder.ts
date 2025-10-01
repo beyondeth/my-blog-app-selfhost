@@ -35,7 +35,6 @@ export class SubscriptionPlanSeeder {
           currency: 'KRW',
         },
         features: {
-          maxMcpPostsPerDay: 5,
           maxMcpPostsPerMonth: 30,
           maxBlogCount: 1,
           analytics: 'none' as const,
@@ -45,7 +44,7 @@ export class SubscriptionPlanSeeder {
         },
         metadata: {
           highlights: [
-            'MCP 자동포스팅 일 5건 / 월 30건',
+            'MCP 자동포스팅 월 30건',
             '무제한 일반 포스트 작성',
             '팔로우 기능',
             '블로그 미공개 기능',
@@ -69,7 +68,6 @@ export class SubscriptionPlanSeeder {
           discountPercentage: 17,
         },
         features: {
-          maxMcpPostsPerDay: 10,
           maxMcpPostsPerMonth: 200,
           maxBlogCount: 1,
           analytics: 'basic' as const,
@@ -79,7 +77,7 @@ export class SubscriptionPlanSeeder {
         },
         metadata: {
           highlights: [
-            'MCP 자동포스팅 일 10건 / 월 200건',
+            'MCP 자동포스팅 월 200건',
             '무제한 일반 포스트 작성',
             '팔로우 기능',
             '블로그 미공개 기능',
@@ -104,7 +102,6 @@ export class SubscriptionPlanSeeder {
           discountPercentage: 17,
         },
         features: {
-          maxMcpPostsPerDay: 20,
           maxMcpPostsPerMonth: 400,
           maxBlogCount: 1,
           analytics: 'advanced' as const,
@@ -114,7 +111,7 @@ export class SubscriptionPlanSeeder {
         },
         metadata: {
           highlights: [
-            'MCP 자동포스팅 일 20건 / 월 400건',
+            'MCP 자동포스팅 월 400건',
             '무제한 일반 포스트 작성',
             '팔로우 기능',
             '블로그 미공개 기능',

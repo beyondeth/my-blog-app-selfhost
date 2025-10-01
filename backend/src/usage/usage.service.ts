@@ -13,7 +13,6 @@ const PLAN_LIMITS = {
   [SubscriptionTier.FREE]: {
     [ResourceType.POST]: -1,              // 일반 포스트 무제한
     [ResourceType.MCP_POST]: 30,          // MCP 자동포스팅 월 30개
-    mcpPostsPerDay: 5,                    // MCP 자동포스팅 일 5개
     [ResourceType.BLOG]: 1,               // 블로그 1개
     [ResourceType.STORAGE]: 100,          // 100MB (사용 안 함)
     [ResourceType.VIEWS]: 1000,           // 월 1000 뷰 (사용 안 함)
@@ -22,7 +21,6 @@ const PLAN_LIMITS = {
   [SubscriptionTier.STARTER]: {
     [ResourceType.POST]: -1,              // 일반 포스트 무제한
     [ResourceType.MCP_POST]: 200,         // MCP 자동포스팅 월 200개
-    mcpPostsPerDay: 10,                   // MCP 자동포스팅 일 10개
     [ResourceType.BLOG]: 1,               // 블로그 1개
     [ResourceType.STORAGE]: 1000,         // 1GB (사용 안 함)
     [ResourceType.VIEWS]: 10000,          // 월 10000 뷰 (사용 안 함)
@@ -31,7 +29,6 @@ const PLAN_LIMITS = {
   [SubscriptionTier.PRO]: {
     [ResourceType.POST]: -1,              // 일반 포스트 무제한
     [ResourceType.MCP_POST]: 400,         // MCP 자동포스팅 월 400개
-    mcpPostsPerDay: 20,                   // MCP 자동포스팅 일 20개
     [ResourceType.BLOG]: 1,               // 블로그 1개
     [ResourceType.STORAGE]: 10000,        // 10GB (사용 안 함)
     [ResourceType.VIEWS]: -1,             // 무제한 (사용 안 함)
@@ -128,8 +125,8 @@ export class UsageService {
   }
 
   /**
-   * MCP 자동포스팅 일간 제한 체크
-   * 일간 제한과 월간 제한을 모두 체크
+   * MCP 자동포스팅 월간 제한 체크
+   * 월간 제한만 체크 (일간 제한 없음)
    */
   async checkMcpPostLimit(userId: string): Promise<{ canPost: boolean; reason?: string }> {
     const tier = await this.getUserSubscriptionTier(userId);
@@ -145,31 +142,6 @@ export class UsageService {
         return {
           canPost: false,
           reason: `월간 MCP 자동포스팅 제한(${monthlyLimit}건)에 도달했습니다. 현재 ${monthlyCount}/${monthlyLimit}건 사용 중입니다.`,
-        };
-      }
-    }
-
-    // 일간 제한 체크
-    const dailyLimit = limits.mcpPostsPerDay;
-    if (dailyLimit !== -1) {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
-
-      // 오늘 작성한 MCP 포스트 수 조회
-      const dailyCount = await this.usageTrackingRepository
-        .createQueryBuilder('usage')
-        .where('usage.userId = :userId', { userId })
-        .andWhere('usage.resourceType = :resourceType', { resourceType: ResourceType.MCP_POST })
-        .andWhere('usage.recordedAt >= :today', { today })
-        .andWhere('usage.recordedAt < :tomorrow', { tomorrow })
-        .getCount();
-
-      if (dailyCount >= dailyLimit) {
-        return {
-          canPost: false,
-          reason: `일간 MCP 자동포스팅 제한(${dailyLimit}건)에 도달했습니다. 현재 ${dailyCount}/${dailyLimit}건 사용 중입니다.`,
         };
       }
     }

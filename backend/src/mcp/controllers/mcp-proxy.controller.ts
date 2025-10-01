@@ -20,6 +20,7 @@ import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Public } from '../../common/decorators/public.decorator';
 import { CacheService } from '../../cache/cache.service';
+import { UsageService } from '../../usage/usage.service';
 
 /**
  * MCP Proxy 컨트롤러
@@ -38,6 +39,7 @@ export class McpProxyController {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly cacheService: CacheService,
+    private readonly usageService: UsageService,
   ) {}
 
   /**
@@ -99,14 +101,25 @@ export class McpProxyController {
     };
 
     try {
-      // User 객체 조회 (PostsService가 User를 필요로 함)
+      // 1. MCP 포스트 제한 체크 (일간 + 월간 제한 모두 확인)
+      const limitCheck = await this.usageService.checkMcpPostLimit(userId);
+      if (!limitCheck.canPost) {
+        this.logger.warn(`[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`);
+        throw new ForbiddenException(limitCheck.reason);
+      }
+
+      // 2. User 객체 조회 (PostsService가 User를 필요로 함)
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user) {
         throw new BadRequestException('사용자를 찾을 수 없습니다');
       }
 
-      // 포스트 생성 (서비스 레이어에서 추가 검증)
+      // 3. 포스트 생성 (서비스 레이어에서 추가 검증)
       const post = await this.postsService.create(postData, user);
+
+      // 4. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
+      await this.usageService.trackMcpPost(userId);
+      this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
 
       // 🔥 Redis 캐시 무효화 (MCP 자동포스팅도 즉시 반영되도록)
       // 작성자의 "내 블로그"에서 즉시 확인 가능하도록 블로그별 캐시 제거
@@ -138,6 +151,9 @@ export class McpProxyController {
         blog: post.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
       };
     } catch (error) {
+      // 에러 로깅 (디버깅을 위해 전체 에러 출력)
+      this.logger.error(`[MCP Post Creation Error] ${error.message}`, error.stack);
+
       // 에러 처리 - 민감한 정보는 숨기고 일반적인 메시지만 반환
       if (error.message.includes('already exists')) {
         throw new BadRequestException('이미 존재하는 슬러그입니다');
@@ -145,6 +161,12 @@ export class McpProxyController {
       if (error.message.includes('not found')) {
         throw new BadRequestException('블로그를 찾을 수 없습니다');
       }
+
+      // 원래 에러가 이미 HTTP Exception이면 그대로 던지기
+      if (error instanceof ForbiddenException || error instanceof BadRequestException) {
+        throw error;
+      }
+
       throw new BadRequestException('포스트 생성 실패');
     }
   }

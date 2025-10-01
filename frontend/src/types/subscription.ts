@@ -59,7 +59,6 @@ export enum ResourceType {
  */
 export interface SubscriptionFeatures {
   // MCP 자동포스팅 제한 (일반 사용자 작성 포스트는 무제한)
-  maxMcpPostsPerDay: number;     // MCP 자동포스팅 일 제한
   maxMcpPostsPerMonth: number;   // MCP 자동포스팅 월 제한
   maxBlogCount: number;          // 블로그 개수 제한 (모든 플랜 1개)
   analytics: 'none' | 'basic' | 'advanced';
