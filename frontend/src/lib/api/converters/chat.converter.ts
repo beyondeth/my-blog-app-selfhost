@@ -24,8 +24,7 @@ export function convertApiMessage(apiMessage: ApiMessage): FrontendMessage {
     content: apiMessage.content,
     createdAt: new Date(apiMessage.createdAt),
     updatedAt: apiMessage.updatedAt ? new Date(apiMessage.updatedAt) : undefined,
-    isRead: apiMessage.isRead,
-    readAt: undefined, // API doesn't provide this
+    // isRead, readAt 제거 - 대화 레벨에서만 읽음 상태 관리
     isEdited: apiMessage.isEdited || false,
     editedAt: undefined, // API doesn't provide this
     isDeleted: apiMessage.isDeleted,
@@ -70,8 +69,7 @@ export function convertApiConversation(apiConv: ApiConversation): FrontendConver
       content: apiConv.lastMessage.content,
       createdAt: new Date(apiConv.lastMessage.createdAt),
       updatedAt: undefined,
-      isRead: false, // Not provided
-      readAt: undefined,
+      // isRead, readAt 제거 - 대화 레벨에서만 읽음 상태 관리
       isEdited: false,
       editedAt: undefined,
       isDeleted: false,

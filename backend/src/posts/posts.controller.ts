@@ -31,6 +31,10 @@ import { MonitoringService } from '../monitoring/monitoring.service';
 export class PostsController {
   private readonly logger = new Logger(PostsController.name);
 
+  // 캐시 무효화 최적화: 중복 무효화 방지를 위한 큐
+  private cacheInvalidationQueue = new Set<string>();
+  private isProcessingQueue = false;
+
   constructor(
     private readonly postsService: PostsService,
     @InjectRepository(PostEntity)
@@ -43,6 +47,43 @@ export class PostsController {
     private readonly cacheService: CacheService,
     private readonly monitoringService: MonitoringService,
   ) {}
+
+  /**
+   * 스마트 캐시 무효화 메서드
+   * 큐를 사용하여 중복 무효화 방지하고 배치로 처리
+   */
+  private async invalidateCache(cacheKeys: string | string[]) {
+    const keys = Array.isArray(cacheKeys) ? cacheKeys : [cacheKeys];
+
+    // 큐에 추가
+    keys.forEach(key => this.cacheInvalidationQueue.add(key));
+
+    // 이미 처리 중이면 스킵
+    if (this.isProcessingQueue) {
+      return;
+    }
+
+    // 100ms 후 배치로 처리 (여러 요청을 모아서 한 번에 처리)
+    setTimeout(async () => {
+      this.isProcessingQueue = true;
+      const keysToInvalidate = Array.from(this.cacheInvalidationQueue);
+      this.cacheInvalidationQueue.clear();
+
+      try {
+        // 병렬로 캐시 무효화
+        await Promise.all(
+          keysToInvalidate.map(key =>
+            this.cacheService.delete(key).catch(err => {
+              this.logger.error(`Failed to invalidate cache key ${key}:`, err);
+            })
+          )
+        );
+        this.logger.debug(`✅ Batch invalidated ${keysToInvalidate.length} cache keys`);
+      } finally {
+        this.isProcessingQueue = false;
+      }
+    }, 100);
+  }
 
   /**
    * 캐시 키 생성 헬퍼 메서드
@@ -90,40 +131,35 @@ export class PostsController {
   async create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: User) {
     const newPost = await this.postsService.create(createPostDto, user);
     
-    // 스마트 캐시 무효화: 1페이지만 무효화 (새 포스트는 첫 페이지에만 영향)
-    try {
-      // 1. 메인 피드 1페이지만 무효화 (새 포스트는 항상 최상단에 추가됨)
-      await this.cacheService.delete('feed:main:p1');
-      console.log('✅ Cache invalidated: page 1 only (new posts always appear on first page)');
-      
-      // 2. 캐시 워밍: 1페이지 데이터를 미리 로드하여 캐시 생성
-      const pageNumber = 1;
-      const limitNumber = 20;
-      const cacheKey = this.generateCacheKey({ 
-        page: pageNumber, 
-        limit: limitNumber,
-        isPublicOnly: true 
-      });
-      
-      // 새 데이터 조회 (캐시용 - liked 필드 제외, 공개 블로그만)
-      const freshData = await this.postsService.findAll(
-        pageNumber, 
-        limitNumber, 
-        null, 
-        null, 
-        null,  // user를 null로 - liked 필드 제외
-        undefined,
-        true   // isForCache: true - 공개 블로그만
-      );
+    // 스마트 캐시 무효화: 배치 처리로 DB 부하 최소화
+    // 새 포스트는 항상 최상단에 추가되므로 1페이지만 즉시 무효화
+    const cacheKeysToInvalidate = ['feed:main:p1'];
 
-      // 캐시에 저장 (TTL: 10분으로 연장)
-      await this.cacheService.set('feed:main:p1', freshData, 600);
-      console.log('🔥 Cache warmed: First page pre-cached with new post');
-    } catch (error) {
-      console.error('❌ Failed to invalidate/warm first page cache:', error);
-      // 캐시 무효화 실패해도 포스트 생성은 성공
+    // 인기 포스트 캐시 무효화 (새 포스트가 인기 목록에 영향을 줄 수 있음)
+    const popularPeriods = ['daily', 'weekly', 'monthly'];
+    for (const period of popularPeriods) {
+      for (let limit = 5; limit <= 10; limit += 5) {
+        cacheKeysToInvalidate.push(`popular:posts:${period}:${limit}`);
+      }
     }
-    
+
+    // 작성자의 블로그 캐시 무효화
+    if (newPost.blog && newPost.blog.slug) {
+      cacheKeysToInvalidate.push(`feed:blog:${newPost.blog.slug}:p1`);
+    }
+
+    // 배치로 캐시 무효화 (중복 방지)
+    await this.invalidateCache(cacheKeysToInvalidate);
+
+    // 2-3페이지는 지연 무효화 (DB 부하 분산)
+    setTimeout(() => {
+      this.invalidateCache(['feed:main:p2']);
+    }, 2000);
+
+    setTimeout(() => {
+      this.invalidateCache(['feed:main:p3']);
+    }, 5000);
+
     return newPost;
   }
 
@@ -375,22 +411,30 @@ export class PostsController {
     
     // 스마트 캐시 무효화: 영향받는 페이지만 무효화
     try {
-      // 메인 피드 1-3페이지 무효화
+      // 메인 피드는 1페이지만 즉시 무효화 (제목/내용 변경 시 영향)
       await this.cacheService.delete('feed:main:p1');
-      await this.cacheService.delete('feed:main:p2');
-      await this.cacheService.delete('feed:main:p3');
+      console.log('✅ Cache invalidated: page 1 after update');
 
-      // 블로그별 피드도 무효화 (해당 블로그만)
+      // 2-3페이지는 지연 무효화
+      setTimeout(async () => {
+        try {
+          await this.cacheService.delete('feed:main:p2');
+          await this.cacheService.delete('feed:main:p3');
+          console.log('✅ Cache invalidated: pages 2-3 (delayed)');
+        } catch (error) {
+          console.error('Failed to invalidate delayed cache:', error);
+        }
+      }, 3000); // 3초 후
+
+      // 블로그별 피드는 해당 블로그 1페이지만 무효화
       const post = await this.postsRepository.findOne({
         where: { id },
         relations: ['blog', 'author']
       });
-      // 작성자 확인 후 블로그 캐시 무효화
       if (post?.author?.id === user.id && post?.blog) {
-        await this.cacheService.deletePattern(`feed:blog:${post.blog.slug}:*`);
+        await this.cacheService.delete(`feed:blog:${post.blog.slug}:p1`);
+        console.log(`✅ Cache invalidated: blog ${post.blog.slug} page 1`);
       }
-
-      console.log('✅ Smart cache invalidation after post update');
     } catch (error) {
       console.error('❌ Failed to invalidate feed cache:', error);
     }
@@ -408,22 +452,45 @@ export class PostsController {
     
     // 스마트 캐시 무효화: 영향받는 페이지만 무효화
     try {
-      // 메인 피드 1-5페이지 무효화 (삭제는 더 많은 페이지에 영향)
-      for (let i = 1; i <= 5; i++) {
-        await this.cacheService.delete(`feed:main:p${i}`);
-      }
+      // 삭제는 페이지 구조에 영향이 크므로 더 많이 무효화 (하지만 지연 처리)
+      // 1페이지는 즉시 무효화
+      await this.cacheService.delete('feed:main:p1');
+      console.log('✅ Cache invalidated: page 1 after deletion');
 
-      // 블로그별 피드도 무효화 (해당 블로그만)
+      // 2-3페이지는 2초 후 무효화
+      setTimeout(async () => {
+        try {
+          await this.cacheService.delete('feed:main:p2');
+          await this.cacheService.delete('feed:main:p3');
+          console.log('✅ Cache invalidated: pages 2-3 (delayed 2s)');
+        } catch (error) {
+          console.error('Failed to invalidate cache:', error);
+        }
+      }, 2000);
+
+      // 4-5페이지는 5초 후 무효화
+      setTimeout(async () => {
+        try {
+          await this.cacheService.delete('feed:main:p4');
+          await this.cacheService.delete('feed:main:p5');
+          console.log('✅ Cache invalidated: pages 4-5 (delayed 5s)');
+        } catch (error) {
+          console.error('Failed to invalidate cache:', error);
+        }
+      }, 5000);
+
+      // 블로그별 피드는 해당 블로그의 1-2페이지만 무효화
       const post = await this.postsRepository.findOne({
         where: { id },
         relations: ['blog', 'author']
       });
-      // 작성자 확인 후 블로그 캐시 무효화
       if (post?.author?.id === user.id && post?.blog) {
-        await this.cacheService.deletePattern(`feed:blog:${post.blog.slug}:*`);
+        await this.cacheService.delete(`feed:blog:${post.blog.slug}:p1`);
+        setTimeout(async () => {
+          await this.cacheService.delete(`feed:blog:${post.blog.slug}:p2`);
+        }, 2000);
+        console.log(`✅ Cache invalidated: blog ${post.blog.slug} pages 1-2`);
       }
-
-      console.log('✅ Smart cache invalidation after post deletion');
     } catch (error) {
       console.error('❌ Failed to invalidate feed cache:', error);
     }

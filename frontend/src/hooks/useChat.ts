@@ -131,7 +131,7 @@ export function useChat(conversationId?: string) {
         conversationId,
         senderId: user?.id || '',
         content,
-        isRead: false,
+        // isRead 제거 - 대화 레벨에서만 읽음 상태 관리
         isEdited: false,
         isDeleted: false,
         createdAt: new Date(),
@@ -290,31 +290,9 @@ export function useChat(conversationId?: string) {
       }
     });
 
-    // Listen for read receipts
-    socket.on('message-read', (data: { messageId: string; conversationId: string; readBy: string; readAt: Date }) => {
-      // Only update if the reader is not the current user
-      if (data.readBy !== user?.id) {
-        setMessages(prev => prev.map(msg =>
-          msg.id === data.messageId
-            ? { ...msg, isRead: true, readAt: new Date(data.readAt) }
-            : msg
-        ));
-      }
-    });
-
-    // Listen for all messages read
-    socket.on('all-messages-read', (data: { conversationId: string; readBy: string; readAt: Date }) => {
-      // Only update if the reader is not the current user
-      if (data.readBy !== user?.id && data.conversationId === conversationId) {
-        setMessages(prev => prev.map(msg => {
-          // Mark all messages from current user as read
-          if (msg.senderId === user?.id) {
-            return { ...msg, isRead: true, readAt: new Date(data.readAt) };
-          }
-          return msg;
-        }));
-      }
-    });
+    // 개별 메시지 읽음 처리 제거 - 대화 레벨에서만 관리
+    // socket.on('message-read', ...) 제거
+    // socket.on('all-messages-read', ...) 제거
 
     // Listen for conversation list refresh event (when a left conversation gets new message)
     socket.on('conversation-list-refresh', () => {

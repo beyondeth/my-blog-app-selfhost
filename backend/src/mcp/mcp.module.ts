@@ -4,6 +4,7 @@ import { McpProxyController } from './controllers/mcp-proxy.controller';
 import { OauthModule } from '../oauth/oauth.module';
 import { PostsModule } from '../posts/posts.module';
 import { RedisModule } from '../redis/redis.module';
+import { CacheModule } from '../cache/cache.module';
 import { User } from '../users/entities/user.entity';
 
 /**
@@ -23,6 +24,7 @@ import { User } from '../users/entities/user.entity';
     OauthModule,  // OAuth2 인증을 위해 필요
     PostsModule,  // PostsService를 사용하기 위해 필요
     RedisModule,  // Redis 직접 접근을 위해 필요
+    CacheModule,  // CacheService를 통한 Redis 캐시 무효화를 위해 필요
   ],
   controllers: [McpProxyController],
   providers: [],

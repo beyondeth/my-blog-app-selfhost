@@ -17,8 +17,9 @@ export const postQueryKeys = {
 // 공통 쿼리 옵션
 const commonQueryOptions = {
   gcTime: 10 * 60 * 1000, // 10분 (가비지 컬렉션 - 메모리에서 제거되는 시간)
-  staleTime: 30 * 1000, // 30초 (5분에서 30초로 단축 - 더 자주 신선한 데이터 확인)
+  staleTime: 30 * 1000, // 30초 - 적절한 프로덕션 값 (성능과 실시간성 균형)
   refetchOnWindowFocus: true, // 탭 전환시 자동 갱신 (사용자가 탭으로 돌아올 때 최신 데이터 보장)
+  refetchOnMount: false, // 마운트시 refetch 비활성화 (성능 최적화)
   retry: 1,
 };
 
@@ -49,7 +50,7 @@ export function useInfinitePosts(options: {
     initialPageParam: 1,
     enabled,
     ...commonQueryOptions,
-    refetchOnMount: false,
+    refetchOnMount: false, // 프로덕션 설정으로 복구
   });
 }
 
@@ -60,14 +61,14 @@ export function usePost(slugOrId: string) {
     queryFn: () => postsAPI.getPostBySlug(slugOrId),
     enabled: !!slugOrId,
     ...commonQueryOptions,
-    refetchOnMount: false, // SSR/Prefetch 활용 시 false가 더 효율적
+    refetchOnMount: false, // 프로덕션 설정으로 복구 (SSR/Prefetch 활용)
   });
 }
 
 // 포스트 생성 뮤테이션 훅
 export function useCreatePost() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: postsAPI.createPost,
     onSuccess: (newPost) => {
@@ -78,7 +79,22 @@ export function useCreatePost() {
         exact: false,
         refetchType: 'active' // 현재 활성화된 쿼리만 refetch
       });
-      
+
+      // 1-1. 작성자 블로그 캐시 무효화 및 즉시 업데이트 (작성자가 "내 블로그"에서 즉시 확인 가능)
+      if (newPost.blog?.slug) {
+        // 캐시 완전 제거 (staleTime 무시)
+        queryClient.removeQueries({
+          queryKey: postQueryKeys.list({ blogSlug: newPost.blog.slug }),
+          exact: false
+        });
+
+        // 즉시 무효화
+        queryClient.invalidateQueries({
+          queryKey: postQueryKeys.list({ blogSlug: newPost.blog.slug }),
+          exact: false
+        });
+      }
+
       // 2. 무한 스크롤 쿼리의 첫 번째 페이지에 새 게시글 추가 (낙관적 업데이트)
       queryClient.setQueriesData(
         { queryKey: postQueryKeys.lists() },
@@ -136,7 +152,26 @@ export function useDeletePost() {
 
   return useMutation({
     mutationFn: postsAPI.deletePost,
-    onSuccess: (_, deletedId) => {
+    onMutate: async (deletedId) => {
+      // 삭제 전에 포스트 정보 백업 (blog 정보 필요)
+      const previousPost = queryClient.getQueryData<Post>(
+        postQueryKeys.detail(deletedId)
+      );
+
+      console.log('🗑️ [Post Delete - onMutate]', {
+        postId: deletedId,
+        hasPreviousPost: !!previousPost,
+        blogSlug: previousPost?.blog?.slug
+      });
+
+      return { previousPost };
+    },
+    onSuccess: (_, deletedId, context) => {
+      console.log('✅ [Post Deleted]', {
+        postId: deletedId,
+        blogSlug: context?.previousPost?.blog?.slug
+      });
+
       // 1. 삭제된 포스트 상세 캐시 제거
       queryClient.removeQueries({ queryKey: postQueryKeys.detail(deletedId) });
 
@@ -162,11 +197,32 @@ export function useDeletePost() {
         }
       );
 
-      // 3. 서버와 동기화를 위해 백그라운드에서 무효화
+      // 3. 홈 피드 캐시 무효화
       queryClient.invalidateQueries({
-        queryKey: postQueryKeys.lists(),
-        refetchType: 'none' // 즉시 refetch하지 않음 (이미 UI는 업데이트됨)
+        queryKey: postQueryKeys.list({}),
+        exact: false,
+        refetchType: 'active'
       });
+
+      // 4. 블로그별 캐시 무효화 (생성과 동일한 로직)
+      // 작성자가 "내 블로그"에서 즉시 삭제 확인 가능
+      if (context?.previousPost?.blog?.slug) {
+        console.log('✅ [Invalidating Blog Cache on Delete]', context.previousPost.blog.slug);
+
+        // 캐시 완전 제거 (staleTime 무시)
+        queryClient.removeQueries({
+          queryKey: postQueryKeys.list({ blogSlug: context.previousPost.blog.slug }),
+          exact: false
+        });
+
+        // 즉시 무효화
+        queryClient.invalidateQueries({
+          queryKey: postQueryKeys.list({ blogSlug: context.previousPost.blog.slug }),
+          exact: false
+        });
+      } else {
+        console.warn('⚠️ [No Blog Info for Delete]', 'previousPost.blog is missing!');
+      }
     },
     retry: 1,
   });
@@ -235,6 +291,20 @@ export function usePrefetchPost() {
     });
   };
 }
+
+// 캐시를 완전히 제거하고 새로 fetch하는 유틸리티 함수
+// 스키마 변경이나 캐시 문제 발생시 사용
+// export function useClearPostCache() {
+//   const queryClient = useQueryClient();
+
+//   return () => {
+//     // 모든 포스트 관련 캐시 제거
+//     queryClient.removeQueries({ queryKey: postQueryKeys.all });
+//     // 제거 후 즉시 무효화하여 새로운 데이터 fetch
+//     queryClient.invalidateQueries({ queryKey: postQueryKeys.all });
+//     console.log('✅ 포스트 캐시가 완전히 제거되고 새로운 데이터를 가져옵니다.');
+//   };
+// }
 
 // 여러 포스트의 좋아요 상태를 10분간 모아뒀다가 한 번에 서버로 전송하는 배치 훅
 // (debounce: 10분, 여러 포스트 동시 지원)

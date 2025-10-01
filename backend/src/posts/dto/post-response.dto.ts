@@ -26,6 +26,9 @@ export class PostResponseDto {
   slug: string;
 
   @Expose()
+  excerpt: string;
+
+  @Expose()
   content: string;
 
   @Expose()

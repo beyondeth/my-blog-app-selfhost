@@ -12,7 +12,7 @@ import {
   useMessagesInfiniteQuery,
   useCreateConversationMutation,
   useSendMessageMutation,
-  useMarkAsReadMutation,
+  // useMarkAsReadMutation 제거 - 개별 메시지 읽음 처리 제거
   useMarkAllAsReadMutation,
   useDeleteConversationMutation,
   useBlockUserMutation,
@@ -171,7 +171,7 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
   // Mutations
   const createConversationMutation = useCreateConversationMutation();
   const sendMessageMutation = useSendMessageMutation(conversationId || '', user?.id);
-  const markAsReadMutation = useMarkAsReadMutation();
+  // markAsReadMutation 제거 - 개별 메시지 읽음 처리 제거
   const markAllAsReadMutation = useMarkAllAsReadMutation();
   const deleteConversationMutation = useDeleteConversationMutation();
   const blockUserMutation = useBlockUserMutation();
@@ -695,15 +695,9 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
   }, [conversationId, sendMessageMutation]);
 
   const markAsRead = useCallback(async (messageId: string) => {
-    if (!conversationId) return;
-
-    await markAsReadMutation.mutateAsync({ conversationId, messageId });
-
-    // Emit WebSocket event for real-time sync
-    if (socket) {
-      socket.emit(SOCKET_EVENTS.MARK_READ, messageId);
-    }
-  }, [conversationId, markAsReadMutation, socket]);
+    // 개별 메시지 읽음 처리 제거 - 대화 레벨에서만 관리
+    console.log('[useChatWithQuery] Individual message read tracking removed');
+  }, []);
 
   const markAllAsRead = useCallback(async () => {
     if (!conversationId) return;

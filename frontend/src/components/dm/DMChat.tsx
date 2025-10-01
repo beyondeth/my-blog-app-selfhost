@@ -40,9 +40,8 @@ export function DMChat({ conversationId }: DMChatProps) {
 
     if (message.id?.startsWith('temp-')) {
       return <Clock className="w-3 h-3 text-gray-400" />;
-    } else if (message.isRead) {
-      return <CheckCheck className="w-3 h-3 text-blue-500" />;
     } else {
+      // 개별 메시지 읽음 표시 제거 - 전송 완료만 표시
       return <Check className="w-3 h-3 text-gray-400" />;
     }
   };

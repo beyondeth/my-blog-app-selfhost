@@ -32,6 +32,7 @@ export interface Message {
   sender?: ChatUser;
   status?: MessageStatus;
   tempId?: string; // For optimistic updates
+  // isRead, readAt 제거 - 대화 레벨에서만 읽음 상태 관리
 }
 
 // Conversation types
@@ -104,7 +105,7 @@ export type ChatAction =
   | { type: 'ADD_MESSAGE'; payload: Message }
   | { type: 'UPDATE_MESSAGE'; payload: { id: string; updates: Partial<Message> } }
   | { type: 'DELETE_MESSAGE'; payload: string }
-  | { type: 'MARK_MESSAGE_READ'; payload: { messageId: string; readAt: Date } }
+  // 개별 메시지 읽음 처리 제거 - 대화 레벨에서만 관리
   | { type: 'MARK_ALL_MESSAGES_READ'; payload: { conversationId: string } }
 
   // Typing Actions

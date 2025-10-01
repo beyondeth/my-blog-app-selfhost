@@ -25,5 +25,5 @@
     "typeRoots": ["./node_modules/@types", "./src/types"]
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "src/components/ui/.HtmlContentRendererV2.tsx"],
-  "exclude": ["node_modules", "../backend/**/*", "../**/*.d.ts"]
+  "exclude": ["node_modules", "../backend/**/*", "../**/*.d.ts", "src/lib/backup/**/*"]
 }

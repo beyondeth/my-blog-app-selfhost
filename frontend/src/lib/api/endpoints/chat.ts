@@ -47,13 +47,13 @@ export interface Message {
   conversationId: string;
   senderId: string;
   content: string;
-  isRead: boolean;
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
   tempId?: string; // 낙관적 업데이트용 임시 ID
   // 프론트엔드 타입과 호환을 위한 필드
   isEdited?: boolean;
+  // isRead 제거 - 백엔드는 대화 레벨에서만 읽음 상태 관리
 }
 
 /**

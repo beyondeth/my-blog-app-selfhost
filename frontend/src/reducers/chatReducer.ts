@@ -251,24 +251,12 @@ export const chatReducer = (state: ChatState, action: ChatAction): ChatState => 
         messages: state.messages.filter(msg => msg.id !== action.payload)
       };
 
-    case 'MARK_MESSAGE_READ':
-      return {
-        ...state,
-        messages: updateMessageInList(
-          state.messages,
-          action.payload.messageId,
-          { isRead: true, readAt: action.payload.readAt }
-        )
-      };
+    // 개별 메시지 읽음 처리 제거 - 대화 레벨에서만 관리
 
     case 'MARK_ALL_MESSAGES_READ':
       return {
         ...state,
-        messages: state.messages.map(msg =>
-          msg.conversationId === action.payload.conversationId && !msg.isRead
-            ? { ...msg, isRead: true, readAt: new Date() }
-            : msg
-        ),
+        // 개별 메시지 업데이트 제거 - 대화 레벨에서만 관리
         conversations: updateConversationInList(
           state.conversations,
           action.payload.conversationId,

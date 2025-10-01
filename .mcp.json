@@ -7,28 +7,6 @@
       "env": {
         "PROXY_SERVER_URL": "http://localhost:3002"
       }
-    },
-    "postgres": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "crystaldba/postgres-mcp",
-        "--access-mode=unrestricted"
-      ]
-    },
-    "redis-mcp-server": {
-      "type": "stdio",
-      "command": "/opt/homebrew/bin/uvx",
-      "args": [
-        "--from",
-        "redis-mcp-server@latest",
-        "redis-mcp-server",
-        "--url",
-        "redis://localhost:6379/0"
-      ]
     }
   }
 }

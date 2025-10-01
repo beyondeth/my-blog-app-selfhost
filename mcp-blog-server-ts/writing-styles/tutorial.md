@@ -96,6 +96,7 @@ tags: ["tutorial", "react", "guide"]
 3. Always use auto_enhance: true
 4. Clear, instructional title required
 5. Default Korean, English only when requested
+6. ⚠️ OUTPUT DISPLAY: When showing tool parameters, display content_markdown as [length] only, not full text
 
 ---
 
@@ -103,6 +104,8 @@ tags: ["tutorial", "react", "guide"]
 # ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
 
 Create a step-by-step tutorial blog post (Default: KOREAN)
+
+⚠️ OUTPUT NOTICE: When displaying tool parameters to LLM output, show content_markdown as [character count] only, not full content. This prevents verbose output in Claude Code UI.
 
 📚 TUTORIAL WRITING GUIDELINES:
 1. **명확한 구조** - Prerequisites, 학습목표, 단계별 진행
@@ -147,6 +150,7 @@ Create a step-by-step tutorial blog post (Default: KOREAN)
 
 # === QUALITY GUIDELINES PROMPT ===
 # ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR WRITING STYLE
+# ⚠️ OUTPUT CONTROL: Content should be shown as [length] in LLM responses, not full text
 
 # 단계별 튜토리얼 작성 가이드
 

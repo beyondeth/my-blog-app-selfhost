@@ -170,8 +170,6 @@ export class ProxyClient {
    * 포스트 생성 요청 - Proxy Server로 전달
    */
   async createPost(title: string, content: string, tags?: string[], qualityScore?: number): Promise<any> {
-    console.error('ProxyClient.createPost 파라미터:', { title, content: content?.substring(0, 100), tags, qualityScore });
-
     if (!this.sessionId) {
       // 더 명확한 에러 메시지
       throw new Error('인증이 필요합니다. 세션 ID가 없습니다.');
@@ -184,10 +182,7 @@ export class ProxyClient {
       qualityScore,
     };
 
-    console.error('ProxyClient.createPost postData:', JSON.stringify(postData, null, 2));
-
     const requestBody = JSON.stringify(postData);
-    console.error('ProxyClient.createPost requestBody:', requestBody);
 
     try {
       const response = await fetch(`${this.proxyUrl}/api/v1/mcp/create-post`, {
@@ -206,7 +201,13 @@ export class ProxyClient {
 
       return await response.json();
     } catch (error) {
-      console.error('❌ Proxy 포스트 생성 실패:', error);
+      // content 축약하여 로깅 (본문 내용 대신 길이만 표시)
+      const logInfo = {
+        title: title || '[no title]',
+        contentLength: content ? content.length : 0,
+        tags: tags || []
+      };
+      console.error('❌ Proxy 포스트 생성 실패:', logInfo, error);
       throw error;
     }
   }

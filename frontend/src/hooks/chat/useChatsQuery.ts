@@ -293,8 +293,6 @@ export const useSendMessageMutation = (conversationId: string, userId?: string) 
         content,
         senderId: userId || '',
         createdAt: new Date(),
-        isRead: true,
-        readAt: new Date(),
         isEdited: false,
         isDeleted: false,
         status: 'sending',
@@ -335,48 +333,11 @@ export const useSendMessageMutation = (conversationId: string, userId?: string) 
   });
 };
 
-/**
- * Mark message as read mutation
- */
-export const useMarkAsReadMutation = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async ({ conversationId, messageId }: { conversationId: string; messageId: string }) => {
-      return await apiClient.markAsRead(messageId);
-    },
-    onSuccess: (_, { conversationId, messageId }) => {
-      // Update message in infinite query cache
-      queryClient.setQueryData<MessagesInfiniteData>(
-        CHAT_QUERY_KEYS.messages(conversationId),
-        (oldData) => updateMessagesInfiniteCache(oldData, (messages) =>
-          messages.map(msg =>
-            msg.id === messageId
-              ? { ...msg, isRead: true, readAt: new Date() }
-              : msg
-          )
-        )
-      );
-
-      // Update unread count in conversations
-      queryClient.setQueryData<Conversation[]>(
-        CHAT_QUERY_KEYS.conversations(),
-        (old) => {
-          if (!old || !Array.isArray(old)) return [];
-          return old.map(conv => {
-            if (conv.id === conversationId && conv.unreadCount > 0) {
-              return { ...conv, unreadCount: conv.unreadCount - 1 };
-            }
-            return conv;
-          });
-        }
-      );
-    },
-  });
-};
+// 개별 메시지 읽음 처리 제거 - 대화 레벨에서만 읽음 상태 관리
 
 /**
  * Mark all messages as read mutation
+ * 대화 레벨에서 읽음 상태 관리 - unreadCount만 업데이트
  */
 export const useMarkAllAsReadMutation = () => {
   const queryClient = useQueryClient();
@@ -386,26 +347,7 @@ export const useMarkAllAsReadMutation = () => {
       return await apiClient.markAllAsRead(conversationId);
     },
     onSuccess: (_, conversationId) => {
-      // Update all messages in infinite query cache
-      queryClient.setQueryData<MessagesInfiniteData>(
-        CHAT_QUERY_KEYS.messages(conversationId),
-        (oldData) => {
-          if (!oldData?.pages) return oldData;
-
-          // Update all messages across all pages
-          return {
-            ...oldData,
-            pages: oldData.pages.map(page => ({
-              ...page,
-              messages: page.messages.map(msg => ({
-                ...msg,
-                isRead: true,
-                readAt: msg.readAt || new Date()
-              }))
-            }))
-          };
-        }
-      );
+      // 개별 메시지 업데이트 제거 - 대화 레벨에서만 관리
 
       // Reset unread count
       queryClient.setQueryData<Conversation[]>(

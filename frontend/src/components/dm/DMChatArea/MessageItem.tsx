@@ -31,8 +31,8 @@ const MessageItem: React.FC<MessageItemProps> = memo(({
   onRetry,
 }) => {
 
-  // Only show "읽음" text for the last message when other user is in room
-  const shouldShowReadText = isOwnMessage && isLastMessage && isOtherUserInRoom && message.isRead;
+  // 개별 메시지 읽음 표시 제거 - 대화 레벨에서만 읽음 상태 관리
+  // const shouldShowReadText = isOwnMessage && isLastMessage && isOtherUserInRoom && message.isRead;
 
   // Format time
   const formatTime = (date: Date) => {
@@ -139,10 +139,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({
           {/* Time and read status - only for last message in group */}
           {isLastInGroup && (
             <div className="flex flex-col items-end gap-0.5">
-              {/* Show "읽음" for last message when other user is in room */}
-              {shouldShowReadText && (
-                <span className="text-xs text-blue-500">읽음</span>
-              )}
+              {/* 개별 메시지 읽음 표시 제거 - 대화 레벨에서만 관리 */}
               {/* Time */}
               <span className={`text-xs text-gray-500 ${message.status === 'failed' ? 'text-red-500' : ''}`}>
                 {formatTime(message.createdAt)}

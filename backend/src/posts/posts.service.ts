@@ -18,6 +18,7 @@ import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class PostsService {
@@ -38,6 +39,7 @@ export class PostsService {
     private markdownRenderer: MarkdownRendererService,
     private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -310,7 +312,9 @@ export class PostsService {
     if (createPostDto.content_markdown) {
       // MCP에서 content_markdown만 보낸 경우
       markdownContent = createPostDto.content_markdown;
-      const htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+      htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
       // 백엔드에서 콘텐츠 처리 파이프라인 적용
       const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
         sanitize: true,
@@ -323,7 +327,9 @@ export class PostsService {
     } else if (createPostDto.content && this.isMarkdownContent(createPostDto.content)) {
       // content가 마크다운인 경우
       markdownContent = createPostDto.content;
-      const htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+      htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
       // 백엔드에서 콘텐츠 처리 파이프라인 적용
       const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
         sanitize: true,
@@ -341,12 +347,28 @@ export class PostsService {
     // 태그를 JSONB로 저장
     const tagList = createPostDto.tags || [];
 
+    // excerpt 생성 (HTML에서 태그 제거 후 200자 추출)
+    let excerpt = '';
+    if (processedContent) {
+      // HTML 태그 제거 및 공백 정리
+      const textContent = processedContent
+        .replace(/<[^>]+>/g, '') // HTML 태그 제거
+        .replace(/\s+/g, ' ') // 연속된 공백을 하나로
+        .trim();
+
+      // 첫 200자 추출
+      excerpt = textContent.length > 200
+        ? textContent.substring(0, 200)
+        : textContent;
+    }
+
     // spread 연산자 대신 명시적 필드 설정
     const post = this.postsRepository.create({
       title: createPostDto.title,
       category: createPostDto.category,
       content: processedContent, // HTML 버전 (디스플레이용)
       content_markdown: markdownContent, // 마크다운 원본 (편집용)
+      excerpt: excerpt, // 포스트 요약 (목록 표시용)
       content_type: contentType,
       content_rendered_at: contentType === 'markdown' ? new Date() : null,
       thumbnail: createPostDto.thumbnail, // YouTube 썸네일 또는 일반 이미지 URL
@@ -368,19 +390,20 @@ export class PostsService {
       if (createPostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
         throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
       }
-      
+
       attachedFiles = await this.filesRepository.find({
         where: { id: In(createPostDto.attachedFileIds), userId: user.id },
       });
-      
+
       // 포스트당 총 파일 용량 검증
       await this.validatePostTotalSize(attachedFiles);
-      
+
       post.attachedFiles = attachedFiles;
       await this.postsRepository.save(post);
     }
 
-    await this.linkFilesFromContent(post);
+    // Lazy loading 방지: user.id를 직접 전달
+    await this.linkFilesFromContent(post, user.id);
 
     /**
      * DTO 변환으로 spread operator 제거
@@ -418,11 +441,50 @@ export class PostsService {
     const safeLimit = Math.min(Math.max(limit, 1), 20); // 최대 20개
     const safePage = Math.max(page, 1);
 
-    // 홈화면 쿼리 최적화: 파일 조인 제거
-    // 파일 정보는 실제로 필요한 경우에만 별도로 로드
+    /**
+     * 홈화면/블로그 피드 쿼리 최적화
+     * - content, content_markdown 제외 (목록에 불필요한 대용량 필드)
+     * - leftJoinAndSelect 대신 select/addSelect 사용으로 데이터 전송량 감소
+     */
     const query = this.postsRepository.createQueryBuilder('post')
-      .leftJoinAndSelect('post.author', 'author')
-      .leftJoinAndSelect('post.blog', 'blog');
+      .select([
+        'post.id',
+        'post.title',
+        'post.slug',
+        'post.excerpt', // 포스트 요약 (목록 표시용)
+        // content와 content_markdown 제외 - 목록에서 불필요
+        'post.content_type',
+        'post.thumbnail',
+        'post.isPublished',
+        'post.viewCount',
+        'post.likeCount',
+        'post.commentCount',
+        'post.qualityScore',
+        'post.tagList',
+        'post.category',
+        'post.blogId',
+        'post.authorId',
+        'post.createdAt',
+        'post.updatedAt',
+        'post.publishedAt',
+        'post.version',
+      ])
+      .addSelect([
+        'author.id',
+        'author.username',
+        // author.email 제외 - 보안상 제거
+        'author.bio',
+        'author.role',
+        'author.profileImage',
+      ])
+      .addSelect([
+        'blog.id',
+        'blog.slug',
+        'blog.name',
+        'blog.isPublic',
+      ])
+      .leftJoin('post.author', 'author')
+      .leftJoin('post.blog', 'blog');
 
     // 캐시용이면 비공개 블로그 제외
     if (isForCache) {
@@ -470,7 +532,11 @@ export class PostsService {
       .take(safeLimit)
       .getManyAndCount();
 
-    // 날짜를 YYYY-MM-DD로 변환 및 이미지 URL 최적화
+    /**
+     * 응답 데이터 최적화
+     * - content, content_markdown 제외 (목록에서 불필요)
+     * - author.email 제외 (보안)
+     */
     const postsWithFormattedDates = posts.map(post => {
       // 중요: ...post 스프레드 연산자를 사용하면 lazy loading이 발생하므로
       // 필요한 필드만 명시적으로 선택
@@ -478,8 +544,8 @@ export class PostsService {
         id: post.id,
         title: post.title,
         slug: post.slug,
-        content: post.content,
-        content_markdown: post.content_markdown,
+        excerpt: post.excerpt, // 포스트 요약 (목록 표시용)
+        // content와 content_markdown 제외 - 목록에서 불필요
         content_type: post.content_type,
         isPublished: post.isPublished,
         category: post.category,
@@ -501,11 +567,11 @@ export class PostsService {
         thumbnail: this.optimizeImageUrl(post.thumbnail),
         // 블로그 정보 (있으면)
         blog: post.blog || null,
-        // 작성자 정보는 필요한 필드만 선택
+        // 작성자 정보는 필요한 필드만 선택 (email 제외)
         author: post.author ? {
           id: post.author.id,
           username: post.author.username,
-          email: post.author.email,
+          // email 제외 - 보안상 제거
           bio: post.author.bio,
           role: post.author.role,
           profileImage: this.optimizeImageUrl(post.author.profileImage),
@@ -552,28 +618,82 @@ export class PostsService {
   ): Promise<any> {
     // 서비스 레이어에서도 이중 검증
     const safeLimit = Math.min(Math.max(limit, 1), 10); // 인기 게시글은 최대 10개
+
+    // Redis 캐시 체크
+    const cacheKey = `popular:posts:${period}:${safeLimit}`;
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for popular posts: ${cacheKey}`);
+      return cached;
+    }
+
+    /**
+     * 최적화된 쿼리 빌더
+     * - 필요한 필드만 선택 (select/addSelect)
+     * - 민감한 정보 제외 (password, refreshToken, email)
+     * - content 필드 제외 (목록에 불필요)
+     */
     const query = this.postsRepository.createQueryBuilder('post')
-      .leftJoinAndSelect('post.author', 'author')
-      .leftJoinAndSelect('post.blog', 'blog')
+      // post의 필수 필드만 선택 (content, content_markdown 제외)
+      .select([
+        'post.id',
+        'post.title',
+        'post.slug',
+        'post.thumbnail',
+        'post.category',
+        'post.isPublished',
+        'post.viewCount',
+        'post.likeCount',
+        'post.commentCount',
+        'post.tagList',
+        'post.publishedAt',
+        'post.createdAt',
+        'post.updatedAt',
+        'post.blogId',
+        'post.authorId'
+      ])
+      // author 관계 설정 (필드 선택 안 함)
+      .leftJoin('post.author', 'author')
+      // author의 공개 필드만 추가 (email, password 제외)
+      .addSelect([
+        'author.id',
+        'author.username',
+        'author.profileImage',
+        'author.bio',
+        'author.role'
+      ])
+      // blog 관계 설정
+      .leftJoin('post.blog', 'blog')
+      // blog의 필수 필드만 추가
+      .addSelect([
+        'blog.id',
+        'blog.slug',
+        'blog.name',
+        'blog.isPublic'
+      ])
       .where('post.isPublished = :isPublished', { isPublished: true })
       .andWhere('blog.isPublic = :isPublic', { isPublic: true });
 
     // 기간별 필터링
     const now = new Date();
     let dateFilter: Date;
-    
+    let ttl: number; // 캐시 TTL (초 단위)
+
     switch (period) {
       case 'daily':
         dateFilter = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        ttl = 3600; // 1시간
         break;
       case 'weekly':
         dateFilter = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        ttl = 10800; // 3시간
         break;
       case 'monthly':
         dateFilter = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        ttl = 21600; // 6시간
         break;
     }
-    
+
     query.andWhere('post.publishedAt >= :dateFilter', { dateFilter });
 
     // 인기도 점수 계산 (viewCount + likeCount*3 + commentCount*2)
@@ -585,16 +705,18 @@ export class PostsService {
 
     const posts = await query.getMany();
 
-    // 날짜 포맷팅 및 썸네일 URL 처리 (최적화 적용)
-    // 중요: ...post 스프레드를 사용하면 lazy loading 발생하므로 필요한 필드만 명시
+    /**
+     * 최적화된 응답 매핑
+     * - content, content_markdown 제외 (목록에 불필요한 대용량 필드)
+     * - email 제외 (보안)
+     * - 필요한 필드만 포함
+     */
     const postsWithFormattedData = posts.map(post => ({
-      // 필요한 필드만 명시적으로 선택
+      // post 필수 필드만 (content 제외)
       id: post.id,
       title: post.title,
       slug: post.slug,
-      content: post.content,
-      content_markdown: post.content_markdown,
-      content_type: post.content_type,
+      // content와 content_markdown 제외 - 목록에서 불필요
       isPublished: post.isPublished,
       category: post.category,
       blogId: post.blogId,
@@ -602,8 +724,6 @@ export class PostsService {
       viewCount: post.viewCount || 0,
       likeCount: post.likeCount || 0,
       commentCount: post.commentCount || 0,
-      qualityScore: post.qualityScore || null, // 품질 점수 (null 가능) - 유지됨!
-      version: post.version,
       // 날짜 포맷팅
       createdAt: formatDate(post.createdAt),
       updatedAt: formatDate(post.updatedAt),
@@ -613,11 +733,11 @@ export class PostsService {
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
       // 블로그 정보
       blog: post.blog || null,
-      // 작성자 프로필 (필요한 필드만)
+      // 작성자 프로필 (email 제외)
       author: post.author ? {
         id: post.author.id,
         username: post.author.username,
-        email: post.author.email,
+        // email 제외 - 보안상 제거
         bio: post.author.bio,
         role: post.author.role,
         profileImage: this.optimizeImageUrl(post.author.profileImage),
@@ -626,11 +746,17 @@ export class PostsService {
       popularityScore: post.viewCount + (post.likeCount * 3) + (post.commentCount * 2)
     }));
 
-    return {
+    const result = {
       posts: postsWithFormattedData,
       period,
       count: posts.length
     };
+
+    // Redis 캐시 저장 (TTL 활용)
+    await this.cacheService.set(cacheKey, result, ttl);
+    this.logger.debug(`Cached popular posts: ${cacheKey} with TTL: ${ttl}s`);
+
+    return result;
   }
 
   async findOne(id: string, user?: User): Promise<any> {
@@ -795,7 +921,9 @@ export class PostsService {
     // 마크다운이 업데이트된 경우
     if (updatePostDto.content_markdown && updatePostDto.content_markdown !== post.content_markdown) {
       markdownContent = updatePostDto.content_markdown;
-      const htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+      htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
       // 백엔드에서 콘텐츠 처리 파이프라인 적용
       const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
         sanitize: true,
@@ -835,6 +963,21 @@ export class PostsService {
     // 컨텐츠 관련 필드 업데이트
     post.content = processedContent;
     post.content_markdown = markdownContent;
+
+    // excerpt 재생성 (content가 변경된 경우)
+    if (processedContent) {
+      // HTML 태그 제거 및 공백 정리
+      const textContent = processedContent
+        .replace(/<[^>]+>/g, '') // HTML 태그 제거
+        .replace(/\s+/g, ' ') // 연속된 공백을 하나로
+        .trim();
+
+      // 첫 200자 추출
+      post.excerpt = textContent.length > 200
+        ? textContent.substring(0, 200)
+        : textContent;
+    }
+
     post.tagList = newTagList; // JSONB 태그 배열 업데이트
 
     // Title 변경 시 slug는 변경하지 않음 (이미 고유한 UUID 포함)
@@ -866,7 +1009,8 @@ export class PostsService {
       await this.postsRepository.save(post);
     }
 
-    await this.linkFilesFromContent(post);
+    // Lazy loading 방지: user.id를 직접 전달
+    await this.linkFilesFromContent(post, user.id);
 
     // DTO 변환으로 안전하게 반환 (spread 연산자 사용 금지)
     return this.toPostDto(post, {
@@ -964,13 +1108,15 @@ export class PostsService {
     await this.postsRepository.update(postId, { attachedFiles: files });
   }
 
-  private async linkFilesFromContent(post: Post): Promise<void> {
+  private async linkFilesFromContent(post: Post, userId?: string): Promise<void> {
     try {
       const imageUrls = this.extractImageUrlsFromContent(post.content);
       if (imageUrls.length === 0) return;
       const s3Keys = imageUrls.map(url => this.extractS3KeyFromUrl(url)).filter(Boolean) as string[];
       if (s3Keys.length === 0) return;
-      const files = await this.filesRepository.find({ where: { fileKey: In(s3Keys), userId: post.author.id } });
+      // Lazy loading 방지: userId를 직접 받거나 post.authorId 사용
+      const authorUserId = userId || post.authorId;
+      const files = await this.filesRepository.find({ where: { fileKey: In(s3Keys), userId: authorUserId } });
       if (files.length > 0) {
         const existingFileIds = post.attachedFiles?.map(f => f.id) || [];
         const newFiles = files.filter(f => !existingFileIds.includes(f.id));
@@ -1210,14 +1356,15 @@ export class PostsService {
   // 기존 게시글들의 파일 연결 재처리 (UUID 기반)
   async relinkContentFiles(): Promise<void> {
     const posts = await this.postsRepository.find({
-      relations: ['author'],
+      // author relation 제거 - authorId 직접 사용
     });
 
     this.logger.log(`Starting to relink content files for ${posts.length} posts`);
 
     for (const post of posts) {
       try {
-        await this.linkFilesFromContent(post);
+        // Lazy loading 방지: authorId 직접 사용
+        await this.linkFilesFromContent(post, post.authorId);
         this.logger.log(`✅ Relinked files for post: ${post.title}`);
       } catch (error) {
         this.logger.error(`❌ Failed to relink files for post ${post.id}:`, error.message);

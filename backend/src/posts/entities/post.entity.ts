@@ -25,7 +25,10 @@ export class Post {
   @Column('text', { nullable: true, name: 'content_markdown' })
   content_markdown: string;  // 마크다운 원본 (편집용)
 
-  @Column({ 
+  @Column('text', { nullable: true, name: 'excerpt' })
+  excerpt: string;  // 포스트 요약 (목록 표시용, 200자)
+
+  @Column({
     type: 'varchar',
     default: 'html',
     nullable: true

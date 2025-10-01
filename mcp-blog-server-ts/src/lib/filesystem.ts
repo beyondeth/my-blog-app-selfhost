@@ -9,9 +9,28 @@ export async function savePostToFile(
 ): Promise<string | null> {
   /** Save markdown post to file in BLOG_POSTS_DIR directory */
   try {
-    // Get the directory from environment variable or use current working directory
-    // This allows users to specify the exact directory where posts should be saved
-    const postsDir = process.env['BLOG_POSTS_DIR'] || process.cwd();
+    // 포스트 저장 디렉토리 결정 로직:
+    // 1. 환경 변수 BLOG_POSTS_DIR이 설정된 경우 사용
+    // 2. 상대 경로인 경우 패키지 루트 디렉토리 기준으로 해석
+    // 3. 환경 변수가 없는 경우 패키지 루트의 posts 디렉토리 사용
+    let postsDir: string;
+
+    if (process.env['BLOG_POSTS_DIR']) {
+      const configuredDir = process.env['BLOG_POSTS_DIR'];
+      // 상대 경로인 경우 패키지 루트 기준으로 절대 경로로 변환
+      if (configuredDir.startsWith('./') || configuredDir.startsWith('../') || !path.isAbsolute(configuredDir)) {
+        // __dirname은 lib 디렉토리, 패키지 루트는 두 단계 위
+        const packageRoot = path.join(__dirname, '../..');
+        postsDir = path.resolve(packageRoot, configuredDir);
+      } else {
+        // 절대 경로인 경우 그대로 사용
+        postsDir = configuredDir;
+      }
+    } else {
+      // 기본값: 패키지 루트의 posts 디렉토리
+      const packageRoot = path.join(__dirname, '../..');
+      postsDir = path.join(packageRoot, 'posts');
+    }
 
     // Create posts directory if it doesn't exist
     await fs.mkdir(postsDir, { recursive: true });

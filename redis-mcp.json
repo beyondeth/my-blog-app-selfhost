@@ -1,0 +1,15 @@
+ {
+  "mcpServers": {
+     "redis-mcp-server": {
+      "type": "stdio",
+      "command": "/opt/homebrew/bin/uvx",
+      "args": [
+        "--from",
+        "redis-mcp-server@latest",
+        "redis-mcp-server",
+        "--url",
+        "redis://localhost:6379/0"
+      ]
+    }
+}
+ }

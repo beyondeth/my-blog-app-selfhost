@@ -8,6 +8,7 @@ import {
   HttpStatus,
   ForbiddenException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { OAuthGuard } from '../../oauth/guards/oauth.guard';
@@ -18,6 +19,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Public } from '../../common/decorators/public.decorator';
+import { CacheService } from '../../cache/cache.service';
 
 /**
  * MCP Proxy 컨트롤러
@@ -29,10 +31,13 @@ import { Public } from '../../common/decorators/public.decorator';
 @Public() // JWT 가드를 우회
 @ApiBearerAuth()
 export class McpProxyController {
+  private readonly logger = new Logger(McpProxyController.name);
+
   constructor(
     private readonly postsService: PostsService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -103,15 +108,34 @@ export class McpProxyController {
       // 포스트 생성 (서비스 레이어에서 추가 검증)
       const post = await this.postsService.create(postData, user);
 
+      // 🔥 Redis 캐시 무효화 (MCP 자동포스팅도 즉시 반영되도록)
+      // 작성자의 "내 블로그"에서 즉시 확인 가능하도록 블로그별 캐시 제거
+      const cacheKeysToInvalidate: string[] = ['feed:main:p1'];
+
+      if (post.blog && post.blog.slug) {
+        const blogCacheKey = `feed:blog:${post.blog.slug}:p1`;
+        cacheKeysToInvalidate.push(blogCacheKey);
+        this.logger.log(`✅ [MCP Cache Invalidation] Invalidating cache for blog: ${post.blog.slug}`);
+      }
+
+      // 병렬로 캐시 무효화 실행
+      await Promise.all(
+        cacheKeysToInvalidate.map(key =>
+          this.cacheService.delete(key).catch(err => {
+            this.logger.error(`Failed to invalidate cache key ${key}:`, err);
+          })
+        )
+      );
+
+      this.logger.log(`✅ [MCP Post Created] Post ID: ${post.id}, Blog: ${post.blog?.slug}`);
+
+      // MCP 응답 최적화: 최소 필수 정보만 반환하여 응답 시간 단축
       return {
         id: post.id,
         slug: post.slug,
         title: post.title,
-        excerpt: post.excerpt,
-        isPublished: post.isPublished,
-        publishedAt: post.publishedAt,
-        createdAt: post.createdAt,
         url: `/blog/${post.blog.slug}/posts/${post.slug}`,
+        blog: post.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
       };
     } catch (error) {
       // 에러 처리 - 민감한 정보는 숨기고 일반적인 메시지만 반환

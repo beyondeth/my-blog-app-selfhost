@@ -79,6 +79,7 @@ export interface Post {
   title: string;
   slug: string;
   content: string;
+  excerpt?: string;  // 포스트 요약 (목록 표시용)
   thumbnail?: string;
   isPublished: boolean;
   viewCount: number;

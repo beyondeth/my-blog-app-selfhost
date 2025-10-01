@@ -96,7 +96,7 @@ export function useMessages(conversationId?: string): UseMessagesReturn {
       conversationId,
       senderId: user.id,
       content,
-      isRead: false,
+      // isRead 제거 - 대화 레벨에서만 읽음 상태 관리
       isEdited: false,
       isDeleted: false,
       createdAt: new Date(),
@@ -149,27 +149,12 @@ export function useMessages(conversationId?: string): UseMessagesReturn {
     await fetchMessages(state.currentPage + 1);
   }, [state.hasMore, state.loading.messages, state.currentPage, fetchMessages]);
 
-  // Mark message as read
+  // 개별 메시지 읽음 처리 제거 - 대화 레벨에서만 관리
   const markAsRead = useCallback(async (messageId: string) => {
-    if (!conversationId) return;
-
-    try {
-      await apiClient.markMessageAsRead(messageId);
-
-      dispatch({
-        type: 'MARK_MESSAGE_READ',
-        payload: {
-          messageId,
-          readAt: new Date()
-        }
-      });
-
-      // Emit socket event
-      emit(SOCKET_EVENTS.MARK_READ, messageId);
-    } catch (error: any) {
-      console.error('[useMessages] Error marking message as read:', error);
-    }
-  }, [conversationId, emit]);
+    // 개별 메시지 읽음 처리 제거
+    // 대화 레벨에서만 읽음 상태를 관리하므로 아무 작업도 하지 않음
+    console.log('[useMessages] Individual message read tracking removed');
+  }, []);
 
   // Mark all messages as read
   const markAllAsRead = useCallback(async () => {
@@ -305,15 +290,10 @@ export function useMessages(conversationId?: string): UseMessagesReturn {
       }
     };
 
-    // Handle read receipts
+    // 개별 메시지 읽음 처리 제거
     const handleMessageRead = (data: { messageId: string; userId: string }) => {
-      dispatch({
-        type: 'MARK_MESSAGE_READ',
-        payload: {
-          messageId: data.messageId,
-          readAt: new Date()
-        }
-      });
+      // 개별 메시지 읽음 처리 제거 - 대화 레벨에서만 관리
+      console.log('[useMessages] Individual message read event ignored');
     };
 
     on(SOCKET_EVENTS.NEW_MESSAGE, handleNewMessage);

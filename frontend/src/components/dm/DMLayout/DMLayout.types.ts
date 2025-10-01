@@ -17,8 +17,7 @@ export interface Message {
   conversationId: string;
   senderId: string;
   content: string;
-  isRead: boolean;
-  readAt?: Date;
+  // isRead, readAt 제거 - 대화 레벨에서만 읽음 상태 관리
   isEdited: boolean;
   editedAt?: Date;
   isDeleted: boolean;

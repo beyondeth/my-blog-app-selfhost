@@ -16,18 +16,20 @@ import { z } from "zod";
 import { ProxyClient } from "./lib/auth-proxy";
 import { parseMarkdownMetadata } from "./lib/markdown";
 import { loadWritingStyle } from "./lib/style-loader";
+import { savePostToFile } from "./lib/filesystem";
 
 // CommonJS __dirname is already available
 
 // Load environment variables
+// 컴파일된 dist 디렉토리에서 실행되므로, 상위 디렉토리의 .env 파일을 로드
+// __dirname = dist 폴더이므로 ../.env가 프로젝트 루트의 .env를 가리킴
+dotenv.config({ path: path.join(__dirname, "../.env") });
+// 백업: 현재 작업 디렉토리에서도 .env 찾기 시도
 dotenv.config();
-dotenv.config({ path: path.join(__dirname, "../../.env") });
 
 
 // Function to create a new server instance with all tools registered
 async function createServerInstance() {
-  console.log("🚀 MCP Blog Client (경량 프록시 모드) 시작...");
-
   // ProxyClient 인스턴스 생성
   const proxyClient = new ProxyClient();
 
@@ -73,16 +75,11 @@ ${writingStyle.instructions}`,
       description: "Check current authentication status and login if needed. Always call this first to ensure session is valid before creating posts.",
     },
     async () => {
-      console.error("🔐 인증 상태 확인 중...");
-
       // 1. 먼저 로컬 세션이 있고 유효한지 확인
       if (proxyClient.getSessionId()) {
-        console.error("📂 로컬 세션 발견, 유효성 검증 중...");
-
         try {
           const isValid = await proxyClient.isAuthenticated();
           if (isValid) {
-            console.error("✅ 기존 세션이 유효합니다! (인증 성공)\n📝 자동포스팅 생성중 입니다. 잠시만 기다려주세요...");
             return {
               content: [
                 {
@@ -92,24 +89,20 @@ ${writingStyle.instructions}`,
               ],
             };
           } else {
-            console.error("❌ 세션이 만료되었습니다. 재인증 필요");
             proxyClient.setSessionId(undefined); // 만료된 세션 삭제
           }
         } catch (error) {
-          console.error("⚠️ 세션 검증 실패:", error);
+          // 세션 검증 실패
         }
       }
 
       // 2. 세션이 없거나 만료된 경우에만 새 인증 시작
-      console.error("🔄 새로운 인증 프로세스 시작...");
-      console.error("🔍 백엔드 서버와 인증 상태 동기화 중...");
 
       try {
         const result = await proxyClient.authenticate();
 
         if (result.success && result.authenticated) {
           // 이미 인증된 상태 (드물지만 가능한 경우)
-          console.error("✅ 인증 상태가 확인되었습니다! (인증 성공)\n📝 자동포스팅 생성중 입니다. 잠시만 기다려주세요...");
           return {
             content: [
               {
@@ -122,8 +115,6 @@ ${writingStyle.instructions}`,
           // 브라우저 인증이 필요한 경우
           const { spawn } = await import('child_process');
           const { authorizationUrl } = result;
-
-          console.error(`🌐 브라우저에서 인증 페이지 열기: ${authorizationUrl}`);
 
           // 브라우저 열기
           const platform = process.platform;
@@ -188,7 +179,6 @@ ${writingStyle.instructions}`,
                     });
                   })
                   .catch(error => {
-                    console.error('❌ 콜백 처리 실패:', error);
                     res.writeHead(500);
                     res.end('Authentication failed');
                     server.close();
@@ -215,7 +205,6 @@ ${writingStyle.instructions}`,
             // 포트 체크 후 서버 시작
             checkPortInUse(7777).then((inUse) => {
               if (inUse) {
-                console.error('⚠️ 포트 7777이 이미 사용 중입니다. 기존 인증이 진행 중일 수 있습니다.');
                 resolve({
                   content: [
                     {
@@ -225,9 +214,7 @@ ${writingStyle.instructions}`,
                   ],
                 });
               } else {
-                server.listen(7777, () => {
-                  console.error('🔐 인증 콜백 서버 시작 (포트 7777)...');
-                });
+                server.listen(7777);
               }
             });
 
@@ -271,7 +258,9 @@ ${writingStyle.instructions}`,
   // Zod 스키마 정의 (ZodRawShape로 정의)
   const createPostSchema = {
     title: z.string().describe("블로그 포스트 제목").optional(),
-    content_markdown: z.string().describe("마크다운 형식의 포스트 내용").optional(),
+    content_markdown: z.string()
+      .describe("마크다운 형식의 포스트 내용 (⚠️ IMPORTANT: DO NOT display full content in LLM output - only show length)")
+      .optional(),
     tags: z.array(z.string()).describe("포스트 태그 목록 (선택사항)").optional(),
     file_path: z.string().describe("마크다운 파일 경로 (선택사항)").optional(),
     auto_enhance: z.boolean().describe("품질 자동 개선 여부 (기본값: true)").optional()
@@ -281,46 +270,37 @@ ${writingStyle.instructions}`,
     "create_post",
     {
       title: "Create Blog Post (via Proxy)",
-      description: "🚨 AUTHENTICATION MANDATORY: You MUST call 'authenticate' tool FIRST before using this tool. This tool creates a blog post through MCP Proxy Server. Will FAIL without prior authentication!",
+      description: "🚨 AUTHENTICATION MANDATORY: You MUST call 'authenticate' tool FIRST before using this tool. This tool creates a blog post through MCP Proxy Server. Will FAIL without prior authentication!\n\n⚠️ OUTPUT NOTICE: When displaying tool parameters, show content_markdown as [length] only, not full text.",
       inputSchema: createPostSchema
     },
     async (args: any) => {
-      // 세션 체크를 가장 먼저 수행 (args 처리 전에!)
-      // 1. 먼저 로컬 세션이 있는지 확인 (서버 요청 최소화)
+      // 세션 체크
       if (!proxyClient.getSessionId()) {
-        console.error("❌ 로컬 세션이 없습니다. 인증이 필요합니다.");
         return {
           content: [
             {
               type: "text",
-              text: `❌ 인증이 필요합니다.\n\n현재 세션이 없습니다.\n포스트를 생성하려면 먼저 인증이 필요합니다.\n\n✅ 해결 방법:\n1. 'authenticate' 도구를 실행하여 인증 상태를 확인하세요\n2. 필요시 브라우저에서 로그인이 진행됩니다\n3. 인증 완료 후 다시 포스트 생성을 시도하세요\n\n💡 Tip: 한 번 인증하면 24시간 동안 유효합니다.`,
+              text: `❌ 인증이 필요합니다. 'authenticate' 도구를 먼저 실행하세요.`,
             },
           ],
         };
       }
 
-      // 2. 세션이 있으면 유효성 검증
+      // 세션 유효성 검증
       const isAuth = await proxyClient.isAuthenticated();
       if (!isAuth) {
-        console.error("❌ 세션이 만료되었습니다. 재인증이 필요합니다.");
-        // 만료된 세션은 삭제
         proxyClient.setSessionId(undefined);
         return {
           content: [
             {
               type: "text",
-              text: `❌ 세션이 만료되었습니다.\n\n기존 세션이 만료되어 재인증이 필요합니다.\n\n✅ 해결 방법:\n1. 'authenticate' 도구를 실행하여 다시 로그인하세요\n2. 브라우저에서 인증을 완료하세요\n3. 인증 후 포스트 생성을 다시 시도하세요\n\n💡 Tip: 세션은 24시간마다 갱신이 필요합니다.`,
+              text: `❌ 세션이 만료되었습니다. 'authenticate' 도구를 실행하여 재인증하세요.`,
             },
           ],
         };
       }
 
-      console.error("✅ 세션 검증 성공. 포스트 생성 진행...");
-
-      // 이제 args 처리 시작
-      console.error("받은 args 타입:", typeof args);
-      console.error("받은 args 키:", Object.keys(args || {}));
-      console.error("받은 args 전체:", JSON.stringify(args, null, 2));
+      // 세션 검증 성공 - 로그 제거하여 출력 간소화
 
       try {
 
@@ -356,26 +336,31 @@ ${writingStyle.instructions}`,
         // 품질 개선은 일단 스킵하고 직접 포스트 생성 시도
 
         // Proxy Server로 포스트 생성 요청
-        console.error("createPost 호출 직전 파라미터 상태:", {
-          title,
-          markdownContent: markdownContent ? markdownContent.substring(0, 100) + "..." : undefined,
-          tags,
-          qualityScore
-        });
         const result = await proxyClient.createPost(title, markdownContent, tags, qualityScore);
 
         if (result.success) {
-          // 4단계: 완료
-          console.log("✅ 포스트 생성 완료!");
 
           const post = result.data?.post || result.post || result.data;
 
-          // 결과 표시 (콘솔 로그 제거하고 간소화)
+          // 포스트를 로컬 파일로도 저장
+          let fileMessage = '';
+          try {
+            const savedFilePath = await savePostToFile(title, markdownContent, tags);
+            if (savedFilePath) {
+              console.log(`📁 포스트 파일 저장: ${savedFilePath}`);
+              fileMessage = `\n📁 파일 저장: ${path.basename(savedFilePath)}`;
+            }
+          } catch (error) {
+            console.error('📁 파일 저장 실패:', error);
+            // 파일 저장 실패해도 포스트 생성 성공은 유지
+          }
+
+          // MCP 응답 최적화: 간단한 성공 메시지만 반환 (병목 현상 제거)
           return {
             content: [
               {
                 type: "text",
-                text: `✅ 포스트가 성공적으로 생성되었습니다: ${post.slug}\n📝 제목: ${post.title}\n🔗 슬러그: ${post.slug}`,
+                text: `✅ 포스트 생성 완료: ${post.title}\n🔗 URL: ${post.url || `/posts/${post.slug}`}${fileMessage}`,
               },
             ],
           };
@@ -390,7 +375,7 @@ ${writingStyle.instructions}`,
           };
         }
       } catch (error: any) {
-        console.error("❌ 포스트 생성 에러:", error);
+        // 에러 발생 시에만 최소한의 로그
 
         // 세션 관련 에러인지 확인
         if (error.message && (error.message.includes('세션') || error.message.includes('인증'))) {
@@ -427,7 +412,6 @@ ${writingStyle.instructions}`,
       description: "Check MCP Proxy Server connection and authentication status",
     },
     async () => {
-      console.error("🔍 연결 상태 확인 중...");
 
       try {
         const health = await proxyClient.checkHealth();
@@ -480,11 +464,8 @@ async function main() {
   const server = await createServerInstance();
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error("🚀 MCP Client 시작됨 (stdio mode) - Proxy Server 연결 대기 중...");
-  console.error(`Proxy Server URL: ${process.env['PROXY_SERVER_URL'] || 'http://localhost:3002'}`);
 }
 
-main().catch((error) => {
-  console.error("Fatal error:", error);
+main().catch((_error) => {
   process.exit(1);
 });

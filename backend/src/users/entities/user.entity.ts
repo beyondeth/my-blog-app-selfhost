@@ -103,28 +103,29 @@ export class User {
   @OneToOne(() => Blog, blog => blog.owner, { eager: true })
   blog: Blog;
 
-  @OneToMany(() => Post, post => post.author, { lazy: true })
-  posts: Promise<Post[]>;
+  // lazy loading 제거 - 성능 문제 해결
+  @OneToMany(() => Post, post => post.author)
+  posts: Post[];
 
-  @OneToMany(() => Comment, comment => comment.author, { lazy: true })
-  comments: Promise<Comment[]>;
+  @OneToMany(() => Comment, comment => comment.author)
+  comments: Comment[];
 
-  @OneToMany(() => CommentLike, commentLike => commentLike.user, { lazy: true })
-  commentLikes: Promise<CommentLike[]>;
+  @OneToMany(() => CommentLike, commentLike => commentLike.user)
+  commentLikes: CommentLike[];
 
   // Follow relationships
-  @OneToMany(() => Follow, follow => follow.follower, { lazy: true })
-  following: Promise<Follow[]>;
+  @OneToMany(() => Follow, follow => follow.follower)
+  following: Follow[];
 
-  @OneToMany(() => Follow, follow => follow.following, { lazy: true })
-  followers: Promise<Follow[]>;
+  @OneToMany(() => Follow, follow => follow.following)
+  followers: Follow[];
 
   // Notification relationships
-  @OneToMany(() => Notification, notification => notification.recipient, { lazy: true })
-  receivedNotifications: Promise<Notification[]>;
+  @OneToMany(() => Notification, notification => notification.recipient)
+  receivedNotifications: Notification[];
 
-  @OneToMany(() => Notification, notification => notification.issuer, { lazy: true })
-  issuedNotifications: Promise<Notification[]>;
+  @OneToMany(() => Notification, notification => notification.issuer)
+  issuedNotifications: Notification[];
 
   // Identity relationships for Multi-Identity Architecture
   @OneToMany(() => UserIdentity, identity => identity.user, { cascade: true })

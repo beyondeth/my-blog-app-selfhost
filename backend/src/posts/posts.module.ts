@@ -13,6 +13,7 @@ import { MonitoringModule } from '../monitoring/monitoring.module';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ViewCountService } from './view-count.service';
 import { ContentProcessingModule } from '../content-processing/content-processing.module';
+import { CacheModule } from '../cache/cache.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { ContentProcessingModule } from '../content-processing/content-processin
     FilesModule,
     MonitoringModule,  // No more forwardRef needed
     ContentProcessingModule, // 콘텐츠 처리 모듈 추가
+    CacheModule, // Redis 캐시 모듈 추가
   ],
   providers: [PostsService, MarkdownRendererService, ViewCountService],
   controllers: [PostsController],

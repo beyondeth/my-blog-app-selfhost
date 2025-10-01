@@ -1,0 +1,15 @@
+{
+  "mcpServers": { 
+    "postgres": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "crystaldba/postgres-mcp",
+        "--access-mode=unrestricted"
+      ]
+    }
+}
+}

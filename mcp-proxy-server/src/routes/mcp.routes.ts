@@ -271,7 +271,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
 
     console.log('[CREATE_POST] OK');
 
-    // 간소화된 응답 (태그 정보 제거)
+    // MCP 응답 최적화: 최소 필수 정보만 반환
     const apiResponse: ApiResponse = {
       success: true,
       data: {
@@ -279,6 +279,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
           title: response.data.title,
           slug: response.data.slug,
           id: response.data.id,
+          blog: response.data.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
         },
       },
       message: `포스트가 성공적으로 생성되었습니다: ${response.data.slug}`,

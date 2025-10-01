@@ -48,40 +48,29 @@ const PostArticle = React.memo(function PostArticle({
   onDelete,
   isDeleting = false,
 }: PostArticleProps) {
-  // 디버깅: 관리자 권한 및 품질점수 확인
-  console.log('[PostArticle Debug]', {
-    postTitle: post.title,
-    isAdmin: isAdmin,
-    qualityScore: post.qualityScore,
-    hasQualityScore: post.qualityScore != null,
-    shouldShowScore: isAdmin && post.qualityScore != null
-  });
-  // HTML 태그를 제거한 순수 텍스트
-  const cleanContent = stripHtmlTags(post.content || '');
-  
-  // 3줄까지만 표시 (한 줄당 50자, 총 150자)
-  const maxLength = 150; // 50자 × 3줄
-  const displayContent = cleanContent && cleanContent.length > maxLength 
-    ? cleanContent.substring(0, maxLength) + '...' 
-    : cleanContent || '';
+  // excerpt가 있으면 사용, 없으면 content에서 추출
+
+  // excerpt를 우선 사용 (홈/목록 페이지용)
+  let displayContent = '';
+
+  if (post.excerpt) {
+    // excerpt가 있으면 그대로 사용
+    displayContent = post.excerpt;
+  } else if (post.content) {
+    // excerpt가 없고 content만 있으면 content에서 추출 (fallback)
+    const cleanContent = stripHtmlTags(post.content);
+    const maxLength = 150;
+    displayContent = cleanContent && cleanContent.length > maxLength
+      ? cleanContent.substring(0, maxLength) + '...'
+      : cleanContent || '';
+  }
   
   // YouTube 썸네일인지 확인하고 비디오 ID 추출 (개선된 감지 로직)
   let isYouTubeThumbnail = false;
   let youtubeVideoId = null;
   
-  // 디버깅: 포스트 데이터 확인
-  console.log('[PostArticle] Post data:', {
-    id: post.id,
-    title: post.title,
-    thumbnail: post.thumbnail,
-    hasContent: !!post.content,
-    contentLength: post.content?.length
-  });
-  
   // thumbnail URL에서 YouTube 패턴 확인
   if (post.thumbnail) {
-    // 디버깅용 로그
-    console.log('[PostArticle] Analyzing thumbnail URL:', post.thumbnail);
     
     // YouTube 썸네일 URL 패턴들 (우선순위 순서)
     const youtubePatterns = [
@@ -106,8 +95,6 @@ const PostArticle = React.memo(function PostArticle({
       if (match && match[1]) {
         isYouTubeThumbnail = true;
         youtubeVideoId = match[1];
-        console.log('[PostArticle] ✅ YouTube video DETECTED! Pattern matched:', pattern.source);
-        console.log('[PostArticle] Video ID extracted:', youtubeVideoId);
         break;
       }
     }
@@ -119,22 +106,14 @@ const PostArticle = React.memo(function PostArticle({
                               post.thumbnail.includes('youtu.be');
       
       if (isYouTubeDomain) {
-        console.log('[PostArticle] YouTube domain detected, trying to extract video ID...');
         // YouTube 비디오 ID는 정확히 11자리
         const idMatch = post.thumbnail.match(/([a-zA-Z0-9_-]{11})/);
         if (idMatch) {
           isYouTubeThumbnail = true;
           youtubeVideoId = idMatch[1];
-          console.log('[PostArticle] ✅ YouTube video DETECTED via domain+ID! Video ID:', youtubeVideoId);
-        } else {
-          console.log('[PostArticle] ❌ YouTube domain found but no valid 11-char ID');
         }
-      } else {
-        console.log('[PostArticle] ❌ Not a YouTube thumbnail URL');
       }
     }
-  } else {
-    console.log('[PostArticle] No thumbnail set for this post');
   }
   
   // YouTube 비디오인 경우 Reddit 스타일 레이아웃
@@ -288,9 +267,16 @@ const PostArticle = React.memo(function PostArticle({
             </Link>
           </h2>
           
-          <p className="text-sm text-gray-900 leading-relaxed line-clamp-3 break-words mb-7">
-            {displayContent}
-          </p>
+          {displayContent && (
+            <p className="text-sm text-gray-900 leading-relaxed line-clamp-3 break-words mb-7">
+              {displayContent}
+            </p>
+          )}
+          {!displayContent && (
+            <p className="text-sm text-gray-400 italic leading-relaxed line-clamp-3 break-words mb-7">
+              내용 미리보기가 없습니다.
+            </p>
+          )}
           
           {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
           <div>
