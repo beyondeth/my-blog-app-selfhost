@@ -159,11 +159,11 @@ export default function SubscriptionManagementPage() {
     const statusConfig = {
       [SubscriptionStatus.ACTIVE]: {
         label: '활성',
-        className: 'bg-green-100 text-green-700',
+        className: 'bg-primary/20 text-primary',
       },
       [SubscriptionStatus.CANCELLED]: {
         label: '취소됨',
-        className: 'bg-yellow-100 text-yellow-700',
+        className: 'bg-muted text-muted-foreground',
       },
       [SubscriptionStatus.EXPIRED]: {
         label: '만료됨',
@@ -239,8 +239,8 @@ export default function SubscriptionManagementPage() {
                   </div>
 
                   {subscription.cancelledAt && (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <p className="text-sm text-yellow-800">
+                    <div className="bg-muted/50 border border-border rounded-lg p-3">
+                      <p className="text-sm text-muted-foreground">
                         <FiAlertCircle className="inline-block w-4 h-4 mr-2" />
                         구독이 {formatDate(subscription.currentPeriodEnd)}에 종료됩니다.
                       </p>
@@ -256,7 +256,7 @@ export default function SubscriptionManagementPage() {
                     {/* highlights 필드 사용 (pricing 페이지와 동일) */}
                     {subscription.plan?.highlights?.map((feature: string, index: number) => (
                       <li key={index} className="flex items-start text-sm text-gray-700">
-                        <FiCheck className="w-4 h-4 text-green-500 mt-0.5 mr-2 flex-shrink-0" />
+                        <FiCheck className="w-4 h-4 text-primary mt-0.5 mr-2 flex-shrink-0" />
                         <span>{feature}</span>
                       </li>
                     ))}
@@ -284,7 +284,7 @@ export default function SubscriptionManagementPage() {
                 <button
                   onClick={handleResumeSubscription}
                   disabled={resumeSubscription.isPending}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors disabled:opacity-50"
                 >
                   구독 재활성화
                 </button>
@@ -339,10 +339,10 @@ export default function SubscriptionManagementPage() {
                         <div
                           className={`h-2 rounded-full transition-all ${
                             stat.percentage >= 90
-                              ? 'bg-red-500'
+                              ? 'bg-destructive'
                               : stat.percentage >= 75
-                              ? 'bg-yellow-500'
-                              : 'bg-green-500'
+                              ? 'bg-muted-foreground'
+                              : 'bg-primary'
                           }`}
                           style={{ width: `${Math.min(stat.percentage, 100)}%` }}
                         />
@@ -400,10 +400,10 @@ export default function SubscriptionManagementPage() {
                         <span
                           className={`inline-flex px-2 text-xs font-semibold rounded-full ${
                             payment.status === 'succeeded'
-                              ? 'bg-green-100 text-green-800'
+                              ? 'bg-primary/20 text-primary'
                               : payment.status === 'failed'
-                              ? 'bg-red-100 text-red-800'
-                              : 'bg-yellow-100 text-yellow-800'
+                              ? 'bg-destructive/20 text-destructive'
+                              : 'bg-muted text-muted-foreground'
                           }`}
                         >
                           {payment.status === 'succeeded' ? '성공' : payment.status === 'failed' ? '실패' : '대기'}

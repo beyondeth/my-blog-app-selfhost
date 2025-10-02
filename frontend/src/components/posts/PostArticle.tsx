@@ -122,7 +122,7 @@ const PostArticle = React.memo(function PostArticle({
   // YouTube 비디오인 경우 Reddit 스타일 레이아웃
   if (youtubeVideoId) {
     return (
-      <article className="border-b border-gray-200 py-6 sm:py-8 first:pt-0">
+      <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-8 first:pt-0">
         <div className="flex flex-col">
           {/* Header - Author Info와 제목 */}
           <div className="mb-4">
@@ -138,9 +138,9 @@ const PostArticle = React.memo(function PostArticle({
                     <UserAvatar
                       profileImage={post.author.profileImage}
                       username={post.author.username}
-                      size="xs"
+                      size="sm"
                     />
-                    <span className="text-sm text-gray-700 font-medium">
+                    <span className="text-sm text-gray-700 dark:text-[#9CA3AF] font-medium">
                       {post.author.username}
                     </span>
                   </div>
@@ -149,10 +149,10 @@ const PostArticle = React.memo(function PostArticle({
             )}
             
             {/* 제목 - YouTube 포스트는 더 큰 제목 */}
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight mb-1">
+            <h2 className="text-lg sm:text-xl font-bold text-foreground leading-tight mb-1">
               <Link
                 href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
-                className="hover:text-black transition-colors"
+                className="hover:text-primary transition-colors"
               >
                 {searchQuery ? (
                   <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
@@ -180,7 +180,7 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 일반 포스트와 동일한 구조 */}
           <div>
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-xs text-gray-500 gap-2 sm:gap-4 mb-2">
+            <div className="flex flex-wrap items-center text-xs text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
                 {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
               </span>
@@ -237,7 +237,7 @@ const PostArticle = React.memo(function PostArticle({
   
   // 일반 포스트 레이아웃 (기존 코드)
   return (
-    <article className="border-b border-gray-200 py-6 sm:py-4 first:pt-0">
+    <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-4 first:pt-0">
       <div className={`flex ${post.thumbnail ? 'flex-row gap-6 sm:gap-12' : 'flex-col'}`}>
         {/* Content */}
         <div className="flex-1 min-w-0 flex flex-col">
@@ -254,10 +254,10 @@ const PostArticle = React.memo(function PostArticle({
                   <UserAvatar
                     profileImage={post.author.profileImage}
                     username={post.author.username}
-                    size="xs"
+                    size="sm"
                   />
                   {/* Author Name */}
-                  <span className="text-sm text-gray-700 font-medium">
+                  <span className="text-sm text-gray-700 dark:text-[#9CA3AF] font-medium">
                     {post.author.username}
                   </span>
                 </div>
@@ -265,10 +265,10 @@ const PostArticle = React.memo(function PostArticle({
             </div>
           )}
           
-          <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
+          <h2 className="text-base sm:text-lg font-bold text-foreground mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
             <Link
               href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
-              className="hover:text-amber-800 transition-colors block"
+              className="hover:text-primary transition-colors block"
             >
               {searchQuery ? (
                 <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
@@ -280,7 +280,7 @@ const PostArticle = React.memo(function PostArticle({
 
           {displayContent && (
             <p
-              className="text-sm text-gray-900 leading-relaxed line-clamp-3 break-words mb-7"
+              className="text-sm text-foreground leading-relaxed line-clamp-3 break-words mb-7"
               dangerouslySetInnerHTML={
                 searchQuery
                   ? { __html: highlightAndTruncate(displayContent, searchQuery, 200) }
@@ -297,7 +297,7 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
           <div>
             {/* 메타 정보 (날짜,조회,좋아요,댓글) - 작성자 정보 제거 */}
-            <div className="flex flex-wrap items-center text-xs text-gray-500 gap-2 sm:gap-4 mb-2">
+            <div className="flex flex-wrap items-center text-xs text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
                 {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
               </span>

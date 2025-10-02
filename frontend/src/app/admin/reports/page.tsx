@@ -107,11 +107,11 @@ const REASON_LABELS: Record<string, string> = {
 };
 
 const STATUS_COLORS: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800',
-  under_review: 'bg-blue-100 text-blue-800',
-  resolved: 'bg-green-100 text-green-800',
-  dismissed: 'bg-gray-100 text-gray-800',
-  escalated: 'bg-red-100 text-red-800',
+  pending: 'bg-muted text-muted-foreground',
+  under_review: 'bg-primary/10 text-primary',
+  resolved: 'bg-secondary text-secondary-foreground',
+  dismissed: 'bg-muted/50 text-muted-foreground',
+  escalated: 'bg-destructive/10 text-destructive',
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -577,10 +577,10 @@ export default function ReportsManagement() {
                 </div>
               </div>
               
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded">
+              <div className="p-3 bg-muted border border-border rounded">
                 <div className="flex items-center space-x-2 mb-2">
-                  <Info className="h-4 w-4 text-yellow-600" />
-                  <p className="text-sm font-medium text-yellow-800">신고 대상</p>
+                  <Info className="h-4 w-4 text-muted-foreground" />
+                  <p className="text-sm font-medium text-foreground">신고 대상</p>
                 </div>
                 <p className="text-sm text-gray-700">
                   {(() => {

@@ -157,9 +157,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
               </div>
             )}
             {loginAttempts > 2 && loginAttempts < MAX_LOGIN_ATTEMPTS && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 flex items-start gap-2">
-                <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
-                <div className="text-sm text-yellow-800">
+              <div className="bg-muted/50 border border-border rounded p-3 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-muted-foreground mt-0.5" />
+                <div className="text-sm text-foreground">
                   {MAX_LOGIN_ATTEMPTS - loginAttempts} attempts remaining
                 </div>
               </div>

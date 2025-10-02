@@ -55,7 +55,7 @@ export default function NotificationItem({ notification, onClose }: Notification
         };
       case 'COMMENT':
         return {
-          icon: <MessageCircle className="h-4 w-4 text-green-500" />,
+          icon: <MessageCircle className="h-4 w-4 text-primary" />,
           message: `${issuerName}님이 회원님의 포스트에 댓글을 남겼습니다`,
           link: `/blog/${notification.post?.blogSlug}/posts/${notification.post?.slug}`,
         };

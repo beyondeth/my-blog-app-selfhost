@@ -24,9 +24,9 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
             <button
               onClick={() => setPeriod('daily')}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
-                period === 'daily' 
-                  ? 'bg-black text-white' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                period === 'daily'
+                  ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
               }`}
               aria-label="일일 인기 포스트"
             >
@@ -36,8 +36,8 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
               onClick={() => setPeriod('weekly')}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 period === 'weekly'
-                  ? 'bg-black text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
               }`}
               aria-label="주간 인기 포스트"
             >
@@ -47,8 +47,8 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
               onClick={() => setPeriod('monthly')}
               className={`px-2 py-0.5 text-xs rounded transition-colors ${
                 period === 'monthly'
-                  ? 'bg-black text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
               }`}
               aria-label="월간 인기 포스트"
             >
@@ -83,7 +83,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
       ) : (
         <div className="space-y-3">
           {posts.map((post: any, index: number) => (
-            <div key={post.id} className="flex gap-3 pb-3 border-b border-gray-100 last:border-b-0">
+            <div key={post.id} className="flex gap-3 pb-3 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
               <span className="text-lg font-bold text-gray-300 w-6 text-center">
                 {index + 1}
               </span>
@@ -107,7 +107,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
                     {post.title}
                   </h4>
                 </Link>
-                <div className="flex items-center gap-3 text-xs text-gray-500 mt-2">
+                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-[#cccccc] mt-2">
                   <div className="flex items-center gap-1">
                     <FiEye className="w-3 h-3" />
                     <span>{post.viewCount || 0}</span>

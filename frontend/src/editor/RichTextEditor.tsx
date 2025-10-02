@@ -434,19 +434,19 @@ export default function BlogRichTextEditor({
               이미지 용량: {imageTracker.formatFileSize(imageTracker.totalSize)} / 30MB
             </span>
             <span className={`font-medium ${
-              imageTracker.percentage >= 80 ? 'text-orange-600' : 
-              imageTracker.percentage >= 60 ? 'text-yellow-600' : 
-              'text-green-600'
+              imageTracker.percentage >= 80 ? 'text-destructive' :
+              imageTracker.percentage >= 60 ? 'text-muted-foreground' :
+              'text-primary'
             }`}>
               {imageTracker.percentage.toFixed(0)}% 사용
             </span>
           </div>
           <div className="mt-2 w-full bg-gray-200 rounded-full h-2">
-            <div 
+            <div
               className={`h-2 rounded-full transition-all ${
-                imageTracker.percentage >= 80 ? 'bg-orange-500' : 
-                imageTracker.percentage >= 60 ? 'bg-yellow-500' : 
-                'bg-green-500'
+                imageTracker.percentage >= 80 ? 'bg-destructive' :
+                imageTracker.percentage >= 60 ? 'bg-muted-foreground' :
+                'bg-primary'
               }`}
               style={{ width: `${Math.min(imageTracker.percentage, 100)}%` }}
             />

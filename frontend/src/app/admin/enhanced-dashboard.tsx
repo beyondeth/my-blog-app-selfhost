@@ -584,8 +584,8 @@ export default function EnhancedDashboard() {
       value: stats?.comments.total || 0,
       change: stats?.comments.changePercent || 0,
       icon: MessageSquare,
-      color: 'text-yellow-600',
-      bgColor: 'bg-yellow-100',
+      color: 'text-muted-foreground',
+      bgColor: 'bg-muted',
       searchSection: 'comments'
     },
     {
@@ -790,7 +790,7 @@ export default function EnhancedDashboard() {
                       <div key={report.id} className="flex justify-between items-center p-2 bg-gray-50 rounded">
                         <span>{report.reason}</span>
                         <span className={`text-sm px-2 py-1 rounded ${
-                          report.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' : 'bg-green-100 text-green-700'
+                          report.status === 'PENDING' ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'
                         }`}>
                           {report.status}
                         </span>
@@ -874,15 +874,15 @@ export default function EnhancedDashboard() {
                   <div key={item.id || index} className="flex items-start space-x-3">
                     <div className="flex-shrink-0">
                       <div className={`p-2 rounded-full ${
-                        item.type === 'user_signup' ? 'bg-blue-100' :
-                        item.type === 'post_created' ? 'bg-green-100' :
-                        item.type === 'comment_created' ? 'bg-yellow-100' :
-                        'bg-red-100'
+                        item.type === 'user_signup' ? 'bg-primary/10' :
+                        item.type === 'post_created' ? 'bg-secondary' :
+                        item.type === 'comment_created' ? 'bg-muted' :
+                        'bg-destructive/10'
                       }`}>
-                        {item.type === 'user_signup' && <Users className="h-4 w-4 text-blue-600" />}
-                        {item.type === 'post_created' && <FileText className="h-4 w-4 text-green-600" />}
-                        {item.type === 'comment_created' && <MessageSquare className="h-4 w-4 text-yellow-600" />}
-                        {item.type === 'report_created' && <Flag className="h-4 w-4 text-red-600" />}
+                        {item.type === 'user_signup' && <Users className="h-4 w-4 text-primary" />}
+                        {item.type === 'post_created' && <FileText className="h-4 w-4 text-secondary-foreground" />}
+                        {item.type === 'comment_created' && <MessageSquare className="h-4 w-4 text-muted-foreground" />}
+                        {item.type === 'report_created' && <Flag className="h-4 w-4 text-destructive" />}
                       </div>
                     </div>
                     <div className="flex-1">

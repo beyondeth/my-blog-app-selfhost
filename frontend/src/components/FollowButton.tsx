@@ -265,7 +265,7 @@ export default function FollowButton({
           isPending
             ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
             : isFollowing
-            ? 'bg-gray-50 text-green-500 border border-gray-300 hover:bg-gray-100 hover:border-gray-400 hover:scale-105'
+            ? 'bg-gray-50 text-primary border border-gray-300 hover:bg-gray-100 hover:border-gray-400 hover:scale-105'
             : 'bg-blue-600 text-white border border-blue-600 hover:bg-blue-700 hover:border-blue-700 hover:scale-105',
           'transition-all duration-200',
           className
@@ -295,7 +295,7 @@ export default function FollowButton({
           'inline-flex items-center justify-center text-sm font-normal px-3 py-0.5 rounded-full',
           'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1',
           'disabled:opacity-50 disabled:pointer-events-none',
-          'bg-white text-gray-900 border border-gray-900',
+          'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-black/30 dark:text-[#9CA3AF] dark:hover:bg-black/40 border border-gray-200 dark:border-gray-700',
           'transition-all duration-200',
           className
         )}

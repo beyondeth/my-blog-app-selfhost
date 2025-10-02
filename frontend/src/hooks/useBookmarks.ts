@@ -121,6 +121,11 @@ export const useIsBookmarked = (postId: string) => {
   return useQuery({
     queryKey: ['bookmark-status', postId],
     queryFn: async () => {
+      // postId가 없으면 쿼리 실행하지 않음 (enabled 옵션과 함께 이중 방어)
+      if (!postId) {
+        return { bookmarked: false };
+      }
+
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/bookmarks/${postId}/status`,
         {
@@ -142,6 +147,7 @@ export const useIsBookmarked = (postId: string) => {
 
       return response.json();
     },
+    enabled: !!postId, // postId가 있을 때만 쿼리 실행
     staleTime: 1000 * 60 * 5, // 5분
     retry: false, // 401 에러 시 재시도하지 않음
   });

@@ -93,7 +93,7 @@ export default function SubscriptionBadge() {
           {mcpPostPercentage >= 80 && mcpPostLimit > 0 && (
             <Link
               href="/account/subscription"
-              className="ml-1 text-orange-500 hover:text-orange-600"
+              className="ml-1 text-destructive hover:text-destructive/80"
               title="MCP 포스팅 한도에 근접했습니다"
             >
               <FiTrendingUp className="w-3 h-3" />

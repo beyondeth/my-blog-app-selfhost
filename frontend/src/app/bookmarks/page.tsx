@@ -122,8 +122,7 @@ export default function BookmarksPage() {
                 placeholder="북마크 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                style={{ backgroundColor: '#f7f7f5' }}
+                className="w-64 pl-10 pr-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
               />
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
@@ -132,8 +131,7 @@ export default function BookmarksPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'recent' | 'popular' | 'oldest')}
-              className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-              style={{ backgroundColor: '#f7f7f5' }}
+              className="px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
             >
               <option value="recent">최근 추가순</option>
               <option value="oldest">오래된 순</option>
@@ -142,13 +140,11 @@ export default function BookmarksPage() {
 
             {/* 전체 북마크 버튼 */}
             <button
-              className="flex items-center px-4 py-2 text-sm font-medium rounded-lg text-white"
-              style={{ backgroundColor: '#1a1a1a' }}
+              className="flex items-center px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <FiBookmark className="w-4 h-4" />
               <span className="ml-2">전체 북마크</span>
-              <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full text-white"
-                style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}>
+              <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-primary-foreground/20 text-primary-foreground">
                 {data?.total || 0}
               </span>
             </button>
@@ -167,8 +163,7 @@ export default function BookmarksPage() {
                 return (
                   <article
                     key={post.id}
-                    className="border border-gray-200 rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer relative group h-fit"
-                    style={{ backgroundColor: '#f7f7f5' }}
+                    className="border border-border rounded-lg p-5 hover:shadow-md transition-shadow cursor-pointer relative group h-fit bg-card"
                     onClick={() => handlePostClick(post)}
                   >
                       {/* 삭제 메뉴 버튼 */}
@@ -178,20 +173,19 @@ export default function BookmarksPage() {
                             e.stopPropagation();
                             setShowDeleteMenu(showDeleteMenu === post.id ? null : post.id);
                           }}
-                          className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
                         >
                           <FiMoreVertical className="w-4 h-4" />
                         </button>
 
                         {showDeleteMenu === post.id && (
-                          <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg border border-gray-200 py-1 z-10"
-                            style={{ backgroundColor: '#f7f7f5' }}>
+                          <div className="absolute right-0 mt-1 w-48 rounded-lg shadow-lg border border-border py-1 z-10 bg-card">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleDeleteBookmark(post.id);
                               }}
-                              className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              className="flex items-center w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
                             >
                               <FiTrash2 className="mr-2 w-4 h-4" />
                               북마크 삭제
@@ -202,18 +196,18 @@ export default function BookmarksPage() {
 
                       {/* 포스트 정보 */}
                       <div className="pr-8">
-                        <h2 className="text-base font-semibold text-gray-900 mb-2 line-clamp-2">
+                        <h2 className="text-base font-semibold text-foreground mb-2 line-clamp-2">
                           {post.title}
                         </h2>
 
                         {post.excerpt && (
-                          <p className="text-gray-600 text-sm mb-3 line-clamp-3">
+                          <p className="text-muted-foreground text-sm mb-3 line-clamp-3">
                             {post.excerpt}
                           </p>
                         )}
 
                         {/* 메타 정보 */}
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
                           {post.blog && (
                             <div className="flex items-center">
                               <FiUser className="mr-1 w-3 h-3" />
@@ -244,7 +238,7 @@ export default function BookmarksPage() {
                           </div>
 
                           {/* 북마크 추가 시간 */}
-                          <div className="flex items-center text-blue-600">
+                          <div className="flex items-center text-accent">
                             <FiBookmark className="mr-1 w-3 h-3" />
                             <span>
                               {new Date(post.bookmarkedAt).toLocaleDateString('ko-KR')} 추가
@@ -258,13 +252,13 @@ export default function BookmarksPage() {
                             {post.tags.slice(0, 3).map((tag: string, index: number) => (
                               <span
                                 key={index}
-                                className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-gray-100 text-gray-700 rounded"
+                                className="inline-flex items-center px-2 py-0.5 text-xs font-medium bg-muted text-muted-foreground rounded"
                               >
                                 #{tag}
                               </span>
                             ))}
                             {post.tags.length > 3 && (
-                              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-gray-500">
+                              <span className="inline-flex items-center px-2 py-0.5 text-xs font-medium text-muted-foreground">
                                 +{post.tags.length - 3}
                               </span>
                             )}
@@ -278,16 +272,16 @@ export default function BookmarksPage() {
           ) : (
             <div className="flex items-center justify-center min-h-[400px]">
               <div className="text-center">
-                <FiBookmark className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">북마크가 없습니다</h3>
-                <p className="text-gray-500 mb-6">
+                <FiBookmark className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-foreground mb-2">북마크가 없습니다</h3>
+                <p className="text-muted-foreground mb-6">
                   {searchQuery
                     ? '검색 결과가 없습니다. 다른 검색어를 시도해보세요.'
                     : '마음에 드는 포스트를 북마크에 추가해보세요.'}
                 </p>
                 <Link
                   href="/"
-                  className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                  className="inline-flex items-center px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
                 >
                   포스트 둘러보기
                 </Link>
@@ -301,7 +295,7 @@ export default function BookmarksPage() {
               <button
                 onClick={() => setPage(Math.max(1, page - 1))}
                 disabled={page === 1}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 이전
               </button>
@@ -316,8 +310,8 @@ export default function BookmarksPage() {
                     onClick={() => setPage(pageNum)}
                     className={`px-3 py-1 text-sm border rounded-md ${
                       page === pageNum
-                        ? 'bg-blue-600 text-white border-blue-600'
-                        : 'border-gray-300 hover:bg-gray-50'
+                        ? 'bg-accent text-accent-foreground border-accent'
+                        : 'border-border hover:bg-muted'
                     }`}
                   >
                     {pageNum}
@@ -328,7 +322,7 @@ export default function BookmarksPage() {
               <button
                 onClick={() => setPage(Math.min(data.totalPages, page + 1))}
                 disabled={page === data.totalPages}
-                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 다음
               </button>

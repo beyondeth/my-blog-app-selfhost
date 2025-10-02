@@ -146,7 +146,7 @@ export default function PricingPage() {
               }`}
             >
               연간 결제
-              <span className="ml-2 text-green-600 text-xs font-semibold">17% 할인</span>
+              <span className="ml-2 text-primary text-xs font-semibold">17% 할인</span>
             </button>
           </div>
         </div>
@@ -182,7 +182,7 @@ export default function PricingPage() {
                 {/* 현재 플랜 배지 */}
                 {isCurrentPlan && (
                   <div className="absolute -top-4 right-4">
-                    <span className="bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold">
+                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold">
                       현재 플랜
                     </span>
                   </div>
@@ -243,7 +243,7 @@ export default function PricingPage() {
                       {/* highlights 필드 사용 (백엔드 seeder에서 정의된 값) */}
                       {plan.highlights?.map((feature: string, index: number) => (
                         <li key={index} className="flex items-start">
-                          <FiCheck className="w-5 h-5 text-green-500 mt-0.5 mr-3 flex-shrink-0" />
+                          <FiCheck className="w-5 h-5 text-primary mt-0.5 mr-3 flex-shrink-0" />
                           <span className="text-gray-700 text-sm">{feature}</span>
                         </li>
                       ))}

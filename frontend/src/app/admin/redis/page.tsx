@@ -192,23 +192,23 @@ export default function RedisMonitoringPage() {
   const getQueueColor = (type: string, value: number, total: number) => {
     const percentage = total > 0 ? (value / total) * 100 : 0;
     switch(type) {
-      case 'completed': return 'bg-green-500';
-      case 'active': return 'bg-blue-500';
-      case 'waiting': return 'bg-yellow-500';
-      case 'failed': return 'bg-red-500';
-      case 'delayed': return 'bg-purple-500';
-      case 'paused': return 'bg-gray-500';
-      default: return 'bg-gray-400';
+      case 'completed': return 'bg-secondary';
+      case 'active': return 'bg-primary';
+      case 'waiting': return 'bg-muted';
+      case 'failed': return 'bg-destructive';
+      case 'delayed': return 'bg-accent';
+      case 'paused': return 'bg-muted-foreground';
+      default: return 'bg-border';
     }
   };
 
   const getPatternColor = (pattern: string) => {
     switch(pattern) {
-      case 'cache:': return 'bg-blue-500';
-      case 'bull:': return 'bg-green-500';
-      case 'lock:': return 'bg-yellow-500';
-      case 'mcp:': return 'bg-purple-500';
-      default: return 'bg-gray-500';
+      case 'cache:': return 'bg-primary';
+      case 'bull:': return 'bg-secondary';
+      case 'lock:': return 'bg-muted';
+      case 'mcp:': return 'bg-accent';
+      default: return 'bg-border';
     }
   };
 
@@ -400,7 +400,7 @@ export default function RedisMonitoringPage() {
                       <td className="px-4 py-2 text-sm">{lock.ttl > 0 ? lock.ttl : 'Expired'}</td>
                       <td className="px-4 py-2">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          lock.locked ? 'bg-yellow-100 text-yellow-800' : 'bg-gray-100 text-gray-800'
+                          lock.locked ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'
                         }`}>
                           {lock.locked ? 'Locked' : 'Released'}
                         </span>

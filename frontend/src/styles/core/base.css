@@ -23,8 +23,8 @@ html {
 body {
   margin: 0;
   padding: 0;
-  color: rgb(var(--color-text));
-  background: rgb(var(--color-bg));
+  color: rgb(var(--foreground));
+  background: rgb(var(--background));
   font-family: var(--font-sans);
   font-size: var(--text-base);
   line-height: var(--leading-normal);

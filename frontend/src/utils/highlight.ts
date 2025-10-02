@@ -32,7 +32,7 @@ export function highlightSearchTerms(
   const regex = new RegExp(`(${searchTerms.join('|')})`, 'gi');
 
   // 매칭된 부분을 mark 태그로 감싸기
-  return text.replace(regex, '<mark class="bg-yellow-200 rounded px-0.5">$1</mark>');
+  return text.replace(regex, '<mark class="bg-primary/20 text-primary font-medium rounded px-0.5">$1</mark>');
 }
 
 /**

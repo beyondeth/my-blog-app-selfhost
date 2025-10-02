@@ -65,23 +65,23 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
           href={user.blog ? `/blog/${user.blog.slug}` : '#'}
           className="group block"
         >
-          <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors duration-200 mb-2">
+          <h3 className="text-xl font-bold text-gray-900 dark:text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 mb-2">
             {user.username}
           </h3>
         </Link>
         <div className="flex items-center gap-4 text-sm">
           <div className="flex items-center gap-1">
-            <span className="font-semibold text-gray-900">
+            <span className="font-semibold text-gray-900 dark:text-foreground">
               {followerState.followersCount.toLocaleString()}
             </span>
-            <span className="text-gray-500">Followers</span>
+            <span className="text-gray-500 dark:text-gray-400">Followers</span>
           </div>
         </div>
       </div>
 
       {/* Bio */}
       {user.bio && (
-        <p className="text-gray-700 text-sm leading-relaxed line-clamp-3 -mt-1">
+        <p className="text-gray-700 dark:text-gray-300 text-sm leading-relaxed line-clamp-3 -mt-1">
           {user.bio}
         </p>
       )}
@@ -90,7 +90,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
       {user.blog && (
         <Link
           href={`/blog/${user.blog.slug}`}
-          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 hover:text-blue-700 transition-all duration-200 hover:gap-2 group"
+          className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 hover:gap-2 group"
         >
           <span>블로그 방문</span>
           <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>

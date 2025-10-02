@@ -53,9 +53,9 @@ export default function EditorToolbar({
       disabled={disabled}
       title={title}
       className={`p-2 rounded transition-colors ${
-        isActive 
-          ? 'bg-amber-100 text-amber-800' 
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        isActive
+          ? 'bg-primary/10 text-primary dark:bg-primary/20 dark:text-primary'
+          : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
     >
       {children}

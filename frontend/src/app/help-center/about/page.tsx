@@ -91,7 +91,7 @@ export default function AboutPage() {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
           {stats.map((stat, index) => (
             <div key={index} className="text-center">
-              <div className="text-3xl text-amber-600 mb-2 flex justify-center">
+              <div className="text-3xl text-primary mb-2 flex justify-center">
                 {stat.icon}
               </div>
               <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
@@ -124,27 +124,27 @@ export default function AboutPage() {
               <h3 className="text-xl font-semibold text-gray-900 mb-4">주요 기능</h3>
               <ul className="space-y-3">
                 <li className="flex items-start">
-                  <span className="text-amber-600 mr-2">✓</span>
+                  <span className="text-primary mr-2">✓</span>
                   <span className="text-gray-700">직관적인 마크다운 에디터</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-amber-600 mr-2">✓</span>
+                  <span className="text-primary mr-2">✓</span>
                   <span className="text-gray-700">실시간 미리보기</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-amber-600 mr-2">✓</span>
+                  <span className="text-primary mr-2">✓</span>
                   <span className="text-gray-700">자동 임시 저장</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-amber-600 mr-2">✓</span>
+                  <span className="text-primary mr-2">✓</span>
                   <span className="text-gray-700">반응형 디자인</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-amber-600 mr-2">✓</span>
+                  <span className="text-primary mr-2">✓</span>
                   <span className="text-gray-700">댓글 및 좋아요 시스템</span>
                 </li>
                 <li className="flex items-start">
-                  <span className="text-amber-600 mr-2">✓</span>
+                  <span className="text-primary mr-2">✓</span>
                   <span className="text-gray-700">통계 및 분석 도구</span>
                 </li>
               </ul>
@@ -159,7 +159,7 @@ export default function AboutPage() {
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
           {values.map((value, index) => (
             <div key={index} className="text-center">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-amber-100 text-amber-600 rounded-full mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 text-primary rounded-full mb-4">
                 {value.icon}
               </div>
               <h3 className="text-lg font-semibold text-gray-900 mb-2">{value.title}</h3>
@@ -177,13 +177,13 @@ export default function AboutPage() {
             {timeline.map((item, index) => (
               <div key={index} className="flex items-start mb-8">
                 <div className="flex-shrink-0">
-                  <div className="w-4 h-4 bg-amber-600 rounded-full mt-1.5"></div>
+                  <div className="w-4 h-4 bg-primary rounded-full mt-1.5"></div>
                   {index < timeline.length - 1 && (
                     <div className="w-0.5 h-full bg-gray-300 ml-1.5 mt-2"></div>
                   )}
                 </div>
                 <div className="ml-6">
-                  <div className="text-sm text-amber-600 font-semibold">{item.year}</div>
+                  <div className="text-sm text-primary font-semibold">{item.year}</div>
                   <div className="text-gray-700 mt-1">{item.event}</div>
                 </div>
               </div>
@@ -193,24 +193,24 @@ export default function AboutPage() {
       </div>
 
       {/* CTA Section */}
-      <div className="bg-amber-600">
+      <div className="bg-primary">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-center">
-          <h2 className="text-3xl font-bold text-white mb-4">
+          <h2 className="text-3xl font-bold text-primary-foreground mb-4">
             지금 바로 시작하세요
           </h2>
-          <p className="text-xl text-amber-100 mb-8">
+          <p className="text-xl text-primary-foreground/90 mb-8">
             당신의 첫 블로그를 만들고 이야기를 시작해보세요
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/register"
-              className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-amber-600 bg-white hover:bg-gray-100 transition-colors"
+              className="inline-flex items-center justify-center px-8 py-3 border border-transparent text-base font-medium rounded-md text-primary bg-background hover:bg-background/90 transition-colors"
             >
               무료로 시작하기
             </Link>
             <Link
               href="/help-center/getting-started"
-              className="inline-flex items-center justify-center px-8 py-3 border border-white text-base font-medium rounded-md text-white hover:bg-amber-700 transition-colors"
+              className="inline-flex items-center justify-center px-8 py-3 border border-primary-foreground text-base font-medium rounded-md text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               시작 가이드 보기
             </Link>

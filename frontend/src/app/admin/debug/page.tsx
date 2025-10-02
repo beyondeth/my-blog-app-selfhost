@@ -253,7 +253,7 @@ export default function AdminDebugPage() {
       case 'in-progress':
         return <FiRefreshCw className="text-blue-600 animate-spin" />;
       default:
-        return <FiAlertTriangle className="text-yellow-600" />;
+        return <FiAlertTriangle className="text-muted-foreground" />;
     }
   };
 
@@ -348,7 +348,7 @@ export default function AdminDebugPage() {
           <button
             onClick={simulateDeletion}
             disabled={loading || !debugInfo}
-            className="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700 disabled:opacity-50"
+            className="px-4 py-2 bg-secondary text-secondary-foreground rounded-md hover:bg-secondary/80 disabled:opacity-50"
           >
             시뮬레이션
           </button>
@@ -419,7 +419,7 @@ export default function AdminDebugPage() {
               <div className="text-sm text-gray-600">API 키</div>
             </div>
             <div className="bg-gray-50 p-4 rounded">
-              <div className="text-2xl font-bold text-yellow-600">
+              <div className="text-2xl font-bold text-muted-foreground">
                 {debugInfo.beforeDeletion.reports.count}
               </div>
               <div className="text-sm text-gray-600">신고</div>

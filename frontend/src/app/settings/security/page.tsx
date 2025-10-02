@@ -293,7 +293,7 @@ export default function SecuritySettingsPage() {
           <h3 className="text-lg font-medium text-gray-900 mb-4">보안 상태</h3>
           <div className="space-y-3">
             <div className="flex items-center">
-              <FiCheck className="h-5 w-5 text-green-500 mr-2" />
+              <FiCheck className="h-5 w-5 text-primary mr-2" />
               <span className="text-sm text-gray-700">이메일 인증 완료</span>
             </div>
             <div className="flex items-center">

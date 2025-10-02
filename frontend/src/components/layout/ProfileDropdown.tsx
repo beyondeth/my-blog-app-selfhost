@@ -55,16 +55,16 @@ export default function ProfileDropdown({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex items-center space-x-2 px-3 py-2 text-sm rounded-md hover:bg-gray-50 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
+        <button className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md hover:bg-accent hover:text-accent-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
           <div className="flex items-center space-x-2">
-            <Avatar 
-              src={user.profileImage} 
+            <Avatar
+              src={user.profileImage}
               alt={user.username}
               fallback={user.username}
               size="sm"
             />
-            <span className="text-gray-700 font-medium">{user.username}</span>
-            <FiChevronDown className="w-4 h-4 text-gray-500" />
+            <span className="font-medium">{user.username}</span>
+            <FiChevronDown className="w-4 h-4" />
           </div>
         </button>
       </DropdownMenuTrigger>

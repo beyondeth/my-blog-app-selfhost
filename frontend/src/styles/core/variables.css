@@ -1,153 +1,231 @@
-/* 
- * Core CSS Variables
- * 단일 소스로 통합된 디자인 토큰
+/*
+ * Core CSS Variables - 사용자 지정 색상만 사용
+ * 사용자가 제공한 색상만을 사용하는 시스템
  */
 
 :root {
   /* ============================
-     색상 시스템 (Color System) 
+     사용자 지정 색상 (User Provided Colors)
      ============================ */
-  
-  /* Gray Scale */
-  --color-gray-50: 249 250 251;
-  --color-gray-100: 243 244 246;
-  --color-gray-200: 229 231 235;
-  --color-gray-300: 209 213 219;
-  --color-gray-400: 156 163 175;
-  --color-gray-500: 107 114 128;
-  --color-gray-600: 75 85 99;
-  --color-gray-700: 55 65 81;
-  --color-gray-800: 31 41 55;
-  --color-gray-900: 17 24 39;
-  
-  /* Sky Blue (Accent) */
-  --color-sky-50: 240 249 255;
-  --color-sky-100: 224 242 254;
-  --color-sky-200: 186 230 253;
-  --color-sky-300: 125 211 252;
-  --color-sky-400: 56 189 248;
-  --color-sky-500: 14 165 233;
-  --color-sky-600: 2 132 199;
-  --color-sky-700: 3 105 161;
-  --color-sky-800: 7 89 133;
-  --color-sky-900: 12 74 110;
-  
-  /* Semantic Colors */
-  --color-success: 34 197 94;
-  --color-warning: 251 146 60;
-  --color-error: 239 68 68;
-  --color-info: 59 130 246;
-  
-  /* Base Colors */
-  --color-bg: 255 255 255;
-  --color-text: 17 24 39;
-  --color-border: 229 231 235;
-  
-  /* Code Block Colors (VSCode Dark+ Theme) */
-  --color-code-bg: #1e1e1e;
-  --color-code-text: #d4d4d4;
-  --color-code-border: #333333;
-  
+
+  /* 라이트 모드는 다크 모드 색상의 반대로 설정 */
+  --color-white: 255 255 255;           /* #FFFFFF */
+  --color-gray-dark: 65 63 76;          /* #413F4C */
+  --color-cyan-light: 196 239 255;      /* #C4EFFF */
+  --color-purple-light: 217 209 248;    /* #D9D1F8 */
+  --color-gray-light: 220 227 233;      /* #DCE3E9 */
+  --color-pink-light: 254 200 200;      /* #FEC8C8 */
+  --color-black: 24 24 24;              /* #181818 */
+  --color-text-light: 253 253 253;      /* #FDFDFD */
+
   /* ============================
-     타이포그래피 (Typography)
+     Gray Scale for Markdown Rendering
+     테이블과 인용문 렌더링을 위한 Gray Scale
      ============================ */
-  
-  /* Font Families */
+  --color-gray-50: 249 250 251;         /* #F9FAFB */
+  --color-gray-100: 243 244 246;        /* #F3F4F6 */
+  --color-gray-200: 229 231 235;        /* #E5E7EB */
+  --color-gray-300: 209 213 219;        /* #D1D5DB */
+  --color-gray-400: 156 163 175;        /* #9CA3AF */
+  --color-gray-500: 107 114 128;        /* #6B7280 */
+  --color-gray-600: 75 85 99;           /* #4B5563 */
+  --color-gray-700: 55 65 81;           /* #374151 */
+  --color-gray-800: 31 41 55;           /* #1F2937 */
+  --color-gray-900: 17 24 39;           /* #111827 */
+
+  /* ============================
+     라이트 모드 테마
+     ============================ */
+
+  /* Background Layers - 라이트 모드는 밝은 색 사용 */
+  --background: 255 255 255;            /* #FFFFFF - 흰색 배경 */
+  --background-secondary: 220 227 233;  /* #DCE3E9 - 연한 회색 */
+  --background-tertiary: 253 253 253;   /* #FDFDFD - 거의 흰색 */
+  --foreground: 24 24 24;               /* #181818 - 검정 텍스트 */
+
+  /* Card & Surfaces */
+  --card: 253 253 253;                  /* #FDFDFD */
+  --card-foreground: 24 24 24;          /* #181818 */
+
+  /* Popover & Dropdown */
+  --popover: 255 255 255;
+  --popover-foreground: 24 24 24;
+
+  /* Primary Actions */
+  --primary: 65 63 76;                  /* #413F4C */
+  --primary-foreground: 255 255 255;
+
+  /* Secondary Actions */
+  --secondary: 220 227 233;             /* #DCE3E9 */
+  --secondary-foreground: 24 24 24;
+
+  /* Muted/Subtle Elements */
+  --muted: 220 227 233;                 /* #DCE3E9 */
+  --muted-foreground: 65 63 76;         /* #413F4C */
+
+  /* Accent/Links - 라이트모드 호버 배경 */
+  --accent: 65 63 76;                   /* #413F4C - 호버 배경 */
+  --accent-foreground: 255 255 255;     /* #FFFFFF - 호버 시 텍스트 */
+
+  /* Destructive Actions */
+  --destructive: 254 200 200;           /* #FEC8C8 */
+  --destructive-foreground: 24 24 24;
+
+  /* Borders */
+  --border: 220 227 233;                /* #DCE3E9 */
+  --input: 220 227 233;
+  --ring: 196 239 255;                  /* #C4EFFF */
+
+  /* Semantic Colors */
+  --color-success: 196 239 255;         /* #C4EFFF */
+  --color-warning: 217 209 248;         /* #D9D1F8 */
+  --color-error: 254 200 200;           /* #FEC8C8 */
+  --color-info: 196 239 255;            /* #C4EFFF */
+
+  /* Shadows */
+  --shadow-sm: 0 1px 2px 0 rgba(24, 24, 24, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(24, 24, 24, 0.07), 0 2px 4px -2px rgba(24, 24, 24, 0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(24, 24, 24, 0.08), 0 4px 6px -4px rgba(24, 24, 24, 0.05);
+  --shadow-xl: 0 20px 25px -5px rgba(24, 24, 24, 0.08), 0 8px 10px -6px rgba(24, 24, 24, 0.04);
+  --shadow-2xl: 0 25px 50px -12px rgba(24, 24, 24, 0.15);
+  --shadow-glow: 0 0 20px rgba(196, 239, 255, 0.15);
+}
+
+.dark {
+  /* ============================
+     다크 모드 테마 - 사용자 제공 색상만 사용
+     ============================ */
+
+  /* Gray Scale for Dark Mode Markdown Rendering */
+  --color-gray-50: 17 24 39;            /* #111827 - 다크모드에서는 반전 */
+  --color-gray-100: 31 41 55;           /* #1F2937 */
+  --color-gray-200: 55 65 81;           /* #374151 */
+  --color-gray-300: 75 85 99;           /* #4B5563 */
+  --color-gray-400: 107 114 128;        /* #6B7280 */
+  --color-gray-500: 156 163 175;        /* #9CA3AF */
+  --color-gray-600: 209 213 219;        /* #D1D5DB */
+  --color-gray-700: 229 231 235;        /* #E5E7EB */
+  --color-gray-800: 243 244 246;        /* #F3F4F6 */
+  --color-gray-900: 249 250 251;        /* #F9FAFB */
+
+  /* Background Layers - 사용자가 제공한 색상 */
+  --background: 24 24 24;               /* #181818 - 메인 배경 */
+  --background-secondary: 31 31 31;     /* #1F1F1F - 카드/섹션 배경 */
+  --background-tertiary: 38 38 38;      /* #262626 - 서페이스 */
+  --foreground: 253 253 253;            /* #FDFDFD - 메인 텍스트 */
+
+  /* Card & Surfaces */
+  --card: 31 31 31;                     /* #1F1F1F - 카드 배경 (더 어두운 색) */
+  --card-foreground: 253 253 253;       /* #FDFDFD - 카드 텍스트 */
+
+  /* Popover & Dropdown */
+  --popover: 38 38 38;                  /* #262626 - 팝오버 배경 */
+  --popover-foreground: 253 253 253;    /* #FDFDFD */
+
+  /* Primary Actions - 밝은 하늘색 */
+  --primary: 196 239 255;               /* #C4EFFF - 메인 액션 색상 */
+  --primary-foreground: 24 24 24;       /* #181818 - 프라이머리 버튼 텍스트 */
+
+  /* Secondary Actions - 연보라 */
+  --secondary: 217 209 248;             /* #D9D1F8 - 세컨더리 액션 */
+  --secondary-foreground: 24 24 24;     /* #181818 - 세컨더리 버튼 텍스트 */
+
+  /* Muted/Subtle Elements - 연한 회청색 */
+  --muted: 220 227 233;                 /* #DCE3E9 - 뮤트된 요소 */
+  --muted-foreground: 220 227 233;      /* #DCE3E9 - 뮤트된 텍스트 */
+
+  /* Accent/Links - 호버 배경용 어두운 색 */
+  --accent: 45 45 45;                   /* #2D2D2D - 호버 배경 */
+  --accent-foreground: 253 253 253;     /* #FDFDFD - 호버 시 텍스트 */
+
+  /* Destructive Actions - 연한 핑크 */
+  --destructive: 254 200 200;           /* #FEC8C8 - 에러/삭제 액션 */
+  --destructive-foreground: 24 24 24;   /* #181818 */
+
+  /* Borders - 약간 밝은 회색 */
+  --border: 42 42 42;                   /* #2A2A2A - 보더 (어두운 회색) */
+  --input: 65 63 76;                    /* #413F4C - 인풋 보더 */
+  --ring: 196 239 255;                  /* #C4EFFF - 포커스 링 */
+
+  /* Semantic Colors */
+  --color-success: 217 209 248;         /* #D9D1F8 - 성공 (연보라) */
+  --color-warning: 217 209 248;         /* #D9D1F8 - 경고 (연보라) */
+  --color-error: 254 200 200;           /* #FEC8C8 - 에러 (연한 핑크) */
+  --color-info: 196 239 255;            /* #C4EFFF - 정보 (밝은 하늘색) */
+
+  /* Shadows - 다크 모드 최적화 */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.5);
+  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  --shadow-glow: 0 0 30px rgba(196, 239, 255, 0.15); /* 하늘색 글로우 */
+}
+
+/* ============================
+   공통 디자인 토큰
+   ============================ */
+
+:root {
+  /* Typography */
   --font-sans: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
   --font-mono: 'GeistMono', 'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace;
-  
+
   /* Font Sizes */
-  --text-xs: 0.75rem;    /* 12px */
-  --text-sm: 0.875rem;   /* 14px */
-  --text-base: 1rem;     /* 16px */
-  --text-lg: 1.125rem;   /* 18px */
-  --text-xl: 1.25rem;    /* 20px */
-  --text-2xl: 1.5rem;    /* 24px */
-  --text-3xl: 1.875rem;  /* 30px */
-  --text-4xl: 2.25rem;   /* 36px */
-  
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+  --text-4xl: 2.25rem;
+
   /* Line Heights */
   --leading-tight: 1.25;
   --leading-normal: 1.5;
   --leading-relaxed: 1.7;
   --leading-loose: 2;
-  
+
   /* Font Weights */
   --font-normal: 400;
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
-  
-  /* ============================
-     간격 시스템 (Spacing) 
-     ============================ */
-  
-  --space-xs: 0.25rem;   /* 4px */
-  --space-sm: 0.5rem;    /* 8px */
-  --space-md: 1rem;      /* 16px */
-  --space-lg: 1.5rem;    /* 24px */
-  --space-xl: 2rem;      /* 32px */
-  --space-2xl: 3rem;     /* 48px */
-  --space-3xl: 4rem;     /* 64px */
-  
-  /* ============================
-     그림자 시스템 (Shadows)
-     ============================ */
-  
-  --shadow-none: none;
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
-  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-  --shadow-2xl: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
-  --shadow-code: 0 4px 6px rgba(0, 0, 0, 0.15);
-  
-  /* ============================
-     보더 시스템 (Borders)
-     ============================ */
-  
+
+  /* Spacing */
+  --space-xs: 0.25rem;
+  --space-sm: 0.5rem;
+  --space-md: 1rem;
+  --space-lg: 1.5rem;
+  --space-xl: 2rem;
+  --space-2xl: 3rem;
+  --space-3xl: 4rem;
+
   /* Border Radius */
-  --radius: 0.5rem; /* Tailwind에서 참조하는 기본 radius 값 */
-  --radius-none: 0;
-  --radius-sm: 0.125rem;
+  --radius: 0.5rem;
+  --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
   --radius-xl: 0.75rem;
   --radius-2xl: 1rem;
   --radius-full: 9999px;
-  
-  /* Border Width */
-  --border-0: 0;
-  --border-1: 1px;
-  --border-2: 2px;
-  --border-4: 4px;
-  
-  /* ============================
-     애니메이션 (Animation)
-     ============================ */
-  
+
+  /* Animation */
   --duration-fast: 150ms;
   --duration-normal: 200ms;
   --duration-slow: 300ms;
-  
+  --duration-slower: 500ms;
+
   --easing-linear: linear;
+  --easing-ease: ease;
   --easing-ease-in: cubic-bezier(0.4, 0, 1, 1);
   --easing-ease-out: cubic-bezier(0, 0, 0.2, 1);
   --easing-ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
-}
+  --easing-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
-/* ============================
-   다크 모드
-   ============================ */
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-bg: 17 24 39;
-    --color-text: 243 244 246;
-    --color-border: 55 65 81;
-    
-    /* 코드 블록은 다크모드에서도 동일 */
-    --color-code-bg: #1e1e1e;
-    --color-code-text: #d4d4d4;
-  }
+  /* Code Block - 다크 테마 유지 */
+  --color-code-bg: #1e1e1e;
+  --color-code-text: #d4d4d4;
+  --color-code-border: #333333;
 }

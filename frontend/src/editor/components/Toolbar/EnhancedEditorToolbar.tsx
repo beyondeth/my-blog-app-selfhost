@@ -70,8 +70,8 @@ const BG_COLOR_PRESETS = [
   { value: '#E9D5FF', label: '보라' },
   { value: '#FEE2E2', label: '연빨강' },
   { value: '#DBEAFE', label: '연파랑' }, // blue-100
-  { value: '#D1FAE5', label: '연초록' }, // green-100
-  { value: '#FFF7ED', label: '연주황' }, // orange-50
+  { value: '#C4EFFF', label: '연한 하늘' }, // user color light blue
+  { value: '#DCE3E9', label: '연한 회색' }, // user color light gray
 ];
 
 // 글꼴 크기 옵션

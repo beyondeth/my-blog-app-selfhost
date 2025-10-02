@@ -11,6 +11,7 @@ import { routes, navigation } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import NotificationIcon from '../notifications/NotificationIcon';
 import SubscriptionBadge from '../subscription/SubscriptionBadge';
+import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 import { blogLogger } from '@/utils/logger';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useDMModal } from '@/hooks/useDMModal';
@@ -153,7 +154,7 @@ export default function Header() {
   }
 
   return (
-    <header className="border-b border-gray-200 sticky top-0 z-50 bg-white" ref={mobileMenuRef}>
+    <header className="border-b border-border sticky top-0 z-50 bg-background" ref={mobileMenuRef}>
       <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-5">
         <div className="flex items-center justify-between">
           {/* Logo */}
@@ -163,16 +164,16 @@ export default function Header() {
               onClick={handleHomeNavigation}
               className="hover:opacity-80 transition-opacity cursor-pointer flex items-center space-x-2"
             >
-              {/* Code Icon */}
-              <div className="bg-blue-500 rounded-lg p-3 flex items-center justify-center min-w-[48px] min-h-[48px]">
+              {/* Code Icon - 모던한 그라데이션 적용 */}
+              <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl p-3 flex items-center justify-center min-w-[48px] min-h-[48px] shadow-md hover:shadow-lg transition-shadow">
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 8l-4 4 4 4M18 8l4 4-4 4M14 7l-4 10"/>
                 </svg>
               </div>
-              {/* Text */}
+              {/* Text - 다크모드 지원 */}
               <div className="flex flex-col">
-                <span className="text-xl font-bold text-black leading-tight">codebase.</span>
-                <span className="text-xl font-bold text-black leading-tight -mt-1">blog</span>
+                <span className="text-xl font-bold text-foreground leading-tight">codebase.</span>
+                <span className="text-xl font-bold text-foreground leading-tight -mt-1">blog</span>
               </div>
             </a>
           </div>
@@ -182,10 +183,10 @@ export default function Header() {
             {/* Search Bar - Medium Style */}
             <div className="max-w-sm ml-8">
               <form onSubmit={handleSearch} className="relative">
-                <div className={`flex items-center bg-gray-50 rounded-full px-5 py-3.5 transition-all ${
-                  isSearchFocused ? 'bg-white border border-gray-300 shadow-sm' : 'hover:bg-gray-100'
+                <div className={`flex items-center bg-card dark:bg-gray-800 rounded-full px-5 py-3.5 transition-all ${
+                  isSearchFocused ? 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 shadow-md ring-2 ring-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
                 }`}>
-                  <FiSearch className="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
+                  <FiSearch className="w-5 h-5 text-muted-foreground mr-3 flex-shrink-0" />
                   <input
                     ref={searchInputRef}
                     type="text"
@@ -194,7 +195,7 @@ export default function Header() {
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
                     placeholder="Search"
-                    className="flex-1 bg-transparent text-sm placeholder-gray-500 focus:outline-none w-48"
+                    className="flex-1 bg-transparent text-sm placeholder-muted-foreground focus:outline-none w-48 text-foreground"
                     autoComplete="off"
                     autoCapitalize="off"
                     autoCorrect="off"
@@ -210,7 +211,7 @@ export default function Header() {
               {authLoading ? (
                 // 로딩 중일 때는 아무것도 표시하지 않거나 스켈레톤 UI
                 <div className="flex items-center space-x-4">
-                  <div className="w-20 h-8 bg-gray-100 rounded animate-pulse"></div>
+                  <div className="w-20 h-8 bg-muted rounded animate-pulse"></div>
                 </div>
               ) : user ? (
                 <>
@@ -218,7 +219,7 @@ export default function Header() {
                   {!blogLoading && blog && (
                     <Link
                       href={`/blog/${blog.slug}`}
-                      className="text-sm text-gray-900 hover:text-gray-800"
+                      className="text-sm text-foreground hover:bg-accent hover:text-accent-foreground font-medium px-3 py-2 rounded-md transition-colors"
                     >
                       내 블로그
                     </Link>
@@ -228,7 +229,7 @@ export default function Header() {
                   <button
                     onClick={handleWriteClick}
                     disabled={isCheckingBlog}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <FiEdit3 className="mr-1.5 w-4 h-4" />
                     {isCheckingBlog ? '확인 중...' : '글쓰기'}
@@ -237,7 +238,7 @@ export default function Header() {
                   {/* DM Button */}
                   <button
                     onClick={() => openModal()}
-                    className="relative p-2 text-gray-600 hover:text-gray-900 transition-colors"
+                    className="relative p-2 text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
                     title="메시지"
                   >
                     <svg
@@ -258,6 +259,9 @@ export default function Header() {
                   {/* Notification Icon */}
                   <NotificationIcon />
 
+                  {/* Theme Switch */}
+                  <ThemeSwitch />
+
                   {/* Profile Dropdown */}
                   <ProfileDropdown
                     user={user}
@@ -272,9 +276,13 @@ export default function Header() {
                   <SubscriptionBadge />
                 </>
               ) : (
-                <Link
-                  href={routes.login()}
-                  className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-black hover:bg-gray-800 text-white rounded-full transition-all"
+                <>
+                  {/* Theme Switch for non-authenticated users */}
+                  <ThemeSwitch />
+
+                  <Link
+                    href={routes.login()}
+                    className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
                   onClick={(e) => {
                     // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
                     if (pathname === '/register') {
@@ -289,6 +297,7 @@ export default function Header() {
                 >
                   로그인
                 </Link>
+                </>
               )}
             </div>
           </nav>
@@ -296,7 +305,7 @@ export default function Header() {
           {/* Mobile Menu Button */}
           <button
             onClick={toggleMobileMenu}
-            className="md:hidden p-2 rounded-md text-gray-600 hover:text-gray-900 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500"
+            className="md:hidden p-2 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring"
             aria-label={isMobileMenuOpen ? "메뉴 닫기" : "메뉴 열기"}
             aria-expanded={isMobileMenuOpen}
           >
@@ -311,14 +320,14 @@ export default function Header() {
         {/* Mobile Search Bar */}
         <div className="md:hidden mt-3">
           <form onSubmit={handleSearch} className="relative">
-            <div className="flex items-center bg-gray-50 rounded-full px-5 py-3.5">
-              <FiSearch className="w-4 h-4 text-gray-400 mr-2 flex-shrink-0" />
+            <div className="flex items-center bg-muted rounded-full px-5 py-3.5">
+              <FiSearch className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchInputChange}
                 placeholder="Search"
-                className="flex-1 bg-transparent text-sm placeholder-gray-500 focus:outline-none"
+                className="flex-1 bg-transparent text-sm placeholder-muted-foreground focus:outline-none text-foreground"
                 autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -329,30 +338,30 @@ export default function Header() {
 
         {/* Mobile Navigation Menu */}
         {isMobileMenuOpen && (
-          <div className="md:hidden mt-4 pb-4 border-t border-gray-200 animate-in slide-in-from-top-1 duration-200">
+          <div className="md:hidden mt-4 pb-4 border-t border-border animate-in slide-in-from-top-1 duration-200">
             <div className="pt-4 space-y-4">
               {/* Navigation Links */}
               <div className="space-y-3">
-                <Link 
-                  href="/analytics" 
+                <Link
+                  href="/analytics"
                   onClick={closeMobileMenu}
-                  className="block text-base text-gray-900 hover:text-gray-800 py-2 px-2 rounded-md hover:bg-gray-50 transition-colors"
+                  className="block text-base text-foreground hover:text-foreground/80 py-2 px-2 rounded-md hover:bg-muted transition-colors"
                 >
                   📊 분석
                 </Link>
               </div>
 
               {/* Mobile Auth Section */}
-              <div className="pt-4 border-t border-gray-100">
+              <div className="pt-4 border-t border-border">
                 {authLoading ? (
                   // 모바일 로딩 UI
                   <div className="space-y-3">
-                    <div className="w-full h-10 bg-gray-100 rounded animate-pulse"></div>
+                    <div className="w-full h-10 bg-muted rounded animate-pulse"></div>
                   </div>
                 ) : user ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between px-2 py-2">
-                      <span className="text-sm text-gray-600">
+                      <span className="text-sm text-muted-foreground">
                         {user.username}님
                       </span>
                       {/* Mobile Subscription Badge */}
@@ -361,10 +370,10 @@ export default function Header() {
                     
                     {/* My Blog Button for Mobile */}
                     {!blogLoading && blog && (
-                      <Link 
+                      <Link
                         href={`/blog/${blog.slug}`}
                         onClick={closeMobileMenu}
-                        className="block text-center py-2 px-2 text-sm text-gray-900 hover:text-gray-800 rounded-md hover:bg-gray-50 transition-colors"
+                        className="block text-center py-2 px-2 text-sm text-foreground hover:text-foreground/80 rounded-md hover:bg-muted transition-colors font-medium"
                       >
                         내 블로그
                       </Link>
@@ -374,7 +383,7 @@ export default function Header() {
                     <button
                       onClick={handleWriteClick}
                       disabled={isCheckingBlog}
-                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full transition-all w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-foreground border border-border hover:border-border/80 hover:bg-muted rounded-full transition-all w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       <FiEdit3 className="mr-2 w-4 h-4" />
                       {isCheckingBlog ? '확인 중...' : '글쓰기'}
@@ -386,7 +395,7 @@ export default function Header() {
                         closeMobileMenu();
                         openModal();
                       }}
-                      className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-gray-700 border border-gray-300 hover:border-gray-400 hover:bg-gray-50 rounded-full transition-all"
+                      className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-foreground border border-border hover:border-border/80 hover:bg-muted rounded-full transition-all"
                     >
                       <svg
                         className="w-4 h-4 mr-2"
@@ -403,37 +412,51 @@ export default function Header() {
                       </svg>
                       메시지
                     </button>
-                    
+
+                    {/* Theme Switch for Mobile */}
+                    <div className="flex items-center justify-between px-2 py-2">
+                      <span className="text-sm text-muted-foreground">테마</span>
+                      <ThemeSwitch />
+                    </div>
+
                     <button
                       onClick={() => {
                         closeMobileMenu();
                         logout('/');
                       }}
-                      className="flex items-center space-x-2 text-sm text-gray-500 hover:text-gray-700 py-2 px-2 rounded-md hover:bg-gray-50 transition-colors w-full"
+                      className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground py-2 px-2 rounded-md hover:bg-muted transition-colors w-full"
                     >
                       <FiLogOut className="w-4 h-4" />
                       <span>로그아웃</span>
                     </button>
                   </div>
                 ) : (
-                  <Link
-                    href={routes.login()}
-                    onClick={(e) => {
-                      closeMobileMenu();
-                      // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
-                      if (pathname === '/register') {
-                        e.preventDefault();
-                        router.push('/login');
-                        // 약간의 지연 후 회원가입 페이지 상태 초기화를 위한 새로고침
-                        setTimeout(() => {
-                          window.dispatchEvent(new Event('register-page-reset'));
-                        }, 100);
-                      }
-                    }}
-                    className="inline-flex items-center justify-center w-full px-4 py-3 text-sm font-medium bg-black hover:bg-gray-800 text-white rounded-full transition-all"
-                  >
-                    로그인
-                  </Link>
+                  <>
+                    {/* Theme Switch for Mobile - Non-authenticated */}
+                    <div className="flex items-center justify-between px-2 py-2 mb-3">
+                      <span className="text-sm text-muted-foreground">테마</span>
+                      <ThemeSwitch />
+                    </div>
+
+                    <Link
+                      href={routes.login()}
+                      onClick={(e) => {
+                        closeMobileMenu();
+                        // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
+                        if (pathname === '/register') {
+                          e.preventDefault();
+                          router.push('/login');
+                          // 약간의 지연 후 회원가입 페이지 상태 초기화를 위한 새로고침
+                          setTimeout(() => {
+                            window.dispatchEvent(new Event('register-page-reset'));
+                          }, 100);
+                        }
+                      }}
+                      className="inline-flex items-center justify-center w-full px-4 py-3 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
+                    >
+                      로그인
+                    </Link>
+                  </>
                 )}
               </div>
             </div>

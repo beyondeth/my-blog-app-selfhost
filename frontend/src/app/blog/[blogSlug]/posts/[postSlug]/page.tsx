@@ -14,7 +14,7 @@ import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
-import { useToggleBookmark } from '@/hooks/useBookmarks';
+import { useToggleBookmark, useIsBookmarked } from '@/hooks/useBookmarks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { downloadPostAsPdf } from '@/utils/pdf';
@@ -86,9 +86,13 @@ export default function BlogPostDetailPage() {
   });
 
   // 북마크 기능 추가 - post.id 사용
+  // post가 로드되지 않았을 때 빈 문자열 대신 명확한 처리
   const bookmarkMutation = useToggleBookmark(post?.id || '', () => {
     alert('로그인이 필요합니다.\n로그인 후 북마크를 추가할 수 있습니다.');
   });
+
+  // 북마크 상태 확인 - post.id가 있을 때만 API 호출됨 (useIsBookmarked 내부에서 enabled 조건으로 제어)
+  const { data: bookmarkStatus } = useIsBookmarked(post?.id || '');
 
 
   const handleEdit = useCallback(() => {
@@ -282,7 +286,7 @@ export default function BlogPostDetailPage() {
           onCopy={handleCopyContent}
           onPdfDownload={handlePdfDownload}
           onBookmark={handleBookmark}
-          bookmarked={post.bookmarked || false}
+          bookmarked={bookmarkStatus?.bookmarked || false}
         />
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}

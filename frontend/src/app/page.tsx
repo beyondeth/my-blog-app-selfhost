@@ -170,7 +170,7 @@ export default function HomePage() {
 
   return (
     <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
-      <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
+      <div className="flex flex-col lg:flex-row gap-4 sm:gap-8 lg:gap-16">
         {/* Main Content Area */}
         <main className="flex-1 lg:max-w-[calc(100%-380px)] min-w-0">
           <div className="space-y-0">
