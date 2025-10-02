@@ -12,8 +12,10 @@ import { FilesModule } from '../files/files.module';
 import { MonitoringModule } from '../monitoring/monitoring.module';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ViewCountService } from './view-count.service';
+import { SearchIndexingService } from './search-indexing.service';
 import { ContentProcessingModule } from '../content-processing/content-processing.module';
 import { CacheModule } from '../cache/cache.module';
+import { BookmarksModule } from '../bookmarks/bookmarks.module';
 
 @Module({
   imports: [
@@ -23,9 +25,15 @@ import { CacheModule } from '../cache/cache.module';
     MonitoringModule,  // No more forwardRef needed
     ContentProcessingModule, // 콘텐츠 처리 모듈 추가
     CacheModule, // Redis 캐시 모듈 추가
+    BookmarksModule, // 북마크 모듈 추가
   ],
-  providers: [PostsService, MarkdownRendererService, ViewCountService],
+  providers: [
+    PostsService,
+    MarkdownRendererService,
+    ViewCountService,
+    SearchIndexingService, // 검색 인덱싱 배치 서비스 추가
+  ],
   controllers: [PostsController],
-  exports: [PostsService, ViewCountService],
+  exports: [PostsService, ViewCountService, SearchIndexingService],
 })
 export class PostsModule {} 

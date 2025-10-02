@@ -42,6 +42,7 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { OauthModule } from './oauth/oauth.module';
+import { BookmarksModule } from './bookmarks/bookmarks.module';
 
 @Module({
   imports: [
@@ -101,6 +102,7 @@ import { OauthModule } from './oauth/oauth.module';
     CommentsModule,
     FilesModule,
     BlogsModule,
+    BookmarksModule,
     McpModule,
     EmailModule,
     ReportsModule,

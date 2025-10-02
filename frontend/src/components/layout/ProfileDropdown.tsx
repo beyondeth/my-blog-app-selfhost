@@ -25,7 +25,8 @@ import {
   FiUsers,
   FiMessageSquare,
   FiCreditCard,
-  FiTrendingUp
+  FiTrendingUp,
+  FiBookmark
 } from 'react-icons/fi';
 
 interface ProfileDropdownProps {
@@ -88,7 +89,7 @@ export default function ProfileDropdown({
 
         {/* My Blog */}
         {!blogLoading && blog && (
-          <DropdownMenuItem 
+          <DropdownMenuItem
             onClick={() => handleNavigation(`/blog/${blog.slug}`)}
             className="cursor-pointer"
           >
@@ -96,6 +97,15 @@ export default function ProfileDropdown({
             <span>내 블로그</span>
           </DropdownMenuItem>
         )}
+
+        {/* Bookmarks - 북마크 메뉴 추가 */}
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/bookmarks')}
+          className="cursor-pointer"
+        >
+          <FiBookmark className="mr-2 h-4 w-4" />
+          <span>북마크</span>
+        </DropdownMenuItem>
 
         {/* Analytics */}
         <DropdownMenuItem

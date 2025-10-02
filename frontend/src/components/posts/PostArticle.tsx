@@ -8,6 +8,7 @@ import UserAvatar from '@/components/ui/UserAvatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
 import { FiHeart, FiMessageCircle } from 'react-icons/fi';
+import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 
 interface PostArticleProps {
   post: Post;
@@ -17,6 +18,7 @@ interface PostArticleProps {
   onEdit: (slug: string) => void;
   onDelete: (id: string) => void;
   isDeleting?: boolean;
+  searchQuery?: string; // 검색어 하이라이팅을 위한 prop
 }
 
 // HTML 태그를 제거하고 순수 텍스트만 반환하는 로컬 함수
@@ -47,6 +49,7 @@ const PostArticle = React.memo(function PostArticle({
   onEdit,
   onDelete,
   isDeleting = false,
+  searchQuery,
 }: PostArticleProps) {
   // excerpt가 있으면 사용, 없으면 content에서 추출
 
@@ -147,11 +150,15 @@ const PostArticle = React.memo(function PostArticle({
             
             {/* 제목 - YouTube 포스트는 더 큰 제목 */}
             <h2 className="text-lg sm:text-xl font-bold text-gray-900 leading-tight mb-1">
-              <Link 
+              <Link
                 href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
                 className="hover:text-black transition-colors"
               >
-                {post.title}
+                {searchQuery ? (
+                  <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
+                ) : (
+                  post.title
+                )}
               </Link>
             </h2>
           </div>
@@ -259,18 +266,27 @@ const PostArticle = React.memo(function PostArticle({
           )}
           
           <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
-            <Link 
+            <Link
               href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
               className="hover:text-amber-800 transition-colors block"
             >
-              {post.title}
+              {searchQuery ? (
+                <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
+              ) : (
+                post.title
+              )}
             </Link>
           </h2>
-          
+
           {displayContent && (
-            <p className="text-sm text-gray-900 leading-relaxed line-clamp-3 break-words mb-7">
-              {displayContent}
-            </p>
+            <p
+              className="text-sm text-gray-900 leading-relaxed line-clamp-3 break-words mb-7"
+              dangerouslySetInnerHTML={
+                searchQuery
+                  ? { __html: highlightAndTruncate(displayContent, searchQuery, 200) }
+                  : { __html: displayContent }
+              }
+            />
           )}
           {!displayContent && (
             <p className="text-sm text-gray-400 italic leading-relaxed line-clamp-3 break-words mb-7">

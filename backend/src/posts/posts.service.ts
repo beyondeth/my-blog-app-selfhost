@@ -19,6 +19,7 @@ import { PostResponseDto } from './dto/post-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
 import { CacheService } from '../cache/cache.service';
+import { BookmarksService } from '../bookmarks/bookmarks.service';
 
 @Injectable()
 export class PostsService {
@@ -40,6 +41,7 @@ export class PostsService {
     private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
     private cacheService: CacheService,
+    private bookmarksService: BookmarksService,
   ) {}
 
   /**
@@ -60,6 +62,7 @@ export class PostsService {
     post: Post,
     options?: {
       liked?: boolean;
+      bookmarked?: boolean;
       user?: User;
       blog?: Blog;
     }
@@ -73,6 +76,9 @@ export class PostsService {
     if (options) {
       if (options.liked !== undefined) {
         dto.liked = options.liked;
+      }
+      if (options.bookmarked !== undefined) {
+        dto.bookmarked = options.bookmarked;
       }
       if (options.user) {
         dto.author = this.toUserDto(options.user);
@@ -507,10 +513,30 @@ export class PostsService {
       query.andWhere('blog.slug = :blogSlug', { blogSlug });
     }
 
+    // 검색어 필터링 - Full-Text Search 사용
     if (search) {
-      query.andWhere('(post.title LIKE :search OR post.content LIKE :search OR post."tagList"::text LIKE :search)', {
-        search: `%${search}%`,
-      });
+      // 검색어 전처리: 특수문자 이스케이프 및 공백 처리
+      const searchTerms = search.trim()
+        .split(/\s+/) // 공백으로 분리
+        .filter(term => term.length > 0) // 빈 문자열 제거
+        .map(term => term.replace(/['"\\]/g, '')) // 특수문자 제거
+        .join(' & '); // AND 연산자로 결합 (모든 단어가 포함되어야 함)
+
+      if (searchTerms) {
+        // 전문 검색 쿼리 - ts_rank로 관련성 점수 계산
+        query
+          .addSelect(
+            `ts_rank(post.search_vector, to_tsquery('simple', :searchQuery))`,
+            'search_rank'
+          )
+          .andWhere(
+            `post.search_vector @@ to_tsquery('simple', :searchQuery)`,
+            { searchQuery: searchTerms }
+          );
+
+        // 검색 결과가 있을 때만 관련성 순으로 정렬 우선
+        // 나중에 다른 정렬 조건이 추가될 수 있으므로 여기서는 설정하지 않음
+      }
     }
 
     // 캐시용이 아니고 유저가 있으면 좋아요 상태를 서브쿼리로 확인 (최적화)
@@ -526,8 +552,16 @@ export class PostsService {
       }, 'userLikedCount');
     }
 
+    // 정렬: 검색 시 관련성순, 일반 목록은 최신순
+    if (search) {
+      // 검색 결과는 관련성 점수로 먼저 정렬, 같은 점수면 최신순
+      query.orderBy('search_rank', 'DESC').addOrderBy('post.publishedAt', 'DESC');
+    } else {
+      // 일반 목록은 최신순 정렬
+      query.orderBy('post.publishedAt', 'DESC');
+    }
+
     const [posts, total] = await query
-      .orderBy('post.publishedAt', 'DESC')
       .skip((safePage - 1) * safeLimit)
       .take(safeLimit)
       .getManyAndCount();
@@ -777,7 +811,7 @@ export class PostsService {
       ])
       .where('post.id = :id', { id });
 
-    // 사용자가 있는 경우에만 좋아요 상태를 서브쿼리로 확인
+    // 사용자가 있는 경우에만 좋아요 상태와 북마크 상태를 서브쿼리로 확인
     if (user) {
       qb.addSelect((subQuery) => {
         return subQuery
@@ -786,6 +820,14 @@ export class PostsService {
           .where('pl.postId = post.id')
           .andWhere('pl.userId = :userId', { userId: user.id });
       }, 'userLikedCount');
+
+      qb.addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(1)')
+          .from('bookmarks', 'b')
+          .where('b.post_id = post.id')
+          .andWhere('b.user_id = :userId', { userId: user.id });
+      }, 'userBookmarkedCount');
     }
     const post = await qb.getOne();
     if (!post) {
@@ -811,12 +853,16 @@ export class PostsService {
     // 사용자 좋아요 상태 확인 (서브쿼리 결과 사용)
     const liked = user && post['userLikedCount'] ? Number(post['userLikedCount']) > 0 : false;
 
+    // 사용자 북마크 상태 확인 (서브쿼리 결과 사용)
+    const bookmarked = user && post['userBookmarkedCount'] ? Number(post['userBookmarkedCount']) > 0 : false;
+
     /**
      * DTO 변환으로 spread operator 제거
      * lazy loading 방지 및 성능 최적화
      */
     const result = this.toPostDto(post, {
       liked: liked,
+      bookmarked: bookmarked,
       user: post.author,
       blog: post.blog,
     });
@@ -846,7 +892,7 @@ export class PostsService {
       .where('post.slug = :slug', { slug })
       .andWhere('post.isPublished = :isPublished', { isPublished: true });
 
-    // 사용자가 있는 경우에만 좋아요 상태를 서브쿼리로 확인
+    // 사용자가 있는 경우에만 좋아요 상태와 북마크 상태를 서브쿼리로 확인
     if (user) {
       qb.addSelect((subQuery) => {
         return subQuery
@@ -855,6 +901,14 @@ export class PostsService {
           .where('pl.postId = post.id')
           .andWhere('pl.userId = :userId', { userId: user.id });
       }, 'userLikedCount');
+
+      qb.addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(1)')
+          .from('bookmarks', 'b')
+          .where('b.post_id = post.id')
+          .andWhere('b.user_id = :userId', { userId: user.id });
+      }, 'userBookmarkedCount');
     }
     const post = await qb.getOne();
     if (!post) {
@@ -881,10 +935,15 @@ export class PostsService {
     
     // 사용자 좋아요 상태 확인 (서브쿼리 결과 사용)
     const liked = user && post['userLikedCount'] ? Number(post['userLikedCount']) > 0 : false;
-    
+
+    // 사용자 북마크 상태 확인 (서브쿼리 결과 사용)
+    const bookmarked = user && post['userBookmarkedCount'] ? Number(post['userBookmarkedCount']) > 0 : false;
+
     // DTO 변환으로 안전하게 처리 (spread 연산자 사용 금지)
     // 날짜 포맷팅은 DTO 변환 후 별도 처리
     const postDto = this.toPostDto(post, {
+      liked: liked,
+      bookmarked: bookmarked,
       user: post.author,
       blog: post.blog
     });
@@ -1041,10 +1100,26 @@ export class PostsService {
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author');
 
+    // 관리자 페이지에서도 Full-Text Search 사용
     if (search) {
-      query.where('(post.title LIKE :search OR post.content LIKE :search OR post.tagList LIKE :search)', {
-        search: `%${search}%`,
-      });
+      const searchTerms = search.trim()
+        .split(/\s+/)
+        .filter(term => term.length > 0)
+        .map(term => term.replace(/['"\\]/g, ''))
+        .join(' & ');
+
+      if (searchTerms) {
+        query
+          .addSelect(
+            `ts_rank(post.search_vector, to_tsquery('simple', :searchQuery))`,
+            'search_rank'
+          )
+          .where(
+            `post.search_vector @@ to_tsquery('simple', :searchQuery)`,
+            { searchQuery: searchTerms }
+          )
+          .orderBy('search_rank', 'DESC');
+      }
     }
 
     const [posts, total] = await query

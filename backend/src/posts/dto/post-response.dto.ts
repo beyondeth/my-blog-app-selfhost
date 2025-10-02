@@ -101,6 +101,9 @@ export class PostResponseDto {
   @Expose()
   liked?: boolean; // 사용자 좋아요 상태
 
+  @Expose()
+  bookmarked?: boolean; // 사용자 북마크 상태
+
   // ManyToMany 관계는 명시적으로 제외 (lazy loading 방지)
   @Exclude()
   likedBy: any;

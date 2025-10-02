@@ -4,6 +4,7 @@ import { User } from '../../users/entities/user.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { File } from '../../files/entities/file.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
+import { Bookmark } from '../../bookmarks/entities/bookmark.entity';
 
 @Entity('posts')
 @Index(['isPublished'])
@@ -89,6 +90,21 @@ export class Post {
   @VersionColumn({ name: 'version' })
   version: number;
 
+  // 전문 검색을 위한 tsvector 컬럼
+  // TypeORM에서는 string 타입으로 선언하지만 실제 DB에서는 tsvector
+  @Column({
+    type: 'tsvector',
+    nullable: true,
+    name: 'search_vector',
+    select: false // 기본 조회에서는 제외 (성능 최적화)
+  })
+  searchVector?: string;
+
+  // 검색 인덱싱 시간 추적
+  // 배치 처리에서 인덱싱 안 된 포스트를 찾기 위해 사용
+  @Column({ type: 'timestamp', nullable: true, name: 'indexed_at' })
+  indexedAt?: Date;
+
   @ManyToOne(() => User, user => user.posts, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'authorId' })
   author: User;
@@ -115,6 +131,10 @@ export class Post {
     inverseJoinColumn: { name: 'fileId', referencedColumnName: 'id' },
   })
   attachedFiles: File[];
+
+  // Bookmarks relationship
+  @OneToMany(() => Bookmark, bookmark => bookmark.post)
+  bookmarks: Bookmark[];
 
   // Helper method to get ordered images
   getOrderedImages?: () => Promise<(File & { imageOrder?: number })[]>;

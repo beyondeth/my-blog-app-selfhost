@@ -14,6 +14,7 @@ import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
+import { useToggleBookmark } from '@/hooks/useBookmarks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { downloadPostAsPdf } from '@/utils/pdf';
@@ -82,6 +83,11 @@ export default function BlogPostDetailPage() {
   const deletePostMutation = useDeletePost();
   const likeMutation = useTogglePostLike(postSlug, () => {
     alert('로그인이 필요합니다.\n로그인 후 좋아요를 누를 수 있습니다.');
+  });
+
+  // 북마크 기능 추가 - post.id 사용
+  const bookmarkMutation = useToggleBookmark(post?.id || '', () => {
+    alert('로그인이 필요합니다.\n로그인 후 북마크를 추가할 수 있습니다.');
   });
 
 
@@ -200,6 +206,12 @@ export default function BlogPostDetailPage() {
     }
   }, [post]);
 
+  // 북마크 핸들러 추가
+  const handleBookmark = useCallback(() => {
+    if (!post?.id || !user) return; // post.id가 없거나 로그인하지 않은 경우 실행 안 함
+    bookmarkMutation.mutate();
+  }, [post, user, bookmarkMutation]);
+
 
   useEffect(() => {
     if (!hasViewed.current && post?.id) {
@@ -269,6 +281,8 @@ export default function BlogPostDetailPage() {
           onShare={handleShare}
           onCopy={handleCopyContent}
           onPdfDownload={handlePdfDownload}
+          onBookmark={handleBookmark}
+          bookmarked={post.bookmarked || false}
         />
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiFileText } from 'react-icons/fi';
+import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiFileText, FiBookmark } from 'react-icons/fi';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui/avatar';
@@ -21,6 +21,8 @@ interface PostHeaderWithReportProps {
   onShare?: () => void;
   onCopy?: () => void;
   onPdfDownload?: () => void;
+  onBookmark?: () => void;
+  bookmarked?: boolean;
   LikeButtonComponent?: ReactNode;
 }
 
@@ -36,6 +38,8 @@ export default function PostHeaderWithReport({
   onShare,
   onCopy,
   onPdfDownload,
+  onBookmark,
+  bookmarked = false,
   LikeButtonComponent
 }: PostHeaderWithReportProps) {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -151,7 +155,21 @@ export default function PostHeaderWithReport({
                 <span>공유</span>
               </button>
             )}
-            
+
+            {onBookmark && (
+              <button
+                onClick={onBookmark}
+                className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
+                  bookmarked
+                    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                }`}
+              >
+                <FiBookmark className={`w-3 h-3 ${bookmarked ? 'fill-current' : ''}`} />
+                <span>북마크</span>
+              </button>
+            )}
+
             {onCopy && (
               <button
                 onClick={onCopy}

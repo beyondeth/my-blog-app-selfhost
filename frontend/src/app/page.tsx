@@ -189,6 +189,7 @@ export default function HomePage() {
                     onEdit={handleEditPost}
                     onDelete={handleDeletePost}
                     isDeleting={deletePostMutation.isPending && deleteDialog.postId === post.id}
+                    searchQuery={currentParams.search}
                   />
                 ))}
                 
