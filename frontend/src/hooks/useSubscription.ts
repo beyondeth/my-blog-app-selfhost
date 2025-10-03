@@ -42,13 +42,20 @@ export function useSubscriptionPlan(tier: SubscriptionTier) {
 /**
  * 현재 사용자의 구독 정보 조회 hook
  * 로그인 상태에서만 활성화
+ * React Query 메모리 캐시를 활용하여 로딩 중에도 이전 데이터 표시
  */
 export function useMySubscription() {
+  const queryClient = useQueryClient();
+
   return useQuery<SubscriptionResponse>({
     queryKey: ['subscription', 'my-subscription'],
     queryFn: subscriptionApi.getMySubscription,
-    staleTime: 1000 * 60 * 5, // 5분
-    refetchOnMount: 'always', // 페이지 마운트 시 항상 최신 데이터 가져오기
+    staleTime: 1000 * 60 * 5, // 5분간 fresh (캐시 사용, API 호출 안함)
+    gcTime: 1000 * 60 * 30, // 30분간 메모리 캐시 유지
+    refetchOnMount: true, // stale한 경우 마운트 시 자동 refetch (mutation 후 즉시 반영)
+    refetchOnWindowFocus: false, // 윈도우 포커스 시에도 refetch 방지
+    // 이전 데이터를 placeholderData로 사용하여 로딩 중에도 표시
+    placeholderData: (previousData) => previousData,
     retry: (failureCount, error: any) => {
       // 401 에러는 재시도하지 않음 (로그인하지 않은 상태)
       if (error?.status === 401) return false;

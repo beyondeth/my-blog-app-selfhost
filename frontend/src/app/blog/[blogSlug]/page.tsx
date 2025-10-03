@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useDeletePost } from '@/hooks/usePosts';
+import { useBlogBySlug } from '@/hooks/useBlogs';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 
@@ -21,30 +22,14 @@ import Spinner from '@/components/ui/Spinner';
 // 클라이언트 사이드 체크 훅
 function useIsClient() {
   const [isClient, setIsClient] = useState(false);
-  
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsClient(true);
     }
   }, []);
-  
-  return isClient;
-}
 
-// 블로그 정보 타입
-interface Blog {
-  id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  thumbnailUrl?: string;
-  isPublic?: boolean;
-  allowComments?: boolean;
-  owner?: {
-    id: string;
-    username: string;
-    email: string;
-  };
+  return isClient;
 }
 
 export default function BlogPage() {
@@ -55,13 +40,14 @@ export default function BlogPage() {
   const isClient = useIsClient();
   const searchParams = useSearchParams();
   const { getCacheStatus } = useNavigationCache();
-  
-  // 블로그 정보 상태
-  const [blog, setBlog] = useState<Blog | null>(null);
-  const [blogLoading, setBlogLoading] = useState(true);
-  const [blogError, setBlogError] = useState<string | null>(null);
-  const [userProfile, setUserProfile] = useState<any>(null);
-  
+
+  // 블로그 정보 가져오기 (React Query 캐싱 사용)
+  const {
+    data: blog,
+    isLoading: blogLoading,
+    error: blogError
+  } = useBlogBySlug(blogSlug);
+
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -72,57 +58,9 @@ export default function BlogPage() {
     postId: null,
     postTitle: ''
   });
-  
+
   // URL에서 검색 파라미터 파싱
   const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
-
-  // 블로그 정보 가져오기
-  useEffect(() => {
-    if (!isClient || !blogSlug) return;
-
-    const fetchBlog = async () => {
-      try {
-        setBlogLoading(true);
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`, {
-          credentials: 'include'
-        });
-        if (!response.ok) {
-          if (response.status === 404) {
-            setBlogError('블로그를 찾을 수 없습니다.');
-          } else {
-            setBlogError('블로그 정보를 불러오는데 실패했습니다.');
-          }
-          return;
-        }
-        const data = await response.json();
-        setBlog(data);
-        
-        // 블로그 owner의 상세 프로필 정보 가져오기
-        if (data.owner?.id) {
-          try {
-            const profileResponse = await fetch(
-              `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${data.owner.id}`,
-              {
-                credentials: 'include'
-              }
-            );
-            if (profileResponse.ok) {
-              const profileData = await profileResponse.json();
-              setUserProfile(profileData);
-            }
-          } catch (error) {
-            console.error('Failed to fetch user profile:', error);
-          }
-        }
-      } catch (error) {
-        setBlogError('블로그 정보를 불러오는데 실패했습니다.');
-      } finally {
-        setBlogLoading(false);
-      }
-    };
-
-    fetchBlog();
-  }, [isClient, blogSlug]);
 
   // 블로그의 포스트 가져오기
   const {
@@ -215,8 +153,8 @@ export default function BlogPage() {
 
   if (blogError) {
     return (
-      <ErrorMessage 
-        message={blogError}
+      <ErrorMessage
+        message={blogError.message || '블로그 정보를 불러오는데 실패했습니다.'}
         showBackButton={true}
       />
     );
@@ -292,8 +230,8 @@ export default function BlogPage() {
             <BlogOwnerCard
               name={blog.owner?.username || blog.owner?.email || blog.name}
               username={blog.owner?.username}
-              description={userProfile?.bio || blog.description}
-              profileImage={userProfile?.profileImage || blog.thumbnailUrl}
+              description={blog.owner?.bio || blog.description}
+              profileImage={blog.owner?.profileImage || blog.thumbnailUrl}
               userId={blog.owner?.id}
               isOwner={isBlogOwner}
             />

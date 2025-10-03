@@ -27,6 +27,9 @@ export interface User {
   readonly isEmailVerified: boolean;
   readonly isActive?: boolean;
   readonly lastLoginAt?: string;
+  readonly blogSlug?: string | null;  // 블로그 슬러그 (헤더 "내 블로그" 버튼에서 사용)
+  readonly subscriptionTier?: string;  // 구독 티어 (헤더 플랜 배지에서 사용)
+  readonly subscriptionStatus?: string;  // 구독 상태
   readonly createdAt: string;
   readonly updatedAt: string;
 }

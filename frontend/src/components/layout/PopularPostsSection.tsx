@@ -23,7 +23,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
           <div className="flex gap-1">
             <button
               onClick={() => setPeriod('daily')}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              className={`px-2 py-0.5 text-[13px] rounded transition-colors ${
                 period === 'daily'
                   ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
@@ -34,7 +34,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
             </button>
             <button
               onClick={() => setPeriod('weekly')}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              className={`px-2 py-0.5 text-[13px] rounded transition-colors ${
                 period === 'weekly'
                   ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
@@ -45,7 +45,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
             </button>
             <button
               onClick={() => setPeriod('monthly')}
-              className={`px-2 py-0.5 text-xs rounded transition-colors ${
+              className={`px-2 py-0.5 text-[13px] rounded transition-colors ${
                 period === 'monthly'
                   ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
@@ -96,18 +96,18 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
                     loading="lazy"
                   />
                 )}
-                <Link 
-                  href={post.blog?.slug 
-                    ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` 
+                <Link
+                  href={post.blog?.slug
+                    ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}`
                     : `/posts/${post.slug || post.id}`
                   }
                   className="block hover:text-gray-600 transition-colors"
                 >
-                  <h4 className="text-sm font-medium line-clamp-2 break-words">
+                  <h4 className="text-[15px] font-medium line-clamp-2 break-words">
                     {post.title}
                   </h4>
                 </Link>
-                <div className="flex items-center gap-3 text-xs text-gray-500 dark:text-[#cccccc] mt-2">
+                <div className="flex items-center gap-3 text-[13px] text-gray-500 dark:text-[#cccccc] mt-2">
                   <div className="flex items-center gap-1">
                     <FiEye className="w-3 h-3" />
                     <span>{post.viewCount || 0}</span>

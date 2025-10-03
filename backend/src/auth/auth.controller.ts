@@ -1,6 +1,7 @@
 import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete, Logger } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
+import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { EmailService } from '../email/email.service';
 import { UserDeletionService } from '../users/services/user-deletion.service';
@@ -387,6 +388,7 @@ export class AuthController {
 
   @Post('check-auth-method')
   @Public()
+  @Throttle({ default: { limit: 5, ttl: 60000 } })  // 분당 5회 제한 (User Enumeration 공격 방지)
   @ApiOperation({ summary: '이메일의 인증 방법 확인' })
   @ApiResponse({ status: 200, description: '인증 방법 반환' })
   async checkAuthMethod(@Body() dto: { email: string }, @Response() res) {
@@ -402,12 +404,14 @@ export class AuthController {
     // 보안을 위해 공개 정보만 반환
     return {
       id: user.id,
+      email: user.email,                              // 이메일 추가 (ProfileDropdown에서 사용)
       username: user.username,
       role: user.role,
       profileImage: user.profileImage,
       isEmailVerified: user.isEmailVerified,
       subscriptionTier: user.subscriptionTier,        // 구독 티어 추가
       subscriptionStatus: user.subscriptionStatus,    // 구독 상태 추가
+      blogSlug: user.blog?.slug || null,              // 블로그 슬러그 추가 (헤더 "내 블로그" 버튼에서 사용)
       createdAt: user.createdAt,
     };
   }

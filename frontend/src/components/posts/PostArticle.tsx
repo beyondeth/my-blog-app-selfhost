@@ -140,16 +140,16 @@ const PostArticle = React.memo(function PostArticle({
                       username={post.author.username}
                       size="sm"
                     />
-                    <span className="text-sm text-gray-700 dark:text-[#9CA3AF] font-medium">
+                    <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
                       {post.author.username}
                     </span>
                   </div>
                 </UserLinkWithTooltip>
               </div>
             )}
-            
+
             {/* 제목 - YouTube 포스트는 더 큰 제목 */}
-            <h2 className="text-lg sm:text-xl font-bold text-foreground leading-tight mb-1">
+            <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight mb-1">
               <Link
                 href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
                 className="hover:text-primary transition-colors"
@@ -180,7 +180,7 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 일반 포스트와 동일한 구조 */}
           <div>
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-xs text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
                 {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
               </span>
@@ -257,7 +257,7 @@ const PostArticle = React.memo(function PostArticle({
                     size="sm"
                   />
                   {/* Author Name */}
-                  <span className="text-sm text-gray-700 dark:text-[#9CA3AF] font-medium">
+                  <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
                     {post.author.username}
                   </span>
                 </div>
@@ -265,7 +265,7 @@ const PostArticle = React.memo(function PostArticle({
             </div>
           )}
           
-          <h2 className="text-base sm:text-lg font-bold text-foreground mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
+          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
             <Link
               href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
               className="hover:text-primary transition-colors block"
@@ -280,7 +280,7 @@ const PostArticle = React.memo(function PostArticle({
 
           {displayContent && (
             <p
-              className="text-sm text-foreground leading-relaxed line-clamp-3 break-words mb-7"
+              className="text-[15px] text-foreground leading-relaxed line-clamp-3 break-words mb-7"
               dangerouslySetInnerHTML={
                 searchQuery
                   ? { __html: highlightAndTruncate(displayContent, searchQuery, 200) }
@@ -289,7 +289,7 @@ const PostArticle = React.memo(function PostArticle({
             />
           )}
           {!displayContent && (
-            <p className="text-sm text-gray-400 italic leading-relaxed line-clamp-3 break-words mb-7">
+            <p className="text-[15px] text-gray-400 italic leading-relaxed line-clamp-3 break-words mb-7">
               내용 미리보기가 없습니다.
             </p>
           )}
@@ -297,7 +297,7 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
           <div>
             {/* 메타 정보 (날짜,조회,좋아요,댓글) - 작성자 정보 제거 */}
-            <div className="flex flex-wrap items-center text-xs text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
                 {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
               </span>

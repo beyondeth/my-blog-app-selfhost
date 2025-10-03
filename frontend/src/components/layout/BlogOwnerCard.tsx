@@ -72,7 +72,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
   };
 
   return (
-    <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
+    <div className="bg-white dark:bg-[rgb(38,38,38)] rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
       <div className="space-y-4">
         {/* Profile Image - Left aligned */}
         <div className="flex justify-start">
@@ -85,14 +85,14 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
         </div>
 
         {/* Name */}
-        <h2 className="text-xl font-semibold text-gray-900">
+        <h2 className="text-xl font-semibold text-foreground">
           {name}
         </h2>
 
         {/* Followers Count */}
         {followInfo && (
-          <p className="text-gray-500">
-            <span className="text-gray-700">
+          <p className="text-gray-500 dark:text-gray-400">
+            <span className="text-gray-700 dark:text-gray-300">
               {formatFollowerCount(followInfo.followersCount)}
             </span>
             {' followers'}
@@ -101,7 +101,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
 
         {/* Bio/Description */}
         {description && (
-          <p className="text-sm text-gray-600 leading-relaxed">
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
             {description}
           </p>
         )}
@@ -119,7 +119,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
         {isOwner && (
           <button
             onClick={() => router.push('/settings')}
-            className="w-full px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-full hover:bg-gray-50 transition-colors"
+            className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
           >
             프로필 편집
           </button>

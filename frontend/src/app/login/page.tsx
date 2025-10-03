@@ -40,7 +40,7 @@ export default function LoginPage() {
 
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-method`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-auth-method`,
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -53,14 +53,12 @@ export default function LoginPage() {
         if (data.exists) {
           setAuthMethodHint({
             exists: true,
-            provider: data.authProvider,
-            message: data.message,
-            hasPassword: data.hasPassword
+            authMethod: data.authMethod,  // 'password' | 'oauth' | 'both'
+            message: data.message
           });
-          
-          // If user should use OAuth, highlight that button
-          if (data.authProvider !== 'local' && !data.hasPassword) {
-            // User registered with OAuth and has no password
+
+          // OAuth만 사용 가능한 경우 알림 표시
+          if (data.authMethod === 'oauth') {
             toast.info(data.message);
           }
         } else {

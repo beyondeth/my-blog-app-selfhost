@@ -198,12 +198,15 @@ export class User {
   toPublicJSON() {
     return {
       id: this.id,
+      email: this.email,                           // 이메일 추가 (ProfileDropdown에서 사용)
       username: this.username,
       profileImage: this.profileImage,
       bio: this.bio,
       role: this.role,
       isEmailVerified: this.isEmailVerified,
-      subscriptionTier: this.subscriptionTier, // 구독 티어는 공개
+      subscriptionTier: this.subscriptionTier,     // 구독 티어는 공개
+      subscriptionStatus: this.subscriptionStatus, // 구독 상태 추가
+      blogSlug: this.blog?.slug || null,           // 블로그 슬러그 추가 (헤더 "내 블로그" 버튼용)
       createdAt: this.createdAt,
     };
   }

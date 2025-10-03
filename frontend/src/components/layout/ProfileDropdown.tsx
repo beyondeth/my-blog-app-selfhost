@@ -31,20 +31,14 @@ import {
 
 interface ProfileDropdownProps {
   user: User;
-  blog: any;
-  blogLoading: boolean;
   onLogout: () => void;
   onWriteClick: (e: React.MouseEvent) => void;
-  isCheckingBlog: boolean;
 }
 
-export default function ProfileDropdown({ 
-  user, 
-  blog, 
-  blogLoading, 
-  onLogout, 
-  onWriteClick,
-  isCheckingBlog 
+export default function ProfileDropdown({
+  user,
+  onLogout,
+  onWriteClick
 }: ProfileDropdownProps) {
   const router = useRouter();
 
@@ -78,19 +72,18 @@ export default function ProfileDropdown({
         <DropdownMenuSeparator />
         
         {/* Write Button */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={onWriteClick}
-          disabled={isCheckingBlog}
           className="cursor-pointer"
         >
           <FiEdit3 className="mr-2 h-4 w-4" />
-          <span>{isCheckingBlog ? '확인 중...' : '글쓰기'}</span>
+          <span>글쓰기</span>
         </DropdownMenuItem>
 
-        {/* My Blog */}
-        {!blogLoading && blog && (
+        {/* My Blog - user.blogSlug로 즉시 표시 */}
+        {user.blogSlug && (
           <DropdownMenuItem
-            onClick={() => handleNavigation(`/blog/${blog.slug}`)}
+            onClick={() => handleNavigation(`/blog/${user.blogSlug}`)}
             className="cursor-pointer"
           >
             <FiBookOpen className="mr-2 h-4 w-4" />

@@ -325,27 +325,32 @@ export class AuthService {
 
   async checkAuthMethod(email: string): Promise<any> {
     const user = await this.usersService.findByEmail(email);
-    
+
     if (!user) {
-      return { 
+      return {
         exists: false,
-        authProviders: [],
         message: '등록되지 않은 이메일입니다.'
       };
     }
-    
+
     // 사용 가능한 모든 인증 방법 확인
     const identities = await this.identityService.findByUserId(user.id);
-    const availableProviders = identities.map(i => i.provider);
-    
-    // 민감한 정보는 제외하고 인증 방법만 반환
+    const hasPassword = !!user.password;
+    const hasOAuth = identities.some(i => i.provider !== 'local');
+
+    // 인증 방법을 간소화하여 반환 (보안 강화)
+    let authMethod: 'password' | 'oauth' | 'both';
+    if (hasPassword && hasOAuth) {
+      authMethod = 'both';
+    } else if (hasPassword) {
+      authMethod = 'password';
+    } else {
+      authMethod = 'oauth';
+    }
+
     return {
       exists: true,
-      authProvider: user.authProvider, // 최초 가입 방법 (호환성 유지)
-      availableProviders, // 사용 가능한 모든 인증 방법
-      hasPassword: !!user.password,
-      isEmailVerified: user.isEmailVerified,
-      // 사용자에게 친화적인 메시지 제공
+      authMethod,  // 'password' | 'oauth' | 'both'로 간소화
       message: this.getAuthMethodMessage(user, identities)
     };
   }

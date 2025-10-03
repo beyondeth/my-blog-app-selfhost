@@ -98,12 +98,12 @@ export default function PostHeaderWithReport({
         )}
         
         {/* Title - 전체 너비 차지 */}
-        <h1 className="text-xl font-bold text-gray-900 mb-5 leading-tight">
+        <h1 className="text-3xl font-bold text-gray-900 mb-5 leading-tight">
           {post.title || ''}
         </h1>
 
         {/* Meta Information with Like/Share and Action Buttons */}
-        <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-gray-500 mb-8 pb-4 border-b border-gray-100">
+        <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500 mb-8 pb-4 border-b border-gray-100">
           {/* Left: Meta Information with Like/Share */}
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center">

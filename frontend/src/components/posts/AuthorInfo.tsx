@@ -91,7 +91,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
                     className="flex-shrink-0 hover:opacity-80 transition-opacity"
                   />
                   <div>
-                    <h3 className="text-xs font-medium text-gray-900 mb-1 hover:text-blue-600 transition-colors">
+                    <h3 className="text-sm font-medium text-gray-900 mb-1 hover:text-blue-600 transition-colors">
                       {author.username || 'Author'}
                     </h3>
                   </div>
@@ -99,7 +99,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
               </TooltipTrigger>
               {/* 바이오는 호버 영역 밖에 배치 */}
               <div className="flex-1">
-                <p className="text-xs text-gray-600 mt-5">
+                <p className="text-sm text-gray-600 mt-5">
                   {author.bio || ''}
                 </p>
               </div>
@@ -130,10 +130,10 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
           className="flex-shrink-0"
         />
         <div className="flex-1">
-          <h3 className="text-xs font-medium text-gray-900 mb-1">
+          <h3 className="text-sm font-medium text-gray-900 mb-1">
             {author.username || 'Author'}
           </h3>
-          <p className="text-xs text-gray-600">
+          <p className="text-sm text-gray-600">
             {author.bio || ''}
           </p>
         </div>

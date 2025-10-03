@@ -7,6 +7,7 @@ import { User, AuthProvider } from './entities/user.entity';
 import { Role } from '../common/enums/role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+import { UnifiedRedisService } from '../redis/unified-redis.service';
 
 @Injectable()
 export class UsersService {
@@ -15,6 +16,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    private readonly redisService: UnifiedRedisService,
   ) {}
 
   /**
@@ -74,17 +76,34 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    const user = await this.usersRepository.findOne({ 
-      where: { email },
-      select: ['id', 'email', 'password', 'username', 'role', 'authProvider', 'isActive', 'profileImage', 'isEmailVerified', 'bio']
-    });
-    
+    // QueryBuilder 사용하여 blog relation과 필요한 모든 필드 포함
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.blog', 'blog')
+      .select([
+        'user.id',
+        'user.email',
+        'user.password',
+        'user.username',
+        'user.role',
+        'user.authProvider',
+        'user.isActive',
+        'user.profileImage',
+        'user.isEmailVerified',
+        'user.bio',
+        'user.subscriptionTier',     // 구독 티어 추가
+        'user.subscriptionStatus',   // 구독 상태 추가
+        'blog.slug',                  // blog의 slug만 선택
+      ])
+      .where('user.email = :email', { email })
+      .getOne();
+
     // 프로필 이미지를 프록시 URL로 변환
     if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
       // 프록시 URL 사용 (공개 접근 가능)
       user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
     }
-    
+
     return user;
   }
 
@@ -119,13 +138,23 @@ export class UsersService {
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
-    
+
     // 패스워드는 엔티티에서 자동으로 해시됨
     Object.assign(user, updateUserDto);
-    
+
     const updatedUser = await this.usersRepository.save(user);
     this.logger.log(`User updated: ${updatedUser.email}`);
-    
+
+    // Redis 캐시 무효화 (JWT 검증 캐시)
+    try {
+      const cacheKey = `user_validate_${id}`;
+      await this.redisService.deleteCache('sessions', cacheKey);
+      this.logger.debug(`User cache invalidated: ${cacheKey}`);
+    } catch (error) {
+      this.logger.error(`Failed to invalidate user cache: ${error.message}`);
+      // 캐시 무효화 실패해도 업데이트는 성공으로 처리
+    }
+
     return updatedUser;
   }
 
@@ -209,10 +238,28 @@ export class UsersService {
 
   // UUID 지원을 위한 새로운 findById 메서드
   async findById(id: string): Promise<User | null> {
-    return this.usersRepository.findOne({ 
-      where: { id },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive', 'refreshToken', 'refreshTokenExpiresAt']
-    });
+    // QueryBuilder를 사용해서 필요한 필드만 선택 (리소스 최적화)
+    return this.usersRepository
+      .createQueryBuilder('user')
+      .leftJoinAndSelect('user.blog', 'blog')  // blog relation 조인
+      .select([
+        'user.id',
+        'user.email',
+        'user.username',
+        'user.role',
+        'user.profileImage',
+        'user.isEmailVerified',
+        'user.createdAt',
+        'user.lastLoginAt',
+        'user.isActive',
+        'user.refreshToken',
+        'user.refreshTokenExpiresAt',
+        'user.subscriptionTier',        // 구독 티어
+        'user.subscriptionStatus',      // 구독 상태
+        'blog.slug',                     // blog의 slug만 선택 (헤더 "내 블로그" 버튼용)
+      ])
+      .where('user.id = :id', { id })
+      .getOne();
   }
 
   // Refresh Token 업데이트

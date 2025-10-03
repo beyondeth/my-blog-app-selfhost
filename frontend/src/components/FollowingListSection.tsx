@@ -60,7 +60,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
         <h3 className="text-lg font-semibold text-foreground mb-5 flex items-center gap-2">
           <div className="w-2 h-2 bg-accent rounded-full"></div>
-          Following <span className="text-sm font-normal text-gray-500 dark:text-[#9CA3AF]">({followingData?.total || 0})</span>
+          Following <span className="text-[15px] font-normal text-gray-500 dark:text-[#9CA3AF]">({followingData?.total || 0})</span>
         </h3>
         
         {isLoadingFollowing ? (
@@ -92,7 +92,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
                       className="ring-2 ring-transparent group-hover:ring-blue-200 transition-all duration-300"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">
+                      <p className="text-[15px] font-semibold truncate">
                         {user.username}
                       </p>
                     </div>
@@ -114,7 +114,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
             <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full opacity-50"></div>
             </div>
-            <p className="text-sm text-gray-500 dark:text-[#9CA3AF]">"아무도 안 따라가면 길을 잃을지도?"</p>
+            <p className="text-[15px] text-gray-500 dark:text-[#9CA3AF]">"아무도 안 따라가면 길을 잃을지도?"</p>
           </div>
         )}
       </div>
@@ -123,7 +123,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
       <div className="bg-card rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
         <h3 className="text-lg font-semibold text-foreground mb-5 flex items-center gap-2">
           <div className="w-2 h-2 bg-accent rounded-full"></div>
-          Followers <span className="text-sm font-normal text-gray-500 dark:text-[#9CA3AF]">({followersData?.total || 0})</span>
+          Followers <span className="text-[15px] font-normal text-gray-500 dark:text-[#9CA3AF]">({followersData?.total || 0})</span>
         </h3>
         
         {isLoadingFollowers ? (
@@ -155,7 +155,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
                       className="ring-2 ring-transparent group-hover:ring-green-200 transition-all duration-300"
                     />
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold truncate">
+                      <p className="text-[15px] font-semibold truncate">
                         {user.username}
                       </p>
                     </div>
@@ -178,7 +178,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
             <div className="w-16 h-16 bg-gray-100 dark:bg-gray-800 rounded-full flex items-center justify-center mx-auto mb-4">
               <div className="w-8 h-8 bg-gray-300 dark:bg-gray-600 rounded-full opacity-50"></div>
             </div>
-            <p className="text-sm text-gray-500 dark:text-[#9CA3AF]">"첫 팬은 언제나 특별하죠. 곧 찾아올 거예요!"</p>
+            <p className="text-[15px] text-gray-500 dark:text-[#9CA3AF]">"첫 팬은 언제나 특별하죠. 곧 찾아올 거예요!"</p>
           </div>
         )}
       </div>

@@ -312,7 +312,7 @@ export default function BlogPostDetailPage() {
                   return (
                     <span
                       key={index}
-                      className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full cursor-pointer transition-colors ${
+                      className={`inline-flex items-center px-3 py-1 text-[13px] font-medium rounded-full cursor-pointer transition-colors ${
                         isAITag
                           ? 'bg-pink-100 text-pink-900 hover:bg-pink-200'
                           : 'bg-gray-100 text-gray-900 hover:bg-gray-200'

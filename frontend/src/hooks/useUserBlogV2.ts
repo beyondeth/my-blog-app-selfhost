@@ -54,9 +54,11 @@ export function useUserBlogV2() {
     queryFn: fetchUserBlog,
     enabled: !!user, // 사용자가 있을 때만 실행
     staleTime: 5 * 60 * 1000, // 5분간 fresh
-    gcTime: 10 * 60 * 1000, // 10분간 캐시 보관
+    gcTime: 30 * 60 * 1000, // 30분간 메모리 캐시 보관
     refetchOnWindowFocus: false,
     refetchOnMount: false, // 마운트시 재요청 방지 (성능 향상)
+    // 이전 데이터를 placeholderData로 사용하여 로딩 중에도 표시
+    placeholderData: (previousData) => previousData,
   });
 
   // 전체 로딩 상태

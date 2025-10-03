@@ -214,7 +214,7 @@ export const useUser = () => {
     gcTime: 10 * 60 * 1000,        // 10분간 캐시 보관
     retry: 1,                      // 인증 실패 시 1번만 재시도
     refetchOnWindowFocus: false,   // 윈도우 포커스 시 재요청 안함
-    refetchOnMount: false,         // 컴포넌트 마운트 시 재요청 안함
+    refetchOnMount: false,         // 마운트 시 재요청 안함 (성능 최적화 - staleTime 활용)
   });
 };
 
@@ -347,7 +347,14 @@ export const useRefreshUser = () => {
   return useMutation({
     mutationFn: () => apiRequest<User>('/auth/me'),
     onSuccess: (data) => {
-      queryClient.setQueryData(authQueryKeys.user(), data);
+      // 캐시에 새 데이터 저장 (mutationFn이 이미 서버에서 최신 데이터 가져옴)
+      queryClient.setQueryData(authQueryKeys.user(), { ...data });
+
+      // 모든 useUser() 사용 컴포넌트에 업데이트 알림 (서버 요청 없이 리렌더링만)
+      queryClient.invalidateQueries({
+        queryKey: authQueryKeys.user(),
+        refetchType: 'none'  // refetch 하지 않고 stale만 마킹하여 타이밍 이슈 방지
+      });
     },
     onError: () => {
       // 새로고침 실패 시 로그아웃 처리

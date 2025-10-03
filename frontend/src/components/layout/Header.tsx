@@ -5,35 +5,22 @@ import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
 import { FiEdit3, FiLogOut, FiMenu, FiX, FiSearch } from 'react-icons/fi';
 import { routes, navigation } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import NotificationIcon from '../notifications/NotificationIcon';
 import SubscriptionBadge from '../subscription/SubscriptionBadge';
 import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
-import { blogLogger } from '@/utils/logger';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useDMModal } from '@/hooks/useDMModal';
 
 export default function Header() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
-  const { blog, loading: blogLoading, checkAndRedirect } = useUserBlogV2();
   const { openModal } = useDMModal();
-  
-  // Debug logging
-  useEffect(() => {
-    blogLogger.debug('[Header] Blog state changed', { 
-      // 민감한 정보 제외
-      hasBlog: !!blog, 
-      loading: blogLoading 
-    });
-  }, [user?.username, blog, blogLoading]);
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isCheckingBlog, setIsCheckingBlog] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
@@ -91,26 +78,25 @@ export default function Header() {
   }, []);
 
 
-  // Handle write button click with blog check
-  const handleWriteClick = useCallback(async (e: React.MouseEvent) => {
+  // Handle write button click
+  const handleWriteClick = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
-    
-    if (isCheckingBlog) return;
-    
-    setIsCheckingBlog(true);
     closeMobileMenu();
-    
-    try {
-      const redirectPath = await checkAndRedirect();
-      router.push(redirectPath);
-    } catch (error) {
-      console.error('Error checking blog:', error);
-      // Fallback to home page if there's an error
-      router.push('/');
-    } finally {
-      setIsCheckingBlog(false);
+
+    if (!user) {
+      router.push('/login');
+      return;
     }
-  }, [checkAndRedirect, router, isCheckingBlog]);
+
+    // 블로그가 있으면 글쓰기 페이지로 이동
+    if (user.blogSlug) {
+      router.push('/new-story');
+    } else {
+      // 블로그가 없으면 홈으로 (신규 사용자는 자동 생성되므로 발생하지 않아야 함)
+      console.error('User does not have a blog. This should not happen for new users.');
+      router.push('/');
+    }
+  }, [user, router]);
 
   // 외부 클릭으로 메뉴 닫기
   useEffect(() => {
@@ -183,8 +169,8 @@ export default function Header() {
             {/* Search Bar - Medium Style */}
             <div className="max-w-sm ml-8">
               <form onSubmit={handleSearch} className="relative">
-                <div className={`flex items-center bg-card dark:bg-gray-800 rounded-full px-5 py-3.5 transition-all ${
-                  isSearchFocused ? 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 shadow-md ring-2 ring-primary/20' : 'hover:bg-gray-100 dark:hover:bg-gray-700'
+                <div className={`flex items-center bg-card dark:bg-[rgb(38,38,38)] rounded-full px-5 py-3.5 transition-all ${
+                  isSearchFocused ? 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 shadow-md ring-2 ring-primary/20' : 'hover:bg-gray-100 dark:hover:bg-[rgb(45,45,45)]'
                 }`}>
                   <FiSearch className="w-5 h-5 text-muted-foreground mr-3 flex-shrink-0" />
                   <input
@@ -195,7 +181,7 @@ export default function Header() {
                     onFocus={() => setIsSearchFocused(true)}
                     onBlur={() => setIsSearchFocused(false)}
                     placeholder="Search"
-                    className="flex-1 bg-transparent text-sm placeholder-muted-foreground focus:outline-none w-48 text-foreground"
+                    className="flex-1 bg-transparent text-[15px] placeholder-muted-foreground focus:outline-none w-48 text-foreground"
                     autoComplete="off"
                     autoCapitalize="off"
                     autoCorrect="off"
@@ -215,11 +201,11 @@ export default function Header() {
                 </div>
               ) : user ? (
                 <>
-                  {/* My Blog Button */}
-                  {!blogLoading && blog && (
+                  {/* My Blog Button - user.blogSlug로 즉시 표시 */}
+                  {user.blogSlug && (
                     <Link
-                      href={`/blog/${blog.slug}`}
-                      className="text-sm text-foreground hover:bg-accent hover:text-accent-foreground font-medium px-3 py-2 rounded-md transition-colors"
+                      href={`/blog/${user.blogSlug}`}
+                      className="text-[15px] text-foreground hover:bg-accent hover:text-accent-foreground font-medium px-3 py-2 rounded-md transition-colors"
                     >
                       내 블로그
                     </Link>
@@ -228,11 +214,10 @@ export default function Header() {
                   {/* Write Button - All logged in users can write */}
                   <button
                     onClick={handleWriteClick}
-                    disabled={isCheckingBlog}
-                    className="inline-flex items-center px-4 py-2 text-sm font-medium text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center px-4 py-2 text-[15px] font-medium text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
                   >
                     <FiEdit3 className="mr-1.5 w-4 h-4" />
-                    {isCheckingBlog ? '확인 중...' : '글쓰기'}
+                    글쓰기
                   </button>
 
                   {/* DM Button */}
@@ -265,15 +250,12 @@ export default function Header() {
                   {/* Profile Dropdown */}
                   <ProfileDropdown
                     user={user}
-                    blog={blog}
-                    blogLoading={blogLoading}
                     onLogout={() => logout('/')}
                     onWriteClick={handleWriteClick}
-                    isCheckingBlog={isCheckingBlog}
                   />
 
-                  {/* Subscription Badge - 프로필 오른쪽으로 이동 */}
-                  <SubscriptionBadge />
+                  {/* Subscription Badge - user.subscriptionTier 사용 */}
+                  <SubscriptionBadge user={user} />
                 </>
               ) : (
                 <>
@@ -282,7 +264,7 @@ export default function Header() {
 
                   <Link
                     href={routes.login()}
-                    className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
+                    className="inline-flex items-center justify-center px-4 py-2 text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
                   onClick={(e) => {
                     // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
                     if (pathname === '/register') {
@@ -320,14 +302,14 @@ export default function Header() {
         {/* Mobile Search Bar */}
         <div className="md:hidden mt-3">
           <form onSubmit={handleSearch} className="relative">
-            <div className="flex items-center bg-muted rounded-full px-5 py-3.5">
+            <div className="flex items-center bg-muted dark:bg-[rgb(38,38,38)] rounded-full px-5 py-3.5">
               <FiSearch className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
               <input
                 type="text"
                 value={searchQuery}
                 onChange={handleSearchInputChange}
                 placeholder="Search"
-                className="flex-1 bg-transparent text-sm placeholder-muted-foreground focus:outline-none text-foreground"
+                className="flex-1 bg-transparent text-[15px] placeholder-muted-foreground focus:outline-none text-foreground"
                 autoComplete="off"
                 autoCapitalize="off"
                 autoCorrect="off"
@@ -361,19 +343,19 @@ export default function Header() {
                 ) : user ? (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between px-2 py-2">
-                      <span className="text-sm text-muted-foreground">
+                      <span className="text-[15px] text-muted-foreground">
                         {user.username}님
                       </span>
-                      {/* Mobile Subscription Badge */}
-                      <SubscriptionBadge />
+                      {/* Mobile Subscription Badge - user.subscriptionTier 사용 */}
+                      <SubscriptionBadge user={user} />
                     </div>
-                    
-                    {/* My Blog Button for Mobile */}
-                    {!blogLoading && blog && (
+
+                    {/* My Blog Button for Mobile - user.blogSlug로 즉시 표시 */}
+                    {user.blogSlug && (
                       <Link
-                        href={`/blog/${blog.slug}`}
+                        href={`/blog/${user.blogSlug}`}
                         onClick={closeMobileMenu}
-                        className="block text-center py-2 px-2 text-sm text-foreground hover:text-foreground/80 rounded-md hover:bg-muted transition-colors font-medium"
+                        className="block text-center py-2 px-2 text-[15px] text-foreground hover:text-foreground/80 rounded-md hover:bg-muted transition-colors font-medium"
                       >
                         내 블로그
                       </Link>
@@ -382,11 +364,10 @@ export default function Header() {
                     {/* Write Button - All logged in users can write */}
                     <button
                       onClick={handleWriteClick}
-                      disabled={isCheckingBlog}
-                      className="inline-flex items-center px-4 py-3 text-sm font-medium text-foreground border border-border hover:border-border/80 hover:bg-muted rounded-full transition-all w-full justify-center disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="inline-flex items-center px-4 py-3 text-[15px] font-medium text-foreground border border-border hover:border-border/80 hover:bg-muted rounded-full transition-all w-full justify-center"
                     >
                       <FiEdit3 className="mr-2 w-4 h-4" />
-                      {isCheckingBlog ? '확인 중...' : '글쓰기'}
+                      글쓰기
                     </button>
 
                     {/* DM Button for Mobile */}
@@ -395,7 +376,7 @@ export default function Header() {
                         closeMobileMenu();
                         openModal();
                       }}
-                      className="flex items-center justify-center w-full px-4 py-3 text-sm font-medium text-foreground border border-border hover:border-border/80 hover:bg-muted rounded-full transition-all"
+                      className="flex items-center justify-center w-full px-4 py-3 text-[15px] font-medium text-foreground border border-border hover:border-border/80 hover:bg-muted rounded-full transition-all"
                     >
                       <svg
                         className="w-4 h-4 mr-2"
@@ -415,7 +396,7 @@ export default function Header() {
 
                     {/* Theme Switch for Mobile */}
                     <div className="flex items-center justify-between px-2 py-2">
-                      <span className="text-sm text-muted-foreground">테마</span>
+                      <span className="text-[15px] text-muted-foreground">테마</span>
                       <ThemeSwitch />
                     </div>
 
@@ -424,7 +405,7 @@ export default function Header() {
                         closeMobileMenu();
                         logout('/');
                       }}
-                      className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-foreground py-2 px-2 rounded-md hover:bg-muted transition-colors w-full"
+                      className="flex items-center space-x-2 text-[15px] text-muted-foreground hover:text-foreground py-2 px-2 rounded-md hover:bg-muted transition-colors w-full"
                     >
                       <FiLogOut className="w-4 h-4" />
                       <span>로그아웃</span>
@@ -434,7 +415,7 @@ export default function Header() {
                   <>
                     {/* Theme Switch for Mobile - Non-authenticated */}
                     <div className="flex items-center justify-between px-2 py-2 mb-3">
-                      <span className="text-sm text-muted-foreground">테마</span>
+                      <span className="text-[15px] text-muted-foreground">테마</span>
                       <ThemeSwitch />
                     </div>
 
@@ -452,7 +433,7 @@ export default function Header() {
                           }, 100);
                         }
                       }}
-                      className="inline-flex items-center justify-center w-full px-4 py-3 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
+                      className="inline-flex items-center justify-center w-full px-4 py-3 text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
                     >
                       로그인
                     </Link>
