@@ -27,7 +27,8 @@ export default function ProfileSettingsPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (user) {
+    // user가 있고 실제 데이터(email)가 있을 때만 업데이트 (깜빡임 방지)
+    if (user?.email) {
       setFormData({
         username: user.username || '',
         email: user.email || '',
@@ -36,13 +37,13 @@ export default function ProfileSettingsPage() {
       if (user.profileImage) {
         console.log('User profileImage:', user.profileImage);
         let imageUrl = user.profileImage;
-        
+
         // 절대 URL이 아닌 경우 처리
         if (!user.profileImage.startsWith('http://') && !user.profileImage.startsWith('https://')) {
           // /api/로 시작하는 경우
           if (user.profileImage.startsWith('/api/')) {
             imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage.replace('/api/v1', '')}`;
-          } 
+          }
           // /로 시작하는 경우
           else if (user.profileImage.startsWith('/')) {
             imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage}`;
@@ -53,7 +54,7 @@ export default function ProfileSettingsPage() {
             imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${user.profileImage}`;
           }
         }
-        
+
         setProfileImageUrl(imageUrl);
       }
     }
@@ -178,7 +179,7 @@ export default function ProfileSettingsPage() {
   if (!user) {
     return (
       <div className="p-8 text-center">
-        <p className="text-gray-600">로그인이 필요합니다</p>
+        <p className="text-gray-600 dark:text-gray-400">로그인이 필요합니다</p>
       </div>
     );
   }
@@ -186,8 +187,8 @@ export default function ProfileSettingsPage() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900">프로필 설정</h2>
-        <p className="text-sm text-gray-600 mt-1">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">프로필 설정</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           기본 프로필 정보를 관리하세요
         </p>
       </div>
@@ -195,11 +196,11 @@ export default function ProfileSettingsPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Profile Image */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             프로필 이미지
           </label>
           <div className="flex items-center space-x-4">
-            <div className="relative w-20 h-20 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
+            <div className="relative w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex-shrink-0">
               {profileImageUrl ? (
                 <Image
                   src={profileImageUrl}
@@ -233,11 +234,11 @@ export default function ProfileSettingsPage() {
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
                 disabled={uploadingImage}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {uploadingImage ? '업로드 중...' : '이미지 변경'}
               </button>
-              <p className="mt-1 text-xs text-gray-500">
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
                 JPG, PNG, GIF (최대 5MB)
               </p>
             </div>
@@ -246,7 +247,7 @@ export default function ProfileSettingsPage() {
 
         {/* Username */}
         <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             사용자 이름
           </label>
           <input
@@ -254,14 +255,14 @@ export default function ProfileSettingsPage() {
             id="username"
             value={formData.username}
             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
             required
           />
         </div>
 
         {/* Email */}
         <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             이메일
           </label>
           <div className="flex items-center">
@@ -270,26 +271,26 @@ export default function ProfileSettingsPage() {
               id="email"
               value={formData.email}
               disabled
-              className="flex-1 px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-gray-500"
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
             />
             {user.isEmailVerified ? (
-              <span className="ml-3 inline-flex items-center text-sm text-green-600">
+              <span className="ml-3 inline-flex items-center text-sm text-green-600 dark:text-green-400">
                 <FiCheck className="mr-1" /> 인증됨
               </span>
             ) : (
-              <span className="ml-3 inline-flex items-center text-sm text-gray-500">
+              <span className="ml-3 inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
                 <FiX className="mr-1" /> 미인증
               </span>
             )}
           </div>
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
             이메일은 보안상의 이유로 변경할 수 없습니다
           </p>
         </div>
 
         {/* Bio */}
         <div>
-          <label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             소개
           </label>
           <textarea
@@ -302,49 +303,49 @@ export default function ProfileSettingsPage() {
             }}
             rows={4}
             maxLength={1000}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
             placeholder="자신을 소개해주세요..."
           />
-          <div className="mt-1 flex justify-between text-xs text-gray-500">
+          <div className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>자신을 소개하는 글을 작성해주세요</span>
             <span>{formData.bio.length}/1000</span>
           </div>
         </div>
 
         {/* Account Info */}
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">계정 정보</h3>
+        <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">계정 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center text-sm">
-              <FiCalendar className="mr-2 text-gray-400" />
-              <span className="text-gray-600">가입일:</span>
-              <span className="ml-2 text-gray-900">
-                {user.createdAt 
+              <FiCalendar className="mr-2 text-gray-400 dark:text-gray-500" />
+              <span className="text-gray-600 dark:text-gray-400">가입일:</span>
+              <span className="ml-2 text-gray-900 dark:text-gray-100">
+                {user.createdAt
                   ? format(new Date(user.createdAt), 'yyyy년 MM월 dd일', { locale: ko })
                   : '정보 없음'}
               </span>
             </div>
             <div className="flex items-center text-sm">
-              <FiShield className="mr-2 text-gray-400" />
-              <span className="text-gray-600">역할:</span>
-              <span className="ml-2 text-gray-900">{user.role === 'admin' ? '관리자' : '일반 사용자'}</span>
+              <FiShield className="mr-2 text-gray-400 dark:text-gray-500" />
+              <span className="text-gray-600 dark:text-gray-400">역할:</span>
+              <span className="ml-2 text-gray-900 dark:text-gray-100">{user.role === 'admin' ? '관리자' : '일반 사용자'}</span>
             </div>
             <div className="flex items-center text-sm">
-              <FiMail className="mr-2 text-gray-400" />
-              <span className="text-gray-600">인증 방법:</span>
-              <span className="ml-2 text-gray-900">{user.authProvider || 'Email'}</span>
+              <FiMail className="mr-2 text-gray-400 dark:text-gray-500" />
+              <span className="text-gray-600 dark:text-gray-400">인증 방법:</span>
+              <span className="ml-2 text-gray-900 dark:text-gray-100">{user.authProvider || 'Email'}</span>
             </div>
           </div>
         </div>
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+          <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
             {error}
           </div>
         )}
         {success && (
-          <div className="p-3 text-sm text-green-600 bg-green-50 rounded-md">
+          <div className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-md">
             프로필이 성공적으로 업데이트되었습니다!
           </div>
         )}
@@ -354,7 +355,7 @@ export default function ProfileSettingsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? '저장 중...' : '변경사항 저장'}
           </button>
@@ -362,15 +363,15 @@ export default function ProfileSettingsPage() {
       </form>
 
       {/* 회원 탈퇴 섹션 */}
-      <div className="mt-12 pt-8 border-t border-gray-200">
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <h4 className="text-base font-medium text-gray-900 mb-2">계정 삭제</h4>
-          <p className="text-sm text-gray-600 mb-4">
+      <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-50 dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">계정 삭제</h4>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             계정을 삭제하면 모든 블로그 게시물, 댓글, 파일이 영구적으로 삭제되며 복구할 수 없습니다.
           </p>
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 transition-colors"
+            className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
           >
             계정 삭제
           </button>
@@ -379,18 +380,18 @@ export default function ProfileSettingsPage() {
 
       {/* 삭제 확인 모달 */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4">
             <div className="flex items-center mb-4">
-              <FiAlertTriangle className="text-red-600 w-6 h-6 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-900">계정 삭제 확인</h3>
+              <FiAlertTriangle className="text-red-600 dark:text-red-400 w-6 h-6 mr-2" />
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">계정 삭제 확인</h3>
             </div>
-            
-            <p className="text-gray-600 mb-6">
+
+            <p className="text-gray-600 dark:text-gray-400 mb-6">
               정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 다음 항목들이 모두 삭제됩니다:
             </p>
-            
-            <ul className="list-disc list-inside text-sm text-gray-600 mb-6 space-y-1">
+
+            <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 mb-6 space-y-1">
               <li>모든 블로그 게시물</li>
               <li>모든 댓글</li>
               <li>업로드한 모든 파일</li>
@@ -400,7 +401,7 @@ export default function ProfileSettingsPage() {
 
             {(!user?.authProvider || user?.authProvider === 'local') && (
               <div className="mb-6">
-                <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                   비밀번호 확인
                 </label>
                 <input
@@ -408,7 +409,7 @@ export default function ProfileSettingsPage() {
                   id="deletePassword"
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-red-500"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
                   placeholder="비밀번호를 입력하세요"
                   autoFocus
                 />
@@ -416,7 +417,7 @@ export default function ProfileSettingsPage() {
             )}
 
             {error && (
-              <div className="mb-4 p-3 text-sm text-red-600 bg-red-50 rounded-md">
+              <div className="mb-4 p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
                 {error}
               </div>
             )}
@@ -425,7 +426,7 @@ export default function ProfileSettingsPage() {
               <button
                 onClick={handleDeleteAccount}
                 disabled={deleteLoading || ((!user?.authProvider || user?.authProvider === 'local') && !deletePassword)}
-                className="flex-1 px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-700 text-white font-medium rounded-md hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {deleteLoading ? '삭제 중...' : '영구 삭제'}
               </button>
@@ -435,7 +436,7 @@ export default function ProfileSettingsPage() {
                   setDeletePassword('');
                   setError('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 font-medium rounded-md hover:bg-gray-300 transition-colors"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
                 취소
               </button>

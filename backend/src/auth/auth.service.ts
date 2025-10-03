@@ -121,6 +121,7 @@ export class AuthService {
         username,
         password,
         authProvider: AuthProvider.LOCAL,
+        isEmailVerified: true,  // 이메일 인증 완료 상태 반영
       });
 
       // 자동으로 블로그 생성

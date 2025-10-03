@@ -66,7 +66,7 @@ export default function ProfileDropdown({
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.username}</p>
-            <p className="text-xs leading-none text-gray-500">{user.email}</p>
+            <p className="text-xs leading-none text-gray-500 dark:text-gray-400">{user.email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
@@ -201,9 +201,9 @@ export default function ProfileDropdown({
         <DropdownMenuSeparator />
 
         {/* Logout */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={onLogout}
-          className="cursor-pointer text-red-600 focus:text-red-600"
+          className="cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
         >
           <FiLogOut className="mr-2 h-4 w-4" />
           <span>로그아웃</span>

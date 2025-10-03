@@ -296,7 +296,7 @@ export default function BlogPostDetailPage() {
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <div className="mt-16 pt-8 border-t border-gray-100">
+          <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-700">
             <div className="flex flex-wrap gap-2">
               {(() => {
                 // AI 태그를 맨 앞으로 정렬
@@ -306,7 +306,7 @@ export default function BlogPostDetailPage() {
                   const [aiTag] = sortedTags.splice(aiIndex, 1);
                   sortedTags.unshift(aiTag);
                 }
-                
+
                 return sortedTags.map((tag, index) => {
                   const isAITag = tag.toLowerCase().startsWith('ai:');
                   return (
@@ -314,8 +314,8 @@ export default function BlogPostDetailPage() {
                       key={index}
                       className={`inline-flex items-center px-3 py-1 text-[13px] font-medium rounded-full cursor-pointer transition-colors ${
                         isAITag
-                          ? 'bg-pink-100 text-pink-900 hover:bg-pink-200'
-                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200'
+                          ? 'bg-pink-100 text-pink-900 hover:bg-pink-200 dark:bg-pink-900/30 dark:text-pink-200 dark:hover:bg-pink-900/40'
+                          : 'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600'
                       }`}
                     >
                       #{tag}

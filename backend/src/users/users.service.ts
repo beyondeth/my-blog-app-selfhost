@@ -256,6 +256,7 @@ export class UsersService {
         'user.refreshTokenExpiresAt',
         'user.subscriptionTier',        // 구독 티어
         'user.subscriptionStatus',      // 구독 상태
+        'user.bio',                      // 사용자 소개
         'blog.slug',                     // blog의 slug만 선택 (헤더 "내 블로그" 버튼용)
       ])
       .where('user.id = :id', { id })

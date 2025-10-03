@@ -79,7 +79,7 @@ export default function PostHeaderWithReport({
           <div className="mb-6 -ml-8">
             <button
               onClick={onBack}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors text-xs font-medium"
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors text-xs font-medium"
             >
               <FiArrowLeft className="mr-2 w-4 h-4" />
               Back
@@ -90,20 +90,20 @@ export default function PostHeaderWithReport({
         {/* Category */}
         {post.category && (
           <div className="mb-6">
-            <span className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gray-100 text-gray-900 rounded-full">
+            <span className="inline-flex items-center px-3 py-1 text-xs font-medium bg-gray-100 text-gray-900 dark:bg-gray-700 dark:text-gray-100 rounded-full">
               <FiTag className="mr-1 w-3 h-3" />
               {post.category}
             </span>
           </div>
         )}
-        
+
         {/* Title - 전체 너비 차지 */}
-        <h1 className="text-3xl font-bold text-gray-900 mb-5 leading-tight">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-5 leading-tight">
           {post.title || ''}
         </h1>
 
         {/* Meta Information with Like/Share and Action Buttons */}
-        <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500 mb-8 pb-4 border-b border-gray-100">
+        <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400 mb-8 pb-4 border-b border-gray-100 dark:border-gray-700">
           {/* Left: Meta Information with Like/Share */}
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center">
@@ -136,20 +136,20 @@ export default function PostHeaderWithReport({
               <button
                 onClick={onLike}
                 className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
-                  liked 
-                    ? 'bg-red-50 text-red-600 hover:bg-red-100' 
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                  liked
+                    ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 <FiHeart className={`w-3 h-3 ${liked ? 'fill-current' : ''}`} />
                 <span>{likeCount}</span>
               </button>
             )}
-            
+
             {onShare && (
               <button
                 onClick={onShare}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
               >
                 <FiShare2 className="w-3 h-3" />
                 <span>공유</span>
@@ -161,8 +161,8 @@ export default function PostHeaderWithReport({
                 onClick={onBookmark}
                 className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
                   bookmarked
-                    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
                 }`}
               >
                 <FiBookmark className={`w-3 h-3 ${bookmarked ? 'fill-current' : ''}`} />
@@ -173,7 +173,7 @@ export default function PostHeaderWithReport({
             {onCopy && (
               <button
                 onClick={onCopy}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
                 title="포스트 내용 복사"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -190,8 +190,8 @@ export default function PostHeaderWithReport({
                 disabled={isPdfGenerating}
                 className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
                   isPdfGenerating
-                    ? 'text-gray-400 cursor-not-allowed opacity-50'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
+                    ? 'text-gray-400 cursor-not-allowed opacity-50 dark:text-gray-600'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
                 }`}
                 title={isPdfGenerating ? "PDF 생성 중..." : "PDF로 다운로드"}
                 data-pdf-hide="true"
@@ -208,7 +208,7 @@ export default function PostHeaderWithReport({
               <>
                 <button
                   onClick={onEdit}
-                  className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                  className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                   title="수정"
                 >
                   <FiEdit3 className="mr-1 w-3 h-3" />
@@ -216,7 +216,7 @@ export default function PostHeaderWithReport({
                 </button>
                 <button
                   onClick={onDelete}
-                  className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                  className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                   title="삭제"
                 >
                   <FiTrash2 className="mr-1 w-3 h-3" />
@@ -224,7 +224,7 @@ export default function PostHeaderWithReport({
                 </button>
               </>
             )}
-            
+
             {/* More Options Menu - Only show if not the author */}
             {!isAuthor && (
               <div className="relative">
@@ -233,25 +233,25 @@ export default function PostHeaderWithReport({
                     if (!user) return; // 로그인하지 않은 경우 실행 안 함
                     setShowDropdown(!showDropdown);
                   }}
-                  className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded transition-colors"
+                  className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
                   title="더보기"
                 >
                   <FiMoreVertical className="w-4 h-4" />
                 </button>
-                
+
                 {showDropdown && (
                   <>
                     {/* Backdrop to close dropdown */}
-                    <div 
-                      className="fixed inset-0 z-10" 
+                    <div
+                      className="fixed inset-0 z-10"
                       onClick={() => setShowDropdown(false)}
                     />
-                    
+
                     {/* Dropdown Menu */}
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                    <div className="absolute right-0 mt-2 w-48 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
                       <button
                         onClick={handleReport}
-                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         <FiFlag className="mr-2 w-4 h-4" />
                         신고하기

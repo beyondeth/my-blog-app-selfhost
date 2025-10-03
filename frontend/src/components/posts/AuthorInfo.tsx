@@ -79,7 +79,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
     return (
       <TooltipProvider delayDuration={300}>
         <Tooltip>
-          <div className="mt-12 p-6 bg-gray-50 rounded-lg">
+          <div className="mt-12 p-6 bg-gray-50 dark:bg-[rgb(38,38,38)] rounded-lg">
             <div className="flex items-start space-x-4">
               <TooltipTrigger asChild>
                 <div className="flex items-start space-x-4 cursor-pointer">
@@ -91,7 +91,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
                     className="flex-shrink-0 hover:opacity-80 transition-opacity"
                   />
                   <div>
-                    <h3 className="text-sm font-medium text-gray-900 mb-1 hover:text-blue-600 transition-colors">
+                    <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                       {author.username || 'Author'}
                     </h3>
                   </div>
@@ -99,7 +99,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
               </TooltipTrigger>
               {/* 바이오는 호버 영역 밖에 배치 */}
               <div className="flex-1">
-                <p className="text-sm text-gray-600 mt-5">
+                <p className="text-sm text-gray-600 dark:text-gray-400 mt-5">
                   {author.bio || ''}
                 </p>
               </div>
@@ -120,7 +120,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
 
   // 데이터가 없는 경우 기존 디자인 그대로 표시 (호버 기능 없음)
   return (
-    <div className="mt-12 p-6 bg-gray-50 rounded-lg">
+    <div className="mt-12 p-6 bg-gray-50 dark:bg-[rgb(38,38,38)] rounded-lg">
       <div className="flex items-start space-x-4">
         <Avatar
           src={author.profileImage}
@@ -130,10 +130,10 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
           className="flex-shrink-0"
         />
         <div className="flex-1">
-          <h3 className="text-sm font-medium text-gray-900 mb-1">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
             {author.username || 'Author'}
           </h3>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 dark:text-gray-400">
             {author.bio || ''}
           </p>
         </div>

@@ -74,7 +74,7 @@ export default function SecuritySettingsPage() {
   if (!user) {
     return (
       <div className="p-8 text-center">
-        <p className="text-gray-600">로그인이 필요합니다</p>
+        <p className="text-gray-600 dark:text-gray-400">로그인이 필요합니다</p>
       </div>
     );
   }
@@ -138,23 +138,23 @@ export default function SecuritySettingsPage() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900">보안 설정</h2>
-        <p className="text-sm text-gray-600 mt-1">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">보안 설정</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           계정 보안을 강화하고 안전하게 관리하세요
         </p>
       </div>
 
       <div className="space-y-8">
         {/* Authentication Info Section */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">인증 정보</h3>
+        <div className="bg-gray-50 dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">인증 정보</h3>
           <div className="flex items-center space-x-3">
             {authInfo.icon}
             <div>
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
                 {authInfo.name} 계정 사용 중
               </p>
-              <p className="text-xs text-gray-500">
+              <p className="text-xs text-gray-500 dark:text-gray-400">
                 {user.email}
               </p>
             </div>
@@ -164,11 +164,11 @@ export default function SecuritySettingsPage() {
         {/* Password Change Section - Only for local users */}
         {(!user.authProvider || user.authProvider === 'local') ? (
           <div>
-            <h3 className="text-lg font-medium text-gray-900 mb-4">비밀번호 변경</h3>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">비밀번호 변경</h3>
           <form onSubmit={handlePasswordSubmit} className="space-y-4">
             {/* Current Password */}
             <div>
-              <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 현재 비밀번호
               </label>
               <div className="relative">
@@ -177,7 +177,7 @@ export default function SecuritySettingsPage() {
                   id="currentPassword"
                   value={passwordForm.currentPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   required
                 />
                 <button
@@ -196,7 +196,7 @@ export default function SecuritySettingsPage() {
 
             {/* New Password */}
             <div>
-              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 새 비밀번호
               </label>
               <div className="relative">
@@ -205,7 +205,7 @@ export default function SecuritySettingsPage() {
                   id="newPassword"
                   value={passwordForm.newPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   required
                 />
                 <button
@@ -220,12 +220,12 @@ export default function SecuritySettingsPage() {
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-500">최소 8자 이상, 영문 대소문자와 숫자를 포함하세요</p>
+              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">최소 8자 이상, 영문 대소문자와 숫자를 포함하세요</p>
             </div>
 
             {/* Confirm Password */}
             <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-2">
+              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 새 비밀번호 확인
               </label>
               <div className="relative">
@@ -234,7 +234,7 @@ export default function SecuritySettingsPage() {
                   id="confirmPassword"
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500"
+                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   required
                 />
                 <button
@@ -255,7 +255,7 @@ export default function SecuritySettingsPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {loading ? '변경 중...' : '비밀번호 변경'}
               </button>
@@ -264,20 +264,20 @@ export default function SecuritySettingsPage() {
         </div>
         ) : (
           /* OAuth Users Security Info */
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-6">
             <div className="flex items-start space-x-3">
-              <FiAlertCircle className="h-5 w-5 text-blue-600 mt-0.5" />
+              <FiAlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
               <div className="flex-1">
-                <h3 className="text-sm font-medium text-blue-900 mb-2">
+                <h3 className="text-sm font-medium text-blue-900 dark:text-blue-100 mb-2">
                   소셜 로그인 사용 중
                 </h3>
-                <p className="text-sm text-blue-700 mb-3">
-                  {authInfo.name} 계정으로 로그인하셨습니다. 
+                <p className="text-sm text-blue-700 dark:text-blue-300 mb-3">
+                  {authInfo.name} 계정으로 로그인하셨습니다.
                   비밀번호는 {authInfo.name}에서 관리됩니다.
                 </p>
                 <div className="space-y-2">
-                  <p className="text-xs text-blue-600 font-medium">보안 강화 팁:</p>
-                  <ul className="text-xs text-blue-600 space-y-1 list-disc list-inside">
+                  <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">보안 강화 팁:</p>
+                  <ul className="text-xs text-blue-600 dark:text-blue-400 space-y-1 list-disc list-inside">
                     <li>{authInfo.name} 계정에서 2단계 인증을 활성화하세요</li>
                     <li>정기적으로 {authInfo.name} 보안 설정을 검토하세요</li>
                     <li>의심스러운 로그인 활동이 있는지 확인하세요</li>
@@ -289,21 +289,21 @@ export default function SecuritySettingsPage() {
         )}
 
         {/* Security Status */}
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">보안 상태</h3>
+        <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">보안 상태</h3>
           <div className="space-y-3">
             <div className="flex items-center">
               <FiCheck className="h-5 w-5 text-primary mr-2" />
-              <span className="text-sm text-gray-700">이메일 인증 완료</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">이메일 인증 완료</span>
             </div>
             <div className="flex items-center">
               <FiShield className="h-5 w-5 text-green-500 mr-2" />
-              <span className="text-sm text-gray-700">활성 세션: 1개</span>
+              <span className="text-sm text-gray-700 dark:text-gray-300">활성 세션: 1개</span>
             </div>
             {user.authProvider && user.authProvider !== 'local' && (
               <div className="flex items-center">
                 {authInfo.icon}
-                <span className="text-sm text-gray-700 ml-2">{authInfo.name} 계정 연결됨</span>
+                <span className="text-sm text-gray-700 dark:text-gray-300 ml-2">{authInfo.name} 계정 연결됨</span>
               </div>
             )}
           </div>
@@ -311,12 +311,12 @@ export default function SecuritySettingsPage() {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+          <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
             {error}
           </div>
         )}
         {success && (
-          <div className="p-3 text-sm text-green-600 bg-green-50 rounded-md">
+          <div className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-md">
             보안 설정이 성공적으로 업데이트되었습니다!
           </div>
         )}

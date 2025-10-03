@@ -5,8 +5,20 @@
 /* 새로운 통합 스타일 시스템 import */
 @import '../styles/core.css';
 
-/* Highlight.js Atom One Dark Theme - 코드 블록 하이라이팅 */
-@import 'highlight.js/styles/atom-one-dark.css';
+/* Highlight.js 테마 - 라이트/다크 모드 대응 */
+@import 'highlight.js/styles/atom-one-light.css' (prefers-color-scheme: light);
+@import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
+
+/* 강제 테마 적용을 위한 클래스 기반 스타일 */
+.light .hljs {
+  background: #fafafa;
+  color: #383a42;
+}
+
+.dark .hljs {
+  background: #282c34;
+  color: #abb2bf;
+}
 
 /* Mermaid 다이어그램 스타일링 - 포스트용 */
 .mermaid-wrapper {

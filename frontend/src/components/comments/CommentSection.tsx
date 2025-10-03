@@ -73,33 +73,33 @@ function CommentSectionContent({ postId, postAuthorId }: CommentSectionProps) {
 
   if (isError) {
     return (
-      <section className="mt-16 pt-8 border-t border-gray-200">
-        <ErrorMessage 
-          message={error?.message || '댓글을 불러오는데 실패했습니다.'} 
+      <section className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
+        <ErrorMessage
+          message={error?.message || '댓글을 불러오는데 실패했습니다.'}
         />
       </section>
     );
   }
 
   return (
-    <section className="mt-16 pt-8 border-t border-gray-200">
+    <section className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
-          <FiMessageCircle className="w-5 h-5 text-gray-700" />
-          <h2 className="text-lg font-semibold text-gray-900">
+          <FiMessageCircle className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             댓글 {comments?.length || 0}개
           </h2>
         </div>
 
         {/* YouTube-style 정렬 탭 */}
-        <div className="flex bg-gray-100 rounded-lg p-1">
+        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
           <button
             onClick={() => setSortType('popular')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               sortType === 'popular'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
             }`}
           >
             <FiTrendingUp className="w-4 h-4 inline mr-1" />
@@ -109,8 +109,8 @@ function CommentSectionContent({ postId, postAuthorId }: CommentSectionProps) {
             onClick={() => setSortType('latest')}
             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
               sortType === 'latest'
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100'
+                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
             }`}
           >
             <FiClock className="w-4 h-4 inline mr-1" />

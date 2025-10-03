@@ -411,6 +411,7 @@ export class AuthController {
       isEmailVerified: user.isEmailVerified,
       subscriptionTier: user.subscriptionTier,        // 구독 티어 추가
       subscriptionStatus: user.subscriptionStatus,    // 구독 상태 추가
+      bio: user.bio,                                  // 사용자 소개
       blogSlug: user.blog?.slug || null,              // 블로그 슬러그 추가 (헤더 "내 블로그" 버튼에서 사용)
       createdAt: user.createdAt,
     };

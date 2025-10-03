@@ -229,3 +229,33 @@
   --color-code-text: #d4d4d4;
   --color-code-border: #333333;
 }
+
+/* ============================
+   부드러운 테마 전환 애니메이션
+   FOUC 방지 및 사용자 경험 향상
+   ============================ */
+
+/* 테마 전환 시 부드러운 애니메이션 적용 */
+*,
+*::before,
+*::after {
+  transition-property: background-color, border-color, color, fill, stroke;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* 애니메이션 성능 최적화 - 필요한 속성만 transition */
+.no-transition,
+.no-transition * {
+  transition: none !important;
+}
+
+/* 특정 요소는 transition 제외 (성능 향상) */
+input,
+textarea,
+select,
+button:active,
+[role="slider"],
+[role="progressbar"] {
+  transition: none;
+}

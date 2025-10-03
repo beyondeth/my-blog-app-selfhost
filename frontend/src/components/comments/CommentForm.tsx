@@ -43,8 +43,8 @@ export default function CommentForm({
 
   if (!user) {
     return (
-      <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center text-gray-600">
-        <p>댓글을 작성하려면 <a href="/login" className="text-blue-600 hover:underline">로그인</a>해주세요.</p>
+      <div className="bg-gray-50 border border-gray-200 dark:bg-[rgb(38,38,38)] dark:border-gray-700 rounded-lg p-4 text-center text-gray-600 dark:text-gray-400">
+        <p>댓글을 작성하려면 <a href="/login" className="text-blue-600 hover:underline dark:text-blue-400 dark:hover:underline">로그인</a>해주세요.</p>
       </div>
     );
   }
@@ -63,9 +63,9 @@ export default function CommentForm({
             maxLength={maxLength}
           />
           <div className={`absolute bottom-2 right-2 text-xs ${
-            content.length > maxLength * 0.9 
-              ? 'text-red-500' 
-              : 'text-gray-400'
+            content.length > maxLength * 0.9
+              ? 'text-red-500'
+              : 'text-gray-400 dark:text-gray-600'
           }`}>
             {content.length}/{maxLength}
           </div>

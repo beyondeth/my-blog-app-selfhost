@@ -104,7 +104,7 @@ export default function PricingPage() {
   if (plansLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
       </div>
     );
   }
@@ -116,23 +116,23 @@ export default function PricingPage() {
       <div className="max-w-7xl mx-auto">
         {/* 페이지 헤더 */}
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-gray-900">
+          <h1 className="text-4xl font-bold text-gray-900 dark:text-gray-100">
             당신의 블로그를 위한 완벽한 플랜
           </h1>
-          <p className="mt-4 text-xl text-gray-600">
+          <p className="mt-4 text-xl text-gray-600 dark:text-gray-400">
             필요에 맞는 플랜을 선택하고 더 많은 기능을 활용하세요
           </p>
         </div>
 
         {/* 결제 주기 선택 */}
         <div className="mt-12 flex justify-center">
-          <div className="bg-gray-100 p-1 rounded-lg flex space-x-1">
+          <div className="bg-gray-100 dark:bg-gray-700 p-1 rounded-lg flex space-x-1">
             <button
               onClick={() => setSelectedBilling(BillingCycle.MONTHLY)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 selectedBilling === BillingCycle.MONTHLY
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
               }`}
             >
               월간 결제
@@ -141,12 +141,12 @@ export default function PricingPage() {
               onClick={() => setSelectedBilling(BillingCycle.YEARLY)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 selectedBilling === BillingCycle.YEARLY
-                  ? 'bg-white text-gray-900 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100'
+                  : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
               }`}
             >
               연간 결제
-              <span className="ml-2 text-primary text-xs font-semibold">17% 할인</span>
+              <span className="ml-2 text-primary dark:text-blue-400 text-xs font-semibold">17% 할인</span>
             </button>
           </div>
         </div>
@@ -166,23 +166,23 @@ export default function PricingPage() {
                 key={plan.id}
                 className={`relative rounded-2xl ${
                   isPopular
-                    ? 'border-2 border-blue-500 shadow-xl'
-                    : 'border border-gray-200'
-                } bg-white p-8 ${isCurrentPlan ? 'ring-2 ring-blue-500' : ''} flex flex-col`}
+                    ? 'border-2 border-blue-500 shadow-xl dark:border-blue-400'
+                    : 'border border-gray-200 dark:border-gray-700'
+                } bg-white dark:bg-gray-800 p-8 ${isCurrentPlan ? 'ring-2 ring-blue-500 dark:ring-blue-400' : ''} flex flex-col`}
               >
                 {/* 인기 배지 */}
                 {isPopular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-blue-500 to-purple-500 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    <span className="bg-gradient-to-r from-blue-500 to-purple-500 dark:from-blue-400 dark:to-purple-400 text-white px-4 py-1 rounded-full text-sm font-semibold">
                       가장 인기
                     </span>
                   </div>
                 )}
 
-                {/* 현재 플랜 배지 */}
+                {/* 현재 플랜 배지 - 강조된 스타일 */}
                 {isCurrentPlan && (
                   <div className="absolute -top-4 right-4">
-                    <span className="bg-primary text-primary-foreground px-3 py-1 rounded-full text-xs font-semibold">
+                    <span className="bg-green-600 dark:bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
                       현재 플랜
                     </span>
                   </div>
@@ -190,10 +190,10 @@ export default function PricingPage() {
 
                 {/* 플랜 이름 및 설명 */}
                 <div className="text-center">
-                  <h3 className="text-2xl font-bold text-gray-900">
+                  <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                     {plan.tier === 'free' ? 'Free' : plan.tier === 'starter' ? 'Starter' : plan.tier === 'pro' ? 'Pro' : plan.displayName}
                   </h3>
-                  <p className="mt-2 text-gray-600">
+                  <p className="mt-2 text-gray-600 dark:text-gray-400">
                     {plan.description}
                   </p>
                 </div>
@@ -202,14 +202,14 @@ export default function PricingPage() {
                 <div className="mt-6 text-center">
                   <div className="flex items-baseline justify-center">
                     {price === 0 ? (
-                      <span className="text-3xl font-bold text-gray-900">무료</span>
+                      <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">무료</span>
                     ) : (
                       <>
-                        <span className="text-xl font-medium text-gray-500">₩</span>
-                        <span className="text-3xl font-bold text-gray-900">
+                        <span className="text-xl font-medium text-gray-500 dark:text-gray-400">₩</span>
+                        <span className="text-3xl font-bold text-gray-900 dark:text-gray-100">
                           {price.toLocaleString('ko-KR')}
                         </span>
-                        <span className="ml-2 text-base text-gray-500">
+                        <span className="ml-2 text-base text-gray-500 dark:text-gray-400">
                           /{selectedBilling === BillingCycle.MONTHLY ? '월' : '년'}
                         </span>
                       </>
@@ -217,17 +217,17 @@ export default function PricingPage() {
                   </div>
                 </div>
 
-                {/* 구독 버튼 */}
+                {/* 구독 버튼 - 현재 플랜 강조 */}
                 <div className="mt-8">
                   <button
                     onClick={() => handleSubscribe(plan.tier)}
                     disabled={isButtonDisabled(plan.tier)}
                     className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
                       isCurrentPlan
-                        ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                        ? 'bg-green-600 dark:bg-green-500 text-white cursor-not-allowed shadow-lg'
                         : isPopular
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white hover:from-blue-600 hover:to-purple-600'
-                        : 'bg-gray-900 text-white hover:bg-gray-800'
+                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 dark:from-blue-400 dark:to-purple-400 text-white hover:from-blue-600 hover:to-purple-600 dark:hover:from-blue-500 dark:hover:to-purple-500'
+                        : 'bg-gray-900 dark:bg-gray-700 text-white hover:bg-gray-800 dark:hover:bg-gray-600'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
                     {getButtonText(plan.tier)}
@@ -238,13 +238,13 @@ export default function PricingPage() {
                 <div className="flex-grow">
                   {/* 주요 기능 */}
                   <div className="mt-8 space-y-4">
-                    <h4 className="font-semibold text-gray-900">주요 기능</h4>
+                    <h4 className="font-semibold text-gray-900 dark:text-gray-100">주요 기능</h4>
                     <ul className="space-y-3">
                       {/* highlights 필드 사용 (백엔드 seeder에서 정의된 값) */}
                       {plan.highlights?.map((feature: string, index: number) => (
                         <li key={index} className="flex items-start">
-                          <FiCheck className="w-5 h-5 text-primary mt-0.5 mr-3 flex-shrink-0" />
-                          <span className="text-gray-700 text-sm">{feature}</span>
+                          <FiCheck className="w-5 h-5 text-primary dark:text-blue-400 mt-0.5 mr-3 flex-shrink-0" />
+                          <span className="text-gray-700 dark:text-gray-300 text-sm">{feature}</span>
                         </li>
                       ))}
                     </ul>
@@ -252,27 +252,27 @@ export default function PricingPage() {
                 </div>
 
                 {/* 리소스 제한 정보 - 항상 카드 하단에 위치 */}
-                <div className="mt-6 pt-6 border-t border-gray-200">
-                  <div className="space-y-2 text-sm text-gray-600">
+                <div className="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                  <div className="space-y-2 text-sm text-gray-600 dark:text-gray-400">
                     <div className="flex justify-between">
                       <span>MCP 자동포스팅</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
                         월 {plan.features?.maxMcpPostsPerMonth}건
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>일반 포스트</span>
-                      <span className="font-medium text-gray-900">무제한</span>
+                      <span className="font-medium text-gray-900 dark:text-gray-100">무제한</span>
                     </div>
                     <div className="flex justify-between">
                       <span>블로그 수</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
                         {plan.features?.maxBlogCount || 1}개
                       </span>
                     </div>
                     <div className="flex justify-between">
                       <span>통계 분석</span>
-                      <span className="font-medium text-gray-900">
+                      <span className="font-medium text-gray-900 dark:text-gray-100">
                         {plan.features?.analytics === 'none'
                           ? '미제공'
                           : plan.features?.analytics === 'basic'
@@ -291,24 +291,24 @@ export default function PricingPage() {
 
         {/* 추가 정보 섹션 */}
         <div className="mt-20 text-center">
-          <h2 className="text-2xl font-bold text-gray-900">자주 묻는 질문</h2>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100">자주 묻는 질문</h2>
           <div className="mt-8 max-w-3xl mx-auto">
             <div className="space-y-6">
               <div className="text-left">
-                <h3 className="font-semibold text-gray-900">플랜은 언제든지 변경할 수 있나요?</h3>
-                <p className="mt-2 text-gray-600">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">플랜은 언제든지 변경할 수 있나요?</h3>
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
                   네, 언제든지 업그레이드하거나 다운그레이드할 수 있습니다. 변경사항은 다음 결제 주기부터 적용됩니다.
                 </p>
               </div>
               <div className="text-left">
-                <h3 className="font-semibold text-gray-900">결제는 어떻게 이루어지나요?</h3>
-                <p className="mt-2 text-gray-600">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">결제는 어떻게 이루어지나요?</h3>
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
                   현재는 테스트 모드로 실제 결제가 이루어지지 않습니다. 추후 Toss Payments를 통해 안전하게 결제할 수 있습니다.
                 </p>
               </div>
               <div className="text-left">
-                <h3 className="font-semibold text-gray-900">취소하면 환불받을 수 있나요?</h3>
-                <p className="mt-2 text-gray-600">
+                <h3 className="font-semibold text-gray-900 dark:text-gray-100">취소하면 환불받을 수 있나요?</h3>
+                <p className="mt-2 text-gray-600 dark:text-gray-400">
                   구독 취소 시 현재 결제 주기가 끝날 때까지 서비스를 이용할 수 있으며, 이후 자동으로 Free 플랜으로 전환됩니다.
                 </p>
               </div>
@@ -318,9 +318,9 @@ export default function PricingPage() {
 
         {/* 문의 섹션 */}
         <div className="mt-16 text-center">
-          <p className="text-gray-600">
+          <p className="text-gray-600 dark:text-gray-400">
             궁금한 점이 있으신가요?{' '}
-            <Link href="/contact" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link href="/contact" className="text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 font-medium">
               문의하기
             </Link>
           </p>

@@ -42,8 +42,8 @@ export default function SettingsLayout({
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">설정</h1>
-        <p className="text-sm text-gray-600 mt-1">
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">설정</h1>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           프로필, 보안, 알림 등을 관리하세요
         </p>
       </div>
@@ -62,13 +62,13 @@ export default function SettingsLayout({
                   href={item.href}
                   className={`
                     flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors
-                    ${isActive 
-                      ? 'bg-blue-50 text-blue-700' 
-                      : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
+                    ${isActive
+                      ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100'
+                      : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
                     }
                   `}
                 >
-                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`} />
                   {item.title}
                 </Link>
               );
@@ -78,7 +78,7 @@ export default function SettingsLayout({
 
         {/* Main Content */}
         <main className="flex-1 min-w-0">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
             {children}
           </div>
         </main>

@@ -161,7 +161,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-50">
+    <div className="flex items-center justify-center min-h-screen bg-gray-50 dark:bg-gray-900">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -171,9 +171,9 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent className="space-y-3 px-5 py-5">
           {loginAttempts >= MAX_LOGIN_ATTEMPTS && (
-            <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />
-              <div className="text-sm text-red-800">
+            <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 rounded p-3 flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5" />
+              <div className="text-sm text-red-800 dark:text-red-300">
                 로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.
               </div>
             </div>
@@ -188,7 +188,7 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               이메일
             </label>
             <Input
@@ -200,15 +200,15 @@ export default function LoginPage() {
               placeholder="이메일을 입력하세요"
             />
             {authMethodHint && !validationErrors.email && (
-              <p className="mt-1 text-sm text-blue-600">💡 {authMethodHint.message}</p>
+              <p className="mt-1 text-sm text-blue-600 dark:text-blue-400">💡 {authMethodHint.message}</p>
             )}
             {validationErrors.email && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.email}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.email}</p>
             )}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               비밀번호
             </label>
             <div className="relative">
@@ -228,13 +228,13 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
             {validationErrors.password && (
-              <p className="mt-1 text-sm text-red-600">{validationErrors.password}</p>
+              <p className="mt-1 text-sm text-red-600 dark:text-red-400">{validationErrors.password}</p>
             )}
           </div>
 
@@ -243,8 +243,8 @@ export default function LoginPage() {
             disabled={isSubmitting || !formData.email || !formData.password || loginAttempts >= MAX_LOGIN_ATTEMPTS}
             className={`w-full flex items-center justify-center px-5 py-3 rounded-full text-sm font-medium transition-all ${
               formData.email && formData.password && !isSubmitting && loginAttempts < MAX_LOGIN_ATTEMPTS
-                ? 'bg-black hover:bg-gray-800 text-white'
-                : 'bg-gray-200 hover:bg-gray-300 text-gray-700 disabled:bg-gray-100 disabled:cursor-not-allowed'
+                ? 'bg-black dark:bg-gray-700 hover:bg-gray-800 dark:hover:bg-gray-600 text-white'
+                : 'bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 disabled:bg-gray-100 dark:disabled:bg-gray-800 disabled:cursor-not-allowed'
             }`}
           >
             {isSubmitting ? '로그인 중...' : '로그인'}
@@ -260,18 +260,18 @@ export default function LoginPage() {
 
           {/* Links */}
           <div className="text-center pt-3 border-t">
-            <p className="text-sm text-gray-600">
+            <p className="text-sm text-gray-600 dark:text-gray-400">
               계정이 없으신가요?{' '}
-              <Link 
-                href="/register" 
-                className="text-gray-900 font-medium hover:underline"
+              <Link
+                href="/register"
+                className="text-gray-900 dark:text-gray-100 font-medium hover:underline"
               >
                 회원가입
               </Link>
               {' / '}
-              <Link 
-                href="/forgot-password" 
-                className="text-gray-900 font-medium hover:underline"
+              <Link
+                href="/forgot-password"
+                className="text-gray-900 dark:text-gray-100 font-medium hover:underline"
               >
                 비밀번호 찾기
               </Link>

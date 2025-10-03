@@ -159,7 +159,7 @@ export default function CommentItem({
 
   if (comment.isDeleted) {
     return (
-      <div className="text-gray-500 italic py-3">
+      <div className="text-gray-500 dark:text-gray-500 italic py-3">
         삭제된 댓글입니다.
       </div>
     );
@@ -170,8 +170,8 @@ export default function CommentItem({
       <div className="flex items-start gap-3">
         {/* Profile Avatar */}
         <div className="flex-shrink-0">
-          <Avatar 
-            src={comment.author.profileImage} 
+          <Avatar
+            src={comment.author.profileImage}
             alt={comment.author.username || '익명'}
             fallback={comment.author.username || '익명'}
             size="sm"
@@ -184,17 +184,17 @@ export default function CommentItem({
             <div className="flex items-center gap-2">
               {/* Post Author Highlight */}
               {isPostAuthor ? (
-                <div className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-sm font-medium">
-                  @{comment.author.username || '익명'} 
+                <div className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 px-2 py-1 rounded text-sm font-medium">
+                  @{comment.author.username || '익명'}
                   <span className="ml-1 text-xs">작성자</span>
                 </div>
               ) : (
-                <span className="font-medium text-sm text-gray-900">
+                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
                   {comment.author.username || '익명'}
                 </span>
               )}
-              
-              <span className="text-xs text-gray-500">
+
+              <span className="text-xs text-gray-500 dark:text-gray-500">
                 {formatTime(comment.createdAt)}
               </span>
             </div>
@@ -207,25 +207,25 @@ export default function CommentItem({
                     if (!user) return; // 로그인하지 않은 경우 실행 안 함
                     setShowDropdown(!showDropdown);
                   }}
-                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
+                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-600 dark:hover:text-gray-400 dark:hover:bg-gray-700 rounded transition-colors"
                   title="더보기"
                 >
                   <FiMoreVertical className="w-4 h-4" />
                 </button>
-                
+
                 {showDropdown && (
                   <>
                     {/* Backdrop */}
-                    <div 
-                      className="fixed inset-0 z-10" 
+                    <div
+                      className="fixed inset-0 z-10"
                       onClick={() => setShowDropdown(false)}
                     />
-                    
+
                     {/* Dropdown Menu */}
-                    <div className="absolute right-0 mt-1 w-40 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-20">
+                    <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
                       <button
                         onClick={handleReport}
-                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         <FiFlag className="mr-2 w-3 h-3" />
                         신고
@@ -251,12 +251,12 @@ export default function CommentItem({
             />
           ) : (
             <>
-              <div className="text-sm text-gray-900 whitespace-pre-wrap mb-3">
+              <div className="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap mb-3">
                 {renderMentions(displayContent)}
                 {isLongContent && !isExpanded && (
                   <button
                     onClick={() => setIsExpanded(true)}
-                    className="text-blue-600 hover:text-blue-800 ml-2 text-sm"
+                    className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 ml-2 text-sm"
                   >
                     더보기
                   </button>
@@ -264,7 +264,7 @@ export default function CommentItem({
                 {isLongContent && isExpanded && (
                   <button
                     onClick={() => setIsExpanded(false)}
-                    className="text-gray-600 hover:text-gray-800 ml-2 text-sm"
+                    className="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 ml-2 text-sm"
                   >
                     접기
                   </button>
@@ -278,16 +278,16 @@ export default function CommentItem({
                   <button
                     onClick={handleLike}
                     disabled={likeMutation.isPending || dislikeMutation.isPending}
-                    className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-600 hover:text-blue-600`}
+                    className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400`}
                   >
                     <FiThumbsUp className="w-4 h-4" />
                     <span className="text-xs">{comment.likesCount || 0}</span>
                   </button>
-                  
+
                   <button
                     onClick={handleDislike}
                     disabled={likeMutation.isPending || dislikeMutation.isPending}
-                    className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 disabled:opacity-50 text-gray-600 hover:text-red-600`}
+                    className={`flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400`}
                   >
                     <FiThumbsDown className="w-4 h-4" />
                     <span className="text-xs">{comment.dislikesCount || 0}</span>
@@ -297,7 +297,7 @@ export default function CommentItem({
                 {/* Reply Button */}
                 <button
                   onClick={() => setIsReplying(!isReplying)}
-                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 text-gray-600 hover:text-gray-800"
+                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
                 >
                   <FiMessageCircle className="w-4 h-4" />
                   <span className="text-xs">답글</span>
@@ -308,7 +308,7 @@ export default function CommentItem({
                   <button
                     onClick={() => setIsEditing(true)}
                     disabled={isLoading}
-                    className="text-xs text-gray-600 hover:text-gray-800 px-2 py-1 rounded hover:bg-gray-100"
+                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
                   >
                     <FiEdit3 className="w-4 h-4" />
                   </button>
@@ -318,7 +318,7 @@ export default function CommentItem({
                   <button
                     onClick={handleDelete}
                     disabled={isLoading}
-                    className="text-xs text-red-600 hover:text-red-800 px-2 py-1 rounded hover:bg-red-50"
+                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
                   >
                     <FiTrash2 className="w-4 h-4" />
                   </button>
@@ -351,7 +351,7 @@ export default function CommentItem({
           {!showReplies ? (
             <button
               onClick={() => toggleReplies(comment.id)}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium py-2 ml-11"
+              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium py-2 ml-11"
             >
               <FiChevronDown className="w-4 h-4" />
               답글 {totalReplies}개
@@ -360,7 +360,7 @@ export default function CommentItem({
             <>
               <button
                 onClick={() => toggleReplies(comment.id)}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 text-sm py-1 mb-1 ml-11"
+                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 text-sm py-1 mb-1 ml-11"
               >
                 <FiChevronDown className="w-4 h-4 transform rotate-180" />
                 답글 숨기기

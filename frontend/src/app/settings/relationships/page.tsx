@@ -174,13 +174,13 @@ export default function RelationshipsPage() {
     const isSelected = selectedUsers.includes(user.id);
 
     return (
-      <div className="flex items-center justify-between p-4 border-b last:border-b-0 hover:bg-gray-50 transition-colors">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
         <div className="flex items-center gap-3 flex-1">
           {/* Checkbox */}
           <div
             onClick={() => toggleUserSelection(user.id)}
             className={`w-5 h-5 border-2 rounded cursor-pointer flex items-center justify-center transition-colors ${
-              isSelected ? 'bg-black border-black' : 'border-gray-300 hover:border-gray-400'
+              isSelected ? 'bg-black dark:bg-gray-600 border-black dark:border-gray-600' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
             }`}
           >
             {isSelected && <Check className="w-3 h-3 text-white" />}
@@ -197,11 +197,11 @@ export default function RelationshipsPage() {
               size="md"
             />
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 group-hover:text-gray-700">
+              <p className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-gray-700 dark:group-hover:text-gray-300">
                 {user.username}
               </p>
               {user.bio && (
-                <p className="text-sm text-gray-500 truncate">{user.bio}</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.bio}</p>
               )}
             </div>
           </Link>
@@ -251,8 +251,8 @@ export default function RelationshipsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2">관계 설정</h2>
-        <p className="text-sm text-gray-600">
+        <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">관계 설정</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
           Following과 Followers를 관리하고 관계를 설정하세요
         </p>
       </div>
@@ -317,12 +317,12 @@ export default function RelationshipsPage() {
         </div>
 
         <TabsContent value="following" className="mt-0">
-          <div className="border rounded-lg bg-white">
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
             {isLoadingFollowing ? (
-              <div className="p-8 text-center text-gray-500">로딩 중...</div>
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">로딩 중...</div>
             ) : followingData?.data?.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <Users className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                <Users className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
                 <p>아직 Following하는 사용자가 없습니다</p>
               </div>
             ) : (
@@ -331,7 +331,7 @@ export default function RelationshipsPage() {
                   <UserCard key={user.id} user={user} type="following" />
                 ))}
                 {filterUsers(followingData?.data || []).length === 0 && searchQuery && (
-                  <div className="p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                     검색 결과가 없습니다
                   </div>
                 )}
@@ -341,12 +341,12 @@ export default function RelationshipsPage() {
         </TabsContent>
 
         <TabsContent value="followers" className="mt-0">
-          <div className="border rounded-lg bg-white">
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800">
             {isLoadingFollowers ? (
-              <div className="p-8 text-center text-gray-500">로딩 중...</div>
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">로딩 중...</div>
             ) : followersData?.data?.length === 0 ? (
-              <div className="p-8 text-center text-gray-500">
-                <UserCheck className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <div className="p-8 text-center text-gray-500 dark:text-gray-400">
+                <UserCheck className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
                 <p>아직 Followers가 없습니다</p>
               </div>
             ) : (
@@ -355,7 +355,7 @@ export default function RelationshipsPage() {
                   <UserCard key={user.id} user={user} type="follower" />
                 ))}
                 {filterUsers(followersData?.data || []).length === 0 && searchQuery && (
-                  <div className="p-8 text-center text-gray-500">
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-400">
                     검색 결과가 없습니다
                   </div>
                 )}
@@ -366,13 +366,13 @@ export default function RelationshipsPage() {
       </Tabs>
 
       {/* Privacy Settings Section */}
-      <div className="mt-8 p-6 border rounded-lg bg-gray-50">
-        <h3 className="text-lg font-semibold mb-4">프라이버시 설정</h3>
+      <div className="mt-8 p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[rgb(38,38,38)]">
+        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">프라이버시 설정</h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">비공개 계정</p>
-              <p className="text-sm text-gray-600">승인된 Followers만 내 콘텐츠를 볼 수 있습니다</p>
+              <p className="font-medium text-gray-900 dark:text-gray-100">비공개 계정</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">승인된 Followers만 내 콘텐츠를 볼 수 있습니다</p>
             </div>
             <Button variant="outline" size="sm" disabled>
               준비 중
@@ -380,8 +380,8 @@ export default function RelationshipsPage() {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-medium">Followers 목록 공개</p>
-              <p className="text-sm text-gray-600">다른 사용자가 내 Followers 목록을 볼 수 있습니다</p>
+              <p className="font-medium text-gray-900 dark:text-gray-100">Followers 목록 공개</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">다른 사용자가 내 Followers 목록을 볼 수 있습니다</p>
             </div>
             <Button variant="outline" size="sm" disabled>
               준비 중

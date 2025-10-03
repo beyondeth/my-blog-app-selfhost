@@ -215,6 +215,7 @@ export const useUser = () => {
     retry: 1,                      // 인증 실패 시 1번만 재시도
     refetchOnWindowFocus: false,   // 윈도우 포커스 시 재요청 안함
     refetchOnMount: false,         // 마운트 시 재요청 안함 (성능 최적화 - staleTime 활용)
+    placeholderData: (previousData) => previousData,  // 리페칭 중에도 이전 데이터 유지 (깜빡임 방지)
   });
 };
 

@@ -72,7 +72,7 @@ export default function BlogSettingsPage() {
   if (!user) {
     return (
       <div className="p-8 text-center">
-        <p className="text-gray-600">로그인이 필요합니다</p>
+        <p className="text-gray-600 dark:text-gray-400">로그인이 필요합니다</p>
       </div>
     );
   }
@@ -82,21 +82,21 @@ export default function BlogSettingsPage() {
     return (
       <div className="p-8">
         <div className="mb-8">
-          <div className="h-7 w-32 bg-gray-200 rounded animate-pulse mb-2"></div>
-          <div className="h-4 w-64 bg-gray-100 rounded animate-pulse"></div>
+          <div className="h-7 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+          <div className="h-4 w-64 bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
         </div>
         <div className="space-y-6">
           <div>
-            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-10 w-full bg-gray-100 rounded animate-pulse"></div>
+            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-10 w-full bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
           </div>
           <div>
-            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-24 w-full bg-gray-100 rounded animate-pulse"></div>
+            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-24 w-full bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
           </div>
           <div>
-            <div className="h-4 w-20 bg-gray-200 rounded animate-pulse mb-2"></div>
-            <div className="h-10 w-full bg-gray-100 rounded animate-pulse"></div>
+            <div className="h-4 w-20 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
+            <div className="h-10 w-full bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
           </div>
         </div>
       </div>
@@ -108,14 +108,14 @@ export default function BlogSettingsPage() {
     return (
       <div className="p-8">
         <div className="text-center py-8">
-          <FiSettings className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">블로그가 없습니다</h3>
-          <p className="text-sm text-gray-600 mb-4">
+          <FiSettings className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">블로그가 없습니다</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             블로그를 찾을 수 없습니다. 새로고침을 시도해보세요.
           </p>
           <button
             onClick={() => window.location.reload()}
-            className="inline-flex items-center px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800"
+            className="inline-flex items-center px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600"
           >
             새로고침
           </button>
@@ -127,8 +127,8 @@ export default function BlogSettingsPage() {
   return (
     <div className="p-8">
       <div className="mb-8">
-        <h2 className="text-xl font-semibold text-gray-900">블로그 설정</h2>
-        <p className="text-sm text-gray-600 mt-1">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">블로그 설정</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           블로그의 기본 정보와 설정을 관리하세요
         </p>
       </div>
@@ -136,7 +136,7 @@ export default function BlogSettingsPage() {
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Blog Name */}
         <div>
-          <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             블로그 이름
           </label>
           <input
@@ -144,14 +144,14 @@ export default function BlogSettingsPage() {
             id="name"
             value={formData.name}
             onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
             required
           />
         </div>
 
         {/* Blog Description */}
         <div>
-          <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
+          <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             블로그 설명
           </label>
           <textarea
@@ -159,31 +159,31 @@ export default function BlogSettingsPage() {
             value={formData.description}
             onChange={(e) => setFormData({ ...formData, description: e.target.value })}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-amber-500"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
             placeholder="블로그를 소개해주세요..."
           />
         </div>
 
         {/* Blog Info */}
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">블로그 정보</h3>
+        <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">블로그 정보</h3>
           <div className="space-y-3">
             <div className="flex items-center text-sm">
-              <FiCalendar className="mr-2 text-gray-400" />
-              <span className="text-gray-600">생성일:</span>
-              <span className="ml-2 text-gray-900">
+              <FiCalendar className="mr-2 text-gray-400 dark:text-gray-500" />
+              <span className="text-gray-600 dark:text-gray-400">생성일:</span>
+              <span className="ml-2 text-gray-900 dark:text-gray-100">
                 {blog?.createdAt && format(new Date(blog.createdAt), 'yyyy년 MM월 dd일', { locale: ko })}
               </span>
             </div>
             <div className="flex items-center justify-between text-sm">
               <div className="flex items-center">
-                <FiLink className="mr-2 text-gray-400" />
-                <span className="text-gray-600">전체 URL:</span>
-                <a 
+                <FiLink className="mr-2 text-gray-400 dark:text-gray-500" />
+                <span className="text-gray-600 dark:text-gray-400">전체 URL:</span>
+                <a
                   href={`/blog/${blog?.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="ml-2 text-gray-700 hover:text-black"
+                  className="ml-2 text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-gray-100"
                 >
                   {window.location.origin}/blog/{blog?.slug}
                 </a>
@@ -194,11 +194,11 @@ export default function BlogSettingsPage() {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
                 title="주소 복사"
               >
                 {copied ? (
-                  <span className="text-xs text-green-600">복사됨!</span>
+                  <span className="text-xs text-green-600 dark:text-green-400">복사됨!</span>
                 ) : (
                   <FiCopy className="w-4 h-4" />
                 )}
@@ -208,17 +208,17 @@ export default function BlogSettingsPage() {
         </div>
 
         {/* Privacy Settings */}
-        <div className="pt-6 border-t border-gray-200">
-          <h3 className="text-sm font-medium text-gray-900 mb-4">공개 설정</h3>
+        <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">공개 설정</h3>
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <FiGlobe className="mr-2 text-gray-400" />
+                <FiGlobe className="mr-2 text-gray-400 dark:text-gray-500" />
                 <div>
-                  <label htmlFor="isPublic" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="isPublic" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     블로그 공개
                   </label>
-                  <p className="text-xs text-gray-500">모든 사람이 블로그를 볼 수 있습니다</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">모든 사람이 블로그를 볼 수 있습니다</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -235,12 +235,12 @@ export default function BlogSettingsPage() {
 
             <div className="flex items-center justify-between">
               <div className="flex items-center">
-                <FiMessageSquare className="mr-2 text-gray-400" />
+                <FiMessageSquare className="mr-2 text-gray-400 dark:text-gray-500" />
                 <div>
-                  <label htmlFor="allowComments" className="text-sm font-medium text-gray-700">
+                  <label htmlFor="allowComments" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     댓글 허용
                   </label>
-                  <p className="text-xs text-gray-500">방문자가 글에 댓글을 남길 수 있습니다</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">방문자가 글에 댓글을 남길 수 있습니다</p>
                 </div>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
@@ -260,12 +260,12 @@ export default function BlogSettingsPage() {
 
         {/* Error/Success Messages */}
         {error && (
-          <div className="p-3 text-sm text-red-600 bg-red-50 rounded-md">
+          <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
             {error}
           </div>
         )}
         {success && (
-          <div className="p-3 text-sm text-green-600 bg-green-50 rounded-md">
+          <div className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-md">
             블로그 설정이 성공적으로 업데이트되었습니다!
           </div>
         )}
@@ -275,7 +275,7 @@ export default function BlogSettingsPage() {
           <button
             type="submit"
             disabled={loading}
-            className="px-4 py-2 bg-black text-white font-medium rounded-md hover:bg-gray-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? '저장 중...' : '변경사항 저장'}
           </button>

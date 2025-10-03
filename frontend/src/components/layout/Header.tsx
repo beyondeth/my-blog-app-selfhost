@@ -201,49 +201,6 @@ export default function Header() {
                 </div>
               ) : user ? (
                 <>
-                  {/* My Blog Button - user.blogSlug로 즉시 표시 */}
-                  {user.blogSlug && (
-                    <Link
-                      href={`/blog/${user.blogSlug}`}
-                      className="text-[15px] text-foreground hover:bg-accent hover:text-accent-foreground font-medium px-3 py-2 rounded-md transition-colors"
-                    >
-                      내 블로그
-                    </Link>
-                  )}
-
-                  {/* Write Button - All logged in users can write */}
-                  <button
-                    onClick={handleWriteClick}
-                    className="inline-flex items-center px-4 py-2 text-[15px] font-medium text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
-                  >
-                    <FiEdit3 className="mr-1.5 w-4 h-4" />
-                    글쓰기
-                  </button>
-
-                  {/* DM Button */}
-                  <button
-                    onClick={() => openModal()}
-                    className="relative p-2 text-foreground hover:bg-accent hover:text-accent-foreground rounded-md transition-colors"
-                    title="메시지"
-                  >
-                    <svg
-                      className="w-6 h-6"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-4l-4 4z"
-                      />
-                    </svg>
-                  </button>
-
-                  {/* Notification Icon */}
-                  <NotificationIcon />
-
                   {/* Theme Switch */}
                   <ThemeSwitch />
 
