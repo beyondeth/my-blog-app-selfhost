@@ -28,6 +28,7 @@ import { Comment } from '../comments/entities/comment.entity';
 import { Report } from '../reports/entities/report.entity';
 import { AuditLog } from '../audit/entities/audit-log.entity';
 import { File } from '../files/entities/file.entity';
+import { EmailApproval } from '../email/entities/email-approval.entity';
 
 // Modules
 import { AuditModule } from '../audit/audit.module';
@@ -45,6 +46,7 @@ import { RedisModule } from '../redis/redis.module';
       Report,
       AuditLog,
       File,
+      EmailApproval,
     ]),
     AuditModule,
     FilesModule,

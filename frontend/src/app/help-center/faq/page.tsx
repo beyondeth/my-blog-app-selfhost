@@ -135,27 +135,27 @@ export default function FAQPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="border-b border-border bg-muted">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Link
             href="/help-center"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+            className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4 transition-colors"
           >
             <FiArrowLeft className="w-4 h-4 mr-2" />
             고객센터로 돌아가기
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">자주 묻는 질문</h1>
-          <p className="mt-2 text-gray-600">MyBlog 사용에 대한 자주 묻는 질문과 답변</p>
+          <h1 className="text-3xl font-bold text-foreground">자주 묻는 질문</h1>
+          <p className="mt-2 text-muted-foreground">MyBlog 사용에 대한 자주 묻는 질문과 답변</p>
         </div>
       </div>
 
       {/* FAQ Content */}
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         {categories.map((category) => (
           <div key={category} className="mb-12">
-            <h2 className="text-xl font-semibold text-gray-900 mb-6 pb-2 border-b">
+            <h2 className="text-xl font-semibold text-foreground mb-6 pb-2 border-b border-border">
               {category}
             </h2>
             <div className="space-y-4">
@@ -164,26 +164,26 @@ export default function FAQPage() {
                 .map((faq, index) => {
                   const globalIndex = faqs.indexOf(faq);
                   const isOpen = openItems.has(globalIndex);
-                  
+
                   return (
                     <div
                       key={globalIndex}
-                      className="border border-gray-200 rounded-lg overflow-hidden"
+                      className="border border-border rounded-lg overflow-hidden bg-card"
                     >
                       <button
                         onClick={() => toggleItem(globalIndex)}
-                        className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
+                        className="w-full px-6 py-4 text-left flex items-center justify-between hover:bg-muted transition-colors"
                       >
-                        <span className="font-medium text-gray-900">{faq.question}</span>
+                        <span className="font-medium text-foreground">{faq.question}</span>
                         {isOpen ? (
-                          <FiChevronUp className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                          <FiChevronUp className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                         ) : (
-                          <FiChevronDown className="w-5 h-5 text-gray-500 flex-shrink-0" />
+                          <FiChevronDown className="w-5 h-5 text-muted-foreground flex-shrink-0" />
                         )}
                       </button>
                       {isOpen && (
                         <div className="px-6 pb-4">
-                          <p className="text-gray-600">{faq.answer}</p>
+                          <p className="text-muted-foreground">{faq.answer}</p>
                         </div>
                       )}
                     </div>
@@ -194,16 +194,16 @@ export default function FAQPage() {
         ))}
 
         {/* Still have questions */}
-        <div className="mt-16 p-8 bg-gray-50 rounded-lg text-center">
-          <h3 className="text-xl font-semibold text-gray-900 mb-4">
+        <div className="mt-16 p-8 bg-muted rounded-lg text-center">
+          <h3 className="text-xl font-semibold text-foreground mb-4">
             원하는 답변을 찾지 못하셨나요?
           </h3>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             직접 문의해주시면 빠르게 답변 드리겠습니다.
           </p>
           <Link
             href="/help-center/contact"
-            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-amber-600 hover:bg-amber-700 transition-colors"
+            className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-foreground bg-foreground hover:bg-foreground/90 transition-colors"
           >
             문의하기
           </Link>

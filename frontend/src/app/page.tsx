@@ -169,10 +169,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-10 pb-4 sm:pb-6 lg:pb-8">
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-8 lg:gap-16">
-        {/* Main Content Area */}
-        <main className="flex-1 lg:max-w-[calc(100%-380px)] min-w-0">
+        {/* Main Content Area - 오른쪽 사이드바를 위한 여백 확보 */}
+        <main className="flex-1 min-w-0 lg:mr-[336px]">
           <div className="space-y-0">
             {isLoading && allPosts.length === 0 ? (
               // 초기 로딩 시 스켈레톤 UI 표시
@@ -212,9 +212,9 @@ export default function HomePage() {
           </div>
           </main>
 
-          {/* Sidebar - sticky with independent scrolling */}
-        <aside className="w-full lg:w-80 lg:min-w-[320px]">
-          <div className="lg:sticky lg:top-8 lg:max-h-[calc(100vh-4rem)] lg:overflow-y-auto space-y-4 sm:space-y-6 sidebar-scroll" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {/* Sidebar - fixed positioning with internal scroll */}
+        <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-28 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll lg:pt-6">
+          <div className="space-y-4 sm:space-y-6">
             <PopularPostsSection />
 
             <TagsSection tags={tags} onTagClick={handleTagClick} />

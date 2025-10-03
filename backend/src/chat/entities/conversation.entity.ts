@@ -47,11 +47,13 @@ export class Conversation {
   updatedAt: Date;
 
   // Relations
-  @ManyToOne(() => User)
+  // 법적 보호: 사용자 간 분쟁 대비 30일 보관
+  // 사용자 삭제 시 CASCADE 아닌 SET NULL로 변경하여 메시지 보관
+  @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user1Id' })
   user1: User;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'user2Id' })
   user2: User;
 

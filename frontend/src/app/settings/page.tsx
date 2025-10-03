@@ -9,7 +9,7 @@ import { ko } from 'date-fns/locale/ko';
 import Image from 'next/image';
 
 export default function ProfileSettingsPage() {
-  const { user, refreshUser, logout } = useAuth();
+  const { user, isLoading: authLoading, refreshUser, logout } = useAuth();
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -21,6 +21,7 @@ export default function ProfileSettingsPage() {
   });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
+  const [deleteConfirmText, setDeleteConfirmText] = useState(''); // Task 26: 계정 삭제 확인 텍스트
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
@@ -176,10 +177,18 @@ export default function ProfileSettingsPage() {
     }
   };
 
-  if (!user) {
+  // 로딩 중이거나 사용자 정보가 없을 때
+  if (authLoading || !user) {
     return (
       <div className="p-8 text-center">
-        <p className="text-gray-600 dark:text-gray-400">로그인이 필요합니다</p>
+        {authLoading ? (
+          <div className="flex flex-col items-center gap-3">
+            <FiLoader className="w-8 h-8 animate-spin text-gray-400" />
+            <p className="text-gray-600 dark:text-gray-400">로딩 중...</p>
+          </div>
+        ) : (
+          <p className="text-gray-600 dark:text-gray-400">로그인이 필요합니다</p>
+        )}
       </div>
     );
   }
@@ -399,6 +408,22 @@ export default function ProfileSettingsPage() {
               <li>프로필 정보</li>
             </ul>
 
+            {/* Task 26: 계정 삭제 확인 텍스트 입력 필드 */}
+            <div className="mb-6">
+              <label htmlFor="deleteConfirmText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                확인을 위해 <strong className="text-red-600 dark:text-red-400">&quot;계정 삭제&quot;</strong>를 입력하세요
+              </label>
+              <input
+                type="text"
+                id="deleteConfirmText"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
+                placeholder="계정 삭제"
+                autoFocus
+              />
+            </div>
+
             {(!user?.authProvider || user?.authProvider === 'local') && (
               <div className="mb-6">
                 <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -411,7 +436,6 @@ export default function ProfileSettingsPage() {
                   onChange={(e) => setDeletePassword(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
                   placeholder="비밀번호를 입력하세요"
-                  autoFocus
                 />
               </div>
             )}
@@ -425,7 +449,11 @@ export default function ProfileSettingsPage() {
             <div className="flex space-x-3">
               <button
                 onClick={handleDeleteAccount}
-                disabled={deleteLoading || ((!user?.authProvider || user?.authProvider === 'local') && !deletePassword)}
+                disabled={
+                  deleteLoading ||
+                  deleteConfirmText !== '계정 삭제' || // Task 27: "계정 삭제" 텍스트가 정확히 일치해야만 활성화
+                  ((!user?.authProvider || user?.authProvider === 'local') && !deletePassword)
+                }
                 className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-700 text-white font-medium rounded-md hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {deleteLoading ? '삭제 중...' : '영구 삭제'}
@@ -434,6 +462,7 @@ export default function ProfileSettingsPage() {
                 onClick={() => {
                   setShowDeleteModal(false);
                   setDeletePassword('');
+                  setDeleteConfirmText(''); // Task 27: 모달 닫을 때 확인 텍스트도 초기화
                   setError('');
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"

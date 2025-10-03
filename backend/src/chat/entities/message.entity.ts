@@ -37,6 +37,10 @@ export class Message {
   @Column({ type: 'timestamptz', nullable: true })
   deletedAt: Date;
 
+  // 사용자 삭제 추적 (30일 보관 후 자동 삭제)
+  @Column({ type: 'timestamptz', nullable: true })
+  senderDeletedAt: Date;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
@@ -47,7 +51,9 @@ export class Message {
   @JoinColumn({ name: 'conversationId' })
   conversation: Conversation;
 
-  @ManyToOne(() => User)
+  // 법적 보호: 사용자 간 분쟁 대비 30일 보관
+  // senderDeletedAt과 함께 사용하여 발신자 삭제 추적
+  @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'senderId' })
   sender: User;
 }

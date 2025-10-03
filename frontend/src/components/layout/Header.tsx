@@ -13,18 +13,29 @@ import SubscriptionBadge from '../subscription/SubscriptionBadge';
 import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useDMModal } from '@/hooks/useDMModal';
+import { FEATURES } from '@/lib/features';
+import { useSidebarStore } from '@/stores/sidebarStore';
+import { useTheme } from 'next-themes';
 
 export default function Header() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
   const { openModal } = useDMModal();
+  const { toggleSidebar } = useSidebarStore();
+  const { resolvedTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [mounted, setMounted] = useState(false);
   const mobileMenuRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // 테마 마운트 상태 관리 (Hydration mismatch 방지)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 홈 페이지로 이동 (캐시 보존)
   const handleHomeNavigation = (e: React.MouseEvent) => {
@@ -141,36 +152,57 @@ export default function Header() {
 
   return (
     <header className="border-b border-border sticky top-0 z-50 bg-background" ref={mobileMenuRef}>
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-5">
+      <div className="max-w-full ml-0 px-4 lg:pl-[43px] lg:pr-32 py-4 sm:py-5">
         <div className="flex items-center justify-between">
-          {/* Logo */}
-          <div className="flex items-center">
-            <a 
+          {/* Hamburger Menu & Logo */}
+          <div className="flex items-center space-x-4">
+            {/* Hamburger Menu Button */}
+            <button
+              onClick={toggleSidebar}
+              className="hidden lg:flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 hover:from-blue-500 hover:via-purple-500 hover:to-pink-500 hover:scale-110 hover:rotate-90 hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] transition-all duration-300 ease-in-out group relative overflow-hidden"
+              aria-label="사이드바 토글"
+            >
+              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+              <Image
+                src="/assets/left-sidebar/menu.svg"
+                alt="Menu"
+                width={24}
+                height={24}
+                className="invert brightness-0 transition-transform duration-300 group-hover:rotate-180 relative z-10"
+              />
+            </button>
+
+            {/* Logo */}
+            <a
               href={routes.home()}
               onClick={handleHomeNavigation}
               className="hover:opacity-80 transition-opacity cursor-pointer flex items-center space-x-2"
             >
-              {/* Code Icon - 모던한 그라데이션 적용 */}
-              <div className="bg-gradient-to-br from-indigo-500 to-blue-600 rounded-xl p-3 flex items-center justify-center min-w-[48px] min-h-[48px] shadow-md hover:shadow-lg transition-shadow">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" strokeWidth="3" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 8l-4 4 4 4M18 8l4 4-4 4M14 7l-4 10"/>
-                </svg>
+              {/* Logo Image - 테마에 따라 다른 로고 표시 */}
+              <div className="flex items-center justify-center min-w-[48px] min-h-[48px]">
+                <Image
+                  src={mounted && resolvedTheme === 'dark' ? '/assets/block-logo(dark)-128.png' : '/assets/logo.png'}
+                  alt="Codebase Blog Logo"
+                  width={48}
+                  height={48}
+                  className="object-contain"
+                  priority
+                />
               </div>
-              {/* Text - 다크모드 지원 */}
-              <div className="flex flex-col">
-                <span className="text-xl font-bold text-foreground leading-tight">codebase.</span>
-                <span className="text-xl font-bold text-foreground leading-tight -mt-1">blog</span>
-              </div>
+              {/* Text - Orbitron 폰트 적용 */}
+              <span className="text-2xl font-bold text-foreground leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+                Codebase
+              </span>
             </a>
           </div>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6 lg:space-x-8 flex-1">
             {/* Search Bar - Medium Style */}
-            <div className="max-w-sm ml-8">
+            <div className="max-w-sm ml-6">
               <form onSubmit={handleSearch} className="relative">
-                <div className={`flex items-center bg-card dark:bg-[rgb(38,38,38)] rounded-full px-5 py-3.5 transition-all ${
-                  isSearchFocused ? 'bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 shadow-md ring-2 ring-primary/20' : 'hover:bg-gray-100 dark:hover:bg-[rgb(45,45,45)]'
+                <div className={`flex items-center bg-muted rounded-full px-5 py-3.5 transition-all ${
+                  isSearchFocused ? 'bg-background border border-border shadow-md ring-2 ring-primary/20' : 'hover:bg-accent'
                 }`}>
                   <FiSearch className="w-5 h-5 text-muted-foreground mr-3 flex-shrink-0" />
                   <input
@@ -211,8 +243,8 @@ export default function Header() {
                     onWriteClick={handleWriteClick}
                   />
 
-                  {/* Subscription Badge - user.subscriptionTier 사용 */}
-                  <SubscriptionBadge user={user} />
+                  {/* Subscription Badge (Feature Flag) */}
+                  {FEATURES.SUBSCRIPTION && <SubscriptionBadge user={user} />}
                 </>
               ) : (
                 <>
@@ -259,7 +291,7 @@ export default function Header() {
         {/* Mobile Search Bar */}
         <div className="md:hidden mt-3">
           <form onSubmit={handleSearch} className="relative">
-            <div className="flex items-center bg-muted dark:bg-[rgb(38,38,38)] rounded-full px-5 py-3.5">
+            <div className="flex items-center bg-gray-100 dark:bg-[rgb(30,30,30)] rounded-full px-5 py-3.5">
               <FiSearch className="w-4 h-4 text-muted-foreground mr-2 flex-shrink-0" />
               <input
                 type="text"
@@ -279,17 +311,6 @@ export default function Header() {
         {isMobileMenuOpen && (
           <div className="md:hidden mt-4 pb-4 border-t border-border animate-in slide-in-from-top-1 duration-200">
             <div className="pt-4 space-y-4">
-              {/* Navigation Links */}
-              <div className="space-y-3">
-                <Link
-                  href="/analytics"
-                  onClick={closeMobileMenu}
-                  className="block text-base text-foreground hover:text-foreground/80 py-2 px-2 rounded-md hover:bg-muted transition-colors"
-                >
-                  📊 분석
-                </Link>
-              </div>
-
               {/* Mobile Auth Section */}
               <div className="pt-4 border-t border-border">
                 {authLoading ? (
@@ -303,8 +324,8 @@ export default function Header() {
                       <span className="text-[15px] text-muted-foreground">
                         {user.username}님
                       </span>
-                      {/* Mobile Subscription Badge - user.subscriptionTier 사용 */}
-                      <SubscriptionBadge user={user} />
+                      {/* Mobile Subscription Badge (Feature Flag) */}
+                      {FEATURES.SUBSCRIPTION && <SubscriptionBadge user={user} />}
                     </div>
 
                     {/* My Blog Button for Mobile - user.blogSlug로 즉시 표시 */}

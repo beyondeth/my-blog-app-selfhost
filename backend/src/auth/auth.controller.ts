@@ -5,6 +5,8 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { EmailService } from '../email/email.service';
 import { UserDeletionService } from '../users/services/user-deletion.service';
+import { UserDeletionQueueService } from '../users/services/user-deletion-queue.service';
+import { UsersService } from '../users/users.service';
 import { SendCodeDto } from '../email/dto/send-code.dto';
 import { VerifyCodeDto } from '../email/dto/verify-code.dto';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
@@ -28,6 +30,8 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
     private readonly userDeletionService: UserDeletionService,
+    private readonly userDeletionQueueService: UserDeletionQueueService,
+    private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly redisService: UnifiedRedisService,
   ) {}
@@ -574,17 +578,30 @@ export class AuthController {
     // OAuth 사용자의 경우 비밀번호 확인 건너뛰기
 
     try {
-      // 계정 삭제 실행
-      const result = await this.userDeletionService.deleteUserAccount(
+      // 1. 즉시 소프트 삭제 실행 (개인정보 마스킹 + 로그인 차단)
+      await this.usersService.softDelete(user.id);
+      this.logger.log(`User ${user.id} soft deleted, personal data masked`);
+
+      // 2. 백그라운드 큐에 삭제 작업 추가
+      await this.userDeletionQueueService.addDeletionJob(
         user.id,
+        'soft-delete',
         {
-          softDelete: dto.softDelete || false,
-          backupData: true,
-          notifyByEmail: true
+          reason: dto.reason || 'User requested account deletion',
+          requestedAt: new Date().toISOString(),
         }
       );
+      this.logger.log(`Deletion job queued for user ${user.id}`);
 
-      // 쿠키 제거
+      // 3. 웹 세션 삭제 (MCP 세션도 무효화되도록)
+      try {
+        await this.redisService.deleteCache('sessions', `user:${user.id}`);
+        this.logger.debug(`Session deleted for user ${user.id}`);
+      } catch (error) {
+        this.logger.error(`Failed to delete session: ${error.message}`);
+      }
+
+      // 4. 쿠키 제거
       res.clearCookie('access_token', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
@@ -599,18 +616,19 @@ export class AuthController {
         path: '/',
       });
 
+      // 5. 즉시 성공 응답 (백그라운드 작업은 비동기로 처리됨)
       return res.json({
         success: true,
-        message: dto.softDelete 
-          ? '계정이 비활성화되었습니다. 30일 이내에 복구 가능합니다.'
-          : '계정이 완전히 삭제되었습니다.',
-        deletionResult: {
-          deletedAt: result.deletedAt,
-          affectedRecords: result.affectedRecords,
-          backupId: result.backupId
+        message: '계정 삭제가 요청되었습니다. 개인정보는 즉시 마스킹되었으며, 관련 데이터는 법적 보관 기간 후 자동으로 삭제됩니다.',
+        deletedAt: new Date().toISOString(),
+        info: {
+          personalDataMasked: true,
+          backgroundDeletionQueued: true,
+          legalRetentionPeriod: '결제 기록: 5년, 분쟁 기록: 3년, 메시지: 30일'
         }
       });
     } catch (error) {
+      this.logger.error(`Account deletion failed for user ${user.id}:`, error);
       return res.status(400).json({
         success: false,
         message: error.message || '계정 삭제 중 오류가 발생했습니다.'

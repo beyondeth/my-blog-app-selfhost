@@ -115,18 +115,18 @@ export default function HelpCenterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Hero Section */}
-      <div className="bg-gradient-to-b from-amber-50 to-white">
+      <div className="bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
-            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            <h1 className="text-4xl font-bold text-foreground mb-4">
               무엇을 도와드릴까요?
             </h1>
-            <p className="text-lg text-gray-600 mb-8">
+            <p className="text-lg text-muted-foreground mb-8">
               MyBlog 사용에 대한 모든 답변을 찾아보세요
             </p>
-            
+
             {/* Search Bar */}
             <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
               <div className="relative">
@@ -135,11 +135,11 @@ export default function HelpCenterPage() {
                   placeholder="검색어를 입력하세요..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-6 py-4 pr-12 text-gray-900 bg-white border border-gray-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  className="w-full px-6 py-4 pr-12 text-foreground bg-background border border-border rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:border-transparent"
                 />
                 <button
                   type="submit"
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-gray-500 hover:text-gray-700"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-2 text-muted-foreground hover:text-foreground"
                 >
                   <FiSearch className="w-5 h-5" />
                 </button>
@@ -151,22 +151,22 @@ export default function HelpCenterPage() {
 
       {/* Categories Grid */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <h2 className="text-2xl font-bold text-gray-900 mb-6">카테고리별 도움말</h2>
+        <h2 className="text-2xl font-bold text-foreground mb-6">카테고리별 도움말</h2>
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {categories.map((category) => (
             <div
               key={category.id}
-              className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-lg transition-shadow"
+              className="bg-card border border-border rounded-lg p-6 hover:shadow-lg transition-shadow"
             >
               <div className="flex items-center mb-4">
-                <div className="text-gray-900">
+                <div className="text-foreground">
                   {category.icon}
                 </div>
-                <h3 className="ml-3 text-lg font-semibold text-gray-900">
+                <h3 className="ml-3 text-lg font-semibold text-foreground">
                   {category.title}
                 </h3>
               </div>
-              <p className="text-gray-600 mb-4 text-sm">
+              <p className="text-muted-foreground mb-4 text-sm">
                 {category.description}
               </p>
               <ul className="space-y-2">
@@ -174,7 +174,7 @@ export default function HelpCenterPage() {
                   <li key={index}>
                     <Link
                       href={article.link}
-                      className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+                      className="text-sm text-foreground hover:text-foreground/80 hover:underline"
                     >
                       {article.title}
                     </Link>
@@ -187,26 +187,26 @@ export default function HelpCenterPage() {
       </div>
 
       {/* Contact Section */}
-      <div className="bg-gray-50 border-t">
+      <div className="bg-muted border-t border-border">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
           <div className="text-center">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+            <h2 className="text-2xl font-bold text-foreground mb-4">
               원하는 답변을 찾지 못하셨나요?
             </h2>
-            <p className="text-gray-600 mb-8">
+            <p className="text-muted-foreground mb-8">
               언제든지 저희에게 문의해주세요. 최대한 빨리 답변 드리겠습니다.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 href="/help-center/contact"
-                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-primary-foreground bg-primary hover:bg-primary/90 transition-colors"
+                className="inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-background bg-foreground hover:bg-foreground/90 transition-colors"
               >
                 <FiMail className="w-5 h-5 mr-2" />
                 문의하기
               </Link>
               <Link
                 href="/help-center/faq"
-                className="inline-flex items-center justify-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+                className="inline-flex items-center justify-center px-6 py-3 border border-border text-base font-medium rounded-md text-foreground bg-background hover:bg-muted transition-colors"
               >
                 <FiHelpCircle className="w-5 h-5 mr-2" />
                 자주 묻는 질문

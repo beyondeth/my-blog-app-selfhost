@@ -18,7 +18,6 @@ import {
   FiChevronDown,
   FiEdit3,
   FiBookOpen,
-  FiBarChart2,
   FiShield,
   FiBell,
   FiHelpCircle,
@@ -28,6 +27,7 @@ import {
   FiTrendingUp,
   FiBookmark
 } from 'react-icons/fi';
+import { FEATURES } from '@/lib/features';
 
 interface ProfileDropdownProps {
   user: User;
@@ -100,18 +100,11 @@ export default function ProfileDropdown({
           <span>북마크</span>
         </DropdownMenuItem>
 
-        {/* Analytics */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/analytics')}
-          className="cursor-pointer"
-        >
-          <FiBarChart2 className="mr-2 h-4 w-4" />
-          <span>분석</span>
-        </DropdownMenuItem>
-
         <DropdownMenuSeparator />
 
-        {/* 구독 관련 메뉴 추가 */}
+        {/* 구독 관련 메뉴 (Feature Flag) */}
+        {FEATURES.SUBSCRIPTION && (
+        <>
         {/* 구독 관리 */}
         <DropdownMenuItem
           onClick={() => handleNavigation('/account/subscription')}
@@ -131,6 +124,8 @@ export default function ProfileDropdown({
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />
+        </>
+        )}
 
         {/* Settings */}
         <DropdownMenuItem 
@@ -170,7 +165,7 @@ export default function ProfileDropdown({
         </DropdownMenuItem>
 
         {/* Security */}
-        <DropdownMenuItem 
+        <DropdownMenuItem
           onClick={() => handleNavigation('/settings/security')}
           className="cursor-pointer"
         >
@@ -178,14 +173,16 @@ export default function ProfileDropdown({
           <span>보안</span>
         </DropdownMenuItem>
 
-        {/* Notifications */}
-        <DropdownMenuItem 
+        {/* Notifications (Feature Flag) */}
+        {FEATURES.NOTIFICATIONS && (
+        <DropdownMenuItem
           onClick={() => handleNavigation('/settings/notifications')}
           className="cursor-pointer"
         >
           <FiBell className="mr-2 h-4 w-4" />
           <span>알림</span>
         </DropdownMenuItem>
+        )}
 
         <DropdownMenuSeparator />
 

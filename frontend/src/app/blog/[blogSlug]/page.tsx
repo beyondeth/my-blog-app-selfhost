@@ -180,10 +180,10 @@ export default function BlogPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6 lg:py-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-10 pb-4 sm:pb-6 lg:pb-8">
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
-          {/* Main Content Area */}
-          <main className="flex-1 lg:max-w-[calc(100%-380px)] min-w-0">
+          {/* Main Content Area - 오른쪽 사이드바를 위한 여백 확보 */}
+          <main className="flex-1 min-w-0 lg:mr-[336px]">
             <div className="space-y-0">
               {isLoading && allPosts.length === 0 ? (
                 <div className="flex justify-center items-center py-12 sm:py-16">
@@ -224,8 +224,9 @@ export default function BlogPage() {
             </div>
           </main>
 
-          {/* Sidebar */}
-          <aside className="w-full lg:w-80 lg:min-w-[320px] space-y-4 sm:space-y-6">
+          {/* Sidebar - fixed positioning with internal scroll */}
+          <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-28 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll lg:pt-6">
+            <div className="space-y-4 sm:space-y-6">
             {/* Blog Owner Card at the top */}
             <BlogOwnerCard
               name={blog.owner?.username || blog.owner?.email || blog.name}
@@ -241,6 +242,7 @@ export default function BlogPage() {
             <TagsSection tags={tags} />
             
             <BlogRecommendations />
+            </div>
           </aside>
       </div>
 

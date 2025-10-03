@@ -80,6 +80,7 @@ export class AdminDashboardService {
 
   /**
    * Get dashboard statistics
+   * 최적화: 16개 COUNT 쿼리 → 1개 CTE 쿼리 (94% 쿼리 감소)
    */
   async getStats(): Promise<DashboardStats> {
     // 오늘 시작 시간 (00:00:00.000)
@@ -90,59 +91,93 @@ export class AdminDashboardService {
     const thirtyDaysAgo = DateUtils.fromNowSubtractDays(30);
     const sevenDaysAgo = DateUtils.fromNowSubtractDays(7);
 
-    const [
-      totalUsers,
-      activeUsers,
-      newUsers,
-      inactiveUsers,
-      totalPosts,
-      publishedPosts,
-      draftPosts,
-      todayPosts,
-      totalComments,
-      todayComments,
-      pendingReports,
-      resolvedReports,
-      todayReports,
-      totalReports,
-      dau,
-      mau,
-      // For change percentages - compare with last week
-      lastWeekUsers,
-      lastWeekPosts,
-      lastWeekComments,
-    ] = await Promise.all([
-      // User stats
-      this.userRepository.count(),
-      this.userRepository.count({ where: { isActive: true } }),
-      this.userRepository.count({ where: { createdAt: MoreThanOrEqual(thirtyDaysAgo) } }),
-      this.userRepository.count({ where: { isActive: false } }),
-      
-      // Post stats
-      this.postRepository.count(),
-      this.postRepository.count({ where: { isPublished: true } }),
-      this.postRepository.count({ where: { isPublished: false } }),
-      this.postRepository.count({ where: { createdAt: MoreThanOrEqual(today) } }),
-      
-      // Comment stats
-      this.commentRepository.count(),
-      this.commentRepository.count({ where: { createdAt: MoreThanOrEqual(today) } }),
-      
-      // Report stats
-      this.reportRepository.count({ where: { status: ReportStatus.PENDING } }),
-      this.reportRepository.count({ where: { status: ReportStatus.RESOLVED } }),
-      this.reportRepository.count({ where: { createdAt: MoreThanOrEqual(today) } }),
-      this.reportRepository.count(), // Total reports
-      
-      // Active user metrics
+    // 최적화된 단일 쿼리: CTE를 사용한 조건부 집계 (FILTER 사용)
+    // 16개의 개별 COUNT 쿼리를 1개의 통합 쿼리로 통합
+    const [statsResult] = await this.userRepository.query(`
+      WITH user_stats AS (
+        SELECT
+          COUNT(*) FILTER (WHERE TRUE) as total,
+          COUNT(*) FILTER (WHERE "isActive" = true) as active,
+          COUNT(*) FILTER (WHERE "createdAt" >= $1) as new,
+          COUNT(*) FILTER (WHERE "isActive" = false) as inactive,
+          COUNT(*) FILTER (WHERE "createdAt" >= $2) as last_week
+        FROM users
+      ),
+      post_stats AS (
+        SELECT
+          COUNT(*) FILTER (WHERE TRUE) as total,
+          COUNT(*) FILTER (WHERE "isPublished" = true) as published,
+          COUNT(*) FILTER (WHERE "isPublished" = false) as draft,
+          COUNT(*) FILTER (WHERE "createdAt" >= $3) as today,
+          COUNT(*) FILTER (WHERE "createdAt" >= $2) as last_week
+        FROM posts
+      ),
+      comment_stats AS (
+        SELECT
+          COUNT(*) FILTER (WHERE TRUE) as total,
+          COUNT(*) FILTER (WHERE "createdAt" >= $3) as today,
+          COUNT(*) FILTER (WHERE "createdAt" >= $2) as last_week
+        FROM comments
+      ),
+      report_stats AS (
+        SELECT
+          COUNT(*) FILTER (WHERE TRUE) as total,
+          COUNT(*) FILTER (WHERE status = 'pending') as pending,
+          COUNT(*) FILTER (WHERE status = 'resolved') as resolved,
+          COUNT(*) FILTER (WHERE "createdAt" >= $3) as today
+        FROM reports
+      )
+      SELECT
+        -- User stats
+        u.total::integer as total_users,
+        u.active::integer as active_users,
+        u.new::integer as new_users,
+        u.inactive::integer as inactive_users,
+        u.last_week::integer as last_week_users,
+        -- Post stats
+        p.total::integer as total_posts,
+        p.published::integer as published_posts,
+        p.draft::integer as draft_posts,
+        p.today::integer as today_posts,
+        p.last_week::integer as last_week_posts,
+        -- Comment stats
+        c.total::integer as total_comments,
+        c.today::integer as today_comments,
+        c.last_week::integer as last_week_comments,
+        -- Report stats
+        r.total::integer as total_reports,
+        r.pending::integer as pending_reports,
+        r.resolved::integer as resolved_reports,
+        r.today::integer as today_reports
+      FROM user_stats u, post_stats p, comment_stats c, report_stats r
+    `, [thirtyDaysAgo, sevenDaysAgo, today]);
+
+    // 별도 쿼리: DAU, MAU (다른 로직을 사용하므로 분리)
+    const [dau, mau] = await Promise.all([
       this.getDailyActiveUsers(),
       this.getMonthlyActiveUsers(),
-      
-      // Last week stats for change calculation
-      this.userRepository.count({ where: { createdAt: MoreThanOrEqual(sevenDaysAgo) } }),
-      this.postRepository.count({ where: { createdAt: MoreThanOrEqual(sevenDaysAgo) } }),
-      this.commentRepository.count({ where: { createdAt: MoreThanOrEqual(sevenDaysAgo) } }),
     ]);
+
+    // 결과 추출 (CTE 쿼리 결과를 변수로 분해)
+    const {
+      total_users: totalUsers,
+      active_users: activeUsers,
+      new_users: newUsers,
+      inactive_users: inactiveUsers,
+      last_week_users: lastWeekUsers,
+      total_posts: totalPosts,
+      published_posts: publishedPosts,
+      draft_posts: draftPosts,
+      today_posts: todayPosts,
+      last_week_posts: lastWeekPosts,
+      total_comments: totalComments,
+      today_comments: todayComments,
+      last_week_comments: lastWeekComments,
+      total_reports: totalReports,
+      pending_reports: pendingReports,
+      resolved_reports: resolvedReports,
+      today_reports: todayReports,
+    } = statsResult;
 
     const avgPostsPerUser = totalUsers > 0 ? totalPosts / totalUsers : 0;
     const avgCommentsPerPost = totalPosts > 0 ? totalComments / totalPosts : 0;
@@ -196,121 +231,94 @@ export class AdminDashboardService {
 
   /**
    * Get recent activity feed
+   * 최적화: 4개 개별 쿼리 → 1개 UNION ALL 쿼리 (75% 쿼리 감소)
    */
   async getActivityFeed(limit = 20): Promise<ActivityFeed[]> {
-    const [
-      recentUsers,
-      recentPosts,
-      recentComments,
-      recentReports,
-    ] = await Promise.all([
-      this.userRepository.find({
-        order: { createdAt: 'DESC' },
-        take: limit / 4,
-      }),
-      this.postRepository.find({
-        relations: ['author'],
-        order: { createdAt: 'DESC' },
-        take: limit / 4,
-      }),
-      this.commentRepository.find({
-        relations: ['author', 'post'],
-        order: { createdAt: 'DESC' },
-        take: limit / 4,
-      }),
-      this.reportRepository.find({
-        relations: ['reportedBy'],
-        order: { createdAt: 'DESC' },
-        take: limit / 4,
-      }),
-    ]);
+    // 최적화된 단일 쿼리: UNION ALL을 사용하여 4개 테이블의 최신 활동을 한 번에 조회
+    // 기존 Promise.all로 4개 쿼리를 병렬 실행하던 것을 단일 쿼리로 통합
+    // 각 엔티티 타입별로 최신 N개를 가져온 후 timestamp 기준으로 정렬하여 최종 limit 적용
+    const activities = await this.userRepository.query(`
+      (
+        SELECT
+          'user_signup' as type,
+          'New user ' || COALESCE(username, email) || ' signed up' as message,
+          "createdAt" as timestamp,
+          jsonb_build_object('userId', id) as metadata
+        FROM users
+        ORDER BY "createdAt" DESC
+        LIMIT $1
+      )
+      UNION ALL
+      (
+        SELECT
+          'post_created' as type,
+          COALESCE(u.username, 'User') || ' created post "' || p.title || '"' as message,
+          p."createdAt" as timestamp,
+          jsonb_build_object('postId', p.id, 'authorId', p."authorId") as metadata
+        FROM posts p
+        LEFT JOIN users u ON p."authorId" = u.id
+        ORDER BY p."createdAt" DESC
+        LIMIT $1
+      )
+      UNION ALL
+      (
+        SELECT
+          'comment_created' as type,
+          COALESCE(u.username, 'User') || ' commented on "' || COALESCE(p.title, 'a post') || '"' as message,
+          c."createdAt" as timestamp,
+          jsonb_build_object('commentId', c.id, 'postId', c."postId") as metadata
+        FROM comments c
+        LEFT JOIN users u ON c."authorId" = u.id
+        LEFT JOIN posts p ON c."postId" = p.id
+        ORDER BY c."createdAt" DESC
+        LIMIT $1
+      )
+      UNION ALL
+      (
+        SELECT
+          'report_created' as type,
+          COALESCE(u.username, 'User') || ' reported ' || r.type as message,
+          r."createdAt" as timestamp,
+          jsonb_build_object('reportId', r.id, 'reportType', r.type) as metadata
+        FROM reports r
+        LEFT JOIN users u ON r."reportedById" = u.id
+        ORDER BY r."createdAt" DESC
+        LIMIT $1
+      )
+      ORDER BY timestamp DESC
+      LIMIT $1
+    `, [limit, limit, limit, limit, limit]);
 
-    const activities: ActivityFeed[] = [];
-
-    // Add user signups
-    recentUsers.forEach(user => {
-      activities.push({
-        type: 'user_signup',
-        message: `New user ${user.username || user.email} signed up`,
-        timestamp: user.createdAt,
-        metadata: { userId: user.id },
-      });
-    });
-
-    // Add post creations
-    recentPosts.forEach(post => {
-      activities.push({
-        type: 'post_created',
-        message: `${post.author?.username || 'User'} created post "${post.title}"`,
-        timestamp: post.createdAt,
-        metadata: { postId: post.id, authorId: post.authorId },
-      });
-    });
-
-    // Add comment creations
-    recentComments.forEach(comment => {
-      activities.push({
-        type: 'comment_created',
-        message: `${comment.author?.username || 'User'} commented on "${comment.post?.title || 'a post'}"`,
-        timestamp: comment.createdAt,
-        metadata: { commentId: comment.id, postId: comment.postId },
-      });
-    });
-
-    // Add reports
-    recentReports.forEach(report => {
-      activities.push({
-        type: 'report_created',
-        message: `${report.reportedBy?.username || 'User'} reported ${report.type}`,
-        timestamp: report.createdAt,
-        metadata: { reportId: report.id, reportType: report.type },
-      });
-    });
-
-    // Sort by timestamp and limit
-    return activities
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())
-      .slice(0, limit);
+    return activities;
   }
 
   /**
    * Get trend data for charts - showing cumulative data
+   * 최적화: 28개 COUNT 쿼리 (7일 × 4 테이블) → 1개 쿼리로 통합 (96% 쿼리 감소)
    */
   async getTrendData(days = 7): Promise<TrendData[]> {
-    const trends: TrendData[] = [];
-    // 오늘 끝 시간 (23:59:59.999)
-    const today = new Date();
-    today.setHours(23, 59, 59, 999);
-
-    for (let i = days - 1; i >= 0; i--) {
-      // DateUtils를 사용한 일수 기반 계산
-      const date = DateUtils.subtractDays(today, i);
-      date.setHours(23, 59, 59, 999);
-
-      // Get cumulative counts up to each date
-      const [users, posts, comments, reports] = await Promise.all([
-        this.userRepository.count({
-          where: { createdAt: LessThanOrEqual(date) },
-        }),
-        this.postRepository.count({
-          where: { createdAt: LessThanOrEqual(date) },
-        }),
-        this.commentRepository.count({
-          where: { createdAt: LessThanOrEqual(date) },
-        }),
-        this.reportRepository.count({
-          where: { createdAt: LessThanOrEqual(date) },
-        }),
-      ]);
-
-      trends.push({
-        date: date.toISOString().split('T')[0],
-        users,
-        posts,
-        comments,
-        reports,
-      });
-    }
+    // 최적화된 단일 쿼리: generate_series를 사용하여 날짜 범위 생성 후 각 날짜별 누적 카운트 계산
+    // 기존 for 루프에서 Promise.all을 7번 실행 (7×4=28개 쿼리) 대신 단일 쿼리로 모든 데이터 조회
+    const trends = await this.userRepository.query(`
+      WITH dates AS (
+        -- 최근 N일간의 날짜 시리즈 생성
+        SELECT
+          generate_series(
+            CURRENT_DATE - $1::integer + 1,
+            CURRENT_DATE,
+            '1 day'::interval
+          )::date as date
+      )
+      SELECT
+        TO_CHAR(d.date, 'YYYY-MM-DD') as date,
+        -- 각 날짜까지의 누적 카운트 (해당 날짜 23:59:59까지 포함)
+        (SELECT COUNT(*) FROM users WHERE "createdAt"::date <= d.date)::integer as users,
+        (SELECT COUNT(*) FROM posts WHERE "createdAt"::date <= d.date)::integer as posts,
+        (SELECT COUNT(*) FROM comments WHERE "createdAt"::date <= d.date)::integer as comments,
+        (SELECT COUNT(*) FROM reports WHERE "createdAt"::date <= d.date)::integer as reports
+      FROM dates d
+      ORDER BY d.date
+    `, [days]);
 
     return trends;
   }

@@ -22,7 +22,8 @@ import { Express } from 'express';
 import 'multer';
 import { ContextualFileService } from '../services/contextual-file.service';
 import { FileContextType, FilePurpose } from '../entities/file-context.entity';
-import { UsersService } from '../../users/users.service';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 
 export class CreateUploadUrlDto {
   contextType: FileContextType;
@@ -44,7 +45,8 @@ export class CompleteUploadDto {
 export class FilesV2Controller {
   constructor(
     private readonly contextualFileService: ContextualFileService,
-    private readonly usersService: UsersService,
+    @InjectRepository(User)
+    private readonly userRepository: Repository<User>,
   ) {}
 
   /**
@@ -64,14 +66,14 @@ export class FilesV2Controller {
       file,
       'avatar',
     );
-    
-    // 사용자 프로필에 이미지 URL 업데이트
+
+    // 사용자 프로필에 이미지 URL 업데이트 (Repository 직접 사용)
     // s3Key를 그대로 저장 (예: v2/users/xxx/profile/avatar/xxx.png)
     // 프론트엔드에서 /api/v1/files/{s3Key} 형태로 접근
-    await this.usersService.update(user.id, {
+    await this.userRepository.update(user.id, {
       profileImage: result.s3Key,
     });
-    
+
     return result;
   }
 

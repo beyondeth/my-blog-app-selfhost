@@ -180,6 +180,23 @@ export class User {
   @Column({ nullable: true })
   paymentMethodId: string; // 저장된 결제 수단 ID
 
+  // 소프트 삭제 관련 필드
+  @Column({ type: 'timestamp', nullable: true })
+  deletedAt: Date; // 계정 삭제 요청 시점
+
+  @Column({ default: false })
+  isDeleted: boolean; // 삭제 플래그 (로그인 차단용)
+
+  @Column({ type: 'timestamp', nullable: true })
+  scheduledDeletionAt: Date; // 완전 삭제 예정일 (법적 보관 기간 후)
+
+  // 개인정보 보유기간 관리
+  @Column({ type: 'timestamp', nullable: true })
+  dataRetentionNotifiedAt: Date; // 보유기간 만료 알림 발송일
+
+  @Column({ type: 'int', default: 3 })
+  dataRetentionYears: number; // 개인정보 보유기간 (기본 3년)
+
   @BeforeInsert()
   @BeforeUpdate()
   async hashPassword() {

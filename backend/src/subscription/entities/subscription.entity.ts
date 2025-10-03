@@ -30,7 +30,9 @@ export class Subscription {
   @Column({ type: 'uuid' })
   userId: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
+  // 법적 보관 의무: 전자상거래법 5년 보관 (결제 기록)
+  // 사용자 삭제 시 CASCADE 아닌 SET NULL로 변경하여 법적 보관 기간 준수
+  @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'userId' })
   user: User;
 

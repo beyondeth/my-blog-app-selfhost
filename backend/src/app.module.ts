@@ -5,6 +5,7 @@ import { APP_GUARD } from '@nestjs/core';
 import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
+import { ScheduleModule } from '@nestjs/schedule';
 
 // Configuration imports
 import databaseConfig from './config/database.config';
@@ -88,6 +89,9 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
         port: parseInt(process.env.REDIS_PORT || '6379'),
       },
     }),
+
+    // Schedule configuration for Cron jobs
+    ScheduleModule.forRoot(),
 
     // Feature modules
     RedisModule, // Global Redis module for distributed state management

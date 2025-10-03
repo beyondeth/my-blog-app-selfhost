@@ -70,27 +70,37 @@ export class CommentsService {
   }
 
   async findAllByPost(postId: string, user?: User): Promise<CommentResponseDto[]> {
-    // 모든 댓글을 가져온 후 프론트엔드에서 트리 구조로 변환하는 방식
-    // 더 깊은 중첩과 무제한 답글을 지원
-    const allComments = await this.commentsRepository.find({
-      where: { post: { id: postId }, isDeleted: false },
-      relations: ['author'],
-      order: { createdAt: 'ASC' },
-    });
+    // 최적화: 2개 쿼리 (comments + likes) → 1개 쿼리 (LEFT JOIN 사용)
+    // QueryBuilder를 사용하여 댓글과 사용자 좋아요 상태를 한 번에 조회
+    const queryBuilder = this.commentsRepository
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.author', 'author')
+      .where('comment.postId = :postId', { postId })
+      .andWhere('comment.isDeleted = :isDeleted', { isDeleted: false })
+      .orderBy('comment.createdAt', 'ASC');
 
-    // 사용자의 좋아요/싫어요 상태를 가져오기
+    // 사용자가 있는 경우, 해당 사용자의 좋아요/싫어요 상태를 LEFT JOIN으로 함께 조회
+    if (user) {
+      queryBuilder.leftJoinAndSelect(
+        'comment.commentLikes',
+        'userLike',
+        'userLike.userId = :userId',
+        { userId: user.id }
+      );
+    }
+
+    const allComments = await queryBuilder.getMany();
+
+    // 사용자의 좋아요/싫어요 상태를 맵으로 변환
     let userLikes: { [commentId: string]: 'like' | 'dislike' } = {};
     if (user) {
-      const likes = await this.commentLikesRepository.find({
-        where: {
-          userId: user.id,
-          commentId: In(allComments.map(c => c.id))
+      allComments.forEach(comment => {
+        // LEFT JOIN으로 가져온 commentLikes 배열에서 사용자의 좋아요 찾기
+        const userLike = comment.commentLikes?.find(like => like.userId === user.id);
+        if (userLike) {
+          userLikes[comment.id] = userLike.type;
         }
       });
-      userLikes = likes.reduce((acc, like) => {
-        acc[like.commentId] = like.type;
-        return acc;
-      }, {});
     }
 
     // 트리 구조로 변환하면서 사용자 상태 포함 (spread 연산자 사용 금지)

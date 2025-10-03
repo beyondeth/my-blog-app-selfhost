@@ -252,6 +252,7 @@ export class UsersService {
         'user.createdAt',
         'user.lastLoginAt',
         'user.isActive',
+        'user.isDeleted',                // 삭제 플래그 (JwtStrategy 로그인 차단용)
         'user.refreshToken',
         'user.refreshTokenExpiresAt',
         'user.subscriptionTier',        // 구독 티어
@@ -288,13 +289,67 @@ export class UsersService {
 
     // 비밀번호 해싱
     const hashedPassword = await bcrypt.hash(newPassword, 10);
-    
+
     await this.usersRepository.update(userId, {
       password: hashedPassword,
       // 보안: 비밀번호 변경 시 모든 refresh token 무효화
       refreshToken: null,
       refreshTokenExpiresAt: null
     });
+  }
+
+  /**
+   * 소프트 삭제: 즉시 개인정보 마스킹 + 법적 보관 기간 설정
+   * - 즉시: isDeleted=true, 개인정보 마스킹, 로그인 차단
+   * - 법적 보관: 결제 기록 5년, 분쟁 기록 3년 후 완전 삭제
+   * - 백그라운드 작업: 큐에 삭제 작업 추가하여 비동기 처리
+   */
+  async softDelete(userId: string): Promise<void> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // 이미 삭제된 사용자인지 확인
+    if (user.isDeleted) {
+      this.logger.warn(`User ${userId} already deleted`);
+      return;
+    }
+
+    const now = new Date();
+
+    // 법적 보관 기간 계산: 기본 3년, 결제 기록 있으면 5년
+    // TODO: 실제로는 결제 기록 존재 여부를 확인하여 5년/3년 결정
+    const retentionYears = user.dataRetentionYears || 3;
+    const scheduledDeletionAt = new Date(now);
+    scheduledDeletionAt.setFullYear(scheduledDeletionAt.getFullYear() + retentionYears);
+
+    // 즉시 개인정보 마스킹 및 삭제 플래그 설정
+    await this.usersRepository.update(userId, {
+      // 소프트 삭제 플래그
+      isDeleted: true,
+      deletedAt: now,
+      scheduledDeletionAt,
+
+      // 개인정보 즉시 마스킹 (법적 요구사항)
+      email: `deleted_${userId}@deleted.local`,
+      username: `deleted_${userId}`,
+      profileImage: null,
+      bio: null,
+
+      // 인증 정보 무효화
+      password: null,
+      refreshToken: null,
+      refreshTokenExpiresAt: null,
+
+      // 활성화 상태 false로 변경 (로그인 차단)
+      isActive: false,
+    });
+
+    this.logger.log(`User ${userId} soft deleted. Scheduled for permanent deletion at ${scheduledDeletionAt.toISOString()}`);
+
+    // TODO: BullMQ 큐에 백그라운드 삭제 작업 추가
+    // await this.userDeletionQueue.add('soft-delete', { userId });
   }
 
 } 

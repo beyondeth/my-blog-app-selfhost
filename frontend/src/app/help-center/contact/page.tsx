@@ -95,76 +95,76 @@ export default function ContactPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="border-b border-border bg-muted">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <Link
             href="/help-center"
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+            className="inline-flex items-center text-muted-foreground hover:text-foreground mb-4 transition-colors"
           >
             <FiArrowLeft className="w-4 h-4 mr-2" />
             고객센터로 돌아가기
           </Link>
-          <h1 className="text-3xl font-bold text-gray-900">문의하기</h1>
-          <p className="mt-2 text-gray-600">궁금한 점이나 문제가 있으신가요? 언제든지 문의해주세요.</p>
+          <h1 className="text-3xl font-bold text-foreground">문의하기</h1>
+          <p className="mt-2 text-muted-foreground">궁금한 점이나 문제가 있으신가요? 언제든지 문의해주세요.</p>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid md:grid-cols-3 gap-8">
           {/* Contact Information */}
           <div className="md:col-span-1">
-            <div className="bg-gray-50 rounded-lg p-6 space-y-6">
+            <div className="bg-muted rounded-lg p-6 space-y-6">
               <div>
                 <div className="flex items-center mb-3">
-                  <FiMail className="w-5 h-5 text-amber-600 mr-3" />
-                  <h3 className="font-semibold text-gray-900">이메일</h3>
+                  <FiMail className="w-5 h-5 text-foreground mr-3" />
+                  <h3 className="font-semibold text-foreground">이메일</h3>
                 </div>
-                <p className="text-gray-600 text-sm">support@myblog.com</p>
-                <p className="text-gray-500 text-xs mt-1">24시간 이내 답변</p>
+                <p className="text-muted-foreground text-sm">support@myblog.com</p>
+                <p className="text-muted-foreground text-xs mt-1">24시간 이내 답변</p>
               </div>
 
               <div>
                 <div className="flex items-center mb-3">
-                  <FiClock className="w-5 h-5 text-amber-600 mr-3" />
-                  <h3 className="font-semibold text-gray-900">운영 시간</h3>
+                  <FiClock className="w-5 h-5 text-foreground mr-3" />
+                  <h3 className="font-semibold text-foreground">운영 시간</h3>
                 </div>
-                <p className="text-gray-600 text-sm">평일 09:00 - 18:00</p>
-                <p className="text-gray-500 text-xs mt-1">주말 및 공휴일 휴무</p>
+                <p className="text-muted-foreground text-sm">평일 09:00 - 18:00</p>
+                <p className="text-muted-foreground text-xs mt-1">주말 및 공휴일 휴무</p>
               </div>
 
               <div>
                 <div className="flex items-center mb-3">
-                  <FiMessageSquare className="w-5 h-5 text-amber-600 mr-3" />
-                  <h3 className="font-semibold text-gray-900">답변 시간</h3>
+                  <FiMessageSquare className="w-5 h-5 text-foreground mr-3" />
+                  <h3 className="font-semibold text-foreground">답변 시간</h3>
                 </div>
-                <p className="text-gray-600 text-sm">평균 12시간 이내</p>
-                <p className="text-gray-500 text-xs mt-1">긴급 문의는 우선 처리</p>
+                <p className="text-muted-foreground text-sm">평균 12시간 이내</p>
+                <p className="text-muted-foreground text-xs mt-1">긴급 문의는 우선 처리</p>
               </div>
             </div>
 
             {/* Quick Links */}
-            <div className="mt-6 bg-blue-50 rounded-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-3">빠른 도움말</h3>
+            <div className="mt-6 bg-accent rounded-lg p-6">
+              <h3 className="font-semibold text-foreground mb-3">빠른 도움말</h3>
               <ul className="space-y-2">
                 <li>
-                  <Link href="/help-center/faq" className="text-sm text-blue-600 hover:text-blue-800">
+                  <Link href="/help-center/faq" className="text-sm text-foreground hover:text-foreground/80">
                     → 자주 묻는 질문
                   </Link>
                 </li>
                 <li>
-                  <Link href="/help-center/getting-started" className="text-sm text-blue-600 hover:text-blue-800">
+                  <Link href="/help-center/getting-started" className="text-sm text-foreground hover:text-foreground/80">
                     → 시작 가이드
                   </Link>
                 </li>
                 <li>
-                  <Link href="/terms" className="text-sm text-blue-600 hover:text-blue-800">
+                  <Link href="/terms" className="text-sm text-foreground hover:text-foreground/80">
                     → 이용약관
                   </Link>
                 </li>
                 <li>
-                  <Link href="/privacy" className="text-sm text-blue-600 hover:text-blue-800">
+                  <Link href="/privacy" className="text-sm text-foreground hover:text-foreground/80">
                     → 개인정보처리방침
                   </Link>
                 </li>
@@ -174,10 +174,10 @@ export default function ContactPage() {
 
           {/* Contact Form */}
           <div className="md:col-span-2">
-            <form onSubmit={handleSubmit} className="bg-white">
+            <form onSubmit={handleSubmit} className="bg-card">
               <div className="grid md:grid-cols-2 gap-6">
                 <div>
-                  <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="name" className="block text-sm font-medium text-foreground mb-2">
                     이름 <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -187,13 +187,13 @@ export default function ContactPage() {
                     value={formData.name}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-4 py-2 text-foreground bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                     placeholder="홍길동"
                   />
                 </div>
 
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-foreground mb-2">
                     이메일 <span className="text-red-500">*</span>
                   </label>
                   <input
@@ -203,14 +203,14 @@ export default function ContactPage() {
                     value={formData.email}
                     onChange={handleChange}
                     required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    className="w-full px-4 py-2 text-foreground bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                     placeholder="your@email.com"
                   />
                 </div>
               </div>
 
               <div className="mt-6">
-                <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="category" className="block text-sm font-medium text-foreground mb-2">
                   문의 유형 <span className="text-red-500">*</span>
                 </label>
                 <select
@@ -219,7 +219,7 @@ export default function ContactPage() {
                   value={formData.category}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-4 py-2 text-foreground bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                 >
                   {categories.map(cat => (
                     <option key={cat.value} value={cat.value}>
@@ -230,7 +230,7 @@ export default function ContactPage() {
               </div>
 
               <div className="mt-6">
-                <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="subject" className="block text-sm font-medium text-foreground mb-2">
                   제목 <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -240,13 +240,13 @@ export default function ContactPage() {
                   value={formData.subject}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-4 py-2 text-foreground bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   placeholder="문의 제목을 입력해주세요"
                 />
               </div>
 
               <div className="mt-6">
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+                <label htmlFor="message" className="block text-sm font-medium text-foreground mb-2">
                   문의 내용 <span className="text-red-500">*</span>
                 </label>
                 <textarea
@@ -256,22 +256,22 @@ export default function ContactPage() {
                   onChange={handleChange}
                   required
                   rows={8}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  className="w-full px-4 py-2 text-foreground bg-background border border-border rounded-lg focus:outline-none focus:ring-2 focus:ring-foreground/20"
                   placeholder="문의하실 내용을 자세히 작성해주세요..."
                 />
-                <p className="mt-2 text-sm text-gray-500">
+                <p className="mt-2 text-sm text-muted-foreground">
                   최대한 자세히 작성해주시면 더 정확한 답변을 드릴 수 있습니다.
                 </p>
               </div>
 
               {/* Notice */}
-              <div className="mt-6 p-4 bg-amber-50 rounded-lg flex items-start">
-                <FiAlertCircle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="mt-6 p-4 bg-accent rounded-lg flex items-start">
+                <FiAlertCircle className="w-5 h-5 text-foreground flex-shrink-0 mt-0.5" />
                 <div className="ml-3">
-                  <p className="text-sm text-amber-800">
+                  <p className="text-sm text-foreground">
                     <strong>개인정보 보호 안내</strong>
                   </p>
-                  <p className="text-sm text-amber-700 mt-1">
+                  <p className="text-sm text-muted-foreground mt-1">
                     문의 내용에 비밀번호, 카드번호 등의 민감한 정보는 포함하지 마세요.
                   </p>
                 </div>
@@ -282,11 +282,11 @@ export default function ContactPage() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-full md:w-auto px-8 py-3 bg-amber-600 text-white font-medium rounded-lg hover:bg-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center"
+                  className="w-full md:w-auto px-8 py-3 bg-foreground text-background font-medium rounded-lg hover:bg-foreground/90 focus:outline-none focus:ring-2 focus:ring-foreground/20 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors inline-flex items-center justify-center"
                 >
                   {isSubmitting ? (
                     <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-background mr-2"></div>
                       전송 중...
                     </>
                   ) : (

@@ -10,21 +10,20 @@ import { S3Service } from './services/s3.service';
 import { CdnService } from './services/cdn.service';
 import { File } from './entities/file.entity';
 import { FileContext } from './entities/file-context.entity';
+import { User } from '../users/entities/user.entity';
 import { ContextualFileService } from './services/contextual-file.service';
 import { FileMigrationService } from './services/file-migration.service';
 import { FileMonitoringService } from './services/file-monitoring.service';
 import { FileLifecycleService } from './services/file-lifecycle.service';
-import { UsersModule } from '../users/users.module';
 import s3Config from '../config/s3.config';
 import cdnConfig from '../config/cdn.config';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([File, FileContext]),
+    TypeOrmModule.forFeature([File, FileContext, User]),
     ConfigModule.forFeature(s3Config),
     ConfigModule.forFeature(cdnConfig),
     ScheduleModule.forRoot(),
-    UsersModule,
   ],
   controllers: [
     FilesController,

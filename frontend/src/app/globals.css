@@ -122,9 +122,14 @@
   line-height: 1.5;
 }
 
-/* 사이드바 스크롤바 숨기기 */
+/* 사이드바 스크롤바 숨기기 - 모든 브라우저 지원 */
+.sidebar-scroll {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
 .sidebar-scroll::-webkit-scrollbar {
-  display: none;
+  display: none;  /* Chrome, Safari, Opera */
 }
 
 /* DM Chat animations */

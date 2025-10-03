@@ -27,6 +27,20 @@ export default function RootLayout({
           crossOrigin=""
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
         />
+        {/* Google Fonts - Orbitron for Logo */}
+        <link
+          rel="preconnect"
+          href="https://fonts.googleapis.com"
+        />
+        <link
+          rel="preconnect"
+          href="https://fonts.gstatic.com"
+          crossOrigin=""
+        />
+        <link
+          href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap"
+          rel="stylesheet"
+        />
         {/* FOUC 방지 스크립트 - 테마 깜빡임 방지 */}
         <script
           dangerouslySetInnerHTML={{
@@ -67,12 +81,14 @@ export default function RootLayout({
         >
           <ClientProviders>
             <DMModalProvider>
-              {/* 유튜브 스타일 레이아웃: 왼쪽 사이드바 + 메인 콘텐츠 */}
-              <div className="flex">
-                <LeftSidebar />
-                <div className="flex-1 lg:ml-20">
-                  <Header />
-                  {children}
+              {/* 유튜브 스타일 레이아웃: 상단 헤더 + 왼쪽 사이드바 + 메인 콘텐츠 */}
+              <div>
+                <Header />
+                <div className="flex">
+                  <LeftSidebar />
+                  <div className="flex-1 lg:ml-20">
+                    {children}
+                  </div>
                 </div>
               </div>
               <Toaster position="top-center" richColors />

@@ -70,6 +70,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return null;
     }
 
+    // 삭제된 사용자 로그인 차단 (소프트 삭제)
+    if (user.isDeleted) {
+      console.error('[JWT Validate] User account has been deleted:', userId);
+      return null;
+    }
+
     // 3. DB 조회 결과를 캐시에 저장
     // TTL 개선: 5초에서 30분으로 연장 (토큰 만료 시 자동 갱신)
     const cacheTTL = this.configService.get<number>('JWT_CACHE_TTL', 1800); // 30분
