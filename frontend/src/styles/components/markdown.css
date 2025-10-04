@@ -281,13 +281,6 @@
   margin-bottom: var(--space-xl);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-  cursor: pointer;
-  transition: all var(--duration-normal) var(--easing-ease-out);
-}
-
-.prose img:hover {
-  transform: scale(1.02);
-  box-shadow: var(--shadow-lg);
 }
 
 /* YouTube iframe 컨테이너 - 685x540 고정 크기 */

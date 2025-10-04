@@ -264,17 +264,15 @@ export function useImageUploadManager({
           chain.focus();
           
           actualImages.forEach((image, index) => {
-            if (!image.isUploading && image.url) {
-              let imageUrl = image.url;
-              if (!imageUrl.startsWith('http')) {
-                imageUrl = `https://myblogdata84.s3.us-east-1.amazonaws.com/${image.url}`;
-              }
-              
+            if (!image.isUploading && image.id) {
+              // 백엔드 다운로드 엔드포인트 사용 (S3 서명 URL 만료 문제 해결)
+              const imageUrl = `/api/v1/files/${image.id}/download`;
+
               // Add spacing between images
               if (index > 0) {
                 chain.insertContent(' ');
               }
-              
+
               console.log('[handleImagesUploaded] Adding image to chain:', image.id, imageUrl);
               // Add the image with proper attributes
               const imageAttrs: any = {
@@ -284,7 +282,7 @@ export function useImageUploadManager({
               };
               // Add data-image-id as a separate property
               imageAttrs['data-image-id'] = image.id;
-              
+
               chain.setImage(imageAttrs);
             }
           });
@@ -322,22 +320,24 @@ export function useImageUploadManager({
 
     try {
       console.log('[insertImageIntoEditor] Inserting image with ID:', image.id);
+      // 백엔드 다운로드 엔드포인트 사용 (S3 서명 URL 만료 문제 해결)
+      const imageUrl = `/api/v1/files/${image.id}/download`;
       const attrs: any = {
-        src: image.url,
+        src: imageUrl,
         alt: image.name,
         title: image.name,
       };
       // Set data-image-id separately to ensure it's properly added
       attrs['data-image-id'] = image.id;
       console.log('[insertImageIntoEditor] 🎨 Setting image with attributes:', attrs);
-      
+
       editor.chain().focus().setImage(attrs).run();
       
       // Verify it was set correctly
       setTimeout(() => {
         let foundId = false;
         editor.state.doc.descendants((node) => {
-          if (node.type.name === 'resizableImage' && node.attrs.src === image.url) {
+          if (node.type.name === 'resizableImage' && node.attrs.src === imageUrl) {
             console.log('[insertImageIntoEditor] 🔍 Verification - Image node attrs after insert:', node.attrs);
             if (node.attrs['data-image-id']) {
               console.log('[insertImageIntoEditor] ✅ data-image-id was successfully set:', node.attrs['data-image-id']);
@@ -347,8 +347,8 @@ export function useImageUploadManager({
             }
           }
         });
-        if (!foundId && image.url) {
-          console.warn('[insertImageIntoEditor] ⚠️ Could not find image with URL:', image.url);
+        if (!foundId) {
+          console.warn('[insertImageIntoEditor] ⚠️ Could not find image with URL:', imageUrl);
         }
       }, 100);
 
@@ -415,15 +415,14 @@ export function useImageUploadManager({
 
       // Re-insert only actual images in new order (skip YouTube thumbnails)
       actualImages.forEach((image, index) => {
-        if (image.url && !image.isUploading) {
-          const imageUrl = image.url.startsWith('http') 
-            ? image.url 
-            : `https://myblogdata84.s3.us-east-1.amazonaws.com/${image.url}`;
-          
+        if (image.id && !image.isUploading) {
+          // 백엔드 다운로드 엔드포인트 사용 (S3 서명 URL 만료 문제 해결)
+          const imageUrl = `/api/v1/files/${image.id}/download`;
+
           if (index > 0) {
             editor.chain().insertContent('<br/>').run();
           }
-          
+
           const imgAttrs: any = {
             src: imageUrl,
             alt: image.name,

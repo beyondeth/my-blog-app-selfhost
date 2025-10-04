@@ -63,7 +63,7 @@ export default function HtmlRenderer({ content, onImageClick, className = '' }: 
             .replace(/crossorigin=["'][^"']*["']/gi, '')
             .replace(/\s+/g, ' ')
             .trim();
-          return `<img ${cleanedAttributes} src="${normalizedSrc}" loading="lazy" data-clickable="true">`;
+          return `<img ${cleanedAttributes} src="${normalizedSrc}" loading="lazy">`;
         } catch (error) {
           return match;
         }

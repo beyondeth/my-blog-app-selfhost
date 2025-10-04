@@ -168,6 +168,12 @@ export function useUpdatePost() {
         queryKey: postQueryKeys.lists(),
         refetchType: 'none',
       });
+
+      // 4. 인기포스트 캐시 무효화 (포스트 수정 시 인기포스트도 업데이트 필요)
+      queryClient.invalidateQueries({
+        queryKey: ['popular-posts'],
+        refetchType: 'none', // stale만 마킹, 사용자가 다시 볼 때 자동 refetch
+      });
     },
     retry: 1,
   });

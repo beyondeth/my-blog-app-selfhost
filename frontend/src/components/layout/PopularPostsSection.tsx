@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { FiTrendingUp, FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 import { usePopularPosts } from '@/hooks/usePopularPosts';
+import OptimizedImage from '@/components/ui/OptimizedImage';
 
 const PopularPostsSection = React.memo(function PopularPostsSection() {
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
@@ -89,12 +90,28 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
               </span>
               <div className="flex-1 min-w-0">
                 {post.thumbnail && (
-                  <img 
-                    src={post.thumbnail} 
-                    alt=""
-                    className="w-full h-16 object-cover rounded mb-2"
-                    loading="lazy"
-                  />
+                  <div className="mb-2">
+                    <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
+                      <OptimizedImage
+                        src={post.thumbnail}
+                        alt={post.title}
+                        className="w-full h-full rounded-lg object-contain"
+                        aspectRatio={100/94}
+                        sizes="100px"
+                        priority={index < 3}
+                      />
+                    </div>
+                    <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
+                      <OptimizedImage
+                        src={post.thumbnail}
+                        alt={post.title}
+                        className="w-full h-full rounded-lg object-contain"
+                        aspectRatio={210/197}
+                        sizes="210px"
+                        priority={index < 3}
+                      />
+                    </div>
+                  </div>
                 )}
                 <Link
                   href={post.blog?.slug

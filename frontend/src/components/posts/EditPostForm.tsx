@@ -68,11 +68,43 @@ export default function EditPostForm({
   const [isUploadValid, setIsUploadValid] = useState<boolean>(true);
   const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
 
-  // DB의 attachedFiles를 UploadedImageInfo 배열로 변환 (useMemo 사용)
+  // DB의 attachedFiles 중 content HTML에 실제로 있는 이미지만 추출 (useMemo 사용)
   // 에디터 초기화 시 한 번만 사용되는 초기 이미지 데이터
   const initialImages = useMemo(() => {
-    if (initialData?.attachedFiles && initialData.attachedFiles.length > 0) {
-      return initialData.attachedFiles.map(file => {
+    if (!initialData?.content || !initialData?.attachedFiles || initialData.attachedFiles.length === 0) {
+      return [];
+    }
+
+    // content HTML에서 실제 사용중인 이미지 ID 추출
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(initialData.content, 'text/html');
+    const imageElements = doc.querySelectorAll('img');
+    const usedImageIds = new Set<string>();
+
+    imageElements.forEach(img => {
+      // data-image-id 속성에서 추출
+      const dataImageId = img.getAttribute('data-image-id');
+      if (dataImageId) {
+        usedImageIds.add(String(dataImageId));
+      }
+
+      // src에서 /api/v1/files/{id}/download 형식 ID 추출
+      const src = img.getAttribute('src');
+      if (src) {
+        const match = src.match(/\/files\/([^/]+)\//);
+        if (match) {
+          usedImageIds.add(match[1]);
+        }
+      }
+    });
+
+    console.log('[EditPostForm] Content에서 추출한 이미지 IDs:', Array.from(usedImageIds));
+    console.log('[EditPostForm] DB attachedFiles 개수:', initialData.attachedFiles.length);
+
+    // content에 실제로 있는 이미지만 필터링
+    const filtered = initialData.attachedFiles
+      .filter(file => usedImageIds.has(String(file.id)))
+      .map(file => {
         let imageUrl = file.fileUrl;
 
         // fileUrl이 상대 경로인 경우 프록시 경로로 변환
@@ -88,9 +120,10 @@ export default function EditPostForm({
           isUploading: false,
         };
       });
-    }
-    return [];
-  }, [initialData?.attachedFiles]);
+
+    console.log('[EditPostForm] 필터링된 initialImages 개수:', filtered.length);
+    return filtered;
+  }, [initialData?.attachedFiles, initialData?.content]);
 
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
@@ -141,10 +174,18 @@ export default function EditPostForm({
   };
 
   const handleSubmit = (data: PostFormValues) => {
+    // 현재 images state에서 직접 attachedFileIds 계산 (React Form state 타이밍 이슈 회피)
+    const currentFileIds = images
+      .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
+      .map(img => img.id);
+
     // 썸네일 처리 (new-story/page.tsx와 동일)
     const formData: any = {
       ...data,
+      attachedFileIds: currentFileIds, // 명시적으로 최신 값 포함
     };
+
+    console.log('[EditPostForm] Submitting with attachedFileIds:', currentFileIds);
 
     if (selectedThumbnailId) {
       if (selectedThumbnailId.startsWith('yt_thumb_')) {

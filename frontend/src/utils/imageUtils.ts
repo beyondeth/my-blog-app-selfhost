@@ -70,16 +70,24 @@ export function getProxyImageUrl(s3Key: string): string {
  * 다양한 이미지 URL 형식을 정규화된 프록시 URL로 변환
  */
 export function normalizeImageUrl(url: string): string {
-  if (!url) return '';
+  if (!url) {
+    if (DEBUG_MODE) console.warn('[normalizeImageUrl] Empty URL provided');
+    return '';
+  }
 
   try {
+    // 디버깅을 위한 입력 로그
+    if (DEBUG_MODE) console.log('[normalizeImageUrl] Input:', url);
+
     // YouTube 썸네일 URL은 직접 사용 (프록시 불필요)
     if (url.includes('img.youtube.com') || url.includes('ytimg.com')) {
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] YouTube URL, using directly');
       return url;
     }
 
     // 외부 HTTPS URL은 그대로 사용
     if (url.startsWith('https://') && !url.includes('amazonaws.com') && !url.includes('/api/v1/files/')) {
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] External HTTPS URL, using directly');
       return url;
     }
 
@@ -87,42 +95,69 @@ export function normalizeImageUrl(url: string): string {
     if (url.includes('/api/v1/files/') && url.includes('/download')) {
       // 이미 절대 URL인 경우
       if (url.startsWith('http')) {
+        if (DEBUG_MODE) console.log('[normalizeImageUrl] Download URL (absolute), using directly');
         return url;
       }
       // 상대 경로인 경우 절대 경로로 변환
-      return `${BACKEND_URL}${url.startsWith('/') ? url : '/' + url}`;
+      const absoluteUrl = `${BACKEND_URL}${url.startsWith('/') ? url : '/' + url}`;
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] Download URL (relative):', absoluteUrl);
+      return absoluteUrl;
     }
 
     // 이미 완전한 프록시 URL인 경우
     if (url.includes('/api/v1/files/proxy/')) {
       // 이미 정확한 형식이면 그대로 반환
       if (url.startsWith('http')) {
+        if (DEBUG_MODE) console.log('[normalizeImageUrl] Proxy URL (absolute), using directly');
         return url;
       }
       // 상대 경로인 경우 절대 경로로 변환
-      return `${API_URL.replace('/api/v1', '')}${url}`;
+      const absoluteUrl = `${API_URL.replace('/api/v1', '')}${url}`;
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] Proxy URL (relative):', absoluteUrl);
+      return absoluteUrl;
     }
 
     // S3 직접 URL인 경우
     if (url.includes('.s3.') && url.includes('amazonaws.com')) {
       // 서명된 URL (쿼리 파라미터가 있는 경우)은 그대로 사용
       if (url.includes('X-Amz-Signature') || url.includes('?')) {
+        if (DEBUG_MODE) console.log('[normalizeImageUrl] Signed S3 URL, using directly');
         return url;
       }
       // 서명이 없는 경우만 프록시 사용
-      return getProxyImageUrl(url);
+      const proxyUrl = getProxyImageUrl(url);
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 URL → Proxy:', proxyUrl);
+      return proxyUrl;
     }
 
-    // 이미 S3 키인 경우
-    if (url.startsWith('uploads/')) {
-      return getProxyImageUrl(url);
+    // 이미 S3 키인 경우 (uploads/로 시작)
+    if (url.startsWith('uploads/') || url.startsWith('v2/')) {
+      const proxyUrl = getProxyImageUrl(url);
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → Proxy:', proxyUrl);
+      return proxyUrl;
+    }
+
+    // Bare 파일명 감지 (경로 구분자가 없고 확장자만 있는 경우)
+    // 예: "freepik__my-blog-svg-__77128.png"
+    const isBareFilename = !url.includes('/') &&
+                          !url.startsWith('http') &&
+                          /\.(jpg|jpeg|png|gif|webp|svg)$/i.test(url);
+
+    if (isBareFilename) {
+      console.warn('[normalizeImageUrl] Bare filename detected:', url);
+      // Bare 파일명을 uploads/ 경로로 변환하여 프록시 URL 생성
+      const proxyUrl = getProxyImageUrl(url);
+      console.log('[normalizeImageUrl] Bare filename → Proxy:', proxyUrl);
+      return proxyUrl;
     }
 
     // 기타 경우 프록시 URL로 변환 시도
-    return getProxyImageUrl(url);
+    const proxyUrl = getProxyImageUrl(url);
+    if (DEBUG_MODE) console.log('[normalizeImageUrl] Default → Proxy:', proxyUrl);
+    return proxyUrl;
 
   } catch (error) {
-    console.error('[imageUtils] Error normalizing URL:', error);
+    console.error('[imageUtils] Error normalizing URL:', url, error);
     return url;
   }
 }
