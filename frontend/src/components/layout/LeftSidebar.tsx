@@ -33,7 +33,7 @@ export default function LeftSidebar() {
   const router = useRouter();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
-  // 읽지 않은 알림 수 조회 (로그인한 사용자만)
+  // 읽지 않은 알림 수 조회 (로그인한 사용자 + Feature Flag 활성화 시에만)
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ['notifications', 'unread'],
     queryFn: async () => {
@@ -48,7 +48,7 @@ export default function LeftSidebar() {
       const data = await response.json();
       return data.count || 0;
     },
-    enabled: !!user, // 로그인한 사용자만 쿼리 실행
+    enabled: !!user && FEATURES.NOTIFICATIONS, // Feature Flag와 로그인 상태 모두 확인
     refetchInterval: 30000, // 30초마다 새로고침
   });
 

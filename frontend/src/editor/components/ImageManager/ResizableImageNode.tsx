@@ -258,8 +258,8 @@ export const ResizableImageComponent: React.FC<ResizableImageNodeProps> = ({
       data-drag-handle={!isResizing}
     >
       <Resizable
-        width={dimensions.width}
-        height={dimensions.height}
+        width={typeof dimensions.width === 'number' ? dimensions.width : parseInt(dimensions.width) || 200}
+        height={typeof dimensions.height === 'number' ? dimensions.height : parseInt(dimensions.height) || 150}
         onResize={handleResize}
         onResizeStart={handleResizeStart}
         onResizeStop={handleResizeStop}

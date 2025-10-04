@@ -38,7 +38,7 @@ export class FilesService {
   private async createTemporaryContext(userId: string): Promise<FileContext> {
     const context = this.contextRepository.create({
       contextType: FileContextType.SYSTEM,
-      contextId: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      contextId: null, // UUID 타입이므로 임시 context는 null 사용
       purpose: FilePurpose.CONTENT, // 기존 enum 사용
       ownerId: userId,
       isActive: true,

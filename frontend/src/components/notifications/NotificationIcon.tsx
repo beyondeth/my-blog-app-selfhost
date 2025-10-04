@@ -1,8 +1,7 @@
 'use client';
 
 import { Bell } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,22 +13,9 @@ import NotificationDropdown from './NotificationDropdown';
 export default function NotificationIcon() {
   const [isOpen, setIsOpen] = useState(false);
 
-  // 읽지 않은 알림 수 조회
-  const { data: unreadCount = 0 } = useQuery({
-    queryKey: ['notifications', 'unread'],
-    queryFn: async () => {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/notifications/unread`,
-        {
-          credentials: 'include',
-        }
-      );
-      if (!response.ok) return 0;
-      const data = await response.json();
-      return data.count || 0;
-    },
-    refetchInterval: 30000, // 30초마다 새로고침
-  });
+  // TODO: 알림 기능은 추후 구현 예정 (FEATURES.NOTIFICATIONS)
+  // 현재는 UI만 표시하고 실제 데이터는 가져오지 않음
+  const unreadCount = 0;
 
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>

@@ -35,6 +35,7 @@ interface RichTextEditorProps {
   selectedThumbnailId?: string;  // Add this to pass selected thumbnail
   onImagesChange?: (images: UploadedImageInfo[]) => void;  // Add this to expose images
   onValidationChange?: (isValid: boolean, reason?: string) => void;  // Validation callback
+  initialImages?: UploadedImageInfo[];  // Initial images for edit mode
   placeholder?: string;
   className?: string;
   enableImageManager?: boolean;
@@ -42,14 +43,15 @@ interface RichTextEditorProps {
   enableCleanupOnUnmount?: boolean;
 }
 
-export default function BlogRichTextEditor({ 
-  content, 
-  onChange, 
+export default function BlogRichTextEditor({
+  content,
+  onChange,
   onFilesChange,
   onThumbnailSelect,
   selectedThumbnailId: parentSelectedThumbnailId,
   onImagesChange,
   onValidationChange,
+  initialImages,
   placeholder = "내용을 입력하세요...",
   className = "",
   enableImageManager = false,
@@ -58,12 +60,16 @@ export default function BlogRichTextEditor({
 }: RichTextEditorProps) {
   const [uploadedFiles, setUploadedFiles] = useState<string[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [images, setImages] = useState<any[]>([]);
   const [editorInstance, setEditorInstance] = useState<any>(null);
   
   // 파일 업로드 및 트래커 훅
   const uploadMutation = useUploadFile();
   const imageTracker = usePostImageTracker();
+
+  // 썸네일 선택 핸들러를 useCallback으로 메모이제이션
+  const handleThumbnailSelectCallback = useCallback((thumbnailId: string) => {
+    onThumbnailSelect?.(thumbnailId);
+  }, [onThumbnailSelect]);
 
   // 이미지 업로드 핸들러 - URL과 ID를 모두 반환
   const handleImageUpload = useCallback(async (file: File) => {
@@ -75,7 +81,10 @@ export default function BlogRichTextEditor({
         throw new Error(validation.error);
       }
 
-      const result = await uploadMutation.mutateAsync({ file });
+      const result = await uploadMutation.mutateAsync({
+        file,
+        fileType: 'image' as const,
+      });
       const imageUrl = (result as any).url || (result as any).accessUrl;
       
       const normalizedUrl = normalizeImageUrl(imageUrl);
@@ -110,8 +119,6 @@ export default function BlogRichTextEditor({
       // 갤러리 이미지 상태 업데이트 (동기화를 위해 setGalleryImages 사용)
       if (setGalleryImages) {
         setGalleryImages(prev => [...prev, newImage]);
-      } else {
-        setImages(prev => [...prev, newImage]);
       }
 
       toast.success('이미지가 업로드되었습니다');
@@ -144,33 +151,26 @@ export default function BlogRichTextEditor({
     editor: editorInstance, // 에디터 인스턴스를 동적으로 전달
     enableImageManager,
     onFilesChange,
-    onThumbnailSelect,
+    onThumbnailSelect: handleThumbnailSelectCallback,  // 메모이제이션된 콜백 사용
     selectedThumbnailId: parentSelectedThumbnailId,  // Parent의 값 전달
+    initialImages,  // 초기 이미지 전달
   });
-  
+
   // Call onImagesChange whenever galleryImages changes
   useEffect(() => {
     if (onImagesChange) {
       onImagesChange(galleryImages);
     }
   }, [galleryImages, onImagesChange]);
-  
-  console.log('[RichTextEditor] galleryImages:', galleryImages);
-  console.log('[RichTextEditor] setGalleryImages 타입:', typeof setGalleryImages);
-  console.log('[RichTextEditor] imageUploadManager.handleGalleryImageChange:', !!imageUploadManager.handleGalleryImageChange);
 
   // YouTube 임베드 훅 - imageUploadManager의 handleGalleryImageChange를 사용
   const { addYouTubeThumbnail, clearProcessedYouTubeId } = useYouTubeEmbed({
     enableImageManager,
     images: galleryImages,
     setImages: (newImages) => {
-      console.log('[RichTextEditor] YouTube calling setImages with', 
-        typeof newImages === 'function' ? 'function' : newImages);
-      
       if (typeof newImages === 'function') {
         // 함수형 업데이트인 경우
         const updated = newImages(galleryImages);
-        console.log('[RichTextEditor] Function update result:', updated);
         imageUploadManager.handleGalleryImageChange(updated);
       } else {
         // 직접 값인 경우
@@ -182,14 +182,11 @@ export default function BlogRichTextEditor({
     setUploadedFiles,
     onFilesChange,
   });
-  
-  console.log('[RichTextEditor] addYouTubeThumbnail 함수:', !!addYouTubeThumbnail);
 
   // 에디터에서 YouTube가 삭제되었을 때 이벤트 리스너
   useEffect(() => {
     const handleYouTubeDeletedFromEditor = (event: CustomEvent) => {
       const { videoId } = event.detail;
-      console.log('[RichTextEditor] 🎯 YouTube deleted from editor event received, videoId:', videoId);
       clearProcessedYouTubeId(videoId);
     };
 
@@ -215,7 +212,6 @@ export default function BlogRichTextEditor({
     
     // 삭제된 YouTube ID들을 processedVideoIds에서 제거
     deletedYouTubeIds.forEach(videoId => {
-      console.log('[RichTextEditor] YouTube 썸네일 삭제 감지, processedVideoIds에서 제거:', videoId);
       clearProcessedYouTubeId(videoId);
     });
     
@@ -235,41 +231,11 @@ export default function BlogRichTextEditor({
   // 에디터가 생성되면 editorInstance 상태 업데이트
   useEffect(() => {
     if (editor) {
-      console.log('[RichTextEditor] 🎯 Editor 인스턴스 설정됨');
       setEditorInstance(editor);
-    } else {
-      console.log('[RichTextEditor] ⚠️ Editor가 아직 없음');
     }
   }, [editor]);
 
-  // 갤러리 이미지와 로컬 이미지 동기화 - enableImageManager가 활성화된 경우만
-  useEffect(() => {
-    if (enableImageManager && galleryImages) {
-      // 배열 내용이 실제로 다른지 확인 (참조 비교가 아닌 내용 비교)
-      const galleryIds = galleryImages.map(img => img.id).join(',');
-      const localIds = images.map(img => img.id).join(',');
-      
-      console.log('[RichTextEditor] Gallery sync - galleryIds:', galleryIds);
-      console.log('[RichTextEditor] Gallery sync - localIds:', localIds);
-      
-      if (galleryIds !== localIds) {
-        console.log('[RichTextEditor] Syncing gallery to local images');
-        setImages(galleryImages);
-      }
-    }
-  }, [enableImageManager, galleryImages]);
-
-  useEffect(() => {
-    if (enableImageManager && images && setGalleryImages) {
-      // 배열 내용이 실제로 다른지 확인 (참조 비교가 아닌 내용 비교)
-      const localIds = images.map(img => img.id).join(',');
-      const galleryIds = galleryImages ? galleryImages.map(img => img.id).join(',') : '';
-      
-      if (localIds !== galleryIds) {
-        setGalleryImages(images);
-      }
-    }
-  }, [enableImageManager, images, setGalleryImages]);
+  // 양방향 동기화 제거 - galleryImages가 진실의 단일 소스 (Single Source of Truth)
 
   // 이벤트 매니저
   useEditorEventManager(editor, {
@@ -302,8 +268,6 @@ export default function BlogRichTextEditor({
             };
             attrs['data-image-id'] = result.id; // 동기화를 위한 ID 추가
             
-            console.log('[triggerImageUpload] Inserting image with attributes:', attrs);
-            
             // 현재 줄의 전체 텍스트 확인 (YouTube URL 체크)
             const { state } = editor;
             const { selection, doc } = state;
@@ -314,10 +278,9 @@ export default function BlogRichTextEditor({
             
             // YouTube URL 패턴 체크
             const youtubeRegex = /^(https?:\/\/)?(www\.|m\.|music\.)?(youtube\.com|youtu\.be|youtube-nocookie\.com)(\/(watch\?v=|embed\/|v\/|shorts\/)?)([\w-]+)(&\S+)?$/;
-            
+
             if (lineText && youtubeRegex.test(lineText)) {
               // YouTube URL이 있으면 먼저 변환
-              console.log('[triggerImageUpload] YouTube URL 감지, 먼저 변환 후 이미지 삽입:', lineText);
               
               // 현재 줄 전체를 YouTube로 변환하고 이미지 추가
               editor
@@ -358,10 +321,9 @@ export default function BlogRichTextEditor({
                   }
                 }
               });
-              
+
               if (isInYouTube && youtubeEndPos !== null) {
                 // YouTube 블록 내부에 있으면 블록 다음에 삽입
-                console.log('[triggerImageUpload] YouTube 블록 감지, 안전한 위치에 삽입');
                 editor
                   .chain()
                   .setTextSelection(youtubeEndPos)

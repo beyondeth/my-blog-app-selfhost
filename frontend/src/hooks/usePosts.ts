@@ -17,7 +17,7 @@ export const postQueryKeys = {
 // 공통 쿼리 옵션
 const commonQueryOptions = {
   gcTime: 10 * 60 * 1000, // 10분 (가비지 컬렉션 - 메모리에서 제거되는 시간)
-  staleTime: 30 * 1000, // 30초 - 적절한 프로덕션 값 (성능과 실시간성 균형)
+  staleTime: 10 * 60 * 1000, // 10분 - Optimistic Update로 즉시 반영, 불필요한 refetch 방지
   refetchOnWindowFocus: true, // 탭 전환시 자동 갱신 (사용자가 탭으로 돌아올 때 최신 데이터 보장)
   refetchOnMount: false, // 마운트시 refetch 비활성화 (성능 최적화)
   retry: 1,
@@ -129,18 +129,45 @@ export function useCreatePost() {
 // 포스트 수정 뮤테이션 훅
 export function useUpdatePost() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: any }) => 
+    mutationFn: ({ id, data }: { id: string; data: any }) =>
       postsAPI.updatePost(id, data),
     onSuccess: (updatedPost) => {
-      // 개별 포스트 캐시 업데이트
+      // 1. 개별 포스트 캐시 직접 업데이트
       queryClient.setQueryData(postQueryKeys.detail(updatedPost.id), updatedPost);
       if (updatedPost.slug) {
         queryClient.setQueryData(postQueryKeys.detail(updatedPost.slug), updatedPost);
       }
-      // 목록 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: postQueryKeys.lists() });
+
+      // 2. Active 목록 캐시에서 해당 포스트 업데이트 (Optimistic Update - 서버 refetch 없음)
+      // 사용자 브라우저의 메모리에 있는 포스트 목록만 업데이트 (보통 20~40개)
+      // 다른 사용자나 서버 DB에는 영향 없음
+      queryClient.setQueriesData(
+        { queryKey: postQueryKeys.lists() },
+        (oldData: any) => {
+          if (!oldData?.pages) return oldData;
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: any) => ({
+              ...page,
+              posts: page.posts.map((post: any) =>
+                post.id === updatedPost.id
+                  ? { ...post, ...updatedPost } // 수정된 포스트 데이터로 교체
+                  : post
+              ),
+            })),
+          };
+        }
+      );
+
+      // 3. Inactive 쿼리들을 stale로 표시 (사용자가 돌아갈 때 자동 refetch)
+      // refetchType: 'none' → 즉시 refetch 안함, stale만 표시
+      queryClient.invalidateQueries({
+        queryKey: postQueryKeys.lists(),
+        refetchType: 'none',
+      });
     },
     retry: 1,
   });

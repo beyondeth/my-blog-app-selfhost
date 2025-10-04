@@ -169,10 +169,10 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 pt-10 pb-4 sm:pb-6 lg:pb-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-4 sm:pb-6 lg:pb-8">
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-8 lg:gap-16">
-        {/* Main Content Area - 오른쪽 사이드바를 위한 여백 확보 */}
-        <main className="flex-1 min-w-0 lg:mr-[336px]">
+        {/* Main Content Area - 오른쪽 사이드바를 위한 여백 확보 (right-16[64px] + w-80[320px] + 여유 16px = 400px) */}
+        <main className="flex-1 min-w-0 lg:mr-[400px] pt-[70px]">
           <div className="space-y-0">
             {isLoading && allPosts.length === 0 ? (
               // 초기 로딩 시 스켈레톤 UI 표시
@@ -213,7 +213,7 @@ export default function HomePage() {
           </main>
 
           {/* Sidebar - fixed positioning with internal scroll */}
-        <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-28 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll lg:pt-6">
+        <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-40 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll">
           <div className="space-y-4 sm:space-y-6">
             <PopularPostsSection />
 

@@ -17,6 +17,22 @@ interface EditorSetupProps {
   addYouTubeThumbnail: (url: string) => void;
 }
 
+/**
+ * S3 Presigned URL을 Proxy endpoint로 변환
+ * 만료된 Presigned URL 문제 해결
+ */
+function convertS3UrlsToProxy(html: string): string {
+  if (!html) return html;
+
+  // S3 direct URL을 proxy endpoint로 변환
+  // https://myblogdata84.s3.us-east-1.amazonaws.com/uploads/image/...
+  // → /api/v1/files/proxy/uploads/image/...
+  return html.replace(
+    /https:\/\/[^\/]+\.s3\.[^\/]+\.amazonaws\.com\/(uploads\/[^"?]+)(?:\?[^"]*)?/g,
+    '/api/v1/files/proxy/$1'
+  );
+}
+
 export function useEditorSetup({
   content,
   placeholder,
@@ -174,7 +190,9 @@ export function useEditorSetup({
     if (editor && content !== editor.getHTML()) {
       // 에디터가 포커스되어 있지 않을 때만 내용 업데이트
       if (!editor.isFocused) {
-        editor.commands.setContent(content);
+        // S3 Presigned URL을 Proxy endpoint로 변환 (만료 문제 해결)
+        const transformedContent = convertS3UrlsToProxy(content);
+        editor.commands.setContent(transformedContent);
       }
     }
   }, [editor, content]);

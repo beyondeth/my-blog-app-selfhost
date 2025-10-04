@@ -1,6 +1,7 @@
 import { Exclude, Expose, Type } from 'class-transformer';
 import { UserResponseDto } from '../../users/dto/user-response.dto';
 import { BlogResponseDto } from '../../blogs/dto/blog-response.dto';
+import { FileResponseDto } from '../../files/dto/file-response.dto';
 
 /**
  * Post 응답 DTO
@@ -104,12 +105,14 @@ export class PostResponseDto {
   @Expose()
   bookmarked?: boolean; // 사용자 북마크 상태
 
+  // 첨부 파일 - 프론트엔드에서 필요하므로 노출
+  @Expose()
+  @Type(() => FileResponseDto)
+  attachedFiles?: FileResponseDto[];
+
   // ManyToMany 관계는 명시적으로 제외 (lazy loading 방지)
   @Exclude()
   likedBy: any;
-
-  @Exclude()
-  attachedFiles: any;
 
   // TypeORM 메타데이터 제외
   @Exclude()

@@ -14,6 +14,7 @@ interface UseImageGallerySyncProps {
   onFilesChange?: (fileIds: string[]) => void;
   onThumbnailSelect?: (thumbnailId: string) => void;
   selectedThumbnailId?: string;  // Parent에서 전달받은 값
+  initialImages?: UploadedImageInfo[];  // 초기 이미지 (수정 모드)
 }
 
 export function useImageGallerySync({
@@ -22,11 +23,17 @@ export function useImageGallerySync({
   onFilesChange,
   onThumbnailSelect,
   selectedThumbnailId = '',  // Parent에서 전달받은 값 사용
+  initialImages,  // 초기 이미지
 }: UseImageGallerySyncProps) {
-  const [images, setImages] = useState<UploadedImageInfo[]>([]);
+  const [images, setImages] = useState<UploadedImageInfo[]>(initialImages || []);
   // 로컬 selectedThumbnailId 상태 제거
-  
-  console.log('[useImageGallerySync] 🔍 Editor 상태:', !!editor, editor?.isDestroyed);
+
+  // initialImages 변경 시 images state 업데이트
+  useEffect(() => {
+    if (initialImages && initialImages.length > 0) {
+      setImages(initialImages);
+    }
+  }, [initialImages]);
 
   // Image upload manager hook 사용
   const imageUploadManager = useImageUploadManager({

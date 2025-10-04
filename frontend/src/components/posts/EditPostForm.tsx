@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -20,6 +20,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Save, ArrowLeft, FileText, Type, FolderOpen } from 'lucide-react';
 import { BlogRichTextEditor } from '@/editor';
+import type { UploadedImageInfo } from '@/editor';
+import type { FileUpload } from '@/types';
 
 // 폼 스키마 정의
 const postFormSchema = z.object({
@@ -31,6 +33,8 @@ const postFormSchema = z.object({
   category: z.string()
     .max(50, { message: "카테고리는 50자 이하로 입력해주세요." })
     .optional(),
+  thumbnail: z.string().optional(),
+  attachedFileIds: z.array(z.string()).optional(),
 });
 
 type PostFormValues = z.infer<typeof postFormSchema>;
@@ -40,6 +44,8 @@ interface EditPostFormProps {
     title: string;
     content: string;
     category?: string;
+    thumbnail?: string;
+    attachedFiles?: FileUpload[];
   };
   isLoading?: boolean;
   onSubmit: (data: PostFormValues) => void;
@@ -56,17 +62,102 @@ export default function EditPostForm({
   submitButtonText = "저장",
   title = "게시글 수정"
 }: EditPostFormProps) {
+  // 이미지 및 썸네일 상태 관리 (new-story/page.tsx와 동일)
+  const [images, setImages] = useState<UploadedImageInfo[]>([]);
+  const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
+  const [isUploadValid, setIsUploadValid] = useState<boolean>(true);
+  const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
+
+  // DB의 attachedFiles를 UploadedImageInfo 배열로 변환 (useMemo 사용)
+  // 에디터 초기화 시 한 번만 사용되는 초기 이미지 데이터
+  const initialImages = useMemo(() => {
+    if (initialData?.attachedFiles && initialData.attachedFiles.length > 0) {
+      return initialData.attachedFiles.map(file => {
+        let imageUrl = file.fileUrl;
+
+        // fileUrl이 상대 경로인 경우 프록시 경로로 변환
+        if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+          imageUrl = `/api/v1/files/proxy/${imageUrl}`;
+        }
+
+        return {
+          id: String(file.id),
+          url: imageUrl || `/api/v1/files/${file.id}/download`,
+          name: file.fileName || file.originalName || `file-${file.id}`,
+          size: file.fileSize || 0,
+          isUploading: false,
+        };
+      });
+    }
+    return [];
+  }, [initialData?.attachedFiles]);
+
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
     defaultValues: {
       title: initialData?.title || '',
       content: initialData?.content || '',
       category: initialData?.category || '',
+      thumbnail: initialData?.thumbnail || '',
+      attachedFileIds: [],
     },
   });
 
+  // 초기 썸네일 ID 설정
+  useEffect(() => {
+    if (initialData?.thumbnail) {
+      // /api/v1/files/{id}/download 형식에서 ID 추출
+      const match = initialData.thumbnail.match(/\/files\/([^/]+)\//);
+      if (match) {
+        setSelectedThumbnailId(match[1]);
+      }
+    }
+  }, [initialData?.thumbnail]);
+
+  // 이미지 목록이 변경될 때마다 form의 attachedFileIds를 업데이트 (new-story/page.tsx와 동일)
+  useEffect(() => {
+    const fileIds = images
+      .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
+      .map(img => img.id);
+    form.setValue('attachedFileIds', fileIds);
+
+    const allImageIds = images.filter(img => !img.isUploading).map(img => img.id);
+
+    if (allImageIds.length > 0) {
+      const currentSelectionValid = selectedThumbnailId && allImageIds.includes(selectedThumbnailId);
+
+      if (!currentSelectionValid) {
+        setSelectedThumbnailId(allImageIds[0]);
+      }
+    } else if (selectedThumbnailId) {
+      setSelectedThumbnailId('');
+    }
+  }, [images, selectedThumbnailId, form]);
+
+  // Upload validation handler (new-story/page.tsx와 동일)
+  const handleUploadValidationChange = (isValid: boolean, reason?: string) => {
+    setIsUploadValid(isValid);
+    setUploadValidationReason(reason);
+  };
+
   const handleSubmit = (data: PostFormValues) => {
-    onSubmit(data);
+    // 썸네일 처리 (new-story/page.tsx와 동일)
+    const formData: any = {
+      ...data,
+    };
+
+    if (selectedThumbnailId) {
+      if (selectedThumbnailId.startsWith('yt_thumb_')) {
+        const selectedImage = images.find(img => img.id === selectedThumbnailId);
+        if (selectedImage) {
+          formData.thumbnail = selectedImage.url;
+        }
+      } else {
+        formData.thumbnail = `/api/v1/files/${selectedThumbnailId}/download`;
+      }
+    }
+
+    onSubmit(formData);
   };
 
   return (
@@ -171,11 +262,21 @@ export default function EditPostForm({
                     <FormLabel>내용 *</FormLabel>
                     <FormControl>
                       <div className="min-h-[400px]">
-                                                 <BlogRichTextEditor
-                           content={field.value}
-                           onChange={field.onChange}
-                           placeholder="게시글 내용을 작성하세요..."
-                         />
+                        <BlogRichTextEditor
+                          content={field.value}
+                          onChange={field.onChange}
+                          onFilesChange={(fileIds) => {
+                            // File IDs are handled via images state
+                          }}
+                          onThumbnailSelect={setSelectedThumbnailId}
+                          selectedThumbnailId={selectedThumbnailId}
+                          onImagesChange={setImages}
+                          onValidationChange={handleUploadValidationChange}
+                          initialImages={initialImages}
+                          enableImageManager={true}
+                          maxImages={10}
+                          placeholder="게시글 내용을 작성하세요..."
+                        />
                       </div>
                     </FormControl>
                     <FormDescription>
@@ -200,8 +301,9 @@ export default function EditPostForm({
             </Button>
             <Button
               type="submit"
-              disabled={isLoading || !form.formState.isValid}
+              disabled={!isUploadValid || isLoading || !form.formState.isValid}
               className="flex items-center gap-2 min-w-[120px]"
+              title={!isUploadValid ? uploadValidationReason : undefined}
             >
               {isLoading ? (
                 <>

@@ -122,7 +122,7 @@ export const useIsBookmarked = (postId: string) => {
     queryKey: ['bookmark-status', postId],
     queryFn: async () => {
       // postId가 없으면 쿼리 실행하지 않음 (enabled 옵션과 함께 이중 방어)
-      if (!postId) {
+      if (!postId || postId.trim() === '') {
         return { bookmarked: false };
       }
 
@@ -147,8 +147,8 @@ export const useIsBookmarked = (postId: string) => {
 
       return response.json();
     },
-    enabled: !!postId, // postId가 있을 때만 쿼리 실행
-    staleTime: 1000 * 60 * 5, // 5분
+    enabled: Boolean(postId && postId.trim()), // postId가 유효할 때만 쿼리 실행
+    staleTime: 1000 * 60 * 10, // 10분 (다른 쿼리와 일관성)
     retry: false, // 401 에러 시 재시도하지 않음
   });
 };

@@ -8,7 +8,6 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { FiEdit3, FiLogOut, FiMenu, FiX, FiSearch } from 'react-icons/fi';
 import { routes, navigation } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
-import NotificationIcon from '../notifications/NotificationIcon';
 import SubscriptionBadge from '../subscription/SubscriptionBadge';
 import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';

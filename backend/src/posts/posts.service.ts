@@ -806,7 +806,7 @@ export class PostsService {
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
-        'file.id', 'file.fileUrl', 'file.fileType',
+        'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
       ])
       .where('post.id = :id', { id });
@@ -886,7 +886,7 @@ export class PostsService {
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
-        'file.id', 'file.fileUrl', 'file.fileType',
+        'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
       ])
       .where('post.slug = :slug', { slug })
@@ -958,7 +958,6 @@ export class PostsService {
     postDto.createdAt = formatDate(post.createdAt) as any;
     postDto.updatedAt = formatDate(post.updatedAt) as any;
 
-    this.logger.log(`Returning post data with ${post.attachedFiles?.length || 0} attached files`);
     return postDto;
   }
 
@@ -1044,9 +1043,12 @@ export class PostsService {
 
     // thumbnail이 명시적으로 제공된 경우 사용, 그렇지 않으면 content에서 추출
     if (updatePostDto.thumbnail !== undefined) {
+      this.logger.log(`[UPDATE] Post ${id} - Updating thumbnail to: ${updatePostDto.thumbnail}`);
       post.thumbnail = updatePostDto.thumbnail;
     } else if (processedContent) {
-      post.thumbnail = this.extractThumbnailFromContent(processedContent);
+      const extractedThumbnail = this.extractThumbnailFromContent(processedContent);
+      this.logger.log(`[UPDATE] Post ${id} - Extracted thumbnail from content: ${extractedThumbnail}`);
+      post.thumbnail = extractedThumbnail;
     }
 
     await this.postsRepository.save(post);

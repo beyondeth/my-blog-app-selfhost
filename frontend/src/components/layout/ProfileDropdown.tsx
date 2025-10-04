@@ -186,17 +186,6 @@ export default function ProfileDropdown({
 
         <DropdownMenuSeparator />
 
-        {/* Help Center */}
-        <DropdownMenuItem 
-          onClick={() => handleNavigation('/help-center')}
-          className="cursor-pointer"
-        >
-          <FiHelpCircle className="mr-2 h-4 w-4" />
-          <span>고객센터</span>
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-
         {/* Logout */}
         <DropdownMenuItem
           onClick={onLogout}

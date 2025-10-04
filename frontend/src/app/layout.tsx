@@ -86,7 +86,8 @@ export default function RootLayout({
                 <Header />
                 <div className="flex">
                   <LeftSidebar />
-                  <div className="flex-1 lg:ml-20">
+                  {/* 왼쪽 사이드바 영역 확보: translate-x-[23px] + w-20 = 103px, 여유 25px 포함 = 128px */}
+                  <div className="flex-1 lg:ml-32">
                     {children}
                   </div>
                 </div>

@@ -11,9 +11,9 @@ interface UseImageUploadManagerProps {
   selectedThumbnailId: string;
 }
 
-export function useImageUploadManager({ 
-  editor, 
-  images, 
+export function useImageUploadManager({
+  editor,
+  images,
   onImagesChange,
   onThumbnailSelect,
   selectedThumbnailId,
@@ -21,8 +21,9 @@ export function useImageUploadManager({
   // 부모로부터 받은 상태를 사용하므로 내부 상태 제거
   // const [uploadedImages, setUploadedImages] = useState<UploadedImageInfo[]>([]);
   // const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
-  
+
   const editorImagePositions = useRef<Map<string, number>>(new Map());
+  const prevImagesRef = useRef<UploadedImageInfo[]>([]);
   
   // Use refs to avoid circular dependency issues
   const removeImageFromEditorRef = useRef<(imageUrl: string) => boolean>();
@@ -140,22 +141,27 @@ export function useImageUploadManager({
     isEnabled: true,
   });
 
+  // images가 변경될 때마다 prevImagesRef 업데이트
+  useEffect(() => {
+    prevImagesRef.current = images;
+  }, [images]);
+
   // REMOVED: needsEditorRebuild state that was causing issues
   // Gallery order changes should not trigger editor rebuilds
-  
+
   // Handle images change from ImageUploadManager (Gallery → Editor sync)
   const handleGalleryImageChange = useCallback((newImages: UploadedImageInfo[]) => {
     console.log('[GallerySync] 🔄 handleGalleryImageChange called with', newImages.length, 'images');
-    
+
     // Skip if we're currently syncing from editor or gallery (reorder)
     if (syncSourceRef.current) {
       console.log('[GallerySync] ⚠️ Skipping - sync in progress by:', syncSourceRef.current);
       return;
     }
-    
+
     acquireSyncLock('gallery', 500);  // 짧은 lock - 삭제만 처리
-    
-    const prevImages = images;
+
+    const prevImages = prevImagesRef.current;  // ref에서 이전 상태 가져오기
 
     // Check if image was deleted
     const deletedImages = prevImages.filter(
@@ -210,7 +216,7 @@ export function useImageUploadManager({
       }
     }, 300);
 
-  }, [onImagesChange, acquireSyncLock, editor, images]);
+  }, [onImagesChange, acquireSyncLock, editor, selectedThumbnailId, onThumbnailSelect]);  // images 의존성 제거 (ref 사용)
   
   // Handle newly uploaded images (insert to editor)
   const handleImagesUploaded = useCallback((newlyUploaded: UploadedImageInfo[]) => {

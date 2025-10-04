@@ -416,7 +416,7 @@ export default function ImageUploadManager({
         ...img,
         position: index
       }));
-      onImagesChange(reindexed);
+      // onImagesChange는 setImages 내부에서 이미 호출됨 (중복 호출 방지)
       return reindexed;
     });
 
@@ -424,7 +424,7 @@ export default function ImageUploadManager({
     if (selectedThumbnailId === imageId) {
       onThumbnailSelect?.('');
     }
-  }, [onImagesChange, onThumbnailSelect, selectedThumbnailId]);
+  }, [onThumbnailSelect, selectedThumbnailId]);
 
   // Handle thumbnail selection
   const handleSelectThumbnail = useCallback((imageId: string) => {

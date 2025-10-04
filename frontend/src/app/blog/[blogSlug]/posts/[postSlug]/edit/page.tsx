@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost, useUpdatePost } from '@/hooks/usePosts';
 import { FiEdit3, FiType, FiAlignLeft, FiImage, FiArrowLeft } from 'react-icons/fi';
 import { BlogRichTextEditor } from '@/editor';
+import type { UploadedImageInfo } from '@/editor';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import { toast } from 'sonner';
@@ -41,6 +42,7 @@ export default function BlogEditPostPage() {
   const { data: post, isLoading: postLoading, error: postError } = usePost(postSlug);
   const updatePostMutation = useUpdatePost();
 
+
   // Fetch blog info
   useEffect(() => {
     if (!blogSlug) return;
@@ -71,21 +73,48 @@ export default function BlogEditPostPage() {
     fetchBlog();
   }, [blogSlug, router]);
 
+  // DB의 attachedFiles를 UploadedImageInfo 배열로 변환
+  const initialImages = useMemo(() => {
+    if (post?.attachedFiles && post.attachedFiles.length > 0) {
+      return post.attachedFiles.map((file: any) => {
+        let imageUrl = file.fileUrl;
+
+        // fileUrl이 상대 경로인 경우 프록시 경로로 변환
+        if (imageUrl && !imageUrl.startsWith('http') && !imageUrl.startsWith('/')) {
+          imageUrl = `/api/v1/files/proxy/${imageUrl}`;
+        }
+
+        return {
+          id: String(file.id),
+          url: imageUrl || `/api/v1/files/${file.id}/download`,
+          name: file.fileName || file.originalName || `file-${file.id}`,
+          size: file.fileSize || 0,
+          isUploading: false,
+        };
+      });
+    }
+    return [];
+  }, [post?.attachedFiles]);
+
   // Load post data
   useEffect(() => {
     if (post) {
       setTitle(post.title || '');
       setContent(post.content || '');
       setCategory(post.category || '');
-      
+
       // Set attached file IDs if they exist
       if (post.attachedFiles && post.attachedFiles.length > 0) {
         setAttachedFileIds(post.attachedFiles.map((file: any) => file.id));
       }
-      
-      // Set thumbnail if exists
-      // Note: thumbnailFileId is not part of the Post type
-      // We'll need to extract it from attachedFiles or thumbnail URL if needed
+
+      // Set thumbnail if exists - extract ID from URL
+      if (post.thumbnail) {
+        const match = post.thumbnail.match(/\/files\/([^/]+)\//);
+        if (match) {
+          setThumbnailId(match[1]);
+        }
+      }
     }
   }, [post]);
 
@@ -138,7 +167,7 @@ export default function BlogEditPostPage() {
         id: post.id,
         data: updateData
       });
-      
+
       toast.success('글이 성공적으로 수정되었습니다!');
       router.push(`/blog/${blogSlug}/posts/${post.slug || post.id}`);
     } catch (error: any) {
@@ -249,6 +278,8 @@ export default function BlogEditPostPage() {
                 onChange={handleContentChange}
                 onFilesChange={handleFilesChange}
                 onThumbnailSelect={handleThumbnailSelect}
+                selectedThumbnailId={thumbnailId}
+                initialImages={initialImages}
                 enableImageManager={true}
                 maxImages={5}
                 className="min-h-[500px]"
