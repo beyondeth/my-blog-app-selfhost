@@ -151,13 +151,9 @@ export default function NewStoryPage() {
       }
       
       const result = await createPostMutation.mutateAsync(postData);
-      
-      // 성공 시 해당 블로그의 포스트로 이동
-      if (blog) {
-        router.push(`/blog/${blog.slug}/posts/${result.slug}`);
-      } else {
-        router.push(`/posts/${result.slug}`);
-      }
+
+      // 성공 시 해당 블로그의 포스트로 이동 (blog는 항상 존재)
+      router.push(`/${blog!.slug}/${result.slug}`);
     } catch (error) {
       console.error('Failed to create post:', error);
       toast.error('포스트 저장에 실패했습니다.');

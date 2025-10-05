@@ -104,7 +104,8 @@ export class PostsController {
     const { page, limit, blogSlug, isPublished, isPublicOnly = true } = params;
 
     // 기본값인 경우 단순한 캐시 키 사용 (대부분의 사용자가 이 조합 사용)
-    if (limit === 10 && !blogSlug && isPublished === undefined) {
+    // 프론트엔드 기본 limit: 20 (usePosts.ts:39)
+    if (limit === 20 && !blogSlug && isPublished === undefined) {
       return `feed:main:p${page}`;  // 더 짧은 키로 메모리 절약
     }
 
@@ -133,7 +134,12 @@ export class PostsController {
     
     // 스마트 캐시 무효화: 배치 처리로 DB 부하 최소화
     // 새 포스트는 항상 최상단에 추가되므로 1페이지만 즉시 무효화
-    const cacheKeysToInvalidate = ['feed:main:p1'];
+    // limit 다양성 대응: 기본 키 + custom 키 모두 무효화
+    const cacheKeysToInvalidate = [
+      'feed:main:p1',          // limit=20 기본 키
+      'feed:custom:p1:l20',    // limit=20 명시적 키 (안전성)
+      'feed:custom:p1:l10',    // limit=10 사용 시 대비
+    ];
 
     // 인기 포스트 캐시 무효화 (새 포스트가 인기 목록에 영향을 줄 수 있음)
     const popularPeriods = ['daily', 'weekly', 'monthly'];
@@ -412,7 +418,10 @@ export class PostsController {
     // 스마트 캐시 무효화: 영향받는 페이지만 무효화
     try {
       // 메인 피드는 1페이지만 즉시 무효화 (제목/내용 변경 시 영향)
+      // limit 다양성 대응: 기본 키 + custom 키 모두 무효화
       await this.cacheService.delete('feed:main:p1');
+      await this.cacheService.delete('feed:custom:p1:l20');
+      await this.cacheService.delete('feed:custom:p1:l10');
       console.log('✅ Cache invalidated: page 1 after update');
 
       // 2-3페이지는 지연 무효화
@@ -454,7 +463,10 @@ export class PostsController {
     try {
       // 삭제는 페이지 구조에 영향이 크므로 더 많이 무효화 (하지만 지연 처리)
       // 1페이지는 즉시 무효화
+      // limit 다양성 대응: 기본 키 + custom 키 모두 무효화
       await this.cacheService.delete('feed:main:p1');
+      await this.cacheService.delete('feed:custom:p1:l20');
+      await this.cacheService.delete('feed:custom:p1:l10');
       console.log('✅ Cache invalidated: page 1 after deletion');
 
       // 2-3페이지는 2초 후 무효화

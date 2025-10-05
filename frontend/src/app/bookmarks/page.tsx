@@ -54,7 +54,7 @@ export default function BookmarksPage() {
   const handlePostClick = (post: any) => {
     // 포스트 상세 페이지로 이동
     if (post.blog?.slug && (post.slug || post.id)) {
-      router.push(`/blog/${post.blog.slug}/posts/${post.slug || post.id}`);
+      router.push(`/${post.blog.slug}/${post.slug || post.id}`);
     }
   };
 

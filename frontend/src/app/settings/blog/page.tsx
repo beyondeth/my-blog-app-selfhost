@@ -180,17 +180,17 @@ export default function BlogSettingsPage() {
                 <FiLink className="mr-2 text-gray-400 dark:text-gray-500" />
                 <span className="text-gray-600 dark:text-gray-400">전체 URL:</span>
                 <a
-                  href={`/blog/${blog?.slug}`}
+                  href={`/${blog?.slug}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="ml-2 text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-gray-100"
                 >
-                  {window.location.origin}/blog/{blog?.slug}
+                  {window.location.origin}/{blog?.slug}
                 </a>
               </div>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/blog/${blog?.slug}`);
+                  navigator.clipboard.writeText(`${window.location.origin}/${blog?.slug}`);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}

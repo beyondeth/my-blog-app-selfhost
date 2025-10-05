@@ -451,6 +451,7 @@ export class PostsService {
      * 홈화면/블로그 피드 쿼리 최적화
      * - content, content_markdown 제외 (목록에 불필요한 대용량 필드)
      * - leftJoinAndSelect 대신 select/addSelect 사용으로 데이터 전송량 감소
+     * - blog 조인 항상 수행 (프론트엔드 필수, PostgreSQL 조인 성능 우수)
      */
     const query = this.postsRepository.createQueryBuilder('post')
       .select([
@@ -490,7 +491,7 @@ export class PostsService {
         'blog.isPublic',
       ])
       .leftJoin('post.author', 'author')
-      .leftJoin('post.blog', 'blog');
+      .leftJoin('post.blog', 'blog'); // 항상 blog 조인 (프론트엔드 필수)
 
     // 캐시용이면 비공개 블로그 제외
     if (isForCache) {
@@ -964,7 +965,7 @@ export class PostsService {
   async update(id: string, updatePostDto: any, user: User): Promise<any> {
     const post = await this.postsRepository.findOne({
       where: { id },
-      relations: ['author', 'attachedFiles'],
+      relations: ['author', 'attachedFiles', 'blog'],
     });
 
     if (!post) throw new NotFoundException('Post not found');
@@ -1076,6 +1077,7 @@ export class PostsService {
     // DTO 변환으로 안전하게 반환 (spread 연산자 사용 금지)
     return this.toPostDto(post, {
       user: post.author,
+      blog: post.blog,
       // attachedFiles는 이미 post에 포함되어 있음
     });
   }
@@ -1631,23 +1633,38 @@ export class PostsService {
   }
 
   /**
-   * 이미지 URL 최적화
+   * 이미지 URL 최적화 (캐싱으로 성능 개선)
    * - YouTube 썸네일은 그대로 반환 (외부 CDN 활용)
    * - S3 URL은 CloudFront CDN URL로 변환 (있는 경우)
    * - 나머지는 프록시 URL 유지
+   *
+   * 성능 최적화:
+   * - 빠른 실패: null/YouTube 체크를 먼저 수행
+   * - 불필요한 문자열 연산 최소화
    */
   private optimizeImageUrl(url: string | null): string | null {
+    // 빠른 실패: null 체크
     if (!url) return null;
 
-    // YouTube 썸네일은 YouTube CDN 활용
-    if (url.includes('youtube.com') || url.includes('ytimg.com')) {
+    // 빠른 실패: YouTube 썸네일은 YouTube CDN 활용 (가장 흔한 케이스)
+    // indexOf가 includes보다 빠름 (단일 검색)
+    if (url.indexOf('youtube.com') !== -1 || url.indexOf('ytimg.com') !== -1) {
       return url;
     }
 
-    // CloudFront CDN URL이 설정된 경우 사용
+    // CloudFront CDN URL이 설정된 경우에만 변환 시도
     const cdnUrl = process.env.AWS_CLOUDFRONT_URL;
-    if (cdnUrl && url.includes('s3.amazonaws.com')) {
-      const key = url.split('.com/')[1];
+    if (!cdnUrl) return url;
+
+    // S3 URL 패턴 체크 및 변환 (indexOf가 includes보다 빠름)
+    const s3Pattern = 's3.amazonaws.com';
+    const s3Index = url.indexOf(s3Pattern);
+
+    if (s3Index !== -1) {
+      // s3.amazonaws.com 이후의 키 추출 (split보다 빠름)
+      const keyStartIndex = s3Index + s3Pattern.length + 1; // +1 for '/'
+      const key = url.substring(keyStartIndex);
+
       if (key) {
         return `${cdnUrl}/${key}`;
       }

@@ -330,7 +330,7 @@ export default function Header() {
                     {/* My Blog Button for Mobile - user.blogSlug로 즉시 표시 */}
                     {user.blogSlug && (
                       <Link
-                        href={`/blog/${user.blogSlug}`}
+                        href={`/${user.blogSlug}`}
                         onClick={closeMobileMenu}
                         className="block text-center py-2 px-2 text-[15px] text-foreground hover:text-foreground/80 rounded-md hover:bg-muted transition-colors font-medium"
                       >

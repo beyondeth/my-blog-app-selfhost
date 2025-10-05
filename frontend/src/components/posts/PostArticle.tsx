@@ -151,7 +151,7 @@ const PostArticle = React.memo(function PostArticle({
             {/* 제목 - YouTube 포스트는 더 큰 제목 */}
             <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight mb-1">
               <Link
-                href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
+                href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
                 className="hover:text-primary transition-colors"
               >
                 {searchQuery ? (
@@ -204,8 +204,8 @@ const PostArticle = React.memo(function PostArticle({
             
             {/* 버튼들 - 메타 정보 바로 아래 */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Link 
-                href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
+              <Link
+                href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
                 className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
               >
                 더보기
@@ -214,7 +214,7 @@ const PostArticle = React.memo(function PostArticle({
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
                   <button
-                    onClick={() => onEdit(post.slug || post.id.toString())}
+                    onClick={() => onEdit(post.id)}
                     className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
                   >
                     수정
@@ -267,7 +267,7 @@ const PostArticle = React.memo(function PostArticle({
           
           <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
             <Link
-              href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
+              href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
               className="hover:text-primary transition-colors block"
             >
               {searchQuery ? (
@@ -321,8 +321,8 @@ const PostArticle = React.memo(function PostArticle({
             
             {/* 버튼들 - 메타 정보 바로 아래 */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Link 
-                href={post.blog?.slug ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}` : `/posts/${post.slug || post.id}`}
+              <Link
+                href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
                 className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
               >
                 더보기
@@ -331,7 +331,7 @@ const PostArticle = React.memo(function PostArticle({
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
                   <button
-                    onClick={() => onEdit(post.slug || post.id.toString())}
+                    onClick={() => onEdit(post.id)}
                     className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
                   >
                     수정

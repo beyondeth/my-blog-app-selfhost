@@ -57,10 +57,9 @@ export interface FollowInfo {
 }
 
 export interface PaginatedResponse<T> {
-  data: T[];
+  posts: T[];  // 백엔드 응답 구조와 일치
   total: number;
   page: number;
-  limit: number;
   totalPages: number;
 }
 

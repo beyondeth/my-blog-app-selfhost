@@ -3,6 +3,7 @@
  * @description 블로그 포스트 CRUD 및 좋아요 기능
  */
 
+import { validate as isUUID } from 'uuid';
 import type { ApiClient } from '../client';
 import type {
   Post,
@@ -47,12 +48,17 @@ export class PostsAPI {
   }
 
   /**
-   * 슬러그로 포스트 조회
-   * @param slug - 포스트 슬러그 (URL 친화적 제목)
+   * 슬러그 또는 ID로 포스트 조회
+   * @param slugOrId - 포스트 슬러그 (URL 친화적 제목) 또는 UUID
    * @returns 포스트 상세 정보
+   * @description UUID인 경우 /posts/:id, 슬러그인 경우 /posts/slug/:slug 엔드포인트 사용
    */
-  async getPostBySlug(slug: string): Promise<Post> {
-    return this.client.get<Post>(`/posts/slug/${slug}`);
+  async getPostBySlug(slugOrId: string): Promise<Post> {
+    // UUID 검증: UUID면 ID 엔드포인트, 아니면 slug 엔드포인트 사용
+    if (isUUID(slugOrId)) {
+      return this.client.get<Post>(`/posts/${slugOrId}`);
+    }
+    return this.client.get<Post>(`/posts/slug/${slugOrId}`);
   }
 
   /**

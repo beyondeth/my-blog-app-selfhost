@@ -80,7 +80,7 @@ export default function UserLinkWithTooltip({
   if (!userData) {
     return (
       <Link
-        href={effectiveBlogSlug ? `/blog/${effectiveBlogSlug}` : '#'}
+        href={effectiveBlogSlug ? `/${effectiveBlogSlug}` : '#'}
         className="inline-block cursor-pointer"
       >
         {children}
@@ -91,7 +91,7 @@ export default function UserLinkWithTooltip({
   return (
     <UserTooltip user={userData} followInfo={followInfo}>
       <Link
-        href={effectiveBlogSlug ? `/blog/${effectiveBlogSlug}` : '#'}
+        href={effectiveBlogSlug ? `/${effectiveBlogSlug}` : '#'}
         className="inline-block cursor-pointer"
       >
         {children}

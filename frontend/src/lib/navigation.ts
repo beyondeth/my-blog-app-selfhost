@@ -3,9 +3,8 @@ import { z } from 'zod';
 // 라우트 정의
 export const routes = {
   home: () => '/',
-  posts: (params?: { slug?: string }) => 
+  posts: (params?: { slug?: string }) =>
     params?.slug ? `/posts/${params.slug}` : '/posts',
-  postsNew: () => '/posts/new',
   postsEdit: (slug: string) => `/posts/edit/${slug}`,
   login: () => '/login',
   register: () => '/register',
@@ -25,15 +24,12 @@ export type HomeSearchParams = z.infer<typeof homeSearchSchema>;
 export const navigation = {
   // 홈으로 이동 (캐시 유지)
   toHome: () => routes.home(),
-  
+
   // 포스트 상세로 이동
   toPost: (slug: string) => routes.posts({ slug }),
-  
+
   // 포스트 편집으로 이동
   toPostEdit: (slug: string) => routes.postsEdit(slug),
-  
-  // 새 포스트 작성으로 이동
-  toPostNew: () => routes.postsNew(),
 } as const;
 
 // URL 파라미터 파싱 헬퍼 (타입 안전)

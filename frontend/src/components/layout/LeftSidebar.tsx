@@ -99,15 +99,15 @@ export default function LeftSidebar() {
         {/* My Blog 버튼 - 로그인 사용자만 표시 */}
         {user && user.blogSlug && (
           <Link
-            href={`/blog/${user.blogSlug}`}
+            href={`/${user.blogSlug}`}
             className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
-              pathname === `/blog/${user.blogSlug}`
+              pathname === `/${user.blogSlug}`
                 ? 'bg-accent text-accent-foreground'
                 : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
             }`}
             title="내 블로그"
           >
-            <MyBlogIcon className={pathname === `/blog/${user.blogSlug}` ? 'opacity-100' : 'opacity-70'} size={24} />
+            <MyBlogIcon className={pathname === `/${user.blogSlug}` ? 'opacity-100' : 'opacity-70'} size={24} />
             <span className="text-xs mt-1 font-medium">내블로그</span>
           </Link>
         )}

@@ -21,7 +21,7 @@ export type {
   MessagesPaginatedResponse,
   BlockedUser
 } from './endpoints/chat';
-export type { Blog, BlogForm } from './endpoints/blogs';
+export type { BlogForm } from './endpoints/blogs';
 
 /**
  * 확장된 API 클라이언트 클래스

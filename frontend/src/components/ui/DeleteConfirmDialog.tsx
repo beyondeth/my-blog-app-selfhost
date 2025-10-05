@@ -12,7 +12,6 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
-import { Trash2, AlertTriangle } from 'lucide-react';
 
 interface DeleteConfirmDialogProps {
   isOpen: boolean;
@@ -30,67 +29,66 @@ export default function DeleteConfirmDialog({
   isOpen,
   onClose,
   onConfirm,
-  title = "정말로 삭제하시겠습니까?",
+  title = "게시물을 삭제하시겠어요?",
   description,
   confirmText = "삭제",
   cancelText = "취소",
   isLoading = false,
   itemName = "항목"
 }: DeleteConfirmDialogProps) {
-  const defaultDescription = `이 작업은 되돌릴 수 없습니다. ${itemName}이(가) 영구적으로 삭제됩니다.`;
+  const defaultDescription = "이 게시물을 삭제하면 복원할 수 없습니다.";
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onClose}>
-      <AlertDialogContent className="sm:max-w-[425px]">
-        <AlertDialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100">
-              <AlertTriangle className="h-5 w-5 text-red-600" />
-            </div>
-            <div className="flex-1">
-              <AlertDialogTitle className="text-lg font-semibold text-gray-900">
-                {title}
-              </AlertDialogTitle>
-            </div>
-          </div>
-          <AlertDialogDescription className="text-sm text-gray-600 mt-2">
+      <AlertDialogContent className="sm:max-w-[340px] p-0 gap-0 bg-white dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-300 dark:border-gray-600">
+        {/* 헤더 영역 */}
+        <div className="px-6 py-10 text-center">
+          <AlertDialogTitle className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+            {title}
+          </AlertDialogTitle>
+          <AlertDialogDescription className="text-sm text-gray-600 dark:text-gray-400">
             {description || defaultDescription}
           </AlertDialogDescription>
-        </AlertDialogHeader>
+        </div>
 
-        <AlertDialogFooter className="flex flex-col-reverse sm:flex-row gap-2 sm:gap-2">
+        {/* 구분선 */}
+        <div className="h-px bg-gray-200 dark:bg-gray-700" />
+
+        {/* 버튼 영역 - iOS 스타일 */}
+        <div className="flex">
+          {/* 취소 버튼 */}
           <AlertDialogCancel asChild>
-            <Button
-              variant="outline"
+            <button
               onClick={onClose}
               disabled={isLoading}
-              className="w-full sm:w-auto"
+              className="flex-1 py-6 text-base font-medium text-gray-900 dark:text-white disabled:opacity-50 bg-transparent hover:bg-transparent hover:text-gray-900 dark:hover:text-white focus:outline-none focus:bg-transparent"
             >
               {cancelText}
-            </Button>
+            </button>
           </AlertDialogCancel>
 
+          {/* 세로 구분선 */}
+          <div className="w-px bg-gray-200 dark:bg-gray-700" />
+
+          {/* 삭제 버튼 */}
           <AlertDialogAction asChild>
-            <Button
-              variant="destructive"
+            <button
               onClick={onConfirm}
               disabled={isLoading}
-              className="w-full sm:w-auto"
+              autoFocus
+              className="flex-1 py-6 text-base font-semibold text-red-600 dark:text-red-500 disabled:opacity-50 bg-gray-800 dark:bg-gray-900 focus:outline-none"
             >
               {isLoading ? (
-                <>
-                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                <span className="flex items-center justify-center">
+                  <div className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-red-600 dark:border-red-500 border-t-transparent" />
                   삭제중...
-                </>
+                </span>
               ) : (
-                <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {confirmText}
-                </>
+                confirmText
               )}
-            </Button>
+            </button>
           </AlertDialogAction>
-        </AlertDialogFooter>
+        </div>
       </AlertDialogContent>
     </AlertDialog>
   );

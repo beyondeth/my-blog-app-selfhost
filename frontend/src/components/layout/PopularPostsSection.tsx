@@ -114,10 +114,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
                   </div>
                 )}
                 <Link
-                  href={post.blog?.slug
-                    ? `/blog/${post.blog.slug}/posts/${post.slug || post.id}`
-                    : `/posts/${post.slug || post.id}`
-                  }
+                  href={`/${post.blog.slug}/${post.slug || post.id}`}
                   className="block hover:text-gray-600 transition-colors"
                 >
                   <h4 className="text-[15px] font-medium line-clamp-2 break-words">

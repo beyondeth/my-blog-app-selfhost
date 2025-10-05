@@ -67,6 +67,7 @@ interface Post {
   blog?: {
     id: string;
     name: string;
+    slug: string;
   };
   isPublished: boolean;
   publishedAt?: string;
@@ -464,7 +465,7 @@ export default function PostsManagement() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
                           <DropdownMenuItem
-                            onClick={() => window.open(`/posts/${post.slug}`, '_blank')}
+                            onClick={() => post.blog?.slug && window.open(`/${post.blog.slug}/${post.slug || post.id}`, '_blank')}
                           >
                             <Eye className="h-4 w-4 mr-2" />
                             {t.posts.viewPost}
@@ -485,7 +486,7 @@ export default function PostsManagement() {
                             )}
                           </DropdownMenuItem>
                           <DropdownMenuItem
-                            onClick={() => window.open(`/posts/edit/${post.slug}`, '_blank')}
+                            onClick={() => window.open(`/p/${post.id}/edit`, '_blank')}
                           >
                             <Edit className="h-4 w-4 mr-2" />
                             {t.posts.editPost}

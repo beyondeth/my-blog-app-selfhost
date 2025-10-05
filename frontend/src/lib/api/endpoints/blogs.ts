@@ -5,30 +5,7 @@
 
 import type { ApiClient } from '../client';
 import type { PaginatedResponse } from '../types';
-
-/**
- * 블로그 타입 정의
- */
-export interface Blog {
-  id: string;
-  name: string;
-  slug: string;
-  description?: string;
-  userId: string;
-  isPrivate: boolean;
-  allowComments: boolean;
-  createdAt: string;
-  updatedAt: string;
-  user?: {
-    id: string;
-    username: string;
-    email: string;
-    profileImage?: string;
-  };
-  _count?: {
-    posts: number;
-  };
-}
+import type { Blog } from '@/types';
 
 /**
  * 블로그 생성/수정 폼

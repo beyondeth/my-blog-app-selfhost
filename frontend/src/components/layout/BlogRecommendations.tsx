@@ -33,7 +33,7 @@ const BlogRecommendations = React.memo(function BlogRecommendations({
         {blogs.map((blog) => (
           <Link
             key={blog.id}
-            href={`/blog/${blog.slug}`}
+            href={`/${blog.slug}`}
             className="flex items-start space-x-3 hover:bg-gray-50 rounded-lg p-2 -mx-2 transition-colors"
           >
             <Avatar 

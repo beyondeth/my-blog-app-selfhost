@@ -34,7 +34,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
     <div className="flex flex-col gap-5 p-6 max-w-sm">
       {/* Header with avatar and follow button */}
       <div className="flex items-start justify-between gap-4">
-        <Link href={user.blog ? `/blog/${user.blog.slug}` : '#'} className="group">
+        <Link href={user.blog ? `/${user.blog.slug}` : '#'} className="group">
           <UserAvatar
             profileImage={user.profileImage}
             username={user.username}
@@ -62,7 +62,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
       {/* Name and stats */}
       <div className="-mt-2">
         <Link
-          href={user.blog ? `/blog/${user.blog.slug}` : '#'}
+          href={user.blog ? `/${user.blog.slug}` : '#'}
           className="group block"
         >
           <h3 className="text-xl font-bold text-gray-900 dark:text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 mb-2">
@@ -89,7 +89,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
       {/* Blog link if exists */}
       {user.blog && (
         <Link
-          href={`/blog/${user.blog.slug}`}
+          href={`/${user.blog.slug}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 hover:gap-2 group"
         >
           <span>블로그 방문</span>

@@ -163,21 +163,12 @@ export default function BlogRichTextEditor({
     }
   }, [galleryImages, onImagesChange]);
 
-  // YouTube 임베드 훅 - imageUploadManager의 handleGalleryImageChange를 사용
+  // YouTube 임베드 훅 - setGalleryImages 직접 연결 (동기화 락 우회)
   const { addYouTubeThumbnail, clearProcessedYouTubeId } = useYouTubeEmbed({
     enableImageManager,
     images: galleryImages,
-    setImages: (newImages) => {
-      if (typeof newImages === 'function') {
-        // 함수형 업데이트인 경우
-        const updated = newImages(galleryImages);
-        imageUploadManager.handleGalleryImageChange(updated);
-      } else {
-        // 직접 값인 경우
-        imageUploadManager.handleGalleryImageChange(newImages);
-      }
-    },
-    setSelectedThumbnailId: onThumbnailSelect as React.Dispatch<React.SetStateAction<string>> || (() => {}), // Parent의 setter 사용
+    setImages: setGalleryImages,  // ✅ handleGalleryImageChange 우회하여 직접 상태 업데이트
+    setSelectedThumbnailId: onThumbnailSelect as React.Dispatch<React.SetStateAction<string>> || (() => {}),
     onThumbnailSelect,
     setUploadedFiles,
     onFilesChange,

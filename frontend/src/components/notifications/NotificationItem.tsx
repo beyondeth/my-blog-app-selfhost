@@ -43,21 +43,21 @@ export default function NotificationItem({ notification, onClose }: Notification
         return {
           icon: <UserPlus className="h-4 w-4 text-blue-500" />,
           message: `${issuerName}님이 회원님을 팔로우했습니다`,
-          link: notification.issuer?.blog?.slug 
-            ? `/blog/${notification.issuer.blog.slug}` 
+          link: notification.issuer?.blog?.slug
+            ? `/${notification.issuer.blog.slug}`
             : '#',
         };
       case 'POST_LIKE':
         return {
           icon: <Heart className="h-4 w-4 text-red-500" />,
           message: `${issuerName}님이 회원님의 포스트를 좋아합니다`,
-          link: `/blog/${notification.post?.blogSlug}/posts/${notification.post?.slug}`,
+          link: `/${notification.post?.blogSlug}/${notification.post?.slug}`,
         };
       case 'COMMENT':
         return {
           icon: <MessageCircle className="h-4 w-4 text-primary" />,
           message: `${issuerName}님이 회원님의 포스트에 댓글을 남겼습니다`,
-          link: `/blog/${notification.post?.blogSlug}/posts/${notification.post?.slug}`,
+          link: `/${notification.post?.blogSlug}/${notification.post?.slug}`,
         };
       default:
         return {

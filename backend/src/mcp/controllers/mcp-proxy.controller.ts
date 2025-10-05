@@ -147,7 +147,7 @@ export class McpProxyController {
         id: post.id,
         slug: post.slug,
         title: post.title,
-        url: `/blog/${post.blog.slug}/posts/${post.slug}`,
+        url: `/${post.blog.slug}/${post.slug}`,  // 새 URL 구조 적용 (리다이렉트 제거)
         blog: post.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
       };
     } catch (error) {

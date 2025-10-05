@@ -16,10 +16,10 @@ export const postQueryKeys = {
 
 // 공통 쿼리 옵션
 const commonQueryOptions = {
-  gcTime: 10 * 60 * 1000, // 10분 (가비지 컬렉션 - 메모리에서 제거되는 시간)
-  staleTime: 10 * 60 * 1000, // 10분 - Optimistic Update로 즉시 반영, 불필요한 refetch 방지
+  gcTime: 5 * 60 * 1000, // 5분 (가비지 컬렉션 - 메모리 관리)
+  staleTime: 30 * 1000, // 30초 - 즉시 반영과 성능의 균형
   refetchOnWindowFocus: true, // 탭 전환시 자동 갱신 (사용자가 탭으로 돌아올 때 최신 데이터 보장)
-  refetchOnMount: false, // 마운트시 refetch 비활성화 (성능 최적화)
+  refetchOnMount: true, // stale 상태면 자동 refetch (항상 최신 데이터 유지)
   retry: 1,
 };
 
@@ -50,7 +50,7 @@ export function useInfinitePosts(options: {
     initialPageParam: 1,
     enabled,
     ...commonQueryOptions,
-    refetchOnMount: false, // 프로덕션 설정으로 복구
+    // refetchOnMount는 commonQueryOptions에서 설정 (중복 제거)
   });
 }
 
@@ -61,7 +61,7 @@ export function usePost(slugOrId: string) {
     queryFn: () => postsAPI.getPostBySlug(slugOrId),
     enabled: !!slugOrId,
     ...commonQueryOptions,
-    refetchOnMount: false, // 프로덕션 설정으로 복구 (SSR/Prefetch 활용)
+    refetchOnMount: 'always', // 상세 페이지는 항상 최신 데이터 표시
   });
 }
 
@@ -187,41 +187,99 @@ export function useDeletePost() {
     mutationFn: postsAPI.deletePost,
     onMutate: async (deletedId) => {
       // 삭제 전에 포스트 정보 백업 (blog 정보 필요)
-      const previousPost = queryClient.getQueryData<Post>(
+      // 1. 먼저 detail 캐시에서 찾기 (UUID로)
+      let previousPost = queryClient.getQueryData<Post>(
         postQueryKeys.detail(deletedId)
       );
+
+      // 2. detail 캐시에 없으면 무한 스크롤 목록 캐시에서 찾기
+      let blogSlug: string | undefined = previousPost?.blog?.slug;
+
+      if (!blogSlug) {
+        const allPosts = queryClient.getQueriesData<any>({
+          queryKey: postQueryKeys.lists()
+        });
+
+        // 무한 스크롤 캐시에서 삭제할 포스트 찾기
+        for (const [_, data] of allPosts) {
+          if (data?.pages) {
+            for (const page of data.pages) {
+              const post = page?.posts?.find((p: any) => p.id === deletedId);
+              if (post?.blog?.slug) {
+                blogSlug = post.blog.slug;
+                previousPost = post;
+                break;
+              }
+            }
+          }
+          if (blogSlug) break;
+        }
+      }
 
       console.log('🗑️ [Post Delete - onMutate]', {
         postId: deletedId,
         hasPreviousPost: !!previousPost,
-        blogSlug: previousPost?.blog?.slug
+        blogSlug: blogSlug,
+        foundInCache: blogSlug ? 'yes' : 'no'
       });
 
-      return { previousPost };
+      return { previousPost, blogSlug };
     },
     onSuccess: (_, deletedId, context) => {
       console.log('✅ [Post Deleted]', {
         postId: deletedId,
-        blogSlug: context?.previousPost?.blog?.slug
+        blogSlug: context?.blogSlug
       });
 
       // 1. 삭제된 포스트 상세 캐시 제거
       queryClient.removeQueries({ queryKey: postQueryKeys.detail(deletedId) });
 
-      // 2. 무한 스크롤 목록에서 즉시 제거 (낙관적 업데이트)
+      // 2. 블로그별 캐시에서 즉시 제거 (낙관적 업데이트 - 최우선)
+      if (context?.blogSlug) {
+        console.log('✅ [Updating Blog Cache on Delete]', context.blogSlug);
+
+        queryClient.setQueriesData(
+          { queryKey: postQueryKeys.list({ blogSlug: context.blogSlug }) },
+          (oldData: any) => {
+            if (!oldData || !oldData.pages) return oldData;
+
+            const newPages = oldData.pages.map((page: any) => {
+              if (!page || !page.posts) return page;
+
+              return {
+                ...page,
+                posts: page.posts.filter((post: any) => post.id !== deletedId),
+                total: page.posts.some((post: any) => post.id === deletedId)
+                  ? page.total - 1
+                  : page.total
+              };
+            });
+
+            return {
+              ...oldData,
+              pages: newPages,
+            };
+          }
+        );
+      }
+
+      // 3. 홈 피드 및 기타 목록 캐시에서도 제거 (낙관적 업데이트)
       queryClient.setQueriesData(
         { queryKey: postQueryKeys.lists() },
         (oldData: any) => {
           if (!oldData || !oldData.pages) return oldData;
 
-          // 모든 페이지에서 삭제된 포스트 필터링
-          const newPages = oldData.pages.map((page: any) => ({
-            ...page,
-            posts: page.posts.filter((post: any) => post.id !== deletedId),
-            total: page.posts.some((post: any) => post.id === deletedId)
-              ? page.total - 1
-              : page.total
-          }));
+          const newPages = oldData.pages.map((page: any) => {
+            if (!page || !page.posts) return page;
+
+            return {
+              ...page,
+              posts: page.posts.filter((post: any) => post.id !== deletedId),
+              total: page.posts.some((post: any) => post.id === deletedId)
+                ? page.total - 1
+                : page.total
+            };
+          });
 
           return {
             ...oldData,
@@ -230,31 +288,18 @@ export function useDeletePost() {
         }
       );
 
-      // 3. 홈 피드 캐시 무효화
+      // 4. 모든 목록 무효화 - 서버와 동기화 (삭제 후 페이지 복귀 시 삭제된 글 다시 안 나타남)
       queryClient.invalidateQueries({
-        queryKey: postQueryKeys.list({}),
-        exact: false,
-        refetchType: 'active'
+        queryKey: postQueryKeys.lists(),
+        refetchType: 'active'  // 현재 활성화된 쿼리만 즉시 refetch
       });
 
-      // 4. 블로그별 캐시 무효화 (생성과 동일한 로직)
-      // 작성자가 "내 블로그"에서 즉시 삭제 확인 가능
-      if (context?.previousPost?.blog?.slug) {
-        console.log('✅ [Invalidating Blog Cache on Delete]', context.previousPost.blog.slug);
-
-        // 캐시 완전 제거 (staleTime 무시)
-        queryClient.removeQueries({
-          queryKey: postQueryKeys.list({ blogSlug: context.previousPost.blog.slug }),
-          exact: false
-        });
-
-        // 즉시 무효화
+      // 5. 블로그별 캐시도 무효화 (내 블로그에서도 즉시 반영)
+      if (context?.blogSlug) {
         queryClient.invalidateQueries({
-          queryKey: postQueryKeys.list({ blogSlug: context.previousPost.blog.slug }),
-          exact: false
+          queryKey: postQueryKeys.list({ blogSlug: context.blogSlug }),
+          refetchType: 'active'
         });
-      } else {
-        console.warn('⚠️ [No Blog Info for Delete]', 'previousPost.blog is missing!');
       }
     },
     retry: 1,

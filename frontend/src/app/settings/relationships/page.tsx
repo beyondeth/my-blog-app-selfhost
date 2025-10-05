@@ -188,7 +188,7 @@ export default function RelationshipsPage() {
 
           {/* User Info */}
           <Link
-            href={user.blog?.slug ? `/blog/${user.blog.slug}` : '#'}
+            href={user.blog?.slug ? `/${user.blog.slug}` : '#'}
             className="flex items-center gap-3 flex-1 group"
           >
             <UserAvatar
@@ -236,7 +236,7 @@ export default function RelationshipsPage() {
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 <DropdownMenuItem>
-                  <Link href={user.blog?.slug ? `/blog/${user.blog.slug}` : '#'}>
+                  <Link href={user.blog?.slug ? `/${user.blog.slug}` : '#'}>
                     프로필 보기
                   </Link>
                 </DropdownMenuItem>

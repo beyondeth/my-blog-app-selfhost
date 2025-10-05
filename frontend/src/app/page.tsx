@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useDeletePost } from '@/hooks/usePosts';
@@ -17,31 +17,17 @@ import TagsSection from '@/components/layout/TagsSection';
 import FollowingListSection from '@/components/FollowingListSection';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
-
-// 클라이언트 사이드 체크 훅 - Context7 모범 사례 적용
-function useIsClient() {
-  const [isClient, setIsClient] = useState(false);
-  
-  useEffect(() => {
-    // 이미 클라이언트인 경우 중복 실행 방지
-    if (typeof window !== 'undefined') {
-      setIsClient(true);
-    }
-  }, []); // 빈 의존성 배열로 한 번만 실행
-  
-  return isClient;
-}
-
 export default function HomePage() {
+  console.log('🏠 [HOME PAGE COMPONENT RENDERED]');
+
   const { user, isAuthenticated, isAdmin } = useAuth();
   const router = useRouter();
-  const isClient = useIsClient();
   const searchParams = useSearchParams();
   const { getCacheStatus } = useNavigationCache();
-  
+
   // 스크롤 위치 복원
   useScrollRestoration('home-page');
-  
+
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -52,9 +38,9 @@ export default function HomePage() {
     postId: null,
     postTitle: ''
   });
-  
+
   // URL에서 검색 파라미터 파싱
-  const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
+  const currentParams = parseSearchParams(searchParams.toString());
 
   // 커스텀 훅 사용
   const {
@@ -64,16 +50,25 @@ export default function HomePage() {
     isFetchingNextPage,
     isLoading,
     error
-  } = useInfinitePosts({ 
+  } = useInfinitePosts({
     search: currentParams.search,
-    enabled: isClient 
+    enabled: true // 홈 페이지는 항상 포스트 로드
   });
+
+  // 디버깅 로그
+  console.log('🔍 [Home Debug] isLoading:', isLoading);
+  console.log('🔍 [Home Debug] hasData:', !!data);
+  console.log('🔍 [Home Debug] pagesCount:', data?.pages?.length);
+  console.log('🔍 [Home Debug] firstPageData:', data?.pages?.[0]);
+  console.log('🔍 [Home Debug] error:', error);
+  console.log('🔍 [Home Debug] search:', currentParams.search);
 
   const deletePostMutation = useDeletePost();
 
   // 모든 포스트 플래튼 - 메모이제이션
   const allPosts = useMemo(() => {
-    return data?.pages.flatMap(page => page.posts) || [];
+    if (!data?.pages) return [];
+    return data.pages.flatMap(page => page?.posts || []).filter(post => post);
   }, [data?.pages]);
 
   const totalPosts = useMemo(() => {
@@ -83,9 +78,9 @@ export default function HomePage() {
   // 실제 포스트에서 태그 추출 - 메모이제이션
   const tags = useMemo(() => {
     const tagMap = new Map<string, number>();
-    
+
     allPosts.forEach(post => {
-      if (post.tags && Array.isArray(post.tags)) {
+      if (post && post.tags && Array.isArray(post.tags)) {
         post.tags.forEach((tag: string) => {
           if (tag && tag.trim()) {
             const trimmedTag = tag.trim();
@@ -120,8 +115,8 @@ export default function HomePage() {
     router.push(newUrl);
   }, [router]);
 
-  const handleEditPost = useCallback((slug: string) => {
-    router.push(`/posts/edit/${slug}`);
+  const handleEditPost = useCallback((id: string) => {
+    router.push(`/p/${id}/edit`);
   }, [router]);
 
   // 삭제 다이얼로그 열기
@@ -154,10 +149,6 @@ export default function HomePage() {
       setDeleteDialog({ isOpen: false, postId: null, postTitle: '' });
     }
   }, [deletePostMutation.isPending]);
-
-  if (!isClient) {
-    return <LoadingSpinner message="페이지를 불러오는 중..." />;
-  }
 
   if (error) {
     return (
@@ -232,9 +223,6 @@ export default function HomePage() {
         onClose={handleCloseDeleteDialog}
         onConfirm={handleConfirmDelete}
         isLoading={deletePostMutation.isPending}
-        itemName={`"${deleteDialog.postTitle}" 게시글`}
-        title="게시글을 삭제하시겠습니까?"
-        description={`"${deleteDialog.postTitle}" 게시글이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.`}
       />
     </div>
   );
