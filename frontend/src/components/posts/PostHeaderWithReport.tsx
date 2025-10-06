@@ -125,7 +125,7 @@ export default function PostHeaderWithReport({
             </div>
             <div className="flex items-center">
               <FiEye className="mr-2 w-4 h-4" />
-              <span>{(post.viewCount || 0).toLocaleString()} views</span>
+              <span>{(post.viewCount || 0).toLocaleString()}</span>
             </div>
             
             {/* Like and Share Buttons - 뷰 바로 옆에 붙임 */}

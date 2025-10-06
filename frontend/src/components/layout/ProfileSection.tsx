@@ -64,6 +64,7 @@ const ProfileSection = React.memo(function ProfileSection({
               <FollowButton
                 userId={userId}
                 initialState={followInfo.followInfo}
+                variant="minimal"
               />
             )}
           </div>

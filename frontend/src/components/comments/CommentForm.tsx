@@ -85,7 +85,7 @@ export default function CommentForm({
         <button
           type="submit"
           disabled={!content.trim() || isLoading}
-          className="px-4 py-2 text-[13px] font-medium rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 dark:!bg-gray-700 dark:!text-gray-100 dark:hover:!bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="px-4 py-2 text-[13px] font-medium rounded-full bg-[#181818] text-white hover:bg-gray-800 dark:!bg-gray-700 dark:!text-gray-100 dark:hover:!bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? '작성 중...' : submitText}
         </button>

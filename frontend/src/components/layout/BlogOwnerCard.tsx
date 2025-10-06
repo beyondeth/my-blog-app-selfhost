@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import UserAvatar from '@/components/ui/UserAvatar';
 import FollowButton from '@/components/FollowButton';
+import { DMButton } from '@/components/dm/DMButton';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { queryKeys } from '@/lib/queries/keys';
 
@@ -106,13 +107,20 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
           </p>
         )}
 
-        {/* Follow/Following Button */}
+        {/* Follow/Following Button and DM Button */}
         {userId && !isOwner && isAuthenticated && user && user.id !== userId && (
-          <FollowButton
-            userId={userId}
-            initialState={followInfo}
-            className="w-full"
-          />
+          <div className="flex gap-2 w-full">
+            <FollowButton
+              userId={userId}
+              initialState={followInfo}
+              variant="minimal"
+              className="flex-1"
+            />
+            <DMButton
+              userId={userId}
+              username={username}
+            />
+          </div>
         )}
 
         {/* Edit Profile for Owner */}

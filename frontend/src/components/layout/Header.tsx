@@ -200,8 +200,8 @@ export default function Header() {
             {/* Search Bar - Medium Style */}
             <div className="max-w-sm ml-6">
               <form onSubmit={handleSearch} className="relative">
-                <div className={`flex items-center bg-muted rounded-full px-5 py-3.5 transition-all ${
-                  isSearchFocused ? 'bg-background border border-border shadow-md ring-2 ring-primary/20' : 'hover:bg-accent'
+                <div className={`flex items-center bg-muted rounded-full px-5 py-3.5 transition-all border border-transparent ${
+                  isSearchFocused ? 'bg-background !border-border shadow-md ring-2 ring-primary/20' : ''
                 }`}>
                   <FiSearch className="w-5 h-5 text-muted-foreground mr-3 flex-shrink-0" />
                   <input

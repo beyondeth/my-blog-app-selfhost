@@ -36,7 +36,6 @@ export default function ProfileSettingsPage() {
         bio: user.bio || '',
       });
       if (user.profileImage) {
-        console.log('User profileImage:', user.profileImage);
         let imageUrl = user.profileImage;
 
         // 절대 URL이 아닌 경우 처리
@@ -99,9 +98,14 @@ export default function ProfileSettingsPage() {
       }
 
       const result = await response.json();
-      console.log('Upload result:', result);
-      
-      // 사용자 정보 새로고침
+
+      // S3 버킷이 private이므로 항상 백엔드 프록시를 통해 접근
+      if (result.s3Key) {
+        const imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${result.s3Key}`;
+        setProfileImageUrl(imageUrl);
+      }
+
+      // 사용자 정보 새로고침 (백그라운드에서 진행)
       // refreshUser가 호출되면 useEffect가 실행되어 새로운 이미지가 자동으로 설정됨
       await refreshUser();
       
