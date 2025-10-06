@@ -1,6 +1,7 @@
 'use client';
 
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { FiArrowLeft } from 'react-icons/fi';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
@@ -226,12 +227,34 @@ export default function BlogPostDetailPage() {
   }, [post?.id]);
 
   if (isError) {
-    // 실제 에러인 경우 (404 등)
+    // 404 에러 - 삭제된 게시글 안내
     return (
-      <ErrorMessage 
-        message={error?.message || '게시글을 찾을 수 없습니다.'}
-        showBackButton={true}
-      />
+      <div className="flex flex-col items-center justify-center min-h-[60vh] px-4">
+        {/* 유머러스한 아이콘 */}
+        <div className="mb-8">
+          <svg className="w-24 h-24 text-gray-300" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+            />
+          </svg>
+        </div>
+
+        {/* 메시지 */}
+        <h2 className="text-xl font-medium text-gray-700 mb-8">
+          이 게시글은 작성자에 의해 삭제되었습니다.
+        </h2>
+
+        {/* 홈 버튼 */}
+        <Link
+          href="/"
+          className="px-6 py-2.5 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+        >
+          홈으로 이동
+        </Link>
+      </div>
     );
   }
   
@@ -272,7 +295,7 @@ export default function BlogPostDetailPage() {
         <PostHeaderWithReport
           post={post}
           canEdit={canEditDelete}
-          onBack={() => router.push(`/${blogSlug}`)}
+          onBack={() => router.back()}
           onEdit={handleEdit}
           onDelete={handleDelete}
           LikeButtonComponent={

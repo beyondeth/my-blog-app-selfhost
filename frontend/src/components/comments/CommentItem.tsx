@@ -1,8 +1,6 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronDown, FiUser, FiMoreVertical, FiFlag } from 'react-icons/fi';
 import type { Comment } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -13,6 +11,7 @@ import { useCommentStore } from '@/contexts/CommentContext';
 import { useToggleCommentLike, useToggleCommentDislike } from '@/hooks/useComments';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
+import { formatRelativeTime } from '@/utils/timeFormat';
 
 interface CommentItemProps {
   comment: Comment;
@@ -128,20 +127,11 @@ export default function CommentItem({
 
   const handleReport = () => {
     if (!user) return; // 로그인하지 않은 경우 실행 안 함
-    const contentPreview = comment.content.length > 100 
-      ? comment.content.substring(0, 100) + '...' 
+    const contentPreview = comment.content.length > 100
+      ? comment.content.substring(0, 100) + '...'
       : comment.content;
     openReportModal('comment', comment.id, contentPreview);
     setShowDropdown(false);
-  };
-
-  const formatTime = (dateString: string) => {
-    const utcDate = new Date(dateString);
-    const koreaTime = new Date(utcDate.getTime() + (9 * 60 * 60 * 1000));
-    return formatDistanceToNow(koreaTime, { 
-      addSuffix: true,
-      locale: ko 
-    });
   };
 
   const renderMentions = (content: string) => {
@@ -195,7 +185,7 @@ export default function CommentItem({
               )}
 
               <span className="text-xs text-gray-500 dark:text-gray-500">
-                {formatTime(comment.createdAt)}
+                {formatRelativeTime(comment.createdAt)}
               </span>
             </div>
 

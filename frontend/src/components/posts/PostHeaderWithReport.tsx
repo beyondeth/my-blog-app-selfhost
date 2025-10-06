@@ -8,6 +8,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import { useAuth } from '@/providers/AuthProviderV2';
+import { formatRelativeTime } from '@/utils/timeFormat';
 
 interface PostHeaderWithReportProps {
   post: Post;
@@ -87,6 +88,18 @@ export default function PostHeaderWithReport({
           </div>
         )}
 
+        {/* Author Info - 제목 위로 이동 */}
+        <div className="flex items-center mb-4">
+          <Avatar
+            src={post.author?.profileImage}
+            alt={post.author?.username || 'Author'}
+            fallback={post.author?.username || 'Author'}
+            size="sm"
+            className="mr-3"
+          />
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{post.author?.username || 'Author'}</span>
+        </div>
+
         {/* Category */}
         {post.category && (
           <div className="mb-6">
@@ -107,22 +120,8 @@ export default function PostHeaderWithReport({
           {/* Left: Meta Information with Like/Share */}
           <div className="flex flex-wrap items-center gap-6">
             <div className="flex items-center">
-              <Avatar 
-                src={post.author?.profileImage} 
-                alt={post.author?.username || 'Author'}
-                fallback={post.author?.username || 'Author'}
-                size="xs"
-                className="mr-2"
-              />
-              <span className="font-medium">{post.author?.username || 'Author'}</span>
-            </div>
-            <div className="flex items-center">
               <FiCalendar className="mr-2 w-4 h-4" />
-              <span>{(post.publishedAt || post.createdAt) ? new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-              }) : ''}</span>
+              <span>{formatRelativeTime(post.publishedAt || post.createdAt)}</span>
             </div>
             <div className="flex items-center">
               <FiEye className="mr-2 w-4 h-4" />
@@ -170,7 +169,8 @@ export default function PostHeaderWithReport({
               </button>
             )}
 
-            {onCopy && (
+            {/* 복사 버튼 - 작성자 본인만 표시 */}
+            {isAuthor && onCopy && (
               <button
                 onClick={onCopy}
                 className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"

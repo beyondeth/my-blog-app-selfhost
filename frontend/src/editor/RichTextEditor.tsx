@@ -362,7 +362,7 @@ export default function BlogRichTextEditor({
       
       {/* Enhanced Image Upload Manager - 에디터가 준비된 후에만 렌더링 */}
       {enableImageManager && editorInstance && (
-        <div className="border-t border-gray-200">
+        <div className="border-t border-gray-200 dark:border-gray-700">
           <div className="p-4">
             <ImageUploadManager
               images={galleryImages}  // galleryImages를 사용해야 함!

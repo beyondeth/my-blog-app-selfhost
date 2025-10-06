@@ -153,9 +153,9 @@ export default function EnhancedEditorToolbar({
       disabled={disabled}
       title={title}
       className={`p-2 rounded transition-all duration-150 ${
-        isActive 
-          ? 'bg-gray-200 text-gray-800' 
-          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+        isActive
+          ? 'bg-gray-200 text-gray-800 dark:bg-gray-600 dark:text-gray-100'
+          : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-600 dark:hover:text-gray-100'
       } ${disabled ? 'opacity-50 cursor-not-allowed' : ''} ${className}`}
     >
       {children}
@@ -181,7 +181,7 @@ export default function EnhancedEditorToolbar({
           e.stopPropagation();
           onClick();
         }}
-        className="px-3 py-2 text-sm flex items-center space-x-1 text-gray-700 hover:bg-gray-100 rounded transition-colors"
+        className="px-3 py-2 text-sm flex items-center space-x-1 text-gray-700 hover:bg-gray-100 rounded transition-colors dark:text-gray-300 dark:hover:bg-gray-600"
       >
         <span>{label}</span>
         <FiChevronDown className={`w-3 h-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
@@ -238,7 +238,7 @@ export default function EnhancedEditorToolbar({
 
   return (
     <>
-      <div className="border-b border-gray-200 p-2 bg-gray-50 overflow-visible relative">
+      <div className="border-b border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-700 overflow-visible relative rounded-lg">
         <div className="flex items-center space-x-1 min-w-max">
           {/* 제목 레벨 드롭다운 */}
           <DropdownButton
@@ -251,7 +251,7 @@ export default function EnhancedEditorToolbar({
               setShowBgColorPicker(false);
             }}
           >
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg" style={{ zIndex: 9999 }}>
+            <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg" style={{ zIndex: 9999 }}>
               {HEADING_LEVELS.map((heading) => (
                 <button
                   key={heading.level}
@@ -261,8 +261,8 @@ export default function EnhancedEditorToolbar({
                     e.stopPropagation();
                     handleSetHeading(heading.level);
                   }}
-                  className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 ${
-                    currentHeadingLevel === heading.level ? 'bg-sky-50 text-sky-700' : 'text-gray-700'
+                  className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                    currentHeadingLevel === heading.level ? 'bg-sky-50 text-sky-700 dark:bg-sky-900 dark:text-sky-300' : 'text-gray-700 dark:text-gray-300'
                   }`}
                   style={{
                     fontSize: heading.level === 0 ? '14px' : `${24 - heading.level * 2}px`,
@@ -275,7 +275,7 @@ export default function EnhancedEditorToolbar({
             </div>
           </DropdownButton>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 글꼴 크기 드롭다운 */}
           <DropdownButton
@@ -288,7 +288,7 @@ export default function EnhancedEditorToolbar({
               setShowBgColorPicker(false);
             }}
           >
-            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg" style={{ zIndex: 9999 }}>
+            <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg" style={{ zIndex: 9999 }}>
               {FONT_SIZES.map((size) => (
                 <button
                   key={size.value}
@@ -298,7 +298,7 @@ export default function EnhancedEditorToolbar({
                     e.stopPropagation();
                     handleSetFontSize(size.value);
                   }}
-                  className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 text-gray-700 whitespace-nowrap"
+                  className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 whitespace-nowrap"
                   style={{ fontSize: size.value }}
                 >
                   {size.label}
@@ -307,7 +307,7 @@ export default function EnhancedEditorToolbar({
             </div>
           </DropdownButton>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 텍스트 서식 버튼들 */}
           <ToolbarButton
@@ -342,7 +342,7 @@ export default function EnhancedEditorToolbar({
             <span className="line-through">S</span>
           </ToolbarButton>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 텍스트 색상 */}
           <div className="relative">
@@ -357,17 +357,16 @@ export default function EnhancedEditorToolbar({
                 setShowHeadingMenu(false);
               }}
               title="텍스트 색상"
-              className="p-2 rounded transition-all duration-150 relative"
+              className="p-2 rounded transition-all duration-150 relative text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
               style={{
-                backgroundColor: editor.getAttributes('textStyle').color ? 
-                  `${editor.getAttributes('textStyle').color}20` : 'transparent',
-                color: editor.getAttributes('textStyle').color || '#4B5563'
+                backgroundColor: editor.getAttributes('textStyle').color ?
+                  `${editor.getAttributes('textStyle').color}20` : undefined
               }}
             >
               <MdFormatColorText className="w-4 h-4" />
             </button>
             {showTextColorPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 p-2">
                 <div className="grid grid-cols-5 gap-1">
                   {COLOR_PRESETS.map((color) => {
                     const currentColor = editor.getAttributes('textStyle').color;
@@ -414,16 +413,15 @@ export default function EnhancedEditorToolbar({
                 setShowHeadingMenu(false);
               }}
               title="배경색"
-              className="p-2 rounded transition-all duration-150 relative"
+              className="p-2 rounded transition-all duration-150 relative text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
               style={{
-                backgroundColor: editor.getAttributes('highlight').color || 'transparent',
-                color: editor.isActive('highlight') ? '#1F2937' : '#4B5563'
+                backgroundColor: editor.getAttributes('highlight').color || undefined
               }}
             >
               <MdFormatColorFill className="w-4 h-4" />
             </button>
             {showBgColorPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-md shadow-lg z-10 p-2">
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 p-2">
                 <div className="grid grid-cols-4 gap-1">
                   {BG_COLOR_PRESETS.map((color) => {
                     const currentHighlight = editor.getAttributes('highlight').color;
@@ -457,7 +455,7 @@ export default function EnhancedEditorToolbar({
             )}
           </div>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 목록 버튼들 */}
           <ToolbarButton
@@ -506,7 +504,7 @@ export default function EnhancedEditorToolbar({
             <FiCode className="w-4 h-4" />
           </ToolbarButton>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 텍스트 정렬 버튼들 - 더 명확한 아이콘 사용 */}
           <ToolbarButton
@@ -549,7 +547,7 @@ export default function EnhancedEditorToolbar({
             </svg>
           </ToolbarButton>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 삽입 버튼들 */}
           {!hideImageButton && (
@@ -571,7 +569,7 @@ export default function EnhancedEditorToolbar({
             <MdHorizontalRule className="w-4 h-4" />
           </ToolbarButton>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 서식 지우기 */}
           <ToolbarButton

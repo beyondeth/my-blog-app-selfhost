@@ -7,8 +7,9 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import UserAvatar from '@/components/ui/UserAvatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
-import { FiHeart, FiMessageCircle } from 'react-icons/fi';
+import { FiHeart, FiMessageCircle, FiEye } from 'react-icons/fi';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
+import { formatRelativeTime } from '@/utils/timeFormat';
 
 interface PostArticleProps {
   post: Post;
@@ -182,9 +183,12 @@ const PostArticle = React.memo(function PostArticle({
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
             <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
-                {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
+                {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
-              <span className="whitespace-nowrap">조회 {post.viewCount || 0}</span>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiEye className="w-3 h-3" />
+                {post.viewCount || 0}
+              </span>
               <span className="flex items-center gap-1 whitespace-nowrap">
                 <FiHeart className="w-3 h-3" />
                 {post.likeCount || 0}
@@ -201,7 +205,7 @@ const PostArticle = React.memo(function PostArticle({
                 />
               )}
             </div>
-            
+
             {/* 버튼들 - 메타 정보 바로 아래 */}
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <Link
@@ -210,7 +214,7 @@ const PostArticle = React.memo(function PostArticle({
               >
                 더보기
               </Link>
-              
+
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
                   <button
@@ -234,7 +238,7 @@ const PostArticle = React.memo(function PostArticle({
       </article>
     );
   }
-  
+
   // 일반 포스트 레이아웃 (기존 코드)
   return (
     <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-4 first:pt-0">
@@ -244,8 +248,8 @@ const PostArticle = React.memo(function PostArticle({
           {/* Author Info - 제목 위에 배치 */}
           {post.author && (
             <div className="flex items-center gap-2 mb-3">
-              <UserLinkWithTooltip 
-                userId={post.author.id} 
+              <UserLinkWithTooltip
+                userId={post.author.id}
                 username={post.author.username}
                 blogSlug={post.blog?.slug}
               >
@@ -264,7 +268,7 @@ const PostArticle = React.memo(function PostArticle({
               </UserLinkWithTooltip>
             </div>
           )}
-          
+
           <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
             <Link
               href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
@@ -293,15 +297,18 @@ const PostArticle = React.memo(function PostArticle({
               내용 미리보기가 없습니다.
             </p>
           )}
-          
+
           {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
           <div>
             {/* 메타 정보 (날짜,조회,좋아요,댓글) - 작성자 정보 제거 */}
             <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
               <span className="whitespace-nowrap">
-                {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
+                {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
-              <span className="whitespace-nowrap">조회 {post.viewCount || 0}</span>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiEye className="w-3 h-3" />
+                {post.viewCount || 0}
+              </span>
               <span className="flex items-center gap-1 whitespace-nowrap">
                 <FiHeart className="w-3 h-3" />
                 {post.likeCount || 0}

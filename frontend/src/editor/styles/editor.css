@@ -15,7 +15,7 @@
 /* 플레이스홀더 */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: #adb5bd;
+  color: #9ca3af;
   pointer-events: none;
   height: 0;
   float: left;
@@ -451,34 +451,32 @@
 }
 
 /* 다크모드 지원 */
-@media (prefers-color-scheme: dark) {
-  .ProseMirror {
-    color: #e5e7eb;
-  }
-  
-  .ProseMirror p.is-editor-empty:first-child::before {
-    color: #6b7280;
-  }
-  
-  .resizable-image-wrapper.selected {
-    outline-color: #60a5fa;
-  }
-  
-  .react-resizable-handle-se {
-    background: linear-gradient(135deg, transparent 50%, #60a5fa 50%);
-  }
-  
-  .slash-command-menu {
-    background: #1f2937;
-    border-color: #374151;
-  }
-  
-  .slash-command-item:hover,
-  .slash-command-item.selected {
-    background: #374151;
-  }
-  
-  .youtube-video iframe {
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  }
+.dark .ProseMirror {
+  color: #e5e7eb;
+}
+
+.dark .ProseMirror p.is-editor-empty:first-child::before {
+  color: #6b7280 !important;
+}
+
+.dark .resizable-image-wrapper.selected {
+  outline-color: #60a5fa;
+}
+
+.dark .react-resizable-handle-se {
+  background: linear-gradient(135deg, transparent 50%, #60a5fa 50%);
+}
+
+.dark .slash-command-menu {
+  background: #1f2937;
+  border-color: #374151;
+}
+
+.dark .slash-command-item:hover,
+.dark .slash-command-item.selected {
+  background: #374151;
+}
+
+.dark .youtube-video iframe {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
 }

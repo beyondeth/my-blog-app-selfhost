@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
@@ -12,11 +12,24 @@ import { useCreatePost } from '@/hooks/usePosts';
 import { useMyBlogs } from '@/hooks/useBlogs';
 import type { UploadedImageInfo } from '@/editor';
 import Spinner from '@/components/ui/Spinner';
+import { Button } from '@/components/ui/button';
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormMessage,
+} from '@/components/ui/form';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent } from '@/components/ui/card';
+import { Save, Plus } from 'lucide-react';
+import React from 'react';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogRichTextEditor = dynamic(
   () => import('@/editor').then(mod => mod.BlogRichTextEditor),
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="flex items-center justify-center h-[400px] border rounded-lg bg-gray-50">
@@ -29,11 +42,10 @@ const BlogRichTextEditor = dynamic(
   }
 );
 
-// Zod 스키마 정의 (기존과 동일)
+// Zod 스키마 정의
 const postSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요.'),
   content: z.string().min(1, '내용을 입력해주세요.'),
-  category: z.string().optional(),
   tags: z.array(z.string()).optional(),
   fileIds: z.array(z.string()).optional(),
 });
@@ -56,14 +68,7 @@ export default function NewStoryPage() {
   const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const {
-    register,
-    handleSubmit,
-    control,
-    setValue,
-    watch,
-    formState: { errors },
-  } = useForm<PostFormData>({
+  const form = useForm<PostFormData>({
     resolver: zodResolver(postSchema),
     defaultValues: {
       title: '',
@@ -90,25 +95,25 @@ export default function NewStoryPage() {
     }
   }, [blog, isBlogsLoading, user, router]);
   
-  // 이미지 목록이 변경될 때마다 form의 fileIds를 업데이트 (기존과 동일)
+  // 이미지 목록이 변경될 때마다 form의 fileIds를 업데이트
   useEffect(() => {
     const fileIds = images
       .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
       .map(img => img.id);
-    setValue('fileIds', fileIds);
+    form.setValue('fileIds', fileIds);
 
     const allImageIds = images.filter(img => !img.isUploading).map(img => img.id);
-    
+
     if (allImageIds.length > 0) {
       const currentSelectionValid = selectedThumbnailId && allImageIds.includes(selectedThumbnailId);
-      
+
       if (!currentSelectionValid) {
         setSelectedThumbnailId(allImageIds[0]);
       }
     } else if (selectedThumbnailId) {
       setSelectedThumbnailId('');
     }
-  }, [images, selectedThumbnailId, setValue]);
+  }, [images, selectedThumbnailId, form]);
 
   // Upload validation handler (기존과 동일)
   const handleUploadValidationChange = (isValid: boolean, reason?: string) => {
@@ -182,86 +187,262 @@ export default function NewStoryPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <h1 className="text-2xl font-bold mb-6">새 포스트 작성</h1>
-      
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-        <div>
-          <label htmlFor="title" className="block text-sm font-medium mb-2">
-            제목
-          </label>
-          <input
-            {...register('title')}
-            type="text"
-            id="title"
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="제목을 입력하세요"
-          />
-          {errors.title && (
-            <p className="text-red-500 text-sm mt-1">{errors.title.message}</p>
-          )}
-        </div>
+    <div className="max-w-4xl mx-auto px-4 py-6">
+      {/* 폼 */}
+      <Form {...form}>
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+          <Card className="border-0 shadow-none bg-transparent">
+            <CardContent className="space-y-4 pt-16">
+              {/* 제목 */}
+              <FormField
+                control={form.control}
+                name="title"
+                render={({ field }) => {
+                  const [isFocused, setIsFocused] = React.useState(false);
+                  const [textareaHeight, setTextareaHeight] = React.useState(0);
+                  const textareaRef = React.useRef<HTMLTextAreaElement>(null);
+                  const showLabel = isFocused || field.value;
 
-        <div>
-          <label htmlFor="category" className="block text-sm font-medium mb-2">
-            카테고리
-          </label>
-          <input
-            {...register('category')}
-            type="text"
-            id="category"
-            className="w-full px-3 py-2 border rounded-lg"
-            placeholder="카테고리 (선택사항)"
-          />
-        </div>
+                  React.useEffect(() => {
+                    if (textareaRef.current) {
+                      setTextareaHeight(textareaRef.current.scrollHeight);
+                    }
+                  }, [field.value]);
 
-        <div>
-          <label className="block text-sm font-medium mb-2">
-            내용
-          </label>
-          <Controller
-            name="content"
-            control={control}
-            render={({ field }) => (
-              <BlogRichTextEditor
-                content={field.value}
-                onChange={field.onChange}
-                onFilesChange={(fileIds) => {
-                  // File IDs are handled via images state
+                  return (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          {/* 왼쪽 라벨 + 세로줄 컨테이너 (absolute로 배치) */}
+                          {showLabel && (
+                            <div className="absolute -left-24 top-0 flex items-start gap-2" style={{ height: textareaHeight + 'px' }}>
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                <Plus className="h-3 w-3" />
+                                <span>제목</span>
+                              </div>
+                              <div className="w-px bg-gray-300 dark:bg-gray-600" style={{ height: '100%' }} />
+                            </div>
+                          )}
+
+                          {/* 제목 입력 영역 */}
+                          <Textarea
+                            ref={textareaRef}
+                            placeholder=" 일단 쓰시죠..."
+                            {...field}
+                            disabled={isSubmitting || createPostMutation.isPending}
+                            onFocus={(e) => {
+                              setIsFocused(true);
+                              field.onBlur();
+                            }}
+                            onBlur={(e) => {
+                              setIsFocused(false);
+                              field.onBlur();
+                            }}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault(); // 엔터 키로 줄바꿈 방지
+                              }
+                            }}
+                            rows={1}
+                            className="!text-lg border-0 border-b border-gray-300 dark:border-gray-600 rounded-none px-0 resize-none overflow-hidden focus-visible:ring-0 focus-visible:border-gray-900 dark:focus-visible:border-gray-100 min-h-0 py-1 w-full placeholder:!text-gray-400 dark:placeholder:!text-gray-500"
+                            style={{
+                              height: 'auto',
+                            }}
+                            onInput={(e) => {
+                              const target = e.target as HTMLTextAreaElement;
+                              target.style.height = 'auto';
+                              target.style.height = target.scrollHeight + 'px';
+                              setTextareaHeight(target.scrollHeight);
+                            }}
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
                 }}
-                onThumbnailSelect={setSelectedThumbnailId}
-                selectedThumbnailId={selectedThumbnailId}
-                onImagesChange={setImages}
-                onValidationChange={handleUploadValidationChange}
-                enableImageManager={true}
-                maxImages={10}
-                placeholder="내용을 입력하세요..."
               />
-            )}
-          />
-          {errors.content && (
-            <p className="text-red-500 text-sm mt-1">{errors.content.message}</p>
-          )}
-        </div>
 
-        <div className="flex justify-end gap-4">
-          <button
-            type="button"
-            onClick={() => router.back()}
-            className="px-4 py-2 border rounded-lg hover:bg-gray-50"
-          >
-            취소
-          </button>
-          <button
-            type="submit"
-            disabled={!isUploadValid || isSubmitting || createPostMutation.isPending}
-            className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-            title={!isUploadValid ? uploadValidationReason : undefined}
-          >
-            {isSubmitting || createPostMutation.isPending ? '저장중...' : '저장'}
-          </button>
-        </div>
-      </form>
+              {/* 태그 */}
+              <FormField
+                control={form.control}
+                name="tags"
+                render={({ field }) => {
+                  const [inputValue, setInputValue] = React.useState('');
+                  const [isFocused, setIsFocused] = React.useState(false);
+                  const [isComposing, setIsComposing] = React.useState(false);
+                  const tags = field.value || [];
+                  const showLabel = isFocused || tags.length > 0 || inputValue;
+
+                  const handleInputChange = (value: string) => {
+                    // 콤마가 입력되면 태그로 변환
+                    if (value.endsWith(',')) {
+                      const newTag = value.slice(0, -1).trim();
+                      if (newTag && !tags.includes(newTag)) {
+                        field.onChange([...tags, newTag]);
+                      }
+                      setInputValue('');
+                    } else {
+                      setInputValue(value);
+                    }
+                  };
+
+                  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+                    // 한글 입력 중일 때는 Enter 키 처리 안함
+                    if (e.key === 'Enter' && !isComposing) {
+                      e.preventDefault();
+                      const newTag = inputValue.trim();
+                      if (newTag && !tags.includes(newTag)) {
+                        field.onChange([...tags, newTag]);
+                        setInputValue('');
+                      }
+                    } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
+                      // 입력값이 없을 때 Backspace로 마지막 태그 삭제
+                      field.onChange(tags.slice(0, -1));
+                    }
+                  };
+
+                  const removeTag = (indexToRemove: number) => {
+                    field.onChange(tags.filter((_: string, index: number) => index !== indexToRemove));
+                  };
+
+                  return (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          {/* 왼쪽 라벨 (absolute로 배치, 세로줄 없음) */}
+                          {showLabel && (
+                            <div className="absolute -left-24 top-0">
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                <Plus className="h-3 w-3" />
+                                <span>태그</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 태그 표시 및 입력 영역 */}
+                          <div className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2">
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {tags.map((tag: string, index: number) => (
+                                <span
+                                  key={index}
+                                  className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm"
+                                >
+                                  <span>#{tag}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeTag(index)}
+                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <Input
+                              value={inputValue}
+                              onChange={(e) => handleInputChange(e.target.value)}
+                              onKeyDown={handleKeyDown}
+                              onCompositionStart={() => setIsComposing(true)}
+                              onCompositionEnd={() => setIsComposing(false)}
+                              onFocus={() => setIsFocused(true)}
+                              onBlur={() => setIsFocused(false)}
+                              disabled={isSubmitting || createPostMutation.isPending}
+                              placeholder={!inputValue ? " 태그 입력 후 콤마(,) 또는 Enter" : ""}
+                              className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
+                              style={{ width: inputValue ? `${Math.max(235, inputValue.length * 14)}px` : '235px' }}
+                            />
+                          </div>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* 내용 */}
+          <Card className="border-0 shadow-none bg-transparent">
+            <CardContent>
+              <FormField
+                control={form.control}
+                name="content"
+                render={({ field }) => {
+                  const showLabel = field.value && field.value.length > 0;
+
+                  return (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          {/* 왼쪽 라벨 (absolute로 배치, 세로줄 없음) */}
+                          {showLabel && (
+                            <div className="absolute -left-24 top-0">
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                <Plus className="h-3 w-3" />
+                                <span>내용</span>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="min-h-[400px]">
+                            <BlogRichTextEditor
+                              content={field.value}
+                              onChange={field.onChange}
+                              onFilesChange={(fileIds) => {
+                                // File IDs are handled via images state
+                              }}
+                              onThumbnailSelect={setSelectedThumbnailId}
+                              selectedThumbnailId={selectedThumbnailId}
+                              onImagesChange={setImages}
+                              onValidationChange={handleUploadValidationChange}
+                              enableImageManager={true}
+                              maxImages={10}
+                              placeholder=" 내용을 입력하세요..."
+                            />
+                          </div>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+            </CardContent>
+          </Card>
+
+          {/* 제출 버튼 */}
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => router.back()}
+              disabled={isSubmitting || createPostMutation.isPending}
+            >
+              취소
+            </Button>
+            <Button
+              type="submit"
+              disabled={!isUploadValid || isSubmitting || createPostMutation.isPending || !form.formState.isValid}
+              className="flex items-center gap-2 min-w-[120px]"
+              title={!isUploadValid ? uploadValidationReason : undefined}
+            >
+              {isSubmitting || createPostMutation.isPending ? (
+                <>
+                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                  저장중...
+                </>
+              ) : (
+                <>
+                  <Save className="h-4 w-4" />
+                  저장
+                </>
+              )}
+            </Button>
+          </div>
+        </form>
+      </Form>
     </div>
   );
 }

@@ -295,7 +295,7 @@ export default function EditPostForm({
                           {/* 제목 입력 영역 */}
                           <Textarea
                             ref={textareaRef}
-                            placeholder="tell me your story..."
+                            placeholder=" 일단 쓰시죠..."
                             {...field}
                             disabled={isLoading}
                             onFocus={(e) => {
@@ -312,7 +312,7 @@ export default function EditPostForm({
                               }
                             }}
                             rows={1}
-                            className="text-2xl font-bold border-0 border-b border-gray-300 dark:border-gray-600 rounded-none px-0 resize-none overflow-hidden focus-visible:ring-0 focus-visible:border-gray-900 dark:focus-visible:border-gray-100 min-h-0 py-1 w-full"
+                            className="!text-lg border-0 border-b border-gray-300 dark:border-gray-600 rounded-none px-0 resize-none overflow-hidden focus-visible:ring-0 focus-visible:border-gray-900 dark:focus-visible:border-gray-100 min-h-0 py-1 w-full placeholder:!text-gray-400 dark:placeholder:!text-gray-500"
                             style={{
                               height: 'auto',
                             }}
@@ -416,8 +416,9 @@ export default function EditPostForm({
                               onFocus={() => setIsFocused(true)}
                               onBlur={() => setIsFocused(false)}
                               disabled={isLoading}
-                              placeholder={tags.length === 0 ? "태그 입력 후 콤마(,) 또는 Enter" : ""}
-                              className="border-0 focus-visible:ring-0 px-0 text-lg h-auto py-1"
+                              placeholder={!inputValue ? " 태그 입력 후 콤마(,) 또는 Enter" : ""}
+                              className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
+                              style={{ width: inputValue ? `${Math.max(235, inputValue.length * 14)}px` : '235px' }}
                             />
                           </div>
                         </div>
@@ -467,7 +468,7 @@ export default function EditPostForm({
                               initialImages={initialImages}
                               enableImageManager={true}
                               maxImages={10}
-                              placeholder="게시글 내용을 작성하세요..."
+                              placeholder=" 내용을 입력하세요..."
                             />
                           </div>
                         </div>

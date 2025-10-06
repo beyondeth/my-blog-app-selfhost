@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 
 interface CommentFormProps {
@@ -74,21 +73,22 @@ export default function CommentForm({
       
       <div className="flex justify-end gap-2">
         {onCancel && (
-          <Button
+          <button
             type="button"
-            variant="outline"
             onClick={onCancel}
             disabled={isLoading}
+            className="px-4 py-2 text-[13px] font-medium rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 dark:!bg-gray-700 dark:!text-gray-100 dark:hover:!bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             취소
-          </Button>
+          </button>
         )}
-        <Button
+        <button
           type="submit"
           disabled={!content.trim() || isLoading}
+          className="px-4 py-2 text-[13px] font-medium rounded-full bg-gray-100 text-gray-900 hover:bg-gray-200 dark:!bg-gray-700 dark:!text-gray-100 dark:hover:!bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading ? '작성 중...' : submitText}
-        </Button>
+        </button>
       </div>
     </form>
   );

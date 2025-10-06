@@ -92,28 +92,28 @@ function CommentSectionContent({ postId, postAuthorId }: CommentSectionProps) {
           </h2>
         </div>
 
-        {/* YouTube-style 정렬 탭 */}
-        <div className="flex bg-gray-100 dark:bg-gray-700 rounded-lg p-1">
+        {/* 태그 버튼 스타일 정렬 탭 */}
+        <div className="flex gap-2">
           <button
             onClick={() => setSortType('popular')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`inline-flex items-center px-4 py-2 text-[13px] font-medium rounded-full transition-colors ${
               sortType === 'popular'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100'
-                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                ? 'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
             }`}
           >
-            <FiTrendingUp className="w-4 h-4 inline mr-1" />
+            <FiTrendingUp className="w-4 h-4 mr-1" />
             인기순
           </button>
           <button
             onClick={() => setSortType('latest')}
-            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+            className={`inline-flex items-center px-4 py-2 text-[13px] font-medium rounded-full transition-colors ${
               sortType === 'latest'
-                ? 'bg-white text-gray-900 shadow-sm dark:bg-gray-800 dark:text-gray-100'
-                : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100'
+                ? 'bg-gray-100 text-gray-900 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600'
+                : 'bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700'
             }`}
           >
-            <FiClock className="w-4 h-4 inline mr-1" />
+            <FiClock className="w-4 h-4 mr-1" />
             최신순
           </button>
         </div>

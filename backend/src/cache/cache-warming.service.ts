@@ -108,7 +108,7 @@ export class CacheWarmingService {
           const [posts, total] = await query.getManyAndCount();
 
           const freshData = {
-            items: posts,
+            posts: posts,
             total,
             page,
             limit,
