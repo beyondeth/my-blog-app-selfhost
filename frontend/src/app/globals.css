@@ -6,13 +6,13 @@
 @import '../styles/core.css';
 
 /* Highlight.js 테마 - 라이트/다크 모드 대응 */
-@import 'highlight.js/styles/atom-one-light.css' (prefers-color-scheme: light);
+@import '../styles/themes/atom-one-light-custom.css' (prefers-color-scheme: light);
 @import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
 
 /* 강제 테마 적용을 위한 클래스 기반 스타일 */
 .light .hljs {
-  background: #fafafa;
-  color: #383a42;
+  background: #ffffff;  /* 순백색 배경으로 대비 향상 */
+  /* color 속성 제거 - syntax highlighting이 처리하도록 허용 */
 }
 
 .dark .hljs {

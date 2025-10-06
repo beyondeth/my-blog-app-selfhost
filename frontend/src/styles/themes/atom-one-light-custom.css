@@ -1,0 +1,115 @@
+/*
+ * Atom One Light Custom Theme
+ *
+ * 원본 Atom One Light 테마를 기반으로 라이트모드 가독성 개선
+ * 주요 변경사항: 주석 색상 대비 향상 (#a0a1a7 → #6b6d77)
+ *
+ * 원본: https://github.com/atom/one-light-syntax
+ *
+ * 색상 팔레트:
+ * base:    #ffffff (순백색 배경 - 대비 향상)
+ * mono-1:  #383a42 (기본 텍스트)
+ * mono-2:  #686b77 (보조 텍스트)
+ * mono-3:  #6b6d77 (주석 - 대비 개선: 2.5:1 → 5.2:1)
+ * hue-1:   #0184bb (리터럴)
+ * hue-2:   #4078f2 (타이틀, 링크)
+ * hue-3:   #a626a4 (키워드)
+ * hue-4:   #50a14f (문자열)
+ * hue-5:   #e45649 (태그, 삭제)
+ * hue-6:   #986801 (숫자, 변수)
+ * hue-6-2: #c18401 (빌트인)
+ */
+
+pre code.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 1em;
+}
+
+code.hljs {
+  padding: 3px 5px;
+}
+
+.hljs {
+  color: #383a42;
+  background: #ffffff;
+}
+
+/* 주석 - 대비 개선 (가독성 향상) */
+.hljs-comment,
+.hljs-quote {
+  color: #6b6d77;  /* 원본: #a0a1a7 → 개선: #6b6d77 (대비비 5.2:1) */
+  font-style: italic;
+}
+
+/* 키워드 */
+.hljs-doctag,
+.hljs-keyword,
+.hljs-formula {
+  color: #a626a4;
+}
+
+/* 태그, 삭제 */
+.hljs-section,
+.hljs-name,
+.hljs-selector-tag,
+.hljs-deletion,
+.hljs-subst {
+  color: #e45649;
+}
+
+/* 리터럴 */
+.hljs-literal {
+  color: #0184bb;
+}
+
+/* 문자열 */
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-attribute,
+.hljs-meta .hljs-string {
+  color: #50a14f;
+}
+
+/* 숫자, 변수 */
+.hljs-attr,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-type,
+.hljs-selector-class,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-number {
+  color: #986801;
+}
+
+/* 타이틀, 링크 */
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link,
+.hljs-meta,
+.hljs-selector-id,
+.hljs-title {
+  color: #4078f2;
+}
+
+/* 빌트인 */
+.hljs-built_in,
+.hljs-title.class_,
+.hljs-class .hljs-title {
+  color: #c18401;
+}
+
+/* 강조 */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
+
+.hljs-link {
+  text-decoration: underline;
+}

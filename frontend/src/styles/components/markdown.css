@@ -182,7 +182,7 @@
   background: #282c34; /* Atom One Dark 배경색 */
   color: #abb2bf; /* Atom One Dark 텍스트 색상 */
   padding: var(--space-lg);
-  padding-top: 3rem; /* 복사 버튼 공간 확보 */
+  /* padding-top 제거 - Copy 버튼이 코드 위에 오버레이됨 */
   border-radius: var(--radius-lg);
   overflow-x: auto;
   margin: 0; /* wrapper가 margin 처리 */
