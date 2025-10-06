@@ -239,7 +239,6 @@ export default function Header() {
                   <ProfileDropdown
                     user={user}
                     onLogout={() => logout('/')}
-                    onWriteClick={handleWriteClick}
                   />
 
                   {/* Subscription Badge (Feature Flag) */}

@@ -9,6 +9,7 @@ import { HomeIcon } from '@/components/icons/HomeIcon';
 import { WriteIcon } from '@/components/icons/WriteIcon';
 import { NotificationBellIcon } from '@/components/icons/NotificationBellIcon';
 import { MyBlogIcon } from '@/components/icons/MyBlogIcon';
+import { BookmarkIcon } from '@/components/icons/BookmarkIcon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -124,6 +125,20 @@ export default function LeftSidebar() {
               <WriteIcon className="opacity-70" size={24} />
               <span className="text-xs mt-1 font-medium">글쓰기</span>
             </button>
+
+            {/* 북마크 버튼 */}
+            <Link
+              href="/bookmarks"
+              className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
+                pathname === '/bookmarks'
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+              }`}
+              title="북마크"
+            >
+              <BookmarkIcon className={pathname === '/bookmarks' ? 'opacity-100' : 'opacity-70'} size={24} />
+              <span className="text-xs mt-1 font-medium">북마크</span>
+            </Link>
 
             {/* 알림 드롭다운 (Feature Flag) */}
             {FEATURES.NOTIFICATIONS && (

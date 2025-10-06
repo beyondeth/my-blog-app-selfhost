@@ -2,35 +2,52 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { FiUser, FiBook, FiShield, FiBell, FiUsers } from 'react-icons/fi';
+import { FiUser, FiSettings, FiShield, FiBell, FiUsers, FiMessageSquare } from 'react-icons/fi';
+import { FEATURES } from '@/lib/features';
 
-const settingsNav = [
-  {
-    title: '프로필',
-    href: '/settings',
-    icon: FiUser,
-  },
-  {
-    title: '관계 설정',
-    href: '/settings/relationships',
-    icon: FiUsers,
-  },
-  {
-    title: '블로그 설정',
-    href: '/settings/blog',
-    icon: FiBook,
-  },
-  {
-    title: '보안',
-    href: '/settings/security',
-    icon: FiShield,
-  },
-  {
-    title: '알림',
-    href: '/settings/notifications',
-    icon: FiBell,
-  },
-];
+// Feature Flag에 따라 동적으로 메뉴 구성
+const getSettingsNav = () => {
+  const baseNav = [
+    {
+      title: '프로필',
+      href: '/settings',
+      icon: FiUser,
+    },
+    {
+      title: '관계 설정',
+      href: '/settings/relationships',
+      icon: FiUsers,
+    },
+    {
+      title: 'DM 관리',
+      href: '/settings/dm',
+      icon: FiMessageSquare,
+    },
+    {
+      title: '블로그 설정',
+      href: '/settings/blog',
+      icon: FiSettings,
+    },
+    {
+      title: '보안',
+      href: '/settings/security',
+      icon: FiShield,
+    },
+  ];
+
+  // 알림 기능이 활성화된 경우에만 메뉴에 추가
+  if (FEATURES.NOTIFICATIONS) {
+    baseNav.push({
+      title: '알림',
+      href: '/settings/notifications',
+      icon: FiBell,
+    });
+  }
+
+  return baseNav;
+};
+
+const settingsNav = getSettingsNav();
 
 export default function SettingsLayout({
   children,

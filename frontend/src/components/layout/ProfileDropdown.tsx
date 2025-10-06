@@ -16,29 +16,24 @@ import {
   FiSettings,
   FiLogOut,
   FiChevronDown,
-  FiEdit3,
-  FiBookOpen,
   FiShield,
   FiBell,
   FiHelpCircle,
   FiUsers,
   FiMessageSquare,
   FiCreditCard,
-  FiTrendingUp,
-  FiBookmark
+  FiTrendingUp
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
 
 interface ProfileDropdownProps {
   user: User;
   onLogout: () => void;
-  onWriteClick: (e: React.MouseEvent) => void;
 }
 
 export default function ProfileDropdown({
   user,
-  onLogout,
-  onWriteClick
+  onLogout
 }: ProfileDropdownProps) {
   const router = useRouter();
 
@@ -69,37 +64,6 @@ export default function ProfileDropdown({
             <p className="text-xs leading-none text-gray-500 dark:text-gray-400">{user.email}</p>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        
-        {/* Write Button */}
-        <DropdownMenuItem
-          onClick={onWriteClick}
-          className="cursor-pointer"
-        >
-          <FiEdit3 className="mr-2 h-4 w-4" />
-          <span>글쓰기</span>
-        </DropdownMenuItem>
-
-        {/* My Blog - user.blogSlug로 즉시 표시 */}
-        {user.blogSlug && (
-          <DropdownMenuItem
-            onClick={() => handleNavigation(`/blog/${user.blogSlug}`)}
-            className="cursor-pointer"
-          >
-            <FiBookOpen className="mr-2 h-4 w-4" />
-            <span>내 블로그</span>
-          </DropdownMenuItem>
-        )}
-
-        {/* Bookmarks - 북마크 메뉴 추가 */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/bookmarks')}
-          className="cursor-pointer"
-        >
-          <FiBookmark className="mr-2 h-4 w-4" />
-          <span>북마크</span>
-        </DropdownMenuItem>
-
         <DropdownMenuSeparator />
 
         {/* 구독 관련 메뉴 (Feature Flag) */}

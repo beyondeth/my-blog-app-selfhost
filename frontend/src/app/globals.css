@@ -190,18 +190,22 @@
   height: auto !important;
 }
 
-/* 모달 열릴 때 스크롤바로 인한 레이아웃 밀림 방지 */
-html,
-body {
-  overflow-x: hidden !important;
-  overflow-y: scroll !important; /* 항상 스크롤바 표시 - Radix UI 덮어쓰기 */
-  margin: 0 !important;
-  padding: 0 !important;
+/* 드롭다운/모달 열릴 때 스크롤바로 인한 레이아웃 밀림 방지 */
+html {
+  scrollbar-gutter: stable; /* 최신 방식: 스크롤바 공간 항상 확보 */
+  overflow-y: scroll; /* 폴백: 항상 스크롤바 표시 */
+  overflow-x: hidden;
 }
 
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* 모달이 열렸을 때 스크롤 방지 (스크롤바 공간은 유지) */
 body[data-scroll-locked] {
-  position: fixed !important; /* 스크롤 방지 */
-  width: 100% !important;
-  top: 0 !important;
-  overflow-y: scroll !important; /* 스크롤바는 유지 */
+  position: fixed;
+  width: 100%;
+  top: 0;
+  overflow-y: scroll; /* 스크롤바 공간 유지 */
 }
