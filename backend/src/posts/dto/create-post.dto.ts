@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsNumber, Min, Max } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, Min, Max, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePostDto {
@@ -52,11 +52,12 @@ export class CreatePostDto {
   attachedFileIds?: string[];
 
   @ApiPropertyOptional({
-    description: '마크다운 원본 내용 (하이브리드 저장용)',
+    description: '마크다운 원본 내용 (하이브리드 저장용, 최대 200,000자)',
     example: '# 제목\n\n마크다운 **내용**...',
   })
   @IsOptional()
   @IsString()
+  @MaxLength(200000, { message: '포스트 내용은 최대 200,000자까지 가능합니다' })
   content_markdown?: string;
 
   @ApiPropertyOptional({

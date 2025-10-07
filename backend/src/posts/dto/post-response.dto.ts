@@ -105,6 +105,12 @@ export class PostResponseDto {
   @Expose()
   bookmarked?: boolean; // 사용자 북마크 상태
 
+  @Expose()
+  isEditorPick?: boolean; // Editor's Pick 여부
+
+  @Expose()
+  editorPickedAt?: Date; // Editor's Pick 선정 시간
+
   // 첨부 파일 - 프론트엔드에서 필요하므로 노출
   @Expose()
   @Type(() => FileResponseDto)

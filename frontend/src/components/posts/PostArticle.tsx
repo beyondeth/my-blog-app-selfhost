@@ -8,6 +8,7 @@ import UserAvatar from '@/components/ui/UserAvatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
 import { FiHeart, FiMessageCircle, FiEye } from 'react-icons/fi';
+import { FaStar } from 'react-icons/fa';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
 
@@ -164,17 +165,19 @@ const PostArticle = React.memo(function PostArticle({
             </h2>
           </div>
           
-          {/* YouTube 비디오 플레이어 - 685x540 고정 크기 */}
-          <div className="w-full mb-7">
-            <div className="relative" style={{ width: '685px', height: '540px', maxWidth: '100%', margin: '0 auto' }}>
-              <iframe
-                src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
-                title={post.title}
-                frameBorder="0"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowFullScreen
-                className="w-full h-full rounded-lg shadow-sm"
-              />
+          {/* YouTube 비디오 플레이어 - 반응형 */}
+          <div className="w-full mb-7 max-w-full">
+            <div className="w-full max-w-[685px] mx-auto">
+              <div className="relative w-full" style={{ paddingBottom: '78.8%' }}>
+                <iframe
+                  src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
+                  title={post.title}
+                  frameBorder="0"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowFullScreen
+                  className="absolute inset-0 w-full h-full rounded-lg shadow-sm"
+                />
+              </div>
             </div>
           </div>
           
@@ -197,6 +200,12 @@ const PostArticle = React.memo(function PostArticle({
                 <FiMessageCircle className="w-3 h-3" />
                 {post.commentCount || 0}
               </span>
+              {post.isEditorPick && (
+                <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400 whitespace-nowrap">
+                  <FaStar className="w-3 h-3" />
+                  <span className="text-[11px]">Pick</span>
+                </span>
+              )}
               {isAdmin && post.qualityScore != null && (
                 <QualityScoreBadge
                   score={post.qualityScore}
@@ -317,6 +326,12 @@ const PostArticle = React.memo(function PostArticle({
                 <FiMessageCircle className="w-3 h-3" />
                 {post.commentCount || 0}
               </span>
+              {post.isEditorPick && (
+                <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400 whitespace-nowrap">
+                  <FaStar className="w-3 h-3" />
+                  <span className="text-[11px]">Pick</span>
+                </span>
+              )}
               {isAdmin && post.qualityScore != null && (
                 <QualityScoreBadge
                   score={post.qualityScore}

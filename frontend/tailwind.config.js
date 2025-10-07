@@ -1,3 +1,5 @@
+const { BREAKPOINTS, CONTAINER_CONFIG } = require('./src/config/responsive.ts');
+
 /** @type {import('tailwindcss').Config} */
 module.exports = {
     darkMode: ['class'],
@@ -8,6 +10,27 @@ module.exports = {
   ],
   theme: {
   	extend: {
+  		screens: BREAKPOINTS,
+  		container: {
+  			center: true,
+  			padding: {
+  				DEFAULT: CONTAINER_CONFIG.xs.padding,
+  				xs: CONTAINER_CONFIG.xs.padding,
+  				sm: CONTAINER_CONFIG.sm.padding,
+  				md: CONTAINER_CONFIG.md.padding,
+  				lg: CONTAINER_CONFIG.lg.padding,
+  				xl: CONTAINER_CONFIG.xl.padding,
+  				'2xl': CONTAINER_CONFIG['2xl'].padding,
+  			},
+  			screens: {
+  				xs: CONTAINER_CONFIG.xs.maxWidth,
+  				sm: CONTAINER_CONFIG.sm.maxWidth,
+  				md: CONTAINER_CONFIG.md.maxWidth,
+  				lg: CONTAINER_CONFIG.lg.maxWidth,
+  				xl: CONTAINER_CONFIG.xl.maxWidth,
+  				'2xl': CONTAINER_CONFIG['2xl'].maxWidth,
+  			},
+  		},
   		colors: {
   			background: 'rgb(var(--background))',
   			foreground: 'rgb(var(--foreground))',

@@ -1,21 +1,14 @@
 "use client";
 
 import { Editor } from '@tiptap/react';
-import { useState, useEffect } from 'react';
-import { 
-  FiBold, 
-  FiItalic, 
-  FiUnderline, 
-  FiList, 
-  FiImage, 
- 
+import { useState, useEffect, useRef, useCallback } from 'react';
+import {
+  FiBold,
+  FiItalic,
+  FiUnderline,
+  FiList,
+  FiImage,
   FiCode,
-  FiAlignLeft,
-  FiAlignCenter,
-  FiAlignRight,
-  FiAlignJustify,
-  FiType,
-  FiMoreHorizontal,
   FiChevronDown,
   FiCheck,
 } from 'react-icons/fi';
@@ -74,48 +67,30 @@ const BG_COLOR_PRESETS = [
   { value: '#DCE3E9', label: '연한 회색' }, // user color light gray
 ];
 
-// 글꼴 크기 옵션
+// 글꼴 크기 옵션 - 본문 전용 (17px 기본, 20px 강조)
 const FONT_SIZES = [
-  { value: '12px', label: '작게' },
-  { value: '14px', label: '보통-' },
-  { value: '16px', label: '보통' },
-  { value: '18px', label: '보통+' },
+  { value: '17px', label: '보통' },
   { value: '20px', label: '크게' },
-  { value: '24px', label: '매우 크게' },
-  { value: '32px', label: '제목' },
 ];
 
-// 제목 레벨
-const HEADING_LEVELS = [
-  { level: 0, label: '본문' },
-  { level: 1, label: '제목 1' },
-  { level: 2, label: '제목 2' },
-  { level: 3, label: '제목 3' },
-  { level: 4, label: '제목 4' },
-  { level: 5, label: '제목 5' },
-  { level: 6, label: '제목 6' },
-];
-
-export default function EnhancedEditorToolbar({ 
-  editor, 
-  onImageUpload, 
+export default function EnhancedEditorToolbar({
+  editor,
+  onImageUpload,
   isUploading = false,
-  hideImageButton = false 
+  hideImageButton = false
 }: EnhancedEditorToolbarProps) {
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showBgColorPicker, setShowBgColorPicker] = useState(false);
   const [showFontSizeMenu, setShowFontSizeMenu] = useState(false);
-  const [showHeadingMenu, setShowHeadingMenu] = useState(false);
-  
+
   // 에디터 클릭 시 드롭다운 닫기
   useEffect(() => {
     const handleEditorClick = () => {
       setShowTextColorPicker(false);
       setShowBgColorPicker(false);
       setShowFontSizeMenu(false);
-      setShowHeadingMenu(false);
     };
-    
+
     if (editor) {
       editor.on('focus', handleEditorClick);
       return () => {
@@ -190,18 +165,6 @@ export default function EnhancedEditorToolbar({
     </div>
   );
 
-  const getCurrentHeadingLevel = () => {
-    for (let i = 1; i <= 6; i++) {
-      if (editor.isActive('heading', { level: i })) {
-        return i;
-      }
-    }
-    return 0;
-  };
-
-  const currentHeadingLevel = getCurrentHeadingLevel();
-  const currentHeadingLabel = HEADING_LEVELS.find(h => h.level === currentHeadingLevel)?.label || '본문';
-
   const handleSetFontSize = (size: string) => {
     editor.chain().focus().setMark('textStyle', { fontSize: size }).run();
     setShowFontSizeMenu(false);
@@ -225,65 +188,19 @@ export default function EnhancedEditorToolbar({
     setShowBgColorPicker(false);
   };
 
-  const handleSetHeading = (level: number) => {
-    if (level === 0) {
-      editor.chain().focus().setParagraph().run();
-    } else {
-      editor.chain().focus().setHeading({ level: level as 1 | 2 | 3 | 4 | 5 | 6 }).run();
-    }
-    setShowHeadingMenu(false);
-  };
-
 
 
   return (
     <>
-      <div className="border-b border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-700 overflow-visible relative rounded-lg">
+      {/* 데스크톱 툴바 */}
+      <div className="hidden md:flex border-b border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-700 overflow-visible relative rounded-lg">
         <div className="flex items-center space-x-1 min-w-max">
-          {/* 제목 레벨 드롭다운 */}
-          <DropdownButton
-            label={currentHeadingLabel}
-            isOpen={showHeadingMenu}
-            onClick={() => {
-              setShowHeadingMenu(!showHeadingMenu);
-              setShowFontSizeMenu(false);
-              setShowTextColorPicker(false);
-              setShowBgColorPicker(false);
-            }}
-          >
-            <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg" style={{ zIndex: 9999 }}>
-              {HEADING_LEVELS.map((heading) => (
-                <button
-                  key={heading.level}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSetHeading(heading.level);
-                  }}
-                  className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                    currentHeadingLevel === heading.level ? 'bg-sky-50 text-sky-700 dark:bg-sky-900 dark:text-sky-300' : 'text-gray-700 dark:text-gray-300'
-                  }`}
-                  style={{
-                    fontSize: heading.level === 0 ? '14px' : `${24 - heading.level * 2}px`,
-                    fontWeight: heading.level === 0 ? 'normal' : 'bold'
-                  }}
-                >
-                  {heading.label}
-                </button>
-              ))}
-            </div>
-          </DropdownButton>
-
-          <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
-
           {/* 글꼴 크기 드롭다운 */}
           <DropdownButton
-            label="크기"
+            label="글자"
             isOpen={showFontSizeMenu}
             onClick={() => {
               setShowFontSizeMenu(!showFontSizeMenu);
-              setShowHeadingMenu(false);
               setShowTextColorPicker(false);
               setShowBgColorPicker(false);
             }}
@@ -354,7 +271,6 @@ export default function EnhancedEditorToolbar({
                 setShowTextColorPicker(!showTextColorPicker);
                 setShowBgColorPicker(false);
                 setShowFontSizeMenu(false);
-                setShowHeadingMenu(false);
               }}
               title="텍스트 색상"
               className="p-2 rounded transition-all duration-150 relative text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -366,8 +282,8 @@ export default function EnhancedEditorToolbar({
               <MdFormatColorText className="w-4 h-4" />
             </button>
             {showTextColorPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 p-2">
-                <div className="grid grid-cols-5 gap-1">
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg px-4 py-3" style={{ zIndex: 9999, width: '184px' }}>
+                <div className="grid grid-cols-3 gap-2.5">
                   {COLOR_PRESETS.map((color) => {
                     const currentColor = editor.getAttributes('textStyle').color;
                     const isSelected = color.value === currentColor || (!color.value && !currentColor);
@@ -380,9 +296,9 @@ export default function EnhancedEditorToolbar({
                           e.stopPropagation();
                           handleSetColor(color.value);
                         }}
-                        className={`w-8 h-8 rounded hover:scale-110 transition-transform ${
-                          isSelected 
-                            ? 'ring-2 ring-blue-500 ring-offset-2 scale-110' 
+                        className={`w-10 h-10 rounded hover:scale-110 transition-transform ${
+                          isSelected
+                            ? 'ring-2 ring-blue-500 ring-offset-2 scale-110'
                             : 'border border-gray-300'
                         }`}
                         style={{ backgroundColor: color.value || '#ffffff' }}
@@ -410,7 +326,6 @@ export default function EnhancedEditorToolbar({
                 setShowBgColorPicker(!showBgColorPicker);
                 setShowTextColorPicker(false);
                 setShowFontSizeMenu(false);
-                setShowHeadingMenu(false);
               }}
               title="배경색"
               className="p-2 rounded transition-all duration-150 relative text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
@@ -421,8 +336,8 @@ export default function EnhancedEditorToolbar({
               <MdFormatColorFill className="w-4 h-4" />
             </button>
             {showBgColorPicker && (
-              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-10 p-2">
-                <div className="grid grid-cols-4 gap-1">
+              <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg px-4 py-3" style={{ zIndex: 9999, width: '184px' }}>
+                <div className="grid grid-cols-3 gap-2.5">
                   {BG_COLOR_PRESETS.map((color) => {
                     const currentHighlight = editor.getAttributes('highlight').color;
                     const isSelected = color.value === currentHighlight || (!color.value && !currentHighlight);
@@ -435,9 +350,9 @@ export default function EnhancedEditorToolbar({
                           e.stopPropagation();
                           handleSetHighlight(color.value);
                         }}
-                        className={`w-8 h-8 rounded hover:scale-110 transition-transform ${
-                          isSelected 
-                            ? 'ring-2 ring-blue-500 ring-offset-2 scale-110' 
+                        className={`w-10 h-10 rounded hover:scale-110 transition-transform ${
+                          isSelected
+                            ? 'ring-2 ring-blue-500 ring-offset-2 scale-110'
                             : 'border border-gray-300'
                         }`}
                         style={{ backgroundColor: color.value || '#ffffff' }}
@@ -580,7 +495,83 @@ export default function EnhancedEditorToolbar({
           </ToolbarButton>
         </div>
       </div>
-      
+
+      {/* 모바일 툴바 - 768px 미만에서 표시 */}
+      <div className="md:hidden border-b border-gray-200 dark:border-gray-700 p-2 bg-gray-50 dark:bg-gray-700 overflow-visible relative rounded-lg">
+        <div className="flex flex-nowrap items-center gap-3 justify-center">
+          {/* 글자 크기 드롭다운 */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                setShowFontSizeMenu(!showFontSizeMenu);
+              }}
+              title="글자"
+              className="p-2 rounded transition-all duration-150 min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-600 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-600"
+            >
+              <span className="text-sm font-medium">글자</span>
+            </button>
+            {showFontSizeMenu && (
+              <div className="absolute left-1/2 -translate-x-1/2 top-full mt-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg z-[9999] min-w-[120px]">
+                {FONT_SIZES.map((size) => (
+                  <button
+                    key={size.value}
+                    type="button"
+                    onClick={() => {
+                      handleSetFontSize(size.value);
+                    }}
+                    className="w-full px-4 py-2.5 text-left hover:bg-gray-100 dark:hover:bg-gray-700 text-sm"
+                  >
+                    {size.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 굵게 */}
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBold().run()}
+            isActive={editor.isActive('bold')}
+            title="굵게"
+            className="min-w-[44px] min-h-[44px]"
+          >
+            <FiBold className="w-5 h-5" />
+          </ToolbarButton>
+
+          {/* 인용구 */}
+          <ToolbarButton
+            onClick={() => editor.chain().focus().toggleBlockquote().run()}
+            isActive={editor.isActive('blockquote')}
+            title="인용구"
+            className="min-w-[44px] min-h-[44px]"
+          >
+            <MdFormatQuote className="w-5 h-5" />
+          </ToolbarButton>
+
+          {/* 이미지 업로드 */}
+          {!hideImageButton && (
+            <ToolbarButton
+              onClick={onImageUpload}
+              disabled={isUploading}
+              title="이미지"
+              className="min-w-[44px] min-h-[44px]"
+            >
+              <FiImage className="w-5 h-5" />
+            </ToolbarButton>
+          )}
+
+          {/* 구분선 */}
+          <ToolbarButton
+            onClick={() => editor.chain().focus().setHorizontalRule().run()}
+            title="구분선"
+            className="min-w-[44px] min-h-[44px]"
+          >
+            <MdHorizontalRule className="w-5 h-5" />
+          </ToolbarButton>
+        </div>
+      </div>
+
     </>
   );
 }

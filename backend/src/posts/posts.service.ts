@@ -475,6 +475,8 @@ export class PostsService {
         'post.updatedAt',
         'post.publishedAt',
         'post.version',
+        'post.isEditorPick', // Editor's Pick 여부
+        'post.editorPickedAt', // Editor's Pick 선정 시간
       ])
       .addSelect([
         'author.id',
@@ -1695,5 +1697,79 @@ export class PostsService {
       tag: row.tag,
       count: parseInt(row.count, 10),
     }));
+  }
+
+  /**
+   * Editor's Pick 토글 (Admin 전용)
+   * @description 관리자가 특정 포스트를 Editor's Pick으로 지정하거나 해제
+   * @param postId - 포스트 ID
+   * @param user - 관리자 사용자 정보
+   * @returns 업데이트된 포스트 정보
+   */
+  async toggleEditorPick(postId: string, user: User): Promise<{ message: string; isEditorPick: boolean }> {
+    // Admin 권한 확인
+    if (user.role !== Role.ADMIN) {
+      throw new ForbiddenException('Editor\'s Pick 권한이 없습니다.');
+    }
+
+    // 포스트 조회
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+    });
+
+    if (!post) {
+      throw new NotFoundException('게시글을 찾을 수 없습니다.');
+    }
+
+    // Editor's Pick 토글
+    post.isEditorPick = !post.isEditorPick;
+    post.editorPickedAt = post.isEditorPick ? new Date() : null;
+
+    await this.postsRepository.save(post);
+
+    this.logger.log(`Editor's Pick ${post.isEditorPick ? 'enabled' : 'disabled'} for post ${postId} by admin ${user.id}`);
+
+    return {
+      message: post.isEditorPick ? 'Editor\'s Pick으로 선정되었습니다.' : 'Editor\'s Pick에서 해제되었습니다.',
+      isEditorPick: post.isEditorPick,
+    };
+  }
+
+  /**
+   * Editor's Pick 목록 조회
+   * @description 관리자가 선정한 추천 포스트 목록 (최신 순)
+   * @param limit - 조회할 개수 (기본: 5, 최대: 10)
+   * @returns Editor's Pick 포스트 목록
+   */
+  async findEditorPicks(limit: number = 5): Promise<{ posts: PostResponseDto[], total: number }> {
+    // limit 제한 (최대 10개)
+    const safeLimit = Math.min(Math.max(1, limit), 10);
+
+    // Editor's Pick 조회 쿼리
+    // 복합 인덱스 활용: (isEditorPick, editorPickedAt DESC)
+    const [posts, total] = await this.postsRepository.findAndCount({
+      where: {
+        isEditorPick: true,
+        isPublished: true, // 공개 포스트만
+      },
+      relations: ['author', 'blog'],
+      order: {
+        editorPickedAt: 'DESC', // 최신 Pick 순
+      },
+      take: safeLimit,
+    });
+
+    // DTO 변환
+    const postDtos = posts.map(post =>
+      this.toPostDto(post, {
+        user: post.author,
+        blog: post.blog,
+      })
+    );
+
+    return {
+      posts: postDtos,
+      total,
+    };
   }
 } 

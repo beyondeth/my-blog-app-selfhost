@@ -101,6 +101,8 @@ export interface Post {
   likedBy?: User[];
   attachedFiles?: FileUpload[];
   qualityScore?: number | null;
+  isEditorPick?: boolean;  // Editor's Pick 여부
+  editorPickedAt?: string;  // Editor's Pick 선정 시간
 }
 
 // 댓글 관련 타입

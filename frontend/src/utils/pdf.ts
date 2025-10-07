@@ -48,16 +48,43 @@ export async function generatePdfFromElement(
     // 현재 스크롤 위치 저장 (나중에 복원)
     const currentScrollPosition = window.scrollY;
 
+    // 콘텐츠 크기 확인 및 동적 스케일 계산
+    const contentHeight = element.scrollHeight;
+    const contentWidth = element.scrollWidth;
+
+    // 브라우저 Canvas 안전 제한 (실제 제한보다 여유있게)
+    const MAX_CANVAS_HEIGHT = 30000;
+    const MAX_CANVAS_WIDTH = 30000;
+
+    // 동적 스케일 계산
+    let scale = 2; // 기본값: 고화질
+    if (contentHeight * scale > MAX_CANVAS_HEIGHT) {
+      scale = Math.floor((MAX_CANVAS_HEIGHT / contentHeight) * 10) / 10;
+      scale = Math.max(scale, 1); // 최소 1
+      console.log(`긴 콘텐츠 감지: Scale을 ${scale}로 조정합니다.`);
+    }
+    if (contentWidth * scale > MAX_CANVAS_WIDTH) {
+      const widthScale = Math.floor((MAX_CANVAS_WIDTH / contentWidth) * 10) / 10;
+      scale = Math.min(scale, widthScale);
+      scale = Math.max(scale, 1);
+      console.log(`넓은 콘텐츠 감지: Scale을 ${scale}로 조정합니다.`);
+    }
+
     // html2canvas 옵션 설정
-    onProgress?.('화면을 캡처하는 중...');
+    if (scale < 1.5) {
+      onProgress?.(`긴 콘텐츠를 처리 중입니다 (화질: ${Math.round(scale * 50)}%)...`);
+    } else {
+      onProgress?.('화면을 캡처하는 중...');
+    }
+
     const canvas = await html2canvas(element, {
-      scale: 2, // 고화질을 위해 스케일 증가
+      scale: scale, // 동적으로 계산된 스케일 적용
       useCORS: true, // 외부 이미지 허용
       logging: false, // 로그 비활성화
       windowWidth: element.scrollWidth,
       windowHeight: element.scrollHeight,
       backgroundColor: '#ffffff', // 배경색 흰색
-      imageTimeout: 15000, // 이미지 로드 타임아웃
+      imageTimeout: contentHeight > 15000 ? 30000 : 15000, // 긴 콘텐츠는 타임아웃 증가
       onclone: (clonedDoc) => {
         // 복제된 문서에서 불필요한 요소 제거
         const clonedElement = clonedDoc.getElementById(elementId);
@@ -80,25 +107,24 @@ export async function generatePdfFromElement(
 
     // A4 사이즈로 PDF 생성 (여백 설정)
     const marginHorizontal = 20; // 좌우 여백 20mm
-    const marginVertical = 28; // 상하 여백 20mm
+    const marginVertical = 28; // 상하 여백 28mm
     const pageWidth = 210; // A4 width in mm
     const pageHeight = 297; // A4 height in mm
-    const contentWidth = pageWidth - (marginHorizontal * 2);
-    const contentHeight = pageHeight - (marginVertical * 2);
+    const contentWidthMM = pageWidth - (marginHorizontal * 2);
+    const contentHeightMM = pageHeight - (marginVertical * 2);
 
     // PDF 문서 생성
     const pdf = new jsPDF('p', 'mm', 'a4');
 
-    // 캔버스를 PDF 크기에 맞게 조정
-    const pdfWidthInPixels = contentWidth;
-    const scale = pdfWidthInPixels / (canvas.width / 2); // scale 2를 고려
-    const pdfHeightInPixels = (canvas.height / 2) * scale;
+    // 캔버스를 PDF 크기에 맞게 조정 (동적 scale 사용)
+    const pdfScale = contentWidthMM / (canvas.width / scale);
+    const pdfHeightInPixels = (canvas.height / scale) * pdfScale;
 
     // 페이지당 표시할 픽셀 높이 계산
-    const pixelsPerPage = contentHeight / scale;
+    const pixelsPerPage = contentHeightMM / pdfScale;
 
     // 총 페이지 수 계산
-    const totalPages = Math.ceil((canvas.height / 2) / pixelsPerPage);
+    const totalPages = Math.ceil((canvas.height / scale) / pixelsPerPage);
 
     // 각 페이지 처리
     for (let pageNum = 0; pageNum < totalPages; pageNum++) {
@@ -107,9 +133,9 @@ export async function generatePdfFromElement(
         pdf.addPage();
       }
 
-      // 현재 페이지에 표시할 캔버스 영역 계산
-      const sourceY = pageNum * pixelsPerPage * 2; // scale 2를 고려
-      const sourceHeight = Math.min(pixelsPerPage * 2, canvas.height - sourceY);
+      // 현재 페이지에 표시할 캔버스 영역 계산 (동적 scale 사용)
+      const sourceY = pageNum * pixelsPerPage * scale;
+      const sourceHeight = Math.min(pixelsPerPage * scale, canvas.height - sourceY);
 
       // 임시 캔버스 생성 - 이 페이지의 내용만 담기
       const tempCanvas = document.createElement('canvas');
@@ -130,8 +156,8 @@ export async function generatePdfFromElement(
         // 임시 캔버스를 이미지로 변환
         const pageImageData = tempCanvas.toDataURL('image/jpeg', 0.85);
 
-        // 실제 그려질 높이 계산 (PDF 단위)
-        const drawHeight = Math.min(contentHeight, (sourceHeight / 2) * scale);
+        // 실제 그려질 높이 계산 (PDF 단위, 동적 scale 사용)
+        const drawHeight = Math.min(contentHeightMM, (sourceHeight / scale) * pdfScale);
 
         // PDF에 이미지 추가 - 정확한 여백 위치에
         pdf.addImage(
@@ -139,7 +165,7 @@ export async function generatePdfFromElement(
           'JPEG',
           marginHorizontal,
           marginVertical,
-          contentWidth,
+          contentWidthMM,
           drawHeight,
           undefined,
           'FAST'

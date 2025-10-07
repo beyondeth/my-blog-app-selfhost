@@ -113,16 +113,16 @@ export default function BookmarksPage() {
       {/* 헤더 영역 - 검색, 필터, 정렬 통합 */}
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* 필터, 검색, 정렬 영역 */}
-          <div className="py-4 flex items-center justify-end gap-3">
+          {/* 필터, 검색, 정렬 영역 - 모바일 세로, 데스크톱 가로 배치 */}
+          <div className="py-4 flex flex-col md:flex-row md:items-center md:justify-end gap-3">
             {/* 검색 */}
-            <div className="relative">
+            <div className="relative w-full md:w-auto">
               <input
                 type="text"
                 placeholder="북마크 검색..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-64 pl-10 pr-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
+                className="w-full md:w-64 pl-10 pr-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
               />
               <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             </div>
@@ -131,7 +131,7 @@ export default function BookmarksPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as 'recent' | 'popular' | 'oldest')}
-              className="px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
+              className="w-full md:w-auto px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
             >
               <option value="recent">최근 추가순</option>
               <option value="oldest">오래된 순</option>
@@ -140,7 +140,7 @@ export default function BookmarksPage() {
 
             {/* 전체 북마크 버튼 */}
             <button
-              className="flex items-center px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+              className="w-full md:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <FiBookmark className="w-4 h-4" />
               <span className="ml-2">전체 북마크</span>
@@ -154,9 +154,9 @@ export default function BookmarksPage() {
 
       {/* 메인 컨텐츠 - 전체 너비 사용 */}
       <main className="flex-1">
-        <div className="max-w-7xl mx-auto p-6">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 py-4 md:py-6">
           {sortedPosts.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-4">
               {sortedPosts.map((post: any) => {
                 if (!post) return null;
 

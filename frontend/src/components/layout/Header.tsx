@@ -84,8 +84,8 @@ export default function Header() {
 
   return (
     <header className="border-b border-border sticky top-0 z-50 bg-background">
-      <div className="max-w-full ml-0 px-4 lg:pl-[43px] lg:pr-32 py-4 sm:py-5">
-        <div className="flex items-center justify-between">
+      <div className="max-w-full ml-0 px-2 xs:px-3 sm:px-4 md:px-4 lg:pl-[43px] lg:pr-32 py-4 sm:py-5">
+        <div className="flex items-center justify-between relative">
           {/* Hamburger Menu & Logo */}
           <div className="flex items-center space-x-4">
             {/* Hamburger Menu Button */}
@@ -205,7 +205,7 @@ export default function Header() {
           </nav>
 
           {/* Mobile Auth Section */}
-          <div className="md:hidden flex items-center space-x-3">
+          <div className="md:hidden absolute right-2 xs:right-3 sm:right-4 flex items-center space-x-3">
             {/* Theme Switch - Always visible */}
             <ThemeSwitch />
 

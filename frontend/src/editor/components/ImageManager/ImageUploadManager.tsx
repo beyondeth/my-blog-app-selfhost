@@ -455,11 +455,11 @@ export default function ImageUploadManager({
         />
       )}
 
-      {/* Upload Area */}
+      {/* Upload Area - 모바일에서는 숨김 */}
       <div
         onDragOver={handleDragOver}
         onDrop={handleDrop}
-        className="border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer"
+        className="max-md:hidden border-2 border-dashed border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center hover:border-gray-400 dark:hover:border-gray-600 transition-colors cursor-pointer"
         onClick={() => fileInputRef.current?.click()}
       >
         <FiUpload className="w-8 h-8 mx-auto mb-2 text-gray-400" />

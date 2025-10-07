@@ -10,6 +10,7 @@ import { Bookmark } from '../../bookmarks/entities/bookmark.entity';
 @Index(['isPublished'])
 @Index(['authorId'])
 @Index(['category'])
+@Index(['isEditorPick', 'editorPickedAt']) // Editor's Pick 조회 최적화
 export class Post {
   @PrimaryGeneratedColumn('uuid')
   id: string;
@@ -86,6 +87,14 @@ export class Post {
 
   @Column({ nullable: true, name: 'publishedAt' })
   publishedAt: Date;
+
+  // Editor's Pick 기능 (관리자가 선정한 추천 포스트)
+  @Column({ default: false, name: 'isEditorPick' })
+  isEditorPick: boolean;
+
+  // Editor's Pick으로 선정된 시간 (최신순 정렬용)
+  @Column({ type: 'timestamp', nullable: true, name: 'editorPickedAt' })
+  editorPickedAt: Date | null;
 
   @VersionColumn({ name: 'version' })
   version: number;

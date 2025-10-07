@@ -12,6 +12,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
+import EditorPickSection from '@/components/layout/EditorPickSection';
 import PopularPostsSection from '@/components/layout/PopularPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
 import FollowingListSection from '@/components/FollowingListSection';
@@ -65,10 +66,23 @@ export default function HomePage() {
 
   const deletePostMutation = useDeletePost();
 
-  // 모든 포스트 플래튼 - 메모이제이션
+  // 모든 포스트 플래튼 - 메모이제이션 (중복 제거)
   const allPosts = useMemo(() => {
     if (!data?.pages) return [];
-    return data.pages.flatMap(page => page?.posts || []).filter(post => post);
+
+    // Map을 사용하여 중복 제거 (post.id 기준)
+    const postsMap = new Map();
+    data.pages.forEach(page => {
+      if (page?.posts) {
+        page.posts.forEach(post => {
+          if (post && post.id) {
+            postsMap.set(post.id, post);
+          }
+        });
+      }
+    });
+
+    return Array.from(postsMap.values());
   }, [data?.pages]);
 
   const totalPosts = useMemo(() => {
@@ -160,7 +174,7 @@ export default function HomePage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-3 sm:px-4 pb-4 sm:pb-6 lg:pb-8">
+    <div className="max-w-7xl mx-auto px-2 xs:px-3 sm:px-4 pb-4 sm:pb-6 lg:pb-8">
       <div className="flex flex-col lg:flex-row gap-4 sm:gap-8 lg:gap-16">
         {/* Main Content Area - 오른쪽 사이드바를 위한 여백 확보 (right-16[64px] + w-80[320px] + 여유 16px = 400px) */}
         <main className="flex-1 min-w-0 lg:mr-[400px] pt-[70px]">
@@ -206,6 +220,9 @@ export default function HomePage() {
           {/* Sidebar - fixed positioning with internal scroll */}
         <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-40 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll">
           <div className="space-y-4 sm:space-y-6">
+            {/* Editor's Pick 섹션 (가장 위에 배치) */}
+            <EditorPickSection />
+
             <PopularPostsSection />
 
             <TagsSection tags={tags} onTagClick={handleTagClick} />

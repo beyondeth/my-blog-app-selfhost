@@ -101,23 +101,43 @@ export class McpProxyController {
     };
 
     try {
-      // 1. MCP 포스트 제한 체크 (일간 + 월간 제한 모두 확인)
+      // 1. 포스트 크기 검증 (글자수 + 바이트 크기)
+      if (createPostDto.content_markdown) {
+        // 글자수 체크 (200,000자 제한)
+        const contentLength = createPostDto.content_markdown.length;
+        if (contentLength > 200000) {
+          throw new BadRequestException(`포스트 내용은 최대 200,000자까지 가능합니다 (현재: ${contentLength.toLocaleString()}자)`);
+        }
+
+        // 바이트 크기 체크 (1MB 제한)
+        const contentSize = Buffer.byteLength(createPostDto.content_markdown, 'utf8');
+        const maxSizeMB = 1;
+        const maxSizeBytes = maxSizeMB * 1024 * 1024;
+        if (contentSize > maxSizeBytes) {
+          const sizeMB = (contentSize / (1024 * 1024)).toFixed(2);
+          throw new BadRequestException(`포스트 크기는 최대 ${maxSizeMB}MB까지 가능합니다 (현재: ${sizeMB}MB)`);
+        }
+
+        this.logger.log(`[MCP Post Size Check] Length: ${contentLength.toLocaleString()} chars, Size: ${(contentSize / 1024).toFixed(2)} KB`);
+      }
+
+      // 2. MCP 포스트 제한 체크 (일간 + 월간 제한 모두 확인)
       const limitCheck = await this.usageService.checkMcpPostLimit(userId);
       if (!limitCheck.canPost) {
         this.logger.warn(`[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`);
         throw new ForbiddenException(limitCheck.reason);
       }
 
-      // 2. User 객체 조회 (PostsService가 User를 필요로 함)
+      // 3. User 객체 조회 (PostsService가 User를 필요로 함)
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user) {
         throw new BadRequestException('사용자를 찾을 수 없습니다');
       }
 
-      // 3. 포스트 생성 (서비스 레이어에서 추가 검증)
+      // 4. 포스트 생성 (서비스 레이어에서 추가 검증)
       const post = await this.postsService.create(postData, user);
 
-      // 4. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
+      // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
       await this.usageService.trackMcpPost(userId);
       this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
 

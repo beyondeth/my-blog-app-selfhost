@@ -397,6 +397,53 @@ export class PostsController {
     return this.postsService.getPostImages(postId);
   }
 
+  @Get('popular-tags')
+  @Public()
+  @UseInterceptors(CacheInterceptor)
+  @CacheTTL(3600) // 1시간 캐시
+  @ApiOperation({ summary: '인기 태그 목록 조회' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '반환할 태그 수 (기본값: 20)' })
+  @ApiResponse({ status: 200, description: '인기 태그 목록 반환' })
+  async getPopularTags(@Query('limit') limit: number = 20) {
+    return this.postsService.getPopularTags(Number(limit));
+  }
+
+  @Get('editor-picks')
+  @Public()
+  @ApiOperation({ summary: 'Editor\'s Pick 목록 조회' })
+  @ApiQuery({ name: 'limit', required: false, type: Number, description: '조회할 개수 (기본: 5, 최대: 10)' })
+  @ApiResponse({ status: 200, description: 'Editor\'s Pick 목록 반환' })
+  async getEditorPicks(@Query('limit') limit?: string) {
+    const limitNumber = limit ? parseInt(limit, 10) : 5;
+
+    // 캐시 키 생성
+    const cacheKey = `editor-picks:${limitNumber}`;
+
+    // 캐시 확인
+    try {
+      const cached = await this.cacheService.get(cacheKey);
+      if (cached) {
+        console.log(`✅ Cache hit for ${cacheKey}`);
+        return cached;
+      }
+    } catch (error) {
+      console.error('Cache get error:', error);
+    }
+
+    // DB 조회
+    const result = await this.postsService.findEditorPicks(limitNumber);
+
+    // 캐싱 (TTL: 30분)
+    try {
+      await this.cacheService.set(cacheKey, result, 1800);
+      console.log(`📦 Cached ${cacheKey} with TTL 1800s`);
+    } catch (error) {
+      console.error('Cache set error:', error);
+    }
+
+    return result;
+  }
+
   @Get(':id')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
@@ -555,14 +602,27 @@ export class PostsController {
     return { message: 'View count queued for batch update' };
   }
 
-  @Get('popular-tags')
-  @Public()
-  @UseInterceptors(CacheInterceptor)
-  @CacheTTL(3600) // 1시간 캐시
-  @ApiOperation({ summary: '인기 태그 목록 조회' })
-  @ApiQuery({ name: 'limit', required: false, type: Number, description: '반환할 태그 수 (기본값: 20)' })
-  @ApiResponse({ status: 200, description: '인기 태그 목록 반환' })
-  async getPopularTags(@Query('limit') limit: number = 20) {
-    return this.postsService.getPopularTags(Number(limit));
+  @Patch(':id/editor-pick')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: 'Editor\'s Pick 토글 (관리자 전용)' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: 'Editor\'s Pick 토글 성공' })
+  @ApiResponse({ status: 403, description: '권한 없음' })
+  @ApiResponse({ status: 404, description: '게시글을 찾을 수 없음' })
+  async toggleEditorPick(
+    @Param('id') id: string,
+    @CurrentUser() user: User,
+  ) {
+    const result = await this.postsService.toggleEditorPick(id, user);
+
+    // Editor's Pick 캐시 무효화 (모든 limit 값에 대해)
+    const cacheKeysToInvalidate = [];
+    for (let limit = 1; limit <= 10; limit++) {
+      cacheKeysToInvalidate.push(`editor-picks:${limit}`);
+    }
+    await this.invalidateCache(cacheKeysToInvalidate);
+
+    return result;
   }
 } 

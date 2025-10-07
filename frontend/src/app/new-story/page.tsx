@@ -213,15 +213,22 @@ export default function NewStoryPage() {
                     <FormItem>
                       <FormControl>
                         <div className="relative">
-                          {/* 왼쪽 라벨 + 세로줄 컨테이너 (absolute로 배치) */}
+                          {/* 라벨: 모바일=상단, 데스크톱=왼쪽 */}
                           {showLabel && (
-                            <div className="absolute -left-24 top-0 flex items-start gap-2" style={{ height: textareaHeight + 'px' }}>
-                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                <Plus className="h-3 w-3" />
-                                <span>제목</span>
+                            <>
+                              {/* 모바일 라벨 (상단) */}
+                              <div className="mb-2 lg:hidden">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">제목</span>
                               </div>
-                              <div className="w-px bg-gray-300 dark:bg-gray-600" style={{ height: '100%' }} />
-                            </div>
+                              {/* 데스크톱 라벨 (왼쪽) */}
+                              <div className="hidden lg:flex absolute -left-24 top-0 items-start gap-2" style={{ height: textareaHeight + 'px' }}>
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                  <Plus className="h-3 w-3" />
+                                  <span>제목</span>
+                                </div>
+                                <div className="w-px bg-gray-300 dark:bg-gray-600" style={{ height: '100%' }} />
+                              </div>
+                            </>
                           )}
 
                           {/* 제목 입력 영역 */}
@@ -310,14 +317,21 @@ export default function NewStoryPage() {
                     <FormItem>
                       <FormControl>
                         <div className="relative">
-                          {/* 왼쪽 라벨 (absolute로 배치, 세로줄 없음) */}
+                          {/* 라벨: 모바일=상단, 데스크톱=왼쪽 */}
                           {showLabel && (
-                            <div className="absolute -left-24 top-0">
-                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                <Plus className="h-3 w-3" />
-                                <span>태그</span>
+                            <>
+                              {/* 모바일 라벨 (상단) */}
+                              <div className="mb-2 lg:hidden">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">태그</span>
                               </div>
-                            </div>
+                              {/* 데스크톱 라벨 (왼쪽) */}
+                              <div className="hidden lg:block absolute -left-24 top-0">
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                  <Plus className="h-3 w-3" />
+                                  <span>태그</span>
+                                </div>
+                              </div>
+                            </>
                           )}
 
                           {/* 태그 표시 및 입력 영역 */}
@@ -376,17 +390,24 @@ export default function NewStoryPage() {
                     <FormItem>
                       <FormControl>
                         <div className="relative">
-                          {/* 왼쪽 라벨 (absolute로 배치, 세로줄 없음) */}
+                          {/* 라벨: 모바일=상단, 데스크톱=왼쪽 */}
                           {showLabel && (
-                            <div className="absolute -left-24 top-0">
-                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
-                                <Plus className="h-3 w-3" />
-                                <span>내용</span>
+                            <>
+                              {/* 모바일 라벨 (상단) */}
+                              <div className="mb-2 lg:hidden">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">내용</span>
                               </div>
-                            </div>
+                              {/* 데스크톱 라벨 (왼쪽) */}
+                              <div className="hidden lg:block absolute -left-24 top-0">
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                  <Plus className="h-3 w-3" />
+                                  <span>내용</span>
+                                </div>
+                              </div>
+                            </>
                           )}
 
-                          <div className="min-h-[400px]">
+                          <div className="min-h-[300px] lg:min-h-[400px]">
                             <BlogRichTextEditor
                               content={field.value}
                               onChange={field.onChange}
@@ -425,7 +446,7 @@ export default function NewStoryPage() {
             <Button
               type="submit"
               disabled={!isUploadValid || isSubmitting || createPostMutation.isPending || !form.formState.isValid}
-              className="flex items-center gap-2 min-w-[120px]"
+              className="flex items-center justify-center gap-2 min-w-[120px]"
               title={!isUploadValid ? uploadValidationReason : undefined}
             >
               {isSubmitting || createPostMutation.isPending ? (

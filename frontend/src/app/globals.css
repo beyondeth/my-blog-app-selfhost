@@ -202,10 +202,44 @@ body {
   padding: 0;
 }
 
+/* 모바일 전용 가로 스크롤 방지 (768px 이하) */
+@media (max-width: 768px) {
+  html, body {
+    max-width: 100vw;
+    overflow-x: hidden !important;
+  }
+}
+
 /* 모달이 열렸을 때 스크롤 방지 (스크롤바 공간은 유지) */
 body[data-scroll-locked] {
   position: fixed;
   width: 100%;
   top: 0;
   overflow-y: scroll; /* 스크롤바 공간 유지 */
+}
+
+/* 359px 이하 모바일 화면 최적화 - 절대 가로 스크롤 방지 */
+@media (max-width: 359px) {
+  /* 전체 레이아웃 가로 스크롤 방지 */
+  body {
+    max-width: 100vw;
+    overflow-x: hidden !important;
+  }
+
+  /* 모든 미디어 요소 강제 제한 */
+  img, video, iframe {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+
+  /* 텍스트 오버플로우 방지 */
+  p, h1, h2, h3, h4, h5, h6, div, span, a {
+    word-break: break-word;
+    overflow-wrap: break-word;
+  }
+
+  /* 모든 컨테이너 요소 너비 제한 */
+  * {
+    max-width: 100%;
+  }
 }
