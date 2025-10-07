@@ -294,11 +294,7 @@ const PostArticle = React.memo(function PostArticle({
           {displayContent && (
             <p
               className="text-[15px] text-foreground leading-relaxed line-clamp-3 break-words mb-7"
-              dangerouslySetInnerHTML={
-                searchQuery
-                  ? { __html: highlightAndTruncate(displayContent, searchQuery, 200) }
-                  : { __html: displayContent }
-              }
+              dangerouslySetInnerHTML={{ __html: displayContent }}
             />
           )}
           {!displayContent && (

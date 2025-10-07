@@ -31,8 +31,8 @@ export function highlightSearchTerms(
   // 모든 검색어를 OR 연산으로 결합
   const regex = new RegExp(`(${searchTerms.join('|')})`, 'gi');
 
-  // 매칭된 부분을 mark 태그로 감싸기
-  return text.replace(regex, '<mark class="bg-primary/20 text-primary font-medium rounded px-0.5">$1</mark>');
+  // 매칭된 부분을 mark 태그로 감싸기 (CSS로 스타일 정의: globals.css)
+  return text.replace(regex, '<mark class="search-highlight">$1</mark>');
 }
 
 /**

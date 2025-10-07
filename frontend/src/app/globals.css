@@ -122,6 +122,20 @@
   line-height: 1.5;
 }
 
+/* 검색 하이라이트 스타일 - 다크모드 대응 */
+mark.search-highlight {
+  background-color: #374151; /* gray-700 */
+  color: white;
+  font-weight: 500;
+  border-radius: 0.125rem;
+  padding: 0 0.125rem;
+}
+
+.dark mark.search-highlight {
+  background-color: #f9a8d4 !important; /* pink-300 */
+  color: black !important;
+}
+
 /* 사이드바 스크롤바 숨기기 - 모든 브라우저 지원 */
 .sidebar-scroll {
   -ms-overflow-style: none;  /* IE and Edge */
