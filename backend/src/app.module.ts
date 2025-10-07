@@ -31,11 +31,12 @@ import { RedisModule } from './redis/redis.module';
 import { ChatModule } from './chat/chat.module';
 import { MetricsModule } from './metrics/metrics.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
-import { SubscriptionModule } from './subscription/subscription.module';
-import { PaymentModule } from './payment/payment.module';
-import { UsageModule } from './usage/usage.module';
-import { PaymentEventsModule } from './payment/payment-events.module';
-import { SharedSubscriptionModule } from './shared/shared-subscription.module';
+// FUTURE: 구독제 기능 활성화 시 주석 해제
+// import { SubscriptionModule } from './subscription/subscription.module';
+// import { PaymentModule } from './payment/payment.module';
+// import { UsageModule } from './usage/usage.module';
+// import { PaymentEventsModule } from './payment/payment-events.module';
+// import { SharedSubscriptionModule } from './shared/shared-subscription.module';
 
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -73,11 +74,23 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
     }),
 
     // Rate limiting configuration
+    // 다중 시간대 Rate Limit: 분당 3회, 시간당 10회, 하루 20회
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          ttl: 3600000, // 1 hour in milliseconds
-          limit: 15,    // 15 posts per hour per user
+          name: 'minute',
+          ttl: 60000,      // 1분 (60초)
+          limit: 3,        // 분당 3회
+        },
+        {
+          name: 'hour',
+          ttl: 3600000,    // 1시간 (3600초)
+          limit: 10,       // 시간당 10회
+        },
+        {
+          name: 'day',
+          ttl: 86400000,   // 1일 (86400초)
+          limit: 20,       // 하루 20회
         }
       ]
     }),
@@ -98,7 +111,8 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
     CacheModule, // Global cache module with Redis support
     MonitoringModule, // Global monitoring module for suspicious requests
     MetricsModule, // Prometheus metrics module
-    PaymentEventsModule, // Global payment events module (Event-Driven Architecture)
+    // FUTURE: 구독제 기능 활성화 시 주석 해제
+    // PaymentEventsModule, // Global payment events module (Event-Driven Architecture)
     AuthModule,
     UsersModule, // 먼저 로드 - 다른 모듈들이 의존
     PostsModule,
@@ -117,10 +131,11 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
     ChatModule,
     OauthModule,
     // AnalyticsModule,
-    SubscriptionModule, // UsersModule 이후에 로드
-    UsageModule, // SubscriptionModule과 UsersModule 이후에 로드
-    SharedSubscriptionModule, // UsageModule 이후에 로드 (UsageLimitGuard 제공)
-    PaymentModule, // 마지막에 로드 (이벤트 기반으로 다른 모듈과 통신)
+    // FUTURE: 구독제 기능 활성화 시 주석 해제
+    // SubscriptionModule, // UsersModule 이후에 로드
+    // UsageModule, // SubscriptionModule과 UsersModule 이후에 로드
+    // SharedSubscriptionModule, // UsageModule 이후에 로드 (UsageLimitGuard 제공)
+    // PaymentModule, // 마지막에 로드 (이벤트 기반으로 다른 모듈과 통신)
   ],
   providers: [
     // Global guards

@@ -18,9 +18,6 @@ import { AdminFilesController } from './admin-files.controller';
 // Debug
 import { AdminDebugController } from './debug/admin-debug.controller';
 
-// Nonce Management - 임시 제거 (McpAuthGuard 의존성 문제)
-// import { AdminNonceController } from './nonce/admin-nonce.controller';
-
 // Entities
 import { User } from '../users/entities/user.entity';
 import { Post } from '../posts/entities/post.entity';
@@ -34,7 +31,6 @@ import { EmailApproval } from '../email/entities/email-approval.entity';
 import { AuditModule } from '../audit/audit.module';
 import { FilesModule } from '../files/files.module';
 import { UsersModule } from '../users/users.module';
-import { McpModule } from '../mcp/mcp.module';
 import { RedisModule } from '../redis/redis.module';
 
 @Module({
@@ -51,7 +47,6 @@ import { RedisModule } from '../redis/redis.module';
     AuditModule,
     FilesModule,
     UsersModule,
-    McpModule,  // MCP 논스 관리를 위해 필요
     RedisModule,  // Redis 상태 모니터링을 위해 필요
   ],
   controllers: [
@@ -59,7 +54,6 @@ import { RedisModule } from '../redis/redis.module';
     AdminUsersController,
     AdminFilesController,
     AdminDebugController,
-    // AdminNonceController,  // 논스 관리 컨트롤러 - 임시 제거
   ],
   providers: [
     AdminDashboardService,

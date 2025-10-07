@@ -84,13 +84,22 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
       return response.json();
     },
     onSuccess: (data) => {
-      // Editor's Pick 목록 캐시 무효화 (모든 limit 값)
+      // 1. Editor's Pick 목록 캐시 무효화 (모든 limit 값)
       for (let limit = 1; limit <= 10; limit++) {
         queryClient.invalidateQueries({ queryKey: ['editorPicks', limit] });
       }
 
-      // 포스트 상세 캐시 무효화
-      queryClient.invalidateQueries({ queryKey: ['post', postId] });
+      // 2. 포스트 상세 캐시 무효화 (올바른 키 사용!)
+      queryClient.invalidateQueries({
+        queryKey: ['posts', 'detail'], // 'post'가 아니라 'posts'!
+        exact: false  // detail 하위의 모든 키 무효화
+      });
+
+      // 3. 포스트 목록 캐시도 무효화 (댓글 옆 아이콘 업데이트용)
+      queryClient.invalidateQueries({
+        queryKey: ['posts', 'list'],
+        exact: false
+      });
 
       // 성공 메시지 표시
       toast.success(data.message || 'Editor\'s Pick이 변경되었습니다.', {

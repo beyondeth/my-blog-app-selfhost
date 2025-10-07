@@ -11,6 +11,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { ThrottlerGuard } from '@nestjs/throttler';
 import { OAuthGuard } from '../../oauth/guards/oauth.guard';
 import { RequireScopes } from '../../oauth/decorators/scopes.decorator';
 import { PostsService } from '../../posts/posts.service';
@@ -20,16 +21,20 @@ import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Public } from '../../common/decorators/public.decorator';
 import { CacheService } from '../../cache/cache.service';
-import { UsageService } from '../../usage/usage.service';
+// FUTURE: 구독제 활성화 시 주석 해제
+// import { UsageService } from '../../usage/usage.service';
 
 /**
  * MCP Proxy 컨트롤러
  * MCP 서버가 OAuth2 토큰을 사용하여 블로그에 포스트를 생성할 수 있도록 하는 프록시 엔드포인트
  * 보안을 위해 오직 포스트 생성만 허용하며, 다른 작업은 모두 차단됨
+ *
+ * Rate Limit: 분당 3회, 시간당 10회, 하루 20회 (ThrottlerGuard 사용)
  */
 @ApiTags('MCP')
 @Controller('mcp')
 @Public() // JWT 가드를 우회
+@UseGuards(ThrottlerGuard) // Rate Limit 적용 (분당 3회, 시간당 10회, 하루 20회)
 @ApiBearerAuth()
 export class McpProxyController {
   private readonly logger = new Logger(McpProxyController.name);
@@ -39,7 +44,8 @@ export class McpProxyController {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly cacheService: CacheService,
-    private readonly usageService: UsageService,
+    // FUTURE: 구독제 활성화 시 주석 해제
+    // private readonly usageService: UsageService,
   ) {}
 
   /**
@@ -121,12 +127,13 @@ export class McpProxyController {
         this.logger.log(`[MCP Post Size Check] Length: ${contentLength.toLocaleString()} chars, Size: ${(contentSize / 1024).toFixed(2)} KB`);
       }
 
-      // 2. MCP 포스트 제한 체크 (일간 + 월간 제한 모두 확인)
-      const limitCheck = await this.usageService.checkMcpPostLimit(userId);
-      if (!limitCheck.canPost) {
-        this.logger.warn(`[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`);
-        throw new ForbiddenException(limitCheck.reason);
-      }
+      // FUTURE: 구독제 활성화 시 주석 해제
+      // // 2. MCP 포스트 제한 체크 (일간 + 월간 제한 모두 확인)
+      // const limitCheck = await this.usageService.checkMcpPostLimit(userId);
+      // if (!limitCheck.canPost) {
+      //   this.logger.warn(`[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`);
+      //   throw new ForbiddenException(limitCheck.reason);
+      // }
 
       // 3. User 객체 조회 (PostsService가 User를 필요로 함)
       const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -137,9 +144,10 @@ export class McpProxyController {
       // 4. 포스트 생성 (서비스 레이어에서 추가 검증)
       const post = await this.postsService.create(postData, user);
 
-      // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
-      await this.usageService.trackMcpPost(userId);
-      this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
+      // FUTURE: 구독제 활성화 시 주석 해제
+      // // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
+      // await this.usageService.trackMcpPost(userId);
+      // this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
 
       // 🔥 Redis 캐시 무효화 (MCP 자동포스팅도 즉시 반영되도록)
       // 작성자의 "내 블로그"에서 즉시 확인 가능하도록 블로그별 캐시 제거

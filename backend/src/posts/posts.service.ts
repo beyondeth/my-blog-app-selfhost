@@ -594,6 +594,9 @@ export class PostsService {
         publishedAt: formatDate(post.publishedAt),
         createdAt: formatDate(post.createdAt),
         updatedAt: formatDate(post.updatedAt),
+        // Editor's Pick 필드 추가
+        isEditorPick: post.isEditorPick || false,
+        editorPickedAt: post.editorPickedAt ? formatDate(post.editorPickedAt) : null,
         // 카운트 필드들
         commentCount: post.commentCount || 0,
         likeCount: post.likeCount || 0,
@@ -808,6 +811,7 @@ export class PostsService {
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
+        'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
@@ -888,6 +892,7 @@ export class PostsService {
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
         'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
+        'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
@@ -1740,24 +1745,66 @@ export class PostsService {
    * @description 관리자가 선정한 추천 포스트 목록 (최신 순)
    * @param limit - 조회할 개수 (기본: 5, 최대: 10)
    * @returns Editor's Pick 포스트 목록
+   *
+   * 최적화:
+   * - content, content_markdown 제외 (목록에 불필요한 대용량 필드)
+   * - leftJoin + select/addSelect로 필요한 필드만 선택
+   * - 민감한 정보 제외 (password, refreshToken, email)
+   * - 복합 인덱스 활용 (isEditorPick, editorPickedAt DESC)
    */
   async findEditorPicks(limit: number = 5): Promise<{ posts: PostResponseDto[], total: number }> {
     // limit 제한 (최대 10개)
     const safeLimit = Math.min(Math.max(1, limit), 10);
 
-    // Editor's Pick 조회 쿼리
-    // 복합 인덱스 활용: (isEditorPick, editorPickedAt DESC)
-    const [posts, total] = await this.postsRepository.findAndCount({
-      where: {
-        isEditorPick: true,
-        isPublished: true, // 공개 포스트만
-      },
-      relations: ['author', 'blog'],
-      order: {
-        editorPickedAt: 'DESC', // 최신 Pick 순
-      },
-      take: safeLimit,
-    });
+    // 최적화된 쿼리 빌더
+    // findAll 메서드와 동일한 패턴 사용
+    const query = this.postsRepository.createQueryBuilder('post')
+      .select([
+        'post.id',
+        'post.title',
+        'post.slug',
+        'post.excerpt', // 포스트 요약 (목록 표시용)
+        // content와 content_markdown 제외 - 목록에서 불필요
+        'post.content_type',
+        'post.thumbnail',
+        'post.isPublished',
+        'post.viewCount',
+        'post.likeCount',
+        'post.commentCount',
+        'post.qualityScore',
+        'post.tagList',
+        'post.category',
+        'post.blogId',
+        'post.authorId',
+        'post.createdAt',
+        'post.updatedAt',
+        'post.publishedAt',
+        'post.version',
+        'post.isEditorPick', // Editor's Pick 여부
+        'post.editorPickedAt', // Editor's Pick 선정 시간
+      ])
+      .addSelect([
+        'author.id',
+        'author.username',
+        // author.email 제외 - 보안상 제거
+        'author.bio',
+        'author.role',
+        'author.profileImage',
+      ])
+      .addSelect([
+        'blog.id',
+        'blog.slug',
+        'blog.name',
+        'blog.isPublic',
+      ])
+      .leftJoin('post.author', 'author')
+      .leftJoin('post.blog', 'blog')
+      .where('post.isEditorPick = :isEditorPick', { isEditorPick: true })
+      .andWhere('post.isPublished = :isPublished', { isPublished: true })
+      .orderBy('post.editorPickedAt', 'DESC') // 최신 Pick 순
+      .take(safeLimit);
+
+    const [posts, total] = await query.getManyAndCount();
 
     // DTO 변환
     const postDtos = posts.map(post =>
