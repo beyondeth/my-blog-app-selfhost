@@ -1,7 +1,6 @@
 'use client';
 
 import { QueryClientProvider } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
 import { useState } from 'react';
 import { AuthProviderV2 } from '@/providers/AuthProviderV2';
 import { MigrationProvider } from '@/providers/MigrationProvider';
@@ -22,8 +21,6 @@ export default function ClientProviders({
           {children}
         </AuthProviderV2>
       </MigrationProvider>
-      {/* 개발 환경에서만 React Query DevTools 표시 */}
-      <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );
 } 

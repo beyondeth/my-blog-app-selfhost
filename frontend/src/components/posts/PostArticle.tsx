@@ -356,9 +356,9 @@ const PostArticle = React.memo(function PostArticle({
           </div>
         </div>
         
-        {/* Thumbnail - 모바일 100x94, 데스크톱 210x197 */}
+        {/* Thumbnail - 모바일에서 제목 위치에 맞춰 정렬, 데스크톱 210x197 */}
         {post.thumbnail && (
-          <div className="flex-shrink-0">
+          <div className="flex-shrink-0 mt-[52px] sm:mt-0">
             <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
               <OptimizedImage
                 src={post.thumbnail}

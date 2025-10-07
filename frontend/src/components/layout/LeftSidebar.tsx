@@ -10,6 +10,7 @@ import { WriteIcon } from '@/components/icons/WriteIcon';
 import { NotificationBellIcon } from '@/components/icons/NotificationBellIcon';
 import { MyBlogIcon } from '@/components/icons/MyBlogIcon';
 import { BookmarkIcon } from '@/components/icons/BookmarkIcon';
+import { SettingsIcon } from '@/components/icons/SettingsIcon';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -72,9 +73,10 @@ export default function LeftSidebar() {
     }
   }, [user, router]);
 
-  // Admin 페이지에서는 사이드바를 숨김
+  // Admin, 로그인, 회원가입 페이지에서는 사이드바를 숨김
   const isAdminPage = pathname?.startsWith('/admin');
-  if (isAdminPage) {
+  const isAuthPage = pathname === '/login' || pathname === '/register';
+  if (isAdminPage || isAuthPage) {
     return null;
   }
 
@@ -138,6 +140,20 @@ export default function LeftSidebar() {
             >
               <BookmarkIcon className={pathname === '/bookmarks' ? 'opacity-100' : 'opacity-70'} size={24} />
               <span className="text-xs mt-1 font-medium">북마크</span>
+            </Link>
+
+            {/* 설정 버튼 */}
+            <Link
+              href="/settings"
+              className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
+                pathname === '/settings' || pathname?.startsWith('/settings/')
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+              }`}
+              title="설정"
+            >
+              <SettingsIcon className={pathname === '/settings' || pathname?.startsWith('/settings/') ? 'opacity-100' : 'opacity-70'} size={24} />
+              <span className="text-xs mt-1 font-medium">설정</span>
             </Link>
 
             {/* 알림 드롭다운 (Feature Flag) */}

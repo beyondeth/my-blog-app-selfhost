@@ -2,8 +2,9 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { FiUser, FiSettings, FiShield, FiBell, FiUsers, FiMessageSquare } from 'react-icons/fi';
+import { FiUser, FiSettings, FiShield, FiBell, FiUsers, FiMessageSquare, FiLogOut } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 // Feature Flag에 따라 동적으로 메뉴 구성
 const getSettingsNav = () => {
@@ -55,6 +56,7 @@ export default function SettingsLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const { logout } = useAuth();
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8">
@@ -72,7 +74,7 @@ export default function SettingsLayout({
             {settingsNav.map((item) => {
               const Icon = item.icon;
               const isActive = pathname === item.href;
-              
+
               return (
                 <Link
                   key={item.href}
@@ -90,6 +92,15 @@ export default function SettingsLayout({
                 </Link>
               );
             })}
+
+            {/* 로그아웃 버튼 */}
+            <button
+              onClick={() => logout('/')}
+              className="flex items-center w-full px-4 py-2 text-sm font-medium rounded-md transition-colors text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-700 dark:hover:text-red-300"
+            >
+              <FiLogOut className="mr-3 h-5 w-5 text-red-500 dark:text-red-400" />
+              로그아웃
+            </button>
           </nav>
         </aside>
 

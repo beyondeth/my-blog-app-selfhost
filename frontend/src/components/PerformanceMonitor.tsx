@@ -11,10 +11,16 @@ import { authQueryKeys } from '@/lib/auth/queries';
  * - 컴포넌트 리렌더링 횟수
  * - 네트워크 요청 횟수
  * - 응답 시간 측정
+ * - 토글 가능 (localStorage에 상태 저장)
  */
 export function PerformanceMonitor() {
   const queryClient = useQueryClient();
   const renderCount = useRef(0);
+  const [mounted, setMounted] = useState(false);
+
+  // 초기값은 항상 true로 설정 (서버와 클라이언트 일치)
+  const [isOpen, setIsOpen] = useState(true);
+
   const [metrics, setMetrics] = useState({
     renderCount: 0,
     cacheHits: 0,
@@ -22,6 +28,24 @@ export function PerformanceMonitor() {
     avgResponseTime: 0,
     memoryUsage: 0,
   });
+
+  // 클라이언트에서 마운트된 후 localStorage에서 상태 로드
+  useEffect(() => {
+    setMounted(true);
+    const saved = localStorage.getItem('perfMonitorOpen');
+    if (saved !== null) {
+      setIsOpen(saved === 'true');
+    }
+  }, []);
+
+  // 토글 함수 - localStorage에 상태 저장
+  const toggleMonitor = () => {
+    setIsOpen(prev => {
+      const newState = !prev;
+      localStorage.setItem('perfMonitorOpen', String(newState));
+      return newState;
+    });
+  };
 
   // 리렌더링 카운트 - 컴포넌트가 실제로 렌더링될 때마다 증가
   renderCount.current++;
@@ -67,9 +91,32 @@ export function PerformanceMonitor() {
     return null;
   }
 
+  // 최소화된 상태: 작은 버튼만 표시
+  if (!isOpen) {
+    return (
+      <button
+        onClick={toggleMonitor}
+        className="fixed bottom-4 right-4 bg-black text-white p-3 rounded-full shadow-lg text-sm font-mono z-50 opacity-90 hover:opacity-100 transition-opacity"
+        title="성능 모니터 열기"
+      >
+        🚀
+      </button>
+    );
+  }
+
+  // 펼쳐진 상태: 전체 모니터 표시
   return (
-    <div className="fixed bottom-4 right-4 bg-black text-white p-4 rounded-lg shadow-lg text-xs font-mono z-50 opacity-90">
-      <h3 className="font-bold mb-2">🚀 Performance Monitor</h3>
+    <div className="fixed bottom-4 right-4 bg-black text-white p-4 rounded-lg shadow-lg text-xs font-mono z-50 opacity-90 min-w-[200px]">
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="font-bold">🚀 Performance Monitor</h3>
+        <button
+          onClick={toggleMonitor}
+          className="text-gray-400 hover:text-white transition-colors ml-2"
+          title="최소화"
+        >
+          ✕
+        </button>
+      </div>
       <div className="space-y-1">
         <div>Renders: {metrics.renderCount}</div>
         <div>Cache Hits: {metrics.cacheHits}</div>

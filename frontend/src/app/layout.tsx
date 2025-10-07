@@ -2,10 +2,12 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Header from '@/components/layout/Header';
 import LeftSidebar from '@/components/layout/LeftSidebar';
+import BottomNavBar from '@/components/layout/BottomNavBar';
+import MainContent from '@/components/layout/MainContent';
 import ClientProviders from '@/components/ClientProviders';
 import { ThemeProvider } from '@/providers/ThemeProvider';
 import { Toaster } from 'sonner';
-import { PerformanceMonitor } from '@/components/PerformanceMonitor';
+// import { PerformanceMonitor } from '@/components/PerformanceMonitor';
 import { DMModalProvider } from '@/components/dm/DMModalProvider';
 
 export const metadata: Metadata = {
@@ -81,19 +83,21 @@ export default function RootLayout({
         >
           <ClientProviders>
             <DMModalProvider>
-              {/* 유튜브 스타일 레이아웃: 상단 헤더 + 왼쪽 사이드바 + 메인 콘텐츠 */}
+              {/* 유튜브 스타일 레이아웃: 상단 헤더 + 왼쪽 사이드바 + 메인 콘텐츠 + 하단 바텀바 */}
               <div>
                 <Header />
                 <div className="flex">
                   <LeftSidebar />
                   {/* 왼쪽 사이드바 영역 확보: translate-x-[23px] + w-20 = 103px, 여유 25px 포함 = 128px */}
-                  <div className="flex-1 lg:ml-32">
+                  <MainContent>
                     {children}
-                  </div>
+                  </MainContent>
                 </div>
+                {/* 모바일 하단 네비게이션 바 */}
+                <BottomNavBar />
               </div>
               <Toaster position="top-center" richColors />
-              <PerformanceMonitor />
+              {/* <PerformanceMonitor /> */}
             </DMModalProvider>
           </ClientProviders>
         </ThemeProvider>

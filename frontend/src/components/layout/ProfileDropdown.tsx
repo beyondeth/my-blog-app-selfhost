@@ -42,7 +42,7 @@ export default function ProfileDropdown({
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu modal={false}>
       <DropdownMenuTrigger asChild>
         <button className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md hover:bg-accent hover:text-accent-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
           <div className="flex items-center space-x-2">
