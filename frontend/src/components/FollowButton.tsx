@@ -292,10 +292,10 @@ export default function FollowButton({
         onClick={handleClick}
         disabled={buttonConfig.disabled}
         className={cn(
-          'inline-flex items-center justify-center text-sm font-normal px-3 py-0.5 rounded-full',
+          'inline-flex items-center justify-center text-sm font-normal px-5 py-1.5 rounded-full',
           'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1',
           'disabled:opacity-50 disabled:pointer-events-none',
-          'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-black/30 dark:text-[#9CA3AF] dark:hover:bg-black/40 border border-gray-200 dark:border-gray-700',
+          'bg-transparent text-gray-700 hover:bg-gray-100 dark:bg-black/30 dark:text-[#9CA3AF] dark:hover:bg-black/40 border border-gray-200 dark:border-gray-700',
           'transition-all duration-200',
           className
         )}

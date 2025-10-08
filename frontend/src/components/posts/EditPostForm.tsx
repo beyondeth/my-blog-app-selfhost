@@ -266,6 +266,8 @@ export default function EditPostForm({
                 control={form.control}
                 name="title"
                 render={({ field }) => {
+                  // React Hook Form의 ref와 커스텀 ref 분리
+                  const { ref: hookFormRef, ...restField } = field;
                   const [isFocused, setIsFocused] = React.useState(false);
                   const [textareaHeight, setTextareaHeight] = React.useState(0);
                   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -294,9 +296,12 @@ export default function EditPostForm({
 
                           {/* 제목 입력 영역 */}
                           <Textarea
-                            ref={textareaRef}
+                            ref={(el) => {
+                              hookFormRef(el);
+                              (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                            }}
                             placeholder=" 일단 쓰시죠..."
-                            {...field}
+                            {...restField}
                             disabled={isLoading}
                             onFocus={(e) => {
                               setIsFocused(true);

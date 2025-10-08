@@ -306,8 +306,8 @@ export function useDeletePost() {
   });
 }
 
-// 포스트 좋아요 토글 뮤테이션 훅 (권장: 로그인 체크/낙관적 업데이트/롤백 일원화)
-export function useTogglePostLike(slug: string, onRequireLogin?: () => void) {
+// 포스트 좋아요 토글 뮤테이션 훅 (Redis Queue 시스템 - postId 파라미터로 받기)
+export function useTogglePostLike(onRequireLogin?: () => void) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -317,42 +317,119 @@ export function useTogglePostLike(slug: string, onRequireLogin?: () => void) {
         if (onRequireLogin) onRequireLogin();
         return Promise.reject(new Error('로그인이 필요합니다.'));
       }
+
+      // Redis 큐로 전송 (디바운싱 제거 - 백엔드에서 처리)
       return postsAPI.toggleLike(postId);
     },
-    onMutate: async () => {
-      // 진행 중인 리페치 취소
-      await queryClient.cancelQueries({ queryKey: postQueryKeys.detail(slug) });
-      
-      // 이전 데이터 백업
-      const previousPost = queryClient.getQueryData<Post>(postQueryKeys.detail(slug));
-      
-      // 낙관적 업데이트: liked/likeCount
-      if (previousPost) {
-        const liked = !previousPost.liked;
-        let likeCount = previousPost.likeCount + (liked ? 1 : -1);
-        if (likeCount < 0) likeCount = 0;
-        
-        queryClient.setQueryData(postQueryKeys.detail(slug), {
-          ...previousPost,
-          liked,
-          likeCount
-        });
-      }
-      
-      return { previousPost };
+    onMutate: async (postId: string) => {
+      // 1. 진행 중인 리페치 취소 (모든 관련 쿼리)
+      await queryClient.cancelQueries({ queryKey: postQueryKeys.all });
+
+      // 2. 이전 데이터 백업 (롤백용)
+      const previousLists = queryClient.getQueriesData({ queryKey: postQueryKeys.lists() });
+      const previousDetails = queryClient.getQueriesData({ queryKey: postQueryKeys.details() });
+
+      // 3. 낙관적 업데이트: 모든 목록 캐시 업데이트 (홈, 내블로그, 검색 등)
+      queryClient.setQueriesData(
+        { queryKey: postQueryKeys.lists() },
+        (oldData: any) => {
+          if (!oldData?.pages) return oldData;
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: any) => {
+              if (!page?.posts) return page;
+
+              return {
+                ...page,
+                posts: page.posts.map((post: any) => {
+                  if (post.id !== postId) return post;
+
+                  // 좋아요 토글
+                  const liked = !post.liked;
+                  let likeCount = post.likeCount + (liked ? 1 : -1);
+                  if (likeCount < 0) likeCount = 0;
+
+                  return { ...post, liked, likeCount };
+                })
+              };
+            })
+          };
+        }
+      );
+
+      // 4. 낙관적 업데이트: 모든 상세 캐시 업데이트
+      queryClient.setQueriesData(
+        { queryKey: postQueryKeys.details() },
+        (oldData: any) => {
+          if (!oldData || oldData.id !== postId) return oldData;
+
+          // 좋아요 토글
+          const liked = !oldData.liked;
+          let likeCount = oldData.likeCount + (liked ? 1 : -1);
+          if (likeCount < 0) likeCount = 0;
+
+          return { ...oldData, liked, likeCount };
+        }
+      );
+
+      return { previousLists, previousDetails };
     },
     onError: (err, variables, context) => {
       // 롤백: 이전 데이터로 복구
-      if (context?.previousPost) {
-        queryClient.setQueryData(postQueryKeys.detail(slug), context.previousPost);
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      if (context?.previousDetails) {
+        context.previousDetails.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
       }
     },
-    onSuccess: (response, variables, context) => {
-      // 서버 응답 성공: 실제 데이터로 교체하지만 invalidation은 하지 않음
-      queryClient.setQueryData(postQueryKeys.detail(slug), (old: Post | undefined) => {
-        if (!old) return old;
-        return { ...old, liked: response.liked };
-      });
+    onSuccess: (response, postId) => {
+      // 큐 시스템 사용 시, 낙관적 업데이트 상태 유지 (깜빡임 방지)
+      if (response.queued) {
+        console.log('⏳ [Like queued - keeping optimistic state]', { postId, response });
+        return; // 서버 응답 무시, onMutate의 낙관적 업데이트 상태 그대로 유지
+      }
+
+      // queued가 아닌 경우에만 서버 응답으로 최종 확정 (모든 캐시 업데이트)
+      const { liked, likeCount } = response;
+
+      console.log('✅ [Like Toggle Success]', { postId, liked, likeCount, response });
+
+      // 목록 캐시 최종 업데이트
+      queryClient.setQueriesData(
+        { queryKey: postQueryKeys.lists() },
+        (oldData: any) => {
+          if (!oldData?.pages) return oldData;
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page: any) => {
+              if (!page?.posts) return page;
+
+              return {
+                ...page,
+                posts: page.posts.map((post: any) =>
+                  post.id === postId ? { ...post, liked, likeCount } : post
+                )
+              };
+            })
+          };
+        }
+      );
+
+      // 상세 캐시 최종 업데이트
+      queryClient.setQueriesData(
+        { queryKey: postQueryKeys.details() },
+        (oldData: any) => {
+          if (!oldData || oldData.id !== postId) return oldData;
+          return { ...oldData, liked, likeCount };
+        }
+      );
     },
     retry: 1,
   });

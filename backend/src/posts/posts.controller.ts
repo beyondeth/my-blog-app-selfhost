@@ -1,8 +1,9 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, UseInterceptors, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, UseInterceptors, Logger, ParseIntPipe, DefaultValuePipe, ForbiddenException } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
 import { PostsService } from './posts.service';
+import { LikeQueueService } from './services/like-queue.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -25,6 +26,8 @@ import { CacheTTL } from '../cache/cache.decorator';
 import { CacheService } from '../cache/cache.service';
 import { PaginationHelper } from '../common/dto/pagination.dto';
 import { MonitoringService } from '../monitoring/monitoring.service';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 
 @ApiTags('posts')
 @Controller('posts')
@@ -46,6 +49,8 @@ export class PostsController {
     private readonly viewCountService: ViewCountService,
     private readonly cacheService: CacheService,
     private readonly monitoringService: MonitoringService,
+    private readonly likeQueueService: LikeQueueService,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
   /**
@@ -560,15 +565,75 @@ export class PostsController {
   @Post(':id/like')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: '게시글 좋아요 토글 (로그인/비로그인 모두 지원)' })
+  @ApiOperation({ summary: '게시글 좋아요 토글 (Redis Queue 시스템)' })
   async toggleLike(
     @Param('id') id: string,
     @Request() req: any,
   ) {
-    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
+    // OptionalJwtAuthGuard로 인증 확인
     const user = req.user || null;
-    console.log('toggleLike called with user:', user ? `${user.username} (${user.id})` : 'null');
-    return this.postsService.toggleLike(id, user);
+
+    if (!user) {
+      throw new ForbiddenException('로그인이 필요합니다.');
+    }
+
+    console.log('toggleLike called with user:', `${user.username} (${user.id})`);
+
+    // Redis pending 키로 연속 클릭 감지 (Race Condition 방지)
+    const pendingKey = `likes:pending:${user.id}:${id}`;
+    const pendingData = await this.redis.get(pendingKey);
+
+    let action: 'like' | 'unlike';
+    let actionDecided = false; // action이 이미 결정되었는지 추적
+
+    // 1. Pending 확인 및 action 결정
+    if (pendingData) {
+      try {
+        const { action: pendingAction } = JSON.parse(pendingData);
+        action = pendingAction === 'like' ? 'unlike' : 'like';
+        actionDecided = true;
+        console.log(`⚡ [Fast Toggle] pending=${pendingAction} → action=${action}`);
+      } catch (e) {
+        console.log(`⚠️ [Pending Parse Failed] Fallback to DB query`);
+      }
+    }
+
+    // 2. 원자적 쿼리로 isLiked와 likeCount를 동시에 조회 (Race Condition 방지)
+    const result = await this.postsRepository.manager.query(
+      `SELECT
+        EXISTS(SELECT 1 FROM post_likes WHERE "postId" = $1 AND "userId" = $2) as is_liked,
+        p."likeCount"
+       FROM posts p
+       WHERE p.id = $1`,
+      [id, user.id]
+    );
+
+    const isLiked = result[0]?.is_liked || false;
+    const currentLikeCount = parseInt(result[0]?.likeCount) || 0;
+
+    // 3. action이 아직 결정되지 않았으면 DB 결과로 결정 (첫 클릭 또는 pending 파싱 실패)
+    if (!actionDecided) {
+      action = isLiked ? 'unlike' : 'like';
+      console.log(`🔍 [First Toggle] isLiked=${isLiked} → action=${action}`);
+    }
+
+    const expectedLikeCount = action === 'like'
+      ? currentLikeCount + 1
+      : Math.max(0, currentLikeCount - 1);
+
+    // Redis 큐에 추가 (즉시 응답)
+    await this.likeQueueService.queueLike(id, user.id, action);
+
+    // 클라이언트에게 즉시 응답 (낙관적 업데이트용)
+    // liked: 토글 후 예상 상태 (action='like' → true, action='unlike' → false)
+    // likeCount: 토글 후 예상 개수
+    return {
+      success: true,
+      queued: true,
+      postId: id,
+      liked: action === 'like',
+      likeCount: expectedLikeCount
+    };
   }
 
   @Post('generate-slugs')
@@ -624,5 +689,85 @@ export class PostsController {
     await this.invalidateCache(cacheKeysToInvalidate);
 
     return result;
+  }
+
+  // ===================================================
+  // 좋아요 큐 모니터링 엔드포인트 (Grafana용)
+  // ===================================================
+
+  @Public()
+  @Get('queue/metrics')
+  @ApiOperation({
+    summary: '좋아요 큐 메트릭 조회',
+    description: 'Grafana 대시보드에서 사용할 좋아요 큐 메트릭 정보 (큐 크기, 처리율, 평균 처리 시간 등)'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '큐 메트릭',
+    schema: {
+      type: 'object',
+      properties: {
+        queueSize: { type: 'number', description: '현재 큐에 대기 중인 좋아요 요청 수' },
+        dlqSize: { type: 'number', description: 'Dead Letter Queue 크기' },
+        processingRate: { type: 'number', description: '처리율 (requests/second)' },
+        averageProcessingTime: { type: 'number', description: '평균 처리 시간 (ms)' },
+        lastProcessedAt: { type: 'string', format: 'date-time', description: '마지막 처리 시간' },
+        failureRate: { type: 'number', description: '실패율 (0.0 ~ 1.0)' },
+      }
+    }
+  })
+  async getLikeQueueMetrics() {
+    return this.likeQueueService.getMetrics();
+  }
+
+  @Public()
+  @Get('queue/health')
+  @ApiOperation({
+    summary: '좋아요 큐 건강 상태 조회',
+    description: '큐의 건강 상태, 샤드별 분포, 경고 메시지 확인'
+  })
+  @ApiResponse({
+    status: 200,
+    description: '큐 건강 상태',
+    schema: {
+      type: 'object',
+      properties: {
+        healthy: { type: 'boolean', description: '건강 여부' },
+        totalSize: { type: 'number', description: '전체 큐 크기' },
+        distribution: {
+          type: 'object',
+          description: '샤드별 큐 크기 분포',
+          additionalProperties: { type: 'number' }
+        },
+        warnings: {
+          type: 'array',
+          items: { type: 'string' },
+          description: '경고 메시지 목록'
+        },
+      }
+    }
+  })
+  async getLikeQueueHealth() {
+    return this.likeQueueService.getQueueHealth();
+  }
+
+  @Post('queue/recover-dlq')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiBearerAuth()
+  @ApiOperation({
+    summary: 'Dead Letter Queue에서 좋아요 요청 복구 (관리자 전용)',
+    description: '실패한 좋아요 요청을 DLQ에서 가져와 다시 큐에 추가'
+  })
+  @ApiResponse({ status: 200, description: '복구 완료' })
+  @ApiResponse({ status: 403, description: '권한 없음' })
+  async recoverDeadLetterQueue(
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number
+  ) {
+    const recovered = await this.likeQueueService.recoverFromDeadLetterQueue(limit);
+    return {
+      recovered: recovered.length,
+      message: `${recovered.length}개 좋아요 요청이 복구되었습니다.`
+    };
   }
 } 

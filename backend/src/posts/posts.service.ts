@@ -1327,6 +1327,100 @@ export class PostsService {
     return { liked: !isLiked };
   }
 
+  /**
+   * 배치로 좋아요 처리 (Queue 시스템용)
+   *
+   * @param likes - 큐에서 가져온 좋아요 요청 배열
+   * @returns 처리된 요청 수
+   *
+   * 동작:
+   * 1. user-post 조합으로 중복 제거 (마지막 액션만 유효)
+   * 2. 한 트랜잭션으로 모든 요청 처리
+   * 3. post_likes 테이블 INSERT/DELETE
+   * 4. posts.likeCount 원자적 업데이트
+   */
+  async processBatchLikes(likes: Array<{
+    id: string;
+    postId: string;
+    userId: string;
+    action: 'like' | 'unlike';
+  }>): Promise<number> {
+    if (likes.length === 0) return 0;
+
+    // 1. 중복 제거: 같은 user-post 조합은 마지막 요청만 처리
+    const uniqueLikes = new Map<string, typeof likes[0]>();
+    for (const like of likes) {
+      const key = `${like.userId}:${like.postId}`;
+      uniqueLikes.set(key, like);
+    }
+
+    const processedLikes = Array.from(uniqueLikes.values());
+    this.logger.log(
+      `배치 처리: ${likes.length}개 요청 → ${processedLikes.length}개 유니크 요청`,
+    );
+
+    // 2. 포스트별로 그룹화 (likeCount 업데이트 최적화)
+    const postGroups = new Map<string, typeof processedLikes>();
+    for (const like of processedLikes) {
+      if (!postGroups.has(like.postId)) {
+        postGroups.set(like.postId, []);
+      }
+      postGroups.get(like.postId).push(like);
+    }
+
+    // 3. 트랜잭션으로 일괄 처리
+    await this.postsRepository.manager.transaction(async (manager) => {
+      for (const [postId, postLikes] of postGroups.entries()) {
+        // 각 포스트의 현재 좋아요 상태 확인
+        const existingLikes = await manager.query(
+          'SELECT "userId" FROM post_likes WHERE "postId" = $1 AND "userId" = ANY($2)',
+          [postId, postLikes.map(l => l.userId)],
+        );
+
+        const existingUserIds = new Set(existingLikes.map(row => row.userId));
+        let likeCountChange = 0;
+
+        // 각 요청 처리
+        for (const like of postLikes) {
+          const isCurrentlyLiked = existingUserIds.has(like.userId);
+
+          if (like.action === 'like' && !isCurrentlyLiked) {
+            // 좋아요 추가
+            await manager.query(
+              'INSERT INTO post_likes ("postId", "userId") VALUES ($1, $2) ON CONFLICT DO NOTHING',
+              [postId, like.userId],
+            );
+            likeCountChange++;
+          } else if (like.action === 'unlike' && isCurrentlyLiked) {
+            // 좋아요 취소
+            await manager.query(
+              'DELETE FROM post_likes WHERE "postId" = $1 AND "userId" = $2',
+              [postId, like.userId],
+            );
+            likeCountChange--;
+          }
+        }
+
+        // likeCount 업데이트 (변경이 있을 때만)
+        if (likeCountChange !== 0) {
+          if (likeCountChange > 0) {
+            await manager.query(
+              'UPDATE posts SET "likeCount" = "likeCount" + $1, version = version + 1 WHERE id = $2',
+              [likeCountChange, postId],
+            );
+          } else {
+            await manager.query(
+              'UPDATE posts SET "likeCount" = GREATEST(0, "likeCount" + $1), version = version + 1 WHERE id = $2',
+              [likeCountChange, postId],
+            );
+          }
+        }
+      }
+    });
+
+    return processedLikes.length;
+  }
+
   // 조회수 증가 (로그인 유저만)
   private async incrementViewCountForUser(post: Post, user: User) {
     if (!user?.id) return;

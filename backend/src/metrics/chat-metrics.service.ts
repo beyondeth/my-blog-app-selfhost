@@ -134,6 +134,11 @@ export class ChatMetricsService {
     this.processingStatus.set(0);
     this.redisConnectionStatus.set(0);
     this.activeWebSocketConnections.set(0);
+
+    // Counter 메트릭 초기화 (Prometheus에 즉시 노출하기 위해)
+    // 초기값 0으로 설정하여 Grafana에서 "No data" 방지
+    this.messagesProcessed.inc({ status: 'success' }, 0);
+    this.messagesFailed.inc({ error_type: 'batch_save' }, 0);
   }
 
   /**

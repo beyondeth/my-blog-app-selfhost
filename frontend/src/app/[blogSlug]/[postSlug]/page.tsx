@@ -84,7 +84,8 @@ export default function BlogPostDetailPage() {
   // Fetch post details
   const { data: post, error, isError, refetch } = usePost(postSlug);
   const deletePostMutation = useDeletePost();
-  const likeMutation = useTogglePostLike(postSlug, () => {
+  // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)
+  const likeMutation = useTogglePostLike(() => {
     alert('로그인이 필요합니다.\n로그인 후 좋아요를 누를 수 있습니다.');
   });
 
@@ -438,49 +439,12 @@ export default function BlogPostDetailPage() {
           onPdfDownload={handlePdfDownload}
           onBookmark={handleBookmark}
           bookmarked={bookmarkStatus?.bookmarked || false}
+          bookmarkPending={bookmarkMutation.isPending}
+          isAdmin={isAdmin}
+          isEditorPick={post.isEditorPick || false}
+          onToggleEditorPick={handleToggleEditorPick}
+          editorPickPending={editorPickMutation.isPending}
         />
-
-        {/* Editor's Pick 표시 (타이틀 아래에 배치) */}
-        {/* Admin: 토글 버튼 표시 | 일반 사용자: isEditorPick이면 배지 표시 */}
-        {isAdmin ? (
-          <div className="mb-6 -mt-4">
-            <button
-              onClick={handleToggleEditorPick}
-              disabled={editorPickMutation.isPending}
-              className={`inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-all border-2 ${
-                post.isEditorPick
-                  ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600 dark:bg-amber-600 dark:border-amber-700 dark:hover:bg-amber-700 shadow-lg'
-                  : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-500'
-              } ${editorPickMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-            >
-              {editorPickMutation.isPending ? (
-                <>
-                  <svg className="animate-spin -ml-1 mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  처리 중...
-                </>
-              ) : (
-                <>
-                  {post.isEditorPick ? (
-                    <FaStar className="w-4 h-4 mr-2" />
-                  ) : (
-                    <FiStar className="w-4 h-4 mr-2" />
-                  )}
-                  {post.isEditorPick ? '✓ Editor\'s Pick 선정됨' : 'Editor\'s Pick으로 선정'}
-                </>
-              )}
-            </button>
-          </div>
-        ) : post.isEditorPick ? (
-          <div className="mb-6 -mt-4">
-            <div className="inline-flex items-center px-4 py-2 text-sm font-medium rounded-lg bg-amber-500 text-white border-2 border-amber-600 dark:bg-amber-600 dark:border-amber-700 shadow-lg">
-              <FaStar className="w-4 h-4 mr-2" />
-              Editor's Pick
-            </div>
-          </div>
-        ) : null}
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}
         <div className="blog-content">
@@ -524,10 +488,12 @@ export default function BlogPostDetailPage() {
 
         {/* 댓글 섹션 - 블로그가 댓글을 허용하는 경우에만 표시 */}
         {blog && blog.allowComments === true && post.id && (
-          <CommentSection 
-            postId={String(post.id)}
-            postAuthorId={post.author?.id?.toString()}
-          />
+          <div data-comment-section>
+            <CommentSection
+              postId={String(post.id)}
+              postAuthorId={post.author?.id?.toString()}
+            />
+          </div>
         )}
       </article>
       

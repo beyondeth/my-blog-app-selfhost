@@ -1,7 +1,9 @@
 "use client";
 
 import { useState } from 'react';
-import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiFileText, FiBookmark } from 'react-icons/fi';
+import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiStar } from 'react-icons/fi';
+import { FaStar } from 'react-icons/fa';
+import { BsFiletypePdf } from 'react-icons/bs';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui/avatar';
@@ -9,6 +11,8 @@ import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { formatRelativeTime } from '@/utils/timeFormat';
+import FollowButton from '@/components/FollowButton';
+import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 
 interface PostHeaderWithReportProps {
   post: Post;
@@ -24,6 +28,11 @@ interface PostHeaderWithReportProps {
   onPdfDownload?: () => void;
   onBookmark?: () => void;
   bookmarked?: boolean;
+  bookmarkPending?: boolean;
+  isAdmin?: boolean;
+  isEditorPick?: boolean;
+  onToggleEditorPick?: () => void;
+  editorPickPending?: boolean;
   LikeButtonComponent?: ReactNode;
 }
 
@@ -41,6 +50,11 @@ export default function PostHeaderWithReport({
   onPdfDownload,
   onBookmark,
   bookmarked = false,
+  bookmarkPending = false,
+  isAdmin = false,
+  isEditorPick = false,
+  onToggleEditorPick,
+  editorPickPending = false,
   LikeButtonComponent
 }: PostHeaderWithReportProps) {
   const [showDropdown, setShowDropdown] = useState(false);
@@ -72,6 +86,14 @@ export default function PostHeaderWithReport({
     setShowDropdown(false);
   };
 
+  // 댓글 섹션으로 스크롤
+  const handleScrollToComments = () => {
+    const commentsSection = document.querySelector('[data-comment-section]');
+    if (commentsSection) {
+      commentsSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   return (
     <>
       <header className="mb-8">
@@ -88,18 +110,6 @@ export default function PostHeaderWithReport({
           </div>
         )}
 
-        {/* Author Info - 제목 위로 이동 */}
-        <div className="flex items-center mb-4">
-          <Avatar
-            src={post.author?.profileImage}
-            alt={post.author?.username || 'Author'}
-            fallback={post.author?.username || 'Author'}
-            size="sm"
-            className="mr-3"
-          />
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">{post.author?.username || 'Author'}</span>
-        </div>
-
         {/* Category */}
         {post.category && (
           <div className="mb-6">
@@ -111,61 +121,171 @@ export default function PostHeaderWithReport({
         )}
 
         {/* Title - 전체 너비 차지 */}
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-5 leading-tight">
+        <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-6 leading-tight">
           {post.title || ''}
         </h1>
 
-        {/* Meta Information with Like/Share and Action Buttons */}
-        <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400 mb-8 pb-4 border-b border-gray-100 dark:border-gray-700">
-          {/* Left: Meta Information with Like/Share */}
-          <div className="flex flex-wrap items-center gap-6">
-            <div className="flex items-center">
-              <FiCalendar className="mr-2 w-4 h-4" />
-              <span>{formatRelativeTime(post.publishedAt || post.createdAt)}</span>
-            </div>
-            <div className="flex items-center">
-              <FiEye className="mr-2 w-4 h-4" />
-              <span>{(post.viewCount || 0).toLocaleString()}</span>
-            </div>
-            
-            {/* Like and Share Buttons - 뷰 바로 옆에 붙임 */}
-            {LikeButtonComponent ? (
-              LikeButtonComponent
-            ) : onLike && (
-              <button
-                onClick={onLike}
-                className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
-                  liked
-                    ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
-                }`}
+        {/* Author Profile with Follow Button and Post Date */}
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
+          {/* 왼쪽 그룹: 프로필, 팔로우, 날짜, 에디터픽 */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* 프로필 이미지 + 유저네임 - 툴팁 포함 */}
+            {post.author?.id ? (
+              <UserLinkWithTooltip
+                userId={post.author.id}
+                username={post.author.username || 'Author'}
+                blogSlug={post.blog?.slug}
               >
-                <FiHeart className={`w-3 h-3 ${liked ? 'fill-current' : ''}`} />
-                <span>{likeCount}</span>
-              </button>
+                <div className="flex items-center gap-3">
+                  <Avatar
+                    src={post.author?.profileImage}
+                    alt={post.author?.username || 'Author'}
+                    fallback={post.author?.username || 'Author'}
+                    size="sm"
+                  />
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {post.author?.username || 'Author'}
+                  </span>
+                </div>
+              </UserLinkWithTooltip>
+            ) : (
+              <div className="flex items-center gap-3">
+                <Avatar
+                  src={post.author?.profileImage}
+                  alt={post.author?.username || 'Author'}
+                  fallback={post.author?.username || 'Author'}
+                  size="sm"
+                />
+                <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                  {post.author?.username || 'Author'}
+                </span>
+              </div>
             )}
 
+            {/* Follow 버튼 */}
+            {post.author?.id && (
+              <FollowButton userId={post.author.id} variant="minimal" className="ml-1" />
+            )}
+
+            {/* 작성시간 */}
+            <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mr-2">
+              <span className="mx-2">·</span>
+              <span>{formatRelativeTime(post.publishedAt || post.createdAt)}</span>
+            </div>
+
+            {/* Editor's Pick 버튼 (Admin 전용) 또는 배지 */}
+            {isAdmin && onToggleEditorPick ? (
+              <button
+                onClick={onToggleEditorPick}
+                disabled={editorPickPending}
+                className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full transition-all border ${
+                  isEditorPick
+                    ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600 dark:bg-amber-600 dark:border-amber-700 dark:hover:bg-amber-700'
+                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-500'
+                } ${editorPickPending ? 'opacity-50 cursor-not-allowed' : ''}`}
+                title={isEditorPick ? 'Editor\'s Pick 선정 해제' : 'Editor\'s Pick으로 선정'}
+              >
+                {editorPickPending ? (
+                  <>
+                    <svg className="animate-spin h-3 w-3 mr-1" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    처리 중
+                  </>
+                ) : (
+                  <>
+                    {isEditorPick ? (
+                      <FaStar className="w-5 h-5 mr-1" />
+                    ) : (
+                      <FiStar className="w-5 h-5 mr-1" />
+                    )}
+                    {isEditorPick ? 'Editor\'s Pick' : 'Pick'}
+                  </>
+                )}
+              </button>
+            ) : isEditorPick ? (
+              <div className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-amber-500 text-white border border-amber-600 dark:bg-amber-600 dark:border-amber-700">
+                <FaStar className="w-5 h-5 mr-1" />
+                Editor's Pick
+              </div>
+            ) : null}
+          </div>
+
+          {/* 오른쪽 그룹: 수정/삭제 버튼 - 작성자 전용 */}
+          {canEdit && onEdit && onDelete && (
+            <div className="flex items-center space-x-3">
+              <button
+                onClick={onEdit}
+                className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="수정"
+              >
+                <FiEdit3 className="mr-1 w-3 h-3" />
+                수정
+              </button>
+              <button
+                onClick={onDelete}
+                className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
+                title="삭제"
+              >
+                <FiTrash2 className="mr-1 w-3 h-3" />
+                삭제
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Meta Information with Like/Share and Action Buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400 mb-8 pt-2 pb-2 border-t border-b border-gray-100 dark:border-gray-700">
+          {/* Left: Meta Information with Like/Share */}
+          <div className="flex flex-wrap items-center gap-6 pl-1">
+            {/* 뷰 - 정보 표시만 */}
+            <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+              <FiEye className="w-5 h-5" />
+              <span>{(post.viewCount || 0).toLocaleString()}</span>
+            </div>
+
+            {/* 인터랙션 그룹: 좋아요, 댓글 - 좁은 간격 */}
+            <div className="flex items-center gap-3">
+              {/* 좋아요 버튼 */}
+              {LikeButtonComponent ? (
+                LikeButtonComponent
+              ) : onLike && (
+                <button
+                  onClick={onLike}
+                  className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
+                    liked
+                      ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40'
+                      : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
+                  }`}
+                >
+                  <FiHeart className={`w-5 h-5 ${liked ? 'fill-current' : ''}`} />
+                  <span>{likeCount}</span>
+                </button>
+              )}
+
+              {/* 댓글 버튼 - 클릭 시 댓글 섹션으로 스크롤 */}
+              <button
+                onClick={handleScrollToComments}
+                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                title="댓글 보기"
+              >
+                <FiMessageCircle className="w-5 h-5" />
+                <span>{post.commentCount || 0}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Right: Share, Copy, PDF, Bookmark, More Menu */}
+          <div className="flex items-center space-x-3">
+            {/* 공유 버튼 */}
             {onShare && (
               <button
                 onClick={onShare}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                className="flex items-center justify-center p-1 rounded-full text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                title="공유"
               >
-                <FiShare2 className="w-3 h-3" />
-                <span>공유</span>
-              </button>
-            )}
-
-            {onBookmark && (
-              <button
-                onClick={onBookmark}
-                className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
-                  bookmarked
-                    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
-                }`}
-              >
-                <FiBookmark className={`w-3 h-3 ${bookmarked ? 'fill-current' : ''}`} />
-                <span>북마크</span>
+                <FiUpload className="w-5 h-5" />
               </button>
             )}
 
@@ -173,13 +293,12 @@ export default function PostHeaderWithReport({
             {isAuthor && onCopy && (
               <button
                 onClick={onCopy}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                className="flex items-center justify-center p-1 rounded-full text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
                 title="포스트 내용 복사"
               >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                <span>복사</span>
               </button>
             )}
 
@@ -188,7 +307,7 @@ export default function PostHeaderWithReport({
               <button
                 onClick={handlePdfDownload}
                 disabled={isPdfGenerating}
-                className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
+                className={`flex items-center justify-center p-1 rounded-full transition-colors ${
                   isPdfGenerating
                     ? 'text-gray-400 cursor-not-allowed opacity-50 dark:text-gray-600'
                     : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
@@ -196,33 +315,26 @@ export default function PostHeaderWithReport({
                 title={isPdfGenerating ? "PDF 생성 중..." : "PDF로 다운로드"}
                 data-pdf-hide="true"
               >
-                <FiFileText className="w-3 h-3" />
-                <span>{isPdfGenerating ? '생성중...' : 'PDF'}</span>
+                <BsFiletypePdf className="w-5 h-5" />
               </button>
             )}
-          </div>
 
-          {/* Right: Edit/Delete Buttons and More Menu */}
-          <div className="flex items-center space-x-3">
-            {canEdit && onEdit && onDelete && (
-              <>
-                <button
-                  onClick={onEdit}
-                  className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  title="수정"
-                >
-                  <FiEdit3 className="mr-1 w-3 h-3" />
-                  수정
-                </button>
-                <button
-                  onClick={onDelete}
-                  className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                  title="삭제"
-                >
-                  <FiTrash2 className="mr-1 w-3 h-3" />
-                  삭제
-                </button>
-              </>
+            {/* 북마크 버튼 */}
+            {onBookmark && (
+              <button
+                onClick={onBookmark}
+                disabled={bookmarkPending}
+                className={`flex items-center justify-center p-1 rounded-full transition-colors ${
+                  bookmarkPending
+                    ? 'opacity-50 cursor-not-allowed'
+                    : bookmarked
+                    ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40'
+                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
+                }`}
+                title={bookmarkPending ? '처리 중...' : '북마크'}
+              >
+                <FiBookmark className={`w-5 h-5 ${bookmarked ? 'fill-current' : ''}`} />
+              </button>
             )}
 
             {/* More Options Menu - Only show if not the author */}

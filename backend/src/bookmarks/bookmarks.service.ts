@@ -34,11 +34,6 @@ export class BookmarksService {
       throw new NotFoundException('포스트를 찾을 수 없습니다.');
     }
 
-    // 자신의 포스트는 북마크할 수 없음
-    if (post.authorId === userId) {
-      throw new BadRequestException('자신의 포스트는 북마크할 수 없습니다.');
-    }
-
     // 트랜잭션으로 동시성 처리
     return await this.dataSource.transaction(async manager => {
       const bookmarkRepo = manager.getRepository(Bookmark);

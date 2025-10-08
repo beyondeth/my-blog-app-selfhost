@@ -19,7 +19,9 @@ interface PostArticleProps {
   userId?: string;
   onEdit: (slug: string) => void;
   onDelete: (id: string) => void;
+  onLike?: (postId: string) => void; // 좋아요 토글 핸들러
   isDeleting?: boolean;
+  likePending?: boolean; // 좋아요 처리 중 상태
   searchQuery?: string; // 검색어 하이라이팅을 위한 prop
 }
 
@@ -50,7 +52,9 @@ const PostArticle = React.memo(function PostArticle({
   userId,
   onEdit,
   onDelete,
+  onLike,
   isDeleting = false,
+  likePending = false,
   searchQuery,
 }: PostArticleProps) {
   // excerpt가 있으면 사용, 없으면 content에서 추출
@@ -184,25 +188,36 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 일반 포스트와 동일한 구조 */}
           <div>
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
-              <span className="whitespace-nowrap">
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5 mb-2">
+              <span className="whitespace-nowrap mr-3">
                 {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <FiEye className="w-3 h-3" />
+              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+                <FiEye className="w-5 h-5" />
                 {post.viewCount || 0}
               </span>
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <FiHeart className="w-3 h-3" />
-                {post.likeCount || 0}
-              </span>
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <FiMessageCircle className="w-3 h-3" />
+              <button
+                onClick={() => onLike?.(post.id)}
+                disabled={!onLike || likePending}
+                className={`flex items-center gap-1 whitespace-nowrap mr-3 transition-colors ${
+                  onLike && !likePending
+                    ? post.liked
+                      ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
+                      : 'hover:text-red-600 dark:hover:text-red-400 cursor-pointer'
+                    : 'cursor-default'
+                } ${likePending ? 'opacity-50 cursor-wait' : ''}`}
+                title={!onLike ? undefined : post.liked ? '좋아요 취소' : '좋아요'}
+              >
+                <FiHeart className={`w-5 h-5 ${post.liked ? 'fill-current' : ''}`} />
+                <span>{post.likeCount || 0}</span>
+              </button>
+              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+                <FiMessageCircle className="w-5 h-5" />
                 {post.commentCount || 0}
               </span>
               {post.isEditorPick && (
                 <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400 whitespace-nowrap">
-                  <FaStar className="w-3 h-3" />
+                  <FaStar className="w-5 h-5" />
                   <span className="text-[11px]">Pick</span>
                 </span>
               )}
@@ -306,25 +321,36 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
           <div>
             {/* 메타 정보 (날짜,조회,좋아요,댓글) - 작성자 정보 제거 */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-2 sm:gap-4 mb-2">
-              <span className="whitespace-nowrap">
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5 mb-2">
+              <span className="whitespace-nowrap mr-3">
                 {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <FiEye className="w-3 h-3" />
+              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+                <FiEye className="w-5 h-5" />
                 {post.viewCount || 0}
               </span>
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <FiHeart className="w-3 h-3" />
-                {post.likeCount || 0}
-              </span>
-              <span className="flex items-center gap-1 whitespace-nowrap">
-                <FiMessageCircle className="w-3 h-3" />
+              <button
+                onClick={() => onLike?.(post.id)}
+                disabled={!onLike || likePending}
+                className={`flex items-center gap-1 whitespace-nowrap mr-3 transition-colors ${
+                  onLike && !likePending
+                    ? post.liked
+                      ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
+                      : 'hover:text-red-600 dark:hover:text-red-400 cursor-pointer'
+                    : 'cursor-default'
+                } ${likePending ? 'opacity-50 cursor-wait' : ''}`}
+                title={!onLike ? undefined : post.liked ? '좋아요 취소' : '좋아요'}
+              >
+                <FiHeart className={`w-5 h-5 ${post.liked ? 'fill-current' : ''}`} />
+                <span>{post.likeCount || 0}</span>
+              </button>
+              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+                <FiMessageCircle className="w-5 h-5" />
                 {post.commentCount || 0}
               </span>
               {post.isEditorPick && (
                 <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400 whitespace-nowrap">
-                  <FaStar className="w-3 h-3" />
+                  <FaStar className="w-5 h-5" />
                   <span className="text-[11px]">Pick</span>
                 </span>
               )}

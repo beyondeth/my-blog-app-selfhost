@@ -139,7 +139,7 @@ export default function NewStoryPage() {
         title: data.title,
         content: data.content,
         tags: data.tags,
-        category: data.category,
+        // category: data.category,  // TODO: 카테고리 UI 구현 후 활성화
         attachedFileIds: data.fileIds,
       };
       
@@ -198,6 +198,8 @@ export default function NewStoryPage() {
                 control={form.control}
                 name="title"
                 render={({ field }) => {
+                  // React Hook Form의 ref와 커스텀 ref 분리
+                  const { ref: hookFormRef, ...restField } = field;
                   const [isFocused, setIsFocused] = React.useState(false);
                   const [textareaHeight, setTextareaHeight] = React.useState(0);
                   const textareaRef = React.useRef<HTMLTextAreaElement>(null);
@@ -233,9 +235,12 @@ export default function NewStoryPage() {
 
                           {/* 제목 입력 영역 */}
                           <Textarea
-                            ref={textareaRef}
+                            ref={(el) => {
+                              hookFormRef(el);              // React Hook Form의 ref
+                              (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                            }}
                             placeholder=" 일단 쓰시죠..."
-                            {...field}
+                            {...restField}
                             disabled={isSubmitting || createPostMutation.isPending}
                             onFocus={(e) => {
                               setIsFocused(true);

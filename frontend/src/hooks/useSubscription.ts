@@ -332,11 +332,10 @@ export function useCheckUsageLimit(resourceType: string) {
   return useQuery<UsageLimitResponse>({
     queryKey: ['subscription', 'usage', 'check', resourceType],
     queryFn: async () => ({
-      canCreate: true, // 제한 없음
+      allowed: true, // 제한 없음
       currentUsage: 0,
       limit: -1, // 무제한
-      percentage: 0,
-    } as UsageLimitResponse),
+    }),
     enabled: false, // 비활성화
   });
 }

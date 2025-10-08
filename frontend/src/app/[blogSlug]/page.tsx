@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useInfinitePosts, useDeletePost } from '@/hooks/usePosts';
+import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
@@ -81,6 +81,11 @@ export default function BlogPage() {
 
   const deletePostMutation = useDeletePost();
 
+  // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)
+  const toggleLikeMutation = useTogglePostLike(() => {
+    router.push('/login');
+  });
+
   // 블로그 소유자 여부 확인
   const isBlogOwner = useMemo(() => {
     return !!(blog && user && String(blog.owner?.id) === String(user.id));
@@ -155,6 +160,11 @@ export default function BlogPage() {
     }
   }, [deletePostMutation.isPending]);
 
+  // 좋아요 토글 핸들러
+  const handleLikePost = useCallback((postId: string) => {
+    toggleLikeMutation.mutate(postId);
+  }, [toggleLikeMutation]);
+
   if (!isClient) {
     return <LoadingSpinner message="페이지를 불러오는 중..." />;
   }
@@ -212,6 +222,7 @@ export default function BlogPage() {
                       userId={user?.id}
                       onEdit={handleEditPost}
                       onDelete={handleDeletePost}
+                      onLike={handleLikePost}
                       isDeleting={deletePostMutation.isPending && deleteDialog.postId === post.id}
                     />
                   ))}

@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useInfinitePosts, useDeletePost } from '@/hooks/usePosts';
+import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 
@@ -65,6 +65,11 @@ export default function HomePage() {
   console.log('🔍 [Home Debug] search:', currentParams.search);
 
   const deletePostMutation = useDeletePost();
+
+  // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)
+  const toggleLikeMutation = useTogglePostLike(() => {
+    router.push('/login');
+  });
 
   // 모든 포스트 플래튼 - 메모이제이션 (중복 제거)
   const allPosts = useMemo(() => {
@@ -164,6 +169,11 @@ export default function HomePage() {
     }
   }, [deletePostMutation.isPending]);
 
+  // 좋아요 토글 핸들러
+  const handleLikePost = useCallback((postId: string) => {
+    toggleLikeMutation.mutate(postId);
+  }, [toggleLikeMutation]);
+
   if (error) {
     return (
       <ErrorMessage 
@@ -193,6 +203,7 @@ export default function HomePage() {
                     userId={user?.id}
                     onEdit={handleEditPost}
                     onDelete={handleDeletePost}
+                    onLike={handleLikePost}
                     isDeleting={deletePostMutation.isPending && deleteDialog.postId === post.id}
                     searchQuery={currentParams.search}
                   />

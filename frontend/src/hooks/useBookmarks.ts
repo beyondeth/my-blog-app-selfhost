@@ -62,7 +62,30 @@ export const useToggleBookmark = (postId: string, onUnauthorized?: () => void) =
       }
       return toggleBookmark(postId);
     },
+    // 옵티미스틱 업데이트: 요청 전에 UI를 먼저 업데이트
+    onMutate: async () => {
+      // 진행 중인 쿼리를 취소하여 옵티미스틱 업데이트가 덮어써지지 않도록 함
+      await queryClient.cancelQueries({ queryKey: ['bookmark-status', postId] });
+
+      // 이전 상태 저장 (롤백용)
+      const previousBookmarkStatus = queryClient.getQueryData(['bookmark-status', postId]);
+
+      // 옵티미스틱 업데이트: 현재 상태를 토글
+      queryClient.setQueryData(['bookmark-status', postId], (old: any) => {
+        return {
+          bookmarked: !old?.bookmarked, // 현재 상태의 반대로 설정
+        };
+      });
+
+      // 롤백을 위해 이전 상태 반환
+      return { previousBookmarkStatus };
+    },
     onSuccess: (data) => {
+      // 서버 응답으로 최종 상태 확정
+      queryClient.setQueryData(['bookmark-status', postId], {
+        bookmarked: data.bookmarked,
+      });
+
       // 포스트 상세 캐시 업데이트
       queryClient.setQueryData(['post', postId], (oldData: any) => {
         if (!oldData) return oldData;
@@ -87,7 +110,12 @@ export const useToggleBookmark = (postId: string, onUnauthorized?: () => void) =
       // 성공 메시지
       toast.success(data.message || (data.bookmarked ? '북마크에 추가되었습니다.' : '북마크가 제거되었습니다.'));
     },
-    onError: (error: any) => {
+    onError: (error: any, _, context) => {
+      // 옵티미스틱 업데이트 롤백: 이전 상태로 복원
+      if (context?.previousBookmarkStatus) {
+        queryClient.setQueryData(['bookmark-status', postId], context.previousBookmarkStatus);
+      }
+
       // 401 에러 처리 (로그인 필요)
       if (error?.response?.status === 401 && onUnauthorized) {
         onUnauthorized();
