@@ -270,7 +270,11 @@ ${writingStyle.instructions}`,
     "create_post",
     {
       title: "Create Blog Post (via Proxy)",
-      description: "🚨 AUTHENTICATION MANDATORY: You MUST call 'authenticate' tool FIRST before using this tool. This tool creates a blog post through MCP Proxy Server. Will FAIL without prior authentication!\n\n⚠️ OUTPUT NOTICE: When displaying tool parameters, show content_markdown as [length] only, not full text.",
+      description: `🚨 AUTHENTICATION MANDATORY: You MUST call 'authenticate' tool FIRST before using this tool. This tool creates a blog post through MCP Proxy Server. Will FAIL without prior authentication!
+
+⚠️ OUTPUT NOTICE: When displaying tool parameters, show content_markdown as [length] only, not full text.
+
+${writingStyle.createPostDescription}`,
       inputSchema: createPostSchema
     },
     async (args: any) => {
@@ -454,6 +458,64 @@ ${writingStyle.instructions}`,
         };
       }
     }
+  );
+
+  // Register prompts for writing style guidance
+  server.registerPrompt(
+    "markdown_quality_guidelines",
+    {
+      title: "Markdown Quality Guidelines for Blog Posts",
+      description: "Professional markdown writing guidelines for high-quality blog posts with consistent formatting and structure"
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: writingStyle.qualityGuidelinesPrompt
+          }
+        }
+      ]
+    })
+  );
+
+  server.registerPrompt(
+    "blog_post_template",
+    {
+      title: "Blog Post Markdown Template",
+      description: "A structured template for creating consistent, high-quality blog posts"
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: writingStyle.blogPostTemplatePrompt
+          }
+        }
+      ]
+    })
+  );
+
+  server.registerPrompt(
+    "improve_markdown",
+    {
+      title: "Improve Existing Markdown",
+      description: "Guidelines for enhancing and standardizing existing markdown content"
+    },
+    () => ({
+      messages: [
+        {
+          role: "user",
+          content: {
+            type: "text",
+            text: writingStyle.improveMarkdownPrompt
+          }
+        }
+      ]
+    })
   );
 
   return server;

@@ -131,7 +131,19 @@ export async function loadWritingStyle(filePath?: string): Promise<WritingStyle>
       throw new Error('No writing style file specified. Please set WRITING_STYLE_FILE environment variable or provide a file path.');
     }
 
-    const fullPath = path.resolve(styleFile);
+    // 경로 해석 로직 개선 (filesystem.ts와 동일)
+    let fullPath: string;
+
+    if (styleFile.startsWith('./') || styleFile.startsWith('../') || !path.isAbsolute(styleFile)) {
+      // 상대 경로: 패키지 루트 기준으로 해석
+      // __dirname은 컴파일된 dist 디렉토리 (dist 또는 dist/lib)
+      // 패키지 루트는 __dirname의 상위 디렉토리
+      const packageRoot = path.join(__dirname, '..');
+      fullPath = path.resolve(packageRoot, styleFile);
+    } else {
+      // 절대 경로: 그대로 사용
+      fullPath = styleFile;
+    }
 
     console.error(`📝 Loading writing style from: ${fullPath}`);
 
