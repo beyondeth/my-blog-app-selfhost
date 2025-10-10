@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, User, Shield, AlertCircle } from 'lucide-react';
@@ -37,6 +37,9 @@ export default function OAuthAuthorizePage() {
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitAction, setSubmitAction] = useState<'approve' | 'deny' | null>(null); // 어떤 버튼을 눌렀는지 추적
+
+  // 중복 클릭 방지를 위한 ref (동기적으로 즉시 체크 가능)
+  const isSubmittingRef = useRef(false);
 
   // URL 파라미터 추출
   const clientId = searchParams.get('client_id');
@@ -95,11 +98,19 @@ export default function OAuthAuthorizePage() {
    * 승인 처리 함수
    */
   const handleApprove = async () => {
+    // 중복 클릭 방지 (동기적 체크)
+    if (isSubmittingRef.current) {
+      console.warn('이미 제출 중입니다. 중복 클릭이 차단되었습니다.');
+      return;
+    }
+
     if (!selectedBlogId) {
       alert('블로그를 선택해주세요.');
       return;
     }
 
+    // 즉시 제출 상태로 전환 (동기적)
+    isSubmittingRef.current = true;
     setSubmitting(true);
     setSubmitAction('approve'); // 승인 버튼을 눌렀음을 표시
     try {
@@ -142,6 +153,7 @@ export default function OAuthAuthorizePage() {
       console.error('Error approving:', err);
       setError('승인 처리 중 오류가 발생했습니다.');
     } finally {
+      isSubmittingRef.current = false; // ref도 초기화
       setSubmitting(false);
       setSubmitAction(null);
     }
@@ -151,6 +163,14 @@ export default function OAuthAuthorizePage() {
    * 거부 처리 함수
    */
   const handleDeny = async () => {
+    // 중복 클릭 방지 (동기적 체크)
+    if (isSubmittingRef.current) {
+      console.warn('이미 제출 중입니다. 중복 클릭이 차단되었습니다.');
+      return;
+    }
+
+    // 즉시 제출 상태로 전환 (동기적)
+    isSubmittingRef.current = true;
     setSubmitting(true);
     setSubmitAction('deny'); // 거부 버튼을 눌렀음을 표시
     try {
@@ -196,6 +216,7 @@ export default function OAuthAuthorizePage() {
       // 에러 발생 시 홈으로 리다이렉트
       window.location.href = '/';
     } finally {
+      isSubmittingRef.current = false; // ref도 초기화
       setSubmitting(false);
       setSubmitAction(null);
     }
@@ -205,6 +226,16 @@ export default function OAuthAuthorizePage() {
    * 계정 전환 처리
    */
   const handleSwitchAccount = () => {
+    // 중복 클릭 방지 (동기적 체크)
+    if (isSubmittingRef.current) {
+      console.warn('이미 제출 중입니다. 중복 클릭이 차단되었습니다.');
+      return;
+    }
+
+    // 즉시 제출 상태로 전환 (동기적)
+    isSubmittingRef.current = true;
+    setSubmitting(true);
+
     // 백엔드 OAuth 엔드포인트로 리다이렉트하여 계정 전환 처리
     const newParams = new URLSearchParams(searchParams.toString());
     newParams.set('switch_account', 'true');
@@ -292,7 +323,7 @@ export default function OAuthAuthorizePage() {
               value={selectedBlogId}
               onChange={(e) => setSelectedBlogId(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              disabled={submitting}
+              disabled={submitting || isSubmittingRef.current}
             >
               <option value="">블로그를 선택하세요</option>
               {data.blogs.map((blog) => (
@@ -314,7 +345,7 @@ export default function OAuthAuthorizePage() {
             <button
               onClick={handleSwitchAccount}
               className="text-sm text-blue-600 hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={submitting}
+              disabled={submitting || isSubmittingRef.current}
             >
               계정 전환
             </button>
@@ -327,7 +358,7 @@ export default function OAuthAuthorizePage() {
             onClick={handleApprove}
             className="w-full py-3 relative"
             size="lg"
-            disabled={submitting || !selectedBlogId}
+            disabled={submitting || isSubmittingRef.current || !selectedBlogId}
           >
             {submitting && submitAction === 'approve' ? (
               <>
@@ -347,7 +378,7 @@ export default function OAuthAuthorizePage() {
             onClick={handleDeny}
             variant="outline"
             className="w-full py-2 relative"
-            disabled={submitting}
+            disabled={submitting || isSubmittingRef.current}
           >
             {submitting && submitAction === 'deny' ? (
               <>

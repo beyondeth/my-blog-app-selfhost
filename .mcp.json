@@ -2,10 +2,11 @@
   "mcpServers": {
     "codebase_blog": {
       "type": "stdio",
-      "command": "node",
-      "args": ["/Users/sihyungpark/Desktop/code/my-blog-app/mcp-blog-server-ts/dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@codebase/mcp-blog-client"],
       "env": {
-        "PROXY_SERVER_URL": "http://localhost:3002"
+        "PROXY_SERVER_URL": "http://localhost:3002",
+        "WRITING_STYLE": "novel"
       }
     }
   }

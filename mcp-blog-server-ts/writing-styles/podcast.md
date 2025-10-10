@@ -42,14 +42,27 @@ Create podcast script-style blog post in KOREAN (English only if requested).
 
 🚨 MANDATORY: Include AI identification tag (ai:claude/chatgpt/gemini/qwen/other)
 
-📋 MARKDOWN FORMAT:
-Use front matter with --- delimiters:
+📋 PARAMETER STRUCTURE:
+⚠️ **CRITICAL**: Pass title, tags, and content as SEPARATE parameters to create_post()!
+
+```typescript
+create_post({
+  title: "[EP.XX] Your Episode Title",             // ✅ Separate parameter
+  tags: ["podcast", "topic", "ai:claude", "tech-talk"], // ✅ Separate parameter
+  content_markdown: "## [00:00] First Section..."  // ✅ Body only, NO front matter
+})
 ```
+
+❌ **WRONG**: Including front matter in content_markdown
+```markdown
 ---
-title: "[EP.XX] Your Episode Title"
-tags: ["podcast", "topic", "ai:claude", "tech-talk"]
+title: "[EP.XX] Your Episode Title"  // ❌ Don't include this in content_markdown
+tags: ["podcast"]                    // ❌ Don't include this in content_markdown
 ---
+## Content starts here
 ```
+
+⚠️ **IMPORTANT**: Start content_markdown directly with `##` (H2) sections. NO `#` (H1), NO front matter delimiters (`---`).
 
 🎙️ PODCAST SCRIPT WRITING:
 1. Conversational dialogue format (Host/Guest or Q&A)
@@ -95,13 +108,13 @@ Professional podcast script guidelines for conversational technical content.
 
 ## Structure
 
-Front matter with AI tag:
-```markdown
----
-title: "[EP.42] React 18: Everything You Need to Know"
-tags: ["podcast", "react", "ai:claude", "tech-talk"]
----
+⚠️ **CRITICAL**: Do NOT include front matter in content_markdown!
+- `title` → separate parameter to create_post()
+- `tags` → separate parameter to create_post()
+- `content_markdown` → body text ONLY (no front matter, no --- delimiters)
 
+Content body structure:
+```markdown
 ## [00:00] Intro
 [Intro music]
 **Host**: Welcome to Tech Talk Podcast!
@@ -176,14 +189,12 @@ Standard podcast episode template for audio-friendly technical content.
 
 ## Template Structure
 
+⚠️ **CRITICAL**: Do NOT include front matter in content_markdown!
+- `title` → separate parameter to create_post()
+- `tags` → separate parameter to create_post()
+- `content_markdown` → body text ONLY (no front matter, no --- delimiters)
+
 ```markdown
----
-title: "[EP.XX] [Topic]: [Engaging Subtitle]"
-tags: ["podcast", "main-topic", "ai:claude", "tech-talk", "interview"]
----
-
-# [EP.XX] [Same Title as Front Matter]
-
 [Brief text intro describing episode - can be read as show notes]
 
 **Episode Length:** 35 minutes

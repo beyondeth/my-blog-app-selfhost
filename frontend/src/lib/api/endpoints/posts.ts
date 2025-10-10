@@ -94,11 +94,11 @@ export class PostsAPI {
   /**
    * 포스트 좋아요 토글
    * @param id - 포스트 ID
-   * @returns 좋아요 상태
-   * @description 좋아요/좋아요 취소 토글
+   * @returns 좋아요 상태 (queued: Redis 큐에 들어갔는지 여부, likeCount: 현재 좋아요 수)
+   * @description 좋아요/좋아요 취소 토글 (Redis 큐 시스템 사용)
    */
-  async toggleLike(id: string): Promise<{ liked: boolean }> {
-    return this.client.post<{ liked: boolean }>(`/posts/${id}/like`);
+  async toggleLike(id: string): Promise<{ liked: boolean; queued?: boolean; likeCount?: number }> {
+    return this.client.post<{ liked: boolean; queued?: boolean; likeCount?: number }>(`/posts/${id}/like`);
   }
 
   /**

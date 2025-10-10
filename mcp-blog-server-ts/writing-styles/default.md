@@ -1,5 +1,5 @@
 ---
-style_name: "Default Natural Korean Blog Style"
+style_name: "Professional Technical Blog"
 language: "korean"
 min_length: 2000
 target_length: "3000-5000"
@@ -10,386 +10,501 @@ auto_enhance: true
 
 # === MCP SERVER INSTRUCTIONS ===
 
-TypeScript MCP server for blog post creation with AI tracking.
+TypeScript MCP server for technical blog post creation with AI identification.
 
-🔴 AUTHENTICATION FIRST:
-Always call authenticate() before creating any content.
+🔴 AUTHENTICATION REQUIRED:
+Call authenticate() before creating content.
 
-🚨 AI IDENTIFICATION REQUIRED:
-- Claude → "ai:claude"
-- ChatGPT → "ai:chatgpt"
-- Gemini → "ai:gemini"
-- Qwen → "ai:qwen"
-- Other → "ai:other"
+🚨 MANDATORY AI TAG:
+Include AI identifier in tags: "ai:claude", "ai:chatgpt", "ai:gemini", "ai:qwen", or "ai:other"
 
-✅ Example: tags: ["javascript", "ai:claude", "tutorial"]
-
-🌐 LANGUAGE:
-Default KOREAN. Use English only when requested.
-
-⚠️ CORE RULES:
-1. AI tag required (mandatory)
-2. Min 2000 chars, ideal 3000-5000 chars
-3. Always use auto_enhance: true
-4. Meaningful title (never "Untitled")
-5. Default Korean unless requested
+⚠️ CORE REQUIREMENTS:
+1. AI tag mandatory in all posts
+2. Minimum 2000 characters (target: 3000-5000)
+3. Always set auto_enhance: true
+4. Title must be meaningful and descriptive
+5. Default to Korean unless English is requested
 
 📤 OUTPUT BEHAVIOR:
-After successful post creation, DO NOT repeat the entire markdown content.
-Only show the success message from the tool result.
-
-포스팅 완료 후 마크다운 전체 내용을 반복하지 마세요.
-도구 결과의 성공 메시지만 보여주세요.
+After successful post creation, display only the success message.
+Do not repeat the entire markdown content.
 
 ---
 
 # === CREATE_POST TOOL DESCRIPTION ===
 
-자연스럽고 매력적인 한국어 블로그 포스트를 작성해주세요. (영어는 요청 시에만)
+Create professional technical blog posts that balance clarity with depth.
 
-🚨 필수: AI 식별 태그 포함 (ai:claude/chatgpt/gemini/qwen/other)
+🚨 MANDATORY: Include AI identification tag (ai:claude/chatgpt/gemini/qwen/other)
 
-📋 마크다운 형식:
-Front matter를 사용하세요:
+📋 PARAMETER STRUCTURE:
+
+⚠️ **CRITICAL**: Pass title, tags, and content as **separate parameters**!
+
+```typescript
+create_post({
+  title: "Clear and Descriptive Title",              // ✅ Separate parameter
+  tags: ["topic", "ai:claude", "category"],          // ✅ Separate parameter
+  content_markdown: "## First Section Starts Here..." // ✅ Body only, no front matter
+})
 ```
----
-title: "매력적인 제목"
-tags: ["주제1", "ai:claude", "카테고리"]
----
 
-## 🎯 첫 번째 섹션부터 시작
+❌ **INCORRECT**: Including front matter in content_markdown
+```markdown
+---
+title: "Title Here"  // ❌ Don't include in content_markdown
+tags: ["topic"]      // ❌ Don't include in content_markdown
+---
+## Content
 ```
 
-⚠️ **중요**: Front matter에 제목이 있으면 본문에 H1 제목(`# 제목`)을 **중복해서 쓰지 마세요**.
-→ Front matter 다음 줄부터 바로 `##` (H2) 섹션으로 시작하세요.
+⚠️ **IMPORTANT**: Start content_markdown directly with `##` (H2) sections. No `#` (H1) or front matter delimiters (`---`).
 
-✨ 자연스러운 글쓰기:
-1. **경험담으로 시작하세요** - "지난주에 이런 일이..."
-2. **코드는 최소화** (전체의 20% 이하) - 설명이 먼저, 코드는 나중에
-3. **대화하듯 편하게** - 독자에게 말하듯이 쓰세요
-4. **개인적 의견을 넣으세요** - "제 생각에는...", "경험상..."
-5. **자연스러운 전환** - "그런데", "예를 들어", "흥미로운 건"
-6. **제목 반복 금지** - 제목을 본문 첫 줄에 또 쓰지 마세요
+## Writing Guidelines
 
-❌ 피해야 할 것들:
-- 코드 블록이 너무 많은 글
-- 기계적이고 딱딱한 설명
-- 감정이 없는 건조한 문체
-- "다음과 같습니다", "~입니다" 같은 공무원 말투
-- 불필요한 전문용어 남발
+**Content Structure**:
+- Lead with the core concept or problem being solved
+- Follow with technical explanation and implementation
+- Include practical examples and use cases
+- End with key takeaways and next steps
 
-⚠️ 필수 요구사항:
-- 최소 2000자 이상 (목표: 3000-5000자)
-- auto_enhance: true 설정
-- AI 태그 필수 포함
-- "Untitled" 같은 제목 금지
+**Code Usage**:
+- Keep code blocks under 20% of total content
+- Always provide context before and after code
+- Specify language in code blocks (```javascript, ```python)
+- Explain what the code does, not just show it
 
-📊 품질 점수 (100점 만점):
-- 자연스러운 흐름 (18점): 전환구 3개 이상 사용
-- 개인적 터치 (16점): 개인 경험/의견 2개 이상
-- 대화체 톤 (16점): 대화 패턴 5개 이상
-- 구조 (25점): H2/H3 제목, 도입/결론 있음
-- 가독성 (15점): 코드 20% 이하
-- 부가 요소 (10점): 이모지, 굵은 글씨, 코드 언어 지정
+**Language and Tone**:
+- Write clearly and directly
+- Use technical terms accurately with proper context
+- Maintain professional but approachable tone
+- Focus on information delivery over entertainment
 
-⚠️ 70점 미만은 자동 개선됩니다. 80점 이상을 목표로!
+**Structure Requirements**:
+- Use H2 (##) for main sections with optional emoji
+- Use H3 (###) for subsections
+- Add horizontal rules (---) between major sections
+- Bold **key terms** (3-5 per post)
+- Minimum 2000 characters, ideally 3000-5000
+
+❌ AVOID:
+- Excessive code without explanation
+- Overly casual or conversational style
+- Emotional or narrative-driven content
+- Formal bureaucratic language
+- Unnecessary jargon without context
+- Starting with personal stories or anecdotes
+
+⚠️ MANDATORY:
+- Minimum 2000 characters (target: 3000-5000)
+- Set auto_enhance: true
+- Include AI tag
+- No "Untitled" or generic titles
+
+📊 QUALITY SCORING (100 points):
+- Clear Structure (25 pts): Logical H2/H3 hierarchy, intro/conclusion present
+- Technical Accuracy (20 pts): Correct terminology, verified information
+- Code Quality (20 pts): Proper context, language tags, explanations
+- Clarity (15 pts): Direct explanations, minimal ambiguity
+- Readability (10 pts): Varied sentence structure, good flow
+- Formatting (10 pts): Proper markdown, bold keywords, code blocks
+
+⚠️ Scores below 70 trigger automatic enhancement. Aim for 80+!
 
 ---
 
 # === QUALITY GUIDELINES PROMPT ===
 
-자연스러운 블로그 포스트를 위한 품질 가이드라인입니다.
+Guidelines for creating high-quality technical blog posts.
 
-## 구조
+## Content Structure
 
-Front matter에 AI 태그 포함:
+⚠️ **CRITICAL**: Do not include front matter in content_markdown!
+- `title` → Separate parameter in create_post()
+- `tags` → Separate parameter in create_post()
+- `content_markdown` → Body only (no front matter, no `---` delimiters)
+
+**Post Architecture**:
 ```markdown
----
-title: "여러분의 제목"
-tags: ["태그1", "ai:claude"]
----
+## Introduction
+State the problem or concept clearly
 
-## 들어가며
-독자의 마음을 사로잡는 오프닝
+## Core Explanation
+Technical details with proper context
 
-## 본문
-예시와 함께 명확하게 설명
+## Implementation
+Practical examples and code
 
-## 마무리
-핵심 정리와 다음 단계
+## Conclusion
+Key points and actionable takeaways
 ```
 
-## 글쓰기 스타일
+## Writing Principles
 
-- 스토리나 경험담으로 시작하세요
-- 감정이 담긴 대화체로 쓰세요
-- 개인적 의견을 포함하세요
-- 섹션 사이를 자연스럽게 연결하세요
+**Clarity First**:
+- Define technical terms when first introduced
+- Use concrete examples to illustrate concepts
+- Break complex ideas into digestible parts
+- Maintain logical progression from simple to complex
 
-## 코드 블록
+**Technical Precision**:
+- Use accurate terminology consistently
+- Cite sources for claims or statistics
+- Include version numbers for libraries/frameworks
+- Mention important constraints or limitations
 
-- 전체의 20% 이하로 제한하세요
-- 언어 태그 추가 (```javascript, ```python)
-- 코드만 보여주지 말고 말로 설명하세요
+**Code Integration**:
+- Limit code to 20% of total content
+- Always specify language (```javascript, ```python)
+- Provide setup context before code blocks
+- Explain the "why" not just the "how"
 
-## 피하세요
+## Format Standards
 
-- "다음과 같습니다" → "이렇게 해보세요" 사용
-- 과도한 기술 전문용어
-- 감정 없는 기계적인 글
-- 정형화된 표현
+**Section Headers**:
+- H2 (##) for main topics, optional emoji for visual appeal
+- H3 (###) for detailed subtopics
+- Use descriptive, scannable headers
 
-## 형식
+**Text Formatting**:
+- **Bold** key terms and important concepts (3-5 per post)
+- Use `inline code` for function names, variables, commands
+- Add horizontal rules (---) between major sections
 
-- H2 (##) 제목에 이모지 추가
-- 중요한 용어 **굵게** 표시 (문서당 3-5개)
-- 주요 파트 사이에 구분선 (---) 추가
-- 최소 2000자, 이상적으로 3000-5000자
+**Content Organization**:
+- Keep paragraphs focused (3-5 sentences)
+- Use bullet lists for multiple related points
+- Number steps in sequential processes
+- Include code comments for complex logic
 
-## 품질 체크리스트
+## What to Avoid
 
-- 도입부와 결론 있음
-- 적절한 제목 계층 (H1 → H2 → H3)
-- 문법과 맞춤법 정확
-- 일관된 톤 유지
-- 기술 용어에 맥락 제공
+❌ **Discouraged Patterns**:
+- Starting with personal anecdotes or stories
+- Excessive use of first-person narrative
+- Overly casual language or slang
+- Long paragraphs without breaks
+- Code dumps without explanation
+- Mixing informal and formal tone
+
+✅ **Preferred Approach**:
+- Lead with the technical concept or problem
+- Maintain consistent professional tone
+- Balance explanation with demonstration
+- Provide clear, actionable information
 
 ---
 
 # === BLOG POST TEMPLATE PROMPT ===
 
-자연스러운 한국어 블로그 포스트의 표준 템플릿입니다.
+Standard template structure for professional technical blog posts.
 
-## 템플릿 구조
+## Template Overview
+
+⚠️ **CRITICAL**: Do not include front matter in content_markdown!
+- `title` → Separate parameter in create_post()
+- `tags` → Separate parameter in create_post()
+- `content_markdown` → Body content only (no front matter, no `---` delimiters)
 
 ```markdown
+## 🎯 Introduction
+
+[Opening hook: State the problem or introduce the concept]
+
+This post covers [brief overview of what readers will learn]. Understanding this concept is crucial for [context and relevance].
+
+**What you'll learn**:
+- Key concept or technique
+- Practical implementation approach
+- Common pitfalls and solutions
+
 ---
-title: "독자의 눈길을 사로잡는 제목"
-tags: ["주제", "하위주제", "ai:claude", "카테고리"]
+
+## 🔍 Background
+
+[Provide necessary context for understanding the main topic]
+
+**Core concepts**: Define and explain essential terms with **bold** emphasis.
+
+### Why This Matters
+
+[Explain the practical importance or use cases]
+
 ---
 
-## 🎯 시작하며
+## 💡 Main Content
 
-[오프닝 훅 - 개인적 경험이나 흥미로운 질문]
-"이런 문제 겪어보신 적 있으세요?" 또는 "지난주에 이런 일이 있었어요..."
+### Concept 1: [Descriptive Title]
 
-## 📋 다룰 내용
+[Clear explanation of the first major concept]
 
-[독자가 배울 내용을 간단히 소개]
-- 핵심 포인트 1
-- 핵심 포인트 2
-- 핵심 포인트 3
+**Key points**:
+- Specific detail with context
+- Implementation consideration
+- Best practice recommendation
 
-## 💡 문제 상황
-
-[스토리나 예시로 문제를 설명]
-
-"[프로젝트]를 진행하던 중에 [문제]를 만났어요..."
-
-## 🔧 해결 방법
-
-[자연스럽게 해결책을 설명]
-
-### 단계 1: [첫 번째 파트]
-
-[대화하듯 편하게 설명]
-
-### 단계 2: [두 번째 파트]
-
-[자연스러운 전환구와 함께 계속]
+When implementing this approach, consider the following:
 
 ```javascript
-// 필요할 때만 코드를 보여주세요
-const example = "최소한으로 유지";
+// Clear comment explaining the purpose
+const example = {
+  property: "value",
+  method() {
+    // Explain what this does
+    return this.property;
+  }
+};
 ```
 
-### 단계 3: [세 번째 파트]
+**Explanation**: [Describe what the code demonstrates and why it's structured this way]
 
-[해결책 마무리]
+### Concept 2: [Descriptive Title]
 
-## ✨ 핵심 정리
+[Build on previous concepts with additional detail]
 
-- 중요 포인트 1
-- 중요 포인트 2
-- 중요 포인트 3
+**Practical application**:
+1. **Step one**: Specific action with context
+2. **Step two**: Next logical step
+3. **Step three**: Final implementation detail
 
-## 🚀 다음 단계
+### Real-World Example
 
-[독자가 다음에 해야 할 일]
+[Demonstrate how to apply these concepts in actual projects]
+
+**Setup requirements**:
+- Dependency or prerequisite 1
+- Dependency or prerequisite 2
+
+```python
+# Complete working example
+def process_data(input_data):
+    """
+    Clear docstring explaining function purpose
+    """
+    # Implementation with explanatory comments
+    result = transform(input_data)
+    return result
+```
+
+**Results**: [Explain the output and its significance]
 
 ---
 
-**여러분은 어떤 경험이 있으신가요?** 댓글로 공유해주세요!
+## ✨ Key Takeaways
+
+Essential points to remember:
+
+1. **Primary insight**: Core concept summary
+2. **Implementation tip**: Practical application advice
+3. **Best practice**: Important guideline or caution
+
+---
+
+## 🚀 Next Steps
+
+**Immediate actions**:
+1. **Try it yourself**: Simplest first step to experiment
+2. **Explore further**: Additional topics to study
+3. **Apply to projects**: How to use in real work
+
+**Additional resources** (optional):
+- [Official Documentation](link) - Authoritative reference
+- [Related Article](link) - Deeper dive
+- [Example Repository](link) - Working code samples
+
+---
+
+**Questions or feedback?** Share your experience in the comments below.
 ```
 
-## 사용 가이드
+## Section Guidelines
 
-- **오프닝**: 질문, 스토리, 흥미로운 사실로 시작하세요
-- **본문**: 논리적인 H2/H3 섹션으로 나누세요
-- **코드**: 필요할 때만, 항상 말로 설명하세요
-- **마무리**: 요약하고 다음 단계를 제시하세요
-- **톤**: 친구에게 말하듯 대화체로
+**Introduction (## 🎯)**:
+- State the main topic or problem directly
+- Provide brief context for relevance
+- Outline what readers will learn
 
-## 모범 사례
+**Background (## 🔍)**:
+- Explain prerequisite concepts
+- Define technical terminology
+- Establish context for main content
 
-- 인칭 대명사 사용 ("저는", "우리는", "여러분")
-- 실제 경험의 예시 포함
-- 섹션 사이에 자연스러운 전환구 추가
-- 이모지는 적절히 효과적으로
-- 중요한 용어는 **굵게** 표시
+**Main Content (## 💡)**:
+- Use H3 (###) to organize subtopics
+- Provide clear explanations before code
+- Include practical examples
+- Balance theory with implementation
+
+**Key Takeaways (## ✨)**:
+- Summarize main points concisely
+- Use numbered list for clarity
+- Focus on actionable insights
+
+**Next Steps (## 🚀)**:
+- Provide concrete actions readers can take
+- Suggest resources for deeper learning
+- Include optional reference links
+
+## Formatting Best Practices
+
+**Code Blocks**:
+- Always specify language (```javascript, not just ```)
+- Add meaningful comments
+- Keep examples focused and runnable
+- Explain before and after the code
+
+**Structure Elements**:
+- Use horizontal rules (---) between major sections
+- Add emoji to H2 headers for visual appeal (optional)
+- Bold **important terms** when first introduced
+- Keep sections scannable with clear headers
+
+**Tone and Style**:
+- Professional but accessible
+- Direct and informative
+- Technically accurate
+- Consistently formal (avoid mixing casual and formal)
 
 ---
 
 # === IMPROVE MARKDOWN PROMPT ===
 
-자연스러운 한국어 블로그 작성을 위한 품질 개선 가이드입니다.
+Techniques for enhancing technical blog post quality.
 
-## 글쓰기 핵심 원칙
+## Core Principles
 
-기술 블로그는 정보 전달과 독자 경험의 균형입니다. 전문성을 유지하면서도 접근 가능한 글을 작성하세요.
+Effective technical writing requires balancing depth with accessibility. Your goal is to inform while remaining clear and approachable.
 
-**핵심 방향**:
-- 명확한 정보 구조 (개념 → 원리 → 예시 → 활용)
-- 전문적이면서도 친근한 톤
-- 독자 중심의 설명 방식
-- 적절한 코드와 충분한 맥락
+**Focus areas**:
+- Logical information flow (concept → implementation → application)
+- Technical accuracy with proper context
+- Clear examples that illustrate key points
+- Consistent professional tone
 
----
+## Improvement Techniques
 
-## 핵심 개선 기법
+### 1. Strengthen Opening
 
-### 1. 효과적인 오프닝 구성
+**Before**: "In this post, we'll look at React hooks."
+**After**: "React hooks transform how we manage state in functional components, eliminating class boilerplate while maintaining full lifecycle control."
 
-**개선 전**: "오늘은 React hooks에 대해 배워보겠습니다."
-**개선 후**: "React hooks는 함수형 컴포넌트의 상태 관리 방식을 근본적으로 변화시켰습니다."
+**Principle**: Lead with value or impact, not just topic announcement.
 
-**적용 원칙**: 정의나 선언문 대신, 핵심 가치나 문제 상황으로 시작합니다. 독자의 관심을 즉시 확보하세요.
+### 2. Add Technical Context
 
-### 2. 명확한 설명 구조
+**Before**: "Use the map function to transform arrays."
+**After**: "The `map()` method creates a new array by applying a transformation function to each element, preserving immutability while enabling functional composition."
 
-**개선 전**: "이 함수는 다음과 같이 동작합니다:"
-**개선 후**: "이 함수의 동작 방식을 단계별로 살펴보겠습니다:"
+**Principle**: Explain both what and why, providing conceptual understanding.
 
-**적용 원칙**: 각 섹션을 "개념 설명 → 동작 원리 → 코드 예시 → 실무 적용" 순서로 구성합니다.
+### 3. Improve Code Integration
 
-### 3. 코드에 맥락 제공
-
-**개선 전**:
+**Before**:
 ```javascript
 const result = data.map(x => x * 2);
 ```
 
-**개선 후**:
-"배열의 각 요소를 변환할 때 `map` 메서드를 사용하면 코드가 간결해집니다:"
+**After**:
+"Transform each element using `map()` for clean, immutable array operations:"
 ```javascript
 const result = data.map(x => x * 2);
 ```
-"이 방식은 원본 배열을 변경하지 않으면서도 새로운 배열을 효율적으로 생성합니다."
+"This approach creates a new array without modifying the original, a key principle in functional programming."
 
-**적용 원칙**: 코드 블록 전후로 맥락을 제공하세요. 코드 앞에서 목적을 설명하고, 코드 뒤에서 결과와 의미를 해석합니다.
+**Principle**: Frame code with purpose (before) and significance (after).
 
-### 4. 자연스러운 전환 표현
+### 4. Clarify Technical Relationships
 
-**효과적인 전환구**:
-- "다음으로 살펴볼 내용은..."
-- "이 개념을 실제로 적용하면..."
-- "여기서 주의할 점은..."
-- "이를 바탕으로..."
-- "구체적인 예시를 통해 확인해보겠습니다..."
+**Effective transitions**:
+- "Building on this concept..."
+- "This approach differs from X in that..."
+- "Consider the trade-offs..."
+- "In practice, this means..."
+- "The key distinction here is..."
 
-**적용 원칙**: 섹션 간 논리적 연결을 명확히 하세요. 갑작스러운 주제 전환은 독자의 이해를 방해합니다.
+**Principle**: Make logical connections explicit for easier comprehension.
 
-### 5. 적절한 비유 활용
+### 5. Use Precise Analogies
 
-**효과적인 비유**:
-- "Redux store는 애플리케이션의 중앙 데이터 저장소입니다 (은행 금고와 유사)"
-- "React 컴포넌트는 재사용 가능한 UI 블록입니다 (레고 블록처럼)"
-- "이벤트 루프는 작업을 순차적으로 처리합니다 (레스토랑 주방의 주문 처리 방식)"
+**Effective comparisons**:
+- "Redux manages state like a single database for your entire application"
+- "React components are composable UI units, similar to functions in programming"
+- "The event loop processes tasks sequentially, like a queue system"
 
-**적용 원칙**: 복잡한 개념을 설명할 때 일상적인 비유를 사용하되, 비유가 정확성을 해치지 않도록 주의하세요.
+**Principle**: Analogies should clarify, not oversimplify. Ensure technical accuracy.
 
-### 6. 문단 구조 최적화
+### 6. Optimize Paragraph Structure
 
-**개선 전**: 기술 설명이 담긴 긴 단일 문단
+**Before**: Long, dense paragraph with multiple concepts
 
-**개선 후**:
-- 짧은 문단으로 분리 (3-4문장)
-- 명확한 소제목 추가
-- 리스트로 구조화
-- 주요 섹션 사이에 구분선 (`---`) 삽입
+**After**:
+- Break into focused paragraphs (3-4 sentences each)
+- Add clear subheadings
+- Use lists for related points
+- Insert horizontal rules between major sections
 
-**적용 원칙**: 모바일 환경에서의 가독성을 고려하세요. 긴 문단은 독자의 집중도를 낮춥니다.
+**Principle**: Visual structure aids comprehension, especially on mobile devices.
 
-### 7. 리듬감 있는 문장 구성
+### 7. Vary Sentence Rhythm
 
-**단조로운 구조**:
-"이 방법은 효율적입니다. 이 방법은 간단합니다. 이 방법은 유용합니다."
+**Monotonous**: "This method is efficient. This method is simple. This method is useful."
 
-**개선된 구조**:
-"이 방법은 효율적입니다. 구현도 간단하며, 실무에서 즉시 적용할 수 있습니다."
+**Improved**: "This method is efficient. It's also simple to implement and useful in most scenarios."
 
-**적용 원칙**: 짧은 문장과 긴 문장을 적절히 혼합하세요. 문장 길이에 변화를 주면 글의 리듬감이 살아납니다.
+**Principle**: Mix short and long sentences for natural reading flow.
 
-### 8. 독자 참여 유도
+### 8. Include Practical Context
 
-**일방적 설명**: "이 기능은 다음과 같이 동작합니다."
-**독자 참여**: "이 기능의 동작 방식을 함께 살펴보겠습니다."
+**Abstract**: "This function processes data efficiently."
+**Concrete**: "This function reduces processing time by 60% when handling datasets over 10,000 records."
 
-**적용 원칙**: 적절한 질문이나 독자를 포함하는 표현을 사용하세요. 단, 과도한 친밀함은 전문성을 해칠 수 있으니 균형을 유지하세요.
+**Principle**: Provide measurable impact or specific use cases when possible.
 
----
+## Quality Checklist
 
-## 품질 기준
+### Structure
+- [ ] Clear introduction stating purpose
+- [ ] Logical H2/H3 hierarchy
+- [ ] Smooth transitions between sections
+- [ ] Concrete conclusion with action items
 
-### 구조 요소
-- [ ] 명확한 오프닝 (문제 제시 또는 핵심 가치)
-- [ ] 논리적인 H2/H3 계층 구조
-- [ ] 섹션 간 자연스러운 전환
-- [ ] 구체적인 결론 (핵심 요약 + 다음 단계)
+### Technical Content
+- [ ] Code blocks limited to 20% of content
+- [ ] All code includes context and explanation
+- [ ] Technical terms defined on first use
+- [ ] Practical, implementable examples
 
-### 내용 품질
-- [ ] 코드 블록은 전체의 20% 이하
-- [ ] 모든 코드 블록에 맥락 설명 포함
-- [ ] 전문 용어에 적절한 설명 추가
-- [ ] 실무 적용 가능한 예시 포함
+### Writing Style
+- [ ] Professional, consistent tone throughout
+- [ ] Technical accuracy verified
+- [ ] Effective transitions used (3+ instances)
+- [ ] Analogies used appropriately (if any)
 
-### 문체 요소
-- [ ] 전문적이면서도 접근 가능한 톤 유지
-- [ ] 일관된 문체 (구어체와 격식체 혼재 방지)
-- [ ] 적절한 전환구 사용 (3개 이상)
-- [ ] 필요시 비유나 은유 활용
+### Technical Elements
+- [ ] Accurate technical information
+- [ ] Current best practices reflected
+- [ ] Working code examples
+- [ ] Constraints and limitations noted
 
-### 기술 요소
-- [ ] 정확한 기술 정보
-- [ ] 최신 베스트 프랙티스 반영
-- [ ] 실제 동작 가능한 코드 예시
-- [ ] 주의사항 및 제약사항 명시
+## Final Polish
 
----
+**Check for consistency**:
+Read the entire post to ensure tone remains professional and technical throughout. Avoid sudden shifts between formal explanation and casual commentary.
 
-## 실전 가이드
+**Verify information density**:
+Balance detail with readability. Core concepts need thorough explanation; supporting details can be concise.
 
-### 작성 후 점검사항
+**Strengthen visual structure**:
+Add section breaks, adjust code-to-text ratio, ensure clear visual hierarchy for comfortable reading.
 
-**톤 일관성 확인**:
-전체 글을 읽으며 톤이 일관되는지 확인하세요. 기술 설명체에서 갑자기 일기체나 구어체로 바뀌면 독자의 집중이 흐트러집니다.
+## Quick Reference
 
-**정보 밀도 조절**:
-너무 밀도 높은 정보는 독자를 피로하게 만듭니다. 중요한 개념은 충분히 설명하고, 부차적인 내용은 간결하게 처리하세요.
+Three essentials for excellent technical posts:
 
-**시각적 구분 강화**:
-주요 섹션 사이에 구분선을 추가하고, 코드 블록과 설명 텍스트의 비율을 조절하여 시각적 휴식 공간을 제공하세요.
+1. **Clear Structure**: Follow concept → implementation → application flow
+2. **Proper Balance**: Mix explanation with demonstration, theory with practice
+3. **Reader Focus**: Provide information readers can understand and apply
 
-### 핵심 요약
+## Validation Step
 
-좋은 기술 블로그 작성을 위한 3가지 핵심:
-
-1. **명확한 구조**: 개념 → 원리 → 예시 → 활용 순서로 논리적 흐름 유지
-2. **적절한 균형**: 전문성과 가독성, 정보와 맥락의 균형
-3. **독자 중심**: 독자가 이해하고 적용할 수 있는 실용적인 내용 제공
-
-### 다음 단계
-
-작성한 글을 소리 내어 읽어보세요. 자연스럽게 읽히고 핵심 내용이 명확하게 전달된다면 효과적인 글입니다.
-
-필요시 동료에게 피드백을 요청하여 독자 관점에서의 가독성과 이해도를 점검하세요.
+Read your post aloud. If it flows naturally and conveys technical concepts clearly, you've succeeded. If anything feels awkward or unclear, revise for better clarity and flow.

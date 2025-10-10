@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
 import { generateSafeFilename } from "./markdown.js";
 
 export async function savePostToFile(
@@ -10,26 +11,16 @@ export async function savePostToFile(
   /** Save markdown post to file in BLOG_POSTS_DIR directory */
   try {
     // 포스트 저장 디렉토리 결정 로직:
-    // 1. 환경 변수 BLOG_POSTS_DIR이 설정된 경우 사용
-    // 2. 상대 경로인 경우 패키지 루트 디렉토리 기준으로 해석
-    // 3. 환경 변수가 없는 경우 패키지 루트의 posts 디렉토리 사용
+    // 1. 환경 변수 BLOG_POSTS_DIR이 설정된 경우 사용 (우선순위)
+    // 2. 기본값: 사용자 홈 디렉토리의 Documents/codebase-mcp-posts
     let postsDir: string;
 
     if (process.env['BLOG_POSTS_DIR']) {
-      const configuredDir = process.env['BLOG_POSTS_DIR'];
-      // 상대 경로인 경우 패키지 루트 기준으로 절대 경로로 변환
-      if (configuredDir.startsWith('./') || configuredDir.startsWith('../') || !path.isAbsolute(configuredDir)) {
-        // __dirname은 lib 디렉토리, 패키지 루트는 두 단계 위
-        const packageRoot = path.join(__dirname, '../..');
-        postsDir = path.resolve(packageRoot, configuredDir);
-      } else {
-        // 절대 경로인 경우 그대로 사용
-        postsDir = configuredDir;
-      }
+      // 사용자가 명시적으로 설정한 경로 사용
+      postsDir = process.env['BLOG_POSTS_DIR'];
     } else {
-      // 기본값: 패키지 루트의 posts 디렉토리
-      const packageRoot = path.join(__dirname, '../..');
-      postsDir = path.join(packageRoot, 'posts');
+      // 기본값: ~/Documents/codebase-mcp-posts
+      postsDir = path.join(os.homedir(), 'Documents', 'codebase-mcp-posts');
     }
 
     // Create posts directory if it doesn't exist

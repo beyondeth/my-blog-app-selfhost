@@ -42,14 +42,27 @@ Create humorous tech blog post in KOREAN (English only if requested).
 
 🚨 MANDATORY: Include AI identification tag (ai:claude/chatgpt/gemini/qwen/other)
 
-📋 MARKDOWN FORMAT:
-Use front matter with --- delimiters:
+📋 PARAMETER STRUCTURE:
+⚠️ **CRITICAL**: Pass title, tags, and content as SEPARATE parameters to create_post()!
+
+```typescript
+create_post({
+  title: "Your Funny Title",                     // ✅ Separate parameter
+  tags: ["tag1", "ai:claude", "dev-humor"],     // ✅ Separate parameter
+  content_markdown: "## 🤪 First Section..."    // ✅ Body only, NO front matter
+})
 ```
+
+❌ **WRONG**: Including front matter in content_markdown
+```markdown
 ---
-title: "Your Funny Title"
-tags: ["tag1", "ai:claude", "dev-humor"]
+title: "Your Funny Title"  // ❌ Don't include this in content_markdown
+tags: ["tag1"]             // ❌ Don't include this in content_markdown
 ---
+## Content starts here
 ```
+
+⚠️ **IMPORTANT**: Start content_markdown directly with `##` (H2) sections. NO `#` (H1), NO front matter delimiters (`---`).
 
 😂 COMEDY WRITING:
 1. Humorous opening hook (not boring intro)
@@ -95,13 +108,13 @@ Professional comedy writing guidelines for humorous technical posts.
 
 ## Structure
 
-Front matter with AI tag:
-```markdown
----
-title: "I Used 1000 useState Hooks (And Survived)"
-tags: ["react", "ai:claude", "dev-humor", "mistakes"]
----
+⚠️ **CRITICAL**: Do NOT include front matter in content_markdown!
+- `title` → separate parameter to create_post()
+- `tags` → separate parameter to create_post()
+- `content_markdown` → body text ONLY (no front matter, no --- delimiters)
 
+Content body structure:
+```markdown
 ## 🤪 Opening: The Setup
 So there I was, thinking I was a React genius...
 
@@ -172,14 +185,12 @@ Standard comedy blog post template for humorous technical writing.
 
 ## Template Structure
 
+⚠️ **CRITICAL**: Do NOT include front matter in content_markdown!
+- `title` → separate parameter to create_post()
+- `tags` → separate parameter to create_post()
+- `content_markdown` → body text ONLY (no front matter, no --- delimiters)
+
 ```markdown
----
-title: "[Funny, Self-Deprecating Title with Emoji]"
-tags: ["main-topic", "ai:claude", "dev-humor", "facepalm"]
----
-
-# [Same Title as Front Matter]
-
 [Opening Hook - Absurd situation or confession]
 "I need to confess something. I committed a war crime... against our codebase."
 

@@ -42,14 +42,27 @@ Create step-by-step tutorial blog post in KOREAN (English only if requested).
 
 🚨 MANDATORY: Include AI identification tag (ai:claude/chatgpt/gemini/qwen/other)
 
-📋 MARKDOWN FORMAT:
-Use front matter with --- delimiters:
+📋 PARAMETER STRUCTURE:
+⚠️ **CRITICAL**: Pass title, tags, and content as SEPARATE parameters to create_post()!
+
+```typescript
+create_post({
+  title: "Your Tutorial Title",                     // ✅ Separate parameter
+  tags: ["topic", "tutorial", "ai:claude", "hands-on"], // ✅ Separate parameter
+  content_markdown: "## 📋 First Section..."        // ✅ Body only, NO front matter
+})
 ```
+
+❌ **WRONG**: Including front matter in content_markdown
+```markdown
 ---
-title: "Your Tutorial Title"
-tags: ["topic", "tutorial", "ai:claude", "hands-on"]
+title: "Your Tutorial Title"  // ❌ Don't include this in content_markdown
+tags: ["tutorial"]            // ❌ Don't include this in content_markdown
 ---
+## Content starts here
 ```
+
+⚠️ **IMPORTANT**: Start content_markdown directly with `##` (H2) sections. NO `#` (H1), NO front matter delimiters (`---`).
 
 📚 TUTORIAL WRITING:
 1. Clear prerequisites and setup
@@ -96,13 +109,13 @@ Professional step-by-step tutorial guidelines for practical hands-on learning.
 
 ## Structure
 
-Front matter with AI tag:
-```markdown
----
-title: "React Complete Guide: Step-by-Step for Beginners"
-tags: ["react", "tutorial", "ai:claude", "hands-on"]
----
+⚠️ **CRITICAL**: Do NOT include front matter in content_markdown!
+- `title` → separate parameter to create_post()
+- `tags` → separate parameter to create_post()
+- `content_markdown` → body text ONLY (no front matter, no --- delimiters)
 
+Content body structure:
+```markdown
 ## 📋 Prerequisites
 - Node.js 16.0+ installed
 - Basic JavaScript knowledge
@@ -186,14 +199,12 @@ Standard tutorial template for comprehensive step-by-step technical learning.
 
 ## Template Structure
 
+⚠️ **CRITICAL**: Do NOT include front matter in content_markdown!
+- `title` → separate parameter to create_post()
+- `tags` → separate parameter to create_post()
+- `content_markdown` → body text ONLY (no front matter, no --- delimiters)
+
 ```markdown
----
-title: "[Technology] Complete Guide: [Specific Goal] for [Audience]"
-tags: ["main-tech", "tutorial", "ai:claude", "hands-on", "beginner"]
----
-
-# [Same Title as Front Matter]
-
 [Brief introduction - what they'll build and why it matters]
 
 In this tutorial, you'll build a [specific project] from scratch. By the end, you'll understand [key concepts] and be able to [practical skills].

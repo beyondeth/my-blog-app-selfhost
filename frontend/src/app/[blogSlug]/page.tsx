@@ -106,10 +106,27 @@ export default function BlogPage() {
     return allPosts.slice(0, 5);
   }, [allPosts]);
 
-  // 태그 추출
+  // 실제 포스트에서 태그 추출 - 메모이제이션
   const tags = useMemo(() => {
-    return ['JavaScript', 'React', 'Node.js', 'TypeScript', 'Next.js'];
-  }, []);
+    const tagMap = new Map<string, number>();
+
+    allPosts.forEach(post => {
+      if (post && post.tags && Array.isArray(post.tags)) {
+        post.tags.forEach((tag: string) => {
+          if (tag && tag.trim()) {
+            const trimmedTag = tag.trim();
+            tagMap.set(trimmedTag, (tagMap.get(trimmedTag) || 0) + 1);
+          }
+        });
+      }
+    });
+
+    // 태그를 빈도순으로 정렬하고 상위 20개만 반환
+    return Array.from(tagMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 20)
+      .map(([tag]) => tag);
+  }, [allPosts]);
 
   const loadMorePosts = useCallback(() => {
     if (hasNextPage && !isFetchingNextPage) {
@@ -164,6 +181,18 @@ export default function BlogPage() {
   const handleLikePost = useCallback((postId: string) => {
     toggleLikeMutation.mutate(postId);
   }, [toggleLikeMutation]);
+
+  // 태그 클릭 처리 (검색으로 이동)
+  const handleTagClick = useCallback((tag: string) => {
+    // 태그를 검색어로 사용하여 URL 업데이트
+    const newParams = {
+      search: tag,
+      page: 1,
+    };
+
+    const newUrl = createSearchUrl(newParams);
+    router.push(newUrl);
+  }, [router]);
 
   if (!isClient) {
     return <LoadingSpinner message="페이지를 불러오는 중..." />;
@@ -261,9 +290,9 @@ export default function BlogPage() {
             />
             
             <RecentPostsSection posts={recentPosts} />
-            
-            <TagsSection tags={tags} />
-            
+
+            <TagsSection tags={tags} onTagClick={handleTagClick} />
+
             <BlogRecommendations />
             </div>
           </aside>
