@@ -10,12 +10,14 @@
  */
 
 import express from 'express';
+import path from 'path';
 import { SessionService } from './services/SessionService';
 import { config } from './config/env.validation';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
 import { createSessionRoutes } from './routes/session.routes';
 import { createMcpRoutes } from './routes/mcp.routes';
 import { createProxyRoutes } from './routes/proxy.routes';
+import { createOAuthRoutes } from './routes/oauth.routes';
 import { logger, httpLogger } from './utils/logger';
 
 // Express 앱 초기화
@@ -54,6 +56,9 @@ if (config.NODE_ENV === 'development' || config.LOG_LEVEL === 'info' || config.L
   app.use(httpLogger);
 }
 
+// 정적 파일 제공 (OAuth 콜백 HTML 등)
+app.use(express.static(path.join(__dirname, '../public')));
+
 // 헬스 체크 (루트 레벨)
 app.get('/health', (req, res) => {
   res.json({
@@ -65,6 +70,7 @@ app.get('/health', (req, res) => {
 });
 
 // 라우터 등록
+app.use(createOAuthRoutes());  // OAuth 콜백 웹페이지 (GET /oauth/callback)
 app.use('/api/v1/mcp/sessions', createSessionRoutes(sessionService));
 app.use('/api/v1/mcp/sessions', createProxyRoutes(sessionService));  // proxy 엔드포인트를 sessions 경로에 포함
 app.use('/api/v1/mcp', createMcpRoutes(sessionService));

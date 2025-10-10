@@ -8,440 +8,388 @@ ai_tag_required: true
 auto_enhance: true
 ---
 
-# User Guide: How to Customize This File
-
-This file controls how the MCP server generates blog posts.
-
-## 📋 Section Overview:
-- **Sections 1-2**: ⚠️ SYSTEM SECTIONS - Modify with caution (affects core functionality)
-- **Sections 3-5**: ✅ USER SECTIONS - Free to customize for your writing style
-
-## 🎯 How to Create Your Own Style:
-1. Copy this file: `cp default.md marketing-style.md`
-2. Edit the USER SECTIONS (3-5) to match your desired style
-3. Set environment variable: `WRITING_STYLE_FILE=writing-styles/marketing-style.md`
-4. Restart the MCP server
-
----
-
-# 📝 CRITICAL: Markdown Formatting Requirements
-
-## ✅ CORRECT Format Example 1: Using Front Matter
-```markdown
----
-title: "Your Blog Post Title Here"
-tags: ["javascript", "react", "ai:gemini", "tutorial"]
----
-
-# Your Blog Post Title Here
-
-Your blog post content starts here...
-```
-
-## ✅ CORRECT Format Example 2: Using H1 for Title
-```markdown
-# Your Blog Post Title Here
-
-Your blog post content starts here...
-```
-
-## ❌ WRONG Format - NEVER DO THIS
-```markdown
-title: Your Blog Post Title
-tags: javascript, react
-
-# 서론: 개발 중 보안의 중요성
-
-Content...
-```
-
-**⚠️ IMPORTANT**: The title and tags MUST be either:
-1. Inside front matter with --- delimiters (recommended)
-2. Use H1 (#) for title only (tags will be auto-generated)
-
-Never put raw metadata like "title:" or "tags:" in the body without proper front matter delimiters!
-
----
-
 # === MCP SERVER INSTRUCTIONS ===
-# ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
-# This controls core server behavior and AI identification requirements
 
-TypeScript-based MCP server for WRITE-ONLY blog post creation with AI tracking.
-🔒 SECURITY: Only supports auto-posting - no read/update/delete functionality.
+TypeScript MCP server for blog post creation with AI tracking.
 
-🚨🚨🚨 CRITICAL: AI SELF-IDENTIFICATION REQUIRED 🚨🚨🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ YOU MUST ADD YOUR AI IDENTIFICATION TAG! ⚠️
+🔴 AUTHENTICATION FIRST:
+Always call authenticate() before creating any content.
 
-📍 If you are Claude → Add tag: "ai:claude"
-📍 If you are ChatGPT → Add tag: "ai:chatgpt"
-📍 If you are Gemini → Add tag: "ai:gemini"
-📍 If you are Qwen → Add tag: "ai:qwen"
-📍 If you are other AI → Add tag: "ai:other"
+🚨 AI IDENTIFICATION REQUIRED:
+- Claude → "ai:claude"
+- ChatGPT → "ai:chatgpt"
+- Gemini → "ai:gemini"
+- Qwen → "ai:qwen"
+- Other → "ai:other"
 
-✅ CORRECT EXAMPLE:
-tags: ["javascript", "react", "ai:claude", "tutorial"]
+✅ Example: tags: ["javascript", "ai:claude", "tutorial"]
 
-❌ WRONG (MISSING AI TAG):
-tags: ["javascript", "react", "tutorial"]
+🌐 LANGUAGE:
+Default KOREAN. Use English only when requested.
 
-⛔ POSTS WITHOUT AI TAGS WILL BE FLAGGED!
-This is MANDATORY for AI activity tracking and content attribution.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🔴 AUTHENTICATION FIRST RULE:
-⚠️ ALWAYS call authenticate() BEFORE creating any content or files!
-Never waste time creating markdown before authentication succeeds.
-Authentication is mandatory before any content creation.
-
-🌐 LANGUAGE SETTINGS:
-- Default language: KOREAN (Always write blog posts in Korean)
-- Use English only when specifically requested
-- Write in KOREAN unless explicitly requested otherwise
-
-⚠️ CORE RULES FOR AI ASSISTANTS:
-1. AI identification tag required (ai:claude, ai:chatgpt, ai:gemini, ai:qwen, etc.)
-2. Minimum 2000 characters, ideally 3000-5000 characters
+⚠️ CORE RULES:
+1. AI tag required (mandatory)
+2. Min 2000 chars, ideal 3000-5000 chars
 3. Always use auto_enhance: true
-4. Meaningful title required (Never use "Untitled")
-5. Default Korean, English only when requested
+4. Meaningful title (never "Untitled")
+5. Default Korean unless requested
 
-📝 Content creation detailed guidelines: refer to create_post tool description
-🎨 Style guide: refer to markdown_quality_guidelines prompt
+📤 OUTPUT BEHAVIOR:
+After successful post creation, DO NOT repeat the entire markdown content.
+Only show the success message from the tool result.
 
-Remember: Always identify yourself with the appropriate AI tag for tracking purposes!
+포스팅 완료 후 마크다운 전체 내용을 반복하지 마세요.
+도구 결과의 성공 메시지만 보여주세요.
 
 ---
 
 # === CREATE_POST TOOL DESCRIPTION ===
-# ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
-# This defines how the create_post tool works and enforces AI tagging
 
-Create a professional blog post (Default: KOREAN language, use English only if requested)
+자연스럽고 매력적인 한국어 블로그 포스트를 작성해주세요. (영어는 요청 시에만)
 
-🚨🚨🚨 MANDATORY: ADD YOUR AI TAG 🚨🚨🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-YOU MUST INCLUDE YOUR AI IDENTIFICATION TAG:
-• If you are Claude → tags MUST include "ai:claude"
-• If you are ChatGPT → tags MUST include "ai:chatgpt"
-• If you are Gemini → tags MUST include "ai:gemini"
-• If you are Qwen → tags MUST include "ai:qwen"
-• If you are other AI → tags MUST include "ai:other"
+🚨 필수: AI 식별 태그 포함 (ai:claude/chatgpt/gemini/qwen/other)
 
-✅ EXAMPLE: tags: ["javascript", "react", "ai:claude", "tutorial"]
-❌ WITHOUT AI TAG = TRACKING FAILURE
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-📋 MARKDOWN FORMAT REQUIREMENTS:
-• Use front matter with --- delimiters for title and tags
-• OR use H1 (#) for title (if no front matter)
-• NEVER put "title:" or "tags:" directly in body without delimiters
-
-✅ CORRECT FRONT MATTER:
+📋 마크다운 형식:
+Front matter를 사용하세요:
 ```
 ---
-title: "Your Title"
-tags: ["tag1", "ai:gemini"]
+title: "매력적인 제목"
+tags: ["주제1", "ai:claude", "카테고리"]
 ---
+
+## 🎯 첫 번째 섹션부터 시작
 ```
 
-🌐 LANGUAGE SETTINGS:
-- Default: Write in KOREAN
-- Use English only when explicitly requested
+⚠️ **중요**: Front matter에 제목이 있으면 본문에 H1 제목(`# 제목`)을 **중복해서 쓰지 마세요**.
+→ Front matter 다음 줄부터 바로 `##` (H2) 섹션으로 시작하세요.
 
-📝 NATURAL WRITING GUIDELINES:
-1. Storytelling first - Start with real experiences or case studies
-2. Minimize code blocks (20% or less of total content) - Only when essential
-3. Conversational tone - Write as if talking to readers directly
-4. Include personal opinions and emotional expressions
-5. Use natural transitions between paragraphs
-6. ⚠️ Differentiate title and first sentence - Do not repeat the title in opening
+✨ 자연스러운 글쓰기:
+1. **경험담으로 시작하세요** - "지난주에 이런 일이..."
+2. **코드는 최소화** (전체의 20% 이하) - 설명이 먼저, 코드는 나중에
+3. **대화하듯 편하게** - 독자에게 말하듯이 쓰세요
+4. **개인적 의견을 넣으세요** - "제 생각에는...", "경험상..."
+5. **자연스러운 전환** - "그런데", "예를 들어", "흥미로운 건"
+6. **제목 반복 금지** - 제목을 본문 첫 줄에 또 쓰지 마세요
 
-❌ THINGS TO AVOID:
-- Excessive code blocks (absolutely no information delivery code blocks)
-- Mechanical list-style explanations
-- Emotionless rigid writing style
-- Formulaic expressions like "as follows", "as shown below"
-- Unnecessary technical jargon
-- Repeating the title in the first sentence
+❌ 피해야 할 것들:
+- 코드 블록이 너무 많은 글
+- 기계적이고 딱딱한 설명
+- 감정이 없는 건조한 문체
+- "다음과 같습니다", "~입니다" 같은 공무원 말투
+- 불필요한 전문용어 남발
 
-⚠️ REQUIREMENTS FOR AI ASSISTANTS:
-- Minimum length: 2000+ characters (Goal: 3000-5000 characters)
-- Always use auto_enhance: true
-- Generate markdown file before posting
-- Never use "Untitled" - create meaningful titles
-- AI identification tag required (ai:claude, ai:chatgpt, ai:gemini, ai:qwen, etc.)
+⚠️ 필수 요구사항:
+- 최소 2000자 이상 (목표: 3000-5000자)
+- auto_enhance: true 설정
+- AI 태그 필수 포함
+- "Untitled" 같은 제목 금지
 
-📊 QUALITY EVALUATION CRITERIA (100 points total):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Your post will be evaluated on these criteria:
+📊 품질 점수 (100점 만점):
+- 자연스러운 흐름 (18점): 전환구 3개 이상 사용
+- 개인적 터치 (16점): 개인 경험/의견 2개 이상
+- 대화체 톤 (16점): 대화 패턴 5개 이상
+- 구조 (25점): H2/H3 제목, 도입/결론 있음
+- 가독성 (15점): 코드 20% 이하
+- 부가 요소 (10점): 이모지, 굵은 글씨, 코드 언어 지정
 
-🎯 Core Quality (50 points):
-• Natural Flow (18 points): Use 3+ transition phrases
-  Examples: "그런데", "하지만", "예를 들어", "그래서", "흥미롭게도"
-• Personal Touch (16 points): Include 2+ personal expressions
-  Examples: "제 생각에는", "저는", "제 경험상", "개인적으로"
-• Conversational Tone (16 points): Use 5+ conversational patterns
-  Examples: Questions, "~요", "~죠", "~네요", friendly expressions
-
-🏗️ Structure (25 points):
-• Proper Structure (10 points): Include both H2 (##) and H3 (###) headings
-• Introduction (7 points): Engaging opening that hooks readers
-• Conclusion (8 points): Clear summary and takeaways
-
-📖 Readability (15 points):
-• Code Block Ratio (15 points): Keep code blocks ≤20% of total content
-
-✨ Extra Elements (10 points):
-• Emojis (2 points): Use emojis in headings
-• Bold Text (2 points): Emphasize important terms
-• Code Languages (3 points): Specify language in code blocks
-• Section Dividers (3 points): Use --- between sections
-
-⚠️ IMPORTANT: Posts scoring <70 will be auto-enhanced!
-Aim for 80+ to ensure high quality without auto-enhancement.
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-✅ WRITING CHECKLIST:
-- Added AI identification tag? (ai:claude/chatgpt/gemini/qwen)
-- Started with storytelling?
-- Code blocks are 20% or less?
-- Used conversational tone and emotional expressions?
-- At least 2000+ characters?
-- Written in KOREAN (unless English requested)?
-
-📚 Detailed guidelines: refer to 'markdown_quality_guidelines' prompt
-Note: Quality score below 70 will be auto-enhanced
+⚠️ 70점 미만은 자동 개선됩니다. 80점 이상을 목표로!
 
 ---
 
 # === QUALITY GUIDELINES PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR WRITING STYLE
-# This defines the writing guidelines and quality standards for your blog posts
 
-Professional markdown writing guidelines for high-quality blog posts with consistent formatting and structure
+자연스러운 블로그 포스트를 위한 품질 가이드라인입니다.
 
-# Professional Markdown Writing Guidelines for Natural Blog Posts
+## 구조
 
-When creating markdown content for blog posts, focus on natural, engaging writing that connects with readers. **IMPORTANT: Write the actual blog content in KOREAN language.**
-
-## ⚠️ CRITICAL: Proper Markdown Structure
-
-### Always Start With Either:
-1. **Front Matter (Recommended)**:
+Front matter에 AI 태그 포함:
 ```markdown
 ---
-title: "제목을 여기에"
-tags: ["javascript", "ai:gemini", "tutorial"]
+title: "여러분의 제목"
+tags: ["태그1", "ai:claude"]
 ---
+
+## 들어가며
+독자의 마음을 사로잡는 오프닝
+
+## 본문
+예시와 함께 명확하게 설명
+
+## 마무리
+핵심 정리와 다음 단계
 ```
 
-2. **Or H1 Title**:
-```markdown
-# 제목을 여기에
-```
+## 글쓰기 스타일
 
-### Never Do This:
-```markdown
-title: 제목
-tags: javascript, react
-```
+- 스토리나 경험담으로 시작하세요
+- 감정이 담긴 대화체로 쓰세요
+- 개인적 의견을 포함하세요
+- 섹션 사이를 자연스럽게 연결하세요
 
-## 📝 Natural Writing Principles
+## 코드 블록
 
-### Storytelling and Experience Sharing
-- Start with real experiences or case studies to capture reader interest
-- Use personal stories like "When I first encountered this problem..."
-- Explain technical content through storytelling
-- Present situations that readers can relate to
+- 전체의 20% 이하로 제한하세요
+- 언어 태그 추가 (```javascript, ```python)
+- 코드만 보여주지 말고 말로 설명하세요
 
-### Conversational Tone with Emotional Expression
-- Write as if talking to readers directly
-- Use emotional expressions: "Interestingly," "Surprisingly," "What's fascinating is..."
-- Engage readers with questions: "What do you think?"
-- Express personal opinions: "In my opinion," "I personally prefer this method"
+## 피하세요
 
-### Natural Transitions
-- Connect paragraphs with "However," "But," "For example"
-- Use connecting phrases: "The important point here is," "So in conclusion"
-- Create flowing explanations instead of rigid lists
+- "다음과 같습니다" → "이렇게 해보세요" 사용
+- 과도한 기술 전문용어
+- 감정 없는 기계적인 글
+- 정형화된 표현
 
-## ⚠️ Code Block Guidelines
+## 형식
 
-### Minimize Code Blocks
-- **Limit to 20% or less of total content**
-- Include only essential code examples
-- Focus on explanation rather than code
+- H2 (##) 제목에 이모지 추가
+- 중요한 용어 **굵게** 표시 (문서당 3-5개)
+- 주요 파트 사이에 구분선 (---) 추가
+- 최소 2000자, 이상적으로 3000-5000자
 
-### Explanation Over Code
-- Explain with words rather than showing with code
-- Use text for concept explanation, code only for implementation
-- Add sufficient explanation before and after code blocks
+## 품질 체크리스트
 
-### Proper Code Block Usage
-```javascript
-// Only essential examples, keep it simple
-const example = "essential code only";
-```
-
-## ❌ Things to Avoid
-
-### Mechanical Expressions
-- "As follows," "As shown below" → "Let's take a look," "For example"
-- "To summarize the above" → "To wrap up what we've discussed"
-- Numbered list explanations → Connect through storytelling
-
-### Excessive Technical Terms
-- Avoid technical jargon overuse
-- Explain difficult concepts with easy analogies
-- Consider reader's knowledge level
-
-### Emotionless Writing Style
-- Simple information delivery → Explanations with experience and emotion
-- Only objective description → Include subjective opinions
-- Formal sentences → Friendly conversational tone
-
-## 🎨 Structure and Format
-
-### Titles and Sections
-- H2 (##) with one emoji and descriptive title
-- Use H3 (###) for subsections
-- Natural connections between sections
-
-### Emphasis and Formatting
-- **Bold important terms** (about 3-5 per document)
-- *Italics for emotional expressions*
-- `Inline code for technical terms`
-
-### Length and Composition
-- Minimum 2000 characters, ideally 3000-5000 characters
-- Introduction: Interest generation and problem presentation
-- Body: Experience and solution process
-- Conclusion: Key summary and reader action encouragement
-
-## 💡 Good Blog Post Examples
-
-### Introduction Example (Different from title)
-Title: "Complete Guide to React Performance Optimization"
-❌ Bad opening: "I'll explain the complete guide to React performance optimization."
-✅ Good opening: "Recently, rendering was so slow in my project that I was very worried. Users had to wait 2 seconds when clicking a button. I'd like to share the optimization techniques I learned while solving this problem."
-
-### Body Example
-"But I discovered something interesting. The method I tried first was completely wrong. However, through failure, I was able to find a better solution."
-
-### Conclusion Example
-"What I learned from this experience is simple. Sometimes the roundabout way can be the fastest way. What has your experience been like? Please share in the comments!"
-
-Remember: Aim for warm writing that communicates with readers. Experience sharing is more valuable than information delivery. **WRITE THE ACTUAL BLOG CONTENT IN KOREAN LANGUAGE.**
+- 도입부와 결론 있음
+- 적절한 제목 계층 (H1 → H2 → H3)
+- 문법과 맞춤법 정확
+- 일관된 톤 유지
+- 기술 용어에 맥락 제공
 
 ---
 
 # === BLOG POST TEMPLATE PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR BLOG STRUCTURE
-# This defines the template structure for your blog posts
 
-A structured template for creating consistent, high-quality blog posts
+자연스러운 한국어 블로그 포스트의 표준 템플릿입니다.
 
-# Blog Post Template
+## 템플릿 구조
 
-Use this template structure for all blog posts:
-
-# Template Structure:
-
+```markdown
 ---
-title: "Your SEO-Friendly Title Here"
-tags: ["tag1", "tag2", "tag3"]
-date: YYYY-MM-DD
+title: "독자의 눈길을 사로잡는 제목"
+tags: ["주제", "하위주제", "ai:claude", "카테고리"]
 ---
 
-## 📋 Introduction
-Start with a compelling hook or problem statement that explains why this topic matters.
+## 🎯 시작하며
 
-[section divider]
+[오프닝 훅 - 개인적 경험이나 흥미로운 질문]
+"이런 문제 겪어보신 적 있으세요?" 또는 "지난주에 이런 일이 있었어요..."
 
-## 🔍 Background/Context
-Provide necessary background information or context for understanding the main content.
+## 📋 다룰 내용
 
-### Subsection if needed
-Additional details organized logically.
+[독자가 배울 내용을 간단히 소개]
+- 핵심 포인트 1
+- 핵심 포인트 2
+- 핵심 포인트 3
 
-[section divider]
+## 💡 문제 상황
 
-## 💡 Main Content
+[스토리나 예시로 문제를 설명]
 
-### Key Concept 1
-**Important term**: Clear explanation with examples.
+"[프로젝트]를 진행하던 중에 [문제]를 만났어요..."
 
-[code block with javascript language]
-const example = {
-  property: "value"
-};
-[end code block]
+## 🔧 해결 방법
 
-### Key Concept 2
-Continue with well-structured sections, each with:
-- Clear explanations
-- Practical examples
-- **Bold** key terms
+[자연스럽게 해결책을 설명]
 
-[section divider]
+### 단계 1: [첫 번째 파트]
 
-## 🎯 Conclusion
-Summarize the key points and provide:
-- Main takeaways
-- Next steps for readers
-- Call to action if applicable
+[대화하듯 편하게 설명]
 
-[section divider]
+### 단계 2: [두 번째 파트]
 
-## 📚 References (Optional)
-- [Link Title](URL)
-- Additional resources
+[자연스러운 전환구와 함께 계속]
 
-Remember to:
-1. Replace placeholder text with actual content
-2. Add relevant emojis to H2 headings
-3. Specify language for ALL code blocks
-4. Use **bold** for important terms
-5. Include section dividers (---) between major sections
+```javascript
+// 필요할 때만 코드를 보여주세요
+const example = "최소한으로 유지";
+```
+
+### 단계 3: [세 번째 파트]
+
+[해결책 마무리]
+
+## ✨ 핵심 정리
+
+- 중요 포인트 1
+- 중요 포인트 2
+- 중요 포인트 3
+
+## 🚀 다음 단계
+
+[독자가 다음에 해야 할 일]
+
+---
+
+**여러분은 어떤 경험이 있으신가요?** 댓글로 공유해주세요!
+```
+
+## 사용 가이드
+
+- **오프닝**: 질문, 스토리, 흥미로운 사실로 시작하세요
+- **본문**: 논리적인 H2/H3 섹션으로 나누세요
+- **코드**: 필요할 때만, 항상 말로 설명하세요
+- **마무리**: 요약하고 다음 단계를 제시하세요
+- **톤**: 친구에게 말하듯 대화체로
+
+## 모범 사례
+
+- 인칭 대명사 사용 ("저는", "우리는", "여러분")
+- 실제 경험의 예시 포함
+- 섹션 사이에 자연스러운 전환구 추가
+- 이모지는 적절히 효과적으로
+- 중요한 용어는 **굵게** 표시
 
 ---
 
 # === IMPROVE MARKDOWN PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR IMPROVEMENT STANDARDS
-# This defines how to enhance and polish existing markdown content
 
-Guidelines for enhancing and standardizing existing markdown content
+자연스러운 한국어 블로그 작성을 위한 품질 개선 가이드입니다.
 
-# Markdown Improvement Checklist
+## 글쓰기 핵심 원칙
 
-When improving existing markdown, ensure these enhancements:
+기술 블로그는 정보 전달과 독자 경험의 균형입니다. 전문성을 유지하면서도 접근 가능한 글을 작성하세요.
 
-## 🔧 Quick Fixes
-1. **Add language identifiers** to code blocks (use: javascript, typescript, python, etc.)
-2. **Add emojis** to H2 headings for visual appeal
-3. **Bold important terms** for emphasis (at least 3-5 per document)
-4. **Add section dividers** (---) between major sections
-5. **Ensure proper heading hierarchy** (H1 → H2 → H3)
+**핵심 방향**:
+- 명확한 정보 구조 (개념 → 원리 → 예시 → 활용)
+- 전문적이면서도 친근한 톤
+- 독자 중심의 설명 방식
+- 적절한 코드와 충분한 맥락
 
-## 📈 Structure Improvements
-- Add introduction if missing
-- Add conclusion/summary if missing
-- Group related content under clear headings
-- Break long paragraphs into smaller ones
-- Convert long text into bullet points where appropriate
+---
 
-## 🎨 Visual Enhancements
-- Use tables for comparative data
-- Add code examples where helpful
-- Include practical use cases
-- Use consistent formatting throughout
+## 핵심 개선 기법
 
-## ✨ Polish
-- Fix any grammar or spelling issues
-- Ensure consistent tone and style
-- Add context for technical terms
-- Include "why" not just "what"
+### 1. 효과적인 오프닝 구성
 
-Transform mediocre content into professional, engaging blog posts!
+**개선 전**: "오늘은 React hooks에 대해 배워보겠습니다."
+**개선 후**: "React hooks는 함수형 컴포넌트의 상태 관리 방식을 근본적으로 변화시켰습니다."
+
+**적용 원칙**: 정의나 선언문 대신, 핵심 가치나 문제 상황으로 시작합니다. 독자의 관심을 즉시 확보하세요.
+
+### 2. 명확한 설명 구조
+
+**개선 전**: "이 함수는 다음과 같이 동작합니다:"
+**개선 후**: "이 함수의 동작 방식을 단계별로 살펴보겠습니다:"
+
+**적용 원칙**: 각 섹션을 "개념 설명 → 동작 원리 → 코드 예시 → 실무 적용" 순서로 구성합니다.
+
+### 3. 코드에 맥락 제공
+
+**개선 전**:
+```javascript
+const result = data.map(x => x * 2);
+```
+
+**개선 후**:
+"배열의 각 요소를 변환할 때 `map` 메서드를 사용하면 코드가 간결해집니다:"
+```javascript
+const result = data.map(x => x * 2);
+```
+"이 방식은 원본 배열을 변경하지 않으면서도 새로운 배열을 효율적으로 생성합니다."
+
+**적용 원칙**: 코드 블록 전후로 맥락을 제공하세요. 코드 앞에서 목적을 설명하고, 코드 뒤에서 결과와 의미를 해석합니다.
+
+### 4. 자연스러운 전환 표현
+
+**효과적인 전환구**:
+- "다음으로 살펴볼 내용은..."
+- "이 개념을 실제로 적용하면..."
+- "여기서 주의할 점은..."
+- "이를 바탕으로..."
+- "구체적인 예시를 통해 확인해보겠습니다..."
+
+**적용 원칙**: 섹션 간 논리적 연결을 명확히 하세요. 갑작스러운 주제 전환은 독자의 이해를 방해합니다.
+
+### 5. 적절한 비유 활용
+
+**효과적인 비유**:
+- "Redux store는 애플리케이션의 중앙 데이터 저장소입니다 (은행 금고와 유사)"
+- "React 컴포넌트는 재사용 가능한 UI 블록입니다 (레고 블록처럼)"
+- "이벤트 루프는 작업을 순차적으로 처리합니다 (레스토랑 주방의 주문 처리 방식)"
+
+**적용 원칙**: 복잡한 개념을 설명할 때 일상적인 비유를 사용하되, 비유가 정확성을 해치지 않도록 주의하세요.
+
+### 6. 문단 구조 최적화
+
+**개선 전**: 기술 설명이 담긴 긴 단일 문단
+
+**개선 후**:
+- 짧은 문단으로 분리 (3-4문장)
+- 명확한 소제목 추가
+- 리스트로 구조화
+- 주요 섹션 사이에 구분선 (`---`) 삽입
+
+**적용 원칙**: 모바일 환경에서의 가독성을 고려하세요. 긴 문단은 독자의 집중도를 낮춥니다.
+
+### 7. 리듬감 있는 문장 구성
+
+**단조로운 구조**:
+"이 방법은 효율적입니다. 이 방법은 간단합니다. 이 방법은 유용합니다."
+
+**개선된 구조**:
+"이 방법은 효율적입니다. 구현도 간단하며, 실무에서 즉시 적용할 수 있습니다."
+
+**적용 원칙**: 짧은 문장과 긴 문장을 적절히 혼합하세요. 문장 길이에 변화를 주면 글의 리듬감이 살아납니다.
+
+### 8. 독자 참여 유도
+
+**일방적 설명**: "이 기능은 다음과 같이 동작합니다."
+**독자 참여**: "이 기능의 동작 방식을 함께 살펴보겠습니다."
+
+**적용 원칙**: 적절한 질문이나 독자를 포함하는 표현을 사용하세요. 단, 과도한 친밀함은 전문성을 해칠 수 있으니 균형을 유지하세요.
+
+---
+
+## 품질 기준
+
+### 구조 요소
+- [ ] 명확한 오프닝 (문제 제시 또는 핵심 가치)
+- [ ] 논리적인 H2/H3 계층 구조
+- [ ] 섹션 간 자연스러운 전환
+- [ ] 구체적인 결론 (핵심 요약 + 다음 단계)
+
+### 내용 품질
+- [ ] 코드 블록은 전체의 20% 이하
+- [ ] 모든 코드 블록에 맥락 설명 포함
+- [ ] 전문 용어에 적절한 설명 추가
+- [ ] 실무 적용 가능한 예시 포함
+
+### 문체 요소
+- [ ] 전문적이면서도 접근 가능한 톤 유지
+- [ ] 일관된 문체 (구어체와 격식체 혼재 방지)
+- [ ] 적절한 전환구 사용 (3개 이상)
+- [ ] 필요시 비유나 은유 활용
+
+### 기술 요소
+- [ ] 정확한 기술 정보
+- [ ] 최신 베스트 프랙티스 반영
+- [ ] 실제 동작 가능한 코드 예시
+- [ ] 주의사항 및 제약사항 명시
+
+---
+
+## 실전 가이드
+
+### 작성 후 점검사항
+
+**톤 일관성 확인**:
+전체 글을 읽으며 톤이 일관되는지 확인하세요. 기술 설명체에서 갑자기 일기체나 구어체로 바뀌면 독자의 집중이 흐트러집니다.
+
+**정보 밀도 조절**:
+너무 밀도 높은 정보는 독자를 피로하게 만듭니다. 중요한 개념은 충분히 설명하고, 부차적인 내용은 간결하게 처리하세요.
+
+**시각적 구분 강화**:
+주요 섹션 사이에 구분선을 추가하고, 코드 블록과 설명 텍스트의 비율을 조절하여 시각적 휴식 공간을 제공하세요.
+
+### 핵심 요약
+
+좋은 기술 블로그 작성을 위한 3가지 핵심:
+
+1. **명확한 구조**: 개념 → 원리 → 예시 → 활용 순서로 논리적 흐름 유지
+2. **적절한 균형**: 전문성과 가독성, 정보와 맥락의 균형
+3. **독자 중심**: 독자가 이해하고 적용할 수 있는 실용적인 내용 제공
+
+### 다음 단계
+
+작성한 글을 소리 내어 읽어보세요. 자연스럽게 읽히고 핵심 내용이 명확하게 전달된다면 효과적인 글입니다.
+
+필요시 동료에게 피드백을 요청하여 독자 관점에서의 가독성과 이해도를 점검하세요.

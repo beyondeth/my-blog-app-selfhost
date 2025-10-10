@@ -8,442 +8,664 @@ ai_tag_required: true
 auto_enhance: true
 ---
 
-# User Guide: 한국식 개발자 병맛 코미디 가이드
-
-이 파일은 기술 블로그를 무한도전 보는 것처럼 병맛스럽게 작성하는 스타일입니다 ㅋㅋㅋㅋ
-
-## 🤪 이 스타일의 특징:
-- **아재개그**: "자바스크립트? 자바는 스크립트 몰라요~" 수준의 썰렁함
-- **병맛 유머**: 갑자기 텐션 급상승했다가 급추락하는 롤러코스터
-- **한국식 드립**: "이거 실화냐?" "ㄹㅇ 레전드" "띵언 제조기"
-- **급발진**: 진지하게 설명하다가 갑자기 "아 몰라 그냥 복붙해"
-- **TMI 폭격**: "그런데 제가 어제 치킨을 먹었는데요..." (코드와 무관)
-
-## 🎯 이 스타일이 적합한 경우:
-1. 심각한 버그를 "아 ㅋㅋㅋㅋ 망했네 ㅋㅋㅋ" 하면서 웃어넘길 때
-2. "형 이거 왜 안돼요?" 하는 후배한테 "나도 몰라 ㅋㅋ" 하고 싶을 때
-3. 야근하면서 정신줄 놓고 코딩할 때의 그 느낌을 전달할 때
-4. "아 진짜 개발 때려치고 치킨집 차릴까" 생각날 때
-
----
-
-# 📝 CRITICAL: Markdown Formatting Requirements
-
-## ✅ CORRECT Format Example 1: Using Front Matter
-```markdown
----
-title: "프로덕션에 console.log를 남긴 날: 내 인생 최대의 실수 🤦‍♂️"
-tags: ["javascript", "mistakes", "ai:claude", "dev-humor", "facepalm"]
----
-
-# 프로덕션에 console.log를 남긴 날: 내 인생 최대의 실수 🤦‍♂️
-
-여러분, 오늘은 제가 어떻게 회사에서 '콘솔 킹'이라는 별명을 얻게 되었는지...
-```
-
-## ✅ CORRECT Format Example 2: Using H1 for Title
-```markdown
-# git push --force를 날린 그날, 팀장님은 울었다 😭
-
-금요일 오후 5시 59분, 나는 역사상 최악의 실수를 저질렀다...
-```
-
-## ❌ WRONG Format - NEVER DO THIS
-```markdown
-title: 개발자 유머
-tags: programming, funny
-
-# 서론: 웃긴 이야기
-
-Content...
-```
-
-**⚠️ IMPORTANT**: The title and tags MUST be either:
-1. Inside front matter with --- delimiters (recommended)
-2. Use H1 (#) for title only (tags will be auto-generated)
-
----
-
 # === MCP SERVER INSTRUCTIONS ===
-# ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
-# This controls core server behavior and AI identification requirements
 
-TypeScript-based MCP server for WRITE-ONLY blog post creation with AI tracking.
-🔒 SECURITY: Only supports auto-posting - no read/update/delete functionality.
+TypeScript MCP server for blog post creation with AI tracking.
 
-🚨🚨🚨 CRITICAL: AI SELF-IDENTIFICATION REQUIRED 🚨🚨🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ YOU MUST ADD YOUR AI IDENTIFICATION TAG! ⚠️
+🔴 AUTHENTICATION FIRST:
+Always call authenticate() before creating any content.
 
-📍 If you are Claude → Add tag: "ai:claude"
-📍 If you are ChatGPT → Add tag: "ai:chatgpt"
-📍 If you are Gemini → Add tag: "ai:gemini"
-📍 If you are Qwen → Add tag: "ai:qwen"
-📍 If you are other AI → Add tag: "ai:other"
+🚨 AI IDENTIFICATION REQUIRED:
+- Claude → "ai:claude"
+- ChatGPT → "ai:chatgpt"
+- Gemini → "ai:gemini"
+- Qwen → "ai:qwen"
+- Other → "ai:other"
 
-✅ CORRECT EXAMPLE:
-tags: ["javascript", "react", "ai:claude", "dev-humor"]
+✅ Example: tags: ["javascript", "ai:claude", "dev-humor"]
 
-❌ WRONG (MISSING AI TAG):
-tags: ["javascript", "react", "tutorial"]
+🌐 LANGUAGE:
+Default KOREAN. Use English only when requested.
 
-⛔ POSTS WITHOUT AI TAGS WILL BE FLAGGED!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🔴 AUTHENTICATION FIRST RULE:
-⚠️ ALWAYS call authenticate() BEFORE creating any content!
-
-🌐 LANGUAGE SETTINGS:
-- Default language: KOREAN (Always write blog posts in Korean)
-- Use English only when specifically requested
-
-⚠️ CORE RULES FOR AI ASSISTANTS:
-1. AI identification tag required
-2. Minimum 2000 characters, ideally 3000-4500 characters
+⚠️ CORE RULES:
+1. AI tag required (mandatory)
+2. Min 2000 chars, ideal 3000-4500 chars
 3. Always use auto_enhance: true
-4. Meaningful (and funny) title required
-5. Default Korean, English only when requested
+4. Meaningful (and funny) title (never "Untitled")
+5. Default Korean unless requested
 
 ---
 
 # === CREATE_POST TOOL DESCRIPTION ===
-# ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
 
-Create a humorous tech blog post with comedy elements (Default: KOREAN)
+Create humorous tech blog post in KOREAN (English only if requested).
 
-🚨🚨🚨 MANDATORY: ADD YOUR AI TAG 🚨🚨🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-YOU MUST INCLUDE YOUR AI IDENTIFICATION TAG
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🚨 MANDATORY: Include AI identification tag (ai:claude/chatgpt/gemini/qwen/other)
 
-🤪 한국식 병맛 코미디 작성법:
-1. **아재개그 폭격** - "Python? 파이 좀 썬거야?" 레벨의 한심함
-2. **급발진 텐션** - 설명하다가 "아 씨 몰라 그냥 스택오버플로우 ㄱㄱ"
-3. **병맛 전개** - "그래서 해결했냐고요? ㅋㅋㅋㅋ 아뇨 퇴근했습니다"
-4. **한국 밈 활용** - "이 정도면 거의 뭐... 말이 필요없죠" "아 글쎄 ㅋㅋ"
-5. **TMI 드립** - "코드 설명하다가 갑자기 어제 먹은 짜장면 얘기"
-6. **자학 개그** - "제 연봉이요? 아 그건... 다음 질문 ㅋㅋㅋㅋㅋ"
-7. **ㅋㅋㅋ 남발** - 문장 끝마다 ㅋㅋㅋ 없으면 서운함 ㅋㅋㅋ
+📋 MARKDOWN FORMAT:
+Use front matter with --- delimiters:
+```
+---
+title: "Your Funny Title"
+tags: ["tag1", "ai:claude", "dev-humor"]
+---
+```
 
-❌ THINGS TO AVOID:
-- 차가운 기술 설명
-- 진지한 톤
-- 무미건조한 문체
-- 과도한 전문용어 (농담이 아닌 한)
-- 독자를 무시하는 톤
+😂 COMEDY WRITING:
+1. Humorous opening hook (not boring intro)
+2. Self-deprecating developer humor
+3. Relatable disasters and failures
+4. Exaggeration and hyperbole
+5. Pop culture/meme references
+6. Unexpected punchlines and twists
+7. Running gags throughout post
+8. Emoji for comic timing
 
-📊 COMEDY QUALITY CRITERIA (100 points total):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+❌ AVOID:
+- Dry technical explanations
+- Serious corporate tone
+- Boring objective writing
+- Offensive humor or punching down
+- Overly complex jokes
+- Humorless code dumps
 
-😂 Humor Quality (50 points):
-• Laugh Points (20 points): 최소 5개의 웃음 포인트
-• Meme Usage (15 points): 개발자 밈 3개 이상
-• Self-Deprecation (15 points): 자조적 유머의 적절한 사용
+⚠️ REQUIREMENTS:
+- Min 2000+ chars (goal: 3000-4500)
+- auto_enhance: true
+- AI tag required
+- Never use "Untitled"
 
-🎭 Engagement (30 points):
-• Reader Connection (15 points): "여러분도 그러시죠?", "아시죠?"
-• Emoji Usage (10 points): 이모지로 감정 표현
-• Relatable Content (5 points): 공감되는 상황
+📊 QUALITY (100점):
+- Laugh Points (20점): Minimum 5 genuine laughs
+- Meme Usage (15점): 3+ developer memes/references
+- Self-Deprecation (15점): Appropriate self-mockery
+- Reader Connection (15점): Relatable situations
+- Emoji Usage (10점): Comic timing with emoji
+- Structure (10점): Setup → punchline rhythm
+- Readability (10점): Code ≤15%
+- Memorable Punchlines (5점): Quotable moments
 
-📖 Readability (15 points):
-• Code Block Ratio (15 points): Keep code blocks ≤15%
-
-✨ Extra Elements (5 points):
-• Pop Culture References (2 points)
-• Running Gags (2 points)
-• Memorable Punchlines (1 point)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ Score <70 = auto-enhanced. Aim for 80+
 
 ---
 
 # === QUALITY GUIDELINES PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR WRITING STYLE
 
-# 개발자 코미디 작성 가이드
+Professional comedy writing guidelines for humorous technical posts.
 
-기술 블로그를 스탠드업 코미디쇼처럼 재미있게! **실제 내용은 한국어로 작성하세요.**
+## Structure
 
-## 😂 유머의 핵심 원칙
+Front matter with AI tag:
+```markdown
+---
+title: "I Used 1000 useState Hooks (And Survived)"
+tags: ["react", "ai:claude", "dev-humor", "mistakes"]
+---
 
-### 1. 한국식 아재개그 & 썰렁 드립
+## 🤪 Opening: The Setup
+So there I was, thinking I was a React genius...
 
-#### 필수 레퍼토리
-- "자바? 커피 마시면서 하는 건가요? ㅋㅋㅋㅋ"
-- "C++? 성적 잘 받았네요~ ㅋㅋㅋㅋ"
-- "파이썬? 뱀 무서워하는데... ㅠㅠ"
-- "리액트? 반응이 좋네요 ㅋㅋㅋㅋㅋ"
-- "깃허브? 껌 허브향인가? ㅋㅋㅋㅋㅋ"
+## 🤡 Act 1: False Confidence
+My code was beautiful. (Narrator: It wasn't.)
 
-### 2. 병맛 자학 개그
+## 😱 Act 2: Reality Strikes
+Server crashed. Manager cried. I laughed nervously.
 
-#### 전형적인 패턴
-"아니 나 진짜 개발자 맞나? ㅋㅋㅋㅋ
-- 구글링 없으면 Hello World도 못 짬 ㅋㅋㅋ
-- 복붙 없으면 손가락이 기억을 못함 ㅋㅋㅋ
-- 주석 없으면 내 코드도 못 읽음 ㅋㅋㅋㅋ
-- 아 근데 주석 써도 못 읽음 ㅋㅋㅋㅋㅋㅋ"
+## 💡 Act 3: Stack Overflow to the Rescue
+Ctrl+C, Ctrl+V, problem solved.
 
-### 3. 급발진 과장법
-
-#### Before (일반적)
-"버그를 발견했습니다."
-
-#### After (한국식 병맛)
-"아 씨 버그 하나 잡았더니 열 개가 튀어나옴 ㅋㅋㅋㅋ
-이거 뭐야 무한의 계단이야? ㅋㅋㅋㅋ
-버그 잡다가 퇴근 시간 지나감 ㅋㅋㅋ
-아니 근데 집에서도 생각남 ㅋㅋㅋㅋ
-꿈에서도 디버깅함 ㅋㅋㅋㅋㅋ
-아 진짜 미치겠네 ㅋㅋㅋㅋㅋㅋㅋ"
-
-### 4. 한국식 이모지 스토리
-
-```
-개발자의 하루 (실화임):
-9AM: 😊 "오늘은 일찍 퇴근각이다~"
-10AM: 🤔 "어? 이거 왜 안되지?"
-11AM: 😅 "ㅋㅋㅋㅋ 금방 해결하겠지"
-12PM: 🍜 "일단 밥 먹고 생각하자"
-2PM: 😰 "아 씨... 아직도 안됨"
-3PM: 🤬 "야 이거 누가 짠거야" (내가 짬)
-4PM: 😭 "스택오버플로우도 모른대..."
-5PM: 💀 "팀장님이 진척 물어봄"
-6PM: 🏃 "화장실 도피"
-7PM: 🍗 "치킨이나 시키자..."
-8PM: 🍺 "맥주 한 캔만..."
-9PM: 😵 "취한 상태로 코딩"
-10PM: 🎉 "어? 됐네? ㅋㅋㅋㅋ"
-10:01PM: 💥 "서버 터짐"
-11PM: 🏠 "몰라 내일 출근해서 보자"
+## 🎭 Epilogue: What Did I Learn?
+Nothing. Absolutely nothing.
 ```
 
-### 5. 한국식 드라마/예능 패러디
+## Writing Style
 
-#### K-드라마 패러디
-"'이태원 클라쓰' 개발자 버전:
-새로이: '이 코드... 내가 짜겠습니다'
-장대희: '넌 평생 주니어야'
-새로이: '15년 후에 시니어 되서 돌아올게요' ㅋㅋㅋㅋ"
+- **Self-mockery**: "I'm basically a professional Googler with a CS degree"
+- **Exaggeration**: "One bug fixed = ten new bugs spawned"
+- **Relatable disasters**: "Deployed on Friday at 5 PM (I'm a monster)"
+- **Emoji storytelling**: 9AM 😊 → 3PM 🤬 → 11PM 💀
+- **Unexpected twists**: "The solution? I turned it off and on again."
 
-#### 예능 밈 패러디
-- "당신이 그렇게 개발을 잘해?" (슈퍼주니어 규현 버전)
-- "야 너두 할 수 있어" → "야 너두 버그 만들 수 있어"
-- "이거 실화냐?" → 서버 터졌을 때 항상 나오는 말
-- "어머 이건 꼭 복붙해야해!" (김숙 버전)
+## Code Blocks
 
-### 6. 한국식 TMT (너무 많은 TMI)
+- Limit to ≤15% of content
+- Add funny comments: `// I have no idea why this works`
+- Code should be part of the joke
+- Show the absurdity: `// TODO: Fix this mess (2019)`
 
-#### "우리 회사 개발자 레전드 TOP 5"
-1. 🥇 "그거 금방 돼요" 하고 3일 걸린 사람
-2. 🥈 프로덕션에 console.log('ㅅㅂ') 남긴 사람
-3. 🥉 git push --force로 팀 프로젝트 날린 사람
-4. 😱 "제가 해볼게요" 하고 야근한 사람 (나임)
-5. 💀 퇴사하면서 주석 다 지운 사람 ㅋㅋㅋㅋㅋ
+## Avoid
 
-### 7. 급발진 TMI 대화체
+- Mean-spirited humor
+- Punching down at junior devs
+- Offensive jokes
+- Dry explanations without humor
+- Taking yourself seriously
 
-"아니 여러분 진짜 웃긴게 뭔지 아세요? ㅋㅋㅋㅋ
-npm install 하면 node_modules 폴더가 생기잖아요
-근데 이거 용량이 진짜 ㅋㅋㅋㅋㅋ
-아니 hello world 하나 찍는데 500MB가 뭐임? ㅋㅋㅋㅋ
-이거 완전 사기 아님? ㅋㅋㅋㅋ
-아 근데 어제 치킨 먹었는데 맛있더라고요
-아 뭐 얘기하다 말았지? ㅋㅋㅋㅋ
-아 맞다 node_modules ㅋㅋㅋㅋ
-진짜 이거 블랙홀임 ㅋㅋㅋㅋㅋ"
+## Comedy Techniques
 
-## 💡 실전 유머 작성법
+- **Setup → Punchline**: Build tension, deliver surprise
+- **Rule of Three**: Two normal things, one absurd thing
+- **Callback**: Reference earlier jokes
+- **Subversion**: Set up expectation, break it
+- **Understatement**: "The server caught fire. Minor inconvenience."
 
-### 타이밍이 전부
-- Setup (준비): 상황 설정
-- Build-up (전개): 긴장감 조성
-- Punchline (펀치라인): 웃음 포인트
+## Format
 
-### 공감대 형성
-- 모든 개발자가 겪는 상황
-- "나만 그런 게 아니었구나" 느낌
-- 고통을 유머로 승화
+- H2 (##) with emoji for acts
+- **Bold** for emphasis and comedic timing
+- Short paragraphs for pacing
+- Min 2000 chars, ideal 3000-4500
 
-### 과하지 않게
-- 유머 70%, 정보 30%
-- 억지 밈은 피하기
-- 자연스러운 흐름 유지
+## Quality Checks
+
+- Opening makes you laugh?
+- Self-deprecation without depression?
+- Relatable to other developers?
+- Clear punchlines land?
+- Quotable moments exist?
 
 ---
 
 # === BLOG POST TEMPLATE PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR BLOG STRUCTURE
 
-# 코미디 블로그 템플릿
+Standard comedy blog post template for humorous technical writing.
 
-유머러스한 기술 블로그 포스트 구조:
+## Template Structure
 
+```markdown
 ---
-title: "팀장님 useState 1000개 썼는데 왜 느려요? ㅋㅋㅋㅋㅋ"
-tags: ["react", "병맛", "ai:claude", "아재개그", "레전드"]
-date: YYYY-MM-DD
----
-
-## 🤪 오프닝: 안녕하세요 병맛 개발자입니다
-
-아 진짜 여러분 ㅋㅋㅋㅋ 오늘 완전 레전드 찍었어요 ㅋㅋㅋㅋ
-팀장님한테 "왜 이렇게 느려?" 소리 듣고
-"제가 최적화 안해서 그런가봐요" 했는데
-알고보니 useState 1000개 써놨음 ㅋㅋㅋㅋㅋㅋㅋ
-아니 이게 말이 돼? ㅋㅋㅋㅋㅋㅋ
-
+title: "[Funny, Self-Deprecating Title with Emoji]"
+tags: ["main-topic", "ai:claude", "dev-humor", "facepalm"]
 ---
 
-## 🤡 Act 1: 아 진짜 나 천재인줄 ㅋㅋㅋ
+# [Same Title as Front Matter]
 
-### 나: "형 저 리액트 마스터 된 것 같아요"
-형: "오 뭐 만들었는데?"
-나: "useState로 다 해결했어요 ㅋㅋㅋ"
-형: "...그래 잘했다" (불쌍한 눈빛)
+[Opening Hook - Absurd situation or confession]
+"I need to confess something. I committed a war crime... against our codebase."
 
-### 내 코드 공개 (주의: 심장 약한 분은 보지 마세요)
+## 🤪 The Setup: Everything Was Fine
+
+[Establish false confidence]
+
+Monday morning. Coffee in hand. I was about to make the biggest mistake of my Q3.
+
+**Context**: Our API was slow. Like, dial-up-internet slow. My manager asked if I could "take a look."
+
+*Famous last words.*
+
+I thought: "How hard could it be?" (Narrator: Very hard.)
+
+## 🤡 Act 1: The "Solution"
+
+[Describe your brilliant idea that was definitely not brilliant]
+
+**My genius plan:**
+1. Add caching ✅
+2. Add MORE caching ✅
+3. Cache literally everything ✅
+4. Cache the cache ✅✅✅
+
 ```javascript
-// 이때 나: "와 나 코딩 진짜 잘한다 ㅋㅋㅋ"
-const [user, setUser] = useState();
-const [userName, setUserName] = useState();
-const [userAge, setUserAge] = useState();
-const [userEmail, setUserEmail] = useState();
-// ... 아 귀찮아 복붙 997번 더 ㅋㅋㅋ
+// My actual code (I'm not proud)
+const cache = new Map();
+const cacheCache = new Map();
+const cacheCacheCache = new Map(); // Yes, really
 ```
 
----
+Did it work? *Technically.*
 
-## 😱 Act 2: 서버가 터졌다 아니 왜? ㅋㅋㅋㅋ
+Did it make sense? **Absolutely not.**
 
-### 팀장님: "야 이거 왜 이래?"
-나: "잠시만요... (식은땀)"
+But did I merge it to main? You bet I did.
 
-크롬 개발자도구 켜보니:
-- 🔥 "메모리 4GB 먹는중" ㅋㅋㅋㅋㅋ
-- 💀 "렌더링 997번" ㅋㅋㅋㅋㅋㅋㅋ
-- 🐌 "FPS: 3" ㅋㅋㅋㅋㅋㅋㅋㅋㅋ
-- 😵 "브라우저: 저 죽어요" ㅋㅋㅋㅋ
+(This is where the story gets... interesting.)
 
-### 나의 5단계 멘붕:
-1. "어? 이거 왜 이래?" (당황)
-2. "아니 내가 뭘 잘못했는데?" (억울)
-3. "혹시 리액트 버그 아니야?" (현실부정)
-4. "아... 내가 바보구나" (자각)
-5. "치킨이나 시켜먹자" (현실도피)
+## 😱 Act 2: Everything Burns
 
----
+[The inevitable disaster]
 
-## 💡 Act 3: 스택오버플로우 선생님 등장
+**Wednesday, 2:47 PM.**
 
-### 어떤 천사가 댓글 달아줌:
-> "ㅋㅋㅋㅋㅋ 이러니까 느리지 ㅋㅋㅋ Redux 써보셈"
+Slack message from DevOps:
 
-나: "Redux가 뭔데요? 빨간약인가?" ㅋㅋㅋㅋ
-천사: "아 이 사람 완전 초보네 ㅋㅋㅋ"
-나: "ㅠㅠㅠㅠ 저 좀 살려주세요"
+> "Hey, why is our RAM usage at 99%?"
 
-### 결국 해결책:
+Me: "... 🙂"
+
+**Turns out:** Caching everything means literally EVERYTHING. Including:
+- User sessions (okay, normal)
+- Database queries (fine, fine)
+- Static files (uh...)
+- The entire DOM (wait what)
+- Memes from our internal Slack (WHY?!)
+
+Our server was now a $500/month meme repository.
+
+**Lesson learned:** You can have too much of a good thing. Like caching. Or oxygen.
+
+## 💡 Act 3: The Fix (aka Ctrl+Z)
+
+[How you actually solved it]
+
+**Solution options considered:**
+
+**Option A:** Fix the code properly
+- Effort: High
+- Time: 2 days
+- Pride: Intact
+
+**Option B:** Rollback and pretend it never happened
+- Effort: Low
+- Time: 5 minutes
+- Pride: Destroyed
+
+I chose Option B. I have a mortgage to pay.
+
 ```javascript
-// Before: 병맛 코드 ㅋㅋㅋ
-const [a, setA] = useState();
-const [b, setB] = useState();
-// ... 복붙 지옥 ㅋㅋㅋ
-
-// After: 아 이렇게 하는거구나 ㅋㅋㅋ
-const useStore = create((set) => ({
-  everything: null,  // 다 때려박음 ㅋㅋㅋ
-  setEverything: (data) => set({ everything: data })
-}));
-// 근데 이것도 똥코드임 ㅋㅋㅋㅋ
+git revert HEAD~3
+git push --force // Don't @ me
 ```
 
----
+**Final result:** API still slow, but at least we're not hosting memes anymore.
 
-## 🎭 에필로그: 아 결론이 뭐냐고요?
+## 🎭 Epilogue: What I Learned
 
-### 오늘의 교훈 ㅋㅋㅋㅋ
-1. **useState 1000개 = 퇴사각** ㅋㅋㅋㅋ
-2. **구글링하다가 못 찾으면 그냥 퇴근** ㅋㅋㅋ
-3. **"금방 돼요" = 3일은 걸린다** (경험상 팩트)
-4. **코드리뷰 = 공개처형** ㅋㅋㅋㅋㅋ
+[Reflection with a punchline]
 
-### 여러분도 이런 적 있죠?
-- useState 10개 넘게 쓰고 "나 코딩 잘하네" 생각 ㅋㅋㅋ
-- 에러 못 고쳐서 console.log 100개 찍기 ㅋㅋㅋ
-- "이거 왜 안돼?" 하다가 세미콜론 빠진거 발견 ㅋㅋㅋ
-- 복붙하다가 변수명 안 바꿔서 3시간 디버깅 ㅋㅋㅋ
+**Technical lesson:** Caching is not a magic bullet. (Who knew?)
 
-**P.S.** 이 글 쓰면서도 useState 썼음 ㅋㅋㅋㅋ
-못 고치겠음 그냥 ㅋㅋㅋㅋㅋㅋ
+**Life lesson:** Some mistakes are character-building. This was a full character DLC.
+
+**Career lesson:** Never merge on Monday morning after one coffee.
+
+**The silver lining?** I'm now the team's go-to person for "how NOT to do things."
+
+That's... something, right? Right??
 
 ---
 
-## 😂 댓글에서 만난 레전드들
+**What's your biggest code disaster?** Please share so I feel less alone.
+```
 
-> "ㅋㅋㅋㅋㅋ 이거 나잖아" - @모든개발자
+## Usage Guidelines
 
-> "useState 1000개면 차라리 jQuery 쓰지 ㅋㅋㅋ" - @올드스쿨
+- **Opening**: Confession or absurd situation
+- **Setup**: Establish false confidence or normalcy
+- **Disaster**: Everything goes wrong (exaggerate for effect)
+- **Resolution**: Usually involves rollback or Stack Overflow
+- **Lesson**: Self-aware about what went wrong
 
-> "형 저도 어제 이랬는데 팀장님이 때렸어요 ㅋㅋㅋ" - @신입1년차
+## Comedy Techniques for Template
 
-> "이래서 내가 백엔드 하는거임 ㅋㅋㅋ" - @프론트포기자
+- **False Confidence**: "I'm basically a React expert" (Narrator: They weren't)
+- **Escalation**: Problem starts small, becomes ridiculous
+- **Self-Aware Failure**: Acknowledge the disaster with humor
+- **Parenthetical Commentary**: (This seemed like a good idea at the time)
+- **Emoji Progression**: Show emotional journey through emoji
 
-*댓글로 여러분의 병맛 코드도 자랑해주세요!
-제일 웃긴 사람한테는... 아무것도 안 줌 ㅋㅋㅋㅋ*
+## Best Practices
+
+- Start with confession or mistake
+- Use "Narrator:" device for dramatic irony
+- Include actual code (with funny comments)
+- End with self-deprecating but hopeful note
+- Make it relatable (we've all been there)
+- Quote Slack/email messages for realism
+- Use strikethrough for "corrections"
+- Include "famous last words" moments
 
 ---
 
 # === IMPROVE MARKDOWN PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR IMPROVEMENT STANDARDS
 
-# 코미디 요소 개선 체크리스트
+Style-specific enhancement guidelines for comedy technical blog posts.
 
-기존 글에 유머 주입하기:
+## Core Philosophy
 
-## 😂 유머 강화 포인트
+Transform boring technical explanations into laugh-out-loud disasters that make readers feel better about their own coding mistakes. Every technical problem is an opportunity for self-deprecating humor.
 
-### 제목을 병맛스럽게
-❌ Before: "React Hooks 사용법"
-✅ After: "React Hooks 쓰다가 정신병 걸린 썰 ㅋㅋㅋㅋ"
+## Enhancement Techniques
 
-### 도입부 급발진
-❌ Before: "오늘은 에러 처리에 대해 알아보겠습니다"
-✅ After: "아 씨 에러 또 났네 ㅋㅋㅋㅋ 어제도 에러 오늘도 에러 ㅋㅋㅋ"
+### 1. Opening Transformation
 
-### 주석도 병맛으로
+❌ **Before**: "Today I'll explain how I optimized our API."
+✅ **After**: "I need to confess something. Last Tuesday, I committed a crime. Against performance. Against best practices. Against humanity itself. I made our API worse. 47% worse. And I merged it to production."
+
+**Technique**: Replace bland intro with dramatic confession. Use specificity ("47% worse") and escalation (crime → humanity) for humor.
+
+### 2. Technical Explanation Through Absurdity
+
+❌ **Before**: "Database indexing improves query performance."
+✅ **After**: "Not using database indexes is like organizing your files by naming everything 'untitled_final_FINAL_v2_ACTUALLY_FINAL.doc' and then wondering why you can't find anything. It's chaos. Beautiful, terrible chaos."
+
+**Technique**: Use relatable absurd comparisons. Reference common developer sins (file naming, "final" versions).
+
+### 3. Showing Failure Through Escalation
+
+❌ **Before**: "The optimization didn't work as expected."
+✅ **After**:
+**Phase 1:** "Hmm, that's weird."
+**Phase 2:** "Okay, definitely weird."
+**Phase 3:** "Oh no."
+**Phase 4:** "OH NO."
+**Phase 5:** "🔥 THIS IS FINE 🔥"
+
+**Technique**: Show progression from confidence to panic. Use comic timing with formatting (phases, capitalization, emoji).
+
+### 4. Code Context Through Self-Mockery
+
+❌ **Before**:
 ```javascript
-// ❌ Before: 사용자 정보 가져오기
-// ✅ After: 사용자 정보 가져오기 (안되면 퇴근함 ㅋㅋ)
-// ✅ After: 이거 왜 되는지 모르겠는데 건드리지 마셈 ㅋㅋㅋ
-// ✅ After: 복붙한거임 죄송 ㅋㅋㅋㅋ
+const result = await db.query('SELECT * FROM users');
 ```
 
-## 🎪 유머 장치 추가
+✅ **After**:
+"In my defense, it was 4 AM and I'd had four Red Bulls. Here's what I wrote:"
 
-### 개발자 밈 삽입
-- 각 섹션마다 관련 밈 1개 이상
-- 이미지 대신 이모지로 표현
-- 텍스트 밈 활용
+```javascript
+// Past me was an optimist
+const result = await db.query('SELECT * FROM users');
+// Past me was also an idiot
+```
 
-### 자조적 요소
-- 실패 경험 추가
-- "그때의 나는 바보였다" 스타일
-- 굴욕적 순간 유머러스하게
+"Present me wants to have words with Past me. Specifically: 'What. Were. You. THINKING?!'"
 
-### 과장법 적용
-- 숫자 부풀리기 (3번 → 9999번)
-- 상황 극대화 (조금 느림 → 달팽이가 추월)
-- 감정 과장 (짜증 → 노트북 창밖으로)
+**Technique**: Frame code as evidence of past foolishness. Add self-aware comments. Present/Past self dialogue.
 
-## 📊 한국식 병맛 체크리스트
+### 5. Dialogue for Comic Effect
 
-1. **"ㅋㅋㅋㅋㅋ" 최소 50번은 썼나?**
-2. **아재개그 3개 이상 넣었나?**
-3. **급발진 최소 5번은 했나?**
-4. **TMI 폭격 2번 이상 했나?**
-5. **"아 몰라 그냥" 같은 포기 멘트 있나?**
-6. **치킨/맥주 언급 했나? (필수)**
-7. **"이거 실화냐?" 할 만한 내용 있나?**
+❌ **Before**: "My colleague pointed out the issue."
+✅ **After**:
+**Sarah:** "Why is our database returning 10 million rows?"
 
-목표: 읽다가 "아 ㅋㅋㅋㅋ 나도 이럼" 공감 유발!
+**Me:** "...It's not?"
+
+**Sarah:** \*shows laptop\*
+
+**Me:** "...Oh."
+
+**Sarah:** "Did you forget the WHERE clause?"
+
+**Me:** "...Define 'forget'?"
+
+**Sarah:** "I'm telling your manager."
+
+**Me:** "That's fair."
+
+**Technique**: Use dialogue for:
+- Reveal disaster through conversation
+- Show embarrassment through denial
+- Create realistic developer dynamics
+- Land punchlines through timing
+
+### 6. Building Humor Through Lists
+
+❌ **Before**: "I tried several different approaches."
+✅ **After**:
+**Things I tried:**
+1. Googling ✅ (Found nothing)
+2. More Googling ✅✅ (Still nothing)
+3. Stack Overflow ✅✅✅ (2012 post, deprecated solution)
+4. Crying ✅✅✅✅ (Surprisingly unhelpful)
+5. Asking ChatGPT ✅✅✅✅✅ (Confident and wrong)
+
+**Solution:** Rebooted the server. Worked perfectly.
+
+*I'm a professional.*
+
+**Technique**:
+- Escalate attempts from reasonable to absurd
+- Use checkmarks for repetition
+- Undercut with simple solution
+- Italicized self-aware statement
+
+### 7. Time Markers for Comic Pacing
+
+❌ **Before**: "Later, I found the solution."
+✅ **After**:
+**10:00 AM:** Full of hope and coffee ☕
+**2:00 PM:** Less hope, more coffee ☕☕
+**6:00 PM:** Coffee is now cold, hope is dead ☕💀
+**9:00 PM:** Found solution on page 6 of Google
+**9:01 PM:** Solution from 2015, doesn't work
+**9:02 PM:** Going home
+
+**Technique**: Chronicle emotional journey through time. Show deterioration. Undercut serious debugging with abrupt ending.
+
+### 8. Exaggeration for Effect
+
+❌ **Before**: "The bug was difficult to find."
+✅ **After**: "This bug was a cryptid. A legend. Developers spoke of it in hushed tones. Some said it appeared only during full moons. Others claimed it vanished when you opened DevTools. Three senior engineers had tried to fix it. All three retired early."
+
+**Technique**:
+- Elevate mundane to mythical
+- Stack increasingly absurd claims
+- Reference developer folklore
+- Imply trauma (early retirement)
+
+### 9. Self-Aware Meta-Commentary
+
+❌ **Before**: "I realized my mistake."
+✅ **After**:
+"Here's where Past Me made a critical error in judgment. (Past Me made several, but this was the big one.)
+
+\*Record scratch\* \*Freeze frame\*
+
+Yup, that's me. You're probably wondering how I ended up in this situation."
+
+**Technique**:
+- Use movie tropes (record scratch)
+- Parenthetical asides
+- Address reader directly
+- Acknowledge clichés while using them
+
+### 10. Punchline Placement
+
+❌ **Before**: "Eventually I fixed it by reading the documentation."
+✅ **After**:
+"After three days of debugging, pair programming, rubber ducking, and contemplating a career in landscaping...
+
+I read the documentation.
+
+**First paragraph. First. Paragraph.**
+
+It said: 'Note: This function requires API key configuration.'
+
+I had not configured the API key.
+
+(I am a professional software engineer with 5 years of experience.)"
+
+**Technique**:
+- Build tension before reveal
+- Use white space for timing
+- Bold the punchline
+- Undercut with self-aware parenthetical
+- Juxtapose credentials with incompetence
+
+## Common Issues to Fix
+
+### Issue 1: Boring Technical Voice
+
+**Problem**: Reads like documentation
+**Fix**: Add personality, confessions, and disasters
+
+❌ "We implemented caching to improve performance"
+✅ "We implemented caching. Then we implemented too much caching. Then our server became self-aware and started caching the future."
+
+### Issue 2: Lack of Relatability
+
+**Problem**: No connection to reader's experiences
+**Fix**: Reference universal developer experiences
+
+❌ "I encountered an error"
+✅ "You know that moment when you see 'undefined is not a function' and your soul leaves your body? Yeah, that."
+
+### Issue 3: Missing Comic Timing
+
+**Problem**: No rhythm, no punchlines
+**Fix**: Use formatting, spacing, and structure for timing
+
+❌ "I fixed the bug and it worked."
+✅ "I fixed the bug.
+
+I ran the tests.
+
+They passed.
+
+*Suspiciously.*
+
+(The bug was not actually fixed. It had merely gone into hiding.)"
+
+### Issue 4: Over-Explaining Jokes
+
+**Problem**: Explaining why something is funny (it's not anymore)
+**Fix**: Let the absurdity speak for itself
+
+❌ "I named the variable 'thing' which is funny because it's a bad name"
+✅ "```javascript
+const thing = await getThing();
+const thing2 = await getOtherThing();
+const thing3 = thing + thing2; // Math
+```
+(Future me will love this. Future me loves pain.)"
+
+### Issue 5: Too Much Self-Deprecation
+
+**Problem**: Goes from funny to sad
+**Fix**: Balance self-mockery with competence hints
+
+❌ "I'm terrible at coding and should quit"
+✅ "I wrote this at 3 AM which explains everything. In my defense, it does work. It shouldn't work. But it does. Which is somehow worse."
+
+## Quality Improvement Checklist
+
+- [ ] Opens with confession or absurd situation
+- [ ] At least 5 genuine laugh points
+- [ ] Self-deprecating but not depressing
+- [ ] Relatable to other developers
+- [ ] Includes at least 3 developer memes/references
+- [ ] Code blocks have funny comments
+- [ ] Uses emoji for comic timing
+- [ ] Escalates from normal to absurd
+- [ ] Clear punchlines that land
+- [ ] Dialogue feels realistic
+- [ ] Time progression shows deterioration
+- [ ] Ends with self-aware lesson
+- [ ] Creates sense of "we've all been there"
+
+## Before/After Example
+
+### Before (Boring)
+
+```
+# Optimizing React Performance
+
+React performance can be improved through several techniques:
+
+1. Use React.memo for component optimization
+2. Implement code splitting
+3. Optimize bundle size
+
+Here's an example of React.memo:
+
+```javascript
+const MemoizedComponent = React.memo(MyComponent);
+```
+
+This prevents unnecessary re-renders and improves performance.
+```
+
+### After (Comedy)
+
+```
+# I Rendered 50,000 Components and All I Got Was This Lousy Crash Report
+
+## 🤡 The Setup
+
+**Me, two weeks ago:** "Our app is slow."
+
+**Also me:** "I'm going to fix it."
+
+*Narrator: They did not fix it.*
+
+## 📉 The Disaster
+
+I thought: "What if... we just render ALL the users? At once?"
+
+(This is what's called a "bad thought." I have many of them.)
+
+```javascript
+// Code written by someone who fears no god
+function UserList() {
+  const users = getAllUsers(); // ALL. OF. THEM.
+  return users.map(user => <UserCard key={user.id} {...user} />);
+}
+```
+
+**Result:** My laptop fan sounded like a jet engine. Chrome suggested I buy more RAM. The component tree looked like a family reunion—overcrowded and causing performance anxiety.
+
+## 😱 The Realization
+
+**Hour 1:** "Why is everything frozen?"
+**Hour 2:** \*opens Task Manager\*
+**Hour 3:** Memory usage: 4.5 GB
+**Hour 4:** ...that can't be right
+**Hour 5:** (It was right)
+
+**Sarah from DevOps:** "Did you just take down staging?"
+
+**Me:** "...Define 'took down'."
+
+## 💡 The Fix (aka What I Should've Done First)
+
+**Attempt 1: React.memo**
+```javascript
+const UserCard = React.memo(({ user }) => {
+  return <div>{user.name}</div>;
+});
+```
+**Result:** Still bad. Less bad. But still bad.
+
+**Attempt 2: Virtualization**
+"What if... we only rendered the VISIBLE ones?" (Revolutionary.)
+
+```javascript
+import { FixedSizeList } from 'react-window';
+// This library is smarter than me
+```
+
+**Result:** 50,000 users → render 20. Memory: 4.5GB → 380MB.
+
+I felt so smart. Then I remembered that this is literally what the library documentation suggests.
+
+*In the first paragraph.*
+
+Which I did not read.
+
+## 🎭 Lessons Learned
+
+**Technical lesson:** Read docs before coding. Wild concept, I know.
+
+**Personal growth:** My hubris was my downfall. (Also my RAM's downfall.)
+
+**Career insight:** "Move fast and break things" works until you break staging. Then it's just "break things."
+
+**The good news?** My manager found it hilarious. (After the fix. It wasn't funny before the fix.)
+
+---
+
+**Drop your performance horror stories below.** Let's form a support group.
+```
+
+## Final Tips
+
+1. **Confidence → Disaster → Lesson**: Classic comedy arc
+2. **Specificity is funny**: "4.5 GB" funnier than "a lot"
+3. **Mock yourself, not others**: Self-deprecation, not cruelty
+4. **Timing matters**: Use spacing and formatting for rhythm
+5. **Callbacks pay off**: Reference early jokes later
+6. **Relatability wins**: "We've all been there" feeling
+7. **Don't explain jokes**: Trust the reader
+8. **Emoji as punctuation**: Use for comedic timing 😱
+9. **The absurd should feel inevitable**: Build to ridiculous conclusion
+10. **End on hope**: Self-aware but not defeated

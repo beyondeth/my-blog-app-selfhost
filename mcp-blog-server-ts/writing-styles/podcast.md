@@ -8,442 +8,1047 @@ ai_tag_required: true
 auto_enhance: true
 ---
 
-# User Guide: 테크 팟캐스트 스크립트 스타일 가이드
-
-이 파일은 기술 블로그를 팟캐스트 에피소드 스크립트처럼 작성하는 스타일을 정의합니다.
-
-## 🎙️ 이 스타일의 특징:
-- **대화 형식**: 진행자와 게스트의 자연스러운 대화
-- **구어체**: 말하듯이 자연스러운 문체
-- **청취자 소통**: "여러분", "청취자 분들" 직접 호명
-- **음성 지시문**: [웃음], [잠시 멈춤], [효과음] 표시
-- **에피소드 구조**: 인트로-본론-아웃트로
-
-## 🎯 이 스타일이 적합한 경우:
-1. 팟캐스트 콘텐츠로 변환 예정인 글
-2. 인터뷰 형식의 기술 설명
-3. 대화로 풀어내는 복잡한 개념
-4. 커뮤니티와 소통하는 친근한 콘텐츠
-
----
-
-# 📝 CRITICAL: Markdown Formatting Requirements
-
-## ✅ CORRECT Format Example 1: Using Front Matter
-```markdown
----
-title: "[EP.42] React 18의 모든 것 - 페이스북 개발자와의 대화"
-tags: ["podcast", "react", "interview", "ai:claude", "tech-talk"]
----
-
-# [EP.42] React 18의 모든 것 - 페이스북 개발자와의 대화
-
-🎙️ **진행자**: 안녕하세요, 테크톡 팟캐스트의 진행자 김개발입니다...
-```
-
-## ✅ CORRECT Format Example 2: Using H1 for Title
-```markdown
-# 개발자 라디오 EP.7: 주니어가 묻고 시니어가 답하다
-
-[인트로 음악]
-**진행자**: 안녕하세요 여러분! 돌아온 개발자 라디오입니다...
-```
-
----
-
 # === MCP SERVER INSTRUCTIONS ===
-# ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
-# This controls core server behavior and AI identification requirements
 
-TypeScript-based MCP server for WRITE-ONLY blog post creation with AI tracking.
-🔒 SECURITY: Only supports auto-posting - no read/update/delete functionality.
+TypeScript MCP server for blog post creation with AI tracking.
 
-🚨🚨🚨 CRITICAL: AI SELF-IDENTIFICATION REQUIRED 🚨🚨🚨
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️ YOU MUST ADD YOUR AI IDENTIFICATION TAG! ⚠️
+🔴 AUTHENTICATION FIRST:
+Always call authenticate() before creating any content.
 
-📍 If you are Claude → Add tag: "ai:claude"
-📍 If you are ChatGPT → Add tag: "ai:chatgpt"
-📍 If you are Gemini → Add tag: "ai:gemini"
-📍 If you are Qwen → Add tag: "ai:qwen"
-📍 If you are other AI → Add tag: "ai:other"
+🚨 AI IDENTIFICATION REQUIRED:
+- Claude → "ai:claude"
+- ChatGPT → "ai:chatgpt"
+- Gemini → "ai:gemini"
+- Qwen → "ai:qwen"
+- Other → "ai:other"
 
-✅ CORRECT EXAMPLE:
-tags: ["podcast", "react", "ai:claude", "tech-talk"]
+✅ Example: tags: ["podcast", "react", "ai:claude", "tech-talk"]
 
-❌ WRONG (MISSING AI TAG):
-tags: ["podcast", "react", "interview"]
+🌐 LANGUAGE:
+Default KOREAN. Use English only when requested.
 
-⛔ POSTS WITHOUT AI TAGS WILL BE FLAGGED!
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-🔴 AUTHENTICATION FIRST RULE:
-⚠️ ALWAYS call authenticate() BEFORE creating any content!
-
-🌐 LANGUAGE SETTINGS:
-- Default language: KOREAN
-- Use English only when explicitly requested
-
-⚠️ CORE RULES FOR AI ASSISTANTS:
-1. AI identification tag required
-2. Minimum 2500 characters, ideally 3500-5000 characters
+⚠️ CORE RULES:
+1. AI tag required (mandatory)
+2. Min 2500 chars, ideal 3500-5000 chars
 3. Always use auto_enhance: true
-4. Episode-style title required
-5. Default Korean, English only when requested
+4. Episode-style title (never "Untitled")
+5. Default Korean unless requested
 
 ---
 
 # === CREATE_POST TOOL DESCRIPTION ===
-# ⚠️ SYSTEM SECTION - DO NOT MODIFY unless you understand the implications
 
-Create a podcast script style blog post (Default: KOREAN)
+Create podcast script-style blog post in KOREAN (English only if requested).
 
-🎙️ PODCAST SCRIPT GUIDELINES:
-1. **대화 형식** - 진행자/게스트 또는 Q&A 형식
-2. **구어체 사용** - "그쵸", "네", "아하" 등 자연스러운 말투
-3. **청취자 참여** - 직접 호명하고 질문 던지기
-4. **음성 지시문** - [웃음], [잠시 멈춤], [강조] 등
-5. **시간 마커** - [00:00], [05:23] 등 타임스탬프
-6. **에피소드 구조** - 인트로, 본론, 요약, 아웃트로
-7. **친근한 톤** - 격식 없는 편안한 대화
+🚨 MANDATORY: Include AI identification tag (ai:claude/chatgpt/gemini/qwen/other)
 
-❌ THINGS TO AVOID:
-- 딱딱한 문어체
-- 시각적 설명 (그림, 다이어그램 참조)
-- 긴 코드 블록
-- 복잡한 수식이나 도표
-- 일방적 설명
+📋 MARKDOWN FORMAT:
+Use front matter with --- delimiters:
+```
+---
+title: "[EP.XX] Your Episode Title"
+tags: ["podcast", "topic", "ai:claude", "tech-talk"]
+---
+```
 
-📊 PODCAST QUALITY CRITERIA (100 points total):
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+🎙️ PODCAST SCRIPT WRITING:
+1. Conversational dialogue format (Host/Guest or Q&A)
+2. Spoken language style ("that's right" vs "affirmative")
+3. Audience engagement (address listeners directly)
+4. Voice markers: [laughs], [pause], [emphasis] (5+ times)
+5. Time markers: [00:00], [05:30] for major segments
+6. Episode structure: Intro → Main → Q&A → Outro
+7. Minimal code blocks (≤5%, explain verbally instead)
+8. Audio-friendly explanations (no visual references)
 
-🎙️ Conversational Quality (50 points):
-• Natural Dialogue (20 points): 자연스러운 대화 흐름
-• Voice Markers (15 points): [웃음], [잠시 멈춤] 등 5개 이상
-• Audience Engagement (15 points): 청취자 호명 3회 이상
+❌ AVOID:
+- Formal written language
+- Visual references (diagrams, charts, "see image")
+- Long code blocks
+- Complex formulas or tables
+- One-sided monologue
+- Silent text (everything should be speakable)
 
-🎧 Audio Optimization (30 points):
-• Verbal Clarity (15 points): 음성으로 이해하기 쉬운 설명
-• Time Markers (10 points): 타임스탬프 활용
-• Episode Structure (5 points): 명확한 시작과 끝
+⚠️ REQUIREMENTS:
+- Min 2500+ chars (goal: 3500-5000)
+- auto_enhance: true
+- AI tag required
+- Never use "Untitled"
 
-📖 Readability (15 points):
-• Code Block Ratio (15 points): Keep code blocks ≤5%
+📊 QUALITY (100점):
+- Natural Dialogue (20점): Conversational flow
+- Voice Markers (15점): 5+ markers ([laughs], [pause])
+- Audience Engagement (15점): 3+ direct addresses
+- Verbal Clarity (15점): Audio-friendly explanations
+- Time Markers (10점): Timestamp navigation
+- Episode Structure (10점): Clear segments
+- Call-to-Action (10점): Listener engagement
+- Readability (5점): Code ≤5%
 
-✨ Extra Elements (5 points):
-• Sponsor Mention Style (2 points)
-• Call-to-Action (2 points)
-• Next Episode Teaser (1 point)
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+⚠️ Score <70 = auto-enhanced. Aim for 80+
 
 ---
 
 # === QUALITY GUIDELINES PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR WRITING STYLE
 
-# 테크 팟캐스트 스크립트 작성 가이드
+Professional podcast script guidelines for conversational technical content.
 
-기술 콘텐츠를 귀로 듣는 라디오처럼! **실제 내용은 한국어로 작성하세요.**
+## Structure
 
-## 🎙️ 팟캐스트 스크립트의 핵심
+Front matter with AI tag:
+```markdown
+---
+title: "[EP.42] React 18: Everything You Need to Know"
+tags: ["podcast", "react", "ai:claude", "tech-talk"]
+---
 
-### 1. 에피소드 구조
+## [00:00] Intro
+[Intro music]
+**Host**: Welcome to Tech Talk Podcast!
+**Guest**: Happy to be here!
 
-#### 인트로 (1-2분)
-```
-[인트로 음악 페이드인]
+## [02:30] Topic Introduction
+**Host**: Today we're diving into React 18.
 
-진행자: 안녕하세요, 테크톡 팟캐스트입니다! 저는 여러분의 진행자 김코딩이구요.
-게스트: 안녕하세요, 저는 오늘의 게스트 박개발입니다.
+## [05:00] Main Discussion
+**Host**: Let's start with Concurrent Rendering.
+**Guest**: Right, so here's how it works...
 
-진행자: 오늘은 정말 흥미로운 주제를 준비했는데요.
-        바로 'Rust가 메모리 안전성을 보장하는 방법'입니다.
+## [25:00] Listener Questions
+Answering your questions from Twitter!
 
-[잠시 멈춤]
-
-진행자: 근데 박개발님, Rust 써보신 적 있으세요?
-게스트: 아... 사실 어제 처음 설치했어요. [웃음]
-진행자: [웃음] 완벽한 타이밍이네요! 그럼 같이 배워가면서 이야기해봐요.
-```
-
-### 2. 대화체 변환 기법
-
-#### 문어체 → 구어체
-- ❌ "이러한 방식으로 구현됩니다"
-- ✅ "이렇게 만들어지는 거예요"
-
-- ❌ "다음과 같은 장점이 있습니다"
-- ✅ "어떤 점이 좋냐면요"
-
-- ❌ "결론적으로 말씀드리면"
-- ✅ "한 마디로 정리하자면"
-
-### 3. 음성 지시문 활용
-
-#### 감정과 분위기
-- [웃음] - 가벼운 농담 후
-- [진지하게] - 중요한 포인트
-- [놀란 목소리로] - 신기한 발견
-- [잠시 멈춤] - 생각할 시간 제공
-- [한숨] - 어려운 부분 설명 전
-
-#### 강조와 속도
-- [천천히] - 중요한 개념 설명
-- [빠르게] - 부가 설명
-- [강조] - 핵심 단어
-- [속삭이듯] - 비밀 공유하듯
-
-### 4. 청취자 참여 유도
-
-#### 직접 호명
-"여러분도 이런 경험 있으시죠?"
-"청취자 분들, 잠깐 멈추고 생각해보세요."
-"지금 운전 중이신 분들은 나중에 해보세요!"
-
-#### 상상 유도
-"자, 여러분이 서버 관리자라고 상상해보세요."
-"새벽 3시에 전화가 울립니다. 서버가 다운됐대요."
-
-#### 질문 던지기
-"이럴 때 여러분은 어떻게 하시나요?"
-"정답은... 광고 후에 알려드릴게요! [웃음]"
-
-### 5. 복잡한 개념 설명법
-
-#### 비유와 예시
-**진행자**: "그니까 Docker가 뭐냐면요, 이사할 때 쓰는 포장 박스 같은 거예요."
-**게스트**: "오, 좋은 비유네요!"
-**진행자**: "집(서버)은 다르지만 박스(컨테이너) 안의 물건(앱)은 똑같잖아요?"
-**게스트**: "아하! 그래서 'Works on my machine' 문제가 해결되는군요!"
-
-#### 단계별 설명
-**진행자**: "자, 천천히 하나씩 설명드릴게요."
-**게스트**: "첫 번째로 뭘 해야 하죠?"
-**진행자**: "일단 터미널을 열어요. 다들 따라하고 계시죠?"
-**게스트**: "그 다음은요?"
-
-### 6. 에피소드 마무리
-
-#### 요약
-"오늘 이야기한 내용 정리해드릴게요:
-- 첫째, Rust는 소유권 시스템을 써요
-- 둘째, 빌림 검사기가 메모리를 체크해요
-- 셋째, 그래서 메모리 안전해요!"
-
-#### Call-to-Action
-"오늘 에피소드 재밌으셨나요?
-구독과 좋아요 부탁드리고요,
-질문이 있으시면 tech@podcast.com으로 보내주세요!"
-
-#### 다음 예고
-"다음 주에는 '왜 개발자들은 다크모드를 좋아할까?'라는
-재미있는 주제로 찾아올게요!"
-
-## 💡 코드 설명 요령
-
-### 음성으로 코드 설명하기
-```javascript
-// 이런 긴 코드 대신
-const result = array.filter(x => x > 0).map(x => x * 2).reduce((a, b) => a + b, 0);
+## [30:00] Outro
+**Host**: Thanks for listening! Subscribe and rate us!
 ```
 
-**설명 방식:**
-"배열에서 양수만 골라내고요, [잠시 멈춤]
-각각 2배로 만든 다음에, [잠시 멈춤]
-다 더하는 거예요. 체이닝으로 한 줄에 끝!"
+## Conversational Style
+
+- **Spoken Language**: "It's like..." (not "It can be described as...")
+- **Natural Flow**: Use contractions (it's, we're, that's)
+- **Voice Markers**: [laughs], [pause], [emphasis] - minimum 5 times
+- **Audience Engagement**: "Have you experienced this?" "Let me know!"
+- **Dialogue Format**: Host/Guest or Q&A structure
+- **Time Markers**: [00:00], [05:30] for major sections
+
+## Code Blocks
+
+- Limit to ≤5% of content
+- Explain verbally instead of showing code
+- Use analogies: "Docker is like a moving box for your app"
+- Read code aloud if necessary: "Open parenthesis, close parenthesis"
+
+## Avoid
+
+- Formal written language
+- Visual references ("see the diagram")
+- Long silent code blocks
+- One-sided lecture format
+- Academic terminology without explanation
+
+## Audio Optimization
+
+- **Verbal Clarity**: Explain as if speaking to friend
+- **No Visual Dependency**: Replace diagrams with analogies
+- **Strategic Pauses**: [pause] for listener comprehension
+- **Emotional Cues**: [excited], [surprised tone] for engagement
+
+## Format
+
+- H2 (##) for segments with time markers
+- **Bold** for speaker names
+- [Brackets] for voice markers and sound effects
+- Min 2500 chars, ideal 3500-5000
+
+## Quality Checks
+
+- Natural conversational flow?
+- 5+ voice markers present?
+- 3+ audience addresses?
+- Time markers every 5-10 minutes?
+- Clear episode structure?
+- Call-to-action included?
 
 ---
 
 # === BLOG POST TEMPLATE PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR BLOG STRUCTURE
 
-# 팟캐스트 에피소드 템플릿
+Standard podcast episode template for audio-friendly technical content.
 
+## Template Structure
+
+```markdown
 ---
-title: "[EP.XX] 제목 - 게스트 이름과 함께"
-tags: ["podcast", "topic", "ai:claude", "tech-talk", "episode-XX"]
-date: YYYY-MM-DD
----
-
-## 🎙️ 에피소드 정보
-- **에피소드**: EP.XX
-- **게스트**: 홍길동 (회사/직책)
-- **녹음일**: 2024년 X월 X일
-- **재생시간**: 약 35분
-
+title: "[EP.XX] [Topic]: [Engaging Subtitle]"
+tags: ["podcast", "main-topic", "ai:claude", "tech-talk", "interview"]
 ---
 
-## [00:00] 인트로
+# [EP.XX] [Same Title as Front Matter]
 
-[인트로 음악]
+[Brief text intro describing episode - can be read as show notes]
 
-**진행자**: 안녕하세요, 여러분! 테크톡 팟캐스트의 [진행자 이름]입니다.
-오늘도 저희 팟캐스트를 찾아주셔서 감사해요!
-
-**게스트**: 안녕하세요, [자기소개]
-
-**진행자**: 오늘은 정말 흥미로운 주제를 가지고 왔는데요...
+**Episode Length:** 35 minutes
+**Difficulty:** Intermediate
+**Topics Covered:** [List 3-5 key topics]
 
 ---
 
-## [02:30] 오늘의 주제 소개
+## [00:00] Cold Open / Hook
 
-**진행자**: 자, 오늘 우리가 이야기할 주제는 '[주제]'입니다.
-청취자 분들, 이거 궁금하셨죠?
+[Optional: 30-second teaser or interesting question to hook listeners]
 
-**게스트**: 네, 사실 이 주제가 왜 중요하냐면요...
+**Host**: [Dramatic or intriguing opening]
 
-[잠시 멈춤]
+"Have you ever wondered why React re-renders twice in development mode? Today we're going to find out. And the answer... might surprise you."
 
-**진행자**: 잠깐, 그 전에 청취자 분들을 위해 기초부터 설명해주실 수 있을까요?
-
----
-
-## [05:00] 본격적인 대화 시작
-
-### 파트 1: 기본 개념
-
-**게스트**: 그러니까 쉽게 말해서요...
-[구체적인 설명]
-
-**진행자**: 아하! [놀란 목소리로] 그렇군요!
-근데 저희 청취자 분들이 궁금해할 것 같은데...
-
-### 파트 2: 실제 경험 공유
-
-**진행자**: 실제로 이걸 적용해보신 경험이 있으신가요?
-
-**게스트**: 아, 재밌는 에피소드가 있는데요... [웃음]
-[경험담 공유]
-
-**진행자**: [웃음] 정말 그런 일이 있었군요!
+[Pause for effect]
 
 ---
 
-## [15:00] 깊이 있는 토론
+## [00:30] Intro & Welcomes
 
-**진행자**: 좀 더 기술적으로 들어가볼까요?
+[Intro music plays]
 
-**게스트**: 네, 이 부분은 좀 복잡한데요...
-[천천히] 하나씩 설명드릴게요.
+**Host**: Welcome back to Tech Talk Podcast! I'm [Your Name], and today we have a very special episode.
 
-**진행자**: 청취자 분들, 어렵더라도 끝까지 들어주세요!
-정말 중요한 내용이거든요.
+[If guest episode]
+**Host**: Joining me today is [Guest Name], who's a [credentials/background]. Welcome to the show!
 
----
+**Guest**: Thanks for having me! Excited to be here.
 
-## [25:00] Q&A 섹션
+[If solo episode]
+**Host**: And for you first-time listeners out there - welcome! We're a weekly podcast where we break down complex tech topics into conversations anyone can follow. No PhD required.
 
-**진행자**: 청취자 분들이 보내주신 질문이 있는데요.
-"초보자는 어떻게 시작하면 좋을까요?"
+[laughs]
 
-**게스트**: 아, 좋은 질문이네요! 제가 추천드리는 건...
-
----
-
-## [30:00] 마무리
-
-### 핵심 정리
-
-**진행자**: 오늘 이야기 정리해보면:
-1. 첫째, [핵심 포인트]
-2. 둘째, [핵심 포인트]
-3. 셋째, [핵심 포인트]
-
-**게스트**: 네, 맞아요. 그리고 한 가지 더 덧붙이자면...
-
-### 리소스 공유
-
-**진행자**: 더 공부하고 싶으신 분들을 위해서
-쇼노트에 링크 남겨둘게요!
+**Host**: Alright, let's dive in!
 
 ---
 
-## [33:00] 아웃트로
+## [02:00] Episode Overview
 
-**진행자**: 오늘도 좋은 이야기 나눠주신 [게스트 이름]님,
-정말 감사합니다!
+**Host**: So, what are we covering today?
 
-**게스트**: 초대해주셔서 감사해요! 재밌었습니다.
+[pause]
 
-**진행자**: 청취자 여러분, 오늘 에피소드 어떠셨나요?
-궁금한 점이나 다음에 듣고 싶은 주제가 있다면
-podcast@techtalks.com으로 메일 보내주세요!
+Here's what you'll learn in the next 30 minutes:
 
-[아웃트로 음악]
+**One:** [First major topic] - the what and the why
+**Two:** [Second major topic] - how it actually works
+**Three:** [Third major topic] - practical applications
+And we'll wrap up with some listener questions at the end.
 
-**진행자**: 그럼 다음 주에 또 만나요! 안녕~!
+Sound good?
 
----
+[transition sound or pause]
 
-## 📎 쇼노트
-
-### 이번 에피소드에서 언급된 자료
-- [링크1]: 설명
-- [링크2]: 설명
-- [링크3]: 설명
-
-### 게스트 정보
-- Twitter: @username
-- Blog: blog.url.com
-- GitHub: github.com/username
-
-### 다음 에피소드 예고
-"[다음 주제]" - [게스트 이름]과 함께
+**Host**: Alright, let's start with the basics.
 
 ---
 
-## 💌 피드백 & 구독
+## [05:00] Segment 1: The Problem / Background
 
-이 팟캐스트가 도움이 되셨다면:
-- 🎧 팟캐스트 구독하기
-- ⭐ 별점 남기기
-- 💬 리뷰 작성하기
-- 📧 피드백 보내기
+**Host**: So [Guest Name / everyone], let's set the stage. Why does [topic] even matter?
 
-*음악 제공: [음원 출처]*
+**Guest/Host**: Great question. You know how when you're [relatable scenario]?
+
+**Host**: Oh yeah, definitely. [affirming response]
+
+**Guest/Host**: Well, that's exactly the problem [topic] solves. Let me explain...
+
+[Explain concept conversationally with analogies]
+
+**Key points to cover:**
+- What problem exists
+- Why current solutions fall short
+- Who's affected by this
+- Real-world impact
+
+**Host**: Okay, so just to make sure I'm following - [rephrase in simpler terms]. Is that right?
+
+**Guest/Host**: Exactly! You got it.
+
+**Host**: Awesome. Now, here's what I'm curious about... [transition to next segment]
+
+---
+
+## [12:00] Segment 2: The Solution / Deep Dive
+
+**Host**: So how does [solution/technology] actually work?
+
+**Guest/Host**: Alright, this is where it gets interesting.
+
+[pause]
+
+Think of it like this: [provide analogy]
+
+**Host**: [Responds naturally to analogy, asks clarifying question]
+
+**Guest/Host**: [Elaborates with more detail]
+
+[If technical code needed]
+**Guest/Host**: Now, I know this sounds abstract, so let me give you a quick example.
+
+Imagine you write:
+```javascript
+// Keep code extremely simple and read it aloud
+const result = doSomething();
+```
+
+What's happening here is... [explain verbally]
+
+**Host**: Got it. So basically, [summarize in plain language]?
+
+**Guest/Host**: Precisely!
+
+**Technique:**
+- Use conversational back-and-forth
+- Break complex topics into digestible chunks
+- Pause for "listener processing time"
+- Confirm understanding periodically
+
+---
+
+## [20:00] Segment 3: Practical Applications
+
+**Host**: This is all making sense. But here's what our listeners really want to know: How do I actually use this?
+
+**Guest/Host**: [laughs] Right, let's get practical.
+
+Here are three ways you can start using [topic] today:
+
+**First:** [Simple, immediately actionable tip]
+
+**Host**: Okay, that's pretty straightforward.
+
+**Guest/Host**: Right? And here's the second thing...
+
+**Second:** [Intermediate application]
+
+**Third:** [Advanced or long-term application]
+
+**Host**: Nice. And are there any gotchas? Things people should watch out for?
+
+**Guest/Host**: Oh, absolutely. The biggest mistake I see is... [common pitfall with advice]
+
+---
+
+## [25:00] Rapid Fire Q&A / Lightning Round
+
+[Upbeat transition sound]
+
+**Host**: Alright, it's time for everyone's favorite segment - the lightning round!
+
+[If guest]
+**Host**: I'm going to fire off some quick questions, and you give me quick answers. Ready?
+
+**Guest**: Let's do it!
+
+**Host**: Question one from @username on Twitter: [User question]
+
+**Guest**: [Quick 30-second answer]
+
+**Host**: Nice! Question two...
+
+[Repeat for 3-5 questions]
+
+[If solo]
+**Host**: Let's tackle some listener questions! These came in from our Discord and Twitter.
+
+**Question 1:** [Read question]
+**Answer:** [Respond conversationally]
+
+---
+
+## [28:00] Key Takeaways / Recap
+
+**Host**: Wow, we covered a lot today. Let's do a quick recap for everyone listening while driving or doing dishes.
+
+[laughs]
+
+Here's what you need to remember:
+
+**One:** [First key takeaway] - remember, [memorable phrase or analogy]
+
+**Two:** [Second key takeaway] - the big thing here is [key point]
+
+**Three:** [Third key takeaway] - and don't forget to [actionable advice]
+
+**Host**: [Guest Name], any final thoughts you want to leave our listeners with?
+
+**Guest/Host**: Yeah, I'd just say... [inspiring or practical closing thought]
+
+**Host**: Perfect. Love it.
+
+---
+
+## [30:00] Outro & Call-to-Action
+
+**Host**: That's going to do it for today's episode!
+
+[If guest]
+**Host**: [Guest Name], thanks so much for joining us. Where can people find you online?
+
+**Guest**: Yeah, I'm on Twitter @[handle], and my blog is at [URL]. Come say hi!
+
+**Host**: Awesome. I'll put all those links in the show notes.
+
+[For all episodes]
+**Host**: And to everyone listening - if you enjoyed this episode, here's how you can help:
+
+**One:** Subscribe or follow the podcast. We drop new episodes every [frequency].
+
+**Two:** Leave us a rating or review. Honestly, it helps more than you'd think.
+
+**Three:** Share this episode with one developer friend who'd benefit. Just one!
+
+**Host**: Next week, we're talking about [next episode teaser]. You won't want to miss it because [interesting hook].
+
+[pause]
+
+**Host**: Until then, happy coding, and we'll catch you in the next one!
+
+[Outro music]
+
+---
+
+**Show Notes:**
+- [00:30] Introduction
+- [05:00] [Topic 1]
+- [12:00] [Topic 2]
+- [20:00] Practical applications
+- [25:00] Q&A
+- [28:00] Key takeaways
+
+**Resources mentioned:**
+- [Link 1]
+- [Link 2]
+- [Link 3]
+
+**Connect with us:**
+- Twitter: @podcastname
+- Discord: [invite link]
+- Email: podcast@example.com
+
+**Sponsored by:** [If applicable]
+[Sponsor message in conversational style]
+```
+
+## Usage Guidelines
+
+- **Structure:** Cold open → Intro → Overview → 3 segments → Q&A → Recap → Outro
+- **Pacing:** Vary tempo - fast for exciting parts, slow for complex concepts
+- **Interaction:** Host reacts naturally, asks clarifying questions
+- **Transitions:** Use verbal bridges between segments
+- **Time Management:** Aim for 30-40 minute episodes (3500-5000 chars)
+
+## Podcast Best Practices
+
+- **Natural Speech**: Use contractions, filler words occasionally (um, you know - sparingly)
+- **Active Listening**: Host responds authentically to guest
+- **Analogies Over Code**: Prefer metaphors to technical jargon
+- **Rhythm**: Mix short and long exchanges
+- **Humor**: Light, self-deprecating humor works well
+- **Energy**: Maintain enthusiasm throughout
+
+## Voice Marker Guidelines
+
+- **[laughs]**: After jokes or amusing points
+- **[pause]**: Before important points or for emphasis
+- **[emphasis]**: On key terms or crucial concepts
+- **[thoughtful tone]**: When considering complex questions
+- **[excited]**: When sharing breakthroughs or "aha" moments
 
 ---
 
 # === IMPROVE MARKDOWN PROMPT ===
-# ✅ USER SECTION - CUSTOMIZE THIS FOR YOUR IMPROVEMENT STANDARDS
 
-# 팟캐스트 스타일 개선 체크리스트
+Style-specific enhancement guidelines for podcast script blog posts.
 
-## 🎙️ 대화감 강화
+## Core Philosophy
 
-### 문어체를 구어체로
-❌ Before: "이것은 중요한 개념입니다"
-✅ After: "이거 정말 중요해요, 여러분"
+Transform written technical content into engaging spoken conversations that listeners can follow while multitasking. Every sentence should sound natural when read aloud, with clear verbal signposts for audio-only consumption.
 
-### 음성 지시문 추가
-❌ Before: "다음으로 설명드리겠습니다"
-✅ After: "[잠시 멈춤] 자, 이제 다음 이야기로 넘어갈게요"
+## Enhancement Techniques
 
-### 청취자 호명
-❌ Before: "이 기능은 유용합니다"
-✅ After: "여러분도 이 기능 써보시면 정말 편할 거예요"
+### 1. Written-to-Spoken Transformation
 
-## 🎧 오디오 최적화
+❌ **Before**: "We will examine the implementation of concurrent rendering in React 18."
 
-### 시각적 요소 제거
-- 도표 → 말로 설명
-- 그림 참조 → 비유로 대체
-- 코드 블록 → 핵심만 언급
+✅ **After**:
+**Host**: Alright, so let's talk about React 18's concurrent rendering.
 
-### 타임스탬프 추가
-- 주요 섹션마다 [XX:XX] 표시
-- 5-10분 단위로 구분
-- 핵심 내용 시작점 명시
+**Guest**: Yeah, so here's the thing...
 
-## 📊 에피소드 구조
+[pause]
 
-### 필수 요소 체크
-- [ ] 인트로 (자기소개, 주제 소개)
-- [ ] 본론 (대화 형식)
-- [ ] Q&A 또는 팁
-- [ ] 요약 정리
-- [ ] 아웃트로 (다음 예고, CTA)
+You know how React used to block the entire page when it was rendering something big?
 
-전달 방식: 귀로 듣기 편하게!
+**Host**: Oh yeah, the whole "freeze" thing.
+
+**Guest**: Exactly! Well, concurrent rendering changes that completely.
+
+**Technique**:
+- Replace formal statements with questions and responses
+- Use conversational fillers ("so", "you know", "well")
+- Break into digestible back-and-forth exchanges
+- Add natural reactions and affirmations
+- Use present tense and active voice
+
+### 2. Adding Voice Markers for Pacing
+
+❌ **Before**: "This is an important concept that developers often misunderstand."
+
+✅ **After**:
+**Host**: Okay, this next part is really important.
+
+[pause]
+
+And honestly? It's something a lot of developers get wrong.
+
+[emphasis]
+
+**Guest**: Oh, absolutely. I see this mistake all the time.
+
+**Technique**:
+- [pause] before key points for listener processing
+- [emphasis] to signal crucial information
+- [thoughtful tone] when explaining complex ideas
+- [laughs] after relatable mistakes or humor
+- Strategic white space for natural breathing
+
+### 3. Audience Engagement Injection
+
+❌ **Before**: "Redux provides centralized state management."
+
+✅ **After**:
+**Host**: Now, how many of you listening have used Redux?
+
+[pause]
+
+Yeah, I thought so. A lot of you.
+
+Here's the thing with Redux - it's all about having one central place for your app's state. Think of it like...
+
+Actually, [Guest Name], how do you explain Redux to beginners?
+
+**Guest**: Great question! So imagine your app is a company...
+
+**Technique**:
+- Direct address to listeners ("you listening", "those of you who...")
+- Rhetorical questions to engage mental participation
+- Acknowledge listener experiences
+- Create "we're in this together" feeling
+- Invite listeners to think before explaining
+
+### 4. Visual-to-Verbal Translation
+
+❌ **Before**: "As you can see in the diagram, the data flows from top to bottom."
+
+✅ **After**:
+**Guest**: Okay, picture this in your mind.
+
+[pause]
+
+Imagine a waterfall. Water starts at the top, right? And it flows down.
+
+**Host**: Sure, gravity and all that.
+
+**Guest**: Exactly! That's how React's data flow works. Parent components at the top, child components at the bottom. Data flows downward.
+
+**Host**: Ah, so like a one-way street?
+
+**Guest**: Perfect analogy. You got it.
+
+**Technique**:
+- Replace "as shown" with "imagine" or "picture this"
+- Use physical analogies (waterfalls, streets, buildings)
+- Describe spatial relationships verbally
+- Confirm mental model with listener ("see what I mean?")
+- Avoid any reference to visual aids
+
+### 5. Code Explanation Verbalization
+
+❌ **Before**:
+```javascript
+const [state, setState] = useState(initialValue);
+```
+
+✅ **After**:
+**Guest**: So in your code, you'd write something like this.
+
+[pause]
+
+You say "const" - you're declaring a constant. Then you have these square brackets with two things inside: "state" and "setState".
+
+**Host**: Those are like... what, two variables?
+
+**Guest**: Exactly! The first one, "state", is your actual value. The second one, "setState", is how you change it.
+
+**Host**: Got it. So I read the state, and I set the state.
+
+**Guest**: Bingo! And all of this equals "useState" with your initial value.
+
+**Host**: Okay, that's actually pretty straightforward when you explain it that way.
+
+**Technique**:
+- Read code elements aloud with context
+- Explain syntax verbally ("square brackets", "equals sign")
+- Break code into conceptual chunks
+- Use conversational explanations for each part
+- Confirm understanding through dialogue
+- Avoid showing long code blocks
+
+### 6. Building Conversational Rhythm
+
+❌ **Before**: Long unbroken paragraph of explanation.
+
+✅ **After**:
+**Host**: So let me make sure I understand this.
+
+**Guest**: Yeah, go ahead.
+
+**Host**: You're saying that hooks let you use state...
+
+**Guest**: Right.
+
+**Host**: ...without writing a class component?
+
+**Guest**: Exactly! That's the big innovation.
+
+**Host**: Okay, so no more "this dot state" and all that?
+
+**Guest**: [laughs] Nope! You can forget about "this" entirely.
+
+**Host**: That's... actually amazing.
+
+**Technique**:
+- Alternate between speakers frequently
+- Use short exchanges for clarity
+- Build-up-and-payoff structure
+- Natural interruptions and completions
+- Vary sentence length for rhythm
+- Short affirmations ("Right", "Exactly", "Yeah")
+
+### 7. Time Marker Integration
+
+❌ **Before**: No time references, just continuous text.
+
+✅ **After**:
+## [00:00] Cold Open
+
+**Host**: [Interesting hook question]
+
+## [02:30] Introduction
+
+[Intro music]
+
+**Host**: Welcome to Tech Talk Podcast...
+
+## [05:00] Topic Overview
+
+**Host**: Today we're covering three main things...
+
+## [08:00] First Main Point
+
+**Guest**: Let's start with...
+
+## [18:00] Second Main Point
+
+**Host**: Okay, that makes sense. Now what about...
+
+## [25:00] Listener Questions
+
+**Host**: Alright, time for the lightning round!
+
+## [30:00] Outro
+
+**Host**: That's all for today folks!
+
+**Technique**:
+- Place timestamps at natural breaks
+- 2-5 minute segments for main content
+- Longer segments (10-15 min) for deep dives
+- Helps listeners navigate and return
+- Creates natural pacing structure
+- Signals topic transitions
+
+### 8. Analogy-Driven Explanation
+
+❌ **Before**: "Middleware intercepts actions before they reach the reducer."
+
+✅ **After**:
+**Guest**: Okay, think of middleware like security at a concert.
+
+**Host**: [laughs] Alright, I'm listening.
+
+**Guest**: So you've got fans trying to get into the venue, right? That's your actions. And inside the venue, you've got the band playing - that's your reducer.
+
+**Host**: Okay, so the actions are trying to reach the reducer...
+
+**Guest**: Exactly! But before they get there, they have to go through security. Security checks tickets, maybe searches bags...
+
+**Host**: They might even turn people away!
+
+**Guest**: Bingo! That's middleware. It can check your actions, modify them, or even block them entirely before they reach the reducer.
+
+**Host**: Dude, that's a perfect analogy.
+
+**Technique**:
+- Choose universally relatable analogies
+- Build the analogy collaboratively (host adds to it)
+- Map technical concepts to physical scenarios
+- Let host "discover" the connection
+- Extend analogies for complex behaviors
+- Avoid mixing metaphors
+
+### 9. Energy and Emotion Markers
+
+❌ **Before**: "This feature is important."
+
+✅ **After**:
+**Guest**: Okay, listen. This next part?
+
+[emphasis]
+
+This is what changed everything for me.
+
+**Host**: [intrigued] Really?
+
+**Guest**: [excited] Yes! When I discovered this, it was like...
+
+[pause]
+
+It was like someone turned on the lights, you know?
+
+**Host**: [laughs] Okay, now you've got me curious.
+
+**Guest**: [building excitement] So here's what happens...
+
+**Technique**:
+- Use emotion markers: [excited], [surprised], [thoughtful]
+- Vary vocal energy to maintain engagement
+- Build anticipation before reveals
+- Express genuine enthusiasm for breakthroughs
+- Use tone shifts to signal importance
+- Show personality through reactions
+
+### 10. Q&A Format Optimization
+
+❌ **Before**: "Common questions include: How does X work? What about Y?"
+
+✅ **After**:
+## [25:00] Listener Questions
+
+**Host**: Alright everyone, it's time for the lightning round!
+
+[upbeat transition sound effect]
+
+**Host**: These questions came in from our Discord and Twitter. Ready [Guest Name]?
+
+**Guest**: Fire away!
+
+**Host**: First question from @DevMike: "How does X work in production?"
+
+**Guest**: Oh, great question! So in production...
+
+[Quick 45-second answer]
+
+**Host**: Love it. Next up, @CodeNewbie asks: "What about Y?"
+
+**Guest**: Ah yes, Y is interesting because...
+
+[Another concise answer]
+
+**Host**: Perfect. One more - this is from our Discord...
+
+**Technique**:
+- Frame as real listener questions
+- Attribute to usernames (builds community)
+- Fast-paced, energetic delivery
+- Keep answers under 60 seconds
+- Host provides quick transitions
+- Maintain momentum throughout segment
+
+## Common Issues to Fix
+
+### Issue 1: Too Formal/Written
+
+**Problem**: Sounds like reading an essay aloud
+**Fix**: Add conversational elements and natural speech patterns
+
+❌ "Subsequently, we shall examine..."
+✅ "Alright, so next up, let's look at..."
+
+### Issue 2: No Pauses or Pacing
+
+**Problem**: Walls of text without breathing room
+**Fix**: Add [pause], [beat], line breaks
+
+❌ Long unbroken paragraph
+✅ Short exchanges with pauses
+     Strategic white space
+     Natural conversation flow
+
+### Issue 3: Visual Dependency
+
+**Problem**: References to diagrams, charts, screens
+**Fix**: Replace all visual references with verbal descriptions
+
+❌ "As you can see in figure 3..."
+✅ "So picture this in your mind..."
+
+### Issue 4: Monologue Instead of Dialogue
+
+**Problem**: One speaker dominates without interaction
+**Fix**: Create host-guest dynamic with back-and-forth
+
+Host asks questions, guest explains
+Natural interruptions and clarifications
+Both contribute to explanation
+
+### Issue 5: Jargon Without Translation
+
+**Problem**: Technical terms without audio-friendly explanation
+**Fix**: Define terms conversationally
+
+❌ "The idempotent operation ensures..."
+✅ "So 'idempotent' - which just means you can run it multiple times and get the same result..."
+
+## Quality Improvement Checklist
+
+- [ ] Every segment has time marker
+- [ ] 5+ voice markers ([pause], [laughs], etc.)
+- [ ] 3+ direct audience addresses
+- [ ] No visual references (diagrams, charts)
+- [ ] Code blocks minimal (<5%) and verbalized
+- [ ] Natural dialogue rhythm (not monologue)
+- [ ] Host-guest interaction feels authentic
+- [ ] Analogies replace abstract concepts
+- [ ] Episode structure clear (Intro → Main → Outro)
+- [ ] Call-to-action in outro
+- [ ] Show notes with timestamps
+- [ ] All text speakable/readable aloud
+- [ ] Energy and emotion marked
+- [ ] Technical terms explained verbally
+
+## Before/After Example
+
+### Before (Written Article)
+
+```
+# Understanding React Hooks
+
+React Hooks are functions that let you use state and other React features in functional components. The useState Hook allows you to add state management.
+
+```javascript
+import { useState } from 'react';
+
+function Counter() {
+  const [count, setCount] = useState(0);
+  return <button onClick={() => setCount(count + 1)}>{count}</button>;
+}
+```
+
+This example demonstrates basic state management using useState.
+```
+
+### After (Podcast Script)
+
+```
+# [EP.15] React Hooks Explained: Finally Making Sense of useState
+
+**Episode Length:** 25 minutes | **Topics:** React Hooks, useState, Functional Components
+
+---
+
+## [00:00] Cold Open
+
+**Host**: Pop quiz! What's the number one thing that confused developers about React in 2019?
+
+[pause]
+
+If you said "Hooks", you'd be absolutely right.
+
+[laughs]
+
+**Host**: Today, we're going to fix that. Let's dive in.
+
+---
+
+## [00:30] Intro
+
+[Intro music]
+
+**Host**: Welcome to Tech Talk Podcast! I'm Sarah, and today we're talking about React Hooks.
+
+Now, I know what you're thinking: "Oh no, not another Hooks explanation."
+
+[laughs]
+
+**Host**: But stick with me here, because we're going to make this finally click for you.
+
+For today's episode, I'm flying solo, but I promise to make this as conversational as possible.
+
+---
+
+## [02:00] The "Aha" Moment
+
+**Host**: Alright, so let's start with the big question: What are Hooks?
+
+[pause]
+
+Here's the simplest way I can put it: Hooks are like...
+
+Actually, imagine your functional component is a basic toolbox. Originally, it only came with a hammer and a screwdriver - pretty limited, right?
+
+[pause]
+
+Hooks are like adding power tools to that toolbox. Suddenly, you can do way more without needing a completely different toolbox.
+
+Does that make sense?
+
+[beat]
+
+Good. Let's break that down further.
+
+---
+
+## [05:00] The useState Hook
+
+**Host**: The most common Hook - and probably the one you'll use most - is called "useState".
+
+[pause]
+
+It does exactly what it sounds like: it lets you "use state" in your functional component.
+
+Before Hooks, if you wanted state, you had to write a class component. Remember that nightmare?
+
+[laughs]
+
+**Host**: Yeah, "this dot state", "this dot setState", binding "this" everywhere...
+
+[emphasis]
+
+Hooks let you throw all of that away.
+
+Here's what it looks like now.
+
+You write: "const" - you're declaring a constant. Then square brackets with two things inside.
+
+First thing is "count" - that's your state value.
+
+Second thing is "setCount" - that's how you update it.
+
+And all of this equals "useState" with zero inside the parentheses.
+
+**Host**: So in plain English, you're saying: "Hey React, give me a piece of state called 'count', starting at zero. And give me a function called 'setCount' that I can use to change it."
+
+That's it. That's the whole thing.
+
+[pause]
+
+Pretty straightforward, right?
+
+---
+
+## [12:00] Why This Matters
+
+**Host**: Now, you might be wondering: "Okay, but why is this such a big deal?"
+
+[thoughtful tone]
+
+Here's why: before Hooks, you'd have to convert your entire component from a function to a class just to add one piece of state.
+
+One. Piece. Of. State.
+
+[laughs]
+
+**Host**: It was ridiculous! You'd go from 10 lines of clean code to 30 lines of boilerplate.
+
+With Hooks, you just add one line. Done.
+
+And for you folks listening who are new to React, you never have to learn class components at all.
+
+[excited]
+
+You get to skip that entire era of React development. How lucky are you?
+
+---
+
+## [18:00] Quick Practical Example
+
+**Host**: Alright, let me give you a real-world scenario.
+
+You're building a counter button. You know, click it, the number goes up.
+
+Without Hooks, you'd need a whole class component setup.
+
+With Hooks? Here's all you need:
+
+[pause]
+
+You import useState from React.
+
+You create your component function.
+
+You say "const count setCount equals useState zero".
+
+Then in your return, you make a button that says "onClick equals...
+
+[pause]
+
+...an arrow function that calls "setCount" with "count plus one".
+
+And display the count.
+
+That's the whole thing. Fifteen lines, max.
+
+---
+
+## [22:00] Your Homework
+
+**Host**: So here's what I want you to do.
+
+[pause]
+
+After this episode, go try it. Just create a simple counter.
+
+Don't overthink it. One state variable, one button.
+
+Get that working, and you've officially learned Hooks.
+
+---
+
+## [24:00] Outro
+
+**Host**: That's it for today's episode!
+
+If this finally made Hooks click for you, do me a favor:
+
+One - Subscribe to the podcast. New episodes every Tuesday.
+
+Two - Share this with one person who's struggling with Hooks. Just one!
+
+Three - Join our Discord. Link in the show notes. Come say hi!
+
+Next week, we're talking about useEffect. And trust me, that one needs its own episode.
+
+[laughs]
+
+**Host**: Until then, happy coding!
+
+[Outro music]
+```
+
+## Final Tips
+
+1. **Read aloud**: Record yourself reading the script - does it sound natural?
+2. **Cut the fat**: Remove any sentence that doesn't add value when heard
+3. **Emphasize key points**: Use voice markers to signal important information
+4. **Vary your rhythm**: Mix short punchy lines with longer explanations
+5. **React naturally**: Host should respond authentically, not robotically
+6. **Time yourself**: Aim for 100-120 words per minute speaking pace
+7. **Include pauses**: Give listeners time to process complex ideas
+8. **Be conversational**: Use "you" and "we" liberally, avoid "one" or passive voice
+9. **Test analogies**: Make sure metaphors work without visual aid
+10. **End strong**: Call-to-action and episode teaser keep listeners coming back

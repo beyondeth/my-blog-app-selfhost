@@ -33,7 +33,7 @@ function parseYamlFrontMatter(content: string): { metadata: any; body: string } 
   const yamlContent = yamlMatch[1];
   const body = yamlMatch[2];
 
-  // Simple YAML parser for our specific use case
+  // Simple YAML parser
   const metadata: any = {};
   const lines = yamlContent.split('\n');
 
@@ -43,12 +43,12 @@ function parseYamlFrontMatter(content: string): { metadata: any; body: string } 
       const key = match[1];
       let value: any = match[2];
 
-      // Remove quotes if present
+      // Remove quotes
       if (value.startsWith('"') && value.endsWith('"')) {
         value = value.slice(1, -1);
       }
 
-      // Convert to appropriate type
+      // Convert types
       if (value === 'true') value = true;
       else if (value === 'false') value = false;
       else if (!isNaN(Number(value))) value = Number(value);
@@ -61,12 +61,10 @@ function parseYamlFrontMatter(content: string): { metadata: any; body: string } 
 }
 
 /**
- * Parse sections from markdown content based on section headers
+ * Parse sections from markdown content
  */
 function parseSections(content: string): Record<string, string> {
   const sections: Record<string, string> = {};
-
-  // Split by section headers (=== SECTION NAME ===)
   const sectionRegex = /^# === (.+?) ===$/gm;
   const matches = [...content.matchAll(sectionRegex)];
 
@@ -82,7 +80,7 @@ function parseSections(content: string): Record<string, string> {
 
     const sectionContent = content.slice(startIndex, endIndex).trim();
 
-    // Remove the comment line and extract actual content
+    // Remove comment lines
     const lines = sectionContent.split('\n');
     const contentLines = lines.filter(line =>
       !line.startsWith('#') ||
@@ -96,12 +94,12 @@ function parseSections(content: string): Record<string, string> {
 }
 
 /**
- * Default fallback writing style (minimal emergency fallback only)
+ * Default fallback writing style
  */
 function getDefaultWritingStyle(): WritingStyle {
   return {
     metadata: {
-      styleName: "Emergency Fallback (default.md not found)",
+      styleName: "⚠️ Fallback Mode (스타일 파일 없음)",
       language: "korean",
       minLength: 2000,
       targetLength: "3000-5000",
@@ -109,54 +107,45 @@ function getDefaultWritingStyle(): WritingStyle {
       aiTagRequired: true,
       autoEnhance: true,
     },
-    instructions: "MCP Blog Server - Fallback Mode. Please ensure default.md exists.",
-    createPostDescription: "Create a blog post (fallback mode - default.md missing)",
-    qualityGuidelinesPrompt: "Write quality content following best practices",
-    blogPostTemplatePrompt: "Use standard blog structure with introduction, body, and conclusion",
-    improveMarkdownPrompt: "Improve markdown content for better readability",
+    instructions: `
+⚠️ FALLBACK MODE
+스타일 파일을 찾을 수 없습니다.
+.env에 WRITING_STYLE 설정을 확인하세요.
+
+기본 규칙:
+- AI 태그 필수 (ai:claude/chatgpt/gemini)
+- 한국어 작성 (요청 시 영어)
+- 2000자 이상
+`,
+    createPostDescription: "⚠️ Fallback: 블로그 포스트 생성 (제한된 기능)",
+    qualityGuidelinesPrompt: "Write quality content (Fallback mode)",
+    blogPostTemplatePrompt: "Basic blog post template (Fallback mode)",
+    improveMarkdownPrompt: "Improve your markdown content (Fallback mode)",
   };
 }
 
 /**
  * Load writing style from markdown file
+ * Reads WRITING_STYLE env var (e.g., "default") and loads writing-styles/{style}.md
  */
-export async function loadWritingStyle(filePath?: string): Promise<WritingStyle> {
+export async function loadWritingStyle(): Promise<WritingStyle> {
   try {
-    // Determine file path
-    // 환경변수에서 스타일 파일을 가져오거나 filePath 파라미터를 사용
-    const styleFile = filePath || process.env['WRITING_STYLE_FILE'];
+    // Get style from env (just the name, e.g., "default")
+    const styleName = process.env['WRITING_STYLE'] || 'default';
+    const styleFile = `writing-styles/${styleName}.md`;
 
-    // 스타일 파일이 지정되지 않았으면 에러 발생
-    if (!styleFile) {
-      throw new Error('No writing style file specified. Please set WRITING_STYLE_FILE environment variable or provide a file path.');
-    }
+    // Resolve path relative to package root
+    // __dirname = dist/lib, so we need to go up two levels
+    const packageRoot = path.join(__dirname, '..', '..');
+    const fullPath = path.resolve(packageRoot, styleFile);
 
-    // 경로 해석 로직 개선 (filesystem.ts와 동일)
-    let fullPath: string;
+    console.error(`📝 Loading style: ${styleName} from ${fullPath}`);
 
-    if (styleFile.startsWith('./') || styleFile.startsWith('../') || !path.isAbsolute(styleFile)) {
-      // 상대 경로: 패키지 루트 기준으로 해석
-      // __dirname은 컴파일된 dist 디렉토리 (dist 또는 dist/lib)
-      // 패키지 루트는 __dirname의 상위 디렉토리
-      const packageRoot = path.join(__dirname, '..');
-      fullPath = path.resolve(packageRoot, styleFile);
-    } else {
-      // 절대 경로: 그대로 사용
-      fullPath = styleFile;
-    }
-
-    console.error(`📝 Loading writing style from: ${fullPath}`);
-
-    // Read file
+    // Read and parse file
     const fileContent = await fs.readFile(fullPath, 'utf-8');
-
-    // Parse YAML front matter
     const { metadata, body } = parseYamlFrontMatter(fileContent);
-
-    // Parse sections
     const sections = parseSections(body);
 
-    // Build WritingStyle object
     const writingStyle: WritingStyle = {
       metadata: {
         styleName: metadata.style_name || "Unknown Style",
@@ -174,12 +163,12 @@ export async function loadWritingStyle(filePath?: string): Promise<WritingStyle>
       improveMarkdownPrompt: sections['IMPROVE MARKDOWN PROMPT'] || '',
     };
 
-    console.error(`✅ Writing style loaded: ${writingStyle.metadata.styleName}`);
+    console.error(`✅ Style loaded: ${writingStyle.metadata.styleName}`);
     return writingStyle;
 
   } catch (error) {
-    console.error(`⚠️ Failed to load writing style: ${error instanceof Error ? error.message : String(error)}`);
-    console.error('📝 Using default fallback writing style');
+    console.error(`⚠️ Failed to load style: ${error instanceof Error ? error.message : String(error)}`);
+    console.error('📝 Using fallback style');
     return getDefaultWritingStyle();
   }
 }
