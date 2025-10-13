@@ -137,7 +137,7 @@ export class ProxyClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.sessionId && { 'X-MCP-Session-ID': this.sessionId }),
+          ...(this.sessionId && { 'Mcp-Session-Id': this.sessionId }),
         },
         body: JSON.stringify({}),
       });
@@ -189,7 +189,7 @@ export class ProxyClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-MCP-Session-ID': this.sessionId,
+          'Mcp-Session-Id': this.sessionId,
         },
         body: requestBody,
       });
@@ -221,7 +221,7 @@ export class ProxyClient {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(this.sessionId && { 'X-MCP-Session-ID': this.sessionId }),
+          ...(this.sessionId && { 'Mcp-Session-Id': this.sessionId }),
         },
         body: JSON.stringify({}),
       });

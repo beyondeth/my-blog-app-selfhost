@@ -7,7 +7,8 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { AxiosError } from 'axios';
-import { config } from '../config/env.validation';
+import { config } from '../config/env.validation.js';
+import { errorsTotal } from '../metrics/prometheus.js';
 
 // 에러 응답 타입 정의
 export interface ErrorResponse {
@@ -164,6 +165,14 @@ export function errorHandler(
   // 안전한 에러 응답 생성
   const errorResponse = sanitizeError(error, isDevelopment);
 
+  // 에러 메트릭 기록
+  const errorCode = errorResponse.error.code;
+  const statusCodeStr = statusCode.toString();
+  errorsTotal.inc({
+    error_code: errorCode,
+    status_code: statusCodeStr,
+  });
+
   // 응답 전송
   res.status(statusCode).json(errorResponse);
 }
@@ -177,6 +186,12 @@ export function notFoundHandler(req: Request, res: Response) {
     'ENDPOINT_NOT_FOUND',
     `엔드포인트를 찾을 수 없습니다: ${req.method} ${req.path}`
   );
+
+  // 에러 메트릭 기록
+  errorsTotal.inc({
+    error_code: 'ENDPOINT_NOT_FOUND',
+    status_code: '404',
+  });
 
   res.status(404).json(sanitizeError(error, config.NODE_ENV === 'development'));
 }

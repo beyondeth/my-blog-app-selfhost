@@ -6,10 +6,10 @@
 
 import { Router } from 'express';
 import axios from 'axios';
-import { SessionService } from '../services/SessionService';
-import { config } from '../config/env.validation';
-import { asyncHandler, AppError, ErrorCodes } from '../middleware/error-handler';
-import { ProxyRequest, ApiResponse } from '../types';
+import { SessionService } from '../services/SessionService.js';
+import { config } from '../config/env.validation.js';
+import { asyncHandler, AppError, ErrorCodes } from '../middleware/error-handler.js';
+import { ProxyRequest, ApiResponse } from '../types/index.js';
 
 export function createProxyRoutes(sessionService: SessionService): Router {
   const router = Router();
@@ -20,11 +20,11 @@ export function createProxyRoutes(sessionService: SessionService): Router {
    * POST /api/v1/mcp/sessions/proxy
    */
   router.post('/proxy', asyncHandler(async (req, res) => {
-    const sessionId = req.headers['x-mcp-session-id'] as string;
+    const sessionId = req.headers['mcp-session-id'] as string;
     const { method, path, body, headers }: ProxyRequest = req.body;
 
     if (!sessionId) {
-      throw new AppError(400, ErrorCodes.MISSING_PARAMS, 'x-mcp-session-id 헤더 필요');
+      throw new AppError(400, ErrorCodes.MISSING_PARAMS, 'mcp-session-id 헤더 필요');
     }
 
     // 세션 유효성 검증

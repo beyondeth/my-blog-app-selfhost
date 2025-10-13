@@ -17,18 +17,20 @@ module.exports = {
       exec_mode: 'cluster',  // 클러스터 모드 활성화
 
       // 환경 변수
+      // ⚠️ 주의: 로컬 개발 시 pnpm start는 .env의 PORT=3002를 사용합니다
+      // PM2로 실행 시에는 아래 포트를 사용합니다
       env: {
         NODE_ENV: 'production',
-        PORT: 8080,
+        PORT: 3002,  // .env 파일과 일관성 유지 (이전: 8080)
       },
       env_development: {
         NODE_ENV: 'development',
-        PORT: 8080,
+        PORT: 3002,  // .env 파일과 일관성 유지 (이전: 8080)
         LOG_LEVEL: 'debug',
       },
       env_staging: {
         NODE_ENV: 'staging',
-        PORT: 8080,
+        PORT: 3002,  // .env 파일과 일관성 유지 (이전: 8080)
         LOG_LEVEL: 'info',
       },
 
@@ -67,7 +69,7 @@ module.exports = {
 
       env: {
         NODE_ENV: 'development',
-        PORT: 8080,
+        PORT: 3002,  // .env 파일과 일관성 유지 (이전: 8080)
         LOG_LEVEL: 'debug',
         LOG_PRETTY: 'true',
       },

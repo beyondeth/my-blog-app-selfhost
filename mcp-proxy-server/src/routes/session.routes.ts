@@ -7,10 +7,11 @@
 import { Router } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
-import { SessionService } from '../services/SessionService';
-import { config } from '../config/env.validation';
-import { asyncHandler, AppError, ErrorCodes } from '../middleware/error-handler';
-import { ApiResponse, TokenResponse, SessionStatus } from '../types';
+import { SessionService } from '../services/SessionService.js';
+import { config } from '../config/env.validation.js';
+import { asyncHandler, AppError, ErrorCodes } from '../middleware/error-handler.js';
+import { ApiResponse, TokenResponse, SessionStatus } from '../types/index.js';
+import { authEmitter } from '../events/auth-events.js';
 
 export function createSessionRoutes(sessionService: SessionService): Router {
   const router = Router();
@@ -118,6 +119,10 @@ export function createSessionRoutes(sessionService: SessionService): Router {
       refresh_token,
       expires_in
     );
+
+    // ✨ 인증 완료 이벤트 발생 (폴링 제거, 즉시 알림)
+    authEmitter.emit('auth_complete', sessionId);
+    console.log(`🎉 인증 완료 이벤트 발생: ${sessionId.substring(0, 8)}...`);
 
     const response: ApiResponse = {
       success: true,

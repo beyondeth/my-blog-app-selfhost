@@ -1,13 +1,8 @@
 {
   "mcpServers": {
-    "codebase_blog": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@codebase/mcp-blog-client"],
-      "env": {
-        "PROXY_SERVER_URL": "http://localhost:3002",
-        "WRITING_STYLE": "novel"
-      }
+    "codebase_blog_v2": {
+      "type": "http",
+      "url": "http://localhost:3002/mcp"
     }
   }
 }

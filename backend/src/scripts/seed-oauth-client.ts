@@ -55,7 +55,8 @@ async function bootstrap() {
       redirectUris: [
         'http://localhost:7777/callback',
         'http://localhost:8080/callback',
-        'http://localhost:3002/callback'
+        'http://localhost:3002/callback',
+        'http://localhost:3002/oauth/callback'  // MCP 프록시 서버 OAuth 콜백
       ],
       allowedScopes: ['mcp:post:create'],
       grantTypes: 'authorization_code',

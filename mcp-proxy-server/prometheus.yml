@@ -1,0 +1,34 @@
+# Prometheus 설정 파일
+# MCP Proxy Server 메트릭 수집 설정
+
+global:
+  scrape_interval: 15s  # 15초마다 메트릭 수집
+  evaluation_interval: 15s  # 15초마다 규칙 평가
+  external_labels:
+    monitor: 'mcp-proxy-monitor'
+    environment: 'development'
+
+# 알림 규칙 파일 (선택사항)
+# rule_files:
+#   - 'alert.rules.yml'
+
+# 메트릭 수집 대상 설정
+scrape_configs:
+  # MCP Proxy Server 메트릭
+  - job_name: 'mcp-proxy-server'
+    static_configs:
+      - targets: ['host.docker.internal:3002']  # Docker 내부에서 호스트 접근
+        labels:
+          service: 'mcp-proxy-server'
+          instance: 'localhost'
+
+    metrics_path: '/metrics'  # 메트릭 엔드포인트
+    scrape_interval: 10s  # 10초마다 수집
+    scrape_timeout: 5s  # 5초 타임아웃
+
+  # Prometheus 자체 메트릭
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+        labels:
+          service: 'prometheus'

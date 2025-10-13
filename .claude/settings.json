@@ -1,13 +1,2 @@
 {
-  "permissions": {
-    "allow": [
-      "mcp__codebase_blog__authenticate",
-      "mcp__codebase_blog__create_post",
-      "mcp__codebase_blog__create_post_from_file",
-      "mcp__codebase_blog__diagnose_connection"
-    ],
-    "defaultMode": "acceptEdits"
-  },
-  "enableAllProjectMcpServers": true,
-  "enabledMcpjsonServers": ["codebase_blog"]
 }

@@ -7,11 +7,11 @@
 import { Router } from 'express';
 import axios from 'axios';
 import crypto from 'crypto';
-import { SessionService } from '../services/SessionService';
-import { qualityEnhancer } from '../lib/quality-enhancer';
-import { config } from '../config/env.validation';
-import { asyncHandler, AppError, ErrorCodes } from '../middleware/error-handler';
-import { ApiResponse, CreatePostRequest, HealthCheckResponse } from '../types';
+import { SessionService } from '../services/SessionService.js';
+import { qualityEnhancer } from '../lib/quality-enhancer.js';
+import { config } from '../config/env.validation.js';
+import { asyncHandler, AppError, ErrorCodes } from '../middleware/error-handler.js';
+import { ApiResponse, CreatePostRequest, HealthCheckResponse } from '../types/index.js';
 
 export function createMcpRoutes(sessionService: SessionService): Router {
   const router = Router();
@@ -70,7 +70,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
    * POST /api/v1/mcp/authenticate
    */
   router.post('/authenticate', asyncHandler(async (req, res) => {
-    const sessionId = req.headers['x-mcp-session-id'] as string;
+    const sessionId = req.headers['mcp-session-id'] as string;
 
     // 세션이 이미 있고 유효한 경우
     console.log(`🔍 인증 요청 받음: sessionId=${sessionId?.substring(0, 8)}...`);
@@ -216,7 +216,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
    * POST /api/v1/mcp/create-post
    */
   router.post('/create-post', asyncHandler(async (req, res) => {
-    const sessionId = req.headers['x-mcp-session-id'] as string;
+    const sessionId = req.headers['mcp-session-id'] as string;
     // Body 로그 제거 - 불필요한 정보 노출 방지
     const { title, content, tags, qualityScore }: CreatePostRequest = req.body;
 
@@ -293,7 +293,7 @@ export function createMcpRoutes(sessionService: SessionService): Router {
    * POST /api/v1/mcp/health
    */
   router.post('/health', asyncHandler(async (req, res) => {
-    const sessionId = req.headers['x-mcp-session-id'] as string;
+    const sessionId = req.headers['mcp-session-id'] as string;
 
     let sessionInfo = null;
     if (sessionId) {
