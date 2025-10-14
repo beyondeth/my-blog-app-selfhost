@@ -5,20 +5,28 @@
  * - Bearer token으로 Backend API 호출
  * - Writing style은 도구 description에 이미 포함되어 있음
  *   (Claude Code가 도구 설명을 보고 해당 스타일로 글을 작성함)
+ * - writingStyle 파라미터: 사용자가 원하는 스타일 지정 (default, novel, tutorial, comedy, podcast)
  * - 입력 검증 강화 (XSS 방어)
+ * - 로컬 .md 백업 자동 저장
  */
 
 import axios from 'axios';
 import { SessionService } from '../services/SessionService.js';
+import { WritingStyleService } from '../services/WritingStyleService.js';
 import { CreatePostSchema, type CreatePostInput } from '../validation/schemas.js';
 import { z } from 'zod';
+import { savePostToFile } from '../lib/filesystem.js';
+import { logger } from '../utils/logger.js';
+import * as path from 'path';
 
 export interface CreatePostToolParams {
-  title: string;
-  content_markdown: string;
+  title?: string;
+  content_markdown?: string;
   tags?: string[];
   category?: string;
-  // writingStyle 파라미터 제거: 스타일은 도구 설명에 이미 포함됨
+  writingStyle?: string;
+  validationToken?: string;  // 검증 토큰 추가 (Phase 1)
+  challengeAnswer?: string;  // 챌린지 답변 추가 (Phase 2)
 }
 
 export interface CreatePostToolContext {
@@ -36,11 +44,173 @@ export async function createPostHandler(
   context: CreatePostToolContext
 ): Promise<{ content: Array<{ type: string; text: string }> }> {
   const { sessionService, config } = context;
-  const { sessionId, title, content_markdown, tags, category } = params;
+  const { sessionId, title, content_markdown, tags, category, writingStyle, validationToken, challengeAnswer } = params;
 
-  // 0. 입력 검증 (XSS/Injection 방어)
+  // Writing Style 로드 및 검증
+  const styleService = new WritingStyleService();
+  const selectedStyle = writingStyle || 'default';
+
+  // Phase 1: 토큰 검증 로직
+  if (!validationToken) {
+    // 토큰이 없으면 get_writing_style_guide 도구 호출을 유도
+    const errorMessage = `
+❌ **스타일 검증 토큰이 필요합니다!**
+
+포스트를 생성하려면 먼저 get_writing_style_guide 도구를 호출하여 스타일 가이드를 조회해야 합니다.
+
+**STEP 1: 스타일 가이드 조회**
+get_writing_style_guide 도구를 호출하세요:
+\`\`\`typescript
+get_writing_style_guide({ style: "${selectedStyle}" })
+\`\`\`
+
+**STEP 2: 토큰 추출**
+반환된 마크다운 상단의 YAML 메타데이터에서 \`validation_token\`을 찾으세요
+
+**STEP 3: create_post 호출**
+찾은 토큰을 \`validationToken\` 파라미터로 전달하세요:
+\`\`\`typescript
+create_post({
+  title: "제목",
+  content_markdown: "내용...",
+  tags: ["태그", "ai:claude"],
+  validationToken: "찾은-토큰-값-여기에"  // ← 이 부분 추가!
+})
+\`\`\`
+
+⚠️ **중요:** 로컬 파일을 직접 읽지 마세요! 반드시 get_writing_style_guide 도구를 사용하세요.
+💡 **힌트:** 도구를 사용하면 스타일 가이드라인도 함께 학습할 수 있습니다!
+`;
+    throw new Error(errorMessage);
+  }
+
+  // 토큰 유효성 검증
+  const tokenValidation = await styleService.validateToken(validationToken);
+  if (!tokenValidation.valid) {
+    throw new Error(
+      `❌ 잘못된 검증 토큰입니다!\n\n` +
+      `제공된 토큰: ${validationToken}\n` +
+      `올바른 스타일 파일을 읽고 정확한 토큰을 제공해주세요.`
+    );
+  }
+
+  // 토큰이 맞는 스타일인지 확인
+  if (tokenValidation.styleName !== selectedStyle) {
+    throw new Error(
+      `❌ 토큰이 요청한 스타일과 일치하지 않습니다!\n\n` +
+      `요청한 스타일: ${selectedStyle}\n` +
+      `토큰의 스타일: ${tokenValidation.styleName}\n` +
+      `올바른 스타일 파일의 토큰을 제공해주세요.`
+    );
+  }
+
+  logger.info({
+    styleName: tokenValidation.style?.metadata.styleName,
+    language: tokenValidation.style?.metadata.language,
+    selectedStyle: selectedStyle,
+    tokenProvided: true
+  }, `✅ [WritingStyle] Style validated with token: ${selectedStyle}`);
+
+  // Phase 2: 동적 챌린지 검증 (스타일 가이드 이해도 확인)
+  if (!challengeAnswer) {
+    // 답변이 없으면 랜덤 질문 던지기
+    const challenge = await styleService.getRandomChallenge(tokenValidation.styleName!);
+
+    if (!challenge) {
+      // 챌린지가 없으면 Phase 1만 통과로 진행 (하위 호환성)
+      logger.warn({
+        styleName: tokenValidation.styleName,
+        phase: 'Phase2-Skip'
+      }, '⚠️ [Challenge] No challenges found for style, proceeding with Phase 1 only');
+    } else {
+      // 챌린지가 있으면 답변 요구
+      const errorMessage = `
+❌ **스타일 가이드 이해도 확인 필요!**
+
+포스트를 생성하려면 다음 질문에 답변해주세요:
+
+**질문:** ${challenge.question}
+
+**답변 찾는 방법:**
+1. get_writing_style_guide 도구로 조회한 가이드를 다시 확인하세요
+2. YAML front matter의 \`validation_challenges\` 섹션에서 위 질문의 답변을 찾으세요
+3. 찾은 답변과 함께 create_post를 다시 호출하세요
+
+**예시:**
+\`\`\`typescript
+create_post({
+  title: "${title}",
+  content_markdown: "...",
+  tags: ${JSON.stringify(tags || [])},
+  validationToken: "${validationToken}",
+  challengeAnswer: "여기에 답변"  // ← 가이드에서 찾은 답변 추가!
+})
+\`\`\`
+
+💡 **힌트:** get_writing_style_guide로 조회한 내용을 다시 확인해보세요!
+`;
+      throw new Error(errorMessage);
+    }
+  } else {
+    // challengeAnswer가 있으면 검증
+    const answerValidation = await styleService.validateAnswerForStyle(
+      tokenValidation.styleName!,
+      challengeAnswer
+    );
+
+    if (!answerValidation.valid) {
+      // 오답일 경우 다른 질문 던지기
+      const newChallenge = await styleService.getRandomChallenge(tokenValidation.styleName!);
+
+      logger.warn({
+        styleName: tokenValidation.styleName,
+        providedAnswer: challengeAnswer.substring(0, 20),
+        phase: 'Phase2-Failed'
+      }, '❌ [Challenge] Wrong answer provided');
+
+      const errorMessage = `
+❌ **답변이 올바르지 않습니다!**
+
+제공하신 답변: "${challengeAnswer}"
+
+스타일 가이드를 다시 확인하고 정확한 답변을 제공해주세요.
+
+**새로운 질문:** ${newChallenge?.question || '질문을 찾을 수 없습니다'}
+
+**답변 찾는 방법:**
+1. get_writing_style_guide({ style: "${selectedStyle}" }) 도구를 다시 호출하세요
+2. 반환된 마크다운의 YAML front matter에서 \`validation_challenges\`를 확인하세요
+3. 위 질문에 해당하는 정확한 답변을 찾으세요
+4. \`challengeAnswer\` 파라미터에 정확한 답변을 포함하여 다시 호출하세요
+
+💡 **팁:** 답변은 정확하게 일치해야 합니다 (대소문자 무시, 공백 제거)
+`;
+      throw new Error(errorMessage);
+    }
+
+    // 답변이 맞으면 로그 기록하고 계속 진행
+    logger.info({
+      styleName: tokenValidation.styleName,
+      matchedQuestion: answerValidation.matchedQuestion,
+      phase: 'Phase2-Success'
+    }, `✅ [Challenge] Correct answer provided`);
+  }
+
+  // 태그 자동 절단 (최대 10개)
+  let validatedTags = tags || [];
+  if (validatedTags.length > 10) {
+    logger.warn({
+      sessionId: sessionId.substring(0, 8),
+      originalCount: validatedTags.length,
+      truncatedTags: validatedTags.slice(10)
+    }, '⚠️ [Tag Validation] Tag count exceeded limit (max 10), auto-truncating');
+
+    validatedTags = validatedTags.slice(0, 10);
+  }
+
+  // 입력 검증 (XSS/Injection 방어)
   try {
-    CreatePostSchema.parse({ title, content_markdown, tags, category });
+    CreatePostSchema.parse({ title, content_markdown, tags: validatedTags, category });
   } catch (error) {
     if (error instanceof z.ZodError) {
       const errorMessages = error.issues.map(issue =>
@@ -78,7 +248,7 @@ export async function createPostHandler(
       {
         title,
         content_markdown,
-        tags: tags || [],
+        tags: validatedTags,
         category,
         // writingStyle 필드 제거: 백엔드에서 받지 않음
       },
@@ -93,7 +263,31 @@ export async function createPostHandler(
 
     const post = response.data;
 
-    // 3. 성공 메시지 반환
+    // 3. 로컬 파일 저장 (non-blocking: 실패해도 포스트 생성은 성공 유지)
+    let fileMessage = '';
+    try {
+      const savedFilePath = await savePostToFile(
+        title!,
+        content_markdown!,
+        tags
+      );
+
+      if (savedFilePath) {
+        fileMessage = `\n📁 **로컬 파일 저장:** ${path.basename(savedFilePath)}`;
+        logger.info({
+          filePath: savedFilePath,
+          title: title
+        }, '📁 Post saved to local file');
+      }
+    } catch (error: any) {
+      // 로컬 저장 실패는 로그만 남기고 포스트 생성 성공 메시지는 그대로 반환
+      logger.error({
+        error: error.message,
+        title: title
+      }, '📁 Failed to save post to local file');
+    }
+
+    // 4. 성공 메시지 반환
     const message = [
       '✅ 포스트가 성공적으로 생성되었습니다!',
       '',
@@ -102,6 +296,7 @@ export async function createPostHandler(
       `**URL:** ${config.BACKEND_BASE_URL}${post.url}`,
       '',
       post.blog ? `**블로그:** ${post.blog.name} (@${post.blog.slug})` : '',
+      fileMessage, // 로컬 파일 저장 정보 추가
     ]
       .filter(Boolean)
       .join('\n');

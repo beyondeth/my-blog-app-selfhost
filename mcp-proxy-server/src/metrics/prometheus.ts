@@ -83,10 +83,27 @@ export const sessionLifetime = new client.Histogram({
   buckets: [60, 300, 600, 1800, 3600, 7200, 14400], // 1분 ~ 4시간
 });
 
+/**
+ * Transport 메트릭 (MCP Transport 세션)
+ */
+
+// 현재 활성 Transport 수
+export const transportsActive = new client.Gauge({
+  name: 'mcp_transports_active',
+  help: 'Number of currently active MCP transports',
+});
+
 // Transport 생성 총 개수
 export const transportsCreatedTotal = new client.Counter({
   name: 'mcp_transports_created_total',
   help: 'Total number of transports created',
+});
+
+// Transport 종료 총 개수
+export const transportsClosedTotal = new client.Counter({
+  name: 'mcp_transports_closed_total',
+  help: 'Total number of transports closed',
+  labelNames: ['reason'], // manual, timeout, error
 });
 
 // Transport 생성 실패 개수
@@ -94,6 +111,29 @@ export const transportsCreationFailedTotal = new client.Counter({
   name: 'mcp_transports_creation_failed_total',
   help: 'Total number of transport creation failures',
   labelNames: ['reason'], // max_sessions, error
+});
+
+// Transport 평균 수명
+export const transportsAverageLifetime = new client.Gauge({
+  name: 'mcp_transports_average_lifetime_seconds',
+  help: 'Average transport lifetime in seconds',
+});
+
+/**
+ * OAuth 세션 메트릭
+ */
+
+// 현재 OAuth 인증된 세션 수
+export const oauthSessionsActive = new client.Gauge({
+  name: 'mcp_oauth_sessions_active',
+  help: 'Number of currently active OAuth authenticated sessions',
+});
+
+// OAuth 세션 생성 총 개수
+export const oauthSessionsTotal = new client.Counter({
+  name: 'mcp_oauth_sessions_total',
+  help: 'Total number of OAuth sessions created',
+  labelNames: ['provider'], // google, github, kakao
 });
 
 /**
@@ -200,8 +240,9 @@ export function initializeMetrics(): void {
   logger.info('✅ Prometheus metrics initialized');
   logger.info(`📊 Metrics endpoint: GET /metrics`);
 
-  // Redis 연결 상태 초기화
-  redisConnected.set(0);
+  // Redis 연결 상태는 SessionService의 Redis 연결 이벤트에서 관리됨
+  // 초기값 설정을 제거하여 실제 연결 상태를 반영하도록 함
+  // redisConnected.set(0);
 }
 
 /**

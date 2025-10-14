@@ -6,6 +6,14 @@ target_length: "3500-5000"
 code_block_ratio: 0.05
 ai_tag_required: true
 auto_enhance: true
+validation_token: "mcp-style-podcast-v1-9c4e6b8a"
+validation_challenges:
+  - question: "podcast 스타일의 최소 글자 수는?"
+    answer: "2500"
+  - question: "podcast 스타일의 주요 톤은?"
+    answer: "conversational"
+  - question: "podcast 스타일의 코드 블록 최대 비율은?"
+    answer: "0.05"
 ---
 
 # === MCP SERVER INSTRUCTIONS ===

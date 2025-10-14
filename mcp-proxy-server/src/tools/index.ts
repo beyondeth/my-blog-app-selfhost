@@ -25,19 +25,19 @@ import { sessionContext } from '../services/TransportManager.js';
 import { authenticateHandler } from './authenticate.js';
 // check_auth_status 제거: authenticate에 자동 폴링 추가로 불필요해짐
 import { createPostHandler } from './create-post.js';
+import { getWritingStyleGuideHandler } from './get-writing-style-guide.js';
 // set_preferences 제거: defaultWritingStyle이 더 이상 작동하지 않음
 import { diagnoseConnectionHandler } from './diagnose-connection.js';
-
-// Writing Style Service import (스타일 가이드라인 로드용)
-import { WritingStyleService } from '../services/WritingStyleService.js';
 
 /**
  * 모든 도구를 MCP 서버에 등록 (DockashellServer 패턴)
  *
- * Writing Style 시스템:
- * - 서버 시작 시 default.md 스타일 로드
- * - create_post 도구 description에 스타일 가이드라인 포함
- * - Claude Code가 도구 설명을 보고 해당 스타일로 글 작성
+ * Writing Style 시스템 (토큰 최적화):
+ * - create_post 도구: 간략한 설명 + Prompts 참조
+ * - MCP Prompts: 상세 가이드라인 (필요시에만 로드)
+ *   - markdown_quality_guidelines: 품질 기준
+ *   - blog_post_template: 템플릿 구조
+ *   - improve_markdown: 개선 기법
  *
  * @param mcpServer MCP 서버 인스턴스
  * @param services 서비스 계층
@@ -49,31 +49,78 @@ export async function registerAllTools(
 ) {
   logger.info('📦 Registering all MCP tools...');
 
-  // Writing Style 로드 (default.md)
-  // Claude Code가 이 스타일 가이드를 보고 포스트를 작성함
-  let createPostDescription = 'Create a new blog post';
-  try {
-    const styleService = new WritingStyleService();
-    const defaultStyle = await styleService.loadAndParseStyle('default');
+  // Writing Style: 간략한 설명 + 스타일 플래그 가이드
+  const createPostDescription = `Create a new blog post
 
-    // 도구 설명에 스타일 가이드라인 포함
-    createPostDescription = `Create a new blog post
+🔑 **VALIDATION TOKEN REQUIRED** 🔑
+Before creating a post, you MUST get the writing style guide using the get_writing_style_guide tool:
 
-${defaultStyle.instructions}
+**STEP 1: Get Style Guide**
+Call the get_writing_style_guide tool with your desired style:
+\`\`\`typescript
+get_writing_style_guide({ style: 'default' })  // or 'novel', 'tutorial', 'comedy', 'podcast'
+\`\`\`
 
-${defaultStyle.createPostDescription}
-`;
+**STEP 2: Extract Validation Info**
+From the returned markdown:
+- Find \`validation_token\` in YAML front matter
+- Find \`validation_challenges\` and choose one question to answer
 
-    logger.info({
-      styleName: defaultStyle.metadata.styleName,
-      language: defaultStyle.metadata.language,
-      targetLength: defaultStyle.metadata.targetLength,
-    }, '✅ Writing style loaded successfully');
-  } catch (error: any) {
-    logger.warn({
-      error: error.message
-    }, '⚠️ Failed to load writing style, using default description');
-  }
+**STEP 3: Create Post**
+Call create_post with the validation info:
+\`\`\`typescript
+create_post({
+  title: "Your title",
+  content_markdown: "Your content...",
+  tags: ["tag1", "ai:claude"],
+  validationToken: "token-from-step2",
+  challengeAnswer: "answer-from-step2"
+})
+\`\`\`
+
+⚠️ DO NOT try to read local files directly - ALWAYS use get_writing_style_guide tool
+
+🚨 MANDATORY: AI tag required in tags array
+- Use one of: ai:claude, ai:chatgpt, ai:gemini, ai:qwen, ai:other
+
+📝 WRITING STYLE FLAGS:
+Add style flags to your request to change the writing style:
+- "--default" or no flag: Professional technical blog (formal, detailed)
+- "--novel": Narrative storytelling with vivid descriptions
+- "--tutorial": Step-by-step educational format
+- "--comedy": Humorous and entertaining tone
+- "--podcast": Conversational and engaging style
+
+Example requests:
+- "자동포스팅해줘 --novel" → Uses novel style
+- "위 내용 포스팅해줘 --podcast" → Uses podcast style
+- "자동포스팅해줘" → Uses default style
+
+📋 PARAMETER STRUCTURE:
+- title: Clear and descriptive post title
+- content_markdown: Body only (no frontmatter, start directly with ## headings)
+- tags: Array including topic tags + mandatory AI tag (⚠️ MAX 10 tags - auto-truncated if exceeded)
+  Example: ["typescript", "backend", "ai:claude"]
+- writingStyle: (optional) One of: default, novel, tutorial, comedy, podcast
+- validationToken: (REQUIRED) Token from writing style file to verify you read the style guide
+- challengeAnswer: (Phase 2 - optional) Answer to dynamic challenge questions
+
+💡 DETAILED WRITING GUIDELINES:
+For comprehensive style guides, use MCP Prompts:
+- markdown_quality_guidelines: Quality standards and structure requirements
+- blog_post_template: Standard blog post template and sections
+- improve_markdown: Techniques for enhancing post quality
+
+⚠️ CORE REQUIREMENTS:
+- Minimum length: 2000 characters (target: 3000-5000)
+- Default language: Korean (use English only if explicitly requested)
+- Professional technical tone (balance clarity with depth)
+- Code blocks: Keep under 20% of total content
+- Always provide context before and after code examples
+
+📤 OUTPUT BEHAVIOR:
+After successful post creation, display only the success message.
+Do not repeat the entire markdown content in the response.`;
 
   /**
    * 모든 도구 정의 (중앙 관리)
@@ -106,6 +153,43 @@ Even if you think authentication might already exist, ALWAYS verify by calling t
       },
     },
     // check_auth_status 제거: authenticate가 자동 폴링으로 인증 완료까지 대기함
+
+    // 스타일 가이드 조회 도구
+    {
+      name: 'get_writing_style_guide',
+      description: `Get writing style guidelines for blog post creation
+
+📖 **USAGE**: Call this tool to get the complete writing style guide for your chosen style.
+
+**What you get:**
+- Complete markdown content with style guidelines
+- \`validation_token\` in YAML front matter (required for create_post)
+- \`validation_challenges\` in YAML front matter (questions and answers)
+- Detailed writing instructions and examples
+
+**Parameters:**
+- style: One of 'default', 'novel', 'tutorial', 'comedy', 'podcast' (default: 'default')
+
+**Example:**
+1. Call: get_writing_style_guide({ style: 'novel' })
+2. Extract validation_token from YAML front matter
+3. Choose one validation_challenge and find its answer
+4. Use both when calling create_post
+
+⚠️ This is the ONLY way to get style guidelines - do NOT try to read local files directly.`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          style: {
+            type: 'string',
+            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast'],
+            default: 'default',
+            description: 'Writing style to get guidelines for'
+          }
+        },
+      },
+    },
+
     // 포스트 도구
     {
       name: 'create_post',
@@ -119,17 +203,45 @@ If you are handling auto-posting (자동포스팅), blog writing (블로그 작�
 2️⃣ Wait for authentication success
 3️⃣ Then call this tool
 
+---
+
 ${createPostDescription}`,  // Writing style 가이드 포함
       inputSchema: {
         type: 'object',
         properties: {
-          title: { type: 'string', description: 'Post title' },
-          content_markdown: { type: 'string', description: 'Post content in markdown' },
-          tags: { type: 'array', items: { type: 'string' }, description: 'Tags (optional)' },
-          category: { type: 'string', description: 'Category (optional)' },
-          // writingStyle 파라미터 제거: 스타일은 도구 설명에 이미 포함됨
+          title: {
+            type: 'string',
+            description: 'Post title'
+          },
+          content_markdown: {
+            type: 'string',
+            description: 'Post content in markdown'
+          },
+          tags: {
+            type: 'array',
+            items: { type: 'string' },
+            description: 'Tags (optional)'
+          },
+          category: {
+            type: 'string',
+            description: 'Category (optional)'
+          },
+          writingStyle: {
+            type: 'string',
+            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast'],
+            default: 'default',
+            description: 'Writing style preset (optional, default: "default")'
+          },
+          validationToken: {
+            type: 'string',
+            description: '🔑 REQUIRED: Validation token from writing-styles/[style].md file'
+          },
+          challengeAnswer: {
+            type: 'string',
+            description: 'Phase 2: Answer to challenge question (optional)'
+          }
         },
-        required: ['title', 'content_markdown'],
+        required: ['title', 'content_markdown']  // validationToken은 create-post.ts에서 체크
       },
     },
     // set_preferences 제거: defaultWritingStyle이 더 이상 작동하지 않음
@@ -209,13 +321,15 @@ ${createPostDescription}`,  // Writing style 가이드 포함
 
         // check_auth_status 제거: authenticate가 자동으로 처리함
 
+        // 스타일 가이드 조회 도구
+        case 'get_writing_style_guide':
+          return await getWritingStyleGuideHandler(args as any, toolContext);
+
         // 포스트 도구
         case 'create_post': {
           const enrichedArgs = { ...args, sessionId };
           return await createPostHandler(enrichedArgs as any, toolContext);
         }
-
-        // set_preferences 제거: defaultWritingStyle이 더 이상 작동하지 않음
 
         // 진단 도구
         case 'diagnose_connection': {

@@ -9,11 +9,27 @@
 
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import {
+  GetPromptRequestSchema,
+  ListPromptsRequestSchema,
+} from '@modelcontextprotocol/sdk/types.js';
 import { SessionService } from './SessionService.js';
 import { logger } from '../utils/logger.js';
 import { registerAllTools } from '../tools/index.js';
 import { McpServices } from '../types/services.js';
 import { AsyncLocalStorage } from 'async_hooks';
+import { WritingStyleService } from './WritingStyleService.js';
+import {
+  recordTransportCreated,
+  recordTransportCreationFailed,
+  recordSessionDeleted,
+  recordTransportClosed,
+  updateActiveSessions,
+  updateActiveTransports,
+  updatePeakSessions,
+  updateAverageSessionLifetime,
+  updateAverageTransportLifetime,
+} from '../metrics/collectors/session.metrics.js';
 
 /**
  * AsyncLocalStorage를 사용한 세션 ID 추적
@@ -49,6 +65,18 @@ export class TransportManager {
   // 세션별 Transport 저장 (세션 ID → Transport)
   private transports: Map<string, StreamableHTTPServerTransport> = new Map();
 
+  // Transport 생성 시간 추적 (세션 ID → 생성 시간)
+  private transportCreatedAt: Map<string, number> = new Map();
+
+  // 피크 세션 수 추적
+  private peakSessions: number = 0;
+
+  // 세션 수명 통계
+  private sessionLifetimes: number[] = [];
+
+  // 통계 업데이트 인터벌
+  private statsInterval: NodeJS.Timeout | null = null;
+
   // TransportManager 설정
   private config: {
     BACKEND_BASE_URL: string;
@@ -76,6 +104,65 @@ export class TransportManager {
       },
       '🚀 Transport Manager initialized with Session-Scoped Transport pattern'
     );
+
+    // 통계 업데이트 인터벌 시작 (1분마다)
+    this.startStatsUpdateInterval();
+  }
+
+  /**
+   * 통계 업데이트 인터벌 시작
+   * 1분마다 세션 메트릭을 업데이트
+   */
+  private startStatsUpdateInterval(): void {
+    this.statsInterval = setInterval(() => {
+      this.updateSessionMetrics();
+    }, 60000); // 1분마다
+
+    logger.info('📊 Session metrics update interval started (every 1 minute)');
+  }
+
+  /**
+   * 세션 메트릭 업데이트
+   * 현재 활성 세션, 피크 세션, 평균 수명 등을 계산하여 메트릭 업데이트
+   */
+  private updateSessionMetrics(): void {
+    const currentActive = this.transports.size;
+
+    // 활성 Transport 수 업데이트 (새로운 메트릭)
+    updateActiveTransports(currentActive);
+
+    // 기존 활성 세션 수도 유지 (하위 호환성)
+    updateActiveSessions(currentActive);
+
+    // 피크 세션 수 업데이트
+    if (currentActive > this.peakSessions) {
+      this.peakSessions = currentActive;
+      updatePeakSessions(this.peakSessions);
+    }
+
+    // 평균 Transport 수명 계산 및 업데이트
+    if (this.sessionLifetimes.length > 0) {
+      const avgLifetime = this.sessionLifetimes.reduce((sum, lt) => sum + lt, 0) / this.sessionLifetimes.length;
+
+      // Transport 평균 수명 업데이트 (새로운 메트릭)
+      updateAverageTransportLifetime(avgLifetime);
+
+      // 기존 세션 평균 수명도 유지 (하위 호환성)
+      updateAverageSessionLifetime(avgLifetime);
+
+      // 최근 100개 세션만 유지 (메모리 관리)
+      if (this.sessionLifetimes.length > 100) {
+        this.sessionLifetimes = this.sessionLifetimes.slice(-100);
+      }
+    }
+
+    logger.debug({
+      activeTransports: currentActive,
+      peakSessions: this.peakSessions,
+      avgLifetime: this.sessionLifetimes.length > 0
+        ? Math.round(this.sessionLifetimes.reduce((sum, lt) => sum + lt, 0) / this.sessionLifetimes.length / 1000)
+        : 0
+    }, '📊 Transport metrics updated');
   }
 
   /**
@@ -85,16 +172,17 @@ export class TransportManager {
     const mcpServer = new McpServer(
       {
         name: 'codebase-blog-mcp',
-        version: '5.0.0',  // Stateless version
+        version: '7.0.0',
       },
       {
         capabilities: {
           tools: {},
+          prompts: {},  // Prompts 지원 선언
         },
       }
     );
 
-    logger.info('✅ MCP Server created (Stateless pattern)');
+    logger.info('✅ MCP Server created with Prompts support (Session-Scoped pattern)');
 
     return mcpServer;
   }
@@ -114,9 +202,107 @@ export class TransportManager {
     logger.info({
       toolCount: toolHelpers.getToolDefinitions().length,
       tools: toolHelpers.getToolDefinitions().map(t => t.name)
-    }, '✅ MCP tools registered (Stateless pattern)');
+    }, '✅ MCP tools registered (Session-Scoped pattern)');
+
+    // Prompts 등록
+    await this.registerPrompts();
 
     this.toolsRegistered = true;
+  }
+
+  /**
+   * Prompts 등록 (Writing Style 가이드)
+   *
+   * 500줄짜리 스타일 가이드를 도구 description에서 분리하여
+   * LLM이 필요시에만 prompts/get으로 가져가도록 최적화
+   */
+  private async registerPrompts(): Promise<void> {
+    try {
+      // default.md 스타일 로드
+      const styleService = new WritingStyleService();
+      const defaultStyle = await styleService.loadAndParseStyle('default');
+
+      // 프롬프트 정의 (3개)
+      const allPromptDefinitions = [
+        {
+          name: 'markdown_quality_guidelines',
+          description: 'Professional markdown writing guidelines for blog posts - Quality structure, technical accuracy, code integration, and formatting standards',
+        },
+        {
+          name: 'blog_post_template',
+          description: 'Standard blog post template structure for professional technical posts - Sections, headers, code blocks, and tone guidelines',
+        },
+        {
+          name: 'improve_markdown',
+          description: 'Techniques for enhancing technical blog post quality - Strengthening openings, code integration, paragraph structure, and clarity',
+        },
+      ];
+
+      // 1. prompts/list 핸들러 등록
+      this.mcpServer.setRequestHandler(
+        ListPromptsRequestSchema,
+        async () => ({
+          prompts: allPromptDefinitions,
+        })
+      );
+
+      // 2. prompts/get 핸들러 등록
+      this.mcpServer.setRequestHandler(
+        GetPromptRequestSchema,
+        async (request) => {
+          const { name } = request.params;
+
+          // 요청된 프롬프트에 따라 콘텐츠 반환
+          let promptContent: string;
+
+          switch (name) {
+            case 'markdown_quality_guidelines':
+              promptContent = defaultStyle.qualityGuidelinesPrompt;
+              break;
+
+            case 'blog_post_template':
+              promptContent = defaultStyle.blogPostTemplatePrompt;
+              break;
+
+            case 'improve_markdown':
+              promptContent = defaultStyle.improveMarkdownPrompt;
+              break;
+
+            default:
+              throw new Error(`Unknown prompt: ${name}`);
+          }
+
+          logger.debug({
+            promptName: name,
+            contentLength: promptContent.length
+          }, '📝 Prompt requested');
+
+          return {
+            description: `Writing style guide: ${name}`,
+            messages: [
+              {
+                role: 'user',
+                content: {
+                  type: 'text',
+                  text: promptContent,
+                },
+              },
+            ],
+          };
+        }
+      );
+
+      logger.info({
+        promptCount: allPromptDefinitions.length,
+        prompts: allPromptDefinitions.map(p => p.name),
+        styleName: defaultStyle.metadata.styleName
+      }, '✅ MCP Prompts registered (Writing Style guides)');
+    } catch (error: any) {
+      logger.error({
+        error: error.message
+      }, '❌ Failed to register prompts');
+      // 프롬프트 등록 실패해도 도구는 작동해야 함 (non-blocking)
+    }
   }
 
   /**
@@ -185,10 +371,29 @@ export class TransportManager {
 
     // Transport 저장
     this.transports.set(sessionId, transport);
+    this.transportCreatedAt.set(sessionId, Date.now());
+
+    // Transport 생성 메트릭 기록
+    recordTransportCreated();
+
+    // 활성 Transport 수 즉시 업데이트
+    const currentActive = this.transports.size;
+    updateActiveTransports(currentActive);
+    updateActiveSessions(currentActive); // 하위 호환성
+
+    // 피크 세션 수 체크 및 업데이트
+    if (currentActive > this.peakSessions) {
+      this.peakSessions = currentActive;
+      updatePeakSessions(this.peakSessions);
+    }
 
     logger.info({
       sessionId: sessionId.substring(0, 8),
-      totalTransports: this.transports.size
+      totalTransports: this.transports.size,
+      metrics: {
+        active: currentActive,
+        peak: this.peakSessions
+      }
     }, '✅ Transport created and connected');
 
     return transport;
@@ -207,12 +412,35 @@ export class TransportManager {
         // Transport 종료 (연결 해제)
         await transport.close();
 
+        // 세션 수명 계산
+        const createdAt = this.transportCreatedAt.get(sessionId);
+        let lifetime = 0;
+        if (createdAt) {
+          lifetime = Date.now() - createdAt;
+          this.sessionLifetimes.push(lifetime);
+        }
+
         // Map에서 제거
         this.transports.delete(sessionId);
+        this.transportCreatedAt.delete(sessionId);
+
+        // Transport 종료 메트릭 기록
+        recordTransportClosed('manual', lifetime);
+        recordSessionDeleted('manual', lifetime); // 하위 호환성
+
+        // 활성 Transport 수 즉시 업데이트
+        const currentActive = this.transports.size;
+        updateActiveTransports(currentActive);
+        updateActiveSessions(currentActive); // 하위 호환성
 
         logger.info({
           sessionId: sessionId.substring(0, 8),
-          remainingTransports: this.transports.size
+          remainingTransports: this.transports.size,
+          lifetime: Math.round(lifetime / 1000), // 초 단위로 표시
+          metrics: {
+            active: currentActive,
+            peak: this.peakSessions
+          }
         }, '🗑️ Transport removed and cleaned up');
       } catch (error: any) {
         logger.error({
@@ -227,6 +455,13 @@ export class TransportManager {
    * Graceful shutdown
    */
   async close(): Promise<void> {
+    // 통계 업데이트 인터벌 정리
+    if (this.statsInterval) {
+      clearInterval(this.statsInterval);
+      this.statsInterval = null;
+      logger.info('📊 Session metrics update interval stopped');
+    }
+
     // 모든 Transport 정리
     logger.info({
       count: this.transports.size
@@ -235,6 +470,15 @@ export class TransportManager {
     for (const [sessionId, transport] of this.transports.entries()) {
       try {
         await transport.close();
+
+        // 세션 수명 계산
+        const createdAt = this.transportCreatedAt.get(sessionId);
+        if (createdAt) {
+          const lifetime = Date.now() - createdAt;
+          recordTransportClosed('manual', lifetime);
+          recordSessionDeleted('manual', lifetime); // 하위 호환성
+        }
+
         logger.debug({
           sessionId: sessionId.substring(0, 8)
         }, '✅ Transport closed');
@@ -247,6 +491,12 @@ export class TransportManager {
     }
 
     this.transports.clear();
+    this.transportCreatedAt.clear();
+
+    // 최종 메트릭 업데이트
+    updateActiveTransports(0);
+    updateActiveSessions(0); // 하위 호환성
+
     logger.info('✅ Transport Manager closed (Session-Scoped pattern)');
   }
 }

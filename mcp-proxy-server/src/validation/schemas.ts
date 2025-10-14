@@ -60,6 +60,22 @@ export const CreatePostSchema = z.object({
       { message: '카테고리에 HTML 태그는 허용되지 않습니다' }
     )
     .optional(),
+
+  // Phase 1: 스타일 가이드 검증 토큰 (LLM이 스타일 파일을 읽었는지 확인)
+  validationToken: z.string()
+    .min(10, '검증 토큰이 너무 짧습니다')
+    .max(100, '검증 토큰이 너무 깁니다')
+    .regex(/^[a-zA-Z0-9-]+$/, '검증 토큰 형식이 올바르지 않습니다')
+    .optional(),
+
+  // Phase 2: 동적 챌린지 답변 (스타일 가이드 이해도 확인)
+  challengeAnswer: z.string()
+    .max(200, '챌린지 답변이 너무 깁니다')
+    .refine(
+      (val) => !XSS_PATTERN.test(val),
+      { message: '챌린지 답변에 HTML 태그는 허용되지 않습니다' }
+    )
+    .optional(),
 });
 
 export type CreatePostInput = z.infer<typeof CreatePostSchema>;

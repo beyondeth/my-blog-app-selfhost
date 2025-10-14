@@ -123,22 +123,22 @@ export async function authenticateHandler(
     return {
       content: [{
         type: 'text',
-        text: `✅ 기존 인증 세션 발견!\n🔄 세션 재사용 중...\n🆔 세션 ID: ${sessionId.substring(0, 8)}...\n\n✨ 인증 완료! 이제 자동으로 포스팅이 진행됩니다.`,
+        text: `✅ 기존 인증 세션 발견!\n🔄 세션 재사용 중...\n🆔 세션 ID: ${sessionId.substring(0, 8)}...\n✨ 인증 완료! 이제 자동으로 포스팅이 진행됩니다.`,
       }]
     };
   }
 
-  // 새 인증 시작 알림
+  // 3. 새 OAuth 인증 시작 (accessToken 없는 경우만 실행)
   console.log('🌐 새로운 OAuth 인증을 시작합니다...');
   console.log('🔓 브라우저가 자동으로 열립니다. 승인 버튼을 눌러주세요.');
 
-  // 3. PKCE code verifier 생성 및 저장
+  // 4. PKCE code verifier 생성 및 저장
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
 
   await sessionService.savePkceVerifier(sessionId, codeVerifier);
 
-  // 4. Authorization URL 생성
+  // 5. Authorization URL 생성
   const authParams = new URLSearchParams({
     response_type: 'code',
     client_id: config.OAUTH_CLIENT_ID,
@@ -151,7 +151,40 @@ export async function authenticateHandler(
 
   const authorizationUrl = `${config.BACKEND_BASE_URL}/api/v1/oauth/authorize?${authParams.toString()}`;
 
-  // 5. 브라우저 자동 실행 (child_process.spawn 사용)
+  // 6. 백그라운드 이벤트 리스너 등록 (브라우저 실행 전에 먼저 등록!)
+  console.log(`⏳ 이벤트 리스너 등록 중... (세션: ${sessionId.substring(0, 8)})`);
+
+  const timeout = 90000; // 1분 30초
+
+  // 타임아웃 타이머 설정
+  const timeoutTimer = setTimeout(() => {
+    // 리스너 정리 (메모리 누수 방지)
+    authEmitter.off('auth_complete', authCompleteListener);
+    console.log(`⏱️ 인증 타임아웃 (1분 30초 초과, 세션: ${sessionId.substring(0, 8)})`);
+  }, timeout);
+
+  // 인증 완료 이벤트 리스너
+  const authCompleteListener = (completedSessionId: string) => {
+    // 세션 ID 매칭 (다른 세션의 이벤트 무시)
+    if (completedSessionId !== sessionId) {
+      return;
+    }
+
+    // 타임아웃 타이머 취소
+    clearTimeout(timeoutTimer);
+
+    // 리스너 정리 (메모리 누수 방지)
+    authEmitter.off('auth_complete', authCompleteListener);
+
+    console.log(`⚡ 즉시 인증 완료 감지! (세션: ${sessionId.substring(0, 8)})`);
+    console.log(`✅ 세션 저장 완료! create_post 도구를 사용할 수 있습니다.`);
+  };
+
+  // 이벤트 리스너 등록 (백그라운드에서 동작)
+  authEmitter.on('auth_complete', authCompleteListener);
+  console.log(`✅ 이벤트 리스너 등록 완료 (세션: ${sessionId.substring(0, 8)})`);
+
+  // 7. 브라우저 자동 실행 (spawn 후 즉시 return)
   const { spawn } = await import('child_process');
   const platform = process.platform;
   const command = platform === 'darwin' ? 'open' : platform === 'win32' ? 'start' : 'xdg-open';
@@ -159,96 +192,39 @@ export async function authenticateHandler(
   try {
     const browserProcess = spawn(command, [authorizationUrl], {
       detached: true,
-      stdio: 'pipe'  // 에러 확인 가능하도록 변경
+      stdio: 'ignore'  // 완전히 분리
     });
 
-    // 브라우저 실행 실패 감지 (비동기 이벤트)
-    let launchError: any = null;
+    // 브라우저 실행 실패 감지 (비동기 이벤트 - 로깅만)
     browserProcess.on('error', (err: any) => {
-      launchError = err;
       console.error('❌ 브라우저 프로세스 실행 실패:', err.message);
+      console.log(`🔗 수동 URL: ${authorizationUrl}`);
     });
 
     browserProcess.unref();
-
-    // 짧은 대기 후 에러 체크 (100ms - spawn 에러 감지용)
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    if (launchError) {
-      const errorMsg = launchError instanceof Error ? launchError.message : String(launchError);
-      console.log(`🔗 수동으로 열어주세요: ${authorizationUrl}`);
-      return {
-        content: [{
-          type: 'text',
-          text: `❌ 브라우저 자동 실행 실패: ${errorMsg}\n\n🔗 아래 URL을 브라우저에서 수동으로 열어주세요:\n${authorizationUrl}\n\n승인 완료 후 자동으로 진행됩니다.`,
-        }]
-      };
-    }
-
-    console.log(`✅ 브라우저 실행 완료: ${sessionId.substring(0, 8)}...`);
-    console.log(`🔗 수동 실행 URL (백업용): ${authorizationUrl}`);
+    console.log(`✅ 브라우저 실행 시작: ${sessionId.substring(0, 8)}...`);
   } catch (error: any) {
-    console.error('❌ 브라우저 자동 실행 실패 (동기 에러):', error.message);
-    console.log(`🔗 수동으로 열어주세요: ${authorizationUrl}`);
-
-    // 동기 에러 발생 시 즉시 반환 (5분 대기 방지)
-    return {
-      content: [{
-        type: 'text',
-        text: `❌ 브라우저 자동 실행 실패: ${error.message}\n\n🔗 아래 URL을 브라우저에서 수동으로 열어주세요:\n${authorizationUrl}\n\n승인 완료 후 자동으로 진행됩니다.`,
-      }]
-    };
+    // 동기 에러는 로깅만 (사용자에게는 URL 제공)
+    console.error('❌ 브라우저 자동 실행 실패 (동기):', error.message);
+    console.log(`🔗 수동 URL: ${authorizationUrl}`);
   }
 
-  // 이벤트 기반 인증 완료 대기 시작
-  console.log(`⏳ 브라우저에서 OAuth 승인을 기다리는 중... (최대 5분, 세션: ${sessionId.substring(0, 8)})`);
-  console.log('🎯 이벤트 리스너 등록: 인증 완료 시 즉시 알림 받습니다.');
+  // 8. 즉시 LLM에게 피드백 반환 (사용자가 먼저 봄!)
+  return {
+    content: [{
+      type: 'text',
+      text: `🌐 새로운 OAuth 인증을 시작합니다... **브라우저가 곧 자동으로 열립니다**\n👉 브라우저에서 <승인> 버튼을 클릭해주세요.\n🔗 **수동 URL** (브라우저가 자동으로 안 열리면 클릭):${authorizationUrl}
 
-  // 6. 이벤트 기반 인증 완료 대기 (폴링 제거)
-  return new Promise((resolve) => {
-    const timeout = 300000; // 5분
+⏳ **백그라운드에서 인증 완료를 기다리는 중...**
+✨ 승인 후 바로 \`create_post\` 도구를 호출하시면 자동으로 인증된 세션이 사용됩니다.
 
-    // 타임아웃 타이머 설정
-    const timeoutTimer = setTimeout(() => {
-      // 리스너 정리 (메모리 누수 방지)
-      authEmitter.off('auth_complete', authCompleteListener);
-      console.log(`⏱️ 인증 타임아웃 (5분 초과, 세션: ${sessionId.substring(0, 8)})`);
+📝 **다음 단계:**
+1. 브라우저에서 OAuth 승인 완료
+2. \`create_post\` 도구로 블로그 포스팅 시작
 
-      resolve({
-        content: [{
-          type: 'text',
-          text: '⏱️ 인증 시간 초과 (5분)\n\n다시 시도해주세요.'
-        }]
-      });
-    }, timeout);
-
-    // 인증 완료 이벤트 리스너
-    const authCompleteListener = (completedSessionId: string) => {
-      // 세션 ID 매칭 (다른 세션의 이벤트 무시)
-      if (completedSessionId !== sessionId) {
-        return;
-      }
-
-      // 타임아웃 타이머 취소
-      clearTimeout(timeoutTimer);
-
-      // 리스너 정리 (메모리 누수 방지)
-      authEmitter.off('auth_complete', authCompleteListener);
-
-      console.log(`⚡ 즉시 인증 완료 감지! (세션: ${sessionId.substring(0, 8)})`);
-
-      resolve({
-        content: [{
-          type: 'text',
-          text: `✅ OAuth2 인증 성공! (로그인 완료)\n🆔 세션 ID: ${sessionId.substring(0, 8)}...\n📝 자동포스팅 준비 완료!\n이제 create_post 도구를 사용하여 블로그 포스팅을 할 수 있습니다.`,
-        }]
-      });
-    };
-
-    // 이벤트 리스너 등록
-    authEmitter.on('auth_complete', authCompleteListener);
-    console.log(`✅ 이벤트 리스너 등록 완료 (세션: ${sessionId.substring(0, 8)})`);
-  });
+🆔 세션 ID: ${sessionId.substring(0, 8)}...`,
+    }]
+  };
 }
 
 /**

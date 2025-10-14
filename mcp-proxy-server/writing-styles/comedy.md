@@ -6,6 +6,14 @@ target_length: "3000-4500"
 code_block_ratio: 0.15
 ai_tag_required: true
 auto_enhance: true
+validation_token: "mcp-style-comedy-v1-3e7b5a2f"
+validation_challenges:
+  - question: "comedy 스타일의 최소 글자 수는?"
+    answer: "2000"
+  - question: "comedy 스타일에서 사용하는 주요 요소는?"
+    answer: "humor"
+  - question: "comedy 스타일의 목표 글자 수 범위는?"
+    answer: "3000-4500"
 ---
 
 # === MCP SERVER INSTRUCTIONS ===

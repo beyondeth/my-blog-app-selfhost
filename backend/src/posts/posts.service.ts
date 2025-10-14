@@ -295,20 +295,6 @@ export class PostsService {
       throw new BadRequestException('블로그를 먼저 생성해주세요.');
     }
 
-    // 중복 포스트 생성 방지: 동일한 사용자가 동일한 제목으로 10초 내에 포스트 생성하는 것을 방지
-    const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
-    const existingPost = await this.postsRepository.findOne({
-      where: {
-        title: createPostDto.title,
-        author: { id: user.id },
-        createdAt: MoreThan(tenSecondsAgo),
-      },
-    });
-
-    if (existingPost) {
-      throw new BadRequestException('동일한 제목의 게시글을 너무 빠르게 생성할 수 없습니다. 잠시 후 다시 시도해주세요.');
-    }
-
     // 하이브리드 저장 시스템: 마크다운과 HTML 모두 저장
     let processedContent = createPostDto.content;
     let markdownContent = null;
