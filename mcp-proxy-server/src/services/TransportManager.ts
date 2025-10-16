@@ -40,7 +40,9 @@ export const sessionContext = new AsyncLocalStorage<{ sessionId: string }>();
 interface TransportManagerConfig {
   sessionService: SessionService;
   config: {
+    MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
+    BACKEND_PUBLIC_URL: string;  // 브라우저 OAuth 인증용 공개 URL
     OAUTH_CLIENT_ID: string;
     OAUTH_REDIRECT_URI: string;
   };
@@ -79,7 +81,9 @@ export class TransportManager {
 
   // TransportManager 설정
   private config: {
+    MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
+    BACKEND_PUBLIC_URL: string;  // 브라우저 OAuth 인증용 공개 URL
     OAUTH_CLIENT_ID: string;
     OAUTH_REDIRECT_URI: string;
   };

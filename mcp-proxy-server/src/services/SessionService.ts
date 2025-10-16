@@ -57,7 +57,7 @@ export class SessionService {
   private readonly PKCE_PREFIX = 'mcp:pkce:';
   private readonly STATS_TOTAL_KEY = 'mcp:stats:total';
   private readonly STATS_ACTIVE_KEY = 'mcp:stats:active';
-  private readonly SESSION_TTL = parseInt(process.env.SESSION_TTL || '86400');
+  private readonly SESSION_TTL = parseInt(process.env.SESSION_TTL || '86400'); // 기본값 24시간 (JWT 토큰 만료와 동일)
   private readonly PKCE_TTL = 600; // PKCE verifier는 10분간만 유효
 
   // 토큰 암호화 키 (32바이트 = 256비트)

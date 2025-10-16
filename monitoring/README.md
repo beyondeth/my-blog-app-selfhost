@@ -1,342 +1,275 @@
-# 채팅 큐 시스템 모니터링 가이드
+# 통합 모니터링 시스템 (Unified Monitoring)
 
-NestJS 백엔드 애플리케이션의 채팅 큐, Redis, 시스템 메트릭을 실시간으로 모니터링하기 위한 Prometheus + Grafana 스택입니다.
+블로그 플랫폼의 통합 모니터링 시스템입니다. Backend, MCP Proxy Server, Redis, System 메트릭을 한곳에서 관리합니다.
 
 ## 📊 시스템 구성
 
-```
-┌─────────────────────────────────────────────────────┐
-│                   채팅 큐 모니터링                    │
-├─────────────────────────────────────────────────────┤
-│                                                       │
-│  NestJS Backend (Port 3000)                          │
-│  └─ 메트릭 노출: /internal/health-check-2f4a8b9c    │
-│                                                       │
-│  Redis (Port 6379)                                   │
-│  └─ Redis Exporter (Port 9121)                       │
-│                                                       │
-│  Node Exporter (Port 9100)                           │
-│  └─ 시스템 메트릭 수집                                │
-│                                                       │
-│  Prometheus (Port 9090) ← localhost only             │
-│  └─ 메트릭 수집 및 저장                               │
-│                                                       │
-│  Grafana (Port 3030) ← localhost only                │
-│  └─ 대시보드 시각화                                   │
-│                                                       │
-└─────────────────────────────────────────────────────┘
-```
+### 모니터링 대상
+- **Backend (NestJS)** - Port 3000
+  - Chat Queue (4 shards)
+  - Like Queue (4 shards)
+  - Post Processing Queue
+  - HTTP 요청/응답
+  - Node.js 런타임 메트릭
+
+- **MCP Proxy Server** - Port 3002
+  - HTTP 요청 메트릭
+  - Redis 작업 메트릭
+  - OAuth 세션 메트릭
+  - Tool 호출 메트릭
+
+- **Redis** - Port 6379
+  - 메모리 사용량
+  - 명령어 처리율
+  - 키 개수
+  - 연결 상태
+
+- **System**
+  - CPU 사용률
+  - 메모리 사용률
+  - 디스크 I/O
+  - 네트워크 I/O
+
+### 모니터링 스택
+- **Prometheus** (Port 9090) - 메트릭 수집 및 저장
+- **Grafana** (Port 3030) - 대시보드 시각화
+- **Redis Exporter** (Port 9121) - Redis 메트릭 수집
+- **Node Exporter** (Port 9100) - 시스템 메트릭 수집
 
 ## 🚀 빠른 시작
 
-### 1. Docker Compose로 모니터링 스택 시작
-
-프로젝트 루트 디렉토리에서 실행:
+### 1. 모니터링 스택 시작
 
 ```bash
-# 모니터링 스택 시작 (백그라운드)
-docker-compose -f docker-compose.monitoring.yml up -d
+# monitoring 디렉토리로 이동
+cd monitoring
+
+# Docker Compose로 모니터링 스택 시작
+docker-compose -f docker-compose.unified-monitoring.yml up -d
 
 # 로그 확인
-docker-compose -f docker-compose.monitoring.yml logs -f
-
-# 특정 서비스 로그만 보기
-docker-compose -f docker-compose.monitoring.yml logs -f grafana
-docker-compose -f docker-compose.monitoring.yml logs -f prometheus
+docker-compose -f docker-compose.unified-monitoring.yml logs -f
 ```
 
-### 2. 컨테이너 상태 확인
+### 2. 접속 정보
+
+- **Grafana**: http://localhost:3030
+  - Username: `admin`
+  - Password: `admin`
+
+- **Prometheus**: http://localhost:9090
+
+### 3. 모니터링 스택 중지
 
 ```bash
-# 실행 중인 컨테이너 확인
-docker ps | grep -E "chat-|prometheus|grafana"
-
-# 예상 출력:
-# chat-grafana       grafana/grafana:latest    Up X minutes    127.0.0.1:3030->3000/tcp
-# chat-prometheus    prom/prometheus:latest    Up X minutes    127.0.0.1:9090->9090/tcp
-# chat-redis-exporter oliver006/redis_exporter Up X minutes   127.0.0.1:9121->9121/tcp
-# chat-node-exporter  prom/node-exporter       Up X minutes    127.0.0.1:9100->9100/tcp
+docker-compose -f docker-compose.unified-monitoring.yml down
 ```
 
-### 3. 접속 URL
+## 📈 대시보드 목록
 
-| 서비스 | URL | 설명 |
-|--------|-----|------|
-| **Prometheus** | http://localhost:9090 | 메트릭 조회 및 쿼리 |
-| **Grafana** | http://localhost:3030 | 대시보드 시각화 |
-| **Prometheus Targets** | http://localhost:9090/targets | 수집 대상 상태 확인 |
-| **백엔드 메트릭** | http://localhost:3000/internal/health-check-2f4a8b9c | Raw 메트릭 데이터 |
+### 1. System Overview
+**경로**: Grafana > Blog Platform > 1. System Overview
 
-### 4. Grafana 로그인
+전체 시스템의 상태를 한눈에 확인할 수 있는 대시보드
 
-- **사용자명**: `admin`
-- **비밀번호**: `admin`
-- 초기 로그인 후 비밀번호 변경 권장
+**주요 패널**:
+- Backend 서버 상태 (UP/DOWN)
+- MCP Proxy 상태 (UP/DOWN)
+- Redis 상태 (UP/DOWN)
+- Redis 메모리 사용량
+- Redis Commands/sec
+- HTTP 요청률
+- 활성 MCP 세션 수
+- 전체 Redis 키 개수
 
-## 📈 수집되는 메트릭
+### 2. Chat Queue Monitoring
+**경로**: Grafana > Blog Platform > 2. Chat Queue
 
-### 채팅 큐 메트릭
-- `chat_queue_size`: 현재 큐에 대기 중인 메시지 수
-- `chat_dlq_size`: Dead Letter Queue 크기
-- `chat_messages_processed_total`: 처리된 총 메시지 수
-- `chat_messages_failed_total`: 실패한 메시지 수
-- `chat_batch_duration_seconds`: 배치 처리 시간
-- `chat_consecutive_failures`: 연속 실패 횟수
+채팅 큐 시스템의 상세 모니터링
 
-### Redis 메트릭 (Redis Exporter)
-- `redis_connected_clients`: 연결된 클라이언트 수
-- `redis_used_memory_bytes`: 사용 중인 메모리
-- `redis_commands_processed_total`: 처리된 명령어 수
-- `redis_keyspace_hits_total`: 키 조회 성공 수
-- `redis_keyspace_misses_total`: 키 조회 실패 수
+**주요 패널**:
+- 큐 크기 (현재 대기 중인 메시지 수)
+- DLQ 크기 (실패한 메시지 수)
+- 처리된 메시지 수 (성공/실패)
+- 배치 처리 시간
+- 메시지 지연 시간
+- 연속 실패 횟수
+- WebSocket 연결 수
+- Redis 연결 상태
 
-### 시스템 메트릭 (Node Exporter)
-- `node_cpu_seconds_total`: CPU 사용 시간
-- `node_memory_MemAvailable_bytes`: 사용 가능한 메모리
-- `node_filesystem_avail_bytes`: 디스크 여유 공간
-- `node_network_receive_bytes_total`: 네트워크 수신 바이트
+### 3. Like Queue Monitoring
+**경로**: Grafana > Blog Platform > 3. Like Queue
 
-### NestJS 애플리케이션 메트릭
-- `nodejs_process_cpu_seconds_total`: Node.js CPU 사용 시간
-- `nodejs_process_resident_memory_bytes`: 프로세스 메모리 사용량
-- `nodejs_eventloop_lag_seconds`: 이벤트 루프 지연
-- `nodejs_gc_duration_seconds`: Garbage Collection 시간
+좋아요 큐 시스템의 상세 모니터링
 
-## 🎨 대시보드
+**주요 패널**:
+- 샤드별 큐 크기 (4개 샤드)
+- DLQ 크기
+- 처리된 좋아요 수 (성공/실패)
+- 배치 처리 시간
+- 좋아요 지연 시간
+- 연속 실패 횟수
+- Redis 연결 상태
 
-자동으로 프로비저닝되는 대시보드:
+### 4. Redis Overview
+**경로**: Grafana > Blog Platform > 4. Redis Overview
 
-1. **Chat Queue Overview** (`monitoring/grafana/dashboards/chat-queue.json`)
-   - 큐 크기, DLQ 크기
-   - 메시지 처리 속도
-   - 실패율 및 연속 실패 횟수
+Redis 전체 메트릭 모니터링
 
-2. **Redis Overview** (`monitoring/grafana/dashboards/redis-overview.json`)
-   - 메모리 사용량
-   - 명령어 처리 속도
-   - 히트율 (Hit Rate)
-   - 연결된 클라이언트 수
+**주요 패널**:
+- 메모리 사용량 (Used/Peak/Limit)
+- 명령어 처리율 (Commands/sec)
+- 키 개수 (전체/만료)
+- 연결된 클라이언트 수
+- 히트율 (Cache Hit Ratio)
+- 네트워크 입출력
+- 데이터베이스별 키 개수
+- Evicted/Expired 키 수
 
-3. **Like Queue** (`monitoring/grafana/dashboards/like-queue.json`)
-   - 좋아요 큐 전용 모니터링
+### 5. MCP Proxy Server
+**경로**: Grafana > Blog Platform > 5. MCP Proxy Server
 
-## 🚨 알림 규칙
+MCP Proxy 서버의 상세 모니터링
 
-`monitoring/prometheus/alerts.yml`에 정의된 주요 알림:
+**주요 패널**:
+- HTTP 요청 메트릭
+- Redis 작업 메트릭
+- OAuth 세션 메트릭
+- Tool 호출 메트릭
+- 에러율
+- 응답 시간
 
-| 알림 | 조건 | 심각도 |
-|------|------|--------|
-| **HighQueueSize** | 큐 크기 > 500 (5분간) | Warning |
-| **CriticalQueueSize** | 큐 크기 > 1000 (2분간) | Critical |
-| **HighDLQSize** | DLQ 크기 > 50 (5분간) | Warning |
-| **CriticalDLQSize** | DLQ 크기 > 100 (2분간) | Critical |
-| **BatchProcessingFailure** | 실패율 > 10% (5분간) | Warning |
-| **ConsecutiveFailures** | 연속 실패 > 3회 (1분간) | Critical |
-| **SlowProcessing** | 처리 시간 > 5초 (10분간) | Warning |
-| **RedisDown** | Redis 서버 다운 (1분간) | Critical |
-| **NestJSDown** | NestJS 앱 다운 (1분간) | Critical |
-| **HighMemoryUsage** | 메모리 > 1GB (5분간) | Warning |
+## 📁 디렉토리 구조
 
-## 🔍 유용한 Prometheus 쿼리
-
-### 큐 모니터링
-```promql
-# 현재 큐 크기
-chat_queue_size
-
-# 시간당 처리된 메시지 수
-rate(chat_messages_processed_total[1h]) * 3600
-
-# 실패율 (%)
-(rate(chat_messages_failed_total[5m]) / rate(chat_messages_processed_total[5m])) * 100
+```
+monitoring/
+├── docker-compose.unified-monitoring.yml  # 통합 Docker Compose 설정
+├── README.md                              # 이 문서
+├── prometheus/
+│   ├── prometheus.yml                     # Prometheus 설정 (모든 타겟 포함)
+│   └── alerts.yml                         # Alert 규칙 정의
+└── grafana/
+    ├── provisioning/
+    │   ├── datasources/
+    │   │   └── prometheus.yml             # Prometheus 데이터소스 자동 설정
+    │   └── dashboards/
+    │       └── dashboard.yml              # 대시보드 자동 로딩 설정
+    └── dashboards/
+        ├── 1-system-overview.json         # System Overview 대시보드
+        ├── 2-chat-queue.json              # Chat Queue 대시보드
+        ├── 3-like-queue.json              # Like Queue 대시보드
+        ├── 4-redis-overview.json          # Redis Overview 대시보드
+        └── 5-mcp-proxy.json               # MCP Proxy 대시보드
 ```
 
-### Redis 성능
-```promql
-# Redis 히트율 (%)
-rate(redis_keyspace_hits_total[5m]) / (rate(redis_keyspace_hits_total[5m]) + rate(redis_keyspace_misses_total[5m])) * 100
+## 🔧 설정
 
-# Redis 메모리 사용량 (MB)
-redis_used_memory_bytes / 1024 / 1024
-```
+### Prometheus 스크래핑 타겟
 
-### 시스템 리소스
-```promql
-# CPU 사용률 (%)
-100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+**Backend (NestJS)**
+- Target: `host.docker.internal:3000`
+- Path: `/internal/health-check-2f4a8b9c`
+- Interval: 10s
 
-# 메모리 사용률 (%)
-(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
-```
+**MCP Proxy Server**
+- Target: `host.docker.internal:3002`
+- Path: `/metrics`
+- Interval: 10s
 
-## 🛠️ Docker 명령어 가이드
+**Redis Exporter**
+- Target: `redis-exporter:9121`
+- Interval: 10s
 
-### 시작 및 중지
+**Node Exporter**
+- Target: `node-exporter:9100`
+- Interval: 15s
+
+### Grafana Provisioning
+
+모든 대시보드는 자동으로 프로비저닝됩니다:
+- 폴더: "Blog Platform"
+- 자동 업데이트: 10초마다
+- UI 수정 허용: Yes
+
+## 🔍 트러블슈팅
+
+### 대시보드가 보이지 않을 때
 
 ```bash
-# 전체 모니터링 스택 시작
-docker-compose -f docker-compose.monitoring.yml up -d
+# Grafana 컨테이너 로그 확인
+docker logs unified-grafana
 
-# 전체 모니터링 스택 중지
-docker-compose -f docker-compose.monitoring.yml down
+# 대시보드 파일 권한 확인
+ls -la grafana/dashboards/
 
-# 특정 서비스만 시작
-docker-compose -f docker-compose.monitoring.yml up -d prometheus grafana
-
-# 특정 서비스만 재시작
-docker-compose -f docker-compose.monitoring.yml restart grafana
+# Grafana 재시작
+docker-compose -f docker-compose.unified-monitoring.yml restart grafana
 ```
 
-### 로그 및 디버깅
+### 메트릭이 수집되지 않을 때
 
 ```bash
-# 전체 로그 보기 (실시간)
-docker-compose -f docker-compose.monitoring.yml logs -f
+# Prometheus 타겟 상태 확인
+# http://localhost:9090/targets
 
-# 특정 서비스 로그 보기
-docker-compose -f docker-compose.monitoring.yml logs -f prometheus
+# Backend 메트릭 엔드포인트 직접 확인
+curl http://localhost:3000/internal/health-check-2f4a8b9c
 
-# 최근 100줄 로그만 보기
-docker-compose -f docker-compose.monitoring.yml logs --tail=100 grafana
+# MCP Proxy 메트릭 엔드포인트 직접 확인
+curl http://localhost:3002/metrics
 
-# 로그 타임스탬프 포함
-docker-compose -f docker-compose.monitoring.yml logs -f --timestamps
+# Prometheus 로그 확인
+docker logs unified-prometheus
 ```
 
-### 상태 확인
+### Redis Exporter 연결 문제
 
 ```bash
-# 실행 중인 컨테이너 확인
-docker-compose -f docker-compose.monitoring.yml ps
-
-# 컨테이너 상세 정보
-docker-compose -f docker-compose.monitoring.yml ps -a
-
-# 리소스 사용량 실시간 모니터링
-docker stats chat-prometheus chat-grafana chat-redis-exporter chat-node-exporter
-```
-
-### 데이터 관리
-
-```bash
-# 컨테이너 중지 (데이터 보존)
-docker-compose -f docker-compose.monitoring.yml down
-
-# 컨테이너 및 볼륨 완전 삭제 (데이터 삭제)
-docker-compose -f docker-compose.monitoring.yml down -v
-
-# 볼륨 목록 확인
-docker volume ls | grep monitoring
-
-# 특정 볼륨 삭제
-docker volume rm my-blog-app_prometheus_data
-docker volume rm my-blog-app_grafana_data
-```
-
-### 컨테이너 내부 접속
-
-```bash
-# Prometheus 컨테이너 접속
-docker exec -it chat-prometheus sh
-
-# Grafana 컨테이너 접속
-docker exec -it chat-grafana sh
+# Redis 연결 확인
+redis-cli -h localhost -p 6379 ping
 
 # Redis Exporter 로그 확인
-docker logs -f chat-redis-exporter
+docker logs unified-redis-exporter
+
+# Redis Exporter 재시작
+docker-compose -f docker-compose.unified-monitoring.yml restart redis-exporter
 ```
 
-### 설정 변경 후 재시작
+## 📝 추가 설정
+
+### Prometheus 설정 변경 후 리로드
 
 ```bash
-# 1. prometheus.yml 또는 alerts.yml 수정
-# 2. Prometheus 설정 다시 로드 (재시작 없이)
+# 설정 파일 검증
+docker exec unified-prometheus promtool check config /etc/prometheus/prometheus.yml
+
+# 설정 리로드 (재시작 없이)
 curl -X POST http://localhost:9090/-/reload
-
-# 또는 컨테이너 재시작
-docker-compose -f docker-compose.monitoring.yml restart prometheus
-
-# Grafana 대시보드 변경 후 재시작
-docker-compose -f docker-compose.monitoring.yml restart grafana
 ```
 
-## 🔧 문제 해결
+### Grafana 비밀번호 변경
 
-### Prometheus가 타겟을 수집하지 못하는 경우
-
-1. **타겟 상태 확인**
-   ```bash
-   # Prometheus Targets 페이지 확인
-   open http://localhost:9090/targets
-   ```
-
-2. **백엔드가 실행 중인지 확인**
-   ```bash
-   curl http://localhost:3000/internal/health-check-2f4a8b9c
-   ```
-
-3. **Docker 네트워크 확인**
-   ```bash
-   # Docker 컨테이너가 호스트에 접근할 수 있는지 확인
-   docker exec -it chat-prometheus ping host.docker.internal
-   ```
-
-### Grafana 대시보드가 보이지 않는 경우
-
-1. **Prometheus 데이터 소스 확인**
-   - Grafana → Configuration → Data Sources
-   - Prometheus가 "Working" 상태인지 확인
-
-2. **대시보드 수동 Import**
-   ```bash
-   # Grafana UI에서:
-   # Dashboards → Import → Upload JSON file
-   # monitoring/grafana/dashboards/*.json 파일 선택
-   ```
-
-### Redis Exporter 연결 실패
-
-1. **Redis 실행 확인**
-   ```bash
-   docker ps | grep redis
-   redis-cli ping  # PONG 응답 확인
-   ```
-
-2. **Redis Exporter 로그 확인**
-   ```bash
-   docker logs chat-redis-exporter
-   ```
-
-### 포트 충돌 발생 시
-
-현재 포트는 **localhost에만 바인딩**되어 있습니다:
-- Prometheus: `127.0.0.1:9090`
-- Grafana: `127.0.0.1:3030`
-
-다른 서비스와 충돌하면 `docker-compose.monitoring.yml`에서 포트 변경:
-```yaml
-ports:
-  - "127.0.0.1:새포트:9090"  # Prometheus
-  - "127.0.0.1:새포트:3000"  # Grafana
+```bash
+# Grafana 컨테이너 접속
+docker exec -it unified-grafana grafana-cli admin reset-admin-password <새비밀번호>
 ```
 
-## 📚 관련 문서
+## 🔄 기존 모니터링 시스템 마이그레이션
 
-- [Prometheus 공식 문서](https://prometheus.io/docs/)
-- [Grafana 공식 문서](https://grafana.com/docs/)
-- [Redis Exporter](https://github.com/oliver006/redis_exporter)
-- [Node Exporter](https://github.com/prometheus/node_exporter)
-- [PromQL 치트시트](https://promlabs.com/promql-cheat-sheet/)
+기존에 분리되어 있던 2개의 모니터링 스택:
+1. Chat/Backend 모니터링 (port 3030)
+2. MCP 모니터링 (port 3333)
 
-## 🔗 연관 시스템
+이 통합 시스템으로 모두 대체됩니다.
 
-이 모니터링 스택은 **my-blog-app 백엔드**를 모니터링합니다.
+### 리소스 절감
+- **Before**: Grafana 2개 + Prometheus 2개 = ~1.48GB
+- **After**: Grafana 1개 + Prometheus 1개 = ~780MB
+- **절감**: 47% (약 700MB)
 
-**MCP Proxy Server 모니터링**은 별도로 구성되어 있습니다:
-- 위치: `mcp-proxy-server/docker-compose.monitoring.yml`
-- Grafana 포트: 3333
-- Prometheus 포트: 9091
+### 백업 위치
+기존 설정 파일은 `/monitoring-backup/` 폴더에 보관됩니다.
 
-두 모니터링 시스템은 독립적으로 실행 가능하며 포트 충돌이 없습니다.
+## 📞 문의
 
-자세한 내용은 프로젝트 루트의 `MONITORING_GUIDE.md`를 참조하세요.
+모니터링 시스템 관련 문의사항이나 개선 제안은 프로젝트 관리자에게 연락하세요.

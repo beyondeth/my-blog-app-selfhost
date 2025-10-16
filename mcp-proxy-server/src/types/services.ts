@@ -19,7 +19,9 @@ export interface McpServices {
  * MCP 설정 인터페이스
  */
 export interface McpConfig {
-  BACKEND_BASE_URL: string;
+  MCP_BASE_URL: string;          // MCP Proxy 공개 URL (브라우저 접근 가능)
+  BACKEND_BASE_URL: string;       // Backend 내부 URL (서버 간 통신)
+  BACKEND_PUBLIC_URL: string;     // Backend 공개 URL (브라우저 OAuth 인증)
   OAUTH_CLIENT_ID: string;
   OAUTH_REDIRECT_URI: string;
 }

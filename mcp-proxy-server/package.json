@@ -6,7 +6,7 @@
   "scripts": {
     "build": "tsc",
     "start": "node dist/index.js",
-    "dev": "nodemon --exec ts-node src/index.ts",
+    "dev": "nodemon --exec npx tsx src/index.ts",
     "clean": "rm -rf dist"
   },
   "keywords": [],
@@ -38,6 +38,7 @@
     "@types/uuid": "^11.0.0",
     "chalk": "^5.6.2",
     "node-fetch": "^3.3.2",
+    "tsx": "^4.20.6",
     "uuid": "^13.0.0"
   }
 }

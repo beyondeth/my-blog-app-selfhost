@@ -96,6 +96,23 @@ export class Post {
   @Column({ type: 'timestamp', nullable: true, name: 'editorPickedAt' })
   editorPickedAt: Date | null;
 
+  // 포스트 처리 상태 (Fast Path + Queue 최적화)
+  // - draft: 임시 저장
+  // - processing: 백그라운드 처리 중 (Fast Path 직후)
+  // - published: 발행 완료 (Worker 처리 완료)
+  // - failed: 처리 실패
+  @Column({ type: 'varchar', default: 'published', name: 'status' })
+  @Index()
+  status: 'draft' | 'processing' | 'published' | 'failed';
+
+  // 처리 실패 시 에러 메시지
+  @Column({ type: 'text', nullable: true, name: 'processing_error' })
+  processingError?: string;
+
+  // 백그라운드 처리 완료 시간
+  @Column({ type: 'timestamp', nullable: true, name: 'processing_completed_at' })
+  processingCompletedAt?: Date;
+
   @VersionColumn({ name: 'version' })
   version: number;
 

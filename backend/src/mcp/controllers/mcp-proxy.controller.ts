@@ -74,12 +74,12 @@ export class McpProxyController {
   @Post('posts')
   @UseGuards(OAuthGuard)
   @RequireScopes('mcp:post:create')
-  @HttpCode(HttpStatus.CREATED)
+  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'MCP 포스트 생성',
-    description: 'MCP 클라이언트가 OAuth2 인증을 통해 블로그에 포스트를 생성합니다. 토큰에 바인딩된 블로그에만 작성 가능합니다.',
+    summary: 'MCP 포스트 생성 (Fast Path)',
+    description: 'MCP 클라이언트가 OAuth2 인증을 통해 블로그에 포스트를 생성합니다. Fast Path 방식으로 즉시 응답하고 백그라운드에서 처리합니다.',
   })
-  @ApiResponse({ status: 201, description: '포스트 생성 성공' })
+  @ApiResponse({ status: 202, description: '포스트 생성 요청 접수 (백그라운드 처리 중)' })
   @ApiResponse({ status: 401, description: '인증 실패' })
   @ApiResponse({ status: 403, description: '권한 없음' })
   @ApiResponse({ status: 400, description: '잘못된 요청' })
@@ -141,8 +141,8 @@ export class McpProxyController {
         throw new BadRequestException('사용자를 찾을 수 없습니다');
       }
 
-      // 4. 포스트 생성 (서비스 레이어에서 추가 검증)
-      const post = await this.postsService.create(postData, user);
+      // 4. 포스트 생성 (Fast Path: 150-200ms 응답, 백그라운드 처리)
+      const post = await this.postsService.createFast(postData, user);
 
       // FUTURE: 구독제 활성화 시 주석 해제
       // // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
@@ -168,15 +168,16 @@ export class McpProxyController {
         )
       );
 
-      this.logger.log(`✅ [MCP Post Created] Post ID: ${post.id}, Blog: ${post.blog?.slug}`);
+      this.logger.log(`✅ [MCP Post Created - Fast Path] Post ID: ${post.id}, Blog: ${post.blog?.slug}, Processing: ${post._meta?.processingTime || 'N/A'}`);
 
-      // MCP 응답 최적화: 최소 필수 정보만 반환하여 응답 시간 단축
+      // MCP 응답 최적화: 최소 필수 정보 + Fast Path 메타데이터 반환
       return {
         id: post.id,
         slug: post.slug,
         title: post.title,
         url: `/${post.blog.slug}/${post.slug}`,  // 새 URL 구조 적용 (리다이렉트 제거)
         blog: post.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
+        _meta: post._meta,  // Fast Path 메타데이터 (처리 상태, 예상 완료 시간 등)
       };
     } catch (error) {
       // 에러 로깅 (디버깅을 위해 전체 에러 출력)

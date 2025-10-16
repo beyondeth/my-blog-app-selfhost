@@ -71,4 +71,13 @@ export class AuthorizeDto {
   @IsOptional()
   @IsString()
   switch_account?: string;
+
+  @ApiProperty({
+    description: 'RFC 8707 Resource Indicator (MCP 서버 식별자)',
+    example: 'http://localhost:3002',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  resource?: string;
 }

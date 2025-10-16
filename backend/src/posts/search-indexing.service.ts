@@ -87,6 +87,7 @@ export class SearchIndexingService {
       await this.logIndexingMetrics();
 
     } catch (error) {
+      
       this.logger.error('검색 인덱싱 실패:', error);
       throw error;
     } finally {
@@ -103,6 +104,7 @@ export class SearchIndexingService {
       where: {
         indexedAt: IsNull(),
         isPublished: true, // 공개된 포스트만 인덱싱
+        status: 'published', // Worker 처리 완료된 포스트만 인덱싱
       },
       order: {
         createdAt: 'ASC', // 오래된 포스트부터 처리
@@ -120,6 +122,7 @@ export class SearchIndexingService {
       where: {
         indexedAt: IsNull(),
         isPublished: true,
+        status: 'published', // Worker 처리 완료된 포스트만 카운트
       },
     });
   }
@@ -207,6 +210,7 @@ export class SearchIndexingService {
         WHERE
           "indexed_at" IS NULL
           AND "isPublished" = true
+          AND "status" = 'published'
       `);
 
       const avgDelaySeconds = avgDelayResult[0]?.avg_delay_seconds || 0;
@@ -262,9 +266,12 @@ export class SearchIndexingService {
   async reindexAll(): Promise<void> {
     this.logger.warn('⚠️  모든 포스트 재인덱싱 시작 - 시스템 부하 주의!');
 
-    // indexed_at을 모두 null로 리셋
+    // indexed_at을 모두 null로 리셋 (Worker 처리 완료된 포스트만)
     await this.postsRepository.update(
-      { isPublished: true },
+      {
+        isPublished: true,
+        status: 'published'
+      },
       { indexedAt: null }
     );
 

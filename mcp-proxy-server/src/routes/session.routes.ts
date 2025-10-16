@@ -87,6 +87,7 @@ export function createSessionRoutes(sessionService: SessionService): Router {
     }
 
     // 토큰 교환
+    // MCP 스펙: resource 파라미터 필수 (RFC 8707 - Resource Indicators for OAuth 2.0)
     const tokenUrl = `${config.BACKEND_BASE_URL}/api/v1/oauth/token`;
     const tokenParams = {
       grant_type: 'authorization_code',
@@ -95,6 +96,7 @@ export function createSessionRoutes(sessionService: SessionService): Router {
       client_id: config.OAUTH_CLIENT_ID,
       client_secret: config.OAUTH_CLIENT_SECRET,
       code_verifier: codeVerifier,
+      resource: config.MCP_BASE_URL, // ✅ MCP 스펙 준수: Resource indicator
     };
 
     console.log('🔄 토큰 교환 요청:', {

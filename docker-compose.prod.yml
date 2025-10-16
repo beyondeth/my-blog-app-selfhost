@@ -1,0 +1,82 @@
+# ============================================
+# Codebase 블로그 플랫폼 - Production Override
+# ============================================
+# docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+# ============================================
+
+services:
+  # ============================================
+  # Backend (프로덕션 모드 - 최적화된 빌드)
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-backend
+    env_file:
+      - .env.production
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: always
+    command: node dist/main.js
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # ============================================
+  # MCP Proxy (프로덕션 모드 - 최적화된 빌드)
+  # ============================================
+  mcp-proxy:
+    build:
+      context: ./mcp-proxy-server
+      dockerfile: Dockerfile
+      target: production
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-mcp-proxy
+    env_file:
+      - .env.production
+    ports:
+      - "${MCP_PROXY_PORT:-3002}:3002"
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: always
+    command: node dist/index.js
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+networks:
+  codebase_network:
+    name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-network

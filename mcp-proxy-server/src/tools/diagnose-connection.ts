@@ -38,7 +38,7 @@ export async function diagnoseConnectionHandler(
 
   // 1. Backend API 헬스체크
   try {
-    const response = await axios.get(`${config.BACKEND_BASE_URL}/api/v1/mcp/health`, {
+    const response = await axios.get(`${config.BACKEND_BASE_URL}/health`, {
       timeout: 5000,
     });
 

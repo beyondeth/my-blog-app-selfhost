@@ -16,6 +16,7 @@ import { WritingStyleService } from '../services/WritingStyleService.js';
 import { CreatePostSchema, type CreatePostInput } from '../validation/schemas.js';
 import { z } from 'zod';
 import { savePostToFile } from '../lib/filesystem.js';
+import { loadErrorMessage } from '../lib/error-messages.js';
 import { logger } from '../utils/logger.js';
 import * as path from 'path';
 
@@ -53,55 +54,28 @@ export async function createPostHandler(
   // Phase 1: 토큰 검증 로직
   if (!validationToken) {
     // 토큰이 없으면 get_writing_style_guide 도구 호출을 유도
-    const errorMessage = `
-❌ **스타일 검증 토큰이 필요합니다!**
-
-포스트를 생성하려면 먼저 get_writing_style_guide 도구를 호출하여 스타일 가이드를 조회해야 합니다.
-
-**STEP 1: 스타일 가이드 조회**
-get_writing_style_guide 도구를 호출하세요:
-\`\`\`typescript
-get_writing_style_guide({ style: "${selectedStyle}" })
-\`\`\`
-
-**STEP 2: 토큰 추출**
-반환된 마크다운 상단의 YAML 메타데이터에서 \`validation_token\`을 찾으세요
-
-**STEP 3: create_post 호출**
-찾은 토큰을 \`validationToken\` 파라미터로 전달하세요:
-\`\`\`typescript
-create_post({
-  title: "제목",
-  content_markdown: "내용...",
-  tags: ["태그", "ai:claude"],
-  validationToken: "찾은-토큰-값-여기에"  // ← 이 부분 추가!
-})
-\`\`\`
-
-⚠️ **중요:** 로컬 파일을 직접 읽지 마세요! 반드시 get_writing_style_guide 도구를 사용하세요.
-💡 **힌트:** 도구를 사용하면 스타일 가이드라인도 함께 학습할 수 있습니다!
-`;
+    const errorMessage = await loadErrorMessage('token-missing', {
+      style: selectedStyle
+    });
     throw new Error(errorMessage);
   }
 
   // 토큰 유효성 검증
   const tokenValidation = await styleService.validateToken(validationToken);
   if (!tokenValidation.valid) {
-    throw new Error(
-      `❌ 잘못된 검증 토큰입니다!\n\n` +
-      `제공된 토큰: ${validationToken}\n` +
-      `올바른 스타일 파일을 읽고 정확한 토큰을 제공해주세요.`
-    );
+    const errorMessage = await loadErrorMessage('token-invalid', {
+      token: validationToken
+    });
+    throw new Error(errorMessage);
   }
 
   // 토큰이 맞는 스타일인지 확인
   if (tokenValidation.styleName !== selectedStyle) {
-    throw new Error(
-      `❌ 토큰이 요청한 스타일과 일치하지 않습니다!\n\n` +
-      `요청한 스타일: ${selectedStyle}\n` +
-      `토큰의 스타일: ${tokenValidation.styleName}\n` +
-      `올바른 스타일 파일의 토큰을 제공해주세요.`
-    );
+    const errorMessage = await loadErrorMessage('token-mismatch', {
+      requestedStyle: selectedStyle,
+      tokenStyle: tokenValidation.styleName || 'unknown'
+    });
+    throw new Error(errorMessage);
   }
 
   logger.info({
@@ -124,31 +98,12 @@ create_post({
       }, '⚠️ [Challenge] No challenges found for style, proceeding with Phase 1 only');
     } else {
       // 챌린지가 있으면 답변 요구
-      const errorMessage = `
-❌ **스타일 가이드 이해도 확인 필요!**
-
-포스트를 생성하려면 다음 질문에 답변해주세요:
-
-**질문:** ${challenge.question}
-
-**답변 찾는 방법:**
-1. get_writing_style_guide 도구로 조회한 가이드를 다시 확인하세요
-2. YAML front matter의 \`validation_challenges\` 섹션에서 위 질문의 답변을 찾으세요
-3. 찾은 답변과 함께 create_post를 다시 호출하세요
-
-**예시:**
-\`\`\`typescript
-create_post({
-  title: "${title}",
-  content_markdown: "...",
-  tags: ${JSON.stringify(tags || [])},
-  validationToken: "${validationToken}",
-  challengeAnswer: "여기에 답변"  // ← 가이드에서 찾은 답변 추가!
-})
-\`\`\`
-
-💡 **힌트:** get_writing_style_guide로 조회한 내용을 다시 확인해보세요!
-`;
+      const errorMessage = await loadErrorMessage('challenge-missing', {
+        question: challenge.question,
+        title: title || '제목',
+        tags: JSON.stringify(tags || []),
+        token: validationToken
+      });
       throw new Error(errorMessage);
     }
   } else {
@@ -168,23 +123,11 @@ create_post({
         phase: 'Phase2-Failed'
       }, '❌ [Challenge] Wrong answer provided');
 
-      const errorMessage = `
-❌ **답변이 올바르지 않습니다!**
-
-제공하신 답변: "${challengeAnswer}"
-
-스타일 가이드를 다시 확인하고 정확한 답변을 제공해주세요.
-
-**새로운 질문:** ${newChallenge?.question || '질문을 찾을 수 없습니다'}
-
-**답변 찾는 방법:**
-1. get_writing_style_guide({ style: "${selectedStyle}" }) 도구를 다시 호출하세요
-2. 반환된 마크다운의 YAML front matter에서 \`validation_challenges\`를 확인하세요
-3. 위 질문에 해당하는 정확한 답변을 찾으세요
-4. \`challengeAnswer\` 파라미터에 정확한 답변을 포함하여 다시 호출하세요
-
-💡 **팁:** 답변은 정확하게 일치해야 합니다 (대소문자 무시, 공백 제거)
-`;
+      const errorMessage = await loadErrorMessage('challenge-wrong', {
+        providedAnswer: challengeAnswer,
+        newQuestion: newChallenge?.question || '질문을 찾을 수 없습니다',
+        style: selectedStyle
+      });
       throw new Error(errorMessage);
     }
 

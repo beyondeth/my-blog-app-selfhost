@@ -13,4 +13,12 @@ export interface AuthResponse {
     isEmailVerified: boolean;
     createdAt: Date;
   };
+  blog?: {
+    id: string;
+    slug: string;
+    name: string;
+    description?: string;
+    isPublic: boolean;
+    createdAt: Date;
+  };
 } 

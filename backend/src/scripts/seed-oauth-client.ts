@@ -1,4 +1,5 @@
-#!/usr/bin/env node
+
+// #!/usr/bin/env node
 
 /**
  * OAuth2 클라이언트 시드 스크립트
@@ -48,10 +49,10 @@ async function bootstrap() {
 
     // MCP 클라이언트 정보
     const clientData = {
-      clientId: 'mcp-blog-server',
-      clientSecret: 'mcp-secret-key-2024', // 실제 환경에서는 강력한 랜덤 키 사용
-      clientName: 'MCP Blog Server',
-      description: 'Model Context Protocol을 통한 블로그 자동 포스팅 클라이언트',
+      clientId: 'mcp-proxy-client',
+      clientSecret: process.env.OAUTH_CLIENT_SECRET || 'c3d73caf292f46e768d1252dbf706cc13538faa62be56bc7d7227c79ea1e8c09',
+      clientName: 'MCP Proxy Client',
+      description: 'Model Context Protocol Proxy를 통한 블로그 자동 포스팅 클라이언트',
       redirectUris: [
         'http://localhost:7777/callback',
         'http://localhost:8080/callback',

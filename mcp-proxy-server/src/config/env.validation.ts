@@ -52,8 +52,8 @@ const encryptionKeySchema = z.string()
 // 환경 변수 스키마 정의
 const envSchema = z.object({
   // 서버 설정
-  PORT: z.string()
-    .regex(/^\d+$/, 'PORT must be a number')
+  MCP_PROXY_PORT: z.string()
+    .regex(/^\d+$/, 'MCP_PROXY_PORT must be a number')
     .default('3002')
     .transform(Number),
   NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
@@ -92,6 +92,8 @@ const envSchema = z.object({
   // Backend API 설정 (필수)
   BACKEND_BASE_URL: z.string().url('BACKEND_BASE_URL must be a valid URL'),
   BACKEND_API_URL: z.string().url('BACKEND_API_URL must be a valid URL'),
+  // Backend 공개 URL (브라우저가 접근할 수 있는 URL - OAuth Authorization용)
+  BACKEND_PUBLIC_URL: z.string().url('BACKEND_PUBLIC_URL must be a valid URL'),
 
   // CORS 설정 (프로덕션에서 와일드카드 금지)
   CORS_ORIGINS: corsOriginsSchema,
@@ -123,6 +125,29 @@ const envSchema = z.object({
     .regex(/^\d+$/, 'MCP_MAX_CONCURRENT_SESSIONS must be a number')
     .default('1000')
     .transform(Number),
+
+  // MCP 서버 공개 URL (외부에서 접근 가능한 URL)
+  // 개발: http://localhost:3002
+  // 프로덕션: https://www.codebase.blog
+  MCP_BASE_URL: z.string()
+    .url('MCP_BASE_URL must be a valid URL')
+    .refine(
+      (url) => {
+        // 프로덕션에서는 HTTPS 필수
+        if (process.env.NODE_ENV === 'production') {
+          return url.startsWith('https://');
+        }
+        return true;
+      },
+      {
+        message: 'MCP_BASE_URL must use HTTPS in production'
+      }
+    )
+    .default(
+      process.env.NODE_ENV === 'production'
+        ? 'https://www.codebase.blog'
+        : `http://localhost:${process.env.MCP_PROXY_PORT || 3002}`
+    ),
 });
 
 // 환경 변수 타입 정의
@@ -138,7 +163,8 @@ export function validateEnv(): EnvConfig {
 
     console.log('✅ 환경 변수 검증 완료');
     console.log(`📍 환경: ${env.NODE_ENV}`);
-    console.log(`📍 포트: ${env.PORT}`);
+    console.log(`📍 MCP Proxy 포트: ${env.MCP_PROXY_PORT}`);
+    console.log(`📍 MCP Base URL: ${env.MCP_BASE_URL}`);
     console.log(`📍 Redis: ${env.REDIS_HOST}:${env.REDIS_PORT}`);
     console.log(`📍 Backend: ${env.BACKEND_BASE_URL}`);
     console.log(`🔐 세션 암호화: 활성화 (AES-256-GCM)`);
@@ -166,6 +192,13 @@ export function validateEnv(): EnvConfig {
         console.warn('  ⚠️ BACKEND_BASE_URL이 HTTPS를 사용하지 않습니다.');
       } else {
         console.log('  ✅ HTTPS 사용 중');
+      }
+
+      // MCP_BASE_URL HTTPS 확인
+      if (!env.MCP_BASE_URL.startsWith('https://')) {
+        console.warn('  ⚠️ MCP_BASE_URL이 HTTPS를 사용하지 않습니다.');
+      } else {
+        console.log('  ✅ MCP Base URL HTTPS 사용 중');
       }
     }
 

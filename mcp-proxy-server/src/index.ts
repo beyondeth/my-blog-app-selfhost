@@ -43,16 +43,21 @@ import { metricsMiddleware } from './metrics/middleware.js';
 
 // Express 앱 초기화
 const app = express();
-const port = config.PORT;
+const port = config.MCP_PROXY_PORT;
 
 // 세션 서비스 초기화
 const sessionService = new SessionService();
+
+// Express app.locals에 SessionService 등록 (OAuth 라우트에서 접근 가능하도록)
+app.locals.sessionService = sessionService;
 
 // Session-Scoped Transport 패턴
 const transportManager = new TransportManager({
   sessionService,
   config: {
+    MCP_BASE_URL: config.MCP_BASE_URL,
     BACKEND_BASE_URL: config.BACKEND_BASE_URL,
+    BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
     OAUTH_CLIENT_ID: config.OAUTH_CLIENT_ID,
     OAUTH_REDIRECT_URI: config.OAUTH_REDIRECT_URI,
   },
@@ -240,6 +245,92 @@ logger.info('✅ OAuth proxy registered: /api/v1/oauth/* → Backend');
 // ====================================================================================
 
 /**
+ * GET /mcp - SSE Stream Endpoint (MCP 표준 준수)
+ *
+ * Server-Sent Events 스트림으로 서버→클라이언트 이벤트 전송
+ * - Accept: text/event-stream 헤더 필수
+ * - Mcp-Session-Id 헤더로 세션 추적
+ * - Transport가 자동으로 handleGetRequest() 호출
+ * - Rate limiting applied (세션 또는 IP 기반)
+ */
+app.get('/mcp', mcpRateLimiter, async (req, res) => {
+  try {
+    // 1. Mcp-Session-Id 헤더에서 세션 ID 가져오기
+    const clientSessionIdHeader = req.headers['mcp-session-id'];
+    const sessionId = Array.isArray(clientSessionIdHeader)
+      ? clientSessionIdHeader[0]
+      : clientSessionIdHeader;
+
+    // 세션 ID 필수 (SSE 스트림은 기존 세션에 연결)
+    if (!sessionId) {
+      logger.warn('⚠️ SSE stream request without session ID');
+      return res.status(400).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Bad Request: Mcp-Session-Id header required for SSE stream'
+        },
+        id: null
+      });
+    }
+
+    // 2. Accept 헤더 검증 (text/event-stream 필수)
+    const acceptHeader = req.headers['accept'];
+    if (!acceptHeader?.includes('text/event-stream')) {
+      logger.warn({
+        sessionId: sessionId.substring(0, 8),
+        acceptHeader
+      }, '⚠️ SSE stream request without proper Accept header');
+      return res.status(406).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Not Acceptable: Client must accept text/event-stream'
+        },
+        id: null
+      });
+    }
+
+    logger.debug({
+      sessionId: sessionId.substring(0, 8),
+      acceptHeader,
+      userAgent: req.headers['user-agent']
+    }, '📡 SSE stream connection request');
+
+    // 3. 세션별 Transport 가져오기 (없으면 생성, 있으면 재사용)
+    const transport = await transportManager.getOrCreateTransport(sessionId);
+
+    // 4. SSE 스트림 처리 (AsyncLocalStorage에 세션 ID 저장)
+    // Transport가 자동으로 handleGetRequest() 호출하여 SSE 스트림 시작
+    await sessionContext.run({ sessionId }, async () => {
+      await transport.handleRequest(req, res);
+    });
+
+    logger.info({
+      sessionId: sessionId.substring(0, 8)
+    }, '✅ SSE stream connected');
+
+  } catch (error: any) {
+    logger.error({
+      error: error.message,
+      stack: error.stack
+    }, '❌ SSE stream failed');
+
+    // handleRequest 실행 전 에러만 처리 (실행 후 에러는 이미 응답 완료)
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal error'
+        },
+        id: null
+      });
+    }
+  }
+});
+
+/**
  * POST /mcp - Modern Streamable HTTP Transport (Session-Scoped) - MCP 표준 준수
  *
  * Single endpoint for all MCP requests
@@ -247,6 +338,7 @@ logger.info('✅ OAuth proxy registered: /api/v1/oauth/* → Backend');
  * - JSON-RPC 2.0 protocol
  * - Session-scoped transport (세션별로 재사용)
  * - Rate limiting applied (세션 또는 IP 기반)
+ * - OAuth 2.0 인증 필수 (RFC 6750, RFC 9728 준수)
  */
 app.post('/mcp', mcpRateLimiter, async (req, res) => {
   try {
@@ -260,7 +352,81 @@ app.post('/mcp', mcpRateLimiter, async (req, res) => {
     // 2. 응답 헤더에 세션 ID 미리 설정 (handleRequest 호출 전에)
     res.setHeader('Mcp-Session-Id', sessionId);
 
-    // Session-Scoped Transport 패턴
+    // 3. OAuth 2.0 인증 체크 (RFC 6750, RFC 9728 준수)
+    const method = req.body?.method;
+    const toolName = req.body?.params?.name;
+
+    // 인증이 필요한 메서드 리스트
+    // tools/list, initialize 등은 인증 없이 허용
+    const AUTH_REQUIRED_METHODS = [
+      'tools/call',  // create_post 등 모든 도구 호출
+    ];
+
+    // 인증 예외 도구 리스트
+    // RFC 9728 표준: 인증되지 않은 요청 → 401 + WWW-Authenticate → 브라우저 자동 실행
+    const AUTH_EXEMPT_TOOLS = [
+      'authenticate',  // ✅ 인증 도구 자체는 예외
+      'diagnose_connection',  // ✅ 진단 도구는 인증 불필요
+    ];
+
+    if (AUTH_REQUIRED_METHODS.includes(method) && !AUTH_EXEMPT_TOOLS.includes(toolName)) {
+      // 1. 먼저 세션 기반 인증 시도 (MCP SDK가 Authorization 헤더를 보내지 않는 경우 대비)
+      const session = await sessionService.getSession(sessionId);
+
+      // 1-a. 세션에 유효한 토큰이 있으면 Authorization 헤더 없이도 통과 (Fallback 인증)
+      if (session?.accessToken && (!session.tokenExpiresAt || session.tokenExpiresAt > Date.now())) {
+        logger.debug({
+          sessionId: sessionId.substring(0, 8),
+          method,
+          authMethod: 'session-based'
+        }, '✅ Session-based authentication (MCP SDK Authorization header fallback)');
+        // 인증 통과 - 다음 단계로 진행
+      }
+      // 1-b. 세션에 토큰이 없으면 Authorization 헤더 체크 (RFC 6750 표준 방식)
+      else {
+        const authHeader = req.headers.authorization;
+
+        // Authorization 헤더 검증
+        if (!authHeader || !authHeader.startsWith('Bearer ')) {
+          logger.warn({
+            sessionId: sessionId.substring(0, 8),
+            method,
+            hasAuthHeader: !!authHeader,
+            hasSession: !!session,
+            hasSessionToken: !!session?.accessToken
+          }, '⚠️ Authorization header missing and no valid session token');
+
+          // RFC 9728: WWW-Authenticate 헤더로 resource_metadata URL 제공
+          // MCP SDK가 이 헤더를 읽어 OAuth discovery 플로우 자동 시작 → 브라우저 자동 팝업
+          res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${config.MCP_BASE_URL}/.well-known/oauth-resource-metadata"`);
+
+          return res.status(401).json(createJsonRpcError(
+            JsonRpcErrorCode.INVALID_REQUEST,
+            'Authorization required',
+            req.body?.id || null
+          ));
+        }
+
+        // Bearer 토큰 추출 및 검증 (RFC 6750 표준)
+        const token = authHeader.substring(7); // "Bearer " 제거
+
+        // 토큰이 세션 토큰과 일치하는지 확인 (선택적 검증)
+        if (session && session.accessToken !== token) {
+          logger.warn({
+            sessionId: sessionId.substring(0, 8),
+            tokenMatch: false
+          }, '⚠️ Authorization header token does not match session token');
+        }
+
+        logger.debug({
+          sessionId: sessionId.substring(0, 8),
+          method,
+          authMethod: 'authorization-header'
+        }, '✅ Authorization header validated');
+      }
+    }
+
+    // 4. Session-Scoped Transport 패턴
     logger.debug({
       sessionId: sessionId.substring(0, 8),
       pattern: 'Session-Scoped Transport',
@@ -272,10 +438,10 @@ app.post('/mcp', mcpRateLimiter, async (req, res) => {
       method: req.body?.method
     }, '📦 Processing MCP request');
 
-    // 3. 세션별 Transport 가져오기 (없으면 생성, 있으면 재사용)
+    // 5. 세션별 Transport 가져오기 (없으면 생성, 있으면 재사용)
     const transport = await transportManager.getOrCreateTransport(sessionId);
 
-    // 4. 요청 처리 (AsyncLocalStorage에 세션 ID 저장하여 도구 핸들러에서 접근 가능하게 함)
+    // 6. 요청 처리 (AsyncLocalStorage에 세션 ID 저장하여 도구 핸들러에서 접근 가능하게 함)
     await sessionContext.run({ sessionId }, async () => {
       await transport.handleRequest(req, res, req.body);
     });
@@ -345,7 +511,7 @@ app.delete('/mcp', async (req, res) => {
   res.status(204).send();
 });
 
-logger.info('✅ MCP Streamable HTTP endpoints registered: POST /mcp, DELETE /mcp (MCP 표준 준수)');
+logger.info('✅ MCP Streamable HTTP endpoints registered: GET /mcp (SSE), POST /mcp (JSON-RPC), DELETE /mcp (세션 종료) - MCP 표준 준수');
 
 // ====================================================================================
 
@@ -358,7 +524,7 @@ app.use(errorHandler);
 // 서버 시작
 const server = app.listen(port, '0.0.0.0', () => {
   logger.info({
-    port,
+    mcpProxyPort: port,
     host: '0.0.0.0',
     environment: config.NODE_ENV,
     redis: `${config.REDIS_HOST}:${config.REDIS_PORT}`,

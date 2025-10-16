@@ -1,5 +1,5 @@
 # Prometheus 설정 파일
-# 채팅 큐 시스템 메트릭 수집 설정
+# 통합 모니터링 시스템: Backend, MCP Proxy, Redis, System
 
 global:
   # 메트릭 수집 주기
@@ -8,7 +8,7 @@ global:
   evaluation_interval: 15s
   # 외부 시스템에 첨부할 레이블
   external_labels:
-    monitor: 'chat-queue-monitor'
+    monitor: 'unified-monitor'
     environment: 'development'
 
 # Alertmanager 설정 (선택사항)
@@ -55,3 +55,11 @@ scrape_configs:
   - job_name: 'grafana'
     static_configs:
       - targets: ['grafana:3000']
+
+  # MCP Proxy Server 메트릭 (신규 추가)
+  - job_name: 'mcp-proxy-server'
+    static_configs:
+      - targets: ['host.docker.internal:3002']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+    scrape_timeout: 5s

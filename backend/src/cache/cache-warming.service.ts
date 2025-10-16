@@ -100,6 +100,7 @@ export class CacheWarmingService {
             .leftJoin('post.author', 'author')
             .leftJoin('post.blog', 'blog')
             .where('post.isPublished = :isPublished', { isPublished: true })
+            .andWhere('post.status = :status', { status: 'published' })
             .andWhere('blog.isPublic = :isPublic', { isPublic: true })
             .orderBy('post.publishedAt', 'DESC') // createdAt → publishedAt으로 변경 (인덱스 활용)
             .skip(offset)

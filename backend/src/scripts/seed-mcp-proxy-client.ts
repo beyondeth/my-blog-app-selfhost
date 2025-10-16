@@ -4,7 +4,16 @@
  * MCP Proxy OAuth2 클라이언트 시드 스크립트
  * MCP Proxy 서버를 위한 OAuth 클라이언트를 데이터베이스에 등록합니다.
  *
+ * 환경변수 (선택):
+ * - OAUTH_CLIENT_ID: 클라이언트 ID (기본값: mcp-proxy-client)
+ * - OAUTH_CLIENT_SECRET: 클라이언트 시크릿 (미설정 시 자동 생성, 프로덕션에서는 필수)
+ * - OAUTH_REDIRECT_URIS: 리다이렉트 URI 목록 (쉼표로 구분)
+ *
  * 사용법:
+ * pnpm ts-node src/scripts/seed-mcp-proxy-client.ts
+ *
+ * 프로덕션 환경:
+ * OAUTH_CLIENT_SECRET=$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")
  * pnpm ts-node src/scripts/seed-mcp-proxy-client.ts
  */
 
@@ -14,6 +23,44 @@ import { DataSource } from 'typeorm';
 import { OAuthClient } from '../oauth/entities/oauth-client.entity';
 import { User } from '../users/entities/user.entity';
 import * as bcrypt from 'bcrypt';
+import * as crypto from 'crypto';
+
+/**
+ * Client Secret 생성/로드 로직
+ * 1. 환경변수 OAUTH_CLIENT_SECRET이 있으면 사용
+ * 2. 없으면:
+ *    - 개발환경: 강력한 랜덤 secret 생성 (64자 hex)
+ *    - 프로덕션: 에러 발생 (보안상 환경변수 필수)
+ */
+function generateClientSecret(): string {
+  // 환경변수에서 읽기
+  const envSecret = process.env.OAUTH_CLIENT_SECRET;
+
+  if (envSecret) {
+    console.log('✅ 환경변수에서 Client Secret을 로드했습니다.');
+    return envSecret;
+  }
+
+  // 프로덕션에서는 환경변수 필수
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      '❌ 프로덕션 환경에서는 OAUTH_CLIENT_SECRET 환경변수가 필수입니다.\n' +
+      '💡 다음 명령어로 강력한 secret을 생성하세요:\n' +
+      '   node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+
+  // 개발환경: 강력한 랜덤 secret 생성 (256-bit, 64자 hex)
+  const generatedSecret = crypto.randomBytes(32).toString('hex');
+
+  console.log('\n⚠️  OAUTH_CLIENT_SECRET 환경변수가 없어 랜덤 secret을 생성했습니다.');
+  console.log('📝 .env 파일에 다음 라인을 추가하세요:');
+  console.log(`\nOAUTH_CLIENT_SECRET=${generatedSecret}\n`);
+  console.log('⚠️  이 secret은 재시작 시마다 변경됩니다. 환경변수에 저장하세요!');
+  console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+
+  return generatedSecret;
+}
 
 async function bootstrap() {
   // NestJS 애플리케이션 인스턴스 생성
@@ -47,17 +94,26 @@ async function bootstrap() {
     }
 
     // MCP Proxy 클라이언트 정보
+    const clientId = process.env.OAUTH_CLIENT_ID || 'mcp-proxy-client';
+    const clientSecret = generateClientSecret();
+
+    // Redirect URIs: 환경변수에서 쉼표로 구분된 리스트 읽기
+    const defaultRedirectUris = [
+      'http://localhost:3002/oauth/callback',  // MCP 프록시 서버 실제 포트 (3002)
+      'http://localhost:8080/oauth/callback',  // 이전 테스트용 포트
+      'http://localhost:7777/callback',
+      'http://localhost:8080/callback'
+    ];
+    const redirectUris = process.env.OAUTH_REDIRECT_URIS
+      ? process.env.OAUTH_REDIRECT_URIS.split(',').map(uri => uri.trim())
+      : defaultRedirectUris;
+
     const clientData = {
-      clientId: 'mcp-proxy-client',
-      clientSecret: 'test-secret-key-123',
+      clientId: clientId,
+      clientSecret: clientSecret,
       clientName: 'MCP Proxy Client',
       description: 'Model Context Protocol Proxy Server for auto-posting',
-      redirectUris: [
-        'http://localhost:3002/oauth/callback',  // MCP 프록시 서버 실제 포트 (3002)
-        'http://localhost:8080/oauth/callback',  // 이전 테스트용 포트
-        'http://localhost:7777/callback',
-        'http://localhost:8080/callback'
-      ],
+      redirectUris: redirectUris,
       allowedScopes: ['mcp:post:create'],
       grantTypes: 'authorization_code',
       userId: adminUser.id,
@@ -101,13 +157,15 @@ async function bootstrap() {
     }
 
     console.log('\n📌 클라이언트 정보:');
-    console.log('Client ID:', clientData.clientId);
-    console.log('Client Secret:', clientData.clientSecret);
-    console.log('Redirect URIs:', clientData.redirectUris.join(', '));
+    console.log('Client ID:', clientId);
+    console.log('Client Secret:', '***' + clientSecret.slice(-8) + ' (보안상 일부만 표시)');
+    console.log('Redirect URIs:', redirectUris.join(', '));
     console.log('Allowed Scopes:', clientData.allowedScopes.join(', '));
 
-    console.log('\n💡 이 정보는 MCP Proxy 서버 .env 파일과 일치합니다.');
-    console.log('⚠️ Client Secret은 안전하게 보관하세요.');
+    console.log('\n💡 MCP Proxy 서버 .env 파일에 다음을 설정하세요:');
+    console.log(`OAUTH_CLIENT_ID=${clientId}`);
+    console.log(`OAUTH_CLIENT_SECRET=${clientSecret}`);
+    console.log('\n⚠️  Client Secret은 절대 커밋하지 마세요! (.env는 .gitignore에 포함)');
 
   } catch (error) {
     console.error('❌ 에러 발생:', error);

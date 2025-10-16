@@ -20,6 +20,7 @@ import {
   getErrorMessage,
 } from '../types/mcp-errors.js';
 import { sessionContext } from '../services/TransportManager.js';
+import { loadToolDescription } from '../lib/error-messages.js';
 
 // 기존 핸들러 import
 import { authenticateHandler } from './authenticate.js';
@@ -49,82 +50,15 @@ export async function registerAllTools(
 ) {
   logger.info('📦 Registering all MCP tools...');
 
-  // Writing Style: 간략한 설명 + 스타일 플래그 가이드
-  const createPostDescription = `Create a new blog post
-
-🔑 **VALIDATION TOKEN REQUIRED** 🔑
-Before creating a post, you MUST get the writing style guide using the get_writing_style_guide tool:
-
-**STEP 1: Get Style Guide**
-Call the get_writing_style_guide tool with your desired style:
-\`\`\`typescript
-get_writing_style_guide({ style: 'default' })  // or 'novel', 'tutorial', 'comedy', 'podcast'
-\`\`\`
-
-**STEP 2: Extract Validation Info**
-From the returned markdown:
-- Find \`validation_token\` in YAML front matter
-- Find \`validation_challenges\` and choose one question to answer
-
-**STEP 3: Create Post**
-Call create_post with the validation info:
-\`\`\`typescript
-create_post({
-  title: "Your title",
-  content_markdown: "Your content...",
-  tags: ["tag1", "ai:claude"],
-  validationToken: "token-from-step2",
-  challengeAnswer: "answer-from-step2"
-})
-\`\`\`
-
-⚠️ DO NOT try to read local files directly - ALWAYS use get_writing_style_guide tool
-
-🚨 MANDATORY: AI tag required in tags array
-- Use one of: ai:claude, ai:chatgpt, ai:gemini, ai:qwen, ai:other
-
-📝 WRITING STYLE FLAGS:
-Add style flags to your request to change the writing style:
-- "--default" or no flag: Professional technical blog (formal, detailed)
-- "--novel": Narrative storytelling with vivid descriptions
-- "--tutorial": Step-by-step educational format
-- "--comedy": Humorous and entertaining tone
-- "--podcast": Conversational and engaging style
-
-Example requests:
-- "자동포스팅해줘 --novel" → Uses novel style
-- "위 내용 포스팅해줘 --podcast" → Uses podcast style
-- "자동포스팅해줘" → Uses default style
-
-📋 PARAMETER STRUCTURE:
-- title: Clear and descriptive post title
-- content_markdown: Body only (no frontmatter, start directly with ## headings)
-- tags: Array including topic tags + mandatory AI tag (⚠️ MAX 10 tags - auto-truncated if exceeded)
-  Example: ["typescript", "backend", "ai:claude"]
-- writingStyle: (optional) One of: default, novel, tutorial, comedy, podcast
-- validationToken: (REQUIRED) Token from writing style file to verify you read the style guide
-- challengeAnswer: (Phase 2 - optional) Answer to dynamic challenge questions
-
-💡 DETAILED WRITING GUIDELINES:
-For comprehensive style guides, use MCP Prompts:
-- markdown_quality_guidelines: Quality standards and structure requirements
-- blog_post_template: Standard blog post template and sections
-- improve_markdown: Techniques for enhancing post quality
-
-⚠️ CORE REQUIREMENTS:
-- Minimum length: 2000 characters (target: 3000-5000)
-- Default language: Korean (use English only if explicitly requested)
-- Professional technical tone (balance clarity with depth)
-- Code blocks: Keep under 20% of total content
-- Always provide context before and after code examples
-
-📤 OUTPUT BEHAVIOR:
-After successful post creation, display only the success message.
-Do not repeat the entire markdown content in the response.`;
+  // .md 파일에서 도구 설명 로드 (SuperClaude 문서 기반 패턴)
+  const authenticateDescription = await loadToolDescription('authenticate');
+  const getWritingStyleGuideDescription = await loadToolDescription('get-writing-style-guide');
+  const createPostDescription = await loadToolDescription('create-post');
+  const diagnoseConnectionDescription = await loadToolDescription('diagnose-connection');
 
   /**
    * 모든 도구 정의 (중앙 관리)
-   * - Writing style 가이드가 create_post description에 포함됨
+   * - 도구 설명은 docs/tool-descriptions/*.md 파일에서 로드
    */
   const allToolDefinitions = [
     // 인증 도구
@@ -144,11 +78,13 @@ Start OAuth2 PKCE authentication flow with automatic browser launch and polling.
 This tool MUST be called before create_post or any content publishing operations.
 Even if you think authentication might already exist, ALWAYS verify by calling this tool first.
 
-✅ Safe to call multiple times - will reuse existing valid sessions automatically.`,
+✅ Safe to call multiple times - will reuse existing valid sessions automatically.
+
+${authenticateDescription}`,
       inputSchema: {
         type: 'object',
-        title: '🔐 Authentication (CALL FIRST)',
-        description: 'Required first step for all posting operations',
+        title: '🔐 OAuth2 Authentication',
+        description: 'ALWAYS call this FIRST before create_post. Required for all posting operations.',
         properties: {},
       },
     },
@@ -157,26 +93,7 @@ Even if you think authentication might already exist, ALWAYS verify by calling t
     // 스타일 가이드 조회 도구
     {
       name: 'get_writing_style_guide',
-      description: `Get writing style guidelines for blog post creation
-
-📖 **USAGE**: Call this tool to get the complete writing style guide for your chosen style.
-
-**What you get:**
-- Complete markdown content with style guidelines
-- \`validation_token\` in YAML front matter (required for create_post)
-- \`validation_challenges\` in YAML front matter (questions and answers)
-- Detailed writing instructions and examples
-
-**Parameters:**
-- style: One of 'default', 'novel', 'tutorial', 'comedy', 'podcast' (default: 'default')
-
-**Example:**
-1. Call: get_writing_style_guide({ style: 'novel' })
-2. Extract validation_token from YAML front matter
-3. Choose one validation_challenge and find its answer
-4. Use both when calling create_post
-
-⚠️ This is the ONLY way to get style guidelines - do NOT try to read local files directly.`,
+      description: getWritingStyleGuideDescription,
       inputSchema: {
         type: 'object',
         properties: {
@@ -193,19 +110,7 @@ Even if you think authentication might already exist, ALWAYS verify by calling t
     // 포스트 도구
     {
       name: 'create_post',
-      description: `⛔ **BLOCKED - AUTHENTICATION REQUIRED FIRST** ⛔
-
-❌ DO NOT call this tool directly!
-✅ You MUST call the 'authenticate' tool FIRST before using this tool.
-
-If you are handling auto-posting (자동포스팅), blog writing (블로그 작성), or content creation (포스트 생성):
-1️⃣ Call authenticate tool
-2️⃣ Wait for authentication success
-3️⃣ Then call this tool
-
----
-
-${createPostDescription}`,  // Writing style 가이드 포함
+      description: createPostDescription,
       inputSchema: {
         type: 'object',
         properties: {
@@ -248,7 +153,7 @@ ${createPostDescription}`,  // Writing style 가이드 포함
     // 진단 도구
     {
       name: 'diagnose_connection',
-      description: 'Diagnose Backend API connection and session status',
+      description: diagnoseConnectionDescription,
       inputSchema: {
         type: 'object',
         properties: {},
@@ -263,6 +168,12 @@ ${createPostDescription}`,  // Writing style 가이드 포함
       protocolVersion: '2024-11-05',
       capabilities: {
         tools: {},  // 기본 도구 기능 지원 선언 (빈 객체 = 기본 기능만)
+        // OAuth 2.1 지원 명시
+        experimental: {
+          oauth: {
+            authorizationUrl: '/.well-known/oauth-authorization-server',
+          },
+        },
       },
       serverInfo: {
         name: 'codebase-blog-mcp',
@@ -273,6 +184,11 @@ ${createPostDescription}`,  // Writing style 가이드 포함
         workflow_requirements: {
           posting: ['authenticate', 'create_post'],  // 순서 명시
           description: 'authenticate must always be called before create_post',
+        },
+        // OAuth 메타데이터 (Claude Code가 인식)
+        oauth: {
+          discoveryUrl: '/.well-known/oauth-authorization-server',
+          resourceMetadataUrl: '/.well-known/oauth-resource-metadata',
         },
       },
     };
@@ -305,6 +221,9 @@ ${createPostDescription}`,  // Writing style 가이드 포함
       sessionId: sessionId.substring(0, 8),
       pattern: 'AsyncLocalStorage'
     }, '🔧 Tool called');
+
+    // 인증 체크는 index.ts의 POST /mcp 엔드포인트에서 처리됨
+    // (RFC 9728: 401 + WWW-Authenticate 헤더로 OAuth discovery 플로우 자동 시작)
 
     // 도구 컨텍스트 생성
     const toolContext = {
