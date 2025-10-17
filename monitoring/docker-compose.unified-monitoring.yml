@@ -85,12 +85,15 @@ services:
     container_name: codebase-monitoring-redis-exporter
     environment:
       # Backend와 MCP가 사용하는 Redis 인스턴스
-      - REDIS_ADDR=${REDIS_HOST:-host.docker.internal}:${REDIS_PORT:-6379}
+      # 로컬 개발: my-blog-app-shared-redis (Docker 네트워크 내부)
+      # 프로덕션: redis (docker-compose 서비스명)
+      - REDIS_ADDR=my-blog-app-shared-redis:6379
       - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     ports:
       - "127.0.0.1:9121:9121"  # Bind to localhost only for security
     networks:
       - monitoring
+      - my-blog-app-network  # Redis와 같은 네트워크 추가
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis_exporter", "--version"]
@@ -128,6 +131,9 @@ networks:
   monitoring:
     driver: bridge
     name: codebase-monitoring-network
+  my-blog-app-network:
+    external: true
+    name: my-blog-app-network  # 기존 Redis 네트워크 이름
 
 volumes:
   prometheus_data:

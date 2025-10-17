@@ -60,28 +60,33 @@ export class UsageService {
    * 사용량 이력 조회
    */
   async getUsageHistory(
-    userId: string,
+    userId: string | null,
     resourceType?: ResourceType,
     startDate?: Date,
     endDate?: Date
   ) {
     const query = this.usageTrackingRepository.createQueryBuilder('usage')
-      .where('usage.userId = :userId', { userId });
+      .leftJoinAndSelect('usage.user', 'user');
+
+    // userId가 null이면 모든 사용자 조회
+    if (userId) {
+      query.where('usage.userId = :userId', { userId });
+    }
 
     if (resourceType) {
       query.andWhere('usage.resourceType = :resourceType', { resourceType });
     }
 
     if (startDate) {
-      query.andWhere('usage.recordedAt >= :startDate', { startDate });
+      query.andWhere('usage.lastUsedAt >= :startDate', { startDate });
     }
 
     if (endDate) {
-      query.andWhere('usage.recordedAt <= :endDate', { endDate });
+      query.andWhere('usage.lastUsedAt <= :endDate', { endDate });
     }
 
     return await query
-      .orderBy('usage.recordedAt', 'DESC')
+      .orderBy('usage.lastUsedAt', 'DESC')
       .getMany();
   }
 

@@ -11,7 +11,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { FilesService } from '../files/files.service';
 // TagsService removed - using JSONB tags
-import { formatDate, extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
+import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ContentProcessingService } from '../content-processing/services/content-processing.service';
 import { plainToInstance } from 'class-transformer';
@@ -93,16 +93,8 @@ export class PostsService {
       }
     }
 
-    // 날짜 포맷팅 (기존 로직 유지)
-    if (dto.publishedAt) {
-      dto.publishedAt = formatDate(dto.publishedAt) as any;
-    }
-    if (dto.createdAt) {
-      dto.createdAt = formatDate(dto.createdAt) as any;
-    }
-    if (dto.updatedAt) {
-      dto.updatedAt = formatDate(dto.updatedAt) as any;
-    }
+    // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
+    // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
 
     // 태그 필드 호환성 (tagList → tags)
     if (post.tagList) {
@@ -148,6 +140,30 @@ export class PostsService {
     return plainToInstance(BlogResponseDto, blog, {
       excludeExtraneousValues: true,
     });
+  }
+
+  /**
+   * UTC 시간을 로컬 timezone으로 해석되는 Date 객체 생성
+   *
+   * timestamp without time zone 컬럼에 UTC 시간을 저장하기 위한 헬퍼 메서드
+   * PostgreSQL의 timestamp without time zone은 timezone 정보 없이 저장하므로,
+   * pg 라이브러리가 로컬 시간을 그대로 저장함
+   *
+   * 예: UTC 12:07을 DB에 저장하려면, Date 객체의 로컬 표현이 12:07이어야 함
+   *
+   * @returns UTC 시간을 로컬 timezone으로 표현한 Date 객체
+   */
+  private getUtcAsLocalDate(): Date {
+    const now = new Date();
+    return new Date(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds(),
+      now.getUTCMilliseconds()
+    );
   }
 
   /**
@@ -373,7 +389,7 @@ export class PostsService {
       blog: blog,
       blogId: blog.id,
       isPublished: true, // Multi-user blog system - all posts are published
-      publishedAt: new Date(),
+      publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
       tagList: tagList, // JSONB 태그 배열 저장
       qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적)
     });
@@ -474,7 +490,7 @@ export class PostsService {
       blog: blog,
       blogId: blog.id,
       isPublished: true, // 공개 상태 (하지만 status='processing'이므로 목록에 안 보임)
-      publishedAt: new Date(),
+      publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
       tagList: tagList,
       qualityScore: createPostDto.qualityScore || null,
       status: 'processing', // 핵심: 백그라운드 처리 대기 중
@@ -688,13 +704,13 @@ export class PostsService {
         authorId: post.authorId,
         qualityScore: post.qualityScore,
         version: post.version,
-        // 날짜 포맷팅
-        publishedAt: formatDate(post.publishedAt),
-        createdAt: formatDate(post.createdAt),
-        updatedAt: formatDate(post.updatedAt),
+        // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
+        publishedAt: post.publishedAt,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
         // Editor's Pick 필드 추가
         isEditorPick: post.isEditorPick || false,
-        editorPickedAt: post.editorPickedAt ? formatDate(post.editorPickedAt) : null,
+        editorPickedAt: post.editorPickedAt,
         // 카운트 필드들
         commentCount: post.commentCount || 0,
         likeCount: post.likeCount || 0,
@@ -863,10 +879,10 @@ export class PostsService {
       viewCount: post.viewCount || 0,
       likeCount: post.likeCount || 0,
       commentCount: post.commentCount || 0,
-      // 날짜 포맷팅
-      createdAt: formatDate(post.createdAt),
-      updatedAt: formatDate(post.updatedAt),
-      publishedAt: post.publishedAt ? formatDate(post.publishedAt) : null,
+      // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+      publishedAt: post.publishedAt,
       // 태그와 썸네일
       tags: post.tagList || [],
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
@@ -1061,10 +1077,7 @@ export class PostsService {
     postDto.tags = post.tagList || []; // 태그 필드 추가 (프론트엔드 호환성)
     postDto.viewCount = post.viewCount + 1; // 증가된 조회수 반영
 
-    // 날짜 포맷 적용
-    postDto.publishedAt = formatDate(post.publishedAt) as any;
-    postDto.createdAt = formatDate(post.createdAt) as any;
-    postDto.updatedAt = formatDate(post.updatedAt) as any;
+    // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화 (formatDate 제거)
 
     return postDto;
   }
@@ -1245,7 +1258,7 @@ export class PostsService {
   async publish(id: string): Promise<Post> {
     const post = await this.findPostById(id);
     post.isPublished = true;
-    post.publishedAt = new Date();
+    post.publishedAt = new Date(); // 현재 시간 (TypeORM이 자동으로 처리)
     return this.postsRepository.save(post);
   }
 

@@ -2,7 +2,7 @@
 
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { FiUser, FiSettings, FiShield, FiBell, FiUsers, FiMessageSquare, FiLogOut } from 'react-icons/fi';
+import { FiUser, FiSettings, FiShield, FiBell, FiUsers, FiMessageSquare, FiLogOut, FiKey } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
 import { useAuth } from '@/providers/AuthProviderV2';
 
@@ -33,6 +33,11 @@ const getSettingsNav = () => {
       title: '보안',
       href: '/settings/security',
       icon: FiShield,
+    },
+    {
+      title: 'API Keys',
+      href: '/settings/api-keys',
+      icon: FiKey,
     },
   ];
 

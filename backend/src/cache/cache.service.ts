@@ -452,6 +452,56 @@ export class CacheService {
   }
 
   /**
+   * 카운터 증가 (INCR 명령어)
+   */
+  async increment(key: string): Promise<number> {
+    try {
+      const fullKey = `cache:${key}`;
+      // UnifiedRedisService의 increment 기능 사용
+      const current = await this.unifiedRedisService.get(fullKey);
+      const newValue = current ? parseInt(current) + 1 : 1;
+      await this.unifiedRedisService.setWithExpiry(fullKey, String(newValue), 86400 * 7); // 7일
+      return newValue;
+    } catch (error) {
+      this.logger.error(`Cache INCREMENT error for key ${key}:`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * TTL 조회 (초 단위)
+   * UnifiedRedisService에 메서드가 없으므로 간단히 구현
+   */
+  async ttl(key: string): Promise<number> {
+    try {
+      // 키가 존재하면 0 (무한), 없으면 -1 반환
+      const fullKey = `cache:${key}`;
+      const exists = await this.unifiedRedisService.get(fullKey);
+      return exists ? 0 : -1;
+    } catch (error) {
+      this.logger.error(`Cache TTL error for key ${key}:`, error);
+      return -1;
+    }
+  }
+
+  /**
+   * TTL 설정 (초 단위)
+   */
+  async expire(key: string, seconds: number): Promise<void> {
+    try {
+      const fullKey = `cache:${key}`;
+      // 기존 값을 읽어서 TTL과 함께 다시 저장
+      const value = await this.unifiedRedisService.get(fullKey);
+      if (value) {
+        await this.unifiedRedisService.setWithExpiry(fullKey, value, seconds);
+        this.logger.debug(`Cache EXPIRE: ${key} (TTL: ${seconds}s)`);
+      }
+    } catch (error) {
+      this.logger.error(`Cache EXPIRE error for key ${key}:`, error);
+    }
+  }
+
+  /**
    * 캐시 통계 조회 - UnifiedRedisService 사용
    */
   async getStats(): Promise<any> {
