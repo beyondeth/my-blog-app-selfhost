@@ -158,7 +158,10 @@ async function bootstrap() {
       '/',
       '/health',
       '/api-docs',
-      process.env.METRICS_PATH || '/internal/health-check-2f4a8b9c'
+      process.env.METRICS_PATH || '/internal/health-check-2f4a8b9c',
+      // MCP Discovery 엔드포인트는 루트 경로에 위치해야 함 (RFC 9728, RFC 8414)
+      '/.well-known/oauth-protected-resource',
+      '/.well-known/oauth-authorization-server',
     ],
   });
 

@@ -28,6 +28,7 @@ import { UnifiedRedisService } from '../../redis/unified-redis.service';
 import { AuthorizeDto } from '../dto/authorize.dto';
 import { TokenExchangeDto } from '../dto/token-exchange.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
+import { RegisterClientDto } from '../dto/register-client.dto';
 import * as crypto from 'crypto';
 import { plainToClass } from 'class-transformer';
 import { validate } from 'class-validator';
@@ -230,7 +231,7 @@ export class OAuthController {
       }
 
       // Authorization Code 생성
-      // 파라미터 순서 수정: userId, blogId, clientId, redirectUri, scopes, state, codeChallenge, codeChallengeMethod
+      // 파라미터 순서 수정: userId, blogId, clientId, redirectUri, scopes, state, codeChallenge, codeChallengeMethod, clientIp, resource
       const authorizationCode = await this.oauthService.generateAuthorizationCode(
         userId,                      // 사용자 ID
         blog.id,                     // 블로그 ID
@@ -241,6 +242,7 @@ export class OAuthController {
         body.code_challenge,         // PKCE 코드 챌린지
         body.code_challenge_method,  // PKCE 메소드
         req.ip,                      // 클라이언트 IP
+        body.resource,               // ✅ RFC 8707: Resource Indicator
       );
 
       // MCP 세션이 있으면 Redis에 연결 정보 저장
@@ -415,5 +417,67 @@ export class OAuthController {
     await this.oauthService.revokeToken(token, client.id);
 
     return { message: 'Token revoked successfully' };
+  }
+
+  /**
+   * Dynamic Client Registration (RFC 7591)
+   *
+   * MCP 클라이언트가 자동으로 등록할 수 있는 엔드포인트
+   * Public Client (PKCE) 또는 Confidential Client 지원
+   */
+  @Post('register')
+  @Public()
+  @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Dynamic Client Registration (RFC 7591)',
+    description: 'MCP 클라이언트를 자동으로 등록합니다.',
+  })
+  @ApiResponse({
+    status: 201,
+    description: '클라이언트 등록 성공',
+    schema: {
+      example: {
+        client_id: 'mcp-a1b2c3d4-5678-90ab-cdef-1234567890ab',
+        client_id_issued_at: 1736985600,
+        client_name: 'MCP Blog Client',
+        redirect_uris: ['http://localhost:8080/callback'],
+        grant_types: ['authorization_code', 'refresh_token'],
+        response_types: ['code'],
+        token_endpoint_auth_method: 'none',
+        scope: 'mcp:post:create', // ✅ RFC 7591: scope 필드 (MCP SDK가 Authorization URL에 scope를 포함하도록 함)
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: '잘못된 요청 (redirect_uri가 localhost가 아님 등)',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Initial Access Token 필요 (Enterprise 배포 시)',
+  })
+  async registerClient(
+    @Body() dto: RegisterClientDto,
+    @Headers('authorization') authHeader?: string,
+  ) {
+    // Initial Access Token 추출 (선택적)
+    let initialAccessToken: string | undefined;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      initialAccessToken = authHeader.substring(7);
+    }
+
+    // Dynamic Client Registration 수행
+    const client = await this.oauthService.registerClient(
+      dto,
+      initialAccessToken,
+    );
+
+    console.log('✅ Dynamic Client Registered:', {
+      client_id: client.client_id,
+      client_name: client.client_name,
+      token_endpoint_auth_method: client.token_endpoint_auth_method,
+    });
+
+    return client;
   }
 }

@@ -15,6 +15,7 @@ interface McpSession {
   userId?: string;
   blogId?: string;
   clientId?: string;
+  clientSecret?: string;  // 암호화된 client secret (Confidential Client용)
 
   // OAuth 토큰 (암호화되어 저장됨)
   accessToken?: string;  // 암호화된 토큰
@@ -300,6 +301,82 @@ export class SessionService {
   }
 
   /**
+   * OAuth 클라이언트 인증 정보 저장 (Dynamic Client Registration)
+   *
+   * RFC 7591 Dynamic Client Registration으로 받은 client_id와 client_secret을 세션에 저장
+   * Public Client의 경우 client_secret은 선택사항
+   *
+   * @param sessionId 세션 ID
+   * @param credentials 클라이언트 인증 정보
+   */
+  async saveClientCredentials(
+    sessionId: string,
+    credentials: { clientId: string; clientSecret?: string }
+  ): Promise<void> {
+    const session = await this.getSession(sessionId);
+
+    if (!session) {
+      throw new Error(`세션을 찾을 수 없습니다: ${sessionId}`);
+    }
+
+    // client_secret 암호화 (존재하는 경우)
+    const encryptedClientSecret = credentials.clientSecret
+      ? this.encryptToken(credentials.clientSecret)
+      : undefined;
+
+    // 세션 업데이트
+    const updatedSession: McpSession = {
+      ...session,
+      clientId: credentials.clientId,
+      clientSecret: encryptedClientSecret,
+      lastAccessedAt: Date.now(),
+    };
+
+    const key = `${this.SESSION_PREFIX}${sessionId}`;
+
+    // Redis SET 작업 - 메트릭 수집
+    await withRedisMetrics('set', async () => {
+      await this.redis.set(
+        key,
+        JSON.stringify(updatedSession),
+        'EX',
+        this.SESSION_TTL
+      );
+    });
+
+    console.log(`🔐 클라이언트 인증 정보 저장: 세션 ${sessionId.substring(0, 8)}... (client_id: ${credentials.clientId})`);
+  }
+
+  /**
+   * OAuth 클라이언트 인증 정보 조회
+   *
+   * 토큰 교환 및 리프레시 시 사용할 클라이언트 인증 정보 반환
+   * client_secret은 자동으로 복호화됨
+   *
+   * @param sessionId 세션 ID
+   * @returns 클라이언트 인증 정보 (평문) 또는 null
+   */
+  async getClientCredentials(
+    sessionId: string
+  ): Promise<{ clientId: string; clientSecret?: string } | null> {
+    const session = await this.getSession(sessionId);
+
+    if (!session || !session.clientId) {
+      return null;
+    }
+
+    // client_secret 복호화 (존재하는 경우)
+    const clientSecret = session.clientSecret
+      ? this.decryptToken(session.clientSecret)
+      : undefined;
+
+    return {
+      clientId: session.clientId,
+      clientSecret,
+    };
+  }
+
+  /**
    * 세션 업데이트 (토큰 등 추가)
    */
   async updateSession(sessionId: string, updates: Partial<McpSession>): Promise<void> {
@@ -421,14 +498,30 @@ export class SessionService {
       try {
         const decryptedRefreshToken = this.decryptToken(session.refreshToken);
 
+        // 동적으로 등록된 클라이언트 정보 조회
+        const clientCredentials = await this.getClientCredentials(sessionId);
+
+        if (!clientCredentials) {
+          console.error('[TOKEN_REFRESH] 클라이언트 정보가 세션에 없습니다. 재인증이 필요합니다.');
+          await this.deleteSession(sessionId);
+          return null;
+        }
+
+        // Token endpoint body 구성 (Public Client vs Confidential Client)
+        const tokenBody: Record<string, string> = {
+          grant_type: 'refresh_token',
+          refresh_token: decryptedRefreshToken,
+          client_id: clientCredentials.clientId,
+        };
+
+        // Confidential Client의 경우 client_secret 추가
+        if (clientCredentials.clientSecret) {
+          tokenBody.client_secret = clientCredentials.clientSecret;
+        }
+
         const response = await axios.post(
           `${process.env.BACKEND_BASE_URL}/api/v1/oauth/token`,
-          new URLSearchParams({
-            grant_type: 'refresh_token',
-            refresh_token: decryptedRefreshToken,
-            client_id: process.env.OAUTH_CLIENT_ID!,
-            client_secret: process.env.OAUTH_CLIENT_SECRET!,
-          }),
+          new URLSearchParams(tokenBody),
           {
             headers: {
               'Content-Type': 'application/x-www-form-urlencoded',

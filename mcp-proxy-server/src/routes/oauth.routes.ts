@@ -57,12 +57,12 @@ export function createOAuthRoutes(): Router {
 
   /**
    * RFC 9728: OAuth 2.0 Protected Resource Metadata
-   * GET /.well-known/oauth-resource-metadata
+   * GET /.well-known/oauth-protected-resource
    *
-   * 표준 엔드포인트 (RFC 9728 준수)
+   * 표준 엔드포인트 (RFC 9728 준수) - 올바른 경로명 사용!
    * 에이전트가 인증되지 않은 요청 시 401 응답의 WWW-Authenticate 헤더에서 이 URL을 받아 접근
    */
-  router.get('/.well-known/oauth-resource-metadata', (_req: Request, res: Response) => {
+  router.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {
     const baseUrl = getBaseUrl();
 
     res.json({

@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "codebase_blog_v2": {
+    "codebase-blog-mcp": {
       "type": "http",
       "url": "http://localhost:3002/mcp"
     }

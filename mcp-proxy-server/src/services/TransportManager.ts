@@ -43,8 +43,6 @@ interface TransportManagerConfig {
     MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
     BACKEND_PUBLIC_URL: string;  // 브라우저 OAuth 인증용 공개 URL
-    OAUTH_CLIENT_ID: string;
-    OAUTH_REDIRECT_URI: string;
   };
 }
 
@@ -84,8 +82,6 @@ export class TransportManager {
     MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
     BACKEND_PUBLIC_URL: string;  // 브라우저 OAuth 인증용 공개 URL
-    OAUTH_CLIENT_ID: string;
-    OAUTH_REDIRECT_URI: string;
   };
 
   constructor(managerConfig: TransportManagerConfig) {
@@ -358,11 +354,13 @@ export class TransportManager {
         'localhost:3002',
         '127.0.0.1',
         '127.0.0.1:3002',
+        '127.0.0.1:3001',
       ],
       allowedOrigins: [
         'https://codebase.blog',
         'https://www.codebase.blog',
         'http://localhost',
+        'http://127.0.0.1:3001',
         'http://localhost:3002',
         'http://127.0.0.1',
         'http://127.0.0.1:3002',

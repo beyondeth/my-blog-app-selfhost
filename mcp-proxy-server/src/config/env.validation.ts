@@ -84,16 +84,14 @@ const envSchema = z.object({
   // 세션 암호화 키 (필수)
   SESSION_ENCRYPTION_KEY: encryptionKeySchema,
 
-  // OAuth 설정 (필수)
-  OAUTH_CLIENT_ID: z.string().min(1, 'OAUTH_CLIENT_ID is required'),
-  OAUTH_CLIENT_SECRET: z.string().min(1, 'OAUTH_CLIENT_SECRET is required'),
-  OAUTH_REDIRECT_URI: z.string().url('OAUTH_REDIRECT_URI must be a valid URL'),
-
   // Backend API 설정 (필수)
   BACKEND_BASE_URL: z.string().url('BACKEND_BASE_URL must be a valid URL'),
   BACKEND_API_URL: z.string().url('BACKEND_API_URL must be a valid URL'),
   // Backend 공개 URL (브라우저가 접근할 수 있는 URL - OAuth Authorization용)
   BACKEND_PUBLIC_URL: z.string().url('BACKEND_PUBLIC_URL must be a valid URL'),
+
+  // Frontend URL (OAuth Authorization 리다이렉트용)
+  FRONTEND_URL: z.string().url('FRONTEND_URL must be a valid URL').default('http://localhost:3001'),
 
   // CORS 설정 (프로덕션에서 와일드카드 금지)
   CORS_ORIGINS: corsOriginsSchema,

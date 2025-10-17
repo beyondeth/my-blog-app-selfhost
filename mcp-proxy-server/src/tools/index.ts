@@ -23,8 +23,9 @@ import { sessionContext } from '../services/TransportManager.js';
 import { loadToolDescription } from '../lib/error-messages.js';
 
 // 기존 핸들러 import
-import { authenticateHandler } from './authenticate.js';
+// authenticate 제거: MCP 표준 OAuth flow (401 → WWW-Authenticate)로 자동 처리됨
 // check_auth_status 제거: authenticate에 자동 폴링 추가로 불필요해짐
+// check_authentication 제거: 불필요한 단계, get_writing_style_guide가 바로 401 트리거
 import { createPostHandler } from './create-post.js';
 import { getWritingStyleGuideHandler } from './get-writing-style-guide.js';
 // set_preferences 제거: defaultWritingStyle이 더 이상 작동하지 않음
@@ -51,7 +52,8 @@ export async function registerAllTools(
   logger.info('📦 Registering all MCP tools...');
 
   // .md 파일에서 도구 설명 로드 (SuperClaude 문서 기반 패턴)
-  const authenticateDescription = await loadToolDescription('authenticate');
+  // authenticate 제거: MCP 표준 OAuth flow로 대체됨
+  // check_authentication 제거: 불필요한 단계
   const getWritingStyleGuideDescription = await loadToolDescription('get-writing-style-guide');
   const createPostDescription = await loadToolDescription('create-post');
   const diagnoseConnectionDescription = await loadToolDescription('diagnose-connection');
@@ -59,38 +61,11 @@ export async function registerAllTools(
   /**
    * 모든 도구 정의 (중앙 관리)
    * - 도구 설명은 docs/tool-descriptions/*.md 파일에서 로드
+   * - authenticate 제거: MCP 표준 OAuth flow (401 → WWW-Authenticate)로 자동 처리됨
+   * - check_authentication 제거: 불필요한 단계, get_writing_style_guide가 바로 401 트리거
    */
   const allToolDefinitions = [
-    // 인증 도구
-    {
-      name: 'authenticate',
-      description: `🔐 **HIGHEST PRIORITY - CALL THIS FIRST**
-
-Start OAuth2 PKCE authentication flow with automatic browser launch and polling.
-
-⚠️ **CRITICAL WORKFLOW REQUIREMENT**:
-- ALWAYS call this tool FIRST when handling:
-  • Auto-posting (자동포스팅)
-  • Blog content creation (블로그 작성)
-  • Post creation (포스트 생성)
-  • Any writing or publishing requests
-
-This tool MUST be called before create_post or any content publishing operations.
-Even if you think authentication might already exist, ALWAYS verify by calling this tool first.
-
-✅ Safe to call multiple times - will reuse existing valid sessions automatically.
-
-${authenticateDescription}`,
-      inputSchema: {
-        type: 'object',
-        title: '🔐 OAuth2 Authentication',
-        description: 'ALWAYS call this FIRST before create_post. Required for all posting operations.',
-        properties: {},
-      },
-    },
-    // check_auth_status 제거: authenticate가 자동 폴링으로 인증 완료까지 대기함
-
-    // 스타일 가이드 조회 도구
+    // 스타일 가이드 조회 도구 (자동포스팅 워크플로우 시작점!)
     {
       name: 'get_writing_style_guide',
       description: getWritingStyleGuideDescription,
@@ -168,28 +143,11 @@ ${authenticateDescription}`,
       protocolVersion: '2024-11-05',
       capabilities: {
         tools: {},  // 기본 도구 기능 지원 선언 (빈 객체 = 기본 기능만)
-        // OAuth 2.1 지원 명시
-        experimental: {
-          oauth: {
-            authorizationUrl: '/.well-known/oauth-authorization-server',
-          },
-        },
+        prompts: {},  // Prompts 지원 선언
       },
       serverInfo: {
         name: 'codebase-blog-mcp',
-        version: '4.0.0',
-        // 🚨 전역 워크플로우 가이드: LLM이 초기화 시 이 지침을 읽음
-        instructions: `🚨 CRITICAL WORKFLOW: When handling blog posting, content creation, or auto-posting requests (자동포스팅, 블로그 작성, 포스트 생성), you MUST ALWAYS call the authenticate tool FIRST before any other tools. This is mandatory for all posting operations. Never call create_post directly without authentication.`,
-        // 📋 도구 호출 순서 명시 (커스텀 메타데이터)
-        workflow_requirements: {
-          posting: ['authenticate', 'create_post'],  // 순서 명시
-          description: 'authenticate must always be called before create_post',
-        },
-        // OAuth 메타데이터 (Claude Code가 인식)
-        oauth: {
-          discoveryUrl: '/.well-known/oauth-authorization-server',
-          resourceMetadataUrl: '/.well-known/oauth-resource-metadata',
-        },
+        version: '7.0.0',
       },
     };
   });
@@ -234,13 +192,11 @@ ${authenticateDescription}`,
     // 도구별 실행
     try {
       switch (name) {
-        // 인증 도구
-        case 'authenticate':
-          return await authenticateHandler(args as any, toolContext);
-
+        // authenticate 제거: MCP 표준 OAuth flow (401 → WWW-Authenticate)로 자동 처리됨
         // check_auth_status 제거: authenticate가 자동으로 처리함
+        // check_authentication 제거: 불필요한 단계, get_writing_style_guide가 바로 401 트리거
 
-        // 스타일 가이드 조회 도구
+        // 스타일 가이드 조회 도구 (자동포스팅 시작점!)
         case 'get_writing_style_guide':
           return await getWritingStyleGuideHandler(args as any, toolContext);
 
@@ -323,9 +279,8 @@ ${authenticateDescription}`,
     getToolsByCategory: (category: 'auth' | 'post' | 'diagnostic') => {
       switch (category) {
         case 'auth':
-          return allToolDefinitions.filter(t =>
-            ['authenticate'].includes(t.name)  // check_auth_status 제거
-          );
+          // authenticate 제거: MCP 표준 OAuth flow로 대체됨
+          return [];  // 인증 도구 없음 (401 + WWW-Authenticate로 자동 처리)
         case 'post':
           return allToolDefinitions.filter(t =>
             t.name === 'create_post'  // set_preferences 제거

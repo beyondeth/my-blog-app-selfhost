@@ -36,8 +36,18 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
       'Content-Security-Policy',
       "default-src 'self'; script-src 'self'; style-src 'self'; connect-src 'self' http://localhost:* https:*; frame-ancestors 'none'"
     );
+  } else if (req.path.startsWith('/mcp') || req.path.startsWith('/.well-known/')) {
+    // MCP 엔드포인트 및 OAuth Discovery 엔드포인트: CSP 완화
+    // Claude Code MCP SDK가 OAuth Discovery를 위해 fetch/XHR 사용 가능
+    // - connect-src *: OAuth metadata 및 Authorization Server 호출 허용
+    // - default-src 'self': 기본적으로 같은 오리진만 허용
+    // - frame-ancestors 'none': Clickjacking 방어 유지
+    res.setHeader(
+      'Content-Security-Policy',
+      "default-src 'self'; connect-src *; frame-ancestors 'none'"
+    );
   } else {
-    // MCP 서버는 API이므로 기본적인 CSP만 설정
+    // 기타 엔드포인트: 엄격한 CSP
     res.setHeader(
       'Content-Security-Policy',
       "default-src 'none'; frame-ancestors 'none'"

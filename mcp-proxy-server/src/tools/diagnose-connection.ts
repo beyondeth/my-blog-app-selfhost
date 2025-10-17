@@ -56,7 +56,7 @@ export async function diagnoseConnectionHandler(
   // 2. OAuth2 엔드포인트 확인
   try {
     // Authorization endpoint는 GET으로 확인 (실제 인증은 안 함)
-    const response = await axios.get(`${config.BACKEND_BASE_URL}/oauth/authorize`, {
+    const response = await axios.get(`${config.BACKEND_BASE_URL}/api/v1/oauth/authorize`, {
       timeout: 5000,
       validateStatus: () => true, // 모든 상태 코드 허용
     });

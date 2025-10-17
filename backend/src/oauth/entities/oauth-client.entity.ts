@@ -90,6 +90,42 @@ export class OAuthClient {
   @Column({ nullable: true })
   lastUsedAt: Date;
 
+  /**
+   * 동적 등록 여부 (Dynamic Client Registration)
+   * true: RFC 7591에 따라 자동으로 생성된 클라이언트
+   * false: 관리자가 수동으로 생성한 클라이언트
+   */
+  @Column({ default: false })
+  isDynamic: boolean;
+
+  /**
+   * Public Client 여부
+   * true: client_secret 없음 (PKCE 필수)
+   * false: client_secret 필요 (Confidential Client)
+   *
+   * MCP 표준: Public Client 권장 (서버 없는 환경)
+   */
+  @Column({ default: false })
+  isPublic: boolean;
+
+  /**
+   * Token Endpoint 인증 방법
+   * - 'none': Public Client (client_secret 불필요)
+   * - 'client_secret_post': POST body에 client_secret 포함
+   * - 'client_secret_basic': Basic Auth 헤더에 client_secret 포함
+   *
+   * RFC 6749 Section 2.3
+   */
+  @Column({ default: 'client_secret_post' })
+  tokenEndpointAuthMethod: string;
+
+  /**
+   * 클라이언트 등록 시간 (발급 시점)
+   * RFC 7591: client_id_issued_at
+   */
+  @Column({ type: 'bigint', nullable: true })
+  issuedAt: number;
+
   @CreateDateColumn()
   createdAt: Date;
 

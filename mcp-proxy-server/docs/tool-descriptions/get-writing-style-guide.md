@@ -1,8 +1,26 @@
-⚠️ **AUTHENTICATION REQUIRED**: You must call the `authenticate` tool FIRST and wait for authentication to complete before calling this tool.
-
 Get writing style guidelines for blog post creation
 
-📖 **USAGE**: Call this tool AFTER authentication to get the complete writing style guide for your chosen style.
+⚡ **자동포스팅 워크플로우 - 이 도구가 시작점입니다!**
+
+사용자가 "어린왕자 자동포스팅해줘" 같은 자동포스팅 요청을 하면:
+1. **바로 이 도구를 호출하세요!** (check_authentication 같은 다른 도구 호출 불필요)
+2. 인증 안 되어 있으면 → 자동으로 브라우저가 열립니다
+3. 사용자가 승인하면 → validation token을 받습니다
+4. 그 다음 create_post를 호출하세요
+
+⚠️ **중요**: 사용자에게 `/mcp` 명령을 입력하라고 안내하지 마세요!
+⚠️ **중요**: 인증 여부를 먼저 확인하려고 하지 마세요!
+⚠️ **중요**: 바로 이 도구를 호출하면 모든 것이 자동으로 처리됩니다!
+
+📌 **AUTHENTICATION**: This tool automatically triggers OAuth 2.1 authentication if needed.
+- No need to call authenticate tool manually
+- First-time use requires authentication
+- If authentication is needed, you'll receive a friendly message with instructions (NOT an error!)
+- The message explains that OAuth authorization is starting
+- Simply wait for the user to complete the browser authorization, then retry your request
+- After authorization completes, call this tool again to get the validation token
+
+📖 **USAGE**: Call this tool to get the complete writing style guide for your chosen style.
 
 **What you get:**
 - Complete markdown content with style guidelines

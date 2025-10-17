@@ -1,16 +1,13 @@
-⛔ **BLOCKED - AUTHENTICATION REQUIRED FIRST** ⛔
+Create a new blog post
 
-❌ DO NOT call this tool directly!
-✅ You MUST call the 'authenticate' tool FIRST before using this tool.
-
-If you are handling auto-posting (자동포스팅), blog writing (블로그 작성), or content creation (포스트 생성):
-1️⃣ Call authenticate tool
-2️⃣ Wait for authentication success
-3️⃣ Then call this tool
+📌 **AUTHENTICATION**: This tool automatically triggers OAuth 2.1 authentication if needed.
+- No need to call authenticate tool manually
+- First-time use requires authentication
+- If authentication is needed, you'll receive a friendly message with instructions (NOT an error!)
+- The message explains that OAuth authorization is starting
+- Simply wait for the user to complete the browser authorization, then retry your request
 
 ---
-
-Create a new blog post
 
 🔑 **VALIDATION TOKEN REQUIRED** 🔑
 Before creating a post, you MUST get the writing style guide using the get_writing_style_guide tool:
@@ -64,7 +61,7 @@ Add style flags to your request to change the writing style:
 **Other Korean Phrases to Watch For**:
 - "자동포스팅", "블로그 작성", "포스트 생성", "글 써줘"
 - "위 내용으로", "이거로", "다음 내용을"
-- All should trigger the workflow: authenticate → get_writing_style_guide → create_post
+- All should trigger the workflow: get_writing_style_guide → create_post (OAuth automatic if needed)
 
 📋 PARAMETER STRUCTURE:
 - title: Clear and descriptive post title

@@ -29,11 +29,13 @@ export class TokenExchangeDto {
   client_id: string;
 
   @ApiProperty({
-    description: 'OAuth 클라이언트 시크릿',
+    description: 'OAuth 클라이언트 시크릿 (Confidential Client만 필수, Public Client는 선택)',
     example: 'secret_xyz789...',
+    required: false,
   })
+  @IsOptional()
   @IsString()
-  client_secret: string;
+  client_secret?: string;
 
   @ApiProperty({
     description: '리다이렉트 URI (인증시 사용한 것과 동일해야 함)',

@@ -52,14 +52,14 @@ const sessionService = new SessionService();
 app.locals.sessionService = sessionService;
 
 // Session-Scoped Transport 패턴
+// MCP Proxy는 OAuth 서버이지 클라이언트가 아닙니다.
+// Claude Code가 MCP 클라이언트로서 동적 클라이언트 등록을 수행합니다.
 const transportManager = new TransportManager({
   sessionService,
   config: {
     MCP_BASE_URL: config.MCP_BASE_URL,
     BACKEND_BASE_URL: config.BACKEND_BASE_URL,
     BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
-    OAUTH_CLIENT_ID: config.OAUTH_CLIENT_ID,
-    OAUTH_REDIRECT_URI: config.OAUTH_REDIRECT_URI,
   },
 });
 
@@ -203,6 +203,37 @@ app.use('/mcp', createMcpRoutes(sessionService));  // MCP 표준 경로
 
 import axios from 'axios';
 
+/**
+ * GET /api/v1/oauth/authorize - MCP OAuth 승인 페이지 리다이렉트
+ *
+ * 브라우저가 이 엔드포인트에 접근하면 Frontend React 페이지로 리다이렉트
+ * - Frontend React 페이지: http://localhost:3001/oauth/authorize
+ * - 사용자 인증 컨텍스트 및 블로그 선택 UI 제공
+ * - 승인 시 POST /api/v1/oauth/authorize로 전달 (Backend API)
+ */
+app.get('/api/v1/oauth/authorize', (req, res) => {
+  logger.debug({
+    query: req.query,
+    hasCookie: !!req.cookies?.access_token,
+  }, '🔐 OAuth authorize 페이지 → Frontend React 리다이렉트');
+
+  // Frontend React 페이지로 리다이렉트 (쿼리 파라미터 보존)
+  const frontendUrl = config.FRONTEND_URL || 'http://localhost:3001';
+  const queryString = new URLSearchParams(req.query as Record<string, string>).toString();
+  const redirectUrl = `${frontendUrl}/oauth/authorize${queryString ? `?${queryString}` : ''}`;
+
+  res.redirect(redirectUrl);
+});
+
+/**
+ * 나머지 OAuth API - Backend로 프록시
+ * - POST /api/v1/oauth/authorize (승인/거부 처리)
+ * - GET /api/v1/oauth/authorize-data (인증 데이터)
+ * - POST /api/v1/oauth/token (토큰 교환)
+ * - POST /api/v1/oauth/introspect (토큰 검증)
+ * - POST /api/v1/oauth/revoke (토큰 취소)
+ * - POST /api/v1/oauth/register (Dynamic Client Registration)
+ */
 app.use('/api/v1/oauth', async (req, res) => {
   try {
     const backendUrl = `${config.BACKEND_BASE_URL}/api/v1/oauth${req.path}`;
@@ -238,7 +269,9 @@ app.use('/api/v1/oauth', async (req, res) => {
   }
 });
 
-logger.info('✅ OAuth proxy registered: /api/v1/oauth/* → Backend');
+logger.info('✅ OAuth endpoints registered:');
+logger.info('   - GET  /api/v1/oauth/authorize → Frontend React redirect (OAuth UI)');
+logger.info('   - POST /api/v1/oauth/* → Backend API proxy');
 
 // ====================================================================================
 // MCP Streamable HTTP 엔드포인트 (Modern - 2025-03-26 spec)
@@ -364,9 +397,26 @@ app.post('/mcp', mcpRateLimiter, async (req, res) => {
 
     // 인증 예외 도구 리스트
     // RFC 9728 표준: 인증되지 않은 요청 → 401 + WWW-Authenticate → 브라우저 자동 실행
+    //
+    // ✅ MCP 표준 OAuth 플로우 (자동 브라우저 열기):
+    // 1. 첫 번째 도구 호출 (예: get_writing_style_guide) → 401 발생
+    // 2. Claude Code가 WWW-Authenticate 헤더 파싱
+    // 3. OAuth Discovery 및 Dynamic Client Registration 자동 수행
+    // 4. 브라우저 자동 열기 (사용자 승인 요청)
+    // 5. Access Token 획득 후 원래 요청 재시도
+    //
+    // ⚠️ CRITICAL: get_writing_style_guide를 AUTH_EXEMPT에 추가하면 안됩니다!
+    // - get_writing_style_guide가 인증 없이 성공하면
+    // - 사용자가 블로그 포스트를 작성한 후
+    // - create_post에서 401 에러가 발생합니다
+    // - 결과: 글을 다 쓴 후에 인증 에러 (최악의 UX)
+    //
+    // ✅ 올바른 플로우:
+    // - 첫 번째 도구 호출(get_writing_style_guide)에서 401 발생
+    // - OAuth 인증 완료 후 세션에 토큰 저장
+    // - 이후 모든 도구 호출(create_post 포함)에서 세션 기반 인증 통과
     const AUTH_EXEMPT_TOOLS = [
-      'authenticate',  // ✅ 인증 도구 자체는 예외
-      'diagnose_connection',  // ✅ 진단 도구는 인증 불필요
+      'diagnose_connection',  // ✅ 진단 도구만 인증 면제
     ];
 
     if (AUTH_REQUIRED_METHODS.includes(method) && !AUTH_EXEMPT_TOOLS.includes(toolName)) {
@@ -388,21 +438,31 @@ app.post('/mcp', mcpRateLimiter, async (req, res) => {
 
         // Authorization 헤더 검증
         if (!authHeader || !authHeader.startsWith('Bearer ')) {
-          logger.warn({
+          logger.info({
             sessionId: sessionId.substring(0, 8),
             method,
+            toolName,
             hasAuthHeader: !!authHeader,
             hasSession: !!session,
             hasSessionToken: !!session?.accessToken
-          }, '⚠️ Authorization header missing and no valid session token');
+          }, '🔐 Authentication required - triggering OAuth flow');
 
           // RFC 9728: WWW-Authenticate 헤더로 resource_metadata URL 제공
-          // MCP SDK가 이 헤더를 읽어 OAuth discovery 플로우 자동 시작 → 브라우저 자동 팝업
-          res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${config.MCP_BASE_URL}/.well-known/oauth-resource-metadata"`);
+          // Claude Code MCP SDK가 이 헤더를 읽어 OAuth discovery 플로우 자동 시작
+          // ✅ 올바른 엔드포인트: /.well-known/oauth-protected-resource (RFC 9728 표준 경로)
+          // ✅ HTTP 401 필수: MCP 표준에 따라 클라이언트가 WWW-Authenticate 헤더 처리
+          res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${config.MCP_BASE_URL}/.well-known/oauth-protected-resource"`);
 
+          // HTTP 401 반환 (MCP 표준 요구사항)
+          // Claude Code는 이 응답을 받으면:
+          // 1. WWW-Authenticate 헤더 파싱
+          // 2. /.well-known/oauth-protected-resource 호출
+          // 3. Dynamic Client Registration
+          // 4. 브라우저 열어서 사용자 승인 요청
+          // 5. Access Token 획득 후 원래 요청 재시도
           return res.status(401).json(createJsonRpcError(
             JsonRpcErrorCode.INVALID_REQUEST,
-            'Authorization required',
+            '🔐 Authentication required. OAuth authorization flow is starting. Please approve in your browser when it opens, then this request will be retried automatically.',
             req.body?.id || null
           ));
         }
