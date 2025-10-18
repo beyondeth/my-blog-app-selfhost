@@ -5,7 +5,6 @@ min_length: 2000
 target_length: "3000-5000"
 code_block_ratio: 0.2
 ai_tag_required: true
-auto_enhance: true
 ---
 
 # === STYLE OVERVIEW ===

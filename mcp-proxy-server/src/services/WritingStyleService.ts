@@ -24,7 +24,6 @@ export interface WritingStyleMetadata {
   targetLength: string;
   codeBlockRatio: number;
   aiTagRequired: boolean;
-  autoEnhance: boolean;
 }
 
 /**
@@ -175,7 +174,6 @@ export class WritingStyleService {
           targetLength: metadata.target_length || '3000-5000',
           codeBlockRatio: metadata.code_block_ratio || 0.2,
           aiTagRequired: metadata.ai_tag_required !== false,
-          autoEnhance: metadata.auto_enhance !== false,
         },
         // 공통 지침이 먼저, 스타일별 지침이 덮어씌움
         instructions: this.mergeInstructions(
@@ -187,18 +185,60 @@ export class WritingStyleService {
           sections['CORE COMEDY PRINCIPLES'] || '',
           sections['CORE PODCAST PRINCIPLES'] || ''
         ),
-        createPostDescription: sections['CREATE_POST TOOL DESCRIPTION'] || sections['WRITING GUIDELINES'] || '',
-        qualityGuidelinesPrompt: sections['QUALITY GUIDELINES PROMPT'] || sections['QUALITY ENHANCEMENT GUIDE'] || '',
-        blogPostTemplatePrompt: sections['BLOG POST TEMPLATE PROMPT'] || sections['ENHANCEMENT TECHNIQUES'] || '',
-        improveMarkdownPrompt: sections['IMPROVE MARKDOWN PROMPT'] || sections['QUALITY CHECKLIST'] || '',
+        createPostDescription: sections['WRITING GUIDELINES'] || '',
+        qualityGuidelinesPrompt: sections['QUALITY ENHANCEMENT GUIDE'] || '',
+        blogPostTemplatePrompt: sections['ENHANCEMENT TECHNIQUES'] || '',
+        improveMarkdownPrompt: sections['QUALITY CHECKLIST'] || '',
       };
 
       console.log(`✅ [WritingStyle] 파싱 완료: ${writingStyle.metadata.styleName}`);
       return writingStyle;
     } catch (error: any) {
-      console.error(`⚠️ [WritingStyle] 파싱 실패: ${error.message}`);
-      console.log('📝 [WritingStyle] Fallback 스타일 사용');
-      return this.getDefaultWritingStyle();
+      console.error(`⚠️ [WritingStyle] ${style} 파싱 실패: ${error.message}`);
+
+      // 무한 루프 방지: default 자체가 실패하면 에러 던지기
+      if (style === 'default') {
+        throw new Error(`default.md 로드 실패: ${error.message}`);
+      }
+
+      console.log('📝 [WritingStyle] Fallback으로 default.md 로드');
+      return await this.loadAndParseStyle('default');
+    }
+  }
+
+  /**
+   * 사용자 제공 원본 마크다운 파싱 (커스텀 스타일용)
+   * LLM이 대화에서 받은 사용자 커스텀 스타일을 파싱
+   * YAML만 파싱하고 본문은 그대로 LLM에게 전달 (LLM이 알아서 해석)
+   */
+  async parseRawMarkdown(markdown: string): Promise<WritingStyle> {
+    try {
+      // YAML front matter 파싱 (있으면)
+      const { metadata, body } = this.parseYamlFrontMatter(markdown);
+
+      const writingStyle: WritingStyle = {
+        metadata: {
+          styleName: metadata.style_name || 'Custom Style',
+          language: metadata.language || 'korean',
+          minLength: metadata.min_length || 2000,
+          targetLength: metadata.target_length || '3000-5000',
+          codeBlockRatio: metadata.code_block_ratio || 0.2,
+          aiTagRequired: metadata.ai_tag_required !== false,
+        },
+        // 사용자가 제공한 본문을 그대로 전달 (LLM이 알아서 해석)
+        instructions: body.trim(),
+        createPostDescription: '',
+        qualityGuidelinesPrompt: '',
+        blogPostTemplatePrompt: '',
+        improveMarkdownPrompt: '',
+      };
+
+      console.log(`✅ [WritingStyle] 커스텀 마크다운 파싱 완료: ${writingStyle.metadata.styleName}`);
+      return writingStyle;
+    } catch (error: any) {
+      console.error(`⚠️ [WritingStyle] 커스텀 마크다운 파싱 실패: ${error.message}`);
+      console.log('📝 [WritingStyle] Fallback으로 default.md 로드');
+      return await this.loadAndParseStyle('default');
     }
   }
 
@@ -285,37 +325,5 @@ export class WritingStyleService {
     }
 
     return sections;
-  }
-
-  /**
-   * 기본 Fallback 스타일 (private)
-   * 파싱 실패 시 사용되는 기본 스타일
-   */
-  private getDefaultWritingStyle(): WritingStyle {
-    return {
-      metadata: {
-        styleName: '⚠️ Fallback Mode (스타일 파일 없음)',
-        language: 'korean',
-        minLength: 2000,
-        targetLength: '3000-5000',
-        codeBlockRatio: 0.2,
-        aiTagRequired: true,
-        autoEnhance: true,
-      },
-      instructions: `
-⚠️ FALLBACK MODE
-스타일 파일을 찾을 수 없습니다.
-.env에 WRITING_STYLE 설정을 확인하세요.
-
-기본 규칙:
-- AI 태그 필수 (ai:claude/chatgpt/gemini)
-- 한국어 작성 (요청 시 영어)
-- 2000자 이상
-`,
-      createPostDescription: '⚠️ Fallback: 블로그 포스트 생성 (제한된 기능)',
-      qualityGuidelinesPrompt: 'Write quality content (Fallback mode)',
-      blogPostTemplatePrompt: 'Basic blog post template (Fallback mode)',
-      improveMarkdownPrompt: 'Improve your markdown content (Fallback mode)',
-    };
   }
 }

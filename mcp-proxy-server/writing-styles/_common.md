@@ -17,8 +17,6 @@ Example: `tags: ["javascript", "ai:claude", "tutorial"]`
 
 **Default Language**: Korean unless English is explicitly requested by user.
 
-**Quality Setting**: Always set `auto_enhance: true` in create_post() call.
-
 ---
 
 ## Parameter Structure (CRITICAL)

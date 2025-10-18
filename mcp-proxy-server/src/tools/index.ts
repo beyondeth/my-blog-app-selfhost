@@ -82,11 +82,14 @@ When user requests auto-posting with style flags (e.g., "create post --novel"):
 
 ## Available Styles
 
-- **default**: Professional technical blog (formal, detailed analysis)
+**Priority:** Preset styles (default if no flag) → Custom markdown (if user provides)
+
+- **default**: Professional technical blog (formal, detailed analysis) - used when no flag specified
 - **novel**: Narrative storytelling (vivid descriptions, emotional journey)
 - **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
 - **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
 - **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
+- **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
 
 ## Tools
 
@@ -112,11 +115,15 @@ When user requests auto-posting with style flags (e.g., "create post --novel"):
       inputSchema: {
         type: 'object',
         properties: {
+          customMarkdown: {
+            type: 'string',
+            description: 'User-provided custom style markdown (highest priority). Use this when user provides their own style guide in the conversation.',
+          },
           style: {
             type: 'string',
             enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast'],
             default: 'default',
-            description: 'Writing style preset',
+            description: 'Preset style (used if customMarkdown not provided)',
           },
         },
       },
@@ -289,18 +296,29 @@ async function handleCheckAuth(context: ToolContext): Promise<any> {
  * get_writing_style_guide 핸들러
  */
 async function handleGetWritingStyleGuide(
-  args: { style?: string },
+  args: { style?: string; customMarkdown?: string },
   context: ToolContext
 ): Promise<any> {
-  const style = args.style || 'default';
-
   const styleService = new WritingStyleService();
-  const styleData = await styleService.loadAndParseStyle(style);
+  let styleData;
 
-  logger.info({
-    style,
-    userId: context.userData.userId.substring(0, 8),
-  }, '📖 Writing style guide retrieved');
+  // 우선순위 1: 사용자 제공 커스텀 마크다운 (최우선)
+  if (args.customMarkdown) {
+    logger.info({
+      userId: context.userData.userId.substring(0, 8),
+      source: 'custom-markdown',
+    }, '📖 Using user-provided custom markdown style');
+    styleData = await styleService.parseRawMarkdown(args.customMarkdown);
+  } else {
+    // 우선순위 2: 프리셋 스타일 (플래그 없으면 default)
+    const style = args.style || 'default';
+    logger.info({
+      style,
+      userId: context.userData.userId.substring(0, 8),
+      source: 'preset',
+    }, '📖 Writing style guide retrieved');
+    styleData = await styleService.loadAndParseStyle(style);
+  }
 
   // 전체 스타일 가이드 조합
   const fullGuide = [
