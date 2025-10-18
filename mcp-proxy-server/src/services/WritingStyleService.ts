@@ -53,6 +53,7 @@ export class WritingStyleService {
   private readonly PRESETS = ['novel', 'tutorial', 'comedy', 'podcast', 'default'];
   private readonly STYLES_DIR = path.join(__dirname, '../../writing-styles');
   private styleCache: Map<string, WritingStyle> = new Map();  // 스타일 캐시
+  private commonInstructionsCache: string | null = null;  // 공통 지침 캐시
 
   /**
    * Writing style 로드
@@ -125,21 +126,57 @@ export class WritingStyleService {
   }
 
   /**
+   * 공통 지침 로드 (캐싱)
+   * 모든 스타일에 공통으로 적용되는 기본 지침
+   */
+  private async loadCommonInstructions(): Promise<string> {
+    if (this.commonInstructionsCache) {
+      return this.commonInstructionsCache;
+    }
+
+    const commonPath = path.join(this.STYLES_DIR, '_common.md');
+
+    try {
+      const content = await fs.readFile(commonPath, 'utf-8');
+      this.commonInstructionsCache = content;
+      console.log(`✅ [WritingStyle] 공통 지침 로드 완료`);
+      return content;
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        console.warn(`⚠️ [WritingStyle] _common.md 파일을 찾을 수 없습니다. 스타일별 파일만 사용합니다.`);
+        return '';
+      }
+      throw error;
+    }
+  }
+
+  /**
    * Writing style 로드 및 파싱
    * 프리셋/URL/인라인 마크다운에서 YAML + 섹션 파싱
+   * 공통 지침(_common.md)과 스타일별 파일을 병합
    */
   async loadAndParseStyle(style: string): Promise<WritingStyle> {
     try {
-      // 1. 원본 마크다운 로드
-      const rawContent = await this.loadStyle(style);
+      // 1. 공통 지침 로드 (캐싱됨)
+      const commonContent = await this.loadCommonInstructions();
 
-      // 2. YAML front matter 파싱
-      const { metadata, body } = this.parseYamlFrontMatter(rawContent);
+      // 2. 스타일별 마크다운 로드
+      const styleContent = await this.loadStyle(style);
 
-      // 3. 섹션 파싱
-      const sections = this.parseSections(body);
+      // 3. YAML front matter 파싱 (스타일별 파일에서)
+      const { metadata, body } = this.parseYamlFrontMatter(styleContent);
 
-      // 4. WritingStyle 객체 생성 (토큰 및 챌린지 포함)
+      // 4. 공통 섹션 파싱
+      const commonSections = this.parseSections(commonContent);
+
+      // 5. 스타일별 섹션 파싱
+      const styleSections = this.parseSections(body);
+
+      // 6. 섹션 병합 (스타일별 섹션이 우선, 없으면 공통 사용)
+      const sections = { ...commonSections, ...styleSections };
+
+      // 7. WritingStyle 객체 생성 (토큰 및 챌린지 포함)
+      // 공통 + 스타일별 섹션을 병합하여 완전한 가이드 생성
       const writingStyle: WritingStyle = {
         metadata: {
           styleName: metadata.style_name || 'Unknown Style',
@@ -152,11 +189,20 @@ export class WritingStyleService {
           validationToken: metadata.validation_token,  // 검증 토큰 파싱
           validationChallenges: metadata.validation_challenges,  // 검증 질문 파싱
         },
-        instructions: sections['MCP SERVER INSTRUCTIONS'] || '',
-        createPostDescription: sections['CREATE_POST TOOL DESCRIPTION'] || '',
-        qualityGuidelinesPrompt: sections['QUALITY GUIDELINES PROMPT'] || '',
-        blogPostTemplatePrompt: sections['BLOG POST TEMPLATE PROMPT'] || '',
-        improveMarkdownPrompt: sections['IMPROVE MARKDOWN PROMPT'] || '',
+        // 공통 지침이 먼저, 스타일별 지침이 덮어씌움
+        instructions: this.mergeInstructions(
+          sections['COMMON INSTRUCTIONS'] || '',
+          sections['STYLE OVERVIEW'] || '',
+          sections['CORE WRITING PRINCIPLES'] || '',
+          sections['CORE NARRATIVE PRINCIPLES'] || '',
+          sections['CORE TUTORIAL PRINCIPLES'] || '',
+          sections['CORE COMEDY PRINCIPLES'] || '',
+          sections['CORE PODCAST PRINCIPLES'] || ''
+        ),
+        createPostDescription: sections['CREATE_POST TOOL DESCRIPTION'] || sections['WRITING GUIDELINES'] || '',
+        qualityGuidelinesPrompt: sections['QUALITY GUIDELINES PROMPT'] || sections['QUALITY ENHANCEMENT GUIDE'] || '',
+        blogPostTemplatePrompt: sections['BLOG POST TEMPLATE PROMPT'] || sections['ENHANCEMENT TECHNIQUES'] || '',
+        improveMarkdownPrompt: sections['IMPROVE MARKDOWN PROMPT'] || sections['QUALITY CHECKLIST'] || '',
       };
 
       console.log(`✅ [WritingStyle] 파싱 완료: ${writingStyle.metadata.styleName}`);
@@ -166,6 +212,16 @@ export class WritingStyleService {
       console.log('📝 [WritingStyle] Fallback 스타일 사용');
       return this.getDefaultWritingStyle();
     }
+  }
+
+  /**
+   * 지침 병합 헬퍼
+   * 공통 지침과 스타일별 지침을 하나로 합침
+   */
+  private mergeInstructions(...sections: string[]): string {
+    return sections
+      .filter(section => section && section.trim())
+      .join('\n\n---\n\n');
   }
 
   /**
