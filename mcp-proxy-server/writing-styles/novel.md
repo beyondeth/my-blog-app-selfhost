@@ -6,14 +6,6 @@ target_length: "4000-6000"
 code_block_ratio: 0.05
 ai_tag_required: true
 auto_enhance: true
-validation_token: "mcp-style-novel-v1-8b2d4e6c"
-validation_challenges:
-  - question: "novel 스타일의 최소 글자 수는?"
-    answer: "2500"
-  - question: "novel 스타일에서 강조하는 주요 요소는?"
-    answer: "narrative"
-  - question: "novel 스타일의 코드 블록 최대 비율은?"
-    answer: "0.05"
 ---
 
 # === STYLE OVERVIEW ===

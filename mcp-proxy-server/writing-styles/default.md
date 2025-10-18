@@ -6,14 +6,6 @@ target_length: "3000-5000"
 code_block_ratio: 0.2
 ai_tag_required: true
 auto_enhance: true
-validation_token: "mcp-style-default-v1-7a9c3f2b"
-validation_challenges:
-  - question: "포스트당 권장하는 굵은 키워드 개수는?"
-    answer: "3-5"
-  - question: "코드 블록의 권장 비율은 전체 콘텐츠의 몇 % 이내?"
-    answer: "20"
-  - question: "기본 언어는 무엇인가?"
-    answer: "korean"
 ---
 
 # === STYLE OVERVIEW ===

@@ -6,14 +6,6 @@ target_length: "4000-7000"
 code_block_ratio: 0.35
 ai_tag_required: true
 auto_enhance: true
-validation_token: "mcp-style-tutorial-v1-4f8a1c9d"
-validation_challenges:
-  - question: "tutorial 스타일의 최소 글자 수는?"
-    answer: "3000"
-  - question: "tutorial 스타일의 권장 코드 블록 비율은?"
-    answer: "0.35"
-  - question: "tutorial 스타일에서 강조하는 형식은?"
-    answer: "step-by-step"
 ---
 
 # === STYLE OVERVIEW ===

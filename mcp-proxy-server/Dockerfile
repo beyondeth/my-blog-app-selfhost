@@ -76,6 +76,7 @@ WORKDIR /app
 COPY --from=builder --chown=mcp:nodejs /app/dist ./dist
 COPY --from=builder --chown=mcp:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=mcp:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=mcp:nodejs /app/writing-styles ./writing-styles
 
 # 비-루트 사용자로 전환
 USER mcp

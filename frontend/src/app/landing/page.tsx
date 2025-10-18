@@ -497,18 +497,50 @@ function FooterSection() {
       viewport={{ once: true, amount: 0.3 }}
       transition={{ duration: 0.8 }}
     >
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-8">
-        <div className="flex items-center gap-2">
-          <div className="text-xl font-semibold">BlogPlatform</div>
+      <div className="max-w-6xl mx-auto">
+        <div className="flex flex-col sm:flex-row items-start justify-between gap-12">
+          {/* 브랜드 */}
+          <div className="flex items-center gap-2">
+            <div className="text-xl font-semibold">Codebase.blog</div>
+          </div>
+
+          {/* Legal 링크 그룹 */}
+          <div className="flex flex-col sm:flex-row gap-8 sm:gap-12">
+            {/* 핵심 약관 */}
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-black mb-1">Legal</h3>
+              <Link href="/legal/terms" className="text-sm text-gray-600 hover:text-black">
+                Terms of Service
+              </Link>
+              <Link href="/legal/privacy" className="text-sm text-gray-600 hover:text-black">
+                Privacy Policy
+              </Link>
+              <Link href="/legal/guidelines" className="text-sm text-gray-600 hover:text-black">
+                Community Guidelines
+              </Link>
+            </div>
+
+            {/* 구독 및 파트너 */}
+            <div className="flex flex-col gap-3">
+              <h3 className="text-sm font-semibold text-black mb-1">Programs</h3>
+              <Link href="/legal/pro" className="text-sm text-gray-600 hover:text-black">
+                PRO Subscription
+              </Link>
+              <Link href="/legal/partner" className="text-sm text-gray-600 hover:text-black">
+                Partner Program
+              </Link>
+              <Link href="/legal/username" className="text-sm text-gray-600 hover:text-black">
+                Username Policy
+              </Link>
+            </div>
+          </div>
         </div>
 
-        <div className="flex items-center gap-8">
-          <Link href="/privacy" className="text-sm text-gray-600 hover:text-black">
-            Privacy
-          </Link>
-          <Link href="/terms" className="text-sm text-gray-600 hover:text-black">
-            Terms
-          </Link>
+        {/* Copyright */}
+        <div className="mt-12 pt-8 border-t border-gray-200 text-center">
+          <p className="text-sm text-gray-500">
+            © 2025 Codebase.blog. All rights reserved.
+          </p>
         </div>
       </div>
     </motion.footer>

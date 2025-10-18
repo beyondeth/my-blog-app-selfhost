@@ -150,14 +150,6 @@ When user requests auto-posting with style flags (e.g., "create post --novel"):
             default: 'default',
             description: 'Writing style preset',
           },
-          validationToken: {
-            type: 'string',
-            description: 'Validation token from get_writing_style_guide (required)',
-          },
-          challengeAnswer: {
-            type: 'string',
-            description: 'Answer to validation challenge (optional)',
-          },
         },
         required: ['title', 'content_markdown'],
       },
@@ -339,8 +331,6 @@ async function handleCreatePost(
     tags?: string[];
     category?: string;
     writingStyle?: string;
-    validationToken?: string;
-    challengeAnswer?: string;
   },
   context: ToolContext
 ): Promise<any> {

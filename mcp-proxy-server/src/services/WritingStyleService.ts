@@ -15,14 +15,6 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * 검증 챌린지 타입 정의
- */
-export interface ValidationChallenge {
-  question: string;
-  answer: string;
-}
-
-/**
  * Writing Style Metadata (YAML front matter)
  */
 export interface WritingStyleMetadata {
@@ -33,8 +25,6 @@ export interface WritingStyleMetadata {
   codeBlockRatio: number;
   aiTagRequired: boolean;
   autoEnhance: boolean;
-  validationToken?: string;  // 검증 토큰 추가
-  validationChallenges?: ValidationChallenge[];  // 검증 질문 추가
 }
 
 /**
@@ -186,8 +176,6 @@ export class WritingStyleService {
           codeBlockRatio: metadata.code_block_ratio || 0.2,
           aiTagRequired: metadata.ai_tag_required !== false,
           autoEnhance: metadata.auto_enhance !== false,
-          validationToken: metadata.validation_token,  // 검증 토큰 파싱
-          validationChallenges: metadata.validation_challenges,  // 검증 질문 파싱
         },
         // 공통 지침이 먼저, 스타일별 지침이 덮어씌움
         instructions: this.mergeInstructions(
@@ -297,150 +285,6 @@ export class WritingStyleService {
     }
 
     return sections;
-  }
-
-  /**
-   * 토큰으로 스타일 검증
-   * 토큰이 유효한지 확인하고 해당 스타일 정보 반환
-   */
-  async validateToken(token: string): Promise<{ valid: boolean; style?: WritingStyle; styleName?: string }> {
-    // 캐시된 스타일이 있는지 확인
-    for (const [name, style] of this.styleCache.entries()) {
-      if (style.metadata.validationToken === token) {
-        return { valid: true, style, styleName: name };
-      }
-    }
-
-    // 캐시에 없으면 모든 프리셋 스타일 로드하여 확인
-    for (const preset of this.PRESETS) {
-      try {
-        const style = await this.loadAndParseStyle(preset);
-        this.styleCache.set(preset, style);  // 캐시에 저장
-
-        if (style.metadata.validationToken === token) {
-          return { valid: true, style, styleName: preset };
-        }
-      } catch (error) {
-        console.error(`[WritingStyle] Failed to load ${preset} for token validation:`, error);
-      }
-    }
-
-    return { valid: false };
-  }
-
-  /**
-   * 스타일에서 검증 토큰 가져오기
-   * LLM이 스타일 파일을 읽고 토큰을 찾을 수 있도록 함
-   */
-  async getValidationToken(styleName: string): Promise<string | null> {
-    try {
-      const style = await this.loadAndParseStyle(styleName);
-      return style.metadata.validationToken || null;
-    } catch (error) {
-      console.error(`[WritingStyle] Failed to get token for ${styleName}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * 랜덤 검증 챌린지 가져오기
-   * 동적 검증을 위해 스타일에서 랜덤 질문 선택
-   */
-  async getRandomChallenge(styleName: string): Promise<ValidationChallenge | null> {
-    try {
-      const style = await this.loadAndParseStyle(styleName);
-      const challenges = style.metadata.validationChallenges;
-
-      if (!challenges || challenges.length === 0) {
-        return null;
-      }
-
-      // 랜덤하게 하나 선택
-      const randomIndex = Math.floor(Math.random() * challenges.length);
-      return challenges[randomIndex];
-    } catch (error) {
-      console.error(`[WritingStyle] Failed to get challenge for ${styleName}:`, error);
-      return null;
-    }
-  }
-
-  /**
-   * 챌린지 답변 검증
-   * 사용자 답변이 정답과 일치하는지 확인
-   */
-  async validateChallenge(
-    styleName: string,
-    question: string,
-    userAnswer: string
-  ): Promise<boolean> {
-    try {
-      const style = await this.loadAndParseStyle(styleName);
-      const challenges = style.metadata.validationChallenges;
-
-      if (!challenges) {
-        return false;
-      }
-
-      // 질문에 해당하는 답변 찾기
-      const challenge = challenges.find(c => c.question === question);
-      if (!challenge) {
-        return false;
-      }
-
-      // 대소문자 구분 없이 답변 비교
-      return challenge.answer.toLowerCase() === userAnswer.toLowerCase();
-    } catch (error) {
-      console.error(`[WritingStyle] Failed to validate challenge:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * 특정 스타일의 모든 챌린지 가져오기
-   * Phase 2에서 답변 검증에 사용
-   */
-  async getChallenges(styleName: string): Promise<ValidationChallenge[]> {
-    try {
-      const style = await this.loadAndParseStyle(styleName);
-      return style.metadata.validationChallenges || [];
-    } catch (error) {
-      console.error(`[WritingStyle] Failed to get challenges for ${styleName}:`, error);
-      return [];
-    }
-  }
-
-  /**
-   * 답변이 유효한지 검증 (모든 챌린지와 비교)
-   * Phase 2: 어떤 질문의 답변이든 맞으면 통과
-   */
-  async validateAnswerForStyle(
-    styleName: string,
-    answer: string
-  ): Promise<{ valid: boolean; matchedQuestion?: string }> {
-    try {
-      const challenges = await this.getChallenges(styleName);
-
-      if (challenges.length === 0) {
-        // 챌린지가 없으면 통과 (하위 호환성)
-        return { valid: true };
-      }
-
-      // 답변 정규화: 소문자 변환 + 공백 제거
-      const normalizedAnswer = answer.toLowerCase().trim();
-
-      // 모든 챌린지와 비교하여 일치하는 것이 있는지 확인
-      const match = challenges.find(c =>
-        c.answer.toLowerCase().trim() === normalizedAnswer
-      );
-
-      return {
-        valid: !!match,
-        matchedQuestion: match?.question
-      };
-    } catch (error) {
-      console.error(`[WritingStyle] Failed to validate answer for ${styleName}:`, error);
-      return { valid: false };
-    }
   }
 
   /**
