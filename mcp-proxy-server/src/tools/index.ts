@@ -64,49 +64,35 @@ export async function registerAllTools(
         title: 'Codebase.blog MCP Server',
         websiteUrl: 'https://codebase.blog'
       },
-      instructions: `# Codebase.blog 자동포스팅 MCP 서버
+      instructions: `# Codebase.blog Auto-posting MCP Server
 
-## 🚀 자동포스팅 워크플로우
+## Workflow
 
-사용자가 "자동포스팅해줘 --novel" 같은 요청을 하면:
+When user requests auto-posting with style flags (e.g., "create post --novel"):
 
-1. **check_auth** 먼저 호출 (인증 상태 확인)
-2. **get_writing_style_guide** 호출 with style parameter:
-   - --novel → style: 'novel'
-   - --tutorial → style: 'tutorial'
-   - --comedy → style: 'comedy'
-   - --podcast → style: 'podcast'
-   - --default 또는 플래그 없음 → style: 'default'
-3. 스타일 가이드에 따라 블로그 글 작성
-4. **create_post** 호출하여 포스트 생성
+1. Call check_auth() to verify authentication
+2. Call get_writing_style_guide(style) with appropriate style parameter:
+   - --novel → 'novel'
+   - --tutorial → 'tutorial'
+   - --comedy → 'comedy'
+   - --podcast → 'podcast'
+   - --default or no flag → 'default'
+3. Write content following the retrieved style guide
+4. Call create_post() to publish
 
-## 📝 사용 가능한 Writing Styles
+## Available Styles
 
-- **default**: 전문적인 기술 블로그 (형식적, 상세함)
-- **novel**: 내러티브 스토리텔링 (생동감 있는 묘사)
-- **tutorial**: 단계별 교육 형식 (초보자 친화적)
-- **comedy**: 유머러스하고 재미있는 톤
-- **podcast**: 대화체이고 참여를 유도하는 스타일
+- **default**: Professional technical blog (formal, detailed analysis)
+- **novel**: Narrative storytelling (vivid descriptions, emotional journey)
+- **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
+- **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
+- **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
 
-## 🔑 한국어 트리거 감지
+## Tools
 
-다음 키워드 감지 시 자동포스팅 워크플로우 시작:
-- "자동포스팅", "블로그 작성", "포스트 생성", "글 써줘"
-- "위 내용으로", "이거로", "다음 내용을"
-
-스타일 플래그는 "--" 형태로 감지 (예: "--novel", "--tutorial")
-
-## 🛠️ 도구 설명
-
-- **check_auth**: 인증 상태 확인 (필수 우선 호출)
-- **get_writing_style_guide**: 글쓰기 스타일 가이드 조회
-- **create_post**: 블로그 포스트 생성
-
-## 📚 프롬프트
-
-- **markdown_quality_guidelines**: 마크다운 품질 가이드라인
-- **blog_post_template**: 블로그 포스트 템플릿
-- **improve_markdown**: 마크다운 개선 기법`
+- **check_auth**: Verify authentication status (required first call)
+- **get_writing_style_guide**: Retrieve writing style guidelines
+- **create_post**: Publish blog post to codebase.blog`
     };
   });
 
@@ -114,7 +100,7 @@ export async function registerAllTools(
   const tools = [
     {
       name: 'check_auth',
-      description: '🔐 REQUIRED FIRST: Verify authentication status with codebase.blog. Always call this first before creating posts to confirm user identity and blog access.',
+      description: 'REQUIRED FIRST: Verify authentication status. Always call this before creating posts to confirm user identity and blog access.',
       inputSchema: {
         type: 'object',
         properties: {},
@@ -122,7 +108,7 @@ export async function registerAllTools(
     },
     {
       name: 'get_writing_style_guide',
-      description: 'Get writing style guidelines for blog posts. Returns validation token and challenges needed for create_post.',
+      description: 'Retrieve writing style guidelines for blog posts. Returns comprehensive style guide with instructions and validation requirements.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -137,7 +123,7 @@ export async function registerAllTools(
     },
     {
       name: 'create_post',
-      description: 'Create a new blog post. Requires validation token from get_writing_style_guide.',
+      description: 'Create and publish a new blog post to codebase.blog.',
       inputSchema: {
         type: 'object',
         properties: {
@@ -147,7 +133,7 @@ export async function registerAllTools(
           },
           content_markdown: {
             type: 'string',
-            description: 'Post content in markdown',
+            description: 'Post content in markdown format',
           },
           tags: {
             type: 'array',
@@ -166,7 +152,7 @@ export async function registerAllTools(
           },
           validationToken: {
             type: 'string',
-            description: '🔑 REQUIRED: Validation token from get_writing_style_guide',
+            description: 'Validation token from get_writing_style_guide (required)',
           },
           challengeAnswer: {
             type: 'string',
@@ -326,19 +312,11 @@ async function handleGetWritingStyleGuide(
 
   // 전체 스타일 가이드 조합
   const fullGuide = [
-    `# Writing Style Guide: ${styleData.metadata.styleName}`,
+    `# ${styleData.metadata.styleName}`,
     '',
-    '## Metadata',
-    `- Language: ${styleData.metadata.language}`,
-    `- Min Length: ${styleData.metadata.minLength}`,
-    `- Target Length: ${styleData.metadata.targetLength}`,
-    `- AI Tag Required: ${styleData.metadata.aiTagRequired}`,
+    `**Requirements:** ${styleData.metadata.minLength}+ chars (target: ${styleData.metadata.targetLength}) | Language: ${styleData.metadata.language} | AI tag: ${styleData.metadata.aiTagRequired ? 'required' : 'optional'}`,
     '',
-    '## Instructions',
     styleData.instructions,
-    '',
-    '## Create Post Description',
-    styleData.createPostDescription,
   ].join('\n');
 
   return {
