@@ -30,70 +30,6 @@
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
-                "value": 50
-              },
-              {
-                "color": "red",
-                "value": 100
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 6,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "mcp_transports_active",
-          "refId": "A"
-        }
-      ],
-      "title": "활성 Transport 세션 수",
-      "type": "gauge"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
             "mode": "palette-classic"
           },
           "custom": {
@@ -234,7 +170,10 @@
       "id": 3,
       "options": {
         "legend": {
-          "calcs": ["mean", "max"],
+          "calcs": [
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -329,7 +268,10 @@
       "id": 4,
       "options": {
         "legend": {
-          "calcs": ["mean", "max"],
+          "calcs": [
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -491,7 +433,9 @@
       "id": 6,
       "options": {
         "legend": {
-          "calcs": ["sum"],
+          "calcs": [
+            "sum"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -586,7 +530,9 @@
       "id": 7,
       "options": {
         "legend": {
-          "calcs": ["sum"],
+          "calcs": [
+            "sum"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -621,29 +567,36 @@
             "mode": "thresholds"
           },
           "mappings": [],
+          "max": 100,
+          "min": 0,
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "blue",
+                "color": "red",
                 "value": null
+              },
+              {
+                "color": "yellow",
+                "value": 70
+              },
+              {
+                "color": "green",
+                "value": 90
               }
             ]
           },
-          "unit": "short"
+          "unit": "percent"
         }
       },
       "gridPos": {
-        "h": 6,
+        "h": 8,
         "w": 6,
         "x": 0,
-        "y": 32
+        "y": 0
       },
       "id": 8,
       "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
           "values": false,
@@ -652,7 +605,8 @@
           ],
           "fields": ""
         },
-        "textMode": "auto"
+        "showThresholdLabels": false,
+        "showThresholdMarkers": true
       },
       "pluginVersion": "10.0.0",
       "targets": [
@@ -661,197 +615,12 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "mcp_transports_created_total",
-          "legendFormat": "생성됨",
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "mcp_transports_closed_total",
-          "legendFormat": "종료됨",
-          "refId": "B"
-        }
-      ],
-      "title": "Transport 총 개수",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "s"
-        }
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 6,
-        "y": 32
-      },
-      "id": 9,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "mcp_transports_average_lifetime_seconds",
+          "expr": "(mcp_api_key_cache_hits_total / (mcp_api_key_cache_hits_total + mcp_api_key_cache_misses_total)) * 100",
           "refId": "A"
         }
       ],
-      "title": "Transport 평균 수명",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 12,
-        "y": 32
-      },
-      "id": 10,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "mcp_oauth_sessions_active",
-          "refId": "A"
-        }
-      ],
-      "title": "OAuth 인증된 세션 수",
-      "type": "stat"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "purple",
-                "value": null
-              }
-            ]
-          },
-          "unit": "short"
-        }
-      },
-      "gridPos": {
-        "h": 6,
-        "w": 6,
-        "x": 18,
-        "y": 32
-      },
-      "id": 11,
-      "options": {
-        "colorMode": "value",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "textMode": "auto"
-      },
-      "pluginVersion": "10.0.0",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "sum(mcp_oauth_sessions_total)",
-          "legendFormat": "총 인증 수",
-          "refId": "A"
-        }
-      ],
-      "title": "OAuth 총 인증 수",
-      "type": "stat"
+      "title": "API Key 캐시 히트율 (%)",
+      "type": "gauge"
     },
     {
       "datasource": {
@@ -903,19 +672,22 @@
               }
             ]
           },
-          "unit": "ops"
+          "unit": "s"
         }
       },
       "gridPos": {
         "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 38
+        "w": 18,
+        "x": 6,
+        "y": 0
       },
-      "id": 12,
+      "id": 9,
       "options": {
         "legend": {
-          "calcs": ["mean", "max"],
+          "calcs": [
+            "mean",
+            "max"
+          ],
           "displayMode": "table",
           "placement": "bottom",
           "showLegend": true
@@ -931,8 +703,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mcp_transports_created_total[5m])",
-          "legendFormat": "Transport 생성",
+          "expr": "histogram_quantile(0.95, rate(mcp_api_key_validation_duration_seconds_bucket{cache_hit=\"false\"}[5m]))",
+          "legendFormat": "P95 (캐시 미스)",
           "refId": "A"
         },
         {
@@ -940,8 +712,8 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mcp_transports_closed_total[5m])",
-          "legendFormat": "Transport 종료 ({{reason}})",
+          "expr": "histogram_quantile(0.50, rate(mcp_api_key_validation_duration_seconds_bucket{cache_hit=\"false\"}[5m]))",
+          "legendFormat": "P50 (캐시 미스)",
           "refId": "B"
         },
         {
@@ -949,19 +721,120 @@
             "type": "prometheus",
             "uid": "prometheus"
           },
-          "expr": "rate(mcp_oauth_sessions_total[5m])",
-          "legendFormat": "OAuth 인증 ({{provider}})",
+          "expr": "histogram_quantile(0.95, rate(mcp_api_key_validation_duration_seconds_bucket{cache_hit=\"true\"}[5m]))",
+          "legendFormat": "P95 (캐시 히트)",
           "refId": "C"
         }
       ],
-      "title": "Transport & OAuth 활동 추세 (초당)",
+      "title": "API Key 검증 시간 (캐시 히트 vs 미스)",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "gradientMode": "none",
+            "hideFrom": {
+              "tooltip": false,
+              "viz": false,
+              "legend": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 2,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "never",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "normal"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "ops"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 10,
+      "options": {
+        "legend": {
+          "calcs": [
+            "sum"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(mcp_requests_total{status=\"success\"}[5m])",
+          "legendFormat": "{{tool}} (성공)",
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "expr": "rate(mcp_requests_total{status=\"error\"}[5m])",
+          "legendFormat": "{{tool}} (실패)",
+          "refId": "B"
+        }
+      ],
+      "title": "MCP 도구별 요청 성공/실패율 (초당)",
       "type": "timeseries"
     }
   ],
   "refresh": "10s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["mcp", "proxy", "monitoring"],
+  "tags": [
+    "mcp",
+    "proxy",
+    "monitoring"
+  ],
   "templating": {
     "list": []
   },
@@ -971,8 +844,9 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "MCP Proxy Server 모니터링",
+  "title": "06. MCP 자동포스팅 API",
   "uid": "mcp-proxy-dashboard",
   "version": 1,
-  "weekStart": ""
+  "weekStart": "",
+  "description": "MCP 자동포스팅 API 모니터링 - API Key 인증, 캐시 성능, 요청 처리 메트릭"
 }

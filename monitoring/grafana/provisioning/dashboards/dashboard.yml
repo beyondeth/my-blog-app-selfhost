@@ -7,6 +7,7 @@
 #   3. Like Queue          - 좋아요 큐 시스템 모니터링
 #   4. Redis Overview      - Redis 전체 메트릭
 #   5. MCP Proxy Server    - MCP Proxy 서버 모니터링
+#   6. Cache System        - 캐시 시스템 모니터링 (히트율, Cache Stampede 방지)
 
 apiVersion: 1
 

@@ -414,63 +414,6 @@
               },
               {
                 "color": "yellow",
-                "value": 10
-              },
-              {
-                "color": "red",
-                "value": 50
-              }
-            ]
-          }
-        }
-      },
-      "gridPos": {
-        "h": 4,
-        "w": 6,
-        "x": 6,
-        "y": 12
-      },
-      "id": 7,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true,
-        "text": {}
-      },
-      "pluginVersion": "8.0.0",
-      "targets": [
-        {
-          "expr": "mcp_sessions_active",
-          "refId": "A"
-        }
-      ],
-      "title": "Active MCP Sessions",
-      "type": "gauge"
-    },
-    {
-      "datasource": "Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "thresholds"
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "yellow",
                 "value": 1000
               },
               {
@@ -510,11 +453,75 @@
       ],
       "title": "Total Redis Keys",
       "type": "gauge"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        }
+      },
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "id": 7,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "values": false,
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": ""
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.0.0",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "Prometheus"
+          },
+          "expr": "sum(rate(mcp_requests_total[5m]))",
+          "refId": "A"
+        }
+      ],
+      "title": "MCP API Key 검증 (초당)",
+      "type": "stat"
     }
   ],
   "schemaVersion": 27,
   "style": "dark",
-  "tags": ["overview", "system"],
+  "tags": [
+    "overview",
+    "system"
+  ],
   "templating": {
     "list": []
   },
@@ -524,7 +531,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "1. System Overview",
+  "title": "01. 전체 시스템 현황",
   "uid": "system-overview",
-  "version": 0
+  "version": 0,
+  "description": "전체 시스템 현황 한눈에 보기 - Backend 서버, MCP Proxy, Redis 상태, API 처리량, 메모리 사용량"
 }
