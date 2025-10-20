@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { Cron } from '@nestjs/schedule';
+import { CacheService } from '../cache/cache.service';
 
 @Injectable()
 export class ViewCountService {
@@ -13,6 +14,7 @@ export class ViewCountService {
   constructor(
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -51,6 +53,35 @@ export class ViewCountService {
   }
 
   /**
+   * 인기 포스트 캐시 무효화
+   * @description 조회수 변경으로 인기 순위가 달라질 수 있으므로 인기 포스트 캐시 무효화
+   */
+  private async invalidatePopularPostsCache(): Promise<void> {
+    const popularPeriods = ['daily', 'weekly', 'monthly'];
+    const limits = [5, 10];
+
+    try {
+      const invalidationPromises = [];
+
+      for (const period of popularPeriods) {
+        for (const limit of limits) {
+          const cacheKey = `popular:posts:${period}:${limit}`;
+          invalidationPromises.push(
+            this.cacheService.delete(cacheKey).catch(err => {
+              this.logger.error(`Failed to invalidate cache key ${cacheKey}:`, err);
+            })
+          );
+        }
+      }
+
+      await Promise.all(invalidationPromises);
+      this.logger.log('✅ Invalidated popular posts cache after view count update');
+    } catch (error) {
+      this.logger.error('❌ Failed to invalidate popular posts cache:', error);
+    }
+  }
+
+  /**
    * 모든 조회수를 DB에 반영
    */
   async flushAllViewCounts(): Promise<void> {
@@ -77,9 +108,13 @@ export class ViewCountService {
       await queryRunner.commitTransaction();
       this.viewCounts.clear();
       this.lastUpdate = new Date();
-      
+
       const totalViews = entries.reduce((sum, [, count]) => sum + count, 0);
       this.logger.log(`Successfully flushed ${totalViews} total views across ${entries.length} posts`);
+
+      // 조회수 업데이트 후 인기 포스트 캐시 무효화
+      // 인기 순위 산정에 viewCount가 포함되므로 무효화 필요
+      await this.invalidatePopularPostsCache();
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error('Failed to flush view counts:', error);

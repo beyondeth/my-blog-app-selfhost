@@ -732,6 +732,40 @@ export class CommentsService {
       await this.cacheService.del(CacheKeys.COMMENT_REPLIES_FIRST(parentCommentId));
     }
 
+    // 인기 포스트 캐시 무효화
+    // 댓글 수 변경으로 인기 순위가 달라질 수 있음
+    // popularity_score = viewCount + (likeCount × 3) + (commentCount × 2)
+    await this.invalidatePopularPostsCache();
+
     this.logger.debug(`Invalidated pagination cache for postId: ${postId}`);
+  }
+
+  /**
+   * 인기 포스트 캐시 무효화
+   * @description 댓글 생성/삭제로 인기 순위가 달라질 수 있으므로 인기 포스트 캐시 무효화
+   */
+  private async invalidatePopularPostsCache(): Promise<void> {
+    const popularPeriods = ['daily', 'weekly', 'monthly'];
+    const limits = [5, 10];
+
+    try {
+      const invalidationPromises = [];
+
+      for (const period of popularPeriods) {
+        for (const limit of limits) {
+          const cacheKey = `popular:posts:${period}:${limit}`;
+          invalidationPromises.push(
+            this.cacheService.delete(cacheKey).catch(err => {
+              this.logger.error(`Failed to invalidate cache key ${cacheKey}:`, err);
+            })
+          );
+        }
+      }
+
+      await Promise.all(invalidationPromises);
+      this.logger.debug('✅ Invalidated popular posts cache after comment update');
+    } catch (error) {
+      this.logger.error('❌ Failed to invalidate popular posts cache:', error);
+    }
   }
 } 

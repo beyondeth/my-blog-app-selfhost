@@ -1691,7 +1691,41 @@ export class PostsService {
       }
     });
 
+    // 4. 좋아요 처리 후 인기 포스트 캐시 무효화
+    // 인기 순위 산정에 likeCount가 포함되므로 무효화 필요
+    // popularity_score = viewCount + (likeCount × 3) + (commentCount × 2)
+    await this.invalidatePopularPostsCache();
+
     return processedLikes.length;
+  }
+
+  /**
+   * 인기 포스트 캐시 무효화
+   * @description 좋아요/댓글 변경으로 인기 순위가 달라질 수 있으므로 인기 포스트 캐시 무효화
+   */
+  private async invalidatePopularPostsCache(): Promise<void> {
+    const popularPeriods = ['daily', 'weekly', 'monthly'];
+    const limits = [5, 10];
+
+    try {
+      const invalidationPromises = [];
+
+      for (const period of popularPeriods) {
+        for (const limit of limits) {
+          const cacheKey = `popular:posts:${period}:${limit}`;
+          invalidationPromises.push(
+            this.cacheService.delete(cacheKey).catch(err => {
+              this.logger.error(`Failed to invalidate cache key ${cacheKey}:`, err);
+            })
+          );
+        }
+      }
+
+      await Promise.all(invalidationPromises);
+      this.logger.debug('✅ Invalidated popular posts cache after like/comment update');
+    } catch (error) {
+      this.logger.error('❌ Failed to invalidate popular posts cache:', error);
+    }
   }
 
   // 조회수 증가 (로그인 유저만)

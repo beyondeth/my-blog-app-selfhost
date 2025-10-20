@@ -136,7 +136,7 @@ export class PostsController {
   @ApiBearerAuth()
   async create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: User) {
     const newPost = await this.postsService.create(createPostDto, user);
-    
+
     // 스마트 캐시 무효화: 배치 처리로 DB 부하 최소화
     // 새 포스트는 항상 최상단에 추가되므로 1페이지만 즉시 무효화
     // limit 다양성 대응: 기본 키 + custom 키 모두 무효화
@@ -146,13 +146,11 @@ export class PostsController {
       'feed:custom:p1:l10',    // limit=10 사용 시 대비
     ];
 
-    // 인기 포스트 캐시 무효화 (새 포스트가 인기 목록에 영향을 줄 수 있음)
-    const popularPeriods = ['daily', 'weekly', 'monthly'];
-    for (const period of popularPeriods) {
-      for (let limit = 5; limit <= 10; limit += 5) {
-        cacheKeysToInvalidate.push(`popular:posts:${period}:${limit}`);
-      }
-    }
+    // 인기 포스트 캐시 무효화 제거
+    // 이유: 새 포스트는 viewCount=0, likeCount=0, commentCount=0으로
+    //      popularity_score=0이므로 인기 목록에 진입 불가능
+    //      불필요한 캐시 무효화로 인한 캐시 히트율 저하 방지
+    // 대신 조회수/좋아요/댓글 변경 시에만 무효화 (view-count.service.ts, like-queue.service.ts, comments.service.ts)
 
     // 작성자의 블로그 캐시 무효화
     if (newPost.blog && newPost.blog.slug) {
