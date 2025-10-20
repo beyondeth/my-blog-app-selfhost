@@ -1,21 +1,28 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, Brackets } from 'typeorm';
 import { plainToInstance } from 'class-transformer';
 import { Comment } from './entities/comment.entity';
 import { CommentLike, LikeType } from './entities/comment-like.entity';
 import { CommentResponseDto } from './dto/comment-response.dto';
+import { GetCommentsDto } from './dto/get-comments-query.dto';
+import { GetRepliesDto } from './dto/get-replies.dto';
+import { PaginatedCommentsDto } from './dto/paginated-comments.dto';
 import { User } from '../users/entities/user.entity';
 import { PostsService } from '../posts/posts.service';
+import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
 
 @Injectable()
 export class CommentsService {
+  private readonly logger = new Logger(CommentsService.name);
+
   constructor(
     @InjectRepository(Comment)
     private commentsRepository: Repository<Comment>,
     @InjectRepository(CommentLike)
     private commentLikesRepository: Repository<CommentLike>,
     private postsService: PostsService,
+    private cacheService: CacheService,
   ) {}
 
   /**
@@ -62,10 +69,13 @@ export class CommentsService {
     });
 
     const savedComment = await this.commentsRepository.save(comment) as unknown as Comment;
-    
+
     // 댓글 수 증가 - 답글도 포함
     await this.postsService.incrementCommentCount(postId);
-    
+
+    // 페이지네이션 캐시 무효화
+    await this.invalidateCommentsPaginationCache(postId, parentCommentId);
+
     return savedComment;
   }
 
@@ -157,9 +167,12 @@ export class CommentsService {
 
     comment.isDeleted = true;
     await this.commentsRepository.save(comment);
-    
+
     // 댓글 수 감소
     await this.postsService.decrementCommentCount(comment.post.id);
+
+    // 페이지네이션 캐시 무효화
+    await this.invalidateCommentsPaginationCache(comment.post.id, comment.parentCommentId);
   }
 
   async findAllComments(): Promise<Comment[]> {
@@ -223,7 +236,10 @@ export class CommentsService {
       
       await queryRunner.manager.save(comment);
       await queryRunner.commitTransaction();
-      
+
+      // 인기순 정렬 캐시 무효화 (좋아요 수 변경)
+      await this.invalidateCommentsPaginationCache(comment.postId);
+
       return { liked, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -286,7 +302,10 @@ export class CommentsService {
       
       await queryRunner.manager.save(comment);
       await queryRunner.commitTransaction();
-      
+
+      // 인기순 정렬 캐시 무효화 (싫어요 수 변경)
+      await this.invalidateCommentsPaginationCache(comment.postId);
+
       return { disliked, likesCount: comment.likesCount, dislikesCount: comment.dislikesCount };
     } catch (error) {
       await queryRunner.rollbackTransaction();
@@ -294,5 +313,425 @@ export class CommentsService {
     } finally {
       await queryRunner.release();
     }
+  }
+
+  // ============================================================
+  // 페이지네이션 메서드 (5,000명+ 커뮤니티 최적화)
+  // ============================================================
+
+  /**
+   * 커서 인코딩 (Base64 JSON)
+   *
+   * @description
+   * 커서 정보를 Base64 인코딩하여 URL-safe 문자열로 변환
+   *
+   * @param cursor - 커서 객체 { likesCount?, createdAt, id }
+   * @returns Base64 인코딩된 문자열
+   */
+  private encodeCursor(cursor: { likesCount?: number; createdAt: Date; id: string }): string {
+    const cursorData = {
+      likesCount: cursor.likesCount,
+      createdAt: cursor.createdAt.toISOString(),
+      id: cursor.id,
+    };
+    return Buffer.from(JSON.stringify(cursorData)).toString('base64');
+  }
+
+  /**
+   * 커서 디코딩 (Base64 JSON)
+   *
+   * @param cursor - Base64 인코딩된 커서 문자열
+   * @returns 디코딩된 커서 객체
+   */
+  private decodeCursor(cursor: string): { likesCount?: number; createdAt: string; id: string } | null {
+    try {
+      const decoded = Buffer.from(cursor, 'base64').toString('utf-8');
+      return JSON.parse(decoded);
+    } catch (error) {
+      this.logger.error(`Failed to decode cursor: ${cursor}`, error);
+      return null;
+    }
+  }
+
+  /**
+   * 부모 댓글 페이지네이션 조회 (최신순/인기순 정렬)
+   *
+   * @description
+   * - 부모 댓글만 조회 (parentCommentId IS NULL)
+   * - 커서 기반 페이지네이션 (createdAt + id 복합 커서)
+   * - 인기순 정렬 시 스냅샷 타임스탬프로 중복/누락 방지
+   * - 첫 페이지만 Redis 캐싱 (TTL 10초)
+   *
+   * @최적화_전략
+   * 1. 복합 인덱스 활용 (idx_comments_recent_parent, idx_comments_popular_parent)
+   * 2. WHERE 절에서 커서 기준 필터링 (LIMIT + 1로 다음 페이지 존재 확인)
+   * 3. 첫 페이지 캐싱으로 DB 부하 감소
+   * 4. 스냅샷 방식으로 인기순 정렬 안정성 확보
+   *
+   * @param postId - 게시글 ID
+   * @param dto - 페이지네이션 옵션
+   * @param user - 현재 사용자 (좋아요 상태 확인용)
+   * @returns 페이지네이션된 댓글 목록
+   */
+  async getParentCommentsPaginated(
+    postId: string,
+    dto: GetCommentsDto,
+    user?: User,
+  ): Promise<PaginatedCommentsDto> {
+    const { cursor, limit = 20, sort = 'recent', snapshotTimestamp } = dto;
+
+    // 캐시 키 생성 (첫 페이지만)
+    const isFirstPage = !cursor;
+    const cacheKey = isFirstPage
+      ? CacheKeys.COMMENTS_PAGE_FIRST(postId, sort)
+      : null;
+
+    // 첫 페이지 캐시 확인
+    if (cacheKey) {
+      const cached = await this.cacheService.get<PaginatedCommentsDto>(cacheKey);
+      if (cached) {
+        this.logger.debug(`Cache HIT: ${cacheKey}`);
+        return cached;
+      }
+    }
+
+    // 커서 디코딩
+    const decodedCursor = cursor ? this.decodeCursor(cursor) : null;
+
+    // 스냅샷 타임스탬프 설정 (인기순 정렬 시)
+    let effectiveSnapshot: Date | null = null;
+    if (sort === 'popular') {
+      if (snapshotTimestamp) {
+        effectiveSnapshot = new Date(snapshotTimestamp);
+      } else if (isFirstPage) {
+        effectiveSnapshot = new Date(); // 첫 페이지 요청 시 현재 시간을 스냅샷으로 사용
+      }
+    }
+
+    // QueryBuilder 구성
+    const queryBuilder = this.commentsRepository
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.author', 'author')
+      .where('comment.postId = :postId', { postId })
+      .andWhere('comment.parentCommentId IS NULL')
+      .andWhere('comment.isDeleted = :isDeleted', { isDeleted: false });
+
+    // 스냅샷 타임스탬프 적용 (인기순 정렬 시)
+    if (effectiveSnapshot) {
+      queryBuilder.andWhere('comment.createdAt <= :snapshot', {
+        snapshot: effectiveSnapshot,
+      });
+    }
+
+    // 사용자 좋아요 상태 JOIN
+    if (user) {
+      queryBuilder.leftJoinAndSelect(
+        'comment.commentLikes',
+        'userLike',
+        'userLike.userId = :userId',
+        { userId: user.id },
+      );
+    }
+
+    // 정렬 및 커서 필터링
+    if (sort === 'popular') {
+      // 인기순: likesCount DESC, createdAt DESC, id DESC
+      queryBuilder.orderBy('comment.likesCount', 'DESC')
+        .addOrderBy('comment.createdAt', 'DESC')
+        .addOrderBy('comment.id', 'DESC');
+
+      if (decodedCursor) {
+        // 복합 커서 필터링 (likesCount, createdAt, id)
+        queryBuilder.andWhere(
+          new Brackets((qb) => {
+            qb.where('comment.likesCount < :likesCount', {
+              likesCount: decodedCursor.likesCount || 0,
+            })
+              .orWhere(
+                new Brackets((qb2) => {
+                  qb2
+                    .where('comment.likesCount = :likesCount', {
+                      likesCount: decodedCursor.likesCount || 0,
+                    })
+                    .andWhere('comment.createdAt < :createdAt', {
+                      createdAt: decodedCursor.createdAt,
+                    });
+                }),
+              )
+              .orWhere(
+                new Brackets((qb3) => {
+                  qb3
+                    .where('comment.likesCount = :likesCount', {
+                      likesCount: decodedCursor.likesCount || 0,
+                    })
+                    .andWhere('comment.createdAt = :createdAt', {
+                      createdAt: decodedCursor.createdAt,
+                    })
+                    .andWhere('comment.id < :id', { id: decodedCursor.id });
+                }),
+              );
+          }),
+        );
+      }
+    } else {
+      // 최신순: createdAt DESC, id DESC
+      queryBuilder.orderBy('comment.createdAt', 'DESC')
+        .addOrderBy('comment.id', 'DESC');
+
+      if (decodedCursor) {
+        // 커서 필터링 (createdAt, id)
+        queryBuilder.andWhere(
+          new Brackets((qb) => {
+            qb.where('comment.createdAt < :createdAt', {
+              createdAt: decodedCursor.createdAt,
+            })
+              .orWhere(
+                new Brackets((qb2) => {
+                  qb2
+                    .where('comment.createdAt = :createdAt', {
+                      createdAt: decodedCursor.createdAt,
+                    })
+                    .andWhere('comment.id < :id', { id: decodedCursor.id });
+                }),
+              );
+          }),
+        );
+      }
+    }
+
+    // LIMIT + 1로 다음 페이지 존재 확인
+    queryBuilder.take(limit + 1);
+
+    const comments = await queryBuilder.getMany();
+
+    // 사용자 좋아요 상태 맵 생성
+    const userLikes: { [commentId: string]: 'like' | 'dislike' } = {};
+    if (user) {
+      comments.forEach((comment) => {
+        const userLike = comment.commentLikes?.find((like) => like.userId === user.id);
+        if (userLike) {
+          userLikes[comment.id] = userLike.type;
+        }
+      });
+    }
+
+    // 다음 페이지 존재 확인
+    const hasNextPage = comments.length > limit;
+    const sliced = hasNextPage ? comments.slice(0, -1) : comments;
+
+    // 다음 커서 생성
+    const nextCursor =
+      hasNextPage && sliced.length > 0
+        ? this.encodeCursor({
+            likesCount: sort === 'popular' ? sliced[sliced.length - 1].likesCount : undefined,
+            createdAt: sliced[sliced.length - 1].createdAt,
+            id: sliced[sliced.length - 1].id,
+          })
+        : null;
+
+    // DTO 변환
+    const commentDtos = sliced.map((comment) =>
+      this.toCommentDto(comment, {
+        userLiked: userLikes[comment.id] === 'like',
+        userDisliked: userLikes[comment.id] === 'dislike',
+      }),
+    );
+
+    // 응답 구성
+    const response: PaginatedCommentsDto = {
+      comments: commentDtos,
+      nextCursor,
+      hasNextPage,
+    };
+
+    // 첫 페이지에만 총 개수 포함
+    if (isFirstPage) {
+      const totalCount = await this.commentsRepository.count({
+        where: {
+          postId,
+          parentCommentId: null,
+          isDeleted: false,
+        },
+      });
+      response.totalCount = totalCount;
+
+      // 스냅샷 타임스탬프 반환 (인기순 정렬 시)
+      if (effectiveSnapshot) {
+        response.snapshotTimestamp = effectiveSnapshot.toISOString();
+      }
+    }
+
+    // 첫 페이지 캐싱
+    if (cacheKey) {
+      await this.cacheService.set(cacheKey, response, CacheTTL.VERY_SHORT);
+      this.logger.debug(`Cache SET: ${cacheKey}`);
+    }
+
+    return response;
+  }
+
+  /**
+   * 답글 페이지네이션 조회 (특정 부모 댓글의 답글)
+   *
+   * @description
+   * - 특정 부모 댓글의 답글만 조회
+   * - 오래된 순서대로 정렬 (스레드 형태 유지)
+   * - 첫 페이지만 Redis 캐싱 (TTL 10초)
+   *
+   * @param parentCommentId - 부모 댓글 ID
+   * @param dto - 페이지네이션 옵션
+   * @param user - 현재 사용자
+   * @returns 페이지네이션된 답글 목록
+   */
+  async getRepliesPaginated(
+    parentCommentId: string,
+    dto: GetRepliesDto,
+    user?: User,
+  ): Promise<PaginatedCommentsDto> {
+    const { cursor, limit = 10 } = dto;
+
+    // 캐시 키 생성 (첫 페이지만)
+    const isFirstPage = !cursor;
+    const cacheKey = isFirstPage
+      ? CacheKeys.COMMENT_REPLIES_FIRST(parentCommentId)
+      : null;
+
+    // 첫 페이지 캐시 확인
+    if (cacheKey) {
+      const cached = await this.cacheService.get<PaginatedCommentsDto>(cacheKey);
+      if (cached) {
+        this.logger.debug(`Cache HIT: ${cacheKey}`);
+        return cached;
+      }
+    }
+
+    // 커서 디코딩
+    const decodedCursor = cursor ? this.decodeCursor(cursor) : null;
+
+    // QueryBuilder 구성
+    const queryBuilder = this.commentsRepository
+      .createQueryBuilder('comment')
+      .leftJoinAndSelect('comment.author', 'author')
+      .where('comment.parentCommentId = :parentCommentId', { parentCommentId })
+      .andWhere('comment.isDeleted = :isDeleted', { isDeleted: false });
+
+    // 사용자 좋아요 상태 JOIN
+    if (user) {
+      queryBuilder.leftJoinAndSelect(
+        'comment.commentLikes',
+        'userLike',
+        'userLike.userId = :userId',
+        { userId: user.id },
+      );
+    }
+
+    // 정렬: createdAt ASC (오래된 것부터)
+    queryBuilder.orderBy('comment.createdAt', 'ASC')
+      .addOrderBy('comment.id', 'ASC');
+
+    // 커서 필터링
+    if (decodedCursor) {
+      queryBuilder.andWhere(
+        new Brackets((qb) => {
+          qb.where('comment.createdAt > :createdAt', {
+            createdAt: decodedCursor.createdAt,
+          })
+            .orWhere(
+              new Brackets((qb2) => {
+                qb2
+                  .where('comment.createdAt = :createdAt', {
+                    createdAt: decodedCursor.createdAt,
+                  })
+                  .andWhere('comment.id > :id', { id: decodedCursor.id });
+              }),
+            );
+        }),
+      );
+    }
+
+    // LIMIT + 1
+    queryBuilder.take(limit + 1);
+
+    const replies = await queryBuilder.getMany();
+
+    // 사용자 좋아요 상태 맵
+    const userLikes: { [commentId: string]: 'like' | 'dislike' } = {};
+    if (user) {
+      replies.forEach((reply) => {
+        const userLike = reply.commentLikes?.find((like) => like.userId === user.id);
+        if (userLike) {
+          userLikes[reply.id] = userLike.type;
+        }
+      });
+    }
+
+    // 다음 페이지 확인
+    const hasNextPage = replies.length > limit;
+    const sliced = hasNextPage ? replies.slice(0, -1) : replies;
+
+    // 다음 커서 생성
+    const nextCursor =
+      hasNextPage && sliced.length > 0
+        ? this.encodeCursor({
+            createdAt: sliced[sliced.length - 1].createdAt,
+            id: sliced[sliced.length - 1].id,
+          })
+        : null;
+
+    // DTO 변환
+    const replyDtos = sliced.map((reply) =>
+      this.toCommentDto(reply, {
+        userLiked: userLikes[reply.id] === 'like',
+        userDisliked: userLikes[reply.id] === 'dislike',
+      }),
+    );
+
+    // 응답 구성
+    const response: PaginatedCommentsDto = {
+      comments: replyDtos,
+      nextCursor,
+      hasNextPage,
+    };
+
+    // 첫 페이지에만 총 개수 포함
+    if (isFirstPage) {
+      const totalCount = await this.commentsRepository.count({
+        where: {
+          parentCommentId,
+          isDeleted: false,
+        },
+      });
+      response.totalCount = totalCount;
+    }
+
+    // 첫 페이지 캐싱
+    if (cacheKey) {
+      await this.cacheService.set(cacheKey, response, CacheTTL.VERY_SHORT);
+      this.logger.debug(`Cache SET: ${cacheKey}`);
+    }
+
+    return response;
+  }
+
+  /**
+   * 댓글 페이지네이션 캐시 무효화
+   *
+   * @description
+   * 댓글 작성/삭제/수정 시 호출하여 캐시 무효화
+   *
+   * @param postId - 게시글 ID
+   * @param parentCommentId - 부모 댓글 ID (답글인 경우)
+   */
+  async invalidateCommentsPaginationCache(postId: string, parentCommentId?: string): Promise<void> {
+    // 부모 댓글 캐시 무효화 (최신순 + 인기순)
+    await this.cacheService.del(CacheKeys.COMMENTS_PAGE_FIRST(postId, 'recent'));
+    await this.cacheService.del(CacheKeys.COMMENTS_PAGE_FIRST(postId, 'popular'));
+
+    // 답글 캐시 무효화
+    if (parentCommentId) {
+      await this.cacheService.del(CacheKeys.COMMENT_REPLIES_FIRST(parentCommentId));
+    }
+
+    this.logger.debug(`Invalidated pagination cache for postId: ${postId}`);
   }
 } 

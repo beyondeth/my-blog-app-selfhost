@@ -84,6 +84,13 @@ export class ExtendedApiClient extends ApiClient {
   async toggleCommentDislike(id: string) {
     return this.comments.toggleCommentDislike(id);
   }
+  // Comments API - 페이지네이션 메서드
+  async getCommentsPaginated(postId: string, params?: any) {
+    return this.comments.getCommentsPaginated(postId, params);
+  }
+  async getRepliesPaginated(commentId: string, params?: any) {
+    return this.comments.getRepliesPaginated(commentId, params);
+  }
 
   // Blogs API - 레거시 메서드
   async getBlogs(params?: any) { return this.blogs.getBlogs(params); }

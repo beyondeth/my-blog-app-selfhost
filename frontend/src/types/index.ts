@@ -89,6 +89,7 @@ export interface Post {
   likeCount: number;
   commentCount: number;
   liked: boolean;
+  bookmarked?: boolean;  // 북마크 여부
   tags?: string[];
   category?: string;
   createdAt: string;

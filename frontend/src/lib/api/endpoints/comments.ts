@@ -17,6 +17,35 @@ export interface CommentReactionResponse {
 }
 
 /**
+ * 페이지네이션된 댓글 응답
+ */
+export interface PaginatedCommentsResponse {
+  comments: Comment[];
+  nextCursor: string | null;
+  hasNextPage: boolean;
+  totalCount?: number;
+  snapshotTimestamp?: string;
+}
+
+/**
+ * 댓글 페이지네이션 쿼리 파라미터
+ */
+export interface GetCommentsParams {
+  cursor?: string;
+  limit?: number;
+  sort?: 'recent' | 'popular';
+  snapshotTimestamp?: string;
+}
+
+/**
+ * 답글 페이지네이션 쿼리 파라미터
+ */
+export interface GetRepliesParams {
+  cursor?: string;
+  limit?: number;
+}
+
+/**
  * 댓글 API 클래스
  * @description 댓글 관련 모든 API 메서드
  */
@@ -81,6 +110,54 @@ export class CommentsAPI {
    */
   async toggleCommentDislike(id: string): Promise<CommentReactionResponse> {
     return this.client.post<CommentReactionResponse>(`/comments/${id}/dislike`);
+  }
+
+  // ============================================================
+  // 페이지네이션 API (5,000명+ 커뮤니티 최적화)
+  // ============================================================
+
+  /**
+   * 부모 댓글 페이지네이션 조회
+   * @param postId - 포스트 ID
+   * @param params - 페이지네이션 파라미터
+   * @returns 페이지네이션된 댓글 목록
+   * @description 커서 기반 무한 스크롤 지원
+   */
+  async getCommentsPaginated(
+    postId: string,
+    params?: GetCommentsParams,
+  ): Promise<PaginatedCommentsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.cursor) queryParams.append('cursor', params.cursor);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.sort) queryParams.append('sort', params.sort);
+    if (params?.snapshotTimestamp) queryParams.append('snapshotTimestamp', params.snapshotTimestamp);
+
+    const queryString = queryParams.toString();
+    const url = `/comments/post/${postId}/paginated${queryString ? `?${queryString}` : ''}`;
+
+    return this.client.get<PaginatedCommentsResponse>(url);
+  }
+
+  /**
+   * 답글 페이지네이션 조회
+   * @param commentId - 부모 댓글 ID
+   * @param params - 페이지네이션 파라미터
+   * @returns 페이지네이션된 답글 목록
+   * @description 특정 부모 댓글의 답글만 조회
+   */
+  async getRepliesPaginated(
+    commentId: string,
+    params?: GetRepliesParams,
+  ): Promise<PaginatedCommentsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params?.cursor) queryParams.append('cursor', params.cursor);
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const queryString = queryParams.toString();
+    const url = `/comments/${commentId}/replies${queryString ? `?${queryString}` : ''}`;
+
+    return this.client.get<PaginatedCommentsResponse>(url);
   }
 }
 

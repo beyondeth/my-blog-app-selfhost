@@ -30,10 +30,10 @@ export class CommentResponseDto {
   parentCommentId: string;
 
   @Expose()
-  likeCount: number;
+  likesCount: number;
 
   @Expose()
-  dislikeCount: number;
+  dislikesCount: number;
 
   @Expose()
   createdAt: Date;
