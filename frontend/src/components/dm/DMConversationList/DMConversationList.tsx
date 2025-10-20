@@ -131,6 +131,7 @@ const DMConversationList: React.FC = () => {
         style={{
           scrollbarWidth: 'thin',
           scrollbarColor: '#CBD5E0 #F7FAFC',
+          overscrollBehavior: 'contain', // 스크롤이 뒷배경에 전파되지 않도록 독립성 보장
         }}
       >
         {isLoading && filteredConversations.length === 0 ? (

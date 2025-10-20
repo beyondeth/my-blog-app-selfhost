@@ -309,3 +309,32 @@ textarea {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
 }
+
+/* 답글 연결선 (YouTube 스타일) - 부모 아바타에서 답글 버튼까지 */
+.comment-parent-avatar::after {
+  content: '';
+  position: absolute;
+  /* 모바일: 24px 아바타 중심 (11px) */
+  left: 11px;
+  /* 모바일: 24px 아바타 높이 + 2px 간격 */
+  top: 26px;
+  width: 40px; /* 가로선 길이 (v 아이콘 왼쪽까지) */
+  height: calc(100% + 50px); /* 아바타 아래 영역 + 답글 버튼 텍스트 중앙까지 */
+  border-left: 2px solid rgb(209, 213, 219); /* gray-300 */
+  border-bottom: 2px solid rgb(209, 213, 219);
+  border-bottom-left-radius: 16px;
+}
+
+/* 데스크톱: 40px 아바타 */
+@media (min-width: 768px) {
+  .comment-parent-avatar::after {
+    left: 19px; /* 40px 아바타 중심에서 1px 왼쪽 */
+    top: 42px; /* 40px 아바타 높이 + 2px 간격 */
+  }
+}
+
+/* 다크 모드 */
+.dark .comment-parent-avatar::after {
+  border-left-color: rgb(75, 85, 99); /* gray-600 */
+  border-bottom-color: rgb(75, 85, 99);
+}

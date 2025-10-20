@@ -2,7 +2,7 @@
 
 import React, { useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { X, Maximize2, Minimize2 } from 'lucide-react';
+import { X, Maximize2, Minimize2, MessageCircle } from 'lucide-react';
 import { useDMStore } from '@/stores/dmStore';
 import DMLayout from './DMLayout/DMLayout';
 import { useWindowSize } from '@/hooks/useWindowSize';
@@ -27,6 +27,7 @@ const DMModal: React.FC<DMModalProps> = ({
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
+  const [skipTransition, setSkipTransition] = React.useState(false);
 
   // ESC key handler removed - modal should not close on ESC
 
@@ -45,11 +46,14 @@ const DMModal: React.FC<DMModalProps> = ({
     setTimeout(() => setIsAnimating(false), 300);
   };
 
-  // Toggle minimize
+  // Toggle minimize - 애니메이션 완전 제거
   const toggleMinimize = () => {
-    setIsAnimating(true);
+    setSkipTransition(true);
     setIsMinimized(!isMinimized);
-    setTimeout(() => setIsAnimating(false), 300);
+    // 다음 프레임에서 skipTransition 리셋
+    requestAnimationFrame(() => {
+      setTimeout(() => setSkipTransition(false), 0);
+    });
   };
 
   // Handle drag start
@@ -135,48 +139,53 @@ const DMModal: React.FC<DMModalProps> = ({
         ${isVisible ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}
       `}
     >
-      {/* Backdrop */}
-      <div
-        className={`
-          absolute inset-0
-          ${isFullscreen ? 'bg-white dark:bg-gray-900' : 'bg-black/30 backdrop-blur-sm'}
-          transition-all duration-300 ease-in-out
-          ${isVisible ? 'opacity-100' : 'opacity-0'}
-        `}
-        onClick={!isFullscreen ? onClose : undefined}
-      />
+      {/* Backdrop - 블러 효과 제거, 최소화 시 숨김 */}
+      {!isMinimized && (
+        <div
+          className={`
+            absolute inset-0
+            ${isFullscreen ? 'bg-white dark:bg-gray-900' : 'bg-black/30'}
+            transition-all duration-300 ease-in-out
+            ${isVisible ? 'opacity-100' : 'opacity-0'}
+          `}
+          onClick={!isFullscreen ? onClose : undefined}
+        />
+      )}
 
       {/* Modal Container */}
       <div
         ref={modalRef}
         className={`
-          ${isFullscreen ? 'fixed inset-0' : 'relative'}
+          ${isFullscreen ? 'fixed inset-0' : isMinimized ? 'fixed' : 'relative'}
           bg-white dark:bg-gray-800
           overflow-hidden
-          transition-all duration-300 ease-out
-          ${isVisible && !isDragging ? 'scale-100 opacity-100' : ''}
-          ${!isVisible ? 'translate-y-8 scale-90 opacity-0' : ''}
-          ${isAnimating ? 'scale-98' : ''}
-          ${isDragging ? 'transition-none' : ''}
+          ${skipTransition || isMinimized || isDragging ? 'transition-none' : 'transition-all duration-300 ease-out'}
+          ${isVisible && !isDragging && !isMinimized && !skipTransition ? 'scale-100 opacity-100' : ''}
+          ${!isVisible && !isMinimized && !skipTransition ? 'translate-y-8 scale-90 opacity-0' : ''}
+          ${isAnimating && !isMinimized && !skipTransition ? 'scale-98' : ''}
           ${isFullscreen
             ? 'w-screen h-screen rounded-none shadow-none'
             : isMobile
               ? 'w-full h-full rounded-none shadow-none'
               : isMinimized
-                ? 'w-[400px] h-[60px] rounded-xl dm-modal-shadow'
+                ? 'w-14 h-14 rounded-full dm-modal-shadow hover:scale-110 cursor-pointer'
                 : 'w-[900px] h-[600px] rounded-xl dm-modal-shadow'
           }
-          ${!isFullscreen && !isMobile ? 'ring-1 ring-black/5' : ''}
+          ${!isFullscreen && !isMobile && !isMinimized ? 'ring-1 ring-black/5' : ''}
           ${isDragging ? 'cursor-move' : ''}
         `}
         style={{
-          ...((!isFullscreen && !isMobile) ? {
-            transform: `translate(${position.x}px, ${position.y}px)`
-          } : {})
+          ...((!isFullscreen && !isMobile) ? (
+            isMinimized
+              ? { bottom: '24px', right: '24px', transform: 'none' }
+              : { transform: `translate(${position.x}px, ${position.y}px)` }
+          ) : {}),
+          // 스크롤 독립성: 모달 내 스크롤이 뒷배경에 전파되지 않도록
+          overscrollBehavior: 'contain'
         }}
       >
-        {/* macOS-style Header Bar */}
-        {!isMobile && (
+        {/* macOS-style Header Bar - 최소화 시 숨김 */}
+        {!isMobile && !isMinimized && (
           <div
             className="absolute top-0 left-0 right-0 z-10 h-[38px] bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 rounded-t-xl flex items-center justify-between px-4 select-none"
             onMouseDown={handleDragStart}
@@ -232,11 +241,15 @@ const DMModal: React.FC<DMModalProps> = ({
           <DMLayout isModal={true} />
         </div>
 
-        {/* Minimized View */}
+        {/* Minimized View - 채팅 아이콘 버튼 */}
         {isMinimized && !isMobile && (
-          <div className="flex items-center justify-center h-full">
-            <span className="text-sm text-gray-500 dark:text-gray-400">Messages (Minimized)</span>
-          </div>
+          <button
+            onClick={toggleMinimize}
+            className="flex items-center justify-center h-full w-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full transition-all shadow-lg"
+            aria-label="채팅 펼치기"
+          >
+            <MessageCircle className="w-6 h-6 text-white" strokeWidth={2} />
+          </button>
         )}
       </div>
     </div>

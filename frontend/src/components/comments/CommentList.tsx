@@ -52,7 +52,7 @@ export default function CommentList({
             onDelete={onDelete}
             onReply={onReply}
             isLoading={isLoading}
-            isPostAuthor={postAuthorId === comment.author.id}
+            postAuthorId={postAuthorId}
             level={0}
           />
         ))}

@@ -99,7 +99,13 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
   }
 
   return (
-    <div ref={chatAreaRef} className="flex flex-col h-full">
+    <div
+      ref={chatAreaRef}
+      className="flex flex-col h-full"
+      style={{
+        overscrollBehavior: 'contain', // 채팅 영역 스크롤이 모달 뒷배경에 전파되지 않도록 독립성 보장
+      }}
+    >
       {/* Header */}
       <ChatHeader otherUser={otherUser} conversationId={conversationId} />
 

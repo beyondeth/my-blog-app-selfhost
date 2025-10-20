@@ -75,6 +75,9 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
               transition-all duration-300 ease-in-out
               overflow-hidden
             "
+            style={{
+              overscrollBehavior: 'contain', // 스크롤이 모달 뒷배경에 전파되지 않도록 독립성 보장
+            }}
           >
             <DMConversationList />
           </div>
@@ -90,6 +93,9 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
               transition-all duration-300 ease-in-out
               overflow-hidden
             "
+            style={{
+              overscrollBehavior: 'contain', // 스크롤이 모달 뒷배경에 전파되지 않도록 독립성 보장
+            }}
           >
             <DMConversationList />
           </div>

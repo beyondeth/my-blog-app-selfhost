@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronDown, FiUser, FiMoreVertical, FiFlag } from 'react-icons/fi';
+import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronRight, FiUser, FiMoreVertical, FiFlag, FiCheckCircle } from 'react-icons/fi';
 import type { Comment } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,7 @@ import { useCommentStore } from '@/contexts/CommentContext';
 import { useToggleCommentLike, useToggleCommentDislike } from '@/hooks/useComments';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { formatRelativeTime } from '@/utils/timeFormat';
 
 interface CommentItemProps {
@@ -20,7 +21,7 @@ interface CommentItemProps {
   onReply: (content: string, parentId: string) => void;
   isLoading?: boolean;
   level?: number; // 0 = main comment, 1 = reply, 2+ = use @mentions
-  isPostAuthor?: boolean; // If this comment is from post author
+  postAuthorId?: string; // Post author ID to check if comment is from post author
 }
 
 export default function CommentItem({
@@ -30,7 +31,7 @@ export default function CommentItem({
   onReply,
   isLoading = false,
   level = 0,
-  isPostAuthor = false
+  postAuthorId
 }: CommentItemProps) {
   const { user, isAdmin } = useAuth();
   const { isRepliesExpanded, toggleReplies } = useCommentStore();
@@ -38,7 +39,11 @@ export default function CommentItem({
   const [isReplying, setIsReplying] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
+
+  // Check if this comment is from post author
+  const isPostAuthor = postAuthorId && comment.author.id === postAuthorId;
   
   // Like/Dislike mutations
   const likeMutation = useToggleCommentLike(comment.postId);
@@ -60,7 +65,7 @@ export default function CommentItem({
   // Reply management - 부모 댓글에서만 전체 답글 수 계산
   const { visibleReplies, totalReplies, flatReplies } = useMemo(() => {
     const directReplies = comment.replies?.filter(reply => !reply.isDeleted) || [];
-    
+
     // 모든 답글을 플랫하게 변환 (재귀적으로)
     const flattenReplies = (replies: Comment[]): Comment[] => {
       const result: Comment[] = [];
@@ -72,16 +77,24 @@ export default function CommentItem({
       });
       return result;
     };
-    
+
     // L0(부모) 댓글인 경우: 모든 하위 답글 플랫하게 표시
     const flatList = level === 0 ? flattenReplies(directReplies) : directReplies;
-    
+
     return {
       visibleReplies: showReplies ? (level === 0 ? flatList : directReplies) : [],
       totalReplies: level === 0 ? flatList.length : directReplies.length,
       flatReplies: flatList
     };
   }, [comment.replies, showReplies, level]);
+
+  // 답글 중에 작성자가 쓴 댓글이 있는지 확인 및 작성자 정보 가져오기
+  const authorReply = useMemo(() => {
+    if (!postAuthorId || level !== 0) return null;
+    return flatReplies.find(reply => reply.author.id === postAuthorId);
+  }, [flatReplies, postAuthorId, level]);
+
+  const hasAuthorReply = !!authorReply;
 
   // Extract @mentions from content for L2+ replies
   const extractMentions = (content: string) => {
@@ -103,10 +116,14 @@ export default function CommentItem({
     setIsReplying(false);
   };
 
-  const handleDelete = () => {
-    if (confirm('댓글을 삭제하시겠습니까?')) {
-      onDelete(comment.id);
-    }
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+    setShowDropdown(false);
+  };
+
+  const handleDeleteConfirm = () => {
+    onDelete(comment.id);
+    setIsDeleteDialogOpen(false);
   };
 
   const handleLike = () => {
@@ -158,13 +175,14 @@ export default function CommentItem({
   return (
     <div className={`${level === 0 ? 'py-4' : 'py-2'} ${level === 1 ? 'ml-11' : ''}`}>
       <div className="flex items-start gap-3">
-        {/* Profile Avatar */}
-        <div className="flex-shrink-0">
+        {/* Profile Avatar with connection line for parent comments with replies */}
+        <div className={`flex-shrink-0 relative ${level === 0 && totalReplies > 0 ? 'comment-parent-avatar' : ''}`}>
           <Avatar
             src={comment.author.profileImage}
             alt={comment.author.username || '익명'}
             fallback={comment.author.username || '익명'}
             size={level === 0 ? "md" : "xs"}
+            className={level === 0 ? "w-6 h-6 md:w-10 md:h-10" : ""}
           />
         </div>
 
@@ -174,12 +192,12 @@ export default function CommentItem({
             <div className="flex items-center gap-2">
               {/* Post Author Highlight */}
               {isPostAuthor ? (
-                <div className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 px-2 py-1 rounded text-sm font-medium">
+                <div className="flex items-center gap-1 bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900 px-1.5 py-0.5 rounded text-xs font-medium">
                   @{comment.author.username || '익명'}
-                  <span className="ml-1 text-xs">작성자</span>
+                  <FiCheckCircle className="w-3.5 h-3.5" />
                 </div>
               ) : (
-                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                <span className="font-medium text-xs text-gray-500 dark:text-gray-500">
                   {comment.author.username || '익명'}
                 </span>
               )}
@@ -230,10 +248,7 @@ export default function CommentItem({
                         )}
                         {canDelete && (
                           <button
-                            onClick={() => {
-                              handleDelete();
-                              setShowDropdown(false);
-                            }}
+                            onClick={handleDeleteClick}
                             disabled={isLoading}
                             className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                           >
@@ -352,22 +367,52 @@ export default function CommentItem({
       {totalReplies > 0 && level === 0 && (
         <div className="mt-2">
           {!showReplies ? (
-            <button
-              onClick={() => toggleReplies(comment.id)}
-              className="flex items-center gap-2 text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm font-medium py-2 ml-11"
-            >
-              <FiChevronDown className="w-4 h-4" />
-              답글 {totalReplies}개
-            </button>
-          ) : (
-            <>
+            <div className="flex items-center gap-1 ml-16">
+              {/* 작성자가 답글을 단 경우 프로필 이미지 표시 */}
+              {hasAuthorReply && authorReply && (
+                <>
+                  <Avatar
+                    src={authorReply.author.profileImage}
+                    alt="작성자"
+                    fallback="작성자"
+                    size="xs"
+                    className="w-6 h-6"
+                  />
+                  <span className="text-gray-400 dark:text-gray-600">·</span>
+                </>
+              )}
               <button
                 onClick={() => toggleReplies(comment.id)}
-                className="flex items-center gap-2 text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 text-sm py-1 mb-1 ml-11"
+                className="flex items-center gap-0.5 text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 text-sm font-semibold py-2 relative comment-reply-button"
               >
-                <FiChevronDown className="w-4 h-4 transform rotate-180" />
-                답글 숨기기
+                답글 {totalReplies}개
+                <FiChevronRight className="w-4 h-4 transition-transform" />
               </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-1 ml-16">
+                {/* 작성자가 답글을 단 경우 프로필 이미지 표시 */}
+                {hasAuthorReply && authorReply && (
+                  <>
+                    <Avatar
+                      src={authorReply.author.profileImage}
+                      alt="작성자"
+                      fallback="작성자"
+                      size="xs"
+                      className="w-6 h-6"
+                    />
+                    <span className="text-gray-400 dark:text-gray-600">·</span>
+                  </>
+                )}
+                <button
+                  onClick={() => toggleReplies(comment.id)}
+                  className="flex items-center gap-0.5 text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 text-sm font-semibold py-2 relative comment-reply-button"
+                >
+                  답글 숨기기
+                  <FiChevronRight className="w-4 h-4 transform rotate-90 transition-transform" />
+                </button>
+              </div>
               
               {visibleReplies.map((reply) => (
                 <CommentItem
@@ -378,7 +423,7 @@ export default function CommentItem({
                   onReply={onReply}
                   isLoading={isLoading}
                   level={1} // 모든 답글을 L1으로 표시 (@mention으로 구분)
-                  isPostAuthor={false} // Only highlight at top level
+                  postAuthorId={postAuthorId} // 답글에도 작성자 ID 전달
                 />
               ))}
             </>
@@ -397,6 +442,18 @@ export default function CommentItem({
           isSubmitting={isSubmitting}
         />
       )}
+
+      {/* Delete Confirm Dialog */}
+      <DeleteConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="댓글을 삭제하시겠어요?"
+        description="이 댓글을 삭제하면 복원할 수 없습니다."
+        confirmText="삭제"
+        cancelText="취소"
+        isLoading={isLoading}
+      />
     </div>
   );
 }

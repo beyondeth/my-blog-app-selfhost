@@ -76,7 +76,7 @@ export default function DeleteConfirmDialog({
               onClick={onConfirm}
               disabled={isLoading}
               autoFocus
-              className="flex-1 py-6 text-base font-semibold text-red-600 dark:text-red-500 disabled:opacity-50 bg-gray-800 dark:bg-gray-900 focus:outline-none"
+              className="flex-1 py-6 text-base font-semibold text-red-600 dark:text-red-500 disabled:opacity-50 bg-transparent hover:bg-transparent focus:outline-none focus:bg-transparent"
             >
               {isLoading ? (
                 <span className="flex items-center justify-center">
