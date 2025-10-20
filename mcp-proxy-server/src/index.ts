@@ -197,10 +197,11 @@ async function createMcpServer(userData: {
     }
   );
 
-  // 도구 등록 (API Key도 함께 전달)
+  // 도구 등록 (API Key + MetricsService 함께 전달)
   await registerAllTools(server, {
     userData,
     apiKey: userData.apiKey, // API Key 추가 (create_post에서 사용)
+    metricsService, // 메트릭 서비스 추가 (도구 호출 추적용)
     config: {
       MCP_BASE_URL: config.MCP_BASE_URL,
       BACKEND_BASE_URL: config.BACKEND_BASE_URL,
@@ -327,15 +328,27 @@ app.post('/mcp', async (req, res) => {
     // 5. MCP 서버와 Transport 연결
     await mcpServer.connect(transport);
 
-    // 6. 요청 처리 (⚠️ req.body 전달하지 않음 - Transport가 raw stream 읽음)
+    // 6. 요청 처리 전 시간 기록 (메트릭 수집용)
+    const startTime = Date.now();
+
+    // 7. 요청 처리 (⚠️ req.body 전달하지 않음 - Transport가 raw stream 읽음)
     await transport.handleRequest(req, res);
 
-    // 7. 자동 cleanup (함수 종료 시 GC가 처리)
+    // 8. 메트릭 기록
+    const duration = Date.now() - startTime;
+    metricsService.recordRequest('success');
+    metricsService.recordRequestDuration(duration);
+
+    // 9. 자동 cleanup (함수 종료 시 GC가 처리)
     logger.debug({
       userId: userData.userId.substring(0, 8),
+      duration: `${duration}ms`,
     }, '✅ Request processed');
 
   } catch (error: any) {
+    // 메트릭 기록 (에러)
+    metricsService.recordRequest('error');
+
     logger.error({
       error: error.message,
       stack: error.stack,

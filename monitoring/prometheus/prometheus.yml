@@ -24,11 +24,11 @@ rule_files:
 
 # 메트릭 수집 대상 설정
 scrape_configs:
-  # NestJS 애플리케이션 메트릭
+  # NestJS 애플리케이션 메트릭 (IP 화이트리스트로 보호)
   - job_name: 'nestjs-chat-app'
     static_configs:
       - targets: ['host.docker.internal:3000']
-    metrics_path: '/internal/health-check-2f4a8b9c'
+    metrics_path: '/api/v1/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s
     # 메트릭 엔드포인트가 없을 경우 무시

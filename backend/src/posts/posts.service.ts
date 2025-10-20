@@ -18,11 +18,17 @@ import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
-import { CacheService } from '../cache/cache.service';
+import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-processing.queue';
+
+/**
+ * 포스트 Core 데이터 타입 (실시간 카운트/상태 제외)
+ * 캐시에 저장되는 정적 데이터만 포함
+ */
+type PostCoreData = Omit<PostResponseDto, 'viewCount' | 'likeCount' | 'commentCount' | 'liked' | 'bookmarked'>;
 
 @Injectable()
 export class PostsService {
@@ -140,6 +146,75 @@ export class PostsService {
     return plainToInstance(BlogResponseDto, blog, {
       excludeExtraneousValues: true,
     });
+  }
+
+  /**
+   * 포스트의 실시간 Counts + liked/bookmarked 조회
+   * 최적화: 단일 쿼리로 합침 (DB Round Trip 감소)
+   */
+  private async getPostCounts(postId: string, user?: User): Promise<{
+    viewCount: number;
+    likeCount: number;
+    commentCount: number;
+    liked: boolean;
+    bookmarked: boolean;
+  }> {
+    if (!user) {
+      // 비로그인 유저: Counts만 조회
+      const post = await this.postsRepository.findOne({
+        where: { id: postId },
+        select: ['viewCount', 'likeCount', 'commentCount']
+      });
+
+      if (!post) {
+        throw new NotFoundException('Post not found');
+      }
+
+      return {
+        viewCount: post.viewCount,
+        likeCount: post.likeCount,
+        commentCount: post.commentCount,
+        liked: false,
+        bookmarked: false,
+      };
+    }
+
+    // 로그인 유저: 단일 쿼리로 모든 정보 조회
+    const result = await this.postsRepository
+      .createQueryBuilder('post')
+      .select([
+        'post.viewCount',
+        'post.likeCount',
+        'post.commentCount',
+      ])
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(1)')
+          .from('post_likes', 'pl')
+          .where('pl.postId = :postId', { postId })
+          .andWhere('pl.userId = :userId', { userId: user.id });
+      }, 'userLiked')
+      .addSelect((subQuery) => {
+        return subQuery
+          .select('COUNT(1)')
+          .from('bookmarks', 'b')
+          .where('b.post_id = :postId', { postId })
+          .andWhere('b.user_id = :userId', { userId: user.id });
+      }, 'userBookmarked')
+      .where('post.id = :postId', { postId })
+      .getRawOne();
+
+    if (!result) {
+      throw new NotFoundException('Post not found');
+    }
+
+    return {
+      viewCount: result.post_viewCount,
+      likeCount: result.post_likeCount,
+      commentCount: result.post_commentCount,
+      liked: Number(result.userLiked) > 0,
+      bookmarked: Number(result.userBookmarked) > 0,
+    };
   }
 
   /**
@@ -916,8 +991,50 @@ export class PostsService {
 
   async findOne(id: string, user?: User): Promise<any> {
     this.logger.log(`Finding post by ID: ${id}`);
-    // QueryBuilder로 필요한 컬럼만 select, 사용자 좋아요 상태도 포함
-    const qb = this.postsRepository.createQueryBuilder('post')
+
+    // 1. Core 데이터 캐시 확인
+    const cacheKey = CacheKeys.POST_CORE(id);
+    const lockKey = CacheKeys.POST_REBUILDING(id);
+
+    const cachedCore = await this.cacheService.get<PostCoreData>(cacheKey);
+
+    if (cachedCore) {
+      this.logger.debug(`✅ Cache HIT: post core ${id}`);
+
+      // 2. 실시간 Counts + liked/bookmarked 조회
+      const counts = await this.getPostCounts(id, user);
+
+      return {
+        ...cachedCore,
+        ...counts
+      };
+    }
+
+    this.logger.debug(`❌ Cache MISS: post core ${id}`);
+
+    // 3. Cache Stampede 방지: 분산 락 획득
+    const lockAcquired = await this.cacheService.acquireLock(lockKey, 5);
+
+    if (!lockAcquired) {
+      // 다른 요청이 캐시 리빌딩 중 → 대기 후 재조회
+      this.logger.debug(`⏳ Waiting for cache rebuild: ${id}`);
+      await this.cacheService.waitForLock(lockKey, 5000);
+
+      // 락 해제 후 캐시 재확인
+      const rebuiltCache = await this.cacheService.get<PostCoreData>(cacheKey);
+      if (rebuiltCache) {
+        const counts = await this.getPostCounts(id, user);
+        return { ...rebuiltCache, ...counts };
+      }
+
+      // 캐시 리빌드 실패 시 폴백: DB 직접 조회
+      this.logger.warn(`Cache rebuild failed, falling back to DB: ${id}`);
+    }
+
+    try {
+      // 4. 기존 DB 조회 로직
+      // QueryBuilder로 필요한 컬럼만 select, 사용자 좋아요 상태도 포함
+      const qb = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('post.attachedFiles', 'file')
       .leftJoinAndSelect('post.blog', 'blog')
@@ -929,7 +1046,7 @@ export class PostsService {
         'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
-        'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
+        'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId', 'blog.allowComments',
       ])
       .where('post.id = :id', { id });
 
@@ -992,8 +1109,37 @@ export class PostsService {
     // 조회수 증가 반영 (기존 로직 유지)
     result.viewCount = post.viewCount;
 
+    // 5. Core 데이터만 캐시 저장 (counts/liked 제외)
+    const coreData = {
+      id: result.id,
+      title: result.title,
+      slug: result.slug,
+      content: result.content,
+      thumbnail: result.thumbnail,
+      isPublished: result.isPublished,
+      tagList: result.tagList,
+      category: result.category,
+      publishedAt: result.publishedAt,
+      createdAt: result.createdAt,
+      updatedAt: result.updatedAt,
+      isEditorPick: result.isEditorPick,
+      editorPickedAt: result.editorPickedAt,
+      author: result.author,
+      blog: result.blog,
+      attachedFiles: result.attachedFiles,
+    };
+
+    await this.cacheService.set(cacheKey, coreData, CacheTTL.POST_CORE);
+    this.logger.debug(`💾 Cached post core: ${id}`);
+
     this.logger.log(`Returning post data with ${post.attachedFiles?.length || 0} attached files`);
     return result;
+    } finally {
+      // 6. 락 해제 (반드시 실행)
+      if (lockAcquired) {
+        await this.cacheService.releaseLock(lockKey);
+      }
+    }
   }
 
   async findBySlug(slug: string, user?: User): Promise<any> {
@@ -1010,7 +1156,7 @@ export class PostsService {
         'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
         'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
         'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
-        'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
+        'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId', 'blog.allowComments',
       ])
       .where('post.slug = :slug', { slug })
       .andWhere('post.isPublished = :isPublished', { isPublished: true })
@@ -1195,6 +1341,10 @@ export class PostsService {
     await this.linkFilesFromContent(post, user.id);
 
     // DTO 변환으로 안전하게 반환 (spread 연산자 사용 금지)
+    // ⭐ Core 캐시 무효화
+    await this.cacheService.del(CacheKeys.POST_CORE(id));
+    this.logger.debug(`🗑️ Invalidated post core cache: ${id}`);
+
     return this.toPostDto(post, {
       user: post.author,
       blog: post.blog,
@@ -1211,11 +1361,15 @@ export class PostsService {
 
     // JSONB 기반 태그는 카운트 관리가 불필요함
     // 태그 통계는 필요시 집계 쿼리로 처리
-    
+
     // 포스트 삭제 (CASCADE로 관련 데이터 자동 삭제)
     // post_tags, post_likes, post_files는 @JoinTable로 자동 처리됨
     await this.postsRepository.remove(post);
-    
+
+    // ⭐ Core 캐시 무효화
+    await this.cacheService.del(CacheKeys.POST_CORE(id));
+    this.logger.debug(`🗑️ Invalidated post core cache: ${id}`);
+
     this.logger.log(`Post ${id} and all related data successfully deleted`);
   }
 

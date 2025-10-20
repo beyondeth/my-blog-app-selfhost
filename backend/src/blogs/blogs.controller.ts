@@ -27,11 +27,7 @@ export class BlogsController {
   @Get('my-blogs')
   @UseGuards(JwtAuthGuard)
   async getMyBlogs(@CurrentUser() user: User) {
-    const blogs = await this.blogsService.findByUserId(user.id);
-    return {
-      success: true,
-      data: blogs,
-    };
+    return await this.blogsService.findByUserId(user.id);
   }
 
   @Get('slug/:slug')

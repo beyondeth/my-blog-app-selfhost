@@ -43,7 +43,6 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
-import { OauthModule } from './oauth/oauth.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
 
 @Module({
@@ -129,7 +128,6 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
     FollowsModule,
     NotificationsModule,
     ChatModule,
-    OauthModule,
     // AnalyticsModule,
     // FUTURE: 구독제 기능 활성화 시 주석 해제
     // SubscriptionModule, // UsersModule 이후에 로드

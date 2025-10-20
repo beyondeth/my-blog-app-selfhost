@@ -1,10 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useQuery } from '@tanstack/react-query';
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import { HomeIcon } from '@/components/icons/HomeIcon';
 import { WriteIcon } from '@/components/icons/WriteIcon';
 import { NotificationBellIcon } from '@/components/icons/NotificationBellIcon';
@@ -32,7 +32,6 @@ export default function LeftSidebar() {
   const { user } = useAuth();
   const { isOpen } = useSidebarStore();
   const pathname = usePathname();
-  const router = useRouter();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
 
   // 읽지 않은 알림 수 조회 (로그인한 사용자 + Feature Flag 활성화 시에만)
@@ -54,25 +53,6 @@ export default function LeftSidebar() {
     refetchInterval: 30000, // 30초마다 새로고침
   });
 
-  // 글쓰기 버튼 클릭 핸들러
-  const handleWriteClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    // 블로그가 있으면 글쓰기 페이지로 이동
-    if (user.blogSlug) {
-      router.push('/new-story');
-    } else {
-      // 블로그가 없으면 홈으로 (신규 사용자는 자동 생성되므로 발생하지 않아야 함)
-      console.error('User does not have a blog. This should not happen for new users.');
-      router.push('/');
-    }
-  }, [user, router]);
-
   // Admin, 로그인, 회원가입 페이지에서는 사이드바를 숨김
   const isAdminPage = pathname?.startsWith('/admin');
   const isAuthPage = pathname === '/login' || pathname === '/register';
@@ -88,7 +68,8 @@ export default function LeftSidebar() {
         {/* 홈 버튼 */}
         <Link
           href="/"
-          className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
+          prefetch={true}
+          className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
             pathname === '/'
               ? 'bg-accent text-accent-foreground'
               : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
@@ -103,7 +84,8 @@ export default function LeftSidebar() {
         {user && user.blogSlug && (
           <Link
             href={`/${user.blogSlug}`}
-            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
+            prefetch={true}
+            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
               pathname === `/${user.blogSlug}`
                 ? 'bg-accent text-accent-foreground'
                 : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
@@ -119,19 +101,21 @@ export default function LeftSidebar() {
         {user && (
           <>
             {/* 글쓰기 버튼 */}
-            <button
-              onClick={handleWriteClick}
-              className="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+            <Link
+              href="/new-story"
+              prefetch={true}
+              className="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors text-muted-foreground hover:bg-accent/50 hover:text-foreground"
               title="글쓰기"
             >
               <WriteIcon className="opacity-70" size={24} />
               <span className="text-xs mt-1 font-medium">글쓰기</span>
-            </button>
+            </Link>
 
             {/* 북마크 버튼 */}
             <Link
               href="/bookmarks"
-              className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
+              prefetch={true}
+              className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                 pathname === '/bookmarks'
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
@@ -145,7 +129,8 @@ export default function LeftSidebar() {
             {/* 설정 버튼 */}
             <Link
               href="/settings"
-              className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
+              prefetch={true}
+              className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                 pathname === '/settings' || pathname?.startsWith('/settings/')
                   ? 'bg-accent text-accent-foreground'
                   : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
@@ -161,7 +146,7 @@ export default function LeftSidebar() {
             <DropdownMenu open={isNotificationOpen} onOpenChange={setIsNotificationOpen}>
               <DropdownMenuTrigger asChild>
                 <button
-                  className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-all ${
+                  className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                     isNotificationOpen
                       ? 'bg-accent text-accent-foreground'
                       : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'

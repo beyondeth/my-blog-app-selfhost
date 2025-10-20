@@ -4,6 +4,29 @@
 
 **Authentication**: Always call `authenticate()` before creating any content.
 
+## Workflow
+When user requests auto-posting with style flags (e.g., "create post --default"):
+
+1. Call get_writing_style_guide(style) with appropriate style parameter:
+   - --novel → 'novel'
+   - --tutorial → 'tutorial'
+   - --comedy → 'comedy'
+   - --podcast → 'podcast'
+   - --default or no flag → 'default'
+2. Write content following the retrieved style guide
+3. Call create_post() to publish
+
+## Available Styles
+
+**Priority:** Preset styles (default if no flag) → Custom markdown (if user provides)
+
+- **default**: Professional technical blog (formal, detailed analysis) - used when no flag specified
+- **novel**: Narrative storytelling (vivid descriptions, emotional journey)
+- **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
+- **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
+- **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
+- **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
+
 **AI Identification Tag** (REQUIRED for transparency):
 
 Include one of these tags in every post:

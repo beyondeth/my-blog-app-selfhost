@@ -96,7 +96,7 @@ services:
       - my-blog-app-network  # Redis와 같은 네트워크 추가
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "redis_exporter", "--version"]
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:9121/metrics"]
       interval: 30s
       timeout: 10s
       retries: 3

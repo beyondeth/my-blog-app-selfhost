@@ -1,6 +1,15 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Theme } from '@/types';
 
+/**
+ * @deprecated 이 hook은 더 이상 사용되지 않습니다.
+ * 대신 next-themes의 useTheme을 사용하세요:
+ * import { useTheme } from "next-themes";
+ *
+ * 현재 프로젝트는 next-themes를 사용하여 테마를 관리합니다.
+ * 이 파일은 하위 호환성을 위해 유지되지만, 새로운 코드에서는 사용하지 마세요.
+ */
+
 const THEME_STORAGE_KEY = 'theme';
 const VALID_THEMES: Theme[] = ['light', 'dark'];
 

@@ -20,6 +20,8 @@ import { logger } from '../utils/logger.js';
 import { WritingStyleService } from '../services/WritingStyleService.js';
 import axios from 'axios';
 
+import { MetricsService } from '../services/MetricsService.js';
+
 /**
  * 도구 컨텍스트 (API Key 검증 결과)
  */
@@ -32,6 +34,7 @@ interface ToolContext {
     blog: { id: string; name: string; slug: string };
   };
   apiKey: string; // 원본 API Key (Backend 인증용)
+  metricsService: MetricsService; // 메트릭 서비스 (도구 호출 추적용)
   config: {
     MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
@@ -68,7 +71,7 @@ export async function registerAllTools(
 
 ## Workflow
 
-When user requests auto-posting with style flags (e.g., "create post --novel"):
+When user requests auto-posting with style flags (e.g., "create post --default"):
 
 1. Call check_auth() to verify authentication
 2. Call get_writing_style_guide(style) with appropriate style parameter:
@@ -178,18 +181,34 @@ When user requests auto-posting with style flags (e.g., "create post --novel"):
       blogSlug: context.userData.blog.slug,
     }, '🔧 Tool called');
 
-    switch (name) {
-      case 'check_auth':
-        return await handleCheckAuth(context);
+    try {
+      let result;
 
-      case 'get_writing_style_guide':
-        return await handleGetWritingStyleGuide(args as any, context);
+      switch (name) {
+        case 'check_auth':
+          result = await handleCheckAuth(context);
+          break;
 
-      case 'create_post':
-        return await handleCreatePost(args as any, context);
+        case 'get_writing_style_guide':
+          result = await handleGetWritingStyleGuide(args as any, context);
+          break;
 
-      default:
-        throw new Error(`Tool '${name}' not found`);
+        case 'create_post':
+          result = await handleCreatePost(args as any, context);
+          break;
+
+        default:
+          throw new Error(`Tool '${name}' not found`);
+      }
+
+      // 메트릭 기록 (성공)
+      context.metricsService.recordRequest('success', name);
+
+      return result;
+    } catch (error) {
+      // 메트릭 기록 (실패)
+      context.metricsService.recordRequest('error', name);
+      throw error;
     }
   });
 

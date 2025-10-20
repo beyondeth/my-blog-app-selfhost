@@ -10,6 +10,7 @@ export const routes = {
   register: () => '/register',
   categories: () => '/categories',
   about: () => '/about',
+  dm: () => '/dm',
 } as const;
 
 // 검색 파라미터 스키마

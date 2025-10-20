@@ -25,7 +25,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -98,10 +98,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "rate(mcp_requests_total[1m])",
-          "legendFormat": "{{tool}} ({{status}})",
+          "expr": "rate(mcp_http_requests_total[5m])",
+          "legendFormat": "{{method}} {{path}}",
           "refId": "A"
         }
       ],
@@ -111,7 +111,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -187,18 +187,18 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.95, rate(mcp_request_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.95, rate(mcp_http_request_duration_seconds_bucket[5m]))",
           "legendFormat": "p95",
           "refId": "A"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "histogram_quantile(0.50, rate(mcp_request_duration_seconds_bucket[5m]))",
+          "expr": "histogram_quantile(0.50, rate(mcp_http_request_duration_seconds_bucket[5m]))",
           "legendFormat": "p50",
           "refId": "B"
         }
@@ -209,7 +209,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -285,7 +285,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, rate(mcp_redis_operation_duration_seconds_bucket[5m]))",
           "legendFormat": "{{operation}} p95",
@@ -298,7 +298,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -362,9 +362,9 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "mcp_redis_connection_status",
+          "expr": "mcp_redis_connected",
           "refId": "A"
         }
       ],
@@ -374,7 +374,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -449,18 +449,18 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "rate(mcp_redis_operations_total{status=\"success\"}[1m])",
+          "expr": "rate(mcp_redis_operations_total{status=\"success\"}[5m])",
           "legendFormat": "{{operation}} (성공)",
           "refId": "A"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "rate(mcp_redis_operations_total{status=\"error\"}[1m])",
+          "expr": "rate(mcp_redis_operations_total{status=\"error\"}[5m])",
           "legendFormat": "{{operation}} (실패)",
           "refId": "B"
         }
@@ -471,7 +471,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -546,10 +546,10 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "rate(mcp_errors_total[1m])",
-          "legendFormat": "{{error_type}} ({{status_code}})",
+          "expr": "rate(mcp_errors_total[5m])",
+          "legendFormat": "{{error_code}} ({{status_code}})",
           "refId": "A"
         }
       ],
@@ -559,7 +559,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -613,7 +613,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
           "expr": "(mcp_api_key_cache_hits_total / (mcp_api_key_cache_hits_total + mcp_api_key_cache_misses_total)) * 100",
           "refId": "A"
@@ -625,7 +625,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -701,7 +701,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, rate(mcp_api_key_validation_duration_seconds_bucket{cache_hit=\"false\"}[5m]))",
           "legendFormat": "P95 (캐시 미스)",
@@ -710,7 +710,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.50, rate(mcp_api_key_validation_duration_seconds_bucket{cache_hit=\"false\"}[5m]))",
           "legendFormat": "P50 (캐시 미스)",
@@ -719,7 +719,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
           "expr": "histogram_quantile(0.95, rate(mcp_api_key_validation_duration_seconds_bucket{cache_hit=\"true\"}[5m]))",
           "legendFormat": "P95 (캐시 히트)",
@@ -732,7 +732,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "prometheus"
       },
       "fieldConfig": {
         "defaults": {
@@ -807,18 +807,18 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "rate(mcp_requests_total{status=\"success\"}[1m])",
+          "expr": "rate(mcp_requests_total{status=\"success\"}[5m])",
           "legendFormat": "{{tool}} (성공)",
           "refId": "A"
         },
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "prometheus"
           },
-          "expr": "rate(mcp_requests_total{status=\"error\"}[1m])",
+          "expr": "rate(mcp_requests_total{status=\"error\"}[5m])",
           "legendFormat": "{{tool}} (실패)",
           "refId": "B"
         }

@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { FiSearch } from 'react-icons/fi';
+import { FiSearch, FiMessageCircle } from 'react-icons/fi';
 import { routes } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import MobileProfileDropdown from './MobileProfileDropdown';
@@ -15,11 +15,13 @@ import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useTheme } from 'next-themes';
+import { useDMModal } from '@/hooks/useDMModal';
 
 export default function Header() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
   const { toggleSidebar } = useSidebarStore();
   const { resolvedTheme } = useTheme();
+  const { openModal } = useDMModal();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -168,6 +170,15 @@ export default function Header() {
                   {/* Theme Switch */}
                   <ThemeSwitch />
 
+                  {/* DM Button */}
+                  <button
+                    onClick={() => openModal()}
+                    className="relative p-2 rounded-full hover:bg-muted transition-colors"
+                    aria-label="메시지"
+                  >
+                    <FiMessageCircle className="w-5 h-5 text-foreground" />
+                  </button>
+
                   {/* Profile Dropdown */}
                   <ProfileDropdown
                     user={user}
@@ -213,11 +224,22 @@ export default function Header() {
               // 로딩 중
               <div className="w-8 h-8 bg-muted rounded-full animate-pulse"></div>
             ) : user ? (
-              // 로그인 상태: 프로필 드롭다운
-              <MobileProfileDropdown
-                user={user}
-                onLogout={() => logout('/')}
-              />
+              <>
+                {/* DM Button */}
+                <button
+                  onClick={() => openModal()}
+                  className="relative p-2 rounded-full hover:bg-muted transition-colors"
+                  aria-label="메시지"
+                >
+                  <FiMessageCircle className="w-5 h-5 text-foreground" />
+                </button>
+
+                {/* 로그인 상태: 프로필 드롭다운 */}
+                <MobileProfileDropdown
+                  user={user}
+                  onLogout={() => logout('/')}
+                />
+              </>
             ) : (
               // 비로그인 상태: 로그인 버튼
               <Link

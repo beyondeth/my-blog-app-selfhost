@@ -1,2 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "docker",
+      "curl"
+    ],
+    "deny": [],
+    "ask": []
+  }
 }

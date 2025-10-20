@@ -16,24 +16,57 @@ import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
-import { useToggleBookmark, useIsBookmarked } from '@/hooks/useBookmarks';
+import { useToggleBookmark } from '@/hooks/useBookmarks';
 import { useToggleEditorPick } from '@/hooks/useEditorPicks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { downloadPostAsPdf } from '@/utils/pdf';
 
-interface Blog {
-  id: string;
-  slug: string;
-  name: string;
-  description?: string;
-  allowComments?: boolean;
-  isPublic?: boolean;
-  owner?: {
-    id: string;
-    username: string;
-    email: string;
-  };
+/**
+ * 댓글 섹션 Lazy Loading 컴포넌트
+ * Intersection Observer를 사용하여 스크롤 시에만 댓글 로드
+ */
+function CommentSectionLazy({ postId, postAuthorId, totalCommentCount }: { postId: string; postAuthorId?: string; totalCommentCount?: number }) {
+  const [isVisible, setIsVisible] = useState(false);
+  const commentRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setIsVisible(true);
+            observer.disconnect(); // 한 번만 로드
+          }
+        });
+      },
+      {
+        rootMargin: '200px', // 200px 전에 미리 로드 시작
+        threshold: 0.1,
+      }
+    );
+
+    if (commentRef.current) {
+      observer.observe(commentRef.current);
+    }
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
+  return (
+    <div ref={commentRef} data-comment-section>
+      {isVisible ? (
+        <CommentSection postId={postId} postAuthorId={postAuthorId} totalCommentCount={totalCommentCount} />
+      ) : (
+        <div className="h-40 flex items-center justify-center text-gray-400">
+          {/* Placeholder skeleton */}
+          <div className="animate-pulse">댓글을 불러오는 중...</div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function BlogPostDetailPage() {
@@ -42,44 +75,11 @@ export default function BlogPostDetailPage() {
   const { user, isAdmin } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [blog, setBlog] = useState<Blog | null>(null);
-  const [blogError, setBlogError] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const hasViewed = useRef(false);
 
   const blogSlug = params.blogSlug as string;
   const postSlug = params.postSlug as string;
-
-  // Fetch blog info
-  useEffect(() => {
-    if (!blogSlug) return;
-
-    const fetchBlog = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}`,
-          {
-            credentials: 'include'
-          }
-        );
-        if (response.ok) {
-          const blogData = await response.json();
-          setBlog(blogData);
-          setBlogError(null);
-          
-        } else if (response.status === 404) {
-          setBlogError('블로그를 찾을 수 없습니다.');
-        } else {
-          setBlogError('블로그 정보를 불러오는데 실패했습니다.');
-        }
-      } catch (error) {
-        console.error('Error fetching blog:', error);
-        setBlogError('블로그 정보를 불러오는데 실패했습니다.');
-      }
-    };
-
-    fetchBlog();
-  }, [blogSlug, user]);
 
   // Fetch post details
   const { data: post, error, isError, refetch } = usePost(postSlug);
@@ -94,9 +94,6 @@ export default function BlogPostDetailPage() {
   const bookmarkMutation = useToggleBookmark(post?.id || '', () => {
     alert('로그인이 필요합니다.\n로그인 후 북마크를 추가할 수 있습니다.');
   });
-
-  // 북마크 상태 확인 - post.id가 있을 때만 API 호출됨 (useIsBookmarked 내부에서 enabled 조건으로 제어)
-  const { data: bookmarkStatus } = useIsBookmarked(post?.id || '');
 
   // Editor's Pick 토글 mutation (Admin 전용)
   const editorPickMutation = useToggleEditorPick(post?.id || '');
@@ -438,7 +435,7 @@ export default function BlogPostDetailPage() {
           onCopy={handleCopyContent}
           onPdfDownload={handlePdfDownload}
           onBookmark={handleBookmark}
-          bookmarked={bookmarkStatus?.bookmarked || false}
+          bookmarked={post.bookmarked || false}
           bookmarkPending={bookmarkMutation.isPending}
           isAdmin={isAdmin}
           isEditorPick={post.isEditorPick || false}
@@ -486,14 +483,13 @@ export default function BlogPostDetailPage() {
 
         <AuthorInfo author={post.author} />
 
-        {/* 댓글 섹션 - 블로그가 댓글을 허용하는 경우에만 표시 */}
-        {blog && blog.allowComments === true && post.id && (
-          <div data-comment-section>
-            <CommentSection
-              postId={String(post.id)}
-              postAuthorId={post.author?.id?.toString()}
-            />
-          </div>
+        {/* 댓글 섹션 - 블로그가 댓글을 허용하는 경우에만 표시 (Lazy Loading) */}
+        {post.blog?.allowComments === true && post.id && (
+          <CommentSectionLazy
+            postId={String(post.id)}
+            postAuthorId={post.author?.id?.toString()}
+            totalCommentCount={post.commentCount}
+          />
         )}
       </article>
       

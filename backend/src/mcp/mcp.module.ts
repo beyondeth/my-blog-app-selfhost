@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { McpProxyController } from './controllers/mcp-proxy.controller';
 import { McpController } from './controllers/mcp.controller';
-import { OauthModule } from '../oauth/oauth.module';
 import { PostsModule } from '../posts/posts.module';
 import { RedisModule } from '../redis/redis.module';
 import { CacheModule } from '../cache/cache.module';
@@ -23,7 +22,7 @@ import { McpApiKeyService } from './services/mcp-api-key.service';
  *
  * 구성:
  * - McpController: API Key 관리 엔드포인트 (create, list, delete, validate)
- * - McpProxyController: OAuth2 프록시 (향후 제거 예정)
+ * - McpProxyController: MCP 자동포스팅 엔드포인트
  */
 @Module({
   imports: [
@@ -33,7 +32,6 @@ import { McpApiKeyService } from './services/mcp-api-key.service';
       McpApiKey,
       UsageTracking, // 관리자 통계용
     ]),
-    OauthModule,  // OAuth2 프록시용 (향후 제거)
     PostsModule,
     RedisModule,
     CacheModule,
@@ -41,7 +39,7 @@ import { McpApiKeyService } from './services/mcp-api-key.service';
   ],
   controllers: [
     McpController,        // API Key 관리
-    McpProxyController,   // OAuth2 프록시 (향후 제거)
+    McpProxyController,   // MCP 자동포스팅
   ],
   providers: [McpApiKeyService],
   exports: [McpApiKeyService],
