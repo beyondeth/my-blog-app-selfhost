@@ -1,121 +1,451 @@
 /**
- * MCP Proxy Server 진입점
+ * MCP Proxy Server - API Key 인증 (Context7 스타일)
  *
- * 프로덕션 레벨로 개선된 구조:
- * - 환경 변수 검증
- * - 에러 처리 미들웨어
- * - 라우터 분리
- * - PKCE 보안 개선
- * - Pino 로거 시스템
+ * 변경 사항:
+ * - OAuth2 완전 제거 (SessionService, TransportManager 제거)
+ * - Stateless 함수 기반 (요청마다 새 서버 생성)
+ * - API Key Bearer 인증 (Backend 검증)
+ * - 깔끔한 구조 (200줄, 기존 640줄)
  */
 
 import express from 'express';
-import path from 'path';
-import { SessionService } from './services/SessionService';
-import { config } from './config/env.validation';
-import { errorHandler, notFoundHandler } from './middleware/error-handler';
-import { createSessionRoutes } from './routes/session.routes';
-import { createMcpRoutes } from './routes/mcp.routes';
-import { createProxyRoutes } from './routes/proxy.routes';
-import { createOAuthRoutes } from './routes/oauth.routes';
-import { logger, httpLogger } from './utils/logger';
+import crypto from 'crypto';
+import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { logger, httpLogger } from './utils/logger.js';
+import { config } from './config/env.validation.js';
+import { registerAllTools } from './tools/index.js';
+import { RedisCacheService } from './services/RedisCacheService.js';
+import { MetricsService } from './services/MetricsService.js';
+import axios from 'axios';
 
 // Express 앱 초기화
 const app = express();
-const port = config.PORT;
+const port = config.MCP_PROXY_PORT;
 
-// 세션 서비스 초기화
-const sessionService = new SessionService();
+// Redis 캐시 서비스 초기화
+const redisCache = new RedisCacheService({
+  host: config.REDIS_HOST,
+  port: config.REDIS_PORT,
+  password: config.REDIS_PASSWORD,
+  ttl: config.API_KEY_CACHE_TTL,
+});
 
-// 미들웨어 - 큰 마크다운 파일을 위해 10MB 제한으로 증가
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+// Prometheus 메트릭 서비스 초기화
+const metricsService = new MetricsService();
+
+// Redis 연결 상태 모니터링 (10초마다)
+setInterval(() => {
+  const isConnected = redisCache.getConnectionStatus();
+  metricsService.updateRedisConnection(isConnected);
+}, 10000);
+
+// 미들웨어 (⚠️ /mcp 경로는 제외 - StreamableHTTPServerTransport가 raw stream 필요)
+app.use((req, res, next) => {
+  if (req.path === '/mcp') {
+    // /mcp는 body parsing 건너뛰기 (StreamableHTTPServerTransport가 직접 처리)
+    return next();
+  }
+  express.json({ limit: '10mb' })(req, res, next);
+});
+app.use((req, res, next) => {
+  if (req.path === '/mcp') {
+    return next();
+  }
+  express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
+});
+
+// HTTP 로깅 (개발 환경에서만)
+if (config.NODE_ENV === 'development' || config.LOG_LEVEL === 'debug') {
+  app.use(httpLogger);
+}
 
 // CORS 설정
 app.use((req, res, next) => {
   const origin = req.headers.origin;
-  const allowedOrigins = config.CORS_ORIGINS?.split(',') || ['http://localhost:*'];
+  const allowedOrigins = config.CORS_ORIGINS.split(',').map(o => o.trim());
 
-  if (origin && (allowedOrigins.includes('*') || allowedOrigins.some(ao => origin.match(ao.replace(/\*/g, '.*'))))) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
+  // Origin 검증
+  let isAllowed = false;
+
+  if (origin) {
+    for (const allowed of allowedOrigins) {
+      const pattern = allowed.replace(/\*/g, '.*');
+      const regex = new RegExp(`^${pattern}$`);
+
+      if (regex.test(origin)) {
+        isAllowed = true;
+        break;
+      }
+    }
+
+    if (isAllowed) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Credentials', 'true');
+    }
   }
 
-  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-mcp-session-id');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(204);
+    return res.sendStatus(isAllowed ? 204 : 403);
+  }
+
+  // 프로덕션에서 허용되지 않은 Origin 차단
+  if (origin && !isAllowed && config.NODE_ENV === 'production') {
+    logger.warn({ origin }, '⚠️ CORS: Blocked origin');
+    return res.status(403).json({ error: 'Origin not allowed' });
   }
 
   next();
 });
 
-// HTTP 요청 로깅 - 개발 환경 또는 info 레벨 이상에서만 활성화
-if (config.NODE_ENV === 'development' || config.LOG_LEVEL === 'info' || config.LOG_LEVEL === 'debug') {
-  app.use(httpLogger);
+/**
+ * API Key 검증 (Redis 캐싱 + Backend 호출)
+ *
+ * 캐시 히트: 1-3ms (99% 단축)
+ * 캐시 미스: 85-165ms (Backend bcrypt 검증)
+ *
+ * @param apiKey Bearer 토큰에서 추출한 API Key (blog_sk_{hint}_{secret})
+ * @returns 검증 성공 시 사용자 정보, 실패 시 null
+ */
+async function validateApiKey(apiKey: string): Promise<{
+  keyId: string;
+  userId: string;
+  blogId: string;
+  user: { id: string; username: string; email: string };
+  blog: { id: string; name: string; slug: string };
+} | null> {
+  const startTime = Date.now();
+
+  try {
+    // 1. API Key hint 추출 (blog_sk_{hint}_{secret})
+    const parts = apiKey.split('_');
+    if (parts.length !== 4) {
+      logger.warn('⚠️ Invalid API key format');
+      metricsService.recordError('invalid_format', 400);
+      return null;
+    }
+    const keyHint = parts[2]; // hint (8자)
+
+    // 2. Redis 캐시 확인 (1-3ms)
+    const cached = await redisCache.getApiKeyValidation(keyHint);
+    if (cached) {
+      const duration = Date.now() - startTime;
+      metricsService.recordCacheHit();
+      metricsService.recordValidationDuration(duration, true);
+      return cached;
+    }
+
+    // 3. 캐시 미스 - Backend 검증 (85-165ms)
+    metricsService.recordCacheMiss();
+
+    const response = await axios.post(
+      `${config.BACKEND_BASE_URL}/api/v1/mcp/validate-key`,
+      { apiKey },
+      { timeout: 5000 }
+    );
+
+    const duration = Date.now() - startTime;
+
+    if (response.data?.valid) {
+      const userData = response.data.data;
+
+      // 4. 검증 성공 - Redis 캐싱 (TTL: 5분)
+      await redisCache.setApiKeyValidation(keyHint, userData);
+
+      metricsService.recordValidationDuration(duration, false);
+      return userData;
+    }
+
+    metricsService.recordError('validation_failed', 401);
+    return null;
+  } catch (error: any) {
+    const duration = Date.now() - startTime;
+    logger.warn({ error: error.message }, '⚠️ API Key validation failed');
+    metricsService.recordValidationDuration(duration, false);
+    metricsService.recordError('backend_error', 500);
+    return null;
+  }
 }
 
-// 정적 파일 제공 (OAuth 콜백 HTML 등)
-app.use(express.static(path.join(__dirname, '../public')));
+/**
+ * MCP 서버 생성 (요청마다 새로 생성 - Context7 스타일)
+ *
+ * @param userData API Key 검증 결과 + 원본 API Key
+ * @returns MCP 서버 인스턴스
+ */
+async function createMcpServer(userData: {
+  keyId: string;
+  userId: string;
+  blogId: string;
+  user: any;
+  blog: any;
+  apiKey: string; // 원본 API Key 추가
+}): Promise<McpServer> {
+  const server = new McpServer(
+    {
+      name: 'codebase-blog-mcp',
+      version: '8.0.0',  // API Key 버전
+    },
+    {
+      capabilities: {
+        tools: {},
+        prompts: {},
+      },
+    }
+  );
 
-// 헬스 체크 (루트 레벨)
+  // 도구 등록 (API Key도 함께 전달)
+  await registerAllTools(server, {
+    userData,
+    apiKey: userData.apiKey, // API Key 추가 (create_post에서 사용)
+    config: {
+      MCP_BASE_URL: config.MCP_BASE_URL,
+      BACKEND_BASE_URL: config.BACKEND_BASE_URL,
+      BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
+    },
+  });
+
+  return server;
+}
+
+// ===== 라우트 =====
+
+/**
+ * 헬스 체크
+ */
 app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     service: 'MCP Proxy Server',
+    version: '8.0.0',
+    pattern: 'Stateless API Key (Context7 style)',
     timestamp: new Date().toISOString(),
     environment: config.NODE_ENV,
+    redis: redisCache.getConnectionStatus() ? 'connected' : 'disconnected',
   });
 });
 
-// 라우터 등록
-app.use(createOAuthRoutes());  // OAuth 콜백 웹페이지 (GET /oauth/callback)
-app.use('/api/v1/mcp/sessions', createSessionRoutes(sessionService));
-app.use('/api/v1/mcp/sessions', createProxyRoutes(sessionService));  // proxy 엔드포인트를 sessions 경로에 포함
-app.use('/api/v1/mcp', createMcpRoutes(sessionService));
+/**
+ * Prometheus 메트릭 (Grafana 수집용)
+ */
+app.get('/metrics', async (req, res) => {
+  try {
+    const metrics = await metricsService.getMetrics();
+    res.set('Content-Type', 'text/plain; version=0.0.4; charset=utf-8');
+    res.send(metrics);
+  } catch (error: any) {
+    logger.error({ error: error.message }, '❌ Failed to get metrics');
+    res.status(500).send('Failed to get metrics');
+  }
+});
+
+/**
+ * 메트릭 통계 (디버그용)
+ */
+app.get('/metrics/stats', async (req, res) => {
+  try {
+    const stats = await metricsService.getStats();
+    const redisStats = await redisCache.getStats();
+
+    res.json({
+      metrics: stats,
+      redis: redisStats,
+    });
+  } catch (error: any) {
+    logger.error({ error: error.message }, '❌ Failed to get stats');
+    res.status(500).json({ error: 'Failed to get stats' });
+  }
+});
+
+/**
+ * POST /mcp - MCP 요청 처리 (API Key 인증)
+ *
+ * 흐름:
+ * 1. Authorization 헤더에서 API Key 추출
+ * 2. Backend /mcp/validate-key 호출
+ * 3. MCP 서버 생성 (요청마다)
+ * 4. Transport 생성 및 연결
+ * 5. 요청 처리
+ * 6. 자동 cleanup (GC)
+ */
+app.post('/mcp', async (req, res) => {
+  try {
+    // 1. Authorization 헤더 검증
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logger.warn('⚠️ Missing Bearer token');
+
+      return res.status(401).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Unauthorized: Bearer token required (format: Bearer blog_sk_...)',
+        },
+        id: null,
+      });
+    }
+
+    const apiKey = authHeader.substring(7);  // "Bearer " 제거
+
+    // 2. API Key 검증 (Backend 호출)
+    const userData = await validateApiKey(apiKey);
+
+    if (!userData) {
+      logger.warn('⚠️ Invalid API key');
+
+      return res.status(401).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32000,
+          message: 'Unauthorized: Invalid or expired API key',
+        },
+        id: null,
+      });
+    }
+
+    logger.debug({
+      userId: userData.userId.substring(0, 8),
+      blogSlug: userData.blog.slug,
+    }, '✅ API Key validated');
+
+    // 3. MCP 서버 생성 (요청마다 새로 생성 - Context7 스타일)
+    // userData에 원본 API Key 추가
+    const mcpServer = await createMcpServer({
+      ...userData,
+      apiKey, // 원본 API Key 전달
+    });
+
+    // 4. Transport 생성 (Context7와 동일한 옵션)
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,  // Context7와 동일
+    });
+
+    // 5. MCP 서버와 Transport 연결
+    await mcpServer.connect(transport);
+
+    // 6. 요청 처리 (⚠️ req.body 전달하지 않음 - Transport가 raw stream 읽음)
+    await transport.handleRequest(req, res);
+
+    // 7. 자동 cleanup (함수 종료 시 GC가 처리)
+    logger.debug({
+      userId: userData.userId.substring(0, 8),
+    }, '✅ Request processed');
+
+  } catch (error: any) {
+    logger.error({
+      error: error.message,
+      stack: error.stack,
+    }, '❌ MCP request failed');
+
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: {
+          code: -32603,
+          message: 'Internal error',
+        },
+        id: null,
+      });
+    }
+  }
+});
+
+/**
+ * GET /mcp - SSE Stream (현재 미지원)
+ *
+ * API Key 인증에서는 SSE 스트림을 지원하지 않습니다.
+ * 모든 통신은 POST /mcp로 처리됩니다.
+ */
+app.get('/mcp', (req, res) => {
+  res.status(501).json({
+    error: 'SSE streaming not supported in API Key mode. Use POST /mcp with Bearer token.',
+  });
+});
+
+/**
+ * DELETE /mcp - 세션 종료
+ *
+ * Stateless 구조라서 특별히 정리할 것이 없지만,
+ * MCP 프로토콜 호환성을 위해 204 응답
+ */
+app.delete('/mcp', (req, res) => {
+  logger.debug('🔌 DELETE /mcp (no-op in stateless mode)');
+  res.status(204).send();
+});
 
 // 404 핸들러
-app.use(notFoundHandler);
+app.use((req, res) => {
+  logger.warn({ path: req.path, method: req.method }, '⚠️ 404 Not Found');
+  res.status(404).json({
+    error: 'Not Found',
+    message: `Route ${req.method} ${req.path} does not exist`,
+  });
+});
 
-// 중앙 집중식 에러 핸들러
-app.use(errorHandler);
+// 에러 핸들러
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  logger.error({
+    error: err.message,
+    stack: err.stack,
+    path: req.path,
+  }, '❌ Unhandled error');
+
+  if (!res.headersSent) {
+    res.status(500).json({
+      error: 'Internal Server Error',
+      message: config.NODE_ENV === 'development' ? err.message : 'An error occurred',
+    });
+  }
+});
 
 // 서버 시작
-const server = app.listen(port, () => {
+const server = app.listen(port, '0.0.0.0', () => {
   logger.info({
     port,
+    host: '0.0.0.0',
     environment: config.NODE_ENV,
-    redis: `${config.REDIS_HOST}:${config.REDIS_PORT}`,
-    architecture: 'MCP Client → Proxy Server → Backend API',
-    improvements: [
-      '환경 변수 검증 (Zod)',
-      '에러 처리 미들웨어',
-      'PKCE verifier 별도 저장',
-      '라우터 분리 구조',
-      'Pino 로거 시스템',
-      '요청 ID 추적'
-    ]
-  }, '🚀 MCP Proxy Server 시작됨');
+    pattern: 'Stateless API Key (Context7 style)',
+    auth: 'Bearer token (blog_sk_...)',
+    backendUrl: config.BACKEND_BASE_URL,
+  }, '🚀 MCP Proxy Server started');
+});
+
+// 서버 에러 핸들링
+server.on('error', (error: NodeJS.ErrnoException) => {
+  if (error.code === 'EADDRINUSE') {
+    logger.fatal({ port }, `❌ Port ${port} already in use`);
+  } else if (error.code === 'EACCES') {
+    logger.fatal({ port }, `❌ Permission denied for port ${port}`);
+  } else {
+    logger.fatal({ error: error.message }, '❌ Server start failed');
+  }
+  process.exit(1);
 });
 
 // Graceful shutdown
-const gracefulShutdown = async (signal: string) => {
-  logger.info({ signal }, '📴 종료 시그널 받음, 서버 종료 중...');
+const shutdown = async (signal: string) => {
+  logger.info({ signal }, '📴 Shutting down...');
+
+  // Redis 연결 종료
+  await redisCache.disconnect();
 
   server.close(() => {
-    logger.info('✅ HTTP 서버 종료됨');
+    logger.info('✅ Server closed');
+    process.exit(0);
   });
 
-  await sessionService.close();
-  logger.info('✅ Redis 연결 종료됨');
-
-  process.exit(0);
+  // 5초 타임아웃
+  setTimeout(() => {
+    logger.warn('⚠️ Forced shutdown after 5s timeout');
+    process.exit(1);
+  }, 5000);
 };
 
-process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-process.on('SIGINT', () => gracefulShutdown('SIGINT'));
-
-// 프로세스 레벨 에러는 logger에서 처리됨 (utils/logger.ts)
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
 
 export default app;

@@ -9,6 +9,9 @@ import { toast } from 'sonner';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Shield, AlertCircle } from 'lucide-react';
 
+// Admin 재인증 세션 키 (브라우저 탭 닫으면 자동 삭제)
+const ADMIN_SESSION_KEY = 'admin_reauth_verified';
+
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -35,10 +38,22 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
       if (response.ok) {
         const data = await response.json();
-        // Admin이어도 재인증 필요 (2중 보안)
-        // 항상 로그인 화면을 보여줌
-        setIsAuthenticated(false);
-        setIsAdmin(false);
+
+        // Session Storage에서 재인증 플래그 확인
+        const isReauthVerified = sessionStorage.getItem(ADMIN_SESSION_KEY);
+
+        if (data.role === 'admin' && isReauthVerified) {
+          // Admin 재인증 완료 상태 → 자동 접근 허용
+          setIsAuthenticated(true);
+          setIsAdmin(true);
+        } else if (data.role === 'admin' && !isReauthVerified) {
+          // Admin이지만 재인증 필요 (2중 보안)
+          setIsAuthenticated(false);
+          setIsAdmin(false);
+        } else {
+          // 일반 사용자 → 조용히 홈으로 리다이렉트 (메시지 없이)
+          router.push('/');
+        }
       } else {
         // 로그인 안 된 경우 - 로그인 화면 표시
         setIsAuthenticated(false);
@@ -93,20 +108,20 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       }
 
       const data = await response.json();
-      
+
       // Server should verify admin role
       if (data.user.role !== 'admin') {
-        toast.error('관리자 권한이 필요합니다. 일반 사용자는 접근할 수 없습니다.');
-        // 일반 사용자는 홈으로 리다이렉트
-        setTimeout(() => {
-          router.push('/');
-        }, 1500);
+        // 일반 사용자는 조용히 홈으로 리다이렉트 (메시지 없이)
+        router.push('/');
         return;
       }
-      
+
+      // Admin 재인증 성공 → Session Storage에 플래그 저장
+      sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+
       // Do NOT store sensitive data in localStorage
       // Session is managed via HttpOnly cookies
-      
+
       toast.success('관리자 로그인 성공!');
       setIsAuthenticated(true);
       setIsAdmin(true);

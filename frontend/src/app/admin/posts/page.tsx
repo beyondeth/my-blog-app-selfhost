@@ -86,7 +86,6 @@ export default function PostsManagement() {
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [categoryFilter, setCategoryFilter] = useState<string>('');
   const [selectedPosts, setSelectedPosts] = useState<string[]>([]);
-  const [allPosts, setAllPosts] = useState<Post[]>([]);
   const [bulkActionDialog, setBulkActionDialog] = useState<{
     open: boolean;
     action: 'publish' | 'unpublish' | 'delete' | null;
@@ -106,23 +105,12 @@ export default function PostsManagement() {
   const total = data?.total || 0;
   const hasMore = page < totalPages;
 
-  useEffect(() => {
-    if (data?.posts) {
-      if (page === 1) {
-        // Reset posts when filters change
-        setAllPosts(data.posts);
-      } else {
-        // Append posts when loading more
-        setAllPosts(prev => [...prev, ...data.posts]);
-      }
-    }
-  }, [data, page]);
+  // React Query의 data를 직접 사용 (로컬 state 불필요)
+  const allPosts = posts;
 
+  // 필터 변경 시 page 리셋
   useEffect(() => {
-    // Reset to page 1 when filters change
     setPage(1);
-    setAllPosts([]);
-    refetch();
   }, [searchTerm, statusFilter, categoryFilter]);
 
   const handleSearch = (value: string) => {

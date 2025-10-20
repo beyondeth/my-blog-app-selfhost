@@ -141,7 +141,7 @@ export default function PostHeaderWithReport({
                     src={post.author?.profileImage}
                     alt={post.author?.username || 'Author'}
                     fallback={post.author?.username || 'Author'}
-                    size="sm"
+                    size="md"
                   />
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                     {post.author?.username || 'Author'}
@@ -154,7 +154,7 @@ export default function PostHeaderWithReport({
                   src={post.author?.profileImage}
                   alt={post.author?.username || 'Author'}
                   fallback={post.author?.username || 'Author'}
-                  size="sm"
+                  size="md"
                 />
                 <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
                   {post.author?.username || 'Author'}

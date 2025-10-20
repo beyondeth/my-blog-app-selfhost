@@ -1,4 +1,4 @@
-import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, UnauthorizedException, BadRequestException, NotFoundException, ForbiddenException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
@@ -12,6 +12,7 @@ import { OAuthToken } from '../entities/oauth-token.entity';
 import { User } from '../../users/entities/user.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
 import { UnifiedRedisService } from '../../redis/unified-redis.service';
+import { RegisterClientDto } from '../dto/register-client.dto';
 
 /**
  * OAuth2 인증 서비스
@@ -19,6 +20,8 @@ import { UnifiedRedisService } from '../../redis/unified-redis.service';
  */
 @Injectable()
 export class OAuthService {
+  private readonly logger = new Logger(OAuthService.name);
+
   constructor(
     @InjectRepository(OAuthClient)
     private readonly clientRepository: Repository<OAuthClient>,
@@ -80,6 +83,7 @@ export class OAuthService {
     codeChallenge?: string,
     codeChallengeMethod?: string,
     clientIp?: string,
+    resource?: string, // ✅ RFC 8707: Resource Indicator 추가
   ): Promise<string> {
     // 블로그 소유권 검증 (중요!)
     const blog = await this.blogRepository.findOne({
@@ -145,6 +149,7 @@ export class OAuthService {
       isUsed: false,
       issuedIp: clientIp,
       state,
+      resource, // ✅ RFC 8707: Resource Indicator 저장
     });
 
     await this.codeRepository.save(authCode);
@@ -253,6 +258,8 @@ export class OAuthService {
       clientId: client.id,
       scopes: authCode.scopes,
       blogId: authCode.blogId,
+      // ✅ RFC 8707: Resource Indicator를 audience claim으로 추가
+      ...(authCode.resource && { aud: authCode.resource }),
     };
 
     const accessToken = this.jwtService.sign(accessPayload, {
@@ -576,5 +583,130 @@ export class OAuthService {
       // 토큰 검증 실패 (만료, 잘못된 서명 등)
       return null;
     }
+  }
+
+  /**
+   * Dynamic Client Registration (RFC 7591)
+   *
+   * MCP 클라이언트가 자동으로 등록할 수 있도록 합니다.
+   * Public Client (PKCE 사용) 또는 Confidential Client 지원.
+   *
+   * @param dto - 클라이언트 등록 정보
+   * @param initialAccessToken - Initial Access Token (Enterprise 배포용, 선택적)
+   * @returns 등록된 클라이언트 정보
+   */
+  async registerClient(
+    dto: RegisterClientDto,
+    initialAccessToken?: string,
+  ): Promise<{
+    client_id: string;
+    client_secret?: string;
+    client_id_issued_at: number;
+    client_name: string;
+    redirect_uris: string[];
+    grant_types: string[];
+    response_types: string[];
+    token_endpoint_auth_method: string;
+  }> {
+    // 1. Initial Access Token 검증 (Enterprise 환경)
+    const requireInitialToken = this.configService.get<boolean>(
+      'OAUTH_REQUIRE_INITIAL_ACCESS_TOKEN',
+      false,
+    );
+
+    if (requireInitialToken) {
+      if (!initialAccessToken) {
+        throw new UnauthorizedException(
+          'Initial access token required for client registration',
+        );
+      }
+      // TODO: Initial Access Token 검증 로직 (Phase 6에서 구현)
+      // await this.validateInitialAccessToken(initialAccessToken);
+    }
+
+    // 2. 입력값 검증 및 기본값 설정
+    const grantTypes = dto.grant_types || ['authorization_code', 'refresh_token'];
+    const responseTypes = dto.response_types || ['code'];
+    const tokenEndpointAuthMethod = dto.token_endpoint_auth_method || 'none';
+    const scopes = dto.scope?.split(' ') || ['mcp:post:create'];
+
+    // 3. Public Client 여부 판단
+    const isPublic = tokenEndpointAuthMethod === 'none';
+
+    // 4. 동적 Client ID 생성
+    const clientId = `mcp-${crypto.randomUUID()}`;
+
+    // 5. Client Secret 생성 (Public Client가 아닌 경우만)
+    let clientSecretPlain: string | undefined;
+    let clientSecretHashed: string;
+
+    if (!isPublic) {
+      // Confidential Client: client_secret 생성
+      clientSecretPlain = crypto.randomBytes(32).toString('hex');
+      clientSecretHashed = await bcrypt.hash(clientSecretPlain, 10);
+    } else {
+      // Public Client: client_secret 없음 (PKCE로 보안 보장)
+      clientSecretHashed = 'N/A';
+    }
+
+    // 6. Redirect URI 검증 (localhost 또는 loopback 주소만 허용)
+    for (const uri of dto.redirect_uris) {
+      const url = new URL(uri);
+      const isLocalhost =
+        url.hostname === 'localhost' ||
+        url.hostname === '127.0.0.1' ||
+        url.hostname === '[::1]';
+
+      if (!isLocalhost) {
+        throw new BadRequestException(
+          `Redirect URI must be localhost or loopback address: ${uri}`,
+        );
+      }
+    }
+
+    // 7. DB에 클라이언트 저장
+    const issuedAt = Math.floor(Date.now() / 1000);
+
+    const client = this.clientRepository.create({
+      clientId,
+      clientSecret: clientSecretHashed,
+      clientName: dto.client_name,
+      redirectUris: dto.redirect_uris,
+      allowedScopes: scopes,
+      grantTypes: grantTypes.join(','),
+      tokenEndpointAuthMethod,
+      isDynamic: true, // ✅ 동적 등록 표시
+      isPublic, // ✅ Public Client 여부
+      issuedAt, // ✅ RFC 7591 필드
+      userId: null, // 동적 등록은 특정 사용자에게 속하지 않음
+      description: dto.description || `Dynamically registered MCP client`,
+      isActive: true,
+      isTrusted: false, // 동적 등록은 기본적으로 신뢰하지 않음
+    });
+
+    await this.clientRepository.save(client);
+
+    this.logger.log(
+      `Dynamic client registered: ${clientId} (${isPublic ? 'Public' : 'Confidential'})`,
+    );
+
+    // 8. RFC 7591 표준 응답 반환
+    const response: any = {
+      client_id: clientId,
+      client_id_issued_at: issuedAt,
+      client_name: dto.client_name,
+      redirect_uris: dto.redirect_uris,
+      grant_types: grantTypes,
+      response_types: responseTypes,
+      token_endpoint_auth_method: tokenEndpointAuthMethod,
+      scope: scopes.join(' '), // ✅ RFC 7591: scope 필드 추가 (MCP SDK가 Authorization URL에 scope를 포함하도록 함)
+    };
+
+    // Confidential Client인 경우에만 client_secret 반환
+    if (clientSecretPlain) {
+      response.client_secret = clientSecretPlain;
+    }
+
+    return response;
   }
 }

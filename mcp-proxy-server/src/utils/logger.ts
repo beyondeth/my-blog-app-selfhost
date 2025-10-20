@@ -8,7 +8,8 @@
  */
 
 import pino from 'pino';
-import { config } from '../config/env.validation';
+import os from 'os';
+import { config } from '../config/env.validation.js';
 
 // 민감한 정보를 필터링할 필드 목록
 const REDACTED_FIELDS = [
@@ -35,7 +36,7 @@ const loggerOptions: pino.LoggerOptions = {
   // 요청 ID 추가
   mixin: () => ({
     pid: process.pid,
-    hostname: require('os').hostname(),
+    hostname: os.hostname(),
   }),
 
   // 민감한 정보 필터링
@@ -119,8 +120,12 @@ export const httpLogger = (req: any, res: any, next: any) => {
     req.id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
+  // 폴링 엔드포인트는 debug 레벨로 로깅 (로그 verbosity 감소)
+  const isStatusEndpoint = req.url.includes('/status');
+  const logLevel = isStatusEndpoint ? 'debug' : 'info';
+
   // 요청 로깅
-  logger.info({
+  logger[logLevel]({
     req,
     type: 'REQUEST',
   }, `Incoming ${req.method} ${req.url}`);
@@ -131,7 +136,7 @@ export const httpLogger = (req: any, res: any, next: any) => {
     res.send = originalSend;
     const duration = Date.now() - start;
 
-    logger.info({
+    logger[logLevel]({
       req,
       res,
       duration,

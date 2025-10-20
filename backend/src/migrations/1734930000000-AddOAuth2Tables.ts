@@ -85,41 +85,14 @@ export class AddOAuth2Tables1734930000000 implements MigrationInterface {
         await queryRunner.query(`CREATE INDEX "IDX_oauth_tokens_blogId" ON "oauth_tokens" ("blogId")`);
         await queryRunner.query(`CREATE INDEX "IDX_oauth_tokens_expiresAt" ON "oauth_tokens" ("expiresAt")`);
 
-        // 외래 키 제약 조건 추가
-        await queryRunner.query(`
-            ALTER TABLE "oauth_clients"
-            ADD CONSTRAINT "FK_oauth_clients_userId"
-            FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION
-        `);
+        // 외래 키 제약 조건 추가는 AddOAuth2ForeignKeys migration에서 처리
+        // (Migration 순서 문제 해결을 위해 별도 migration으로 분리)
 
-        await queryRunner.query(`
-            ALTER TABLE "oauth_codes"
-            ADD CONSTRAINT "FK_oauth_codes_userId"
-            FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION
-        `);
-
-        await queryRunner.query(`
-            ALTER TABLE "oauth_codes"
-            ADD CONSTRAINT "FK_oauth_codes_blogId"
-            FOREIGN KEY ("blogId") REFERENCES "blogs"("id") ON DELETE CASCADE ON UPDATE NO ACTION
-        `);
-
+        // oauth_clients 내부 FK는 추가 가능
         await queryRunner.query(`
             ALTER TABLE "oauth_codes"
             ADD CONSTRAINT "FK_oauth_codes_clientId"
             FOREIGN KEY ("clientId") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION
-        `);
-
-        await queryRunner.query(`
-            ALTER TABLE "oauth_tokens"
-            ADD CONSTRAINT "FK_oauth_tokens_userId"
-            FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION
-        `);
-
-        await queryRunner.query(`
-            ALTER TABLE "oauth_tokens"
-            ADD CONSTRAINT "FK_oauth_tokens_blogId"
-            FOREIGN KEY ("blogId") REFERENCES "blogs"("id") ON DELETE CASCADE ON UPDATE NO ACTION
         `);
 
         await queryRunner.query(`
@@ -130,14 +103,9 @@ export class AddOAuth2Tables1734930000000 implements MigrationInterface {
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        // 외래 키 제약 조건 삭제
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" DROP CONSTRAINT "FK_oauth_tokens_clientId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" DROP CONSTRAINT "FK_oauth_tokens_blogId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" DROP CONSTRAINT "FK_oauth_tokens_userId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" DROP CONSTRAINT "FK_oauth_codes_clientId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" DROP CONSTRAINT "FK_oauth_codes_blogId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" DROP CONSTRAINT "FK_oauth_codes_userId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_clients" DROP CONSTRAINT "FK_oauth_clients_userId"`);
+        // 외래 키 제약 조건 삭제 (이 migration에서 추가한 것만)
+        await queryRunner.query(`ALTER TABLE "oauth_tokens" DROP CONSTRAINT IF EXISTS "FK_oauth_tokens_clientId"`);
+        await queryRunner.query(`ALTER TABLE "oauth_codes" DROP CONSTRAINT IF EXISTS "FK_oauth_codes_clientId"`);
 
         // 인덱스 삭제
         await queryRunner.query(`DROP INDEX "IDX_oauth_tokens_expiresAt"`);

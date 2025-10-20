@@ -272,7 +272,7 @@ export const useRegister = () => {
 
   return useMutation({
     mutationFn: (userData: RegisterForm) =>
-      apiRequest<{ user: User }>('/auth/register', {
+      apiRequest<{ user: User; blog?: any }>('/auth/register', {
         method: 'POST',
         body: JSON.stringify(userData),
       }),
@@ -280,12 +280,13 @@ export const useRegister = () => {
       // 사용자 정보 캐시 업데이트
       queryClient.setQueryData(authQueryKeys.user(), data.user);
 
+      // 블로그 정보가 있으면 캐시에 저장 (근본적 해결)
+      if (data.blog) {
+        queryClient.setQueryData(['user-blog'], data.blog);
+      }
+
       // 회원가입 후 자동 로그인 이벤트
       emitLogin(data.user);
-
-      // 블로그 정보 무효화
-      queryClient.invalidateQueries({ queryKey: ['blogs', 'my-blogs'] });
-      queryClient.invalidateQueries({ queryKey: ['user-blog'] });
     },
     onError: (error) => {
       console.error('회원가입 실패:', error);

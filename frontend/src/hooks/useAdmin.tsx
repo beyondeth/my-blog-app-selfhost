@@ -243,12 +243,16 @@ export function useAdminPosts(page = 1, limit = 20, filters?: any) {
   }
 
   return useQuery({
-    queryKey: ['admin', 'posts', page, limit, filters],
+    queryKey: ['admin', 'posts', page, limit, JSON.stringify(filters || {})],
     queryFn: async () => {
       const response = await fetchWithAuth(`${API_URL}/posts?${params}`);
       // Return the response as-is since the backend already provides the correct structure
       return response;
     },
+    staleTime: 30000, // 30초간 fresh 유지 (30초 내 재방문 시 API 호출 안함)
+    gcTime: 5 * 60 * 1000, // 5분간 캐시 보관
+    refetchOnWindowFocus: false, // 윈도우 포커스 시 refetch 방지
+    placeholderData: (previousData) => previousData, // 이전 데이터를 placeholder로 사용
   });
 }
 

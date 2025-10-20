@@ -112,6 +112,16 @@ export class OAuthCode {
   @Column({ nullable: true })
   state: string;
 
+  /**
+   * Resource Indicator (RFC 8707)
+   * 이 코드로 발급된 토큰이 사용될 Resource Server의 URI
+   *
+   * MCP 표준: MCP 서버의 공개 URL (예: http://localhost:3002)
+   * Access Token의 audience (aud) claim으로 포함됨
+   */
+  @Column({ nullable: true })
+  resource: string;
+
   @CreateDateColumn()
   createdAt: Date;
 }

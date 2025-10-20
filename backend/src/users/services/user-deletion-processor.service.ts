@@ -100,9 +100,10 @@ export class UserDeletionProcessorService {
       await this.queueService.markJobFailed(job, error.message);
 
       // 재시도 횟수 초과 시 관리자 알림
-      if (job.retryCount >= 4) {
-        await this.sendAdminAlert(job, error);
-      }
+      // TODO: 이메일 시스템 구현 완료 후 활성화
+      // if (job.retryCount >= 4) {
+      //   await this.sendAdminAlert(job, error);
+      // }
     }
   }
 

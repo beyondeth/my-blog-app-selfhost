@@ -345,7 +345,7 @@ export class PostsController {
     // MCP 전용 읽기 엔드포인트 - 공개 포스트만 검색
     const pageNumber = PaginationHelper.getSafePage(page);
     const limitNumber = PaginationHelper.getSafeLimit(limit, 20);
-    
+
     // 공개 포스트만 검색
     return this.postsService.findAll(
       pageNumber,
@@ -356,6 +356,47 @@ export class PostsController {
       true,      // isPublished
       false      // isForCache
     );
+  }
+
+  @Get('status/:postId')
+  @Public()
+  @ApiOperation({
+    summary: '포스트 처리 상태 조회 (Fast Path 전용)',
+    description: 'Fast Path로 생성된 포스트의 백그라운드 처리 상태를 확인합니다. status 값: processing(처리중), published(완료), failed(실패)'
+  })
+  @ApiResponse({ status: 200, description: '포스트 상태 반환' })
+  @ApiResponse({ status: 404, description: '포스트를 찾을 수 없음' })
+  async getPostStatus(@Param('postId') postId: string) {
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+      select: [
+        'id',
+        'title',
+        'slug',
+        'status',
+        'processingError',
+        'processingCompletedAt',
+        'isPublished',
+        'publishedAt',
+        'createdAt',
+      ],
+    });
+
+    if (!post) {
+      throw new ForbiddenException('포스트를 찾을 수 없습니다.');
+    }
+
+    return {
+      id: post.id,
+      title: post.title,
+      slug: post.slug,
+      status: post.status,
+      processingError: post.processingError,
+      processingCompletedAt: post.processingCompletedAt,
+      isPublished: post.isPublished,
+      publishedAt: post.publishedAt,
+      createdAt: post.createdAt,
+    };
   }
 
   @Get('slug/:slug')

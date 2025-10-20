@@ -7,6 +7,7 @@ import { OAuthCode } from './entities/oauth-code.entity';
 import { OAuthToken } from './entities/oauth-token.entity';
 import { OAuthService } from './services/oauth.service';
 import { OAuthController } from './controllers/oauth.controller';
+import { DiscoveryController } from './controllers/discovery.controller';
 import { OAuthGuard, OptionalOAuthGuard } from './guards/oauth.guard';
 import { RedisModule } from '../redis/redis.module';
 import { BlogsModule } from '../blogs/blogs.module';
@@ -40,7 +41,7 @@ import { Blog } from '../blogs/entities/blog.entity';
     BlogsModule,  // BlogsService를 사용하기 위해 필요
     UsersModule,  // UsersService를 사용하기 위해 필요
   ],
-  controllers: [OAuthController],
+  controllers: [OAuthController, DiscoveryController],
   providers: [OAuthService, OAuthGuard, OptionalOAuthGuard],
   exports: [OAuthService, OAuthGuard, OptionalOAuthGuard],
 })

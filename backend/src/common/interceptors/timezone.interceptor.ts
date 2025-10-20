@@ -7,57 +7,24 @@ import {
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 
+/**
+ * Timezone Interceptor
+ *
+ * ⚠️ DEPRECATED - 이 인터셉터는 사용하지 않습니다!
+ *
+ * 문제:
+ * - DB에 저장된 시간은 이미 로컬 시간 (KST)
+ * - 9시간을 더하면 미래 시간이 됨 (예: 14시간 전 → 미래로 표시)
+ *
+ * 해결책:
+ * - DB 시간을 그대로 반환
+ * - 프론트엔드에서 브라우저 타임존으로 표시
+ */
 @Injectable()
 export class TimezoneInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
-    return next.handle().pipe(
-      map((data) => {
-        return this.convertDatesToKST(data);
-      }),
-    );
-  }
-
-  private convertDatesToKST(obj: any): any {
-    if (obj === null || obj === undefined) {
-      return obj;
-    }
-
-    if (obj instanceof Date) {
-      // UTC를 KST로 변환 (9시간 추가)
-      const kstDate = new Date(obj.getTime() + (9 * 60 * 60 * 1000));
-      return kstDate.toISOString();
-    }
-
-    if (Array.isArray(obj)) {
-      return obj.map(item => this.convertDatesToKST(item));
-    }
-
-    if (typeof obj === 'object') {
-      const converted: any = {};
-      for (const key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          // Date 관련 필드들을 변환
-          if (key === 'createdAt' || key === 'updatedAt' || key === 'lastUsedAt' || key === 'expiresAt') {
-            if (obj[key] && typeof obj[key] === 'string') {
-              const date = new Date(obj[key]);
-              if (!isNaN(date.getTime())) {
-                // UTC를 KST로 변환 (9시간 추가)
-                const kstDate = new Date(date.getTime() + (9 * 60 * 60 * 1000));
-                converted[key] = kstDate.toISOString();
-              } else {
-                converted[key] = obj[key];
-              }
-            } else {
-              converted[key] = this.convertDatesToKST(obj[key]);
-            }
-          } else {
-            converted[key] = this.convertDatesToKST(obj[key]);
-          }
-        }
-      }
-      return converted;
-    }
-
-    return obj;
+    // ⚠️ 변환하지 않고 그대로 반환
+    // DB 시간은 이미 로컬 시간이므로 추가 변환 불필요
+    return next.handle();
   }
 }

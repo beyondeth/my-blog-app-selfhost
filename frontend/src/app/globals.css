@@ -5,6 +5,48 @@
 /* 새로운 통합 스타일 시스템 import */
 @import '../styles/core.css';
 
+/* ============================
+   View Transition API - 테마 전환 애니메이션
+   Chrome 111+, Edge 111+ 지원
+   ============================ */
+
+/* View Transition이 활성화될 때만 적용 */
+@supports (view-transition-name: none) {
+  /* 루트 요소 전환 설정 */
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 300ms;
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 크로스페이드 효과 */
+  ::view-transition-old(root) {
+    animation-name: fade-out;
+  }
+
+  ::view-transition-new(root) {
+    animation-name: fade-in;
+  }
+
+  @keyframes fade-out {
+    from {
+      opacity: 1;
+    }
+    to {
+      opacity: 0;
+    }
+  }
+
+  @keyframes fade-in {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+}
+
 /* Highlight.js 테마 - 라이트/다크 모드 대응 */
 @import '../styles/themes/atom-one-light-custom.css' (prefers-color-scheme: light);
 @import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
@@ -256,4 +298,14 @@ body[data-scroll-locked] {
   * {
     max-width: 100%;
   }
+}
+
+/* 댓글 입력창 스크롤바 숨김 */
+textarea::-webkit-scrollbar {
+  display: none;
+}
+
+textarea {
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
 }

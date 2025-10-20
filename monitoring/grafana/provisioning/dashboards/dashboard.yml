@@ -1,26 +1,25 @@
 # Grafana 대시보드 자동 프로비저닝 설정
+# 통합 모니터링: Backend, MCP Proxy, Redis, System
+#
+# 대시보드 목록:
+#   1. System Overview      - 전체 시스템 상태 한눈에 보기
+#   2. Chat Queue          - 채팅 큐 시스템 모니터링
+#   3. Like Queue          - 좋아요 큐 시스템 모니터링
+#   4. Redis Overview      - Redis 전체 메트릭
+#   5. MCP Proxy Server    - MCP Proxy 서버 모니터링
+#   6. Cache System        - 캐시 시스템 모니터링 (히트율, Cache Stampede 방지)
 
 apiVersion: 1
 
 providers:
-  # 채팅 시스템 대시보드
-  - name: 'Chat Queue Monitoring'
+  # 통합 모니터링 대시보드 (모든 대시보드를 하나의 폴더에서 관리)
+  - name: 'Unified Monitoring'
     orgId: 1
-    folder: 'Chat System'
+    folder: 'Blog Platform'
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 10
-    allowUiUpdates: true
+    updateIntervalSeconds: 10  # 10초마다 대시보드 파일 변경 확인
+    allowUiUpdates: true       # UI에서 대시보드 수정 허용
     options:
       path: /var/lib/grafana/dashboards
-
-  # Redis 전체 모니터링 대시보드
-  - name: 'Redis Monitoring'
-    orgId: 1
-    folder: 'Infrastructure'
-    type: file
-    disableDeletion: false
-    updateIntervalSeconds: 10
-    allowUiUpdates: true
-    options:
-      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false  # 파일 구조를 폴더로 변환하지 않음

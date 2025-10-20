@@ -14,6 +14,7 @@ import { BlogsService } from '../blogs/blogs.service';
 import { EmailService } from '../email/email.service';
 import { IdentityService } from '../users/services/identity.service';
 import { User, AuthProvider } from '../users/entities/user.entity';
+import { Blog } from '../blogs/entities/blog.entity';
 import { IdentityProvider } from '../users/entities/user-identity.entity';
 import { PasswordResetToken } from './entities/password-reset-token.entity';
 import { LoginDto } from './dto/login.dto';
@@ -125,10 +126,10 @@ export class AuthService {
       });
 
       // 자동으로 블로그 생성
-      await this.createUserBlog(user);
+      const blog = await this.createUserBlog(user);
 
       this.logger.log(`New user registered with blog: ${email}`);
-      return this.generateTokenResponse(user);
+      return this.generateTokenResponse(user, blog);
     } catch (error) {
       this.logger.error(`Registration failed for ${email}:`, error.message);
       throw new BadRequestException('Registration failed');
@@ -158,19 +159,24 @@ export class AuthService {
       if (existingIdentity) {
         // 기존 identity로 로그인
         this.logger.log(`Existing ${provider} identity found for user ${existingIdentity.userId}`);
-        
+
         await this.identityService.updateLastUsed(existingIdentity.id);
         const user = await this.usersService.findById(existingIdentity.userId);
-        
+
+        // 블로그 정보 가져오기
+        let userBlogs = await this.blogsService.findByUserId(user.id);
+        let blog: Blog | null = null;
+
         // 블로그가 없으면 자동 생성
-        const userBlogs = await this.blogsService.findByUserId(user.id);
         if (!userBlogs || userBlogs.length === 0) {
-          await this.createUserBlog(user);
+          blog = await this.createUserBlog(user);
           this.logger.log(`Blog automatically created for returning OAuth user: ${user.email}`);
+        } else {
+          blog = userBlogs[0]; // 첫 번째 블로그 사용
         }
-        
+
         await this.usersService.updateLastLogin(user.id);
-        return this.generateTokenResponse(user);
+        return this.generateTokenResponse(user, blog);
       }
 
       // 2. 이메일로 기존 사용자 찾기
@@ -210,11 +216,16 @@ export class AuthService {
             });
           }
 
+          // 블로그 정보 가져오기
+          let userBlogs = await this.blogsService.findByUserId(existingUser.id);
+          let blog: Blog | null = null;
+
           // 블로그가 없으면 자동 생성
-          const userBlogs = await this.blogsService.findByUserId(existingUser.id);
           if (!userBlogs || userBlogs.length === 0) {
-            await this.createUserBlog(existingUser);
+            blog = await this.createUserBlog(existingUser);
             this.logger.log(`Blog automatically created for existing user during OAuth link: ${email}`);
+          } else {
+            blog = userBlogs[0]; // 첫 번째 블로그 사용
           }
 
           // 계정 연결 알림
@@ -229,7 +240,7 @@ export class AuthService {
 
           this.logger.log(`${provider} identity linked to existing account: ${email}`);
           await this.usersService.updateLastLogin(existingUser.id);
-          return this.generateTokenResponse(existingUser);
+          return this.generateTokenResponse(existingUser, blog);
         } else {
           // 수동 링킹 필요
           throw new ConflictException({
@@ -265,10 +276,10 @@ export class AuthService {
       });
 
       // 블로그 자동 생성
-      await this.createUserBlog(newUser);
-      
+      const blog = await this.createUserBlog(newUser);
+
       this.logger.log(`New OAuth user created with blog: ${newUser.email} via ${provider}`);
-      return this.generateTokenResponse(newUser);
+      return this.generateTokenResponse(newUser, blog);
     } catch (error) {
       this.logger.error(`OAuth validation failed for ${provider}:`, error.message);
       throw error;
@@ -405,7 +416,7 @@ export class AuthService {
     });
   }
 
-  private async generateTokenResponse(user: User): Promise<AuthResponse> {
+  private async generateTokenResponse(user: User, blog?: Blog | null): Promise<AuthResponse> {
     const now = Math.floor(Date.now() / 1000);
 
     // Access Token 생성 (짧은 수명)
@@ -442,13 +453,27 @@ export class AuthService {
     this.logger.log(`Saving refresh token for user ${user.id}, expires at: ${refreshExpiresAt}`);
     await this.usersService.updateRefreshToken(user.id, refreshToken, refreshExpiresAt);
 
-    return {
+    const response: AuthResponse = {
       access_token: accessToken,
       refresh_token: refreshToken,
       token_type: 'Bearer',
       expires_in: this.getTokenExpiresIn('JWT_ACCESS_EXPIRES_IN', '1d'),
       user: user.toPublicJSON(), // 보안 강화: 공개 정보만 반환
     };
+
+    // 블로그 정보가 있으면 응답에 포함
+    if (blog) {
+      response.blog = {
+        id: blog.id,
+        slug: blog.slug,
+        name: blog.name,
+        description: blog.description,
+        isPublic: blog.isPublic,
+        createdAt: blog.createdAt,
+      };
+    }
+
+    return response;
   }
 
   private generateUsernameFromEmail(email: string): string {
@@ -505,40 +530,42 @@ export class AuthService {
     return parseInt(expiresIn) || 900;
   }
 
-  private async createUserBlog(user: User): Promise<void> {
+  private async createUserBlog(user: User): Promise<Blog | null> {
     try {
       // 이메일에서 @ 앞 부분 추출
       const emailPrefix = user.email.split('@')[0].toLowerCase();
-      
+
       // slug 규칙에 맞게 변환 (영문 소문자, 숫자, 하이픈만 허용)
       let slug = emailPrefix.replace(/[^a-z0-9]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-      
+
       // slug가 비어있거나 너무 짧으면 기본값 사용
       if (!slug || slug.length < 3) {
         slug = `user-${user.id.slice(0, 8)}`;
       }
-      
+
       // slug 중복 확인 및 고유하게 만들기
       let finalSlug = slug;
       while (!(await this.blogsService.checkSlugAvailability(finalSlug))) {
         // 알파벳 랜덤 4자리 생성 (a-z)
-        const randomSuffix = Array.from({ length: 4 }, () => 
+        const randomSuffix = Array.from({ length: 4 }, () =>
           String.fromCharCode(97 + Math.floor(Math.random() * 26))
         ).join('');
         finalSlug = `${slug}-${randomSuffix}`;
       }
-      
+
       // 블로그 생성
-      await this.blogsService.create({
+      const blog = await this.blogsService.create({
         slug: finalSlug,
         name: user.username || emailPrefix,
         description: `${user.username || emailPrefix}님의 블로그입니다.`,
       }, user);
-      
+
       this.logger.log(`Blog created automatically for user: ${user.email} with slug: ${finalSlug}`);
+      return blog;
     } catch (error) {
       // 블로그 생성 실패는 회원가입을 막지 않음 (로그만 남김)
       this.logger.error(`Failed to create blog for user ${user.email}:`, error.message);
+      return null;
     }
   }
 

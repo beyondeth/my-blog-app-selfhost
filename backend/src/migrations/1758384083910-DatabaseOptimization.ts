@@ -41,7 +41,14 @@ export class DatabaseOptimization1758384083910 implements MigrationInterface {
 
     // Phase 4: 모니터링 확장 설치
     await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS pg_stat_statements`);
-    await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS hypopg`);
+
+    // hypopg는 선택적 확장 (가상 인덱스 테스트용)
+    // Alpine 이미지나 일부 PostgreSQL 설정에서는 사용 불가능할 수 있음
+    try {
+      await queryRunner.query(`CREATE EXTENSION IF NOT EXISTS hypopg`);
+    } catch (error) {
+      console.warn('hypopg extension 설치 실패 (선택적 확장이므로 무시): ', error.message);
+    }
 
     // Phase 5: 통계 업데이트
     await queryRunner.query(`ANALYZE posts`);

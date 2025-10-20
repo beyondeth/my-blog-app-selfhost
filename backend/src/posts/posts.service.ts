@@ -11,7 +11,7 @@ import { CreatePostDto } from './dto/create-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { FilesService } from '../files/files.service';
 // TagsService removed - using JSONB tags
-import { formatDate, extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
+import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ContentProcessingService } from '../content-processing/services/content-processing.service';
 import { plainToInstance } from 'class-transformer';
@@ -20,6 +20,9 @@ import { UserResponseDto } from '../users/dto/user-response.dto';
 import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
 import { CacheService } from '../cache/cache.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
+import { InjectQueue } from '@nestjs/bullmq';
+import { Queue } from 'bullmq';
+import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-processing.queue';
 
 @Injectable()
 export class PostsService {
@@ -42,6 +45,8 @@ export class PostsService {
     private dataSource: DataSource,
     private cacheService: CacheService,
     private bookmarksService: BookmarksService,
+    @InjectQueue(POST_PROCESSING_QUEUE)
+    private postProcessingQueue: Queue<PostProcessingJobData>,
   ) {}
 
   /**
@@ -88,16 +93,8 @@ export class PostsService {
       }
     }
 
-    // 날짜 포맷팅 (기존 로직 유지)
-    if (dto.publishedAt) {
-      dto.publishedAt = formatDate(dto.publishedAt) as any;
-    }
-    if (dto.createdAt) {
-      dto.createdAt = formatDate(dto.createdAt) as any;
-    }
-    if (dto.updatedAt) {
-      dto.updatedAt = formatDate(dto.updatedAt) as any;
-    }
+    // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
+    // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
 
     // 태그 필드 호환성 (tagList → tags)
     if (post.tagList) {
@@ -143,6 +140,30 @@ export class PostsService {
     return plainToInstance(BlogResponseDto, blog, {
       excludeExtraneousValues: true,
     });
+  }
+
+  /**
+   * UTC 시간을 로컬 timezone으로 해석되는 Date 객체 생성
+   *
+   * timestamp without time zone 컬럼에 UTC 시간을 저장하기 위한 헬퍼 메서드
+   * PostgreSQL의 timestamp without time zone은 timezone 정보 없이 저장하므로,
+   * pg 라이브러리가 로컬 시간을 그대로 저장함
+   *
+   * 예: UTC 12:07을 DB에 저장하려면, Date 객체의 로컬 표현이 12:07이어야 함
+   *
+   * @returns UTC 시간을 로컬 timezone으로 표현한 Date 객체
+   */
+  private getUtcAsLocalDate(): Date {
+    const now = new Date();
+    return new Date(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds(),
+      now.getUTCMilliseconds()
+    );
   }
 
   /**
@@ -295,20 +316,6 @@ export class PostsService {
       throw new BadRequestException('블로그를 먼저 생성해주세요.');
     }
 
-    // 중복 포스트 생성 방지: 동일한 사용자가 동일한 제목으로 10초 내에 포스트 생성하는 것을 방지
-    const tenSecondsAgo = new Date(Date.now() - 10 * 1000);
-    const existingPost = await this.postsRepository.findOne({
-      where: {
-        title: createPostDto.title,
-        author: { id: user.id },
-        createdAt: MoreThan(tenSecondsAgo),
-      },
-    });
-
-    if (existingPost) {
-      throw new BadRequestException('동일한 제목의 게시글을 너무 빠르게 생성할 수 없습니다. 잠시 후 다시 시도해주세요.');
-    }
-
     // 하이브리드 저장 시스템: 마크다운과 HTML 모두 저장
     let processedContent = createPostDto.content;
     let markdownContent = null;
@@ -382,7 +389,7 @@ export class PostsService {
       blog: blog,
       blogId: blog.id,
       isPublished: true, // Multi-user blog system - all posts are published
-      publishedAt: new Date(),
+      publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
       tagList: tagList, // JSONB 태그 배열 저장
       qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적)
     });
@@ -419,6 +426,109 @@ export class PostsService {
       user: user,
       blog: blog,
     });
+  }
+
+  /**
+   * Fast Path 포스트 생성 (MCP 최적화용)
+   *
+   * 목표: 150-200ms 응답 시간으로 즉시 응답 반환
+   * 전략: 최소 처리 + 백그라운드 Queue 사용
+   *
+   * 처리 흐름:
+   * 1. 최소 검증 (블로그 존재, 컨텐츠 비어있지 않음)
+   * 2. 포스트 생성 (status='processing', 원본 markdown만 저장)
+   * 3. 백그라운드 Job Queue에 추가
+   * 4. 즉시 202 Accepted 응답 반환
+   *
+   * 백그라운드 Worker가 처리:
+   * - Markdown → HTML 변환
+   * - Content 처리 (HTML sanitization, code highlighting, image processing)
+   * - File link 처리 (S3 key 추출, FileContext 업데이트)
+   * - Search vector 생성
+   * - Status 업데이트 ('processing' → 'published' 또는 'failed')
+   *
+   * @param createPostDto - 포스트 생성 DTO
+   * @param user - 작성자 정보
+   * @returns 생성된 포스트 정보 (status='processing' 상태)
+   */
+  async createFast(createPostDto: CreatePostDto, user: User): Promise<any> {
+    const startTime = Date.now();
+
+    // 1. 블로그 존재 확인 (필수)
+    const blog = await this.blogsRepository.findOne({
+      where: { userId: user.id },
+    });
+
+    if (!blog) {
+      throw new BadRequestException('블로그를 먼저 생성해주세요.');
+    }
+
+    // 2. 컨텐츠 검증 (content_markdown 또는 content 필수)
+    const markdownContent = createPostDto.content_markdown || createPostDto.content;
+    if (!markdownContent) {
+      throw new BadRequestException('게시글 내용이 필요합니다.');
+    }
+
+    // 3. 태그 처리
+    const tagList = createPostDto.tags || [];
+
+    // 4. 간단한 excerpt 생성 (제목 기반, 빠른 처리)
+    // Worker에서 content 기반 excerpt로 교체됨
+    const quickExcerpt = createPostDto.title.substring(0, 200);
+
+    // 5. 포스트 생성 (status='processing')
+    const post = this.postsRepository.create({
+      title: createPostDto.title,
+      category: createPostDto.category,
+      content: '', // 임시 빈 문자열 (Worker에서 렌더링된 HTML로 교체)
+      content_markdown: markdownContent, // 원본 저장
+      excerpt: quickExcerpt, // 임시 excerpt (Worker에서 교체)
+      content_type: 'markdown',
+      content_rendered_at: null, // Worker에서 설정
+      thumbnail: createPostDto.thumbnail,
+      author: user,
+      blog: blog,
+      blogId: blog.id,
+      isPublished: true, // 공개 상태 (하지만 status='processing'이므로 목록에 안 보임)
+      publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
+      tagList: tagList,
+      qualityScore: createPostDto.qualityScore || null,
+      status: 'processing', // 핵심: 백그라운드 처리 대기 중
+      processingError: null,
+      processingCompletedAt: null,
+    });
+
+    // 6. DB 저장 (빠른 저장, content 처리 스킵)
+    await this.postsRepository.save(post);
+
+    // 7. 백그라운드 Job Queue에 추가
+    await this.postProcessingQueue.add('process-post', {
+      postId: post.id,
+      userId: user.id,
+      blogId: blog.id,
+      title: post.title,
+      content: markdownContent,
+      tags: tagList,
+      category: post.category,
+    });
+
+    const processingTime = Date.now() - startTime;
+    this.logger.log(`✅ Fast Path 완료: ${post.id} (${processingTime}ms) - Worker 처리 대기 중`);
+
+    // 8. 202 Accepted 응답 반환 (즉시 응답)
+    return {
+      ...this.toPostDto(post, {
+        user: user,
+        blog: blog,
+      }),
+      // 추가 메타데이터
+      _meta: {
+        processingStatus: 'queued',
+        message: '포스트가 생성되었습니다. 백그라운드에서 처리 중입니다.',
+        estimatedCompletion: '2-3초 후 완료 예상',
+        processingTime: `${processingTime}ms`,
+      },
+    };
   }
 
   private async findPostById(id: string): Promise<Post> {
@@ -498,7 +608,8 @@ export class PostsService {
     // 캐시용이면 비공개 블로그 제외
     if (isForCache) {
       query.where('blog.isPublic = :isPublic', { isPublic: true })
-        .andWhere('post.isPublished = :isPublished', { isPublished: true });
+        .andWhere('post.isPublished = :isPublished', { isPublished: true })
+        .andWhere('post.status = :status', { status: 'published' });
     } else {
       // Admin can see all posts, regular users only see published posts
       if (user?.role === Role.ADMIN) {
@@ -508,7 +619,10 @@ export class PostsService {
         }
       } else {
         // Regular users: always show only published posts
-        query.where('post.isPublished = :isPublished', { isPublished: true });
+        query.where('post.isPublished = :isPublished AND post.status = :status', {
+          isPublished: true,
+          status: 'published'
+        });
       }
     }
 
@@ -590,13 +704,13 @@ export class PostsService {
         authorId: post.authorId,
         qualityScore: post.qualityScore,
         version: post.version,
-        // 날짜 포맷팅
-        publishedAt: formatDate(post.publishedAt),
-        createdAt: formatDate(post.createdAt),
-        updatedAt: formatDate(post.updatedAt),
+        // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
+        publishedAt: post.publishedAt,
+        createdAt: post.createdAt,
+        updatedAt: post.updatedAt,
         // Editor's Pick 필드 추가
         isEditorPick: post.isEditorPick || false,
-        editorPickedAt: post.editorPickedAt ? formatDate(post.editorPickedAt) : null,
+        editorPickedAt: post.editorPickedAt,
         // 카운트 필드들
         commentCount: post.commentCount || 0,
         likeCount: post.likeCount || 0,
@@ -712,6 +826,7 @@ export class PostsService {
         'blog.isPublic'
       ])
       .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.status = :status', { status: 'published' })
       .andWhere('blog.isPublic = :isPublic', { isPublic: true });
 
     // 기간별 필터링
@@ -764,10 +879,10 @@ export class PostsService {
       viewCount: post.viewCount || 0,
       likeCount: post.likeCount || 0,
       commentCount: post.commentCount || 0,
-      // 날짜 포맷팅
-      createdAt: formatDate(post.createdAt),
-      updatedAt: formatDate(post.updatedAt),
-      publishedAt: post.publishedAt ? formatDate(post.publishedAt) : null,
+      // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
+      createdAt: post.createdAt,
+      updatedAt: post.updatedAt,
+      publishedAt: post.publishedAt,
       // 태그와 썸네일
       tags: post.tagList || [],
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
@@ -898,7 +1013,8 @@ export class PostsService {
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId',
       ])
       .where('post.slug = :slug', { slug })
-      .andWhere('post.isPublished = :isPublished', { isPublished: true });
+      .andWhere('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.status = :status', { status: 'published' });
 
     // 사용자가 있는 경우에만 좋아요 상태와 북마크 상태를 서브쿼리로 확인
     if (user) {
@@ -961,10 +1077,7 @@ export class PostsService {
     postDto.tags = post.tagList || []; // 태그 필드 추가 (프론트엔드 호환성)
     postDto.viewCount = post.viewCount + 1; // 증가된 조회수 반영
 
-    // 날짜 포맷 적용
-    postDto.publishedAt = formatDate(post.publishedAt) as any;
-    postDto.createdAt = formatDate(post.createdAt) as any;
-    postDto.updatedAt = formatDate(post.updatedAt) as any;
+    // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화 (formatDate 제거)
 
     return postDto;
   }
@@ -1145,7 +1258,7 @@ export class PostsService {
   async publish(id: string): Promise<Post> {
     const post = await this.findPostById(id);
     post.isPublished = true;
-    post.publishedAt = new Date();
+    post.publishedAt = new Date(); // 현재 시간 (TypeORM이 자동으로 처리)
     return this.postsRepository.save(post);
   }
 
@@ -1158,7 +1271,12 @@ export class PostsService {
 
   async getStats(): Promise<any> {
     const totalPosts = await this.postsRepository.count();
-    const publishedPosts = await this.postsRepository.count({ where: { isPublished: true } });
+    const publishedPosts = await this.postsRepository.count({
+      where: {
+        isPublished: true,
+        status: 'published'
+      }
+    });
     const draftPosts = totalPosts - publishedPosts;
 
     const topCategories = await this.postsRepository
@@ -1166,6 +1284,7 @@ export class PostsService {
       .select('post.category', 'category')
       .addSelect('COUNT(*)', 'count')
       .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.status = :status', { status: 'published' })
       .andWhere('post.category IS NOT NULL')
       .groupBy('post.category')
       .orderBy('count', 'DESC')
@@ -1451,6 +1570,7 @@ export class PostsService {
       .createQueryBuilder('post')
       .select('DISTINCT post.category', 'category')
       .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.status = :status', { status: 'published' })
       .andWhere('post.category IS NOT NULL')
       .getRawMany();
 
@@ -1464,6 +1584,7 @@ export class PostsService {
     const query = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.status = :status', { status: 'published' })
       .andWhere('post.category = :category', { category });
 
     const [posts, total] = await query
@@ -1785,6 +1906,7 @@ export class PostsService {
       .select('jsonb_array_elements_text(post.tagList) as tag')
       .addSelect('COUNT(*)', 'count')
       .where('post.isPublished = true')
+      .andWhere('post.status = :status', { status: 'published' })
       .andWhere('jsonb_array_length(post.tagList) > 0')
       .groupBy('tag')
       .orderBy('count', 'DESC')
@@ -1895,6 +2017,7 @@ export class PostsService {
       .leftJoin('post.blog', 'blog')
       .where('post.isEditorPick = :isEditorPick', { isEditorPick: true })
       .andWhere('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.status = :status', { status: 'published' })
       .orderBy('post.editorPickedAt', 'DESC') // 최신 Pick 순
       .take(safeLimit);
 

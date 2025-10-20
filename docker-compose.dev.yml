@@ -1,0 +1,90 @@
+# ============================================
+# Codebase 블로그 플랫폼 - Development Override
+# ============================================
+# docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# ============================================
+
+services:
+  # ============================================
+  # PostgreSQL (개발 환경 전용)
+  # ============================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
+      POSTGRES_DB: ${DB_NAME:-blog-dev}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - codebase_network
+    restart: unless-stopped
+
+  # ============================================
+  # Backend (개발 모드 - Hot Reload)
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: development
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-backend
+    env_file:
+      - .env.development
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    command: pnpm run start:dev
+
+  # ============================================
+  # MCP Proxy (개발 모드 - Hot Reload)
+  # ============================================
+  mcp-proxy:
+    build:
+      context: ./mcp-proxy-server
+      dockerfile: Dockerfile
+      target: development
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-mcp-proxy
+    env_file:
+      - .env.development
+    ports:
+      - "${MCP_PROXY_PORT:-3002}:3002"
+    volumes:
+      - ./mcp-proxy-server:/app
+      - /app/node_modules
+    depends_on:
+      backend:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    command: pnpm run dev
+
+volumes:
+  postgres_data:
+    name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-postgres-data
+
+networks:
+  codebase_network:
+    name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-network

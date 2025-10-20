@@ -12,8 +12,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { OAuthGuard } from '../../oauth/guards/oauth.guard';
-import { RequireScopes } from '../../oauth/decorators/scopes.decorator';
+import { ApiKeyGuard } from '../guards/api-key.guard';
 import { PostsService } from '../../posts/posts.service';
 import { CreatePostDto } from '../../posts/dto/create-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -21,15 +20,15 @@ import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Public } from '../../common/decorators/public.decorator';
 import { CacheService } from '../../cache/cache.service';
-// FUTURE: 구독제 활성화 시 주석 해제
-// import { UsageService } from '../../usage/usage.service';
+import { UsageService } from '../../usage/usage.service';
 
 /**
  * MCP Proxy 컨트롤러
- * MCP 서버가 OAuth2 토큰을 사용하여 블로그에 포스트를 생성할 수 있도록 하는 프록시 엔드포인트
+ * MCP 서버가 API Key를 사용하여 블로그에 포스트를 생성할 수 있도록 하는 프록시 엔드포인트
  * 보안을 위해 오직 포스트 생성만 허용하며, 다른 작업은 모두 차단됨
  *
  * Rate Limit: 분당 3회, 시간당 10회, 하루 20회 (ThrottlerGuard 사용)
+ * 인증: API Key (X-API-Key 헤더)
  */
 @ApiTags('MCP')
 @Controller('mcp')
@@ -44,8 +43,7 @@ export class McpProxyController {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly cacheService: CacheService,
-    // FUTURE: 구독제 활성화 시 주석 해제
-    // private readonly usageService: UsageService,
+    private readonly usageService: UsageService,
   ) {}
 
   /**
@@ -69,17 +67,16 @@ export class McpProxyController {
 
   /**
    * MCP를 통한 포스트 생성
-   * OAuth2 토큰에 바인딩된 블로그에만 포스트 생성 가능
+   * API Key로 인증된 블로그에만 포스트 생성 가능
    */
   @Post('posts')
-  @UseGuards(OAuthGuard)
-  @RequireScopes('mcp:post:create')
-  @HttpCode(HttpStatus.CREATED)
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'MCP 포스트 생성',
-    description: 'MCP 클라이언트가 OAuth2 인증을 통해 블로그에 포스트를 생성합니다. 토큰에 바인딩된 블로그에만 작성 가능합니다.',
+    summary: 'MCP 포스트 생성 (Fast Path)',
+    description: 'MCP 클라이언트가 API Key 인증을 통해 블로그에 포스트를 생성합니다. Fast Path 방식으로 즉시 응답하고 백그라운드에서 처리합니다.',
   })
-  @ApiResponse({ status: 201, description: '포스트 생성 성공' })
+  @ApiResponse({ status: 202, description: '포스트 생성 요청 접수 (백그라운드 처리 중)' })
   @ApiResponse({ status: 401, description: '인증 실패' })
   @ApiResponse({ status: 403, description: '권한 없음' })
   @ApiResponse({ status: 400, description: '잘못된 요청' })
@@ -87,13 +84,8 @@ export class McpProxyController {
     @Req() req: any,
     @Body() createPostDto: CreatePostDto,
   ) {
-    // OAuth 정보 추출 (OAuthGuard에서 설정)
-    const { userId, blogId, scopes } = req.oauth;
-
-    // 스코프 재확인 (중복 확인이지만 보안상 중요)
-    if (!scopes.includes('mcp:post:create')) {
-      throw new ForbiddenException('포스트 생성 권한이 없습니다');
-    }
+    // API Key 정보 추출 (ApiKeyGuard에서 설정)
+    const { userId, blogId } = req.apiKey;
 
     // MCP에서 오는 content_markdown은 원본 마크다운 (base64 인코딩 없음)
     // PostsService.create는 user를 통해 blogId를 자동으로 찾으므로
@@ -127,13 +119,12 @@ export class McpProxyController {
         this.logger.log(`[MCP Post Size Check] Length: ${contentLength.toLocaleString()} chars, Size: ${(contentSize / 1024).toFixed(2)} KB`);
       }
 
-      // FUTURE: 구독제 활성화 시 주석 해제
-      // // 2. MCP 포스트 제한 체크 (일간 + 월간 제한 모두 확인)
-      // const limitCheck = await this.usageService.checkMcpPostLimit(userId);
-      // if (!limitCheck.canPost) {
-      //   this.logger.warn(`[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`);
-      //   throw new ForbiddenException(limitCheck.reason);
-      // }
+      // 2. MCP 포스트 제한 체크 (월간 제한 확인)
+      const limitCheck = await this.usageService.checkMcpPostLimit(userId);
+      if (!limitCheck.canPost) {
+        this.logger.warn(`[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`);
+        throw new ForbiddenException(limitCheck.reason);
+      }
 
       // 3. User 객체 조회 (PostsService가 User를 필요로 함)
       const user = await this.userRepository.findOne({ where: { id: userId } });
@@ -141,13 +132,12 @@ export class McpProxyController {
         throw new BadRequestException('사용자를 찾을 수 없습니다');
       }
 
-      // 4. 포스트 생성 (서비스 레이어에서 추가 검증)
-      const post = await this.postsService.create(postData, user);
+      // 4. 포스트 생성 (Fast Path: 150-200ms 응답, 백그라운드 처리)
+      const post = await this.postsService.createFast(postData, user);
 
-      // FUTURE: 구독제 활성화 시 주석 해제
-      // // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
-      // await this.usageService.trackMcpPost(userId);
-      // this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
+      // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
+      await this.usageService.trackMcpPost(userId);
+      this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
 
       // 🔥 Redis 캐시 무효화 (MCP 자동포스팅도 즉시 반영되도록)
       // 작성자의 "내 블로그"에서 즉시 확인 가능하도록 블로그별 캐시 제거
@@ -168,15 +158,16 @@ export class McpProxyController {
         )
       );
 
-      this.logger.log(`✅ [MCP Post Created] Post ID: ${post.id}, Blog: ${post.blog?.slug}`);
+      this.logger.log(`✅ [MCP Post Created - Fast Path] Post ID: ${post.id}, Blog: ${post.blog?.slug}, Processing: ${post._meta?.processingTime || 'N/A'}`);
 
-      // MCP 응답 최적화: 최소 필수 정보만 반환하여 응답 시간 단축
+      // MCP 응답 최적화: 최소 필수 정보 + Fast Path 메타데이터 반환
       return {
         id: post.id,
         slug: post.slug,
         title: post.title,
         url: `/${post.blog.slug}/${post.slug}`,  // 새 URL 구조 적용 (리다이렉트 제거)
         blog: post.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
+        _meta: post._meta,  // Fast Path 메타데이터 (처리 상태, 예상 완료 시간 등)
       };
     } catch (error) {
       // 에러 로깅 (디버깅을 위해 전체 에러 출력)

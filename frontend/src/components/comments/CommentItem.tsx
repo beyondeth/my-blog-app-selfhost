@@ -164,7 +164,7 @@ export default function CommentItem({
             src={comment.author.profileImage}
             alt={comment.author.username || '익명'}
             fallback={comment.author.username || '익명'}
-            size="sm"
+            size={level === 0 ? "md" : "xs"}
           />
         </div>
 
@@ -189,42 +189,75 @@ export default function CommentItem({
               </span>
             </div>
 
-            {/* More Options Menu - Only show if not the author */}
-            {!isAuthor && (
-              <div className="relative">
-                <button
-                  onClick={() => {
-                    if (!user) return; // 로그인하지 않은 경우 실행 안 함
-                    setShowDropdown(!showDropdown);
-                  }}
-                  className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-600 dark:hover:text-gray-400 dark:hover:bg-gray-700 rounded transition-colors"
-                  title="더보기"
-                >
-                  <FiMoreVertical className="w-4 h-4" />
-                </button>
+            {/* More Options Menu - Show for all comments */}
+            <div className="relative">
+              <button
+                onClick={() => {
+                  if (!user) return; // 로그인하지 않은 경우 실행 안 함
+                  setShowDropdown(!showDropdown);
+                }}
+                className="p-1 text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:text-gray-600 dark:hover:text-gray-400 dark:hover:bg-gray-700 rounded transition-colors"
+                title="더보기"
+              >
+                <FiMoreVertical className="w-4 h-4" />
+              </button>
 
-                {showDropdown && (
-                  <>
-                    {/* Backdrop */}
-                    <div
-                      className="fixed inset-0 z-10"
-                      onClick={() => setShowDropdown(false)}
-                    />
+              {showDropdown && (
+                <>
+                  {/* Backdrop */}
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setShowDropdown(false)}
+                  />
 
-                    {/* Dropdown Menu */}
-                    <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
-                      <button
-                        onClick={handleReport}
-                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <FiFlag className="mr-2 w-3 h-3" />
-                        신고
-                      </button>
-                    </div>
-                  </>
-                )}
-              </div>
-            )}
+                  {/* Dropdown Menu */}
+                  <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-20">
+                    {isAuthor ? (
+                      <>
+                        {/* Edit & Delete for own comments */}
+                        {canEdit && (
+                          <button
+                            onClick={() => {
+                              setIsEditing(true);
+                              setShowDropdown(false);
+                            }}
+                            disabled={isLoading}
+                            className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors disabled:opacity-50"
+                          >
+                            <FiEdit3 className="mr-2 w-3 h-3" />
+                            수정
+                          </button>
+                        )}
+                        {canDelete && (
+                          <button
+                            onClick={() => {
+                              handleDelete();
+                              setShowDropdown(false);
+                            }}
+                            disabled={isLoading}
+                            className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                          >
+                            <FiTrash2 className="mr-2 w-3 h-3" />
+                            삭제
+                          </button>
+                        )}
+                      </>
+                    ) : (
+                      <>
+                        {/* Report for other's comments */}
+                        <button
+                          onClick={handleReport}
+                          className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        >
+                          <FiFlag className="mr-2 w-3 h-3" />
+                          신고
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
 
           {/* Comment Content */}
@@ -292,27 +325,6 @@ export default function CommentItem({
                   <FiMessageCircle className="w-4 h-4" />
                   <span className="text-xs">답글</span>
                 </button>
-
-                {/* Edit/Delete */}
-                {canEdit && (
-                  <button
-                    onClick={() => setIsEditing(true)}
-                    disabled={isLoading}
-                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2 py-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <FiEdit3 className="w-4 h-4" />
-                  </button>
-                )}
-
-                {canDelete && (
-                  <button
-                    onClick={handleDelete}
-                    disabled={isLoading}
-                    className="text-xs text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20"
-                  >
-                    <FiTrash2 className="w-4 h-4" />
-                  </button>
-                )}
               </div>
             </>
           )}
@@ -329,6 +341,7 @@ export default function CommentItem({
                 placeholder={level >= 1 ? `@${comment.author.username}에게 답글...` : "답글을 작성해주세요..."}
                 submitText="답글 작성"
                 maxLength={1000}
+                autoFocus={true}
               />
             </div>
           )}

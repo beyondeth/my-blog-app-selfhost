@@ -6,9 +6,12 @@ import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { EmailVerification } from '@/components/auth/EmailVerification';
 import { FiEye, FiEyeOff, FiLock, FiUser, FiArrowLeft, FiMail } from 'react-icons/fi';
+import { useQueryClient } from '@tanstack/react-query';
+import { userBlogQueryKey } from '@/hooks/useUserBlogV2';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { register, isLoading, clearError } = useAuth();
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
@@ -155,12 +158,15 @@ export default function RegisterPage() {
     });
     
     try {
+      // 회원가입 - register API가 blog 정보를 포함해서 응답하므로
+      // useRegister의 onSuccess에서 자동으로 캐시에 저장됨 (근본적 해결)
       await register({
         username: formData.username,
         email: formData.email,
         password: formData.password,
         emailVerificationToken
       });
+
       router.push('/');
     } catch (error: any) {
       // 에러 메시지에 따라 적절한 필드에 에러 표시

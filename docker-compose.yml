@@ -1,46 +1,42 @@
-version: '3.8'
+# ============================================
+# Codebase 블로그 플랫폼 - Base Docker Compose
+# ============================================
+# 이 파일은 기본 설정이며, 환경별로 오버라이드 파일과 함께 사용합니다.
+#
+# 개발 환경:
+#   docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+#
+# 프로덕션 환경:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# ============================================
 
 services:
+  # ============================================
+  # Redis (공유 캐시 및 큐)
+  # ============================================
   redis:
-    image: redis:7-alpine
-    container_name: myblog_redis
+    image: redis:7.4-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase}-shared-redis
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 6gb --maxmemory-policy allkeys-lru
+    command: redis-server --appendonly yes --maxmemory 6gb --maxmemory-policy noeviction
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
     networks:
-      - myblog_network
-
-  postgres:
-    image: postgres:14
-    container_name: myblog_postgres
-    environment:
-      POSTGRES_USER: ${DB_USER:-postgres}
-      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
-      POSTGRES_DB: ${DB_NAME:-blog-db}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-    networks:
-      - myblog_network
+      - codebase_network
+    restart: unless-stopped
 
 volumes:
   redis_data:
-  postgres_data:
+    name: ${COMPOSE_PROJECT_NAME:-codebase}-redis-data
 
 networks:
-  myblog_network:
+  codebase_network:
+    name: ${COMPOSE_PROJECT_NAME:-codebase}-network
     driver: bridge
-    

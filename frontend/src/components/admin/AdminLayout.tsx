@@ -16,12 +16,14 @@ import {
   Image,
   Bug,
   Database,
-  AlertTriangle
+  AlertTriangle,
+  Key
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { toast } from 'sonner';
 import { t } from '@/constants/adminTranslations';
+import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 
 interface NavigationItem {
   name: string;
@@ -36,8 +38,9 @@ const navigation: NavigationItem[] = [
   { name: t.navigation.users, href: '/admin/users', icon: Users },
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
+  { name: 'MCP 대시보드', href: '/admin/mcp', icon: Key, adminOnly: true, badge: 'New' },
   { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
-  { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true, badge: 'New' },
+  { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: t.navigation.settings, href: '/admin/settings', icon: Settings },
@@ -101,7 +104,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-[#181818]">
       {/* Mobile sidebar backdrop */}
       {sidebarOpen && (
         <div
@@ -112,23 +115,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
       {/* Sidebar */}
       <div
-        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white border-r border-gray-200 lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col transform ${
+        className={`fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-white dark:bg-[#1F1F1F] border-r border-gray-200 dark:border-[#2A2A2A] lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col transform ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } transition-transform duration-300 ease-in-out lg:translate-x-0`}
       >
-        <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-200">
-          <div className="flex items-center">
+        <div className="flex h-16 shrink-0 items-center justify-between px-6 border-b border-gray-200 dark:border-[#2A2A2A]">
+          <div className="flex items-center space-x-3">
             <div className="relative">
-              <Shield className="h-8 w-8 text-indigo-600 fill-indigo-200" />
+              <Shield className="h-8 w-8 text-indigo-600 dark:text-indigo-400 fill-indigo-200 dark:fill-indigo-900" />
               <div className="absolute inset-0 h-8 w-8 animate-shimmer">
-                <Shield className="h-8 w-8 text-indigo-500 fill-transparent" />
+                <Shield className="h-8 w-8 text-indigo-500 dark:text-indigo-500 fill-transparent" />
               </div>
             </div>
-            <span className="ml-2 text-xl font-semibold">{t.navigation.adminPanel}</span>
+            <span className="ml-2 text-xl font-semibold text-gray-900 dark:text-[#FDFDFD]">{t.navigation.adminPanel}</span>
+            {/* 테마 토글 버튼 */}
+            <ThemeSwitch />
           </div>
           <button
             type="button"
-            className="lg:hidden"
+            className="lg:hidden text-gray-700 dark:text-gray-300"
             onClick={() => setSidebarOpen(false)}
           >
             <X className="h-6 w-6" />
@@ -151,20 +156,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 href={item.href}
                 className={`group flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
                   isActive
-                    ? 'bg-indigo-50 text-indigo-600'
-                    : 'text-gray-700 hover:text-gray-900 hover:bg-gray-50'
+                    ? 'bg-indigo-50 dark:bg-[#2D2D2D] text-indigo-600 dark:text-indigo-400'
+                    : 'text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-[#FDFDFD] hover:bg-gray-50 dark:hover:bg-[#2D2D2D]'
                 }`}
               >
                 <div className="flex items-center">
                   <Icon
                     className={`mr-3 h-5 w-5 ${
-                      isActive ? 'text-indigo-600' : 'text-gray-400 group-hover:text-gray-500'
+                      isActive ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400'
                     }`}
                   />
                   {item.name}
                 </div>
                 {item.badge && (
-                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200">
                     {item.badge}
                   </span>
                 )}
@@ -173,7 +178,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           })}
         </nav>
 
-        <div className="border-t border-gray-200 p-4">
+        <div className="border-t border-gray-200 dark:border-[#2A2A2A] p-4">
           <div className="flex items-center">
             <img
               className="h-8 w-8 rounded-full"
@@ -181,14 +186,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               alt={user.username}
             />
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-700">{user.username}</p>
-              <p className="text-xs text-gray-500 capitalize">{user.role}</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{user.username}</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 capitalize">{user.role}</p>
             </div>
           </div>
           <Button
             onClick={handleLogout}
             variant="ghost"
-            className="mt-3 w-full justify-start"
+            className="mt-3 w-full justify-start text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-[#FDFDFD] hover:bg-gray-100 dark:hover:bg-[#2D2D2D]"
           >
             <LogOut className="mr-2 h-4 w-4" />
             {t.navigation.logout}
@@ -199,20 +204,20 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       {/* Main content */}
       <div className="lg:pl-64">
         {/* Mobile header */}
-        <div className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 bg-white px-4 shadow-sm lg:hidden">
+        <div className="sticky top-0 z-10 flex h-16 shrink-0 items-center gap-x-4 border-b border-gray-200 dark:border-[#2A2A2A] bg-white dark:bg-[#1F1F1F] px-4 shadow-sm lg:hidden">
           <button
             type="button"
-            className="text-gray-700"
+            className="text-gray-700 dark:text-gray-300"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-6 w-6" />
           </button>
           <div className="flex flex-1 items-center justify-between">
-            <h1 className="text-lg font-semibold">{t.navigation.adminPanel}</h1>
+            <h1 className="text-lg font-semibold text-gray-900 dark:text-[#FDFDFD]">{t.navigation.adminPanel}</h1>
             <div className="relative">
-              <Shield className="h-6 w-6 text-indigo-600 fill-indigo-200" />
+              <Shield className="h-6 w-6 text-indigo-600 dark:text-indigo-400 fill-indigo-200 dark:fill-indigo-900" />
               <div className="absolute inset-0 h-6 w-6 animate-shimmer">
-                <Shield className="h-6 w-6 text-indigo-500 fill-transparent" />
+                <Shield className="h-6 w-6 text-indigo-500 dark:text-indigo-500 fill-transparent" />
               </div>
             </div>
           </div>
