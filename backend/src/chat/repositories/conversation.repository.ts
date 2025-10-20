@@ -183,10 +183,10 @@ export class ConversationRepository {
 
   async findUserConversations(userId: string): Promise<Conversation[]> {
     /**
-     * 단순화된 대화 목록 조회
-     * - 복잡한 EXISTS 서브쿼리 제거
-     * - MessageRepository.saveBatch에서 자동으로 deletedAt을 null로 리셋하므로
-     *   나간 후 새 메시지가 있는 경우를 체크할 필요 없음
+     * 대화 목록 조회
+     * - 삭제하지 않은 대화 표시 (deletedAt IS NULL)
+     * - 삭제했지만 새 메시지가 있는 대화도 표시 (lastMessageAt > deletedAt)
+     * - 삭제 후 새 메시지가 오면 대화는 다시 나타나지만, 이전 메시지는 보이지 않음
      */
     return this.repository
       .createQueryBuilder('conversation')
@@ -199,8 +199,8 @@ export class ConversationRepository {
       ])
       .where(
         new Brackets((qb) => {
-          qb.where('conversation.user1Id = :userId AND conversation.user1DeletedAt IS NULL')
-            .orWhere('conversation.user2Id = :userId AND conversation.user2DeletedAt IS NULL');
+          qb.where('conversation.user1Id = :userId AND (conversation.user1DeletedAt IS NULL OR conversation.lastMessageAt > conversation.user1DeletedAt)')
+            .orWhere('conversation.user2Id = :userId AND (conversation.user2DeletedAt IS NULL OR conversation.lastMessageAt > conversation.user2DeletedAt)');
         })
       )
       .setParameters({ userId })

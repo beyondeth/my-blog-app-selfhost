@@ -1,9 +1,11 @@
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useMessageManagement } from '@/hooks/useMessageManagement';
 import { useChatWithQuery } from '@/hooks/chat/useChatWithQuery';
+import { useSocketManager } from '@/hooks/chat/useSocketManager';
+import { SOCKET_EVENTS } from '@/constants/chat';
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
@@ -14,6 +16,8 @@ interface DMChatAreaProps {
 
 const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
   const { user } = useAuth();
+  const chatAreaRef = useRef<HTMLDivElement>(null);
+  const { socket } = useSocketManager();
   const {
     currentConversation,
     typingUser,
@@ -37,6 +41,27 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
   const otherUser = currentConversation?.user1Id === user?.id
     ? currentConversation?.user2
     : currentConversation?.user1;
+
+  // 채팅창 외부 클릭 처리 - 대화방 나가기
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      // 채팅 영역 외부를 클릭하면 대화방에서 나감
+      if (chatAreaRef.current && !chatAreaRef.current.contains(e.target as Node)) {
+        if (socket) {
+          socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+          console.log('[채팅] 외부 클릭으로 대화방 나감:', conversationId);
+        }
+      }
+    };
+
+    // mousedown 이벤트 리스너 추가
+    document.addEventListener('mousedown', handleOutsideClick);
+
+    // 클린업
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [conversationId, socket]);
 
   // Track last read message position (no backend calls)
   useEffect(() => {
@@ -74,7 +99,7 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    <div ref={chatAreaRef} className="flex flex-col h-full">
       {/* Header */}
       <ChatHeader otherUser={otherUser} conversationId={conversationId} />
 

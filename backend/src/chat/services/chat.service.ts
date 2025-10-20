@@ -510,17 +510,37 @@ export class ChatService {
       { lastMessageAt: new Date() }
     );
 
-    // If the recipient has left, reactivate the conversation for them
-    // so they can see new messages
-    // recipientId already declared above, just check if they've left
+    // 대화방에 활성 상태인 사용자들 확인 (Redis Set 사용)
+    const activeUsers = await this.unifiedRedisService.getSetMembers(
+      'conversation',
+      `${dto.conversationId}:active-users`
+    );
+
+    // 수신자가 현재 대화방에 있으면 자동으로 읽음 처리
+    const isRecipientActive = activeUsers.includes(String(recipientId));
+
+    if (isRecipientActive) {
+      // 수신자가 대화방에 실시간으로 있으므로 메시지를 읽은 것으로 처리
+      const updateData = recipientId === conversation.user1Id
+        ? { user1LastReadAt: new Date() }
+        : { user2LastReadAt: new Date() };
+
+      await this.conversationRepository.update(dto.conversationId, updateData);
+
+      if (process.env.NODE_ENV === 'development') {
+        console.log(`[ChatService] 수신자(${recipientId})가 대화방에 있어서 자동 읽음 처리`);
+      }
+    }
+
+    // 수신자가 대화를 삭제했었는지 확인
     const recipientHasLeft =
       (conversation.user1Id === recipientId && conversation.user1DeletedAt) ||
       (conversation.user2Id === recipientId && conversation.user2DeletedAt);
 
     if (recipientHasLeft && process.env.NODE_ENV === 'development') {
-      console.log('[ChatService] Recipient had left this conversation, but new message will make it reappear for them');
-      // Note: We do NOT reset their deletedAt here - they'll see the conversation
-      // in the list due to the new message, but only see messages after they left
+      console.log('[ChatService] 수신자가 삭제했던 대화에 새 메시지 전송 - 대화 목록에 다시 표시됨 (이전 메시지는 보이지 않음)');
+      // deletedAt은 유지하여 이전 메시지는 보이지 않도록 함
+      // 대화 목록에는 lastMessageAt > deletedAt 조건으로 표시됨
     }
 
     // Clear cache for both sender and recipient in parallel
@@ -536,14 +556,24 @@ export class ChatService {
         .to(`conversation:${dto.conversationId}`)
         .emit('new-message', fullMessage);
 
-      // Also emit notification to recipient's user room (even if they've left,
-      // so the conversation can reappear in their list)
-      this.chatGateway.server
-        .to(`user:${recipientId}`)
-        .emit('message-notification', {
-          conversationId: dto.conversationId,
-          message: fullMessage,
-        });
+      // 수신자가 대화방에 없을 때만 notification 발생
+      if (!isRecipientActive) {
+        // 대화방에 없을 때만 알림 (읽지 않은 메시지 카운트 증가)
+        this.chatGateway.server
+          .to(`user:${recipientId}`)
+          .emit('message-notification', {
+            conversationId: dto.conversationId,
+            message: fullMessage,
+          });
+
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[ChatService] 수신자(${recipientId})가 대화방에 없어서 message-notification 발생`);
+        }
+      } else {
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`[ChatService] 수신자(${recipientId})가 대화방에 있어서 notification 생략 (자동 읽음 처리됨)`);
+        }
+      }
 
       // If recipient had left, also send event to refresh their conversation list
       if (recipientHasLeft) {

@@ -68,13 +68,17 @@ export class MessageRepository {
         });
 
         if (conversation) {
-          const updateData: any = { lastMessageAt: new Date() };
+          // 새 메시지가 전송되면 lastMessageAt만 업데이트
+          // deletedAt은 유지하여 이전 메시지는 보이지 않도록 함
+          const updateData: any = {
+            lastMessageAt: new Date()
+          };
 
-          // 발신자에 따라 deletedAt 리셋
+          // 발신자가 대화를 삭제했었다면 발신자의 deletedAt만 리셋
           senderIds.forEach(senderId => {
-            if (senderId === conversation.user1Id) {
+            if (senderId === conversation.user1Id && conversation.user1DeletedAt) {
               updateData.user1DeletedAt = null;
-            } else if (senderId === conversation.user2Id) {
+            } else if (senderId === conversation.user2Id && conversation.user2DeletedAt) {
               updateData.user2DeletedAt = null;
             }
           });

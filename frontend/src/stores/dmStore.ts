@@ -193,6 +193,14 @@ export const useDMStore = create<DMStore>()(
       // Conversation management actions
       leaveConversation: async (conversationId) => {
         try {
+          // Socket 이벤트 먼저 발생 (전역 socket 인스턴스 사용)
+          const socketManager = (window as any).__socketManager;
+          if (socketManager?.socket) {
+            socketManager.socket.emit('leave-conversation', conversationId);
+            console.log('[DMStore] WebSocket leave 이벤트 발생:', conversationId);
+          }
+
+          // HTTP DELETE 요청
           const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
           const response = await fetch(`${API_URL}/chat/conversation/${conversationId}`, {
             method: 'DELETE',

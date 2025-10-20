@@ -178,6 +178,7 @@ export class ChatGateway
   /**
    * 채팅방 입장 처리
    * - Socket.io room 입장
+   * - Redis Set에 활성 사용자 추가
    * - lastReadAt 현재 시간으로 업데이트 (unreadCount 0으로 만들기)
    * - 다른 사용자들에게 입장 알림
    */
@@ -191,10 +192,21 @@ export class ChatGateway
     // Socket.io room 입장
     client.join(`conversation:${conversationId}`);
 
+    // Redis Set에 활성 사용자 추가 (대화방에 실제로 있는 사용자 추적)
+    await this.unifiedRedisService.addToSet(
+      'conversation',
+      `${conversationId}:active-users`,
+      userId
+    );
+
     // Room 멤버십 확인 로그 제거 - 디버깅용이므로 개발 환경에서만
     if (process.env.NODE_ENV === 'development' && process.env.DEBUG_CHAT === 'true') {
       const rooms = Array.from(client.rooms);
-      console.log(`[채팅] Room 입장 - User: ${userId}, Conv: ${conversationId}`);
+      const activeUsers = await this.unifiedRedisService.getSetMembers(
+        'conversation',
+        `${conversationId}:active-users`
+      );
+      console.log(`[채팅] Room 입장 - User: ${userId}, Conv: ${conversationId}, 활성 사용자: ${activeUsers.join(', ')}`);
     }
 
     /**
@@ -226,6 +238,7 @@ export class ChatGateway
   /**
    * 채팅방 나가기 처리
    * - Socket.io room에서 나가기
+   * - Redis Set에서 활성 사용자 제거
    * - lastReadAt는 변경하지 않음 (나간 시점부터 unreadCount 증가)
    * - 다른 사용자들에게 퇴장 알림
    */
@@ -236,6 +249,22 @@ export class ChatGateway
   ) {
     const userId = client.data.userId;
     client.leave(`conversation:${conversationId}`);
+
+    // Redis Set에서 활성 사용자 제거
+    await this.unifiedRedisService.removeFromSet(
+      'conversation',
+      `${conversationId}:active-users`,
+      userId
+    );
+
+    // 디버깅용 로그
+    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_CHAT === 'true') {
+      const activeUsers = await this.unifiedRedisService.getSetMembers(
+        'conversation',
+        `${conversationId}:active-users`
+      );
+      console.log(`[채팅] Room 퇴장 - User: ${userId}, Conv: ${conversationId}, 남은 활성 사용자: ${activeUsers.join(', ')}`);
+    }
 
     // lastReadAt 유지 (나간 후 메시지는 읽지 않은 것으로 처리)
 

@@ -6,6 +6,8 @@ import ConfirmModal from '../ConfirmModal';
 import { Avatar } from '@/components/ui/avatar';
 import { User } from '../DMLayout/DMLayout.types';
 import { useDMStore } from '@/stores/dmStore';
+import { useSocketManager } from '@/hooks/chat/useSocketManager';
+import { SOCKET_EVENTS } from '@/constants/chat';
 
 interface ChatHeaderProps {
   otherUser?: User | null;
@@ -15,6 +17,7 @@ interface ChatHeaderProps {
 
 const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conversationId }) => {
   const { setActiveConversation, setConversationListVisible, leaveConversation } = useDMStore();
+  const { socket } = useSocketManager();
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
 
@@ -34,6 +37,13 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
 
     setIsLeaving(true);
     try {
+      // WebSocket으로 먼저 leave 이벤트 발생
+      if (socket) {
+        socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
+        console.log('[채팅] X 버튼 - WebSocket leave 이벤트 발생:', conversationId);
+      }
+
+      // 그 다음 HTTP DELETE 요청
       await leaveConversation(conversationId);
       setShowLeaveModal(false);
       // Navigate back to conversation list

@@ -7,6 +7,13 @@ import { useEffect, useCallback, useState } from 'react';
 import { useSocket } from '../useSocket';
 import { SOCKET_EVENTS } from '@/constants/chat';
 
+// 전역 접근을 위한 타입 선언
+declare global {
+  interface Window {
+    __socketManager?: { socket: any };
+  }
+}
+
 export interface UseSocketManagerReturn {
   socket: any;
   connectionStatus: 'connected' | 'disconnected' | 'reconnecting';
@@ -20,6 +27,20 @@ export interface UseSocketManagerReturn {
 export function useSocketManager(): UseSocketManagerReturn {
   const socket = useSocket();
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'reconnecting'>('disconnected');
+
+  // 전역 접근을 위한 socket 인스턴스 저장
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.__socketManager = { socket };
+    }
+
+    // 클린업 시 제거
+    return () => {
+      if (typeof window !== 'undefined') {
+        delete window.__socketManager;
+      }
+    };
+  }, [socket]);
 
   // Connection status management
   useEffect(() => {
