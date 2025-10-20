@@ -188,10 +188,10 @@ function CommentSectionContent({ postId, postAuthorId, totalCommentCount }: Comm
     );
 }
 
-export default function CommentSection({ postId, postAuthorId }: CommentSectionProps) {
+export default function CommentSection({ postId, postAuthorId, totalCommentCount }: CommentSectionProps) {
   return (
     <CommentProvider>
-      <CommentSectionContent postId={postId} postAuthorId={postAuthorId} />
+      <CommentSectionContent postId={postId} postAuthorId={postAuthorId} totalCommentCount={totalCommentCount} />
     </CommentProvider>
   );
 }

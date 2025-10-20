@@ -15,6 +15,7 @@ import CommentItemPaginated from './CommentItemPaginated';
 interface CommentSectionPaginatedProps {
   postId: string;
   postAuthorId?: string;
+  totalCommentCount?: number; // Total comment count from parent (includes all replies)
 }
 
 type SortType = 'recent' | 'popular';
@@ -33,7 +34,7 @@ type SortType = 'recent' | 'popular';
  * - 첫 페이지만 Redis 캐싱 (TTL 10초)
  * - 정렬 변경 시 전체 리셋
  */
-export default function CommentSectionPaginated({ postId, postAuthorId }: CommentSectionPaginatedProps) {
+export default function CommentSectionPaginated({ postId, postAuthorId, totalCommentCount }: CommentSectionPaginatedProps) {
   const [sortType, setSortType] = useState<SortType>('popular');
   const [snapshotTimestamp, setSnapshotTimestamp] = useState<string | undefined>();
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -122,7 +123,6 @@ export default function CommentSectionPaginated({ postId, postAuthorId }: Commen
 
   // 평탄화된 댓글 목록
   const flatComments = flattenPaginatedComments(data);
-  const totalCount = data?.pages?.[0]?.totalCount;
 
   if (isError) {
     return (
@@ -141,7 +141,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId }: Commen
         <div className="flex items-center gap-2">
           <FiMessageCircle className="w-5 h-5 text-gray-700 dark:text-gray-300" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            댓글 {totalCount !== undefined ? `${totalCount}개` : ''}
+            댓글 {totalCommentCount !== undefined ? `${totalCommentCount}개` : ''}
           </h2>
         </div>
 
