@@ -37,6 +37,25 @@ export class AdminMetricsController {
   ) {}
 
   /**
+   * 캐시 메트릭 미리보기 (Grafana 연동 전 테스트용)
+   * @returns 현재 등록된 모든 캐시 메트릭 목록
+   */
+  @Get('cache-metrics-preview')
+  @ApiOperation({
+    summary: '캐시 메트릭 미리보기',
+    description: 'Grafana 연동 전 Prometheus 형식의 캐시 메트릭 확인'
+  })
+  async getCacheMetricsPreview(): Promise<string[]> {
+    const metricsText = await register.metrics();
+    const lines = metricsText.split('\n');
+
+    // cache_ 로 시작하는 메트릭만 필터링
+    return lines.filter(line =>
+      line.includes('cache_') && !line.startsWith('#')
+    );
+  }
+
+  /**
    * 관리자용 메트릭 대시보드 데이터
    * @returns 포맷된 메트릭 정보 (JSON)
    */

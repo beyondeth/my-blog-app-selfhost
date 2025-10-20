@@ -9,14 +9,16 @@ import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { MetricsService } from './metrics.service';
 import { ChatMetricsService } from './chat-metrics.service';
 import { LikeMetricsService } from './like-metrics.service';
+import { CacheMetricsService } from './cache-metrics.service';
 import { AdminMetricsController } from './admin-metrics.controller';
+import { MetricsController } from './metrics.controller';
 import { RedisModule } from '../redis/redis.module';
 
 @Module({
   imports: [
     PrometheusModule.register({
-      // Prometheus가 메트릭을 수집할 엔드포인트 (환경변수로 설정)
-      path: process.env.METRICS_PATH || '/internal/health-check-2f4a8b9c',
+      // PrometheusModule의 자동 엔드포인트 비활성화 (커스텀 컨트롤러 사용)
+      path: null,
       // 기본 Node.js 메트릭 활성화
       defaultMetrics: {
         enabled: true,
@@ -32,8 +34,8 @@ import { RedisModule } from '../redis/redis.module';
     }),
     RedisModule,
   ],
-  controllers: [AdminMetricsController],
-  providers: [MetricsService, ChatMetricsService, LikeMetricsService],
-  exports: [MetricsService, ChatMetricsService, LikeMetricsService],
+  controllers: [MetricsController, AdminMetricsController],
+  providers: [MetricsService, ChatMetricsService, LikeMetricsService, CacheMetricsService],
+  exports: [MetricsService, ChatMetricsService, LikeMetricsService, CacheMetricsService],
 })
 export class MetricsModule {}

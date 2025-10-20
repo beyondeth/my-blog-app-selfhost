@@ -533,4 +533,92 @@ export class UnifiedRedisService {
       return 0;
     }
   }
+
+  /**
+   * Redis Set에 멤버 추가
+   * 대화방 활성 사용자 추적에 사용
+   */
+  async addToSet(namespace: string, key: string, member: string): Promise<void> {
+    const fullKey = this.buildKey(namespace, key);
+
+    try {
+      await this.redis.sadd(fullKey, member);
+      // TTL 설정 (대화방 활성 사용자는 1시간 유지)
+      await this.redis.expire(fullKey, 3600);
+
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`Set에 멤버 추가: ${fullKey} -> ${member}`);
+      }
+    } catch (error) {
+      this.logger.error(`Set 멤버 추가 실패: ${fullKey}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Redis Set에서 멤버 제거
+   * 대화방에서 나간 사용자 제거에 사용
+   */
+  async removeFromSet(namespace: string, key: string, member: string): Promise<void> {
+    const fullKey = this.buildKey(namespace, key);
+
+    try {
+      await this.redis.srem(fullKey, member);
+
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`Set에서 멤버 제거: ${fullKey} -> ${member}`);
+      }
+    } catch (error) {
+      this.logger.error(`Set 멤버 제거 실패: ${fullKey}`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Redis Set의 모든 멤버 조회
+   * 대화방 활성 사용자 목록 조회에 사용
+   */
+  async getSetMembers(namespace: string, key: string): Promise<string[]> {
+    const fullKey = this.buildKey(namespace, key);
+
+    try {
+      const members = await this.redis.smembers(fullKey);
+      return members || [];
+    } catch (error) {
+      this.logger.error(`Set 멤버 조회 실패: ${fullKey}`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Redis Set에 특정 멤버가 있는지 확인
+   * 사용자가 대화방에 있는지 빠른 확인에 사용
+   */
+  async isSetMember(namespace: string, key: string, member: string): Promise<boolean> {
+    const fullKey = this.buildKey(namespace, key);
+
+    try {
+      const result = await this.redis.sismember(fullKey, member);
+      return result === 1;
+    } catch (error) {
+      this.logger.error(`Set 멤버 확인 실패: ${fullKey}`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Redis Set의 크기 조회
+   * 대화방 활성 사용자 수 확인에 사용
+   */
+  async getSetSize(namespace: string, key: string): Promise<number> {
+    const fullKey = this.buildKey(namespace, key);
+
+    try {
+      const size = await this.redis.scard(fullKey);
+      return size || 0;
+    } catch (error) {
+      this.logger.error(`Set 크기 조회 실패: ${fullKey}`, error);
+      return 0;
+    }
+  }
 }

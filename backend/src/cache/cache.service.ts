@@ -1,11 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
+import { CacheMetricsService } from '../metrics/cache-metrics.service';
 
 // 캐시 TTL 상수 (초 단위)
 export enum CacheTTL {
-  SHORT = 60,        // 1분 - 댓글, 실시간 데이터
+  VERY_SHORT = 10,   // 10초 - 댓글 트리 (실시간성 중요)
+  SHORT = 60,        // 1분 - 실시간 데이터
   MEDIUM = 300,      // 5분 - 포스트 목록
-  LONG = 600,        // 10분 - 포스트 상세
+  LONG = 600,        // 10분 - 기타 데이터
+  POST_CORE = 1800,  // 30분 - 포스트 Core 데이터 (title, content, author 등)
   EXTRA_LONG = 1800, // 30분 - 프로필
   STATIC = 3600,     // 1시간 - 블로그 설정, 태그
 }
@@ -52,6 +55,25 @@ export const CacheKeys = {
   
   // API 키 (짧은 TTL)
   API_KEY: (keyId: string) => `api:key:${keyId}`,
+
+  // 포스트 Core 데이터 (counts 제외)
+  POST_CORE: (id: string) => `post:core:${id}`,
+
+  // 포스트 캐시 리빌딩 락 (Cache Stampede 방지)
+  POST_REBUILDING: (id: string) => `rebuilding:post:${id}`,
+
+  // ❌ 제거됨 (페이지네이션으로 대체)
+  // COMMENTS_TREE: (postId: string) => `comments:tree:${postId}`,
+
+  // 댓글 페이지네이션 (신규)
+  COMMENTS_PAGE_FIRST: (postId: string, sortBy: string) =>
+    `comments:page:first:${postId}:${sortBy}`, // 첫 페이지만 캐시
+  COMMENTS_TOTAL: (postId: string) => `comments:total:${postId}`, // 전체 부모 댓글 개수
+  COMMENT_REPLIES_FIRST: (commentId: string) =>
+    `comments:replies:first:${commentId}`, // 답글 첫 페이지만 캐시
+
+  // 댓글 캐시 리빌딩 락
+  COMMENTS_REBUILDING: (postId: string) => `rebuilding:comments:${postId}`,
 };
 
 @Injectable()
@@ -66,7 +88,28 @@ export class CacheService {
 
   constructor(
     private readonly unifiedRedisService: UnifiedRedisService,
+    private readonly cacheMetricsService: CacheMetricsService,
   ) {}
+
+  /**
+   * 키 패턴으로 캐시 타입 감지
+   * @param key - 캐시 키
+   * @returns 'post' | 'comments' | 'other'
+   */
+  private detectCacheType(key: string): 'post' | 'comments' | 'other' {
+    if (key.includes('post:core') || key.includes('rebuilding:post')) {
+      return 'post';
+    }
+    if (
+      key.includes('comments:page') ||
+      key.includes('comments:replies') ||
+      key.includes('comments:total') ||
+      key.includes('rebuilding:comments')
+    ) {
+      return 'comments';
+    }
+    return 'other';
+  }
 
   /**
    * 캐시에서 값 가져오기 - UnifiedRedisService 사용
@@ -78,10 +121,28 @@ export class CacheService {
       if (cached) {
         this.cacheHits++;
         this.logger.debug(`Cache HIT: ${key}`);
+
+        // Prometheus 메트릭 기록
+        const cacheType = this.detectCacheType(key);
+        if (cacheType === 'post') {
+          this.cacheMetricsService.recordPostCacheHit();
+        } else if (cacheType === 'comments') {
+          this.cacheMetricsService.recordCommentsCacheHit();
+        }
+
         return cached;
       }
       this.cacheMisses++;
       this.logger.debug(`Cache MISS: ${key}`);
+
+      // Prometheus 메트릭 기록
+      const cacheType = this.detectCacheType(key);
+      if (cacheType === 'post') {
+        this.cacheMetricsService.recordPostCacheMiss();
+      } else if (cacheType === 'comments') {
+        this.cacheMetricsService.recordCommentsCacheMiss();
+      }
+
       return null;
     } catch (error) {
       this.logger.error(`Cache GET error for key ${key}:`, error);
@@ -114,6 +175,14 @@ export class CacheService {
 
       this.cacheDeletes++;
       this.logger.debug(`Cache DEL: ${key}`);
+
+      // Prometheus 메트릭 기록 - 캐시 무효화
+      const cacheType = this.detectCacheType(key);
+      if (cacheType === 'post') {
+        this.cacheMetricsService.recordCacheInvalidation('post_core', 'manual');
+      } else if (cacheType === 'comments') {
+        this.cacheMetricsService.recordCacheInvalidation('comments_tree', 'manual');
+      }
     } catch (error) {
       this.logger.error(`Cache DEL error for key ${key}:`, error);
     }
@@ -535,11 +604,100 @@ export class CacheService {
       };
     } catch (error) {
       this.logger.error('Failed to get cache stats:', error);
-      return { 
+      return {
         totalKeys: 0,
         patterns: {},
-        error: 'Failed to get cache stats' 
+        error: 'Failed to get cache stats'
       };
+    }
+  }
+
+  /**
+   * 분산 락 획득 (Cache Stampede 방지)
+   * LikeQueueService의 pending 패턴 재사용
+   *
+   * @param key - 락 키
+   * @param ttl - 락 유지 시간 (초), 기본 5초
+   * @returns 락 획득 성공 여부
+   */
+  async acquireLock(key: string, ttl: number = 5): Promise<boolean> {
+    try {
+      const fullKey = `cache:${key}`;
+
+      // Redis GET: 키가 이미 존재하는지 확인
+      const exists = await this.unifiedRedisService.get(fullKey);
+      if (exists) {
+        this.logger.debug(`Lock already held: ${key}`);
+        return false; // 이미 락 존재
+      }
+
+      // Redis SET with TTL: 키가 없을 때만 설정
+      await this.unifiedRedisService.setWithExpiry(fullKey, '1', ttl);
+      this.logger.debug(`Lock acquired: ${key} (TTL: ${ttl}s)`);
+
+      // Prometheus 메트릭 기록 - 락 획득
+      const cacheType = this.detectCacheType(key);
+      if (cacheType === 'post' || cacheType === 'comments') {
+        this.cacheMetricsService.recordCacheLockAcquired(cacheType);
+      }
+
+      return true;
+    } catch (error) {
+      this.logger.error(`Failed to acquire lock ${key}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 분산 락 해제
+   *
+   * @param key - 락 키
+   */
+  async releaseLock(key: string): Promise<void> {
+    try {
+      const fullKey = `cache:${key}`;
+      await this.unifiedRedisService.del(fullKey);
+      this.logger.debug(`Lock released: ${key}`);
+    } catch (error) {
+      this.logger.error(`Failed to release lock ${key}:`, error);
+    }
+  }
+
+  /**
+   * 락이 해제될 때까지 대기 (최대 대기 시간 제한)
+   *
+   * @param key - 락 키
+   * @param maxWaitMs - 최대 대기 시간 (밀리초), 기본 5초
+   */
+  async waitForLock(key: string, maxWaitMs: number = 5000): Promise<void> {
+    const fullKey = `cache:${key}`;
+    const startTime = Date.now();
+
+    while (Date.now() - startTime < maxWaitMs) {
+      const locked = await this.unifiedRedisService.get(fullKey);
+      if (!locked) {
+        const waitTime = Date.now() - startTime;
+        this.logger.debug(`Lock released, proceeding: ${key} (waited ${waitTime}ms)`);
+
+        // Prometheus 메트릭 기록 - 락 대기
+        const cacheType = this.detectCacheType(key);
+        if (cacheType === 'post' || cacheType === 'comments') {
+          this.cacheMetricsService.recordCacheLockWaited(cacheType, waitTime);
+        }
+
+        return; // 락 해제됨
+      }
+
+      // 100ms 대기 후 재시도
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    this.logger.warn(`Lock wait timeout (${maxWaitMs}ms): ${key}`);
+
+    // Prometheus 메트릭 기록 - 타임아웃도 기록
+    const cacheType = this.detectCacheType(key);
+    if (cacheType === 'post' || cacheType === 'comments') {
+      this.cacheMetricsService.recordCacheLockWaited(cacheType, maxWaitMs);
     }
   }
 }
