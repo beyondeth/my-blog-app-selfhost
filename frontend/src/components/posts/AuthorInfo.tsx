@@ -87,7 +87,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
                     src={author.profileImage}
                     alt={author.username || 'Author'}
                     fallback={author.username || 'Author'}
-                    size="lg"
+                    size="md"
                     className="flex-shrink-0 hover:opacity-80 transition-opacity"
                   />
                   <div>
@@ -126,7 +126,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
           src={author.profileImage}
           alt={author.username || 'Author'}
           fallback={author.username || 'Author'}
-          size="lg"
+          size="md"
           className="flex-shrink-0"
         />
         <div className="flex-1">
