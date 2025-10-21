@@ -37,6 +37,7 @@ export default function MobileProfileDropdown({
             alt={user.username}
             fallback={user.username}
             size="sm"
+            priority={true}
           />
         </button>
       </DropdownMenuTrigger>

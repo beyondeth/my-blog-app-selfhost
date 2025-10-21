@@ -85,6 +85,7 @@ export default function OptimizedImage({
         sizes={sizes}
         style={responsiveStyle}
         loading={priority ? 'eager' : 'lazy'}
+        fetchPriority={priority ? 'high' : 'auto'}
         className={`block ${hasError ? 'opacity-50' : 'opacity-100'}`}
         onLoad={handleLoad}
         onError={handleError}

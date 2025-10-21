@@ -389,7 +389,7 @@ const PostArticle = React.memo(function PostArticle({
                 className="w-full h-full rounded-lg object-contain"
                 aspectRatio={100/94}
                 sizes="100px"
-                priority={false}
+                priority={priority}
               />
             </div>
             <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
@@ -399,7 +399,7 @@ const PostArticle = React.memo(function PostArticle({
                 className="w-full h-full rounded-lg object-contain"
                 aspectRatio={210/197}
                 sizes="210px"
-                priority={false}
+                priority={priority}
               />
             </div>
           </div>

@@ -13,6 +13,7 @@ interface AvatarProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
   onClick?: () => void;
+  priority?: boolean; // LCP 최적화: 헤더 프로필 이미지 우선 로드
 }
 
 const sizeClasses = {
@@ -31,13 +32,14 @@ const iconSizes = {
   xl: 'w-9 h-9',
 };
 
-export function Avatar({ 
-  src, 
-  alt = 'Avatar', 
+export function Avatar({
+  src,
+  alt = 'Avatar',
   fallback,
   size = 'sm',
   className,
-  onClick
+  onClick,
+  priority = false // 기본값: lazy loading
 }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,6 +89,7 @@ export function Avatar({
         fill
         sizes={size === 'xs' ? '24px' : size === 'sm' ? '32px' : size === 'md' ? '40px' : size === 'lg' ? '48px' : '64px'}
         className="object-contain"
+        priority={priority}
         onLoad={() => setIsLoading(false)}
         onError={() => {
           setImageError(true);
