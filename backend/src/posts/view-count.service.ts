@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
 import { Cron } from '@nestjs/schedule';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CacheService } from '../cache/cache.service';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class ViewCountService {
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
     private readonly cacheService: CacheService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -52,34 +54,6 @@ export class ViewCountService {
     }
   }
 
-  /**
-   * 인기 포스트 캐시 무효화
-   * @description 조회수 변경으로 인기 순위가 달라질 수 있으므로 인기 포스트 캐시 무효화
-   */
-  private async invalidatePopularPostsCache(): Promise<void> {
-    const popularPeriods = ['daily', 'weekly', 'monthly'];
-    const limits = [5, 10];
-
-    try {
-      const invalidationPromises = [];
-
-      for (const period of popularPeriods) {
-        for (const limit of limits) {
-          const cacheKey = `popular:posts:${period}:${limit}`;
-          invalidationPromises.push(
-            this.cacheService.delete(cacheKey).catch(err => {
-              this.logger.error(`Failed to invalidate cache key ${cacheKey}:`, err);
-            })
-          );
-        }
-      }
-
-      await Promise.all(invalidationPromises);
-      this.logger.log('✅ Invalidated popular posts cache after view count update');
-    } catch (error) {
-      this.logger.error('❌ Failed to invalidate popular posts cache:', error);
-    }
-  }
 
   /**
    * 모든 조회수를 DB에 반영
@@ -114,7 +88,10 @@ export class ViewCountService {
 
       // 조회수 업데이트 후 인기 포스트 캐시 무효화
       // 인기 순위 산정에 viewCount가 포함되므로 무효화 필요
-      await this.invalidatePopularPostsCache();
+      // 각 업데이트된 포스트에 대해 이벤트 발행
+      for (const [postId] of entries) {
+        this.eventEmitter.emit('post.popularity.updated', { postId });
+      }
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error('Failed to flush view counts:', error);

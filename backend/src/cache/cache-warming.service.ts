@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
-import { CacheService } from './cache.service';
+import { CacheService, CacheKeys } from './cache.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from '../posts/entities/post.entity';
@@ -59,7 +59,7 @@ export class CacheWarmingService {
 
       // 메인 피드 1-3페이지 미리 캐싱
       for (let page = 1; page <= 3; page++) {
-        const cacheKey = `feed:main:p${page}`;
+        const cacheKey = CacheKeys.FEED_HOME(page);
 
         // 기존 캐시 확인
         const existing = await this.cacheService.get(cacheKey);

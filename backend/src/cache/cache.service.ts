@@ -1,6 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRedis } from '@nestjs-modules/ioredis';
+import Redis from 'ioredis';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
 import { CacheMetricsService } from '../metrics/cache-metrics.service';
+import { createHash } from 'crypto';
 
 // 캐시 TTL 상수 (초 단위)
 export enum CacheTTL {
@@ -13,80 +16,101 @@ export enum CacheTTL {
   STATIC = 3600,     // 1시간 - 블로그 설정, 태그
 }
 
-// 캐시 키 생성 헬퍼
+// 표준화된 캐시 키 생성 헬퍼
 export const CacheKeys = {
-  // 블로그 관련
+  // Feed 관련 - 표준화된 패턴
+  FEED_HOME: (page: number = 1) => `feed:home:page:${page}`,
+  FEED_BLOG: (slug: string, page: number = 1) => `feed:blog:${slug}:page:${page}`,
+  FEED_EDITOR_PICKS: (limit?: number) =>
+    limit ? `feed:editor-picks:limit:${limit}` : 'feed:editor-picks',
+  FEED_POPULAR: (period: 'daily' | 'weekly' | 'monthly', limit?: number) =>
+    limit ? `feed:popular:${period}:limit:${limit}` : `feed:popular:${period}`,
+  FEED_SEARCH: (query: string, page: number = 1) => {
+    const hash = createHash('md5').update(query).digest('hex').substring(0, 8);
+    return `feed:search:${hash}:page:${page}`;
+  },
+  FEED_CATEGORY: (category: string, page: number = 1) =>
+    `feed:category:${category}:page:${page}`,
+  FEED_TAG: (tag: string, page: number = 1) =>
+    `feed:tag:${tag}:page:${page}`,
+
+  // Post 관련
+  POST_DETAIL: (id: string) => `post:${id}`,
+  POST_CORE: (id: string) => `post:core:${id}`,
+  POST_METRICS: (id: string) => `post:metrics:${id}`,
+  POST_COMMENTS: (id: string, page?: number) =>
+    page ? `post:${id}:comments:page:${page}` : `post:${id}:comments`,
+  POST_RELATED: (id: string) => `post:${id}:related`,
+  POST_BY_SLUG: (slug: string) => `post:slug:${slug}`,
+  POST_REBUILDING: (id: string) => `rebuilding:post:${id}`,
+
+  // User 관련
+  USER_BY_ID: (id: string) => `user:id:${id}`,
+  USER_PROFILE: (id: string) => `user:${id}:profile`,
+  USER_POSTS: (id: string, page: number = 1) =>
+    `user:${id}:posts:page:${page}`,
+  USER_COMMENTS: (id: string, page: number = 1) =>
+    `user:${id}:comments:page:${page}`,
+  USER_STATS: (id: string) => `user:${id}:stats`,
+  USER_BY_EMAIL: (email: string) => `user:email:${btoa(email)}`,
+
+  // Blog 관련
+  BLOG_INFO: (slug: string) => `blog:${slug}:info`,
+  BLOG_STATS: (slug: string) => `blog:${slug}:stats`,
+  BLOG_CATEGORIES: (slug: string) => `blog:${slug}:categories`,
+  BLOG_TAGS: (slug: string) => `blog:${slug}:tags`,
   BLOG_BY_SLUG: (slug: string) => `blog:slug:${slug}`,
   BLOG_BY_USER: (userId: string) => `blog:user:${userId}`,
   BLOG_BY_ID: (id: string) => `blog:id:${id}`,
-  
-  // 포스트 관련
-  POST_LIST: (page: number, limit: number, search?: string, blogSlug?: string) => {
-    const parts = ['posts', 'list', page, limit];
-    if (blogSlug) parts.push(blogSlug);
-    if (search) parts.push(btoa(search)); // Base64 인코딩으로 특수문자 처리
-    return parts.join(':');
-  },
-  POST_DETAIL: (id: string) => `post:${id}`,
-  POST_BY_SLUG: (slug: string) => `post:slug:${slug}`,
-  POST_COUNT: (blogId?: string) => blogId ? `post:count:blog:${blogId}` : 'post:count:all',
-  
-  // 인기 포스트 (기간별)
-  POPULAR_POSTS_DAILY: (limit: number = 5) => `popular:posts:daily:${limit}`,
-  POPULAR_POSTS_WEEKLY: (limit: number = 5) => `popular:posts:weekly:${limit}`,
-  POPULAR_POSTS_MONTHLY: (limit: number = 5) => `popular:posts:monthly:${limit}`,
-  
-  // 홈페이지 캐싱
-  HOME_PAGE_POSTS: (page: number) => `home:posts:page:${page}`,
-  
-  // 사용자 관련
-  USER_PROFILE: (username: string) => `user:profile:${username}`,
-  USER_BY_ID: (id: string) => `user:id:${id}`,
-  USER_BY_EMAIL: (email: string) => `user:email:${btoa(email)}`,
-  
-  // 태그 관련
-  TAG_LIST: () => 'tags:all',
-  TAG_BY_NAME: (name: string) => `tag:${name}`,
-  
+
+  // Comment 관련
+  COMMENT_TREE: (postId: string) => `comment:tree:${postId}`,
+  COMMENT_COUNT: (postId: string) => `comment:count:${postId}`,
+  COMMENTS_PAGE_FIRST: (postId: string, sortBy: string) =>
+    `comments:page:first:${postId}:${sortBy}`,
+  COMMENTS_TOTAL: (postId: string) => `comments:total:${postId}`,
+  COMMENT_REPLIES_FIRST: (commentId: string) =>
+    `comments:replies:first:${commentId}`,
+  COMMENTS_REBUILDING: (postId: string) => `rebuilding:comments:${postId}`,
+
   // 통계
-  BLOG_STATS: (blogId: string) => `stats:blog:${blogId}`,
   POST_VIEW_COUNT: (postId: string) => `views:post:${postId}`,
-  USER_STATS: (userId: string) => `stats:user:${userId}`,
-  
-  // API 키 (짧은 TTL)
+
+  // API 키
   API_KEY: (keyId: string) => `api:key:${keyId}`,
 
-  // 포스트 Core 데이터 (counts 제외)
-  POST_CORE: (id: string) => `post:core:${id}`,
+  // System 관련
+  SYSTEM_WARMING_LIST: () => `system:warming:list`,
+  SYSTEM_CACHE_STATS: () => `system:cache:stats`,
+  SYSTEM_CACHE_VERSION: () => `system:cache:version`,
 
-  // 포스트 캐시 리빌딩 락 (Cache Stampede 방지)
-  POST_REBUILDING: (id: string) => `rebuilding:post:${id}`,
-
-  // ❌ 제거됨 (페이지네이션으로 대체)
-  // COMMENTS_TREE: (postId: string) => `comments:tree:${postId}`,
-
-  // 댓글 페이지네이션 (신규)
-  COMMENTS_PAGE_FIRST: (postId: string, sortBy: string) =>
-    `comments:page:first:${postId}:${sortBy}`, // 첫 페이지만 캐시
-  COMMENTS_TOTAL: (postId: string) => `comments:total:${postId}`, // 전체 부모 댓글 개수
-  COMMENT_REPLIES_FIRST: (commentId: string) =>
-    `comments:replies:first:${commentId}`, // 답글 첫 페이지만 캐시
-
-  // 댓글 캐시 리빌딩 락
-  COMMENTS_REBUILDING: (postId: string) => `rebuilding:comments:${postId}`,
+  // 캐시 키 패턴 (와일드카드 포함)
+  PATTERN_ALL_FEEDS: () => `feed:*`,
+  PATTERN_BLOG_FEEDS: (slug: string) => `feed:blog:${slug}:*`,
+  PATTERN_HOME_PAGES: () => `feed:home:page:*`,
+  PATTERN_ALL_POPULAR: () => `feed:popular:*`,
+  PATTERN_POST_ALL: (id: string) => `post:*:${id}:*`,
+  PATTERN_USER_ALL: (id: string) => `user:${id}:*`,
+  PATTERN_BLOG_ALL: (slug: string) => `blog:${slug}:*`,
 };
 
 @Injectable()
 export class CacheService {
   private readonly logger = new Logger(CacheService.name);
 
-  // 캐시 통계 추적 (UnifiedRedisService에서 관리되지만 호환성을 위해 유지)
+  // Debounce 메커니즘
+  private readonly pendingInvalidations = new Map<string, NodeJS.Timeout>();
+  private readonly defaultDebounce = 500; // 500ms
+  private readonly defaultTTL = 300; // 5분
+
+  // 캐시 통계 추적
   private cacheHits = 0;
   private cacheMisses = 0;
   private cacheSets = 0;
   private cacheDeletes = 0;
 
   constructor(
+    @InjectRedis() private readonly redis: Redis,
     private readonly unifiedRedisService: UnifiedRedisService,
     private readonly cacheMetricsService: CacheMetricsService,
   ) {}
@@ -699,5 +723,116 @@ export class CacheService {
     if (cacheType === 'post' || cacheType === 'comments') {
       this.cacheMetricsService.recordCacheLockWaited(cacheType, maxWaitMs);
     }
+  }
+
+  /**
+   * 패턴 기반 캐시 무효화 (Debounce 지원)
+   * 여러 요청이 동시에 들어와도 한 번만 실행
+   */
+  async invalidatePattern(pattern: string, options?: { force?: boolean; debounce?: number }): Promise<void> {
+    // Force 옵션이 있으면 즉시 실행
+    if (options?.force) {
+      return this.executeInvalidation(pattern);
+    }
+
+    // Debounce 처리
+    const debounceTime = options?.debounce || this.defaultDebounce;
+
+    // 이미 대기 중인 무효화가 있으면 취소
+    const existingTimeout = this.pendingInvalidations.get(pattern);
+    if (existingTimeout) {
+      clearTimeout(existingTimeout);
+      this.logger.debug(`🔄 [Debounce] Cancelled previous invalidation for: ${pattern}`);
+    }
+
+    // 새로운 타임아웃 설정
+    const timeout = setTimeout(async () => {
+      await this.executeInvalidation(pattern);
+      this.pendingInvalidations.delete(pattern);
+      this.cacheMetricsService.recordDebounceHit();
+      this.logger.debug(`✅ [Debounce] Executed invalidation for: ${pattern}`);
+    }, debounceTime);
+
+    this.pendingInvalidations.set(pattern, timeout);
+    this.logger.debug(`⏳ [Debounce] Scheduled invalidation for: ${pattern} in ${debounceTime}ms`);
+  }
+
+  /**
+   * 실제 캐시 무효화 실행 (SCAN + UNLINK)
+   * Non-blocking 방식으로 대량 키 삭제
+   */
+  private async executeInvalidation(pattern: string): Promise<void> {
+    const startTime = Date.now();
+    let deletedCount = 0;
+
+    try {
+      // Redis에 저장된 키는 'cache:' prefix를 가지므로 패턴에도 추가
+      const scanPattern = `cache:${pattern}`;
+
+      // SCAN을 사용한 비차단 패턴 매칭
+      const stream = this.redis.scanStream({
+        match: scanPattern,
+        count: 100,
+      });
+
+      const keysToDelete: string[] = [];
+
+      stream.on('data', (keys: string[]) => {
+        if (keys.length > 0) {
+          keysToDelete.push(...keys);
+          this.logger.debug(`🔍 Found ${keys.length} keys matching: ${scanPattern}`);
+        }
+      });
+
+      await new Promise<void>((resolve, reject) => {
+        stream.on('end', async () => {
+          if (keysToDelete.length > 0) {
+            // UNLINK를 사용한 비차단 삭제
+            deletedCount = await this.redis.unlink(...keysToDelete);
+            this.logger.log(`🧹 Deleted ${deletedCount} keys for pattern: ${scanPattern}`);
+          } else {
+            this.logger.debug(`⚠️ No keys found matching: ${scanPattern}`);
+          }
+          resolve();
+        });
+
+        stream.on('error', reject);
+      });
+
+      // 메트릭 기록
+      const duration = Date.now() - startTime;
+      this.cacheMetricsService.recordPatternDeletion(pattern, deletedCount, duration);
+
+      if (deletedCount > 0) {
+        this.logger.log(`✅ Cache invalidation completed for: ${pattern} (${deletedCount} keys, ${duration}ms)`);
+      }
+    } catch (error) {
+      this.logger.error(`❌ Failed to invalidate pattern ${pattern}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 여러 패턴을 배치로 무효화
+   */
+  async invalidatePatterns(patterns: string[], options?: { force?: boolean; debounce?: number }): Promise<void> {
+    const promises = patterns.map(pattern =>
+      this.invalidatePattern(pattern, options)
+    );
+    await Promise.all(promises);
+  }
+
+  /**
+   * 서비스 종료 시 pending 패턴 정리
+   */
+  async onModuleDestroy(): Promise<void> {
+    // 모든 pending 타임아웃 취소
+    for (const [pattern, timeout] of this.pendingInvalidations) {
+      clearTimeout(timeout);
+      // 종료 시점에는 즉시 무효화 실행
+      await this.executeInvalidation(pattern);
+    }
+    this.pendingInvalidations.clear();
+    this.logger.log('🔚 [Shutdown] Cleared all pending cache invalidations');
   }
 }

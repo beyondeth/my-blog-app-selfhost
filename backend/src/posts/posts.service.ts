@@ -24,6 +24,7 @@ import { BookmarksService } from '../bookmarks/bookmarks.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-processing.queue';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 /**
  * 포스트 Core 데이터 타입 (실시간 카운트/상태 제외)
@@ -55,6 +56,7 @@ export class PostsService {
     private bookmarksService: BookmarksService,
     @InjectQueue(POST_PROCESSING_QUEUE)
     private postProcessingQueue: Queue<PostProcessingJobData>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -495,6 +497,12 @@ export class PostsService {
     // Lazy loading 방지: user.id를 직접 전달
     await this.linkFilesFromContent(post, user.id);
 
+    // 포스트 생성 이벤트 발행 (캐시 무효화용)
+    this.eventEmitter.emit('post.created', {
+      postId: post.id,
+      blogSlug: blog.slug,
+    });
+
     /**
      * DTO 변환으로 spread operator 제거
      * lazy loading 방지 및 성능 최적화
@@ -591,6 +599,12 @@ export class PostsService {
 
     const processingTime = Date.now() - startTime;
     this.logger.log(`✅ Fast Path 완료: ${post.id} (${processingTime}ms) - Worker 처리 대기 중`);
+
+    // 포스트 생성 이벤트 발행 (캐시 무효화용)
+    this.eventEmitter.emit('post.created', {
+      postId: post.id,
+      blogSlug: blog.slug,
+    });
 
     // 8. 202 Accepted 응답 반환 (즉시 응답)
     return {
@@ -851,7 +865,8 @@ export class PostsService {
     const safeLimit = Math.min(Math.max(limit, 1), 10); // 인기 게시글은 최대 10개
 
     // Redis 캐시 체크
-    const cacheKey = `popular:posts:${period}:${safeLimit}`;
+    const cacheKey = CacheKeys.FEED_POPULAR(period, safeLimit);
+
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
       this.logger.debug(`Cache hit for popular posts: ${cacheKey}`);
@@ -1342,10 +1357,11 @@ export class PostsService {
     // Lazy loading 방지: user.id를 직접 전달
     await this.linkFilesFromContent(post, user.id);
 
-    // DTO 변환으로 안전하게 반환 (spread 연산자 사용 금지)
-    // ⭐ Core 캐시 무효화
-    await this.cacheService.del(CacheKeys.POST_CORE(id));
-    this.logger.debug(`🗑️ Invalidated post core cache: ${id}`);
+    // 이벤트 발행 (캐시 무효화는 리스너가 처리)
+    this.eventEmitter.emit('post.updated', {
+      postId: id,
+      blogSlug: post.blog?.slug,
+    });
 
     return this.toPostDto(post, {
       user: post.author,
@@ -1361,6 +1377,9 @@ export class PostsService {
       throw new ForbiddenException('You can only delete your own posts');
     }
 
+    // 삭제 전 블로그 정보 백업 (이벤트 발행용)
+    const blogSlug = post.blog?.slug;
+
     // JSONB 기반 태그는 카운트 관리가 불필요함
     // 태그 통계는 필요시 집계 쿼리로 처리
 
@@ -1368,9 +1387,11 @@ export class PostsService {
     // post_tags, post_likes, post_files는 @JoinTable로 자동 처리됨
     await this.postsRepository.remove(post);
 
-    // ⭐ Core 캐시 무효화
-    await this.cacheService.del(CacheKeys.POST_CORE(id));
-    this.logger.debug(`🗑️ Invalidated post core cache: ${id}`);
+    // 이벤트 발행 (캐시 무효화는 리스너가 처리)
+    this.eventEmitter.emit('post.deleted', {
+      postId: id,
+      blogSlug: blogSlug,
+    });
 
     this.logger.log(`Post ${id} and all related data successfully deleted`);
   }
@@ -1696,39 +1717,18 @@ export class PostsService {
     // 4. 좋아요 처리 후 인기 포스트 캐시 무효화
     // 인기 순위 산정에 likeCount가 포함되므로 무효화 필요
     // popularity_score = viewCount + (likeCount × 3) + (commentCount × 2)
-    await this.invalidatePopularPostsCache();
+    // 이벤트 발행으로 캐시 무효화 (CacheInvalidationListener가 처리)
+    if (processedLikes.length > 0) {
+      // 영향받은 모든 포스트에 대해 이벤트 발행
+      const affectedPostIds = new Set(processedLikes.map(like => like.postId));
+      for (const postId of affectedPostIds) {
+        this.eventEmitter.emit('post.popularity.updated', { postId });
+      }
+    }
 
     return processedLikes.length;
   }
 
-  /**
-   * 인기 포스트 캐시 무효화
-   * @description 좋아요/댓글 변경으로 인기 순위가 달라질 수 있으므로 인기 포스트 캐시 무효화
-   */
-  private async invalidatePopularPostsCache(): Promise<void> {
-    const popularPeriods = ['daily', 'weekly', 'monthly'];
-    const limits = [5, 10];
-
-    try {
-      const invalidationPromises = [];
-
-      for (const period of popularPeriods) {
-        for (const limit of limits) {
-          const cacheKey = `popular:posts:${period}:${limit}`;
-          invalidationPromises.push(
-            this.cacheService.delete(cacheKey).catch(err => {
-              this.logger.error(`Failed to invalidate cache key ${cacheKey}:`, err);
-            })
-          );
-        }
-      }
-
-      await Promise.all(invalidationPromises);
-      this.logger.debug('✅ Invalidated popular posts cache after like/comment update');
-    } catch (error) {
-      this.logger.error('❌ Failed to invalidate popular posts cache:', error);
-    }
-  }
 
   // 조회수 증가 (로그인 유저만)
   private async incrementViewCountForUser(post: Post, user: User) {
@@ -2140,6 +2140,12 @@ export class PostsService {
     await this.postsRepository.save(post);
 
     this.logger.log(`Editor's Pick ${post.isEditorPick ? 'enabled' : 'disabled'} for post ${postId} by admin ${user.id}`);
+
+    // Editor's Pick 토글 이벤트 발행 (캐시 무효화용)
+    this.eventEmitter.emit('post.editorPick.toggled', {
+      postId: post.id,
+      isPicked: post.isEditorPick,
+    });
 
     return {
       message: post.isEditorPick ? 'Editor\'s Pick으로 선정되었습니다.' : 'Editor\'s Pick에서 해제되었습니다.',
