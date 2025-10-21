@@ -33,10 +33,9 @@
   opacity: 1 !important;
 }
 
+/* 이미지 wrapper 선택 시 - outline 제거하여 이중 외곽선 방지 */
 .resizable-image-wrapper.selected {
-  outline: 2px solid #3b82f6;
-  outline-offset: 2px;
-  border-radius: 4px;
+  /* outline 제거: 이미지의 border만 표시 */
 }
 
 .resizable-image-wrapper.resizing {
@@ -361,6 +360,7 @@
   pointer-events: auto;
 }
 
+/* 이미지 선택 시 스타일 - 이미지에 직접 border 표시 */
 .resizable-image.selected {
   border: 2px solid #3b82f6;
 }
