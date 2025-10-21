@@ -17,6 +17,7 @@ interface MessageItemProps {
   isOtherUserInRoom?: boolean;  // Whether other user is actively in the room
   otherUser?: User;
   onRetry?: (messageId: string) => void;
+  shouldShowTime?: boolean;  // Whether to show timestamp
 }
 
 const MessageItem: React.FC<MessageItemProps> = memo(({
@@ -29,6 +30,7 @@ const MessageItem: React.FC<MessageItemProps> = memo(({
   isOtherUserInRoom = false,
   otherUser,
   onRetry,
+  shouldShowTime = true,
 }) => {
 
   // 개별 메시지 읽음 표시 제거 - 대화 레벨에서만 읽음 상태 관리
@@ -136,11 +138,9 @@ const MessageItem: React.FC<MessageItemProps> = memo(({
             )}
           </div>
 
-          {/* Time and read status - only for last message in group */}
-          {isLastInGroup && (
+          {/* Time - 같은 "분" 안의 마지막 메시지에만 표시 */}
+          {shouldShowTime && (
             <div className="flex flex-col items-end gap-0.5">
-              {/* 개별 메시지 읽음 표시 제거 - 대화 레벨에서만 관리 */}
-              {/* Time */}
               <span className={`text-xs text-gray-500 ${message.status === 'failed' ? 'text-red-500' : ''}`}>
                 {formatTime(message.createdAt)}
               </span>

@@ -16,6 +16,11 @@ FROM node:22-slim AS development
 # 작업 디렉토리 설정
 WORKDIR /app
 
+# 시스템 패키지 설치 (procps: ps 명령어 포함, NestJS watch mode 필요)
+RUN apt-get update && \
+    apt-get install -y procps && \
+    rm -rf /var/lib/apt/lists/*
+
 # pnpm 설치 (Node 22와 호환되는 최신 버전)
 RUN npm install -g pnpm@latest
 

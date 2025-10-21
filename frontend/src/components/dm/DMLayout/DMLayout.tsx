@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react';
 import { useDMStore } from '@/stores/dmStore';
 import { useWindowSize } from '@/hooks/useWindowSize';
+import { useMyBlocks } from '@/hooks/useBlock';
 import DMSidebar from '../DMSidebar/DMSidebar';
 import DMConversationList from '../DMConversationList/DMConversationList';
 import DMChatArea from '../DMChatArea/DMChatArea';
@@ -18,10 +19,24 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
     activeConversationId,
     isSidebarCollapsed,
     isConversationListVisible,
-    setConversationListVisible
+    setConversationListVisible,
+    setBlockedUsers
   } = useDMStore();
 
   const { isMobile } = useWindowSize();
+
+  // 차단 목록 로드
+  const { data: blockedData } = useMyBlocks(1, 100);
+
+  // 차단 목록을 dmStore에 설정
+  useEffect(() => {
+    if (blockedData?.data) {
+      // Block 엔티티에서 blockedId만 추출하여 Set으로 변환
+      const blockedUserIds = blockedData.data.map((block: any) => block.blockedId);
+      setBlockedUsers(blockedUserIds);
+      console.log('[DMLayout] 차단 목록 로드:', blockedUserIds);
+    }
+  }, [blockedData, setBlockedUsers]);
 
   // Handle responsive layout
   useEffect(() => {

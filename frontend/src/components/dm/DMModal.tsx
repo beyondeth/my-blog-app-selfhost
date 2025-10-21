@@ -33,7 +33,14 @@ const DMModal: React.FC<DMModalProps> = ({
 
   // Handle outside click
   const handleOutsideClick = useCallback((e: MouseEvent) => {
-    if (modalRef.current && !modalRef.current.contains(e.target as Node) && !isFullscreen) {
+    const target = e.target as HTMLElement;
+
+    // Portal로 렌더링된 모달들(신고, 차단 등)을 클릭한 경우 무시
+    if (target.closest('[data-portal-modal]')) {
+      return;
+    }
+
+    if (modalRef.current && !modalRef.current.contains(target) && !isFullscreen) {
       onClose();
     }
   }, [onClose, isFullscreen]);

@@ -37,8 +37,8 @@ export function useModal(): UseModalReturn {
   const handleImageClick = useCallback((e: React.MouseEvent<HTMLElement>) => {
     const target = e.target as HTMLElement;
 
-    // 이미지 클릭 확인
-    if (target.tagName === 'IMG' && target.dataset.clickable === 'true') {
+    // 이미지 클릭 확인 (모든 이미지 클릭 가능)
+    if (target.tagName === 'IMG') {
       e.preventDefault();
       e.stopPropagation();
 

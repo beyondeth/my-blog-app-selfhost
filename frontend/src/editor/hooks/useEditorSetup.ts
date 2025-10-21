@@ -7,6 +7,7 @@ import { useEditor } from '@tiptap/react';
 import { useEffect, useRef } from 'react';
 import { getEditorExtensions } from '../config/editor-extensions';
 import { createEditorHandlers } from './useEditorHandlers';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 // YouTube 관련 import 제거 - 더 이상 필요하지 않음
 
 interface EditorSetupProps {
@@ -18,18 +19,19 @@ interface EditorSetupProps {
 }
 
 /**
- * S3 Presigned URL을 Proxy endpoint로 변환
- * 만료된 Presigned URL 문제 해결
+ * HTML 내의 모든 이미지 URL을 CDN URL로 정규화
+ * S3 URL, 프록시 URL 등을 CDN URL로 변환
  */
-function convertS3UrlsToProxy(html: string): string {
+function normalizeContentImageUrls(html: string): string {
   if (!html) return html;
 
-  // S3 direct URL을 proxy endpoint로 변환
-  // https://myblogdata84.s3.us-east-1.amazonaws.com/uploads/image/...
-  // → /api/v1/files/proxy/uploads/image/...
+  // HTML 내의 모든 img 태그의 src 속성을 CDN URL로 변환
   return html.replace(
-    /https:\/\/[^\/]+\.s3\.[^\/]+\.amazonaws\.com\/(uploads\/[^"?]+)(?:\?[^"]*)?/g,
-    '/api/v1/files/proxy/$1'
+    /<img([^>]*?)src="([^"]*)"([^>]*?)>/g,
+    (match, beforeSrc, srcUrl, afterSrc) => {
+      const normalizedUrl = normalizeImageUrl(srcUrl);
+      return `<img${beforeSrc}src="${normalizedUrl}"${afterSrc}>`;
+    }
   );
 }
 
@@ -190,8 +192,8 @@ export function useEditorSetup({
     if (editor && content !== editor.getHTML()) {
       // 에디터가 포커스되어 있지 않을 때만 내용 업데이트
       if (!editor.isFocused) {
-        // S3 Presigned URL을 Proxy endpoint로 변환 (만료 문제 해결)
-        const transformedContent = convertS3UrlsToProxy(content);
+        // 모든 이미지 URL을 CDN URL로 정규화
+        const transformedContent = normalizeContentImageUrls(content);
         editor.commands.setContent(transformedContent);
       }
     }

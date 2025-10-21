@@ -15,7 +15,6 @@ const DMConversationList: React.FC = () => {
     setActiveConversation,
     conversationFilter,
     setShowUnreadOnly,
-    leaveConversation,
     conversationListVersion,
   } = useDMStore();
 
@@ -53,13 +52,6 @@ const DMConversationList: React.FC = () => {
 
     return () => clearInterval(interval);
   }, [refreshConversations]);
-
-  // Handle leave conversation
-  const handleLeaveConversation = useCallback(async (conversationId: string) => {
-    await leaveConversation(conversationId);
-    // The store will handle clearing active conversation if needed
-    // and incrementing conversationListVersion to trigger refresh
-  }, [leaveConversation]);
 
   // Handle scroll for infinite loading
   const handleScroll = useCallback(() => {
@@ -187,7 +179,6 @@ const DMConversationList: React.FC = () => {
                 currentUserId={user?.id || ''}
                 isActive={activeConversationId === conversation.id}
                 onClick={handleConversationClick}
-                onLeaveConversation={handleLeaveConversation}
               />
             ))}
 

@@ -20,7 +20,7 @@ import ImageUploadManager, { UploadedImageInfo } from './components/ImageManager
 
 // Utils
 import { validateImageFile } from '@/utils/imageUtils';
-import { getProxyImageUrl, normalizeImageUrl, debugLog } from '@/utils/imageUtils';
+import { normalizeImageUrl, debugLog } from '@/utils/imageUtils';
 import { getErrorMessage } from '@/utils/queryHelpers';
 import { stripUnderline } from '@/utils/stripUnderline';
 
@@ -86,9 +86,9 @@ export default function BlogRichTextEditor({
         fileType: 'image' as const,
       });
       const imageUrl = (result as any).url || (result as any).accessUrl;
-      
-      const normalizedUrl = normalizeImageUrl(imageUrl);
-      const finalUrl = getProxyImageUrl(normalizedUrl) || normalizedUrl;
+
+      // CDN URL로 정규화 (프록시 불필요)
+      const finalUrl = normalizeImageUrl(imageUrl);
       const imageId = String(result.id);
       
       debugLog('image-upload', '이미지 업로드 성공');

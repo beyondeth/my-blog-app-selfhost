@@ -1,12 +1,9 @@
 'use client';
 
-import React, { memo, useMemo, useState } from 'react';
+import React, { memo, useMemo } from 'react';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Avatar } from '@/components/ui/avatar';
-import { LogOut } from 'lucide-react';
-import { useDMStore } from '@/stores/dmStore';
-import ConfirmModal from '../ConfirmModal';
 import { Conversation } from '@/types/chat';
 
 interface ConversationItemProps {
@@ -14,7 +11,6 @@ interface ConversationItemProps {
   currentUserId: string;
   isActive: boolean;
   onClick: (conversationId: string) => void;
-  onLeaveConversation?: (conversationId: string) => Promise<void>;
 }
 
 const ConversationItem: React.FC<ConversationItemProps> = memo(({
@@ -23,10 +19,6 @@ const ConversationItem: React.FC<ConversationItemProps> = memo(({
   isActive,
   onClick,
 }) => {
-  const [isHovered, setIsHovered] = useState(false);
-  const [showLeaveModal, setShowLeaveModal] = useState(false);
-  const [isLeaving, setIsLeaving] = useState(false);
-  const { leaveConversation } = useDMStore();
   // Get the other user in the conversation
   const otherUser = useMemo(() => {
     return conversation.user1Id === currentUserId
@@ -73,29 +65,9 @@ const ConversationItem: React.FC<ConversationItemProps> = memo(({
     return `${content.slice(0, maxLength)}...`;
   }, [conversation.lastMessage]);
 
-  const handleLeaveClick = (e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent triggering onClick
-    setShowLeaveModal(true);
-  };
-
-  const handleConfirmLeave = async () => {
-    setIsLeaving(true);
-    try {
-      await leaveConversation(conversation.id);
-      setShowLeaveModal(false);
-    } catch (error) {
-      console.error('Error leaving conversation:', error);
-    } finally {
-      setIsLeaving(false);
-    }
-  };
-
   return (
-    <>
-      <div
-        onClick={() => onClick(conversation.id)}
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
+    <div
+      onClick={() => onClick(conversation.id)}
       className={`
         relative
         flex
@@ -118,11 +90,11 @@ const ConversationItem: React.FC<ConversationItemProps> = memo(({
         <Avatar
           src={otherUser?.profileImage}
           fallback={otherUser?.username?.[0]?.toUpperCase() || '?'}
-          size="md"
+          size="sm"
           className="ring-2 ring-white"
         />
         {otherUser?.isOnline && (
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full" />
+          <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 border-2 border-white rounded-full" />
         )}
       </div>
 
@@ -173,44 +145,7 @@ const ConversationItem: React.FC<ConversationItemProps> = memo(({
           )}
         </div>
       </div>
-
-      {/* Leave button - shown on hover */}
-      {isHovered && (
-        <button
-          onClick={handleLeaveClick}
-          className="
-            absolute
-            right-2
-            top-1/2
-            -translate-y-1/2
-            p-2
-            rounded-lg
-            bg-gray-100
-            text-gray-600
-            hover:bg-gray-200
-            hover:text-gray-800
-            transition-all
-            duration-200
-          "
-          title="대화방 나가기"
-        >
-          <LogOut className="w-4 h-4" />
-        </button>
-      )}
     </div>
-
-    {/* Leave Confirmation Modal */}
-    <ConfirmModal
-      isOpen={showLeaveModal}
-      onClose={() => setShowLeaveModal(false)}
-      onConfirm={handleConfirmLeave}
-      title="대화방 나가기"
-      message="대화 내용이 사라집니다. 진행하시겠습니까?"
-      confirmText="나가기"
-      cancelText="취소"
-      isLoading={isLeaving}
-    />
-  </>
   );
 }, (prevProps, nextProps) => {
   // Custom comparison for performance

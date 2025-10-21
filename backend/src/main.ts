@@ -58,8 +58,25 @@ async function bootstrap() {
         defaultSrc: ["'self'"],
         styleSrc: ["'self'", "'unsafe-inline'"],
         scriptSrc: ["'self'", "'unsafe-inline'"], // OAuth 페이지의 인라인 스크립트를 위해 추가
-        imgSrc: ["'self'", "data:", "https:", "http://localhost:*", "*.s3.amazonaws.com", "*.cloudfront.net"],
-        connectSrc: ["'self'", "http://localhost:*", "https:", "*.s3.amazonaws.com", "*.cloudfront.net"],
+        imgSrc: [
+          "'self'",
+          "data:",
+          "https:",
+          "http://localhost:*",
+          "*.s3.amazonaws.com",        // AWS S3
+          "*.oraclecloud.com",         // Oracle OCI Object Storage
+          // Cloudflare CDN (계정 생성 후 실제 도메인으로 교체 필요)
+          // 예: "cdn.yourdomain.com"
+        ],
+        connectSrc: [
+          "'self'",
+          "http://localhost:*",
+          "https:",
+          "*.s3.amazonaws.com",        // AWS S3
+          "*.oraclecloud.com",         // Oracle OCI Object Storage
+          // Cloudflare CDN (계정 생성 후 실제 도메인으로 교체 필요)
+          // 예: "cdn.yourdomain.com"
+        ],
         formAction: ["'self'", "http://localhost:*"], // OAuth 폼 제출을 위해 추가
       },
     },

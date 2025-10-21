@@ -11,14 +11,25 @@ const nextConfig = {
   },
 
   images: {
-    domains: [
-      'd1y66zmnw3oigo.cloudfront.net', // CloudFront CDN
-      'myblogdata84.s3.amazonaws.com', // S3 글로벌 도메인
-      'myblogdata84.s3.us-east-1.amazonaws.com', // S3 리전 도메인 (추가)
-      'lh3.googleusercontent.com', // Google 프로필 이미지
-      'localhost'
-    ],
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'cdn.codebase.blog',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'd1y66zmnw3oigo.cloudfront.net',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'https',
+        hostname: 'myblogdata84.s3.amazonaws.com',
+        port: '',
+        pathname: '/**',
+      },
       {
         protocol: 'https',
         hostname: 'myblogdata84.s3.us-east-1.amazonaws.com',
@@ -34,6 +45,12 @@ const nextConfig = {
       {
         protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
+        port: '',
+        pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'localhost',
         port: '',
         pathname: '/**',
       },

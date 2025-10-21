@@ -44,6 +44,7 @@ import { RolesGuard } from './common/guards/roles.guard';
 import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
+import { BlocksModule } from './blocks/blocks.module';
 
 @Module({
   imports: [
@@ -127,6 +128,7 @@ import { BookmarksModule } from './bookmarks/bookmarks.module';
     AdminModule,
     FollowsModule,
     NotificationsModule,
+    BlocksModule,
     ChatModule,
     // AnalyticsModule,
     // FUTURE: 구독제 기능 활성화 시 주석 해제

@@ -5,6 +5,7 @@ import { ConfigService } from '@nestjs/config';
 import { File } from './entities/file.entity';
 import { FileContext, FileContextType, FilePurpose } from './entities/file-context.entity';
 import { S3Service, PresignedUrlResponse } from './services/s3.service';
+import { CdnService } from './services/cdn.service';
 import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
 import { UploadCompleteDto } from './dto/upload-complete.dto';
 import { CreateBatchUploadUrlDto, BatchUploadCompleteDto } from './dto/batch-upload.dto';
@@ -27,6 +28,7 @@ export class FilesService {
     @InjectRepository(FileContext)
     private contextRepository: Repository<FileContext>,
     private s3Service: S3Service,
+    private cdnService: CdnService,
     private configService: ConfigService,
   ) {}
 
@@ -148,9 +150,6 @@ export class FilesService {
             throw new Error(`File metadata not found: ${fileKey}`);
           }
 
-          // Presigned URL 생성
-          const accessUrl = await this.s3Service.generatePresignedDownloadUrl(fileKey);
-
           // 파일 정보 DB에 저장
           const file = this.fileRepository.create({
             originalName: fileMetadata.originalName || fileKey.split('/').pop(),
@@ -165,7 +164,13 @@ export class FilesService {
           });
 
           const savedFile = await this.fileRepository.save(file);
-          
+
+          // CDN URL 생성 (CDN 활성화 시 CDN URL, 비활성화 시 OCI 직접 URL)
+          const cdnUrlResult = this.cdnService.generateCdnUrl(savedFile);
+          const accessUrl = cdnUrlResult.url;
+
+          this.logger.log(`Generated URL for file ${fileKey}: ${accessUrl} (CDN: ${cdnUrlResult.cached})`);
+
           return {
             ...savedFile,
             accessUrl,
@@ -333,11 +338,6 @@ export class FilesService {
       // 임시 FileContext 생성
       const tempContext = await this.createTemporaryContext(userId);
 
-      // 이미지 파일인 경우 Presigned URL 생성 (1시간 유효)
-      const accessUrl = await this.s3Service.generatePresignedDownloadUrl(fileKey);
-
-      this.logger.log(`Generated access URL for S3 key: ${fileKey}`);
-
       // 파일 정보 DB에 저장 - fileUrl에는 S3 키를 저장
       const file = this.fileRepository.create({
         originalName: fileName, // 원본 파일명 유지
@@ -353,8 +353,12 @@ export class FilesService {
 
       const savedFile = await this.fileRepository.save(file);
 
-      this.logger.log(`File upload completed for user ${userId}, fileId: ${savedFile.id}, S3 key: ${fileKey}`);
-      
+      // CDN URL 생성 (CDN 활성화 시 CDN URL, 비활성화 시 OCI 직접 URL)
+      const cdnUrlResult = this.cdnService.generateCdnUrl(savedFile);
+      const accessUrl = cdnUrlResult.url;
+
+      this.logger.log(`File upload completed for user ${userId}, fileId: ${savedFile.id}, URL: ${accessUrl} (CDN: ${cdnUrlResult.cached})`);
+
       return {
         ...savedFile,
         accessUrl
@@ -486,13 +490,14 @@ export class FilesService {
 
     // S3 키가 저장되어 있다면 사용
     const s3Key = file.fileKey || file.fileUrl;
-    
+
     if (!s3Key || !s3Key.includes('uploads/')) {
       throw new BadRequestException('Invalid file reference');
     }
 
-    // Presigned URL 생성 (1시간 유효)
-    return this.s3Service.generatePresignedDownloadUrl(s3Key);
+    // CDN URL 생성 (CDN 활성화 시 CDN URL, 비활성화 시 S3 Presigned URL)
+    const cdnUrlResult = this.cdnService.generateCdnUrl(file);
+    return cdnUrlResult.url;
   }
 
   /**

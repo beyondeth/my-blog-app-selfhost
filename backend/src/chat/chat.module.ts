@@ -27,6 +27,7 @@ import { User } from '../users/entities/user.entity';
 
 // External Modules
 import { UsersModule } from '../users/users.module';
+import { FilesModule } from '../files/files.module';
 import { CacheModule } from '../cache/cache.module';
 import { RedisModule } from '../redis/redis.module';
 import { MetricsModule } from '../metrics/metrics.module';
@@ -48,6 +49,7 @@ import { MetricsModule } from '../metrics/metrics.module';
     }),
     ScheduleModule.forRoot(),
     forwardRef(() => UsersModule),
+    FilesModule,
     CacheModule,
     RedisModule,
     MetricsModule,

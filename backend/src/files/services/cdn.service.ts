@@ -1,7 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { File } from '../entities/file.entity';
-import * as crypto from 'crypto';
 
 export interface CDNUrl {
   url: string;
@@ -12,23 +11,36 @@ export interface CDNUrl {
 
 /**
  * CDN 서비스
- * CloudFront 또는 다른 CDN과 연동
+ * Cloudflare CDN 연동
  */
 @Injectable()
 export class CdnService {
   private readonly logger = new Logger(CdnService.name);
   private readonly cdnEnabled: boolean;
   private readonly cdnDomain: string;
-  private readonly signedUrls: boolean;
+  private readonly cloudflareZoneId: string;
+  private readonly cloudflareApiToken: string;
 
   constructor(private configService: ConfigService) {
-    const cdnConfig = this.configService.get('cdn');
-    this.cdnEnabled = cdnConfig?.enabled || false;
-    this.cdnDomain = cdnConfig?.domain || '';
-    this.signedUrls = cdnConfig?.security?.signedUrls || false;
-    
+    // 환경변수 직접 읽기 (S3Service와 동일한 패턴)
+    const cdnEnabledRaw = this.configService.get('CDN_ENABLED', 'false');
+    this.cdnEnabled = cdnEnabledRaw === 'true';
+    this.cdnDomain = this.configService.get('CDN_DOMAIN', '');
+    this.cloudflareZoneId = this.configService.get('CLOUDFLARE_ZONE_ID', '');
+    this.cloudflareApiToken = this.configService.get('CLOUDFLARE_API_TOKEN', '');
+
+    // 디버깅 로그
+    this.logger.debug(`CDN_ENABLED raw value: "${cdnEnabledRaw}" (type: ${typeof cdnEnabledRaw})`);
+    this.logger.debug(`CDN_ENABLED parsed: ${this.cdnEnabled}`);
+    this.logger.debug(`CDN_DOMAIN: "${this.cdnDomain}"`);
+
     if (this.cdnEnabled) {
-      this.logger.log(`CDN enabled with domain: ${this.cdnDomain}`);
+      this.logger.log(`✅ Cloudflare CDN enabled with domain: ${this.cdnDomain}`);
+      if (!this.cloudflareZoneId || !this.cloudflareApiToken) {
+        this.logger.warn('⚠️ Cloudflare credentials not configured - cache purge will not work');
+      }
+    } else {
+      this.logger.log('❌ CDN disabled - using S3 direct URLs');
     }
   }
 
@@ -51,25 +63,35 @@ export class CdnService {
     }
 
     let cdnPath = file.fileKey;
-    
-    // 이미지 변환 파라미터 추가
+
+    // Cloudflare Image Resizing 파라미터 추가
+    // https://developers.cloudflare.com/images/image-resizing/
     if (options?.transform && this.isImage(file.mimeType)) {
       const params = this.buildTransformParams(options);
       cdnPath = `${cdnPath}?${params}`;
     }
 
     const baseUrl = `https://${this.cdnDomain}/${cdnPath}`;
-    
-    // Signed URL 생성
-    if (this.signedUrls) {
-      return this.generateSignedUrl(baseUrl);
-    }
 
     return {
       url: baseUrl,
       cached: true,
       headers: this.getCacheHeaders(file.fileType),
     };
+  }
+
+  /**
+   * S3 키만으로 CDN URL 생성 (File 엔티티 없이)
+   * UsersService 등에서 프로필 이미지 URL 생성 시 사용
+   */
+  generateCdnUrlFromKey(s3Key: string, mimeType: string = 'image/jpeg'): string {
+    if (!this.cdnEnabled) {
+      // CDN 비활성화 시 S3 직접 URL 반환
+      return this.generateS3Url(s3Key);
+    }
+
+    // CDN URL 생성
+    return `https://${this.cdnDomain}/${s3Key}`;
   }
 
   /**
@@ -81,7 +103,7 @@ export class CdnService {
     }
 
     const dimensions = this.getThumbnailDimensions(size);
-    
+
     return this.generateCdnUrl(file, {
       transform: true,
       width: dimensions.width,
@@ -125,34 +147,48 @@ export class CdnService {
   }
 
   /**
-   * CDN 캐시 무효화
+   * Cloudflare 캐시 무효화 (Purge API)
+   * 무료 티어: 1,000회/일 제한
+   * https://developers.cloudflare.com/api/operations/zone-purge
    */
   async invalidateCache(paths: string[]): Promise<void> {
     if (!this.cdnEnabled) {
+      this.logger.debug('CDN disabled - skipping cache invalidation');
       return;
     }
 
-    const distributionId = this.configService.get('cdn.distributionId');
-    
-    if (!distributionId) {
-      this.logger.warn('CDN distribution ID not configured');
+    if (!this.cloudflareZoneId || !this.cloudflareApiToken) {
+      this.logger.warn('Cloudflare credentials not configured - skipping cache invalidation');
+      return;
+    }
+
+    if (paths.length === 0) {
+      this.logger.debug('No paths to invalidate');
       return;
     }
 
     try {
-      // CloudFront Invalidation API 호출
-      // TODO: AWS SDK를 사용하여 실제 구현
-      this.logger.log(`Invalidating CDN cache for ${paths.length} paths`);
-      
-      // 배치 처리 (CloudFront는 한 번에 최대 3000개 경로)
-      const batchSize = parseInt(process.env.CDN_BATCH_SIZE || '3000');
+      // Cloudflare API는 한 번에 최대 30개 URL 지원
+      // 무료 티어: 1,000회/일 제한이 있으므로 신중하게 사용
+      const batchSize = 30;
+      const totalBatches = Math.ceil(paths.length / batchSize);
+
+      this.logger.log(`🔄 Purging Cloudflare cache for ${paths.length} paths (${totalBatches} batches)`);
+
       for (let i = 0; i < paths.length; i += batchSize) {
         const batch = paths.slice(i, i + batchSize);
-        await this.createInvalidation(distributionId, batch);
+        await this.purgeCloudflareCache(batch);
+
+        // API Rate Limiting 방지: 배치 간 100ms 대기
+        if (i + batchSize < paths.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
       }
+
+      this.logger.log(`✅ Cloudflare cache purged successfully`);
     } catch (error) {
-      this.logger.error('Failed to invalidate CDN cache:', error);
-      throw error;
+      this.logger.error(`❌ Failed to purge Cloudflare cache:`, error.message);
+      // 캐시 무효화 실패해도 서비스는 계속 동작 (Cache Busting으로 대체)
     }
   }
 
@@ -161,108 +197,117 @@ export class CdnService {
    */
   async handleFileDeletion(file: File): Promise<void> {
     const paths = [file.fileKey];
-    
+
     // 썸네일이 있다면 함께 무효화
     if (file.metadata?.thumbnails) {
       paths.push(...file.metadata.thumbnails);
     }
-    
+
     await this.invalidateCache(paths);
   }
 
   /**
-   * Private: S3 직접 URL 생성
+   * Private: Cloudflare Purge API 호출
+   */
+  private async purgeCloudflareCache(filePaths: string[]): Promise<void> {
+    // 파일 경로를 완전한 URL로 변환
+    const urls = filePaths.map(path => {
+      // path가 이미 http로 시작하면 그대로 사용
+      if (path.startsWith('http')) {
+        return path;
+      }
+      // 아니면 CDN 도메인과 결합
+      const cleanPath = path.startsWith('/') ? path : `/${path}`;
+      return `https://${this.cdnDomain}${cleanPath}`;
+    });
+
+    const apiUrl = `https://api.cloudflare.com/client/v4/zones/${this.cloudflareZoneId}/purge_cache`;
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.cloudflareApiToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        files: urls,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(`Cloudflare API error: ${response.status} - ${JSON.stringify(errorData)}`);
+    }
+
+    const data = await response.json();
+
+    if (!data.success) {
+      throw new Error(`Cloudflare purge failed: ${JSON.stringify(data.errors)}`);
+    }
+
+    this.logger.debug(`Purged ${urls.length} URLs from Cloudflare cache`);
+  }
+
+  /**
+   * Private: Object Storage 직접 URL 생성 (AWS S3 또는 OCI)
    */
   private generateS3Url(key: string): string {
-    const bucket = this.configService.get('s3.bucket');
-    const region = this.configService.get('s3.region');
-    return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
-  }
+    // 환경변수 직접 읽기 (ConfigService 네임스페이스가 없을 경우 대비)
+    const bucket = this.configService.get('AWS_S3_BUCKET') || this.configService.get('s3.bucket');
+    const region = this.configService.get('AWS_REGION') || this.configService.get('s3.region');
+    const storageProvider = this.configService.get('STORAGE_PROVIDER', 'aws');
+    const ociNamespace = this.configService.get('OCI_NAMESPACE');
 
-  /**
-   * Private: Signed URL 생성
-   */
-  private generateSignedUrl(url: string): CDNUrl {
-    const expiresIn = 3600; // 1시간
-    const expiresAt = new Date(Date.now() + expiresIn * 1000);
-    
-    // CloudFront Signed URL 생성 로직
-    // TODO: 실제 서명 구현
-    const signature = this.generateSignature(url, expiresAt);
-    
-    return {
-      url: `${url}?Expires=${expiresAt.getTime()}&Signature=${signature}`,
-      cached: true,
-      expiresAt,
-    };
-  }
-
-  /**
-   * Private: 서명 생성
-   */
-  private generateSignature(url: string, expiresAt: Date): string {
-    const privateKey = this.configService.get('cdn.security.privateKey');
-    const keyPairId = this.configService.get('cdn.security.keyPairId');
-    
-    if (!privateKey || !keyPairId) {
-      throw new Error('CDN signing credentials not configured');
+    if (storageProvider === 'oci' && ociNamespace) {
+      // OCI Object Storage URL 형식 (Path-style)
+      return `https://${ociNamespace}.compat.objectstorage.${region}.oraclecloud.com/${bucket}/${key}`;
+    } else {
+      // AWS S3 URL 형식
+      return `https://${bucket}.s3.${region}.amazonaws.com/${key}`;
     }
-    
-    // CloudFront 서명 정책
-    const policy = {
-      Statement: [{
-        Resource: url,
-        Condition: {
-          DateLessThan: {
-            'AWS:EpochTime': Math.floor(expiresAt.getTime() / 1000),
-          },
-        },
-      }],
-    };
-    
-    const policyString = JSON.stringify(policy);
-    const policyBase64 = Buffer.from(policyString).toString('base64');
-    
-    // RSA-SHA1 서명
-    const sign = crypto.createSign('RSA-SHA1');
-    sign.update(policyBase64);
-    const signature = sign.sign(privateKey, 'base64');
-    
-    return signature.replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   /**
-   * Private: 변환 파라미터 생성
+   * Private: 이미지 변환 파라미터 생성 (Cloudflare 형식)
+   * Cloudflare Image Resizing 파라미터
    */
   private buildTransformParams(options: any): string {
     const params = new URLSearchParams();
-    
-    if (options.width) params.append('w', options.width.toString());
-    if (options.height) params.append('h', options.height.toString());
-    if (options.format) params.append('f', options.format);
-    if (options.quality) params.append('q', options.quality.toString());
-    
+
+    // Cloudflare Image Resizing 파라미터
+    // https://developers.cloudflare.com/images/image-resizing/url-format/
+    if (options.width) params.append('width', options.width.toString());
+    if (options.height) params.append('height', options.height.toString());
+    if (options.format) params.append('format', options.format);
+    if (options.quality) params.append('quality', options.quality.toString());
+
+    // 기본값: fit=scale-down (원본보다 크게 확대하지 않음)
+    if (options.width || options.height) {
+      params.append('fit', 'scale-down');
+    }
+
     return params.toString();
   }
 
   /**
    * Private: 캐시 헤더 생성
+   * Cloudflare는 s-maxage를 우선 사용 (Edge 캐시 TTL)
    */
   private getCacheHeaders(fileType: string): Record<string, string> {
     const cacheConfig = this.configService.get('cdn.cache');
     let cacheSettings;
-    
+
     switch (fileType) {
       case 'image':
-        cacheSettings = cacheConfig.images;
+        cacheSettings = cacheConfig?.images || { maxAge: 86400 }; // 기본 24시간
         break;
       case 'document':
-        cacheSettings = cacheConfig.documents;
+        cacheSettings = cacheConfig?.documents || { maxAge: 3600 }; // 기본 1시간
         break;
       default:
         cacheSettings = { maxAge: 3600 };
     }
-    
+
     return {
       'Cache-Control': `public, max-age=${cacheSettings.maxAge}, s-maxage=${cacheSettings.sMaxAge || cacheSettings.maxAge}`,
       'Vary': 'Accept-Encoding',
@@ -273,8 +318,12 @@ export class CdnService {
    * Private: 썸네일 크기 조회
    */
   private getThumbnailDimensions(size: string): { width: number; height: number } {
-    const sizes = this.configService.get('cdn.imageTransform.sizes');
-    return sizes[size] || sizes.thumbnail;
+    const sizes = this.configService.get('cdn.imageTransform.sizes') || {
+      small: { width: 320, height: 240 },
+      medium: { width: 640, height: 480 },
+      large: { width: 1280, height: 960 },
+    };
+    return sizes[size] || sizes.medium;
   }
 
   /**
@@ -285,53 +334,42 @@ export class CdnService {
   }
 
   /**
-   * Private: CloudFront Invalidation 생성
-   */
-  private async createInvalidation(distributionId: string, paths: string[]): Promise<void> {
-    // TODO: AWS SDK CloudFront client 사용
-    this.logger.log(`Creating invalidation for distribution ${distributionId}`);
-    
-    // 예시 코드
-    // const cloudfront = new CloudFrontClient({ region: 'us-east-1' });
-    // const command = new CreateInvalidationCommand({
-    //   DistributionId: distributionId,
-    //   InvalidationBatch: {
-    //     CallerReference: Date.now().toString(),
-    //     Paths: {
-    //       Quantity: paths.length,
-    //       Items: paths.map(path => `/${path}`),
-    //     },
-    //   },
-    // });
-    // await cloudfront.send(command);
-  }
-
-  /**
    * 헬스 체크
    */
   async healthCheck(): Promise<{
     enabled: boolean;
     domain?: string;
+    provider: string;
     status: 'healthy' | 'degraded' | 'unhealthy';
   }> {
     if (!this.cdnEnabled) {
-      return { enabled: false, status: 'healthy' };
+      return {
+        enabled: false,
+        provider: 'cloudflare',
+        status: 'healthy'
+      };
     }
-    
+
     try {
       // CDN 엔드포인트 체크
       const testUrl = `https://${this.cdnDomain}/health`;
-      const response = await fetch(testUrl, { method: 'HEAD' });
-      
+      const response = await fetch(testUrl, {
+        method: 'HEAD',
+        signal: AbortSignal.timeout(5000), // 5초 타임아웃
+      });
+
       return {
         enabled: true,
         domain: this.cdnDomain,
+        provider: 'cloudflare',
         status: response.ok ? 'healthy' : 'degraded',
       };
     } catch (error) {
+      this.logger.warn(`CDN health check failed: ${error.message}`);
       return {
         enabled: true,
         domain: this.cdnDomain,
+        provider: 'cloudflare',
         status: 'unhealthy',
       };
     }

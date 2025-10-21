@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { File } from '../entities/file.entity';
 import { FileContext, FileContextType, FilePurpose } from '../entities/file-context.entity';
 import { S3Service, PresignedUrlResponse } from './s3.service';
+import { CdnService } from './cdn.service';
 import { v4 as uuidv4 } from 'uuid';
 import * as path from 'path';
 import * as crypto from 'crypto';
@@ -36,6 +37,7 @@ export class ContextualFileService {
     @InjectRepository(FileContext)
     private contextRepository: Repository<FileContext>,
     private s3Service: S3Service,
+    private cdnService: CdnService,
   ) {}
 
   /**
@@ -174,20 +176,26 @@ export class ContextualFileService {
 
     // 만료 시간 제거 (영구 보관)
     file.expiresAt = null;
-    
+
     // 체크섬 생성
     file.checksum = this.generateChecksum(file);
-    
+
     await this.fileRepository.save(file);
 
     // 컨텍스트 통계 업데이트
     await this.updateContextStats(file.context);
 
+    // CDN URL 생성 (CDN 활성화 시 CDN URL, 비활성화 시 OCI 직접 URL)
+    const cdnUrlResult = this.cdnService.generateCdnUrl(file);
+    const url = cdnUrlResult.url;
+
+    this.logger.log(`Upload completed: ${file.fileKey}, URL: ${url} (CDN: ${cdnUrlResult.cached})`);
+
     return {
       fileId: file.id,
       contextId: file.contextId,
       s3Key: file.fileKey,
-      url: await this.s3Service.generatePresignedDownloadUrl(file.fileKey),
+      url,
       version: file.context.version,
     };
   }
@@ -251,7 +259,12 @@ export class ContextualFileService {
     file: Express.Multer.File | { originalname: string },
     subId?: string,
   ): string {
-    const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    // 날짜 + 시간 타임스탬프 생성 (예: 20250130_142335)
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+    const timeStr = now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
+    const timestamp = `${dateStr}_${timeStr}`;
+
     const uuid = uuidv4().split('-')[0];
     const ext = path.extname(file.originalname);
     const fileName = `${timestamp}_${uuid}_${purpose}${ext}`;
@@ -272,7 +285,12 @@ export class ContextualFileService {
    * Private: 컨텍스트에서 S3 키 생성
    */
   private generateS3KeyFromContext(context: FileContext, fileName: string): string {
-    const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
+    // 날짜 + 시간 타임스탬프 생성 (예: 20250130_142335)
+    const now = new Date();
+    const dateStr = now.toISOString().split('T')[0].replace(/-/g, '');
+    const timeStr = now.toISOString().split('T')[1].split('.')[0].replace(/:/g, '');
+    const timestamp = `${dateStr}_${timeStr}`;
+
     const uuid = uuidv4().split('-')[0];
     const ext = path.extname(fileName);
     const newFileName = `${timestamp}_${uuid}_${context.purpose}${ext}`;
@@ -472,11 +490,17 @@ export class ContextualFileService {
     // 컨텍스트 통계 업데이트
     await this.updateContextStats(context);
 
+    // CDN URL 생성 (CDN 활성화 시 CDN URL, 비활성화 시 OCI 직접 URL)
+    const cdnUrlResult = this.cdnService.generateCdnUrl(fileRecord);
+    const url = cdnUrlResult.url;
+
+    this.logger.log(`File uploaded: ${s3Key}, URL: ${url} (CDN: ${cdnUrlResult.cached})`);
+
     return {
       fileId: fileRecord.id,
       contextId: context.id,
       s3Key,
-      url: s3Result.location || s3Key,
+      url,
       version: context.version,
     };
   }

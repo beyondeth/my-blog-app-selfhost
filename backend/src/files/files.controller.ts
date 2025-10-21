@@ -278,9 +278,12 @@ export class FilesController {
       const contentType = s3Response.headers.get('content-type') || 'image/*';
       const contentLength = s3Response.headers.get('content-length');
       
+      // 용도별 차등 Cache-Control 헤더 설정 (Cloudflare 최적화)
+      const cacheControl = this.getCacheControlHeader(processedFileKey);
+
       // 캐시 및 컨텐츠 헤더 설정 (명시적 CORS 헤더 추가)
       res.set({
-        'Cache-Control': 'public, max-age=3600, immutable',
+        'Cache-Control': cacheControl,
         'Content-Type': contentType,
         'ETag': `"${processedFileKey}"`,
         'Access-Control-Allow-Origin': '*',
@@ -341,6 +344,35 @@ export class FilesController {
     @CurrentUser('id') userId: string,
   ) {
     return this.filesService.deleteFile(fileId, userId);
+  }
+
+  /**
+   * 파일 경로에 따라 적절한 Cache-Control 헤더 반환
+   * Cloudflare CDN 최적화: 용도별 차등 TTL 적용
+   *
+   * @param fileKey - S3 파일 키
+   * @returns Cache-Control 헤더 문자열
+   */
+  private getCacheControlHeader(fileKey: string): string {
+    // 프로필 이미지 (자주 변경됨): 24시간
+    if (fileKey.includes('/profile/avatar/') || fileKey.includes('/profile/cover/')) {
+      return 'public, max-age=86400, s-maxage=86400, immutable';
+    }
+
+    // 블로그 브랜딩 (거의 안 변경됨): 30일
+    if (fileKey.includes('/branding/logo/') ||
+        fileKey.includes('/branding/banner/') ||
+        fileKey.includes('/branding/favicon/')) {
+      return 'public, max-age=2592000, s-maxage=2592000, immutable';
+    }
+
+    // 포스트 이미지 (거의 안 변경됨): 7일
+    if (fileKey.includes('/posts/') || fileKey.includes('/content/')) {
+      return 'public, max-age=604800, s-maxage=604800, immutable';
+    }
+
+    // 기타 파일 (기본값): 1시간
+    return 'public, max-age=3600, s-maxage=3600, immutable';
   }
 
   // test/s3-connection, test/s3-files, test/db-files 등 테스트/디버깅 엔드포인트 삭제 또는 주석 처리

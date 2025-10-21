@@ -23,6 +23,7 @@ interface PostArticleProps {
   isDeleting?: boolean;
   likePending?: boolean; // 좋아요 처리 중 상태
   searchQuery?: string; // 검색어 하이라이팅을 위한 prop
+  priority?: boolean; // LCP 최적화: 프로필 이미지 우선 로드 (상위 3개 포스트)
 }
 
 // HTML 태그를 제거하고 순수 텍스트만 반환하는 로컬 함수
@@ -56,6 +57,7 @@ const PostArticle = React.memo(function PostArticle({
   isDeleting = false,
   likePending = false,
   searchQuery,
+  priority = false, // 기본값: lazy loading
 }: PostArticleProps) {
   // excerpt가 있으면 사용, 없으면 content에서 추출
 
@@ -145,6 +147,7 @@ const PostArticle = React.memo(function PostArticle({
                       profileImage={post.author.profileImage}
                       username={post.author.username}
                       size="sm"
+                      priority={priority}
                     />
                     <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
                       {post.author.username}
@@ -185,10 +188,10 @@ const PostArticle = React.memo(function PostArticle({
             </div>
           </div>
           
-          {/* 하단 고정 영역 - 일반 포스트와 동일한 구조 */}
-          <div>
+          {/* 하단 고정 영역 - 메타 정보와 버튼을 한 줄에 배치 */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5 mb-2">
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5">
               <span className="whitespace-nowrap mr-3">
                 {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
@@ -230,33 +233,24 @@ const PostArticle = React.memo(function PostArticle({
               )}
             </div>
 
-            {/* 버튼들 - 메타 정보 바로 아래 */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Link
-                href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
-                className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
-              >
-                더보기
-              </Link>
-
-              {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
-                <>
-                  <button
-                    onClick={() => onEdit(post.id)}
-                    className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={() => onDelete(post.id)}
-                    disabled={isDeleting}
-                    className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {isDeleting ? '삭제중...' : '삭제'}
-                  </button>
-                </>
-              )}
-            </div>
+            {/* 수정/삭제 버튼 - 오른쪽 끝에 배치 */}
+            {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => onEdit(post.id)}
+                  className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={() => onDelete(post.id)}
+                  disabled={isDeleting}
+                  className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isDeleting ? '삭제중...' : '삭제'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </article>
@@ -283,6 +277,7 @@ const PostArticle = React.memo(function PostArticle({
                     profileImage={post.author.profileImage}
                     username={post.author.username}
                     size="sm"
+                    priority={priority}
                   />
                   {/* Author Name */}
                   <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
@@ -318,10 +313,10 @@ const PostArticle = React.memo(function PostArticle({
             </p>
           )}
 
-          {/* 하단 고정 영역 - 보더라인에 붙게 배치 */}
-          <div>
-            {/* 메타 정보 (날짜,조회,좋아요,댓글) - 작성자 정보 제거 */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5 mb-2">
+          {/* 하단 고정 영역 - 메타 정보와 버튼을 한 줄에 배치 */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5">
               <span className="whitespace-nowrap mr-3">
                 {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
@@ -362,34 +357,25 @@ const PostArticle = React.memo(function PostArticle({
                 />
               )}
             </div>
-            
-            {/* 버튼들 - 메타 정보 바로 아래 */}
-            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Link
-                href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
-                className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
-              >
-                더보기
-              </Link>
-              
-              {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
-                <>
-                  <button
-                    onClick={() => onEdit(post.id)}
-                    className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
-                  >
-                    수정
-                  </button>
-                  <button
-                    onClick={() => onDelete(post.id)}
-                    disabled={isDeleting}
-                    className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap"
-                  >
-                    {isDeleting ? '삭제중...' : '삭제'}
-                  </button>
-                </>
-              )}
-            </div>
+
+            {/* 수정/삭제 버튼 - 오른쪽 끝에 배치 */}
+            {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
+              <div className="flex items-center gap-2 sm:gap-3">
+                <button
+                  onClick={() => onEdit(post.id)}
+                  className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
+                >
+                  수정
+                </button>
+                <button
+                  onClick={() => onDelete(post.id)}
+                  disabled={isDeleting}
+                  className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {isDeleting ? '삭제중...' : '삭제'}
+                </button>
+              </div>
+            )}
           </div>
         </div>
         

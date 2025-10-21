@@ -41,19 +41,8 @@ export class ReportsService {
     // Check if target exists based on type
     await this.validateTarget(createReportDto.type, createReportDto.targetId);
 
-    // Check for duplicate reports from same user
-    const existingReport = await this.reportRepository.findOne({
-      where: {
-        type: createReportDto.type,
-        targetId: createReportDto.targetId,
-        reportedById: userId,
-        status: In([ReportStatus.PENDING, ReportStatus.UNDER_REVIEW]),
-      },
-    });
-
-    if (existingReport) {
-      throw new ConflictException('You have already reported this content');
-    }
+    // 중복 신고 허용: 같은 사용자가 같은 대상을 여러 번 신고할 수 있음
+    // 관리자 패널에서 모든 신고 기록을 확인 가능
 
     // Calculate priority based on reason
     const priority = this.calculatePriority(createReportDto.reason);

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { getProxyImageUrl } from '@/utils/imageUtils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface AttachedFile {
   id: number;
@@ -41,7 +41,7 @@ export function useImageProcessor({ content = '', attachedFiles = [] }: UseImage
           
           // 이미지들을 HTML로 변환하여 내용에 추가
           const imageHtml = imageFiles.map(file => {
-            const imageUrl = getProxyImageUrl(file.fileKey) || getProxyImageUrl(file.fileUrl) || file.fileUrl;
+            const imageUrl = normalizeImageUrl(file.fileKey) || normalizeImageUrl(file.fileUrl) || file.fileUrl;
             return `<p><img src="${imageUrl}" alt="${file.originalName}" style="max-width: 100%; height: auto;" data-file-id="${file.id}" /></p>`;
           }).join('\n');
           
@@ -54,16 +54,16 @@ export function useImageProcessor({ content = '', attachedFiles = [] }: UseImage
           
           console.log('✅ [IMAGE PROCESSOR] Images auto-added to content for editing');
         } else {
-          // 기존 이미지들의 URL을 프록시 URL로 업데이트
+          // 기존 이미지들의 URL을 CDN URL로 정규화
           processedContent = processedContent.replace(
             /<img([^>]*?)src="([^"]*)"([^>]*?)>/g,
             (match, beforeSrc, srcUrl, afterSrc) => {
-              const normalizedUrl = getProxyImageUrl(srcUrl) || srcUrl;
+              const normalizedUrl = normalizeImageUrl(srcUrl) || srcUrl;
               const spaceBefore = beforeSrc && !beforeSrc.endsWith(' ') ? ' ' : '';
               return `<img${beforeSrc}${spaceBefore}src="${normalizedUrl}"${afterSrc}>`;
             }
           );
-          console.log('✅ [IMAGE PROCESSOR] Updated existing image URLs to proxy URLs');
+          console.log('✅ [IMAGE PROCESSOR] Updated existing image URLs to CDN URLs');
         }
       }
     }

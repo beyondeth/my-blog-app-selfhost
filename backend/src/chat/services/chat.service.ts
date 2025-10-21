@@ -23,6 +23,8 @@ import { ChatBatchService } from './chat-batch.service';
 import { MessageRepository } from '../repositories/message.repository';
 import { ConversationRepository } from '../repositories/conversation.repository';
 import { RedisMessageData } from '../interfaces/message-queue.interface';
+import { UsersService } from '../../users/users.service';
+import { CdnService } from '../../files/services/cdn.service';
 
 @Injectable()
 export class ChatService {
@@ -43,6 +45,8 @@ export class ChatService {
     private readonly conversationRepo: ConversationRepository,
     private readonly queueService: ChatQueueService,
     private readonly batchService: ChatBatchService,
+    private readonly usersService: UsersService,
+    private readonly cdnService: CdnService,
   ) {}
 
   setChatGateway(gateway: ChatGateway) {
@@ -491,11 +495,8 @@ export class ChatService {
     // For now, let batch worker handle it
     // const savedMessage = await this.messageRepository.save(message);
 
-    // Load sender relation efficiently
-    const sender = await this.userRepository.findOne({
-      where: { id: senderId },
-      select: ['id', 'username', 'email', 'profileImage'],
-    });
+    // UsersService를 통해 CDN URL이 적용된 sender 정보 로드
+    const sender = await this.usersService.findOne(senderId);
 
     // Combine message with sender info
     const fullMessage = {
@@ -892,6 +893,13 @@ export class ChatService {
     const senders = await this.userRepository.find({
       where: senderIds.map(id => ({ id })),
       select: ['id', 'username', 'email', 'profileImage'],
+    });
+
+    // 프로필 이미지를 CDN URL로 변환
+    senders.forEach(sender => {
+      if (sender.profileImage && sender.profileImage.startsWith('v2/')) {
+        sender.profileImage = this.cdnService.generateCdnUrlFromKey(sender.profileImage);
+      }
     });
 
     const senderMap = new Map(senders.map(s => [s.id, s]));

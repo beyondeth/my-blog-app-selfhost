@@ -10,6 +10,7 @@ import { Role } from '../common/enums/role.enum';
 import { CreatePostDto } from './dto/create-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { FilesService } from '../files/files.service';
+import { CdnService } from '../files/services/cdn.service';
 // TagsService removed - using JSONB tags
 import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
@@ -46,6 +47,7 @@ export class PostsService {
     @InjectRepository(Blog)
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
+    private cdnService: CdnService,
     private markdownRenderer: MarkdownRendererService,
     private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
@@ -2052,32 +2054,33 @@ export class PostsService {
    * - 빠른 실패: null/YouTube 체크를 먼저 수행
    * - 불필요한 문자열 연산 최소화
    */
+  /**
+   * 이미지 URL 최적화 (CDN 사용)
+   * @param url - 원본 이미지 URL 또는 S3 키
+   * @returns CDN URL 또는 원본 URL
+   */
   private optimizeImageUrl(url: string | null): string | null {
     // 빠른 실패: null 체크
     if (!url) return null;
 
-    // 빠른 실패: YouTube 썸네일은 YouTube CDN 활용 (가장 흔한 케이스)
-    // indexOf가 includes보다 빠름 (단일 검색)
+    // 빠른 실패: YouTube 썸네일은 YouTube CDN 활용
     if (url.indexOf('youtube.com') !== -1 || url.indexOf('ytimg.com') !== -1) {
       return url;
     }
 
-    // CloudFront CDN URL이 설정된 경우에만 변환 시도
-    const cdnUrl = process.env.AWS_CLOUDFRONT_URL;
-    if (!cdnUrl) return url;
+    // CDN URL이 이미 있으면 그대로 반환
+    if (url.indexOf('cdn.codebase.blog') !== -1) {
+      return url;
+    }
 
-    // S3 URL 패턴 체크 및 변환 (indexOf가 includes보다 빠름)
-    const s3Pattern = 's3.amazonaws.com';
-    const s3Index = url.indexOf(s3Pattern);
+    // 외부 HTTP/HTTPS URL은 그대로 반환
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
 
-    if (s3Index !== -1) {
-      // s3.amazonaws.com 이후의 키 추출 (split보다 빠름)
-      const keyStartIndex = s3Index + s3Pattern.length + 1; // +1 for '/'
-      const key = url.substring(keyStartIndex);
-
-      if (key) {
-        return `${cdnUrl}/${key}`;
-      }
+    // S3 키 (uploads/, v2/ 등)는 CDN URL로 변환
+    if (url.startsWith('uploads/') || url.startsWith('v2/')) {
+      return this.cdnService.generateCdnUrlFromKey(url);
     }
 
     return url;

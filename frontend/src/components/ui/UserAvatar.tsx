@@ -1,13 +1,16 @@
 'use client';
 
+import { useMemo } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface UserAvatarProps {
   profileImage?: string | null;
   username?: string;
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
   className?: string;
+  priority?: boolean; // LCP 최적화: 초기 렌더링 시 우선 로드 (상위 3개 포스트에 적용)
 }
 
 const sizeClasses = {
@@ -43,26 +46,16 @@ export default function UserAvatar({
   username,
   size = 'md',
   className,
+  priority = false, // 기본값: lazy loading
 }: UserAvatarProps) {
   const sizeClass = sizeClasses[size];
 
-  // 이미지 URL 처리
-  let imageUrl = profileImage || '';
-  if (profileImage && !profileImage.startsWith('http://') && !profileImage.startsWith('https://')) {
-    // /api/로 시작하는 경우
-    if (profileImage.startsWith('/api/')) {
-      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${profileImage.replace('/api/v1', '')}`;
-    } 
-    // /로 시작하는 경우
-    else if (profileImage.startsWith('/')) {
-      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${profileImage}`;
-    }
-    // v2/users/... 같은 상대 경로인 경우 (S3 키)
-    else {
-      // proxy 엔드포인트 사용
-      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${profileImage}`;
-    }
-  }
+  // 이미지 URL 처리 - normalizeImageUrl 사용 (CDN 지원)
+  // useMemo로 메모이제이션하여 불필요한 재계산 방지
+  const imageUrl = useMemo(() =>
+    profileImage ? normalizeImageUrl(profileImage) : '',
+    [profileImage]
+  );
 
   return (
     <div
@@ -85,6 +78,7 @@ export default function UserAvatar({
             size === 'lg' ? '64px' :
             '80px'
           }
+          priority={priority} // LCP 최적화: priority=true 시 즉시 로드 (lazy loading 비활성화)
         />
       ) : (
         <DefaultAvatar />

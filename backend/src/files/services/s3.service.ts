@@ -22,24 +22,58 @@ export class S3Service {
   private readonly logger = new Logger(S3Service.name);
   private readonly s3Client: S3Client;
   private readonly bucket: string;
+  private readonly storageProvider: 'aws' | 'oci'; // AWS S3 또는 Oracle Object Storage
+  private readonly ociNamespace?: string; // OCI Object Storage Namespace
+  private readonly region: string;
 
   constructor(private configService: ConfigService) {
-    const s3Config = this.configService.get('s3');
-    
-    if (!s3Config.accessKeyId || !s3Config.secretAccessKey || !s3Config.bucket) {
-      throw new Error('S3 configuration is incomplete');
+    // 환경변수 직접 읽기 (ConfigService 네임스페이스가 없을 경우 대비)
+    const accessKeyId = this.configService.get('AWS_S3_ACCESS_KEY_ID') || this.configService.get('s3.accessKeyId');
+    const secretAccessKey = this.configService.get('AWS_S3_SECRET_ACCESS_KEY') || this.configService.get('s3.secretAccessKey');
+    const bucket = this.configService.get('AWS_S3_BUCKET') || this.configService.get('s3.bucket');
+    const region = this.configService.get('AWS_REGION') || this.configService.get('s3.region');
+
+    if (!accessKeyId || !secretAccessKey || !bucket) {
+      throw new Error('S3 configuration is incomplete. Required: AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY, AWS_S3_BUCKET');
     }
 
-    this.s3Client = new S3Client({
-      region: s3Config.region,
-      credentials: {
-        accessKeyId: s3Config.accessKeyId,
-        secretAccessKey: s3Config.secretAccessKey,
-      },
-    });
+    this.bucket = bucket;
+    this.region = region || 'us-east-1';
+    this.storageProvider = this.configService.get('STORAGE_PROVIDER', 'aws'); // 기본값: AWS
+    this.ociNamespace = this.configService.get('OCI_NAMESPACE'); // OCI 전용
 
-    this.bucket = s3Config.bucket;
-    this.logger.log(`S3 Service initialized with bucket: ${this.bucket}`);
+    // S3 호환 클라이언트 생성 (AWS S3 또는 OCI Object Storage)
+    const clientConfig: any = {
+      region: this.region,
+      credentials: {
+        accessKeyId,
+        secretAccessKey,
+      },
+    };
+
+    // OCI Object Storage 사용 시 엔드포인트 설정
+    if (this.storageProvider === 'oci') {
+      if (!this.ociNamespace) {
+        throw new Error('OCI_NAMESPACE is required when using Oracle Object Storage');
+      }
+      // OCI S3 호환 엔드포인트 (Path-style URL 사용)
+      // 형식: https://{namespace}.compat.objectstorage.{region}.oraclecloud.com
+      const ociEndpoint = `https://${this.ociNamespace}.compat.objectstorage.${this.region}.oraclecloud.com`;
+      clientConfig.endpoint = ociEndpoint;
+      clientConfig.forcePathStyle = true; // OCI는 path-style URL 필수 (SSL 인증서 문제 회피)
+
+      this.logger.log(`✅ Oracle Object Storage initialized`);
+      this.logger.log(`   Namespace: ${this.ociNamespace}`);
+      this.logger.log(`   Region: ${this.region}`);
+      this.logger.log(`   Bucket: ${this.bucket}`);
+      this.logger.log(`   Endpoint: ${ociEndpoint}`);
+    } else {
+      this.logger.log(`✅ AWS S3 initialized`);
+      this.logger.log(`   Region: ${this.region}`);
+      this.logger.log(`   Bucket: ${this.bucket}`);
+    }
+
+    this.s3Client = new S3Client(clientConfig);
   }
 
   /**
@@ -165,12 +199,12 @@ export class S3Service {
   }
 
   /**
-   * Upload file to S3 (for tests and direct uploads)
+   * Upload file to Object Storage (AWS S3 또는 OCI)
    */
   async uploadFile(file: Express.Multer.File | null, s3Key: string): Promise<{ location?: string }> {
     if (!file) {
       // Mock upload for tests
-      return { location: `https://${this.bucket}.s3.amazonaws.com/${s3Key}` };
+      return { location: this.generatePublicUrl(s3Key) };
     }
 
     try {
@@ -183,14 +217,30 @@ export class S3Service {
       });
 
       await this.s3Client.send(putObjectCommand);
-      this.logger.log(`File uploaded to S3: ${s3Key}`);
+      this.logger.log(`File uploaded: ${s3Key} (${this.storageProvider.toUpperCase()})`);
 
       return {
-        location: `https://${this.bucket}.s3.amazonaws.com/${s3Key}`,
+        location: this.generatePublicUrl(s3Key),
       };
     } catch (error) {
       this.logger.error(`Failed to upload file: ${error.message}`, error.stack);
       throw new InternalServerErrorException('Failed to upload file');
+    }
+  }
+
+  /**
+   * Public URL 생성 (provider에 따라 형식 다름)
+   *
+   * @param fileKey - S3 키
+   * @returns Public URL
+   */
+  private generatePublicUrl(fileKey: string): string {
+    if (this.storageProvider === 'oci') {
+      // OCI Object Storage URL 형식
+      return `https://${this.ociNamespace}.compat.objectstorage.${this.region}.oraclecloud.com/${this.bucket}/${fileKey}`;
+    } else {
+      // AWS S3 URL 형식
+      return `https://${this.bucket}.s3.${this.region}.amazonaws.com/${fileKey}`;
     }
   }
 

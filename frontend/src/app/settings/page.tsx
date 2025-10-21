@@ -7,6 +7,7 @@ import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, Fi
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale/ko';
 import Image from 'next/image';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 export default function ProfileSettingsPage() {
   const { user, isLoading: authLoading, refreshUser, logout } = useAuth();
@@ -36,26 +37,8 @@ export default function ProfileSettingsPage() {
         bio: user.bio || '',
       });
       if (user.profileImage) {
-        let imageUrl = user.profileImage;
-
-        // 절대 URL이 아닌 경우 처리
-        if (!user.profileImage.startsWith('http://') && !user.profileImage.startsWith('https://')) {
-          // /api/로 시작하는 경우
-          if (user.profileImage.startsWith('/api/')) {
-            imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage.replace('/api/v1', '')}`;
-          }
-          // /로 시작하는 경우
-          else if (user.profileImage.startsWith('/')) {
-            imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${user.profileImage}`;
-          }
-          // v2/users/... 같은 상대 경로인 경우 (S3 키)
-          else {
-            // proxy 엔드포인트 사용
-            imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${user.profileImage}`;
-          }
-        }
-
-        setProfileImageUrl(imageUrl);
+        // normalizeImageUrl 사용 (CDN 지원)
+        setProfileImageUrl(normalizeImageUrl(user.profileImage));
       }
     }
   }, [user]);
@@ -99,10 +82,9 @@ export default function ProfileSettingsPage() {
 
       const result = await response.json();
 
-      // S3 버킷이 private이므로 항상 백엔드 프록시를 통해 접근
+      // CDN URL 또는 S3 키 처리
       if (result.s3Key) {
-        const imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${result.s3Key}`;
-        setProfileImageUrl(imageUrl);
+        setProfileImageUrl(normalizeImageUrl(result.s3Key));
       }
 
       // 사용자 정보 새로고침 (백그라운드에서 진행)

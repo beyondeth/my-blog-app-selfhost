@@ -194,7 +194,7 @@ export default function HomePage() {
               <PostSkeletonWithShimmer count={5} />
             ) : allPosts.length > 0 ? (
               <>
-                {allPosts.map((post) => (
+                {allPosts.map((post, index) => (
                   <PostArticle
                     key={post.id}
                     post={post}
@@ -206,6 +206,7 @@ export default function HomePage() {
                     onLike={handleLikePost}
                     isDeleting={deletePostMutation.isPending && deleteDialog.postId === post.id}
                     searchQuery={currentParams.search}
+                    priority={index < 3} // LCP 최적화: 상위 3개 포스트의 프로필 이미지는 즉시 로드
                   />
                 ))}
                 

@@ -48,7 +48,7 @@ const MessageList: React.FC<MessageListProps> = ({
     } else if (isYesterday(date)) {
       return '어제';
     } else {
-      return format(date, 'yyyy년 MM월 dd일', { locale: ko });
+      return format(date, 'yyyy년 MM월 dd일(E)', { locale: ko }); // 요일 추가
     }
   };
 
@@ -172,6 +172,14 @@ const MessageList: React.FC<MessageListProps> = ({
                       groupIndex === groupedMessages.length - 1 &&
                       messageIndex === group.messages.length - 1;
 
+                    // 시간 표시 여부 결정: 같은 "분" 안의 마지막 메시지에만 표시
+                    const nextMessage = group.messages[messageIndex + 1];
+                    const currentMinute = format(new Date(message.createdAt), 'yyyy-MM-dd HH:mm');
+                    const nextMinute = nextMessage ? format(new Date(nextMessage.createdAt), 'yyyy-MM-dd HH:mm') : null;
+
+                    // 다음 메시지가 없거나, 다음 메시지와 분이 다르면 시간 표시
+                    const shouldShowTime = !nextMessage || currentMinute !== nextMinute;
+
                     return (
                       <MessageItem
                         key={message.id}
@@ -184,6 +192,7 @@ const MessageList: React.FC<MessageListProps> = ({
                         isLastMessage={isLastMessageInConversation}
                         isOtherUserInRoom={isOtherUserInRoom}
                         otherUser={otherUser}
+                        shouldShowTime={shouldShowTime}
                       />
                     );
                   })}

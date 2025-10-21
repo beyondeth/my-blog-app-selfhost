@@ -84,6 +84,18 @@ export const addMessageToInfiniteCache = (
     };
   }
 
+  // 🔒 Race condition 방어: message.id 기반 중복 체크
+  // WebSocket 이벤트가 동시에 발생하여 같은 메시지가 두 번 추가되는 것을 방지
+  // 참고: message.id (UUID)로 체크하므로 같은 텍스트를 여러 번 보내는 것은 허용됨
+  const exists = oldData.pages.some(page =>
+    page.messages.some((m: Message) => m.id === message.id)
+  );
+
+  if (exists) {
+    console.log('[Chat] 중복 메시지 추가 방지 (Race condition):', message.id);
+    return oldData; // 이미 존재하면 기존 데이터 반환
+  }
+
   // Add to first page (most recent messages)
   return {
     ...oldData,

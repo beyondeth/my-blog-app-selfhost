@@ -405,19 +405,38 @@ export class AuthController {
   @ApiOperation({ summary: '현재 사용자 정보 조회' })
   @ApiResponse({ status: 200, description: '사용자 정보 조회 성공' })
   async getCurrentUser(@CurrentUser() user: any) {
-    // 보안을 위해 공개 정보만 반환
+    // UsersService를 통해 CDN URL이 적용된 사용자 정보 가져오기
+    const fullUser = await this.usersService.findOne(user.id);
+
+    if (!fullUser) {
+      return {
+        id: user.id,
+        email: user.email,
+        username: user.username,
+        role: user.role,
+        profileImage: user.profileImage,
+        isEmailVerified: user.isEmailVerified,
+        subscriptionTier: user.subscriptionTier,
+        subscriptionStatus: user.subscriptionStatus,
+        bio: user.bio,
+        blogSlug: user.blog?.slug || null,
+        createdAt: user.createdAt,
+      };
+    }
+
+    // 보안을 위해 공개 정보만 반환 (CDN URL 적용됨)
     return {
-      id: user.id,
-      email: user.email,                              // 이메일 추가 (ProfileDropdown에서 사용)
-      username: user.username,
-      role: user.role,
-      profileImage: user.profileImage,
-      isEmailVerified: user.isEmailVerified,
-      subscriptionTier: user.subscriptionTier,        // 구독 티어 추가
-      subscriptionStatus: user.subscriptionStatus,    // 구독 상태 추가
-      bio: user.bio,                                  // 사용자 소개
-      blogSlug: user.blog?.slug || null,              // 블로그 슬러그 추가 (헤더 "내 블로그" 버튼에서 사용)
-      createdAt: user.createdAt,
+      id: fullUser.id,
+      email: fullUser.email,
+      username: fullUser.username,
+      role: fullUser.role,
+      profileImage: fullUser.profileImage,  // ✅ CDN URL로 변환됨
+      isEmailVerified: fullUser.isEmailVerified,
+      subscriptionTier: fullUser.subscriptionTier,
+      subscriptionStatus: fullUser.subscriptionStatus,
+      bio: fullUser.bio,
+      blogSlug: fullUser.blog?.slug || null,
+      createdAt: fullUser.createdAt,
     };
   }
 

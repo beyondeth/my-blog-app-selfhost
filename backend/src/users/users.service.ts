@@ -8,6 +8,7 @@ import { Role } from '../common/enums/role.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
+import { CdnService } from '../files/services/cdn.service';
 
 @Injectable()
 export class UsersService {
@@ -17,6 +18,7 @@ export class UsersService {
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
     private readonly redisService: UnifiedRedisService,
+    private readonly cdnService: CdnService,
   ) {}
 
   /**
@@ -65,13 +67,13 @@ export class UsersService {
     if (!user) {
       throw new NotFoundException('User not found');
     }
-    
-    // 프로필 이미지를 프록시 URL로 변환
+
+    // 프로필 이미지를 CDN URL로 변환
     if (user.profileImage && user.profileImage.startsWith('v2/')) {
-      // 프록시 URL 사용 (공개 접근 가능)
-      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+      this.logger.debug(`Profile image CDN URL: ${user.profileImage}`);
     }
-    
+
     return user;
   }
 
@@ -98,46 +100,61 @@ export class UsersService {
       .where('user.email = :email', { email })
       .getOne();
 
-    // 프로필 이미지를 프록시 URL로 변환
+    // 프로필 이미지를 CDN URL로 변환
     if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
-      // 프록시 URL 사용 (공개 접근 가능)
-      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+      this.logger.debug(`Profile image CDN URL (findById): ${user.profileImage}`);
     }
 
     return user;
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    const user = await this.usersRepository.findOne({ 
+    const user = await this.usersRepository.findOne({
       where: { username },
       select: ['id', 'username', 'email', 'bio', 'profileImage', 'createdAt', 'isActive']
     });
-    
-    // Transform profile image for public access
+
+    // Transform profile image to CDN URL for public access
     if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
-      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+      this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profileImage}`);
     }
-    
+
     return user;
   }
 
   async findByProviderId(providerId: string, provider: AuthProvider): Promise<User | null> {
-    const user = await this.usersRepository.findOne({ 
+    const user = await this.usersRepository.findOne({
       where: { providerId, authProvider: provider },
       select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'authProvider', 'providerId', 'bio']
     });
-    
-    // 프로필 이미지를 프록시 URL로 변환
+
+    // 프로필 이미지를 CDN URL로 변환
     if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
-      // 프록시 URL 사용 (공개 접근 가능)
-      user.profileImage = `/api/v1/files/proxy/${user.profileImage}`;
+      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+      this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profileImage}`);
     }
-    
+
     return user;
   }
 
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
+
+    // Cache Busting: 프로필 이미지 변경 시 타임스탬프 쿼리 파라미터 추가
+    // CDN 캐시 즉시 회피 (Cloudflare 최적화)
+    if (updateUserDto.profileImage && updateUserDto.profileImage !== user.profileImage) {
+      const timestamp = Date.now();
+
+      // 기존 쿼리 파라미터 제거
+      let cleanUrl = updateUserDto.profileImage.split('?')[0];
+
+      // 새 타임스탬프 추가
+      updateUserDto.profileImage = `${cleanUrl}?v=${timestamp}`;
+
+      this.logger.log(`🔄 Profile image cache busting applied: ?v=${timestamp}`);
+    }
 
     // 패스워드는 엔티티에서 자동으로 해시됨
     Object.assign(user, updateUserDto);

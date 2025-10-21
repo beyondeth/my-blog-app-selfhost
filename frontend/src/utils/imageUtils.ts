@@ -11,7 +11,8 @@ import imageCompression from 'browser-image-compression';
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 const USE_UUID_FILENAMES = process.env.NEXT_PUBLIC_USE_UUID_FILENAMES === 'true';
-const DEBUG_MODE = process.env.NEXT_PUBLIC_DEBUG_MODE === 'true';
+// 디버그 로그 비활성화 (필요 시 true로 변경)
+const DEBUG_MODE = false;
 
 
 /**
@@ -79,14 +80,33 @@ export function normalizeImageUrl(url: string): string {
     // 디버깅을 위한 입력 로그
     if (DEBUG_MODE) console.log('[normalizeImageUrl] Input:', url);
 
+    // CDN URL은 그대로 사용 (프록시 불필요)
+    if (url.includes('cdn.codebase.blog')) {
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] CDN URL, using directly');
+      return url;
+    }
+
     // YouTube 썸네일 URL은 직접 사용 (프록시 불필요)
     if (url.includes('img.youtube.com') || url.includes('ytimg.com')) {
       if (DEBUG_MODE) console.log('[normalizeImageUrl] YouTube URL, using directly');
       return url;
     }
 
+    // Oracle OCI Object Storage presigned URL 처리
+    if (url.includes('oraclecloud.com')) {
+      // OCI presigned URL에서 S3 키 추출
+      // 형식: https://{namespace}.compat.objectstorage.{region}.oraclecloud.com/{bucket}/{key}?...
+      const match = url.match(/oraclecloud\.com\/[^\/]+\/(.+?)(\?|$)/);
+      if (match && match[1]) {
+        const s3Key = match[1];
+        const proxyUrl = getProxyImageUrl(s3Key);
+        if (DEBUG_MODE) console.log('[normalizeImageUrl] OCI URL → Proxy:', { input: url, key: s3Key, output: proxyUrl });
+        return proxyUrl;
+      }
+    }
+
     // 외부 HTTPS URL은 그대로 사용
-    if (url.startsWith('https://') && !url.includes('amazonaws.com') && !url.includes('/api/v1/files/')) {
+    if (url.startsWith('https://') && !url.includes('amazonaws.com') && !url.includes('oraclecloud.com') && !url.includes('/api/v1/files/')) {
       if (DEBUG_MODE) console.log('[normalizeImageUrl] External HTTPS URL, using directly');
       return url;
     }

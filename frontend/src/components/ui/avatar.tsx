@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import Image from 'next/image';
 import { FiUser } from 'react-icons/fi';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface AvatarProps {
   src?: string | null;
@@ -41,23 +42,12 @@ export function Avatar({
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Convert backend proxy URLs to full URLs if needed
-  let imageUrl = src || '';
-  if (src && !src.startsWith('http://') && !src.startsWith('https://')) {
-    // /api/로 시작하는 경우
-    if (src.startsWith('/api/')) {
-      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${src.replace('/api/v1', '')}`;
-    } 
-    // /로 시작하는 경우
-    else if (src.startsWith('/')) {
-      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}${src}`;
-    }
-    // v2/users/... 같은 상대 경로인 경우 (S3 키)
-    else {
-      // proxy 엔드포인트 사용
-      imageUrl = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/proxy/${src}`;
-    }
-  }
+  // normalizeImageUrl 사용 (CDN 지원)
+  // useMemo로 메모이제이션하여 불필요한 재계산 방지
+  const imageUrl = useMemo(() =>
+    src ? normalizeImageUrl(src) : '',
+    [src]
+  );
 
   const showFallback = !imageUrl || imageError;
 
