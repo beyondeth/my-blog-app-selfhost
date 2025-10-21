@@ -12,6 +12,21 @@
   outline: none;
 }
 
+/* 단락 스타일 */
+.ProseMirror p {
+  margin: 1px 0 !important; /* 위아래 1px로 간격 조정 (Tailwind Preflight 덮어쓰기) */
+}
+
+/* 빈 줄 간격 조정 - 엔터 두 번 눌렀을 때 */
+.ProseMirror p:empty,
+.ProseMirror p br:only-child {
+  line-height: 10px; /* 빈 줄의 높이를 10px로 제한 */
+}
+
+.ProseMirror p:empty {
+  height: 10px;
+}
+
 /* 플레이스홀더 */
 .ProseMirror p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

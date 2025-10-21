@@ -300,6 +300,20 @@ body[data-scroll-locked] {
   }
 }
 
+/* 포스트 상세페이지 단락 간격 - 에디터와 동일하게 */
+.prose p {
+  margin: 1px 0 !important;
+}
+
+.prose p:empty,
+.prose p br:only-child {
+  line-height: 10px;
+}
+
+.prose p:empty {
+  height: 10px;
+}
+
 /* 댓글 입력창 스크롤바 숨김 */
 textarea::-webkit-scrollbar {
   display: none;
