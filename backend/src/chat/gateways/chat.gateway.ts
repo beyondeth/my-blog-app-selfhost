@@ -12,7 +12,7 @@ import {
 import { Server, Socket } from 'socket.io';
 import { ChatService } from '../services/chat.service';
 import { CreateMessageDto } from '../dto/create-message.dto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { UsersService } from '../../users/users.service';
 import { UnifiedRedisService } from '../../redis/unified-redis.service';
@@ -29,6 +29,8 @@ import { ChatMetricsService } from '../../metrics/chat-metrics.service';
 export class ChatGateway
   implements OnGatewayInit, OnGatewayConnection, OnGatewayDisconnect
 {
+  private readonly logger = new Logger(ChatGateway.name);
+
   @WebSocketServer()
   server: Server;
 
@@ -60,7 +62,7 @@ export class ChatGateway
       const token = this.extractToken(client);
       if (!token) {
         // 토큰 없음 - 인증 실패만 로그 (중요 이벤트)
-        console.error('[Chat Gateway] Authentication failed: No token found');
+        this.logger.warn('WebSocket authentication failed: No token found');
         client.disconnect();
         return;
       }
@@ -68,7 +70,7 @@ export class ChatGateway
       const payload = await this.verifyToken(token);
       if (!payload) {
         // 무효한 토큰 - 인증 실패만 로그 (중요 이벤트)
-        console.error('[Chat Gateway] Authentication failed: Invalid token');
+        this.logger.warn('WebSocket authentication failed: Invalid token');
         client.disconnect();
         return;
       }
@@ -95,7 +97,7 @@ export class ChatGateway
           if (existingSocket) {
             // 중복 연결 처리 - 중요 이벤트이므로 로그 유지
             if (process.env.NODE_ENV === 'development') {
-              console.log(`[Chat Gateway] Disconnecting duplicate connection for user ${userId}`);
+              this.logger.debug('Disconnecting duplicate WebSocket connection');
             }
             existingSocket.disconnect(true);
           }
@@ -135,13 +137,13 @@ export class ChatGateway
         if (client.data.tokenExp && client.data.tokenExp < now) {
           // 토큰 만료 - 중요 이벤트이므로 로그 유지
           if (process.env.NODE_ENV === 'development') {
-            console.log(`[Chat Gateway] Token expired for user ${userId}`);
+            this.logger.debug('WebSocket token expired, disconnecting');
           }
           client.disconnect();
         }
       }, 60000); // Check every minute
     } catch (error) {
-      console.error('Connection error:', error);
+      this.logger.error('WebSocket connection error', error.stack);
       client.disconnect();
     }
   }
@@ -171,7 +173,7 @@ export class ChatGateway
         // 연결 해제 로그 제거 - 너무 빈번함
       }
     } catch (error) {
-      console.error('Disconnect error:', error);
+      this.logger.error('WebSocket disconnect error', error.stack);
     }
   }
 
@@ -206,7 +208,7 @@ export class ChatGateway
         'conversation',
         `${conversationId}:active-users`
       );
-      console.log(`[채팅] Room 입장 - User: ${userId}, Conv: ${conversationId}, 활성 사용자: ${activeUsers.join(', ')}`);
+      this.logger.debug(`Room joined - Conv: ${conversationId}, Active users: ${activeUsers.length}`);
     }
 
     /**
@@ -219,7 +221,7 @@ export class ChatGateway
       // lastReadAt 업데이트 성공 로그 제거 - 너무 빈번함
     } catch (error) {
       // 오류는 중요하므로 유지
-      console.error('[Chat Gateway] Failed to update lastReadAt:', error);
+      this.logger.error('Failed to update lastReadAt on room join', error.stack);
     }
 
     // 다른 사용자들에게 입장 알림
@@ -263,7 +265,7 @@ export class ChatGateway
         'conversation',
         `${conversationId}:active-users`
       );
-      console.log(`[채팅] Room 퇴장 - User: ${userId}, Conv: ${conversationId}, 남은 활성 사용자: ${activeUsers.join(', ')}`);
+      this.logger.debug(`Room left - Conv: ${conversationId}, Remaining active users: ${activeUsers.length}`);
     }
 
     // lastReadAt 유지 (나간 후 메시지는 읽지 않은 것으로 처리)
@@ -351,7 +353,7 @@ export class ChatGateway
               await this.chatService.markAllMessagesAsRead(dto.conversationId, recipientId);
               // lastReadAt 업데이트 성공 로그 제거
             } catch (error) {
-              console.error('[Chat Gateway] Failed to mark messages as read:', error);
+              this.logger.error('Failed to mark messages as read', error.stack);
             }
           } else {
             /**
@@ -370,7 +372,7 @@ export class ChatGateway
         } else {
           // Socket은 있는데 실제 연결이 없는 경우 (캐시 불일치)
           // 캐시 불일치는 중요한 문제이므로 로그 유지
-          console.error('[Chat Gateway] Cache inconsistency: Socket ID exists but no connection');
+          this.logger.warn('Cache inconsistency detected: Socket ID exists but no WebSocket connection');
 
           // 캐시 정리
           await this.unifiedRedisService.deleteCache('chat', `online:${recipientId}`);

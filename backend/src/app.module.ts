@@ -6,6 +6,7 @@ import { JwtModule } from '@nestjs/jwt';
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bullmq';
 import { ScheduleModule } from '@nestjs/schedule';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 // Configuration imports
 import databaseConfig from './config/database.config';
@@ -105,6 +106,9 @@ import { BlocksModule } from './blocks/blocks.module';
 
     // Schedule configuration for Cron jobs
     ScheduleModule.forRoot(),
+
+    // Event-driven architecture (캐시 무효화용)
+    EventEmitterModule.forRoot(),
 
     // Feature modules
     RedisModule, // Global Redis module for distributed state management

@@ -347,4 +347,33 @@ export class CacheMetricsService {
       // 에러 발생 시 무시 (메트릭 업데이트 실패는 치명적이지 않음)
     }
   }
+
+  /**
+   * Debounce 히트 기록
+   * 중복 캐시 무효화가 방지된 횟수 기록
+   */
+  recordDebounceHit(): void {
+    // TODO: debounce 관련 메트릭 추가
+    // 현재는 로그만 남기고, 추후 메트릭 추가
+  }
+
+  /**
+   * 패턴 기반 캐시 삭제 기록
+   * @param pattern 삭제된 패턴
+   * @param count 삭제된 키 개수
+   * @param duration 소요 시간 (ms)
+   */
+  recordPatternDeletion(pattern: string, count: number, duration: number): void {
+    // 캐시 무효화 카운터 증가
+    this.cacheInvalidations.inc({
+      type: 'pattern',
+      reason: 'batch_delete'
+    }, count);
+
+    // 삭제 소요 시간 히스토그램 기록
+    this.cacheRebuildDuration.observe(
+      { type: 'pattern_deletion' },
+      duration / 1000 // ms to seconds
+    );
+  }
 }

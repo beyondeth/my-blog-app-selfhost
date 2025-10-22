@@ -19,7 +19,7 @@ import FollowingListSection from '@/components/FollowingListSection';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
 export default function HomePage() {
-  console.log('🏠 [HOME PAGE COMPONENT RENDERED]');
+  // console.log('🏠 [HOME PAGE COMPONENT RENDERED]');
 
   const { user, isAuthenticated, isAdmin } = useAuth();
   const router = useRouter();
@@ -57,12 +57,12 @@ export default function HomePage() {
   });
 
   // 디버깅 로그
-  console.log('🔍 [Home Debug] isLoading:', isLoading);
-  console.log('🔍 [Home Debug] hasData:', !!data);
-  console.log('🔍 [Home Debug] pagesCount:', data?.pages?.length);
-  console.log('🔍 [Home Debug] firstPageData:', data?.pages?.[0]);
-  console.log('🔍 [Home Debug] error:', error);
-  console.log('🔍 [Home Debug] search:', currentParams.search);
+  // console.log('🔍 [Home Debug] isLoading:', isLoading);
+  // console.log('🔍 [Home Debug] hasData:', !!data);
+  // console.log('🔍 [Home Debug] pagesCount:', data?.pages?.length);
+  // console.log('🔍 [Home Debug] firstPageData:', data?.pages?.[0]);
+  // console.log('🔍 [Home Debug] error:', error);
+  // console.log('🔍 [Home Debug] search:', currentParams.search);
 
   const deletePostMutation = useDeletePost();
 
@@ -151,7 +151,8 @@ export default function HomePage() {
   // 삭제 확인
   const handleConfirmDelete = useCallback(() => {
     if (deleteDialog.postId) {
-      deletePostMutation.mutate(deleteDialog.postId, {
+      // 새 인터페이스 사용 ({ postId } 형태)
+      deletePostMutation.mutate({ postId: deleteDialog.postId }, {
         onSuccess: () => {
           setDeleteDialog({ isOpen: false, postId: null, postTitle: '' });
         },

@@ -1,6 +1,6 @@
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../../users/users.service';
 import { Request } from 'express';
@@ -8,6 +8,8 @@ import { UnifiedRedisService } from '../../redis/unified-redis.service';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
+  private readonly logger = new Logger(JwtStrategy.name);
+
   constructor(
     private configService: ConfigService,
     private usersService: UsersService,
@@ -37,12 +39,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 에러와 중요 이벤트만 로그로 남김
 
     if (!userId) {
-      console.error('[JWT Validate] No userId found in payload');
+      this.logger.error('No userId found in JWT payload');
       return null;
     }
 
     if (tokenType !== 'access') {
-      console.error('[JWT Validate] Invalid token type:', tokenType);
+      this.logger.error(`Invalid token type: ${tokenType}`);
       return null;
     }
 
@@ -55,24 +57,25 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     // 2. 캐시에 없으면 DB에서 조회 - 중요 이벤트이므로 로그 유지
+    // userId는 민감정보이므로 마스킹하여 로깅
     if (process.env.NODE_ENV === 'development') {
-      console.log('[JWT Validate] Cache miss, fetching from DB:', userId);
+      this.logger.debug(`JWT cache miss for user ID: ${userId.substring(0, 8)}...`);
     }
     const user = await this.usersService.findById(userId);
 
     if (!user) {
-      console.error('[JWT Validate] User not found in database:', userId);
+      this.logger.warn('User not found in database');
       return null;
     }
 
     if (!user.isActive) {
-      console.error('[JWT Validate] User is not active:', userId);
+      this.logger.warn('User account is not active');
       return null;
     }
 
     // 삭제된 사용자 로그인 차단 (소프트 삭제)
     if (user.isDeleted) {
-      console.error('[JWT Validate] User account has been deleted:', userId);
+      this.logger.warn('User account has been deleted');
       return null;
     }
 

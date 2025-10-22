@@ -1,5 +1,13 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // 프로덕션 빌드 최적화: console 제거
+  // error와 warn은 유지 (중요 에러 추적용)
+  compiler: {
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'],
+    } : false,
+  },
+
   // 백엔드 API 서버로 프록시 설정
   async rewrites() {
     return [

@@ -119,6 +119,16 @@ export default function ProfileDropdown({
           <span>DM 관리</span>
         </DropdownMenuItem>
 
+        {/* Customer Support */}
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/support')}
+          className="cursor-pointer"
+        >
+          <FiHelpCircle className="mr-2 h-4 w-4" />
+          <span>고객센터</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuSeparator />
 
         {/* Blog Settings */}
         <DropdownMenuItem 

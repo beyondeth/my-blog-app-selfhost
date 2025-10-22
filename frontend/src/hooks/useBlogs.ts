@@ -20,6 +20,10 @@ export function useMyBlogs() {
   return useQuery({
     queryKey: ['my-blogs'],
     queryFn: getMyBlogs,
+    staleTime: 5 * 60 * 1000,       // 5분간 캐싱 (블로그 정보는 자주 변경되지 않음)
+    gcTime: 10 * 60 * 1000,          // 10분간 메모리 보관
+    refetchOnMount: false,           // 마운트 시 재요청 안함 (성능 최적화)
+    refetchOnWindowFocus: false,     // 포커스 시 재요청 안함
   });
 }
 

@@ -9,7 +9,7 @@ import { ResizableImageComponent } from '../components/ImageManager/ResizableIma
 
 export const ResizableImage = Image.extend({
   name: 'resizableImage',
-  
+
   addAttributes() {
     return {
       ...this.parent?.(),

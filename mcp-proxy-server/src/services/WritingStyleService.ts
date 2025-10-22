@@ -47,6 +47,8 @@ export class WritingStyleService {
   /**
    * Writing style 로드
    * 프리셋 파일명을 받아서 로드
+   *
+   * @param style - 프리셋 스타일명 (이미 정규화된 값)
    */
   async loadStyle(style: string): Promise<string> {
     if (!this.isPreset(style)) {
@@ -57,9 +59,18 @@ export class WritingStyleService {
 
   /**
    * 프리셋 스타일인지 확인
+   *
+   * @param style - 스타일명 (undefined, "--default", "default" 등 모두 처리)
+   * @returns 유효한 프리셋이면 true, 아니면 false
    */
-  private isPreset(style: string): boolean {
-    return this.PRESETS.includes(style.toLowerCase());
+  private isPreset(style?: string): boolean {
+    // undefined나 빈 문자열은 default로 취급 (유효함)
+    if (!style) return true;
+
+    // "--default" 같은 플래그 형식도 처리
+    const normalized = style.replace(/^--/, '').trim().toLowerCase();
+
+    return this.PRESETS.includes(normalized);
   }
 
   /**
@@ -98,13 +109,22 @@ export class WritingStyleService {
 
   /**
    * 프리셋 유효성 검증
+   *
+   * @param preset - 프리셋 스타일명 (--default, undefined 등도 처리)
+   * @returns 프리셋이 유효하고 파일이 존재하면 true
    */
-  async validatePreset(preset: string): Promise<boolean> {
+  async validatePreset(preset?: string): Promise<boolean> {
     if (!this.isPreset(preset)) {
       return false;
     }
 
-    const filePath = path.join(this.STYLES_DIR, `${preset.toLowerCase()}.md`);
+    // 정규화 (loadAndParseStyle과 동일한 로직)
+    const normalizedPreset = (preset || 'default')
+      .replace(/^--/, '')
+      .trim()
+      .toLowerCase();
+
+    const filePath = path.join(this.STYLES_DIR, `${normalizedPreset}.md`);
 
     try {
       await fs.access(filePath);
@@ -143,14 +163,28 @@ export class WritingStyleService {
    * Writing style 로드 및 파싱
    * 프리셋/URL/인라인 마크다운에서 YAML + 섹션 파싱
    * 공통 지침(_common.md)과 스타일별 파일을 병합
+   *
+   * @param style - 스타일명 (--default, undefined, "" 등 모두 처리)
+   * @returns 파싱된 WritingStyle 객체
+   *
+   * 지원 형식:
+   * - undefined, null, "" → default
+   * - "--default", "--novel" → default, novel
+   * - "default", "novel" → default, novel
    */
-  async loadAndParseStyle(style: string): Promise<WritingStyle> {
+  async loadAndParseStyle(style?: string): Promise<WritingStyle> {
+    // ✅ 스타일 정규화: "--default" / undefined / "" → "default"
+    const normalizedStyle = (style || 'default')
+      .replace(/^--/, '')   // "--default" → "default"
+      .trim()
+      .toLowerCase();
+
     try {
       // 1. 공통 지침 로드 (캐싱됨)
       const commonContent = await this.loadCommonInstructions();
 
       // 2. 스타일별 마크다운 로드
-      const styleContent = await this.loadStyle(style);
+      const styleContent = await this.loadStyle(normalizedStyle);
 
       // 3. YAML front matter 파싱 (스타일별 파일에서)
       const { metadata, body } = this.parseYamlFrontMatter(styleContent);
@@ -168,7 +202,7 @@ export class WritingStyleService {
       // 공통 + 스타일별 섹션을 병합하여 완전한 가이드 생성
       const writingStyle: WritingStyle = {
         metadata: {
-          styleName: metadata.style_name || 'Unknown Style',
+          styleName: metadata.style_name || normalizedStyle,
           language: metadata.language || 'korean',
           minLength: metadata.min_length || 2000,
           targetLength: metadata.target_length || '3000-5000',
@@ -194,10 +228,10 @@ export class WritingStyleService {
       console.log(`✅ [WritingStyle] 파싱 완료: ${writingStyle.metadata.styleName}`);
       return writingStyle;
     } catch (error: any) {
-      console.error(`⚠️ [WritingStyle] ${style} 파싱 실패: ${error.message}`);
+      console.error(`⚠️ [WritingStyle] ${normalizedStyle} 파싱 실패: ${error.message}`);
 
       // 무한 루프 방지: default 자체가 실패하면 에러 던지기
-      if (style === 'default') {
+      if (normalizedStyle === 'default') {
         throw new Error(`default.md 로드 실패: ${error.message}`);
       }
 

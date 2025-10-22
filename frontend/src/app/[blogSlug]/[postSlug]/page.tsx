@@ -111,11 +111,12 @@ export default function BlogPostDetailPage() {
 
   const handleConfirmDelete = useCallback(async () => {
     if (!post || deletePostMutation.isPending) return;
-    
+
     setIsDeleting(true);
-    
+
     try {
-      await deletePostMutation.mutateAsync(post.id);
+      // blogSlug를 명시적으로 전달하여 블로그 캐시 무효화 보장
+      await deletePostMutation.mutateAsync({ postId: post.id, blogSlug });
       // 애니메이션 후 리다이렉트
       setTimeout(() => {
         router.push(`/${blogSlug}`);
@@ -123,8 +124,8 @@ export default function BlogPostDetailPage() {
     } catch (error: any) {
       setIsDeleting(false);
       // 상세한 에러 메시지 처리
-      const errorMessage = error?.response?.data?.message || 
-                          error?.message || 
+      const errorMessage = error?.response?.data?.message ||
+                          error?.message ||
                           '게시글 삭제 중 오류가 발생했습니다';
       toast.error(errorMessage);
       console.error('Delete error:', error);

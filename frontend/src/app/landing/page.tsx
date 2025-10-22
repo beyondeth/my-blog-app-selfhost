@@ -160,13 +160,12 @@ function FeatureEditor() {
           {/* Mock UI - 3D 회전 + Hover 확대 */}
           <motion.div
             className="flex-1 w-full"
-            style={{ y: imageY }}
+            style={{ y: imageY, perspective: 1000 }}
             initial={{ opacity: 0, rotateY: -25, scale: 0.8 }}
             whileInView={{ opacity: 1, rotateY: 0, scale: 1 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 1, ease: "easeOut" }}
             whileHover={{ scale: 1.05, rotateY: 5 }}
-            style={{ perspective: 1000 }}
           >
             <div className="bg-gradient-to-br from-green-400 to-blue-500 rounded-2xl aspect-video shadow-2xl flex items-center justify-center">
               <div className="text-white text-xl font-medium">Editor Preview</div>
@@ -220,13 +219,12 @@ function FeatureMessaging() {
           {/* Mock UI - 오른쪽에서 회전 */}
           <motion.div
             className="flex-1 w-full"
-            style={{ y: imageY }}
+            style={{ y: imageY, perspective: 1000 }}
             initial={{ opacity: 0, rotateY: 25, scale: 0.8 }}
             whileInView={{ opacity: 1, rotateY: 0, scale: 1 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 1, ease: "easeOut" }}
             whileHover={{ scale: 1.05, rotateY: -5 }}
-            style={{ perspective: 1000 }}
           >
             <div className="bg-gradient-to-br from-pink-400 to-purple-500 rounded-2xl aspect-video shadow-2xl flex items-center justify-center">
               <div className="text-white text-xl font-medium">Chat Preview</div>
@@ -280,13 +278,12 @@ function FeatureSubscription() {
           {/* Mock UI */}
           <motion.div
             className="flex-1 w-full"
-            style={{ y: imageY }}
+            style={{ y: imageY, perspective: 1000 }}
             initial={{ opacity: 0, rotateY: -25, scale: 0.8 }}
             whileInView={{ opacity: 1, rotateY: 0, scale: 1 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 1, ease: "easeOut" }}
             whileHover={{ scale: 1.05, rotateY: 5 }}
-            style={{ perspective: 1000 }}
           >
             <div className="bg-gradient-to-br from-yellow-400 to-orange-500 rounded-2xl aspect-video shadow-2xl flex items-center justify-center">
               <div className="text-white text-xl font-medium">Analytics Preview</div>
@@ -341,13 +338,12 @@ function FeatureAuth() {
           {/* Mock UI */}
           <motion.div
             className="flex-1 w-full"
-            style={{ y: imageY }}
+            style={{ y: imageY, perspective: 1000 }}
             initial={{ opacity: 0, rotateY: 25, scale: 0.8 }}
             whileInView={{ opacity: 1, rotateY: 0, scale: 1 }}
             viewport={{ once: true, amount: 0.3 }}
             transition={{ duration: 1, ease: "easeOut" }}
             whileHover={{ scale: 1.05, rotateY: -5 }}
-            style={{ perspective: 1000 }}
           >
             <div className="bg-gradient-to-br from-blue-400 to-indigo-500 rounded-2xl aspect-video shadow-2xl flex items-center justify-center">
               <div className="text-white text-xl font-medium">Auth Preview</div>
@@ -404,7 +400,7 @@ function UseCasesSection() {
       y: 0,
       transition: {
         duration: 0.6,
-        ease: "easeOut",
+        ease: "easeOut" as any,
       },
     },
   };

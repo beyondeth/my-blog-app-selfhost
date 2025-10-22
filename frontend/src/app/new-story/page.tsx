@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -68,6 +68,9 @@ export default function NewStoryPage() {
   const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
+  // 중복 제출 방지를 위한 ref (타이밍 이슈 방지)
+  const isSubmittingRef = useRef<boolean>(false);
+
   const form = useForm<PostFormData>({
     resolver: zodResolver(postSchema),
     defaultValues: {
@@ -121,19 +124,21 @@ export default function NewStoryPage() {
     setUploadValidationReason(reason);
   };
   
-  // 폼 제출 핸들러 (기존과 동일)
+  // 폼 제출 핸들러 (중복 제출 방지 강화)
   const onSubmit = async (data: PostFormData) => {
     if (!isUploadValid) {
       toast.error(`업로드 제한 초과: ${uploadValidationReason}`);
       return;
     }
-    
-    if (isSubmitting) {
+
+    // Ref 기반 중복 방지 (타이밍 이슈에도 안전)
+    if (isSubmittingRef.current || isSubmitting) {
       return;
     }
-    
+
+    isSubmittingRef.current = true;
     setIsSubmitting(true);
-    
+
     try {
       const postData: any = {
         title: data.title,
@@ -163,6 +168,7 @@ export default function NewStoryPage() {
       console.error('Failed to create post:', error);
       toast.error('포스트 저장에 실패했습니다.');
     } finally {
+      isSubmittingRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -444,13 +450,23 @@ export default function NewStoryPage() {
               type="button"
               variant="outline"
               onClick={() => router.back()}
-              disabled={isSubmitting || createPostMutation.isPending}
+              disabled={
+                isSubmitting ||
+                createPostMutation.isPending ||
+                form.formState.isSubmitting
+              }
             >
               취소
             </Button>
             <Button
               type="submit"
-              disabled={!isUploadValid || isSubmitting || createPostMutation.isPending || !form.formState.isValid}
+              disabled={
+                !isUploadValid ||
+                isSubmitting ||
+                createPostMutation.isPending ||
+                !form.formState.isValid ||
+                form.formState.isSubmitting
+              }
               className="flex items-center justify-center gap-2 min-w-[120px]"
               title={!isUploadValid ? uploadValidationReason : undefined}
             >

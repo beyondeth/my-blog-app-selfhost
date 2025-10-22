@@ -30,9 +30,8 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/etc/prometheus/console_libraries'
       - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=15d'      # 30일 → 15일 (디스크 절약)
-      - '--storage.tsdb.retention.size=2GB'      # 최대 2GB 제한
-      - '--web.enable-lifecycle'                 # 설정 리로드 활성화
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION_TIME:-30d}'
+      - '--web.enable-lifecycle'             # 설정 리로드 활성화
     ports:
       - "127.0.0.1:9090:9090"  # Bind to localhost only for security
     networks:
@@ -43,14 +42,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '0.3'          # 최대 0.3 OCPU
-          memory: 400M         # 최대 400MB (현재 94MB → 여유 4배)
-        reservations:
-          cpus: '0.1'
-          memory: 100M
 
   # ============================================
   # Grafana - 통합 대시보드 및 시각화
@@ -60,7 +51,7 @@ services:
     container_name: codebase-monitoring-grafana
     volumes:
       - grafana_data:/var/lib/grafana
-      # 통합 Grafana provisioning 설정 (2개 대시보드로 감소)
+      # 통합 Grafana provisioning 설정 (5개 대시보드)
       - ./grafana/provisioning:/etc/grafana/provisioning
       # 대시보드 파일 디렉토리
       - ./grafana/dashboards:/var/lib/grafana/dashboards
@@ -85,14 +76,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '0.2'          # 최대 0.2 OCPU
-          memory: 300M         # 최대 300MB (현재 134MB → 여유 2배)
-        reservations:
-          cpus: '0.05'
-          memory: 100M
 
   # ============================================
   # Redis Exporter - Redis 메트릭 수집
@@ -100,10 +83,12 @@ services:
   redis-exporter:
     image: oliver006/redis_exporter:v1.62.0-alpine
     container_name: codebase-monitoring-redis-exporter
-    command:
-      # CPU 9% 문제 해결: 과도한 메트릭 제거
-      - '--redis.addr=my-blog-app-shared-redis:6379'
-      - '--include-system-metrics=false'  # 시스템 메트릭 제외
+    environment:
+      # Backend와 MCP가 사용하는 Redis 인스턴스
+      # 로컬 개발: my-blog-app-shared-redis (Docker 네트워크 내부)
+      # 프로덕션: redis (docker-compose 서비스명)
+      - REDIS_ADDR=my-blog-app-shared-redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
     ports:
       - "127.0.0.1:9121:9121"  # Bind to localhost only for security
     networks:
@@ -115,14 +100,32 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    deploy:
-      resources:
-        limits:
-          cpus: '0.1'          # CPU 사용률 제한 (9% → 0.3%)
-          memory: 50M
-        reservations:
-          cpus: '0.02'
-          memory: 20M
+
+  # ============================================
+  # Node Exporter - 시스템 메트릭 수집
+  # ============================================
+  node-exporter:
+    image: prom/node-exporter:v1.8.2
+    container_name: codebase-monitoring-node-exporter
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "127.0.0.1:9100:9100"  # Bind to localhost only for security
+    networks:
+      - monitoring
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9100/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 networks:
   monitoring:

@@ -114,3 +114,58 @@ groups:
         annotations:
           summary: "NestJS 앱 메모리 사용량이 높습니다"
           description: "메모리 사용량이 {{ $value | humanize1024 }}B입니다."
+
+      # CPU 사용량 임계값 (80% 초과)
+      - alert: HighCPUUsage
+        expr: rate(nodejs_process_cpu_seconds_total{job="nestjs-chat-app"}[5m]) > 0.8
+        for: 5m
+        labels:
+          severity: critical
+          component: nestjs
+        annotations:
+          summary: "CPU 사용량이 80%를 초과했습니다"
+          description: "CPU 사용률: {{ $value | humanizePercentage }}"
+
+      # 메모리 임계값 위험 (8GB 초과)
+      - alert: CriticalMemoryUsage
+        expr: nodejs_process_resident_memory_bytes{job="nestjs-chat-app"} > 8000000000
+        for: 5m
+        labels:
+          severity: critical
+          component: nestjs
+        annotations:
+          summary: "메모리 사용량이 8GB를 초과했습니다"
+          description: "메모리: {{ $value | humanize1024 }}B"
+
+      # Redis 연결 상태 (채팅 큐)
+      - alert: ChatRedisConnectionLost
+        expr: chat_redis_connection_status == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: chat-redis
+        annotations:
+          summary: "채팅 시스템의 Redis 연결이 끊어졌습니다"
+          description: "Redis 연결 복구 필요"
+
+      # 큐 적체 (1000개 초과)
+      - alert: QueueBacklog
+        expr: chat_queue_size > 1000
+        for: 5m
+        labels:
+          severity: warning
+          component: chat-queue
+        annotations:
+          summary: "채팅 큐 적체 (1000개 초과)"
+          description: "현재 큐 크기: {{ $value }}개"
+
+      # MCP Proxy 다운
+      - alert: MCPProxyDown
+        expr: up{job="mcp-proxy-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          component: mcp-proxy
+        annotations:
+          summary: "MCP Proxy 서버가 다운되었습니다"
+          description: "MCP Proxy 서버에 연결할 수 없습니다"

@@ -13,7 +13,7 @@ const YOUTUBE_REGEX = /^(https?:\/\/)?(www\.|m\.|music\.)?(youtube\.com|youtu\.b
  */
 export const isYouTubeUrl = (url: string): boolean => {
   const result = YOUTUBE_REGEX.test(url);
-  console.log('[isYouTubeUrl] Checking URL:', url, 'Result:', result);
+  // console.log('[isYouTubeUrl] Checking URL:', url, 'Result:', result);
   return result;
 };
 
@@ -29,7 +29,7 @@ export const isEmbeddableYouTubeUrl = (url: string): boolean => {
   // 플레이리스트나 채널이 아닌 비디오 URL인지 확인
   const urlType = getYouTubeUrlType(url);
   const result = urlType === 'video';
-  console.log('[isEmbeddableYouTubeUrl] URL:', url, 'Type:', urlType, 'Embeddable:', result);
+  // console.log('[isEmbeddableYouTubeUrl] URL:', url, 'Type:', urlType, 'Embeddable:', result);
   return result;
 };
 
@@ -39,16 +39,16 @@ export const isEmbeddableYouTubeUrl = (url: string): boolean => {
 export const getYouTubeUrlType = (url: string): 'video' | 'channel' | 'playlist' | 'unknown' => {
   // 채널 URL 패턴
   if (url.includes('/@') || url.includes('/channel/') || url.includes('/c/') || url.includes('/user/')) {
-    console.log('[getYouTubeUrlType] Channel URL detected:', url);
+    // console.log('[getYouTubeUrlType] Channel URL detected:', url);
     return 'channel';
   }
-  
+
   // 플레이리스트 URL 패턴
   if (url.includes('/playlist?') || url.includes('&list=')) {
-    console.log('[getYouTubeUrlType] Playlist URL detected:', url);
+    // console.log('[getYouTubeUrlType] Playlist URL detected:', url);
     return 'playlist';
   }
-  
+
   // 비디오 URL 패턴 (11자리 ID 확인)
   const videoPatterns = [
     /[?&]v=[\w-]{11}/,
@@ -56,13 +56,13 @@ export const getYouTubeUrlType = (url: string): 'video' | 'channel' | 'playlist'
     /\/embed\/[\w-]{11}/,
     /\/shorts\/[\w-]{11}/,
   ];
-  
+
   if (videoPatterns.some(pattern => pattern.test(url))) {
-    console.log('[getYouTubeUrlType] Video URL detected:', url);
+    // console.log('[getYouTubeUrlType] Video URL detected:', url);
     return 'video';
   }
-  
-  console.log('[getYouTubeUrlType] Unknown URL type:', url);
+
+  // console.log('[getYouTubeUrlType] Unknown URL type:', url);
   return 'unknown';
 };
 
@@ -72,11 +72,11 @@ export const getYouTubeUrlType = (url: string): 'video' | 'channel' | 'playlist'
 export const extractYouTubeVideoId = (url: string): string | null => {
   const match = url.match(YOUTUBE_REGEX);
   if (match && match[6]) {
-    console.log('[extractYouTubeVideoId] Found video ID:', match[6]);
+    // console.log('[extractYouTubeVideoId] Found video ID:', match[6]);
     return match[6];
   }
-  
-  console.log('[extractYouTubeVideoId] No video ID found in:', url);
+
+  // console.log('[extractYouTubeVideoId] No video ID found in:', url);
   return null;
 };
 

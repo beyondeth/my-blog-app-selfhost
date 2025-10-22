@@ -1,10 +1,12 @@
-import { ExecutionContext, Injectable, UnauthorizedException } from '@nestjs/common';
+import { ExecutionContext, Injectable, Logger, UnauthorizedException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
 
 @Injectable()
 export class JwtAuthGuard extends AuthGuard('jwt') {
+  private readonly logger = new Logger(JwtAuthGuard.name);
+
   constructor(private reflector: Reflector) {
     super();
   }
@@ -60,11 +62,12 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     // URL에서 쿼리 파라미터 제거하고 경로만 비교
     const requestPath = request.path || request.url.split('?')[0];
 
-    console.log('🔍 JwtAuthGuard - Request path:', requestPath);
-    console.log('🔍 JwtAuthGuard - Request method:', request.method);
+    if (process.env.NODE_ENV === 'development') {
+      this.logger.debug(`Request path: ${requestPath}, method: ${request.method}`);
+    }
 
     if (oauthPaths.includes(requestPath)) {
-      console.log('✅ OAuth 경로 감지 - 선택적 JWT 처리');
+      this.logger.debug('OAuth endpoint detected - optional JWT handling');
       // OAuth 엔드포인트는 JWT 검증을 시도하되, 실패해도 통과
       // OptionalJwtAuthGuard가 실제 처리를 담당
       const result = super.canActivate(context);
@@ -72,7 +75,7 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
       // Promise인 경우 에러를 catch하고, 아닌 경우 그대로 반환
       if (result instanceof Promise) {
         return result.catch((err) => {
-          console.log('⚠️ JWT 검증 실패했지만 OAuth 경로이므로 통과:', err?.message);
+          this.logger.debug(`JWT validation failed but allowed for OAuth path: ${err?.message}`);
           return true;
         });
       }
@@ -106,13 +109,13 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     ];
     const requestPath = request.path || request.url.split('?')[0];
 
-    console.log('🔍 JwtAuthGuard.handleRequest - Path:', requestPath);
-    console.log('🔍 JwtAuthGuard.handleRequest - User:', user ? 'exists' : 'null');
-    console.log('🔍 JwtAuthGuard.handleRequest - Error:', err?.message);
+    if (process.env.NODE_ENV === 'development') {
+      this.logger.debug(`handleRequest - Path: ${requestPath}, User: ${user ? 'exists' : 'null'}, Error: ${err?.message || 'none'}`);
+    }
 
     // OAuth 엔드포인트는 사용자가 없어도 통과 (컨트롤러에서 처리)
     if (oauthPaths.includes(requestPath)) {
-      console.log('✅ OAuth 경로에서 handleRequest - user 또는 null 반환');
+      this.logger.debug('OAuth path - returning user or null');
       return user || null;
     }
 

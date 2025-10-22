@@ -81,44 +81,44 @@ export function useEditorSetup({
       const handlers = createEditorHandlers(editor, {
         handleImageUpload,
       });
-      
-      console.log('[EditorSetup] Setting up paste/drop handlers');
-      
+
+      // console.log('[EditorSetup] Setting up paste/drop handlers');
+
       // editorView에 직접 핸들러 등록
       const { view } = editor;
       const originalHandlePaste = view.props.handlePaste;
       const originalHandleDrop = view.props.handleDrop;
-      
-      console.log('[EditorSetup] Original handlePaste exists:', !!originalHandlePaste);
-      console.log('[EditorSetup] Original handleDrop exists:', !!originalHandleDrop);
+
+      // console.log('[EditorSetup] Original handlePaste exists:', !!originalHandlePaste);
+      // console.log('[EditorSetup] Original handleDrop exists:', !!originalHandleDrop);
       
       // 새로운 props 생성
       const newProps = {
         ...view.props,
         handlePaste: (view: any, event: ClipboardEvent, slice: any) => {
-          console.log('[EditorSetup handlePaste wrapper] Called');
+          // console.log('[EditorSetup handlePaste wrapper] Called');
           const handled = handlers.handlePaste(view, event, slice);
-          console.log('[EditorSetup handlePaste wrapper] Handled by custom:', handled);
+          // console.log('[EditorSetup handlePaste wrapper] Handled by custom:', handled);
           if (!handled && originalHandlePaste) {
-            console.log('[EditorSetup handlePaste wrapper] Passing to original handler');
+            // console.log('[EditorSetup handlePaste wrapper] Passing to original handler');
             return originalHandlePaste(view, event, slice);
           }
           return handled;
         },
         handleDrop: (view: any, event: DragEvent, slice: any, moved: boolean) => {
-          console.log('[EditorSetup handleDrop wrapper] Called');
+          // console.log('[EditorSetup handleDrop wrapper] Called');
           const handled = handlers.handleDrop(view, event, slice, moved);
-          console.log('[EditorSetup handleDrop wrapper] Handled by custom:', handled);
+          // console.log('[EditorSetup handleDrop wrapper] Handled by custom:', handled);
           if (!handled && originalHandleDrop) {
             return originalHandleDrop(view, event, slice, moved);
           }
           return handled;
         },
       };
-      
+
       // props 업데이트
       view.setProps(newProps);
-      console.log('[EditorSetup] Props updated with custom handlers');
+      // console.log('[EditorSetup] Props updated with custom handlers');
     },
     onDestroy: () => {
       // 에디터가 파괴될 때 전역 참조 제거
@@ -175,13 +175,13 @@ export function useEditorSetup({
   useEffect(() => {
     const handleYouTubeEmbed = (event: CustomEvent) => {
       const { url } = event.detail;
-      console.log('[useEditorSetup] 🎆 YouTube embed 이벤트 발생! URL:', url);
-      console.log('[useEditorSetup] addYouTubeThumbnail 함수 존재:', !!addYouTubeThumbnail);
+      // console.log('[useEditorSetup] 🎆 YouTube embed 이벤트 발생! URL:', url);
+      // console.log('[useEditorSetup] addYouTubeThumbnail 함수 존재:', !!addYouTubeThumbnail);
       addYouTubeThumbnail(url);
     };
-    
+
     window.addEventListener('youtubeEmbedAdded', handleYouTubeEmbed as EventListener);
-    
+
     return () => {
       window.removeEventListener('youtubeEmbedAdded', handleYouTubeEmbed as EventListener);
     };

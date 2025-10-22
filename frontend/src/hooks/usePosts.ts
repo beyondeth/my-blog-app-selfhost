@@ -184,17 +184,28 @@ export function useDeletePost() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: postsAPI.deletePost,
-    onMutate: async (deletedId) => {
+    // mutationFn: 하위 호환성을 위해 string | { postId, blogSlug? } 모두 지원
+    mutationFn: (variables: string | { postId: string; blogSlug?: string }) => {
+      const postId = typeof variables === 'string' ? variables : variables.postId;
+      return postsAPI.deletePost(postId);
+    },
+    onMutate: async (variables) => {
+      // 파라미터에서 postId와 blogSlug 추출
+      const deletedId = typeof variables === 'string' ? variables : variables.postId;
+      let blogSlug = typeof variables === 'string' ? undefined : variables.blogSlug;
+
       // 삭제 전에 포스트 정보 백업 (blog 정보 필요)
       // 1. 먼저 detail 캐시에서 찾기 (UUID로)
       let previousPost = queryClient.getQueryData<Post>(
         postQueryKeys.detail(deletedId)
       );
 
-      // 2. detail 캐시에 없으면 무한 스크롤 목록 캐시에서 찾기
-      let blogSlug: string | undefined = previousPost?.blog?.slug;
+      // 2. blogSlug가 파라미터로 전달되지 않았고, detail 캐시에 있으면 사용
+      if (!blogSlug && previousPost?.blog?.slug) {
+        blogSlug = previousPost.blog.slug;
+      }
 
+      // 3. 여전히 blogSlug가 없으면 무한 스크롤 목록 캐시에서 찾기
       if (!blogSlug) {
         const allPosts = queryClient.getQueriesData<any>({
           queryKey: postQueryKeys.lists()
@@ -216,49 +227,59 @@ export function useDeletePost() {
         }
       }
 
-      console.log('🗑️ [Post Delete - onMutate]', {
-        postId: deletedId,
-        hasPreviousPost: !!previousPost,
-        blogSlug: blogSlug,
-        foundInCache: blogSlug ? 'yes' : 'no'
-      });
 
       return { previousPost, blogSlug };
     },
-    onSuccess: (_, deletedId, context) => {
-      console.log('✅ [Post Deleted]', {
-        postId: deletedId,
-        blogSlug: context?.blogSlug
-      });
+    onSuccess: (_, variables, context) => {
+      const deletedId = typeof variables === 'string' ? variables : variables.postId;
+
 
       // 1. 삭제된 포스트 상세 캐시 제거
       queryClient.removeQueries({ queryKey: postQueryKeys.detail(deletedId) });
 
       // 2. 블로그별 캐시에서 즉시 제거 (낙관적 업데이트 - 최우선)
       if (context?.blogSlug) {
-        console.log('✅ [Updating Blog Cache on Delete]', context.blogSlug);
 
+        // predicate를 사용하여 blogSlug를 포함한 모든 쿼리 매칭 (search, category 무관)
         queryClient.setQueriesData(
-          { queryKey: postQueryKeys.list({ blogSlug: context.blogSlug }) },
+          {
+            predicate: (query) => {
+              const queryKey = query.queryKey;
+              // ['posts', 'list', { ...filters }] 형태 확인
+              if (queryKey[0] === 'posts' && queryKey[1] === 'list' && queryKey[2]) {
+                // 타입 가드: queryKey[2]가 객체이고 blogSlug 속성을 가지는지 확인
+                const filters = queryKey[2] as Record<string, unknown>;
+                if (typeof filters === 'object' && filters !== null && 'blogSlug' in filters) {
+                  const matched = filters.blogSlug === context.blogSlug;
+                  return matched;
+                }
+              }
+              return false;
+            }
+          },
           (oldData: any) => {
-            if (!oldData || !oldData.pages) return oldData;
+            if (!oldData || !oldData.pages) {
+              return oldData;
+            }
 
             const newPages = oldData.pages.map((page: any) => {
               if (!page || !page.posts) return page;
 
+              const hasDeletedPost = page.posts.some((post: any) => post.id === deletedId);
+
               return {
                 ...page,
                 posts: page.posts.filter((post: any) => post.id !== deletedId),
-                total: page.posts.some((post: any) => post.id === deletedId)
-                  ? page.total - 1
-                  : page.total
+                total: hasDeletedPost ? page.total - 1 : page.total
               };
             });
 
-            return {
+            const result = {
               ...oldData,
               pages: newPages,
             };
+
+            return result;
           }
         );
       }
@@ -295,11 +316,25 @@ export function useDeletePost() {
       });
 
       // 5. 블로그별 캐시도 무효화 (내 블로그에서도 즉시 반영)
+      // refetchType: 'none' - 즉시 refetch 안함, 낙관적 업데이트 상태 유지
+      // 사용자가 페이지를 떠났다 돌아올 때만 서버에서 최신 데이터 가져옴
       if (context?.blogSlug) {
         queryClient.invalidateQueries({
-          queryKey: postQueryKeys.list({ blogSlug: context.blogSlug }),
-          refetchType: 'active'
+          predicate: (query) => {
+            const queryKey = query.queryKey;
+            // ['posts', 'list', { ...filters }] 형태 확인
+            if (queryKey[0] === 'posts' && queryKey[1] === 'list' && queryKey[2]) {
+              // 타입 가드: queryKey[2]가 객체이고 blogSlug 속성을 가지는지 확인
+              const filters = queryKey[2] as Record<string, unknown>;
+              if (typeof filters === 'object' && filters !== null && 'blogSlug' in filters) {
+                return filters.blogSlug === context.blogSlug;
+              }
+            }
+            return false;
+          },
+          refetchType: 'none'  // 즉시 refetch 안함 - 낙관적 업데이트 유지
         });
+
       }
     },
     retry: 1,
@@ -391,14 +426,11 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
     onSuccess: (response, postId) => {
       // 큐 시스템 사용 시, 낙관적 업데이트 상태 유지 (깜빡임 방지)
       if (response.queued) {
-        console.log('⏳ [Like queued - keeping optimistic state]', { postId, response });
         return; // 서버 응답 무시, onMutate의 낙관적 업데이트 상태 그대로 유지
       }
 
       // queued가 아닌 경우에만 서버 응답으로 최종 확정 (모든 캐시 업데이트)
       const { liked, likeCount } = response;
-
-      console.log('✅ [Like Toggle Success]', { postId, liked, likeCount, response });
 
       // 목록 캐시 최종 업데이트
       queryClient.setQueriesData(

@@ -19,7 +19,6 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
 import { Public } from '../../common/decorators/public.decorator';
-import { CacheService } from '../../cache/cache.service';
 import { UsageService } from '../../usage/usage.service';
 
 /**
@@ -42,7 +41,6 @@ export class McpProxyController {
     private readonly postsService: PostsService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    private readonly cacheService: CacheService,
     private readonly usageService: UsageService,
   ) {}
 
@@ -139,24 +137,8 @@ export class McpProxyController {
       await this.usageService.trackMcpPost(userId);
       this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
 
-      // 🔥 Redis 캐시 무효화 (MCP 자동포스팅도 즉시 반영되도록)
-      // 작성자의 "내 블로그"에서 즉시 확인 가능하도록 블로그별 캐시 제거
-      const cacheKeysToInvalidate: string[] = ['feed:main:p1'];
-
-      if (post.blog && post.blog.slug) {
-        const blogCacheKey = `feed:blog:${post.blog.slug}:p1`;
-        cacheKeysToInvalidate.push(blogCacheKey);
-        this.logger.log(`✅ [MCP Cache Invalidation] Invalidating cache for blog: ${post.blog.slug}`);
-      }
-
-      // 병렬로 캐시 무효화 실행
-      await Promise.all(
-        cacheKeysToInvalidate.map(key =>
-          this.cacheService.delete(key).catch(err => {
-            this.logger.error(`Failed to invalidate cache key ${key}:`, err);
-          })
-        )
-      );
+      // 캐시 무효화는 posts.service.ts의 createFast()에서 이벤트 발행을 통해 처리됨
+      // CacheInvalidationListener가 'post.created' 이벤트를 받아 자동으로 처리
 
       this.logger.log(`✅ [MCP Post Created - Fast Path] Post ID: ${post.id}, Blog: ${post.blog?.slug}, Processing: ${post._meta?.processingTime || 'N/A'}`);
 

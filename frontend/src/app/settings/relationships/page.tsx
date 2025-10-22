@@ -270,7 +270,7 @@ export default function RelationshipsPage() {
         </p>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'following' | 'followers' | 'blocked')} className="w-full">
         <TabsList className="grid w-full grid-cols-3 mb-6">
           <TabsTrigger value="following" className="flex items-center gap-2">
             <Users className="w-4 h-4" />

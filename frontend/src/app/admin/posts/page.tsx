@@ -159,7 +159,7 @@ export default function PostsManagement() {
     if (selectedPosts.length === allPosts.length) {
       setSelectedPosts([]);
     } else {
-      setSelectedPosts(allPosts.map(p => p.id));
+      setSelectedPosts(allPosts.map((p: Post) => p.id));
     }
   };
 
@@ -206,7 +206,7 @@ export default function PostsManagement() {
     }
   };
 
-  const categories = Array.from(new Set(allPosts.map(p => p.category).filter(Boolean))) as string[];
+  const categories = Array.from(new Set(allPosts.map((p: Post) => p.category).filter(Boolean))) as string[];
 
   return (
     <div>
@@ -234,7 +234,7 @@ export default function PostsManagement() {
               <div>
                 <p className="text-sm text-gray-600">{t.posts.published}</p>
                 <p className="text-2xl font-semibold">
-                  {allPosts.filter(p => p.isPublished).length}
+                  {allPosts.filter((p: Post) => p.isPublished).length}
                 </p>
               </div>
               <CheckCircle className="h-8 w-8 text-green-500" />
@@ -247,7 +247,7 @@ export default function PostsManagement() {
               <div>
                 <p className="text-sm text-gray-600">{t.posts.drafts}</p>
                 <p className="text-2xl font-semibold">
-                  {allPosts.filter(p => !p.isPublished).length}
+                  {allPosts.filter((p: Post) => !p.isPublished).length}
                 </p>
               </div>
               <Edit className="h-8 w-8 text-yellow-500" />
@@ -260,7 +260,7 @@ export default function PostsManagement() {
               <div>
                 <p className="text-sm text-gray-600">{t.posts.totalViews}</p>
                 <p className="text-2xl font-semibold">
-                  {allPosts.reduce((acc, p) => acc + p.viewCount, 0).toLocaleString()}
+                  {allPosts.reduce((acc: number, p: Post) => acc + p.viewCount, 0).toLocaleString()}
                 </p>
               </div>
               <Eye className="h-8 w-8 text-blue-500" />
@@ -391,7 +391,7 @@ export default function PostsManagement() {
                   </TableCell>
                 </TableRow>
               ) : (
-                allPosts.map((post) => (
+                allPosts.map((post: Post) => (
                   <TableRow key={post.id}>
                     <TableCell>
                       <input

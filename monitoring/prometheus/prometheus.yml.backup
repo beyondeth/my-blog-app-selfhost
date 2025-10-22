@@ -2,14 +2,14 @@
 # 통합 모니터링 시스템: Backend, MCP Proxy, Redis, System
 
 global:
-  # 메트릭 수집 주기 (최적화: 15s → 30s, CPU/디스크 절약)
-  scrape_interval: 30s
+  # 메트릭 수집 주기
+  scrape_interval: 15s
   # 규칙 평가 주기
-  evaluation_interval: 30s
+  evaluation_interval: 15s
   # 외부 시스템에 첨부할 레이블
   external_labels:
     monitor: 'unified-monitor'
-    environment: 'production'  # development → production
+    environment: 'development'
 
 # Alertmanager 설정 (선택사항)
 alerting:
@@ -29,38 +29,22 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:3000']
     metrics_path: '/api/v1/metrics'
-    scrape_interval: 30s      # 10s → 30s (최적화)
-    scrape_timeout: 10s       # 5s → 10s (안정성)
+    scrape_interval: 10s
+    scrape_timeout: 5s
     # 메트릭 엔드포인트가 없을 경우 무시
     honor_timestamps: true
-
-    # 불필요한 메트릭 제거 (메모리 절약)
-    metric_relabel_configs:
-      # GC 상세 메트릭 제거 (9개 series)
-      - source_labels: [__name__]
-        regex: 'nodejs_gc_.*'
-        action: drop
-      # Heap 상세 메트릭 제거 (6개 series)
-      - source_labels: [__name__]
-        regex: 'nodejs_heap_space_.*'
-        action: drop
 
   # Redis 메트릭
   - job_name: 'redis'
     static_configs:
       - targets: ['redis-exporter:9121']
-    scrape_interval: 30s      # 10s → 30s (최적화)
+    scrape_interval: 10s
 
-    # Redis 과도한 메트릭 제거 (612+156 series)
-    metric_relabel_configs:
-      # commands_latencies 제거 (612 series, CPU 9% 주범)
-      - source_labels: [__name__]
-        regex: 'redis_commands_latencies_usec.*'
-        action: drop
-      # latency_percentiles 제거 (156 series)
-      - source_labels: [__name__]
-        regex: 'redis_latency_percentiles_usec.*'
-        action: drop
+  # Node Exporter (시스템 메트릭)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 15s
 
   # Prometheus 자체 메트릭
   - job_name: 'prometheus'
@@ -77,5 +61,5 @@ scrape_configs:
     static_configs:
       - targets: ['host.docker.internal:3002']
     metrics_path: '/metrics'
-    scrape_interval: 30s      # 10s → 30s (최적화)
-    scrape_timeout: 10s       # 5s → 10s (안정성)
+    scrape_interval: 10s
+    scrape_timeout: 5s

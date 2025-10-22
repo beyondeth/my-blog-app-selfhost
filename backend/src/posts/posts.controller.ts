@@ -23,7 +23,7 @@ import { ViewCountService } from './view-count.service';
 import { CacheInterceptor } from '../cache/cache.interceptor';
 import { FilesService } from '../files/files.service';
 import { CacheTTL } from '../cache/cache.decorator';
-import { CacheService } from '../cache/cache.service';
+import { CacheService, CacheKeys } from '../cache/cache.service';
 import { PaginationHelper } from '../common/dto/pagination.dto';
 import { MonitoringService } from '../monitoring/monitoring.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
@@ -33,10 +33,6 @@ import Redis from 'ioredis';
 @Controller('posts')
 export class PostsController {
   private readonly logger = new Logger(PostsController.name);
-
-  // 캐시 무효화 최적화: 중복 무효화 방지를 위한 큐
-  private cacheInvalidationQueue = new Set<string>();
-  private isProcessingQueue = false;
 
   constructor(
     private readonly postsService: PostsService,
@@ -54,50 +50,8 @@ export class PostsController {
   ) {}
 
   /**
-   * 스마트 캐시 무효화 메서드
-   * 큐를 사용하여 중복 무효화 방지하고 배치로 처리
-   */
-  private async invalidateCache(cacheKeys: string | string[]) {
-    const keys = Array.isArray(cacheKeys) ? cacheKeys : [cacheKeys];
-
-    // 큐에 추가
-    keys.forEach(key => this.cacheInvalidationQueue.add(key));
-
-    // 이미 처리 중이면 스킵
-    if (this.isProcessingQueue) {
-      return;
-    }
-
-    // 100ms 후 배치로 처리 (여러 요청을 모아서 한 번에 처리)
-    setTimeout(async () => {
-      this.isProcessingQueue = true;
-      const keysToInvalidate = Array.from(this.cacheInvalidationQueue);
-      this.cacheInvalidationQueue.clear();
-
-      try {
-        // 병렬로 캐시 무효화
-        await Promise.all(
-          keysToInvalidate.map(key =>
-            this.cacheService.delete(key).catch(err => {
-              this.logger.error(`Failed to invalidate cache key ${key}:`, err);
-            })
-          )
-        );
-        this.logger.debug(`✅ Batch invalidated ${keysToInvalidate.length} cache keys`);
-      } finally {
-        this.isProcessingQueue = false;
-      }
-    }, 100);
-  }
-
-  /**
    * 캐시 키 생성 헬퍼 메서드
-   * 일관된 캐시 키 생성을 보장하고, 캐시 관리를 쉽게 만듦
-   *
-   * 캐시 히트율 개선 전략:
-   * 1. 기본값(limit=10)은 단순한 키 사용
-   * 2. 자주 사용되는 조합만 캐싱
-   * 3. 블로그별 캐시는 활성 블로그만
+   * 표준화된 캐시 키 생성
    */
   private generateCacheKey(params: {
     page: number;
@@ -106,27 +60,25 @@ export class PostsController {
     isPublished?: boolean;
     isPublicOnly?: boolean;
   }): string {
-    const { page, limit, blogSlug, isPublished, isPublicOnly = true } = params;
-
-    // 기본값인 경우 단순한 캐시 키 사용 (대부분의 사용자가 이 조합 사용)
-    // 프론트엔드 기본 limit: 20 (usePosts.ts:39)
-    if (limit === 20 && !blogSlug && isPublished === undefined) {
-      return `feed:main:p${page}`;  // 더 짧은 키로 메모리 절약
-    }
+    const { page, limit, blogSlug, isPublished } = params;
 
     // 블로그별 피드
     if (blogSlug) {
-      // 블로그+페이지만 포함 (limit 제외하여 캐시 히트율 상승)
-      return `feed:blog:${blogSlug}:p${page}`;
+      return CacheKeys.FEED_BLOG(blogSlug, page);
+    }
+
+    // 홈 피드 (기본값)
+    if (limit === 20 && !blogSlug && isPublished === undefined) {
+      return CacheKeys.FEED_HOME(page);
     }
 
     // published 필터가 있는 경우
     if (isPublished !== undefined) {
-      return `feed:pub${isPublished ? '1' : '0'}:p${page}`;
+      return `feed:pub${isPublished ? '1' : '0'}:page:${page}`;
     }
 
     // 그 외의 경우 (limit이 다른 경우)
-    return `feed:custom:p${page}:l${limit}`;
+    return `feed:custom:page:${page}:limit:${limit}`;
   }
 
   @Post()
@@ -136,39 +88,7 @@ export class PostsController {
   @ApiBearerAuth()
   async create(@Body() createPostDto: CreatePostDto, @CurrentUser() user: User) {
     const newPost = await this.postsService.create(createPostDto, user);
-
-    // 스마트 캐시 무효화: 배치 처리로 DB 부하 최소화
-    // 새 포스트는 항상 최상단에 추가되므로 1페이지만 즉시 무효화
-    // limit 다양성 대응: 기본 키 + custom 키 모두 무효화
-    const cacheKeysToInvalidate = [
-      'feed:main:p1',          // limit=20 기본 키
-      'feed:custom:p1:l20',    // limit=20 명시적 키 (안전성)
-      'feed:custom:p1:l10',    // limit=10 사용 시 대비
-    ];
-
-    // 인기 포스트 캐시 무효화 제거
-    // 이유: 새 포스트는 viewCount=0, likeCount=0, commentCount=0으로
-    //      popularity_score=0이므로 인기 목록에 진입 불가능
-    //      불필요한 캐시 무효화로 인한 캐시 히트율 저하 방지
-    // 대신 조회수/좋아요/댓글 변경 시에만 무효화 (view-count.service.ts, like-queue.service.ts, comments.service.ts)
-
-    // 작성자의 블로그 캐시 무효화
-    if (newPost.blog && newPost.blog.slug) {
-      cacheKeysToInvalidate.push(`feed:blog:${newPost.blog.slug}:p1`);
-    }
-
-    // 배치로 캐시 무효화 (중복 방지)
-    await this.invalidateCache(cacheKeysToInvalidate);
-
-    // 2-3페이지는 지연 무효화 (DB 부하 분산)
-    setTimeout(() => {
-      this.invalidateCache(['feed:main:p2']);
-    }, 2000);
-
-    setTimeout(() => {
-      this.invalidateCache(['feed:main:p3']);
-    }, 5000);
-
+    // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return newPost;
   }
 
@@ -461,17 +381,17 @@ export class PostsController {
     const limitNumber = limit ? parseInt(limit, 10) : 5;
 
     // 캐시 키 생성
-    const cacheKey = `editor-picks:${limitNumber}`;
+    const cacheKey = CacheKeys.FEED_EDITOR_PICKS(limitNumber);
 
     // 캐시 확인
     try {
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
-        console.log(`✅ Cache hit for ${cacheKey}`);
+        this.logger.debug(`✅ Cache hit for ${cacheKey}`);
         return cached;
       }
     } catch (error) {
-      console.error('Cache get error:', error);
+      this.logger.error('Cache get error:', error);
     }
 
     // DB 조회
@@ -480,9 +400,9 @@ export class PostsController {
     // 캐싱 (TTL: 30분)
     try {
       await this.cacheService.set(cacheKey, result, 1800);
-      console.log(`📦 Cached ${cacheKey} with TTL 1800s`);
+      this.logger.debug(`📦 Cached ${cacheKey} with TTL 1800s`);
     } catch (error) {
-      console.error('Cache set error:', error);
+      this.logger.error('Cache set error:', error);
     }
 
     return result;
@@ -505,40 +425,7 @@ export class PostsController {
   @ApiBearerAuth()
   async update(@Param('id') id: string, @Body() updatePostDto: any, @CurrentUser() user: User) {
     const updated = await this.postsService.update(id, updatePostDto, user);
-    
-    // 스마트 캐시 무효화: 영향받는 페이지만 무효화
-    try {
-      // 메인 피드는 1페이지만 즉시 무효화 (제목/내용 변경 시 영향)
-      // limit 다양성 대응: 기본 키 + custom 키 모두 무효화
-      await this.cacheService.delete('feed:main:p1');
-      await this.cacheService.delete('feed:custom:p1:l20');
-      await this.cacheService.delete('feed:custom:p1:l10');
-      console.log('✅ Cache invalidated: page 1 after update');
-
-      // 2-3페이지는 지연 무효화
-      setTimeout(async () => {
-        try {
-          await this.cacheService.delete('feed:main:p2');
-          await this.cacheService.delete('feed:main:p3');
-          console.log('✅ Cache invalidated: pages 2-3 (delayed)');
-        } catch (error) {
-          console.error('Failed to invalidate delayed cache:', error);
-        }
-      }, 3000); // 3초 후
-
-      // 블로그별 피드는 해당 블로그 1페이지만 무효화
-      const post = await this.postsRepository.findOne({
-        where: { id },
-        relations: ['blog', 'author']
-      });
-      if (post?.author?.id === user.id && post?.blog) {
-        await this.cacheService.delete(`feed:blog:${post.blog.slug}:p1`);
-        console.log(`✅ Cache invalidated: blog ${post.blog.slug} page 1`);
-      }
-    } catch (error) {
-      console.error('❌ Failed to invalidate feed cache:', error);
-    }
-    
+    // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return updated;
   }
 
@@ -549,55 +436,7 @@ export class PostsController {
   @ApiBearerAuth()
   async remove(@Param('id') id: string, @CurrentUser() user: User) {
     const result = await this.postsService.remove(id, user);
-    
-    // 스마트 캐시 무효화: 영향받는 페이지만 무효화
-    try {
-      // 삭제는 페이지 구조에 영향이 크므로 더 많이 무효화 (하지만 지연 처리)
-      // 1페이지는 즉시 무효화
-      // limit 다양성 대응: 기본 키 + custom 키 모두 무효화
-      await this.cacheService.delete('feed:main:p1');
-      await this.cacheService.delete('feed:custom:p1:l20');
-      await this.cacheService.delete('feed:custom:p1:l10');
-      console.log('✅ Cache invalidated: page 1 after deletion');
-
-      // 2-3페이지는 2초 후 무효화
-      setTimeout(async () => {
-        try {
-          await this.cacheService.delete('feed:main:p2');
-          await this.cacheService.delete('feed:main:p3');
-          console.log('✅ Cache invalidated: pages 2-3 (delayed 2s)');
-        } catch (error) {
-          console.error('Failed to invalidate cache:', error);
-        }
-      }, 2000);
-
-      // 4-5페이지는 5초 후 무효화
-      setTimeout(async () => {
-        try {
-          await this.cacheService.delete('feed:main:p4');
-          await this.cacheService.delete('feed:main:p5');
-          console.log('✅ Cache invalidated: pages 4-5 (delayed 5s)');
-        } catch (error) {
-          console.error('Failed to invalidate cache:', error);
-        }
-      }, 5000);
-
-      // 블로그별 피드는 해당 블로그의 1-2페이지만 무효화
-      const post = await this.postsRepository.findOne({
-        where: { id },
-        relations: ['blog', 'author']
-      });
-      if (post?.author?.id === user.id && post?.blog) {
-        await this.cacheService.delete(`feed:blog:${post.blog.slug}:p1`);
-        setTimeout(async () => {
-          await this.cacheService.delete(`feed:blog:${post.blog.slug}:p2`);
-        }, 2000);
-        console.log(`✅ Cache invalidated: blog ${post.blog.slug} pages 1-2`);
-      }
-    } catch (error) {
-      console.error('❌ Failed to invalidate feed cache:', error);
-    }
-    
+    // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return result;
   }
 
@@ -719,14 +558,7 @@ export class PostsController {
     @CurrentUser() user: User,
   ) {
     const result = await this.postsService.toggleEditorPick(id, user);
-
-    // Editor's Pick 캐시 무효화 (모든 limit 값에 대해)
-    const cacheKeysToInvalidate = [];
-    for (let limit = 1; limit <= 10; limit++) {
-      cacheKeysToInvalidate.push(`editor-picks:${limit}`);
-    }
-    await this.invalidateCache(cacheKeysToInvalidate);
-
+    // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return result;
   }
 

@@ -18,12 +18,14 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
   
   // 환경에 따른 로그 레벨 설정
-  // 프로덕션: ERROR, WARN, LOG만 출력 (DEBUG, VERBOSE 제외)
+  // 프로덕션: ERROR, WARN만 출력 (LOG, DEBUG, VERBOSE 제외)
+  //   - 운영 환경에서는 중요한 에러와 경고만 로깅
+  //   - 성능 최적화 및 리소스 절약
   // 개발환경: 모든 레벨 출력
   const isDevelopment = process.env.NODE_ENV !== 'production';
   const logLevels: LogLevel[] = isDevelopment
     ? ['error', 'warn', 'log', 'debug', 'verbose']
-    : ['error', 'warn', 'log'];
+    : ['error', 'warn'];
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     logger: logLevels,
@@ -38,7 +40,7 @@ async function bootstrap() {
     ? join(__dirname, '..', 'src', 'views')  // 개발: src/views
     : join(__dirname, 'views');              // 프로덕션: dist/views
   app.setBaseViewsDir(viewsPath);
-  console.log('📁 Views directory:', viewsPath);
+  logger.log(`Views directory: ${viewsPath}`);
 
   // Handlebars 헬퍼 등록 (조건부 렌더링 등을 위해)
   hbs.registerHelper('eq', (a, b) => a === b);

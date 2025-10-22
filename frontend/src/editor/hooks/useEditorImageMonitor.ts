@@ -38,15 +38,15 @@ export function useEditorImageMonitor({
       if (node.type.name === 'resizableImage') {
         // Try to get image ID from data attribute first
         const dataImageId = node.attrs['data-image-id'];
-        console.log('[EditorMonitor] 🔍 Checking resizableImage node, attrs:', node.attrs);
+        // console.log('[EditorMonitor] 🔍 Checking resizableImage node, attrs:', node.attrs);
         if (dataImageId) {
           const normalizedId = String(dataImageId).trim();
-          console.log('[EditorMonitor] ✅ Found image with data-image-id:', normalizedId);
+          // console.log('[EditorMonitor] ✅ Found image with data-image-id:', normalizedId);
           imageIds.add(normalizedId);
         } else {
           // Fallback: extract from URL
           const src = node.attrs.src;
-          console.warn('[EditorMonitor] ⚠️ Image without data-image-id, trying URL extraction:', src);
+          // console.warn('[EditorMonitor] ⚠️ Image without data-image-id, trying URL extraction:', src);
           
           if (src) {
             // More aggressive ID extraction patterns
@@ -70,11 +70,11 @@ export function useEditorImageMonitor({
             
             if (foundId) {
               const normalizedId = String(foundId).trim();
-              console.log('[EditorMonitor] 🔍 Extracted ID from URL:', normalizedId, 'from', src);
+              // console.log('[EditorMonitor] 🔍 Extracted ID from URL:', normalizedId, 'from', src);
               imageIds.add(normalizedId);
             } else {
               // Last resort: use the entire URL as ID
-              console.error('[EditorMonitor] ❌ Could not extract ID, using URL as ID:', src);
+              // console.error('[EditorMonitor] ❌ Could not extract ID, using URL as ID:', src);
               imageIds.add(src);
             }
           }
@@ -90,14 +90,14 @@ export function useEditorImageMonitor({
           if (videoIdMatch && videoIdMatch[1]) {
             const videoId = videoIdMatch[1];
             const youtubeThumbId = `yt_thumb_${videoId}`;
-            console.log('[EditorMonitor] 🎥 Found YouTube video, adding thumbnail ID:', youtubeThumbId);
+            // console.log('[EditorMonitor] 🎥 Found YouTube video, adding thumbnail ID:', youtubeThumbId);
             imageIds.add(youtubeThumbId);
           }
         }
       }
     });
-    
-    console.log('[EditorMonitor] 📊 Total media in editor:', imageIds.size, Array.from(imageIds));
+
+    // console.log('[EditorMonitor] 📊 Total media in editor:', imageIds.size, Array.from(imageIds));
     return imageIds;
   }, []);
 
@@ -117,7 +117,7 @@ export function useEditorImageMonitor({
 
     // Don't check if we're locked - but log it
     if (syncLockRef.current) {
-      console.log('[EditorMonitor] ⚠️ Sync lock active, skipping check');
+      // console.log('[EditorMonitor] ⚠️ Sync lock active, skipping check');
       return;
     }
 
@@ -136,13 +136,13 @@ export function useEditorImageMonitor({
     
     // Only trigger if there are actual changes
     if (deleted.length > 0 || added.length > 0) {
-      console.log('[EditorMonitor] 🔍 Changes detected:', {
-        deleted,
-        added,
-        current: Array.from(currentImages),
-        previous: Array.from(previousImages),
-      });
-      
+      // console.log('[EditorMonitor] 🔍 Changes detected:', {
+      //   deleted,
+      //   added,
+      //   current: Array.from(currentImages),
+      //   previous: Array.from(previousImages),
+      // });
+
       // Update reference BEFORE calling onImagesChange to prevent re-triggering
       previousImagesRef.current = currentImages;
       
@@ -162,16 +162,16 @@ export function useEditorImageMonitor({
    * Debounced check function - stable reference
    */
   const scheduleCheck = useCallback(() => {
-    console.log('[EditorMonitor] 📅 Scheduling check...');
-    
+    // console.log('[EditorMonitor] 📅 Scheduling check...');
+
     // Clear any pending check
     if (checkTimeoutRef.current) {
       clearTimeout(checkTimeoutRef.current);
     }
-    
+
     // Schedule new check with debounce
     checkTimeoutRef.current = setTimeout(() => {
-      console.log('[EditorMonitor] ⏰ Executing scheduled check');
+      // console.log('[EditorMonitor] ⏰ Executing scheduled check');
       checkForChanges();
     }, 300); // Increased debounce for stability
   }, [checkForChanges]);
@@ -181,11 +181,11 @@ export function useEditorImageMonitor({
    */
   const acquireSyncLock = useCallback((duration: number = 300) => {
     syncLockRef.current = true;
-    console.log('[EditorMonitor] Sync lock acquired');
-    
+    // console.log('[EditorMonitor] Sync lock acquired');
+
     setTimeout(() => {
       syncLockRef.current = false;
-      console.log('[EditorMonitor] Sync lock released');
+      // console.log('[EditorMonitor] Sync lock released');
     }, duration);
   }, []);
 
@@ -195,18 +195,18 @@ export function useEditorImageMonitor({
   useEffect(() => {
     if (!editor || !isEnabled) return;
 
-    console.log('[EditorMonitor] Setting up listeners');
+    // console.log('[EditorMonitor] Setting up listeners');
 
     const handleUpdate = () => {
-      console.log('[EditorMonitor] 📝 Editor update event fired');
+      // console.log('[EditorMonitor] 📝 Editor update event fired');
       scheduleCheck();
     };
 
     const handleTransaction = ({ transaction }: any) => {
       // Check if document actually changed
       if (transaction.docChanged) {
-        console.log('[EditorMonitor] 📄 Transaction with doc change detected');
-        
+        // console.log('[EditorMonitor] 📄 Transaction with doc change detected');
+
         // Check if the change involves images or YouTube videos
         let hasMediaChange = false;
         transaction.steps.forEach((step: any) => {
@@ -216,11 +216,11 @@ export function useEditorImageMonitor({
             hasMediaChange = true;
           }
         });
-        
+
         if (hasMediaChange) {
-          console.log('[EditorMonitor] 🖼️ Media-related transaction detected (image or YouTube)!');
+          // console.log('[EditorMonitor] 🖼️ Media-related transaction detected (image or YouTube)!');
         }
-        
+
         scheduleCheck();
       }
     };
@@ -228,17 +228,17 @@ export function useEditorImageMonitor({
     // Listen to editor updates
     editor.on('update', handleUpdate);
     editor.on('transaction', handleTransaction);
-    
+
     // Do initial scan after a short delay to let everything settle
     const initialTimeout = setTimeout(() => {
-      console.log('[EditorMonitor] Initial scan');
+      // console.log('[EditorMonitor] Initial scan');
       const currentImages = extractImageIds(editor);
       previousImagesRef.current = currentImages;
-      console.log('[EditorMonitor] Initial images:', Array.from(currentImages));
+      // console.log('[EditorMonitor] Initial images:', Array.from(currentImages));
     }, 500);
-    
+
     return () => {
-      console.log('[EditorMonitor] Cleaning up listeners');
+      // console.log('[EditorMonitor] Cleaning up listeners');
       // Clean up
       editor.off('update', handleUpdate);
       editor.off('transaction', handleTransaction);

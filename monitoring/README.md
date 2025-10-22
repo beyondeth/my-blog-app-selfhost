@@ -24,17 +24,13 @@
   - 키 개수
   - 연결 상태
 
-- **System**
-  - CPU 사용률
-  - 메모리 사용률
-  - 디스크 I/O
-  - 네트워크 I/O
-
 ### 모니터링 스택
 - **Prometheus** (Port 9090) - 메트릭 수집 및 저장
-- **Grafana** (Port 3030) - 대시보드 시각화
-- **Redis Exporter** (Port 9121) - Redis 메트릭 수집
-- **Node Exporter** (Port 9100) - 시스템 메트릭 수집
+- **Grafana** (Port 3030) - 대시보드 시각화 (2개 대시보드)
+- **Redis Exporter** (Port 9121) - Redis 메트릭 수집 (최적화됨)
+
+> **시스템 메트릭**: Oracle Cloud Console 또는 `docker stats` 명령어로 확인
+> (Node Exporter는 중복으로 인해 제거됨)
 
 ## 🚀 빠른 시작
 

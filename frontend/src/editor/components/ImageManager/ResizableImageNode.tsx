@@ -245,11 +245,11 @@ export const ResizableImageComponent: React.FC<ResizableImageNodeProps> = ({
   }, [naturalSize, updateAttributes, getPos]);
 
   return (
-    <NodeViewWrapper 
+    <NodeViewWrapper
       className={`resizable-image-wrapper ${selected ? 'selected' : ''} ${isResizing ? 'resizing' : ''}`}
-      style={{ 
-        display: 'inline-block', 
-        maxWidth: '100%', 
+      style={{
+        display: 'inline-block',
+        maxWidth: '100%',
         position: 'relative',
         userSelect: isResizing ? 'none' : 'auto'
       }}

@@ -244,9 +244,127 @@ pnpm lint            # Both
 - E2E tests for critical user flows
 - Security testing for auth flows
 
+## Logging Guidelines
+
+### Frontend Logging Rules
+
+#### 1. Production Build Optimization
+- Next.js는 프로덕션 빌드 시 `console.log`, `console.info`, `console.debug` 자동 제거
+- `console.error`와 `console.warn`만 유지 (중요 에러 추적용)
+- 설정: `next.config.js`의 `compiler.removeConsole` 옵션
+
+#### 2. 민감정보 로깅 금지
+```typescript
+// ❌ 금지: 민감정보 직접 로깅
+console.log('User logged in:', user.email, user.password);
+console.log('Token:', accessToken);
+
+// ✅ 허용: 일반 디버그 정보
+console.log('Login successful');
+console.log('Fetching user data...');
+```
+
+#### 3. 개발 환경 구분
+```typescript
+// ✅ 개발 환경에서만 로깅
+if (process.env.NODE_ENV === 'development') {
+  console.log('Debug info:', data);
+}
+```
+
+### Backend Logging Rules
+
+#### 1. Logger 사용 필수
+```typescript
+import { Injectable, Logger } from '@nestjs/common';
+
+@Injectable()
+export class MyService {
+  private readonly logger = new Logger(MyService.name);
+
+  someMethod() {
+    this.logger.log('Info message');       // 일반 정보
+    this.logger.debug('Debug message');    // 디버그 (개발만)
+    this.logger.warn('Warning message');   // 경고
+    this.logger.error('Error message', error.stack);  // 에러
+  }
+}
+```
+
+#### 2. console.log 사용 금지
+```typescript
+// ❌ 금지: console 직접 사용
+console.log('User ID:', userId);
+
+// ✅ 허용: Logger 사용
+this.logger.debug('Processing request');
+```
+
+#### 3. 민감정보 보호
+```typescript
+// ❌ 금지: 개인정보/인증정보 로깅
+this.logger.log(`User ${userId} logged in`);        // userId 노출
+this.logger.log(`Token: ${accessToken}`);           // 토큰 노출
+this.logger.debug(`User data: ${JSON.stringify(user)}`);  // 전체 객체
+
+// ✅ 허용: 마스킹 또는 제거
+this.logger.log('User logged in successfully');
+this.logger.debug(`User ID: ${userId.substring(0, 8)}...`);  // 마스킹
+this.logger.debug(`Processing request for authenticated user`);
+```
+
+#### 4. 로그 레벨 기준
+
+**프로덕션 환경** (error, warn만 출력)
+- `error`: 시스템 오류, 예외 발생
+- `warn`: 잠재적 문제, 비정상 상황
+
+**개발 환경** (모든 레벨 출력)
+- `log`: 중요한 비즈니스 이벤트
+- `debug`: 디버깅용 상세 정보
+- `verbose`: 매우 상세한 정보
+
+```typescript
+// 프로덕션에서 출력 O
+this.logger.error('Database connection failed', error.stack);
+this.logger.warn('API rate limit approaching');
+
+// 프로덕션에서 출력 X (개발에서만)
+this.logger.log('User registration completed');
+this.logger.debug('Cache hit for key: xyz');
+this.logger.verbose('Request headers:', headers);
+```
+
+#### 5. 에러 로깅 패턴
+```typescript
+try {
+  await this.processData();
+} catch (error) {
+  // ✅ 올바른 에러 로깅
+  this.logger.error('Failed to process data', error.stack);
+  throw error;
+}
+```
+
+### 보안 체크리스트
+
+**로깅 시 절대 금지:**
+- ❌ 비밀번호 (password)
+- ❌ API 키 (apiKey, api_key)
+- ❌ 토큰 (accessToken, refreshToken, jwt)
+- ❌ 세션 ID (sessionId)
+- ❌ 민감한 개인정보 (이메일, 전화번호, 주민번호 등)
+- ❌ 사용자 ID 전체 (마스킹 필수)
+
+**로깅 가능:**
+- ✅ 비즈니스 이벤트 (로그인 성공, 포스트 생성 등)
+- ✅ 성능 지표 (응답 시간, 처리 건수)
+- ✅ 에러 메시지 (단, 민감정보 제외)
+- ✅ 마스킹된 식별자 (ID의 일부만)
+
 ---
 
-**Last Updated**: 2025-01-10
+**Last Updated**: 2025-01-21
 **Project**: Multi-user Blog Platform with Subscription System
 - 이 프로젝트는 개인 프로젝트가 아닌 엔터프라이즈급 saas 블로그 플랫폼이면서 mcp 를 활용한 자동블로그 시스템을 구축하기 위한 프로젝트이다. 그렇기 때문에 코드는 항상 클린하며, 여러 사용자가 사용하는만큼 최적화가 필수여야한다. 메모리 누수 방지, 클린업, 에러처리 필수.\
 또한 함수형 코드, OOP 코드 작성이 적절하게 시기 적절하게 적용되어야한다.

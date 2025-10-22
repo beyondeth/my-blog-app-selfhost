@@ -38,7 +38,7 @@ export default function BlogPage() {
   const router = useRouter();
   const params = useParams();
   const blogSlug = params.blogSlug as string;
-  console.log('📝 [BLOG PAGE COMPONENT RENDERED] blogSlug:', blogSlug);
+  // console.log('📝 [BLOG PAGE COMPONENT RENDERED] blogSlug:', blogSlug);
 
   const isClient = useIsClient();
   const searchParams = useSearchParams();
@@ -151,7 +151,8 @@ export default function BlogPage() {
   // 삭제 확인
   const handleConfirmDelete = useCallback(() => {
     if (deleteDialog.postId) {
-      deletePostMutation.mutate(deleteDialog.postId, {
+      // blogSlug를 명시적으로 전달하여 블로그 캐시 무효화 보장
+      deletePostMutation.mutate({ postId: deleteDialog.postId, blogSlug }, {
         onSuccess: () => {
           toast.success('포스트가 삭제되었습니다');
           setDeleteDialog({ isOpen: false, postId: null, postTitle: '' });
@@ -168,7 +169,7 @@ export default function BlogPage() {
         }
       });
     }
-  }, [deleteDialog.postId, deletePostMutation]);
+  }, [deleteDialog.postId, deletePostMutation, blogSlug]);
 
   // 삭제 다이얼로그 닫기
   const handleCloseDeleteDialog = useCallback(() => {
