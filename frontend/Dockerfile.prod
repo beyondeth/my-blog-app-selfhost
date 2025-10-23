@@ -25,8 +25,8 @@ RUN npm install -g pnpm@latest
 # package.json과 pnpm-lock.yaml 복사 (캐싱 최적화)
 COPY package.json pnpm-lock.yaml* ./
 
-# 프로덕션 의존성 설치
-RUN pnpm install --frozen-lockfile --prod=false
+# 프로덕션 의존성 설치 (lockfile 자동 업데이트 허용)
+RUN pnpm install --no-frozen-lockfile --prod=false
 
 # ============================================
 # Stage 2: Builder (Next.js 빌드)

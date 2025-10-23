@@ -10,11 +10,14 @@ config();
  */
 export const createDataSourceOptions = (): any => {
   const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
-  
+
+  // 프로덕션 환경에서는 빌드된 경로 사용
+  const isProduction = process.env.NODE_ENV === 'production';
+
   const baseConfig = {
     type: 'postgres',
-    entities: ['src/**/*.entity{.ts,.js}'],
-    migrations: ['src/migrations/*{.ts,.js}'],
+    entities: [isProduction ? 'dist/src/**/*.entity{.ts,.js}' : 'src/**/*.entity{.ts,.js}'],
+    migrations: [isProduction ? 'dist/src/migrations/*{.ts,.js}' : 'src/migrations/*{.ts,.js}'],
     synchronize: false,
     logging: process.env.NODE_ENV === 'development',
   };

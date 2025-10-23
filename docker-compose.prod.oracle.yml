@@ -64,22 +64,22 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
-      # PgBouncer 경유 (포트 6432)
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME:-blog_prod}
+      # PostgreSQL 직접 연결 (PgBouncer 임시 비활성화 - ARM64 호환 이슈)
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-blog_prod}
       REDIS_URL: redis://redis:6379
-      NODE_OPTIONS: "--max-old-space-size=2048 --gc-interval=100"
+      NODE_OPTIONS: "--max-old-space-size=2048"
       UV_THREADPOOL_SIZE: 8
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
-      pgbouncer:
-        condition: service_started
+      postgres:
+        condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - codebase_network
     restart: unless-stopped
-    command: node dist/main.js
+    command: node dist/src/main.js
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
       interval: 30s
@@ -106,7 +106,7 @@ services:
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
     volumes:
       # Block Volume 사용 (100GB)
-      - /mnt/data/postgres:/var/lib/postgresql/data
+      - /mnt/data/postgres:/var/lib/postgresql
       # 최적화된 PostgreSQL 설정 (1.5GB shared_buffers)
       - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
@@ -127,41 +127,41 @@ services:
     shm_size: 512mb  # 공유 메모리
 
   # ============================================
-  # PgBouncer (연결 풀링)
+  # PgBouncer (연결 풀링) - 임시 비활성화 (ARM64 호환 이슈)
   # ============================================
-  pgbouncer:
-    image: edoburu/pgbouncer:1.21-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-pgbouncer
-    environment:
-      # PostgreSQL 연결 정보
-      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-blog_prod}
-      # 풀링 모드: transaction (권장)
-      POOL_MODE: transaction
-      # 클라이언트 연결 제한
-      MAX_CLIENT_CONN: 1000
-      # 데이터베이스 연결 풀 크기
-      DEFAULT_POOL_SIZE: 25
-      MIN_POOL_SIZE: 10
-      RESERVE_POOL_SIZE: 5
-      RESERVE_POOL_TIMEOUT: 3
-      # PostgreSQL 최대 연결 수 (postgresql.conf의 max_connections와 일치)
-      MAX_DB_CONNECTIONS: 200
-      MAX_USER_CONNECTIONS: 100
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - codebase_network
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "5432"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-    # 리소스 제한
-    cpus: 0.1
-    mem_limit: 128m
-    mem_reservation: 64m
+  # pgbouncer:
+  #   image: edoburu/pgbouncer:1.21-alpine
+  #   container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-pgbouncer
+  #   environment:
+  #     # PostgreSQL 연결 정보
+  #     DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-blog_prod}
+  #     # 풀링 모드: transaction (권장)
+  #     POOL_MODE: transaction
+  #     # 클라이언트 연결 제한
+  #     MAX_CLIENT_CONN: 1000
+  #     # 데이터베이스 연결 풀 크기
+  #     DEFAULT_POOL_SIZE: 25
+  #     MIN_POOL_SIZE: 10
+  #     RESERVE_POOL_SIZE: 5
+  #     RESERVE_POOL_TIMEOUT: 3
+  #     # PostgreSQL 최대 연결 수 (postgresql.conf의 max_connections와 일치)
+  #     MAX_DB_CONNECTIONS: 200
+  #     MAX_USER_CONNECTIONS: 100
+  #   depends_on:
+  #     postgres:
+  #       condition: service_healthy
+  #   networks:
+  #     - codebase_network
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "nc", "-z", "localhost", "5432"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #   # 리소스 제한
+  #   cpus: 0.1
+  #   mem_limit: 128m
+  #   mem_reservation: 64m
 
   # ============================================
   # Redis (캐시 + 큐 + 소켓)
@@ -171,7 +171,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis
     command: >
       redis-server
-      --maxmemory 3.5gb
+      --maxmemory 3500mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
