@@ -6,9 +6,17 @@ import { Comment } from './entities/comment.entity';
 import { CommentLike } from './entities/comment-like.entity';
 import { UsersModule } from '../users/users.module';
 import { PostsModule } from '../posts/posts.module';
+import { CacheModule } from '../cache/cache.module';
+import { MetricsModule } from '../metrics/metrics.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Comment, CommentLike]), UsersModule, PostsModule],
+  imports: [
+    TypeOrmModule.forFeature([Comment, CommentLike]),
+    UsersModule,
+    PostsModule,
+    CacheModule,
+    MetricsModule,
+  ],
   providers: [CommentsService],
   controllers: [CommentsController],
   exports: [CommentsService],

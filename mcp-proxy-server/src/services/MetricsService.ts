@@ -23,9 +23,13 @@ export class MetricsService {
   // 히스토그램 (분포 측정)
   private validationDuration: Histogram;
   private requestDuration: Histogram;
+  private redisOperationDuration: Histogram;
 
   // 게이지 (현재 값)
   private redisConnectionGauge: Gauge;
+
+  // Redis 작업 카운터
+  private redisOperationsCounter: Counter;
 
   constructor() {
     // Registry 생성 (메트릭 저장소)
@@ -88,12 +92,29 @@ export class MetricsService {
       registers: [this.registry],
     });
 
+    // Redis 작업 시간 (경량 버킷 - 5개만)
+    this.redisOperationDuration = new Histogram({
+      name: 'mcp_redis_operation_duration_seconds',
+      help: 'Redis operation duration in seconds',
+      labelNames: ['operation'], // get, set, del
+      buckets: [0.001, 0.01, 0.1, 0.5, 1], // 1ms, 10ms, 100ms, 500ms, 1s
+      registers: [this.registry],
+    });
+
     // ===== 게이지 (현재 값) =====
 
     // Redis 연결 상태
     this.redisConnectionGauge = new Gauge({
       name: 'mcp_redis_connection_status',
       help: 'Redis connection status (1 = connected, 0 = disconnected)',
+      registers: [this.registry],
+    });
+
+    // Redis 작업 카운터 (경량 - operation과 status만 추적)
+    this.redisOperationsCounter = new Counter({
+      name: 'mcp_redis_operations_total',
+      help: 'Total number of Redis operations',
+      labelNames: ['operation', 'status'], // get/set/del, success/error
       registers: [this.registry],
     });
 
@@ -173,6 +194,31 @@ export class MetricsService {
    */
   updateRedisConnection(connected: boolean): void {
     this.redisConnectionGauge.set(connected ? 1 : 0);
+  }
+
+  /**
+   * Redis 작업 기록 (경량 구현)
+   *
+   * @param operation Redis 작업 유형 (get, set, del)
+   * @param durationMs 작업 시간 (밀리초)
+   * @param success 성공 여부
+   */
+  recordRedisOperation(
+    operation: 'get' | 'set' | 'del',
+    durationMs: number,
+    success: boolean
+  ): void {
+    // 작업 시간 기록 (히스토그램)
+    this.redisOperationDuration.observe(
+      { operation },
+      durationMs / 1000 // 초 단위로 변환
+    );
+
+    // 작업 카운터 증가
+    this.redisOperationsCounter.inc({
+      operation,
+      status: success ? 'success' : 'error',
+    });
   }
 
   /**

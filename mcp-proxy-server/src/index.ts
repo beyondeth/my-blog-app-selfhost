@@ -23,16 +23,19 @@ import axios from 'axios';
 const app = express();
 const port = config.MCP_PROXY_PORT;
 
-// Redis 캐시 서비스 초기화
-const redisCache = new RedisCacheService({
-  host: config.REDIS_HOST,
-  port: config.REDIS_PORT,
-  password: config.REDIS_PASSWORD,
-  ttl: config.API_KEY_CACHE_TTL,
-});
-
-// Prometheus 메트릭 서비스 초기화
+// Prometheus 메트릭 서비스 초기화 (먼저 생성)
 const metricsService = new MetricsService();
+
+// Redis 캐시 서비스 초기화 (메트릭 서비스 주입)
+const redisCache = new RedisCacheService(
+  {
+    host: config.REDIS_HOST,
+    port: config.REDIS_PORT,
+    password: config.REDIS_PASSWORD,
+    ttl: config.API_KEY_CACHE_TTL,
+  },
+  metricsService
+);
 
 // Redis 연결 상태 모니터링 (10초마다)
 setInterval(() => {

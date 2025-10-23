@@ -20,6 +20,7 @@ import { PostResponseDto } from './dto/post-response.dto';
 import { UserResponseDto } from '../users/dto/user-response.dto';
 import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
+import { CacheMetricsService } from '../metrics/cache-metrics.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -53,6 +54,7 @@ export class PostsService {
     private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
     private cacheService: CacheService,
+    private cacheMetricsService: CacheMetricsService,
     private bookmarksService: BookmarksService,
     @InjectQueue(POST_PROCESSING_QUEUE)
     private postProcessingQueue: Queue<PostProcessingJobData>,
@@ -1017,6 +1019,7 @@ export class PostsService {
 
     if (cachedCore) {
       this.logger.debug(`✅ Cache HIT: post core ${id}`);
+      this.cacheMetricsService.recordPostCacheHit();
 
       // 2. 실시간 Counts + liked/bookmarked 조회
       const counts = await this.getPostCounts(id, user);
@@ -1028,6 +1031,7 @@ export class PostsService {
     }
 
     this.logger.debug(`❌ Cache MISS: post core ${id}`);
+    this.cacheMetricsService.recordPostCacheMiss();
 
     // 3. Cache Stampede 방지: 분산 락 획득
     const lockAcquired = await this.cacheService.acquireLock(lockKey, 5);

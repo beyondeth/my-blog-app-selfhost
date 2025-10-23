@@ -390,7 +390,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "sum(rate(mcp_http_requests_total[5m]))",
+          "expr": "sum(rate(mcp_requests_total[5m]))",
           "refId": "A"
         }
       ],

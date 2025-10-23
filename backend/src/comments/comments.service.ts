@@ -12,6 +12,7 @@ import { PaginatedCommentsDto } from './dto/paginated-comments.dto';
 import { User } from '../users/entities/user.entity';
 import { PostsService } from '../posts/posts.service';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
+import { CacheMetricsService } from '../metrics/cache-metrics.service';
 
 @Injectable()
 export class CommentsService {
@@ -24,6 +25,7 @@ export class CommentsService {
     private commentLikesRepository: Repository<CommentLike>,
     private postsService: PostsService,
     private cacheService: CacheService,
+    private cacheMetricsService: CacheMetricsService,
     private eventEmitter: EventEmitter2,
   ) {}
 
@@ -393,8 +395,11 @@ export class CommentsService {
       const cached = await this.cacheService.get<PaginatedCommentsDto>(cacheKey);
       if (cached) {
         this.logger.debug(`Cache HIT: ${cacheKey}`);
+        this.cacheMetricsService.recordCommentsCacheHit();
         return cached;
       }
+      this.logger.debug(`Cache MISS: ${cacheKey}`);
+      this.cacheMetricsService.recordCommentsCacheMiss();
     }
 
     // 커서 디코딩
@@ -603,8 +608,11 @@ export class CommentsService {
       const cached = await this.cacheService.get<PaginatedCommentsDto>(cacheKey);
       if (cached) {
         this.logger.debug(`Cache HIT: ${cacheKey}`);
+        this.cacheMetricsService.recordCommentsCacheHit();
         return cached;
       }
+      this.logger.debug(`Cache MISS: ${cacheKey}`);
+      this.cacheMetricsService.recordCommentsCacheMiss();
     }
 
     // 커서 디코딩

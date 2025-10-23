@@ -13,6 +13,7 @@
 
 import Redis from 'ioredis';
 import { logger } from '../utils/logger.js';
+import type { MetricsService } from './MetricsService.js';
 
 /**
  * API Key 검증 결과 캐시 데이터
@@ -37,14 +38,19 @@ export class RedisCacheService {
   private client: Redis;
   private isConnected: boolean = false;
   private readonly ttl: number;
+  private metricsService?: MetricsService;
 
-  constructor(config: {
-    host: string;
-    port: number;
-    password?: string;
-    ttl?: number;
-  }) {
+  constructor(
+    config: {
+      host: string;
+      port: number;
+      password?: string;
+      ttl?: number;
+    },
+    metricsService?: MetricsService
+  ) {
     this.ttl = config.ttl || 300; // 기본 5분
+    this.metricsService = metricsService;
 
     // Redis 클라이언트 생성
     this.client = new Redis({
@@ -100,9 +106,14 @@ export class RedisCacheService {
       return null;
     }
 
+    const startTime = Date.now();
     try {
       const cacheKey = `mcp:apikey:valid:${keyHint}`;
       const cached = await this.client.get(cacheKey);
+      const duration = Date.now() - startTime;
+
+      // 메트릭 기록 (성공)
+      this.metricsService?.recordRedisOperation('get', duration, true);
 
       if (!cached) {
         logger.debug({ keyHint }, '📭 Cache MISS');
@@ -114,6 +125,10 @@ export class RedisCacheService {
 
       return data;
     } catch (error: any) {
+      const duration = Date.now() - startTime;
+      // 메트릭 기록 (실패)
+      this.metricsService?.recordRedisOperation('get', duration, false);
+
       logger.error({ error: error.message, keyHint }, '❌ Cache GET error');
       return null;
     }
@@ -131,9 +146,14 @@ export class RedisCacheService {
       return;
     }
 
+    const startTime = Date.now();
     try {
       const cacheKey = `mcp:apikey:valid:${keyHint}`;
       await this.client.setex(cacheKey, this.ttl, JSON.stringify(data));
+      const duration = Date.now() - startTime;
+
+      // 메트릭 기록 (성공)
+      this.metricsService?.recordRedisOperation('set', duration, true);
 
       logger.debug(
         {
@@ -144,6 +164,10 @@ export class RedisCacheService {
         '💾 Cache SET'
       );
     } catch (error: any) {
+      const duration = Date.now() - startTime;
+      // 메트릭 기록 (실패)
+      this.metricsService?.recordRedisOperation('set', duration, false);
+
       logger.error({ error: error.message, keyHint }, '❌ Cache SET error');
     }
   }
@@ -159,12 +183,21 @@ export class RedisCacheService {
       return;
     }
 
+    const startTime = Date.now();
     try {
       const cacheKey = `mcp:apikey:valid:${keyHint}`;
       await this.client.del(cacheKey);
+      const duration = Date.now() - startTime;
+
+      // 메트릭 기록 (성공)
+      this.metricsService?.recordRedisOperation('del', duration, true);
 
       logger.debug({ keyHint }, '🗑️ Cache DEL');
     } catch (error: any) {
+      const duration = Date.now() - startTime;
+      // 메트릭 기록 (실패)
+      this.metricsService?.recordRedisOperation('del', duration, false);
+
       logger.error({ error: error.message, keyHint }, '❌ Cache DEL error');
     }
   }
