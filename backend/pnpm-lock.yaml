@@ -195,7 +195,7 @@ importers:
         specifier: ^1.0.1
         version: 1.0.1
       pg:
-        specifier: ^8.11.0
+        specifier: ^8.13.1
         version: 8.16.1
       prom-client:
         specifier: ^15.1.3

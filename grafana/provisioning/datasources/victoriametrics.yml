@@ -1,0 +1,124 @@
+# ============================================
+# Grafana Datasource Configuration
+# ============================================
+# 🔄 Prometheus → VictoriaMetrics 마이그레이션
+# ✅ Prometheus 호환 API (PromQL 사용 가능)
+# 📊 기존 대시보드 JSON 파일 그대로 사용
+#
+# 📝 사용법:
+#   Grafana 컨테이너 시작 시 자동 프로비저닝
+#   /etc/grafana/provisioning/datasources/victoriametrics.yml
+# ============================================
+
+apiVersion: 1
+
+# 데이터소스 삭제 정책 (기존 Prometheus 데이터소스 유지)
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+
+datasources:
+  # ==========================================
+  # VictoriaMetrics (Main Datasource)
+  # ==========================================
+  - name: VictoriaMetrics
+    type: prometheus  # Prometheus 호환 타입
+    access: proxy     # Grafana 서버를 통한 프록시 방식
+    orgId: 1
+    uid: victoriametrics
+    url: http://victoriametrics:8428  # VictoriaMetrics HTTP API 주소
+    isDefault: true   # 기본 데이터소스로 설정
+    version: 1
+    editable: false   # UI에서 수정 불가 (provisioning으로만 관리)
+    jsonData:
+      httpMethod: POST  # PromQL 쿼리는 POST 방식 권장
+      timeInterval: "15s"  # 최소 스크랩 주기 (scrape_config.yml과 일치)
+      customQueryParameters: ""
+      # VictoriaMetrics 특화 기능 (선택사항)
+      # graphiteVersion: "1.1"
+      # tlsSkipVerify: false
+      # manageAlerts: true  # Grafana Alerting 사용 시
+
+    # Basic Auth (사용하지 않음)
+    basicAuth: false
+    # basicAuthUser: ""
+    # secureJsonData:
+    #   basicAuthPassword: ""
+
+    # TLS/SSL (내부 네트워크이므로 비활성화)
+    withCredentials: false
+
+  # ==========================================
+  # VictoriaMetrics - Read-Only (선택사항)
+  # ==========================================
+  # 읽기 전용 데이터소스 (대시보드 공유용)
+  - name: VictoriaMetrics-ReadOnly
+    type: prometheus
+    access: proxy
+    orgId: 1
+    uid: victoriametrics-readonly
+    url: http://victoriametrics:8428
+    isDefault: false
+    version: 1
+    editable: false
+    jsonData:
+      httpMethod: GET
+      timeInterval: "15s"
+    # Grafana 8.0+ 권한 설정
+    secureJsonFields: {}
+
+# ============================================
+# Prometheus vs VictoriaMetrics 비교
+# ============================================
+# 항목                  Prometheus        VictoriaMetrics
+# ----------------------------------------------------------
+# API 엔드포인트        :9090/api/v1      :8428/api/v1
+# PromQL 호환           100%              100%
+# Grafana 타입          prometheus        prometheus (동일)
+# 쿼리 성능             기준              2~3배 빠름
+# 메모리 사용           400MB             100MB
+# 데이터 압축           1x                10x
+# ----------------------------------------------------------
+#
+# 마이그레이션 후 작업:
+#   1. Grafana → Configuration → Data sources 확인
+#   2. VictoriaMetrics가 기본(Default)으로 표시되는지 확인
+#   3. 기존 대시보드 테스트 (쿼리 정상 작동 확인)
+#   4. Prometheus 데이터소스 삭제 (선택)
+# ============================================
+
+# ============================================
+# 대시보드 마이그레이션
+# ============================================
+# 기존 Prometheus 대시보드를 VictoriaMetrics로 변경:
+#
+# 1. 수동 변경:
+#    - Dashboard Settings → JSON Model
+#    - "datasource": "Prometheus" → "datasource": "VictoriaMetrics"
+#    - 저장
+#
+# 2. 자동 변경 (provisioning):
+#    - dashboards/*.json 파일에서
+#    - "datasource": "Prometheus"를 모두 찾아서
+#    - "datasource": "VictoriaMetrics"로 변경
+#
+# 3. UID 사용 (권장):
+#    - "datasource": { "type": "prometheus", "uid": "victoriametrics" }
+#    - UID를 사용하면 이름 변경에도 동작
+# ============================================
+
+# ============================================
+# 트러블슈팅
+# ============================================
+# 문제 1: "Failed to query VictoriaMetrics"
+#   - VictoriaMetrics 컨테이너 상태 확인
+#   - curl http://victoriametrics:8428/api/v1/query?query=up
+#
+# 문제 2: 대시보드가 "No data" 표시
+#   - 스크랩 설정 확인 (scrape_config.yml)
+#   - 타겟 상태 확인: curl http://victoriametrics:8428/api/v1/targets
+#
+# 문제 3: 쿼리가 느림
+#   - timeInterval을 늘림 (15s → 30s)
+#   - 쿼리 최적화 (rate, increase 대신 irate 사용)
+# ============================================

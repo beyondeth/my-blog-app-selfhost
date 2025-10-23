@@ -58,16 +58,33 @@ export async function generatePdfFromElement(
 
     // 동적 스케일 계산
     let scale = 2; // 기본값: 고화질
+
+    // Canvas 높이 제한 체크
     if (contentHeight * scale > MAX_CANVAS_HEIGHT) {
       scale = Math.floor((MAX_CANVAS_HEIGHT / contentHeight) * 10) / 10;
-      scale = Math.max(scale, 1); // 최소 1
+      scale = Math.max(scale, 1.5); // 최소 1.5 (화질 유지하되 유연성 확보)
       console.log(`긴 콘텐츠 감지: Scale을 ${scale}로 조정합니다.`);
     }
+
+    // Canvas 너비 제한 체크
     if (contentWidth * scale > MAX_CANVAS_WIDTH) {
       const widthScale = Math.floor((MAX_CANVAS_WIDTH / contentWidth) * 10) / 10;
       scale = Math.min(scale, widthScale);
-      scale = Math.max(scale, 1);
+      scale = Math.max(scale, 1.5); // 최소 1.5
       console.log(`넓은 콘텐츠 감지: Scale을 ${scale}로 조정합니다.`);
+    }
+
+    // Canvas 총 면적 제한 체크 (브라우저별 픽셀 제한)
+    const totalPixels = (contentWidth * scale) * (contentHeight * scale);
+    const CHROME_LIMIT = 268435456; // Chrome 최대 픽셀
+    const SAFARI_LIMIT = 16777216;  // Safari 최대 픽셀 (가장 엄격)
+
+    if (totalPixels > SAFARI_LIMIT) {
+      // Safari 기준으로 scale 재계산 (가장 안전)
+      const safeScale = Math.sqrt(SAFARI_LIMIT / (contentWidth * contentHeight));
+      scale = Math.min(scale, Math.floor(safeScale * 10) / 10);
+      scale = Math.max(scale, 1); // 최소 1
+      console.log(`Canvas 면적 제한: Scale을 ${scale}로 조정합니다. (총 픽셀: ${Math.round(totalPixels / 1000000)}M)`);
     }
 
     // html2canvas 옵션 설정
@@ -100,6 +117,29 @@ export async function generatePdfFromElement(
           });
         }
       }
+    });
+
+    // Canvas 유효성 검사 (검은 화면 방지)
+    if (!canvas || canvas.width === 0 || canvas.height === 0) {
+      console.error('Canvas 생성 실패:', {
+        exists: !!canvas,
+        width: canvas?.width,
+        height: canvas?.height,
+        contentWidth,
+        contentHeight,
+        scale
+      });
+      throw new Error('Canvas 생성에 실패했습니다. 콘텐츠가 너무 크거나 브라우저 제한을 초과했을 수 있습니다.');
+    }
+
+    // 디버그 로깅
+    console.log('PDF 생성 정보:', {
+      canvasWidth: canvas.width,
+      canvasHeight: canvas.height,
+      totalPixels: canvas.width * canvas.height,
+      scale: scale,
+      contentWidth,
+      contentHeight
     });
 
     // PDF 생성
@@ -153,8 +193,8 @@ export async function generatePdfFromElement(
           canvas.width, sourceHeight   // destination width, height
         );
 
-        // 임시 캔버스를 이미지로 변환
-        const pageImageData = tempCanvas.toDataURL('image/jpeg', 0.85);
+        // 임시 캔버스를 이미지로 변환 (95% 고품질)
+        const pageImageData = tempCanvas.toDataURL('image/jpeg', 0.95);
 
         // 실제 그려질 높이 계산 (PDF 단위, 동적 scale 사용)
         const drawHeight = Math.min(contentHeightMM, (sourceHeight / scale) * pdfScale);

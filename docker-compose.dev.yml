@@ -9,17 +9,17 @@ services:
   # PostgreSQL (개발 환경 전용)
   # ============================================
   postgres:
-    image: postgres:16-alpine
+    image: postgres:18-alpine
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-postgres
     environment:
       POSTGRES_USER: ${DB_USER:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_NAME:-blog-dev}
-      PGDATA: /var/lib/postgresql/data/pgdata
+      PGDATA: /var/lib/postgresql/pgdata
     ports:
       - "${DB_PORT:-5432}:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres}"]
       interval: 10s

@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class InitialSchema1757158710842 implements MigrationInterface {
-    name = 'InitialSchema1757158710842'
+export class InitialSchema1757000000000 implements MigrationInterface {
+    name = 'InitialSchema1757000000000'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         await queryRunner.query(`CREATE TYPE "public"."comment_likes_type_enum" AS ENUM('like', 'dislike')`);

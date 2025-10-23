@@ -4,37 +4,38 @@ export class CreateSubscriptionSystem1759079431987 implements MigrationInterface
     name = 'CreateSubscriptionSystem1759079431987'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        await queryRunner.query(`ALTER TABLE "oauth_clients" DROP CONSTRAINT "FK_oauth_clients_userId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" DROP CONSTRAINT "FK_oauth_tokens_clientId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" DROP CONSTRAINT "FK_oauth_tokens_blogId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" DROP CONSTRAINT "FK_oauth_tokens_userId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" DROP CONSTRAINT "FK_oauth_codes_clientId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" DROP CONSTRAINT "FK_oauth_codes_blogId"`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" DROP CONSTRAINT "FK_oauth_codes_userId"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_blogs_is_public"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_blogs_id_public"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_blogs_id_ispublic"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_posts_published_at_desc"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_posts_author_published"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_posts_id_ispublished_blogid"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_posts_id_published"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_posts_blogid_ispublished"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_posts_id_published_v2"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_posts_blogid_ispublished_v2"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_clients_clientId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_clients_userId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_tokens_tokenHash"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_tokens_userId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_tokens_blogId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_tokens_expiresAt"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_codes_code"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_oauth_codes_expiresAt"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_user_blocks_blocker_blocked"`);
-        await queryRunner.query(`DROP INDEX "public"."idx_messages_created_at"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_messages_conversationId_createdAt"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_messages_senderId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_conversations_user1_lastRead"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_conversations_user2_lastRead"`);
+        // oauth 테이블이 존재하는 경우에만 제약조건 삭제 (선택적)
+        await queryRunner.query(`ALTER TABLE IF EXISTS "oauth_clients" DROP CONSTRAINT IF EXISTS "FK_oauth_clients_userId"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "oauth_tokens" DROP CONSTRAINT IF EXISTS "FK_oauth_tokens_clientId"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "oauth_tokens" DROP CONSTRAINT IF EXISTS "FK_oauth_tokens_blogId"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "oauth_tokens" DROP CONSTRAINT IF EXISTS "FK_oauth_tokens_userId"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "oauth_codes" DROP CONSTRAINT IF EXISTS "FK_oauth_codes_clientId"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "oauth_codes" DROP CONSTRAINT IF EXISTS "FK_oauth_codes_blogId"`);
+        await queryRunner.query(`ALTER TABLE IF EXISTS "oauth_codes" DROP CONSTRAINT IF EXISTS "FK_oauth_codes_userId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_blogs_is_public"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_blogs_id_public"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_blogs_id_ispublic"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_posts_published_at_desc"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_posts_author_published"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_posts_id_ispublished_blogid"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_posts_id_published"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_posts_blogid_ispublished"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_posts_id_published_v2"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_posts_blogid_ispublished_v2"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_clients_clientId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_clients_userId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_tokens_tokenHash"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_tokens_userId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_tokens_blogId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_tokens_expiresAt"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_codes_code"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_oauth_codes_expiresAt"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_user_blocks_blocker_blocked"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."idx_messages_created_at"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_messages_conversationId_createdAt"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_messages_senderId"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_conversations_user1_lastRead"`);
+        await queryRunner.query(`DROP INDEX IF EXISTS "public"."IDX_conversations_user2_lastRead"`);
         await queryRunner.query(`CREATE TYPE "public"."subscription_plans_tier_enum" AS ENUM('free', 'starter', 'pro')`);
         await queryRunner.query(`CREATE TABLE "subscription_plans" ("id" uuid NOT NULL DEFAULT uuid_generate_v4(), "name" character varying(50) NOT NULL, "displayName" character varying(255), "tier" "public"."subscription_plans_tier_enum" NOT NULL, "features" jsonb NOT NULL, "pricing" jsonb NOT NULL, "description" text, "isActive" boolean NOT NULL DEFAULT true, "sortOrder" integer NOT NULL DEFAULT '0', "isPopular" boolean NOT NULL DEFAULT false, "badge" character varying, "trialDays" integer NOT NULL DEFAULT '7', "metadata" jsonb, "createdAt" TIMESTAMP NOT NULL DEFAULT now(), "updatedAt" TIMESTAMP NOT NULL DEFAULT now(), CONSTRAINT "UQ_fa0f49704b17b369c641981806e" UNIQUE ("tier"), CONSTRAINT "PK_9ab8fe6918451ab3d0a4fb6bb0c" PRIMARY KEY ("id"))`);
         await queryRunner.query(`CREATE UNIQUE INDEX "IDX_fa0f49704b17b369c641981806" ON "subscription_plans" ("tier") `);
@@ -77,15 +78,16 @@ export class CreateSubscriptionSystem1759079431987 implements MigrationInterface
         await queryRunner.query(`CREATE INDEX "IDX_c81be77ac4b528ea4f2c94fcfb" ON "posts" ("category") `);
         await queryRunner.query(`CREATE INDEX "IDX_c5a322ad12a7bf95460c958e80" ON "posts" ("authorId") `);
         await queryRunner.query(`CREATE INDEX "IDX_54b5dc2739f2dea57900933db6" ON "follows" ("follower_id") `);
-        await queryRunner.query(`CREATE INDEX "IDX_89481ceb60b67e5e052bf6e16f" ON "oauth_clients" ("userId") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_b0c094fe1ef0a6c4af8f2b10be" ON "oauth_clients" ("clientId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_65a43b80d25744e438a6ecd1fd" ON "oauth_tokens" ("expiresAt") `);
-        await queryRunner.query(`CREATE INDEX "IDX_b76db67a6b209d6cb3ac65f998" ON "oauth_tokens" ("blogId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_a8c200cc4c90d24e832caf0a18" ON "oauth_tokens" ("userId") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_095f87160acedf5dc5a8c9a814" ON "oauth_tokens" ("tokenHash") `);
+        // oauth 테이블은 더 이상 사용하지 않으므로 주석 처리
+        // await queryRunner.query(`CREATE INDEX "IDX_89481ceb60b67e5e052bf6e16f" ON "oauth_clients" ("userId") `);
+        // await queryRunner.query(`CREATE UNIQUE INDEX "IDX_b0c094fe1ef0a6c4af8f2b10be" ON "oauth_clients" ("clientId") `);
+        // await queryRunner.query(`CREATE INDEX "IDX_65a43b80d25744e438a6ecd1fd" ON "oauth_tokens" ("expiresAt") `);
+        // await queryRunner.query(`CREATE INDEX "IDX_b76db67a6b209d6cb3ac65f998" ON "oauth_tokens" ("blogId") `);
+        // await queryRunner.query(`CREATE INDEX "IDX_a8c200cc4c90d24e832caf0a18" ON "oauth_tokens" ("userId") `);
+        // await queryRunner.query(`CREATE UNIQUE INDEX "IDX_095f87160acedf5dc5a8c9a814" ON "oauth_tokens" ("tokenHash") `);
         await queryRunner.query(`CREATE INDEX "IDX_67286c99c7756fb0961b60c58f" ON "reports" ("type", "targetId") `);
-        await queryRunner.query(`CREATE INDEX "IDX_fe0c99de843e00174b8d34e158" ON "oauth_codes" ("expiresAt") `);
-        await queryRunner.query(`CREATE UNIQUE INDEX "IDX_9d33ac9c512011dd64af4c8d01" ON "oauth_codes" ("code") `);
+        // await queryRunner.query(`CREATE INDEX "IDX_fe0c99de843e00174b8d34e158" ON "oauth_codes" ("expiresAt") `);
+        // await queryRunner.query(`CREATE UNIQUE INDEX "IDX_9d33ac9c512011dd64af4c8d01" ON "oauth_codes" ("code") `);
         await queryRunner.query(`CREATE INDEX "IDX_6999d13aca25e33515210abaf1" ON "post_likes" ("postId") `);
         await queryRunner.query(`CREATE INDEX "IDX_a12706e0fd90132ab2ffa9b0b1" ON "post_files" ("postId") `);
         await queryRunner.query(`ALTER TABLE "subscriptions" ADD CONSTRAINT "FK_fbdba4e2ac694cf8c9cecf4dc84" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
@@ -93,13 +95,14 @@ export class CreateSubscriptionSystem1759079431987 implements MigrationInterface
         await queryRunner.query(`ALTER TABLE "payment_history" ADD CONSTRAINT "FK_34d643de1a588d2350297da5c24" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "payment_history" ADD CONSTRAINT "FK_3309cd631d6c3263c550d19ff19" FOREIGN KEY ("subscriptionId") REFERENCES "subscriptions"("id") ON DELETE SET NULL ON UPDATE NO ACTION`);
         await queryRunner.query(`ALTER TABLE "usage_tracking" ADD CONSTRAINT "FK_5d8df20d681cd50fcde4db2db32" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "oauth_clients" ADD CONSTRAINT "FK_89481ceb60b67e5e052bf6e16f6" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" ADD CONSTRAINT "FK_a8c200cc4c90d24e832caf0a180" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" ADD CONSTRAINT "FK_b76db67a6b209d6cb3ac65f9987" FOREIGN KEY ("blogId") REFERENCES "blogs"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "oauth_tokens" ADD CONSTRAINT "FK_3d9dfb37837e5dd891bbc81b324" FOREIGN KEY ("clientId") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" ADD CONSTRAINT "FK_4dac391deea4c1f8d24a63107b2" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" ADD CONSTRAINT "FK_0d965a63d2832bb967c49e8a2dc" FOREIGN KEY ("blogId") REFERENCES "blogs"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
-        await queryRunner.query(`ALTER TABLE "oauth_codes" ADD CONSTRAINT "FK_1e80210c80509097733e5194bda" FOREIGN KEY ("clientId") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // oauth 테이블은 더 이상 사용하지 않으므로 주석 처리
+        // await queryRunner.query(`ALTER TABLE "oauth_clients" ADD CONSTRAINT "FK_89481ceb60b67e5e052bf6e16f6" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // await queryRunner.query(`ALTER TABLE "oauth_tokens" ADD CONSTRAINT "FK_a8c200cc4c90d24e832caf0a180" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // await queryRunner.query(`ALTER TABLE "oauth_tokens" ADD CONSTRAINT "FK_b76db67a6b209d6cb3ac65f9987" FOREIGN KEY ("blogId") REFERENCES "blogs"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // await queryRunner.query(`ALTER TABLE "oauth_tokens" ADD CONSTRAINT "FK_3d9dfb37837e5dd891bbc81b324" FOREIGN KEY ("clientId") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // await queryRunner.query(`ALTER TABLE "oauth_codes" ADD CONSTRAINT "FK_4dac391deea4c1f8d24a63107b2" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // await queryRunner.query(`ALTER TABLE "oauth_codes" ADD CONSTRAINT "FK_0d965a63d2832bb967c49e8a2dc" FOREIGN KEY ("blogId") REFERENCES "blogs"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
+        // await queryRunner.query(`ALTER TABLE "oauth_codes" ADD CONSTRAINT "FK_1e80210c80509097733e5194bda" FOREIGN KEY ("clientId") REFERENCES "oauth_clients"("id") ON DELETE CASCADE ON UPDATE NO ACTION`);
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {

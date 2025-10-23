@@ -201,17 +201,30 @@ export default function BlogPostDetailPage() {
     }
   }, [post]);
 
-  // PDF 다운로드 핸들러 - 에러 시 조용히 실패
+  // PDF 다운로드 핸들러 - html2canvas + jsPDF 사용
   const handlePdfDownload = useCallback(async () => {
     if (!post) return;
 
+    let toastId: string | number | undefined;
+
     try {
-      // PDF 생성 - 진행 상태 콜백 제거 (조용히 처리)
-      await downloadPostAsPdf(post.title);
-      // 성공해도 특별히 알리지 않음 (다운로드가 시작되면 사용자가 알 수 있음)
+      // 진행 상태를 보여주는 toast
+      toastId = toast.loading('PDF 생성 준비 중...');
+
+      const success = await downloadPostAsPdf(post.title, (status) => {
+        // 진행 상태 업데이트
+        if (toastId) {
+          toast.loading(status, { id: toastId });
+        }
+      });
+
+      if (success) {
+        toast.success('PDF 다운로드 완료!', { id: toastId });
+      } else {
+        toast.error('PDF 생성에 실패했습니다.', { id: toastId });
+      }
     } catch (error) {
-      // 에러 완전 무시 - 로그만 남기고 사용자에게 알리지 않음
-      console.error('PDF 다운로드 실패:', error);
+      toast.error('PDF 생성 중 오류가 발생했습니다.', { id: toastId });
     }
   }, [post]);
 

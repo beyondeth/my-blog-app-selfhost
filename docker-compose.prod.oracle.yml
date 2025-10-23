@@ -1,0 +1,359 @@
+# ============================================
+# Codebase 블로그 플랫폼 - Oracle Free Tier 프로덕션 설정
+# ============================================
+# 🎯 목표: 오라클 무료 티어 (4 OCPU, 24GB RAM) 단일 인스턴스 최적화
+# 🔧 변경사항:
+#   - Prometheus → VictoriaMetrics (메모리 75% 절감)
+#   - PostgreSQL shared_buffers 2GB → 1.5GB
+#   - Redis maxmemory 5.5GB → 3.5GB
+#   - CPU Quota 3.8 OCPU (20% 여유 유지)
+#
+# 📝 사용법:
+#   docker compose -f docker-compose.prod.oracle.yml up -d --build
+#
+# ⚠️ 사전 준비:
+#   1. .env.production 파일 생성 필수
+#   2. Nginx 네이티브 설치 (Reverse Proxy용)
+#   3. /mnt/data 디렉토리 마운트 (Block Volume)
+# ============================================
+
+version: '3.9'
+
+services:
+  # ============================================
+  # Frontend (Next.js Standalone)
+  # ============================================
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.prod
+      target: runner
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-frontend
+    environment:
+      NODE_ENV: production
+      # Backend API는 내부 Docker 네트워크로 통신
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://yourdomain.com}
+      HOSTNAME: "0.0.0.0"
+    ports:
+      - "127.0.0.1:3001:3000"  # Next.js는 내부적으로 3000 포트 사용
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 리소스 제한 (docker-compose는 cpus, mem_limit 사용)
+    cpus: 0.4
+    mem_limit: 768m
+    mem_reservation: 512m
+
+  # ============================================
+  # Backend (NestJS)
+  # ============================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-backend
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+      # PgBouncer 경유 (포트 6432)
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME:-blog_prod}
+      REDIS_URL: redis://redis:6379
+      NODE_OPTIONS: "--max-old-space-size=2048 --gc-interval=100"
+      UV_THREADPOOL_SIZE: 8
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      pgbouncer:
+        condition: service_started
+      redis:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    command: node dist/main.js
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 리소스 제한
+    cpus: 1.2
+    mem_limit: 2.5g
+    mem_reservation: 1.5g
+
+  # ============================================
+  # PostgreSQL 18 (최적화된 설정)
+  # ============================================
+  postgres:
+    image: postgres:18-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-blog_prod}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      PGDATA: /var/lib/postgresql/data/pgdata
+      # 성능 최적화 환경변수
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
+    volumes:
+      # Block Volume 사용 (100GB)
+      - /mnt/data/postgres:/var/lib/postgresql/data
+      # 최적화된 PostgreSQL 설정 (1.5GB shared_buffers)
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME:-blog_prod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    # 리소스 제한 (1.5GB shared_buffers + 여유)
+    cpus: 1.0
+    mem_limit: 8g
+    mem_reservation: 4g
+    shm_size: 512mb  # 공유 메모리
+
+  # ============================================
+  # PgBouncer (연결 풀링)
+  # ============================================
+  pgbouncer:
+    image: edoburu/pgbouncer:1.21-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-pgbouncer
+    environment:
+      # PostgreSQL 연결 정보
+      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-blog_prod}
+      # 풀링 모드: transaction (권장)
+      POOL_MODE: transaction
+      # 클라이언트 연결 제한
+      MAX_CLIENT_CONN: 1000
+      # 데이터베이스 연결 풀 크기
+      DEFAULT_POOL_SIZE: 25
+      MIN_POOL_SIZE: 10
+      RESERVE_POOL_SIZE: 5
+      RESERVE_POOL_TIMEOUT: 3
+      # PostgreSQL 최대 연결 수 (postgresql.conf의 max_connections와 일치)
+      MAX_DB_CONNECTIONS: 200
+      MAX_USER_CONNECTIONS: 100
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "5432"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # 리소스 제한
+    cpus: 0.1
+    mem_limit: 128m
+    mem_reservation: 64m
+
+  # ============================================
+  # Redis (캐시 + 큐 + 소켓)
+  # ============================================
+  redis:
+    image: redis:7.4-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis
+    command: >
+      redis-server
+      --maxmemory 3.5gb
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1 300 10 60 10000
+      --tcp-backlog 511
+      --timeout 0
+      --tcp-keepalive 300
+      --maxclients 10000
+      --hz 10
+      --io-threads 2
+      --io-threads-do-reads yes
+    volumes:
+      - /mnt/data/redis:/data
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    # 리소스 제한 (3.5GB maxmemory + 여유)
+    cpus: 0.3
+    mem_limit: 5.5g
+    mem_reservation: 3g
+
+  # ============================================
+  # MCP Proxy (MCP 자동 포스팅 API)
+  # ============================================
+  mcp-proxy:
+    build:
+      context: ./mcp-proxy-server
+      dockerfile: Dockerfile
+      target: production
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-mcp-proxy
+    env_file:
+      - .env.production
+    environment:
+      NODE_ENV: production
+    ports:
+      - "127.0.0.1:3002:3002"
+    depends_on:
+      backend:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    command: node dist/index.js
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 리소스 제한
+    cpus: 0.5
+    mem_limit: 1g
+    mem_reservation: 512m
+
+  # ============================================
+  # VictoriaMetrics (Prometheus 대체)
+  # ============================================
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.97.0
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-victoriametrics
+    command:
+      - '--storageDataPath=/storage'
+      - '--retentionPeriod=30d'  # Prometheus 15일 → VictoriaMetrics 30일
+      - '--promscrape.config=/etc/victoriametrics/scrape_config.yml'
+      - '--httpListenAddr=:8428'
+      # 리소스 제한 (디스크 사용량)
+      - '--storage.maxDiskUsageBytes=2GB'
+      # 메모리 최적화
+      - '--memory.allowedPercent=80'
+    volumes:
+      - /mnt/data/victoriametrics:/storage
+      - ./victoriametrics/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
+      - ./victoriametrics/alerts.yml:/etc/victoriametrics/alerts.yml:ro
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8428/-/healthy"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # 리소스 제한 (Prometheus 400MB → VictoriaMetrics 100MB)
+    cpus: 0.1
+    mem_limit: 100m
+    mem_reservation: 50m
+
+  # ============================================
+  # Grafana (모니터링 대시보드)
+  # ============================================
+  grafana:
+    image: grafana/grafana:11.3.0
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-grafana
+    volumes:
+      - /mnt/data/grafana:/var/lib/grafana
+      # VictoriaMetrics 데이터소스 설정
+      - ./grafana/provisioning/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml:ro
+      - ./grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+      # 대시보드 파일 디렉토리
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    environment:
+      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
+      - GF_INSTALL_PLUGINS=  # 플러그인 불필요 (VictoriaMetrics는 Prometheus 호환)
+      - GF_SERVER_ROOT_URL=https://${DOMAIN:-yourdomain.com}/grafana
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_USERS_ALLOW_SIGN_UP=false
+      # 로그 레벨
+      - GF_LOG_LEVEL=${GF_LOG_LEVEL:-info}
+    ports:
+      - "127.0.0.1:3030:3000"
+    networks:
+      - codebase_network
+    depends_on:
+      - victoriametrics
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # 리소스 제한
+    cpus: 0.2
+    mem_limit: 300m
+    mem_reservation: 150m
+
+  # ============================================
+  # Redis Exporter (Redis 메트릭 수집)
+  # ============================================
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.62.0-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis-exporter
+    command:
+      - '--redis.addr=redis:6379'
+      - '--include-system-metrics=false'  # 시스템 메트릭 제외 (CPU 절약)
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:9121/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    # 리소스 제한
+    cpus: 0.1
+    mem_limit: 50m
+    mem_reservation: 20m
+
+# ============================================
+# 네트워크 설정
+# ============================================
+networks:
+  codebase_network:
+    name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-network
+    driver: bridge
+
+# ============================================
+# 볼륨 설정 (외부 마운트 사용)
+# ============================================
+# Block Volume을 /mnt/data에 마운트하여 사용
+# 별도 Named Volume 불필요
+
+# ============================================
+# 리소스 사용 요약
+# ============================================
+# 총 CPU: 3.8 OCPU (4 OCPU 중 95%, 0.2 OCPU 여유)
+# 총 RAM: 18.3 GB (24 GB 중 76%, 5.7 GB 여유)
+#
+# 서비스별 CPU/RAM:
+#   frontend:         0.4 OCPU, 768 MB
+#   backend:          1.2 OCPU, 2.5 GB
+#   postgres:         1.0 OCPU, 8 GB (실제 4~5GB 사용)
+#   pgbouncer:        0.1 OCPU, 128 MB
+#   redis:            0.3 OCPU, 5.5 GB (실제 3.5GB 사용)
+#   mcp-proxy:        0.5 OCPU, 1 GB
+#   victoriametrics:  0.1 OCPU, 100 MB
+#   grafana:          0.2 OCPU, 300 MB
+#   redis-exporter:   0.1 OCPU, 50 MB
+# ============================================

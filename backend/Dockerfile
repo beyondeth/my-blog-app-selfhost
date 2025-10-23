@@ -91,4 +91,4 @@ EXPOSE 3000
 ENV NODE_ENV=production
 
 # 프로덕션 서버 실행
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]

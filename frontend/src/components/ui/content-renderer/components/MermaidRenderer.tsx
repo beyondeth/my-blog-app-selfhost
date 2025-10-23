@@ -89,17 +89,53 @@ export default function MermaidRenderer({
   if (error) {
     return (
       <div className={`mermaid-wrapper mermaid-error ${className}`}>
-        <div className="text-red-600 text-sm mb-2">
-          ⚠️ 다이어그램 렌더링 실패
-        </div>
-        <pre className="mermaid-source">
-          <code>{content}</code>
-        </pre>
-        {process.env.NODE_ENV === 'development' && (
-          <div className="text-xs text-gray-500 mt-2">
-            Error: {error}
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-3">
+          <div className="flex items-start gap-2">
+            <svg className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            <div className="flex-1">
+              <h4 className="text-red-800 text-sm font-medium mb-1">
+                ⚠️ Mermaid 다이어그램 렌더링 실패
+              </h4>
+              <p className="text-red-700 text-xs mb-2">
+                다이어그램 구문에 오류가 있습니다. 아래 원본 코드를 확인해주세요.
+              </p>
+              {process.env.NODE_ENV === 'development' && (
+                <details className="text-xs text-red-600 mt-2">
+                  <summary className="cursor-pointer hover:text-red-800 font-medium">
+                    에러 상세 정보 (개발 모드)
+                  </summary>
+                  <div className="mt-2 p-2 bg-red-100 rounded border border-red-300 font-mono text-xs whitespace-pre-wrap break-all">
+                    {error}
+                  </div>
+                </details>
+              )}
+            </div>
           </div>
-        )}
+        </div>
+
+        {/* 원본 Mermaid 코드를 코드 블록으로 표시 */}
+        <div className="bg-gray-50 border border-gray-200 rounded-lg overflow-hidden">
+          <div className="bg-gray-100 px-3 py-2 border-b border-gray-200">
+            <span className="text-xs font-medium text-gray-600">
+              원본 Mermaid 코드
+            </span>
+          </div>
+          <pre className="mermaid-source p-4 overflow-x-auto text-sm">
+            <code className="language-mermaid">{content}</code>
+          </pre>
+        </div>
+
+        {/* 도움말 */}
+        <div className="mt-3 text-xs text-gray-600">
+          <strong>일반적인 해결 방법:</strong>
+          <ul className="list-disc list-inside mt-1 space-y-1">
+            <li>구문 오류가 있는지 확인하세요 (괄호, 화살표 등)</li>
+            <li>특수문자는 따옴표로 감싸주세요 (예: <code className="bg-gray-200 px-1 rounded">"텍스트 {'{'} 특수문자 {'}'}"</code>)</li>
+            <li>Mermaid 공식 문서를 참고하세요: <a href="https://mermaid.js.org/" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">mermaid.js.org</a></li>
+          </ul>
+        </div>
       </div>
     );
   }

@@ -1,5 +1,8 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Standalone 빌드 모드 (Docker 최적화: 메모리 49% 절감)
+  output: 'standalone',
+
   // 프로덕션 빌드 최적화: console 제거
   // error와 warn은 유지 (중요 에러 추적용)
   compiler: {

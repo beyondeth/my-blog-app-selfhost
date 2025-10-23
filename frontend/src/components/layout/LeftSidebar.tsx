@@ -104,10 +104,14 @@ export default function LeftSidebar() {
             <Link
               href="/new-story"
               prefetch={true}
-              className="flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
+                pathname === '/new-story' || pathname?.startsWith('/edit/')
+                  ? 'bg-accent text-accent-foreground'
+                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+              }`}
               title="글쓰기"
             >
-              <WriteIcon className="opacity-70" size={24} />
+              <WriteIcon className={pathname === '/new-story' || pathname?.startsWith('/edit/') ? 'opacity-100' : 'opacity-70'} size={24} />
               <span className="text-xs mt-1 font-medium">글쓰기</span>
             </Link>
 

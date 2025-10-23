@@ -352,3 +352,21 @@ textarea {
   border-left-color: rgb(75, 85, 99); /* gray-600 */
   border-bottom-color: rgb(75, 85, 99);
 }
+
+/* ===================================================================
+   PDF 생성 최적화 - 페이지 분할 시 요소가 잘리지 않도록 처리
+   ================================================================ */
+#post-content h1,
+#post-content h2,
+#post-content h3,
+#post-content h4,
+#post-content h5,
+#post-content h6,
+#post-content pre,
+#post-content img,
+#post-content .mermaid-wrapper,
+#post-content blockquote {
+  page-break-inside: avoid;
+  display: inline-block;
+  width: 100%;
+}

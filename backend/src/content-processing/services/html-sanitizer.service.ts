@@ -119,8 +119,9 @@ export class HtmlSanitizerService {
 
       if (preserveMermaid) {
         // Mermaid 코드 블록을 임시 플레이스홀더로 교체
+        // data-language 속성이 있는 경우도 지원 (code-highlight.service.ts와 호환)
         processedHtml = processedHtml.replace(
-          /<pre><code class="language-mermaid">([\s\S]*?)<\/code><\/pre>/gi,
+          /<pre[^>]*><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
           (match, content) => {
             const placeholder = `<!--MERMAID_BLOCK_${mermaidBlocks.length}-->`;
             mermaidBlocks.push({ placeholder, content });
@@ -141,12 +142,8 @@ export class HtmlSanitizerService {
       // Mermaid 블록 복원
       if (preserveMermaid) {
         mermaidBlocks.forEach(({ placeholder, content }) => {
-          // Mermaid 콘텐츠도 기본적인 살균 수행 (스크립트 태그 등 제거)
-          const sanitizedContent = DOMPurify.sanitize(content, {
-            ALLOWED_TAGS: [], // 태그 없이 텍스트만
-            ALLOWED_ATTR: [],
-            KEEP_CONTENT: true,
-          });
+          // Mermaid 콘텐츠 전처리 및 살균
+          let sanitizedContent = this.sanitizeMermaidContent(content);
           sanitized = sanitized.replace(
             placeholder,
             `<pre><code class="language-mermaid">${sanitizedContent}</code></pre>`,
@@ -217,5 +214,71 @@ export class HtmlSanitizerService {
       ALLOWED_ATTR: [],
       KEEP_CONTENT: true,
     });
+  }
+
+  /**
+   * Mermaid 콘텐츠를 안전하게 살균합니다.
+   *
+   * Mermaid 다이어그램은 특별한 구문을 사용하므로, HTML 태그를 적절히 처리합니다.
+   * - <br>, <br/> 태그를 Mermaid 라인 브레이크(\n)로 변환
+   * - HTML 엔티티 디코딩
+   * - 위험한 스크립트 태그 제거
+   *
+   * @param content - Mermaid 원본 콘텐츠
+   * @returns 살균된 Mermaid 콘텐츠
+   */
+  private sanitizeMermaidContent(content: string): string {
+    if (!content) return '';
+
+    try {
+      // 1. HTML 엔티티 디코딩 (백엔드에서 인코딩된 경우)
+      let processed = this.decodeHtmlEntitiesForMermaid(content);
+
+      // 2. <br> 태그를 Mermaid 라인 브레이크로 변환
+      // Mermaid는 HTML <br>을 지원하지만, \n으로 통일하는 것이 더 안전함
+      processed = processed.replace(/<br\s*\/?>/gi, '<br/>');
+
+      // 3. 위험한 태그만 제거 (스크립트, 이벤트 핸들러 등)
+      processed = DOMPurify.sanitize(processed, {
+        ALLOWED_TAGS: ['br'], // br 태그만 허용
+        ALLOWED_ATTR: [],
+        KEEP_CONTENT: true,
+      });
+
+      return processed.trim();
+    } catch (error) {
+      console.error('Mermaid content sanitization failed:', error);
+      // Fallback: 기본 살균
+      return DOMPurify.sanitize(content, {
+        ALLOWED_TAGS: [],
+        ALLOWED_ATTR: [],
+        KEEP_CONTENT: true,
+      });
+    }
+  }
+
+  /**
+   * Mermaid용 HTML 엔티티 디코딩
+   *
+   * Mermaid 다이어그램에서 자주 사용되는 HTML 엔티티를 디코딩합니다.
+   */
+  private decodeHtmlEntitiesForMermaid(text: string): string {
+    const entities: Record<string, string> = {
+      '&lt;': '<',
+      '&gt;': '>',
+      '&amp;': '&',
+      '&quot;': '"',
+      '&#039;': "'",
+      '&#x27;': "'",
+      '&#x2F;': '/',
+      '&#x5C;': '\\',
+      '&#x60;': '`',
+      '&nbsp;': ' ',
+    };
+
+    return text.replace(
+      /&[#\w]+;/g,
+      (entity) => entities[entity] || entity,
+    );
   }
 }
