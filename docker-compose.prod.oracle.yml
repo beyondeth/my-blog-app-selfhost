@@ -317,11 +317,8 @@ services:
     networks:
       - codebase_network
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:9121/metrics"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+    # healthcheck 제거: 최신 이미지는 distroless로 wget/curl 없음
+    # VictoriaMetrics가 정상적으로 메트릭 수집 중
     # 리소스 제한
     cpus: 0.1
     mem_limit: 50m
