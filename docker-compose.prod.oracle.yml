@@ -270,6 +270,8 @@ services:
   grafana:
     image: grafana/grafana:11.3.0
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-grafana
+    env_file:
+      - .env.production
     volumes:
       - /mnt/data/grafana:/var/lib/grafana
       # VictoriaMetrics 데이터소스 설정
