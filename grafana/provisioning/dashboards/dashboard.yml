@@ -1,0 +1,97 @@
+# ============================================
+# Grafana Dashboard Provisioning Configuration
+# ============================================
+# 📊 대시보드 자동 로드 설정
+# 🔄 변경 사항 자동 감지 및 반영
+#
+# 📝 사용법:
+#   1. /var/lib/grafana/dashboards/ 에 JSON 대시보드 파일 배치
+#   2. Grafana 재시작 시 자동 로드
+#   3. 파일 변경 시 10초마다 자동 업데이트
+#
+# 📂 대시보드 파일 위치:
+#   - 로컬: ./grafana/dashboards/*.json
+#   - 컨테이너: /var/lib/grafana/dashboards/*.json
+# ============================================
+
+apiVersion: 1
+
+providers:
+  # ==========================================
+  # Default Dashboard Provider
+  # ==========================================
+  - name: 'default'
+    # Organization ID (단일 조직이므로 1)
+    orgId: 1
+
+    # 폴더 이름 (빈 문자열 = General 폴더)
+    folder: ''
+
+    # Provider 타입 (file = 파일 시스템에서 로드)
+    type: file
+
+    # 대시보드 삭제 방지 (UI에서 삭제 가능)
+    disableDeletion: false
+
+    # 대시보드 파일 변경 감지 주기 (10초)
+    updateIntervalSeconds: 10
+
+    # UI에서 대시보드 수정 허용
+    allowUiUpdates: true
+
+    options:
+      # 대시보드 JSON 파일 경로
+      path: /var/lib/grafana/dashboards
+
+      # 하위 디렉토리를 폴더로 인식
+      foldersFromFilesStructure: true
+
+  # ==========================================
+  # Custom Dashboard Provider (선택사항)
+  # ==========================================
+  # - name: 'custom'
+  #   orgId: 1
+  #   folder: 'Custom Dashboards'
+  #   type: file
+  #   disableDeletion: false
+  #   updateIntervalSeconds: 30
+  #   allowUiUpdates: true
+  #   options:
+  #     path: /var/lib/grafana/custom-dashboards
+
+# ============================================
+# 대시보드 추가 방법
+# ============================================
+# 1. JSON 파일 생성:
+#    - Grafana UI에서 대시보드 생성 → Share → Export → Save to file
+#    - 또는 직접 JSON 작성
+#
+# 2. 파일 배치:
+#    - 로컬: ./grafana/dashboards/my-dashboard.json
+#    - Docker volume으로 자동 마운트됨
+#
+# 3. 자동 로드:
+#    - Grafana가 10초마다 변경 감지
+#    - 또는 Grafana 재시작
+#
+# 4. 대시보드 UID:
+#    - 각 대시보드는 고유 UID 필요
+#    - 예: "uid": "blog-metrics"
+# ============================================
+
+# ============================================
+# 트러블슈팅
+# ============================================
+# 문제 1: 대시보드가 로드되지 않음
+#   - 파일 경로 확인: docker exec grafana ls /var/lib/grafana/dashboards
+#   - JSON 유효성 검사: cat dashboard.json | jq .
+#   - Grafana 로그 확인: docker logs grafana
+#
+# 문제 2: "Dashboard with same UID already exists"
+#   - 각 대시보드의 UID가 고유한지 확인
+#   - 기존 대시보드 삭제 후 재시도
+#
+# 문제 3: 대시보드 변경이 반영되지 않음
+#   - updateIntervalSeconds 확인 (기본 10초)
+#   - allowUiUpdates: false인 경우 UI 수정 불가
+# ============================================

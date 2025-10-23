@@ -244,8 +244,6 @@ services:
       - '--retentionPeriod=30d'  # Prometheus 15일 → VictoriaMetrics 30일
       - '--promscrape.config=/etc/victoriametrics/scrape_config.yml'
       - '--httpListenAddr=:8428'
-      # 리소스 제한 (디스크 사용량)
-      - '--storage.maxDiskUsageBytes=2GB'
       # 메모리 최적화
       - '--memory.allowedPercent=80'
     volumes:
