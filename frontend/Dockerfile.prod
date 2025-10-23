@@ -23,7 +23,7 @@ WORKDIR /app
 RUN npm install -g pnpm@latest
 
 # package.json과 pnpm-lock.yaml 복사 (캐싱 최적화)
-COPY package.json pnpm-lock.yaml* ./
+COPY frontend/package.json frontend/pnpm-lock.yaml* ./
 
 # 프로덕션 의존성 설치 (lockfile 자동 업데이트 허용)
 RUN pnpm install --no-frozen-lockfile --prod=false
@@ -42,10 +42,10 @@ RUN npm install -g pnpm@latest
 COPY --from=deps /app/node_modules ./node_modules
 
 # 소스 코드 복사
-COPY . .
+COPY frontend/ .
 
 # Backend 법률 문서 복사 (API 라우트에서 참조)
-COPY ../backend/docs/legal /backend/docs/legal
+COPY backend/docs/legal /backend/docs/legal
 
 # Next.js 환경 변수 (빌드 타임)
 ENV NEXT_TELEMETRY_DISABLED=1
