@@ -280,15 +280,14 @@ services:
       # 대시보드 파일 디렉토리
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
-      - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
       - GF_INSTALL_PLUGINS=  # 플러그인 불필요 (VictoriaMetrics는 Prometheus 호환)
-      - GF_SERVER_ROOT_URL=${GRAFANA_ROOT_URL:-https://${DOMAIN:-yourdomain.com}/grafana}
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_USERS_ALLOW_SIGN_UP=false
-      # 로그 레벨
-      - GF_LOG_LEVEL=${GF_LOG_LEVEL:-info}
+      # 나머지 설정은 .env.production에서 로드
+      # GF_SECURITY_ADMIN_USER, GF_SECURITY_ADMIN_PASSWORD
+      # GRAFANA_ROOT_URL -> GF_SERVER_ROOT_URL
+      # GF_LOG_LEVEL
     ports:
       - "127.0.0.1:3030:3000"
     networks:
