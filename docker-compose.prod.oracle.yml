@@ -255,7 +255,7 @@ services:
       - codebase_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8428/-/healthy"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8428/-/healthy"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -309,7 +309,7 @@ services:
   # Redis Exporter (Redis 메트릭 수집)
   # ============================================
   redis-exporter:
-    image: oliver006/redis_exporter:v1.62.0-alpine
+    image: oliver006/redis_exporter:latest  # ARM64 호환
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis-exporter
     command:
       - '--redis.addr=redis:6379'
@@ -318,7 +318,7 @@ services:
       - codebase_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:9121/metrics"]
+      test: ["CMD", "wget", "--spider", "--quiet", "http://127.0.0.1:9121/metrics"]
       interval: 30s
       timeout: 10s
       retries: 3

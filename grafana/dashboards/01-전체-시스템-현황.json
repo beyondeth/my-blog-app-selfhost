@@ -68,7 +68,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "up{job=\"nestjs-chat-app\"}",
+          "expr": "up{job=\"nestjs-backend\"}",
           "refId": "A"
         }
       ],
@@ -182,7 +182,7 @@
       "pluginVersion": "8.0.0",
       "targets": [
         {
-          "expr": "redis_up{job=\"redis\"}",
+          "expr": "up{job=\"redis\"}",
           "refId": "A"
         }
       ],

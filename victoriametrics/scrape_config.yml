@@ -128,18 +128,18 @@ scrape_configs:
     scrape_interval: 30s
 
   # ==========================================
-  # Grafana
+  # Grafana (비활성화 - /metrics 엔드포인트 307 리다이렉트 발생)
   # ==========================================
-  - job_name: 'grafana'
-    static_configs:
-      - targets: ['grafana:3000']
-    scrape_interval: 30s
-
-    # 메트릭 레이블 추가
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: instance
-        replacement: 'grafana'
+  # - job_name: 'grafana'
+  #   static_configs:
+  #     - targets: ['grafana:3000']
+  #   scrape_interval: 30s
+  #
+  #   # 메트릭 레이블 추가
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: instance
+  #       replacement: 'grafana'
 
 # ============================================
 # VictoriaMetrics vs Prometheus 비교
