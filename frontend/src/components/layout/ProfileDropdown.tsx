@@ -26,6 +26,12 @@ import {
   FiKey
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ProfileDropdownProps {
   user: User;
@@ -43,23 +49,31 @@ export default function ProfileDropdown({
   };
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <button className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md hover:bg-accent hover:text-accent-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2">
-          <div className="flex items-center space-x-2">
-            <Avatar
-              src={user.profileImage}
-              alt={user.username}
-              fallback={user.username}
-              size="sm"
-              priority={true}
-            />
-            <span className="font-medium">{user.username}</span>
-            <FiChevronDown className="w-4 h-4" />
-          </div>
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
+    <TooltipProvider delayDuration={300}>
+      <DropdownMenu modal={false}>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <DropdownMenuTrigger asChild>
+              <button className="flex items-center space-x-2 px-3 py-2 text-sm text-foreground rounded-md border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-gray-300 dark:focus-visible:ring-gray-600">
+                <div className="flex items-center space-x-2">
+                  <Avatar
+                    src={user.profileImage}
+                    alt={user.username}
+                    fallback={user.username}
+                    size="sm"
+                    priority={true}
+                  />
+                  <span className="font-medium">{user.username}</span>
+                  <FiChevronDown className="w-4 h-4" />
+                </div>
+              </button>
+            </DropdownMenuTrigger>
+          </TooltipTrigger>
+          <TooltipContent side="bottom" sideOffset={5}>
+            <p className="text-sm">계정</p>
+          </TooltipContent>
+        </Tooltip>
+        <DropdownMenuContent align="end" className="w-56">
         <DropdownMenuLabel>
           <div className="flex flex-col space-y-1">
             <p className="text-sm font-medium leading-none">{user.username}</p>
@@ -180,6 +194,7 @@ export default function ProfileDropdown({
           <span>로그아웃</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
-    </DropdownMenu>
+      </DropdownMenu>
+    </TooltipProvider>
   );
 }

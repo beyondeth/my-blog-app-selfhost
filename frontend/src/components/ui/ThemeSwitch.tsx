@@ -4,6 +4,12 @@ import * as React from "react";
 import { useTheme } from "next-themes";
 import { DarkModeIcon } from "@/components/icons/DarkModeIcon";
 import { LightModeIcon } from "@/components/icons/LightModeIcon";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 /**
  * View Transition API를 사용한 부드러운 테마 전환
@@ -88,17 +94,25 @@ export function ThemeSwitch() {
   };
 
   return (
-    <button
-      onClick={handleThemeToggle}
-      className="p-2 rounded-md text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-interactive"
-      aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
-      title={`${isDark ? "라이트" : "다크"} 모드로 전환`}
-    >
-      {isDark ? (
-        <LightModeIcon size={24} className="transition-interactive hover:rotate-45" />
-      ) : (
-        <DarkModeIcon size={24} className="transition-interactive hover:-rotate-12" />
-      )}
-    </button>
+    <TooltipProvider delayDuration={300}>
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            onClick={handleThemeToggle}
+            className="p-2 rounded-full border border-transparent text-foreground hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+            aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+          >
+            {isDark ? (
+              <LightModeIcon size={20} className="transition-transform hover:rotate-45" />
+            ) : (
+              <DarkModeIcon size={20} className="transition-transform hover:-rotate-12" />
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent side="bottom" sideOffset={5}>
+          <p className="text-sm">{isDark ? "라이트 모드" : "다크 모드"}</p>
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 }

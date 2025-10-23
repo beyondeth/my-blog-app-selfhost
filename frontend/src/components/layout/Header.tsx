@@ -16,6 +16,12 @@ import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useTheme } from 'next-themes';
 import { useDMModal } from '@/hooks/useDMModal';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 export default function Header() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
@@ -171,13 +177,22 @@ export default function Header() {
                   <ThemeSwitch />
 
                   {/* DM Button */}
-                  <button
-                    onClick={() => openModal()}
-                    className="relative p-2 rounded-full hover:bg-muted transition-colors"
-                    aria-label="메시지"
-                  >
-                    <FiMessageCircle className="w-5 h-5 text-foreground" />
-                  </button>
+                  <TooltipProvider delayDuration={300}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          onClick={() => openModal()}
+                          className="relative p-2 rounded-full border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                          aria-label="메시지"
+                        >
+                          <FiMessageCircle className="w-5 h-5 text-foreground" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="bottom" sideOffset={5}>
+                        <p className="text-sm">메시지</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
 
                   {/* Profile Dropdown */}
                   <ProfileDropdown
@@ -226,13 +241,22 @@ export default function Header() {
             ) : user ? (
               <>
                 {/* DM Button */}
-                <button
-                  onClick={() => openModal()}
-                  className="relative p-2 rounded-full hover:bg-muted transition-colors"
-                  aria-label="메시지"
-                >
-                  <FiMessageCircle className="w-5 h-5 text-foreground" />
-                </button>
+                <TooltipProvider delayDuration={300}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => openModal()}
+                        className="relative p-2 rounded-full border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+                        aria-label="메시지"
+                      >
+                        <FiMessageCircle className="w-5 h-5 text-foreground" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom" sideOffset={5}>
+                      <p className="text-sm">메시지</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
                 {/* 로그인 상태: 프로필 드롭다운 */}
                 <MobileProfileDropdown
