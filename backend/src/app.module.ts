@@ -75,23 +75,23 @@ import { BlocksModule } from './blocks/blocks.module';
     }),
 
     // Rate limiting configuration
-    // 다중 시간대 Rate Limit: 분당 3회, 시간당 10회, 하루 20회
+    // 다중 시간대 Rate Limit: 분당 20회, 시간당 30회, 하루 50회
     ThrottlerModule.forRoot({
       throttlers: [
         {
           name: 'minute',
           ttl: 60000,      // 1분 (60초)
-          limit: 3,        // 분당 3회
+          limit: 20,       // 분당 20회
         },
         {
           name: 'hour',
           ttl: 3600000,    // 1시간 (3600초)
-          limit: 10,       // 시간당 10회
+          limit: 30,       // 시간당 30회
         },
         {
           name: 'day',
           ttl: 86400000,   // 1일 (86400초)
-          limit: 20,       // 하루 20회
+          limit: 50,       // 하루 50회
         }
       ]
     }),

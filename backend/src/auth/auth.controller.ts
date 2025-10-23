@@ -392,7 +392,7 @@ export class AuthController {
 
   @Post('check-auth-method')
   @Public()
-  @Throttle({ default: { limit: 5, ttl: 60000 } })  // 분당 5회 제한 (User Enumeration 공격 방지)
+  @Throttle({ default: { limit: 20, ttl: 60000 } })  // 분당 20회 제한 (User Enumeration 공격 방지)
   @ApiOperation({ summary: '이메일의 인증 방법 확인' })
   @ApiResponse({ status: 200, description: '인증 방법 반환' })
   async checkAuthMethod(@Body() dto: { email: string }, @Response() res) {
