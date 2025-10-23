@@ -22,7 +22,8 @@ import {
   FiUsers,
   FiMessageSquare,
   FiCreditCard,
-  FiTrendingUp
+  FiTrendingUp,
+  FiKey
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
 
@@ -146,6 +147,15 @@ export default function ProfileDropdown({
         >
           <FiShield className="mr-2 h-4 w-4" />
           <span>보안</span>
+        </DropdownMenuItem>
+
+        {/* API Keys */}
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/settings/api-keys')}
+          className="cursor-pointer"
+        >
+          <FiKey className="mr-2 h-4 w-4" />
+          <span>API Keys</span>
         </DropdownMenuItem>
 
         {/* Notifications (Feature Flag) */}
