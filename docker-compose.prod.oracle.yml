@@ -243,6 +243,7 @@ services:
       - '--storageDataPath=/storage'
       - '--retentionPeriod=30d'  # Prometheus 15일 → VictoriaMetrics 30일
       - '--promscrape.config=/etc/victoriametrics/scrape_config.yml'
+      - '--promscrape.config.strictParse=false'  # Prometheus 호환성을 위한 엄격한 파싱 비활성화
       - '--httpListenAddr=:8428'
       # 메모리 최적화
       - '--memory.allowedPercent=80'
