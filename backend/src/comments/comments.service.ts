@@ -55,10 +55,10 @@ export class CommentsService {
 
   async create(createCommentDto: any, user: User): Promise<Comment> {
     const { postId, parentCommentId, ...commentData } = createCommentDto;
-    
+
     // 게시글 존재 확인 및 블로그 정보 가져오기
     const post = await this.postsService.findOne(postId);
-    
+
     // 블로그의 댓글 허용 여부 확인
     const blog = await this.postsService.getBlogByPostId(postId);
     if (!blog.allowComments) {
@@ -628,127 +628,205 @@ export class CommentsService {
     // 커서 디코딩
     const decodedCursor = cursor ? this.decodeCursor(cursor) : null;
 
-    // QueryBuilder 구성
-    const queryBuilder = this.commentsRepository
-      .createQueryBuilder('comment')
-      .leftJoinAndSelect('comment.author', 'author')
-      .where('comment.parentCommentId = :parentCommentId', { parentCommentId })
-      .andWhere('comment.isDeleted = :isDeleted', { isDeleted: false });
+    // Raw SQL 쿼리로 재귀적 댓글 가져오기 (플랫 구조)
+    // PostgreSQL의 Recursive CTE 사용
+    const queryParams: any[] = [parentCommentId];
+    let cursorWhereClause = '';
+    let paramIndex = 2;
 
-    // 사용자 좋아요 상태 JOIN
-    if (user) {
-      queryBuilder.leftJoinAndSelect(
-        'comment.commentLikes',
-        'userLike',
-        'userLike.userId = :userId',
-        { userId: user.id },
-      );
-    }
-
-    // 정렬: createdAt ASC (오래된 것부터)
-    queryBuilder.orderBy('comment.createdAt', 'ASC')
-      .addOrderBy('comment.id', 'ASC');
-
-    // 커서 필터링
     if (decodedCursor) {
-      queryBuilder.andWhere(
-        new Brackets((qb) => {
-          qb.where('comment.createdAt > :createdAt', {
-            createdAt: decodedCursor.createdAt,
-          })
-            .orWhere(
-              new Brackets((qb2) => {
-                qb2
-                  .where('comment.createdAt = :createdAt', {
-                    createdAt: decodedCursor.createdAt,
-                  })
-                  .andWhere('comment.id > :id', { id: decodedCursor.id });
-              }),
-            );
-        }),
-      );
+      cursorWhereClause = `AND (ct."createdAt" > $${paramIndex} OR (ct."createdAt" = $${paramIndex} AND ct.id > $${paramIndex + 1}))`;
+      queryParams.push(decodedCursor.createdAt);
+      queryParams.push(decodedCursor.id);
+      paramIndex += 2;
     }
 
-    // LIMIT + 1
-    queryBuilder.take(limit + 1);
+    const rawQuery = `
+      WITH RECURSIVE comment_tree AS (
+        -- 직계 자식 댓글
+        SELECT c.*, 0 as depth
+        FROM comments c
+        WHERE c."parentCommentId" = $1 AND c."isDeleted" = false
+        ${cursorWhereClause}
 
-    const replies = await queryBuilder.getMany();
+        UNION ALL
 
-    // 사용자 좋아요 상태 맵
-    const userLikes: { [commentId: string]: 'like' | 'dislike' } = {};
+        -- 재귀적으로 모든 하위 댓글 (최대 depth 2까지만)
+        SELECT c.*, ct.depth + 1
+        FROM comments c
+        INNER JOIN comment_tree ct ON c."parentCommentId" = ct.id
+        WHERE c."isDeleted" = false AND ct.depth < 2
+      )
+      SELECT
+        ct.*,
+        u.id as author_id,
+        u.username as author_username,
+        u."profileImage" as author_profileImage,
+        u.email as author_email
+      FROM comment_tree ct
+      LEFT JOIN users u ON ct."authorId" = u.id
+      ORDER BY ct."createdAt" ASC, ct.id ASC
+      LIMIT ${limit + 1}
+    `;
+
+    const rawResults = await this.commentsRepository.query(rawQuery, queryParams);
+
+    // Raw 결과를 Comment 엔티티로 변환
+    const comments = rawResults.slice(0, limit).map(row => {
+      const comment = new Comment();
+      comment.id = row.id;
+      comment.content = row.content;
+      comment.postId = row.postId || row.postid; // PostgreSQL은 소문자로 반환할 수 있음
+      comment.authorId = row.authorId || row.authorid;
+      comment.parentCommentId = row.parentCommentId || row.parentcommentid;
+      comment.likesCount = parseInt(row.likesCount || row.likescount || '0', 10);
+      comment.dislikesCount = parseInt(row.dislikesCount || row.dislikescount || '0', 10);
+      comment.repliesCount = parseInt(row.repliesCount || row.repliescount || '0', 10);
+      comment.isDeleted = row.isDeleted || row.isdeleted;
+      comment.createdAt = row.createdAt || row.createdat;
+      comment.updatedAt = row.updatedAt || row.updatedat;
+
+      // Author 정보 설정
+      comment.author = {
+        id: row.author_id,
+        username: row.author_username,
+        profileImage: row.author_profileImage || row.author_profileimage,
+        email: row.author_email
+      } as any;
+
+      return comment;
+    });
+
+    const hasMore = rawResults.length > limit;
+    const nextCursor = hasMore && comments.length > 0
+      ? this.encodeCursor({
+          createdAt: comments[comments.length - 1].createdAt,
+          id: comments[comments.length - 1].id,
+        })
+      : null;
+
+    // 사용자 좋아요/싫어요 상태 추가
+    let commentsWithLikeStatus = comments;
     if (user) {
-      replies.forEach((reply) => {
-        const userLike = reply.commentLikes?.find((like) => like.userId === user.id);
-        if (userLike) {
-          userLikes[reply.id] = userLike.type;
-        }
-      });
-    }
-
-    // 다음 페이지 확인
-    const hasNextPage = replies.length > limit;
-    const sliced = hasNextPage ? replies.slice(0, -1) : replies;
-
-    // 다음 커서 생성
-    const nextCursor =
-      hasNextPage && sliced.length > 0
-        ? this.encodeCursor({
-            createdAt: sliced[sliced.length - 1].createdAt,
-            id: sliced[sliced.length - 1].id,
-          })
-        : null;
-
-    // DTO 변환
-    const replyDtos = sliced.map((reply) =>
-      this.toCommentDto(reply, {
-        userLiked: userLikes[reply.id] === 'like',
-        userDisliked: userLikes[reply.id] === 'dislike',
-      }),
-    );
-
-    // 응답 구성
-    const response: PaginatedCommentsDto = {
-      comments: replyDtos,
-      nextCursor,
-      hasNextPage,
-    };
-
-    // 첫 페이지에만 총 개수 포함
-    if (isFirstPage) {
-      const totalCount = await this.commentsRepository.count({
+      const commentIds = comments.map(c => c.id);
+      const likes = await this.commentLikesRepository.find({
         where: {
-          parentCommentId,
-          isDeleted: false,
+          commentId: In(commentIds),
+          userId: user.id,
         },
       });
-      response.totalCount = totalCount;
+
+      const userLikes: { [commentId: string]: 'like' | 'dislike' } = {};
+      likes.forEach(like => {
+        userLikes[like.commentId] = like.type;
+      });
+
+      commentsWithLikeStatus = comments.map(comment =>
+        this.toCommentDto(comment, {
+          userLiked: userLikes[comment.id] === 'like',
+          userDisliked: userLikes[comment.id] === 'dislike',
+        })
+      );
+    } else {
+      commentsWithLikeStatus = comments.map(comment =>
+        this.toCommentDto(comment, {
+          userLiked: false,
+          userDisliked: false,
+        })
+      );
     }
 
-    // 첫 페이지 캐싱
-    if (cacheKey) {
-      await this.cacheService.set(cacheKey, response, CacheTTL.VERY_SHORT);
-      this.logger.debug(`Cache SET: ${cacheKey}`);
-    }
+    // 재귀적으로 모든 하위 댓글 수 카운트
+    const totalCountQuery = `
+      WITH RECURSIVE comment_tree AS (
+        SELECT id FROM comments
+        WHERE "parentCommentId" = $1 AND "isDeleted" = false
 
-    return response;
+        UNION ALL
+
+        SELECT c.id FROM comments c
+        INNER JOIN comment_tree ct ON c."parentCommentId" = ct.id
+        WHERE c."isDeleted" = false
+      )
+      SELECT COUNT(*) as count FROM comment_tree
+    `;
+
+    const countResult = await this.commentsRepository.query(totalCountQuery, [parentCommentId]);
+    const totalCount = parseInt(countResult[0]?.count || '0', 10);
+
+    const result: PaginatedCommentsDto = {
+      comments: commentsWithLikeStatus,
+      nextCursor,
+      hasNextPage: hasMore,
+      totalCount,
+    };
+
+    // 캐싱은 하지 않음 (자식 댓글은 선택적으로 보기 때문)
+    return result;
   }
 
   /**
    * 부모 댓글의 답글 수 증가
    *
    * @param commentId - 부모 댓글 ID
+   * @description 최상위 부모 댓글의 카운트만 증가
    */
   async incrementRepliesCount(commentId: string): Promise<void> {
-    await this.commentsRepository.increment({ id: commentId }, 'repliesCount', 1);
+    // 최상위 부모 찾기
+    let currentComment = await this.commentsRepository.findOne({
+      where: { id: commentId },
+      select: ['id', 'parentCommentId'],
+    });
+
+    if (!currentComment) return;
+
+    // 재귀적으로 최상위 부모 찾기
+    let rootParentId = currentComment.id;
+    while (currentComment.parentCommentId) {
+      const parentComment = await this.commentsRepository.findOne({
+        where: { id: currentComment.parentCommentId },
+        select: ['id', 'parentCommentId'],
+      });
+
+      if (!parentComment) break;
+      rootParentId = parentComment.id;
+      currentComment = parentComment;
+    }
+
+    // 최상위 부모 댓글의 카운트만 증가
+    await this.commentsRepository.increment({ id: rootParentId }, 'repliesCount', 1);
   }
 
   /**
    * 부모 댓글의 답글 수 감소
    *
    * @param commentId - 부모 댓글 ID
+   * @description 최상위 부모 댓글의 카운트만 감소
    */
   async decrementRepliesCount(commentId: string): Promise<void> {
-    await this.commentsRepository.decrement({ id: commentId }, 'repliesCount', 1);
+    // 최상위 부모 찾기
+    let currentComment = await this.commentsRepository.findOne({
+      where: { id: commentId },
+      select: ['id', 'parentCommentId'],
+    });
+
+    if (!currentComment) return;
+
+    // 재귀적으로 최상위 부모 찾기
+    let rootParentId = currentComment.id;
+    while (currentComment.parentCommentId) {
+      const parentComment = await this.commentsRepository.findOne({
+        where: { id: currentComment.parentCommentId },
+        select: ['id', 'parentCommentId'],
+      });
+
+      if (!parentComment) break;
+      rootParentId = parentComment.id;
+      currentComment = parentComment;
+    }
+
+    // 최상위 부모 댓글의 카운트만 감소
+    await this.commentsRepository.decrement({ id: rootParentId }, 'repliesCount', 1);
   }
 
   /**

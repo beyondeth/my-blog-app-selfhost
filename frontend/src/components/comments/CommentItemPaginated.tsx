@@ -1,7 +1,8 @@
 'use client';
 
 import { useState } from 'react';
-import { FiThumbsUp, FiThumbsDown, FiChevronDown, FiChevronUp, FiMoreVertical, FiEdit3, FiTrash2, FiFlag, FiMessageCircle } from 'react-icons/fi';
+import { FiThumbsUp, FiThumbsDown, FiChevronRight, FiMoreVertical, FiEdit3, FiTrash2, FiFlag, FiCheckCircle, FiMessageCircle } from 'react-icons/fi';
+import { useQueryClient } from '@tanstack/react-query';
 import type { Comment } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Avatar } from '@/components/ui/avatar';
@@ -18,6 +19,7 @@ import { formatRelativeTime } from '@/utils/timeFormat';
 import CommentForm from './CommentForm';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
+import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { apiClient } from '@/lib/api';
 
 interface CommentItemPaginatedProps {
@@ -25,6 +27,7 @@ interface CommentItemPaginatedProps {
   postId: string;
   postAuthorId?: string;
   level?: number; // 0 = parent, 1+ = reply
+  rootParentId?: string; // 최상위 부모 댓글 ID (플랫 구조용)
 }
 
 /**
@@ -40,38 +43,57 @@ export default function CommentItemPaginated({
   postId,
   postAuthorId,
   level = 0,
+  rootParentId,
 }: CommentItemPaginatedProps) {
   const { user } = useAuth();
-  const [showReplies, setShowReplies] = useState(false);
+  const queryClient = useQueryClient();
+
+  // 답글 상태를 localStorage나 sessionStorage에 저장하여 유지
+  const repliesStateKey = `replies_open_${comment.id}`;
+  const [showReplies, setShowReplies] = useState(() => {
+    // 세션 스토리지에서 상태 복원
+    if (typeof window !== 'undefined') {
+      return sessionStorage.getItem(repliesStateKey) === 'true';
+    }
+    return false;
+  });
+
   const [isEditing, setIsEditing] = useState(false);
   const [isReplying, setIsReplying] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
 
-  // 답글 페이지네이션 (lazy-load)
+  // 답글 페이지네이션 (lazy-load) - level 0만 직접 로드
   const {
     data: repliesData,
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
+    refetch: refetchReplies,
   } = useRepliesPaginated(
     comment.id,
-    { limit: 10 },
-    { enabled: showReplies }, // 답글 펼침 상태일 때만 fetch
+    { limit: 20 },
+    { enabled: showReplies && level === 0 }, // 부모 댓글만 답글 로드
   );
 
   // 좋아요/싫어요 mutations
   const likeMutation = useToggleCommentLikePaginated(postId);
   const dislikeMutation = useToggleCommentDislikePaginated(postId);
   const deleteMutation = useDeleteCommentPaginated(postId);
-  const createReplyMutation = useCreateCommentPaginated(postId);
+  // 항상 최상위 부모 댓글 ID를 사용
+  const parentIdForMutation = level === 0 ? comment.id : (rootParentId || comment.parentCommentId);
+  const createReplyMutation = useCreateCommentPaginated(postId, parentIdForMutation);
 
   // useInfiniteQuery는 { pages: [...] } 구조를 반환
   const flatReplies = flattenPaginatedComments(repliesData);
-  // 답글 개수는 comment.repliesCount에서 가져옴 (매번 COUNT 쿼리 방지)
   const totalReplies = comment.repliesCount || 0;
 
   const isPostAuthor = comment.author.id === postAuthorId;
+
+  // 답글 중에 작성자가 쓴 댓글이 있는지 확인
+  // 플랫 구조에서 모든 답글이 로드되므로 정확한 확인 가능
+  const hasAuthorReply = postAuthorId && flatReplies.some(reply => reply.author.id === postAuthorId);
   const isAuthor = user?.id === comment.author.id;
   const canEdit = isAuthor;
   const canDelete = isAuthor;
@@ -93,22 +115,53 @@ export default function CommentItemPaginated({
   };
 
   const handleToggleReplies = () => {
-    setShowReplies(!showReplies);
+    // 답글을 숨길 때만 스크롤 위치 유지 (펼칠 때는 자연스럽게)
+    if (showReplies) {
+      // 현재 댓글의 위치를 저장
+      const currentScrollY = window.scrollY;
+
+      // 답글 숨기기
+      setShowReplies(false);
+      sessionStorage.removeItem(repliesStateKey);
+
+      // 다음 프레임에서 스크롤 위치 복원
+      requestAnimationFrame(() => {
+        window.scrollTo(0, currentScrollY);
+      });
+    } else {
+      setShowReplies(true);
+      sessionStorage.setItem(repliesStateKey, 'true');
+    }
   };
 
   const handleReply = async (content: string) => {
-    // L1 이상 댓글에는 @mention 추가
+    // 답글의 답글인 경우 @username 추가
     const finalContent = level >= 1
       ? `@${comment.author.username} ${content}`
       : content;
 
-    await createReplyMutation.mutateAsync({
-      content: finalContent,
-      postId: postId,
-      parentCommentId: comment.id,
-    });
+    try {
+      await createReplyMutation.mutateAsync({
+        content: finalContent,
+        postId: postId,
+        parentCommentId: comment.id, // 실제 부모 댓글의 ID
+      });
 
-    setIsReplying(false);
+      setIsReplying(false);
+
+      // 부모 댓글(level 0)에 답글을 단 경우
+      if (level === 0) {
+        // 답글 섹션이 닫혀있으면 자동으로 열기
+        if (!showReplies) {
+          setShowReplies(true);
+          sessionStorage.setItem(repliesStateKey, 'true');
+        }
+        // 답글 목록 새로고침
+        await refetchReplies();
+      }
+    } catch (error) {
+      console.error('답글 작성 실패:', error);
+    }
   };
 
   const handleEdit = async (content: string) => {
@@ -122,11 +175,14 @@ export default function CommentItemPaginated({
     }
   };
 
-  const handleDelete = () => {
-    if (confirm('댓글을 삭제하시겠습니까?')) {
-      deleteMutation.mutate(comment.id);
-      setShowDropdown(false);
-    }
+  const handleDeleteClick = () => {
+    setIsDeleteDialogOpen(true);
+    setShowDropdown(false);
+  };
+
+  const handleDeleteConfirm = () => {
+    deleteMutation.mutate(comment.id);
+    setIsDeleteDialogOpen(false);
   };
 
   const handleReport = () => {
@@ -147,15 +203,16 @@ export default function CommentItemPaginated({
   }
 
   return (
-    <div className={`${level === 0 ? 'py-4 border-b border-gray-100 dark:border-gray-800' : 'py-2 ml-12'}`}>
+    <div className={`${level === 0 ? 'py-4 border-b border-gray-100 dark:border-gray-800' : 'py-2 ml-8'}`}>
       <div className="flex items-start gap-3">
         {/* Avatar */}
-        <div className="flex-shrink-0">
+        <div className="flex-shrink-0 relative">
           <Avatar
             src={comment.author.profileImage}
             alt={comment.author.username || '익명'}
             fallback={comment.author.username || '익명'}
             size={level === 0 ? "md" : "xs"}
+            className={level === 0 ? "w-6 h-6 md:w-10 md:h-10" : ""}
           />
         </div>
 
@@ -164,12 +221,12 @@ export default function CommentItemPaginated({
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2">
               {isPostAuthor ? (
-                <div className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 px-2 py-1 rounded text-sm font-medium">
+                <div className="flex items-center gap-1 bg-gray-800 text-white dark:bg-gray-200 dark:text-gray-900 px-1.5 py-0.5 rounded text-xs font-medium">
                   @{comment.author.username || '익명'}
-                  <span className="ml-1 text-xs">작성자</span>
+                  <FiCheckCircle className="w-3.5 h-3.5" />
                 </div>
               ) : (
-                <span className="font-medium text-sm text-gray-900 dark:text-gray-100">
+                <span className="font-medium text-xs text-gray-500 dark:text-gray-500">
                   {comment.author.username || '익명'}
                 </span>
               )}
@@ -219,7 +276,7 @@ export default function CommentItemPaginated({
                         )}
                         {canDelete && (
                           <button
-                            onClick={handleDelete}
+                            onClick={handleDeleteClick}
                             disabled={deleteMutation.isPending}
                             className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                           >
@@ -259,7 +316,7 @@ export default function CommentItemPaginated({
               maxLength={1000}
             />
           ) : (
-            <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words mb-3">
+            <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words mb-4">
               {comment.content}
             </p>
           )}
@@ -292,65 +349,154 @@ export default function CommentItemPaginated({
               <span>{comment.dislikesCount || 0}</span>
             </button>
 
-            {/* Reply Button */}
+            {/* Reply Button (답글 작성 버튼) */}
             {user && (
               <button
                 onClick={() => setIsReplying(!isReplying)}
-                className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                className={`flex items-center gap-1 text-xs transition-colors ${
+                  isReplying
+                    ? 'text-gray-900 dark:text-gray-100'
+                    : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                }`}
               >
                 <FiMessageCircle className="w-4 h-4" />
                 답글
               </button>
             )}
-
-            {/* Reply Count (부모 댓글에만 표시) */}
-            {level === 0 && totalReplies > 0 && (
-              <button
-                onClick={handleToggleReplies}
-                className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-              >
-                {showReplies ? <FiChevronUp className="w-4 h-4" /> : <FiChevronDown className="w-4 h-4" />}
-                답글 {totalReplies}개
-              </button>
-            )}
           </div>
 
-          {/* Reply Form */}
+          {/* Reply Form (답글 작성 폼) */}
           {isReplying && (
-            <div className="mt-4 mb-4">
+            <div className="mt-4 ml-12">
               <CommentForm
                 postId={postId}
-                parentCommentId={comment.id}
                 onSubmit={handleReply}
                 onCancel={() => setIsReplying(false)}
                 isLoading={createReplyMutation.isPending}
                 placeholder={level >= 1 ? `@${comment.author.username}에게 답글...` : "답글을 작성해주세요..."}
                 submitText="답글 작성"
                 maxLength={1000}
-                autoFocus={true}
               />
             </div>
           )}
 
-          {/* Replies (Lazy-loaded) */}
+          {/* Reply Count (부모 댓글에서만 표시) */}
+          {level === 0 && totalReplies > 0 && (
+            <div className="flex items-center gap-1 mt-6">
+              {/* 작성자가 답글을 단 경우 프로필 표시 - 답글 로드 여부와 무관 */}
+              {hasAuthorReply && !showReplies && (
+                <>
+                  <div className="w-6 h-6 rounded-full bg-gray-800 dark:bg-gray-200 flex items-center justify-center">
+                    <FiCheckCircle className="w-3.5 h-3.5 text-white dark:text-gray-900" />
+                  </div>
+                  <span className="text-gray-400 dark:text-gray-600">·</span>
+                </>
+              )}
+              <button
+                onClick={handleToggleReplies}
+                className="flex items-center gap-0.5 text-xs text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 font-semibold transition-colors relative comment-reply-button"
+              >
+                {showReplies ? '답글 숨기기' : `답글 ${totalReplies}개`}
+                <FiChevronRight className={`w-4 h-4 transition-transform ${showReplies ? 'rotate-90' : ''}`} />
+              </button>
+            </div>
+          )}
+
+          {/* Replies (부모 댓글에서만 표시, 플랫 구조) */}
           {level === 0 && showReplies && (
             <div className="mt-4 space-y-2">
-              {flatReplies.map((reply) => (
-                <CommentItemPaginated
-                  key={reply.id}
-                  comment={reply}
-                  postId={postId}
-                  postAuthorId={postAuthorId}
-                  level={level + 1}
-                />
-              ))}
+              {/* 모든 답글을 플랫하게 표시 */}
+              {flatReplies.map((reply) => {
+                // 답글의 답글인 경우 약간 더 들여쓰기
+                const isNestedReply = reply.parentCommentId !== comment.id;
+
+                return (
+                  <div
+                    key={reply.id}
+                    className={`${isNestedReply ? 'ml-16' : 'ml-8'} py-2`}
+                  >
+                    <div className="flex items-start gap-3">
+                      {/* Avatar */}
+                      <div className="flex-shrink-0">
+                        <Avatar
+                          src={reply.author.profileImage}
+                          alt={reply.author.username || '익명'}
+                          fallback={reply.author.username || '익명'}
+                          size="xs"
+                        />
+                      </div>
+
+                      {/* Content */}
+                      <div className="flex-1 min-w-0">
+                        {/* Author and metadata */}
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-medium text-xs text-gray-500 dark:text-gray-500">
+                            {reply.author.username || '익명'}
+                          </span>
+                          <span className="text-xs text-gray-400 dark:text-gray-600">
+                            {formatRelativeTime(reply.createdAt)}
+                          </span>
+                        </div>
+
+                        {/* Comment content */}
+                        <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+                          {reply.content}
+                        </p>
+
+                        {/* Actions */}
+                        <div className="flex items-center gap-3 mt-2">
+                          <button
+                            onClick={() => likeMutation.mutate(reply.id)}
+                            disabled={likeMutation.isPending}
+                            className={`flex items-center gap-1 text-xs transition-colors ${
+                              reply.userLiked
+                                ? 'text-blue-600 dark:text-blue-400'
+                                : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            <FiThumbsUp className={`w-4 h-4 ${reply.userLiked ? 'fill-current' : ''}`} />
+                            <span>{reply.likesCount || 0}</span>
+                          </button>
+
+                          <button
+                            onClick={() => dislikeMutation.mutate(reply.id)}
+                            disabled={dislikeMutation.isPending}
+                            className={`flex items-center gap-1 text-xs transition-colors ${
+                              reply.userDisliked
+                                ? 'text-red-600 dark:text-red-400'
+                                : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                            }`}
+                          >
+                            <FiThumbsDown className={`w-4 h-4 ${reply.userDisliked ? 'fill-current' : ''}`} />
+                            <span>{reply.dislikesCount || 0}</span>
+                          </button>
+
+                          {/* Reply button (답글의 답글도 가능) */}
+                          {user && (
+                            <button
+                              onClick={() => {
+                                setIsReplying(true);
+                                // 답글의 답글은 최상위 부모에 대한 답글로 처리
+                              }}
+                              className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+                            >
+                              <FiMessageCircle className="w-4 h-4" />
+                              답글
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
 
               {/* Load More Replies */}
               {hasNextPage && (
                 <button
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 ml-12"
+                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 ml-8"
                 >
                   {isFetchingNextPage ? <LoadingSpinner /> : '답글 더 보기'}
                 </button>
@@ -371,6 +517,18 @@ export default function CommentItemPaginated({
           isSubmitting={isSubmitting}
         />
       )}
+
+      {/* Delete Confirm Dialog */}
+      <DeleteConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleDeleteConfirm}
+        title="댓글을 삭제하시겠어요?"
+        description="이 댓글을 삭제하면 복원할 수 없습니다."
+        confirmText="삭제"
+        cancelText="취소"
+        isLoading={deleteMutation.isPending}
+      />
     </div>
   );
 }
