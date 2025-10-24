@@ -20,6 +20,9 @@ export class Comment {
   @Column({ type: 'int', default: 0 })
   dislikesCount: number;
 
+  @Column({ type: 'int', default: 0 })
+  repliesCount: number;
+
   @Column({ type: 'uuid', name: 'authorId' })
   authorId: string;
 

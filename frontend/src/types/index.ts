@@ -121,6 +121,7 @@ export interface Comment {
   replies?: Comment[];
   likesCount?: number;
   dislikesCount?: number;
+  repliesCount?: number;
   userLiked?: boolean;
   userDisliked?: boolean;
 }

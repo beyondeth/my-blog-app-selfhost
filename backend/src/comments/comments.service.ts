@@ -77,6 +77,11 @@ export class CommentsService {
     // 댓글 수 증가 - 답글도 포함
     await this.postsService.incrementCommentCount(postId);
 
+    // 답글인 경우 부모 댓글의 답글 수 증가
+    if (parentCommentId) {
+      await this.incrementRepliesCount(parentCommentId);
+    }
+
     // 페이지네이션 캐시 무효화
     await this.invalidateCommentsPaginationCache(postId, parentCommentId);
 
@@ -174,6 +179,11 @@ export class CommentsService {
 
     // 댓글 수 감소
     await this.postsService.decrementCommentCount(comment.post.id);
+
+    // 답글인 경우 부모 댓글의 답글 수 감소
+    if (comment.parentCommentId) {
+      await this.decrementRepliesCount(comment.parentCommentId);
+    }
 
     // 페이지네이션 캐시 무효화
     await this.invalidateCommentsPaginationCache(comment.post.id, comment.parentCommentId);
@@ -721,6 +731,24 @@ export class CommentsService {
     }
 
     return response;
+  }
+
+  /**
+   * 부모 댓글의 답글 수 증가
+   *
+   * @param commentId - 부모 댓글 ID
+   */
+  async incrementRepliesCount(commentId: string): Promise<void> {
+    await this.commentsRepository.increment({ id: commentId }, 'repliesCount', 1);
+  }
+
+  /**
+   * 부모 댓글의 답글 수 감소
+   *
+   * @param commentId - 부모 댓글 ID
+   */
+  async decrementRepliesCount(commentId: string): Promise<void> {
+    await this.commentsRepository.decrement({ id: commentId }, 'repliesCount', 1);
   }
 
   /**

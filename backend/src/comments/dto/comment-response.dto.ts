@@ -36,6 +36,9 @@ export class CommentResponseDto {
   dislikesCount: number;
 
   @Expose()
+  repliesCount: number;
+
+  @Expose()
   createdAt: Date;
 
   @Expose()

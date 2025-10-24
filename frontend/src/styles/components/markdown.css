@@ -68,7 +68,7 @@
   margin-top: var(--space-md);
   margin-bottom: var(--space-md);
   line-height: var(--leading-relaxed);
-  color: rgb(var(--color-gray-700));
+  color: rgb(var(--foreground)); /* 거의 검정색으로 변경하여 가독성 향상 */
   font-size: 1.0625rem; /* 17px */
 }
 
@@ -229,7 +229,7 @@
   margin-top: var(--space-xs);
   margin-bottom: var(--space-xs);
   line-height: var(--leading-relaxed);
-  color: rgb(var(--color-gray-700));
+  color: rgb(var(--foreground)); /* 본문과 동일하게 진한 색상으로 변경 */
 }
 
 .prose ul ul,
@@ -330,7 +330,7 @@
 
 .prose td {
   padding: var(--space-sm) var(--space-md);
-  color: rgb(var(--color-gray-700));
+  color: rgb(var(--foreground)); /* 본문과 동일하게 진한 색상으로 변경 */
   border-bottom: 1px solid rgb(var(--color-gray-100));
 }
 
