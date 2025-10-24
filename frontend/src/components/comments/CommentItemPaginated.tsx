@@ -22,6 +22,227 @@ import ReportModal from '@/components/reports/ReportModal';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { apiClient } from '@/lib/api';
 
+// 답글 아이템 컴포넌트
+interface ReplyItemProps {
+  reply: Comment;
+  user: any;
+  postId: string;
+  likeMutation: any;
+  dislikeMutation: any;
+  deleteMutation: any;
+  createReplyMutation: any;
+  refetchReplies: () => void;
+  openReportModal: () => void;
+  parentCommentId: string;
+  replyingToId: string | null;
+  setReplyingToId: (id: string | null) => void;
+}
+
+function ReplyItem({
+  reply,
+  user,
+  postId,
+  likeMutation,
+  dislikeMutation,
+  deleteMutation,
+  createReplyMutation,
+  refetchReplies,
+  openReportModal,
+  parentCommentId,
+  replyingToId,
+  setReplyingToId,
+}: ReplyItemProps) {
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const isAuthor = user?.id === reply.author.id;
+
+  return (
+    <div className="ml-8 py-2">
+      <div className="flex items-start gap-3">
+        {/* Avatar */}
+        <div className="flex-shrink-0">
+          <Avatar
+            src={reply.author.profileImage}
+            alt={reply.author.username || '익명'}
+            fallback={reply.author.username || '익명'}
+            size="xs"
+          />
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 min-w-0">
+          {/* Author and metadata */}
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-xs text-gray-500 dark:text-gray-500">
+                {reply.author.username || '익명'}
+              </span>
+              <span className="text-xs text-gray-400 dark:text-gray-600">
+                {formatRelativeTime(reply.createdAt)}
+              </span>
+            </div>
+
+            {/* Dropdown menu */}
+            <div className="relative">
+              <button
+                onClick={() => setShowDropdown(!showDropdown)}
+                className="p-1 text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
+              >
+                <FiMoreVertical className="w-4 h-4" />
+              </button>
+
+              {showDropdown && (
+                <div className="absolute right-0 mt-1 w-40 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 py-1 z-10">
+                  {isAuthor && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setIsEditing(true);
+                          setShowDropdown(false);
+                        }}
+                        className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                      >
+                        <FiEdit3 className="w-4 h-4 mr-2" />
+                        수정
+                      </button>
+                      <button
+                        onClick={async () => {
+                          if (confirm('답글을 삭제하시겠습니까?')) {
+                            await deleteMutation.mutateAsync(reply.id);
+                            refetchReplies();
+                          }
+                          setShowDropdown(false);
+                        }}
+                        className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                      >
+                        <FiTrash2 className="w-4 h-4 mr-2" />
+                        삭제
+                      </button>
+                    </>
+                  )}
+                  {!isAuthor && (
+                    <button
+                      onClick={() => {
+                        openReportModal();
+                        setShowDropdown(false);
+                      }}
+                      className="flex items-center w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                    >
+                      <FiFlag className="w-4 h-4 mr-2" />
+                      신고
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Content or Edit form */}
+          {isEditing ? (
+            <CommentForm
+              postId={postId}
+              initialValue={reply.content}
+              onSubmit={async (content) => {
+                try {
+                  await apiClient.updateComment(reply.id, content);
+                  setIsEditing(false);
+                  refetchReplies();
+                } catch (error) {
+                  console.error('답글 수정 실패:', error);
+                }
+              }}
+              onCancel={() => setIsEditing(false)}
+              isLoading={false}
+              placeholder="답글을 수정하세요..."
+              submitText="수정"
+              maxLength={1000}
+            />
+          ) : (
+            <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+              {reply.content}
+            </p>
+          )}
+
+          {/* Actions */}
+          <div className="flex items-center gap-3 mt-2">
+            <button
+              onClick={() => likeMutation.mutate(reply.id)}
+              disabled={likeMutation.isPending}
+              className={`flex items-center gap-1 text-xs transition-colors ${
+                reply.userLiked
+                  ? 'text-blue-600 dark:text-blue-400'
+                  : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+              }`}
+            >
+              <FiThumbsUp className={`w-4 h-4 ${reply.userLiked ? 'fill-current' : ''}`} />
+              <span>{reply.likesCount || 0}</span>
+            </button>
+
+            <button
+              onClick={() => dislikeMutation.mutate(reply.id)}
+              disabled={dislikeMutation.isPending}
+              className={`flex items-center gap-1 text-xs transition-colors ${
+                reply.userDisliked
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+              }`}
+            >
+              <FiThumbsDown className={`w-4 h-4 ${reply.userDisliked ? 'fill-current' : ''}`} />
+              <span>{reply.dislikesCount || 0}</span>
+            </button>
+
+            {/* Reply button */}
+            {user && (
+              <button
+                onClick={() => setReplyingToId(replyingToId === reply.id ? null : reply.id)}
+                className={`flex items-center gap-1 text-xs transition-colors ${
+                  replyingToId === reply.id
+                    ? 'text-gray-900 dark:text-gray-100'
+                    : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
+                }`}
+              >
+                <FiMessageCircle className="w-4 h-4" />
+                답글
+              </button>
+            )}
+          </div>
+
+          {/* Reply form */}
+          {replyingToId === reply.id && (
+            <div className="mt-3">
+              <CommentForm
+                postId={postId}
+                onSubmit={async (content) => {
+                  // @멘션 자동 추가
+                  const finalContent = `@${reply.author.username} ${content}`;
+                  try {
+                    await createReplyMutation.mutateAsync({
+                      content: finalContent,
+                      postId: postId,
+                      parentCommentId: reply.id, // 실제 부모는 답글
+                    });
+                    setReplyingToId(null);
+                    // 답글 목록 새로고침
+                    await refetchReplies();
+                  } catch (error) {
+                    console.error('답글 작성 실패:', error);
+                  }
+                }}
+                onCancel={() => setReplyingToId(null)}
+                isLoading={createReplyMutation.isPending}
+                placeholder={`@${reply.author.username}에게 답글...`}
+                submitText="답글 작성"
+                maxLength={1000}
+                autoFocus={true}
+              />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface CommentItemPaginatedProps {
   comment: Comment;
   postId: string;
@@ -62,6 +283,8 @@ export default function CommentItemPaginated({
   const [isReplying, setIsReplying] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  // 각 답글에 대한 답글 폼 상태 관리
+  const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
 
   // 답글 페이지네이션 (lazy-load) - level 0만 직접 로드
@@ -376,6 +599,7 @@ export default function CommentItemPaginated({
                 placeholder={level >= 1 ? `@${comment.author.username}에게 답글...` : "답글을 작성해주세요..."}
                 submitText="답글 작성"
                 maxLength={1000}
+                autoFocus={true}
               />
             </div>
           )}
@@ -405,91 +629,28 @@ export default function CommentItemPaginated({
           {/* Replies (부모 댓글에서만 표시, 플랫 구조) */}
           {level === 0 && showReplies && (
             <div className="mt-4 space-y-2">
-              {/* 모든 답글을 플랫하게 표시 */}
-              {flatReplies.map((reply) => {
-                // 답글의 답글인 경우 약간 더 들여쓰기
-                const isNestedReply = reply.parentCommentId !== comment.id;
-
-                return (
-                  <div
-                    key={reply.id}
-                    className={`${isNestedReply ? 'ml-16' : 'ml-8'} py-2`}
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Avatar */}
-                      <div className="flex-shrink-0">
-                        <Avatar
-                          src={reply.author.profileImage}
-                          alt={reply.author.username || '익명'}
-                          fallback={reply.author.username || '익명'}
-                          size="xs"
-                        />
-                      </div>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        {/* Author and metadata */}
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-medium text-xs text-gray-500 dark:text-gray-500">
-                            {reply.author.username || '익명'}
-                          </span>
-                          <span className="text-xs text-gray-400 dark:text-gray-600">
-                            {formatRelativeTime(reply.createdAt)}
-                          </span>
-                        </div>
-
-                        {/* Comment content */}
-                        <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
-                          {reply.content}
-                        </p>
-
-                        {/* Actions */}
-                        <div className="flex items-center gap-3 mt-2">
-                          <button
-                            onClick={() => likeMutation.mutate(reply.id)}
-                            disabled={likeMutation.isPending}
-                            className={`flex items-center gap-1 text-xs transition-colors ${
-                              reply.userLiked
-                                ? 'text-blue-600 dark:text-blue-400'
-                                : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
-                            }`}
-                          >
-                            <FiThumbsUp className={`w-4 h-4 ${reply.userLiked ? 'fill-current' : ''}`} />
-                            <span>{reply.likesCount || 0}</span>
-                          </button>
-
-                          <button
-                            onClick={() => dislikeMutation.mutate(reply.id)}
-                            disabled={dislikeMutation.isPending}
-                            className={`flex items-center gap-1 text-xs transition-colors ${
-                              reply.userDisliked
-                                ? 'text-red-600 dark:text-red-400'
-                                : 'text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100'
-                            }`}
-                          >
-                            <FiThumbsDown className={`w-4 h-4 ${reply.userDisliked ? 'fill-current' : ''}`} />
-                            <span>{reply.dislikesCount || 0}</span>
-                          </button>
-
-                          {/* Reply button (답글의 답글도 가능) */}
-                          {user && (
-                            <button
-                              onClick={() => {
-                                setIsReplying(true);
-                                // 답글의 답글은 최상위 부모에 대한 답글로 처리
-                              }}
-                              className="flex items-center gap-1 text-xs text-gray-500 dark:text-gray-500 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-                            >
-                              <FiMessageCircle className="w-4 h-4" />
-                              답글
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+              {/* 모든 답글을 플랫하게 표시 (동일한 레벨) */}
+              {flatReplies.map((reply) => (
+                <ReplyItem
+                  key={reply.id}
+                  reply={reply}
+                  user={user}
+                  postId={postId}
+                  likeMutation={likeMutation}
+                  dislikeMutation={dislikeMutation}
+                  deleteMutation={deleteMutation}
+                  createReplyMutation={createReplyMutation}
+                  refetchReplies={refetchReplies}
+                  openReportModal={() => openReportModal(
+                    'comment',
+                    reply.id,
+                    reply.author.username || '익명'
+                  )}
+                  parentCommentId={comment.id}
+                  replyingToId={replyingToId}
+                  setReplyingToId={setReplyingToId}
+                />
+              ))}
 
               {/* Load More Replies */}
               {hasNextPage && (

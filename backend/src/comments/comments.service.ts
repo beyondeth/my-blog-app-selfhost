@@ -65,11 +65,24 @@ export class CommentsService {
       throw new ForbiddenException('이 블로그는 댓글을 허용하지 않습니다.');
     }
 
+    // YouTube 스타일 2단계 강제: 답글의 답글은 최상위 부모에게 달림
+    let actualParentCommentId = parentCommentId;
+    if (parentCommentId) {
+      const parentComment = await this.findOne(parentCommentId);
+      if (parentComment && parentComment.parentCommentId) {
+        // 부모의 부모가 있으면 최상위 부모로 변경
+        actualParentCommentId = parentComment.parentCommentId;
+        this.logger.debug(
+          `답글의 답글 감지: ${parentCommentId} → ${actualParentCommentId}로 변경`
+        );
+      }
+    }
+
     const comment = this.commentsRepository.create({
       ...commentData,
       author: user,
       post: { id: postId },
-      parentComment: parentCommentId ? { id: parentCommentId } : null,
+      parentComment: actualParentCommentId ? { id: actualParentCommentId } : null,
     });
 
     const savedComment = await this.commentsRepository.save(comment) as unknown as Comment;
@@ -78,12 +91,12 @@ export class CommentsService {
     await this.postsService.incrementCommentCount(postId);
 
     // 답글인 경우 부모 댓글의 답글 수 증가
-    if (parentCommentId) {
-      await this.incrementRepliesCount(parentCommentId);
+    if (actualParentCommentId) {
+      await this.incrementRepliesCount(actualParentCommentId);
     }
 
     // 페이지네이션 캐시 무효화
-    await this.invalidateCommentsPaginationCache(postId, parentCommentId);
+    await this.invalidateCommentsPaginationCache(postId, actualParentCommentId);
 
     return savedComment;
   }
@@ -651,11 +664,11 @@ export class CommentsService {
 
         UNION ALL
 
-        -- 재귀적으로 모든 하위 댓글 (최대 depth 2까지만)
+        -- 재귀적으로 모든 하위 댓글 (기존 데이터 호환성 위해 충분한 depth)
         SELECT c.*, ct.depth + 1
         FROM comments c
         INNER JOIN comment_tree ct ON c."parentCommentId" = ct.id
-        WHERE c."isDeleted" = false AND ct.depth < 2
+        WHERE c."isDeleted" = false AND ct.depth < 10
       )
       SELECT
         ct.*,

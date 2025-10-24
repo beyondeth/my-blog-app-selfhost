@@ -269,9 +269,13 @@ export function useToggleCommentLikePaginated(postId: string) {
   return useMutation({
     mutationFn: (commentId: string) => apiClient.toggleCommentLike(commentId),
     onSuccess: () => {
-      // 인기순 정렬 캐시만 무효화
+      // 부모 댓글 캐시 무효화 (인기순)
       queryClient.invalidateQueries({
         queryKey: ['comments', 'paginated', postId, 'popular'],
+      });
+      // 모든 답글 캐시도 무효화 (좋아요 상태 업데이트)
+      queryClient.invalidateQueries({
+        queryKey: ['comments', 'replies'],
       });
     },
   });
@@ -289,9 +293,13 @@ export function useToggleCommentDislikePaginated(postId: string) {
   return useMutation({
     mutationFn: (commentId: string) => apiClient.toggleCommentDislike(commentId),
     onSuccess: () => {
-      // 인기순 정렬 캐시만 무효화
+      // 인기순 정렬 캐시 무효화
       queryClient.invalidateQueries({
         queryKey: ['comments', 'paginated', postId, 'popular'],
+      });
+      // 모든 답글 캐시도 무효화 (싫어요 상태 업데이트)
+      queryClient.invalidateQueries({
+        queryKey: ['comments', 'replies'],
       });
     },
   });
