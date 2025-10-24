@@ -10,7 +10,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';
 import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
-import CommentSection from '@/components/comments/CommentSection';
+import CommentSectionPaginated from '@/components/comments/CommentSectionPaginated';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useState, useCallback, useEffect, useRef } from 'react';
@@ -58,7 +58,7 @@ function CommentSectionLazy({ postId, postAuthorId, totalCommentCount }: { postI
   return (
     <div ref={commentRef} data-comment-section>
       {isVisible ? (
-        <CommentSection postId={postId} postAuthorId={postAuthorId} totalCommentCount={totalCommentCount} />
+        <CommentSectionPaginated postId={postId} postAuthorId={postAuthorId} totalCommentCount={totalCommentCount} />
       ) : (
         <div className="h-40 flex items-center justify-center text-gray-400">
           {/* Placeholder skeleton */}
