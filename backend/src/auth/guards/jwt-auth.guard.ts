@@ -27,6 +27,11 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
   handleRequest(err, user, info, context: ExecutionContext) {
     const request = context.switchToHttp().getRequest();
 
+    // 🔍 디버그: JWT에서 추출한 user 정보 확인
+    if (user) {
+      console.log(`[JwtAuthGuard] JWT decoded - email: ${user.email}, role: "${user.role}" (type: ${typeof user.role})`);
+    }
+
     if (err || !user) {
       // 중요한 OAuth 요청인 경우만 로그
       if (request.url?.includes('oauth')) {

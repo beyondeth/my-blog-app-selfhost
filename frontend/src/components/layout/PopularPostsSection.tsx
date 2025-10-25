@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
-import { FiTrendingUp, FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
+import { FiBarChart2, FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 import { usePopularPosts } from '@/hooks/usePopularPosts';
 import OptimizedImage from '@/components/ui/OptimizedImage';
@@ -18,7 +18,7 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
       title={
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-2">
-            <FiTrendingUp className="w-4 h-4 text-blue-500" />
+            <FiBarChart2 className="w-4 h-4 text-gray-700 dark:text-gray-300" />
             <span>인기 포스트</span>
           </div>
           <div className="flex gap-1">

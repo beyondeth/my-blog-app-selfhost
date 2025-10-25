@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
 
-export type OAuthProvider = 'google' | 'kakao' | 'github';
+export type OAuthProvider = 'google'  | 'github';
 
 interface SocialLoginButtonProps {
   provider: OAuthProvider;
@@ -23,14 +23,14 @@ const providerConfig = {
       </svg>
     ),
   },
-  kakao: {
-    name: 'Kakao',
-    icon: (
-      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-        <path d="M12 3C6.48 3 2 6.32 2 10.5c0 2.66 1.82 5 4.57 6.32l-.72 2.68c-.07.26.18.5.44.37l3.13-1.57c.52.07 1.05.1 1.58.1 5.52 0 10-3.32 10-7.4S17.52 3 12 3z" fill="#FEE500"/>
-      </svg>
-    ),
-  },
+  // kakao: {
+  //   name: 'Kakao',
+  //   icon: (
+  //     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
+  //       <path d="M12 3C6.48 3 2 6.32 2 10.5c0 2.66 1.82 5 4.57 6.32l-.72 2.68c-.07.26.18.5.44.37l3.13-1.57c.52.07 1.05.1 1.58.1 5.52 0 10-3.32 10-7.4S17.52 3 12 3z" fill="#FEE500"/>
+  //     </svg>
+  //   ),
+  // },
   github: {
     name: 'GitHub',
     icon: (
@@ -75,8 +75,8 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
       onClick={handleLogin}
       disabled={isLoading || disabled}
       className={`
-        w-full flex items-center justify-center px-3 py-2.5
-        rounded-lg text-sm font-medium transition-all
+        flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3
+        rounded-lg text-xs sm:text-sm font-medium transition-all
         bg-white dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700/50
         border border-gray-200 dark:border-gray-700
         text-gray-700 dark:text-gray-200
@@ -86,12 +86,12 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
       title={`Login with ${config.name}`}
     >
       {isLoading ? (
-        <div className="w-5 h-5 border-2 border-gray-400 dark:border-gray-500 border-t-transparent rounded-full animate-spin" />
+        <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-gray-400 dark:border-gray-500 border-t-transparent rounded-full animate-spin" />
       ) : (
-        <div className="flex items-center justify-center gap-2">
-          <div className="flex-shrink-0">{config.icon}</div>
-          <span className="font-medium hidden sm:inline">
-            {config.name}
+        <div className="flex items-center justify-center gap-1.5 sm:gap-2 whitespace-nowrap">
+          <div className="flex-shrink-0 w-4 h-4 sm:w-5 sm:h-5">{config.icon}</div>
+          <span className="font-medium">
+            Login with {config.name}
           </span>
         </div>
       )}

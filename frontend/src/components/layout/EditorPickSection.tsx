@@ -2,8 +2,7 @@
 
 import React from 'react';
 import Link from 'next/link';
-import { FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
-import { FaStar } from 'react-icons/fa';
+import { FiEye, FiHeart, FiMessageCircle, FiTarget } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 import { useEditorPicks } from '@/hooks/useEditorPicks';
 import OptimizedImage from '@/components/ui/OptimizedImage';
@@ -22,8 +21,8 @@ const EditorPickSection = React.memo(function EditorPickSection() {
     <SidebarSection
       title={
         <div className="flex items-center gap-2">
-          <FaStar className="w-4 h-4 text-amber-500" />
-          <span>Editor's Pick</span>
+          <FiTarget className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+          <span>Pick</span>
         </div>
       }
     >

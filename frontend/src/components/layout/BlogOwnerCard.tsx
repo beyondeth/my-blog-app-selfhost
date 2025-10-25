@@ -3,6 +3,7 @@
 import React from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
+import { FiUsers } from 'react-icons/fi';
 import UserAvatar from '@/components/ui/UserAvatar';
 import FollowButton from '@/components/FollowButton';
 import { DMButton } from '@/components/dm/DMButton';
@@ -92,12 +93,13 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
 
         {/* Followers Count */}
         {followInfo && (
-          <p className="text-gray-500 dark:text-gray-400">
-            <span className="text-gray-700 dark:text-gray-300">
+          <div className="flex items-center gap-1.5 text-sm">
+            <FiUsers className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+            <span className="font-medium text-gray-900 dark:text-gray-100">
               {formatFollowerCount(followInfo.followersCount)}
             </span>
-            {' followers'}
-          </p>
+            <span className="text-gray-500 dark:text-gray-400">팔로워</span>
+          </div>
         )}
 
         {/* Bio/Description */}

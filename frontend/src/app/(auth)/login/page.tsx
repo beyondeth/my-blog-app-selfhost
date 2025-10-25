@@ -4,17 +4,19 @@ import { useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { AlertCircle, Eye, EyeOff, Sparkles } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
+import Image from 'next/image';
+import { useTheme } from 'next-themes';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, refreshUser } = useAuth();
+  const { resolvedTheme } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [authMethodHint, setAuthMethodHint] = useState<any>(null);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const MAX_LOGIN_ATTEMPTS = 5;
 
@@ -27,47 +29,6 @@ export default function LoginPage() {
     email: '',
     password: ''
   });
-
-  // Check auth method when email loses focus
-  const handleEmailBlur = async () => {
-    if (!formData.email || !validateEmail(formData.email)) {
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-auth-method`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email: formData.email })
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.exists) {
-          setAuthMethodHint({
-            exists: true,
-            authMethod: data.authMethod,  // 'password' | 'oauth' | 'both'
-            message: data.message
-          });
-
-          // OAuth만 사용 가능한 경우 알림 표시
-          if (data.authMethod === 'oauth') {
-            toast.info(data.message);
-          }
-        } else {
-          setAuthMethodHint({
-            exists: false,
-            message: '계정이 없습니다. 회원가입을 진행해주세요.'
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Failed to check auth method:', error);
-    }
-  };
 
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -122,7 +83,10 @@ export default function LoginPage() {
 
       // 로그인 요청 - returnUrl을 보내지 않음 (프론트엔드에서만 처리)
       await login(formData);
-      toast.success('로그인 성공!');
+
+      // 로그인 직후 user 정보 새로고침하여 약관 동의 필드 최신화
+      // ConsentGuard 타이밍 이슈 방지 (회원가입과 동일한 처리)
+      await refreshUser();
 
       // OAuth 콜백 URL인 경우 직접 리다이렉트 (localhost:7777/callback)
       if (returnUrl && returnUrl.includes('localhost:7777/callback')) {
@@ -138,19 +102,21 @@ export default function LoginPage() {
       console.error('Login failed:', error);
 
       // Increment failed login attempts
-      setLoginAttempts(prev => prev + 1);
+      const newAttempts = loginAttempts + 1;
+      setLoginAttempts(newAttempts);
 
       // Clear password on failed login
       setFormData(prev => ({ ...prev, password: '' }));
 
-      const errorMessage = error.message || '로그인에 실패했습니다';
-      toast.error(errorMessage);
+      const errorMessage = error.message || '이메일 또는 비밀번호가 일치하지 않습니다';
 
-      if (errorMessage.includes('비밀번호')) {
-        setValidationErrors(prev => ({ ...prev, password: errorMessage }));
-      } else {
-        setValidationErrors(prev => ({ ...prev, email: errorMessage }));
-      }
+      // 시도 횟수 표시 메시지
+      const displayMessage = newAttempts < MAX_LOGIN_ATTEMPTS
+        ? `${errorMessage} (${newAttempts}/${MAX_LOGIN_ATTEMPTS} 시도)`
+        : errorMessage;
+
+      toast.error(displayMessage);
+      setValidationErrors(prev => ({ ...prev, password: displayMessage }));
     } finally {
       setIsSubmitting(false);
     }
@@ -166,29 +132,45 @@ export default function LoginPage() {
       <div className="blur-orb blur-orb-1 opacity-20 dark:opacity-10" />
       <div className="blur-orb blur-orb-2 opacity-20 dark:opacity-10" />
 
-      <div className="relative flex items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8">
-        <div className="w-full max-w-md">
+      <div className="relative flex items-center justify-center min-h-screen px-2 sm:px-4 lg:px-8 py-4 sm:py-0">
+        <div className="w-full max-w-3xl">
+          {/* 뒤로가기 버튼 */}
+          <button
+            onClick={() => router.back()}
+            className="mb-2 sm:mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
           {/* 통합된 로그인 카드 - Resend 스타일 */}
-          <div className="auth-card rounded-2xl p-8 fade-in-up">
+          <div className="auth-card rounded-2xl px-1 py-4 sm:py-8 fade-in-up">
             {/* 로고와 타이틀 - 카드 내부로 이동 */}
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 mb-4 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
-                <Sparkles className="h-7 w-7" />
+            <div className="text-center mb-4 sm:mb-8 w-full">
+              <div className="inline-flex items-center justify-center mb-2 sm:mb-4">
+                <Image
+                  src="/assets/logo.svg"
+                  alt="Logo"
+                  width={48}
+                  height={48}
+                  priority
+                  className="object-contain sm:w-16 sm:h-16"
+                />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 다시 만나서 반가워요
               </h1>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 계정으로 <span className="font-medium">로그인</span>하세요
               </p>
             </div>
 
             {/* 에러 메시지들 */}
             {loginAttempts >= MAX_LOGIN_ATTEMPTS && (
-              <div className="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 shake">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-red-600 dark:text-red-400 mt-0.5" />
-                  <div className="text-sm text-red-800 dark:text-red-300">
+              <div className="mb-3 sm:mb-6 p-3 sm:p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 shake w-full">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-600 dark:text-red-400 mt-0.5" />
+                  <div className="text-xs sm:text-sm text-red-800 dark:text-red-300">
                     로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.
                   </div>
                 </div>
@@ -196,10 +178,10 @@ export default function LoginPage() {
             )}
 
             {loginAttempts > 2 && loginAttempts < MAX_LOGIN_ATTEMPTS && (
-              <div className="mb-6 p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  <div className="text-sm text-amber-800 dark:text-amber-300">
+              <div className="mb-3 sm:mb-6 p-3 sm:p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 w-full">
+                <div className="flex items-start gap-2 sm:gap-3">
+                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
+                  <div className="text-xs sm:text-sm text-amber-800 dark:text-amber-300">
                     {MAX_LOGIN_ATTEMPTS - loginAttempts}회 시도 가능합니다.
                   </div>
                 </div>
@@ -207,21 +189,21 @@ export default function LoginPage() {
             )}
 
             {/* 섹션 1: OAuth 로그인 */}
-            <div className="mb-6">
+            <div className="mb-3 sm:mb-6 w-full">
               <SocialLoginGroup
-                providers={['google', /* 'kakao', */ 'github']}
+                providers={['google', 'github']}
                 disabled={isSubmitting || loginAttempts >= MAX_LOGIN_ATTEMPTS}
               />
             </div>
 
             {/* 섹션 구분선 - 중요한 시각적 구분 역할 */}
-            <div className="auth-divider mb-6">또는</div>
+            <div className="auth-divider mb-3 sm:mb-6 w-full text-xs sm:text-sm">또는</div>
 
             {/* 섹션 2: 이메일/비밀번호 로그인 */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-5 w-full">
               {/* 이메일 필드 */}
-              <div className="space-y-2">
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="space-y-1 sm:space-y-2">
+                <label htmlFor="email" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                   이메일
                 </label>
                 <input
@@ -230,34 +212,28 @@ export default function LoginPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  onBlur={handleEmailBlur}
                   placeholder="example@email.com"
-                  className={`w-full px-4 py-3 rounded-lg auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+                  className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                     validationErrors.email ? 'border-red-500 dark:border-red-400' : ''
                   } ${validationErrors.email ? 'shake' : ''}`}
                   disabled={isSubmitting}
                 />
-                {authMethodHint && !validationErrors.email && (
-                  <p className="text-sm text-blue-600 dark:text-blue-400">
-                    💡 {authMethodHint.message}
-                  </p>
-                )}
                 {validationErrors.email && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">
                     {validationErrors.email}
                   </p>
                 )}
               </div>
 
               {/* 비밀번호 필드 */}
-              <div className="space-y-2">
+              <div className="space-y-1 sm:space-y-2">
                 <div className="flex items-center justify-between">
-                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                  <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                     비밀번호
                   </label>
                   <Link
                     href="/forgot-password"
-                    className="text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
+                    className="text-xs sm:text-sm text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
                   >
                     비밀번호를 잊으셨나요?
                   </Link>
@@ -270,7 +246,7 @@ export default function LoginPage() {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    className={`w-full px-4 py-3 pr-12 rounded-lg auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+                    className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                       validationErrors.password ? 'border-red-500 dark:border-red-400' : ''
                     } ${validationErrors.password ? 'shake' : ''}`}
                     disabled={isSubmitting}
@@ -286,14 +262,14 @@ export default function LoginPage() {
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
                     {showPassword ? (
-                      <EyeOff className="h-5 w-5" />
+                      <EyeOff className="h-4 w-4 sm:h-5 sm:w-5" />
                     ) : (
-                      <Eye className="h-5 w-5" />
+                      <Eye className="h-4 w-4 sm:h-5 sm:w-5" />
                     )}
                   </button>
                 </div>
                 {validationErrors.password && (
-                  <p className="text-sm text-red-600 dark:text-red-400">
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">
                     {validationErrors.password}
                   </p>
                 )}
@@ -303,7 +279,7 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={isSubmitting || !formData.email || !formData.password || loginAttempts >= MAX_LOGIN_ATTEMPTS}
-                className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                className={`w-full py-2.5 sm:py-3 px-4 sm:px-6 rounded-lg font-medium text-sm sm:text-base transition-all ${
                   formData.email && formData.password && !isSubmitting && loginAttempts < MAX_LOGIN_ATTEMPTS
                     ? 'auth-button-primary'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
@@ -311,7 +287,7 @@ export default function LoginPage() {
               >
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
+                    <span className="animate-spin h-3.5 w-3.5 sm:h-4 sm:w-4 border-2 border-white border-t-transparent rounded-full" />
                     로그인 중...
                   </span>
                 ) : (
@@ -321,8 +297,8 @@ export default function LoginPage() {
             </form>
 
             {/* Footer - Terms와 Sign up 링크 */}
-            <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-3">
+            <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 w-full">
+              <p className="text-center text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">
                 로그인함으로써{' '}
                 <Link href="/legal/terms" className="text-gray-700 dark:text-gray-300 underline">
                   이용약관
@@ -333,7 +309,7 @@ export default function LoginPage() {
                 </Link>
                 에 동의하게 됩니다.
               </p>
-              <p className="text-center text-sm text-gray-600 dark:text-gray-400">
+              <p className="text-center text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 계정이 없으신가요?{' '}
                 <Link
                   href="/register"

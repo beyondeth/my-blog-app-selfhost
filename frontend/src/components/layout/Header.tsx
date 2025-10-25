@@ -118,10 +118,10 @@ export default function Header() {
               onClick={handleHomeNavigation}
               className="hover:opacity-80 transition-opacity cursor-pointer flex items-center space-x-2"
             >
-              {/* Logo Image - 테마에 따라 다른 로고 표시 */}
+              {/* Logo Image - 벡터 로고 */}
               <div className="flex items-center justify-center min-w-[48px] min-h-[48px]">
                 <Image
-                  src={mounted && resolvedTheme === 'dark' ? '/assets/block-logo(dark)-128.png' : '/assets/logo.png'}
+                  src="/assets/logo.svg"
                   alt="Codebase Blog Logo"
                   width={48}
                   height={48}

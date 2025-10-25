@@ -5,15 +5,18 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { EmailVerification } from '@/components/auth/EmailVerification';
-import { Eye, EyeOff, Lock, User, Sparkles, Check, X } from 'lucide-react';
+import { Eye, EyeOff, Lock, User, Check, X, ArrowLeft } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import { validatePasswordStrength, getPasswordStrengthColor, getPasswordStrengthWidth } from '@/lib/password-utils';
+import Image from 'next/image';
+import { useTheme } from 'next-themes';
 
 export default function RegisterPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { register, isLoading, clearError } = useAuth();
+  const { register, isLoading, clearError, refreshUser } = useAuth();
+  const { resolvedTheme } = useTheme();
   const usernameRef = useRef<HTMLInputElement>(null);
   const emailRef = useRef<HTMLInputElement>(null);
   const passwordRef = useRef<HTMLInputElement>(null);
@@ -235,6 +238,10 @@ export default function RegisterPage() {
         newsletterOptIn: consents.newsletterOptIn
       });
 
+      // 회원가입 직후 user 정보 새로고침하여 약관 동의 필드 최신화
+      // ConsentGuard 타이밍 이슈 방지
+      await refreshUser();
+
       router.push('/');
     } catch (error: any) {
       // 에러 메시지에 따라 적절한 필드에 에러 표시
@@ -278,13 +285,29 @@ export default function RegisterPage() {
       <div className="blur-orb blur-orb-2 opacity-20 dark:opacity-10" />
 
       <div className="relative flex items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 py-12">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-2xl">
+          {/* 뒤로가기 버튼 */}
+          <button
+            onClick={() => router.back()}
+            className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
           {/* 통합된 회원가입 카드 - Resend 스타일 */}
-          <div className="auth-card rounded-2xl p-8 fade-in-up">
+          <div className="auth-card rounded-2xl px-1 py-4 sm:py-8 fade-in-up flex flex-col items-center">
             {/* 로고와 타이틀 - 카드 내부로 이동 */}
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 mb-4 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
-                <Sparkles className="h-7 w-7" />
+            <div className="text-center mb-8 w-full">
+              <div className="inline-flex items-center justify-center mb-4">
+                <Image
+                  src="/assets/logo.svg"
+                  alt="Logo"
+                  width={64}
+                  height={64}
+                  priority
+                  className="object-contain"
+                />
               </div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 계정 만들기
@@ -301,18 +324,18 @@ export default function RegisterPage() {
             </div>
 
             {/* 섹션 1: OAuth 회원가입 */}
-            <div className="mb-6">
+            <div className="mb-6 w-full">
               <SocialLoginGroup
-                providers={['google', /* 'kakao', */ 'github']}
+                providers={['google', 'github']}
                 disabled={isSubmitting}
               />
             </div>
 
             {/* 섹션 구분선 */}
-            <div className="auth-divider mb-6">또는</div>
+            <div className="auth-divider mb-6 w-full">또는</div>
 
             {/* 섹션 2: 이메일 회원가입 폼 */}
-            <form onSubmit={handleSubmit} className="space-y-5">
+            <form onSubmit={handleSubmit} className="space-y-5 w-full">
               {error && (
                 <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shake">
                   {error}
@@ -320,12 +343,12 @@ export default function RegisterPage() {
               )}
 
               {/* 닉네임 필드 */}
-              <div className="space-y-2">
-                <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="space-y-1 sm:space-y-2">
+                <label htmlFor="username" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                   닉네임
                 </label>
                 <div className="relative">
-                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+                  <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 sm:w-5 sm:h-5" />
                   <input
                     ref={usernameRef}
                     type="text"
@@ -333,18 +356,18 @@ export default function RegisterPage() {
                     name="username"
                     value={formData.username}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-4 py-3 rounded-lg auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+                    className={`w-full pl-9 sm:pl-10 pr-4 sm:pr-4 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                       fieldErrors.username ? 'border-red-500 dark:border-red-400' : ''
                     } ${shakeField === 'username' ? 'shake' : ''}`}
                     placeholder="실명이 아닌 별명을 사용하세요"
                     required
                   />
                 </div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
+                <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
                   프로필에서 변경 가능합니다
                 </p>
                 {fieldErrors.username && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{fieldErrors.username}</p>
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{fieldErrors.username}</p>
                 )}
               </div>
 
@@ -364,12 +387,12 @@ export default function RegisterPage() {
               </div>
 
               {/* 비밀번호 필드 */}
-              <div className="space-y-2">
-                <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="space-y-1 sm:space-y-2">
+                <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                   비밀번호
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 sm:w-5 sm:h-5" />
                   <input
                     ref={passwordRef}
                     type={showPassword ? 'text' : 'password'}
@@ -377,7 +400,7 @@ export default function RegisterPage() {
                     name="password"
                     value={formData.password}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-12 py-3 rounded-lg auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+                    className={`w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                       fieldErrors.password ? 'border-red-500 dark:border-red-400' : ''
                     } ${shakeField === 'password' ? 'shake' : ''}`}
                     placeholder="최소 8자 이상"
@@ -388,11 +411,11 @@ export default function RegisterPage() {
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
-                    {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
                   </button>
                 </div>
                 {fieldErrors.password && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{fieldErrors.password}</p>
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{fieldErrors.password}</p>
                 )}
 
                 {/* 비밀번호 강도 표시기 */}
@@ -448,12 +471,12 @@ export default function RegisterPage() {
               </div>
 
               {/* 비밀번호 확인 필드 */}
-              <div className="space-y-2">
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <div className="space-y-1 sm:space-y-2">
+                <label htmlFor="confirmPassword" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
                   비밀번호 확인
                 </label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
+                  <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 sm:w-5 sm:h-5" />
                   <input
                     ref={confirmPasswordRef}
                     type={showConfirmPassword ? 'text' : 'password'}
@@ -461,7 +484,7 @@ export default function RegisterPage() {
                     name="confirmPassword"
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className={`w-full pl-10 pr-12 py-3 rounded-lg auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+                    className={`w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                       fieldErrors.confirmPassword ? 'border-red-500 dark:border-red-400' : ''
                     } ${shakeField === 'confirmPassword' ? 'shake' : ''}`}
                     placeholder="비밀번호 재입력"
@@ -472,11 +495,11 @@ export default function RegisterPage() {
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                   >
-                    {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4 sm:w-5 sm:h-5" /> : <Eye className="w-4 h-4 sm:w-5 sm:h-5" />}
                   </button>
                 </div>
                 {fieldErrors.confirmPassword && (
-                  <p className="text-sm text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
+                  <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{fieldErrors.confirmPassword}</p>
                 )}
               </div>
 
@@ -601,7 +624,7 @@ export default function RegisterPage() {
               <button
                 type="submit"
                 disabled={isSubmitting || !isEmailVerified || !consents.isOver14 || !consents.termsAccepted || !consents.privacyAccepted}
-                className={`w-full py-3 px-4 rounded-lg font-medium transition-all ${
+                className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
                   !isSubmitting && isEmailVerified && consents.isOver14 && consents.termsAccepted && consents.privacyAccepted
                     ? 'auth-button-primary'
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'

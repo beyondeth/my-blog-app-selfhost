@@ -89,24 +89,36 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
       {/* 인증 코드 입력 필드 */}
       {state.step === 'verify' && (
         <div className="space-y-3 fade-in-up">
-          <div className="flex gap-2">
+          {/* 인증 코드 입력창 - 위아래 필드와 동일한 너비 */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              인증 코드
+            </label>
             <input
               type="text"
               value={code}
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               maxLength={6}
               disabled={state.isLoading}
-              className={`flex-1 px-3 py-3 rounded-lg text-center text-lg font-mono tracking-wider auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+              className={`w-full px-4 py-3 rounded-lg text-center text-lg font-mono tracking-wider auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                 state.error ? 'border-red-500 dark:border-red-400' : ''
               }`}
               placeholder="인증 코드 6자리"
               autoFocus
             />
+          </div>
+
+          {/* 버튼들 - 아래 줄에 깔끔하게 배치 */}
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={handleVerifyCode}
               disabled={state.isLoading || code.length !== 6}
-              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-600 dark:disabled:to-gray-600 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+              className={`flex-1 py-3 rounded-lg font-medium transition-all ${
+                state.isLoading || code.length !== 6
+                  ? 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
+                  : 'auth-button-primary'
+              }`}
             >
               {state.isLoading ? '확인중...' : '인증'}
             </button>
@@ -114,7 +126,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               type="button"
               onClick={handleResendCode}
               disabled={state.isLoading}
-              className="px-5 py-3 social-login-btn rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
+              className="flex-1 py-3 social-login-btn rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               재발급
             </button>

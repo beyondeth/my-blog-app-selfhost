@@ -10,18 +10,15 @@ interface SocialLoginGroupProps {
 }
 
 export function SocialLoginGroup({
-  providers = ['google', 'kakao', 'github'],
+  providers = ['google','github'],
   disabled = false,
   className = '',
   title
 }: SocialLoginGroupProps) {
-  // 동적으로 그리드 컬럼 설정
-  const gridCols = providers.length === 2 ? 'grid-cols-2' : 'grid-cols-3';
-
   return (
-    <div className={`${className}`}>
+    <div className={`flex justify-center ${className}`}>
       {/* Social login buttons - 가로 배치 */}
-      <div className={`grid ${gridCols} gap-3`}>
+      <div className="flex gap-2">
         {providers.map((provider) => (
           <SocialLoginButton
             key={provider}

@@ -12,7 +12,10 @@ import { normalizeImageUrl } from '@/utils/imageUtils';
 export default function ProfileSettingsPage() {
   const { user, isLoading: authLoading, refreshUser, logout } = useAuth();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [usernameLoading, setUsernameLoading] = useState(false);
+  const [bioLoading, setBioLoading] = useState(false);
+  const [usernameSuccess, setUsernameSuccess] = useState(false);
+  const [bioSuccess, setBioSuccess] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
@@ -147,9 +150,12 @@ export default function ProfileSettingsPage() {
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  /**
+   * 닉네임 업데이트 핸들러
+   * 닉네임 필드의 저장 버튼 클릭 시 호출
+   */
+  const handleUsernameUpdate = async () => {
+    setUsernameLoading(true);
     setError('');
     setSuccess(false);
 
@@ -162,22 +168,65 @@ export default function ProfileSettingsPage() {
         credentials: 'include',
         body: JSON.stringify({
           username: formData.username,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '닉네임 업데이트에 실패했습니다');
+      }
+
+      await refreshUser();
+      setUsernameLoading(false);
+      setUsernameSuccess(true);
+      setSuccess(true);
+      setTimeout(() => {
+        setUsernameSuccess(false);
+        setSuccess(false);
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || '오류가 발생했습니다');
+      setUsernameLoading(false);
+    }
+  };
+
+  /**
+   * 소개(Bio) 업데이트 핸들러
+   * Bio 필드의 저장 버튼 클릭 시 호출
+   */
+  const handleBioUpdate = async () => {
+    setBioLoading(true);
+    setError('');
+    setSuccess(false);
+
+    try {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
           bio: formData.bio,
         }),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '프로필 업데이트에 실패했습니다');
+        throw new Error(error.message || '소개 업데이트에 실패했습니다');
       }
 
       await refreshUser();
+      setBioLoading(false);
+      setBioSuccess(true);
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setTimeout(() => {
+        setBioSuccess(false);
+        setSuccess(false);
+      }, 2000);
     } catch (err: any) {
       setError(err.message || '오류가 발생했습니다');
-    } finally {
-      setLoading(false);
+      setBioLoading(false);
     }
   };
 
@@ -235,7 +284,7 @@ export default function ProfileSettingsPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Profile Image */}
         <div>
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
@@ -292,15 +341,30 @@ export default function ProfileSettingsPage() {
           <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             닉네임
           </label>
-          <input
-            type="text"
-            id="username"
-            value={formData.username}
-            onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
-            placeholder="실명이 아닌 별명을 사용하세요"
-            required
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              id="username"
+              value={formData.username}
+              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
+              placeholder="실명이 아닌 별명을 사용하세요"
+            />
+            <button
+              type="button"
+              onClick={handleUsernameUpdate}
+              disabled={usernameLoading || usernameSuccess}
+              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            >
+              {usernameLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : usernameSuccess ? (
+                '완료'
+              ) : (
+                '저장'
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Email */}
@@ -346,12 +410,28 @@ export default function ProfileSettingsPage() {
             }}
             rows={4}
             maxLength={1000}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
             placeholder="자신을 소개해주세요..."
           />
-          <div className="mt-1 flex justify-between text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-1 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
             <span>자신을 소개하는 글을 작성해주세요</span>
             <span>{formData.bio.length}/1000</span>
+          </div>
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={handleBioUpdate}
+              disabled={bioLoading || bioSuccess}
+              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            >
+              {bioLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : bioSuccess ? (
+                '완료'
+              ) : (
+                '저장'
+              )}
+            </button>
           </div>
         </div>
 
@@ -407,7 +487,7 @@ export default function ProfileSettingsPage() {
                     }}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white peer-checked:after:bg-gray-800 dark:peer-checked:after:bg-white after:border-gray-300 peer-checked:after:border-gray-800 dark:peer-checked:after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-100 dark:peer-checked:bg-blue-600"></div>
                 </label>
               </div>
 
@@ -434,7 +514,7 @@ export default function ProfileSettingsPage() {
                     }}
                     className="sr-only peer"
                   />
-                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
+                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white peer-checked:after:bg-gray-800 dark:peer-checked:after:bg-white after:border-gray-300 peer-checked:after:border-gray-800 dark:peer-checked:after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-100 dark:peer-checked:bg-blue-600"></div>
                 </label>
               </div>
             </div>
@@ -452,18 +532,7 @@ export default function ProfileSettingsPage() {
             프로필이 성공적으로 업데이트되었습니다!
           </div>
         )}
-
-        {/* Submit Button */}
-        <div className="flex justify-end pt-4">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? '저장 중...' : '변경사항 저장'}
-          </button>
-        </div>
-      </form>
+      </div>
 
       {/* 회원 탈퇴 섹션 */}
       <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">

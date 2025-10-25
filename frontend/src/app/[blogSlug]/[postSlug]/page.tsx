@@ -2,8 +2,7 @@
 
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { FiArrowLeft, FiStar } from 'react-icons/fi';
-import { FaStar } from 'react-icons/fa';
+import { FiArrowLeft } from 'react-icons/fi';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';

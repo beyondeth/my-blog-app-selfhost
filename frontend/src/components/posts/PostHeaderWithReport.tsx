@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiStar } from 'react-icons/fi';
-import { FaStar } from 'react-icons/fa';
+import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget } from 'react-icons/fi';
 import { BsFiletypePdf } from 'react-icons/bs';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
@@ -180,10 +179,10 @@ export default function PostHeaderWithReport({
                 disabled={editorPickPending}
                 className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full transition-all border ${
                   isEditorPick
-                    ? 'bg-amber-500 text-white border-amber-600 hover:bg-amber-600 dark:bg-amber-600 dark:border-amber-700 dark:hover:bg-amber-700'
+                    ? 'bg-gray-700 text-white border-gray-800 hover:bg-gray-800 dark:bg-gray-600 dark:border-gray-700 dark:hover:bg-gray-700'
                     : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-500'
                 } ${editorPickPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={isEditorPick ? 'Editor\'s Pick 선정 해제' : 'Editor\'s Pick으로 선정'}
+                title={isEditorPick ? 'Pick 선정 해제' : 'Pick으로 선정'}
               >
                 {editorPickPending ? (
                   <>
@@ -195,19 +194,15 @@ export default function PostHeaderWithReport({
                   </>
                 ) : (
                   <>
-                    {isEditorPick ? (
-                      <FaStar className="w-5 h-5 mr-1" />
-                    ) : (
-                      <FiStar className="w-5 h-5 mr-1" />
-                    )}
-                    {isEditorPick ? 'Editor\'s Pick' : 'Pick'}
+                    <FiTarget className="w-5 h-5 mr-1" />
+                    Pick
                   </>
                 )}
               </button>
             ) : isEditorPick ? (
-              <div className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-amber-500 text-white border border-amber-600 dark:bg-amber-600 dark:border-amber-700">
-                <FaStar className="w-5 h-5 mr-1" />
-                Editor's Pick
+              <div className="inline-flex items-center px-3 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700 border border-gray-300 dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600">
+                <FiTarget className="w-5 h-5 mr-1" />
+                Pick
               </div>
             ) : null}
           </div>

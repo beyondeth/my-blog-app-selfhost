@@ -375,19 +375,18 @@ textarea {
    Auth 페이지 모던 디자인 - 라이트/다크 모드 지원
    ================================================================ */
 
-/* 그라디언트 배경 효과 - 라이트 모드 */
+/* 그라디언트 배경 효과 - 라이트 모드 (Stripe 스타일) */
 .auth-gradient-light {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(180deg, #ffffff 0%, #f6f9fc 100%);
   position: fixed;
   inset: 0;
-  opacity: 0.05;
+  opacity: 1;
   pointer-events: none;
 }
 
-/* 그라디언트 배경 효과 - 다크 모드 */
+/* 그라디언트 배경 효과 - 다크 모드 (Stripe 스타일) */
 .auth-gradient-dark {
-  background: radial-gradient(ellipse at top left, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
-              radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+  background: linear-gradient(180deg, #0A2540 0%, #0f1c2e 100%);
   position: fixed;
   inset: 0;
   pointer-events: none;
@@ -403,19 +402,19 @@ textarea {
 }
 
 .blur-orb-1 {
-  width: 500px;
-  height: 500px;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  top: -200px;
-  left: -200px;
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, rgba(96, 165, 250, 0.08) 0%, transparent 70%);
+  top: -300px;
+  left: -300px;
 }
 
 .blur-orb-2 {
-  width: 400px;
-  height: 400px;
-  background: linear-gradient(135deg, #f093fb, #f5576c);
-  bottom: -150px;
-  right: -150px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.06) 0%, transparent 70%);
+  bottom: -250px;
+  right: -250px;
 }
 
 /* 카드 - 배경과 자연스럽게 융합 (Resend 스타일) */
@@ -433,15 +432,25 @@ textarea {
 
 /* 입력 필드 스타일 - 라이트 모드 */
 .auth-input {
-  background: rgba(255, 255, 255, 0.6);
+  background: transparent;
   border: 1px solid rgba(229, 231, 235, 0.8);
   transition: all 0.3s ease;
 }
 
 .auth-input:focus {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: #6366f1;
-  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background: transparent;
+  border-color: #d1d5db;
+  box-shadow: 0 0 0 3px rgba(209, 213, 219, 0.1);
+}
+
+/* 브라우저 autofill 배경색 제거 - 라이트모드는 투명 유지 */
+.auth-input:-webkit-autofill,
+.auth-input:-webkit-autofill:hover,
+.auth-input:-webkit-autofill:focus,
+.auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px transparent inset !important;
+  -webkit-text-fill-color: #111827 !important;
+  transition: background-color 5000s ease-in-out 0s;
 }
 
 /* 입력 필드 스타일 - 다크 모드 */
@@ -453,38 +462,44 @@ textarea {
 
 .dark .auth-input:focus {
   background: rgba(17, 24, 39, 0.8);
-  border-color: #818cf8;
-  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+  border-color: #6b7280;
+  box-shadow: 0 0 0 3px rgba(107, 114, 128, 0.1);
 }
 
-/* 버튼 그라디언트 효과 */
+/* 다크 모드 autofill 배경색 제거 */
+.dark .auth-input:-webkit-autofill,
+.dark .auth-input:-webkit-autofill:hover,
+.dark .auth-input:-webkit-autofill:focus,
+.dark .auth-input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px #111827 inset !important;
+  -webkit-text-fill-color: #e5e7eb !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* 버튼 스타일 - 부드러운 회색 톤 (배경과 자연스럽게 어울림) */
 .auth-button-primary {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #18181b;  /* zinc-900 - 순수 검은색보다 부드러움 */
   color: white;
   font-weight: 600;
   transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-.auth-button-primary::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
-}
-
-.auth-button-primary:hover::before {
-  left: 100%;
 }
 
 .auth-button-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+  background: #27272a;  /* zinc-800 */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 다크 모드: 밝은 회색 버튼 */
+.dark .auth-button-primary {
+  background: #e4e4e7;  /* zinc-200 - 순수 흰색보다 부드러움 */
+  color: #18181b;  /* zinc-900 텍스트 */
+}
+
+.dark .auth-button-primary:hover {
+  background: #f4f4f5;  /* zinc-100 */
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.08);
 }
 
 /* 소셜 로그인 버튼 - 라이트 모드 */

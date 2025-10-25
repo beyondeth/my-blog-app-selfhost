@@ -2124,6 +2124,8 @@ export class PostsService {
    */
   async toggleEditorPick(postId: string, user: User): Promise<{ message: string; isEditorPick: boolean }> {
     // Admin 권한 확인
+    this.logger.debug(`[toggleEditorPick] User role: "${user.role}", Role.ADMIN: "${Role.ADMIN}", Match: ${user.role === Role.ADMIN}`);
+
     if (user.role !== Role.ADMIN) {
       throw new ForbiddenException('Editor\'s Pick 권한이 없습니다.');
     }

@@ -20,8 +20,22 @@ export default function RootLayout({
 }) {
   const pathname = usePathname();
   const [shouldHideLayout, setShouldHideLayout] = useState(false);
+  const [isLandingPage, setIsLandingPage] = useState(false);
 
   useEffect(() => {
+    // 랜딩페이지 - 헤더만 표시, 사이드바 제거
+    if (pathname === '/landing') {
+      setShouldHideLayout(false);
+      setIsLandingPage(true);
+      return;
+    }
+
+    setIsLandingPage(false);
+
+    // 인증 페이지 목록
+    const authPaths = ['/login', '/register', '/consent', '/forgot-password', '/reset-password'];
+    const isAuthPage = authPaths.some(path => pathname.startsWith(path));
+
     // 법적 문서 페이지 목록
     const legalPaths = [
       '/legal/terms',
@@ -36,20 +50,17 @@ export default function RootLayout({
     // 현재 페이지가 법적 문서 페이지인지 확인
     const isLegalPage = legalPaths.some(path => pathname.startsWith(path));
 
-    if (isLegalPage) {
+    // 인증 페이지는 항상 레이아웃 숨김
+    if (isAuthPage) {
+      setShouldHideLayout(true);
+    } else if (isLegalPage) {
       // 법적 문서 페이지: sessionStorage 체크
       const fromAuth = sessionStorage.getItem('from-auth') === 'true';
       setShouldHideLayout(fromAuth);
     } else {
-      // 법적 문서가 아닌 다른 페이지로 이동 시 sessionStorage 초기화
-      // 단, 인증 페이지로 이동하는 경우는 제외 (인증 레이아웃에서 설정)
-      const authPaths = ['/login', '/register', '/consent', '/forgot-password', '/reset-password'];
-      const isAuthPage = authPaths.some(path => pathname.startsWith(path));
-
-      if (!isAuthPage) {
-        sessionStorage.removeItem('from-auth');
-        sessionStorage.removeItem('auth-pathname');
-      }
+      // 일반 페이지로 이동 시 sessionStorage 초기화
+      sessionStorage.removeItem('from-auth');
+      sessionStorage.removeItem('auth-pathname');
       setShouldHideLayout(false);
     }
   }, [pathname]);
@@ -134,6 +145,14 @@ export default function RootLayout({
                   <MainContent>
                     {children}
                   </MainContent>
+                </div>
+              ) : isLandingPage ? (
+                // 랜딩페이지: 헤더만 표시, 사이드바/하단바 제거
+                <div className="min-h-screen bg-background">
+                  <Header />
+                  <div className="w-full">
+                    {children}
+                  </div>
                 </div>
               ) : (
                 // 일반 레이아웃: 헤더 + 사이드바 + 메인 콘텐츠 + 하단 바텀바

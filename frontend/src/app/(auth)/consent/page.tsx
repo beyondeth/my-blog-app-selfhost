@@ -4,8 +4,9 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import Link from 'next/link';
-import { Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
+import Image from 'next/image';
+import { useTheme } from 'next-themes';
 
 /**
  * OAuth 로그인 후 약관 동의 페이지
@@ -13,7 +14,8 @@ import { toast } from 'sonner';
  */
 export default function ConsentPage() {
   const router = useRouter();
-  const { user, refreshUser } = useAuth();
+  const { user, isLoading, refreshUser } = useAuth();
+  const { resolvedTheme } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -26,7 +28,20 @@ export default function ConsentPage() {
     allAccepted: false,
   });
 
-  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
+  // 로딩 중이면 로딩 화면 표시
+  // OAuth 직후 user 정보가 로드될 때까지 대기
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-gray-900 dark:border-gray-700 dark:border-t-gray-100 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-400">로딩 중...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // 로딩 완료 후 user가 없으면 로그인 페이지로 리다이렉트
   if (!user) {
     router.push('/login');
     return null;
@@ -142,12 +157,19 @@ export default function ConsentPage() {
       <div className="blur-orb blur-orb-2 opacity-20 dark:opacity-10" />
 
       <div className="relative flex items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 py-12">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-2xl">
           <div className="auth-card rounded-2xl p-8 fade-in-up">
             {/* 로고와 타이틀 */}
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-14 h-14 mb-4 rounded-full bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
-                <Sparkles className="h-7 w-7" />
+              <div className="inline-flex items-center justify-center mb-4">
+                <Image
+                  src="/assets/logo.svg"
+                  alt="Logo"
+                  width={64}
+                  height={64}
+                  priority
+                  className="object-contain"
+                />
               </div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                 약관 동의

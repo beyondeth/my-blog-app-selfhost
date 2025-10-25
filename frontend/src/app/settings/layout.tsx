@@ -74,7 +74,7 @@ export default function SettingsLayout({
 
       <div className="flex flex-col md:flex-row gap-8">
         {/* Sidebar Navigation */}
-        <aside className="w-full md:w-64">
+        <aside className="w-full md:w-48">
           <nav className="space-y-1">
             {settingsNav.map((item) => {
               const Icon = item.icon;
@@ -85,14 +85,14 @@ export default function SettingsLayout({
                   key={item.href}
                   href={item.href}
                   className={`
-                    flex items-center px-4 py-2 text-sm font-medium rounded-md transition-colors
+                    flex items-center px-3 py-1.5 text-sm font-medium rounded-md transition-colors
                     ${isActive
-                      ? 'bg-blue-50 dark:bg-gray-700 text-blue-700 dark:text-gray-100'
+                      ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-gray-100'
                       : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-gray-100'
                     }
                   `}
                 >
-                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-blue-600 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`} />
+                  <Icon className={`mr-3 h-5 w-5 ${isActive ? 'text-gray-700 dark:text-gray-100' : 'text-gray-400 dark:text-gray-500'}`} />
                   {item.title}
                 </Link>
               );

@@ -42,21 +42,17 @@ export class AuthService {
   async validateUser(email: string, password: string): Promise<User | null> {
     try {
       const user = await this.usersService.findByEmail(email);
-      
+
+      // 🔍 디버그: DB에서 가져온 유저의 role 확인
+      this.logger.debug(`[validateUser] Retrieved user from DB - email: ${email}, role: "${user?.role}" (type: ${typeof user?.role})`);
+
       if (!user || !user.isActive) {
         return null;
       }
 
-      // 비밀번호가 없는 경우 (소셜 로그인만 사용 중)
+      // 비밀번호가 없는 경우 또는 비밀번호가 일치하지 않는 경우 - 통일된 에러 메시지
       if (!user.password) {
-        // Identity 확인하여 더 명확한 안내 제공
-        const identities = await this.identityService.findByUserId(user.id);
-        const providers = identities.map(i => i.getProviderDisplayName()).join(', ');
-        
-        throw new BadRequestException(
-          `이 계정은 ${providers || '소셜'} 로그인으로만 접속 가능합니다. ` +
-          `비밀번호로 로그인하려면 먼저 소셜 로그인 후 계정 설정에서 비밀번호를 추가하세요.`
-        );
+        return null;
       }
 
       const isPasswordValid = await user.validatePassword(password);
@@ -66,24 +62,23 @@ export class AuthService {
 
       // 마지막 로그인 시간 업데이트
       await this.usersService.updateLastLogin(user.id);
-      
+
+      // 🔍 디버그: validateUser가 반환하기 직전의 role 확인
+      this.logger.debug(`[validateUser] Returning user - email: ${email}, role: "${user.role}" (type: ${typeof user.role})`);
+
       return user;
     } catch (error) {
       this.logger.error(`Validation failed for email ${email}:`, error.message);
-      // BadRequestException은 그대로 throw, 다른 에러는 null 반환
-      if (error instanceof BadRequestException) {
-        throw error;
-      }
       return null;
     }
   }
 
   async login(loginDto: LoginDto): Promise<AuthResponse> {
     const { email, password } = loginDto;
-    
+
     const user = await this.validateUser(email, password);
     if (!user) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new UnauthorizedException('이메일 또는 비밀번호가 일치하지 않습니다');
     }
 
     return this.generateTokenResponse(user);
@@ -356,65 +351,6 @@ export class AuthService {
     this.logger.log(`User ${userId} logged out`);
   }
 
-  async checkAuthMethod(email: string): Promise<any> {
-    const user = await this.usersService.findByEmail(email);
-
-    if (!user) {
-      return {
-        exists: false,
-        message: '등록되지 않은 이메일입니다.'
-      };
-    }
-
-    // 사용 가능한 모든 인증 방법 확인
-    const identities = await this.identityService.findByUserId(user.id);
-    const hasPassword = !!user.password;
-    const hasOAuth = identities.some(i => i.provider !== 'local');
-
-    // 인증 방법을 간소화하여 반환 (보안 강화)
-    let authMethod: 'password' | 'oauth' | 'both';
-    if (hasPassword && hasOAuth) {
-      authMethod = 'both';
-    } else if (hasPassword) {
-      authMethod = 'password';
-    } else {
-      authMethod = 'oauth';
-    }
-
-    return {
-      exists: true,
-      authMethod,  // 'password' | 'oauth' | 'both'로 간소화
-      message: this.getAuthMethodMessage(user, identities)
-    };
-  }
-
-  private getAuthMethodMessage(user: User, identities: any[]): string {
-    const hasPassword = !!user.password;
-    const providers = identities
-      .filter(i => i.provider !== 'local')
-      .map(i => {
-        switch (i.provider) {
-          case 'kakao': return '카카오';
-          case 'google': return '구글';
-          case 'github': return '깃헙';
-          default: return i.provider;
-        }
-      });
-    
-    const methods = [];
-    if (hasPassword) {
-      methods.push('이메일/비밀번호');
-    }
-    if (providers.length > 0) {
-      methods.push(...providers);
-    }
-    
-    if (methods.length === 0) {
-      return '로그인 방법을 설정해주세요';
-    }
-    
-    return `${methods.join(', ')} 로그인이 가능합니다`;
-  }
 
   async createSessionToken(userId: string): Promise<string> {
     // API 키 검증 후 세션 토큰 생성
@@ -439,6 +375,9 @@ export class AuthService {
 
   private async generateTokenResponse(user: User, blog?: Blog | null): Promise<AuthResponse> {
     const now = Math.floor(Date.now() / 1000);
+
+    // 🔍 디버그: JWT 생성 시 사용되는 user.role 확인
+    this.logger.debug(`[generateTokenResponse] Creating JWT for user - email: ${user.email}, role: "${user.role}" (type: ${typeof user.role})`);
 
     // Access Token 생성 (짧은 수명)
     const accessPayload: JwtPayload = {

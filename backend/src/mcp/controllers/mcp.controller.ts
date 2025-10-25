@@ -273,4 +273,257 @@ export class McpController {
       data: logs.slice(0, limit || 50),
     };
   }
+
+  // ============================================================
+  // Writing Styles API (프론트엔드용)
+  // ============================================================
+
+  /**
+   * Writing Styles 목록 조회
+   *
+   * @returns 5가지 Writing Style 목록 (미리보기)
+   *
+   * 용도:
+   * - /mcp 페이지에서 스타일 목록 표시
+   * - 각 스타일의 메타데이터 + 짧은 설명
+   */
+  @Get('writing-styles')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async getWritingStyles() {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+
+      // writing-styles 디렉토리 경로
+      // Docker 환경: /mcp-proxy-server/writing-styles
+      // 로컬 개발: ./mcp-proxy-server/writing-styles
+      const fs_sync = await import('fs');
+      let styleDir = '/mcp-proxy-server/writing-styles';
+
+      // 로컬 환경에서는 다른 경로 시도
+      if (!fs_sync.existsSync(styleDir)) {
+        styleDir = path.resolve(process.cwd(), 'mcp-proxy-server/writing-styles');
+      }
+
+      if (!fs_sync.existsSync(styleDir)) {
+        styleDir = path.resolve(process.cwd(), '../mcp-proxy-server/writing-styles');
+      }
+
+      const styles = ['default', 'novel', 'comedy', 'podcast', 'tutorial'];
+      const styleData = [];
+
+      for (const styleName of styles) {
+        try {
+          const filePath = path.join(styleDir, `${styleName}.md`);
+          const content = await fs.readFile(filePath, 'utf-8');
+
+          // YAML Front Matter 파싱
+          const match = content.match(/^---\n([\s\S]*?)\n---/);
+          const metadata = this.parseYaml(match ? match[1] : '');
+
+          // 짧은 미리보기 추출 (처음 500자)
+          const preview = content
+            .replace(/^---[\s\S]*?---/, '') // Front matter 제거
+            .trim()
+            .substring(0, 500);
+
+          styleData.push({
+            name: styleName,
+            metadata,
+            content: preview,
+          });
+        } catch (error) {
+          console.warn(`[MCP] Failed to load style: ${styleName}. Returning fallback metadata.`);
+          // 스타일 로드 실패해도 계속 진행 (fallback)
+          const styleMetadata: Record<string, any> = {
+            default: {
+              style_name: 'Professional Technical Blog',
+              language: 'korean',
+              min_length: 2000,
+              target_length: '3000-5000',
+              code_block_ratio: 0.2,
+              ai_tag_required: true,
+            },
+            novel: {
+              style_name: 'Fiction Writer\'s Narrative Style',
+              language: 'korean',
+              min_length: 2500,
+              target_length: '4000-6000',
+              code_block_ratio: 0.05,
+              ai_tag_required: true,
+            },
+            comedy: {
+              style_name: 'Tech Comedy Blog Style',
+              language: 'korean',
+              min_length: 2000,
+              target_length: '3000-4500',
+              code_block_ratio: 0.15,
+              ai_tag_required: true,
+            },
+            podcast: {
+              style_name: 'Tech Podcast Script Style',
+              language: 'korean',
+              min_length: 2500,
+              target_length: '3500-5000',
+              code_block_ratio: 0.05,
+              ai_tag_required: true,
+            },
+            tutorial: {
+              style_name: 'Step-by-Step Tutorial Style',
+              language: 'korean',
+              min_length: 3000,
+              target_length: '4000-7000',
+              code_block_ratio: 0.35,
+              ai_tag_required: true,
+            },
+          };
+
+          styleData.push({
+            name: styleName,
+            metadata: styleMetadata[styleName] || {
+              style_name: styleName.charAt(0).toUpperCase() + styleName.slice(1),
+              language: 'korean',
+              min_length: 2000,
+              target_length: '3000-5000',
+              code_block_ratio: 0.2,
+              ai_tag_required: true,
+            },
+            content: '💡 전체 가이드를 보려면 "전체 가이드 보기" 버튼을 클릭하세요.',
+          });
+        }
+      }
+
+      return {
+        success: true,
+        data: styleData,
+      };
+    } catch (error) {
+      console.error('Failed to fetch writing styles:', error);
+      return {
+        success: false,
+        error: 'Failed to fetch writing styles',
+        data: [],
+      };
+    }
+  }
+
+  /**
+   * 특정 Writing Style 전체 가이드 조회
+   *
+   * @param style 스타일 이름 (default, novel, comedy, podcast, tutorial)
+   * @returns 전체 Writing Style 가이드 (Markdown)
+   *
+   * 용도:
+   * - /mcp 페이지에서 "전체 가이드 보기" 클릭 시
+   * - 스타일 가이드 다운로드 시
+   */
+  @Get('writing-styles/:style')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  async getWritingStyleGuide(@Param('style') style: string) {
+    try {
+      const fs = await import('fs/promises');
+      const path = await import('path');
+
+      // 스타일 이름 검증
+      const validStyles = ['default', 'novel', 'comedy', 'podcast', 'tutorial'];
+      if (!validStyles.includes(style)) {
+        return {
+          success: false,
+          error: `Invalid style: ${style}. Valid styles: ${validStyles.join(', ')}`,
+          data: null,
+        };
+      }
+
+      const fs_sync = await import('fs');
+      let styleDir = '/mcp-proxy-server/writing-styles';
+
+      // 로컬 환경에서는 다른 경로 시도
+      if (!fs_sync.existsSync(styleDir)) {
+        styleDir = path.resolve(process.cwd(), 'mcp-proxy-server/writing-styles');
+      }
+
+      if (!fs_sync.existsSync(styleDir)) {
+        styleDir = path.resolve(process.cwd(), '../mcp-proxy-server/writing-styles');
+      }
+
+      const filePath = path.join(styleDir, `${style}.md`);
+
+      // 파일 존재 여부 확인
+      try {
+        await fs.access(filePath);
+      } catch {
+        return {
+          success: false,
+          error: `Style file not found: ${style}`,
+          data: null,
+        };
+      }
+
+      const content = await fs.readFile(filePath, 'utf-8');
+
+      // YAML Front Matter 파싱
+      const match = content.match(/^---\n([\s\S]*?)\n---/);
+      const metadata = this.parseYaml(match ? match[1] : '');
+
+      // Front Matter 제거한 본문만 반환
+      const body = content.replace(/^---[\s\S]*?---\n?/, '');
+
+      return {
+        success: true,
+        data: {
+          name: style,
+          metadata,
+          fullContent: body,
+        },
+      };
+    } catch (error) {
+      console.error(`Failed to fetch writing style: ${style}`, error);
+      return {
+        success: false,
+        error: 'Failed to fetch writing style',
+        data: null,
+      };
+    }
+  }
+
+  /**
+   * 간단한 YAML Front Matter 파서
+   * 실제로는 js-yaml 패키지 사용 권장
+   */
+  private parseYaml(yamlString: string): any {
+    const result: any = {};
+
+    const lines = yamlString.trim().split('\n');
+    for (const line of lines) {
+      const [key, ...valueParts] = line.split(':');
+      if (key && valueParts.length > 0) {
+        let value = valueParts.join(':').trim();
+
+        // 큰따옴표 제거
+        if (value.startsWith('"') && value.endsWith('"')) {
+          value = value.slice(1, -1);
+        }
+
+        // 작은따옴표 제거
+        if (value.startsWith("'") && value.endsWith("'")) {
+          value = value.slice(1, -1);
+        }
+
+        // 타입 변환
+        if (value === 'true') {
+          result[key.trim()] = true;
+        } else if (value === 'false') {
+          result[key.trim()] = false;
+        } else if (!isNaN(Number(value))) {
+          result[key.trim()] = Number(value);
+        } else {
+          result[key.trim()] = value;
+        }
+      }
+    }
+
+    return result;
+  }
 }

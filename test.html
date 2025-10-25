@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM & MCP - 자동 포스팅 솔루션</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+
+        :root {
+            --primary-color: #4A90E2;
+            --background-color: #0D1128;
+            --card-background: rgba(255, 255, 255, 0.05);
+            --text-color: #FFFFFF;
+            --subtext-color: #B0B8C5;
+            --accent-glow: rgba(74, 144, 226, 0.3);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 2rem;
+            background-image: radial-gradient(circle at 10% 20%, rgba(74, 144, 226, 0.1), transparent 30%),
+                              radial-gradient(circle at 90% 80%, rgba(88, 81, 219, 0.1), transparent 30%);
+        }
+
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            background-color: #121731;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 40px 50px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+            text-align: center;
+        }
+
+        header h1 {
+            font-size: 2.8rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #FFFFFF, #B0B8C5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        header p {
+            font-size: 1.2rem;
+            color: var(--subtext-color);
+            margin-bottom: 40px;
+        }
+
+        .main-visual {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+            margin-bottom: 50px;
+            position: relative;
+        }
+
+        .visual-node {
+            width: 180px;
+            height: 180px;
+            border-radius: 50%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, rgba(74, 144, 226, 0.2), transparent 70%);
+            border: 1px solid var(--primary-color);
+            box-shadow: 0 0 25px var(--accent-glow), inset 0 0 15px var(--accent-glow);
+            position: relative;
+        }
+        
+        .visual-node::before {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            background-image: url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><defs><pattern id="grid" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="rgba(74, 144, 226, 0.3)" stroke-width="0.5"/></pattern></defs><rect width="100" height="100" fill="url(%23grid)"/></svg>');
+            opacity: 0.2;
+            animation: rotate 20s linear infinite;
+        }
+
+        .visual-node h2 {
+            font-size: 1.8rem;
+            font-weight: 600;
+        }
+
+        .visual-node span {
+            font-size: 0.9rem;
+            color: var(--subtext-color);
+        }
+        
+        .arrow {
+            color: var(--primary-color);
+            font-size: 3rem;
+            font-weight: bold;
+            position: relative;
+            padding: 0 20px;
+        }
+
+        .arrow-label {
+            position: absolute;
+            bottom: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 0.8rem;
+            color: var(--subtext-color);
+            background-color: var(--background-color);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .features {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 30px;
+            margin-bottom: 50px;
+        }
+
+        .feature-card {
+            background-color: var(--card-background);
+            padding: 30px;
+            border-radius: 10px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .feature-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+        }
+
+        .feature-card .icon {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .feature-card .icon svg {
+            width: 100%;
+            height: 100%;
+            fill: var(--primary-color);
+        }
+
+        .feature-card h3 {
+            font-size: 1.3rem;
+            margin-bottom: 10px;
+        }
+
+        .feature-card p {
+            font-size: 1rem;
+            color: var(--subtext-color);
+            line-height: 1.6;
+        }
+
+        .cta-button {
+            background-color: var(--primary-color);
+            color: var(--text-color);
+            font-size: 1.1rem;
+            font-weight: 600;
+            padding: 15px 40px;
+            border-radius: 8px;
+            text-decoration: none;
+            border: none;
+            cursor: pointer;
+            transition: background-color 0.3s ease, transform 0.3s ease;
+            box-shadow: 0 4px 15px rgba(74, 144, 226, 0.4);
+        }
+
+        .cta-button:hover {
+            background-color: #5A9EEE;
+            transform: translateY(-2px);
+        }
+        
+        @keyframes rotate {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        @media (max-width: 992px) {
+            .features {
+                grid-template-columns: 1fr;
+            }
+            .container {
+                padding: 30px;
+            }
+            header h1 {
+                font-size: 2.2rem;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .main-visual {
+                flex-direction: column;
+                gap: 30px;
+            }
+            .arrow {
+                transform: rotate(90deg);
+            }
+             .arrow-label {
+                transform: translateX(-50%) rotate(-90deg);
+                bottom: auto;
+                left: -35px;
+            }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Unlock Effortless Content Creation</h1>
+            <p>LLM & MCP Unite for Automated Posting</p>
+        </header>
+
+        <div class="main-visual">
+            <div class="visual-node">
+                <h2>LLM</h2>
+                <span>(Language Learning Model)</span>
+            </div>
+            <div class="arrow">
+                →
+                <span class="arrow-label">Auto-Published</span>
+            </div>
+            <div class="visual-node">
+                <h2>MCP</h2>
+                <span>(Multi-Channel Publisher)</span>
+            </div>
+        </div>
+
+        <div class="features">
+            <div class="feature-card">
+                <div class="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/></svg>
+                </div>
+                <h3>Connect</h3>
+                <p>Seamlessly link your data sources & platforms</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12.01 2.01C10.09 2.01 8.28 2.63 6.77 3.81l-1.3-1.3c-.39-.39-1.02-.39-1.41 0s-.39 1.02 0 1.41l1.49 1.49C4.41 6.8 3.5 8.82 3.5 11c0 3.86 2.64 7.12 6.25 7.84.4.08.75-.24.75-.64V16.5c0-.4-.36-.73-.75-.66C7.54 15.24 6.5 13.25 6.5 11c0-1.89 1.08-3.52 2.68-4.41.34-.19.46-.62.24-1-.22-.38-.65-.53-1.03-.32C6.44 6.31 5.5 8.51 5.5 11c0 2.76 2.24 5 5 5h.5v2.16c1.13-.42 2.13-1.14 2.91-2.09.34-.41.98-.44 1.37-.06.43.43.41 1.12-.04 1.52-1.09 1.1-2.48 1.9-4.03 2.37.31.05.62.1.94.1 4.41 0 8-3.59 8-8s-3.59-8-8-8zM12 5c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-4 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm8 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm-4 4c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1z"/></svg>
+                </div>
+                <h3>Create</h3>
+                <p>AI-driven content generation & optimization</p>
+            </div>
+            <div class="feature-card">
+                <div class="icon">
+                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                </div>
+                <h3>Automate</h3>
+                <p>Schedule & publish across all channels</p>
+            </div>
+        </div>
+
+        <a href="#" class="cta-button">
+            Start Your Free Trial
+        </a>
+    </div>
+
+</body>
+</html>

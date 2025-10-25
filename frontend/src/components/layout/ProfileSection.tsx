@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { FiUsers, FiUserPlus } from 'react-icons/fi';
 import UserAvatar from '@/components/ui/UserAvatar';
 import SidebarSection from './SidebarSection';
 import useFollowInfo from '@/hooks/useFollowInfo';
@@ -47,18 +48,20 @@ const ProfileSection = React.memo(function ProfileSection({
         
         {/* Follow Stats */}
         {followInfo?.followInfo && (
-          <div className="flex items-center justify-between text-sm text-gray-600 pt-2 border-t">
-            <div className="flex gap-4">
-              <div>
-                <span className="font-medium">{followInfo.followInfo.followersCount}</span>
-                <span className="ml-1 text-gray-500">Followers</span>
+          <div className="flex items-center justify-between text-sm text-gray-600 pt-2 border-t dark:border-gray-700">
+            <div className="flex gap-3">
+              <div className="flex items-center gap-1.5">
+                <FiUsers className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                <span className="font-medium text-gray-900 dark:text-gray-100">{followInfo.followInfo.followersCount}</span>
+                <span className="text-gray-500 dark:text-gray-400">팔로워</span>
               </div>
-              <div>
-                <span className="font-medium">{followInfo.followInfo.followingCount}</span>
-                <span className="ml-1 text-gray-500">Following</span>
+              <div className="flex items-center gap-1.5">
+                <FiUserPlus className="w-3.5 h-3.5 text-gray-500 dark:text-gray-400" />
+                <span className="font-medium text-gray-900 dark:text-gray-100">{followInfo.followInfo.followingCount}</span>
+                <span className="text-gray-500 dark:text-gray-400">팔로잉</span>
               </div>
             </div>
-            
+
             {/* Follow Button */}
             {userId && !isOwner && isAuthenticated && (
               <FollowButton

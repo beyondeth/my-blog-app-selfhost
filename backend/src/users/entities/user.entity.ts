@@ -250,6 +250,8 @@ export class User {
       blogSlug: this.blog?.slug || null,           // 블로그 슬러그 추가 (헤더 "내 블로그" 버튼용)
       termsAcceptedAt: this.termsAcceptedAt,       // 약관 동의 시각 (ConsentGuard에서 사용)
       privacyAcceptedAt: this.privacyAcceptedAt,   // 개인정보 동의 시각 (ConsentGuard에서 사용)
+      marketingOptIn: this.marketingOptIn,         // 마케팅 정보 수신 동의 (Settings 페이지에서 사용)
+      newsletterOptIn: this.newsletterOptIn,       // 뉴스레터 수신 동의 (Settings 페이지에서 사용)
       createdAt: this.createdAt,
     };
   }

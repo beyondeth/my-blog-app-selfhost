@@ -13,7 +13,10 @@ export default function BlogSettingsPage() {
   const { user } = useAuth();
   const { blog, loading: blogLoading, refresh: refreshBlog } = useUserBlogV2();
   const router = useRouter();
-  const [loading, setLoading] = useState(false);
+  const [nameLoading, setNameLoading] = useState(false);
+  const [descriptionLoading, setDescriptionLoading] = useState(false);
+  const [nameSuccess, setNameSuccess] = useState(false);
+  const [descriptionSuccess, setDescriptionSuccess] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
@@ -35,9 +38,12 @@ export default function BlogSettingsPage() {
     }
   }, [blog]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
+  /**
+   * 블로그 이름 업데이트 핸들러
+   * 블로그 이름 필드의 저장 버튼 클릭 시 호출
+   */
+  const handleNameUpdate = async () => {
+    setNameLoading(true);
     setError('');
     setSuccess(false);
 
@@ -50,22 +56,137 @@ export default function BlogSettingsPage() {
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify(formData),
+          body: JSON.stringify({
+            name: formData.name,
+          }),
         }
       );
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '블로그 업데이트에 실패했습니다');
+        throw new Error(error.message || '블로그 이름 업데이트에 실패했습니다');
       }
 
       await refreshBlog();
+      setNameLoading(false);
+      setNameSuccess(true);
       setSuccess(true);
-      setTimeout(() => setSuccess(false), 3000);
+      setTimeout(() => {
+        setNameSuccess(false);
+        setSuccess(false);
+      }, 2000);
     } catch (err: any) {
       setError(err.message || '오류가 발생했습니다');
-    } finally {
-      setLoading(false);
+      setNameLoading(false);
+    }
+  };
+
+  /**
+   * 블로그 설명 업데이트 핸들러
+   * 블로그 설명 필드의 저장 버튼 클릭 시 호출
+   */
+  const handleDescriptionUpdate = async () => {
+    setDescriptionLoading(true);
+    setError('');
+    setSuccess(false);
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/${blog?.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            description: formData.description,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '블로그 설명 업데이트에 실패했습니다');
+      }
+
+      await refreshBlog();
+      setDescriptionLoading(false);
+      setDescriptionSuccess(true);
+      setSuccess(true);
+      setTimeout(() => {
+        setDescriptionSuccess(false);
+        setSuccess(false);
+      }, 2000);
+    } catch (err: any) {
+      setError(err.message || '오류가 발생했습니다');
+      setDescriptionLoading(false);
+    }
+  };
+
+  /**
+   * 블로그 공개 설정 변경 핸들러
+   * 토글 변경 시 즉시 API 호출하여 백엔드 업데이트
+   */
+  const handlePublicSettingChange = async (isPublic: boolean) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/${blog?.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ isPublic }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '블로그 공개 설정 업데이트에 실패했습니다');
+      }
+
+      await refreshBlog();
+    } catch (err: any) {
+      setError(err.message || '블로그 공개 설정 업데이트 중 오류가 발생했습니다');
+      // 에러 발생 시 이전 상태로 되돌리기
+      if (blog) {
+        setFormData(prev => ({ ...prev, isPublic: blog.isPublic }));
+      }
+    }
+  };
+
+  /**
+   * 댓글 허용 설정 변경 핸들러
+   * 토글 변경 시 즉시 API 호출하여 백엔드 업데이트
+   */
+  const handleCommentsSettingChange = async (allowComments: boolean) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/${blog?.id}`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({ allowComments }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '댓글 허용 설정 업데이트에 실패했습니다');
+      }
+
+      await refreshBlog();
+    } catch (err: any) {
+      setError(err.message || '댓글 허용 설정 업데이트 중 오류가 발생했습니다');
+      // 에러 발생 시 이전 상태로 되돌리기
+      if (blog) {
+        setFormData(prev => ({ ...prev, allowComments: blog.allowComments }));
+      }
     }
   };
 
@@ -133,20 +254,35 @@ export default function BlogSettingsPage() {
         </p>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* Blog Name */}
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             블로그 이름
           </label>
-          <input
-            type="text"
-            id="name"
-            value={formData.name}
-            onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
-            required
-          />
+          <div className="flex gap-2">
+            <input
+              type="text"
+              id="name"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
+            />
+            <button
+              type="button"
+              onClick={handleNameUpdate}
+              disabled={nameLoading || nameSuccess}
+              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            >
+              {nameLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : nameSuccess ? (
+                '완료'
+              ) : (
+                '저장'
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Blog Description */}
@@ -157,11 +293,36 @@ export default function BlogSettingsPage() {
           <textarea
             id="description"
             value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+            onChange={(e) => {
+              if (e.target.value.length <= 1000) {
+                setFormData({ ...formData, description: e.target.value });
+              }
+            }}
             rows={4}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
+            maxLength={1000}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
             placeholder="블로그를 소개해주세요..."
           />
+          <div className="mt-1 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+            <span>블로그를 소개하는 글을 작성해주세요</span>
+            <span>{formData.description.length}/1000</span>
+          </div>
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              onClick={handleDescriptionUpdate}
+              disabled={descriptionLoading || descriptionSuccess}
+              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+            >
+              {descriptionLoading ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : descriptionSuccess ? (
+                '완료'
+              ) : (
+                '저장'
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Blog Info */}
@@ -226,10 +387,14 @@ export default function BlogSettingsPage() {
                   type="checkbox"
                   id="isPublic"
                   checked={formData.isPublic}
-                  onChange={(e) => setFormData({ ...formData, isPublic: e.target.checked })}
+                  onChange={async (e) => {
+                    const newValue = e.target.checked;
+                    setFormData({ ...formData, isPublic: newValue });
+                    await handlePublicSettingChange(newValue);
+                  }}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
+                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white peer-checked:after:bg-gray-800 dark:peer-checked:after:bg-white after:border-gray-300 peer-checked:after:border-gray-800 dark:peer-checked:after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-100 dark:peer-checked:bg-blue-600"></div>
               </label>
             </div>
 
@@ -248,10 +413,14 @@ export default function BlogSettingsPage() {
                   type="checkbox"
                   id="allowComments"
                   checked={formData.allowComments}
-                  onChange={(e) => setFormData({ ...formData, allowComments: e.target.checked })}
+                  onChange={async (e) => {
+                    const newValue = e.target.checked;
+                    setFormData({ ...formData, allowComments: newValue });
+                    await handleCommentsSettingChange(newValue);
+                  }}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
+                <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white peer-checked:after:bg-gray-800 dark:peer-checked:after:bg-white after:border-gray-300 peer-checked:after:border-gray-800 dark:peer-checked:after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-100 dark:peer-checked:bg-blue-600"></div>
               </label>
             </div>
           </div>
@@ -269,18 +438,7 @@ export default function BlogSettingsPage() {
             블로그 설정이 성공적으로 업데이트되었습니다!
           </div>
         )}
-
-        {/* Submit Button */}
-        <div className="flex justify-end pt-4">
-          <button
-            type="submit"
-            disabled={loading}
-            className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            {loading ? '저장 중...' : '변경사항 저장'}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

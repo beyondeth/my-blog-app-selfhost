@@ -44,12 +44,12 @@ export class AuthController {
    */
   private async createWebSessionInRedis(userId: number | string): Promise<void> {
     try {
-      // userId를 숫자로 변환 (string인 경우)
-      const userIdNumber = typeof userId === 'string' ? parseInt(userId, 10) : userId;
+      // userId는 UUID이므로 문자열로 유지
+      const userIdString = String(userId);
 
       // 웹 세션을 Redis에 저장 (MCP 세션 검증에 사용)
       const sessionData = {
-        userId: userIdNumber,
+        userId: userIdString,
         isActive: true,
         loginAt: Date.now(),
         lastAccessAt: Date.now(),
@@ -58,12 +58,12 @@ export class AuthController {
       // 24시간 TTL로 세션 저장
       await this.redisService.setCache(
         'sessions',
-        `user:${userIdNumber}`,
+        `user:${userIdString}`,
         sessionData,
         24 * 60 * 60, // 24시간
       );
 
-      this.logger.debug(`웹 세션 생성: userId=${userIdNumber}`);
+      this.logger.debug(`웹 세션 생성: userId=${userIdString}`);
     } catch (error) {
       this.logger.error(`웹 세션 생성 실패: ${error.message}`);
       // 세션 생성 실패해도 로그인은 진행
@@ -72,9 +72,11 @@ export class AuthController {
 
   @Public()
   @Post('login')
+  @Throttle({ default: { limit: 5, ttl: 60000 } })  // 분당 5회 제한 (브루트포스 공격 방지)
   @ApiOperation({ summary: '로그인' })
   @ApiResponse({ status: 200, description: '로그인 성공' })
   @ApiResponse({ status: 401, description: '인증 실패' })
+  @ApiResponse({ status: 429, description: '요청 횟수 초과' })
   async login(@Body() loginDto: LoginDto, @Res() res: Response) {
     const authResponse = await this.authService.login(loginDto);
 
@@ -161,6 +163,9 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: '구글 로그인 콜백' })
   async googleAuthRedirect(@Request() req, @Res() res) {
+    // 🔍 디버그: OAuth 콜백에서 받은 user 정보 확인
+    this.logger.log(`[Google OAuth Callback] User: ${req.user.user.email}, Role in response: ${req.user.user.role}`);
+
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie('access_token', req.user.access_token, {
       httpOnly: true,
@@ -178,11 +183,21 @@ export class AuthController {
       path: '/',
     });
 
+    // 🔍 디버그: 쿠키 설정 완료 로그
+    this.logger.log(`[Google OAuth Callback] Cookies set - access_token length: ${req.user.access_token.length}`);
+
     // 웹 세션 생성 (MCP 세션과 동기화를 위해)
     await this.createWebSessionInRedis(req.user.user.id);
 
-    // 프론트엔드로 리다이렉트 (토큰 없이)
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
+    // 약관 동의 여부 확인
+    const user = req.user.user;
+    const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
+
+    this.logger.debug(`Google OAuth callback - User: ${user.id}, termsAcceptedAt: ${user.termsAcceptedAt}, needsConsent: ${needsConsent}`);
+
+    // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
+    const redirectPath = needsConsent ? '/consent' : '/';
+    res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
   }
 
   @Public()
@@ -218,8 +233,13 @@ export class AuthController {
     // 웹 세션 생성 (MCP 세션과 동기화를 위해)
     await this.createWebSessionInRedis(req.user.user.id);
 
-    // 프론트엔드로 리다이렉트 (토큰 없이)
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
+    // 약관 동의 여부 확인
+    const user = req.user.user;
+    const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
+
+    // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
+    const redirectPath = needsConsent ? '/consent' : '/';
+    res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
   }
 
   @Public()
@@ -262,8 +282,13 @@ export class AuthController {
     // 웹 세션 생성 (MCP 세션과 동기화를 위해)
     await this.createWebSessionInRedis(req.user.user.id);
 
-    // 프론트엔드로 리다이렉트 (토큰 없이)
-    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?success=true`);
+    // 약관 동의 여부 확인
+    const user = req.user.user;
+    const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
+
+    // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
+    const redirectPath = needsConsent ? '/consent' : '/';
+    res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
   }
 
   @Public()
@@ -392,15 +417,6 @@ export class AuthController {
     });
   }
 
-  @Post('check-auth-method')
-  @Public()
-  @Throttle({ default: { limit: 20, ttl: 60000 } })  // 분당 20회 제한 (User Enumeration 공격 방지)
-  @ApiOperation({ summary: '이메일의 인증 방법 확인' })
-  @ApiResponse({ status: 200, description: '인증 방법 반환' })
-  async checkAuthMethod(@Body() dto: { email: string }, @Res() res: Response) {
-    const result = await this.authService.checkAuthMethod(dto.email);
-    return res.json(result);
-  }
 
   @Get('me')
   @UseGuards(JwtAuthGuard)
@@ -424,6 +440,8 @@ export class AuthController {
         blogSlug: user.blog?.slug || null,
         termsAcceptedAt: user.termsAcceptedAt,
         privacyAcceptedAt: user.privacyAcceptedAt,
+        marketingOptIn: user.marketingOptIn,
+        newsletterOptIn: user.newsletterOptIn,
         createdAt: user.createdAt,
       };
     }
@@ -442,6 +460,8 @@ export class AuthController {
       blogSlug: fullUser.blog?.slug || null,
       termsAcceptedAt: fullUser.termsAcceptedAt,       // 약관 동의 시각
       privacyAcceptedAt: fullUser.privacyAcceptedAt,   // 개인정보 동의 시각
+      marketingOptIn: fullUser.marketingOptIn,         // 마케팅 정보 수신 동의
+      newsletterOptIn: fullUser.newsletterOptIn,       // 뉴스레터 수신 동의
       createdAt: fullUser.createdAt,
     };
   }
@@ -451,6 +471,8 @@ export class AuthController {
   @ApiOperation({ summary: '로그아웃' })
   @ApiResponse({ status: 200, description: '로그아웃 성공' })
   async logout(@CurrentUser() user: any, @Res() res: Response) {
+    this.logger.log(`[Logout] 로그아웃 시작 - userId: ${user.id}, email: ${user.email}`);
+
     await this.authService.logout(user.id);
 
     // 웹 세션 삭제 (MCP 세션도 무효화되도록)
@@ -458,16 +480,21 @@ export class AuthController {
       // 웹 세션 삭제
       await this.redisService.deleteCache('sessions', `user:${user.id}`);
 
+      // JWT validation 캐시 삭제 (JwtStrategy가 사용)
+      await this.redisService.deleteCache('sessions', `user_validate_${user.id}`);
+
       // 해당 사용자의 모든 MCP 세션 찾아서 삭제
       // MCP 세션은 mcp:sessions:* 패턴으로 저장되어 있고, 세션 데이터에 userId가 포함됨
       // 여기서는 간단히 웹 세션만 삭제하고, MCP 세션은 검증 시 자동으로 무효화됨
-      this.logger.debug(`웹 세션 삭제: userId=${user.id}`);
+      this.logger.debug(`웹 세션 및 JWT validation 캐시 삭제: userId=${user.id}`);
     } catch (error) {
       this.logger.error(`세션 삭제 실패: ${error.message}`);
       // 세션 삭제 실패해도 로그아웃은 진행
     }
 
     // 모든 쿠키 제거
+    this.logger.log(`[Logout] 쿠키 삭제 중 - access_token, refresh_token`);
+
     res.clearCookie('access_token', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -481,6 +508,8 @@ export class AuthController {
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
       path: '/',
     });
+
+    this.logger.log(`[Logout] 로그아웃 완료 - userId: ${user.id}`);
 
     return res.json({ message: '로그아웃되었습니다.' });
   }

@@ -95,7 +95,17 @@ async function apiRequest<T>(
         localStorage.removeItem('access_token');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/login';
+
+        // 현재 경로가 인증 관련 페이지인지 확인
+        // OAuth 직후 /consent 페이지에서 쿠키 설정 전 401 에러가 발생할 수 있으므로
+        // 인증 페이지에서는 /login으로 리다이렉트하지 않음
+        const authPages = ['/login', '/register', '/consent', '/auth/callback'];
+        const currentPath = window.location.pathname;
+        const isAuthPage = authPages.some(page => currentPath.startsWith(page));
+
+        if (!isAuthPage) {
+          window.location.href = '/login';
+        }
       }
 
       throw new Error('세션이 만료되었습니다');
@@ -154,7 +164,17 @@ async function apiRequest<T>(
           localStorage.removeItem('access_token');
           localStorage.removeItem('token');
           localStorage.removeItem('user');
-          window.location.href = '/login';
+
+          // 현재 경로가 인증 관련 페이지인지 확인
+          // OAuth 직후 /consent 페이지에서 쿠키 설정 전 401 에러가 발생할 수 있으므로
+          // 인증 페이지에서는 /login으로 리다이렉트하지 않음
+          const authPages = ['/login', '/register', '/consent', '/auth/callback'];
+          const currentPath = window.location.pathname;
+          const isAuthPage = authPages.some(page => currentPath.startsWith(page));
+
+          if (!isAuthPage) {
+            window.location.href = '/login';
+          }
         }
 
         throw error;

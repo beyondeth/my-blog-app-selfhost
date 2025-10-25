@@ -7,8 +7,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import UserAvatar from '@/components/ui/UserAvatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
-import { FiHeart, FiMessageCircle, FiEye } from 'react-icons/fi';
-import { FaStar } from 'react-icons/fa';
+import { FiHeart, FiMessageCircle, FiEye, FiTarget } from 'react-icons/fi';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
 
@@ -219,8 +218,8 @@ const PostArticle = React.memo(function PostArticle({
                 {post.commentCount || 0}
               </span>
               {post.isEditorPick && (
-                <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400 whitespace-nowrap">
-                  <FaStar className="w-5 h-5" />
+                <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  <FiTarget className="w-5 h-5" />
                   <span className="text-[11px]">Pick</span>
                 </span>
               )}
@@ -344,8 +343,8 @@ const PostArticle = React.memo(function PostArticle({
                 {post.commentCount || 0}
               </span>
               {post.isEditorPick && (
-                <span className="flex items-center gap-1 text-amber-500 dark:text-amber-400 whitespace-nowrap">
-                  <FaStar className="w-5 h-5" />
+                <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  <FiTarget className="w-5 h-5" />
                   <span className="text-[11px]">Pick</span>
                 </span>
               )}

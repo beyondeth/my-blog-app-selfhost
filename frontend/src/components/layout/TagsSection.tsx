@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import { FiHash } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 
 interface TagsSectionProps {
@@ -24,7 +25,14 @@ const TagsSection = React.memo(function TagsSection({ tags, onTagClick }: TagsSe
   }
 
   return (
-    <SidebarSection title="태그">
+    <SidebarSection
+      title={
+        <div className="flex items-center gap-2">
+          <FiHash className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+          <span>태그</span>
+        </div>
+      }
+    >
       <div className="flex flex-wrap gap-2">
         {sortedTags.map((tag, index) => {
           const isAITag = tag.toLowerCase().startsWith('ai:');
