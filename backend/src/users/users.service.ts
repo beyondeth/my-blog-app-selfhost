@@ -59,9 +59,9 @@ export class UsersService {
   }
 
   async findOne(id: string): Promise<User> {
-    const user = await this.usersRepository.findOne({ 
+    const user = await this.usersRepository.findOne({
       where: { id },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive', 'bio', 'authProvider', 'providerId']
+      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive', 'bio', 'authProvider', 'providerId', 'marketingOptIn', 'newsletterOptIn', 'termsAcceptedAt', 'privacyAcceptedAt']
     });
     
     if (!user) {
@@ -275,6 +275,10 @@ export class UsersService {
         'user.subscriptionTier',        // 구독 티어
         'user.subscriptionStatus',      // 구독 상태
         'user.bio',                      // 사용자 소개
+        'user.marketingOptIn',          // 마케팅 정보 수신 동의
+        'user.newsletterOptIn',         // 뉴스레터 수신 동의
+        'user.termsAcceptedAt',         // 이용약관 동의 시각
+        'user.privacyAcceptedAt',       // 개인정보 처리방침 동의 시각
         'blog.slug',                     // blog의 slug만 선택 (헤더 "내 블로그" 버튼용)
       ])
       .where('user.id = :id', { id })
@@ -367,6 +371,37 @@ export class UsersService {
 
     // TODO: BullMQ 큐에 백그라운드 삭제 작업 추가
     // await this.userDeletionQueue.add('soft-delete', { userId });
+  }
+
+  /**
+   * 마케팅 정보 수신 설정 업데이트
+   * 사용자가 설정 페이지에서 마케팅 및 뉴스레터 수신 여부를 변경할 때 사용
+   */
+  async updateMarketingPreferences(
+    userId: string,
+    preferences: { marketingOptIn?: boolean; newsletterOptIn?: boolean },
+  ): Promise<User> {
+    const user = await this.findOne(userId);
+
+    const updateData: any = {};
+
+    // 마케팅 정보 수신 동의 업데이트
+    if (preferences.marketingOptIn !== undefined) {
+      updateData.marketingOptIn = preferences.marketingOptIn;
+      updateData.marketingOptInAt = preferences.marketingOptIn ? new Date() : null;
+    }
+
+    // 뉴스레터 수신 동의 업데이트
+    if (preferences.newsletterOptIn !== undefined) {
+      updateData.newsletterOptIn = preferences.newsletterOptIn;
+    }
+
+    Object.assign(user, updateData);
+    const updatedUser = await this.usersRepository.save(user);
+
+    this.logger.log(`Marketing preferences updated for user: ${userId}`);
+
+    return updatedUser;
   }
 
 } 

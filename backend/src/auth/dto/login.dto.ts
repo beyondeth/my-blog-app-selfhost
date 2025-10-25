@@ -11,10 +11,10 @@ export class LoginDto {
 
   @ApiProperty({
     description: 'User password',
-    minLength: 6,
+    minLength: 8,
     example: 'password123',
   })
   @IsString()
-  @MinLength(6, { message: 'Password must be at least 6 characters long' })
+  @MinLength(8, { message: '비밀번호는 최소 8자 이상이어야 합니다' })
   password: string;
 } 

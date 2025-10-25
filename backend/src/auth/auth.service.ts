@@ -90,7 +90,17 @@ export class AuthService {
   }
 
   async register(registerDto: RegisterDto): Promise<AuthResponse> {
-    const { email, username, password, emailVerificationToken } = registerDto;
+    const {
+      email,
+      username,
+      password,
+      emailVerificationToken,
+      isOver14,
+      termsAccepted,
+      privacyAccepted,
+      marketingOptIn,
+      newsletterOptIn
+    } = registerDto;
 
     // 이메일 인증 확인 (필수)
     // curl 등 직접 API 호출을 통한 회원가입 방지
@@ -123,6 +133,11 @@ export class AuthService {
         password,
         authProvider: AuthProvider.LOCAL,
         isEmailVerified: true,  // 이메일 인증 완료 상태 반영
+        termsAcceptedAt: termsAccepted ? new Date() : null,
+        privacyAcceptedAt: privacyAccepted ? new Date() : null,
+        marketingOptIn: marketingOptIn || false,
+        marketingOptInAt: marketingOptIn ? new Date() : null,
+        newsletterOptIn: newsletterOptIn || false,
       });
 
       // 자동으로 블로그 생성
@@ -261,6 +276,12 @@ export class AuthService {
         providerId: profile.id,
         isEmailVerified: true,
         accountVerifiedAt: new Date(),
+        // OAuth 로그인은 약관 동의를 받지 않으므로 null로 초기화
+        // 프론트엔드에서 /consent 페이지로 리다이렉트하여 동의 받음
+        termsAcceptedAt: null,
+        privacyAcceptedAt: null,
+        marketingOptIn: false,
+        newsletterOptIn: false,
       });
 
       // Identity 생성
@@ -684,5 +705,39 @@ export class AuthService {
     });
 
     this.logger.log(`Password reset successful for user: ${resetToken.user.email}`);
+  }
+
+  /**
+   * OAuth 로그인 후 약관 동의 완료 처리
+   * 소셜 로그인 사용자가 최초 로그인 시 필수 약관 동의를 받은 후 호출
+   */
+  async updateConsent(userId: string, consentDto: {
+    isOver14: boolean;
+    termsAccepted: boolean;
+    privacyAccepted: boolean;
+    marketingOptIn?: boolean;
+    newsletterOptIn?: boolean;
+  }): Promise<void> {
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new BadRequestException('User not found');
+    }
+
+    // 이미 약관 동의가 완료된 경우
+    if (user.termsAcceptedAt && user.privacyAcceptedAt) {
+      this.logger.warn(`User ${userId} already completed consent`);
+      return;
+    }
+
+    // 약관 동의 정보 업데이트
+    await this.usersService.update(userId, {
+      termsAcceptedAt: consentDto.termsAccepted ? new Date() : null,
+      privacyAcceptedAt: consentDto.privacyAccepted ? new Date() : null,
+      marketingOptIn: consentDto.marketingOptIn || false,
+      marketingOptInAt: consentDto.marketingOptIn ? new Date() : null,
+      newsletterOptIn: consentDto.newsletterOptIn || false,
+    });
+
+    this.logger.log(`Consent updated for OAuth user: ${user.email}`);
   }
 } 

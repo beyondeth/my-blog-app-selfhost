@@ -1,4 +1,5 @@
-import type { Metadata } from "next";
+'use client';
+
 import "./globals.css";
 import Header from '@/components/layout/Header';
 import LeftSidebar from '@/components/layout/LeftSidebar';
@@ -9,17 +10,50 @@ import { ThemeProvider } from '@/providers/ThemeProvider';
 import { Toaster } from 'sonner';
 // import { PerformanceMonitor } from '@/components/PerformanceMonitor';
 import { DMModalProvider } from '@/components/dm/DMModalProvider';
-
-export const metadata: Metadata = {
-  title: "My Blog",
-  description: "개인 블로그입니다.",
-};
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
+  const [shouldHideLayout, setShouldHideLayout] = useState(false);
+
+  useEffect(() => {
+    // 법적 문서 페이지 목록
+    const legalPaths = [
+      '/legal/terms',
+      '/legal/privacy',
+      '/legal/marketing-consent',
+      '/legal/guidelines',
+      '/legal/username',
+      '/legal/partner',
+      '/legal/pro',
+    ];
+
+    // 현재 페이지가 법적 문서 페이지인지 확인
+    const isLegalPage = legalPaths.some(path => pathname.startsWith(path));
+
+    if (isLegalPage) {
+      // 법적 문서 페이지: sessionStorage 체크
+      const fromAuth = sessionStorage.getItem('from-auth') === 'true';
+      setShouldHideLayout(fromAuth);
+    } else {
+      // 법적 문서가 아닌 다른 페이지로 이동 시 sessionStorage 초기화
+      // 단, 인증 페이지로 이동하는 경우는 제외 (인증 레이아웃에서 설정)
+      const authPaths = ['/login', '/register', '/consent', '/forgot-password', '/reset-password'];
+      const isAuthPage = authPaths.some(path => pathname.startsWith(path));
+
+      if (!isAuthPage) {
+        sessionStorage.removeItem('from-auth');
+        sessionStorage.removeItem('auth-pathname');
+      }
+      setShouldHideLayout(false);
+    }
+  }, [pathname]);
+
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
@@ -94,19 +128,28 @@ export default function RootLayout({
         >
           <ClientProviders>
             <DMModalProvider>
-              {/* 유튜브 스타일 레이아웃: 상단 헤더 + 왼쪽 사이드바 + 메인 콘텐츠 + 하단 바텀바 */}
-              <div>
-                <Header />
-                <div className="flex">
-                  <LeftSidebar />
-                  {/* 왼쪽 사이드바 영역 확보: translate-x-[23px] + w-20 = 103px, 여유 25px 포함 = 128px */}
+              {shouldHideLayout ? (
+                // 법적 문서 페이지에서 인증 페이지에서 온 경우: 헤더/사이드바 숨김
+                <div className="min-h-screen bg-background">
                   <MainContent>
                     {children}
                   </MainContent>
                 </div>
-                {/* 모바일 하단 네비게이션 바 */}
-                <BottomNavBar />
-              </div>
+              ) : (
+                // 일반 레이아웃: 헤더 + 사이드바 + 메인 콘텐츠 + 하단 바텀바
+                <div>
+                  <Header />
+                  <div className="flex">
+                    <LeftSidebar />
+                    {/* 왼쪽 사이드바 영역 확보: translate-x-[23px] + w-20 = 103px, 여유 25px 포함 = 128px */}
+                    <MainContent>
+                      {children}
+                    </MainContent>
+                  </div>
+                  {/* 모바일 하단 네비게이션 바 */}
+                  <BottomNavBar />
+                </div>
+              )}
               <Toaster position="top-center" richColors />
               {/* <PerformanceMonitor /> */}
             </DMModalProvider>

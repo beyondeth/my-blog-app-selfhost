@@ -197,6 +197,30 @@ export class User {
   @Column({ type: 'int', default: 3 })
   dataRetentionYears: number; // 개인정보 보유기간 (기본 3년)
 
+  // 약관 동의 관련 필드 추가
+  @Column({ type: 'timestamp', nullable: true })
+  termsAcceptedAt: Date; // 이용약관 동의 시각
+
+  @Column({ type: 'timestamp', nullable: true })
+  privacyAcceptedAt: Date; // 개인정보처리방침 동의 시각
+
+  // 마케팅 동의 관련 (선택)
+  @Column({ default: false })
+  marketingOptIn: boolean; // 마케팅 수신 동의
+
+  @Column({ type: 'timestamp', nullable: true })
+  marketingOptInAt: Date; // 마케팅 동의 시각
+
+  @Column({ default: false })
+  newsletterOptIn: boolean; // 뉴스레터 수신 동의
+
+  // 보안 관련
+  @Column({ type: 'int', default: 0 })
+  loginAttempts: number; // 로그인 실패 횟수
+
+  @Column({ type: 'timestamp', nullable: true })
+  lockedUntil: Date; // 계정 잠금 해제 시간 (5회 실패 시)
+
   @BeforeInsert()
   @BeforeUpdate()
   async hashPassword() {
@@ -224,6 +248,8 @@ export class User {
       subscriptionTier: this.subscriptionTier,     // 구독 티어는 공개
       subscriptionStatus: this.subscriptionStatus, // 구독 상태 추가
       blogSlug: this.blog?.slug || null,           // 블로그 슬러그 추가 (헤더 "내 블로그" 버튼용)
+      termsAcceptedAt: this.termsAcceptedAt,       // 약관 동의 시각 (ConsentGuard에서 사용)
+      privacyAcceptedAt: this.privacyAcceptedAt,   // 개인정보 동의 시각 (ConsentGuard에서 사용)
       createdAt: this.createdAt,
     };
   }

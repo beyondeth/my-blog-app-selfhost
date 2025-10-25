@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Request, Query, DefaultValuePipe, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, UseGuards, Request, Query, DefaultValuePipe, ParseIntPipe, Patch } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -6,6 +6,7 @@ import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateMarketingPreferencesDto } from './dto/update-marketing-preferences.dto';
 import { Public } from '../common/decorators/public.decorator';
 
 @ApiTags('users')
@@ -42,6 +43,20 @@ export class UsersController {
   @ApiBearerAuth()
   updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
     return this.usersService.update(req.user.id, updateProfileDto);
+  }
+
+  @Patch('marketing-preferences')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '마케팅 정보 수신 설정 업데이트' })
+  @ApiBearerAuth()
+  updateMarketingPreferences(
+    @Request() req,
+    @Body() updateMarketingPreferencesDto: UpdateMarketingPreferencesDto,
+  ) {
+    return this.usersService.updateMarketingPreferences(
+      req.user.id,
+      updateMarketingPreferencesDto,
+    );
   }
 
   @Delete(':id')

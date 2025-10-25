@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
-import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, FiLoader } from 'react-icons/fi';
+import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, FiLoader, FiBell } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale/ko';
 import Image from 'next/image';
@@ -20,6 +20,10 @@ export default function ProfileSettingsPage() {
     email: '',
     bio: '',
   });
+  const [marketingPreferences, setMarketingPreferences] = useState({
+    marketingOptIn: false,
+    newsletterOptIn: false,
+  });
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmText, setDeleteConfirmText] = useState(''); // Task 26: 계정 삭제 확인 텍스트
@@ -35,6 +39,10 @@ export default function ProfileSettingsPage() {
         username: user.username || '',
         email: user.email || '',
         bio: user.bio || '',
+      });
+      setMarketingPreferences({
+        marketingOptIn: user.marketingOptIn || false,
+        newsletterOptIn: user.newsletterOptIn || false,
       });
       if (user.profileImage) {
         // normalizeImageUrl 사용 (CDN 지원)
@@ -97,6 +105,45 @@ export default function ProfileSettingsPage() {
       setError(err.message || '이미지 업로드 중 오류가 발생했습니다');
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  /**
+   * 마케팅 정보 수신 설정 변경 핸들러
+   * 토글 변경 시 즉시 API 호출하여 백엔드 업데이트
+   */
+  const handleMarketingPreferenceChange = async (
+    preferences: { marketingOptIn?: boolean; newsletterOptIn?: boolean }
+  ) => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/marketing-preferences`,
+        {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify(preferences),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '마케팅 정보 수신 설정 업데이트에 실패했습니다');
+      }
+
+      // 사용자 정보 새로고침 (JWT 토큰에 반영)
+      await refreshUser();
+    } catch (err: any) {
+      setError(err.message || '마케팅 정보 수신 설정 업데이트 중 오류가 발생했습니다');
+      // 에러 발생 시 이전 상태로 되돌리기
+      if (user) {
+        setMarketingPreferences({
+          marketingOptIn: user.marketingOptIn || false,
+          newsletterOptIn: user.newsletterOptIn || false,
+        });
+      }
     }
   };
 
@@ -243,7 +290,7 @@ export default function ProfileSettingsPage() {
         {/* Username */}
         <div>
           <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            사용자 이름
+            닉네임
           </label>
           <input
             type="text"
@@ -251,6 +298,7 @@ export default function ProfileSettingsPage() {
             value={formData.username}
             onChange={(e) => setFormData({ ...formData, username: e.target.value })}
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-amber-500 dark:focus:ring-amber-400"
+            placeholder="실명이 아닌 별명을 사용하세요"
             required
           />
         </div>
@@ -329,6 +377,66 @@ export default function ProfileSettingsPage() {
               <FiMail className="mr-2 text-gray-400 dark:text-gray-500" />
               <span className="text-gray-600 dark:text-gray-400">인증 방법:</span>
               <span className="ml-2 text-gray-900 dark:text-gray-100">{user.authProvider || 'Email'}</span>
+            </div>
+          </div>
+
+          {/* 마케팅 정보 수신 설정 */}
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">마케팅 정보 수신</h3>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <FiBell className="mr-2 text-gray-400 dark:text-gray-500" />
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      마케팅 정보 수신
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      신규 기능, 이벤트, 프로모션 정보를 받아보세요
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={marketingPreferences.marketingOptIn}
+                    onChange={async (e) => {
+                      const newValue = e.target.checked;
+                      setMarketingPreferences({ ...marketingPreferences, marketingOptIn: newValue });
+                      await handleMarketingPreferenceChange({ marketingOptIn: newValue });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center">
+                  <FiMail className="mr-2 text-gray-400 dark:text-gray-500" />
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                      뉴스레터 수신
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      주간/월간 뉴스레터와 추천 콘텐츠를 받아보세요
+                    </p>
+                  </div>
+                </div>
+                <label className="relative inline-flex items-center cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={marketingPreferences.newsletterOptIn}
+                    onChange={async (e) => {
+                      const newValue = e.target.checked;
+                      setMarketingPreferences({ ...marketingPreferences, newsletterOptIn: newValue });
+                      await handleMarketingPreferenceChange({ newsletterOptIn: newValue });
+                    }}
+                    className="sr-only peer"
+                  />
+                  <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-gray-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-700"></div>
+                </label>
+              </div>
             </div>
           </div>
         </div>

@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsEnum } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Role } from '../../common/enums/role.enum';
 import { AuthProvider } from '../entities/user.entity';
@@ -87,4 +87,41 @@ export class CreateUserDto {
   })
   @IsOptional()
   accountVerifiedAt?: Date;
+
+  @ApiPropertyOptional({
+    description: '이용약관 동의 시각',
+    example: new Date().toISOString(),
+  })
+  @IsOptional()
+  termsAcceptedAt?: Date | null;
+
+  @ApiPropertyOptional({
+    description: '개인정보 처리방침 동의 시각',
+    example: new Date().toISOString(),
+  })
+  @IsOptional()
+  privacyAcceptedAt?: Date | null;
+
+  @ApiPropertyOptional({
+    description: '마케팅 정보 수신 동의',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  marketingOptIn?: boolean;
+
+  @ApiPropertyOptional({
+    description: '마케팅 정보 수신 동의 시각',
+    example: new Date().toISOString(),
+  })
+  @IsOptional()
+  marketingOptInAt?: Date | null;
+
+  @ApiPropertyOptional({
+    description: '뉴스레터 수신 동의',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  newsletterOptIn?: boolean;
 } 

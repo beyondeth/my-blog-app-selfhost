@@ -370,3 +370,220 @@ textarea {
   display: inline-block;
   width: 100%;
 }
+
+/* ===================================================================
+   Auth 페이지 모던 디자인 - 라이트/다크 모드 지원
+   ================================================================ */
+
+/* 그라디언트 배경 효과 - 라이트 모드 */
+.auth-gradient-light {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  position: fixed;
+  inset: 0;
+  opacity: 0.05;
+  pointer-events: none;
+}
+
+/* 그라디언트 배경 효과 - 다크 모드 */
+.auth-gradient-dark {
+  background: radial-gradient(ellipse at top left, rgba(99, 102, 241, 0.15) 0%, transparent 50%),
+              radial-gradient(ellipse at bottom right, rgba(139, 92, 246, 0.15) 0%, transparent 50%);
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+}
+
+/* 블러 오브 효과 (장식용 원형 그라디언트) */
+.blur-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  opacity: 0.3;
+  pointer-events: none;
+}
+
+.blur-orb-1 {
+  width: 500px;
+  height: 500px;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  top: -200px;
+  left: -200px;
+}
+
+.blur-orb-2 {
+  width: 400px;
+  height: 400px;
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  bottom: -150px;
+  right: -150px;
+}
+
+/* 카드 - 배경과 자연스럽게 융합 (Resend 스타일) */
+.auth-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+.dark .auth-card {
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* 입력 필드 스타일 - 라이트 모드 */
+.auth-input {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  transition: all 0.3s ease;
+}
+
+.auth-input:focus {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+/* 입력 필드 스타일 - 다크 모드 */
+.dark .auth-input {
+  background: rgba(17, 24, 39, 0.5);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+  color: #e5e7eb;
+}
+
+.dark .auth-input:focus {
+  background: rgba(17, 24, 39, 0.8);
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.1);
+}
+
+/* 버튼 그라디언트 효과 */
+.auth-button-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-button-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transition: left 0.5s ease;
+}
+
+.auth-button-primary:hover::before {
+  left: 100%;
+}
+
+.auth-button-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 20px rgba(99, 102, 241, 0.3);
+}
+
+/* 소셜 로그인 버튼 - 라이트 모드 */
+.social-login-btn {
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  transition: all 0.3s ease;
+}
+
+.social-login-btn:hover {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(209, 213, 219, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* 소셜 로그인 버튼 - 다크 모드 */
+.dark .social-login-btn {
+  background: rgba(17, 24, 39, 0.5);
+  border: 1px solid rgba(55, 65, 81, 0.5);
+}
+
+.dark .social-login-btn:hover {
+  background: rgba(17, 24, 39, 0.8);
+  border-color: rgba(75, 85, 99, 0.8);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+/* 구분선 스타일 */
+.auth-divider {
+  position: relative;
+  text-align: center;
+  color: #9ca3af;
+  font-size: 0.875rem;
+  margin: 1.5rem 0;
+}
+
+.auth-divider::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: calc(50% - 20px);
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(156, 163, 175, 0.3));
+}
+
+.auth-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: 0;
+  width: calc(50% - 20px);
+  height: 1px;
+  background: linear-gradient(270deg, transparent, rgba(156, 163, 175, 0.3));
+}
+
+.dark .auth-divider {
+  color: #6b7280;
+}
+
+.dark .auth-divider::before,
+.dark .auth-divider::after {
+  background: linear-gradient(90deg, transparent, rgba(75, 85, 99, 0.5));
+}
+
+/* 페이드 인 애니메이션 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* 흔들림 애니메이션 (에러 시) */
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+/* 글로우 효과 */
+.glow {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.3);
+}
+
+.dark .glow {
+  box-shadow: 0 0 20px rgba(129, 140, 248, 0.3);
+}

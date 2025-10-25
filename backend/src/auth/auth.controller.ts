@@ -1,4 +1,5 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Res, Response, Delete, Logger } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Res, Delete, Logger } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Throttle } from '@nestjs/throttler';
@@ -18,6 +19,7 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { ConsentDto } from './dto/consent.dto';
 import { User } from '../users/entities/user.entity';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
 
@@ -73,7 +75,7 @@ export class AuthController {
   @ApiOperation({ summary: '로그인' })
   @ApiResponse({ status: 200, description: '로그인 성공' })
   @ApiResponse({ status: 401, description: '인증 실패' })
-  async login(@Body() loginDto: LoginDto, @Response() res) {
+  async login(@Body() loginDto: LoginDto, @Res() res: Response) {
     const authResponse = await this.authService.login(loginDto);
 
     // HttpOnly 쿠키로 토큰들 설정
@@ -112,7 +114,7 @@ export class AuthController {
   @ApiOperation({ summary: '회원가입' })
   @ApiResponse({ status: 201, description: '회원가입 성공' })
   @ApiResponse({ status: 400, description: '잘못된 요청' })
-  async register(@Body() registerDto: RegisterDto, @Response() res) {
+  async register(@Body() registerDto: RegisterDto, @Res() res: Response) {
     const authResponse = await this.authService.register(registerDto);
     
     // HttpOnly 쿠키로 토큰들 설정
@@ -270,7 +272,7 @@ export class AuthController {
   @ApiResponse({ status: 200, description: '인증 코드 발송 성공' })
   @ApiResponse({ status: 400, description: '잘못된 요청' })
   @ApiResponse({ status: 409, description: '이미 존재하는 이메일' })
-  async sendEmailCode(@Body() dto: SendCodeDto, @Response() res) {
+  async sendEmailCode(@Body() dto: SendCodeDto, @Res() res: Response) {
     try {
       await this.emailService.sendVerificationCode(dto.email);
       return res.json({ 
@@ -304,7 +306,7 @@ export class AuthController {
   @ApiOperation({ summary: '이메일 인증 코드 검증' })
   @ApiResponse({ status: 200, description: '인증 코드 검증 성공' })
   @ApiResponse({ status: 401, description: '인증 실패' })
-  async verifyEmailCode(@Body() dto: VerifyCodeDto, @Response() res) {
+  async verifyEmailCode(@Body() dto: VerifyCodeDto, @Res() res: Response) {
     try {
       const result = await this.emailService.verifyCode(dto.email, dto.code);
       return res.json({ 
@@ -332,7 +334,7 @@ export class AuthController {
   @ApiOperation({ summary: '이메일 인증 코드 재발송' })
   @ApiResponse({ status: 200, description: '인증 코드 재발송 성공' })
   @ApiResponse({ status: 400, description: '잘못된 요청' })
-  async resendEmailCode(@Body() dto: SendCodeDto, @Response() res) {
+  async resendEmailCode(@Body() dto: SendCodeDto, @Res() res: Response) {
     try {
       await this.emailService.resendVerificationCode(dto.email);
       return res.json({ 
@@ -358,7 +360,7 @@ export class AuthController {
   @ApiOperation({ summary: '토큰 갱신' })
   @ApiResponse({ status: 200, description: '토큰 갱신 성공' })
   @ApiResponse({ status: 401, description: '유효하지 않은 토큰' })
-  async refreshToken(@Request() req, @Response() res) {
+  async refreshToken(@Request() req, @Res() res: Response) {
     const refreshToken = req.cookies?.refresh_token;
     
     if (!refreshToken) {
@@ -395,7 +397,7 @@ export class AuthController {
   @Throttle({ default: { limit: 20, ttl: 60000 } })  // 분당 20회 제한 (User Enumeration 공격 방지)
   @ApiOperation({ summary: '이메일의 인증 방법 확인' })
   @ApiResponse({ status: 200, description: '인증 방법 반환' })
-  async checkAuthMethod(@Body() dto: { email: string }, @Response() res) {
+  async checkAuthMethod(@Body() dto: { email: string }, @Res() res: Response) {
     const result = await this.authService.checkAuthMethod(dto.email);
     return res.json(result);
   }
@@ -420,6 +422,8 @@ export class AuthController {
         subscriptionStatus: user.subscriptionStatus,
         bio: user.bio,
         blogSlug: user.blog?.slug || null,
+        termsAcceptedAt: user.termsAcceptedAt,
+        privacyAcceptedAt: user.privacyAcceptedAt,
         createdAt: user.createdAt,
       };
     }
@@ -436,6 +440,8 @@ export class AuthController {
       subscriptionStatus: fullUser.subscriptionStatus,
       bio: fullUser.bio,
       blogSlug: fullUser.blog?.slug || null,
+      termsAcceptedAt: fullUser.termsAcceptedAt,       // 약관 동의 시각
+      privacyAcceptedAt: fullUser.privacyAcceptedAt,   // 개인정보 동의 시각
       createdAt: fullUser.createdAt,
     };
   }
@@ -444,7 +450,7 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '로그아웃' })
   @ApiResponse({ status: 200, description: '로그아웃 성공' })
-  async logout(@CurrentUser() user: any, @Response() res) {
+  async logout(@CurrentUser() user: any, @Res() res: Response) {
     await this.authService.logout(user.id);
 
     // 웹 세션 삭제 (MCP 세션도 무효화되도록)
@@ -487,7 +493,7 @@ export class AuthController {
   async forgotPassword(
     @Body() dto: { email: string },
     @Request() req,
-    @Response() res
+    @Res() res: Response
   ) {
     try {
       const ipAddress = req.ip || req.connection.remoteAddress;
@@ -523,7 +529,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: '토큰 무효' })
   async validateResetToken(
     @Body() dto: { token: string },
-    @Response() res
+    @Res() res: Response
   ) {
     const isValid = await this.authService.validateResetToken(dto.token);
     
@@ -547,7 +553,7 @@ export class AuthController {
   @ApiResponse({ status: 400, description: '잘못된 요청' })
   async resetPassword(
     @Body() dto: { token: string; newPassword: string },
-    @Response() res
+    @Res() res: Response
   ) {
     try {
       await this.authService.resetPassword(dto.token, dto.newPassword);
@@ -573,7 +579,7 @@ export class AuthController {
   async deleteAccount(
     @CurrentUser() user: User,
     @Body() dto: DeleteAccountDto,
-    @Response() res
+    @Res() res: Response
   ) {
     // 로컬 인증 사용자의 경우에만 비밀번호 확인
     if (user.authProvider === 'local' || !user.authProvider) {
@@ -651,6 +657,46 @@ export class AuthController {
       return res.status(400).json({
         success: false,
         message: error.message || '계정 삭제 중 오류가 발생했습니다.'
+      });
+    }
+  }
+
+  /**
+   * OAuth 로그인 후 약관 동의 완료
+   * 소셜 로그인 사용자가 최초 로그인 시 필수 약관 동의를 받은 후 호출
+   */
+  @Post('consent')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'OAuth 로그인 후 약관 동의 완료' })
+  @ApiResponse({
+    status: 200,
+    description: '약관 동의 완료',
+    schema: {
+      type: 'object',
+      properties: {
+        success: { type: 'boolean', example: true },
+        message: { type: 'string', example: '약관 동의가 완료되었습니다.' }
+      }
+    }
+  })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  async updateConsent(
+    @CurrentUser() user: User,
+    @Body() consentDto: ConsentDto,
+    @Res() res: Response,
+  ) {
+    try {
+      await this.authService.updateConsent(user.id, consentDto);
+
+      return res.status(200).json({
+        success: true,
+        message: '약관 동의가 완료되었습니다.'
+      });
+    } catch (error) {
+      this.logger.error(`Consent update failed for user ${user.id}:`, error);
+      return res.status(400).json({
+        success: false,
+        message: error.message || '약관 동의 처리 중 오류가 발생했습니다.'
       });
     }
   }

@@ -30,8 +30,18 @@ export interface User {
   readonly blogSlug?: string | null;  // 블로그 슬러그 (헤더 "내 블로그" 버튼에서 사용)
   readonly subscriptionTier?: string;  // 구독 티어 (헤더 플랜 배지에서 사용)
   readonly subscriptionStatus?: string;  // 구독 상태
+  readonly marketingOptIn?: boolean;  // 마케팅 정보 수신 동의
+  readonly newsletterOptIn?: boolean;  // 뉴스레터 수신 동의
+  readonly termsAcceptedAt?: string | null;  // 이용약관 동의 시각
+  readonly privacyAcceptedAt?: string | null;  // 개인정보 처리방침 동의 시각
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+// Helper function: 약관 동의가 필요한지 확인
+export function needsConsent(user: User | null): boolean {
+  if (!user) return false;
+  return !user.termsAcceptedAt || !user.privacyAcceptedAt;
 }
 
 export interface AuthResponse {
@@ -155,6 +165,13 @@ export interface RegisterForm {
   password: string;
   username: string;
   emailVerificationToken?: string;
+  // 약관 동의 필드 (필수)
+  isOver14?: boolean;
+  termsAccepted?: boolean;
+  privacyAccepted?: boolean;
+  // 선택 동의 필드
+  marketingOptIn?: boolean;
+  newsletterOptIn?: boolean;
 }
 
 export interface PostForm {

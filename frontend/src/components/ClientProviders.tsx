@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { useState } from 'react';
 import { AuthProviderV2 } from '@/providers/AuthProviderV2';
 import { MigrationProvider } from '@/providers/MigrationProvider';
+import ConsentGuard from '@/components/auth/ConsentGuard';
 import { createQueryClient } from '@/utils/queryHelpers';
 
 export default function ClientProviders({
@@ -18,7 +19,9 @@ export default function ClientProviders({
     <QueryClientProvider client={queryClient}>
       <MigrationProvider>
         <AuthProviderV2>
-          {children}
+          <ConsentGuard>
+            {children}
+          </ConsentGuard>
         </AuthProviderV2>
       </MigrationProvider>
     </QueryClientProvider>

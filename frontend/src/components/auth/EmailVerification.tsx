@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, forwardRef } from 'react';
-import { FiMail, FiCheck, FiAlertCircle } from 'react-icons/fi';
+import { Mail, Check, AlertCircle } from 'lucide-react';
 import { useEmailVerification } from '@/hooks/useEmailVerification';
 
 interface EmailVerificationProps {
@@ -50,11 +50,11 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
     <div className="space-y-4">
       {/* 이메일 입력 필드 */}
       <div>
-        <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
           이메일
         </label>
         <div className="relative">
-          <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
           <input
             ref={ref}
             type="email"
@@ -62,10 +62,10 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
             value={email}
             onChange={(e) => onEmailChange(e.target.value)}
             disabled={disabled || state.step !== 'input'}
-            className={`w-full pl-10 pr-32 py-3 border rounded-md focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
-              state.error && state.step === 'input' ? 'border-red-300 bg-red-50' : 'border-gray-300'
-            } ${state.step !== 'input' ? 'bg-gray-50' : ''} ${className}`}
-            placeholder="이메일을 입력하세요"
+            className={`w-full pl-10 pr-32 py-3 rounded-lg auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+              state.error && state.step === 'input' ? 'border-red-500 dark:border-red-400' : ''
+            } ${state.step !== 'input' ? 'opacity-60' : ''} ${className}`}
+            placeholder="name@example.com"
             required
           />
           {state.step === 'input' && (
@@ -73,14 +73,14 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               type="button"
               onClick={handleSendCode}
               disabled={state.isLoading || !email}
-              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-3 py-1.5 bg-blue-500 text-white rounded text-sm hover:bg-blue-600 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              className="absolute right-2 top-1/2 transform -translate-y-1/2 px-4 py-2 bg-indigo-600 dark:bg-indigo-500 text-white rounded-md text-sm font-medium hover:bg-indigo-700 dark:hover:bg-indigo-600 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed transition-colors"
             >
               {state.isLoading ? '발송 중...' : '인증 코드 발급'}
             </button>
           )}
           {state.step === 'verified' && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <FiCheck className="w-5 h-5 text-green-500" />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center justify-center w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30">
+              <Check className="w-5 h-5 text-green-600 dark:text-green-400" />
             </div>
           )}
         </div>
@@ -88,7 +88,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
 
       {/* 인증 코드 입력 필드 */}
       {state.step === 'verify' && (
-        <div className="space-y-3 animate-fadeIn">
+        <div className="space-y-3 fade-in-up">
           <div className="flex gap-2">
             <input
               type="text"
@@ -96,8 +96,8 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               onChange={(e) => setCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
               maxLength={6}
               disabled={state.isLoading}
-              className={`flex-1 px-3 py-3 border rounded-md text-center text-lg font-mono tracking-wider focus:ring-2 focus:ring-gray-900 focus:border-transparent transition-all ${
-                state.error ? 'border-red-300 bg-red-50' : 'border-gray-300'
+              className={`flex-1 px-3 py-3 rounded-lg text-center text-lg font-mono tracking-wider auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+                state.error ? 'border-red-500 dark:border-red-400' : ''
               }`}
               placeholder="인증 코드 6자리"
               autoFocus
@@ -106,7 +106,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               type="button"
               onClick={handleVerifyCode}
               disabled={state.isLoading || code.length !== 6}
-              className="px-5 py-3 bg-gray-900 text-white rounded-md hover:bg-gray-800 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+              className="px-5 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg font-medium hover:from-indigo-700 hover:to-purple-700 disabled:from-gray-300 disabled:to-gray-300 dark:disabled:from-gray-600 dark:disabled:to-gray-600 disabled:cursor-not-allowed transition-all whitespace-nowrap"
             >
               {state.isLoading ? '확인중...' : '인증'}
             </button>
@@ -114,20 +114,20 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
               type="button"
               onClick={handleResendCode}
               disabled={state.isLoading}
-              className="px-5 py-3 border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors whitespace-nowrap"
+              className="px-5 py-3 social-login-btn rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed transition-all whitespace-nowrap"
             >
               재발급
             </button>
           </div>
-          
+
           {/* 타이머 */}
           {state.timer > 0 && (
             <div className="flex items-center justify-between text-sm">
-              <span className="text-gray-500">
-                남은 시간: <span className="font-mono font-medium">{formatTime(state.timer)}</span>
+              <span className="text-gray-500 dark:text-gray-400">
+                남은 시간: <span className="font-mono font-medium text-indigo-600 dark:text-indigo-400">{formatTime(state.timer)}</span>
               </span>
               {state.attemptCount > 0 && (
-                <span className="text-orange-600">
+                <span className="text-amber-600 dark:text-amber-400">
                   시도 횟수: {state.attemptCount}/3
                 </span>
               )}
@@ -138,16 +138,16 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
 
       {/* 인증 완료 메시지 */}
       {state.step === 'verified' && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center gap-2 animate-fadeIn">
-          <FiCheck className="w-4 h-4" />
+        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-300 px-4 py-3 rounded-lg flex items-center gap-2 fade-in-up">
+          <Check className="w-5 h-5" />
           <span className="text-sm font-medium">이메일 인증이 완료되었습니다.</span>
         </div>
       )}
 
       {/* 에러 메시지 */}
       {state.error && (
-        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md flex items-center gap-2 text-sm animate-fadeIn">
-          <FiAlertCircle className="w-4 h-4 flex-shrink-0" />
+        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 px-4 py-3 rounded-lg flex items-center gap-2 text-sm fade-in-up shake">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
           <span>{state.error}</span>
         </div>
       )}

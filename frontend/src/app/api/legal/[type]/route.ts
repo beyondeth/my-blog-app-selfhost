@@ -26,6 +26,7 @@ export async function GET(
       'pro-terms',
       'partner-program',
       'username-policy',
+      'marketing-consent',
     ];
 
     if (!allowedTypes.includes(type)) {

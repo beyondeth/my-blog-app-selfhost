@@ -1,4 +1,4 @@
-import { IsEmail, IsString, MinLength, MaxLength, Matches, IsOptional } from 'class-validator';
+import { IsEmail, IsString, MinLength, MaxLength, Matches, IsOptional, IsBoolean, ValidateIf } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export class RegisterDto {
@@ -33,6 +33,9 @@ export class RegisterDto {
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
     message: '비밀번호는 최소 하나의 소문자, 하나의 대문자, 그리고 하나의 숫자를 포함해야 합니다',
   })
+  @Matches(/^[^"'\\<>`\s]*$/, {
+    message: '비밀번호에 사용할 수 없는 문자가 포함되어 있습니다: " \' \\ < > ` 공백',
+  })
   password: string;
 
   @ApiProperty({
@@ -42,4 +45,49 @@ export class RegisterDto {
   })
   @IsString()
   emailVerificationToken: string;
+
+  @ApiProperty({
+    description: '만 14세 이상 확인',
+    example: true,
+    required: true,
+  })
+  @IsBoolean()
+  @ValidateIf((o) => o.isOver14 === false)
+  isOver14: boolean;
+
+  @ApiProperty({
+    description: '이용약관 동의',
+    example: true,
+    required: true,
+  })
+  @IsBoolean()
+  @ValidateIf((o) => o.termsAccepted === false)
+  termsAccepted: boolean;
+
+  @ApiProperty({
+    description: '개인정보 처리방침 동의',
+    example: true,
+    required: true,
+  })
+  @IsBoolean()
+  @ValidateIf((o) => o.privacyAccepted === false)
+  privacyAccepted: boolean;
+
+  @ApiProperty({
+    description: '마케팅 정보 수신 동의 (선택)',
+    example: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  marketingOptIn?: boolean;
+
+  @ApiProperty({
+    description: '뉴스레터 수신 동의 (선택)',
+    example: false,
+    required: false,
+  })
+  @IsBoolean()
+  @IsOptional()
+  newsletterOptIn?: boolean;
 } 
