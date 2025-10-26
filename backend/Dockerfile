@@ -74,12 +74,21 @@ FROM node:22-slim AS production
 RUN groupadd -g 1001 nodejs && \
     useradd -r -u 1001 -g nodejs nestjs
 
+# PM2 전역 설치 (클러스터 모드 지원)
+RUN npm install -g pm2@latest
+
 WORKDIR /app
+
+# PM2 로그 디렉토리 생성 (nestjs 사용자 권한)
+RUN mkdir -p /app/logs && chown -R nestjs:nodejs /app/logs
 
 # 필요한 파일만 복사 (빌드된 파일 + 프로덕션 의존성)
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist
 COPY --from=builder --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=nestjs:nodejs /app/package.json ./package.json
+
+# PM2 Ecosystem 설정 파일 복사
+COPY --chown=nestjs:nodejs ecosystem.config.js ./ecosystem.config.js
 
 # 비-루트 사용자로 전환
 USER nestjs
@@ -90,5 +99,7 @@ EXPOSE 3000
 # 환경 변수 (기본값, docker-compose에서 오버라이드)
 ENV NODE_ENV=production
 
-# 프로덕션 서버 실행
-CMD ["node", "dist/src/main.js"]
+# PM2 Runtime으로 프로덕션 서버 실행
+# pm2-runtime: foreground 모드 (Docker 컨테이너에 적합)
+# --env production: 프로덕션 환경 변수 사용
+CMD ["pm2-runtime", "start", "ecosystem.config.js", "--env", "production"]
