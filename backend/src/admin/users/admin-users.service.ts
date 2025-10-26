@@ -13,6 +13,7 @@ import { Comment } from '../../comments/entities/comment.entity';
 import { Role } from '../../common/enums/role.enum';
 import { AuditService } from '../../audit/audit.service';
 import { AuditAction } from '../../audit/entities/audit-log.entity';
+import { UsersService } from '../../users/users.service';
 
 export interface UserFilters {
   role?: Role;
@@ -47,6 +48,7 @@ export class AdminUsersService {
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
     private auditService: AuditService,
+    private usersService: UsersService,
   ) {}
 
   /**
@@ -549,5 +551,118 @@ export class AdminUsersService {
     if (updateDto.isActive === false) return AuditAction.USER_SUSPENDED;
     if (updateDto.isActive === true) return AuditAction.USER_ACTIVATED;
     return AuditAction.USER_UPDATED;
+  }
+
+  /**
+   * 삭제된 사용자 목록 조회 (관리자 전용)
+   * - isDeleted = true인 사용자만 조회
+   * - 삭제일, 예정 삭제일 표시
+   */
+  async findDeletedUsers(
+    page = 1,
+    limit = 20,
+    sortBy = 'deletedAt',
+    sortOrder: 'ASC' | 'DESC' = 'DESC',
+  ) {
+    const query = this.userRepository
+      .createQueryBuilder('user')
+      .where('user.isDeleted = :isDeleted', { isDeleted: true })
+      .orderBy(`user.${sortBy}`, sortOrder)
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const [users, total] = await query.getManyAndCount();
+
+    // 각 사용자의 남은 삭제 대기 시간 계산
+    const usersWithDaysRemaining = users.map((user) => {
+      const now = new Date();
+      const scheduledDeletionAt = user.scheduledDeletionAt;
+      let daysRemaining = null;
+
+      if (scheduledDeletionAt) {
+        const diffTime = scheduledDeletionAt.getTime() - now.getTime();
+        daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      }
+
+      return {
+        ...user,
+        daysRemaining, // 남은 일수 (음수면 이미 삭제 예정 시간 지남)
+      };
+    });
+
+    return {
+      data: usersWithDaysRemaining,
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
+  }
+
+  /**
+   * 삭제된 사용자 복구 (관리자 전용)
+   * - isDeleted 플래그 해제
+   * - 개인정보는 이미 마스킹되어 복구 불가
+   */
+  async restoreUser(
+    userId: string,
+    adminId: string,
+    context: { ipAddress?: string; userAgent?: string },
+  ) {
+    const restoredUser = await this.usersService.restoreUser(userId);
+
+    // 감사 로그 기록
+    await this.auditService.logUserAction(
+      AuditAction.USER_ACTIVATED,
+      userId,
+      {
+        previous: { isDeleted: true },
+        new: { isDeleted: false, restoredBy: adminId },
+      },
+      { userId: adminId, ...context },
+    );
+
+    return {
+      message: 'User restored successfully. Note: Personal data was masked and cannot be recovered.',
+      user: restoredUser,
+    };
+  }
+
+  /**
+   * 사용자 즉시 영구 삭제 (관리자 전용)
+   * - DB에서 완전히 제거
+   * - CASCADE로 관련 데이터 모두 삭제
+   * - 복구 불가능
+   */
+  async permanentDeleteUser(
+    userId: string,
+    adminId: string,
+    context: { ipAddress?: string; userAgent?: string },
+  ) {
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // 감사 로그 먼저 기록 (삭제 후에는 기록 불가)
+    await this.auditService.logUserAction(
+      AuditAction.USER_DELETED,
+      userId,
+      {
+        previous: { email: user.email, isDeleted: user.isDeleted },
+        new: { permanentlyDeleted: true, deletedBy: adminId },
+      },
+      { userId: adminId, ...context },
+    );
+
+    // 영구 삭제 실행
+    await this.usersService.permanentDelete(userId);
+
+    return {
+      message: 'User permanently deleted from database. This action cannot be undone.',
+    };
   }
 }

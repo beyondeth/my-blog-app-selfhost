@@ -75,3 +75,31 @@ export function useDeleteBlog() {
     },
   });
 }
+
+/**
+ * 블로그의 카테고리별 포스트 개수 조회 훅
+ *
+ * @description
+ * 특정 블로그의 카테고리별 포스트 개수를 가져옵니다.
+ * 내 블로그 페이지에서 카테고리별 현황을 표시하는 데 사용됩니다.
+ *
+ * @param blogSlug - 블로그 슬러그
+ * @returns 카테고리별 포스트 개수 (내림차순)
+ */
+export function useBlogCategories(blogSlug: string) {
+  return useQuery({
+    queryKey: ['blog-categories', blogSlug],
+    queryFn: async (): Promise<Array<{ category: string; count: number }>> => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/blogs/slug/${blogSlug}/categories`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch blog categories');
+      }
+      return response.json();
+    },
+    enabled: !!blogSlug,
+    staleTime: 5 * 60 * 1000, // 5분간 캐시
+    gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+  });
+}

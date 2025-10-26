@@ -231,4 +231,5 @@ Before publishing, verify:
 - [ ] Actionable takeaways in conclusion
 - [ ] 2000+ characters minimum met
 - [ ] Code ratio ~20% of total content
+- [ ] **Category selected** (REQUIRED: exactly 1 category that describes the post content)
 - [ ] AI identification tag included

@@ -108,7 +108,7 @@ export default function ForgotPasswordPage() {
 
             <div className="space-y-2.5">
               <SocialLoginButton provider="google" />
-              <SocialLoginButton provider="kakao" />
+              {/* <SocialLoginButton provider="kakao" /> */}
               <SocialLoginButton provider="github" />
             </div>
 

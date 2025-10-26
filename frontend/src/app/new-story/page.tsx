@@ -25,6 +25,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Save, Plus } from 'lucide-react';
 import React from 'react';
+import CategoryAutocomplete from '@/components/ui/CategoryAutocomplete';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogRichTextEditor = dynamic(
@@ -45,6 +46,7 @@ const BlogRichTextEditor = dynamic(
 // Zod 스키마 정의
 const postSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요.'),
+  category: z.string().min(1, '카테고리를 입력해주세요.'),
   content: z.string().min(1, '내용을 입력해주세요.'),
   tags: z.array(z.string()).optional(),
   fileIds: z.array(z.string()).optional(),
@@ -75,6 +77,7 @@ export default function NewStoryPage() {
     resolver: zodResolver(postSchema),
     defaultValues: {
       title: '',
+      category: '',
       content: '',
       tags: [],
       fileIds: [],
@@ -142,9 +145,9 @@ export default function NewStoryPage() {
     try {
       const postData: any = {
         title: data.title,
+        category: data.category,
         content: data.content,
         tags: data.tags,
-        // category: data.category,  // TODO: 카테고리 UI 구현 후 활성화
         attachedFileIds: data.fileIds,
       };
       
@@ -273,6 +276,57 @@ export default function NewStoryPage() {
                               setTextareaHeight(target.scrollHeight);
                             }}
                           />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+
+              {/* 카테고리 */}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => {
+                  const [isFocused, setIsFocused] = React.useState(false);
+                  const showLabel = isFocused || field.value;
+
+                  return (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          {/* 라벨: 모바일=상단, 데스크톱=왼쪽 */}
+                          {showLabel && (
+                            <>
+                              {/* 모바일 라벨 (상단) */}
+                              <div className="mb-2 lg:hidden">
+                                <span className="text-xs text-gray-500 dark:text-gray-400">카테고리</span>
+                              </div>
+                              {/* 데스크톱 라벨 (왼쪽) */}
+                              <div className="hidden lg:block absolute -left-24 top-0">
+                                <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                  <Plus className="h-3 w-3" />
+                                  <span>카테고리</span>
+                                </div>
+                              </div>
+                            </>
+                          )}
+
+                          {/* 카테고리 입력 영역 (자동완성) */}
+                          <div className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2">
+                            <CategoryAutocomplete
+                              value={field.value}
+                              onChange={field.onChange}
+                              onBlur={() => {
+                                setIsFocused(false);
+                                field.onBlur();
+                              }}
+                              disabled={isSubmitting || createPostMutation.isPending}
+                              placeholder=" 카테고리 입력 (필수)"
+                              className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
+                            />
+                          </div>
                         </div>
                       </FormControl>
                       <FormMessage />

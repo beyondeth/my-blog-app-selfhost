@@ -3,7 +3,6 @@
 import HeroSection from '@/components/landing/HeroSection';
 import ProblemSection from '@/components/landing/ProblemSection';
 import SolutionSection from '@/components/landing/SolutionSection';
-import ValueSection from '@/components/landing/ValueSection';
 import HowItWorksSection from '@/components/landing/HowItWorksSection';
 import SocialProofSection from '@/components/landing/SocialProofSection';
 import CTASection from '@/components/landing/CTASection';
@@ -17,12 +16,11 @@ import FooterCTA from '@/components/landing/FooterCTA';
  * 1. Hero - 타이핑 애니메이션 + 데모 영상 CTA
  * 2. Problem - 사용자 공감 (3가지 문제점)
  * 3. Solution - 인터랙티브 데모 (대화 → 블로그)
- * 4. Value - 4가지 핵심 가치
- * 5. How It Works - 3단계 가이드
- * 6. Social Proof - 사용자 블로그 갤러리
- * 7. CTA - 주요 전환 섹션
- * 8. FAQ - 자주 묻는 질문
- * 9. Footer - 최종 CTA + 링크
+ * 4. How It Works - 3단계 가이드
+ * 5. Social Proof - 사용자 블로그 갤러리
+ * 6. CTA - 주요 전환 섹션
+ * 7. FAQ - 자주 묻는 질문
+ * 8. Footer - 최종 CTA + 링크
  *
  * 디자인 원칙:
  * - 미니멀/감성적 톤앤매너
@@ -40,9 +38,6 @@ export default function LandingPage() {
 
       {/* Solution Section - 핵심 기능 시연 */}
       <SolutionSection />
-
-      {/* Value Proposition - 4가지 가치 */}
-      <ValueSection />
 
       {/* How It Works - 사용 방법 */}
       <HowItWorksSection />

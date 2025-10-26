@@ -34,13 +34,12 @@ export class CreatePostDto {
   @IsString({ each: true })
   tags?: string[];
 
-  @ApiPropertyOptional({
-    description: '카테고리',
+  @ApiProperty({
+    description: '카테고리 (필수)',
     example: '개발',
   })
-  @IsOptional()
   @IsString()
-  category?: string;
+  category: string;
 
   @ApiPropertyOptional({
     description: '첨부 파일 ID 배열 (UUID)',

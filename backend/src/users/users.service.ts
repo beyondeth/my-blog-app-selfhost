@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { DateUtils } from '../common/utils/date.utils';
@@ -320,10 +320,10 @@ export class UsersService {
   }
 
   /**
-   * 소프트 삭제: 즉시 개인정보 마스킹 + 법적 보관 기간 설정
+   * 소프트 삭제: 즉시 개인정보 마스킹 + 180일 보관 정책
    * - 즉시: isDeleted=true, 개인정보 마스킹, 로그인 차단
-   * - 법적 보관: 결제 기록 5년, 분쟁 기록 3년 후 완전 삭제
-   * - 백그라운드 작업: 큐에 삭제 작업 추가하여 비동기 처리
+   * - 보관 기간: 180일 (문제 발생 시 확인용)
+   * - 180일 후: Cron 작업으로 자동 완전 삭제
    */
   async softDelete(userId: string): Promise<void> {
     const user = await this.findById(userId);
@@ -339,11 +339,10 @@ export class UsersService {
 
     const now = new Date();
 
-    // 법적 보관 기간 계산: 기본 3년, 결제 기록 있으면 5년
-    // TODO: 실제로는 결제 기록 존재 여부를 확인하여 5년/3년 결정
-    const retentionYears = user.dataRetentionYears || 3;
+    // 보관 기간 계산: 180일 (약 6개월)
+    const retentionDays = 180;
     const scheduledDeletionAt = new Date(now);
-    scheduledDeletionAt.setFullYear(scheduledDeletionAt.getFullYear() + retentionYears);
+    scheduledDeletionAt.setDate(scheduledDeletionAt.getDate() + retentionDays);
 
     // 즉시 개인정보 마스킹 및 삭제 플래그 설정
     await this.usersRepository.update(userId, {
@@ -367,10 +366,58 @@ export class UsersService {
       isActive: false,
     });
 
-    this.logger.log(`User ${userId} soft deleted. Scheduled for permanent deletion at ${scheduledDeletionAt.toISOString()}`);
+    this.logger.log(`User ${userId} soft deleted. Scheduled for permanent deletion at ${scheduledDeletionAt.toISOString()} (180 days from now)`);
 
     // TODO: BullMQ 큐에 백그라운드 삭제 작업 추가
     // await this.userDeletionQueue.add('soft-delete', { userId });
+  }
+
+  /**
+   * 사용자 복구: 소프트 삭제 취소
+   * - 관리자 전용 기능
+   * - 개인정보는 복구 불가 (이미 마스킹됨)
+   * - isDeleted 플래그만 해제하여 로그인 재활성화
+   */
+  async restoreUser(userId: string): Promise<User> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    if (!user.isDeleted) {
+      this.logger.warn(`User ${userId} is not deleted`);
+      throw new BadRequestException('User is not deleted');
+    }
+
+    // 소프트 삭제 해제
+    await this.usersRepository.update(userId, {
+      isDeleted: false,
+      deletedAt: null,
+      scheduledDeletionAt: null,
+      isActive: true,
+    });
+
+    this.logger.log(`User ${userId} restored by admin`);
+
+    return this.findById(userId);
+  }
+
+  /**
+   * 영구 삭제: DB에서 완전히 제거
+   * - 관리자 전용 기능
+   * - CASCADE로 관련 데이터 모두 삭제
+   * - 복구 불가능
+   */
+  async permanentDelete(userId: string): Promise<void> {
+    const user = await this.findById(userId);
+    if (!user) {
+      throw new NotFoundException('User not found');
+    }
+
+    // DB에서 완전히 삭제 (CASCADE로 관련 데이터 자동 삭제)
+    await this.usersRepository.delete(userId);
+
+    this.logger.log(`User ${userId} permanently deleted from database`);
   }
 
   /**

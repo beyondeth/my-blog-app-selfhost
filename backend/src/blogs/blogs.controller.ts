@@ -7,10 +7,16 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
+import { PostsService } from '../posts/posts.service';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
+@ApiTags('blogs')
 @Controller('blogs')
 export class BlogsController {
-  constructor(private readonly blogsService: BlogsService) {}
+  constructor(
+    private readonly blogsService: BlogsService,
+    private readonly postsService: PostsService,
+  ) {}
 
   @Post()
   async create(@Body() createBlogDto: CreateBlogDto, @CurrentUser() user: User) {
@@ -56,5 +62,36 @@ export class BlogsController {
       throw new UnauthorizedException('블로그를 수정할 권한이 없습니다.');
     }
     return await this.blogsService.update(id, updateBlogDto);
+  }
+
+  /**
+   * 특정 블로그의 카테고리별 포스트 개수 조회
+   *
+   * @description
+   * 블로그의 카테고리별 포스트 개수를 반환합니다.
+   * 내 블로그 페이지에서 카테고리별 현황을 표시하는 데 사용됩니다.
+   *
+   * @param slug - 블로그 슬러그
+   * @returns 카테고리별 포스트 개수 (내림차순)
+   */
+  @Get('slug/:slug/categories')
+  @Public()
+  @ApiOperation({ summary: '블로그의 카테고리별 포스트 개수 조회' })
+  @ApiResponse({
+    status: 200,
+    description: '카테고리별 포스트 개수 (내림차순)',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          category: { type: 'string', example: 'JavaScript' },
+          count: { type: 'number', example: 12 },
+        },
+      },
+    },
+  })
+  async getBlogCategories(@Param('slug') slug: string): Promise<Array<{ category: string; count: number }>> {
+    return this.postsService.getBlogCategoriesWithCount(slug);
   }
 }

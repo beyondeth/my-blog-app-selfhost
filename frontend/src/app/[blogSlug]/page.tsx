@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
-import { useBlogBySlug } from '@/hooks/useBlogs';
+import { useBlogBySlug, useBlogCategories } from '@/hooks/useBlogs';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 import { toast } from 'sonner';
@@ -15,6 +15,7 @@ import PostArticle from '@/components/posts/PostArticle';
 import LoadMoreSection from '@/components/posts/LoadMoreSection';
 import RecentPostsSection from '@/components/layout/RecentPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
+import CategorySection from '@/components/layout/CategorySection';
 import BlogOwnerCard from '@/components/layout/BlogOwnerCard';
 import BlogRecommendations from '@/components/layout/BlogRecommendations';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
@@ -51,6 +52,12 @@ export default function BlogPage() {
     error: blogError
   } = useBlogBySlug(blogSlug);
 
+  // 블로그의 카테고리별 포스트 개수 가져오기
+  const {
+    data: categories = [],
+    isLoading: categoriesLoading
+  } = useBlogCategories(blogSlug);
+
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -73,8 +80,9 @@ export default function BlogPage() {
     isFetchingNextPage,
     isLoading,
     error
-  } = useInfinitePosts({ 
+  } = useInfinitePosts({
     search: currentParams.search,
+    category: currentParams.category,
     blogSlug: blogSlug, // 블로그별 포스트 필터링
     enabled: isClient && !!blog
   });
@@ -195,6 +203,18 @@ export default function BlogPage() {
     router.push(newUrl);
   }, [router]);
 
+  // 카테고리 클릭 처리 (카테고리 필터링)
+  const handleCategoryClick = useCallback((category: string) => {
+    // 카테고리 필터를 사용하여 URL 업데이트
+    const newParams = {
+      category: category,
+      page: 1,
+    };
+
+    const newUrl = createSearchUrl(newParams);
+    router.push(newUrl);
+  }, [router]);
+
   if (!isClient) {
     return <LoadingSpinner message="페이지를 불러오는 중..." />;
   }
@@ -289,7 +309,15 @@ export default function BlogPage() {
               userId={blog.owner?.id}
               isOwner={isBlogOwner}
             />
-            
+
+            {/* 카테고리별 현황 섹션 */}
+            {!categoriesLoading && categories.length > 0 && (
+              <CategorySection
+                categories={categories}
+                onCategoryClick={handleCategoryClick}
+              />
+            )}
+
             <RecentPostsSection posts={recentPosts} />
 
             <TagsSection tags={tags} onTagClick={handleTagClick} />

@@ -8,10 +8,5 @@
 		"@tanstack/react-query-persist-client": "^5.81.2",
 		"react-hook-form": "^7.58.1",
 		"zod": "^3.25.67"
-	},
-	"devDependencies": {
-		"markdown-pdf": "^11.0.0",
-		"marked": "^16.1.2",
-		"puppeteer": "^24.19.0"
 	}
 }

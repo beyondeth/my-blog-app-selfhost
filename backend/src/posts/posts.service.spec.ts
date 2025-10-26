@@ -118,6 +118,7 @@ describe('PostsService - Image Optimization', () => {
         title: 'Test Post',
         content: '<p>Test content with image</p>',
         attachedFileIds: ['file-1'],
+        category: 'Test Category',
       };
 
       const mockPost = {
@@ -189,6 +190,7 @@ describe('PostsService - Image Optimization', () => {
       const createPostDto = {
         title: 'Test Post',
         content: '<p>Test content</p>',
+        category: 'Test Category',
       };
 
       const mockPost = { id: 'post-1', title: 'Test Post' };
@@ -231,6 +233,7 @@ describe('PostsService - Image Optimization', () => {
       const createPostDto = {
         title: 'Text Only Post',
         content: '<p>No images here</p>',
+        category: 'Test Category',
       };
 
       const mockPost = { id: 'post-1', title: 'Text Only Post' };

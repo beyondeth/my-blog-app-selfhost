@@ -235,6 +235,10 @@ Before publishing novel-style posts, verify:
 - [ ] Character experiences arc (confusion → understanding)
 - [ ] Ends with reflection and wisdom gained
 
+**Required**:
+- [ ] **Category selected** (REQUIRED: exactly 1 category that describes the post content)
+- [ ] AI identification tag included
+
 **Avoid**:
 - [ ] Tutorial-style "step 1, step 2" structure
 - [ ] Excessive code (keep under 5%)

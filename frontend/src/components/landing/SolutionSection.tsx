@@ -41,7 +41,7 @@ export default function SolutionSection() {
           >
             <Sparkles className="w-4 h-4 text-cyan-500" />
             <span className="text-sm font-semibold text-cyan-600 dark:text-cyan-400">
-              마법 같은 자동화
+              간편한 자동 변환
             </span>
           </motion.div>
 
@@ -53,7 +53,7 @@ export default function SolutionSection() {
           </h2>
 
           <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            위 내용 자동포스팅 해줘! 단, 한마디면 호출되는 Codebase MCP로 자동 포스팅 완료.
+            우리 대화 자동포스팅 해줘! 한 마디면 자동으로 블로그가 완성됩니다.
           </p>
         </motion.div>
 

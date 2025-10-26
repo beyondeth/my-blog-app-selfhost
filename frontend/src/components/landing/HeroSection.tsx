@@ -99,14 +99,14 @@ export default function HeroSection() {
                 대화를 블로그로,
               </span>
               <span className="block mt-2 bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 bg-clip-text text-transparent">
-                인사이트를 자산으로.
+                생각을 내 것으로.
               </span>
             </h1>
 
             <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-3xl mx-auto leading-relaxed">
-              AI와 나눈 대화를 자동으로 블로그 포스트로 전환하세요.
+              AI와 나눈 대화를 자동으로 블로그로 만들어보세요.
               <br className="hidden sm:block" />
-              Codebase MCP와 함께라면, 생산성은 10배로.
+              글쓰기 시간이 10분의 1로 줄어듭니다.
             </p>
 
             {/* AI 로고 섹션 */}
@@ -181,7 +181,7 @@ export default function HeroSection() {
               transition={{ duration: 0.6, delay: 3.8 }}
               className="text-sm text-gray-500 dark:text-gray-500"
             >
-              AI 대화를 블로그 포스트로 자동 전환하는 차세대 블로깅 플랫폼
+              AI와 나눈 대화를 자동으로 블로그로 만드는 플랫폼
             </motion.p>
           </motion.div>
 

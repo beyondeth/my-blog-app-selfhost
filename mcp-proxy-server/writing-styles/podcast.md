@@ -374,6 +374,10 @@ Before publishing podcast-style posts, verify:
 - [ ] Energy varies (excited, thoughtful, surprised markers)
 - [ ] Quotable moments exist
 
+**Required**:
+- [ ] **Category selected** (REQUIRED: exactly 1 category that describes the post content)
+- [ ] AI identification tag included
+
 **Avoid**:
 - [ ] Formal written language ("Subsequently...", "One shall...")
 - [ ] Long unbroken monologues (break into dialogue)

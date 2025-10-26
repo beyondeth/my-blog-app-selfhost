@@ -40,9 +40,9 @@ export default function HowItWorksSection() {
     {
       icon: Key,
       number: '01',
-      title: 'API-KEY 발급',
+      title: '접속 키 만들기',
       subtitle: '1분이면 완료',
-      description: '회원가입 후 설정 페이지에서 API-KEY를 발급받으세요. 발급받은 키는 안전하게 보관하세요.',
+      description: '회원가입 후 설정 페이지에서 접속 키를 만들면 됩니다. 만든 키는 안전하게 보관하세요.',
       gradient: 'from-purple-500 to-pink-500',
       content: (
         <div className="space-y-3">
@@ -62,7 +62,7 @@ export default function HowItWorksSection() {
               </div>
               <div className="mt-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                 <p className="text-xs text-yellow-800 dark:text-yellow-200 font-semibold">
-                  💡 발급받은 API-KEY는 다시 확인할 수 없으니 안전한 곳에 보관하세요!
+                  💡 만든 접속 키는 다시 확인할 수 없으니 안전한 곳에 보관하세요!
                 </p>
               </div>
             </div>
@@ -73,17 +73,17 @@ export default function HowItWorksSection() {
     {
       icon: Download,
       number: '02',
-      title: 'MCP 설치',
+      title: '자동 연결 설정',
       subtitle: '3분이면 완료',
-      description: 'Claude Code CLI에 MCP 서버를 연결하세요.',
+      description: 'AI 도구에 자동 포스팅 기능을 연결하면 준비 끝!',
       gradient: 'from-cyan-500 to-blue-500',
       content: (
         <div className="space-y-3">
           <p className="text-sm text-gray-600 dark:text-gray-400">
             <code className="px-2 py-1 bg-gray-100 dark:bg-gray-800 rounded">
-              (Project Folder) VSCODE 환경이라면 .mcp.json 파일에 추가:
+              설정 파일(.mcp.json)에 아래 내용을 추가하세요:
             </code>{' '}
-            
+
           </p>
           <div className="relative">
             <pre className="bg-gray-900 dark:bg-gray-950 text-gray-100 p-4 rounded-lg text-xs sm:text-sm overflow-x-auto font-mono">
@@ -108,7 +108,7 @@ export default function HowItWorksSection() {
       number: '03',
       title: '대화하기',
       subtitle: '평소처럼 자연스럽게',
-      description: '평소처럼 Claude Code CLI와 대화하고, 인사이트가 떠오르면 바로 포스팅을 요청하세요.',
+      description: '평소처럼 AI와 대화하고, 좋은 생각이 떠오르면 바로 블로그에 올려달라고 말하면 돼요.',
       gradient: 'from-purple-500 to-pink-500',
       content: (
         <div className="space-y-4">
@@ -151,8 +151,8 @@ export default function HowItWorksSection() {
       icon: Rocket,
       number: '04',
       title: '자동 발행',
-      subtitle: '승인만 하면 끝',
-      description: '생성된 포스트를 확인하고 승인하면 자동으로 블로그에 발행됩니다. 나중에 수정도 자유롭게 가능합니다.',
+      subtitle: '확인만 하면 끝',
+      description: '만들어진 글을 확인하고 좋으면 바로 블로그에 올라갑니다. 나중에 수정도 자유롭게 가능해요.',
       gradient: 'from-green-500 to-teal-500',
       content: (
         <div className="space-y-3">
@@ -197,13 +197,13 @@ export default function HowItWorksSection() {
           className="text-center mb-20"
         >
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-black dark:text-white mb-6">
-            간단한 4단계면{' '}
+            간단한 4단계로{' '}
             <span className="bg-gradient-to-r from-cyan-500 to-purple-500 bg-clip-text text-transparent">
-              시작할 수 있습니다
+              바로 시작할 수 있어요
             </span>
           </h2>
           <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400">
-            복잡한 설정 없이, 바로 사용 가능합니다
+            복잡한 설정 없이 바로 사용할 수 있어요
           </p>
         </motion.div>
 

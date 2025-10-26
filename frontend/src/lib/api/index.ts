@@ -12,6 +12,7 @@ import { BlogsAPI, createBlogsAPI } from './endpoints/blogs';
 import { FilesAPI, createFilesAPI } from './endpoints/files';
 import { UsersAPI, createUsersAPI } from './endpoints/users';
 import { ChatAPI, createChatAPI } from './endpoints/chat';
+import { AdminAPI, createAdminAPI } from './endpoints/admin';
 
 // Types re-export
 export * from './types';
@@ -35,6 +36,7 @@ export class ExtendedApiClient extends ApiClient {
   public files: FilesAPI;
   public users: UsersAPI;
   public chat: ChatAPI;
+  public admin: AdminAPI;
 
   constructor(config: any = {}) {
     super(config);
@@ -47,6 +49,7 @@ export class ExtendedApiClient extends ApiClient {
     this.files = createFilesAPI(this);
     this.users = createUsersAPI(this);
     this.chat = createChatAPI(this);
+    this.admin = createAdminAPI(this);
   }
 
   // ==================== 레거시 호환성을 위한 메서드 ====================

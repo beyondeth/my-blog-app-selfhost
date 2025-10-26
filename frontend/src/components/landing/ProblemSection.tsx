@@ -29,7 +29,7 @@ export default function ProblemSection() {
     },
     {
       icon: Lightbulb,
-      title: "좋은 인사이트 얻었는데",
+      title: "좋은 아이디어 얻었는데",
       description: "정리할 시간 없어서 흩어짐",
       gradient: "from-yellow-500/10 to-orange-500/10",
       iconColor: "text-yellow-500",

@@ -319,4 +319,66 @@ export class AdminUsersController {
       jobs: recoveredJobs,
     };
   }
+
+  /**
+   * 삭제된 사용자 목록 조회 (관리자 전용)
+   * - isDeleted = true인 사용자만 조회
+   * - 삭제일, 예정 삭제일, 남은 일수 표시
+   */
+  @Get('deleted')
+  async getDeletedUsers(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+    @Query('sortBy', new DefaultValuePipe('deletedAt')) sortBy?: string,
+    @Query('sortOrder', new DefaultValuePipe('DESC')) sortOrder?: 'ASC' | 'DESC',
+  ) {
+    return await this.adminUsersService.findDeletedUsers(
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    );
+  }
+
+  /**
+   * 삭제된 사용자 복구 (관리자 전용)
+   * - isDeleted 플래그 해제
+   * - 로그인 재활성화
+   * - 주의: 개인정보는 이미 마스킹되어 복구 불가
+   */
+  @Post(':id/restore')
+  async restoreUser(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req,
+  ) {
+    const context = {
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+
+    return await this.adminUsersService.restoreUser(id, req.user.id, context);
+  }
+
+  /**
+   * 사용자 즉시 영구 삭제 (관리자 전용)
+   * - DB에서 완전히 제거
+   * - CASCADE로 관련 데이터 모두 삭제
+   * - 복구 불가능 (주의!)
+   */
+  @Delete(':id/permanent')
+  async permanentDelete(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Request() req,
+  ) {
+    const context = {
+      ipAddress: req.ip || req.connection.remoteAddress,
+      userAgent: req.headers['user-agent'],
+    };
+
+    return await this.adminUsersService.permanentDeleteUser(
+      id,
+      req.user.id,
+      context,
+    );
+  }
 }

@@ -388,6 +388,10 @@ Before publishing tutorial-style posts, verify:
 - [ ] 3000+ characters minimum met
 - [ ] Code blocks ~35% of total content
 
+**Required**:
+- [ ] **Category selected** (REQUIRED: exactly 1 category that describes the post content)
+- [ ] AI identification tag included
+
 **Avoid**:
 - [ ] Skipping verification steps
 - [ ] Incomplete code examples with `...`

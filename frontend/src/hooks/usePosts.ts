@@ -528,4 +528,30 @@ export function useBatchLikeManager() {
   }, [sendBatch]);
 
   return { updateLike, flush };
+}
+
+/**
+ * 사용자의 카테고리 목록 조회 훅 (자동완성용)
+ *
+ * @description
+ * 로그인한 사용자가 작성한 포스트의 카테고리 목록을 가져옵니다.
+ * 글쓰기/수정 페이지의 자동완성 드롭다운에서 사용됩니다.
+ *
+ * @returns 카테고리 목록 (사용 빈도순)
+ */
+export function useUserCategories() {
+  return useQuery({
+    queryKey: ['user-categories'],
+    queryFn: async (): Promise<string[]> => {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/posts/categories`, {
+        credentials: 'include',
+      });
+      if (!response.ok) {
+        throw new Error('Failed to fetch user categories');
+      }
+      return response.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5분간 캐시
+    gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+  });
 } 

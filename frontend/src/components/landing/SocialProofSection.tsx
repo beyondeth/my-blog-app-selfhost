@@ -15,23 +15,23 @@ export default function SocialProofSection() {
   const useCases = [
     {
       avatar: '👨‍💻',
-      title: '개발 회고록을 자동으로 정리',
-      description: '매일의 코딩 세션과 문제 해결 과정을 AI와 대화로 정리하면, 자동으로 개발 블로그가 완성됩니다.',
-      tags: ['개발', '회고', 'TIL'],
+      title: '개발 일기를 자동으로 정리',
+      description: '매일 코딩하면서 배운 내용을 AI와 대화로 정리하면, 자동으로 개발 블로그가 완성됩니다.',
+      tags: ['개발', '일기', '학습'],
       gradient: 'from-cyan-500 to-blue-500',
     },
     {
       avatar: '🔬',
-      title: '논문 리서치를 블로그 시리즈로',
-      description: 'AI와 브레인스토밍한 연구 내용을 체계적으로 정리하여 논문 작성 시간을 절반으로 단축합니다.',
-      tags: ['연구', '논문', '리서치'],
+      title: '연구 내용을 블로그로',
+      description: 'AI와 이야기 나눈 연구 내용을 체계적으로 정리하여 글 쓰는 시간을 절반으로 줄일 수 있어요.',
+      tags: ['연구', '논문', '정리'],
       gradient: 'from-purple-500 to-pink-500',
     },
     {
       avatar: '✨',
-      title: '튜토리얼 제작 시간 대폭 단축',
-      description: '아이디어 구상부터 콘텐츠 작성까지 대화로 해결하면, 제작 시간이 1/10로 줄어듭니다.',
-      tags: ['튜토리얼', '교육', '생산성'],
+      title: '설명 글 만드는 시간 대폭 단축',
+      description: '아이디어 구상부터 글 작성까지 대화로 해결하면, 만드는 시간이 10분의 1로 줄어듭니다.',
+      tags: ['강의', '교육', '시간절약'],
       gradient: 'from-green-500 to-teal-500',
     },
   ];
@@ -40,20 +40,20 @@ export default function SocialProofSection() {
   const usageExamples = [
     {
       icon: Code,
-      title: '기술 블로그 자동화',
-      description: '개발하면서 배운 내용을 즉시 포스팅',
+      title: '기술 블로그 자동으로 작성',
+      description: '개발하면서 배운 내용을 바로 글로 만들기',
       gradient: 'from-cyan-500 to-blue-500',
     },
     {
       icon: BookOpen,
-      title: '학습 노트 아카이빙',
-      description: 'AI와의 학습 대화를 지식 베이스로 저장',
+      title: '학습 노트 보관하기',
+      description: 'AI와 나눈 학습 대화를 내 지식으로 저장',
       gradient: 'from-purple-500 to-pink-500',
     },
     {
       icon: FileText,
-      title: '프로젝트 문서화',
-      description: '프로젝트 진행 과정을 자동으로 문서로 정리',
+      title: '프로젝트 기록 만들기',
+      description: '프로젝트 진행 과정을 자동으로 정리',
       gradient: 'from-green-500 to-teal-500',
     },
   ];
@@ -76,7 +76,7 @@ export default function SocialProofSection() {
             </span>
           </h2>
           <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400">
-            실제 업무에 바로 적용 가능한 사례들
+            실제로 이렇게 사용할 수 있어요
           </p>
         </motion.div>
 

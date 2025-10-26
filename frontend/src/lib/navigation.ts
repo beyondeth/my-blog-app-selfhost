@@ -16,6 +16,7 @@ export const routes = {
 // 검색 파라미터 스키마
 export const homeSearchSchema = z.object({
   search: z.string().optional(),
+  category: z.string().optional(),
   page: z.coerce.number().min(1).default(1),
 }).default({});
 
@@ -38,23 +39,28 @@ export const parseSearchParams = (searchParams: unknown): HomeSearchParams => {
   const urlParams = new URLSearchParams(searchParams as string);
   const params = {
     search: urlParams.get('search') || undefined,
+    category: urlParams.get('category') || undefined,
     page: urlParams.get('page') ? parseInt(urlParams.get('page')!) : 1,
   };
-  
+
   return homeSearchSchema.parse(params);
 };
 
 // 브라우저 히스토리 관리를 위한 헬퍼
 export const createSearchUrl = (params: HomeSearchParams): string => {
   const url = new URL(routes.home(), window.location.origin);
-  
+
   if (params.search) {
     url.searchParams.set('search', params.search);
   }
-  
+
+  if (params.category) {
+    url.searchParams.set('category', params.category);
+  }
+
   if (params.page && params.page > 1) {
     url.searchParams.set('page', params.page.toString());
   }
-  
+
   return url.pathname + url.search;
 }; 

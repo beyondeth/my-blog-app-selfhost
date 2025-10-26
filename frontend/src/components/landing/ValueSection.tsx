@@ -18,9 +18,9 @@ export default function ValueSection() {
   const values = [
     {
       icon: Zap,
-      title: '생산성 혁신',
+      title: '시간이 훨씬 줄어듭니다',
       subtitle: '글쓰기 시간 80% 단축',
-      description: '대화만으로 완성도 높은 콘텐츠를 생성하세요. 글쓰기에 드는 시간을 대폭 줄이고, 사고와 창작에 집중할 수 있습니다.',
+      description: '대화만으로 완성도 높은 글을 만들 수 있어요. 글쓰기에 드는 시간을 대폭 줄이고, 생각과 창작에 집중할 수 있습니다.',
       gradient: 'from-yellow-500 to-orange-500',
       bgGradient: 'from-yellow-500/10 to-orange-500/10',
       iconBg: 'bg-yellow-500/20',
@@ -28,9 +28,9 @@ export default function ValueSection() {
     },
     {
       icon: MessageSquare,
-      title: '대화에서 콘텐츠로',
-      subtitle: 'MCP 한 줄이면 끝',
-      description: '"--tutorial", "--novel" 등 원하는 스타일로 즉시 변환. 같은 내용도 다양한 형태로 표현할 수 있습니다.',
+      title: '대화에서 글로',
+      subtitle: '한 마디면 끝',
+      description: '원하는 스타일로 즉시 변환됩니다. 같은 내용도 다양한 형태로 표현할 수 있어요.',
       gradient: 'from-cyan-500 to-blue-500',
       bgGradient: 'from-cyan-500/10 to-blue-500/10',
       iconBg: 'bg-cyan-500/20',
@@ -38,9 +38,9 @@ export default function ValueSection() {
     },
     {
       icon: Brain,
-      title: '학습 가속화',
-      subtitle: '대화 히스토리 자동 정리',
-      description: 'AI와 나눈 모든 대화가 체계적으로 정리됩니다. 과거 인사이트와 새로운 아이디어를 연결하며 학습을 가속화하세요.',
+      title: '배운 내용을 잊지 않아요',
+      subtitle: '대화 기록 자동 정리',
+      description: 'AI와 나눈 모든 대화가 체계적으로 정리됩니다. 과거 생각과 새로운 아이디어를 연결하며 계속 성장할 수 있어요.',
       gradient: 'from-purple-500 to-pink-500',
       bgGradient: 'from-purple-500/10 to-pink-500/10',
       iconBg: 'bg-purple-500/20',
@@ -48,9 +48,9 @@ export default function ValueSection() {
     },
     {
       icon: RefreshCw,
-      title: '지식 재활용',
+      title: '예전 대화를 다시 찾을 수 있어요',
       subtitle: '흩어진 대화를 한곳에',
-      description: '검색, 태그, 카테고리로 과거 대화를 쉽게 재발견하세요. 잊혀진 인사이트가 새로운 콘텐츠로 다시 태어납니다.',
+      description: '검색, 태그, 카테고리로 과거 대화를 쉽게 다시 볼 수 있어요. 잊었던 생각이 새로운 글로 다시 태어납니다.',
       gradient: 'from-green-500 to-teal-500',
       bgGradient: 'from-green-500/10 to-teal-500/10',
       iconBg: 'bg-green-500/20',
@@ -77,7 +77,7 @@ export default function ValueSection() {
             인가?
           </h2>
           <p className="text-lg sm:text-xl text-gray-600 dark:text-gray-400 max-w-2xl mx-auto">
-            AI 대화를 자산으로 만드는 4가지 핵심 가치
+            AI와 나눈 대화, 이렇게 활용할 수 있어요
           </p>
         </motion.div>
 

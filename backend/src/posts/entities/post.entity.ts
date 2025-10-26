@@ -70,7 +70,7 @@ export class Post {
   @Column('jsonb', { default: [], name: 'tagList' })
   tagList: string[];
 
-  @Column({ nullable: true, name: 'category' })
+  @Column({ name: 'category', default: '기타' })
   category: string;
 
   @Column({ type: 'uuid', name: 'authorId' })

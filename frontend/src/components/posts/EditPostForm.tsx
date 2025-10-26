@@ -21,12 +21,15 @@ import { Save, Plus } from 'lucide-react';
 import { BlogRichTextEditor } from '@/editor';
 import type { UploadedImageInfo } from '@/editor';
 import type { FileUpload } from '@/types';
+import CategoryAutocomplete from '@/components/ui/CategoryAutocomplete';
 
 // 폼 스키마 정의
 const postFormSchema = z.object({
   title: z.string()
     .min(1, { message: "제목을 입력해주세요." })
     .max(200, { message: "제목은 200자 이하로 입력해주세요." }),
+  category: z.string()
+    .min(1, { message: "카테고리를 입력해주세요." }),
   content: z.string()
     .min(1, { message: "내용을 입력해주세요." }),
   tags: z.array(z.string()).optional(),
@@ -39,6 +42,7 @@ type PostFormValues = z.infer<typeof postFormSchema>;
 interface EditPostFormProps {
   initialData?: {
     title: string;
+    category: string;
     content: string;
     tags?: string[];
     thumbnail?: string;
@@ -162,6 +166,7 @@ export default function EditPostForm({
     resolver: zodResolver(postFormSchema),
     defaultValues: {
       title: initialData?.title || '',
+      category: initialData?.category || '',
       content: initialData?.content || '',
       tags: initialData?.tags || [],
       thumbnail: initialData?.thumbnail || '',
@@ -328,6 +333,50 @@ export default function EditPostForm({
                               setTextareaHeight(target.scrollHeight);
                             }}
                           />
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  );
+                }}
+              />
+
+              {/* 카테고리 */}
+              <FormField
+                control={form.control}
+                name="category"
+                render={({ field }) => {
+                  const [isFocused, setIsFocused] = React.useState(false);
+                  const showLabel = isFocused || field.value;
+
+                  return (
+                    <FormItem>
+                      <FormControl>
+                        <div className="relative">
+                          {/* 왼쪽 라벨 */}
+                          {showLabel && (
+                            <div className="absolute -left-24 top-0">
+                              <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                <Plus className="h-3 w-3" />
+                                <span>카테고리</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* 카테고리 입력 영역 (자동완성) */}
+                          <div className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2">
+                            <CategoryAutocomplete
+                              value={field.value}
+                              onChange={field.onChange}
+                              onBlur={() => {
+                                setIsFocused(false);
+                                field.onBlur();
+                              }}
+                              disabled={isLoading}
+                              placeholder=" 카테고리 입력 (필수)"
+                              className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
+                            />
+                          </div>
                         </div>
                       </FormControl>
                       <FormMessage />

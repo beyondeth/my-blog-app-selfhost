@@ -101,7 +101,7 @@ export interface Post {
   liked: boolean;
   bookmarked?: boolean;  // 북마크 여부
   tags?: string[];
-  category?: string;
+  category: string;  // 카테고리 (필수)
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
@@ -179,7 +179,7 @@ export interface PostForm {
   content: string;
   thumbnail?: string;
   tags?: string[];
-  category?: string;
+  category: string;  // 카테고리 (필수)
   attachedFileIds?: string[];
 }
 

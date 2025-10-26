@@ -98,6 +98,7 @@ export class PostsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '최대 20' })
   @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'category', required: false, type: String, description: '카테고리 필터 (예: JavaScript, JavaScript/React)' })
   @ApiQuery({ name: 'blogSlug', required: false, type: String })
   @ApiQuery({ name: 'isPublished', required: false, type: Boolean })
   async findAll(
@@ -105,6 +106,7 @@ export class PostsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('category') category?: string,
     @Query('blogSlug') blogSlug?: string,
     @Query('isPublished') isPublished?: string,
   ) {
@@ -136,11 +138,11 @@ export class PostsController {
     if (isPublished === 'true') publishedFilter = true;
     else if (isPublished === 'false') publishedFilter = false;
     
-    // 검색 쿼리나 로그인 유저는 캐싱하지 않음
-    if (search || user) {
-      return this.postsService.findAll(pageNumber, limitNumber, search, blogSlug, user, publishedFilter, false);
+    // 검색 쿼리, 카테고리 필터, 로그인 유저는 캐싱하지 않음
+    if (search || category || user) {
+      return this.postsService.findAll(pageNumber, limitNumber, search, category, blogSlug, user, publishedFilter, false);
     }
-    
+
     // 캐시 키 생성 (공개 데이터만)
     const cacheKey = this.generateCacheKey({
       page: pageNumber,
@@ -163,10 +165,11 @@ export class PostsController {
     
     // DB 조회 (캐시용 - liked 필드 제외, 공개 블로그만)
     const result = await this.postsService.findAll(
-      pageNumber, 
-      limitNumber, 
-      null, 
-      blogSlug, 
+      pageNumber,
+      limitNumber,
+      null,  // search
+      null,  // category - 캐시는 카테고리 필터 없이
+      blogSlug,
       null,  // user를 null로 - liked 필드 제외
       publishedFilter,
       true   // isForCache: true - 공개 블로그만
@@ -269,6 +272,7 @@ export class PostsController {
       pageNumber,
       limitNumber,
       search,
+      undefined, // category
       undefined, // blogSlug
       null,      // user (로그인 정보 없음)
       true,      // isPublished
@@ -640,5 +644,31 @@ export class PostsController {
       recovered: recovered.length,
       message: `${recovered.length}개 좋아요 요청이 복구되었습니다.`
     };
+  }
+
+  /**
+   * 사용자의 모든 카테고리 목록 조회 (자동완성용)
+   *
+   * @description
+   * 로그인한 사용자가 작성한 포스트의 카테고리 목록을 반환합니다.
+   * 사용 빈도순으로 정렬되어 자동완성 UI에서 사용됩니다.
+   *
+   * @returns 카테고리 목록 (문자열 배열)
+   */
+  @Get('categories')
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: '사용자의 카테고리 목록 조회 (자동완성용)' })
+  @ApiResponse({
+    status: 200,
+    description: '카테고리 목록 (사용 빈도순)',
+    schema: {
+      type: 'array',
+      items: { type: 'string' },
+      example: ['JavaScript', 'TypeScript', 'React', 'Node.js'],
+    },
+  })
+  async getUserCategories(@CurrentUser() user: User): Promise<string[]> {
+    return this.postsService.getUserCategories(user.id);
   }
 } 

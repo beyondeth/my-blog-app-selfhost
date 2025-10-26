@@ -152,7 +152,7 @@ export default function BlogSettingsPage() {
       setError(err.message || '블로그 공개 설정 업데이트 중 오류가 발생했습니다');
       // 에러 발생 시 이전 상태로 되돌리기
       if (blog) {
-        setFormData(prev => ({ ...prev, isPublic: blog.isPublic }));
+        setFormData(prev => ({ ...prev, isPublic: blog.isPublic ?? true }));
       }
     }
   };
@@ -185,7 +185,7 @@ export default function BlogSettingsPage() {
       setError(err.message || '댓글 허용 설정 업데이트 중 오류가 발생했습니다');
       // 에러 발생 시 이전 상태로 되돌리기
       if (blog) {
-        setFormData(prev => ({ ...prev, allowComments: blog.allowComments }));
+        setFormData(prev => ({ ...prev, allowComments: blog.allowComments ?? true }));
       }
     }
   };

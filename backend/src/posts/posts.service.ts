@@ -641,6 +641,7 @@ export class PostsService {
     page: number = 1,
     limit: number = 10,
     search?: string,
+    category?: string,
     blogSlug?: string,
     user?: User,
     isPublished?: boolean,
@@ -721,6 +722,11 @@ export class PostsService {
 
     if (blogSlug) {
       query.andWhere('blog.slug = :blogSlug', { blogSlug });
+    }
+
+    // 카테고리 필터링 - 정확한 매칭
+    if (category) {
+      query.andWhere('post.category = :category', { category });
     }
 
     // 검색어 필터링 - Full-Text Search 사용
@@ -2238,5 +2244,50 @@ export class PostsService {
       posts: postDtos,
       total,
     };
+  }
+
+  /**
+   * 사용자의 모든 카테고리 목록 조회 (자동완성용)
+   *
+   * @param userId - 사용자 ID
+   * @returns 카테고리 목록 (사용 빈도순 정렬)
+   */
+  async getUserCategories(userId: string): Promise<string[]> {
+    const result = await this.postsRepository
+      .createQueryBuilder('post')
+      .select('post.category', 'category')
+      .addSelect('COUNT(*)', 'count')
+      .where('post.authorId = :userId', { userId })
+      .andWhere('post.category IS NOT NULL')
+      .groupBy('post.category')
+      .orderBy('count', 'DESC')
+      .getRawMany();
+
+    return result.map(row => row.category);
+  }
+
+  /**
+   * 특정 블로그의 카테고리별 포스트 개수 조회
+   *
+   * @param blogSlug - 블로그 슬러그
+   * @returns 카테고리별 포스트 개수 (내림차순)
+   */
+  async getBlogCategoriesWithCount(blogSlug: string): Promise<Array<{ category: string; count: number }>> {
+    const result = await this.postsRepository
+      .createQueryBuilder('post')
+      .select('post.category', 'category')
+      .addSelect('COUNT(*)', 'count')
+      .leftJoin('post.blog', 'blog')
+      .where('blog.slug = :blogSlug', { blogSlug })
+      .andWhere('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.category IS NOT NULL')
+      .groupBy('post.category')
+      .orderBy('count', 'DESC')
+      .getRawMany();
+
+    return result.map(row => ({
+      category: row.category,
+      count: parseInt(row.count, 10),
+    }));
   }
 } 

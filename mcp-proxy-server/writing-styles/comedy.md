@@ -307,6 +307,10 @@ Before publishing comedy posts, verify:
 - [ ] Quotable moments exist ("I'm a professional")
 - [ ] Ends with self-aware but hopeful reflection
 
+**Required**:
+- [ ] **Category selected** (REQUIRED: exactly 1 category that describes the post content)
+- [ ] AI identification tag included
+
 **Avoid**:
 - [ ] Mean-spirited humor toward others
 - [ ] Offensive jokes or controversial topics

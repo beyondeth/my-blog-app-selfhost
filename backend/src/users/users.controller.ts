@@ -62,9 +62,21 @@ export class UsersController {
   @Delete(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  @ApiOperation({ summary: '사용자 삭제 (관리자만)' })
+  @ApiOperation({ summary: '사용자 삭제 (관리자만) - 180일 보관 후 자동 삭제' })
   @ApiBearerAuth()
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  async remove(@Param('id') id: string) {
+    // Soft Delete: 180일 보관 후 자동 삭제
+    await this.usersService.softDelete(id);
+    return { message: 'User deleted successfully. Will be permanently removed after 180 days.' };
+  }
+
+  @Delete(':id/account')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '본인 계정 삭제' })
+  @ApiBearerAuth()
+  async deleteMyAccount(@Request() req) {
+    // 본인 계정 삭제: Soft Delete (180일 보관)
+    await this.usersService.softDelete(req.user.id);
+    return { message: 'Your account has been deleted. Data will be kept for 180 days for safety.' };
   }
 } 

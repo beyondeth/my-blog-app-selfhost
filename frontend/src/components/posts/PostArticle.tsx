@@ -136,8 +136,8 @@ const PostArticle = React.memo(function PostArticle({
             {/* Author Info - 날짜 제거 */}
             {post.author && (
               <div className="flex items-center gap-2 mb-2">
-                <UserLinkWithTooltip 
-                  userId={post.author.id} 
+                <UserLinkWithTooltip
+                  userId={post.author.id}
                   username={post.author.username}
                   blogSlug={post.blog?.slug}
                 >
@@ -153,6 +153,13 @@ const PostArticle = React.memo(function PostArticle({
                     </span>
                   </div>
                 </UserLinkWithTooltip>
+                {/* 카테고리 표시 */}
+                {post.category && (
+                  <span className="text-[13px] text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                    <span>🏷️</span>
+                    <span>{post.category}</span>
+                  </span>
+                )}
               </div>
             )}
 
@@ -284,6 +291,13 @@ const PostArticle = React.memo(function PostArticle({
                   </span>
                 </div>
               </UserLinkWithTooltip>
+              {/* 카테고리 표시 */}
+              {post.category && (
+                <span className="text-[13px] text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                  <span>🏷️</span>
+                  <span>{post.category}</span>
+                </span>
+              )}
             </div>
           )}
 

@@ -16,16 +16,16 @@ export default function FAQSection() {
   // FAQ 데이터
   const faqs = [
     {
-      question: '어떤 LLM을 지원하나요?',
-      answer: 'MCP 프로토콜을 지원하는 모든 LLM에서 사용 가능합니다.',
+      question: '어떤 AI와 사용할 수 있나요?',
+      answer: 'ChatGPT, Claude, Gemini 등 대부분의 AI 프로그램에서 사용할 수 있어요. 자동 연결 기능을 지원하는 AI라면 모두 가능합니다.',
     },
     {
-      question: 'MCP가 뭔가요? 어렵지 않나요?',
-      answer: 'MCP (Model Context Protocol)는 AI 모델과 외부 도구를 연결하는 표준 프로토콜입니다. streamhttp 방식으로 사용하시는 IDE에 따라 설정하시면 됩니다.',
+      question: '설정이 어렵지 않나요?',
+      answer: '전혀 어렵지 않아요! 설정 파일에 간단한 내용만 추가하면 바로 사용할 수 있습니다. 3분이면 충분해요.',
     },
     {
-      question: '비공개 포스트도 가능한가요?',
-      answer: '블로그 설정에서 포스트 공개/비공개 설정이 가능하며, 댓글 허용 또한 공개/비공개 설정이 가능합니다.',
+      question: '비공개 글도 작성할 수 있나요?',
+      answer: '네! 블로그 설정에서 글을 공개하거나 비공개로 설정할 수 있어요. 댓글도 받을지 말지 선택할 수 있습니다.',
     },
   ];
 

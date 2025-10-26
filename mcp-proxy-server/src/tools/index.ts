@@ -81,7 +81,8 @@ When user requests auto-posting with style flags (e.g., "create post --default")
    - --podcast → 'podcast'
    - --default or no flag → 'default'
 3. Write content following the retrieved style guide
-4. Call create_post() to publish
+4. **Select a category** that best describes the post content (REQUIRED)
+5. Call create_post() to publish (must include title, content_markdown, and category)
 
 ## Available Styles
 
@@ -94,11 +95,16 @@ When user requests auto-posting with style flags (e.g., "create post --default")
 - **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
 - **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
 
+## Important Requirements
+
+- **Category is REQUIRED**: Every post must have exactly 1 category that describes its content
+- **Tags are optional**: Add up to 10 tags to help with post discoverability
+
 ## Tools
 
 - **check_auth**: Verify authentication status (required first call)
 - **get_writing_style_guide**: Retrieve writing style guidelines
-- **create_post**: Publish blog post to codebase.blog`
+- **create_post**: Publish blog post to codebase.blog (requires: title, content_markdown, category)`
     };
   });
 
@@ -152,7 +158,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
           },
           category: {
             type: 'string',
-            description: 'Category (optional)',
+            description: 'Category (required) - Select exactly 1 category that best describes the post content',
           },
           writingStyle: {
             type: 'string',
@@ -161,7 +167,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
             description: 'Writing style preset',
           },
         },
-        required: ['title', 'content_markdown'],
+        required: ['title', 'content_markdown', 'category'],
       },
     },
   ];
