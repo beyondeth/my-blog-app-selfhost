@@ -699,9 +699,12 @@ export class PostsService {
       .leftJoin('post.author', 'author')
       .leftJoin('post.blog', 'blog'); // 항상 blog 조인 (프론트엔드 필수)
 
+    // 삭제된 포스트 제외 (기본 필터)
+    query.where('post.isDeleted = :isDeleted', { isDeleted: false });
+
     // 캐시용이면 비공개 블로그 제외
     if (isForCache) {
-      query.where('blog.isPublic = :isPublic', { isPublic: true })
+      query.andWhere('blog.isPublic = :isPublic', { isPublic: true })
         .andWhere('post.isPublished = :isPublished', { isPublished: true })
         .andWhere('post.status = :status', { status: 'published' });
     } else {
@@ -709,11 +712,11 @@ export class PostsService {
       if (user?.role === Role.ADMIN) {
         // Admin: filter by isPublished only if explicitly requested
         if (isPublished !== undefined) {
-          query.where('post.isPublished = :isPublished', { isPublished });
+          query.andWhere('post.isPublished = :isPublished', { isPublished });
         }
       } else {
         // Regular users: always show only published posts
-        query.where('post.isPublished = :isPublished AND post.status = :status', {
+        query.andWhere('post.isPublished = :isPublished AND post.status = :status', {
           isPublished: true,
           status: 'published'
         });
@@ -1075,7 +1078,8 @@ export class PostsService {
         'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId', 'blog.allowComments',
       ])
-      .where('post.id = :id', { id });
+      .where('post.id = :id', { id })
+      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false }); // 삭제된 포스트 제외
 
     // 사용자가 있는 경우에만 좋아요 상태와 북마크 상태를 서브쿼리로 확인
     if (user) {
@@ -1186,6 +1190,7 @@ export class PostsService {
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId', 'blog.allowComments',
       ])
       .where('post.slug = :slug', { slug })
+      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false }) // 삭제된 포스트 제외
       .andWhere('post.isPublished = :isPublished', { isPublished: true })
       .andWhere('post.status = :status', { status: 'published' });
 

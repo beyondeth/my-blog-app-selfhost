@@ -63,18 +63,43 @@ export default function Header() {
   // Handle search submit
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    
-    const newParams = {
-      search: searchQuery.trim() || undefined,
-      page: 1,
-    };
-    
-    const newUrl = createSearchUrl(newParams);
-    router.push(newUrl);
-    
+
+    // 블로그 페이지인지 확인 (pathname이 /[blogSlug] 형태)
+    // 홈('/'), 포스트 상세('/p/...'), 설정('/settings/...') 등은 제외
+    const isBlogPage = pathname &&
+      !pathname.startsWith('/p/') &&
+      !pathname.startsWith('/settings/') &&
+      !pathname.startsWith('/new-story') &&
+      !pathname.startsWith('/login') &&
+      !pathname.startsWith('/register') &&
+      !pathname.startsWith('/dm') &&
+      !pathname.startsWith('/pricing') &&
+      pathname !== '/' &&
+      pathname.split('/').length === 2; // /[blogSlug] 형태만
+
+    if (isBlogPage) {
+      // 블로그 페이지: blogSlug 유지하면서 검색
+      const params = new URLSearchParams();
+      if (searchQuery.trim()) {
+        params.set('search', searchQuery.trim());
+      }
+      params.set('page', '1');
+
+      router.push(`${pathname}?${params.toString()}`);
+    } else {
+      // 홈 페이지 또는 기타 페이지: 홈으로 이동하면서 검색
+      const newParams = {
+        search: searchQuery.trim() || undefined,
+        page: 1,
+      };
+
+      const newUrl = createSearchUrl(newParams);
+      router.push(newUrl);
+    }
+
     // Blur the search input after submission
     searchInputRef.current?.blur();
-  }, [searchQuery, router]);
+  }, [searchQuery, router, pathname]);
 
   // Handle search input change
   const handleSearchInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {

@@ -20,6 +20,7 @@ import { Follow } from '../follows/entities/follow.entity';
 import { EmailApproval } from '../email/entities/email-approval.entity';
 import { EmailModule } from '../email/email.module';
 import { FilesModule } from '../files/files.module';
+import { AuditModule } from '../audit/audit.module';
 
 @Module({
   imports: [
@@ -37,6 +38,7 @@ import { FilesModule } from '../files/files.module';
     ]),
     forwardRef(() => EmailModule),
     FilesModule,
+    AuditModule,
   ],
   providers: [
     UsersService,

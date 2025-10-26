@@ -50,6 +50,26 @@ export class AuthService {
         return null;
       }
 
+      // 삭제된 계정 로그인 차단 (30일 재가입 정책 안내)
+      if (user.isDeleted) {
+        const now = new Date();
+        const deletedAt = new Date(user.deletedAt);
+        const daysSinceDeletion = Math.floor((now.getTime() - deletedAt.getTime()) / (1000 * 60 * 60 * 24));
+        const WAITING_PERIOD_DAYS = 30;
+        const remainingDays = Math.max(0, WAITING_PERIOD_DAYS - daysSinceDeletion);
+
+        throw new UnauthorizedException({
+          statusCode: 401,
+          message: `계정이 삭제되었습니다. 재가입은 삭제 후 30일이 지나야 가능합니다. ` +
+            (remainingDays > 0
+              ? `${remainingDays}일 후 재가입 가능합니다.`
+              : `회원가입 페이지에서 재가입해주세요.`),
+          error: 'Unauthorized',
+          code: 'ACCOUNT_DELETED',
+          remainingDays,
+        });
+      }
+
       // 비밀번호가 없는 경우 또는 비밀번호가 일치하지 않는 경우 - 통일된 에러 메시지
       if (!user.password) {
         return null;
@@ -60,8 +80,8 @@ export class AuthService {
         return null;
       }
 
-      // 마지막 로그인 시간 업데이트
-      await this.usersService.updateLastLogin(user.id);
+      // 마지막 로그인 시간 및 로그인 방법 업데이트
+      await this.usersService.updateLastLogin(user.id, 'local');
 
       // 🔍 디버그: validateUser가 반환하기 직전의 role 확인
       this.logger.debug(`[validateUser] Returning user - email: ${email}, role: "${user.role}" (type: ${typeof user.role})`);
@@ -109,10 +129,38 @@ export class AuthService {
       throw new BadRequestException('유효하지 않거나 만료된 이메일 인증 토큰입니다.');
     }
 
-    // 이메일 중복 체크
-    const existingUser = await this.usersService.findByEmail(email);
+    // 이메일 중복 체크 (삭제된 계정 포함)
+    const existingUser = await this.usersService.findByEmailIncludingDeleted(email);
+
     if (existingUser) {
-      throw new ConflictException('이미 존재하는 회원입니다. 로그인 페이지에서 로그인해주세요.');
+      // 활성 계정이면 중복 에러
+      if (!existingUser.isDeleted) {
+        throw new ConflictException('이미 존재하는 회원입니다. 로그인 페이지에서 로그인해주세요.');
+      }
+
+      // 삭제된 계정이면 재가입 대기 기간 확인 (30일 정책)
+      const now = new Date();
+      const deletedAt = new Date(existingUser.deletedAt);
+      const daysSinceDeletion = Math.floor((now.getTime() - deletedAt.getTime()) / (1000 * 60 * 60 * 24));
+      const WAITING_PERIOD_DAYS = 30;
+
+      if (daysSinceDeletion < WAITING_PERIOD_DAYS) {
+        // 30일 미경과: 재가입 차단
+        const remainingDays = WAITING_PERIOD_DAYS - daysSinceDeletion;
+        const availableDate = new Date(deletedAt);
+        availableDate.setDate(availableDate.getDate() + WAITING_PERIOD_DAYS);
+
+        throw new ConflictException(
+          `계정 삭제 후 ${WAITING_PERIOD_DAYS}일이 지나야 재가입이 가능합니다. ` +
+          `${remainingDays}일 후 (${availableDate.toLocaleDateString('ko-KR')}) 재가입 가능합니다.`
+        );
+      }
+
+      // 30일 경과: 재가입 허용 (로그 기록)
+      this.logger.log(
+        `User ${email} deleted ${daysSinceDeletion} days ago. ` +
+        `Allowing re-registration (old account ID: ${existingUser.id})`
+      );
     }
 
     // 사용자명 중복 체크
@@ -173,6 +221,26 @@ export class AuthService {
         await this.identityService.updateLastUsed(existingIdentity.id);
         const user = await this.usersService.findById(existingIdentity.userId);
 
+        // 🔐 삭제된 계정 로그인 차단 (30일 재가입 정책)
+        if (user.isDeleted || !user.isActive) {
+          const now = new Date();
+          const deletedAt = new Date(user.deletedAt);
+          const daysSinceDeletion = Math.floor((now.getTime() - deletedAt.getTime()) / (1000 * 60 * 60 * 24));
+          const WAITING_PERIOD_DAYS = 30;
+          const remainingDays = Math.max(0, WAITING_PERIOD_DAYS - daysSinceDeletion);
+
+          throw new UnauthorizedException({
+            statusCode: 401,
+            message: `계정이 삭제되었습니다. ` +
+              (remainingDays > 0
+                ? `재가입은 삭제 후 30일이 지나야 가능합니다. ${remainingDays}일 후 재가입 가능합니다.`
+                : `재가입을 원하시면 회원가입 페이지에서 진행해주세요.`),
+            error: 'Unauthorized',
+            code: 'ACCOUNT_DELETED',
+            remainingDays,
+          });
+        }
+
         // 블로그 정보 가져오기
         let userBlogs = await this.blogsService.findByUserId(user.id);
         let blog: Blog | null = null;
@@ -185,14 +253,49 @@ export class AuthService {
           blog = userBlogs[0]; // 첫 번째 블로그 사용
         }
 
-        await this.usersService.updateLastLogin(user.id);
+        await this.usersService.updateLastLogin(user.id, provider);
         return this.generateTokenResponse(user, blog);
       }
 
-      // 2. 이메일로 기존 사용자 찾기
-      const existingUser = await this.usersService.findByEmail(email);
+      // 2. 이메일로 기존 사용자 찾기 (삭제된 계정 포함)
+      const existingUser = await this.usersService.findByEmailIncludingDeleted(email);
 
       if (existingUser) {
+        // 삭제된 계정이면 재가입 정책 적용
+        if (existingUser.isDeleted) {
+          const now = new Date();
+          const deletedAt = new Date(existingUser.deletedAt);
+          const daysSinceDeletion = Math.floor((now.getTime() - deletedAt.getTime()) / (1000 * 60 * 60 * 24));
+          const WAITING_PERIOD_DAYS = 30;
+
+          if (daysSinceDeletion < WAITING_PERIOD_DAYS) {
+            // 30일 미경과: OAuth 로그인 차단
+            const remainingDays = WAITING_PERIOD_DAYS - daysSinceDeletion;
+            const availableDate = new Date(deletedAt);
+            availableDate.setDate(availableDate.getDate() + WAITING_PERIOD_DAYS);
+
+            throw new UnauthorizedException({
+              statusCode: 401,
+              message: `계정 삭제 후 ${WAITING_PERIOD_DAYS}일이 지나야 로그인이 가능합니다. ` +
+                `${remainingDays}일 후 (${availableDate.toLocaleDateString('ko-KR')}) 이용 가능합니다.`,
+              error: 'Unauthorized',
+              code: 'ACCOUNT_DELETED',
+              remainingDays,
+            });
+          }
+
+          // 30일 경과: OAuth 로그인 허용하지 않고, 재가입 유도
+          // (OAuth는 자동 회원가입이므로, 명시적 재가입 요구)
+          throw new UnauthorizedException({
+            statusCode: 401,
+            message: '삭제된 계정입니다. 재가입을 원하시면 회원가입 페이지에서 진행해주세요.',
+            error: 'Unauthorized',
+            code: 'ACCOUNT_DELETED',
+            remainingDays: 0,
+          });
+        }
+
+        // 활성 계정이면 기존 로직 진행
         // Multi-Identity: 기존 사용자에 새 identity 연결
         if (existingUser.isEmailVerified || this.identityService.isTrustedProvider(identityProvider)) {
           // 자동 링킹 가능
@@ -238,18 +341,20 @@ export class AuthService {
             blog = userBlogs[0]; // 첫 번째 블로그 사용
           }
 
-          // 계정 연결 알림
-          try {
-            await this.emailService.sendAccountLinkNotification(
-              email,
-              `${provider} 계정이 성공적으로 연결되었습니다.`
-            );
-          } catch (emailError) {
-            this.logger.warn(`Failed to send account link notification: ${emailError.message}`);
-          }
+          // 계정 연결 알림 (비용 절감을 위해 비활성화 - 프로덕션 성장 후 재활성화)
+          // TODO: 사용자가 많아지고 수익이 나면 주석 해제
+          // try {
+          //   await this.emailService.sendAccountLinkNotification(
+          //     existingUser.email,
+          //     provider,
+          //     email
+          //   );
+          // } catch (emailError) {
+          //   this.logger.warn(`Failed to send account link notification: ${emailError.message}`);
+          // }
 
           this.logger.log(`${provider} identity linked to existing account: ${email}`);
-          await this.usersService.updateLastLogin(existingUser.id);
+          await this.usersService.updateLastLogin(existingUser.id, provider);
           return this.generateTokenResponse(existingUser, blog);
         } else {
           // 수동 링킹 필요
@@ -384,6 +489,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      lastLoginProvider: user.lastLoginProvider || user.authProvider || 'local', // UX: 현재 로그인 방법 포함
       tokenType: 'access',
       iat: now,
     };
@@ -397,6 +503,7 @@ export class AuthService {
       sub: user.id,
       email: user.email,
       role: user.role,
+      lastLoginProvider: user.lastLoginProvider || user.authProvider || 'local', // UX: 현재 로그인 방법 포함
       tokenType: 'refresh',
       iat: now,
     };

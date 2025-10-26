@@ -129,18 +129,20 @@ export class IdentityService {
       await this.setPrimaryIdentity(userId, savedIdentity.id);
     }
 
-    // Send security notification
-    try {
-      const user = await this.userRepository.findOne({ where: { id: userId } });
-      if (user?.email) {
-        await this.emailService.sendAccountLinkNotification(
-          user.email,
-          `${data.provider} account has been successfully linked to your account.`
-        );
-      }
-    } catch (error) {
-      this.logger.warn(`Failed to send account link notification: ${error.message}`);
-    }
+    // Send security notification (비용 절감을 위해 비활성화 - 프로덕션 성장 후 재활성화)
+    // TODO: 사용자가 많아지고 수익이 나면 주석 해제
+    // try {
+    //   const user = await this.userRepository.findOne({ where: { id: userId } });
+    //   if (user?.email) {
+    //     await this.emailService.sendAccountLinkNotification(
+    //       user.email,
+    //       data.provider,
+    //       data.email || user.email
+    //     );
+    //   }
+    // } catch (error) {
+    //   this.logger.warn(`Failed to send account link notification: ${error.message}`);
+    // }
 
     this.logger.log(`Successfully linked ${data.provider} identity to user ${userId}`);
     return savedIdentity;
@@ -191,17 +193,20 @@ export class IdentityService {
 
     await this.identityRepository.delete({ id: identityId, userId });
 
-    // Send security notification
-    try {
-      if (user?.email) {
-        await this.emailService.sendAccountLinkNotification(
-          user.email,
-          `${identityToRemove.provider} account has been unlinked from your account.`
-        );
-      }
-    } catch (error) {
-      this.logger.warn(`Failed to send account unlink notification: ${error.message}`);
-    }
+    // Send security notification (비용 절감을 위해 비활성화 - 프로덕션 성장 후 재활성화)
+    // TODO: 사용자가 많아지고 수익이 나면 주석 해제
+    // TODO: 연결 해제 전용 이메일 템플릿 필요 (현재는 연결 알림 템플릿 재사용)
+    // try {
+    //   if (user?.email) {
+    //     await this.emailService.sendAccountLinkNotification(
+    //       user.email,
+    //       identityToRemove.provider,
+    //       identityToRemove.providerEmail || user.email
+    //     );
+    //   }
+    // } catch (error) {
+    //   this.logger.warn(`Failed to send account unlink notification: ${error.message}`);
+    // }
 
     this.logger.log(`Unlinked ${identityToRemove.provider} identity from user ${userId}`);
   }

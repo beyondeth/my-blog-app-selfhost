@@ -195,6 +195,12 @@ async function apiRequest<T>(
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: '요청 실패' }));
+
+    // /auth/me의 401은 비로그인 상태를 의미하므로 예상된 동작 (에러 메시지 간소화)
+    if (endpoint === '/auth/me' && response.status === 401) {
+      throw new Error('Unauthorized');
+    }
+
     throw new Error(error.message || `HTTP ${response.status}`);
   }
 
@@ -236,6 +242,10 @@ export const useUser = () => {
     refetchOnWindowFocus: false,   // 윈도우 포커스 시 재요청 안함
     refetchOnMount: false,         // 마운트 시 재요청 안함 (성능 최적화 - staleTime 활용)
     placeholderData: (previousData) => previousData,  // 리페칭 중에도 이전 데이터 유지 (깜빡임 방지)
+    meta: {
+      // 비로그인 상태의 401 에러는 예상된 동작이므로 에러 바운더리에서 처리 안함
+      errorBoundary: false,
+    },
   });
 };
 

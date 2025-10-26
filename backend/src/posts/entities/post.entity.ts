@@ -54,6 +54,12 @@ export class Post {
   @Column({ default: false, name: 'isPublished' })
   isPublished: boolean;
 
+  // 소프트 삭제 플래그 (법적 조회용 데이터 보존)
+  // 사용자가 삭제되면 isDeleted = true로 설정되며, 180일 후 완전 삭제
+  @Column({ default: false, name: 'isDeleted' })
+  @Index()
+  isDeleted: boolean;
+
   @Column({ default: 0, name: 'viewCount' })
   viewCount: number;
 

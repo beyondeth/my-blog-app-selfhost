@@ -65,7 +65,7 @@ export class AuditLog {
   @Column({ type: 'jsonb', nullable: true })
   metadata: Record<string, any>; // Additional context
 
-  @Column({ type: 'uuid' })
+  @Column({ type: 'uuid', nullable: true })
   performedById: string;
 
   @Column({ type: 'varchar', nullable: true })
@@ -80,7 +80,7 @@ export class AuditLog {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => User)
+  @ManyToOne(() => User, { onDelete: 'SET NULL' })
   @JoinColumn({ name: 'performedById' })
   performedBy: User;
 }

@@ -21,7 +21,7 @@ export default function UserLinkWithTooltip({
 }: UserLinkWithTooltipProps) {
   const { user } = useAuth();
   
-  // 사용자 데이터 조회
+  // 사용자 데이터 조회 (로그인된 상태에서만)
   const { data: userData } = useQuery({
     queryKey: queryKeys.users.detail(userId),
     queryFn: async () => {
@@ -34,15 +34,15 @@ export default function UserLinkWithTooltip({
           },
         }
       );
-      
+
       if (!response.ok) {
         throw new Error('Failed to fetch user data');
       }
-      
+
       return response.json();
     },
     staleTime: 5 * 60 * 1000, // 5분
-    enabled: !!userId,
+    enabled: !!userId && !!user,  // 로그인된 상태에서만 실행
   });
 
   // 팔로우 정보 조회 (로그인된 상태에서만)

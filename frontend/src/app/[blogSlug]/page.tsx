@@ -203,17 +203,15 @@ export default function BlogPage() {
     router.push(newUrl);
   }, [router]);
 
-  // 카테고리 클릭 처리 (카테고리 필터링)
+  // 카테고리 클릭 처리 (블로그 내 카테고리 필터링)
   const handleCategoryClick = useCallback((category: string) => {
-    // 카테고리 필터를 사용하여 URL 업데이트
-    const newParams = {
-      category: category,
-      page: 1,
-    };
+    // 현재 블로그 경로를 유지하면서 category 파라미터만 추가
+    const params = new URLSearchParams();
+    params.set('category', category);
+    params.set('page', '1');
 
-    const newUrl = createSearchUrl(newParams);
-    router.push(newUrl);
-  }, [router]);
+    router.push(`/${blogSlug}?${params.toString()}`);
+  }, [router, blogSlug]);
 
   if (!isClient) {
     return <LoadingSpinner message="페이지를 불러오는 중..." />;

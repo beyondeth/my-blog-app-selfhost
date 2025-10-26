@@ -94,4 +94,6 @@ export interface ApiError {
   message: string;
   error?: string;
   statusCode?: number;
+  code?: string;  // 에러 코드 (예: 'ACCOUNT_DELETED')
+  remainingDays?: number;  // 삭제된 계정의 재가입 가능까지 남은 일수
 }

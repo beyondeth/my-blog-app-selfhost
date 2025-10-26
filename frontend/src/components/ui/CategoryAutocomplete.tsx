@@ -8,6 +8,7 @@ interface CategoryAutocompleteProps {
   value: string;
   onChange: (value: string) => void;
   onBlur?: () => void;
+  onFocus?: () => void;
   disabled?: boolean;
   placeholder?: string;
   className?: string;
@@ -30,6 +31,7 @@ export default function CategoryAutocomplete({
   value,
   onChange,
   onBlur,
+  onFocus,
   disabled,
   placeholder = " 카테고리 입력",
   className,
@@ -56,6 +58,9 @@ export default function CategoryAutocomplete({
 
   const handleFocus = () => {
     setIsFocused(true);
+    if (onFocus) {
+      onFocus();
+    }
   };
 
   const handleBlur = (e: React.FocusEvent<HTMLInputElement>) => {

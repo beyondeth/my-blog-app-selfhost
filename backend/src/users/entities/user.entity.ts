@@ -244,6 +244,8 @@ export class User {
       profileImage: this.profileImage,
       bio: this.bio,
       role: this.role,
+      authProvider: this.authProvider,             // 최초 가입 방법 (계정 관리용)
+      lastLoginProvider: this.lastLoginProvider,   // 현재 로그인 방법 (계정 삭제 UX용)
       isEmailVerified: this.isEmailVerified,
       subscriptionTier: this.subscriptionTier,     // 구독 티어는 공개
       subscriptionStatus: this.subscriptionStatus, // 구독 상태 추가

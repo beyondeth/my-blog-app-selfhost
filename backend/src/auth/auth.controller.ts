@@ -427,13 +427,15 @@ export class AuthController {
     const fullUser = await this.usersService.findOne(user.id);
 
     if (!fullUser) {
-      return {
+      const fallbackResponse = {
         id: user.id,
         email: user.email,
         username: user.username,
         role: user.role,
         profileImage: user.profileImage,
         isEmailVerified: user.isEmailVerified,
+        authProvider: user.authProvider,             // 최초 가입 방법 (계정 관리용)
+        lastLoginProvider: user.lastLoginProvider,   // 현재 로그인 방법 (계정 삭제 UX용)
         subscriptionTier: user.subscriptionTier,
         subscriptionStatus: user.subscriptionStatus,
         bio: user.bio,
@@ -444,16 +446,21 @@ export class AuthController {
         newsletterOptIn: user.newsletterOptIn,
         createdAt: user.createdAt,
       };
+
+      this.logger.debug(`[/auth/me] Fallback response - authProvider: ${fallbackResponse.authProvider}, lastLoginProvider: ${fallbackResponse.lastLoginProvider}`);
+      return fallbackResponse;
     }
 
     // 보안을 위해 공개 정보만 반환 (CDN URL 적용됨)
-    return {
+    const response = {
       id: fullUser.id,
       email: fullUser.email,
       username: fullUser.username,
       role: fullUser.role,
       profileImage: fullUser.profileImage,  // ✅ CDN URL로 변환됨
       isEmailVerified: fullUser.isEmailVerified,
+      authProvider: fullUser.authProvider,             // 최초 가입 방법 (계정 관리용)
+      lastLoginProvider: fullUser.lastLoginProvider,   // 현재 로그인 방법 (계정 삭제 UX용)
       subscriptionTier: fullUser.subscriptionTier,
       subscriptionStatus: fullUser.subscriptionStatus,
       bio: fullUser.bio,
@@ -464,6 +471,9 @@ export class AuthController {
       newsletterOptIn: fullUser.newsletterOptIn,       // 뉴스레터 수신 동의
       createdAt: fullUser.createdAt,
     };
+
+    this.logger.debug(`[/auth/me] Response for ${fullUser.email} - authProvider: ${response.authProvider}, lastLoginProvider: ${response.lastLoginProvider}`);
+    return response;
   }
 
   @Post('logout')
@@ -610,9 +620,21 @@ export class AuthController {
     @Body() dto: DeleteAccountDto,
     @Res() res: Response
   ) {
-    // 로컬 인증 사용자의 경우에만 비밀번호 확인
-    if (user.authProvider === 'local' || !user.authProvider) {
-      // 비밀번호가 제공되지 않은 경우
+    /**
+     * UX 개선: 현재 세션의 로그인 방법 기준으로 비밀번호 확인
+     *
+     * 시나리오:
+     * 1. 로컬 가입 → 로컬 로그인 → 계정 삭제: 비밀번호 필요 ✅
+     * 2. 로컬 가입 → 구글 로그인 → 계정 삭제: 비밀번호 불필요 ✅
+     * 3. 구글 가입만 → 계정 삭제: 비밀번호 불필요 ✅
+     *
+     * lastLoginProvider: 현재 세션의 로그인 방법
+     * authProvider: 최초 가입 방법 (변경 안됨)
+     */
+    const currentLoginMethod = user.lastLoginProvider || user.authProvider || 'local';
+
+    if (currentLoginMethod === 'local') {
+      // 로컬 로그인 사용자만 비밀번호 확인
       if (!dto.password) {
         return res.status(400).json({
           success: false,
@@ -629,7 +651,7 @@ export class AuthController {
         });
       }
     }
-    // OAuth 사용자의 경우 비밀번호 확인 건너뛰기
+    // OAuth로 로그인한 사용자는 비밀번호 없이 삭제 가능
 
     try {
       // 1. 즉시 소프트 삭제 실행 (개인정보 마스킹 + 로그인 차단)

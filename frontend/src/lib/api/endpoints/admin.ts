@@ -26,15 +26,33 @@ export interface DeletedUsersResponse {
   totalPages: number;
 }
 
-// 사용자 복구 응답
-export interface RestoreUserResponse {
-  message: string;
-  user: any;
-}
-
 // 영구 삭제 응답
 export interface PermanentDeleteResponse {
   message: string;
+}
+
+// 법적 조회: 삭제된 포스트
+export interface DeletedPost {
+  id: string;
+  title: string;
+  slug: string;
+  content: string; // 법적 증거로 가장 중요
+  category: string;
+  excerpt: string;
+  viewCount: number;
+  likeCount: number;
+  commentCount: number;
+  createdAt: Date;
+  publishedAt: Date;
+}
+
+// 법적 조회: 삭제된 댓글
+export interface DeletedComment {
+  id: string;
+  content: string;
+  postId: string;
+  likesCount: number;
+  createdAt: Date;
 }
 
 /**
@@ -51,24 +69,19 @@ export class AdminAPI {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'ASC' | 'DESC';
+    search?: string;
   }): Promise<DeletedUsersResponse> {
     const queryParams = new URLSearchParams();
     if (params?.page) queryParams.append('page', params.page.toString());
     if (params?.limit) queryParams.append('limit', params.limit.toString());
     if (params?.sortBy) queryParams.append('sortBy', params.sortBy);
     if (params?.sortOrder) queryParams.append('sortOrder', params.sortOrder);
+    if (params?.search) queryParams.append('search', params.search);
 
     const queryString = queryParams.toString();
     const url = `/admin/users/deleted${queryString ? `?${queryString}` : ''}`;
 
     return this.client.get<DeletedUsersResponse>(url);
-  }
-
-  /**
-   * 삭제된 사용자 복구
-   */
-  async restoreUser(userId: string): Promise<RestoreUserResponse> {
-    return this.client.post<RestoreUserResponse>(`/admin/users/${userId}/restore`);
   }
 
   /**

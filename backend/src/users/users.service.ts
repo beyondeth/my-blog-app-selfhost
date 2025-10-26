@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Repository, DataSource } from 'typeorm';
 import { DateUtils } from '../common/utils/date.utils';
 import * as bcrypt from 'bcrypt';
 import { User, AuthProvider } from './entities/user.entity';
@@ -9,6 +9,10 @@ import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
 import { CdnService } from '../files/services/cdn.service';
+import { AuditService } from '../audit/audit.service';
+import { AuditAction } from '../audit/entities/audit-log.entity';
+import { Post } from '../posts/entities/post.entity';
+import { Comment } from '../comments/entities/comment.entity';
 
 @Injectable()
 export class UsersService {
@@ -17,8 +21,14 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Post)
+    private readonly postRepository: Repository<Post>,
+    @InjectRepository(Comment)
+    private readonly commentRepository: Repository<Comment>,
     private readonly redisService: UnifiedRedisService,
     private readonly cdnService: CdnService,
+    private readonly auditService: AuditService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -61,9 +71,29 @@ export class UsersService {
   async findOne(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'createdAt', 'lastLoginAt', 'isActive', 'bio', 'authProvider', 'providerId', 'marketingOptIn', 'newsletterOptIn', 'termsAcceptedAt', 'privacyAcceptedAt']
+      select: [
+        'id',
+        'email',
+        'username',
+        'role',
+        'profileImage',
+        'isEmailVerified',
+        'createdAt',
+        'lastLoginAt',
+        'isActive',
+        'bio',
+        'authProvider',               // 최초 가입 방법
+        'lastLoginProvider',          // 현재 로그인 방법 (계정 삭제 UX용)
+        'providerId',
+        'subscriptionTier',           // 구독 티어
+        'subscriptionStatus',         // 구독 상태
+        'marketingOptIn',
+        'newsletterOptIn',
+        'termsAcceptedAt',
+        'privacyAcceptedAt'
+      ]
     });
-    
+
     if (!user) {
       throw new NotFoundException('User not found');
     }
@@ -88,14 +118,15 @@ export class UsersService {
         'user.password',
         'user.username',
         'user.role',
-        'user.authProvider',
+        'user.authProvider',         // 최초 가입 방법
+        'user.lastLoginProvider',    // 현재 로그인 방법 (계정 삭제 UX용)
         'user.isActive',
         'user.profileImage',
         'user.isEmailVerified',
         'user.bio',
-        'user.subscriptionTier',     // 구독 티어 추가
-        'user.subscriptionStatus',   // 구독 상태 추가
-        'blog.slug',                  // blog의 slug만 선택
+        'user.subscriptionTier',     // 구독 티어
+        'user.subscriptionStatus',   // 구독 상태
+        'blog.slug',                 // blog의 slug만 선택
       ])
       .where('user.email = :email', { email })
       .getOne();
@@ -107,6 +138,67 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  /**
+   * 이메일로 사용자 조회 (삭제된 계정 포함)
+   *
+   * 재가입 정책 체크를 위해 삭제된 계정도 포함하여 조회합니다.
+   * - 활성 계정: email 필드로 직접 검색
+   * - 삭제된 계정: audit_logs의 previousData에서 원본 이메일 추적
+   *
+   * @param email 검색할 이메일 주소
+   * @returns User 엔티티 (삭제 정보 포함) 또는 null
+   */
+  async findByEmailIncludingDeleted(email: string): Promise<User | null> {
+    // 1. 먼저 활성 계정 검색 (일반적인 케이스)
+    const activeUser = await this.usersRepository
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.email',
+        'user.isDeleted',
+        'user.deletedAt',
+        'user.scheduledDeletionAt',
+      ])
+      .where('user.email = :email', { email })
+      .getOne();
+
+    if (activeUser) {
+      return activeUser;
+    }
+
+    // 2. 활성 계정이 없으면 audit_logs에서 삭제된 계정 검색
+    // 삭제된 계정은 email이 마스킹되어 있으므로 audit_logs에서 원본 이메일 추적
+    const auditLog = await this.dataSource
+      .createQueryBuilder()
+      .select('audit_log."entityId"', 'userId')  // entityId가 삭제된 사용자의 ID
+      .from('audit_logs', 'audit_log')
+      .where('audit_log.action = :action', { action: 'user_deleted' })  // snake_case
+      .andWhere(`audit_log."previousData"->>'email' = :email`, { email })  // PostgreSQL 대소문자 유지
+      .orderBy('audit_log."createdAt"', 'DESC') // 최신 삭제 기록
+      .limit(1)
+      .getRawOne();
+
+    if (!auditLog) {
+      return null; // 해당 이메일로 가입/삭제된 기록 없음
+    }
+
+    // 3. audit_logs에서 찾은 userId로 삭제된 사용자 조회
+    const deletedUser = await this.usersRepository
+      .createQueryBuilder('user')
+      .select([
+        'user.id',
+        'user.email',
+        'user.isDeleted',
+        'user.deletedAt',
+        'user.scheduledDeletionAt',
+      ])
+      .where('user.id = :userId', { userId: auditLog.userId })
+      .andWhere('user.isDeleted = :isDeleted', { isDeleted: true })
+      .getOne();
+
+    return deletedUser;
   }
 
   async findByUsername(username: string): Promise<User | null> {
@@ -175,10 +267,25 @@ export class UsersService {
     return updatedUser;
   }
 
-  async updateLastLogin(id: string): Promise<void> {
-    await this.usersRepository.update(id, { 
-      lastLoginAt: new Date() 
-    });
+  /**
+   * 마지막 로그인 시간 및 로그인 방법 업데이트
+   * @param id 사용자 ID
+   * @param provider 로그인 제공자 (local, google, kakao, github)
+   *
+   * UX 개선: 현재 세션의 로그인 방법을 기록하여
+   * 계정 삭제 시 적절한 인증 방법을 요구할 수 있도록 함
+   */
+  async updateLastLogin(id: string, provider?: string): Promise<void> {
+    const updateData: any = {
+      lastLoginAt: new Date()
+    };
+
+    // provider가 제공된 경우 lastLoginProvider도 업데이트
+    if (provider) {
+      updateData.lastLoginProvider = provider;
+    }
+
+    await this.usersRepository.update(id, updateData);
   }
 
   async deactivate(id: string): Promise<void> {
@@ -264,22 +371,24 @@ export class UsersService {
         'user.email',
         'user.username',
         'user.role',
+        'user.authProvider',            // 최초 가입 방법 (계정 관리용)
+        'user.lastLoginProvider',       // 현재 로그인 방법 (계정 삭제 UX용)
         'user.profileImage',
         'user.isEmailVerified',
         'user.createdAt',
         'user.lastLoginAt',
         'user.isActive',
-        'user.isDeleted',                // 삭제 플래그 (JwtStrategy 로그인 차단용)
+        'user.isDeleted',               // 삭제 플래그 (JwtStrategy 로그인 차단용)
         'user.refreshToken',
         'user.refreshTokenExpiresAt',
         'user.subscriptionTier',        // 구독 티어
         'user.subscriptionStatus',      // 구독 상태
-        'user.bio',                      // 사용자 소개
+        'user.bio',                     // 사용자 소개
         'user.marketingOptIn',          // 마케팅 정보 수신 동의
         'user.newsletterOptIn',         // 뉴스레터 수신 동의
         'user.termsAcceptedAt',         // 이용약관 동의 시각
         'user.privacyAcceptedAt',       // 개인정보 처리방침 동의 시각
-        'blog.slug',                     // blog의 slug만 선택 (헤더 "내 블로그" 버튼용)
+        'blog.slug',                    // blog의 slug만 선택 (헤더 "내 블로그" 버튼용)
       ])
       .where('user.id = :id', { id })
       .getOne();
@@ -344,6 +453,94 @@ export class UsersService {
     const scheduledDeletionAt = new Date(now);
     scheduledDeletionAt.setDate(scheduledDeletionAt.getDate() + retentionDays);
 
+    /**
+     * 🔒 법적 요구사항 대응: 감사 로그에 원본 데이터 보관
+     *
+     * 목적: 형사 수사, 민사 소송, 금융감독 등 법적 요구 시 원본 데이터 제공
+     * 근거:
+     * - 형사소송법 제106조 (법원 영장 시 데이터 제공 의무)
+     * - 전자금융거래법 (5년간 거래 기록 보관)
+     * - 개인정보보호법 제63조 (조사 협조 의무)
+     *
+     * 보관 데이터:
+     * - 개인정보: email, username, profileImage, bio
+     * - 계정 정보: authProvider, lastLoginProvider, role
+     * - 시간 정보: createdAt, lastLoginAt
+     * - 구독 정보: subscriptionTier, subscriptionStatus
+     *
+     * 주의: password는 보안상 저장하지 않음 (해시된 값도 미저장)
+     */
+    await this.auditService.log(
+      {
+        action: AuditAction.USER_DELETED,
+        entityType: 'user',
+        entityId: userId,
+        previousData: {
+          // 개인정보 (법적 조회용)
+          email: user.email,
+          username: user.username,
+          profileImage: user.profileImage,
+          bio: user.bio,
+
+          // 계정 정보
+          authProvider: user.authProvider,
+          lastLoginProvider: user.lastLoginProvider,
+          role: user.role,
+          isEmailVerified: user.isEmailVerified,
+
+          // 시간 정보
+          createdAt: user.createdAt,
+          lastLoginAt: user.lastLoginAt,
+
+          // 구독 정보
+          subscriptionTier: user.subscriptionTier,
+          subscriptionStatus: user.subscriptionStatus,
+        },
+        newData: {
+          isDeleted: true,
+          deletedAt: now,
+          scheduledDeletionAt,
+        },
+        metadata: {
+          retentionDays,
+          reason: '사용자 계정 삭제 요청',
+          legalNote: '법적 요구 시 audit_logs.previousData에서 원본 조회 가능',
+        },
+      },
+      {
+        userId, // 본인이 삭제 요청
+      },
+    );
+
+    /**
+     * 📝 관련 콘텐츠 Soft Delete (법적 조회용 보존)
+     *
+     * 사용자가 삭제될 때 해당 사용자의 모든 포스트와 댓글도 soft delete
+     * - Posts: isDeleted = true 설정
+     * - Comments: isDeleted = true 설정
+     *
+     * 이유:
+     * - 법적 요구 시 포스트/댓글 내용 제공 필요
+     * - 180일 보관 정책 준수
+     * - 나중에 permanentDelete 시 CASCADE로 완전 삭제
+     */
+    const [postsUpdated, commentsUpdated] = await Promise.all([
+      // 해당 사용자의 모든 포스트 soft delete
+      this.postRepository.update(
+        { authorId: userId, isDeleted: false },
+        { isDeleted: true }
+      ),
+      // 해당 사용자의 모든 댓글 soft delete
+      this.commentRepository.update(
+        { authorId: userId, isDeleted: false },
+        { isDeleted: true }
+      ),
+    ]);
+
+    this.logger.log(
+      `Soft deleted ${postsUpdated.affected} posts and ${commentsUpdated.affected} comments for user ${userId}`
+    );
+
     // 즉시 개인정보 마스킹 및 삭제 플래그 설정
     await this.usersRepository.update(userId, {
       // 소프트 삭제 플래그
@@ -351,7 +548,7 @@ export class UsersService {
       deletedAt: now,
       scheduledDeletionAt,
 
-      // 개인정보 즉시 마스킹 (법적 요구사항)
+      // 개인정보 즉시 마스킹 (프론트엔드 비공개 처리)
       email: `deleted_${userId}@deleted.local`,
       username: `deleted_${userId}`,
       profileImage: null,
@@ -366,40 +563,14 @@ export class UsersService {
       isActive: false,
     });
 
-    this.logger.log(`User ${userId} soft deleted. Scheduled for permanent deletion at ${scheduledDeletionAt.toISOString()} (180 days from now)`);
+    this.logger.log(
+      `User ${userId} soft deleted. Original data saved to audit_logs. ` +
+      `Soft deleted ${postsUpdated.affected} posts and ${commentsUpdated.affected} comments. ` +
+      `Scheduled for permanent deletion at ${scheduledDeletionAt.toISOString()} (180 days from now)`
+    );
 
     // TODO: BullMQ 큐에 백그라운드 삭제 작업 추가
     // await this.userDeletionQueue.add('soft-delete', { userId });
-  }
-
-  /**
-   * 사용자 복구: 소프트 삭제 취소
-   * - 관리자 전용 기능
-   * - 개인정보는 복구 불가 (이미 마스킹됨)
-   * - isDeleted 플래그만 해제하여 로그인 재활성화
-   */
-  async restoreUser(userId: string): Promise<User> {
-    const user = await this.findById(userId);
-    if (!user) {
-      throw new NotFoundException('User not found');
-    }
-
-    if (!user.isDeleted) {
-      this.logger.warn(`User ${userId} is not deleted`);
-      throw new BadRequestException('User is not deleted');
-    }
-
-    // 소프트 삭제 해제
-    await this.usersRepository.update(userId, {
-      isDeleted: false,
-      deletedAt: null,
-      scheduledDeletionAt: null,
-      isActive: true,
-    });
-
-    this.logger.log(`User ${userId} restored by admin`);
-
-    return this.findById(userId);
   }
 
   /**

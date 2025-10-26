@@ -29,7 +29,14 @@ const postFormSchema = z.object({
     .min(1, { message: "제목을 입력해주세요." })
     .max(200, { message: "제목은 200자 이하로 입력해주세요." }),
   category: z.string()
-    .min(1, { message: "카테고리를 입력해주세요." }),
+    .min(1, { message: "카테고리를 입력해주세요." })
+    .refine(
+      (val) => {
+        const slashCount = (val.match(/\//g) || []).length;
+        return slashCount <= 1;
+      },
+      { message: '카테고리는 최대 2단계까지만 입력 가능합니다 (예: JavaScript/React)' }
+    ),
   content: z.string()
     .min(1, { message: "내용을 입력해주세요." }),
   tags: z.array(z.string()).optional(),
@@ -228,12 +235,17 @@ export default function EditPostForm({
   };
 
   const handleSubmit = (data: PostFormValues) => {
+    // 1차 방어: 이미 제출 중이면 무시
+    if (isLoading) {
+      return;
+    }
+
     // 현재 images state에서 직접 attachedFileIds 계산 (React Form state 타이밍 이슈 회피)
     const currentFileIds = images
       .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
       .map(img => img.id);
 
-    // 썸네일 처리 (new-story/page.tsx와 동일)
+    // 썸네일 처리
     const formData: any = {
       ...data,
       attachedFileIds: currentFileIds, // 명시적으로 최신 값 포함
@@ -547,15 +559,20 @@ export default function EditPostForm({
             </Button>
             <Button
               type="submit"
-              disabled={!isUploadValid || isLoading || !form.formState.isValid}
+              disabled={!isUploadValid || isLoading}
+              onClick={(e) => {
+                // 2차 방어: 버튼 클릭 시 Form 제출 차단
+                if (isLoading) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               className="flex items-center gap-2 min-w-[120px]"
               title={!isUploadValid ? uploadValidationReason : undefined}
+              aria-label={isLoading ? "저장 중" : submitButtonText}
             >
               {isLoading ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  저장중...
-                </>
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
                 <>
                   <Save className="h-4 w-4" />

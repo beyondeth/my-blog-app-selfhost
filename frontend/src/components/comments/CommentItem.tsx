@@ -127,18 +127,30 @@ export default function CommentItem({
   };
 
   const handleLike = () => {
+    // 중복 방지: 이미 처리 중이면 무시
+    if (likeMutation.isPending) {
+      return;
+    }
+
     if (!user) {
       alert('로그인이 필요합니다.');
       return;
     }
+
     likeMutation.mutate(comment.id);
   };
 
   const handleDislike = () => {
+    // 중복 방지: 이미 처리 중이면 무시
+    if (dislikeMutation.isPending) {
+      return;
+    }
+
     if (!user) {
       alert('로그인이 필요합니다.');
       return;
     }
+
     dislikeMutation.mutate(comment.id);
   };
 

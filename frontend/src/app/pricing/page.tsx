@@ -33,6 +33,11 @@ export default function PricingPage() {
    * 로그인한 경우 체크아웃 세션 생성
    */
   const handleSubscribe = async (tier: SubscriptionTier) => {
+    // 1차 방어: 이미 처리 중이면 무시
+    if (createCheckout.isPending) {
+      return;
+    }
+
     if (!user) {
       // 로그인하지 않은 경우 로그인 페이지로 이동
       router.push('/login?redirect=/pricing');
@@ -51,7 +56,7 @@ export default function PricingPage() {
       return;
     }
 
-    // 처리 중 상태 설정
+    // 처리 중 상태 설정 (UI 피드백용)
     setProcessingTier(tier);
 
     try {
@@ -96,7 +101,7 @@ export default function PricingPage() {
    * 플랜 카드의 버튼 비활성화 여부
    */
   const isButtonDisabled = (tier: SubscriptionTier) => {
-    if (processingTier) return true;
+    if (createCheckout.isPending || processingTier) return true;
     if (user && currentTier === tier) return true;
     return false;
   };
@@ -220,7 +225,15 @@ export default function PricingPage() {
                 {/* 구독 버튼 - 현재 플랜 강조 */}
                 <div className="mt-8">
                   <button
-                    onClick={() => handleSubscribe(plan.tier)}
+                    onClick={(e) => {
+                      // 2차 방어: 버튼 클릭 시 중복 방지
+                      if (createCheckout.isPending) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        return;
+                      }
+                      handleSubscribe(plan.tier);
+                    }}
                     disabled={isButtonDisabled(plan.tier)}
                     className={`w-full py-3 px-6 rounded-lg font-medium transition-all ${
                       isCurrentPlan

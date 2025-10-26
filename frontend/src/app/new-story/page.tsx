@@ -46,7 +46,15 @@ const BlogRichTextEditor = dynamic(
 // Zod 스키마 정의
 const postSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요.'),
-  category: z.string().min(1, '카테고리를 입력해주세요.'),
+  category: z.string()
+    .min(1, '카테고리를 입력해주세요.')
+    .refine(
+      (val) => {
+        const slashCount = (val.match(/\//g) || []).length;
+        return slashCount <= 1;
+      },
+      { message: '카테고리는 최대 2단계까지만 입력 가능합니다 (예: JavaScript/React)' }
+    ),
   content: z.string().min(1, '내용을 입력해주세요.'),
   tags: z.array(z.string()).optional(),
   fileIds: z.array(z.string()).optional(),
@@ -68,10 +76,6 @@ export default function NewStoryPage() {
   const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
   const [isUploadValid, setIsUploadValid] = useState<boolean>(true);
   const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
-  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
-
-  // 중복 제출 방지를 위한 ref (타이밍 이슈 방지)
-  const isSubmittingRef = useRef<boolean>(false);
 
   const form = useForm<PostFormData>({
     resolver: zodResolver(postSchema),
@@ -127,20 +131,18 @@ export default function NewStoryPage() {
     setUploadValidationReason(reason);
   };
   
-  // 폼 제출 핸들러 (중복 제출 방지 강화)
+  // 폼 제출 핸들러 (mutation.isPending 기반 중복 방지)
   const onSubmit = async (data: PostFormData) => {
+    // 1차 방어: 업로드 유효성 검사
     if (!isUploadValid) {
       toast.error(`업로드 제한 초과: ${uploadValidationReason}`);
       return;
     }
 
-    // Ref 기반 중복 방지 (타이밍 이슈에도 안전)
-    if (isSubmittingRef.current || isSubmitting) {
+    // 2차 방어: 이미 제출 중이면 무시 (React Query 상태 기반)
+    if (createPostMutation.isPending) {
       return;
     }
-
-    isSubmittingRef.current = true;
-    setIsSubmitting(true);
 
     try {
       const postData: any = {
@@ -150,8 +152,8 @@ export default function NewStoryPage() {
         tags: data.tags,
         attachedFileIds: data.fileIds,
       };
-      
-      // 썸네일 처리 (기존과 동일)
+
+      // 썸네일 처리
       if (selectedThumbnailId) {
         if (selectedThumbnailId.startsWith('yt_thumb_')) {
           const selectedImage = images.find(img => img.id === selectedThumbnailId);
@@ -162,17 +164,14 @@ export default function NewStoryPage() {
           postData.thumbnail = `/api/v1/files/${selectedThumbnailId}/download`;
         }
       }
-      
+
       const result = await createPostMutation.mutateAsync(postData);
 
-      // 성공 시 해당 블로그의 포스트로 이동 (blog는 항상 존재)
+      // 성공 시 해당 블로그의 포스트로 이동
       router.push(`/${blog!.slug}/${result.slug}`);
     } catch (error) {
       console.error('Failed to create post:', error);
       toast.error('포스트 저장에 실패했습니다.');
-    } finally {
-      isSubmittingRef.current = false;
-      setIsSubmitting(false);
     }
   };
 
@@ -250,7 +249,7 @@ export default function NewStoryPage() {
                             }}
                             placeholder=" 일단 쓰시죠..."
                             {...restField}
-                            disabled={isSubmitting || createPostMutation.isPending}
+                            disabled={createPostMutation.isPending}
                             onFocus={(e) => {
                               setIsFocused(true);
                               field.onBlur();
@@ -317,15 +316,26 @@ export default function NewStoryPage() {
                           <div className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2">
                             <CategoryAutocomplete
                               value={field.value}
-                              onChange={field.onChange}
+                              onChange={(value) => {
+                                field.onChange(value);
+                              }}
+                              onFocus={() => {
+                                setIsFocused(true);
+                              }}
                               onBlur={() => {
                                 setIsFocused(false);
                                 field.onBlur();
                               }}
-                              disabled={isSubmitting || createPostMutation.isPending}
-                              placeholder=" 카테고리 입력 (필수)"
+                              disabled={createPostMutation.isPending}
+                              placeholder=" 카테고리 입력"
                               className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
                             />
+                            {/* 카테고리 입력 안내 문구 (Focus 시 또는 값이 없을 때) */}
+                            {isFocused && !field.value && (
+                              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-0">
+                                💡 "/" 구분자로 최대 2단계까지 입력 가능 (예: JavaScript/React)
+                              </p>
+                            )}
                           </div>
                         </div>
                       </FormControl>
@@ -426,7 +436,7 @@ export default function NewStoryPage() {
                               onCompositionEnd={() => setIsComposing(false)}
                               onFocus={() => setIsFocused(true)}
                               onBlur={() => setIsFocused(false)}
-                              disabled={isSubmitting || createPostMutation.isPending}
+                              disabled={createPostMutation.isPending}
                               placeholder={!inputValue ? " 태그 입력 후 콤마(,) 또는 Enter" : ""}
                               className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
                               style={{ width: inputValue ? `${Math.max(235, inputValue.length * 14)}px` : '235px' }}
@@ -504,11 +514,7 @@ export default function NewStoryPage() {
               type="button"
               variant="outline"
               onClick={() => router.back()}
-              disabled={
-                isSubmitting ||
-                createPostMutation.isPending ||
-                form.formState.isSubmitting
-              }
+              disabled={createPostMutation.isPending}
             >
               취소
             </Button>
@@ -516,19 +522,21 @@ export default function NewStoryPage() {
               type="submit"
               disabled={
                 !isUploadValid ||
-                isSubmitting ||
-                createPostMutation.isPending ||
-                !form.formState.isValid ||
-                form.formState.isSubmitting
+                createPostMutation.isPending
               }
+              onClick={(e) => {
+                // 3차 방어: 버튼 클릭 시 Form 제출 차단
+                if (createPostMutation.isPending) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               className="flex items-center justify-center gap-2 min-w-[120px]"
               title={!isUploadValid ? uploadValidationReason : undefined}
+              aria-label={createPostMutation.isPending ? "저장 중" : "저장"}
             >
-              {isSubmitting || createPostMutation.isPending ? (
-                <>
-                  <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                  저장중...
-                </>
+              {createPostMutation.isPending ? (
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
                 <>
                   <Save className="h-4 w-4" />

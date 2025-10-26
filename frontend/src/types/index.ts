@@ -22,7 +22,8 @@ export interface User {
   readonly profileImage?: string;
   readonly bio?: string;
   readonly role: UserRoleType;
-  readonly authProvider: AuthProviderType;
+  readonly authProvider: AuthProviderType;            // 최초 가입 방법 (변경 안됨)
+  readonly lastLoginProvider?: AuthProviderType;      // 현재 로그인 방법 (계정 삭제 UX용)
   readonly providerId?: string;
   readonly isEmailVerified: boolean;
   readonly isActive?: boolean;
@@ -146,6 +147,8 @@ export interface ApiError {
   message: string;
   statusCode: number;
   error?: string;
+  code?: string;  // 에러 코드 (예: 'ACCOUNT_DELETED')
+  remainingDays?: number;  // 삭제된 계정의 재가입 가능까지 남은 일수
   details?: any;
 }
 

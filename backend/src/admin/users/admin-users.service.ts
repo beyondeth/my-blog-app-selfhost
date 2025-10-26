@@ -557,17 +557,60 @@ export class AdminUsersService {
    * 삭제된 사용자 목록 조회 (관리자 전용)
    * - isDeleted = true인 사용자만 조회
    * - 삭제일, 예정 삭제일 표시
+   * - 검색: audit_logs의 원본 데이터에서 이메일/사용자명 검색
    */
   async findDeletedUsers(
     page = 1,
     limit = 20,
     sortBy = 'deletedAt',
     sortOrder: 'ASC' | 'DESC' = 'DESC',
+    searchQuery?: string,
   ) {
     const query = this.userRepository
       .createQueryBuilder('user')
-      .where('user.isDeleted = :isDeleted', { isDeleted: true })
-      .orderBy(`user.${sortBy}`, sortOrder)
+      .where('user.isDeleted = :isDeleted', { isDeleted: true });
+
+    // 검색어가 있으면 audit_logs에서 원본 데이터 검색
+    if (searchQuery && searchQuery.trim()) {
+      const search = searchQuery.toLowerCase().trim();
+
+      // audit_logs에서 삭제된 사용자 감사 로그 조회 (최대 1000개)
+      const auditLogs = await this.auditService.findAll(
+        {
+          action: AuditAction.USER_DELETED,
+          entityType: 'user',
+        },
+        1,
+        1000,
+      );
+
+      // previousData에서 원본 이메일/username 검색하여 userId 추출
+      const matchingUserIds = auditLogs.data
+        .filter((log) => {
+          const email = log.previousData?.email?.toLowerCase() || '';
+          const username = log.previousData?.username?.toLowerCase() || '';
+          return email.includes(search) || username.includes(search);
+        })
+        .map((log) => log.entityId)
+        .filter((id) => id); // null/undefined 제거
+
+      // 매칭되는 사용자가 없으면 빈 결과 반환
+      if (matchingUserIds.length === 0) {
+        return {
+          data: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+        };
+      }
+
+      // 매칭된 userId로 필터링
+      query.andWhere('user.id IN (:...userIds)', { userIds: matchingUserIds });
+    }
+
+    // 정렬 및 페이지네이션 적용
+    query.orderBy(`user.${sortBy}`, sortOrder)
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -596,35 +639,6 @@ export class AdminUsersService {
       page,
       limit,
       totalPages: Math.ceil(total / limit),
-    };
-  }
-
-  /**
-   * 삭제된 사용자 복구 (관리자 전용)
-   * - isDeleted 플래그 해제
-   * - 개인정보는 이미 마스킹되어 복구 불가
-   */
-  async restoreUser(
-    userId: string,
-    adminId: string,
-    context: { ipAddress?: string; userAgent?: string },
-  ) {
-    const restoredUser = await this.usersService.restoreUser(userId);
-
-    // 감사 로그 기록
-    await this.auditService.logUserAction(
-      AuditAction.USER_ACTIVATED,
-      userId,
-      {
-        previous: { isDeleted: true },
-        new: { isDeleted: false, restoredBy: adminId },
-      },
-      { userId: adminId, ...context },
-    );
-
-    return {
-      message: 'User restored successfully. Note: Personal data was masked and cannot be recovered.',
-      user: restoredUser,
     };
   }
 
@@ -664,5 +678,61 @@ export class AdminUsersService {
     return {
       message: 'User permanently deleted from database. This action cannot be undone.',
     };
+  }
+
+  /**
+   * 법적 조회: 삭제된 사용자의 포스트 목록 조회
+   * - isDeleted = true인 포스트만 조회
+   * - 법적 요구 시 증거 자료로 제공
+   */
+  async getDeletedPostsByUserId(userId: string): Promise<Post[]> {
+    return await this.postRepository.find({
+      where: {
+        authorId: userId,
+        isDeleted: true,
+      },
+      select: [
+        'id',
+        'title',
+        'slug',
+        'content', // 법적 조회 시 가장 중요한 증거
+        'category',
+        'excerpt',
+        'viewCount',
+        'likeCount',
+        'commentCount',
+        'createdAt',
+        'publishedAt',
+      ],
+      order: {
+        createdAt: 'DESC',
+      },
+      take: 100, // 최대 100개 (법적 조회용)
+    });
+  }
+
+  /**
+   * 법적 조회: 삭제된 사용자의 댓글 목록 조회
+   * - isDeleted = true인 댓글만 조회
+   * - 법적 요구 시 증거 자료로 제공
+   */
+  async getDeletedCommentsByUserId(userId: string): Promise<Comment[]> {
+    return await this.commentRepository.find({
+      where: {
+        authorId: userId,
+        isDeleted: true,
+      },
+      select: [
+        'id',
+        'content',
+        'postId',
+        'likesCount',
+        'createdAt',
+      ],
+      order: {
+        createdAt: 'DESC',
+      },
+      take: 100, // 최대 100개 (법적 조회용)
+    });
   }
 }

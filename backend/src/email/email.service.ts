@@ -6,7 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { EmailVerification } from './entities/email-verification.entity';
 import { User } from '../users/entities/user.entity';
 import * as crypto from 'crypto';
-import { getAWSStyleEmailTemplate, getAWSStylePasswordResetTemplate } from './email-templates';
+import { getAWSStyleEmailTemplate, getAWSStylePasswordResetTemplate, getModernAccountLinkTemplate } from './email-templates';
 import { DateUtils } from '../common/utils/date.utils';
 
 @Injectable()
@@ -236,8 +236,8 @@ export class EmailService {
   /**
    * 계정 연결 알림 이메일 발송
    */
-  async sendAccountLinkNotification(email: string, message: string): Promise<void> {
-    const html = this.getAccountLinkTemplate(message);
+  async sendAccountLinkNotification(email: string, provider: string, linkedEmail: string): Promise<void> {
+    const html = getModernAccountLinkTemplate(provider, linkedEmail);
 
     try {
       await this.mailerService.sendMail({
@@ -727,159 +727,4 @@ export class EmailService {
     `;
   }
 
-  /**
-   * 계정 연결 이메일 템플릿
-   */
-  private getAccountLinkTemplate(message: string): string {
-    // Provider 이름 추출 (예: "Google 로그인이 계정에 연결되었습니다")
-    const providerMatch = message.match(/(Google|Kakao|github)/i);
-    const provider = providerMatch ? providerMatch[0] : 'OAuth';
-
-    return `
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <style>
-          body {
-            margin: 0;
-            padding: 0;
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f8f8f8;
-            color: #333333;
-          }
-          .container {
-            max-width: 560px;
-            margin: 0 auto;
-            padding: 40px 20px;
-          }
-          .card {
-            background: #ffffff;
-            border: 1px solid #e5e5e5;
-            border-radius: 8px;
-            overflow: hidden;
-          }
-          .header {
-            background: #000000;
-            padding: 24px;
-            text-align: center;
-          }
-          .logo {
-            color: #ffffff;
-            font-size: 20px;
-            font-weight: 600;
-            letter-spacing: -0.3px;
-            margin: 0;
-          }
-          .content {
-            padding: 32px;
-          }
-          .title {
-            font-size: 24px;
-            font-weight: 600;
-            color: #000000;
-            margin: 0 0 16px;
-          }
-          .text {
-            font-size: 15px;
-            color: #555555;
-            line-height: 1.6;
-            margin: 0 0 24px;
-          }
-          .provider-box {
-            display: inline-block;
-            padding: 8px 16px;
-            background: #f8f8f8;
-            border-radius: 6px;
-            margin: 0 0 24px;
-          }
-          .provider-name {
-            font-size: 16px;
-            font-weight: 600;
-            color: #000000;
-          }
-          .info-box {
-            background: #f8f8f8;
-            border-radius: 6px;
-            padding: 16px;
-            margin: 24px 0;
-          }
-          .info-text {
-            font-size: 14px;
-            color: #666666;
-            line-height: 1.6;
-            margin: 0;
-          }
-          .warning-box {
-            background: #fff5f5;
-            border: 1px solid #ffdddd;
-            border-radius: 6px;
-            padding: 16px;
-            margin: 24px 0;
-          }
-          .warning-text {
-            font-size: 14px;
-            color: #cc0000;
-            line-height: 1.6;
-            margin: 0;
-          }
-          .footer {
-            padding: 24px 32px;
-            text-align: center;
-            border-top: 1px solid #e5e5e5;
-          }
-          .footer-text {
-            font-size: 13px;
-            color: #999999;
-            margin: 0;
-            line-height: 1.6;
-          }
-        </style>
-      </head>
-      <body>
-        <div class="container">
-          <div class="card">
-            <div class="header">
-              <div class="logo">codebase.blog</div>
-            </div>
-            <div class="content">
-              <h1 class="title">새로운 로그인 방법 추가</h1>
-              
-              <div class="provider-box">
-                <span class="provider-name">${provider} 연결됨</span>
-              </div>
-              
-              <p class="text">
-                ${message}
-              </p>
-              
-              <div class="info-box">
-                <p class="info-text">
-                  <strong>연결 정보</strong><br>
-                  • 시간: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}<br>
-                  • 위치: Seoul, KR<br>
-                  • 장치: Web Browser
-                </p>
-              </div>
-              
-              <div class="warning-box">
-                <p class="warning-text">
-                  <strong>⚠️ 본인이 아닌 경우</strong><br>
-                  즉시 계정 설정에서 연결을 해제하고 비밀번호를 변경해 주세요.
-                </p>
-              </div>
-            </div>
-            <div class="footer">
-              <p class="footer-text">
-                이 메일은 보안 알림입니다.<br>
-                © 2025 codebase.blog. All rights reserved.
-              </p>
-            </div>
-          </div>
-        </div>
-      </body>
-      </html>
-    `;
-  }
 }

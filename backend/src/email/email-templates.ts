@@ -97,3 +97,74 @@ export const getAWSStylePasswordResetTemplate = (username: string, resetUrl: str
     </html>
   `;
 };
+
+/**
+ * 계정 연결 알림 이메일 템플릿 (Google 스타일)
+ * OAuth Provider 계정이 기존 계정에 연결되었을 때 발송
+ */
+export const getModernAccountLinkTemplate = (provider: string, linkedEmail: string): string => {
+  // Provider 이름을 한글로 매핑
+  const providerNames: { [key: string]: string } = {
+    'google': 'Google',
+    'kakao': 'Kakao',
+    'github': 'GitHub',
+  };
+
+  const providerName = providerNames[provider.toLowerCase()] || provider;
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Amazon Ember', Roboto, Arial, sans-serif; background-color: #f5f5f5; color: #232f3e;">
+      <div style="max-width: 600px; margin: 0 auto; padding: 40px 20px;">
+        <div style="background: #232f3e; padding: 24px; text-align: center; border-radius: 8px 8px 0 0;">
+          <div style="color: #ff9900; font-size: 24px; font-weight: 700; margin: 0;">codebase.blog</div>
+        </div>
+        <div style="background: #ffffff; border: 1px solid #d5d9d9; border-top: none; border-radius: 0 0 8px 8px; padding: 48px 40px; text-align: center;">
+          <!-- 로고 -->
+          <div style="margin-bottom: 32px;">
+            <div style="display: inline-block; width: 80px; height: 80px; background: #f7f8f8; border-radius: 50%; display: flex; align-items: center; justify-content: center;">
+              <div style="color: #ff9900; font-size: 36px; font-weight: 700; line-height: 80px;">CB</div>
+            </div>
+          </div>
+
+          <!-- 제목 -->
+          <h1 style="font-size: 24px; font-weight: 700; color: #232f3e; margin: 0 0 16px;">새로운 로그인 방법 추가</h1>
+
+          <!-- Provider 정보 -->
+          <p style="font-size: 16px; color: #232f3e; margin: 0 0 8px;">
+            <strong>${providerName}</strong> 계정이 연결되었습니다
+          </p>
+
+          <!-- 연결된 이메일 -->
+          <p style="font-size: 14px; color: #687078; margin: 0 0 32px;">
+            ${linkedEmail}
+          </p>
+
+          <!-- 경고 박스 -->
+          <div style="background: #fff5f5; border: 1px solid #fed7d7; border-radius: 8px; padding: 20px; margin: 32px 0; text-align: left;">
+            <p style="font-size: 14px; color: #c53030; margin: 0 0 8px; font-weight: 600;">
+              ⚠️ 본인이 아닌 경우
+            </p>
+            <p style="font-size: 13px; color: #742a2a; margin: 0; line-height: 1.6;">
+              즉시 계정 설정에서 연결을 해제하고 비밀번호를 변경해 주세요.
+            </p>
+          </div>
+
+          <!-- 보안 안내 -->
+          <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
+            <p style="font-size: 12px; color: #687078; margin: 0; line-height: 1.6;">
+              이 메일은 보안 알림입니다.<br>
+              © ${process.env.EMAIL_COPYRIGHT_YEAR || '2025'} codebase.blog. All rights reserved.
+            </p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+};

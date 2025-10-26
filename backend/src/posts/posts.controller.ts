@@ -216,9 +216,9 @@ export class PostsController {
     return this.postsService.findPopularPosts(period, limitNumber);
   }
 
-  @Get('categories')
+  @Get('categories/public')
   @Public()
-  @ApiOperation({ summary: '카테고리 목록 조회' })
+  @ApiOperation({ summary: '전체 공개 카테고리 목록 조회' })
   getCategories() {
     return this.postsService.getCategories();
   }

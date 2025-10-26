@@ -64,6 +64,12 @@ export default function EditProfileDialog({ isOpen, onClose, user }: EditProfile
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1차 방어: 이미 처리 중이면 무시
+    if (updateProfileMutation.isPending) {
+      return;
+    }
+
     updateProfileMutation.mutate(formData);
   };
 
@@ -132,9 +138,16 @@ export default function EditProfileDialog({ isOpen, onClose, user }: EditProfile
             >
               취소
             </Button>
-            <Button 
+            <Button
               type="submit"
               disabled={updateProfileMutation.isPending}
+              onClick={(e) => {
+                // 2차 방어: 버튼 클릭 시 중복 방지
+                if (updateProfileMutation.isPending) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
             >
               {updateProfileMutation.isPending ? (
                 <>

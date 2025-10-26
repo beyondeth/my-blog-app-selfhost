@@ -65,7 +65,11 @@ export function DMChat({ conversationId }: DMChatProps) {
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!messageContent.trim() || isSending) return;
+
+    // 1차 방어: 이미 전송 중이거나 내용이 없으면 무시
+    if (!messageContent.trim() || isSending) {
+      return;
+    }
 
     const content = messageContent.trim();
     setMessageContent('');
@@ -282,6 +286,13 @@ export function DMChat({ conversationId }: DMChatProps) {
             <button
               type="submit"
               disabled={!messageContent.trim() || isSending}
+              onClick={(e) => {
+                // 2차 방어: 버튼 클릭 시 중복 방지
+                if (isSending) {
+                  e.preventDefault();
+                  e.stopPropagation();
+                }
+              }}
               className={`p-3 rounded-2xl transition-all duration-200 transform active:scale-95 disabled:cursor-not-allowed ${
                 messageContent.trim() && !isSending
                   ? 'bg-gradient-to-r from-blue-600 to-blue-700 text-white shadow-lg hover:shadow-xl hover:scale-105 disabled:opacity-50'

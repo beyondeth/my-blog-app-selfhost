@@ -30,6 +30,12 @@ export default function LoginPage() {
     password: ''
   });
 
+  // 삭제된 계정 에러 상태
+  const [accountDeletedError, setAccountDeletedError] = useState<{
+    message: string;
+    remainingDays: number;
+  } | null>(null);
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -47,6 +53,11 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // 1차 방어: 이미 처리 중이면 무시
+    if (isSubmitting) {
+      return;
+    }
 
     // Check for too many failed attempts
     if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
@@ -100,6 +111,17 @@ export default function LoginPage() {
       router.push(redirectTo);
     } catch (error: any) {
       console.error('Login failed:', error);
+
+      // 삭제된 계정 에러 체크
+      if (error.response?.code === 'ACCOUNT_DELETED' || error.code === 'ACCOUNT_DELETED') {
+        setAccountDeletedError({
+          message: error.response?.message || error.message || '계정이 삭제되었습니다.',
+          remainingDays: error.response?.remainingDays || error.remainingDays || 0,
+        });
+        setFormData(prev => ({ ...prev, password: '' }));
+        setIsSubmitting(false);
+        return;
+      }
 
       // Increment failed login attempts
       const newAttempts = loginAttempts + 1;
@@ -164,6 +186,31 @@ export default function LoginPage() {
                 계정으로 <span className="font-medium">로그인</span>하세요
               </p>
             </div>
+
+            {/* 삭제된 계정 경고 */}
+            {accountDeletedError && (
+              <div className="mb-3 sm:mb-6 p-4 sm:p-5 rounded-lg bg-red-50 dark:bg-red-900/20 border-2 border-red-300 dark:border-red-700 w-full shake">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-red-600 dark:text-red-400 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <h3 className="text-sm sm:text-base font-semibold text-red-900 dark:text-red-200 mb-1">
+                      계정이 삭제되었습니다
+                    </h3>
+                    <p className="text-xs sm:text-sm text-red-800 dark:text-red-300 mb-3">
+                      {accountDeletedError.message}
+                    </p>
+                    {accountDeletedError.remainingDays === 0 && (
+                      <Link
+                        href="/register"
+                        className="inline-flex items-center justify-center px-4 py-2 text-xs sm:text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-600 rounded-lg transition-colors"
+                      >
+                        회원가입 페이지로 이동
+                      </Link>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 에러 메시지들 */}
             {loginAttempts >= MAX_LOGIN_ATTEMPTS && (

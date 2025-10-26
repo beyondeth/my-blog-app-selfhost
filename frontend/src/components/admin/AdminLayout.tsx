@@ -17,7 +17,8 @@ import {
   Bug,
   Database,
   AlertTriangle,
-  Key
+  Key,
+  UserX
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -36,6 +37,7 @@ interface NavigationItem {
 const navigation: NavigationItem[] = [
   { name: t.navigation.dashboard, href: '/admin', icon: LayoutDashboard },
   { name: t.navigation.users, href: '/admin/users', icon: Users },
+  { name: '삭제된 사용자', href: '/admin/users/deleted', icon: UserX, adminOnly: true },
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
   { name: 'MCP 대시보드', href: '/admin/mcp', icon: Key, adminOnly: true, badge: 'New' },

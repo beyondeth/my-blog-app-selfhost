@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsNumber, Min, Max, MaxLength } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, Min, Max, MaxLength, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreatePostDto {
@@ -35,10 +35,13 @@ export class CreatePostDto {
   tags?: string[];
 
   @ApiProperty({
-    description: '카테고리 (필수)',
-    example: '개발',
+    description: '카테고리 (필수, 최대 2단계)',
+    example: 'JavaScript/React',
   })
   @IsString()
+  @Matches(/^[^/]+$|^[^/]+\/[^/]+$/, {
+    message: '카테고리는 최대 2단계까지만 입력 가능합니다 (예: JavaScript/React)'
+  })
   category: string;
 
   @ApiPropertyOptional({
