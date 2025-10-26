@@ -238,7 +238,14 @@ export const useUser = () => {
     queryFn: () => apiRequest<User>('/auth/me'),
     staleTime: 5 * 60 * 1000,     // 5분간 fresh 상태 유지
     gcTime: 10 * 60 * 1000,        // 10분간 캐시 보관
-    retry: 1,                      // 인증 실패 시 1번만 재시도
+    retry: (failureCount, error) => {
+      // 401 Unauthorized는 재시도 불필요 (정상 응답)
+      if (error.message === 'Unauthorized') {
+        return false;
+      }
+      // 네트워크 오류나 서버 오류는 1번 재시도
+      return failureCount < 1;
+    },
     refetchOnWindowFocus: false,   // 윈도우 포커스 시 재요청 안함
     refetchOnMount: false,         // 마운트 시 재요청 안함 (성능 최적화 - staleTime 활용)
     placeholderData: (previousData) => previousData,  // 리페칭 중에도 이전 데이터 유지 (깜빡임 방지)
