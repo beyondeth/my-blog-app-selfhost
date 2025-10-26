@@ -45,7 +45,13 @@ CPU_USAGE_INT=$(printf "%.0f" $CPU_USAGE)
 log "현재 CPU 사용률: ${CPU_USAGE}%"
 
 # 현재 PM2 워커 수 확인
-CURRENT_WORKERS=$(docker exec $CONTAINER_NAME pm2 jlist 2>/dev/null | jq '.[0].pm2_env.instances' 2>/dev/null || echo "4")
+# jq가 설치되어 있으면 사용, 없으면 grep/sed로 파싱
+if command -v jq &> /dev/null; then
+    CURRENT_WORKERS=$(docker exec $CONTAINER_NAME pm2 jlist 2>/dev/null | jq '.[0].pm2_env.instances' 2>/dev/null || echo "4")
+else
+    log "WARNING: jq not installed. Using grep/sed fallback (less reliable)"
+    CURRENT_WORKERS=$(docker exec $CONTAINER_NAME pm2 jlist 2>/dev/null | grep -o '"instances":[0-9]*' | head -1 | cut -d':' -f2 || echo "4")
+fi
 
 if [ -z "$CURRENT_WORKERS" ] || [ "$CURRENT_WORKERS" = "null" ]; then
     CURRENT_WORKERS=4

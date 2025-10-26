@@ -47,9 +47,9 @@ services:
       retries: 3
       start_period: 40s
     # 리소스 제한 (SSR 중심 Next.js)
-    cpus: 0.8
-    mem_limit: 1.5g
-    mem_reservation: 1g
+    cpus: 1.0
+    mem_limit: 2g
+    mem_reservation: 1.5g
 
   # ============================================
   # Backend (NestJS + PM2 Cluster)
@@ -346,8 +346,8 @@ networks:
 # ============================================
 # 리소스 사용 요약 (PM2 Cluster + 자동 스케일링)
 # ============================================
-# 총 CPU: ~6.9 OCPU 설정 (PostgreSQL 무제한, 피크 타임만 사용)
-# 총 RAM: 18.88 GB (24 GB 중 78.7%, 5.12 GB 여유)
+# 총 CPU: ~7.1 OCPU 설정 (PostgreSQL 무제한, 피크 타임만 사용)
+# 총 RAM: 19.38 GB (24 GB 중 80.7%, 4.62 GB 여유)
 #
 # 🎯 Oracle Free Tier 할당량:
 #   - 월 3,000 OCPU시간 (평균 4.17 OCPU)
@@ -355,7 +355,7 @@ networks:
 #   - 자동 스케일링으로 평균 3.5 OCPU 이하 유지 (62% 사용)
 #
 # 서비스별 CPU/RAM:
-#   frontend:         0.8 OCPU, 1.5 GB (SSR 중심)
+#   frontend:         1.0 OCPU, 2 GB (SSR 중심 Next.js)
 #   backend:          3.0 OCPU, 4 GB (PM2 4 워커)
 #   postgres:         무제한, 7.5 GB (Async I/O, ARM64 최적화)
 #   pgbouncer:        0.2 OCPU, 128 MB (연결 풀링, ARM64 지원)
@@ -366,8 +366,8 @@ networks:
 #   redis-exporter:   0.1 OCPU, 50 MB
 #
 # 🔄 동적 스케일링 시나리오:
-#   - 피크 타임: PM2 4 워커 → ~3.9 OCPU (8시간/일)
-#   - 일반 시간: PM2 2 워커 → ~2.9 OCPU (10시간/일)
-#   - 심야 시간: PM2 1 워커 → ~1.9 OCPU (6시간/일)
-#   - 월 평균: ~1,860 OCPU시간 (< 3,000 안전)
+#   - 피크 타임: PM2 4 워커 → ~4.1 OCPU (8시간/일)
+#   - 일반 시간: PM2 2 워커 → ~3.1 OCPU (10시간/일)
+#   - 심야 시간: PM2 1 워커 → ~2.1 OCPU (6시간/일)
+#   - 월 평균: ~2,016 OCPU시간 (< 3,000 안전, 67% 사용)
 # ============================================
