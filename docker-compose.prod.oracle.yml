@@ -27,6 +27,10 @@ services:
       context: .
       dockerfile: ./frontend/Dockerfile.prod
       target: runner
+      # 빌드 타임 환경변수 (Next.js NEXT_PUBLIC_* 변수 주입)
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://yourdomain.com}
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-frontend
     environment:
       NODE_ENV: production
