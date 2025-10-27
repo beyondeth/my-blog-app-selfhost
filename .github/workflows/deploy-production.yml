@@ -45,7 +45,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 10m
+          timeout: 15m
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
