@@ -1,0 +1,56 @@
+name: Deploy to Development Server
+
+# develop 브랜치에 push 시 자동 배포
+on:
+  push:
+    branches:
+      - develop
+  workflow_dispatch:  # 수동 실행 허용
+
+jobs:
+  deploy:
+    name: Deploy to Development Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 10  # 최대 10분 제한
+
+    steps:
+      # 1. 코드 체크아웃 (선택사항)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. SSH로 개발 서버 접속 및 배포
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEV_DEPLOY_HOST }}
+          username: ${{ secrets.DEV_DEPLOY_USER }}
+          key: ${{ secrets.DEV_DEPLOY_SSH_KEY }}
+          port: 22
+          timeout: 8m
+          script_stop: true
+          script: |
+            set -e
+            echo "=========================================="
+            echo "개발 서버 배포 시작: $(date)"
+            echo "=========================================="
+
+            cd /home/ubuntu/my-blog-app
+
+            # 배포 스크립트 실행
+            bash scripts/deploy-development.sh
+
+            echo "=========================================="
+            echo "개발 서버 배포 완료: $(date)"
+            echo "=========================================="
+
+      # 3. 배포 실패 시 알림
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ 개발 서버 배포 실패!"
+
+      # 4. 배포 성공 시 알림
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ 개발 서버 배포 성공!"

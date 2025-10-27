@@ -1,0 +1,215 @@
+# ============================================
+# Grafana Alerting Rules
+# ============================================
+# Oracle Free Tier 리소스 모니터링 알림
+#
+# 설정 방법:
+#   1. Grafana > Alerting > Alert rules에서 확인
+#   2. VictoriaMetrics 데이터소스 사용
+#   3. 알림 채널 설정 (Slack, Discord, Email 등)
+#
+# 주의사항:
+#   - VictoriaMetrics의 alerts.yml과 중복 설정 가능
+#   - Grafana UI에서 직접 수정 권장
+#   - 파일 기반 설정은 백업용으로 사용
+# ============================================
+
+apiVersion: 1
+
+groups:
+  # ============================================
+  # 리소스 모니터링 그룹
+  # ============================================
+  - name: resource-monitoring
+    interval: 1m
+    rules:
+      # CPU 사용률 90% 초과 (PM2 Scale Down)
+      - uid: cpu-high-scale-down
+        title: CPU 사용률 90% 초과 - PM2 워커 감소 필요
+        condition: A
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: victoriametrics
+            model:
+              expr: sum(rate(container_cpu_usage_seconds_total[5m])) / 4 > 0.9
+              intervalMs: 15000
+              maxDataPoints: 43200
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "평균 CPU 사용률이 90%를 초과했습니다. scripts/auto-scale.sh가 PM2 워커를 자동으로 줄입니다."
+          summary: "CPU 사용률 {{ $value | humanizePercentage }}"
+        labels:
+          severity: critical
+          component: resource
+          action: scale_down
+
+      # 메모리 사용률 85% 초과
+      - uid: memory-high
+        title: 메모리 사용률 85% 초과
+        condition: A
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 180
+              to: 0
+            datasourceUid: victoriametrics
+            model:
+              expr: (sum(container_memory_usage_bytes) / (24 * 1024 * 1024 * 1024)) > 0.85
+              intervalMs: 15000
+        noDataState: NoData
+        execErrState: Error
+        for: 3m
+        annotations:
+          description: "메모리 사용률이 85%를 초과했습니다. OOM 위험이 있습니다."
+          summary: "메모리 사용: {{ $value | humanizePercentage }}"
+        labels:
+          severity: critical
+          component: resource
+
+      # Backend 메모리 높음
+      - uid: backend-memory-high
+        title: Backend 메모리 사용량 높음
+        condition: A
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 180
+              to: 0
+            datasourceUid: victoriametrics
+            model:
+              expr: container_memory_usage_bytes{name=~".*backend.*"} > 3.8 * 1024 * 1024 * 1024
+              intervalMs: 15000
+        noDataState: NoData
+        execErrState: Error
+        for: 3m
+        annotations:
+          description: "Backend 컨테이너 메모리 사용량이 3.8GB를 초과했습니다."
+          summary: "현재 사용량: {{ $value | humanize1024 }}B (제한: 4GB)"
+        labels:
+          severity: critical
+          component: backend
+
+      # PostgreSQL 메모리 높음
+      - uid: postgresql-memory-high
+        title: PostgreSQL 메모리 사용량 높음
+        condition: A
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: victoriametrics
+            model:
+              expr: container_memory_usage_bytes{name=~".*postgres.*"} > 7 * 1024 * 1024 * 1024
+              intervalMs: 15000
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          description: "PostgreSQL 메모리 사용량이 7GB를 초과했습니다."
+          summary: "현재 사용량: {{ $value | humanize1024 }}B (제한: 7.5GB)"
+        labels:
+          severity: warning
+          component: postgresql
+
+  # ============================================
+  # 서비스 헬스체크 그룹
+  # ============================================
+  - name: service-health
+    interval: 30s
+    rules:
+      # Backend 다운
+      - uid: backend-down
+        title: Backend 서버 다운
+        condition: A
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: victoriametrics
+            model:
+              expr: up{job="nestjs-backend"} == 0
+              intervalMs: 15000
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          description: "Backend 서버가 응답하지 않습니다. 즉시 확인이 필요합니다."
+          summary: "Backend 서버 다운 감지"
+        labels:
+          severity: critical
+          component: backend
+
+      # MCP Proxy 다운
+      - uid: mcp-proxy-down
+        title: MCP Proxy 서버 다운
+        condition: A
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: victoriametrics
+            model:
+              expr: up{job="mcp-proxy-server"} == 0
+              intervalMs: 15000
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          description: "MCP Proxy 서버가 응답하지 않습니다."
+          summary: "MCP Proxy 서버 다운 감지"
+        labels:
+          severity: critical
+          component: mcp-proxy
+
+      # Redis 다운
+      - uid: redis-down
+        title: Redis 서버 다운
+        condition: A
+        data:
+          - refId: A
+            queryType: instant
+            relativeTimeRange:
+              from: 60
+              to: 0
+            datasourceUid: victoriametrics
+            model:
+              expr: up{job="redis"} == 0
+              intervalMs: 15000
+        noDataState: Alerting
+        execErrState: Error
+        for: 1m
+        annotations:
+          description: "Redis 서버가 응답하지 않습니다. 캐시 및 큐 시스템이 작동하지 않습니다."
+          summary: "Redis 서버 다운 감지"
+        labels:
+          severity: critical
+          component: redis
+
+# ============================================
+# 알림 채널 설정 (Grafana UI에서 설정 필요)
+# ============================================
+# 1. Grafana > Alerting > Contact points
+# 2. 새 Contact point 추가:
+#    - Slack: Webhook URL 입력
+#    - Discord: Webhook URL 입력
+#    - Email: SMTP 설정
+#
+# 3. Notification policies 설정:
+#    - severity=critical → Slack/Discord 즉시 알림
+#    - severity=warning → 5분마다 그룹화
+#    - severity=info → 30분마다 그룹화
+# ============================================
