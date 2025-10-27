@@ -22,7 +22,9 @@ jobs:
       # 2. Environment Secrets에서 .env.production 생성
       - name: Create .env.production from Environment Secrets
         run: |
-          echo "${{ secrets.ENV_FILE }}" > .env.production
+          cat > .env.production << 'EOF'
+          ${{ secrets.ENV_FILE }}
+          EOF
 
       # 3. .env.production 파일을 서버에 업로드
       - name: Upload .env.production to server
