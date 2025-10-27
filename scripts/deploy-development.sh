@@ -74,6 +74,21 @@ log_info "✓ 컨테이너 시작 완료"
 log_info "Step 6: 헬스체크 대기 (30초)"
 sleep 30
 
+# 6-1. 데이터베이스 마이그레이션 실행
+log_info "Step 6-1: 데이터베이스 마이그레이션 실행"
+# 개발 서버는 일반 migration:run 스크립트 사용 (ts-node)
+CONTAINER_NAME=$(docker ps --filter "name=backend" --format "{{.Names}}" | grep -i dev | head -1)
+if [ -n "$CONTAINER_NAME" ]; then
+    if docker exec "$CONTAINER_NAME" pnpm migration:run 2>&1 | tee -a /tmp/migration-dev.log; then
+        log_info "✓ 마이그레이션 완료"
+    else
+        log_warn "⚠️  마이그레이션 실패 또는 변경사항 없음"
+        log_warn "수동 확인 필요: docker exec $CONTAINER_NAME pnpm migration:run"
+    fi
+else
+    log_warn "⚠️  Backend 컨테이너를 찾을 수 없습니다"
+fi
+
 # 7. 컨테이너 상태 확인
 log_info "Step 7: 컨테이너 상태 확인"
 docker compose -f docker-compose.dev-server.yml ps

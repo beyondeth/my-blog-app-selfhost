@@ -90,6 +90,16 @@ if [ $WAITED -ge $MAX_WAIT ]; then
     exit 1
 fi
 
+# 4-4. 데이터베이스 마이그레이션 실행
+log_info "Step 4-4: 데이터베이스 마이그레이션 실행"
+if docker exec codebase-prod-backend pnpm migration:run:prod 2>&1 | tee -a /tmp/migration.log; then
+    log_info "✓ 마이그레이션 완료"
+else
+    log_warn "⚠️  마이그레이션 실패 또는 변경사항 없음"
+    log_warn "수동 확인 필요: docker exec codebase-prod-backend pnpm migration:run:prod"
+    # 마이그레이션 실패해도 배포는 계속 진행 (마이그레이션이 없을 수도 있음)
+fi
+
 # 5. Frontend 재시작 (빠른 재시작)
 log_info "Step 5: Frontend 재시작"
 docker compose -f docker-compose.prod.oracle.yml build frontend
