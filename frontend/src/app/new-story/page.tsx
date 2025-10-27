@@ -289,6 +289,7 @@ export default function NewStoryPage() {
                 name="category"
                 render={({ field }) => {
                   const [isFocused, setIsFocused] = React.useState(false);
+                  const categoryInputRef = React.useRef<HTMLInputElement>(null);
                   const showLabel = isFocused || field.value;
 
                   return (
@@ -312,9 +313,13 @@ export default function NewStoryPage() {
                             </>
                           )}
 
-                          {/* 카테고리 입력 영역 (자동완성) */}
-                          <div className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2">
+                          {/* 카테고리 입력 영역 (자동완성) - 전체 영역 클릭 시 포커스 */}
+                          <div
+                            className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-pointer"
+                            onClick={() => categoryInputRef.current?.focus()}
+                          >
                             <CategoryAutocomplete
+                              ref={categoryInputRef}
                               value={field.value}
                               onChange={(value) => {
                                 field.onChange(value);
@@ -353,6 +358,7 @@ export default function NewStoryPage() {
                   const [inputValue, setInputValue] = React.useState('');
                   const [isFocused, setIsFocused] = React.useState(false);
                   const [isComposing, setIsComposing] = React.useState(false);
+                  const tagInputRef = React.useRef<HTMLInputElement>(null);
                   const tags = field.value || [];
                   const showLabel = isFocused || tags.length > 0 || inputValue;
 
@@ -409,8 +415,11 @@ export default function NewStoryPage() {
                             </>
                           )}
 
-                          {/* 태그 표시 및 입력 영역 */}
-                          <div className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2">
+                          {/* 태그 표시 및 입력 영역 - 전체 영역 클릭 시 포커스 */}
+                          <div
+                            className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-pointer"
+                            onClick={() => tagInputRef.current?.focus()}
+                          >
                             <div className="flex flex-wrap gap-2 mb-2">
                               {tags.map((tag: string, index: number) => (
                                 <span
@@ -420,7 +429,10 @@ export default function NewStoryPage() {
                                   <span>#{tag}</span>
                                   <button
                                     type="button"
-                                    onClick={() => removeTag(index)}
+                                    onClick={(e) => {
+                                      e.stopPropagation(); // 부모 div의 onClick 방지
+                                      removeTag(index);
+                                    }}
                                     className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                                   >
                                     ×
@@ -429,6 +441,7 @@ export default function NewStoryPage() {
                               ))}
                             </div>
                             <Input
+                              ref={tagInputRef}
                               value={inputValue}
                               onChange={(e) => handleInputChange(e.target.value)}
                               onKeyDown={handleKeyDown}

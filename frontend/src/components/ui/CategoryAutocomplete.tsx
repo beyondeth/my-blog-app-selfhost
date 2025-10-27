@@ -27,7 +27,7 @@ interface CategoryAutocompleteProps {
  * @param placeholder - 플레이스홀더 텍스트
  * @param className - 추가 CSS 클래스
  */
-export default function CategoryAutocomplete({
+const CategoryAutocomplete = React.forwardRef<HTMLInputElement, CategoryAutocompleteProps>(({
   value,
   onChange,
   onBlur,
@@ -35,7 +35,7 @@ export default function CategoryAutocomplete({
   disabled,
   placeholder = " 카테고리 입력",
   className,
-}: CategoryAutocompleteProps) {
+}, ref) => {
   const [isFocused, setIsFocused] = useState(false);
   const [inputValue, setInputValue] = useState(value);
   const { data: categories = [], isLoading } = useUserCategories();
@@ -82,6 +82,7 @@ export default function CategoryAutocomplete({
   return (
     <div className="relative">
       <Input
+        ref={ref}
         value={inputValue}
         onChange={handleInputChange}
         onFocus={handleFocus}
@@ -110,4 +111,8 @@ export default function CategoryAutocomplete({
       )}
     </div>
   );
-}
+});
+
+CategoryAutocomplete.displayName = 'CategoryAutocomplete';
+
+export default CategoryAutocomplete;

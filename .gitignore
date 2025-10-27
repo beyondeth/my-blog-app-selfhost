@@ -20,9 +20,6 @@
 **/.env.production.local
 **/.env.monitoring
 
-# ✅ Allow .env.example files (템플릿 파일은 Git에 커밋)
-!**/.env.example
-
 # IDE
 **/.vscode/
 **/.idea/

@@ -29,14 +29,16 @@ services:
       target: runner
       # 빌드 타임 환경변수 (Next.js NEXT_PUBLIC_* 변수 주입)
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://yourdomain.com}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://www.codebase.blog/api/v1}
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://www.codebase.blog}
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-frontend
+    env_file:
+      - .env.production
     environment:
       NODE_ENV: production
       # Backend API는 내부 Docker 네트워크로 통신
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://yourdomain.com/api/v1}
-      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://yourdomain.com}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://www.codebase.blog/api/v1}
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://www.codebase.blog}
       HOSTNAME: "0.0.0.0"
     ports:
       - "127.0.0.1:3001:3000"  # Next.js는 내부적으로 3000 포트 사용
