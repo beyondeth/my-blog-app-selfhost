@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs - Docker에서 새로 빌드하므로 로컬 빌드 파일 제외
+dist/
+.next/
+build/
+
+# Environment files
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Temp
+tmp/
+temp/
+
+# Cache
+.cache
+.parcel-cache
+
+# Database
+*.sqlite
+*.db
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile*
+docker-compose*.yml
+.dockerignore
