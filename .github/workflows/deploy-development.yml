@@ -1,11 +1,11 @@
 name: Deploy to Development Server
 
-# develop 브랜치에 push 시 자동 배포
+# develop 브랜치에 push 시 자동 배포 (현재 비활성화 - 개발 서버 없음)
 on:
-  push:
-    branches:
-      - develop
-  workflow_dispatch:  # 수동 실행 허용
+  workflow_dispatch:  # 수동 실행만 허용
+  # push:
+  #   branches:
+  #     - develop
 
 jobs:
   deploy:
@@ -19,12 +19,13 @@ jobs:
         uses: actions/checkout@v4
 
       # 2. SSH로 개발 서버 접속 및 배포
+      # 프로덕션 서버와 동일 (개발 서버 별도 없음)
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DEV_DEPLOY_HOST }}
-          username: ${{ secrets.DEV_DEPLOY_USER }}
-          key: ${{ secrets.DEV_DEPLOY_SSH_KEY }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
           timeout: 8m
           script_stop: true
