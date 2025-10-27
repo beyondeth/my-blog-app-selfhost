@@ -1,0 +1,69 @@
+# VictoriaMetrics 스크랩 설정 파일 (개발 환경)
+# Prometheus 호환 포맷 사용
+
+global:
+  # 메트릭 수집 주기
+  scrape_interval: 30s
+  # 규칙 평가 주기
+  evaluation_interval: 30s
+  # 외부 시스템에 첨부할 레이블
+  external_labels:
+    monitor: 'dev-monitor'
+    environment: 'development'
+
+# 메트릭 수집 대상 설정
+scrape_configs:
+  # NestJS 애플리케이션 메트릭 (개발 환경)
+  - job_name: 'nestjs-chat-app'
+    static_configs:
+      - targets: ['host.docker.internal:3000']
+    metrics_path: '/api/v1/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    honor_timestamps: true
+
+    # 불필요한 메트릭 제거 (메모리 절약)
+    metric_relabel_configs:
+      # GC 상세 메트릭 제거
+      - source_labels: [__name__]
+        regex: 'nodejs_gc_.*'
+        action: drop
+      # Heap 상세 메트릭 제거
+      - source_labels: [__name__]
+        regex: 'nodejs_heap_space_.*'
+        action: drop
+
+  # Redis 메트릭
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 30s
+
+    # Redis 과도한 메트릭 제거
+    metric_relabel_configs:
+      # commands_latencies 제거
+      - source_labels: [__name__]
+        regex: 'redis_commands_latencies_usec.*'
+        action: drop
+      # latency_percentiles 제거
+      - source_labels: [__name__]
+        regex: 'redis_latency_percentiles_usec.*'
+        action: drop
+
+  # VictoriaMetrics 자체 메트릭
+  - job_name: 'victoriametrics'
+    static_configs:
+      - targets: ['localhost:8428']
+
+  # Grafana 메트릭
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+
+  # MCP Proxy Server 메트릭
+  - job_name: 'mcp-proxy-server'
+    static_configs:
+      - targets: ['host.docker.internal:3002']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+    scrape_timeout: 10s

@@ -162,6 +162,7 @@ export class EmailService {
         to: email,
         subject: '[codebase.blog] 이메일 인증 코드',
         html,
+        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
       });
     } catch (error) {
       console.error('Email sending error:', error);
@@ -226,6 +227,7 @@ export class EmailService {
         to: email,
         subject: '[codebase.blog] 계정 삭제 완료',
         html,
+        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
       });
     } catch (error) {
       console.error('Account deletion email sending error:', error);
@@ -244,6 +246,7 @@ export class EmailService {
         to: email,
         subject: '[codebase.blog] 새로운 로그인 방법이 추가되었습니다',
         html,
+        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
       });
     } catch (error) {
       console.error('Account link email sending error:', error);
@@ -573,6 +576,7 @@ export class EmailService {
         to: email,
         subject: '[codebase.blog] 비밀번호 재설정',
         html,
+        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
       });
     } catch (error) {
       console.error('Password reset email sending error:', error);
