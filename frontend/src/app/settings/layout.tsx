@@ -68,7 +68,7 @@ export default function SettingsLayout({
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">설정</h1>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          프로필, 보안, 알림 등을 관리하세요
+          프로필, 블로그 등을 관리하세요
         </p>
       </div>
 
