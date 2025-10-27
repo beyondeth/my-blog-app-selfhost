@@ -36,6 +36,12 @@ jobs:
 
             cd /home/ubuntu/my-blog-app
 
+            # 최신 코드 가져오기 (배포 스크립트 포함)
+            echo "Step 0: Git Pull (main 브랜치)"
+            git fetch origin main
+            git reset --hard origin/main
+            echo "✓ Git Pull 완료"
+
             # 배포 스크립트 실행
             bash scripts/deploy-production.sh
 
