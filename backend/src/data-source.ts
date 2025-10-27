@@ -16,8 +16,10 @@ export const createDataSourceOptions = (): any => {
 
   const baseConfig = {
     type: 'postgres',
-    entities: [isProduction ? 'dist/src/**/*.entity{.ts,.js}' : 'src/**/*.entity{.ts,.js}'],
-    migrations: [isProduction ? 'dist/src/migrations/*{.ts,.js}' : 'src/migrations/*{.ts,.js}'],
+    // 경로 통일: 개발/프로덕션 환경 모두 동일한 마이그레이션 파일 참조
+    // dist와 src를 모두 포함하여 마이그레이션 꼬임 방지
+    entities: ['dist/**/*.entity.js', 'src/**/*.entity.ts'],
+    migrations: ['dist/src/migrations/*.js', 'src/migrations/*.ts'],
     synchronize: false,
     logging: process.env.NODE_ENV === 'development',
   };
