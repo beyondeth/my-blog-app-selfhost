@@ -89,6 +89,7 @@ Thumbs.db
 # Gatsby files
 **/.cache/
 **/public
+!frontend/public/assets/**  # Frontend 정적 자산 허용 (로고, 아이콘 등)
 
 # Storybook build outputs
 **/storybook-static
