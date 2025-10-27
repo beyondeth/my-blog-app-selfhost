@@ -17,7 +17,6 @@
 #   3. /mnt/data 디렉토리 마운트 (Block Volume)
 # ============================================
 
-version: '3.9'
 
 services:
   # ============================================
@@ -127,31 +126,44 @@ services:
     shm_size: 512mb  # 공유 메모리
 
   # ============================================
-  # PgBouncer (연결 풀링) - ARM64 지원 확인 (icoretech)
+  # PgBouncer (연결 풀링) - edoburu 이미지 (ARM64/AMD64 지원)
+  # ============================================
+  # 🎯 설계 기준: 1만 명 동시 사용자 (블로그 플랫폼 읽기 위주)
+  #   - PM2 워커: 1-4개 (동적 스케일링)
+  #   - 워커당 연결: 20개
+  #   - 피크 타임: 80개 (4 워커 × 20)
+  #   - 심야 시간: 20개 (1 워커 × 20)
+  #   - PostgreSQL max_connections: 200 (50% 활용 = 100개)
   # ============================================
   pgbouncer:
-    image: icoretech/pgbouncer-docker:1.24.1
+    image: edoburu/pgbouncer:latest
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-pgbouncer
     environment:
-      # PostgreSQL 연결 정보
-      DATABASES_HOST: postgres
-      DATABASES_PORT: 5432
-      DATABASES_USER: ${DB_USER}
-      DATABASES_PASSWORD: ${DB_PASSWORD}
-      DATABASES_DBNAME: ${DB_NAME:-blog_prod}
-      # 풀링 모드: transaction (권장)
-      PGBOUNCER_POOL_MODE: transaction
-      # 클라이언트 연결 제한
-      PGBOUNCER_MAX_CLIENT_CONN: 1000
+      # PostgreSQL 백엔드 연결 정보
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-blog_prod}
+      # SCRAM 인증 지원
+      AUTH_TYPE: scram-sha-256
+      # 풀링 모드 (읽기 위주 워크로드에 최적)
+      POOL_MODE: transaction
+      # 클라이언트 연결 제한 (1만 명 수용)
+      MAX_CLIENT_CONN: 10000
       # 데이터베이스 연결 풀 크기
-      PGBOUNCER_DEFAULT_POOL_SIZE: 25
-      PGBOUNCER_MIN_POOL_SIZE: 10
-      PGBOUNCER_RESERVE_POOL_SIZE: 5
-      # PostgreSQL 최대 연결 수 (postgresql.conf의 max_connections와 일치)
-      PGBOUNCER_MAX_DB_CONNECTIONS: 200
-      PGBOUNCER_MAX_USER_CONNECTIONS: 100
-      # 로그 레벨
-      PGBOUNCER_LOG_LEVEL: info
+      DEFAULT_POOL_SIZE: 80   # 피크 타임 (4 워커 × 20)
+      MIN_POOL_SIZE: 20       # 심야 시간 (1 워커 × 20)
+      RESERVE_POOL_SIZE: 20   # 버스트 대비
+      # PostgreSQL 연결 제한
+      MAX_DB_CONNECTIONS: 100 # PostgreSQL max_connections=200의 50%
+      MAX_USER_CONNECTIONS: 100
+      # 타임아웃 설정 (초)
+      SERVER_IDLE_TIMEOUT: 600     # 유휴 서버 연결 10분
+      QUERY_TIMEOUT: 30            # 쿼리 타임아웃 30초
+      IDLE_TRANSACTION_TIMEOUT: 60 # 유휴 트랜잭션 1분
+      # 로그 설정 (프로덕션 최소화)
+      VERBOSE: 0
     depends_on:
       postgres:
         condition: service_healthy
@@ -159,7 +171,7 @@ services:
       - codebase_network
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "nc", "-z", "localhost", "5432"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3

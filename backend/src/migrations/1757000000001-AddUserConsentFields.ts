@@ -1,7 +1,7 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class AddUserConsentFields1734567890123 implements MigrationInterface {
-    name = 'AddUserConsentFields1734567890123'
+export class AddUserConsentFields1757000000001 implements MigrationInterface {
+    name = 'AddUserConsentFields1757000000001'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         // 약관 동의 관련 필드 추가

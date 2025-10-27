@@ -1,0 +1,35 @@
+# Grafana 데이터소스 자동 설정
+# VictoriaMetrics를 기본 데이터소스로 추가 (Prometheus API 호환)
+
+apiVersion: 1
+
+# 기존 Prometheus 데이터소스 삭제
+deleteDatasources:
+  - name: Prometheus
+    orgId: 1
+  - name: VictoriaMetrics
+    orgId: 1
+
+# 데이터소스 설정
+datasources:
+  - name: VictoriaMetrics
+    type: prometheus  # VictoriaMetrics는 Prometheus type 사용
+    access: proxy
+    url: http://victoriametrics:8428
+    isDefault: true
+    editable: true
+    orgId: 1
+    version: 1
+    jsonData:
+      httpMethod: POST
+      # Prometheus 타입 지정 (VictoriaMetrics는 Prometheus API 호환)
+      prometheusType: Prometheus
+      prometheusVersion: 1.97.0
+      # 타임아웃 설정
+      timeout: 60
+      # 쿼리 타임아웃
+      queryTimeout: 60s
+      # 증분 쿼리 활성화
+      incrementalQuerying: true
+      # 메트릭 조회 활성화
+      manageAlerts: true

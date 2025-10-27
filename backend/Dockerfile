@@ -58,8 +58,8 @@ RUN pnpm install --frozen-lockfile --prod=false
 # 소스 코드 복사
 COPY . .
 
-# NestJS 빌드
-RUN pnpm run build
+# 빌드 전 dist 폴더 정리 및 NestJS 빌드
+RUN rm -rf dist && pnpm run build
 
 # 프로덕션 의존성만 재설치
 RUN rm -rf node_modules && \
@@ -72,15 +72,16 @@ FROM node:22-slim AS production
 
 # 보안 강화: 비-루트 사용자 생성 (Debian 방식)
 RUN groupadd -g 1001 nodejs && \
-    useradd -r -u 1001 -g nodejs nestjs
+    useradd -r -u 1001 -g nodejs -m nestjs
 
 # PM2 전역 설치 (클러스터 모드 지원)
 RUN npm install -g pm2@latest
 
 WORKDIR /app
 
-# PM2 로그 디렉토리 생성 (nestjs 사용자 권한)
-RUN mkdir -p /app/logs && chown -R nestjs:nodejs /app/logs
+# PM2 로그 및 설정 디렉토리 생성 (nestjs 사용자 권한)
+RUN mkdir -p /app/logs && chown -R nestjs:nodejs /app/logs && \
+    mkdir -p /home/nestjs/.pm2 && chown -R nestjs:nodejs /home/nestjs/.pm2
 
 # 필요한 파일만 복사 (빌드된 파일 + 프로덕션 의존성)
 COPY --from=builder --chown=nestjs:nodejs /app/dist ./dist

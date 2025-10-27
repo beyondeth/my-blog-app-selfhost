@@ -394,6 +394,7 @@ Error: ${error.message}
         to: adminEmail,
         subject: '[긴급] 사용자 삭제 작업 실패',
         text: emailContent,
+        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
       });
 
       this.logger.log(`Admin alert sent for job ${job.id}`);
