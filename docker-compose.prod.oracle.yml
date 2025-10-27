@@ -17,7 +17,6 @@
 #   3. /mnt/data 디렉토리 마운트 (Block Volume)
 # ============================================
 
-version: '3.9'
 
 services:
   # ============================================
@@ -46,13 +45,13 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    # 리소스 제한 (docker-compose는 cpus, mem_limit 사용)
-    cpus: 0.4
-    mem_limit: 768m
-    mem_reservation: 512m
+    # 리소스 제한 (SSR 중심 Next.js)
+    cpus: 1.0
+    mem_limit: 2g
+    mem_reservation: 1.5g
 
   # ============================================
-  # Backend (NestJS)
+  # Backend (NestJS + PM2 Cluster)
   # ============================================
   backend:
     build:
@@ -64,35 +63,36 @@ services:
       - .env.production
     environment:
       NODE_ENV: production
-      # PostgreSQL 직접 연결 (PgBouncer 임시 비활성화 - ARM64 호환 이슈)
-      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-blog_prod}
+      # PgBouncer 연결 (연결 풀링)
+      DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME:-blog_prod}
       REDIS_URL: redis://redis:6379
-      NODE_OPTIONS: "--max-old-space-size=2048"
+      # PM2 워커당 힙 메모리 (ecosystem.config.js와 일치)
+      NODE_OPTIONS: "--max-old-space-size=800"
       UV_THREADPOOL_SIZE: 8
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
-      postgres:
+      pgbouncer:
         condition: service_healthy
       redis:
         condition: service_healthy
     networks:
       - codebase_network
     restart: unless-stopped
-    command: node dist/src/main.js
+    # PM2는 Dockerfile CMD에서 실행 (pm2-runtime)
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
-    # 리소스 제한
-    cpus: 1.2
-    mem_limit: 2.5g
-    mem_reservation: 1.5g
+    # 리소스 제한 (PM2 4 워커)
+    cpus: 3.0
+    mem_limit: 4g
+    mem_reservation: 3g
 
   # ============================================
-  # PostgreSQL 18 (최적화된 설정)
+  # PostgreSQL 18 (Async I/O, ARM64 최적화)
   # ============================================
   postgres:
     image: postgres:18-alpine
@@ -107,7 +107,7 @@ services:
     volumes:
       # Block Volume 사용 (100GB)
       - /mnt/data/postgres:/var/lib/postgresql
-      # 최적화된 PostgreSQL 설정 (1.5GB shared_buffers)
+      # 최적화된 PostgreSQL 설정 (shared_buffers 조정 필요)
       - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
     command: postgres -c config_file=/etc/postgresql/postgresql.conf
@@ -120,48 +120,65 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # 리소스 제한 (1.5GB shared_buffers + 여유)
-    cpus: 1.0
-    mem_limit: 8g
-    mem_reservation: 4g
+    # 리소스 제한 (CPU 무제한, 피크 타임만 사용)
+    mem_limit: 7.5g
+    mem_reservation: 5g
     shm_size: 512mb  # 공유 메모리
 
   # ============================================
-  # PgBouncer (연결 풀링) - 임시 비활성화 (ARM64 호환 이슈)
+  # PgBouncer (연결 풀링) - edoburu 이미지 (ARM64/AMD64 지원)
   # ============================================
-  # pgbouncer:
-  #   image: edoburu/pgbouncer:1.21-alpine
-  #   container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-pgbouncer
-  #   environment:
-  #     # PostgreSQL 연결 정보
-  #     DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@postgres:5432/${DB_NAME:-blog_prod}
-  #     # 풀링 모드: transaction (권장)
-  #     POOL_MODE: transaction
-  #     # 클라이언트 연결 제한
-  #     MAX_CLIENT_CONN: 1000
-  #     # 데이터베이스 연결 풀 크기
-  #     DEFAULT_POOL_SIZE: 25
-  #     MIN_POOL_SIZE: 10
-  #     RESERVE_POOL_SIZE: 5
-  #     RESERVE_POOL_TIMEOUT: 3
-  #     # PostgreSQL 최대 연결 수 (postgresql.conf의 max_connections와 일치)
-  #     MAX_DB_CONNECTIONS: 200
-  #     MAX_USER_CONNECTIONS: 100
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #   networks:
-  #     - codebase_network
-  #   restart: unless-stopped
-  #   healthcheck:
-  #     test: ["CMD", "nc", "-z", "localhost", "5432"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #   # 리소스 제한
-  #   cpus: 0.1
-  #   mem_limit: 128m
-  #   mem_reservation: 64m
+  # 🎯 설계 기준: 1만 명 동시 사용자 (블로그 플랫폼 읽기 위주)
+  #   - PM2 워커: 1-4개 (동적 스케일링)
+  #   - 워커당 연결: 20개
+  #   - 피크 타임: 80개 (4 워커 × 20)
+  #   - 심야 시간: 20개 (1 워커 × 20)
+  #   - PostgreSQL max_connections: 200 (50% 활용 = 100개)
+  # ============================================
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-pgbouncer
+    environment:
+      # PostgreSQL 백엔드 연결 정보
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: ${DB_NAME:-blog_prod}
+      # SCRAM 인증 지원
+      AUTH_TYPE: scram-sha-256
+      # 풀링 모드 (읽기 위주 워크로드에 최적)
+      POOL_MODE: transaction
+      # 클라이언트 연결 제한 (1만 명 수용)
+      MAX_CLIENT_CONN: 10000
+      # 데이터베이스 연결 풀 크기
+      DEFAULT_POOL_SIZE: 80   # 피크 타임 (4 워커 × 20)
+      MIN_POOL_SIZE: 20       # 심야 시간 (1 워커 × 20)
+      RESERVE_POOL_SIZE: 20   # 버스트 대비
+      # PostgreSQL 연결 제한
+      MAX_DB_CONNECTIONS: 100 # PostgreSQL max_connections=200의 50%
+      MAX_USER_CONNECTIONS: 100
+      # 타임아웃 설정 (초)
+      SERVER_IDLE_TIMEOUT: 600     # 유휴 서버 연결 10분
+      QUERY_TIMEOUT: 30            # 쿼리 타임아웃 30초
+      IDLE_TRANSACTION_TIMEOUT: 60 # 유휴 트랜잭션 1분
+      # 로그 설정 (프로덕션 최소화)
+      VERBOSE: 0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - codebase_network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    # 리소스 제한
+    cpus: 0.2
+    mem_limit: 128m
+    mem_reservation: 64m
 
   # ============================================
   # Redis (캐시 + 큐 + 소켓)
@@ -171,7 +188,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis
     command: >
       redis-server
-      --maxmemory 3500mb
+      --maxmemory 4000mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
@@ -193,10 +210,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    # 리소스 제한 (3.5GB maxmemory + 여유)
-    cpus: 0.3
-    mem_limit: 5.5g
-    mem_reservation: 3g
+    # 리소스 제한 (4GB maxmemory + 여유)
+    cpus: 1.5
+    mem_limit: 4.5g
+    mem_reservation: 3.5g
 
   # ============================================
   # MCP Proxy (MCP 자동 포스팅 API)
@@ -229,9 +246,9 @@ services:
       retries: 3
       start_period: 40s
     # 리소스 제한
-    cpus: 0.5
-    mem_limit: 1g
-    mem_reservation: 512m
+    cpus: 1.0
+    mem_limit: 800m
+    mem_reservation: 500m
 
   # ============================================
   # VictoriaMetrics (Prometheus 대체)
@@ -339,19 +356,30 @@ networks:
 # 별도 Named Volume 불필요
 
 # ============================================
-# 리소스 사용 요약
+# 리소스 사용 요약 (PM2 Cluster + 자동 스케일링)
 # ============================================
-# 총 CPU: 3.8 OCPU (4 OCPU 중 95%, 0.2 OCPU 여유)
-# 총 RAM: 18.3 GB (24 GB 중 76%, 5.7 GB 여유)
+# 총 CPU: ~7.1 OCPU 설정 (PostgreSQL 무제한, 피크 타임만 사용)
+# 총 RAM: 19.38 GB (24 GB 중 80.7%, 4.62 GB 여유)
+#
+# 🎯 Oracle Free Tier 할당량:
+#   - 월 3,000 OCPU시간 (평균 4.17 OCPU)
+#   - 월 18,000 GB시간 (평균 25 GB)
+#   - 자동 스케일링으로 평균 3.5 OCPU 이하 유지 (62% 사용)
 #
 # 서비스별 CPU/RAM:
-#   frontend:         0.4 OCPU, 768 MB
-#   backend:          1.2 OCPU, 2.5 GB
-#   postgres:         1.0 OCPU, 8 GB (실제 4~5GB 사용)
-#   pgbouncer:        0.1 OCPU, 128 MB
-#   redis:            0.3 OCPU, 5.5 GB (실제 3.5GB 사용)
-#   mcp-proxy:        0.5 OCPU, 1 GB
+#   frontend:         1.0 OCPU, 2 GB (SSR 중심 Next.js)
+#   backend:          3.0 OCPU, 4 GB (PM2 4 워커)
+#   postgres:         무제한, 7.5 GB (Async I/O, ARM64 최적화)
+#   pgbouncer:        0.2 OCPU, 128 MB (연결 풀링, ARM64 지원)
+#   redis:            1.5 OCPU, 4.5 GB (maxmemory 4GB)
+#   mcp-proxy:        1.0 OCPU, 800 MB
 #   victoriametrics:  0.1 OCPU, 100 MB
 #   grafana:          0.2 OCPU, 300 MB
 #   redis-exporter:   0.1 OCPU, 50 MB
+#
+# 🔄 동적 스케일링 시나리오:
+#   - 피크 타임: PM2 4 워커 → ~4.1 OCPU (8시간/일)
+#   - 일반 시간: PM2 2 워커 → ~3.1 OCPU (10시간/일)
+#   - 심야 시간: PM2 1 워커 → ~2.1 OCPU (6시간/일)
+#   - 월 평균: ~2,016 OCPU시간 (< 3,000 안전, 67% 사용)
 # ============================================

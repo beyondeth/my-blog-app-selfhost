@@ -286,15 +286,14 @@ export default function DMSettingsPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-yellow-200 bg-yellow-50">
+          <Card className="border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
             <CardContent className="pt-6">
               <div className="flex items-start gap-3">
-                <FiAlertCircle className="h-5 w-5 text-yellow-600 mt-0.5" />
-                <div className="text-sm text-yellow-800">
+                <FiAlertCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 mt-0.5" />
+                <div className="text-sm text-gray-800 dark:text-gray-200">
                   <p className="font-medium mb-1">차단 기능 안내</p>
-                  <ul className="list-disc list-inside space-y-1 text-yellow-700">
+                  <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
                     <li>차단된 사용자는 당신에게 메시지를 보낼 수 없습니다.</li>
-                    <li>차단된 사용자와의 기존 대화는 자동으로 숨겨집니다.</li>
                     <li>차단을 해제하면 이전 대화를 다시 볼 수 있습니다.</li>
                   </ul>
                 </div>

@@ -125,7 +125,7 @@ const CategorySection = React.memo(function CategorySection({
                   aria-label={`${node.parent} 카테고리 (${node.singleCategory!.count}개)`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <FiTag className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    <FiFolder className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
                     <span className="text-gray-800 dark:text-gray-200 truncate group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
                       {node.parent}
                     </span>
@@ -143,15 +143,15 @@ const CategorySection = React.memo(function CategorySection({
                     aria-label={`${node.parent} 카테고리 펼치기/접기`}
                   >
                     <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <FiFolder className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
+                      <span className="text-gray-800 dark:text-gray-200 font-medium truncate group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
+                        {node.parent}
+                      </span>
                       {isExpanded ? (
                         <FiChevronDown className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
                       ) : (
                         <FiChevronRight className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
                       )}
-                      <FiFolder className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-gray-800 dark:text-gray-200 font-medium truncate group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
-                        {node.parent}
-                      </span>
                     </div>
                     <span className="flex-shrink-0 text-[13px] text-gray-500 dark:text-gray-400 font-medium ml-2">
                       {node.totalCount}
@@ -170,7 +170,7 @@ const CategorySection = React.memo(function CategorySection({
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
                             <span className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-800 dark:group-hover:text-gray-300 transition-colors">
-                              {childNode.child}
+                              - {childNode.child}
                             </span>
                           </div>
                           <span className="flex-shrink-0 text-[12px] text-gray-500 dark:text-gray-400 font-medium ml-2">

@@ -9,55 +9,53 @@
 #   docker compose -f docker-compose.unified-monitoring.yml up -d
 #
 # 접속 정보:
-#   Grafana: http://localhost:3030 (admin/admin)
-#   Prometheus: http://localhost:9090
+#   Grafana (개발): http://localhost:3033 (admin/admin)
+#   VictoriaMetrics (개발): http://localhost:8428
 # ============================================
 
 services:
   # ============================================
-  # Prometheus - 메트릭 수집 및 저장
+  # VictoriaMetrics - 메트릭 수집 및 저장 (개발 환경)
   # ============================================
-  prometheus:
-    image: prom/prometheus:v2.54.0
-    container_name: codebase-monitoring-prometheus
-    volumes:
-      # 통합 Prometheus 설정 파일 (Backend + MCP + Redis 타겟)
-      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
-      - ./prometheus/alerts.yml:/etc/prometheus/alerts.yml
-      - prometheus_data:/prometheus
+  victoriametrics:
+    image: victoriametrics/victoria-metrics:v1.97.0
+    container_name: codebase-dev-monitoring-victoriametrics
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.console.libraries=/etc/prometheus/console_libraries'
-      - '--web.console.templates=/etc/prometheus/consoles'
-      - '--storage.tsdb.retention.time=15d'      # 30일 → 15일 (디스크 절약)
-      - '--storage.tsdb.retention.size=2GB'      # 최대 2GB 제한
-      - '--web.enable-lifecycle'                 # 설정 리로드 활성화
+      - '--storageDataPath=/storage'
+      - '--retentionPeriod=30d'
+      - '--promscrape.config=/etc/victoriametrics/scrape_config.yml'
+      - '--promscrape.config.strictParse=false'
+      - '--httpListenAddr=:8428'
+      - '--memory.allowedPercent=80'
+    volumes:
+      - ./victoriametrics/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
+      - ./victoriametrics/alerts.yml:/etc/victoriametrics/alerts.yml:ro
+      - victoriametrics_data:/storage
     ports:
-      - "127.0.0.1:9090:9090"  # Bind to localhost only for security
+      - "127.0.0.1:8428:8428"  # VictoriaMetrics HTTP API
     networks:
       - monitoring
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9090/-/healthy"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8428/-/healthy"]
       interval: 30s
       timeout: 10s
       retries: 3
     deploy:
       resources:
         limits:
-          cpus: '0.3'          # 최대 0.3 OCPU
-          memory: 400M         # 최대 400MB (현재 94MB → 여유 4배)
-        reservations:
           cpus: '0.1'
           memory: 100M
+        reservations:
+          cpus: '0.05'
+          memory: 50M
 
   # ============================================
-  # Grafana - 통합 대시보드 및 시각화
+  # Grafana - 통합 대시보드 및 시각화 (개발 환경)
   # ============================================
   grafana:
     image: grafana/grafana:11.3.0
-    container_name: codebase-monitoring-grafana
+    container_name: codebase-dev-monitoring-grafana
     volumes:
       - grafana_data:/var/lib/grafana
       # 통합 Grafana provisioning 설정 (2개 대시보드로 감소)
@@ -68,17 +66,17 @@ services:
       - GF_SECURITY_ADMIN_USER=${GF_SECURITY_ADMIN_USER:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
       - GF_INSTALL_PLUGINS=redis-datasource
-      - GF_SERVER_ROOT_URL=http://localhost:3030
+      - GF_SERVER_ROOT_URL=http://localhost:3033
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_USERS_ALLOW_SIGN_UP=false
       # 로그 레벨 (개발: debug, 운영: info)
       - GF_LOG_LEVEL=${GF_LOG_LEVEL:-info}
     ports:
-      - "127.0.0.1:3030:3000"  # Bind to localhost only, port 3030 (Backend 3000과 충돌 방지)
+      - "127.0.0.1:3033:3000"  # 개발 환경 전용 포트 (VM SSH 터널 3030과 분리)
     networks:
       - monitoring
     depends_on:
-      - prometheus
+      - victoriametrics
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
@@ -95,11 +93,11 @@ services:
           memory: 100M
 
   # ============================================
-  # Redis Exporter - Redis 메트릭 수집
+  # Redis Exporter - Redis 메트릭 수집 (개발 환경)
   # ============================================
   redis-exporter:
     image: oliver006/redis_exporter:v1.62.0-alpine
-    container_name: codebase-monitoring-redis-exporter
+    container_name: codebase-dev-monitoring-redis-exporter
     command:
       # CPU 9% 문제 해결: 과도한 메트릭 제거
       - '--redis.addr=my-blog-app-shared-redis:6379'
@@ -133,9 +131,9 @@ networks:
     name: my-blog-app-network  # 기존 Redis 네트워크 이름
 
 volumes:
-  prometheus_data:
+  victoriametrics_data:
     driver: local
-    name: codebase-prometheus-data
+    name: codebase-dev-monitoring-victoriametrics-data
   grafana_data:
     driver: local
-    name: codebase-grafana-data
+    name: codebase-dev-monitoring-grafana-data

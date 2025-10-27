@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import Toast, { ToastProps } from '@/components/ui/Toast';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
+import { CheckCircle2, AlertTriangle, Lightbulb, ChevronRight, ChevronDown, Copy } from 'lucide-react';
 
 /**
  * MCP API Key 관리 페이지
@@ -45,6 +46,7 @@ export default function ApiKeysPage() {
   } | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string>('');
   const [keyName, setKeyName] = useState('My MCP Key');
+  const [expandedEnv, setExpandedEnv] = useState<string | null>(null);
 
   // Toast 상태
   const [toast, setToast] = useState<ToastProps | null>(null);
@@ -171,18 +173,109 @@ export default function ApiKeysPage() {
     });
   };
 
+  const toggleEnv = (env: string) => {
+    setExpandedEnv(expandedEnv === env ? null : env);
+  };
+
   const getMcpJsonConfig = (apiKey: string) => {
     return `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "type": "http",
-      "url": "http://localhost:3002/mcp",
+      "url": "https://mcp.codebase.blog/mcp",
       "headers": {
         "Authorization": "Bearer ${apiKey}"
       }
     }
   }
 }`;
+  };
+
+  const getCursorConfig = (apiKey: string) => {
+    return `// 설정 위치: ~/.cursor/mcp.json
+{
+  "mcpServers": {
+    "codebase-blog-mcp": {
+      "url": "https://mcp.codebase.blog/mcp",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}"
+      }
+    }
+  }
+}`;
+  };
+
+  const getClaudeCodeConfig = (apiKey: string) => {
+    return `# 터미널에서 실행
+claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`;
+  };
+
+  const getWindsurfConfig = (apiKey: string) => {
+    return `// 설정 위치: ~/.windsurf/mcp.json
+{
+  "mcpServers": {
+    "codebase-blog-mcp": {
+      "serverUrl": "https://mcp.codebase.blog/mcp",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}"
+      }
+    }
+  }
+}`;
+  };
+
+  const getVSCodeConfig = (apiKey: string) => {
+    return `// 설정 위치: 프로젝트 루트/.mcp.json
+{
+  "mcpServers": {
+    "codebase-blog-mcp": {
+      "url": "https://mcp.codebase.blog/mcp",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}"
+      }
+    }
+  }
+}`;
+  };
+
+  const getGeminiConfig = (apiKey: string) => {
+    return `// 설정 위치: ~/.gemini/mcp.json
+{
+  "mcpServers": {
+    "codebase-blog-mcp": {
+      "httpUrl": "https://mcp.codebase.blog/mcp",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}",
+        "Accept": "application/json"
+      }
+    }
+  }
+}`;
+  };
+
+  const getQwenConfig = (apiKey: string) => {
+    return `// 설정 위치: ~/.qwen/mcp.json
+{
+  "mcpServers": {
+    "codebase-blog-mcp": {
+      "httpUrl": "https://mcp.codebase.blog/mcp",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}",
+        "Accept": "application/json"
+      }
+    }
+  }
+}`;
+  };
+
+  const getCodexConfig = (apiKey: string) => {
+    return `# 설정 위치: ~/.config/openai/config.toml
+# Streamable HTTP 서버 활성화
+experimental_use_rmcp_client = true
+
+[mcp_servers.codebase-blog-mcp]
+url = "https://mcp.codebase.blog/mcp"
+bearer_token = "${apiKey}"`;
   };
 
   // 블로그 로딩 중
@@ -206,7 +299,7 @@ export default function ApiKeysPage() {
     <div className="max-w-4xl mx-auto p-6">
       <h1 className="text-3xl font-bold mb-6 text-gray-900 dark:text-gray-100">MCP API Keys</h1>
       <p className="text-gray-600 dark:text-gray-400 mb-8">
-        Claude Code에서 블로그 포스트를 자동으로 작성하기 위한 API Key를 관리합니다.
+        AI 에이전트가 블로그 포스트를 자동으로 작성하기 위한 API Key를 관리합니다.
       </p>
 
       {/* API Key 생성 섹션 */}
@@ -260,61 +353,59 @@ export default function ApiKeysPage() {
                 : 'API Key 생성'}
           </button>
 
-            <p className="text-sm text-gray-500 dark:text-gray-400">
-              ⚠️ 사용자당 1개만 생성 가능합니다.
-              {keys.length > 0
-                ? '기존 키를 먼저 삭제해주세요.'
-                : '새 키 생성 시 기존 키가 자동 삭제됩니다.'}
-            </p>
+          <div className="space-y-2 mt-3">
+            <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-600 dark:text-amber-500" />
+              <p>사용자당 1개만 생성 가능합니다. 기존 키를 먼저 삭제해주세요.</p>
+            </div>
+            <div className="flex items-start gap-2 text-sm text-gray-600 dark:text-gray-400">
+              <Lightbulb className="w-4 h-4 mt-0.5 flex-shrink-0 text-blue-600 dark:text-blue-500" />
+              <p>API Key는 90일 후 자동 만료됩니다. 만료 전에 새 키를 생성하세요.</p>
+            </div>
+          </div>
           </div>
         </div>
       )}
 
       {/* 새로 생성된 키 표시 (1회만) */}
       {newKey && (
-        <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold text-green-800 dark:text-green-300 mb-4">
-            ✅ API Key가 생성되었습니다!
-          </h2>
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-8">
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-500" />
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+              API Key가 생성되었습니다!
+            </h2>
+          </div>
 
-          <div className="bg-white dark:bg-gray-800 p-4 rounded border border-green-300 dark:border-green-700 mb-4">
+          <div className="mb-4">
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">API Key (1회만 표시됩니다)</p>
-            <div className="flex items-center gap-2">
-              <code className="flex-1 bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded text-sm font-mono break-all text-gray-900 dark:text-gray-100">
+            <div className="relative bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded">
+              <code className="block pr-12 text-sm font-mono break-all text-gray-900 dark:text-gray-100">
                 {newKey.apiKey}
               </code>
               <button
                 onClick={() => copyToClipboard(newKey.apiKey)}
-                className="px-3 py-2 bg-green-600 dark:bg-green-700 text-white rounded hover:bg-green-700 dark:hover:bg-green-600 text-sm"
+                className="absolute top-1/2 -translate-y-1/2 right-2 p-1.5 bg-gray-700 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-500 transition"
+                title="복사"
               >
-                복사
+                <Copy className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          <div className="mb-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">.mcp.json 설정</p>
-            <div className="bg-gray-900 dark:bg-gray-950 text-gray-100 dark:text-gray-200 p-4 rounded font-mono text-xs overflow-x-auto">
-              <pre>{getMcpJsonConfig(newKey.apiKey)}</pre>
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">.mcp.json 설정 예시</p>
+            <div className="relative bg-gray-900 dark:bg-gray-950 rounded">
+              <pre className="text-gray-100 p-4 pr-12 font-mono text-xs overflow-x-auto">{getMcpJsonConfig('[YOUR-API-KEY]')}</pre>
+              <button
+                onClick={() => copyToClipboard(getMcpJsonConfig(newKey.apiKey))}
+                className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-500 transition"
+                title="복사"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
             </div>
-            <button
-              onClick={() => copyToClipboard(getMcpJsonConfig(newKey.apiKey))}
-              className="mt-2 px-3 py-1 bg-green-600 dark:bg-green-700 text-white rounded hover:bg-green-700 dark:hover:bg-green-600 text-sm"
-            >
-              .mcp.json 복사
-            </button>
           </div>
-
-          <p className="text-sm text-green-700 dark:text-green-400">
-            💡 위 API Key를 안전한 곳에 보관하세요. 재조회가 불가능합니다.
-          </p>
-
-          <button
-            onClick={() => setNewKey(null)}
-            className="mt-4 px-4 py-2 bg-green-600 dark:bg-green-700 text-white rounded hover:bg-green-700 dark:hover:bg-green-600"
-          >
-            확인
-          </button>
         </div>
       )}
 
@@ -382,32 +473,246 @@ export default function ApiKeysPage() {
         )}
       </div>
 
-      {/* 사용 가이드 */}
-      <div className="mt-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-        <h2 className="text-xl font-semibold text-blue-800 dark:text-blue-300 mb-4">
-          📖 Claude Code 설정 가이드
+      {/* MCP 설정 가이드 (항상 표시) */}
+      <div className="mt-8 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">
+          MCP 설정 가이드
         </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+          사용 중인 AI 에이전트를 선택하여 설정 방법을 확인하세요. 생성한 API Key를 <code className="bg-gray-200 dark:bg-gray-800 px-2 py-1 rounded">[YOUR-API-KEY]</code> 위치에 입력하세요.
+        </p>
 
-        <ol className="space-y-3 text-sm text-blue-900 dark:text-blue-200">
-          <li>
-            <strong>1. API Key 생성:</strong> 위에서 블로그를 선택하고 API Key를 생성하세요.
-          </li>
-          <li>
-            <strong>2. .mcp.json 파일 생성:</strong> 생성된 설정을 복사하여{' '}
-            <code className="bg-blue-100 dark:bg-blue-900/50 px-2 py-1 rounded">~/.claude/mcp.json</code> 파일에 저장하세요.
-          </li>
-          <li>
-            <strong>3. Claude Code 재시작:</strong> Claude Code를 재시작하면 MCP 서버가 자동으로 연결됩니다.
-          </li>
-          <li>
-            <strong>4. 자동 포스팅:</strong> Claude Code에서 "블로그 포스트 작성해줘"라고 요청하면 자동으로 포스트가 생성됩니다.
-          </li>
-        </ol>
+        <div className="space-y-2">
+          {/* Cursor */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('cursor')}
+              className={`w-full flex items-center justify-between p-4 transition ${
+                expandedEnv === 'cursor'
+                  ? 'bg-orange-500 dark:bg-orange-500'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {expandedEnv === 'cursor' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'cursor' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'cursor' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'cursor' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>Cursor</span>
+              </div>
+            </button>
+            {expandedEnv === 'cursor' && (
+              <div className="relative bg-gray-900 dark:bg-gray-900 p-4">
+                <pre className="text-gray-100 pr-12 font-mono text-xs overflow-x-auto">{getCursorConfig('[YOUR-API-KEY]')}</pre>
+                <button
+                  onClick={() => copyToClipboard(getCursorConfig('[YOUR-API-KEY]'))}
+                  className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
+                  title="복사"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
 
-        <div className="mt-4 p-3 bg-blue-100 dark:bg-blue-900/30 rounded">
-          <p className="text-sm text-blue-800 dark:text-blue-300">
-            💡 <strong>Tip:</strong> API Key는 90일 후 자동 만료됩니다. 만료 전에 새 키를 생성하세요.
-          </p>
+          {/* Claude Code */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('claude-code')}
+              className={`w-full flex items-center justify-between p-4 transition ${
+                expandedEnv === 'claude-code'
+                  ? 'bg-orange-500 dark:bg-orange-500'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {expandedEnv === 'claude-code' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'claude-code' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'claude-code' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'claude-code' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>Claude Code</span>
+              </div>
+            </button>
+            {expandedEnv === 'claude-code' && (
+              <div className="relative bg-gray-900 dark:bg-gray-900 p-4 pb-6">
+                <pre className="text-gray-100 pr-12 pb-3 font-mono text-xs overflow-x-auto [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-500">{getClaudeCodeConfig('[YOUR-API-KEY]')}</pre>
+                <button
+                  onClick={() => copyToClipboard(getClaudeCodeConfig('[YOUR-API-KEY]'))}
+                  className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
+                  title="복사"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Windsurf */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('windsurf')}
+              className={`w-full flex items-center justify-between p-4 transition ${
+                expandedEnv === 'windsurf'
+                  ? 'bg-orange-500 dark:bg-orange-500'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {expandedEnv === 'windsurf' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'windsurf' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'windsurf' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'windsurf' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>Windsurf</span>
+              </div>
+            </button>
+            {expandedEnv === 'windsurf' && (
+              <div className="relative bg-gray-900 dark:bg-gray-900 p-4">
+                <pre className="text-gray-100 pr-12 font-mono text-xs overflow-x-auto">{getWindsurfConfig('[YOUR-API-KEY]')}</pre>
+                <button
+                  onClick={() => copyToClipboard(getWindsurfConfig('[YOUR-API-KEY]'))}
+                  className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
+                  title="복사"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* VS Code */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('vscode')}
+              className={`w-full flex items-center justify-between p-4 transition ${
+                expandedEnv === 'vscode'
+                  ? 'bg-orange-500 dark:bg-orange-500'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {expandedEnv === 'vscode' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'vscode' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'vscode' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'vscode' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>VS Code (Cline, Continue 등)</span>
+              </div>
+            </button>
+            {expandedEnv === 'vscode' && (
+              <div className="relative bg-gray-900 dark:bg-gray-900 p-4">
+                <pre className="text-gray-100 pr-12 font-mono text-xs overflow-x-auto">{getVSCodeConfig('[YOUR-API-KEY]')}</pre>
+                <button
+                  onClick={() => copyToClipboard(getVSCodeConfig('[YOUR-API-KEY]'))}
+                  className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
+                  title="복사"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Gemini CLI */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('gemini')}
+              className={`w-full flex items-center justify-between p-4 transition ${
+                expandedEnv === 'gemini'
+                  ? 'bg-orange-500 dark:bg-orange-500'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {expandedEnv === 'gemini' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'gemini' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'gemini' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'gemini' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>Gemini CLI</span>
+              </div>
+            </button>
+            {expandedEnv === 'gemini' && (
+              <div className="relative bg-gray-900 dark:bg-gray-900 p-4">
+                <pre className="text-gray-100 pr-12 font-mono text-xs overflow-x-auto">{getGeminiConfig('[YOUR-API-KEY]')}</pre>
+                <button
+                  onClick={() => copyToClipboard(getGeminiConfig('[YOUR-API-KEY]'))}
+                  className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
+                  title="복사"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Qwen Coder */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('qwen')}
+              className={`w-full flex items-center justify-between p-4 transition ${
+                expandedEnv === 'qwen'
+                  ? 'bg-orange-500 dark:bg-orange-500'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {expandedEnv === 'qwen' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'qwen' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'qwen' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'qwen' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>Qwen Coder</span>
+              </div>
+            </button>
+            {expandedEnv === 'qwen' && (
+              <div className="relative bg-gray-900 dark:bg-gray-900 p-4">
+                <pre className="text-gray-100 pr-12 font-mono text-xs overflow-x-auto">{getQwenConfig('[YOUR-API-KEY]')}</pre>
+                <button
+                  onClick={() => copyToClipboard(getQwenConfig('[YOUR-API-KEY]'))}
+                  className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
+                  title="복사"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* OpenAI Codex */}
+          <div className="border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('codex')}
+              className={`w-full flex items-center justify-between p-4 transition ${
+                expandedEnv === 'codex'
+                  ? 'bg-orange-500 dark:bg-orange-500'
+                  : 'bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {expandedEnv === 'codex' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'codex' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'codex' ? 'text-white' : 'text-gray-600 dark:text-gray-400'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'codex' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>OpenAI Codex</span>
+              </div>
+            </button>
+            {expandedEnv === 'codex' && (
+              <div className="relative bg-gray-900 dark:bg-gray-900 p-4 pb-6">
+                <pre className="text-gray-100 pr-12 font-mono text-xs overflow-x-auto">{getCodexConfig('[YOUR-API-KEY]')}</pre>
+                <button
+                  onClick={() => copyToClipboard(getCodexConfig('[YOUR-API-KEY]'))}
+                  className="absolute top-2 right-2 p-1.5 bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
+                  title="복사"
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 

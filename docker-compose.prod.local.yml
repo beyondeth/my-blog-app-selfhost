@@ -1,0 +1,75 @@
+# ============================================
+# 로컬 프로덕션 테스트용 오버라이드
+# ============================================
+# 사용법:
+#   docker-compose -f docker-compose.prod.oracle.yml -f docker-compose.prod.local.yml up -d --build
+#
+# 변경사항:
+#   - /mnt/data/ → ./data/ (로컬 맥 호환)
+#   - !override 태그로 volumes 완전 대체 (병합 방지)
+#   - 포트 4000번대로 변경 (개발환경 3000번대와 분리)
+#   - 나머지 설정은 동일 (서버와 동일한 환경 테스트)
+#
+# 포트 매핑:
+#   - Frontend: 4001 (기존 3001)
+#   - Backend: 4000 (기존 3000)
+#   - MCP Proxy: 4002 (기존 3002)
+#   - Grafana: 4030 (기존 3030)
+# ============================================
+
+services:
+  # Frontend 포트 및 API URL 오버라이드 (3001 → 4001)
+  frontend:
+    build:
+      args:
+        NEXT_PUBLIC_API_URL: "http://localhost:4000/api/v1"
+        NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
+    ports: !override
+      - "127.0.0.1:4001:3000"
+    environment:
+      NODE_ENV: production
+      NEXT_PUBLIC_API_URL: "http://localhost:4000/api/v1"
+      NEXT_PUBLIC_BACKEND_URL: "http://localhost:4000"
+      HOSTNAME: "0.0.0.0"
+
+  # Backend 포트 및 CORS 오버라이드 (3000 → 4000)
+  backend:
+    ports: !override
+      - "127.0.0.1:4000:3000"
+    environment:
+      CORS_ALLOWED_ORIGINS: "https://www.codebase.blog,https://codebase.blog,http://localhost:4001"
+      FRONTEND_URL: "http://localhost:4001"
+
+  # MCP Proxy 포트 오버라이드 (3002 → 4002)
+  mcp-proxy:
+    ports:
+      - "127.0.0.1:4002:3002"
+
+  # PostgreSQL 볼륨 오버라이드 (!override 태그로 완전 대체)
+  postgres:
+    volumes: !override
+      - ./data/postgres:/var/lib/postgresql
+      - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+
+  # Redis 볼륨 오버라이드
+  redis:
+    volumes: !override
+      - ./data/redis:/data
+
+  # VictoriaMetrics 볼륨 오버라이드
+  victoriametrics:
+    volumes: !override
+      - ./data/victoriametrics:/storage
+      - ./victoriametrics/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
+      - ./victoriametrics/alerts.yml:/etc/victoriametrics/alerts.yml:ro
+
+  # Grafana 포트 및 볼륨 오버라이드 (3030 → 4030)
+  grafana:
+    ports: !override
+      - "127.0.0.1:4030:3000"
+    volumes: !override
+      - ./data/grafana:/var/lib/grafana
+      - ./grafana/provisioning/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml:ro
+      - ./grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro

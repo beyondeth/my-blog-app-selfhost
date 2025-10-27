@@ -1,10 +1,30 @@
 # ============================================
-# Codebase 블로그 플랫폼 - Development Override
+# Codebase 블로그 플랫폼 - Development Environment
 # ============================================
-# docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# docker compose -f docker-compose.dev.yml up -d
 # ============================================
 
 services:
+  # ============================================
+  # Redis (공유 캐시 및 큐)
+  # ============================================
+  redis:
+    image: redis:7.4-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes --maxmemory 6gb --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - codebase_network
+    restart: unless-stopped
+
   # ============================================
   # PostgreSQL (개발 환경 전용)
   # ============================================
@@ -84,6 +104,8 @@ services:
 volumes:
   postgres_data:
     name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-postgres-data
+  redis_data:
+    name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis-data
 
 networks:
   codebase_network:

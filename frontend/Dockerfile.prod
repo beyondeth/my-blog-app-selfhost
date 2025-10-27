@@ -51,6 +51,14 @@ COPY backend/docs/legal /backend/docs/legal
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
+# 빌드 인자로 API URL 받기
+ARG NEXT_PUBLIC_API_URL
+ARG NEXT_PUBLIC_BACKEND_URL
+
+# 빌드 인자를 환경변수로 설정
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_BACKEND_URL=$NEXT_PUBLIC_BACKEND_URL
+
 # Next.js 빌드 (Standalone 모드)
 # next.config.js에 output: 'standalone' 설정 필요
 RUN pnpm build

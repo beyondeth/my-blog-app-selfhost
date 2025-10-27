@@ -1,8 +1,9 @@
 import { DataSource } from 'typeorm';
-import { config } from 'dotenv';
 
-// Load environment variables
-config();
+// 프로덕션 환경이 아닐 때만 dotenv 로드 (프로덕션에서는 환경변수가 이미 설정됨)
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 
 /**
  * Migration 전용 DataSource 생성 함수
@@ -16,8 +17,11 @@ export const createDataSourceOptions = (): any => {
 
   const baseConfig = {
     type: 'postgres',
-    entities: [isProduction ? 'dist/src/**/*.entity{.ts,.js}' : 'src/**/*.entity{.ts,.js}'],
-    migrations: [isProduction ? 'dist/src/migrations/*{.ts,.js}' : 'src/migrations/*{.ts,.js}'],
+    // 환경별 마이그레이션 경로 분리 (중복 방지)
+    // - 개발: src/*.ts (TypeScript 직접 실행)
+    // - 프로덕션: dist/*.js (빌드된 JavaScript 실행)
+    entities: isProduction ? ['dist/**/*.entity.js'] : ['src/**/*.entity.ts'],
+    migrations: isProduction ? ['dist/src/migrations/*.js'] : ['src/migrations/*.ts'],
     synchronize: false,
     logging: process.env.NODE_ENV === 'development',
   };
