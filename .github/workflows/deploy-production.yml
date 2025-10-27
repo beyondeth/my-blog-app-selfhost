@@ -1,0 +1,65 @@
+name: Deploy to Production (Oracle Free Tier)
+
+# main 브랜치에 push 시 자동 배포
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:  # 수동 실행 허용
+
+jobs:
+  deploy:
+    name: Deploy to Production Server
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # 최대 15분 제한
+
+    steps:
+      # 1. 코드 체크아웃 (선택사항, 서버에서 git pull 수행)
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 2. SSH로 프로덕션 서버 접속 및 배포
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          port: 22
+          timeout: 10m
+          script_stop: true  # 에러 발생 시 즉시 중단
+          script: |
+            set -e
+            echo "=========================================="
+            echo "프로덕션 배포 시작: $(date)"
+            echo "=========================================="
+
+            cd /home/ubuntu/my-blog-app
+
+            # 배포 스크립트 실행
+            bash scripts/deploy-production.sh
+
+            echo "=========================================="
+            echo "배포 완료: $(date)"
+            echo "=========================================="
+
+      # 3. 배포 실패 시 알림 (선택사항)
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ 프로덕션 배포 실패!"
+          echo "롤백을 실행하세요: ssh ubuntu@server 'cd /home/ubuntu/my-blog-app && bash scripts/rollback.sh'"
+          # Slack/Discord 알림 (선택사항)
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"❌ 프로덕션 배포 실패"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      # 4. 배포 성공 시 알림 (선택사항)
+      - name: Notify on success
+        if: success()
+        run: |
+          echo "✅ 프로덕션 배포 성공!"
+          # Slack/Discord 알림 (선택사항)
+          # curl -X POST -H 'Content-type: application/json' \
+          #   --data '{"text":"✅ 프로덕션 배포 성공"}' \
+          #   ${{ secrets.SLACK_WEBHOOK_URL }}

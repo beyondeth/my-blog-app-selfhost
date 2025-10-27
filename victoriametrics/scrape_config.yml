@@ -120,6 +120,31 @@ scrape_configs:
         replacement: 'mcp-proxy'
 
   # ==========================================
+  # PgBouncer (연결 풀링)
+  # ==========================================
+  # 참고: PgBouncer 메트릭 수집을 위해서는 PgBouncer Exporter 필요
+  # TODO: docker-compose에 pgbouncer-exporter 추가 시 활성화
+  # - job_name: 'pgbouncer'
+  #   static_configs:
+  #     - targets: ['pgbouncer-exporter:9127']
+  #   scrape_interval: 15s
+  #   scrape_timeout: 10s
+  #
+  #   # 메트릭 레이블 추가
+  #   relabel_configs:
+  #     - source_labels: [__address__]
+  #       target_label: instance
+  #       replacement: 'pgbouncer'
+  #
+  # PgBouncer 주요 메트릭:
+  #   - pgbouncer_pools_cl_active: 활성 클라이언트 연결
+  #   - pgbouncer_pools_sv_active: 활성 서버 연결
+  #   - pgbouncer_pools_sv_idle: 유휴 서버 연결
+  #   - pgbouncer_pools_sv_used: 사용 중인 서버 연결
+  #   - pgbouncer_pools_maxwait: 최대 대기 시간
+  #   - pgbouncer_stats_total_query_time: 총 쿼리 시간
+
+  # ==========================================
   # VictoriaMetrics 자체 메트릭
   # ==========================================
   - job_name: 'victoriametrics'

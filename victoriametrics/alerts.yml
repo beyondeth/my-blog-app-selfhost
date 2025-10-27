@@ -169,3 +169,113 @@ groups:
         annotations:
           summary: "MCP Proxy 서버가 다운되었습니다"
           description: "MCP Proxy 서버에 연결할 수 없습니다"
+
+  # ============================================
+  # Oracle Free Tier 리소스 모니터링
+  # ============================================
+  - name: oracle_resource_alerts
+    interval: 30s
+    rules:
+      # CPU 사용률 90% 이상 (PM2 Scale Down 필요)
+      - alert: HighCPUUsageScaleDown
+        expr: sum(rate(container_cpu_usage_seconds_total[5m])) / 4 > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: resource
+          action: scale_down
+        annotations:
+          summary: "CPU 사용률 90% 초과 - PM2 워커 감소 필요"
+          description: "평균 CPU 사용률: {{ $value | humanizePercentage }}. PM2 워커를 줄이세요."
+
+      # CPU 사용률 70% 이상 (경고)
+      - alert: ModerateHighCPUUsage
+        expr: sum(rate(container_cpu_usage_seconds_total[5m])) / 4 > 0.7 and sum(rate(container_cpu_usage_seconds_total[5m])) / 4 <= 0.9
+        for: 10m
+        labels:
+          severity: warning
+          component: resource
+        annotations:
+          summary: "CPU 사용률 70% 초과"
+          description: "평균 CPU 사용률: {{ $value | humanizePercentage }}. 모니터링 필요."
+
+      # CPU 사용률 50% 이하 (PM2 Scale Up 가능)
+      - alert: LowCPUUsageScaleUp
+        expr: sum(rate(container_cpu_usage_seconds_total[5m])) / 4 < 0.5
+        for: 10m
+        labels:
+          severity: info
+          component: resource
+          action: scale_up
+        annotations:
+          summary: "CPU 사용률 50% 이하 - PM2 워커 증가 가능"
+          description: "평균 CPU 사용률: {{ $value | humanizePercentage }}. PM2 워커를 늘릴 수 있습니다."
+
+      # 메모리 사용률 85% 이상 (위험)
+      - alert: HighMemoryUsageOracleTier
+        expr: (sum(container_memory_usage_bytes) / (24 * 1024 * 1024 * 1024)) > 0.85
+        for: 3m
+        labels:
+          severity: critical
+          component: resource
+        annotations:
+          summary: "메모리 사용률 85% 초과"
+          description: "현재 메모리 사용: {{ $value | humanizePercentage }}. OOM 위험."
+
+      # 메모리 사용률 75% 이상 (경고)
+      - alert: ModerateHighMemoryUsage
+        expr: (sum(container_memory_usage_bytes) / (24 * 1024 * 1024 * 1024)) > 0.75 and (sum(container_memory_usage_bytes) / (24 * 1024 * 1024 * 1024)) <= 0.85
+        for: 5m
+        labels:
+          severity: warning
+          component: resource
+        annotations:
+          summary: "메모리 사용률 75% 초과"
+          description: "현재 메모리 사용: {{ $value | humanizePercentage }}. 주의 필요."
+
+      # PostgreSQL 메모리 높음
+      - alert: PostgreSQLHighMemory
+        expr: container_memory_usage_bytes{name=~".*postgres.*"} > 7 * 1024 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+          component: postgresql
+        annotations:
+          summary: "PostgreSQL 메모리 사용량 높음"
+          description: "현재 사용량: {{ $value | humanize1024 }}B (제한: 7.5GB)"
+
+      # Redis 메모리 높음
+      - alert: RedisHighMemory
+        expr: container_memory_usage_bytes{name=~".*redis.*"} > 4.3 * 1024 * 1024 * 1024
+        for: 5m
+        labels:
+          severity: warning
+          component: redis
+        annotations:
+          summary: "Redis 메모리 사용량 높음"
+          description: "현재 사용량: {{ $value | humanize1024 }}B (제한: 4.5GB)"
+
+      # Backend 메모리 높음 (PM2)
+      - alert: BackendHighMemory
+        expr: container_memory_usage_bytes{name=~".*backend.*"} > 3.8 * 1024 * 1024 * 1024
+        for: 3m
+        labels:
+          severity: critical
+          component: backend
+        annotations:
+          summary: "Backend 메모리 사용량 높음"
+          description: "현재 사용량: {{ $value | humanize1024 }}B (제한: 4GB)"
+
+      # 월 할당량 경고 (CPU)
+      # 월초부터 누적 OCPU시간 계산 (대략적)
+      # 실제로는 외부 모니터링 필요
+      - alert: MonthlyCPUQuotaWarning
+        expr: sum(rate(container_cpu_usage_seconds_total[1h])) * 720 > 2700
+        for: 1h
+        labels:
+          severity: warning
+          component: resource
+          quota: cpu
+        annotations:
+          summary: "월 OCPU 할당량 90% 초과 예상"
+          description: "현재 속도로 사용 시 월 3,000 OCPU시간을 초과할 수 있습니다."
