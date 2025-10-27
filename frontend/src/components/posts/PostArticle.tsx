@@ -7,7 +7,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import UserAvatar from '@/components/ui/UserAvatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
-import { FiHeart, FiMessageCircle, FiEye, FiTarget } from 'react-icons/fi';
+import { FiHeart, FiMessageCircle, FiEye, FiTarget, FiTag } from 'react-icons/fi';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
 
@@ -135,32 +135,36 @@ const PostArticle = React.memo(function PostArticle({
           <div className="mb-4">
             {/* Author Info - 날짜 제거 */}
             {post.author && (
-              <div className="flex items-center gap-2 mb-2">
-                <UserLinkWithTooltip
-                  userId={post.author.id}
-                  username={post.author.username}
-                  blogSlug={post.blog?.slug}
-                >
-                  <div className="flex items-center gap-2">
-                    <UserAvatar
-                      profileImage={post.author.profileImage}
-                      username={post.author.username}
-                      size="sm"
-                      priority={priority}
-                    />
-                    <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
-                      {post.author.username}
+              <>
+                <div className="flex items-center gap-2 mb-4">
+                  <UserLinkWithTooltip
+                    userId={post.author.id}
+                    username={post.author.username}
+                    blogSlug={post.blog?.slug}
+                  >
+                    <div className="flex items-center gap-2">
+                      <UserAvatar
+                        profileImage={post.author.profileImage}
+                        username={post.author.username}
+                        size="sm"
+                        priority={priority}
+                      />
+                      <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
+                        {post.author.username}
+                      </span>
+                    </div>
+                  </UserLinkWithTooltip>
+                </div>
+                {/* 카테고리 표시 - 작성자 정보 아래 독립된 줄 */}
+                {post.category && (
+                  <div className="mb-2">
+                    <span className="text-[13px] text-gray-600 dark:text-gray-400 inline-flex items-center gap-1">
+                      <FiTag className="w-4 h-4" />
+                      <span>{post.category}</span>
                     </span>
                   </div>
-                </UserLinkWithTooltip>
-                {/* 카테고리 표시 */}
-                {post.category && (
-                  <span className="text-[13px] text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                    <span>🏷️</span>
-                    <span>{post.category}</span>
-                  </span>
                 )}
-              </div>
+              </>
             )}
 
             {/* 제목 - YouTube 포스트는 더 큰 제목 */}
@@ -271,34 +275,38 @@ const PostArticle = React.memo(function PostArticle({
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Author Info - 제목 위에 배치 */}
           {post.author && (
-            <div className="flex items-center gap-2 mb-3">
-              <UserLinkWithTooltip
-                userId={post.author.id}
-                username={post.author.username}
-                blogSlug={post.blog?.slug}
-              >
-                <div className="flex items-center gap-2">
-                  {/* Profile Image - 공통 UserAvatar 사용 */}
-                  <UserAvatar
-                    profileImage={post.author.profileImage}
-                    username={post.author.username}
-                    size="sm"
-                    priority={priority}
-                  />
-                  {/* Author Name */}
-                  <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
-                    {post.author.username}
+            <>
+              <div className="flex items-center gap-2 mb-4">
+                <UserLinkWithTooltip
+                  userId={post.author.id}
+                  username={post.author.username}
+                  blogSlug={post.blog?.slug}
+                >
+                  <div className="flex items-center gap-2">
+                    {/* Profile Image - 공통 UserAvatar 사용 */}
+                    <UserAvatar
+                      profileImage={post.author.profileImage}
+                      username={post.author.username}
+                      size="sm"
+                      priority={priority}
+                    />
+                    {/* Author Name */}
+                    <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
+                      {post.author.username}
+                    </span>
+                  </div>
+                </UserLinkWithTooltip>
+              </div>
+              {/* 카테고리 표시 - 작성자 정보 아래 독립된 줄 */}
+              {post.category && (
+                <div className="mb-3">
+                  <span className="text-[13px] text-gray-600 dark:text-gray-400 inline-flex items-center gap-1">
+                    <FiTag className="w-4 h-4" />
+                    <span>{post.category}</span>
                   </span>
                 </div>
-              </UserLinkWithTooltip>
-              {/* 카테고리 표시 */}
-              {post.category && (
-                <span className="text-[13px] text-gray-600 dark:text-gray-400 flex items-center gap-1">
-                  <span>🏷️</span>
-                  <span>{post.category}</span>
-                </span>
               )}
-            </div>
+            </>
           )}
 
           <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">

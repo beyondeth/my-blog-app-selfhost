@@ -12,13 +12,30 @@ jobs:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
     timeout-minutes: 15  # 최대 15분 제한
+    environment: production  # Environment Secrets 사용
 
     steps:
       # 1. 코드 체크아웃 (선택사항, 서버에서 git pull 수행)
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # 2. SSH로 프로덕션 서버 접속 및 배포
+      # 2. Environment Secrets에서 .env.production 생성
+      - name: Create .env.production from Environment Secrets
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env.production
+
+      # 3. .env.production 파일을 서버에 업로드
+      - name: Upload .env.production to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: ".env.production"
+          target: "/home/ubuntu/my-blog-app/"
+          overwrite: true
+
+      # 4. SSH로 프로덕션 서버 접속 및 배포
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:

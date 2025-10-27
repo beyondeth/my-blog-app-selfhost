@@ -96,25 +96,26 @@ export default function PostHeaderWithReport({
   return (
     <>
       <header className="mb-8">
-        {/* Back Button과 Category를 같은 줄에 배치 */}
-        {(onBack || post.category) && (
-          <div className="mb-6 -ml-8 flex items-center gap-3">
-            {onBack && (
-              <button
-                onClick={onBack}
-                className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors text-xs font-medium"
-              >
-                <FiArrowLeft className="mr-2 w-4 h-4" />
-                Back
-              </button>
-            )}
-            {/* Category - Back 버튼 옆에 배치 */}
-            {post.category && (
-              <span className="inline-flex items-center text-[13px] text-gray-600 dark:text-gray-400 gap-1">
-                <span>🏷️</span>
-                <span>{post.category}</span>
-              </span>
-            )}
+        {/* Back Button */}
+        {onBack && (
+          <div className="mb-6 -ml-8">
+            <button
+              onClick={onBack}
+              className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors text-xs font-medium"
+            >
+              <FiArrowLeft className="mr-2 w-4 h-4" />
+              Back
+            </button>
+          </div>
+        )}
+
+        {/* Category - 제목 위 독립된 줄 */}
+        {post.category && (
+          <div className="mb-3">
+            <span className="inline-flex items-center text-[13px] text-gray-600 dark:text-gray-400 gap-1">
+              <FiTag className="w-4 h-4" />
+              <span>{post.category}</span>
+            </span>
           </div>
         )}
 
