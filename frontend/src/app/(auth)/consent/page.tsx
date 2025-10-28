@@ -292,7 +292,7 @@ export default function ConsentPage() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">
                       (선택) 뉴스레터 수신에 동의합니다{' '}
                       <Link
-                        href="/legal/marketing-consent"
+                        href="/legal/newsletter-consent"
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}

@@ -236,7 +236,7 @@ export default function LoginPage() {
             )}
 
             {/* 섹션 1: OAuth 로그인 */}
-            <div className="mb-3 sm:mb-6 w-full">
+            <div className="w-full">
               <SocialLoginGroup
                 providers={['google', 'github']}
                 disabled={isSubmitting || loginAttempts >= MAX_LOGIN_ATTEMPTS}
@@ -244,7 +244,7 @@ export default function LoginPage() {
             </div>
 
             {/* 섹션 구분선 - 중요한 시각적 구분 역할 */}
-            <div className="auth-divider mb-3 sm:mb-6 w-full text-xs sm:text-sm">또는</div>
+            <div className="auth-divider my-3 sm:my-6 w-full text-xs sm:text-sm">or</div>
 
             {/* 섹션 2: 이메일/비밀번호 로그인 */}
             <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-5 w-full">
@@ -259,7 +259,7 @@ export default function LoginPage() {
                   name="email"
                   value={formData.email}
                   onChange={handleChange}
-                  placeholder="example@email.com"
+                  placeholder="vangogh@example.com"
                   className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                     validationErrors.email ? 'border-red-500 dark:border-red-400' : ''
                   } ${validationErrors.email ? 'shake' : ''}`}
@@ -343,19 +343,8 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Footer - Terms와 Sign up 링크 */}
+            {/* Footer - Sign up 링크 */}
             <div className="mt-4 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-200 dark:border-gray-700 w-full">
-              <p className="text-center text-[10px] sm:text-xs text-gray-500 dark:text-gray-400 mb-2 sm:mb-3">
-                로그인함으로써{' '}
-                <Link href="/legal/terms" className="text-gray-700 dark:text-gray-300 underline">
-                  이용약관
-                </Link>
-                {' '}및{' '}
-                <Link href="/legal/privacy" className="text-gray-700 dark:text-gray-300 underline">
-                  개인정보 처리방침
-                </Link>
-                에 동의하게 됩니다.
-              </p>
               <p className="text-center text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 계정이 없으신가요?{' '}
                 <Link

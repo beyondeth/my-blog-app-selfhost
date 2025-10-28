@@ -8,6 +8,7 @@ import { Role } from '../common/enums/role.enum';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { UpdateMarketingPreferencesDto } from './dto/update-marketing-preferences.dto';
 import { Public } from '../common/decorators/public.decorator';
+import { getAllCharacters } from '../common/utils/character.util';
 
 @ApiTags('users')
 @Controller('users')
@@ -29,6 +30,18 @@ export class UsersController {
   @ApiBearerAuth()
   getProfile(@Request() req) {
     return this.usersService.findOne(req.user.id);
+  }
+
+  @Get('characters')
+  @Public()
+  @ApiOperation({ summary: '사용 가능한 캐릭터 목록 조회 (Public)' })
+  getCharacters() {
+    // 프론트엔드 캐릭터 선택 UI에서 사용
+    // /public/character 폴더의 정적 이미지 목록 반환
+    return {
+      characters: getAllCharacters(),
+      total: getAllCharacters().length,
+    };
   }
 
   @Get(':id')

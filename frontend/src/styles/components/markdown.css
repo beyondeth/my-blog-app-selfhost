@@ -190,6 +190,10 @@
   line-height: 1.7;
   border: 1px solid #181a1f;
   font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  /* 모바일 반응형: 부모 컨테이너를 확장하지 않도록 격리 */
+  max-width: 100%;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .prose pre code {
@@ -202,6 +206,9 @@
   display: block;
   overflow-x: auto;
   white-space: pre;
+  /* 코드는 원본 길이 유지하되 최소 부모 너비는 채우기 */
+  max-width: max-content;
+  min-width: 100%;
 }
 
 /* highlight.js 적용 후에도 일관된 스타일 유지 */
@@ -347,16 +354,36 @@
   .prose h1 { font-size: var(--text-2xl); }
   .prose h2 { font-size: var(--text-xl); }
   .prose h3 { font-size: var(--text-lg); }
-  
+
+  /* 일반 텍스트 자동 줄바꿈 - 긴 URL이나 단어 처리 */
+  .prose p,
+  .prose li,
+  .prose div:not(.code-block-wrapper) {
+    word-break: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+  }
+
+  /* 코드 블록 패딩 축소 - 모바일 공간 효율성 */
+  .prose pre,
+  .code-block-wrapper pre {
+    padding: 0.75rem 0.75rem 1.25rem 0.75rem; /* 하단 패딩 추가로 스크롤바와 텍스트 사이 여백 확보 */
+  }
+
+  /* 테이블 수평 스크롤 처리 */
   .prose table {
+    display: block;
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch; /* iOS 부드러운 스크롤 */
     font-size: var(--text-sm);
   }
-  
+
   .prose th,
   .prose td {
     padding: var(--space-xs) var(--space-sm);
   }
-  
+
   .prose img {
     max-height: 60vh;
     object-fit: contain;

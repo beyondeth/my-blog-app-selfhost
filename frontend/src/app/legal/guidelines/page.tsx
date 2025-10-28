@@ -12,10 +12,7 @@ export const metadata: Metadata = {
 export default function GuidelinesPage() {
   return (
     <LegalPageLayout
-      title={{
-        ko: '커뮤니티 가이드라인',
-        en: 'Community Guidelines',
-      }}
+      title="커뮤니티 가이드라인"
       documentType="community-guidelines"
     />
   );
