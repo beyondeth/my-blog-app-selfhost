@@ -31,30 +31,6 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'd1y66zmnw3oigo.cloudfront.net',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'myblogdata84.s3.amazonaws.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 'myblogdata84.s3.us-east-1.amazonaws.com',
-        port: '',
-        pathname: '/**',
-      },
-      {
-        protocol: 'https',
-        hostname: 's3.us-east-1.amazonaws.com',
-        port: '',
-        pathname: '/myblogdata84/**',
-      },
-      {
-        protocol: 'https',
         hostname: 'lh3.googleusercontent.com',
         port: '',
         pathname: '/**',
@@ -80,7 +56,6 @@ const nextConfig = {
     };
     return config;
   },
-  // assetPrefix: process.env.NODE_ENV === 'production' ? 'https://d1y66zmnw3oigo.cloudfront.net' : undefined,
 };
 
 module.exports = nextConfig;

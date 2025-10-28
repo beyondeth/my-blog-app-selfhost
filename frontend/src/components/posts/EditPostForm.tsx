@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import {
   Form,
@@ -18,10 +19,25 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Save, Plus } from 'lucide-react';
-import { BlogRichTextEditor } from '@/editor';
 import type { UploadedImageInfo } from '@/editor';
 import type { FileUpload } from '@/types';
 import CategoryAutocomplete from '@/components/ui/CategoryAutocomplete';
+
+// Dynamic import for editor - 초기 로딩 속도 개선 (976 KB 청크 제거)
+const BlogRichTextEditor = dynamic(
+  () => import('@/editor').then(mod => mod.BlogRichTextEditor),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex items-center justify-center h-[400px] border rounded-lg bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-gray-900 dark:border-gray-600 dark:border-t-gray-100 mx-auto" />
+          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">에디터 로딩 중...</p>
+        </div>
+      </div>
+    )
+  }
+);
 
 // 폼 스키마 정의
 const postFormSchema = z.object({

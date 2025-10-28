@@ -12,10 +12,7 @@ export const metadata: Metadata = {
 export default function TermsPage() {
   return (
     <LegalPageLayout
-      title={{
-        ko: '이용약관',
-        en: 'Terms of Service',
-      }}
+      title="이용약관"
       documentType="terms-of-service"
     />
   );

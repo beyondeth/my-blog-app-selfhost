@@ -23,6 +23,7 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 import { AuthResponse } from './interfaces/auth-response.interface';
 import * as crypto from 'crypto';
 import { v4 as uuidv4 } from 'uuid';
+import { getRandomCharacter, isOAuthProviderImage } from '../common/utils/character.util';
 
 @Injectable()
 export class AuthService {
@@ -174,6 +175,8 @@ export class AuthService {
         email,
         username,
         password,
+        // 🎨 랜덤 캐릭터 프로필 이미지 할당 (OAuth와 동일)
+        profileImage: getRandomCharacter(),
         authProvider: AuthProvider.LOCAL,
         isEmailVerified: true,  // 이메일 인증 완료 상태 반영
         termsAcceptedAt: termsAccepted ? new Date() : null,
@@ -220,6 +223,17 @@ export class AuthService {
 
         await this.identityService.updateLastUsed(existingIdentity.id);
         const user = await this.usersService.findById(existingIdentity.userId);
+
+        // 🎨 OAuth 제공자 이미지를 캐릭터로 마이그레이션 (점진적 전환)
+        // 기존 사용자가 OAuth URL을 사용 중이면 랜덤 캐릭터로 교체
+        if (isOAuthProviderImage(user.profileImage)) {
+          const newCharacter = getRandomCharacter();
+          await this.usersService.update(user.id, {
+            profileImage: newCharacter
+          });
+          user.profileImage = newCharacter;
+          this.logger.log(`Migrated OAuth image to character (${newCharacter}) for user ${user.email}`);
+        }
 
         // 🔐 삭제된 계정 로그인 차단 (30일 재가입 정책)
         if (user.isDeleted || !user.isActive) {
@@ -321,12 +335,15 @@ export class AuthService {
             this.logger.log(`Email automatically verified through ${provider} OAuth for: ${email}`);
           }
 
-          // 프로필 이미지 업데이트 (없는 경우)
-          if (!existingUser.profileImage && profile.profileImage) {
+          // 🎨 프로필 이미지가 없으면 랜덤 캐릭터 할당
+          // OAuth 제공자 이미지는 사용하지 않음 (플랫폼 일관성 유지)
+          if (!existingUser.profileImage) {
+            const newCharacter = getRandomCharacter();
             await this.usersService.update(existingUser.id, {
-              profileImage: profile.profileImage,
+              profileImage: newCharacter,
               // 중요: password는 절대 건드리지 않음
             });
+            this.logger.log(`Assigned random character (${newCharacter}) to user ${existingUser.email}`);
           }
 
           // 블로그 정보 가져오기
@@ -370,7 +387,8 @@ export class AuthService {
       const newUser = await this.usersService.create({
         email,
         username: profile.username || this.generateUsernameFromEmail(email),
-        profileImage: profile.profileImage || profile.photos?.[0]?.value,
+        // 🎨 OAuth 제공자 이미지 대신 랜덤 캐릭터 할당 (플랫폼 일관성 유지)
+        profileImage: getRandomCharacter(),
         bio: profile.bio,
         authProvider: provider,
         providerId: profile.id,
