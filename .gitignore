@@ -29,6 +29,12 @@
 # Claude personal settings
 .claude/settings.local.json
 
+# MCP client settings (개인 API 키 포함)
+.mcp.json
+
+# Codex settings (개인 API 키 포함)
+.codex/
+
 # OS
 .DS_Store
 **/.DS_Store
