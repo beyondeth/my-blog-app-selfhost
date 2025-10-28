@@ -1,0 +1,7 @@
+# MCP 클라이언트 활성화
+experimental_use_rmcp_client = true
+
+# codebase-blog-mcp 서버 설정
+[mcp_servers.codebase-blog-mcp]
+url = "https://mcp.codebase.blog/mcp"
+bearer_token = "blog_sk_v0y3jcl5_RlrnxyZoeNXdFVQTZX7X0tXaFKBLiDo7"

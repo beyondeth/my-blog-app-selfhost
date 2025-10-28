@@ -441,7 +441,7 @@ bearer_token = "${apiKey}"`;
 
                 <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-500 dark:text-gray-400">사용 횟수</p>
+                    <p className="text-gray-500 dark:text-gray-400">총 도구 호출</p>
                     <p className="font-semibold text-gray-900 dark:text-gray-100">{key.requestCount.toLocaleString()}회</p>
                   </div>
                   <div>
