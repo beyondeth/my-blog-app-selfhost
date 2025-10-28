@@ -298,21 +298,21 @@ export default function RegisterPage() {
           {/* 통합된 회원가입 카드 - Resend 스타일 */}
           <div className="auth-card rounded-2xl px-1 py-4 sm:py-8 fade-in-up flex flex-col items-center">
             {/* 로고와 타이틀 - 카드 내부로 이동 */}
-            <div className="text-center mb-8 w-full">
-              <div className="inline-flex items-center justify-center mb-4">
+            <div className="text-center mb-4 sm:mb-8 w-full">
+              <div className="inline-flex items-center justify-center mb-2 sm:mb-4">
                 <Image
                   src="/assets/logo.svg"
                   alt="Logo"
-                  width={64}
-                  height={64}
+                  width={48}
+                  height={48}
                   priority
-                  className="object-contain"
+                  className="object-contain sm:w-16 sm:h-16"
                 />
               </div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
                 계정 만들기
               </h1>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
+              <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 이미 계정이 있으신가요?{' '}
                 <Link
                   href="/login"
@@ -324,7 +324,7 @@ export default function RegisterPage() {
             </div>
 
             {/* 섹션 1: OAuth 회원가입 */}
-            <div className="mb-6 w-full">
+            <div className="w-full">
               <SocialLoginGroup
                 providers={['google', 'github']}
                 disabled={isSubmitting}
@@ -332,10 +332,10 @@ export default function RegisterPage() {
             </div>
 
             {/* 섹션 구분선 */}
-            <div className="auth-divider mb-6 w-full">또는</div>
+            <div className="auth-divider my-3 sm:my-6 w-full text-xs sm:text-sm">or</div>
 
             {/* 섹션 2: 이메일 회원가입 폼 */}
-            <form onSubmit={handleSubmit} className="space-y-5 w-full">
+            <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-5 w-full">
               {error && (
                 <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-800 dark:text-red-300 shake">
                   {error}
@@ -608,7 +608,7 @@ export default function RegisterPage() {
                     <span className="text-sm text-gray-700 dark:text-gray-300">
                       (선택) 뉴스레터 수신에 동의합니다{' '}
                       <Link
-                        href="/legal/marketing-consent"
+                        href="/legal/newsletter-consent"
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}

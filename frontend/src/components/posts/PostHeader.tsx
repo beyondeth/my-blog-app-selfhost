@@ -67,8 +67,8 @@ export default function PostHeader({
         {/* Left: Meta Information with Like/Share */}
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center">
-            <Avatar 
-              src={post.author?.profileImage} 
+            <Avatar
+              src={post.author?.profileImage}
               alt={post.author?.username || 'Author'}
               fallback={post.author?.username || 'Author'}
               size="xs"

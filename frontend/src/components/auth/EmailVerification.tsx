@@ -65,7 +65,7 @@ export const EmailVerification = forwardRef<HTMLInputElement, EmailVerificationP
             className={`w-full pl-10 pr-32 py-3 rounded-lg auth-input text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
               state.error && state.step === 'input' ? 'border-red-500 dark:border-red-400' : ''
             } ${state.step !== 'input' ? 'opacity-60' : ''} ${className}`}
-            placeholder="name@example.com"
+            placeholder="vangogh@example.com"
             required
           />
           {state.step === 'input' && (

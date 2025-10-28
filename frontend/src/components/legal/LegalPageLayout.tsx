@@ -1,29 +1,48 @@
 'use client';
 
-import { useSearchParams, useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import LanguageToggle from './LanguageToggle';
 import MarkdownRenderer from './MarkdownRenderer';
 import { ArrowLeft } from 'lucide-react';
+import { getLegalFilePath, LEGAL_VERSIONS } from '@/constants/legalVersions';
 
 interface LegalPageLayoutProps {
-  title: {
-    ko: string;
-    en: string;
-  };
-  documentType: 'terms-of-service' | 'privacy-policy' | 'community-guidelines' | 'pro-terms' | 'partner-program' | 'username-policy' | 'marketing-consent';
+  title: string;
+  documentType: 'terms-of-service' | 'privacy-policy' | 'community-guidelines' | 'marketing-consent' | 'newsletter-consent';
+}
+
+/**
+ * documentType을 LEGAL_VERSIONS 키로 변환
+ */
+function getVersionKey(documentType: string): keyof typeof LEGAL_VERSIONS | null {
+  switch (documentType) {
+    case 'privacy-policy':
+      return 'PRIVACY';
+    case 'terms-of-service':
+      return 'TERMS';
+    case 'community-guidelines':
+      return 'GUIDELINES';
+    case 'marketing-consent':
+      return 'MARKETING';
+    case 'newsletter-consent':
+      return 'NEWSLETTER';
+    default:
+      return null;
+  }
 }
 
 /**
  * 법적 문서 페이지 공통 레이아웃 컴포넌트
- * Markdown 파일을 동적으로 로드하여 렌더링
+ *
+ * 버전 관리된 주요 문서(privacy, terms, guidelines, marketing)는 /public/legal/ko 에서 직접 로드하여
+ * CDN 캐싱 최적화 및 API 부하 제거. 파일명에 버전 포함으로 자동 캐시 무효화.
+ *
+ * 한국어 문서만 지원.
  */
 export default function LegalPageLayout({ title, documentType }: LegalPageLayoutProps) {
-  const searchParams = useSearchParams();
   const router = useRouter();
   const [content, setContent] = useState<string>('');
   const [loading, setLoading] = useState(true);
-  const [lang, setLang] = useState<'ko' | 'en'>('ko');
   const [isFromAuth, setIsFromAuth] = useState(false);
   const [authPathname, setAuthPathname] = useState<string>('');
 
@@ -35,21 +54,22 @@ export default function LegalPageLayout({ title, documentType }: LegalPageLayout
     setAuthPathname(pathname);
   }, []);
 
-  // 언어 설정
-  useEffect(() => {
-    const urlLang = searchParams.get('lang');
-    const storedLang = typeof window !== 'undefined' ? localStorage.getItem('preferred-lang') : null;
-    const initialLang = (urlLang || storedLang || 'ko') as 'ko' | 'en';
-    setLang(initialLang);
-  }, [searchParams]);
-
-  // Markdown 파일 로드
+  // Markdown 파일 로드 (버전 관리된 정적 파일, 한국어만 지원)
   useEffect(() => {
     const loadDocument = async () => {
       setLoading(true);
       try {
-        // 백엔드 API 또는 public 폴더에서 Markdown 파일 로드
-        const response = await fetch(`/api/legal/${documentType}?lang=${lang}`);
+        // 버전 키 가져오기
+        const versionKey = getVersionKey(documentType);
+
+        if (!versionKey) {
+          // 지원하지 않는 문서 타입
+          throw new Error('Unsupported document type');
+        }
+
+        // 버전 관리 시스템: /public/legal/ko 에서 직접 로드
+        const filePath = getLegalFilePath(versionKey, 'ko');
+        const response = await fetch(filePath);
 
         if (!response.ok) {
           throw new Error('Failed to load document');
@@ -59,14 +79,14 @@ export default function LegalPageLayout({ title, documentType }: LegalPageLayout
         setContent(markdown);
       } catch (error) {
         console.error('Error loading legal document:', error);
-        setContent(`# Error\n\nFailed to load the document. Please try again later.`);
+        setContent(`# 오류\n\n문서를 불러오는데 실패했습니다. 나중에 다시 시도해주세요.`);
       } finally {
         setLoading(false);
       }
     };
 
     loadDocument();
-  }, [documentType, lang]);
+  }, [documentType]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -85,12 +105,9 @@ export default function LegalPageLayout({ title, documentType }: LegalPageLayout
 
         {/* 헤더 */}
         <div className="mb-8 border-b border-border pb-6">
-          <div className="flex items-center justify-between">
-            <h1 className="text-4xl font-bold text-foreground">
-              {lang === 'ko' ? title.ko : title.en}
-            </h1>
-            <LanguageToggle />
-          </div>
+          <h1 className="text-4xl font-bold text-foreground">
+            {title}
+          </h1>
         </div>
 
         {/* 본문 */}

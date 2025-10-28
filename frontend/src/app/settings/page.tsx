@@ -8,6 +8,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale/ko';
 import Image from 'next/image';
 import { normalizeImageUrl } from '@/utils/imageUtils';
+import CharacterSelector from '@/components/settings/CharacterSelector';
 
 export default function ProfileSettingsPage() {
   const { user, isLoading: authLoading, refreshUser, logout } = useAuth();
@@ -34,6 +35,7 @@ export default function ProfileSettingsPage() {
   const [uploadingImage, setUploadingImage] = useState(false);
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [showCharacterSelector, setShowCharacterSelector] = useState(false);
 
   useEffect(() => {
     // user가 있고 실제 데이터(email)가 있을 때만 업데이트 (깜빡임 방지)
@@ -108,6 +110,47 @@ export default function ProfileSettingsPage() {
       setError(err.message || '이미지 업로드 중 오류가 발생했습니다');
     } finally {
       setUploadingImage(false);
+    }
+  };
+
+  /**
+   * 캐릭터 선택 핸들러
+   * 사용자가 CharacterSelector에서 캐릭터를 선택하면 프로필 이미지 업데이트
+   */
+  const handleSelectCharacter = async (characterPath: string) => {
+    setError('');
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/profile`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            profileImage: characterPath,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || '프로필 이미지 변경에 실패했습니다');
+      }
+
+      // 로컬 상태 업데이트 (즉시 반영)
+      setProfileImageUrl(characterPath);
+
+      // 사용자 정보 새로고침 (백그라운드에서 진행)
+      await refreshUser();
+
+      setSuccess(true);
+      setTimeout(() => setSuccess(false), 3000);
+    } catch (err: any) {
+      setError(err.message || '캐릭터 선택 중 오류가 발생했습니다');
+      throw err; // CharacterSelector에서 에러 처리
     }
   };
 
@@ -325,16 +368,26 @@ export default function ProfileSettingsPage() {
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingImage}
-                className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploadingImage ? '업로드 중...' : '이미지 변경'}
-              </button>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploadingImage}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploadingImage ? '업로드 중...' : '이미지 변경'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowCharacterSelector(true)}
+                  disabled={uploadingImage}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  캐릭터 선택
+                </button>
+              </div>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                JPG, PNG, GIF (최대 5MB)
+                JPG, PNG, GIF (최대 5MB) 또는 캐릭터 선택
               </p>
             </div>
           </div>
@@ -465,7 +518,7 @@ export default function ProfileSettingsPage() {
           </div>
 
           {/* 마케팅 정보 수신 설정 */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-8 mt-6">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">마케팅 정보 수신</h3>
             <div className="space-y-4">
               <div className="flex items-center justify-between">
@@ -630,6 +683,17 @@ export default function ProfileSettingsPage() {
 
             <div className="flex space-x-3">
               <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeletePassword('');
+                  setDeleteConfirmText(''); // Task 27: 모달 닫을 때 확인 텍스트도 초기화
+                  setError('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                취소
+              </button>
+              <button
                 onClick={handleDeleteAccount}
                 disabled={
                   deleteLoading ||
@@ -643,21 +707,18 @@ export default function ProfileSettingsPage() {
               >
                 {deleteLoading ? '삭제 중...' : '영구 삭제'}
               </button>
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeletePassword('');
-                  setDeleteConfirmText(''); // Task 27: 모달 닫을 때 확인 텍스트도 초기화
-                  setError('');
-                }}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
-              >
-                취소
-              </button>
             </div>
           </div>
         </div>
       )}
+
+      {/* 캐릭터 선택 모달 */}
+      <CharacterSelector
+        isOpen={showCharacterSelector}
+        onClose={() => setShowCharacterSelector(false)}
+        currentProfileImage={profileImageUrl}
+        onSelectCharacter={handleSelectCharacter}
+      />
     </div>
   );
 }

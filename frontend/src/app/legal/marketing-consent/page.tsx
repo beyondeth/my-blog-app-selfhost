@@ -13,10 +13,7 @@ export const metadata: Metadata = {
 export default function MarketingConsentPage() {
   return (
     <LegalPageLayout
-      title={{
-        ko: '마케팅 정보 수신 동의',
-        en: 'Marketing Consent',
-      }}
+      title="마케팅 정보 수신 동의"
       documentType="marketing-consent"
     />
   );
