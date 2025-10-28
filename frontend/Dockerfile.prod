@@ -44,9 +44,6 @@ COPY --from=deps /app/node_modules ./node_modules
 # 소스 코드 복사
 COPY frontend/ .
 
-# Backend 법률 문서 복사 (API 라우트에서 참조)
-COPY backend/docs/legal /backend/docs/legal
-
 # Next.js 환경 변수 (빌드 타임)
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
@@ -84,9 +81,6 @@ ENV HOSTNAME="0.0.0.0"
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
-
-# Backend 법률 문서 복사 (API 라우트에서 참조)
-COPY --from=builder --chown=nextjs:nodejs /backend/docs/legal /backend/docs/legal
 
 # Sharp 복사 (Next.js 이미지 최적화용 - native 모듈)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
