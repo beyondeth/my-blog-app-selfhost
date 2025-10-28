@@ -92,6 +92,13 @@ export function normalizeImageUrl(url: string): string {
       return url;
     }
 
+    // 캐릭터 이미지 경로는 Next.js public 폴더에서 직접 제공 (프록시 불필요)
+    // /public/character/*.jpeg 파일들을 정적 파일로 직접 사용
+    if (url.startsWith('/character/')) {
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] Character image, using directly from public folder');
+      return url;
+    }
+
     // Oracle OCI Object Storage presigned URL 처리
     if (url.includes('oraclecloud.com')) {
       // OCI presigned URL에서 S3 키 추출

@@ -31,57 +31,52 @@ export class GitHubStrategy extends PassportStrategy(Strategy, 'github') {
     accessToken: string,
     refreshToken: string,
     profile: any,
-    done: (error: any, user?: any) => void,
   ): Promise<any> {
     // Check if GitHub OAuth is properly configured
     if (!this.isConfigured) {
-      return done(new Error('GitHub OAuth is not configured'), null);
+      throw new Error('GitHub OAuth is not configured');
     }
-    
-    try {
-      // GitHub profile structure
-      const githubProfile = {
-        id: profile.id,
-        username: profile.username || profile.login,
-        displayName: profile.displayName || profile.name,
-        emails: profile.emails || [],
-        photos: profile.photos || [],
-        profileUrl: profile.profileUrl || profile.html_url,
-        provider: 'github',
-        _raw: profile._raw,
-        _json: profile._json,
-      };
 
-      // Get primary email (GitHub may return multiple emails)
-      const primaryEmail = githubProfile.emails.find((email: any) => email.primary)?.value ||
-                          githubProfile.emails[0]?.value ||
-                          githubProfile._json?.email;
+    // GitHub profile structure
+    const githubProfile = {
+      id: profile.id,
+      username: profile.username || profile.login,
+      displayName: profile.displayName || profile.name,
+      emails: profile.emails || [],
+      photos: profile.photos || [],
+      profileUrl: profile.profileUrl || profile.html_url,
+      provider: 'github',
+      _raw: profile._raw,
+      _json: profile._json,
+    };
 
-      // Create a unified profile object
-      const userProfile = {
-        id: githubProfile.id,
-        email: primaryEmail,
-        username: githubProfile.username,
-        displayName: githubProfile.displayName,
-        profileImage: githubProfile.photos[0]?.value || githubProfile._json?.avatar_url,
-        provider: 'github',
-        emails: githubProfile.emails,
-        photos: githubProfile.photos,
-        profileUrl: githubProfile.profileUrl,
-        bio: githubProfile._json?.bio,
-        company: githubProfile._json?.company,
-        location: githubProfile._json?.location,
-      };
+    // Get primary email (GitHub may return multiple emails)
+    const primaryEmail = githubProfile.emails.find((email: any) => email.primary)?.value ||
+                        githubProfile.emails[0]?.value ||
+                        githubProfile._json?.email;
 
-      // Validate with AuthService
-      const authResponse = await this.authService.validateOAuthUser(
-        userProfile,
-        'github' as any,
-      );
+    // Create a unified profile object
+    const userProfile = {
+      id: githubProfile.id,
+      email: primaryEmail,
+      username: githubProfile.username,
+      displayName: githubProfile.displayName,
+      profileImage: githubProfile.photos[0]?.value || githubProfile._json?.avatar_url,
+      provider: 'github',
+      emails: githubProfile.emails,
+      photos: githubProfile.photos,
+      profileUrl: githubProfile.profileUrl,
+      bio: githubProfile._json?.bio,
+      company: githubProfile._json?.company,
+      location: githubProfile._json?.location,
+    };
 
-      return done(null, authResponse);
-    } catch (error) {
-      return done(error, null);
-    }
+    // Validate with AuthService
+    const authResponse = await this.authService.validateOAuthUser(
+      userProfile,
+      'github' as any,
+    );
+
+    return authResponse;
   }
 }

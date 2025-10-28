@@ -41,10 +41,8 @@ export default function RootLayout({
       '/legal/terms',
       '/legal/privacy',
       '/legal/marketing-consent',
+      '/legal/newsletter-consent',
       '/legal/guidelines',
-      '/legal/username',
-      '/legal/partner',
-      '/legal/pro',
     ];
 
     // 현재 페이지가 법적 문서 페이지인지 확인

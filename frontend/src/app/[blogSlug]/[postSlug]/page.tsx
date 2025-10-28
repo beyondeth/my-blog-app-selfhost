@@ -19,7 +19,6 @@ import { useToggleBookmark } from '@/hooks/useBookmarks';
 import { useToggleEditorPick } from '@/hooks/useEditorPicks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { downloadPostAsPdf } from '@/utils/pdf';
 
 /**
  * 댓글 섹션 Lazy Loading 컴포넌트
@@ -200,7 +199,8 @@ export default function BlogPostDetailPage() {
     }
   }, [post]);
 
-  // PDF 다운로드 핸들러 - html2canvas + jsPDF 사용
+  // PDF 다운로드 핸들러 - html2canvas + jsPDF 사용 (Dynamic Import)
+  // 번들 사이즈 최적화: 클릭 시에만 라이브러리 로드 (350 KB 절약)
   const handlePdfDownload = useCallback(async () => {
     if (!post) return;
 
@@ -209,6 +209,9 @@ export default function BlogPostDetailPage() {
     try {
       // 진행 상태를 보여주는 toast
       toastId = toast.loading('PDF 생성 준비 중...');
+
+      // 🚀 Dynamic Import: 첫 클릭 시에만 라이브러리 로드 (이후 캐시됨)
+      const { downloadPostAsPdf } = await import('@/utils/pdf');
 
       const success = await downloadPostAsPdf(post.title, (status) => {
         // 진행 상태 업데이트
@@ -411,7 +414,7 @@ export default function BlogPostDetailPage() {
       <article
         id="post-content"
         className={cn(
-          "max-w-5xl mx-auto px-6 py-16 transition-all duration-500 relative",
+          "max-w-5xl mx-auto px-6 py-16 overflow-x-hidden transition-all duration-500 relative",
           isDeleting && "opacity-30 blur-sm pointer-events-none scale-[0.98]"
         )}
       >

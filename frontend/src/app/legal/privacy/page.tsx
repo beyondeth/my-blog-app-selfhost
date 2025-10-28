@@ -12,10 +12,7 @@ export const metadata: Metadata = {
 export default function PrivacyPage() {
   return (
     <LegalPageLayout
-      title={{
-        ko: '개인정보처리방침',
-        en: 'Privacy Policy',
-      }}
+      title="개인정보처리방침"
       documentType="privacy-policy"
     />
   );

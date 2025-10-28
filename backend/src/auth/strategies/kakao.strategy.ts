@@ -30,7 +30,6 @@ export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
     accessToken: string,
     refreshToken: string,
     profile: any,
-    done: any,
   ): Promise<any> {
     // 카카오 프로필 전체 구조 확인
     console.log('Kakao profile structure:', {
@@ -41,18 +40,18 @@ export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
       _json: profile._json,
       _raw: profile._raw,
     });
-    
+
     // Kakao는 이메일을 다른 방식으로 제공할 수 있음
     if (profile._json) {
       console.log('Kakao _json details:', {
         email: profile._json.email,
         kakao_account: profile._json.kakao_account,
       });
-      
+
       // kakao_account 안에 이메일이 있을 수 있음
       if (profile._json.kakao_account) {
         console.log('Kakao account details:', profile._json.kakao_account);
-        
+
         // 이메일을 kakao_account에서 가져와서 profile.emails에 추가
         if (profile._json.kakao_account.email) {
           profile.emails = [{
@@ -62,8 +61,8 @@ export class KakaoStrategy extends PassportStrategy(Strategy, 'kakao') {
         }
       }
     }
-    
+
     const result = await this.authService.validateOAuthUser(profile, AuthProvider.KAKAO);
-    done(null, result);
+    return result;
   }
 } 

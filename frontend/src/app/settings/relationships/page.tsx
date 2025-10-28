@@ -465,31 +465,6 @@ export default function RelationshipsPage() {
           </div>
         </TabsContent>
       </Tabs>
-
-      {/* Privacy Settings Section */}
-      <div className="mt-8 p-6 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-[rgb(38,38,38)]">
-        <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">프라이버시 설정</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-gray-900 dark:text-gray-100">비공개 계정</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">승인된 Followers만 내 콘텐츠를 볼 수 있습니다</p>
-            </div>
-            <Button variant="outline" size="sm" disabled>
-              준비 중
-            </Button>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="font-medium text-gray-900 dark:text-gray-100">Followers 목록 공개</p>
-              <p className="text-sm text-gray-600 dark:text-gray-400">다른 사용자가 내 Followers 목록을 볼 수 있습니다</p>
-            </div>
-            <Button variant="outline" size="sm" disabled>
-              준비 중
-            </Button>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

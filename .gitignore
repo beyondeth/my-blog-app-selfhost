@@ -29,6 +29,12 @@
 # Claude personal settings
 .claude/settings.local.json
 
+# MCP client settings (개인 API 키 포함)
+.mcp.json
+
+# Codex settings (개인 API 키 포함)
+.codex/
+
 # OS
 .DS_Store
 **/.DS_Store
@@ -89,6 +95,7 @@ Thumbs.db
 # Gatsby files
 **/.cache/
 **/public
+!frontend/public/assets/**  # Frontend 정적 자산 허용 (로고, 아이콘 등)
 
 # Storybook build outputs
 **/storybook-static

@@ -5,11 +5,7 @@ import {
   FiShield,
   FiFileText,
   FiUsers,
-  FiAward,
-  FiDollarSign,
-  FiAtSign,
   FiMail,
-  FiHelpCircle,
 } from 'react-icons/fi';
 
 /**
@@ -18,39 +14,18 @@ import {
 const legalDocuments = [
   {
     title: '개인정보처리방침',
-    description: '개인정보 수집 및 이용에 관한 방침을 확인하세요.',
     href: '/legal/privacy',
     icon: FiShield,
   },
   {
     title: '이용약관',
-    description: 'DevLog 서비스 이용약관을 확인하세요.',
     href: '/legal/terms',
     icon: FiFileText,
   },
   {
     title: '커뮤니티 가이드라인',
-    description: '커뮤니티 규칙과 가이드라인을 확인하세요.',
     href: '/legal/guidelines',
     icon: FiUsers,
-  },
-  {
-    title: '파트너 프로그램',
-    description: 'DevLog 파트너 프로그램에 대해 알아보세요.',
-    href: '/legal/partner',
-    icon: FiAward,
-  },
-  {
-    title: '프로 약관',
-    description: 'DevLog Pro 구독 약관을 확인하세요.',
-    href: '/legal/pro',
-    icon: FiDollarSign,
-  },
-  {
-    title: '사용자명 정책',
-    description: '사용자명 및 블로그 주소 정책을 확인하세요.',
-    href: '/legal/username',
-    icon: FiAtSign,
   },
 ];
 
@@ -59,24 +34,29 @@ const legalDocuments = [
  */
 const faqs = [
   {
+    question: '자동 포스팅 시 MCP를 어떻게 연결해야 하나요?',
+    answer: '설정 > API-KEY 메뉴에서 키 생성이 가능합니다. 자세한 설명은 아래 링크에서 확인 가능합니다.',
+    hasLink: true,
+  },
+  {
+    question: 'MCP 사용은 무료인가요?',
+    answer: 'Codebase.blog 의 MCP 를 사용한 자동포스팅은 \'무료\' 입니다. 단, 무료 계정의 경우 시간당 30개, 하루 50회의 제한이 있습니다.',
+  },
+  {
     question: '계정을 삭제하려면 어떻게 해야 하나요?',
-    answer: '설정 > 보안 메뉴에서 계정 삭제를 진행할 수 있습니다. 계정 삭제 시 모든 데이터가 영구적으로 삭제되며 복구할 수 없습니다.',
+    answer: '프로필 설정 메뉴에서 \'계정 삭제\'를 진행할 수 있습니다. 모든 데이터가 영구적으로 삭제되며 복구가 불가합니다. 재가입은 30일 이후 가능합니다.',
   },
   {
     question: '블로그 주소를 변경할 수 있나요?',
-    answer: '네, 설정 > 블로그 설정 메뉴에서 블로그 주소(slug)를 변경할 수 있습니다. 단, 블로그 주소는 고유해야 하며, 사용자명 정책을 준수해야 합니다.',
+    answer: '블로그 주소는 변경 할 수 없습니다.',
   },
   {
     question: '게시글을 비공개로 설정할 수 있나요?',
-    answer: '네, 게시글 작성 시 공개 범위를 설정할 수 있습니다. 전체 공개, 로그인 사용자만, 비공개 중 선택할 수 있습니다.',
+    answer: '블로그 설정에서 공개 / 비공개 설정이 가능합니다.',
   },
   {
     question: '이미지 업로드 용량 제한이 있나요?',
-    answer: '무료 계정은 파일당 5MB, Pro 계정은 파일당 20MB까지 업로드할 수 있습니다. 총 저장 용량은 무료 계정 1GB, Pro 계정 100GB입니다.',
-  },
-  {
-    question: 'DevLog Pro를 구독하면 어떤 혜택이 있나요?',
-    answer: '더 큰 이미지 업로드 용량, 고급 통계 기능, 커스텀 도메인 연결, 광고 제거 등의 혜택을 받을 수 있습니다. 자세한 내용은 요금제 페이지를 확인해주세요.',
+    answer: '프로필 이미지는 파일당 5MB, 게시글 이미지는 파일당 10MB까지 업로드할 수 있습니다.',
   },
   {
     question: '신고된 콘텐츠는 어떻게 처리되나요?',
@@ -94,9 +74,6 @@ export default function SupportPage() {
       <div className="mx-auto max-w-6xl px-4 py-12 lg:ml-32">
         {/* 헤더 */}
         <div className="mb-12 text-center">
-          <div className="mb-4 flex items-center justify-center">
-            <FiHelpCircle className="h-12 w-12 text-gray-700 dark:text-gray-300" />
-          </div>
           <h1 className="mb-4 text-4xl font-bold text-foreground">고객센터</h1>
           <p className="text-lg text-gray-600 dark:text-gray-400">
             무엇을 도와드릴까요? 자주 묻는 질문과 법적 문서를 확인하세요.
@@ -123,9 +100,17 @@ export default function SupportPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                   </svg>
                 </summary>
-                <p className="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
-                  {faq.answer}
-                </p>
+                <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+                  <p>{faq.answer}</p>
+                  {(faq as any).hasLink && (
+                    <Link
+                      href="/settings/api-keys"
+                      className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline"
+                    >
+                      API 키 관리 페이지로 이동 →
+                    </Link>
+                  )}
+                </div>
               </details>
             ))}
           </div>
@@ -141,17 +126,22 @@ export default function SupportPage() {
                 <Link
                   key={doc.href}
                   href={doc.href}
-                  className="group block rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 transition-all hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md"
+                  className="group flex flex-col rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 p-6 transition-all hover:border-gray-300 dark:hover:border-gray-600 hover:shadow-md"
                 >
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 group-hover:bg-gray-200 dark:group-hover:bg-gray-600 transition-colors">
                     <Icon className="h-6 w-6" />
                   </div>
-                  <h3 className="mb-2 text-lg font-semibold text-foreground group-hover:text-gray-900 dark:group-hover:text-gray-100">
+                  <h3 className="text-lg font-semibold text-foreground group-hover:text-gray-900 dark:group-hover:text-gray-100 mb-4">
                     {doc.title}
                   </h3>
-                  <p className="text-sm text-gray-600 dark:text-gray-400">
-                    {doc.description}
-                  </p>
+                  <div className="mt-auto pt-4 border-t border-gray-100 dark:border-gray-700">
+                    <span className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400 group-hover:text-black dark:group-hover:text-white transition-colors">
+                      자세히 보기
+                      <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                  </div>
                 </Link>
               );
             })}
@@ -168,7 +158,7 @@ export default function SupportPage() {
             FAQ에서 답을 찾지 못하셨다면 언제든지 문의해주세요.
           </p>
           <a
-            href="mailto:support@devlog.com"
+            href="mailto:support@codebase.blog"
             className="inline-flex items-center gap-2 rounded-lg bg-black dark:bg-white text-white dark:text-black px-6 py-3 font-medium transition-colors hover:bg-gray-800 dark:hover:bg-gray-200"
           >
             <FiMail className="h-5 w-5" />

@@ -59,7 +59,7 @@ services:
       target: development
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-backend
     env_file:
-      - .env.development
+      - .env
     ports:
       - "${BACKEND_PORT:-3000}:3000"
     volumes:
@@ -85,7 +85,7 @@ services:
       target: development
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-mcp-proxy
     env_file:
-      - .env.development
+      - .env
     ports:
       - "${MCP_PROXY_PORT:-3002}:3002"
     volumes:

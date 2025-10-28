@@ -4,7 +4,7 @@ import React from 'react';
 import Link from 'next/link';
 import { Post } from '@/types';
 import OptimizedImage from '@/components/ui/OptimizedImage';
-import UserAvatar from '@/components/ui/UserAvatar';
+import { Avatar } from '@/components/ui/avatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
 import { FiHeart, FiMessageCircle, FiEye, FiTarget, FiTag } from 'react-icons/fi';
@@ -143,9 +143,10 @@ const PostArticle = React.memo(function PostArticle({
                     blogSlug={post.blog?.slug}
                   >
                     <div className="flex items-center gap-2">
-                      <UserAvatar
-                        profileImage={post.author.profileImage}
-                        username={post.author.username}
+                      <Avatar
+                        src={post.author.profileImage}
+                        alt={post.author.username}
+                        fallback={post.author.username}
                         size="sm"
                         priority={priority}
                       />
@@ -283,10 +284,11 @@ const PostArticle = React.memo(function PostArticle({
                   blogSlug={post.blog?.slug}
                 >
                   <div className="flex items-center gap-2">
-                    {/* Profile Image - 공통 UserAvatar 사용 */}
-                    <UserAvatar
-                      profileImage={post.author.profileImage}
-                      username={post.author.username}
+                    {/* Profile Image - 공통 Avatar 사용 (캐릭터 이미지 지원) */}
+                    <Avatar
+                      src={post.author.profileImage}
+                      alt={post.author.username}
+                      fallback={post.author.username}
                       size="sm"
                       priority={priority}
                     />

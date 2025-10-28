@@ -52,10 +52,10 @@ if [ ! -f .env.production ]; then
 fi
 log_info "✓ 환경 변수 확인 완료"
 
-# 2. Docker 이미지 빌드 (Backend만 - PM2 포함)
-log_info "Step 2: Docker 이미지 빌드 (Backend)"
-docker compose -f docker-compose.prod.oracle.yml build backend
-log_info "✓ Backend 이미지 빌드 완료"
+# 2. Docker 이미지 빌드 (병렬 - Backend, Frontend, MCP Proxy)
+log_info "Step 2: Docker 이미지 빌드 (병렬)"
+docker compose -f docker-compose.prod.oracle.yml build backend frontend mcp-proxy
+log_info "✓ 모든 이미지 빌드 완료"
 
 # 3. Backend 컨테이너 재시작 (PM2 reload)
 log_info "Step 3: Backend PM2 Reload (Zero-downtime)"
@@ -67,9 +67,9 @@ docker compose -f docker-compose.prod.oracle.yml up -d backend
 log_info "PM2 워커 reload 중..."
 docker exec codebase-prod-backend pm2 reload all --update-env
 
-# 3-3. 헬스체크 대기 (최대 60초)
+# 3-3. 헬스체크 대기 (최대 30초)
 log_info "헬스체크 대기 중..."
-MAX_WAIT=60
+MAX_WAIT=30
 WAITED=0
 while [ $WAITED -lt $MAX_WAIT ]; do
     if docker exec codebase-prod-backend node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
@@ -81,18 +81,18 @@ while [ $WAITED -lt $MAX_WAIT ]; do
 done
 
 if [ $WAITED -ge $MAX_WAIT ]; then
-    log_error "Backend 헬스체크 실패 (60초 타임아웃)"
+    log_error "Backend 헬스체크 실패 (30초 타임아웃)"
     log_error "롤백을 실행하세요: ./scripts/rollback.sh"
     exit 1
 fi
 
 # 3-4. 데이터베이스 마이그레이션 실행
 log_info "Step 3-4: 데이터베이스 마이그레이션 실행"
-if docker exec codebase-prod-backend pnpm migration:run:prod 2>&1 | tee -a /tmp/migration.log; then
+if docker exec codebase-prod-backend npm run migration:run:prod:nobuild 2>&1 | tee -a /tmp/migration.log; then
     log_info "✓ 마이그레이션 완료"
 else
     log_warn "⚠️  마이그레이션 실패 또는 변경사항 없음"
-    log_warn "수동 확인 필요: docker exec codebase-prod-backend pnpm migration:run:prod"
+    log_warn "수동 확인 필요: docker exec codebase-prod-backend npm run migration:run:prod:nobuild"
     # 마이그레이션 실패해도 배포는 계속 진행 (마이그레이션이 없을 수도 있음)
 fi
 
