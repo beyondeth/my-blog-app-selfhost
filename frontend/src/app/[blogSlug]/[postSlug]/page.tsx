@@ -33,7 +33,7 @@ async function getPost(blogSlug: string, postSlug: string): Promise<Post | null>
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
     const response = await fetch(
-      `${apiUrl}/posts/${blogSlug}/${postSlug}`,
+      `${apiUrl}/posts/slug/${postSlug}`,
       {
         // 서버 컴포넌트에서는 revalidate 옵션 사용
         next: { revalidate: 60 }, // 60초마다 재검증
