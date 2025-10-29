@@ -505,16 +505,6 @@ export class PostsService {
       blogSlug: blog.slug,
     });
 
-    // Cloudflare CDN 캐시 퍼지 (홈 피드 갱신)
-    if (process.env.NODE_ENV === 'production') {
-      this.cdnService.invalidateCache([
-        'https://www.codebase.blog/',
-        'https://www.codebase.blog/api/v1/posts',
-      ]).catch(err => {
-        this.logger.error('CDN purge failed:', err);
-      });
-    }
-
     /**
      * DTO 변환으로 spread operator 제거
      * lazy loading 방지 및 성능 최적화
@@ -617,16 +607,6 @@ export class PostsService {
       postId: post.id,
       blogSlug: blog.slug,
     });
-
-    // Cloudflare CDN 캐시 퍼지 (홈 피드 갱신 - MCP 자동블로깅)
-    if (process.env.NODE_ENV === 'production') {
-      this.cdnService.invalidateCache([
-        'https://www.codebase.blog/',
-        'https://www.codebase.blog/api/v1/posts',
-      ]).catch(err => {
-        this.logger.error('CDN purge failed (MCP):', err);
-      });
-    }
 
     // 8. 202 Accepted 응답 반환 (즉시 응답)
     return {
