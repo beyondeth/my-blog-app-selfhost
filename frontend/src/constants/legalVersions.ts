@@ -17,6 +17,9 @@ export const LEGAL_VERSIONS = {
 
 /**
  * Legal 문서 파일 경로 생성 헬퍼 함수
+ *
+ * Cloudflare가 .md 파일 직접 접근을 차단하므로
+ * API Route를 통해 서빙 (/api/legal/...)
  */
 export function getLegalFilePath(type: keyof typeof LEGAL_VERSIONS, lang: 'ko' | 'en' = 'ko'): string {
   const typeMap = {
@@ -30,5 +33,5 @@ export function getLegalFilePath(type: keyof typeof LEGAL_VERSIONS, lang: 'ko' |
   const fileName = typeMap[type];
   const version = LEGAL_VERSIONS[type];
 
-  return `/legal/${lang}/${fileName}-${version}.md`;
+  return `/api/legal/${lang}/${fileName}-${version}.md`;
 }
