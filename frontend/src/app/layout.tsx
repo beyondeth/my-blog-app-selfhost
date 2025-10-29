@@ -66,6 +66,10 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
+        {/* 필수 메타 태그 - 모바일 반응형 및 문자 인코딩 */}
+        <meta charSet="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes" />
+
         {/* Pretendard Font - preload for LCP optimization */}
         <link
           rel="preload"
