@@ -67,9 +67,9 @@ docker compose -f docker-compose.prod.oracle.yml up -d backend
 log_info "PM2 워커 reload 중..."
 docker exec codebase-prod-backend pm2 reload all --update-env
 
-# 3-3. 헬스체크 대기 (최대 60초)
+# 3-3. 헬스체크 대기 (최대 120초 - PM2 Cold Start 고려)
 log_info "헬스체크 대기 중..."
-MAX_WAIT=60
+MAX_WAIT=120
 WAITED=0
 while [ $WAITED -lt $MAX_WAIT ]; do
     if docker exec codebase-prod-backend node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
@@ -81,10 +81,16 @@ while [ $WAITED -lt $MAX_WAIT ]; do
 done
 
 if [ $WAITED -ge $MAX_WAIT ]; then
-    log_error "Backend 헬스체크 실패 (60초 타임아웃)"
+    log_error "Backend 헬스체크 실패 (120초 타임아웃)"
     log_error "롤백을 실행하세요: ./scripts/rollback.sh"
     exit 1
 fi
+
+# 3-3-1. PM2 워커 스케일업 (2개 → 4개)
+log_info "PM2 워커 스케일업 (2 → 4 워커)"
+docker exec codebase-prod-backend pm2 scale codebase-backend 4
+sleep 5
+log_info "✓ PM2 워커 스케일업 완료"
 
 # 3-4. 데이터베이스 마이그레이션 실행
 log_info "Step 3-4: 데이터베이스 마이그레이션 실행"
