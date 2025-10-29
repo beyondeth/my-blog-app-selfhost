@@ -88,9 +88,14 @@ fi
 
 # 3-3-1. PM2 워커 스케일업 (2개 → 4개)
 log_info "PM2 워커 스케일업 (2 → 4 워커)"
-docker exec codebase-prod-backend pm2 scale codebase-backend 4
-sleep 5
-log_info "✓ PM2 워커 스케일업 완료"
+if docker exec codebase-prod-backend pm2 scale codebase-backend 4 2>&1 | grep -q "Nothing to do"; then
+    log_info "✓ 이미 4개 워커 실행 중"
+elif docker exec codebase-prod-backend pm2 scale codebase-backend 4; then
+    log_info "✓ PM2 워커 스케일업 완료"
+    sleep 5
+else
+    log_warn "⚠️  스케일업 실패, 현재 워커 수 유지"
+fi
 
 # 3-4. 데이터베이스 마이그레이션 실행
 log_info "Step 3-4: 데이터베이스 마이그레이션 실행"
