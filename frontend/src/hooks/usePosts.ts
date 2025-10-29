@@ -55,13 +55,23 @@ export function useInfinitePosts(options: {
 }
 
 // 단일 포스트 조회 훅 (상세)
-export function usePost(slugOrId: string) {
+export function usePost(
+  slugOrId: string,
+  options?: {
+    initialData?: any; // Post 타입으로 나중에 변경 가능
+    enabled?: boolean;
+  }
+) {
   return useQuery({
     queryKey: postQueryKeys.detail(slugOrId),
     queryFn: () => postsAPI.getPostBySlug(slugOrId),
-    enabled: !!slugOrId,
+    enabled: options?.enabled ?? !!slugOrId,
     ...commonQueryOptions,
-    refetchOnMount: 'always', // 상세 페이지는 항상 최신 데이터 표시
+    initialData: options?.initialData,
+    // initialData가 있으면 mount 시 refetch 안함
+    refetchOnMount: !options?.initialData ? 'always' : false,
+    // initialData가 있으면 30초간 fresh 상태 유지
+    staleTime: options?.initialData ? 30 * 1000 : 0,
   });
 }
 

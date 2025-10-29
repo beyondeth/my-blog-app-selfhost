@@ -1,4 +1,5 @@
 import { Metadata } from 'next';
+import { cache } from 'react';
 import BlogPostDetailClient from './client-page';
 import { notFound } from 'next/navigation';
 
@@ -29,7 +30,8 @@ interface Post {
 }
 
 // 포스트 데이터 가져오기 (서버 컴포넌트용)
-async function getPost(blogSlug: string, postSlug: string): Promise<Post | null> {
+// cache로 감싸서 동일한 렌더링 사이클 내 중복 호출 방지
+const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post | null> => {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
     const response = await fetch(
@@ -56,7 +58,7 @@ async function getPost(blogSlug: string, postSlug: string): Promise<Post | null>
     console.error('Error fetching post for metadata:', error);
     return null;
   }
-}
+});
 
 // 동적 메타데이터 생성 함수
 export async function generateMetadata(
@@ -285,8 +287,8 @@ export default async function BlogPostDetailPage({
         />
       ))}
 
-      {/* 클라이언트 컴포넌트 렌더링 */}
-      <BlogPostDetailClient />
+      {/* 클라이언트 컴포넌트 렌더링 - 서버 데이터 전달 */}
+      <BlogPostDetailClient initialPost={post} />
     </>
   );
 }
