@@ -24,7 +24,7 @@ module.exports = {
       script: 'dist/src/main.js',
 
       // 클러스터 모드 설정
-      instances: 4, // 시작 시 4개 워커 (4 OCPU 활용)
+      instances: 2, // 시작 시 2개 워커 (빠른 시작, 배포 후 4개로 증가)
       exec_mode: 'cluster', // cluster 모드 (단일 컨테이너 내 멀티 프로세스)
 
       // 동적 스케일링 설정
@@ -41,11 +41,12 @@ module.exports = {
       max_restarts: 10, // 최대 재시작 횟수 (무한 재시작 방지)
       min_uptime: '10s', // 최소 실행 시간 (10초 미만이면 비정상 종료로 판단)
       restart_delay: 4000, // 재시작 지연 (4초)
+      increment_var: 'PORT_OFFSET', // 워커 순차 시작 (CPU 병목 완화)
 
       // Graceful Shutdown/Reload 설정
       kill_timeout: 5000, // SIGINT 후 5초 대기 후 SIGKILL
       wait_ready: true, // 앱에서 process.send('ready') 신호 대기
-      listen_timeout: 10000, // ready 신호 대기 시간 (10초)
+      listen_timeout: 20000, // ready 신호 대기 시간 (20초, Cold Start 고려)
 
       // 로그 설정
       error_file: '/app/logs/pm2-error.log', // 에러 로그 경로
