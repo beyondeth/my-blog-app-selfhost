@@ -70,8 +70,8 @@ export function usePost(
     initialData: options?.initialData,
     // initialData가 있으면 mount 시 refetch 안함
     refetchOnMount: !options?.initialData ? 'always' : false,
-    // initialData가 있으면 30초간 fresh 상태 유지
-    staleTime: options?.initialData ? 30 * 1000 : 0,
+    // 항상 즉시 stale 처리하여 캐시 무효화가 바로 반영되도록 함
+    staleTime: 0,
   });
 }
 
