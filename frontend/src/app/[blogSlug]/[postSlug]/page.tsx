@@ -17,15 +17,21 @@ interface Post {
   viewCount?: number;
   readingTime?: string;
   tags?: string[];
+  author?: {
+    id: string;
+    username: string;
+    profileImage?: string | null;
+    bio?: string | null;
+    role?: string;
+  };
   blog: {
     id: string;
     name: string;
     slug: string;
     description?: string;
-    user: {
-      username: string;
-      profileImage?: string | null;
-    };
+    isPublic?: boolean;
+    allowComments?: boolean;
+    userId?: string;
   };
 }
 
@@ -99,7 +105,7 @@ export async function generateMetadata(
     : `${siteUrl}/default-og-image.jpg`; // 기본 OG 이미지
 
   // 저자 정보
-  const authorName = post.blog.user.username || post.blog.name;
+  const authorName = post.author?.username || post.blog?.name || 'Unknown Author';
 
   return {
     // 기본 메타 태그
@@ -136,7 +142,7 @@ export async function generateMetadata(
       title: post.title,
       description,
       images: [ogImage],
-      creator: `@${post.blog.user.username || post.blog.slug}`,
+      creator: `@${post.author?.username || post.blog?.slug}`,
     },
 
     // 기타 메타 태그
@@ -188,7 +194,7 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
     dateModified: post.updatedAt,
     author: {
       '@type': 'Person',
-      name: post.blog.user.username || post.blog.name,
+      name: post.author?.username || post.blog?.name || 'Unknown Author',
       url: `${siteUrl}/${params.blogSlug}`,
     },
     publisher: {
