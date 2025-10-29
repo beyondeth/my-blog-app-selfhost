@@ -91,7 +91,7 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 40s
+      start_period: 90s  # PM2 Cold Start 고려 (daemon spawning + 워커 시작)
     # 리소스 제한 (PM2 4 워커)
     cpus: 3.0
     mem_limit: 4g
