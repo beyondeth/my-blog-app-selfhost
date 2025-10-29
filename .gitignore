@@ -94,8 +94,14 @@ Thumbs.db
 
 # Gatsby files
 **/.cache/
-**/public
+# Public 폴더 무시 (Next.js 빌드 산출물 제외)
+/public
+backend/public
+# Frontend public 폴더 선택적 허용
 !frontend/public/assets/**  # Frontend 정적 자산 허용 (로고, 아이콘 등)
+!frontend/public/legal/**   # Legal 문서 허용 (버전 관리 필요)
+!frontend/public/fonts/**   # 폰트 파일 허용
+!frontend/public/character/**  # 캐릭터 이미지 허용
 
 # Storybook build outputs
 **/storybook-static
