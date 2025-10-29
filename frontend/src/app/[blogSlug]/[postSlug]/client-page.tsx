@@ -67,7 +67,12 @@ function CommentSectionLazy({ postId, postAuthorId, totalCommentCount }: { postI
   );
 }
 
-export default function BlogPostDetailClient() {
+// Props 타입 정의
+interface BlogPostDetailClientProps {
+  initialPost?: any; // Post 타입으로 나중에 변경 가능
+}
+
+export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClientProps) {
   const params = useParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
@@ -79,8 +84,11 @@ export default function BlogPostDetailClient() {
   const blogSlug = params.blogSlug as string;
   const postSlug = params.postSlug as string;
 
-  // Fetch post details
-  const { data: post, error, isError, refetch } = usePost(postSlug);
+  // Fetch post details - initialPost가 있으면 사용, 없으면 fetch
+  const { data: post, error, isError, refetch } = usePost(postSlug, {
+    initialData: initialPost,
+    enabled: !initialPost, // initialPost가 있으면 fetch 안함
+  });
   const deletePostMutation = useDeletePost();
   // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)
   const likeMutation = useTogglePostLike(() => {
