@@ -43,6 +43,18 @@ log_info "=========================================="
 
 # Git Pull은 GitHub Actions 워크플로우에서 수행됨
 
+# 0. Nginx 설정 심볼릭 링크 확인
+log_info "Step 0: Nginx 설정 상태 확인"
+if [ ! -L /etc/nginx/sites-enabled/default ]; then
+    log_warn "sites-enabled/default가 심볼릭 링크가 아닙니다!"
+    log_info "심볼릭 링크로 재생성 중..."
+    sudo rm -f /etc/nginx/sites-enabled/default
+    sudo ln -s /etc/nginx/sites-available/default /etc/nginx/sites-enabled/default
+    sudo nginx -t > /dev/null 2>&1 && log_info "✓ Nginx 설정 정상" || log_error "Nginx 설정 오류"
+else
+    log_info "✓ Nginx 심볼릭 링크 정상"
+fi
+
 # 1. 환경 변수 체크
 log_info "Step 1: 환경 변수 체크"
 cd /home/ubuntu/my-blog-app || exit 1
