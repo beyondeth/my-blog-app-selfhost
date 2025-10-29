@@ -53,7 +53,8 @@ const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post |
     }
 
     const data = await response.json();
-    return data.data;
+    // API가 직접 포스트 객체를 반환
+    return data;
   } catch (error) {
     console.error('Error fetching post for metadata:', error);
     return null;
