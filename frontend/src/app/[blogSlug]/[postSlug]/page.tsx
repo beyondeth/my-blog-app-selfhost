@@ -399,7 +399,7 @@ export default function BlogPostDetailPage() {
       </div>
     );
   }
-  
+
   // 아직 로딩 중이면 아무것도 표시하지 않음
   if (!post) {
     return null;
@@ -433,7 +433,7 @@ export default function BlogPostDetailPage() {
             </div>
           </div>
         )}
-        
+
         <PostHeaderWithReport
           post={post}
           canEdit={canEditDelete}
@@ -508,7 +508,7 @@ export default function BlogPostDetailPage() {
           />
         )}
       </article>
-      
+
       <DeleteConfirmDialog
         isOpen={deleteDialogOpen}
         onClose={handleCloseDeleteDialog}
