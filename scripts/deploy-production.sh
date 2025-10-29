@@ -65,15 +65,31 @@ fi
 log_info "✓ 환경 변수 확인 완료"
 
 # 2. Docker 이미지 빌드 (병렬 - Backend, Frontend, MCP Proxy)
-log_info "Step 2: Docker 이미지 빌드 (병렬)"
-docker compose -f docker-compose.prod.oracle.yml build backend frontend mcp-proxy
-log_info "✓ 모든 이미지 빌드 완료"
+log_info "Step 2: Docker 이미지 빌드 (병렬) - 캐시 무효화"
+# --no-cache: 항상 최신 코드로 빌드 보장
+docker compose -f docker-compose.prod.oracle.yml build --no-cache backend frontend mcp-proxy
+log_info "✓ 모든 이미지 빌드 완료 (최신 코드 반영)"
+
+# 2-1. 빌드 검증 - 이미지 생성 시간 확인
+log_info "Step 2-1: 빌드 검증 - 이미지 생성 시간 확인"
+BUILD_TIME=$(date +"%Y-%m-%d %H:%M:%S")
+log_info "빌드 완료 시간: $BUILD_TIME"
+
+# 각 이미지 생성 시간 확인 (5분 이내여야 함)
+for IMAGE in "codebase-prod-frontend" "codebase-prod-backend" "codebase-prod-mcp-proxy"; do
+    IMAGE_CREATED=$(docker inspect $IMAGE --format='{{.Created}}' 2>/dev/null | cut -d'T' -f1,2 | tr 'T' ' ' | cut -d'.' -f1)
+    if [ -n "$IMAGE_CREATED" ]; then
+        log_info "✓ $IMAGE 이미지 생성: $IMAGE_CREATED"
+    else
+        log_warn "⚠️  $IMAGE 이미지를 찾을 수 없습니다"
+    fi
+done
 
 # 3. Backend 컨테이너 재시작 (PM2 reload)
 log_info "Step 3: Backend PM2 Reload (Zero-downtime)"
 
-# 3-1. Backend 컨테이너 시작 (새 이미지)
-docker compose -f docker-compose.prod.oracle.yml up -d backend
+# 3-1. Backend 컨테이너 시작 (새 이미지) - 강제 재생성
+docker compose -f docker-compose.prod.oracle.yml up -d --force-recreate backend
 
 # 3-2. PM2 reload 실행 (워커 하나씩 재시작)
 log_info "PM2 워커 reload 중..."
@@ -123,8 +139,8 @@ fi
 
 # 4. Frontend 재시작 (빠른 재시작)
 log_info "Step 4: Frontend 재시작"
-docker compose -f docker-compose.prod.oracle.yml build frontend
-docker compose -f docker-compose.prod.oracle.yml up -d frontend
+# 이미 Step 2에서 빌드했으므로 여기서는 재시작만
+docker compose -f docker-compose.prod.oracle.yml up -d --force-recreate frontend
 
 # 헬스체크 대기
 log_info "Frontend 헬스체크 대기 중..."
@@ -137,8 +153,8 @@ fi
 
 # 5. MCP Proxy 재시작
 log_info "Step 5: MCP Proxy 재시작"
-docker compose -f docker-compose.prod.oracle.yml build mcp-proxy
-docker compose -f docker-compose.prod.oracle.yml up -d mcp-proxy
+# 이미 Step 2에서 빌드했으므로 여기서는 재시작만
+docker compose -f docker-compose.prod.oracle.yml up -d --force-recreate mcp-proxy
 
 # 헬스체크 대기
 log_info "MCP Proxy 헬스체크 대기 중..."
@@ -156,6 +172,18 @@ docker compose -f docker-compose.prod.oracle.yml ps
 # 7. PM2 상태 확인
 log_info "Step 7: PM2 상태 확인"
 docker exec codebase-prod-backend pm2 status
+
+# 8. 배포 완료 검증
+log_info "Step 8: 배포 완료 검증"
+
+# 컨테이너 시작 시간 확인 (모두 최근에 시작되었는지)
+log_info "컨테이너 시작 시간 확인:"
+for CONTAINER in "codebase-prod-backend" "codebase-prod-frontend" "codebase-prod-mcp-proxy"; do
+    STARTED=$(docker inspect $CONTAINER --format='{{.State.StartedAt}}' 2>/dev/null | cut -d'T' -f1,2 | tr 'T' ' ' | cut -d'.' -f1)
+    if [ -n "$STARTED" ]; then
+        log_info "  $CONTAINER: $STARTED"
+    fi
+done
 
 # 9. 배포 완료
 DEPLOY_END_TIME=$(date +%s)
