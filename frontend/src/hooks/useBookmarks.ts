@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { mixpanel } from '@/lib/mixpanel';
 
 /**
  * 북마크 관련 API 호출 함수들
@@ -81,6 +82,11 @@ export const useToggleBookmark = (postId: string, onUnauthorized?: () => void) =
       return { previousBookmarkStatus };
     },
     onSuccess: (data) => {
+      // Mixpanel: 북마크 추가 이벤트 추적 (추가 시만)
+      if (data.bookmarked) {
+        mixpanel.track('Post Bookmarked', { postId });
+      }
+
       // 서버 응답으로 최종 상태 확정
       queryClient.setQueryData(['bookmark-status', postId], {
         bookmarked: data.bookmarked,

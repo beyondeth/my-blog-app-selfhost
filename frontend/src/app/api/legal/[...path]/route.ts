@@ -13,11 +13,14 @@ import { join } from 'path';
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { path: string[] } },
+  { params }: { params: Promise<{ path: string[] }> },
 ) {
   try {
+    // Next.js 16: params는 이제 Promise (async)
+    const resolvedParams = await params;
+
     // 경로 파라미터 결합 (예: ['ko', 'privacy-policy-20251029-v1.0.md'])
-    const filePath = params.path.join('/');
+    const filePath = resolvedParams.path.join('/');
 
     // public/legal/ 폴더 내 파일만 허용 (보안)
     if (!filePath || filePath.includes('..')) {

@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { ArrowLeft } from 'lucide-react';
 
 /**
  * OAuth 로그인 후 약관 동의 페이지
@@ -158,6 +159,15 @@ export default function ConsentPage() {
 
       <div className="relative flex items-center justify-center min-h-screen px-4 sm:px-6 lg:px-8 py-12">
         <div className="w-full max-w-2xl">
+          {/* 뒤로가기 버튼 */}
+          <button
+            onClick={() => router.back()}
+            className="mb-2 sm:mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
+
           <div className="auth-card rounded-2xl p-8 fade-in-up">
             {/* 로고와 타이틀 */}
             <div className="text-center mb-8">

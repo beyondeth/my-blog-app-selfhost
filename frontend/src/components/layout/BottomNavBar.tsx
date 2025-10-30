@@ -8,7 +8,6 @@ import { HomeIcon } from '@/components/icons/HomeIcon';
 import { WriteIcon } from '@/components/icons/WriteIcon';
 import { MyBlogIcon } from '@/components/icons/MyBlogIcon';
 import { BookmarkIcon } from '@/components/icons/BookmarkIcon';
-import { SettingsIcon } from '@/components/icons/SettingsIcon';
 
 /**
  * 모바일 하단 네비게이션 바 컴포넌트
@@ -126,29 +125,6 @@ export default function BottomNavBar() {
           >
             <BookmarkIcon size={16} />
             <span className="hidden xs:block text-xs mt-0.5">북마크</span>
-          </button>
-        )}
-
-        {/* 설정 버튼 - 로그인 시에만 활성화 */}
-        {user ? (
-          <Link
-            href="/settings"
-            className={`flex flex-col items-center justify-center transition-colors min-w-0 flex-shrink-0 ${
-              pathname === '/settings' || pathname?.startsWith('/settings/')
-                ? 'text-primary'
-                : 'text-muted-foreground'
-            }`}
-          >
-            <SettingsIcon size={16} />
-            <span className="hidden xs:block text-xs mt-0.5">설정</span>
-          </Link>
-        ) : (
-          <button
-            onClick={(e) => handleAuthRequiredClick(e, '/login')}
-            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0 flex-shrink-0"
-          >
-            <SettingsIcon size={16} />
-            <span className="hidden xs:block text-xs mt-0.5">설정</span>
           </button>
         )}
       </div>

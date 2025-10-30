@@ -18,7 +18,7 @@ const DMModal: React.FC<DMModalProps> = ({
   onClose,
   mode = 'modal'
 }) => {
-  const { isMobile } = useWindowSize();
+  const { isMobile, isDesktop } = useWindowSize();
   const modalRef = useRef<HTMLDivElement>(null);
   const [isFullscreen, setIsFullscreen] = React.useState(false);
   const [isAnimating, setIsAnimating] = React.useState(false);
@@ -176,13 +176,13 @@ const DMModal: React.FC<DMModalProps> = ({
               ? 'w-full h-full rounded-none shadow-none'
               : isMinimized
                 ? 'w-14 h-14 rounded-full dm-modal-shadow hover:scale-110 cursor-pointer'
-                : 'w-[900px] h-[600px] rounded-xl dm-modal-shadow'
+                : 'w-full max-w-[900px] mx-4 h-[600px] max-h-[calc(100vh-32px)] rounded-xl dm-modal-shadow'
           }
-          ${!isFullscreen && !isMobile && !isMinimized ? 'ring-1 ring-black/5' : ''}
+          ${!isFullscreen && isDesktop && !isMinimized ? 'ring-1 ring-black/5' : ''}
           ${isDragging ? 'cursor-move' : ''}
         `}
         style={{
-          ...((!isFullscreen && !isMobile) ? (
+          ...((!isFullscreen && isDesktop) ? (
             isMinimized
               ? { bottom: '24px', right: '24px', transform: 'none' }
               : { transform: `translate(${position.x}px, ${position.y}px)` }
@@ -191,8 +191,8 @@ const DMModal: React.FC<DMModalProps> = ({
           overscrollBehavior: 'contain'
         }}
       >
-        {/* macOS-style Header Bar - 최소화 시 숨김 */}
-        {!isMobile && !isMinimized && (
+        {/* macOS-style Header Bar - 데스크톱에서만 표시, 최소화 시 숨김 */}
+        {isDesktop && !isMinimized && (
           <div
             className="absolute top-0 left-0 right-0 z-10 h-[38px] bg-gradient-to-b from-gray-50 to-gray-100 dark:from-gray-700 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 rounded-t-xl flex items-center justify-between px-4 select-none"
             onMouseDown={handleDragStart}
@@ -244,12 +244,12 @@ const DMModal: React.FC<DMModalProps> = ({
         )}
 
         {/* DM Layout */}
-        <div className={`${!isMobile ? 'h-[calc(100%-38px)] mt-[38px]' : 'h-full'} ${isMinimized ? 'hidden' : ''}`}>
+        <div className={`${isDesktop ? 'h-[calc(100%-38px)] mt-[38px]' : 'h-full'} ${isMinimized ? 'hidden' : ''}`}>
           <DMLayout isModal={true} />
         </div>
 
-        {/* Minimized View - 채팅 아이콘 버튼 */}
-        {isMinimized && !isMobile && (
+        {/* Minimized View - 채팅 아이콘 버튼 (데스크톱에서만 표시) */}
+        {isMinimized && isDesktop && (
           <button
             onClick={toggleMinimize}
             className="flex items-center justify-center h-full w-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full transition-all shadow-lg"

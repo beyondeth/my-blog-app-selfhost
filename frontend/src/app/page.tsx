@@ -12,6 +12,7 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
+import PromoCarouselSection from '@/components/layout/PromoCarouselSection';
 import EditorPickSection from '@/components/layout/EditorPickSection';
 import PopularPostsSection from '@/components/layout/PopularPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
@@ -233,7 +234,10 @@ export default function HomePage() {
           {/* Sidebar - fixed positioning with internal scroll */}
         <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-40 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll">
           <div className="space-y-4 sm:space-y-6">
-            {/* Editor's Pick 섹션 (가장 위에 배치) */}
+            {/* 프로모션 캐러셀 섹션 (자동 슬라이드) */}
+            <PromoCarouselSection />
+
+            {/* Editor's Pick 섹션 */}
             <EditorPickSection />
 
             <PopularPostsSection />

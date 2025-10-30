@@ -8,10 +8,8 @@ import { formatDistanceToNow } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  FiMessageSquare,
   FiUserX,
   FiTrash2,
   FiRefreshCw,
@@ -143,17 +141,18 @@ export default function DMSettingsPage() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
-          <FiMessageSquare className="h-6 w-6" />
-          DM 관리
+    <div className="container mx-auto px-3 sm:px-4 py-6 sm:py-8 max-w-6xl">
+      <div className="flex items-center justify-between mb-4 sm:mb-6">
+        <h1 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+          <FiMessageCircle className="h-5 w-5 sm:h-6 sm:w-6" />
+          채팅 관리
         </h1>
         <Button
           onClick={handleRefresh}
           disabled={refreshing}
           variant="outline"
           size="sm"
+          className="min-h-[44px]"
         >
           <FiRefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
           새로고침
@@ -161,145 +160,128 @@ export default function DMSettingsPage() {
       </div>
 
       <Tabs defaultValue="conversations" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="conversations">대화 목록</TabsTrigger>
-          <TabsTrigger value="blocked">차단 목록</TabsTrigger>
+        <TabsList className="grid w-full grid-cols-2 min-h-[44px]">
+          <TabsTrigger value="conversations" className="min-h-[44px]">대화 목록</TabsTrigger>
+          <TabsTrigger value="blocked" className="min-h-[44px]">차단 목록</TabsTrigger>
         </TabsList>
 
         {/* 대화 목록 탭 */}
         <TabsContent value="conversations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">진행 중인 대화</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {conversations.length === 0 ? (
-                <div className="text-center py-8">
-                  <FiMessageCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">진행 중인 대화가 없습니다.</p>
-                  <p className="text-sm text-gray-400 mt-2">
-                    다른 사용자의 프로필에서 메시지 버튼을 눌러 대화를 시작하세요.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {conversations.map((conversation) => {
-                    const otherUser = conversation.user1Id === user?.id
-                      ? conversation.user2
-                      : conversation.user1;
+          {conversations.length === 0 ? (
+            <div className="text-center py-8">
+              <FiMessageCircle className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">진행 중인 대화가 없습니다.</p>
+              <p className="text-sm text-gray-400 mt-2 break-keep">
+                다른 사용자의 프로필에서 메시지 버튼을 눌러 대화를 시작하세요.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {conversations.map((conversation) => {
+                const otherUser = conversation.user1Id === user?.id
+                  ? conversation.user2
+                  : conversation.user1;
 
-                    return (
-                      <div
-                        key={conversation.id}
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors"
-                      >
-                        <div
-                          className="flex items-center gap-3 flex-1 cursor-pointer"
-                          onClick={() => router.push(`/dm/${conversation.id}`)}
-                        >
-                          <Avatar
-                            src={otherUser?.profileImage}
-                            fallback={otherUser?.username?.[0]?.toUpperCase() || '?'}
-                            alt={otherUser?.username || 'User'}
-                            size="md"
-                          />
-                          <div className="flex-1">
-                            <p className="font-medium">{otherUser?.username || 'Unknown User'}</p>
-                            {conversation.lastMessageAt && (
-                              <p className="text-sm text-gray-500">
-                                마지막 메시지: {formatDistanceToNow(new Date(conversation.lastMessageAt), {
-                                  addSuffix: true,
-                                  locale: ko
-                                })}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                        <Button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDeleteConversation(conversation.id);
-                          }}
-                          variant="ghost"
-                          size="sm"
-                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                        >
-                          <FiTrash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* 차단 목록 탭 */}
-        <TabsContent value="blocked" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">차단한 사용자</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {blockedUsers.length === 0 ? (
-                <div className="text-center py-8">
-                  <FiUserX className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">차단한 사용자가 없습니다.</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {blockedUsers.map((blocked) => (
+                return (
+                  <div
+                    key={conversation.id}
+                    className="flex items-center justify-between p-3 sm:p-4 border rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                  >
                     <div
-                      key={blocked.id}
-                      className="flex items-center justify-between p-4 border rounded-lg"
+                      className="flex items-center gap-2 sm:gap-3 flex-1 cursor-pointer min-h-[44px]"
+                      onClick={() => router.push(`/dm/${conversation.id}`)}
                     >
-                      <div className="flex items-center gap-3">
-                        <Avatar
-                          src={blocked.blockedUser.profileImage}
-                          fallback={blocked.blockedUser.username?.[0]?.toUpperCase() || '?'}
-                          alt={blocked.blockedUser.username}
-                          size="md"
-                        />
-                        <div>
-                          <p className="font-medium">{blocked.blockedUser.username}</p>
-                          <p className="text-sm text-gray-500">
-                            차단일: {formatDistanceToNow(new Date(blocked.createdAt), {
+                      <Avatar
+                        src={otherUser?.profileImage}
+                        fallback={otherUser?.username?.[0]?.toUpperCase() || '?'}
+                        alt={otherUser?.username || 'User'}
+                        size="md"
+                      />
+                      <div className="flex-1">
+                        <p className="font-medium text-sm sm:text-base">{otherUser?.username || 'Unknown User'}</p>
+                        {conversation.lastMessageAt && (
+                          <p className="text-xs sm:text-sm text-gray-500">
+                            마지막 메시지: {formatDistanceToNow(new Date(conversation.lastMessageAt), {
                               addSuffix: true,
                               locale: ko
                             })}
                           </p>
-                        </div>
+                        )}
                       </div>
-                      <Button
-                        onClick={() => handleUnblock(blocked.blockedUserId)}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <FiUnlock className="h-4 w-4 mr-2" />
-                        차단 해제
-                      </Button>
                     </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
+                    <Button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteConversation(conversation.id);
+                      }}
+                      variant="ghost"
+                      size="sm"
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 min-w-[44px] min-h-[44px] flex items-center justify-center"
+                    >
+                      <FiTrash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </TabsContent>
 
-          <Card className="border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800">
-            <CardContent className="pt-6">
-              <div className="flex items-start gap-3">
-                <FiAlertCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 mt-0.5" />
-                <div className="text-sm text-gray-800 dark:text-gray-200">
-                  <p className="font-medium mb-1">차단 기능 안내</p>
-                  <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
-                    <li>차단된 사용자는 당신에게 메시지를 보낼 수 없습니다.</li>
-                    <li>차단을 해제하면 이전 대화를 다시 볼 수 있습니다.</li>
-                  </ul>
+        {/* 차단 목록 탭 */}
+        <TabsContent value="blocked" className="space-y-4">
+          {blockedUsers.length === 0 ? (
+            <div className="text-center py-8">
+              <FiUserX className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+              <p className="text-gray-500">차단한 사용자가 없습니다.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {blockedUsers.map((blocked) => (
+                <div
+                  key={blocked.id}
+                  className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3 sm:gap-0 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="flex items-center gap-2 sm:gap-3 min-h-[44px]">
+                    <Avatar
+                      src={blocked.blockedUser.profileImage}
+                      fallback={blocked.blockedUser.username?.[0]?.toUpperCase() || '?'}
+                      alt={blocked.blockedUser.username}
+                      size="md"
+                    />
+                    <div>
+                      <p className="font-medium text-sm sm:text-base">{blocked.blockedUser.username}</p>
+                      <p className="text-xs sm:text-sm text-gray-500">
+                        차단일: {formatDistanceToNow(new Date(blocked.createdAt), {
+                          addSuffix: true,
+                          locale: ko
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    onClick={() => handleUnblock(blocked.blockedUserId)}
+                    variant="outline"
+                    size="sm"
+                    className="w-full sm:w-auto min-h-[44px]"
+                  >
+                    <FiUnlock className="h-4 w-4 mr-2" />
+                    차단 해제
+                  </Button>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              ))}
+            </div>
+          )}
+
+          <div className="flex items-start gap-3 p-4 rounded-lg bg-gray-50 dark:bg-gray-800/50 border border-gray-200 dark:border-gray-700">
+            <FiAlertCircle className="h-5 w-5 text-gray-600 dark:text-gray-400 mt-0.5 flex-shrink-0" />
+            <div className="text-sm text-gray-800 dark:text-gray-200">
+              <p className="font-medium mb-1">차단 기능 안내</p>
+              <ul className="list-disc list-inside space-y-1 text-gray-700 dark:text-gray-300">
+                <li>차단된 사용자는 당신에게 메시지를 보낼 수 없습니다.</li>
+                <li>차단을 해제하면 이전 대화를 다시 볼 수 있습니다.</li>
+              </ul>
+            </div>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

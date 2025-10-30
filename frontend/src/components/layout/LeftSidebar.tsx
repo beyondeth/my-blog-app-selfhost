@@ -4,13 +4,14 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { HomeIcon } from '@/components/icons/HomeIcon';
 import { WriteIcon } from '@/components/icons/WriteIcon';
 import { NotificationBellIcon } from '@/components/icons/NotificationBellIcon';
 import { MyBlogIcon } from '@/components/icons/MyBlogIcon';
 import { BookmarkIcon } from '@/components/icons/BookmarkIcon';
 import { SettingsIcon } from '@/components/icons/SettingsIcon';
+import { MessageCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +20,7 @@ import {
 import NotificationDropdown from '@/components/notifications/NotificationDropdown';
 import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
+import { useDMModal } from '@/hooks/useDMModal';
 
 /**
  * 왼쪽 고정 사이드바 컴포넌트
@@ -27,12 +29,21 @@ import { useSidebarStore } from '@/stores/sidebarStore';
  * - 내 블로그: 내 블로그로 이동 (로그인 사용자만)
  * - 글쓰기: 새 포스트 작성 (로그인 사용자만)
  * - 알림: 알림 확인 (로그인 사용자만, Feature Flag로 활성화)
+ *
+ * SSR 하이드레이션 불일치 방지를 위해 클라이언트에서만 렌더링
  */
 export default function LeftSidebar() {
   const { user } = useAuth();
   const { isOpen } = useSidebarStore();
   const pathname = usePathname();
+  const { openModal: openDMModal } = useDMModal();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+
+  // 클라이언트에서만 렌더링 (SSR 하이드레이션 불일치 방지)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 읽지 않은 알림 수 조회 (로그인한 사용자 + Feature Flag 활성화 시에만)
   const { data: unreadCount = 0 } = useQuery({
@@ -60,10 +71,21 @@ export default function LeftSidebar() {
     return null;
   }
 
+  // SSR에서는 렌더링하지 않음 (테마 전환 시 border 깜빡임 방지)
+  if (!mounted) {
+    return null;
+  }
+
   return (
-    <aside className={`hidden lg:block fixed left-0 top-40 h-[calc(100vh-10rem)] w-20 bg-background z-40 transition-transform duration-300 ease-in-out ${
-      isOpen ? 'translate-x-[23px]' : '-translate-x-full'
-    }`}>
+    <aside
+      className={`hidden lg:block fixed left-0 top-40 h-[calc(100vh-10rem)] w-20 bg-background z-40 ${
+        isOpen ? 'translate-x-[23px]' : '-translate-x-full'
+      }`}
+      style={{
+        border: 'none',
+        transition: 'transform 300ms ease-in-out'
+      }}
+    >
       <nav className="flex flex-col items-center py-6 space-y-6">
         {/* 홈 버튼 */}
         <Link
@@ -129,6 +151,23 @@ export default function LeftSidebar() {
               <BookmarkIcon className={pathname === '/bookmarks' ? 'opacity-100' : 'opacity-70'} size={24} />
               <span className="text-xs mt-1 font-medium">북마크</span>
             </Link>
+
+            {/* 채팅(DM) 버튼 */}
+            <button
+              type="button"
+              onClick={() => openDMModal()}
+              className="relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              title="채팅"
+            >
+              <MessageCircle className="opacity-70" size={24} />
+              <span className="text-xs mt-1 font-medium">채팅</span>
+              {/* 읽지 않은 메시지 뱃지 (향후 API 연동 시 표시) */}
+              {/* {unreadDMCount > 0 && (
+                <span className="absolute top-1 right-1 h-5 w-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
+                  {unreadDMCount > 99 ? '99+' : unreadDMCount}
+                </span>
+              )} */}
+            </button>
 
             {/* 설정 버튼 */}
             <Link

@@ -201,7 +201,7 @@ export default function BlogSettingsPage() {
   // 블로그 데이터 로딩 중일 때 스켈레톤 UI 표시
   if (blogLoading) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <div className="mb-8">
           <div className="h-7 w-32 bg-gray-200 dark:bg-gray-700 rounded animate-pulse mb-2"></div>
           <div className="h-4 w-64 bg-gray-100 dark:bg-gray-600 rounded animate-pulse"></div>
@@ -227,7 +227,7 @@ export default function BlogSettingsPage() {
   // 로딩이 완료되었는데 블로그가 없을 때만 에러 표시
   if (!blogLoading && !blog) {
     return (
-      <div className="p-8">
+      <div className="p-4 sm:p-6 md:p-8">
         <div className="text-center py-8">
           <FiSettings className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">블로그가 없습니다</h3>
@@ -246,8 +246,8 @@ export default function BlogSettingsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 sm:mb-8">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">블로그 설정</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           블로그의 기본 정보와 설정을 관리하세요
@@ -260,19 +260,19 @@ export default function BlogSettingsPage() {
           <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             블로그 이름
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               id="name"
               value={formData.name}
               onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
+              className="flex-1 px-3 py-2 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
             />
             <button
               type="button"
               onClick={handleNameUpdate}
               disabled={nameLoading || nameSuccess}
-              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              className="w-full sm:w-[60px] min-h-[44px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
             >
               {nameLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -303,16 +303,16 @@ export default function BlogSettingsPage() {
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
             placeholder="블로그를 소개해주세요..."
           />
-          <div className="mt-1 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-1 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             <span>블로그를 소개하는 글을 작성해주세요</span>
             <span>{formData.description.length}/1000</span>
           </div>
-          <div className="mt-2 flex justify-end">
+          <div className="mt-2">
             <button
               type="button"
               onClick={handleDescriptionUpdate}
               disabled={descriptionLoading || descriptionSuccess}
-              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              className="w-full sm:w-[60px] min-h-[44px] sm:ml-auto px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
             >
               {descriptionLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -336,18 +336,20 @@ export default function BlogSettingsPage() {
                 {blog?.createdAt && format(new Date(blog.createdAt), 'yyyy년 MM월 dd일', { locale: ko })}
               </span>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <div className="flex items-center">
-                <FiLink className="mr-2 text-gray-400 dark:text-gray-500" />
-                <span className="text-gray-600 dark:text-gray-400">전체 URL:</span>
-                <a
-                  href={`/${blog?.slug}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ml-2 text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-gray-100"
-                >
-                  {window.location.origin}/{blog?.slug}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
+              <div className="flex items-start sm:items-center min-w-0 flex-1">
+                <FiLink className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <span className="text-gray-600 dark:text-gray-400 block sm:inline">전체 URL:</span>
+                  <a
+                    href={`/${blog?.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ml-0 sm:ml-2 text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-gray-100 break-all block sm:inline"
+                  >
+                    {window.location.origin}/{blog?.slug}
                 </a>
+              </div>
               </div>
               <button
                 onClick={() => {
@@ -355,11 +357,11 @@ export default function BlogSettingsPage() {
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
-                className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors"
+                className="min-w-[44px] min-h-[44px] p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors flex items-center justify-center flex-shrink-0"
                 title="주소 복사"
               >
                 {copied ? (
-                  <span className="text-xs text-green-600 dark:text-green-400">복사됨!</span>
+                  <span className="text-xs text-green-600 dark:text-green-400 whitespace-nowrap">복사됨!</span>
                 ) : (
                   <FiCopy className="w-4 h-4" />
                 )}
@@ -372,17 +374,17 @@ export default function BlogSettingsPage() {
         <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
           <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">공개 설정</h3>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <FiGlobe className="mr-2 text-gray-400 dark:text-gray-500" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-start sm:items-center">
+                <FiGlobe className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
                   <label htmlFor="isPublic" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     블로그 공개
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">모든 사람이 블로그를 볼 수 있습니다</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">모든 사람이 블로그를 볼 수 있습니다</p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-8 sm:ml-0">
                 <input
                   type="checkbox"
                   id="isPublic"
@@ -398,17 +400,17 @@ export default function BlogSettingsPage() {
               </label>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <FiMessageSquare className="mr-2 text-gray-400 dark:text-gray-500" />
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-start sm:items-center">
+                <FiMessageSquare className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
                   <label htmlFor="allowComments" className="text-sm font-medium text-gray-700 dark:text-gray-300">
                     댓글 허용
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">방문자가 글에 댓글을 남길 수 있습니다</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">방문자가 글에 댓글을 남길 수 있습니다</p>
                 </div>
               </div>
-              <label className="relative inline-flex items-center cursor-pointer">
+              <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-8 sm:ml-0">
                 <input
                   type="checkbox"
                   id="allowComments"
