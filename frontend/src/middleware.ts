@@ -16,7 +16,7 @@ export async function middleware(request: NextRequest) {
       }
       
       // 백엔드에 사용자 정보 확인
-      const apiUrl = 'http://localhost:3000/api/v1';
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
       const response = await fetch(`${apiUrl}/auth/me`, {
         headers: {
           'Cookie': request.headers.get('cookie') || '',

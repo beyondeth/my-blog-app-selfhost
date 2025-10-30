@@ -3,6 +3,7 @@ import { postsAPI } from '@/lib/api';
 import { Post } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRef, useCallback } from 'react';
+import { mixpanel } from '@/lib/mixpanel';
 
 // Query 키 팩토리 패턴
 export const postQueryKeys = {
@@ -82,6 +83,13 @@ export function useCreatePost() {
   return useMutation({
     mutationFn: postsAPI.createPost,
     onSuccess: (newPost) => {
+      // Mixpanel: 포스트 생성 이벤트 추적
+      mixpanel.track('Post Created', {
+        categoryId: newPost.category,
+        tags: newPost.tags,
+        wordCount: newPost.content ? newPost.content.length : 0,
+      });
+
       // 1. 첫 페이지만 무효화 (새 포스트는 항상 첫 페이지에만 나타남)
       // 검색이나 필터가 없는 기본 목록만 무효화하여 성능 최적화
       queryClient.invalidateQueries({
@@ -420,6 +428,10 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
 
       return { previousLists, previousDetails };
     },
+    onSuccess: (data, postId) => {
+      // Mixpanel: 좋아요 이벤트 추적
+      mixpanel.track('Post Liked', { postId });
+    },
     onError: (err, variables, context) => {
       // 롤백: 이전 데이터로 복구
       if (context?.previousLists) {
@@ -553,9 +565,12 @@ export function useUserCategories() {
   return useQuery({
     queryKey: ['user-categories'],
     queryFn: async (): Promise<string[]> => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/posts/categories`, {
-        credentials: 'include',
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/posts/categories`,
+        {
+          credentials: 'include',
+        }
+      );
       if (!response.ok) {
         throw new Error('Failed to fetch user categories');
       }
