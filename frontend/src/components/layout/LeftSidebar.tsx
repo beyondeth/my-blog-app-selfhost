@@ -10,8 +10,8 @@ import { WriteIcon } from '@/components/icons/WriteIcon';
 import { NotificationBellIcon } from '@/components/icons/NotificationBellIcon';
 import { MyBlogIcon } from '@/components/icons/MyBlogIcon';
 import { BookmarkIcon } from '@/components/icons/BookmarkIcon';
-import { MessageIcon } from '@/components/icons/MessageIcon';
 import { SettingsIcon } from '@/components/icons/SettingsIcon';
+import { MessageCircle } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -152,15 +152,15 @@ export default function LeftSidebar() {
               <span className="text-xs mt-1 font-medium">북마크</span>
             </Link>
 
-            {/* 메시지(DM) 버튼 */}
+            {/* 채팅(DM) 버튼 */}
             <button
               type="button"
               onClick={() => openDMModal()}
               className="relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors text-muted-foreground hover:bg-accent/50 hover:text-foreground"
-              title="메시지"
+              title="채팅"
             >
-              <MessageIcon className="opacity-70" size={24} />
-              <span className="text-xs mt-1 font-medium">메시지</span>
+              <MessageCircle className="opacity-70" size={24} />
+              <span className="text-xs mt-1 font-medium">채팅</span>
               {/* 읽지 않은 메시지 뱃지 (향후 API 연동 시 표시) */}
               {/* {unreadDMCount > 0 && (
                 <span className="absolute top-1 right-1 h-5 w-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
