@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,11 @@ import { Button } from '@/components/ui/button';
 import { Shield, AlertCircle, Eye, EyeOff, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 
-export default function ResetPasswordPage() {
+/**
+ * 비밀번호 재설정 페이지 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
+ */
+function ResetPasswordPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const token = searchParams.get('token');
@@ -313,8 +317,8 @@ export default function ResetPasswordPage() {
           </form>
 
           <div className="text-center pt-3 border-t">
-            <Link 
-              href="/login" 
+            <Link
+              href="/login"
               className="text-sm text-gray-600 hover:text-gray-900"
             >
               로그인으로 돌아가기
@@ -323,5 +327,16 @@ export default function ResetPasswordPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/**
+ * 비밀번호 재설정 페이지 (Suspense 래퍼)
+ */
+export default function ResetPasswordPage() {
+  return (
+    <Suspense fallback={null}>
+      <ResetPasswordPageContent />
+    </Suspense>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
@@ -19,7 +19,12 @@ import TagsSection from '@/components/layout/TagsSection';
 import FollowingListSection from '@/components/FollowingListSection';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
-export default function HomePage() {
+
+/**
+ * 홈 페이지 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
+ */
+function HomePageContent() {
   // console.log('🏠 [HOME PAGE COMPONENT RENDERED]');
 
   const { user, isAuthenticated, isAdmin } = useAuth();
@@ -259,5 +264,16 @@ export default function HomePage() {
         isLoading={deletePostMutation.isPending}
       />
     </div>
+  );
+}
+
+/**
+ * 홈 페이지 (Suspense 래퍼)
+ */
+export default function HomePage() {
+  return (
+    <Suspense fallback={<PostSkeletonWithShimmer count={5} />}>
+      <HomePageContent />
+    </Suspense>
   );
 }

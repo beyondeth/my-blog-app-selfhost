@@ -9,7 +9,7 @@ import { ThemeProvider } from '@/providers/ThemeProvider';
 import { Toaster } from 'sonner';
 import { DMModalProvider } from '@/components/dm/DMModalProvider';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { initMixpanel } from '@/lib/mixpanel';
 import Script from 'next/script';
 
@@ -96,7 +96,9 @@ export default function LayoutClient({ children }: LayoutClientProps) {
           ) : isLandingPage ? (
             // 랜딩페이지: 헤더만 표시, 사이드바/하단바 제거
             <div className="min-h-screen bg-background">
-              <Header />
+              <Suspense fallback={null}>
+                <Header />
+              </Suspense>
               <div className="w-full">
                 {children}
               </div>
@@ -104,7 +106,9 @@ export default function LayoutClient({ children }: LayoutClientProps) {
           ) : (
             // 일반 레이아웃: 헤더 + 사이드바 + 메인 콘텐츠 + 하단 바텀바
             <div>
-              <Header />
+              <Suspense fallback={null}>
+                <Header />
+              </Suspense>
               <div className="flex" style={{ border: 'none', transition: 'none' }}>
                 <LeftSidebar />
                 {/* 왼쪽 사이드바 영역 확보: translate-x-[23px] + w-20 = 103px, 여유 25px 포함 = 128px */}
