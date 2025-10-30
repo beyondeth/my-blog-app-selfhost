@@ -1,9 +1,11 @@
+/* CSS @import 규칙 - CSS 표준에 따라 파일 맨 위에 위치 */
+@import '../styles/core.css';
+@import '../styles/themes/atom-one-light-custom.css' (prefers-color-scheme: light);
+@import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-/* 새로운 통합 스타일 시스템 import */
-@import '../styles/core.css';
 
 /* ============================
    View Transition API - 테마 전환 애니메이션
@@ -47,11 +49,12 @@
   }
 }
 
-/* Highlight.js 테마 - 라이트/다크 모드 대응 */
-@import '../styles/themes/atom-one-light-custom.css' (prefers-color-scheme: light);
-@import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
+/* 테마 전환 시 border transition 비활성화 - border 깜빡임 방지 */
+* {
+  transition-property: background-color, color, fill, stroke, opacity, box-shadow, transform !important;
+}
 
-/* 강제 테마 적용을 위한 클래스 기반 스타일 */
+/* Highlight.js 테마 - 강제 테마 적용을 위한 클래스 기반 스타일 */
 .light .hljs {
   background: #ffffff;  /* 순백색 배경으로 대비 향상 */
   /* color 속성 제거 - syntax highlighting이 처리하도록 허용 */
@@ -322,6 +325,47 @@ textarea::-webkit-scrollbar {
 textarea {
   scrollbar-width: none; /* Firefox */
   -ms-overflow-style: none; /* IE and Edge */
+}
+
+/* ===================================================================
+   Writing Styles 마크다운 코드 블록 - 부드러운 라운드 스크롤바
+   ================================================================ */
+
+/* 마크다운 코드 블록 스크롤바 스타일 (WebKit: Chrome, Safari, Edge) */
+.markdown-code-block::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+/* 스크롤바 track - 컨테이너 가장자리에서 떨어뜨리기 */
+.markdown-code-block::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 8px; /* 상하좌우 8px씩 여백 - 각진 부분 숨김 */
+}
+
+/* 스크롤바 thumb - 더 라운드하게 */
+.markdown-code-block::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+.markdown-code-block::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.5);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+}
+
+/* 스크롤바 코너 (세로/가로 스크롤바 만나는 부분) */
+.markdown-code-block::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 마크다운 코드 블록 스크롤바 (Firefox) */
+.markdown-code-block {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
 }
 
 /* 답글 연결선 (YouTube 스타일) - 부모 아바타에서 답글 버튼까지 */
