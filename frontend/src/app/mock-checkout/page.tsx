@@ -5,12 +5,16 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
 import { SubscriptionTier, BillingCycle } from '@/types/subscription';
 
-export default function MockCheckoutPage() {
+/**
+ * Mock 체크아웃 페이지 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
+ */
+function MockCheckoutPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [processing, setProcessing] = useState(false);
@@ -164,5 +168,16 @@ export default function MockCheckoutPage() {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * Mock 체크아웃 페이지 (Suspense 래퍼)
+ */
+export default function MockCheckoutPage() {
+  return (
+    <Suspense fallback={null}>
+      <MockCheckoutPageContent />
+    </Suspense>
   );
 }

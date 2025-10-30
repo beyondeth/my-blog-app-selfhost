@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { FiUser, FiSettings, FiShield, FiBell, FiUsers, FiMessageCircle, FiLogOut, FiKey, FiX } from 'react-icons/fi';
@@ -56,7 +56,11 @@ const getSettingsNav = () => {
 
 const settingsNav = getSettingsNav();
 
-export default function SettingsLayout({
+/**
+ * 설정 레이아웃 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
+ */
+function SettingsLayoutContent({
   children,
 }: {
   children: React.ReactNode;
@@ -208,5 +212,20 @@ export default function SettingsLayout({
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * 설정 레이아웃 (Suspense 래퍼)
+ */
+export default function SettingsLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
+  return (
+    <Suspense fallback={null}>
+      <SettingsLayoutContent>{children}</SettingsLayoutContent>
+    </Suspense>
   );
 }
