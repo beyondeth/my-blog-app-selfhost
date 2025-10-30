@@ -105,7 +105,8 @@ export default function AdminImagesPage() {
   const { data: statsData } = useQuery({
     queryKey: ['admin', 'files', 'stats'],
     queryFn: async () => {
-      const response = await fetch('/api/v1/admin/files/stats', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+      const response = await fetch(`${apiUrl}/admin/files/stats`, {
         credentials: 'include',
       });
       
