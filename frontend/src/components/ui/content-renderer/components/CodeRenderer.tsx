@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import hljs from 'highlight.js';
+import { Copy, Check } from 'lucide-react';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { CodeBlockInfo } from '../types';
 
 interface CodeRendererProps extends CodeBlockInfo {
@@ -37,6 +39,7 @@ export default function CodeRenderer({
 }: CodeRendererProps) {
   const [highlighted, setHighlighted] = useState<string>('');
   const [copied, setCopied] = useState(false);
+  const isMobile = useMediaQuery('(max-width: 768px)');
 
   /**
    * 코드 하이라이팅을 수행합니다.
@@ -118,28 +121,40 @@ export default function CodeRenderer({
           aria-label="Copy code"
           title={copied ? 'Copied!' : 'Copy code'}
         >
-          <span
-            className="copy-text"
-            style={{
-              display: copied ? 'none' : 'inline',
-              color: 'rgba(255, 255, 255, 0.6)',
-              fontSize: '12px',
-              fontWeight: 500,
-            }}
-          >
-            Copy
-          </span>
-          <span
-            className="check-text"
-            style={{
-              display: copied ? 'inline' : 'none',
-              color: '#4ade80',
-              fontSize: '12px',
-              fontWeight: 500,
-            }}
-          >
-            Copied!
-          </span>
+          {isMobile ? (
+            // 모바일: 작은 아이콘만 표시
+            copied ? (
+              <Check className="w-4 h-4" style={{ color: '#4ade80' }} />
+            ) : (
+              <Copy className="w-4 h-4" style={{ color: 'rgba(255, 255, 255, 0.6)' }} />
+            )
+          ) : (
+            // 데스크톱: 기존 텍스트 표시
+            <>
+              <span
+                className="copy-text"
+                style={{
+                  display: copied ? 'none' : 'inline',
+                  color: 'rgba(255, 255, 255, 0.6)',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                }}
+              >
+                Copy
+              </span>
+              <span
+                className="check-text"
+                style={{
+                  display: copied ? 'inline' : 'none',
+                  color: '#4ade80',
+                  fontSize: '12px',
+                  fontWeight: 500,
+                }}
+              >
+                Copied!
+              </span>
+            </>
+          )}
         </button>
       )}
       <pre className="code-block" data-language={language}>
