@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-export async function middleware(request: NextRequest) {
+// Next.js 16: middleware → proxy로 변경 (기능은 동일)
+export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   
   // /admin 경로 접근 시도
