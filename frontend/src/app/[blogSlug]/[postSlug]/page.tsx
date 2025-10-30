@@ -3,20 +3,19 @@ import { cache } from 'react';
 import BlogPostDetailClient from './client-page';
 import { notFound } from 'next/navigation';
 
-// 포스트 데이터 타입 정의
+// 포스트 데이터 타입 정의 (백엔드 실제 구조 반영)
 interface Post {
   id: string;
   title: string;
   content: string;
-  excerpt?: string;
-  summary?: string;
+  excerpt?: string;           // 백엔드에서 제공하는 요약 (200자)
   slug: string;
-  coverImage?: string | null;
+  thumbnail?: string | null;  // 썸네일 이미지 URL
   createdAt: string;
   updatedAt: string;
   viewCount?: number;
-  readingTime?: string;
-  tags?: string[];
+  tagList?: string[];         // 백엔드 실제 필드명
+  tags?: string[];            // tagList 별칭 (호환성)
   author?: {
     id: string;
     username: string;
@@ -80,29 +79,28 @@ export async function generateMetadata(
     };
   }
 
-  // 포스트 요약문 생성 (excerpt > summary > content 순서)
+  // 포스트 요약문 생성 (excerpt 우선, 없으면 content에서 추출)
   const description = post.excerpt ||
-                      post.summary ||
                       post.content
                         ?.replace(/<[^>]*>/g, '') // HTML 태그 제거
-                        .replace(/\n+/g, ' ') // 줄바꿈 제거
+                        .replace(/\n+/g, ' ') // 줄바꿈 공백 변환
                         .trim()
                         .substring(0, 160) || // 160자로 제한
                       '블로그 포스트';
 
-  // 기본 사이트 정보
-  const siteName = 'My Blog Platform';
+  // 사이트 정보 (환경변수에서 가져오기)
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
   // 포스트 전체 URL
   const postUrl = `${siteUrl}/${params.blogSlug}/${params.postSlug}`;
 
-  // 커버 이미지 URL (절대 경로로 변환)
-  const ogImage = post.coverImage
-    ? (post.coverImage.startsWith('http')
-        ? post.coverImage
-        : `${siteUrl}${post.coverImage}`)
-    : `${siteUrl}/default-og-image.jpg`; // 기본 OG 이미지
+  // 썸네일 이미지 URL (절대 경로로 변환)
+  const ogImage = post.thumbnail
+    ? (post.thumbnail.startsWith('http')
+        ? post.thumbnail
+        : `${siteUrl}${post.thumbnail}`)
+    : `${siteUrl}/assets/block-logo.png`; // 기본 OG 이미지
 
   // 저자 정보
   const authorName = post.author?.username || post.blog?.name || 'Unknown Author';
@@ -113,7 +111,7 @@ export async function generateMetadata(
     description,
 
     // 키워드 (태그가 있으면 사용)
-    keywords: post.tags?.length ? post.tags.join(', ') : undefined,
+    keywords: (post.tagList || post.tags)?.length ? (post.tagList || post.tags)!.join(', ') : undefined,
 
     // Open Graph 메타 태그
     openGraph: {
@@ -133,7 +131,7 @@ export async function generateMetadata(
       authors: [authorName],
       publishedTime: post.createdAt,
       modifiedTime: post.updatedAt,
-      tags: post.tags,
+      tags: post.tagList || post.tags,
     },
 
     // Twitter 카드 메타 태그
@@ -173,14 +171,15 @@ export async function generateMetadata(
 
 // JSON-LD 구조화된 데이터 생성 함수
 function generateStructuredData(post: Post, params: { blogSlug: string; postSlug: string }) {
+  const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
   const postUrl = `${siteUrl}/${params.blogSlug}/${params.postSlug}`;
 
-  // 커버 이미지 URL (절대 경로로 변환)
-  const imageUrl = post.coverImage
-    ? (post.coverImage.startsWith('http')
-        ? post.coverImage
-        : `${siteUrl}${post.coverImage}`)
+  // 썸네일 이미지 URL (절대 경로로 변환)
+  const imageUrl = post.thumbnail
+    ? (post.thumbnail.startsWith('http')
+        ? post.thumbnail
+        : `${siteUrl}${post.thumbnail}`)
     : undefined;
 
   // Article 구조화된 데이터
@@ -188,7 +187,7 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
     '@context': 'https://schema.org',
     '@type': 'BlogPosting',
     headline: post.title,
-    description: post.excerpt || post.summary || post.content?.replace(/<[^>]*>/g, '').substring(0, 160),
+    description: post.excerpt || post.content?.replace(/<[^>]*>/g, '').substring(0, 160),
     url: postUrl,
     datePublished: post.createdAt,
     dateModified: post.updatedAt,
@@ -199,11 +198,11 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
     },
     publisher: {
       '@type': 'Organization',
-      name: 'My Blog Platform',
+      name: siteName,
       url: siteUrl,
       logo: {
         '@type': 'ImageObject',
-        url: `${siteUrl}/logo.png`,
+        url: `${siteUrl}/assets/logo.svg`,
         width: 600,
         height: 60,
       },
@@ -220,11 +219,8 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
         height: 630,
       },
     }),
-    ...(post.tags && post.tags.length > 0 && {
-      keywords: post.tags.join(', '),
-    }),
-    ...(post.readingTime && {
-      timeRequired: `PT${post.readingTime}`,
+    ...((post.tagList || post.tags) && (post.tagList || post.tags)!.length > 0 && {
+      keywords: (post.tagList || post.tags)!.join(', '),
     }),
     interactionStatistic: [
       {
