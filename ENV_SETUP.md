@@ -46,7 +46,75 @@ Next.js는 다음 순서로 환경 변수를 로드합니다 (번호가 작을�
 5. .env                           # 기본값 (Git 포함)
 ```
 
-**중요**: Next.js는 **프로젝트 루트 디렉토리의 .env 파일만 읽습니다**. `frontend/.env.*` 파일은 직접 읽지 않습니다.
+**중요**: Next.js는 **자신의 프로젝트 루트 디렉토리의 .env 파일만 읽습니다**.
+- **Next.js 프로젝트 루트**: `frontend/` 폴더 (package.json, next.config.js 위치)
+- **읽는 파일**: `frontend/.env`, `frontend/.env.local` 등
+- **읽지 않는 파일**: 상위 폴더의 `.env.production` (개발 환경에서)
+
+---
+
+## 🔍 Next.js 환경 변수 로딩 메커니즘 (중요!)
+
+### 프로젝트 구조와 환경변수 로딩
+
+이 프로젝트는 **모노레포 구조**로 backend와 frontend가 분리되어 있습니다:
+
+```
+my-blog-app/                    (모노레포 루트)
+├── backend/                    (NestJS 프로젝트)
+├── frontend/                   (Next.js 프로젝트 루트 ✅)
+│   ├── package.json
+│   ├── next.config.js
+│   ├── .env.local             # Next.js가 읽음 (개발 최우선)
+│   └── .env                   # Next.js가 읽음 (기본값)
+├── .env                        # Backend용 (Next.js는 읽지 않음)
+└── .env.production             # Docker/Backend용 (Next.js는 읽지 않음)
+```
+
+### 개발 환경 (pnpm dev)
+
+```bash
+# 실행 위치
+cd /path/to/my-blog-app/frontend
+pnpm dev
+
+# Next.js가 읽는 .env 파일 경로
+✅ frontend/.env.local        (최우선)
+✅ frontend/.env              (fallback)
+❌ ../.env.production         (상위 폴더, 읽지 않음)
+❌ ../.env                    (상위 폴더, 읽지 않음)
+```
+
+**핵심**: Next.js는 **자신의 package.json이 있는 폴더**를 프로젝트 루트로 인식하고, 해당 폴더 내부의 .env 파일만 읽습니다.
+
+### 프로덕션 환경 (Docker 빌드)
+
+프로덕션에서는 .env 파일을 직접 읽지 않고, **Docker ARG/ENV를 통해 환경변수를 주입**합니다:
+
+```yaml
+# docker-compose.prod.oracle.yml
+services:
+  frontend:
+    env_file:
+      - .env.production         # 1️⃣ Docker Compose가 읽음
+    build:
+      args:
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}  # 2️⃣ ARG로 전달
+
+# frontend/Dockerfile.prod
+ARG NEXT_PUBLIC_SITE_URL                               # 3️⃣ ARG 받음
+ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL         # 4️⃣ ENV 설정
+RUN pnpm build                                         # 5️⃣ 빌드 시 코드에 임베딩
+```
+
+**결과**: `process.env.NEXT_PUBLIC_SITE_URL` → 빌드 시 하드코딩됨
+
+### 환경별 로딩 경로 요약
+
+| 환경 | 실행 위치 | 읽는 파일 | 결과 |
+|------|----------|----------|------|
+| **개발** | `pnpm dev` | `frontend/.env.local` | `http://localhost:3001` |
+| **프로덕션** | Docker | 루트 `.env.production` → ARG/ENV | `https://www.codebase.blog` |
 
 ---
 
@@ -311,8 +379,9 @@ fetch(`${API_URL}/blogs`);  // ← /api/v1/blogs (정상)
 | 날짜 | 변경 내용 |
 |------|----------|
 | 2025-01-30 | 초기 문서 작성, `frontend/.env.production` 제거 |
+| 2025-10-30 | Next.js 환경 변수 로딩 메커니즘 섹션 추가, `frontend/.env.development` 삭제, `frontend/.env`에 NEXT_PUBLIC_SITE_URL 추가 |
 
 ---
 
-**Last Updated**: 2025-01-30
+**Last Updated**: 2025-10-30
 **Maintainer**: Codebase Development Team
