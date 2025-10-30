@@ -428,10 +428,6 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
 
       return { previousLists, previousDetails };
     },
-    onSuccess: (data, postId) => {
-      // Mixpanel: 좋아요 이벤트 추적
-      mixpanel.track('Post Liked', { postId });
-    },
     onError: (err, variables, context) => {
       // 롤백: 이전 데이터로 복구
       if (context?.previousLists) {
@@ -446,6 +442,9 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
       }
     },
     onSuccess: (response, postId) => {
+      // Mixpanel: 좋아요 이벤트 추적
+      mixpanel.track('Post Liked', { postId });
+
       // 큐 시스템 사용 시, 낙관적 업데이트 상태 유지 (깜빡임 방지)
       if (response.queued) {
         return; // 서버 응답 무시, onMutate의 낙관적 업데이트 상태 그대로 유지
