@@ -94,4 +94,38 @@ export class BlogsController {
   async getBlogCategories(@Param('slug') slug: string): Promise<Array<{ category: string; count: number }>> {
     return this.postsService.getBlogCategoriesWithCount(slug);
   }
+
+  /**
+   * Sitemap 생성을 위한 모든 공개 블로그 조회
+   *
+   * @description
+   * SEO 최적화를 위해 sitemap.xml 생성 시 사용되는 엔드포인트입니다.
+   * - 인증 불필요 (@Public)
+   * - 공개 블로그만 반환 (isPublic = true)
+   * - 최소 데이터만 반환 (slug, updatedAt)
+   * - 페이지네이션 없이 전체 데이터 반환
+   * - 성능 최적화를 위해 최소 필드만 SELECT
+   *
+   * @returns 공개 블로그의 slug와 updatedAt 배열
+   */
+  @Get('sitemap/all')
+  @Public()
+  @ApiOperation({ summary: 'Sitemap용 모든 공개 블로그 조회' })
+  @ApiResponse({
+    status: 200,
+    description: '공개 블로그 목록 (slug, updatedAt)',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', example: 'john-blog' },
+          updatedAt: { type: 'string', format: 'date-time', example: '2025-01-20T12:00:00.000Z' },
+        },
+      },
+    },
+  })
+  async getAllBlogsForSitemap(): Promise<Array<{ slug: string; updatedAt: Date }>> {
+    return this.blogsService.getAllPublicBlogsForSitemap();
+  }
 }

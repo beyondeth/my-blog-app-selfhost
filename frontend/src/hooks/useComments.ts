@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import type { Comment, CommentForm } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
+import { mixpanel } from '@/lib/mixpanel';
 
 // 댓글 조회 훅
 export function useComments(postId: string, options?: { enabled?: boolean }) {
@@ -94,12 +95,18 @@ export function useCreateComment(postId: string, onReplyAdded?: (parentId: strin
       }
     },
     onSuccess: (data, variables, context) => {
+      // Mixpanel: 댓글 작성 이벤트 추적
+      mixpanel.track('Comment Created', {
+        postId: data.postId,
+        parentId: data.parentCommentId || undefined,
+      });
+
       // 성공 시 실제 데이터로 교체
-      queryClient.invalidateQueries({ 
+      queryClient.invalidateQueries({
         queryKey: ['comments', postId],
         refetchType: 'none' // 리페치하지 않고 캐시만 무효화
       });
-      
+
       // 실제 댓글 데이터로 업데이트
       const previousComments = queryClient.getQueryData<Comment[]>(['comments', postId]);
       if (previousComments) {

@@ -90,9 +90,12 @@ export function useBlogCategories(blogSlug: string) {
   return useQuery({
     queryKey: ['blog-categories', blogSlug],
     queryFn: async (): Promise<Array<{ category: string; count: number }>> => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/blogs/slug/${blogSlug}/categories`, {
-        credentials: 'include',
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}/categories`,
+        {
+          credentials: 'include',
+        }
+      );
       if (!response.ok) {
         throw new Error('Failed to fetch blog categories');
       }

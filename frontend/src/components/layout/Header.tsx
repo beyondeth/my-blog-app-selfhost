@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { FiSearch, FiMessageCircle } from 'react-icons/fi';
+import { FiSearch } from 'react-icons/fi';
 import { routes } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import MobileProfileDropdown from './MobileProfileDropdown';
@@ -15,19 +15,11 @@ import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useTheme } from 'next-themes';
-import { useDMModal } from '@/hooks/useDMModal';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
 
 export default function Header() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
   const { toggleSidebar } = useSidebarStore();
   const { resolvedTheme } = useTheme();
-  const { openModal } = useDMModal();
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -201,24 +193,6 @@ export default function Header() {
                   {/* Theme Switch */}
                   <ThemeSwitch />
 
-                  {/* DM Button */}
-                  <TooltipProvider delayDuration={300}>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button
-                          onClick={() => openModal()}
-                          className="relative p-2 rounded-full border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-                          aria-label="메시지"
-                        >
-                          <FiMessageCircle className="w-5 h-5 text-foreground" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent side="bottom" sideOffset={5}>
-                        <p className="text-sm">메시지</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  </TooltipProvider>
-
                   {/* Profile Dropdown */}
                   <ProfileDropdown
                     user={user}
@@ -265,24 +239,6 @@ export default function Header() {
               <div className="w-8 h-8 bg-muted rounded-full animate-pulse"></div>
             ) : user ? (
               <>
-                {/* DM Button */}
-                <TooltipProvider delayDuration={300}>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        onClick={() => openModal()}
-                        className="relative p-2 rounded-full border border-transparent hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-                        aria-label="메시지"
-                      >
-                        <FiMessageCircle className="w-5 h-5 text-foreground" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" sideOffset={5}>
-                      <p className="text-sm">메시지</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
                 {/* 로그인 상태: 프로필 드롭다운 */}
                 <MobileProfileDropdown
                   user={user}

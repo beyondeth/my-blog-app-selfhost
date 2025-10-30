@@ -1,7 +1,6 @@
 'use client';
 
 import React, { memo, useState, useRef, useEffect } from 'react';
-import { ArrowLeft, MoreVertical } from 'lucide-react';
 import ConfirmModal from '../ConfirmModal';
 import { Avatar } from '@/components/ui/avatar';
 import { User } from '../DMLayout/DMLayout.types';
@@ -10,8 +9,8 @@ import { useSocketManager } from '@/hooks/chat/useSocketManager';
 import { SOCKET_EVENTS } from '@/constants/chat';
 import { useReport } from '@/hooks/useReport';
 import { useBlock } from '@/hooks/useBlock';
-import ReportModal from '@/components/reports/ReportModal';
-import BlockConfirmModal from '@/components/blocks/BlockConfirmModal';
+import ReportDialog from '@/components/reports/ReportDialog';
+import BlockConfirmDialog from '@/components/blocks/BlockConfirmDialog';
 
 interface ChatHeaderProps {
   otherUser?: User | null;
@@ -24,8 +23,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
   const { socket } = useSocketManager();
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
-  const [showDropdown, setShowDropdown] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // 액션 버튼 표시 상태
+  const [showActions, setShowActions] = useState(false);
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   // 신고 기능
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
@@ -33,17 +34,22 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
   // 차단 기능
   const { isBlockModalOpen, blockTarget, openBlockModal, closeBlockModal, blockUser, isBlocking } = useBlock();
 
-  // 드롭다운 외부 클릭 감지
+  // 외부 클릭 감지 - 액션 버튼 숨기기
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowDropdown(false);
+      if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
+        setShowActions(false);
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    if (showActions) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [showActions]);
 
   const handleBackClick = () => {
     setActiveConversation(null);
@@ -64,7 +70,6 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
       // WebSocket으로 먼저 leave 이벤트 발생
       if (socket) {
         socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
-        console.log('[채팅] X 버튼 - WebSocket leave 이벤트 발생:', conversationId);
       }
 
       // 그 다음 HTTP DELETE 요청
@@ -80,18 +85,25 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
     }
   };
 
-  // 신고하기
+  // 신고하기 핸들러
   const handleReport = () => {
     if (!otherUser) return;
+    setShowActions(false);
     openReportModal('user', otherUser.id, otherUser.username);
-    setShowDropdown(false);
   };
 
-  // 차단하기
+  // 차단하기 핸들러
   const handleBlock = () => {
     if (!otherUser) return;
+    setShowActions(false);
     openBlockModal(otherUser.id, otherUser.username);
-    setShowDropdown(false);
+  };
+
+  // 아바타 클릭 핸들러
+  const handleAvatarClick = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setShowActions(!showActions);
   };
 
   return (
@@ -107,30 +119,40 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
       shadow-sm
     ">
       <div className="flex items-center gap-3">
-        {/* Back button (mobile) */}
+        {/* Back button (mobile) - 대화목록 버튼 */}
         <button
           onClick={handleBackClick}
           className="
-            p-2
-            -ml-2
+            px-3
+            py-1.5
             rounded-lg
-            hover:bg-gray-100
+            bg-gray-100
+            text-gray-700
+            hover:bg-gray-200
             transition-colors
+            text-sm
+            font-medium
             md:hidden
           "
           aria-label="Back to conversations"
         >
-          <ArrowLeft className="w-5 h-5 text-gray-600" />
+          대화목록
         </button>
 
         {/* User info */}
-        <div className="flex items-center gap-3">
-          <Avatar
-            src={otherUser?.profileImage}
-            fallback={otherUser?.username?.[0]?.toUpperCase() || '?'}
-            size="md"
-            className={`ring-2 ring-white ${isLoading ? 'animate-pulse' : ''}`}
-          />
+        <div className="flex items-center gap-3 relative" ref={actionsRef}>
+          <button
+            onClick={handleAvatarClick}
+            className="p-0 border-0 bg-transparent cursor-pointer rounded-full hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500"
+            type="button"
+          >
+            <Avatar
+              src={otherUser?.profileImage}
+              fallback={otherUser?.username?.[0]?.toUpperCase() || '?'}
+              size="md"
+              className={`ring-2 ring-white ${isLoading ? 'animate-pulse' : ''}`}
+            />
+          </button>
 
           <div>
             <h2 className="font-semibold text-gray-900">
@@ -141,95 +163,47 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
               )}
             </h2>
           </div>
-        </div>
-      </div>
 
-      {/* Actions */}
-      <div className="flex items-center gap-2">
-        {/* More menu button */}
-        <div className="relative" ref={dropdownRef}>
-          <button
-            onClick={() => setShowDropdown(!showDropdown)}
-            className="
-              p-2
-              rounded-lg
-              bg-gray-100
-              text-gray-700
-              hover:bg-gray-200
-              transition-colors
-            "
-            aria-label="More options"
-          >
-            <MoreVertical className="w-5 h-5" />
-          </button>
-
-          {/* Dropdown menu */}
-          {showDropdown && (
-            <div className="
-              absolute
-              right-0
-              mt-2
-              w-48
-              bg-white
-              border
-              border-gray-200
-              rounded-lg
-              shadow-lg
-              py-1
-              z-50
-            ">
+          {/* 클릭 시 표시되는 액션 버튼 */}
+          {showActions && (
+            <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-1 z-[100] min-w-[100px]">
               <button
                 onClick={handleReport}
-                className="
-                  w-full
-                  px-4
-                  py-2
-                  text-left
-                  text-sm
-                  text-gray-700
-                  hover:bg-gray-50
-                  transition-colors
-                "
+                type="button"
+                className="w-full px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               >
                 신고하기
               </button>
               <button
                 onClick={handleBlock}
-                className="
-                  w-full
-                  px-4
-                  py-2
-                  text-left
-                  text-sm
-                  text-red-600
-                  hover:bg-red-50
-                  transition-colors
-                "
+                type="button"
+                className="w-full px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               >
                 차단하기
               </button>
             </div>
           )}
         </div>
-
-        {/* Leave button */}
-        <button
-          onClick={handleLeaveClick}
-          className="
-            px-4
-            py-2
-            rounded-lg
-            bg-gray-100
-            text-gray-700
-            hover:bg-gray-200
-            transition-colors
-            text-sm
-            font-medium
-          "
-        >
-          나가기
-        </button>
       </div>
+
+      {/* 나가기 버튼 */}
+      <button
+        onClick={handleLeaveClick}
+        className="
+          px-4
+          py-2
+          rounded-lg
+          bg-gray-100
+          text-gray-700
+          hover:bg-gray-200
+          transition-colors
+          text-sm
+          font-medium
+          min-h-[44px]
+        "
+      >
+        나가기
+      </button>
 
       {/* Leave Confirmation Modal */}
       <ConfirmModal
@@ -243,20 +217,24 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
         isLoading={isLeaving}
       />
 
-      {/* Report Modal */}
-      <ReportModal
-        isOpen={isReportModalOpen}
-        onClose={closeReportModal}
+      {/* Report Dialog - Radix UI Dialog 기반 */}
+      <ReportDialog
+        open={isReportModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeReportModal();
+        }}
         onSubmit={submitReport}
         targetTitle={reportTarget?.targetTitle}
         targetType="user"
         isSubmitting={isSubmitting}
       />
 
-      {/* Block Confirmation Modal */}
-      <BlockConfirmModal
-        isOpen={isBlockModalOpen}
-        onClose={closeBlockModal}
+      {/* Block Confirmation Dialog - Radix UI Dialog 기반 */}
+      <BlockConfirmDialog
+        open={isBlockModalOpen}
+        onOpenChange={(open) => {
+          if (!open) closeBlockModal();
+        }}
         onConfirm={blockUser}
         username={blockTarget?.username}
         isBlocking={isBlocking}

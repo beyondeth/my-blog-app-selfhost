@@ -20,7 +20,7 @@ import {
   FiBell,
   FiHelpCircle,
   FiUsers,
-  FiMessageSquare,
+  FiMessageCircle,
   FiCreditCard,
   FiTrendingUp,
   FiKey
@@ -130,8 +130,8 @@ export default function ProfileDropdown({
           onClick={() => handleNavigation('/settings/dm')}
           className="cursor-pointer"
         >
-          <FiMessageSquare className="mr-2 h-4 w-4" />
-          <span>DM 관리</span>
+          <FiMessageCircle className="mr-2 h-4 w-4" />
+          <span>채팅 관리</span>
         </DropdownMenuItem>
 
         {/* Customer Support */}

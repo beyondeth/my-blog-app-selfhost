@@ -319,8 +319,8 @@ export default function ProfileSettingsPage() {
   }
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 sm:mb-8">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">프로필 설정</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           기본 프로필 정보를 관리하세요
@@ -333,7 +333,7 @@ export default function ProfileSettingsPage() {
           <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             프로필 이미지
           </label>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="relative w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex-shrink-0">
               {profileImageUrl ? (
                 <Image
@@ -360,7 +360,7 @@ export default function ProfileSettingsPage() {
                 </div>
               )}
             </div>
-            <div>
+            <div className="w-full sm:w-auto">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -368,12 +368,12 @@ export default function ProfileSettingsPage() {
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row gap-2 w-full">
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploadingImage}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploadingImage ? '업로드 중...' : '이미지 변경'}
                 </button>
@@ -381,12 +381,12 @@ export default function ProfileSettingsPage() {
                   type="button"
                   onClick={() => setShowCharacterSelector(true)}
                   disabled={uploadingImage}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   캐릭터 선택
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 JPG, PNG, GIF (최대 5MB) 또는 캐릭터 선택
               </p>
             </div>
@@ -398,20 +398,20 @@ export default function ProfileSettingsPage() {
           <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
             닉네임
           </label>
-          <div className="flex gap-2">
+          <div className="flex flex-col sm:flex-row gap-2">
             <input
               type="text"
               id="username"
               value={formData.username}
               onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
+              className="flex-1 px-3 py-2 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
               placeholder="실명이 아닌 별명을 사용하세요"
             />
             <button
               type="button"
               onClick={handleUsernameUpdate}
               disabled={usernameLoading || usernameSuccess}
-              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              className="w-full sm:w-[60px] min-h-[44px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
             >
               {usernameLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -470,16 +470,16 @@ export default function ProfileSettingsPage() {
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
             placeholder="자신을 소개해주세요..."
           />
-          <div className="mt-1 flex justify-between items-center text-xs text-gray-500 dark:text-gray-400">
+          <div className="mt-1 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
             <span>자신을 소개하는 글을 작성해주세요</span>
             <span>{formData.bio.length}/1000</span>
           </div>
-          <div className="mt-2 flex justify-end">
+          <div className="mt-2">
             <button
               type="button"
               onClick={handleBioUpdate}
               disabled={bioLoading || bioSuccess}
-              className="w-[60px] h-[40px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              className="w-full sm:w-[60px] min-h-[44px] sm:ml-auto px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
             >
               {bioLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -518,22 +518,22 @@ export default function ProfileSettingsPage() {
           </div>
 
           {/* 마케팅 정보 수신 설정 */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-8 mt-6">
+          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 sm:pt-8 mt-6">
             <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">마케팅 정보 수신</h3>
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <FiBell className="mr-2 text-gray-400 dark:text-gray-500" />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start sm:items-center">
+                  <FiBell className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                   <div>
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       마케팅 정보 수신
                     </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       신규 기능, 이벤트, 프로모션 정보를 받아보세요
                     </p>
                   </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-8 sm:ml-0">
                   <input
                     type="checkbox"
                     checked={marketingPreferences.marketingOptIn}
@@ -548,19 +548,19 @@ export default function ProfileSettingsPage() {
                 </label>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center">
-                  <FiMail className="mr-2 text-gray-400 dark:text-gray-500" />
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-start sm:items-center">
+                  <FiMail className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                   <div>
                     <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
                       뉴스레터 수신
                     </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                       주간/월간 뉴스레터와 추천 콘텐츠를 받아보세요
                     </p>
                   </div>
                 </div>
-                <label className="relative inline-flex items-center cursor-pointer">
+                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-8 sm:ml-0">
                   <input
                     type="checkbox"
                     checked={marketingPreferences.newsletterOptIn}
@@ -592,15 +592,15 @@ export default function ProfileSettingsPage() {
       </div>
 
       {/* 회원 탈퇴 섹션 */}
-      <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
-        <div className="bg-gray-50 dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+      <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-200 dark:border-gray-700">
+        <div className="bg-gray-50 dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6">
           <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">계정 삭제</h4>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
             계정을 삭제하면 모든 블로그 게시물, 댓글, 파일이 영구적으로 삭제되며 복구할 수 없습니다.
           </p>
           <button
             onClick={() => setShowDeleteModal(true)}
-            className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
+            className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
           >
             계정 삭제
           </button>
