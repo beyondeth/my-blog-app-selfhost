@@ -22,7 +22,8 @@ export default function EditPostPage() {
   const { postId } = useParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
-  const postIdOrSlug = Array.isArray(postId) ? postId[0] : postId;
+  // Next.js 16: useParams()의 반환값이 undefined일 수 있음
+  const postIdOrSlug = Array.isArray(postId) ? postId[0] : (postId || '');
   const { data: post, isLoading, error } = usePost(postIdOrSlug);
   const updatePost = useUpdatePost();
 

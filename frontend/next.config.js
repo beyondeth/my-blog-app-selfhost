@@ -44,10 +44,20 @@ const nextConfig = {
     ],
     formats: ['image/webp', 'image/avif'],
   },
-  experimental: {
-    serverComponentsExternalPackages: ['sharp'],
-  },
+
+  // Next.js 16: serverComponentsExternalPackages를 루트 레벨로 이동
+  serverExternalPackages: ['sharp'],
+
   transpilePackages: ['mermaid'],
+
+  // Turbopack 설정 (Next.js 16 기본값)
+  turbopack: {
+    resolveAlias: {
+      'cytoscape': require.resolve('cytoscape'),
+    },
+  },
+
+  // Webpack 설정 (fallback - webpack 사용 시)
   webpack: (config) => {
     // Mermaid와 cytoscape 관련 문제 해결
     config.resolve.alias = {
