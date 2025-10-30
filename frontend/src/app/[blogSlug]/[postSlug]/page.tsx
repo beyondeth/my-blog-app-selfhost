@@ -68,9 +68,11 @@ const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post |
 
 // 동적 메타데이터 생성 함수
 export async function generateMetadata(
-  { params }: { params: { blogSlug: string; postSlug: string } }
+  { params }: { params: Promise<{ blogSlug: string; postSlug: string }> }
 ): Promise<Metadata> {
-  const post = await getPost(params.blogSlug, params.postSlug);
+  // Next.js 16: params는 Promise
+  const { blogSlug, postSlug } = await params;
+  const post = await getPost(blogSlug, postSlug);
 
   if (!post) {
     return {
@@ -93,14 +95,14 @@ export async function generateMetadata(
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
   // 포스트 전체 URL
-  const postUrl = `${siteUrl}/${params.blogSlug}/${params.postSlug}`;
+  const postUrl = `${siteUrl}/${blogSlug}/${postSlug}`;
 
   // 썸네일 이미지 URL (절대 경로로 변환)
   const ogImage = post.thumbnail
     ? (post.thumbnail.startsWith('http')
         ? post.thumbnail
         : `${siteUrl}${post.thumbnail}`)
-    : `${siteUrl}/assets/block-logo.png`; // 기본 OG 이미지
+    : `${siteUrl}/assets/block-logo(dark)-128.png`; // 기본 OG 이미지
 
   // 저자 정보
   const authorName = post.author?.username || post.blog?.name || 'Unknown Author';
@@ -264,10 +266,13 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
 export default async function BlogPostDetailPage({
   params,
 }: {
-  params: { blogSlug: string; postSlug: string };
+  params: Promise<{ blogSlug: string; postSlug: string }>;
 }) {
+  // Next.js 16: params는 Promise
+  const { blogSlug, postSlug } = await params;
+
   // 포스트 데이터 미리 가져오기 (404 체크용)
-  const post = await getPost(params.blogSlug, params.postSlug);
+  const post = await getPost(blogSlug, postSlug);
 
   // 포스트가 없으면 404 페이지로
   if (!post) {
@@ -275,7 +280,7 @@ export default async function BlogPostDetailPage({
   }
 
   // JSON-LD 구조화된 데이터 생성
-  const structuredData = generateStructuredData(post, params);
+  const structuredData = generateStructuredData(post, { blogSlug, postSlug });
 
   return (
     <>

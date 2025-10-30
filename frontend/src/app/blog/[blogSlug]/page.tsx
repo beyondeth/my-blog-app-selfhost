@@ -8,10 +8,11 @@ import { redirect } from 'next/navigation';
  *
  * SEO 유지를 위한 영구 리다이렉트
  */
-export default function LegacyBlogHomePage({
+export default async function LegacyBlogHomePage({
   params
 }: {
-  params: { blogSlug: string }
+  params: Promise<{ blogSlug: string }>
 }) {
-  redirect(`/${params.blogSlug}`);
+  const { blogSlug } = await params;
+  redirect(`/${blogSlug}`);
 }
