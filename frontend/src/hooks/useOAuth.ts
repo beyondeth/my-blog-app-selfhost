@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from 'react';
 import { toast } from 'sonner';
+import { mixpanel } from '@/lib/mixpanel';
 
 export type OAuthProvider = 'google' | 'kakao' | 'github';
 
@@ -33,10 +34,13 @@ export function useOAuth(options: UseOAuthOptions = {}) {
         console.log(`OAuth redirect to: ${authUrl}`);
       }
 
+      // Mixpanel: OAuth 로그인 시작 추적
+      mixpanel.track('User Login', { method: provider });
+
       // OAuth 제공자 페이지로 리디렉션
       // replace를 사용하여 로그인 페이지를 히스토리에서 대체
       window.location.replace(authUrl);
-      
+
       // 성공 콜백 (실제로는 리디렉션 되므로 실행되지 않음)
       options.onSuccess?.();
     } catch (err) {

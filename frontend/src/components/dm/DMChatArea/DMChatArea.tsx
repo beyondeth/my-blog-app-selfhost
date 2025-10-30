@@ -45,11 +45,21 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
   // 채팅창 외부 클릭 처리 - 대화방 나가기
   useEffect(() => {
     const handleOutsideClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+
+      // Radix UI Portal 요소 무시 (Popover, Dialog 등)
+      if (
+        target.closest('[data-radix-portal]') ||
+        target.closest('[data-radix-popper-content-wrapper]') ||
+        target.closest('[data-portal-modal]')
+      ) {
+        return;
+      }
+
       // 채팅 영역 외부를 클릭하면 대화방에서 나감
-      if (chatAreaRef.current && !chatAreaRef.current.contains(e.target as Node)) {
+      if (chatAreaRef.current && !chatAreaRef.current.contains(target)) {
         if (socket) {
           socket.emit(SOCKET_EVENTS.LEAVE_CONVERSATION, conversationId);
-          console.log('[채팅] 외부 클릭으로 대화방 나감:', conversationId);
         }
       }
     };

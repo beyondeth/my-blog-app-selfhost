@@ -105,7 +105,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
             // 일반 레이아웃: 헤더 + 사이드바 + 메인 콘텐츠 + 하단 바텀바
             <div>
               <Header />
-              <div className="flex">
+              <div className="flex" style={{ border: 'none', transition: 'none' }}>
                 <LeftSidebar />
                 {/* 왼쪽 사이드바 영역 확보: translate-x-[23px] + w-20 = 103px, 여유 25px 포함 = 128px */}
                 <MainContent>

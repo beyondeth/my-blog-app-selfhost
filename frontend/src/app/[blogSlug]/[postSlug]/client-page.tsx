@@ -19,6 +19,7 @@ import { useToggleBookmark } from '@/hooks/useBookmarks';
 import { useToggleEditorPick } from '@/hooks/useEditorPicks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { mixpanel } from '@/lib/mixpanel';
 
 /**
  * 댓글 섹션 Lazy Loading 컴포넌트
@@ -256,6 +257,12 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       hasViewed.current = true;
       // Increment view count
       fetch(`/api/v1/posts/${post.id}/view`, { method: 'POST' }).catch(console.error);
+
+      // Mixpanel: 포스트 조회 이벤트 추적
+      mixpanel.track('Post Viewed', {
+        postId: post.id,
+        slug: post.slug || postSlug,
+      });
     }
   }, [post?.id]);
 

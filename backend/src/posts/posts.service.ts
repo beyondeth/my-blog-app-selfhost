@@ -2295,4 +2295,37 @@ export class PostsService {
       count: parseInt(row.count, 10),
     }));
   }
+
+  /**
+   * Sitemap 생성을 위한 모든 발행된 포스트 조회
+   *
+   * @description
+   * SEO 최적화를 위해 sitemap.xml 생성 시 사용됩니다.
+   * - 발행된 포스트(isPublished = true)만 조회
+   * - 공개 블로그의 포스트만 포함
+   * - 성능을 위해 최소 필드만 SELECT (slug, blogSlug, updatedAt)
+   * - relations 없이 조회하여 쿼리 최적화
+   * - 페이지네이션 없이 전체 데이터 반환
+   *
+   * @returns 발행된 포스트의 slug, blogSlug, updatedAt 배열
+   */
+  async getAllPublishedPostsForSitemap(): Promise<Array<{ slug: string; blogSlug: string; updatedAt: Date }>> {
+    const posts = await this.postsRepository
+      .createQueryBuilder('post')
+      .select(['post.slug', 'post.updatedAt'])
+      .addSelect('blog.slug', 'blogSlug')
+      .leftJoin('post.blog', 'blog')
+      .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('blog.isPublic = :isPublic', { isPublic: true })
+      .orderBy('post.updatedAt', 'DESC')
+      .getRawMany();
+
+    this.logger.debug(`[Sitemap] Found ${posts.length} published posts`);
+
+    return posts.map(row => ({
+      slug: row.post_slug,
+      blogSlug: row.blogSlug,
+      updatedAt: row.post_updatedAt
+    }));
+  }
 } 

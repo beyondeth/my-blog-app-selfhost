@@ -78,7 +78,7 @@ export default function SecuritySettingsPage() {
 
   if (!user) {
     return (
-      <div className="p-8 text-center">
+      <div className="p-4 sm:p-6 md:p-8 text-center">
         <p className="text-gray-600 dark:text-gray-400">로그인이 필요합니다</p>
       </div>
     );
@@ -141,19 +141,19 @@ export default function SecuritySettingsPage() {
   const authInfo = getAuthProviderInfo();
 
   return (
-    <div className="p-8">
-      <div className="mb-8">
+    <div className="p-4 sm:p-6 md:p-8">
+      <div className="mb-6 sm:mb-8">
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">보안 설정</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
           계정 보안을 강화하고 안전하게 관리하세요
         </p>
       </div>
 
-      <div className="space-y-8">
+      <div className="space-y-6 sm:space-y-8">
         {/* Authentication Info Section */}
-        <div className="bg-gray-50 dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-lg p-6">
+        <div className="bg-gray-50 dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6">
           <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-4">인증 정보</h3>
-          <div className="flex items-center space-x-3">
+          <div className="flex items-start sm:items-center gap-3">
             {authInfo.icon}
             <div>
               <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
@@ -182,13 +182,14 @@ export default function SecuritySettingsPage() {
                   id="currentPassword"
                   value={passwordForm.currentPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
+                  className="w-full px-3 py-2 pr-12 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowCurrentPassword(!showCurrentPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center"
+                  aria-label={showCurrentPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
                 >
                   {showCurrentPassword ? (
                     <FiEyeOff className="h-5 w-5 text-gray-400" />
@@ -210,13 +211,14 @@ export default function SecuritySettingsPage() {
                   id="newPassword"
                   value={passwordForm.newPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
+                  className="w-full px-3 py-2 pr-12 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowNewPassword(!showNewPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center"
+                  aria-label={showNewPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
                 >
                   {showNewPassword ? (
                     <FiEyeOff className="h-5 w-5 text-gray-400" />
@@ -239,13 +241,14 @@ export default function SecuritySettingsPage() {
                   id="confirmPassword"
                   value={passwordForm.confirmPassword}
                   onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
-                  className="w-full px-3 py-2 pr-10 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
+                  className="w-full px-3 py-2 pr-12 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-500 dark:focus:ring-gray-400"
                   required
                 />
                 <button
                   type="button"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  className="absolute inset-y-0 right-0 pr-2 flex items-center min-w-[44px] justify-center"
+                  aria-label={showConfirmPassword ? "비밀번호 숨기기" : "비밀번호 표시"}
                 >
                   {showConfirmPassword ? (
                     <FiEyeOff className="h-5 w-5 text-gray-400" />
@@ -256,7 +259,7 @@ export default function SecuritySettingsPage() {
               </div>
             </div>
 
-            <div className="flex justify-end">
+            <div>
               <button
                 type="submit"
                 disabled={loading}
@@ -267,7 +270,7 @@ export default function SecuritySettingsPage() {
                     e.stopPropagation();
                   }
                 }}
-                className="px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="w-full sm:w-auto sm:ml-auto min-h-[44px] px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
               >
                 {loading ? '변경 중...' : '비밀번호 변경'}
               </button>
@@ -276,7 +279,7 @@ export default function SecuritySettingsPage() {
         </div>
         ) : (
           /* OAuth Users Security Info */
-          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-6">
+          <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4 sm:p-6">
             <div className="flex items-start space-x-3">
               <FiAlertCircle className="h-5 w-5 text-blue-600 dark:text-blue-400 mt-0.5" />
               <div className="flex-1">
