@@ -14,11 +14,11 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: 'Codebase - 개발자를 위한 블로그 플랫폼',
+    default: 'Codebase - 블로그 자동포스팅 MCP',
     template: '%s | Codebase',
   },
-  description: '개발자를 위한 전문 블로그 플랫폼. 기술 블로그를 작성하고 공유하세요. 마크다운 에디터, 코드 하이라이팅, 구독 시스템을 제공합니다.',
-  keywords: ['개발 블로그', '기술 블로그', '프로그래밍', '코딩', '개발자 커뮤니티', 'Codebase'],
+  description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
+  keywords: ['개발 블로그', '기술 블로그', '바이브코딩', '일상공유', '커뮤니티'],
   authors: [{ name: 'Codebase' }],
   creator: 'Codebase',
   publisher: 'Codebase',
@@ -37,22 +37,22 @@ export const metadata: Metadata = {
     type: 'website',
     locale: 'ko_KR',
     url: siteUrl,
-    title: 'Codebase - 개발자를 위한 블로그 플랫폼',
-    description: '개발자를 위한 전문 블로그 플랫폼. 기술 블로그를 작성하고 공유하세요.',
+    title: 'Codebase - 블로그 자동포스팅 MCP',
+    description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
     siteName: 'Codebase',
     images: [
       {
         url: '/og-image.png',
         width: 1200,
         height: 630,
-        alt: 'Codebase - 개발자를 위한 블로그 플랫폼',
+        alt: '블로그 자동포스팅',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Codebase - 개발자를 위한 블로그 플랫폼',
-    description: '개발자를 위한 전문 블로그 플랫폼. 기술 블로그를 작성하고 공유하세요.',
+    title: 'Codebase - 블로그 자동포스팅 MCP',
+    description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
     images: ['/og-image.png'],
   },
   icons: {

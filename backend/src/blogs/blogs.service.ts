@@ -127,14 +127,14 @@ export class BlogsService {
 
   async update(id: string, updateBlogDto: UpdateBlogDto): Promise<Blog> {
     const blog = await this.findOne(id);
-    
+
     // isPublic과 allowComments 필드가 없는 경우 기본값 설정
     // 데이터베이스에 필드가 아직 없을 수 있으므로 임시로 처리
     const updatedBlog = {
       ...blog,
       ...updateBlogDto
     };
-    
+
     // isPublic과 allowComments가 undefined인 경우 기본값 설정
     if (updateBlogDto.isPublic !== undefined) {
       updatedBlog.isPublic = updateBlogDto.isPublic;
@@ -142,8 +142,36 @@ export class BlogsService {
     if (updateBlogDto.allowComments !== undefined) {
       updatedBlog.allowComments = updateBlogDto.allowComments;
     }
-    
+
     await this.blogRepository.save(updatedBlog);
     return await this.findOne(id);
+  }
+
+  /**
+   * Sitemap 생성을 위한 모든 공개 블로그 조회
+   *
+   * @description
+   * SEO 최적화를 위해 sitemap.xml 생성 시 사용됩니다.
+   * - 공개 블로그(isPublic = true)만 조회
+   * - 성능을 위해 최소 필드만 SELECT (slug, updatedAt)
+   * - relations 없이 조회하여 쿼리 최적화
+   * - 페이지네이션 없이 전체 데이터 반환
+   *
+   * @returns 공개 블로그의 slug와 updatedAt 배열
+   */
+  async getAllPublicBlogsForSitemap(): Promise<Array<{ slug: string; updatedAt: Date }>> {
+    const blogs = await this.blogRepository
+      .createQueryBuilder('blog')
+      .select(['blog.slug', 'blog.updatedAt'])
+      .where('blog.isPublic = :isPublic', { isPublic: true })
+      .orderBy('blog.updatedAt', 'DESC')
+      .getMany();
+
+    this.logger.debug(`[Sitemap] Found ${blogs.length} public blogs`);
+
+    return blogs.map(blog => ({
+      slug: blog.slug,
+      updatedAt: blog.updatedAt
+    }));
   }
 }

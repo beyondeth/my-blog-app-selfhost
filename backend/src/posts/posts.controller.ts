@@ -672,4 +672,40 @@ export class PostsController {
   async getUserCategories(@CurrentUser() user: User): Promise<string[]> {
     return this.postsService.getUserCategories(user.id);
   }
+
+  /**
+   * Sitemap 생성을 위한 모든 발행된 포스트 조회
+   *
+   * @description
+   * SEO 최적화를 위해 sitemap.xml 생성 시 사용되는 엔드포인트입니다.
+   * - 인증 불필요 (@Public)
+   * - 발행된 포스트만 반환 (isPublished = true)
+   * - 공개 블로그의 포스트만 포함 (isPublic = true)
+   * - 최소 데이터만 반환 (slug, blogSlug, updatedAt)
+   * - 페이지네이션 없이 전체 데이터 반환
+   * - 성능 최적화를 위해 최소 필드만 SELECT
+   *
+   * @returns 발행된 포스트의 slug, blogSlug, updatedAt 배열
+   */
+  @Get('sitemap/all')
+  @Public()
+  @ApiOperation({ summary: 'Sitemap용 모든 발행된 포스트 조회' })
+  @ApiResponse({
+    status: 200,
+    description: '발행된 포스트 목록 (slug, blogSlug, updatedAt)',
+    schema: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          slug: { type: 'string', example: 'my-first-post' },
+          blogSlug: { type: 'string', example: 'john-blog' },
+          updatedAt: { type: 'string', format: 'date-time', example: '2025-01-20T12:00:00.000Z' },
+        },
+      },
+    },
+  })
+  async getAllPostsForSitemap(): Promise<Array<{ slug: string; blogSlug: string; updatedAt: Date }>> {
+    return this.postsService.getAllPublishedPostsForSitemap();
+  }
 } 
