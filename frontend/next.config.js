@@ -52,8 +52,9 @@ const nextConfig = {
 
   // Turbopack 설정 (Next.js 16 기본값)
   turbopack: {
+    // Turbopack은 require.resolve() 절대 경로를 처리 못함 → 패키지명만 사용
     resolveAlias: {
-      'cytoscape': require.resolve('cytoscape'),
+      cytoscape: 'cytoscape',
     },
   },
 
@@ -62,7 +63,7 @@ const nextConfig = {
     // Mermaid와 cytoscape 관련 문제 해결
     config.resolve.alias = {
       ...config.resolve.alias,
-      'cytoscape': require.resolve('cytoscape'),
+      cytoscape: 'cytoscape',
     };
     return config;
   },
