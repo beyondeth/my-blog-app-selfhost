@@ -7,15 +7,21 @@ import { useDMStore } from '@/stores/dmStore';
 import { useConversationList } from '@/hooks/useConversationList';
 import ConversationItem from './ConversationItem';
 import ConversationSearch from './ConversationSearch';
+import { Avatar } from '@/components/ui/avatar';
+import { useRouter } from 'next/navigation';
+import { useWindowSize } from '@/hooks/useWindowSize';
 
 const DMConversationList: React.FC = () => {
   const { user } = useAuth();
+  const router = useRouter();
+  const { isMobile } = useWindowSize();
   const {
     activeConversationId,
     setActiveConversation,
     conversationFilter,
     setShowUnreadOnly,
     conversationListVersion,
+    setDMModalOpen,
   } = useDMStore();
 
   const {
@@ -29,6 +35,12 @@ const DMConversationList: React.FC = () => {
 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
+
+  // 모바일 헤더용 나가기 핸들러
+  const handleExit = useCallback(() => {
+    setDMModalOpen(false);
+    router.push('/');
+  }, [router, setDMModalOpen]);
 
   // Handle conversation selection
   const handleConversationClick = useCallback((conversationId: string) => {
@@ -46,7 +58,6 @@ const DMConversationList: React.FC = () => {
   // This ensures the lastReadAt-based unreadCount is accurate
   useEffect(() => {
     const interval = setInterval(() => {
-      console.log('[DMConversationList] Auto-refreshing conversations to sync unreadCount');
       refreshConversations();
     }, 10000); // Refresh every 10 seconds (reduced from 30 seconds for better accuracy)
 
@@ -87,10 +98,30 @@ const DMConversationList: React.FC = () => {
       <div className="px-4 py-4 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold text-gray-800">메시지</h2>
+
+          {/* 모바일 전용: 프로필 이미지 + 나가기 버튼 */}
+          <div className="flex items-center gap-2 md:hidden">
+            <Avatar
+              src={user?.profileImage}
+              fallback={user?.username?.[0]?.toUpperCase() || '?'}
+              size="sm"
+              className="cursor-pointer ring-2 ring-gray-300 hover:ring-gray-400 transition-all"
+              onClick={() => router.push('/settings')}
+            />
+            <button
+              onClick={handleExit}
+              className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors text-sm font-medium"
+              aria-label="나가기"
+            >
+              나가기
+            </button>
+          </div>
+
+          {/* 데스크톱 전용: 새로고침 버튼 */}
           <button
             onClick={handleRefresh}
             disabled={isRefreshing}
-            className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="p-2 rounded-lg hover:bg-gray-100 transition-colors disabled:opacity-50 hidden md:block"
             aria-label="Refresh conversations"
           >
             <RefreshCw
@@ -144,28 +175,28 @@ const DMConversationList: React.FC = () => {
           </div>
         ) : error ? (
           // Error state
-          <div className="text-center p-8">
-            <p className="text-red-500 mb-2">오류가 발생했습니다</p>
+          <div className="text-center p-4 sm:p-8">
+            <p className="text-sm sm:text-base text-red-500 mb-2">오류가 발생했습니다</p>
             <p className="text-sm text-gray-500">{error}</p>
             <button
               onClick={handleRefresh}
-              className="mt-4 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              className="mt-3 sm:mt-4 px-4 py-2 min-h-[44px] bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
               다시 시도
             </button>
           </div>
         ) : filteredConversations.length === 0 ? (
           // Empty state
-          <div className="text-center p-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-gray-100 rounded-full flex items-center justify-center">
-              <Search className="w-8 h-8 text-gray-400" />
+          <div className="text-center p-4 sm:p-8">
+            <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-gray-100 rounded-full flex items-center justify-center">
+              <Search className="w-6 h-6 sm:w-8 sm:h-8 text-gray-400" />
             </div>
-            <p className="text-gray-500">
+            <p className="text-sm sm:text-base text-gray-500">
               {conversationFilter.searchQuery
                 ? '검색 결과가 없습니다'
                 : '대화가 없습니다'}
             </p>
-            <p className="text-sm text-gray-400 mt-2">
+            <p className="text-sm text-gray-400 mt-2 break-keep">
               프로필에서 메시지 버튼을 눌러 대화를 시작하세요
             </p>
           </div>

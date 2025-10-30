@@ -364,10 +364,59 @@
     max-width: 100%;
   }
 
-  /* 코드 블록 패딩 축소 - 모바일 공간 효율성 */
+  /* 코드 블록 모바일 최적화 - PC 레이아웃 영향 없음 */
   .prose pre,
   .code-block-wrapper pre {
     padding: 0.75rem 0.75rem 1.25rem 0.75rem; /* 하단 패딩 추가로 스크롤바와 텍스트 사이 여백 확보 */
+    font-size: 0.75rem; /* 12px - 모바일에서만 축소, PC는 0.9375rem 유지 */
+    -webkit-overflow-scrolling: touch; /* iOS 부드러운 스크롤 */
+    scroll-behavior: smooth;
+  }
+
+  /* 코드 내용도 폰트 크기 조정 */
+  .prose pre code {
+    font-size: 0.75rem; /* 12px - 모바일 전용 */
+    /* 긴 라인은 스크롤로 처리 (코드는 줄바꿈 안함) */
+    word-break: normal;
+    white-space: pre;
+  }
+
+  /* 복사 버튼 모바일 최적화 - 최소 크기 */
+  .copy-code-btn {
+    padding: 0.25rem; /* 매우 컴팩트 (4px) */
+    min-width: 24px;
+    min-height: 24px;
+    top: 0.5rem;
+    right: 0.5rem;
+  }
+
+  .copy-code-btn svg {
+    width: 10px; /* 매우 작은 아이콘 */
+    height: 10px;
+  }
+
+  /* 인라인 코드도 모바일에서 약간 축소 */
+  .prose code:not(pre code) {
+    font-size: 0.8125rem; /* 13px */
+    padding: 0.125rem 0.25rem;
+  }
+
+  /* 코드블록 스크롤 가능 힌트 (그라데이션) */
+  .code-block-wrapper {
+    position: relative;
+  }
+
+  /* 오른쪽 페이드 효과로 스크롤 가능함을 표시 */
+  .code-block-wrapper.has-overflow::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 30px;
+    background: linear-gradient(to right, transparent, rgba(40, 44, 52, 0.9));
+    pointer-events: none;
+    border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
   }
 
   /* 테이블 수평 스크롤 처리 */
@@ -387,6 +436,55 @@
   .prose img {
     max-height: 60vh;
     object-fit: contain;
+  }
+}
+
+/* 초소형 모바일 대응 (360px 이하) - 저사양 안드로이드 기기 */
+@media (max-width: 360px) {
+  /* 더 작은 폰트 크기 */
+  .prose pre,
+  .code-block-wrapper pre {
+    font-size: 0.6875rem; /* 11px */
+    padding: 0.5rem;
+  }
+
+  .prose pre code {
+    font-size: 0.6875rem; /* 11px */
+  }
+
+  /* 제목도 더 축소 */
+  .prose h1 {
+    font-size: 1.5rem; /* 24px */
+  }
+  .prose h2 {
+    font-size: 1.25rem; /* 20px */
+  }
+  .prose h3 {
+    font-size: 1.125rem; /* 18px */
+  }
+
+  /* 본문 텍스트 */
+  .prose p {
+    font-size: 0.9375rem; /* 15px */
+  }
+
+  /* 포스트 콘테이너 패딩 조정 */
+  #post-content {
+    padding-left: 0.75rem !important;  /* 12px */
+    padding-right: 0.75rem !important; /* 12px */
+  }
+}
+
+/* 안전 영역(Safe Area) 대응 - iPhone X 이상 노치/홈 인디케이터 */
+@supports (padding: env(safe-area-inset-bottom)) {
+  .prose {
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* 하단 네비게이션이 있는 경우 */
+  .prose:last-child {
+    padding-bottom: env(safe-area-inset-bottom);
   }
 }
 

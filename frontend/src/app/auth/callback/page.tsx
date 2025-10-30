@@ -1,17 +1,18 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Home, UserPlus } from 'lucide-react';
 import Link from 'next/link';
 
 /**
- * OAuth 콜백 페이지
+ * OAuth 콜백 페이지 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
  *
  * 참고: 백엔드에서 약관 동의 여부를 체크하여 /consent 또는 /로 직접 리다이렉트합니다.
  * 이 페이지는 에러 처리 또는 예외 상황을 위해 유지됩니다.
  */
-export default function AuthCallbackPage() {
+function AuthCallbackPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const hasProcessed = useRef(false);
@@ -118,5 +119,26 @@ export default function AuthCallbackPage() {
         <p className="text-gray-600 dark:text-gray-400">로그인 처리 중...</p>
       </div>
     </div>
+  );
+}
+
+/**
+ * OAuth 콜백 페이지 (Suspense 래퍼)
+ */
+export default function AuthCallbackPage() {
+  // fallback도 로딩 화면으로 동일하게
+  const fallback = (
+    <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
+      <div className="text-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-gray-900 dark:border-gray-700 dark:border-t-gray-100 mx-auto mb-4"></div>
+        <p className="text-gray-600 dark:text-gray-400">로그인 처리 중...</p>
+      </div>
+    </div>
+  );
+
+  return (
+    <Suspense fallback={fallback}>
+      <AuthCallbackPageContent />
+    </Suspense>
   );
 }

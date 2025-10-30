@@ -7,6 +7,7 @@
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
 import type { User, LoginForm, RegisterForm } from '@/types';
 import { authEvents, emitLogin, emitLogout, emitTokenRefreshed, emitAuthError } from './events';
+import { mixpanel } from '@/lib/mixpanel';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -293,6 +294,10 @@ export const useLogin = () => {
       // 블로그 정보 무효화 (재조회 트리거)
       queryClient.invalidateQueries({ queryKey: ['blogs', 'my-blogs'] });
       queryClient.invalidateQueries({ queryKey: ['user-blog'] });
+
+      // Mixpanel: 로그인 이벤트 추적
+      mixpanel.track('User Login', { method: 'email' });
+      mixpanel.identify(data.user.id);
     },
     onError: (error) => {
       console.error('로그인 실패:', error);
@@ -324,6 +329,14 @@ export const useRegister = () => {
 
       // 회원가입 후 자동 로그인 이벤트
       emitLogin(data.user);
+
+      // Mixpanel: 회원가입 이벤트 추적
+      mixpanel.track('User Signup', { method: 'email' });
+      mixpanel.identify(data.user.id);
+      mixpanel.people.set({
+        $name: data.user.username,
+        $email: data.user.email,
+      });
     },
     onError: (error) => {
       console.error('회원가입 실패:', error);
@@ -365,6 +378,10 @@ export const useLogout = () => {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       }
+
+      // Mixpanel: 로그아웃 이벤트 추적 및 세션 초기화
+      mixpanel.track('User Logout', {});
+      mixpanel.reset();
     },
     onError: (error) => {
       console.error('[Auth] 로그아웃 실패:', error);

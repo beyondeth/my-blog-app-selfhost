@@ -73,7 +73,8 @@ class DMErrorBoundary extends Component<Props, State> {
 
     // Example API call to error tracking service
     if (typeof window !== 'undefined') {
-      fetch('/api/v1/errors/track', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+      fetch(`${apiUrl}/errors/track`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(errorData),

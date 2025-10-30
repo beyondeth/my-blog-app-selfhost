@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -10,7 +10,11 @@ import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 
-export default function LoginPage() {
+/**
+ * 로그인 페이지 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
+ */
+function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login, refreshUser } = useAuth();
@@ -359,5 +363,16 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * 로그인 페이지 (Suspense 래퍼)
+ */
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginPageContent />
+    </Suspense>
   );
 }

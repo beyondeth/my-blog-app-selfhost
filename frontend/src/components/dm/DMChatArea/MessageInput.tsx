@@ -203,7 +203,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
               border-gray-200
               p-3
               z-50
-              w-80
+              w-full max-w-[280px] sm:w-80
             ">
               <div className="grid grid-cols-8 gap-1">
                 {['😀', '😁', '😂', '😃', '😄', '😅', '😆', '😇',

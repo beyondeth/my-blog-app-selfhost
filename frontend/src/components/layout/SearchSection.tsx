@@ -3,7 +3,7 @@
 import React, { useCallback } from 'react';
 import { FiSearch } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
-// import { useAnalytics } from '@/modules/analytics';
+import { mixpanel } from '@/lib/mixpanel';
 
 interface SearchSectionProps {
   searchQuery: string;
@@ -18,35 +18,23 @@ const SearchSection = React.memo(function SearchSection({
   onSearch,
   resultsCount = 0,
 }: SearchSectionProps) {
-  // const analytics = useAnalytics();
-
   const handleSubmit = useCallback((e: React.FormEvent) => {
     e.preventDefault();
-    
-    // 검색 추적 (모듈화된 분석 시스템 사용)
-    // if (searchQuery.trim()) {
-    //   analytics.trackSearch(searchQuery.trim(), resultsCount);
-    //   analytics.trackInteraction('search_submit', searchQuery.trim(), {
-    //     queryLength: searchQuery.trim().length,
-    //     timestamp: Date.now(),
-    //   });
-    // }
-    
     onSearch(searchQuery);
-  }, [onSearch, searchQuery, resultsCount/*, analytics*/]);
+
+    // Mixpanel: 검색 이벤트 추적
+    if (searchQuery.trim()) {
+      mixpanel.track('Search Performed', {
+        query: searchQuery.trim(),
+        resultsCount: resultsCount,
+      });
+    }
+  }, [onSearch, searchQuery, resultsCount]);
 
   const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const newQuery = e.target.value;
     onSearchQueryChange(newQuery);
-    
-    // 타이핑 패턴 추적 (3글자 이상일 때만)
-    // if (newQuery.length >= 3) {
-    //   analytics.trackInteraction('search_typing', newQuery, {
-    //     queryLength: newQuery.length,
-    //     timestamp: Date.now(),
-    //   });
-    // }
-  }, [onSearchQueryChange/*, analytics*/]);
+  }, [onSearchQueryChange]);
 
   return (
     <SidebarSection title="검색">

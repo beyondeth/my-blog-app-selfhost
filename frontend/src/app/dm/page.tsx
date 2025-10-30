@@ -1,13 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useDMStore } from '@/stores/dmStore';
 import DMLayout from '@/components/dm/DMLayout/DMLayout';
 import DMErrorBoundary from '@/components/dm/DMErrorBoundary';
 
-export default function DMPage() {
+/**
+ * DM 페이지 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
+ */
+function DMPageContent() {
   const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -41,5 +45,16 @@ export default function DMPage() {
     >
       <DMLayout />
     </DMErrorBoundary>
+  );
+}
+
+/**
+ * DM 페이지 (Suspense 래퍼)
+ */
+export default function DMPage() {
+  return (
+    <Suspense fallback={null}>
+      <DMPageContent />
+    </Suspense>
   );
 }
