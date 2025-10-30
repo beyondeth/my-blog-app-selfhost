@@ -71,6 +71,11 @@ export default function HtmlRenderer({ content, onImageClick, className = '' }: 
     );
 
     // 클라이언트 사이드 살균 (백엔드에서 이미 처리되었지만 추가 보안)
+    // SSR 환경에서 DOMPurify 실행 방지
+    if (typeof window === 'undefined') {
+      return processed;
+    }
+
     const sanitized = DOMPurify.sanitize(processed, {
       ALLOWED_TAGS: [
         'p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',

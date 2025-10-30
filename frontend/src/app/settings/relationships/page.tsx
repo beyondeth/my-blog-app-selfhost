@@ -202,22 +202,22 @@ export default function RelationshipsPage() {
     const isSelected = selectedUsers.includes(user.id);
 
     return (
-      <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-        <div className="flex items-center gap-3 flex-1">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors gap-3 sm:gap-0">
+        <div className="flex items-center gap-2 sm:gap-3 flex-1 w-full sm:w-auto">
           {/* Checkbox */}
           <div
             onClick={() => toggleUserSelection(user.id)}
-            className={`w-5 h-5 border-2 rounded cursor-pointer flex items-center justify-center transition-colors ${
+            className={`min-w-[44px] min-h-[44px] w-6 h-6 sm:w-5 sm:h-5 border-2 rounded cursor-pointer flex items-center justify-center transition-colors ${
               isSelected ? 'bg-black dark:bg-gray-600 border-black dark:border-gray-600' : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
             }`}
           >
-            {isSelected && <Check className="w-3 h-3 text-white" />}
+            {isSelected && <Check className="w-4 h-4 sm:w-3 sm:h-3 text-white" />}
           </div>
 
           {/* User Info */}
           <Link
             href={user.blog?.slug ? `/${user.blog.slug}` : '#'}
-            className="flex items-center gap-3 flex-1 group"
+            className="flex items-center gap-2 sm:gap-3 flex-1 group min-h-[44px]"
           >
             <UserAvatar
               profileImage={user.profileImage}
@@ -225,69 +225,71 @@ export default function RelationshipsPage() {
               size="md"
             />
             <div className="flex-1 min-w-0">
-              <p className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-gray-700 dark:group-hover:text-gray-300">
+              <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-gray-100 group-hover:text-gray-700 dark:group-hover:text-gray-300">
                 {user.username}
               </p>
               {user.bio && (
-                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.bio}</p>
+                <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{user.bio}</p>
               )}
             </div>
           </Link>
+        </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2">
-            {type === 'following' ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => unfollowMutation.mutate(user.id)}
-                disabled={unfollowMutation.isPending}
-              >
-                언팔로우
-              </Button>
-            ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => removeFollowerMutation.mutate(user.id)}
-                disabled={removeFollowerMutation.isPending}
-              >
-                삭제
-              </Button>
-            )}
-          </div>
+        {/* Actions */}
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          {type === 'following' ? (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => unfollowMutation.mutate(user.id)}
+              disabled={unfollowMutation.isPending}
+              className="min-h-[44px] w-full sm:w-auto"
+            >
+              언팔로우
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => removeFollowerMutation.mutate(user.id)}
+              disabled={removeFollowerMutation.isPending}
+              className="min-h-[44px] w-full sm:w-auto"
+            >
+              삭제
+            </Button>
+          )}
         </div>
       </div>
     );
   };
 
   return (
-    <div className="p-6">
-      <div className="mb-6">
-        <h2 className="text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">관계 설정</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400">
+    <div className="p-4 sm:p-6">
+      <div className="mb-4 sm:mb-6">
+        <h2 className="text-lg sm:text-xl font-semibold mb-2 text-gray-900 dark:text-gray-100">관계 설정</h2>
+        <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
           Following과 Followers를 관리하고 관계를 설정하세요
         </p>
       </div>
 
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as 'following' | 'followers' | 'blocked')} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-6">
-          <TabsTrigger value="following" className="flex items-center gap-2">
-            <Users className="w-4 h-4" />
-            Following ({followingData?.total || 0})
+        <TabsList className="grid w-full grid-cols-3 mb-4 sm:mb-6 min-h-[44px]">
+          <TabsTrigger value="following" className="flex items-center gap-1 sm:gap-2 min-h-[44px] text-xs sm:text-sm px-1 sm:px-3">
+            <Users className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Following</span><span className="sm:hidden">팔로잉</span> ({followingData?.total || 0})
           </TabsTrigger>
-          <TabsTrigger value="followers" className="flex items-center gap-2">
-            <UserCheck className="w-4 h-4" />
-            Followers ({followersData?.total || 0})
+          <TabsTrigger value="followers" className="flex items-center gap-1 sm:gap-2 min-h-[44px] text-xs sm:text-sm px-1 sm:px-3">
+            <UserCheck className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">Followers</span><span className="sm:hidden">팔로워</span> ({followersData?.total || 0})
           </TabsTrigger>
-          <TabsTrigger value="blocked" className="flex items-center gap-2">
-            <Ban className="w-4 h-4" />
-            차단 목록 ({blockedData?.total || 0})
+          <TabsTrigger value="blocked" className="flex items-center gap-1 sm:gap-2 min-h-[44px] text-xs sm:text-sm px-1 sm:px-3">
+            <Ban className="w-3 h-3 sm:w-4 sm:h-4" />
+            <span className="hidden sm:inline">차단 목록</span><span className="sm:hidden">차단</span> ({blockedData?.total || 0})
           </TabsTrigger>
         </TabsList>
 
         {/* Search and Actions Bar */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-4">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
@@ -295,16 +297,17 @@ export default function RelationshipsPage() {
               placeholder="사용자 검색..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 min-h-[44px]"
             />
           </div>
-          
+
           {selectedUsers.length > 0 && (
             <div className="flex gap-2">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={clearSelection}
+                className="min-h-[44px] flex-1 sm:flex-initial"
               >
                 선택 해제 ({selectedUsers.length})
               </Button>
@@ -313,10 +316,10 @@ export default function RelationshipsPage() {
                   variant="destructive"
                   size="sm"
                   onClick={handleBulkUnfollow}
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 min-h-[44px] flex-1 sm:flex-initial"
                 >
                   <UserMinus className="w-4 h-4" />
-                  선택 언팔로우
+                  <span className="hidden sm:inline">선택 언팔로우</span><span className="sm:hidden">언팔로우</span>
                 </Button>
               )}
               {activeTab === 'blocked' && (
@@ -324,20 +327,21 @@ export default function RelationshipsPage() {
                   variant="outline"
                   size="sm"
                   onClick={handleBulkUnblock}
-                  className="flex items-center gap-2"
+                  className="flex items-center justify-center gap-2 min-h-[44px] flex-1 sm:flex-initial"
                 >
                   <X className="w-4 h-4" />
-                  선택 차단 해제
+                  <span className="hidden sm:inline">선택 차단 해제</span><span className="sm:hidden">차단 해제</span>
                 </Button>
               )}
             </div>
           )}
-          
+
           {selectedUsers.length === 0 && (
             <Button
               variant="outline"
               size="sm"
               onClick={selectAllUsers}
+              className="min-h-[44px]"
             >
               전체 선택
             </Button>
@@ -404,24 +408,24 @@ export default function RelationshipsPage() {
             ) : (
               <div>
                 {filterUsers(blockedData?.data?.map((block: any) => block.blocked) || []).map((user: User) => (
-                  <div key={user.id} className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    <div className="flex items-center gap-3 flex-1">
+                  <div key={user.id} className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3 sm:p-4 border-b border-gray-200 dark:border-gray-700 last:border-b-0 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors gap-3 sm:gap-0">
+                    <div className="flex items-center gap-2 sm:gap-3 flex-1 w-full sm:w-auto">
                       {/* Checkbox */}
                       <div
                         onClick={() => toggleUserSelection(user.id)}
-                        className={`w-5 h-5 border-2 rounded cursor-pointer flex items-center justify-center transition-colors ${
+                        className={`min-w-[44px] min-h-[44px] w-6 h-6 sm:w-5 sm:h-5 border-2 rounded cursor-pointer flex items-center justify-center transition-colors ${
                           selectedUsers.includes(user.id)
                             ? 'bg-black dark:bg-gray-600 border-black dark:border-gray-600'
                             : 'border-gray-300 dark:border-gray-600 hover:border-gray-400 dark:hover:border-gray-500'
                         }`}
                       >
-                        {selectedUsers.includes(user.id) && <Check className="w-3 h-3 text-white" />}
+                        {selectedUsers.includes(user.id) && <Check className="w-4 h-4 sm:w-3 sm:h-3 text-white" />}
                       </div>
 
                       {/* User Info */}
                       <Link
                         href={user.blog?.slug ? `/${user.blog.slug}` : '#'}
-                        className="flex items-center gap-3 flex-1 group"
+                        className="flex items-center gap-2 sm:gap-3 flex-1 group min-h-[44px]"
                       >
                         <UserAvatar
                           profileImage={user.profileImage}
@@ -429,29 +433,30 @@ export default function RelationshipsPage() {
                           size="md"
                         />
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 dark:text-gray-100 group-hover:text-gray-700 dark:group-hover:text-gray-300">
+                          <p className="font-medium text-sm sm:text-base text-gray-900 dark:text-gray-100 group-hover:text-gray-700 dark:group-hover:text-gray-300">
                             {user.username}
                           </p>
                           {user.bio && (
-                            <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.bio}</p>
+                            <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 truncate">{user.bio}</p>
                           )}
                         </div>
                       </Link>
+                    </div>
 
-                      {/* Actions */}
-                      <div className="flex items-center gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            if (confirm(`${user.username}님의 차단을 해제하시겠습니까?`)) {
-                              unblockUser(user.id);
-                            }
-                          }}
-                        >
-                          차단 해제
-                        </Button>
-                      </div>
+                    {/* Actions */}
+                    <div className="flex items-center gap-2 w-full sm:w-auto">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          if (confirm(`${user.username}님의 차단을 해제하시겠습니까?`)) {
+                            unblockUser(user.id);
+                          }
+                        }}
+                        className="min-h-[44px] w-full sm:w-auto"
+                      >
+                        차단 해제
+                      </Button>
                     </div>
                   </div>
                 ))}

@@ -3,6 +3,7 @@ import { postsAPI } from '@/lib/api';
 import { Post } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRef, useCallback } from 'react';
+import { mixpanel } from '@/lib/mixpanel';
 
 // Query 키 팩토리 패턴
 export const postQueryKeys = {
@@ -55,13 +56,23 @@ export function useInfinitePosts(options: {
 }
 
 // 단일 포스트 조회 훅 (상세)
-export function usePost(slugOrId: string) {
+export function usePost(
+  slugOrId: string,
+  options?: {
+    initialData?: any; // Post 타입으로 나중에 변경 가능
+    enabled?: boolean;
+  }
+) {
   return useQuery({
     queryKey: postQueryKeys.detail(slugOrId),
     queryFn: () => postsAPI.getPostBySlug(slugOrId),
-    enabled: !!slugOrId,
+    enabled: options?.enabled ?? !!slugOrId,
     ...commonQueryOptions,
-    refetchOnMount: 'always', // 상세 페이지는 항상 최신 데이터 표시
+    initialData: options?.initialData,
+    // initialData가 있으면 mount 시 refetch 안함
+    refetchOnMount: !options?.initialData ? 'always' : false,
+    // 항상 즉시 stale 처리하여 캐시 무효화가 바로 반영되도록 함
+    staleTime: 0,
   });
 }
 
@@ -72,6 +83,13 @@ export function useCreatePost() {
   return useMutation({
     mutationFn: postsAPI.createPost,
     onSuccess: (newPost) => {
+      // Mixpanel: 포스트 생성 이벤트 추적
+      mixpanel.track('Post Created', {
+        categoryId: newPost.category,
+        tags: newPost.tags,
+        wordCount: newPost.content ? newPost.content.length : 0,
+      });
+
       // 1. 첫 페이지만 무효화 (새 포스트는 항상 첫 페이지에만 나타남)
       // 검색이나 필터가 없는 기본 목록만 무효화하여 성능 최적화
       queryClient.invalidateQueries({
@@ -424,6 +442,9 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
       }
     },
     onSuccess: (response, postId) => {
+      // Mixpanel: 좋아요 이벤트 추적
+      mixpanel.track('Post Liked', { postId });
+
       // 큐 시스템 사용 시, 낙관적 업데이트 상태 유지 (깜빡임 방지)
       if (response.queued) {
         return; // 서버 응답 무시, onMutate의 낙관적 업데이트 상태 그대로 유지
@@ -543,9 +564,12 @@ export function useUserCategories() {
   return useQuery({
     queryKey: ['user-categories'],
     queryFn: async (): Promise<string[]> => {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/posts/categories`, {
-        credentials: 'include',
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/posts/categories`,
+        {
+          credentials: 'include',
+        }
+      );
       if (!response.ok) {
         throw new Error('Failed to fetch user categories');
       }

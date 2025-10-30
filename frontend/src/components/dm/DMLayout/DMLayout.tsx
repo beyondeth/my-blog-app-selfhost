@@ -66,9 +66,10 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
     <div className={containerClass}>
       {/* Main container */}
       <div className={innerContainerClass}>
-        {/* Left Sidebar */}
+        {/* Left Sidebar - 데스크톱에서만 표시, 모바일에서는 완전 숨김 */}
         <div
           className={`
+            hidden md:flex
             ${isSidebarCollapsed ? 'w-14' : 'w-16'}
             flex-shrink-0
             bg-gradient-to-b from-gray-900 to-gray-800
@@ -79,11 +80,11 @@ const DMLayout: React.FC<ExtendedDMLayoutProps> = ({ isModal = false }) => {
           <DMSidebar />
         </div>
 
-        {/* Conversation List - 일관된 레이아웃 유지 */}
+        {/* Conversation List - 반응형 레이아웃 */}
         {!isMobile && (
           <div
             className="
-              w-64 lg:w-72
+              w-48 md:w-64 lg:w-72
               flex-shrink-0
               bg-white
               border-r border-gray-200

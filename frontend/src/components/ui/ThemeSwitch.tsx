@@ -2,14 +2,6 @@
 
 import * as React from "react";
 import { useTheme } from "next-themes";
-import { DarkModeIcon } from "@/components/icons/DarkModeIcon";
-import { LightModeIcon } from "@/components/icons/LightModeIcon";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
 
 /**
  * View Transition API를 사용한 부드러운 테마 전환
@@ -53,11 +45,9 @@ const disableTransitionsTemporarily = (callback: () => void) => {
 };
 
 /**
- * 심플한 테마 전환 버튼 컴포넌트
- * 다크모드 ↔ 라이트모드 전환
- * - 다크모드일 때: 태양 아이콘 표시 (라이트모드로 전환)
- * - 라이트모드일 때: 달 아이콘 표시 (다크모드로 전환)
- * - View Transition API로 부드러운 전환 효과 (최신 브라우저)
+ * 심플하고 세련된 테마 전환 버튼
+ * - 커스텀 SVG 아이콘 (날씬한 초승달)
+ * - 원형 버튼 디자인
  */
 export function ThemeSwitch() {
   const { setTheme, resolvedTheme } = useTheme();
@@ -70,7 +60,7 @@ export function ThemeSwitch() {
   // 마운트 전에는 placeholder 표시
   if (!mounted) {
     return (
-      <div className="w-10 h-10 rounded-md bg-muted animate-pulse" />
+      <div className="w-9 h-9 rounded-full bg-muted/50 animate-pulse" />
     );
   }
 
@@ -94,25 +84,44 @@ export function ThemeSwitch() {
   };
 
   return (
-    <TooltipProvider delayDuration={300}>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <button
-            onClick={handleThemeToggle}
-            className="p-2 rounded-full border border-transparent text-foreground hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-            aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
-          >
-            {isDark ? (
-              <LightModeIcon size={20} className="transition-transform hover:rotate-45" />
-            ) : (
-              <DarkModeIcon size={20} className="transition-transform hover:-rotate-12" />
-            )}
-          </button>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" sideOffset={5}>
-          <p className="text-sm">{isDark ? "라이트 모드" : "다크 모드"}</p>
-        </TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <button
+      onClick={handleThemeToggle}
+      className="p-2 flex items-center justify-center"
+      aria-label={`Switch to ${isDark ? "light" : "dark"} mode`}
+    >
+      {isDark ? (
+        // 해 아이콘 (stroke 스타일)
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="w-5 h-5 text-gray-400"
+        >
+          <circle cx="12" cy="12" r="4" />
+          <path d="M12 2v2" />
+          <path d="M12 20v2" />
+          <path d="m4.93 4.93 1.41 1.41" />
+          <path d="m17.66 17.66 1.41 1.41" />
+          <path d="M2 12h2" />
+          <path d="M20 12h2" />
+          <path d="m6.34 17.66-1.41 1.41" />
+          <path d="m19.07 4.93-1.41 1.41" />
+        </svg>
+      ) : (
+        // 날씬한 초승달 아이콘
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="currentColor"
+          className="w-5 h-5 text-gray-600"
+        >
+          <path d="M21.53 15.93c-.16-.27-.61-.69-1.73-.49a8.46 8.46 0 01-1.88.13 8.409 8.409 0 01-5.91-2.82 8.068 8.068 0 01-1.44-8.66c.44-1.01.13-1.54-.09-1.76s-.77-.55-1.83-.11a10.318 10.318 0 00-6.32 10.21 10.475 10.475 0 007.04 8.99 10 10 0 002.89.55c.16.01.32.02.48.02a10.5 10.5 0 008.47-4.27c.67-.93.49-1.519.32-1.79z" />
+        </svg>
+      )}
+    </button>
   );
 }

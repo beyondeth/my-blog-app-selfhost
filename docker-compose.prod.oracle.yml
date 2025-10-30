@@ -31,6 +31,9 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://www.codebase.blog/api/v1}
         NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://www.codebase.blog}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://www.codebase.blog}
+        NEXT_PUBLIC_MIXPANEL_TOKEN: ${NEXT_PUBLIC_MIXPANEL_TOKEN}
+        NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-frontend
     env_file:
       - .env.production
@@ -39,6 +42,9 @@ services:
       # Backend API는 내부 Docker 네트워크로 통신
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://www.codebase.blog/api/v1}
       NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://www.codebase.blog}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://www.codebase.blog}
+      NEXT_PUBLIC_MIXPANEL_TOKEN: ${NEXT_PUBLIC_MIXPANEL_TOKEN}
+      NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
       HOSTNAME: "0.0.0.0"
     ports:
       - "127.0.0.1:3001:3000"  # Next.js는 내부적으로 3000 포트 사용

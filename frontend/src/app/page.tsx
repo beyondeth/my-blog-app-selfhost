@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
@@ -12,13 +12,19 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
+import PromoCarouselSection from '@/components/layout/PromoCarouselSection';
 import EditorPickSection from '@/components/layout/EditorPickSection';
 import PopularPostsSection from '@/components/layout/PopularPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
 import FollowingListSection from '@/components/FollowingListSection';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
-export default function HomePage() {
+
+/**
+ * 홈 페이지 메인 컴포넌트
+ * useSearchParams를 사용하므로 Suspense로 감싸야 함
+ */
+function HomePageContent() {
   // console.log('🏠 [HOME PAGE COMPONENT RENDERED]');
 
   const { user, isAuthenticated, isAdmin } = useAuth();
@@ -233,7 +239,10 @@ export default function HomePage() {
           {/* Sidebar - fixed positioning with internal scroll */}
         <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-40 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll">
           <div className="space-y-4 sm:space-y-6">
-            {/* Editor's Pick 섹션 (가장 위에 배치) */}
+            {/* 프로모션 캐러셀 섹션 (자동 슬라이드) */}
+            <PromoCarouselSection />
+
+            {/* Editor's Pick 섹션 */}
             <EditorPickSection />
 
             <PopularPostsSection />
@@ -255,5 +264,16 @@ export default function HomePage() {
         isLoading={deletePostMutation.isPending}
       />
     </div>
+  );
+}
+
+/**
+ * 홈 페이지 (Suspense 래퍼)
+ */
+export default function HomePage() {
+  return (
+    <Suspense fallback={<PostSkeletonWithShimmer count={5} />}>
+      <HomePageContent />
+    </Suspense>
   );
 }

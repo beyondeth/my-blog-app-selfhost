@@ -1,68 +1,71 @@
-'use client';
-
+import type { Metadata } from 'next';
 import "./globals.css";
-import Header from '@/components/layout/Header';
-import LeftSidebar from '@/components/layout/LeftSidebar';
-import BottomNavBar from '@/components/layout/BottomNavBar';
-import MainContent from '@/components/layout/MainContent';
-import ClientProviders from '@/components/ClientProviders';
-import { ThemeProvider } from '@/providers/ThemeProvider';
-import { Toaster } from 'sonner';
-// import { PerformanceMonitor } from '@/components/PerformanceMonitor';
-import { DMModalProvider } from '@/components/dm/DMModalProvider';
-import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import LayoutClient from './layout-client';
+
+// metadataBase를 환경 변수에서 동적으로 설정
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
+
+/**
+ * 루트 레이아웃 - 서버 컴포넌트
+ *
+ * SEO 최적화를 위한 metadata 설정 및 정적 HTML 구조 제공
+ * 동적 레이아웃 제어는 LayoutClient 컴포넌트에서 처리
+ */
+export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: 'Codebase - 블로그 자동포스팅 MCP',
+    template: '%s | Codebase',
+  },
+  description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
+  keywords: ['개발 블로그', '기술 블로그', '바이브코딩', '일상공유', '커뮤니티'],
+  authors: [{ name: 'Codebase' }],
+  creator: 'Codebase',
+  publisher: 'Codebase',
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      'max-video-preview': -1,
+      'max-image-preview': 'large',
+      'max-snippet': -1,
+    },
+  },
+  openGraph: {
+    type: 'website',
+    locale: 'ko_KR',
+    url: siteUrl,
+    title: 'Codebase - 블로그 자동포스팅 MCP',
+    description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
+    siteName: 'Codebase',
+    images: [
+      {
+        url: '/og-image.png',
+        width: 1200,
+        height: 630,
+        alt: '블로그 자동포스팅',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Codebase - 블로그 자동포스팅 MCP',
+    description: 'AI 자동포스팅 전문 블로그 플랫폼. MCP 를 이용한 블로그 자동화.',
+    images: ['/og-image.png'],
+  },
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-touch-icon.png',
+  },
+};
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const [shouldHideLayout, setShouldHideLayout] = useState(false);
-  const [isLandingPage, setIsLandingPage] = useState(false);
-
-  useEffect(() => {
-    // 랜딩페이지 - 헤더만 표시, 사이드바 제거
-    if (pathname === '/landing') {
-      setShouldHideLayout(false);
-      setIsLandingPage(true);
-      return;
-    }
-
-    setIsLandingPage(false);
-
-    // 인증 페이지 목록
-    const authPaths = ['/login', '/register', '/consent', '/forgot-password', '/reset-password'];
-    const isAuthPage = authPaths.some(path => pathname.startsWith(path));
-
-    // 법적 문서 페이지 목록
-    const legalPaths = [
-      '/legal/terms',
-      '/legal/privacy',
-      '/legal/marketing-consent',
-      '/legal/newsletter-consent',
-      '/legal/guidelines',
-    ];
-
-    // 현재 페이지가 법적 문서 페이지인지 확인
-    const isLegalPage = legalPaths.some(path => pathname.startsWith(path));
-
-    // 인증 페이지는 항상 레이아웃 숨김
-    if (isAuthPage) {
-      setShouldHideLayout(true);
-    } else if (isLegalPage) {
-      // 법적 문서 페이지: sessionStorage 체크
-      const fromAuth = sessionStorage.getItem('from-auth') === 'true';
-      setShouldHideLayout(fromAuth);
-    } else {
-      // 일반 페이지로 이동 시 sessionStorage 초기화
-      sessionStorage.removeItem('from-auth');
-      sessionStorage.removeItem('auth-pathname');
-      setShouldHideLayout(false);
-    }
-  }, [pathname]);
-
   return (
     <html lang="ko" suppressHydrationWarning>
       <head>
@@ -130,48 +133,7 @@ export default function RootLayout({
         }}
         suppressHydrationWarning={true}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-        >
-          <ClientProviders>
-            <DMModalProvider>
-              {shouldHideLayout ? (
-                // 법적 문서 페이지에서 인증 페이지에서 온 경우: 헤더/사이드바 숨김
-                <div className="min-h-screen bg-background">
-                  <MainContent>
-                    {children}
-                  </MainContent>
-                </div>
-              ) : isLandingPage ? (
-                // 랜딩페이지: 헤더만 표시, 사이드바/하단바 제거
-                <div className="min-h-screen bg-background">
-                  <Header />
-                  <div className="w-full">
-                    {children}
-                  </div>
-                </div>
-              ) : (
-                // 일반 레이아웃: 헤더 + 사이드바 + 메인 콘텐츠 + 하단 바텀바
-                <div>
-                  <Header />
-                  <div className="flex">
-                    <LeftSidebar />
-                    {/* 왼쪽 사이드바 영역 확보: translate-x-[23px] + w-20 = 103px, 여유 25px 포함 = 128px */}
-                    <MainContent>
-                      {children}
-                    </MainContent>
-                  </div>
-                  {/* 모바일 하단 네비게이션 바 */}
-                  <BottomNavBar />
-                </div>
-              )}
-              <Toaster position="top-center" richColors />
-              {/* <PerformanceMonitor /> */}
-            </DMModalProvider>
-          </ClientProviders>
-        </ThemeProvider>
+        <LayoutClient>{children}</LayoutClient>
       </body>
     </html>
   );
