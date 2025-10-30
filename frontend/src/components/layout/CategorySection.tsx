@@ -142,7 +142,7 @@ const CategorySection = React.memo(function CategorySection({
                     className="w-full flex items-center justify-between px-3 py-2 text-[14px] rounded-lg transition-colors bg-gray-50 hover:bg-gray-100 dark:bg-black/20 dark:hover:bg-black/30 text-left group"
                     aria-label={`${node.parent} 카테고리 펼치기/접기`}
                   >
-                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 min-w-0 overflow-hidden">
                       <FiFolder className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
                       <span className="text-gray-800 dark:text-gray-200 font-medium truncate group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
                         {node.parent}
