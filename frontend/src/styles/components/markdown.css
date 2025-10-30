@@ -381,18 +381,18 @@
     white-space: pre;
   }
 
-  /* 복사 버튼 모바일 터치 최적화 */
+  /* 복사 버튼 모바일 최적화 - 최소 크기 */
   .copy-code-btn {
-    padding: 0.75rem; /* 터치 영역 확대 */
-    min-width: 44px;  /* WCAG 터치 타겟 최소 크기 */
-    min-height: 44px;
+    padding: 0.375rem; /* 최소 컴팩트 크기 (6px) */
+    min-width: 32px;
+    min-height: 32px;
     top: 0.5rem;
     right: 0.5rem;
   }
 
   .copy-code-btn svg {
-    width: 20px;
-    height: 20px;
+    width: 14px; /* 작은 아이콘 */
+    height: 14px;
   }
 
   /* 인라인 코드도 모바일에서 약간 축소 */
