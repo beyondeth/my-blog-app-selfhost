@@ -3,6 +3,10 @@
 @import '../styles/themes/atom-one-light-custom.css' (prefers-color-scheme: light);
 @import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
 
+/* TipTap Simple Editor 스타일 */
+@import '../styles/_variables.scss';
+@import '../styles/_keyframe-animations.scss';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
