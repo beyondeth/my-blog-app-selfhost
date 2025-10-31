@@ -467,7 +467,7 @@
 
 /* 다크모드 지원 */
 .dark .ProseMirror {
-  color: #e5e7eb;
+  color: #f3f4f6; /* gray-100 - 더 명확한 대비로 가독성 개선 */
 }
 
 .dark .ProseMirror p.is-editor-empty:first-child::before {
@@ -494,4 +494,13 @@
 
 .dark .youtube-video iframe {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+/* 글자 크기 스타일 반영 (작게 14px, 보통 17px 기본, 크게 20px) */
+.ProseMirror span[style*="font-size"] {
+  line-height: 1.6;
+}
+
+.dark .ProseMirror span[style*="font-size"] {
+  line-height: 1.6;
 }
