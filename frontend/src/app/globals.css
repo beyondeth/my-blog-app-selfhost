@@ -58,6 +58,13 @@
   transition-property: background-color, color, fill, stroke, opacity, box-shadow, transform !important;
 }
 
+/* floating-ui 기반 tooltip은 transform transition 제외 - 위치 계산 중 애니메이션 방지 */
+.tiptap-tooltip {
+  transition-property: opacity !important;
+  transition-duration: 0.15s !important;
+  transition-timing-function: ease-out !important;
+}
+
 /* Highlight.js 테마 - 강제 테마 적용을 위한 클래스 기반 스타일 */
 .light .hljs {
   background: #ffffff;  /* 순백색 배경으로 대비 향상 */

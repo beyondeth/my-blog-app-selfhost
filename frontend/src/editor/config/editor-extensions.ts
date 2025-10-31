@@ -6,7 +6,7 @@
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import TextAlign from '@tiptap/extension-text-align';
-import TextStyle from '@tiptap/extension-text-style';
+import { TextStyle } from '@tiptap/extension-text-style';
 import { Color } from '@tiptap/extension-color';
 import Heading from '@tiptap/extension-heading';
 import Highlight from '@tiptap/extension-highlight';
@@ -16,9 +16,7 @@ import Link from '@tiptap/extension-link';
 import Placeholder from '@tiptap/extension-placeholder';
 // import Youtube from '@tiptap/extension-youtube'; // 기본 YouTube extension 대신 커스텀 사용
 import { CustomYoutube } from '../extensions/CustomYoutube.extension';
-import ListItem from '@tiptap/extension-list-item';
-import BulletList from '@tiptap/extension-bullet-list';
-import OrderedList from '@tiptap/extension-ordered-list';
+import { BulletList, OrderedList, ListItem } from '@tiptap/extension-list';
 import CodeBlock from '@tiptap/extension-code-block';
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import { common, createLowlight } from 'lowlight';
@@ -27,7 +25,6 @@ import typescript from 'highlight.js/lib/languages/typescript';
 import { EDITOR_DOCUMENT_CONFIG, YOUTUBE_CONFIG } from '../constants/editor.constants';
 import { ResizableImage } from '../extensions';
 import { YoutubeAutoEmbed } from '../extensions/YoutubeAutoEmbed.extension';
-import { FontSize } from '../extensions/FontSize.extension';
 
 // lowlight 인스턴스 생성 및 언어 등록
 const lowlight = createLowlight(common);
@@ -89,7 +86,6 @@ export const getEditorExtensions = (placeholder?: string) => [
   Color.configure({
     types: ['textStyle'],
   }),
-  FontSize, // 글자 크기 (보통/크게)
   
   // 제목
   Heading.configure({

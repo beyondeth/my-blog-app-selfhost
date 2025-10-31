@@ -27,8 +27,8 @@ import { Save, Plus } from 'lucide-react';
 import React from 'react';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
-const BlogRichTextEditor = dynamic(
-  () => import('@/editor').then(mod => mod.BlogRichTextEditor),
+const BlogSimpleEditor = dynamic(
+  () => import('@/editor').then(mod => ({ default: mod.BlogSimpleEditor })),
   {
     ssr: false,
     loading: () => (
@@ -690,8 +690,8 @@ export default function NewStoryPage() {
                             </>
                           )}
 
-                          <div className="min-h-[300px] lg:min-h-[400px]">
-                            <BlogRichTextEditor
+                          <div className="h-[400px] lg:h-[500px]">
+                            <BlogSimpleEditor
                               content={field.value}
                               onChange={field.onChange}
                               onFilesChange={(fileIds) => {

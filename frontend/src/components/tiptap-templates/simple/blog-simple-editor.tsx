@@ -12,13 +12,13 @@ import { Highlight } from "@tiptap/extension-highlight"
 import { Subscript } from "@tiptap/extension-subscript"
 import { Superscript } from "@tiptap/extension-superscript"
 import { Color } from "@tiptap/extension-color"
-import TextStyle from "@tiptap/extension-text-style"
+import { TextStyle } from "@tiptap/extension-text-style"
+import { Selection } from "@tiptap/extensions"
 
 // --- 커스텀 Extensions ---
 import { ResizableImage } from "@/editor/extensions/ResizableImage.extension"
 import { CustomYoutube } from "@/editor/extensions/CustomYoutube.extension"
 import { YoutubeAutoEmbed } from "@/editor/extensions/YoutubeAutoEmbed.extension"
-import { FontSize } from "@/editor/extensions/FontSize.extension"
 
 // --- Hooks ---
 import { useUploadFile } from "@/hooks/useFiles"
@@ -63,6 +63,7 @@ import {
 import { MarkButton } from "@/components/tiptap-ui/mark-button"
 import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
+import { YoutubeButton } from "@/components/tiptap-ui/youtube-button"
 
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
@@ -76,6 +77,10 @@ import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 
 // --- Components ---
 import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
+import ImageUploadManager, { UploadedImageInfo } from "@/editor/components/ImageManager/ImageUploadManager"
+
+// --- Hooks ---
+import { useImageUploadManager } from "@/editor/hooks/useImageUploadManager"
 
 // --- Lib ---
 import { handleImageUpload as demoHandleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
@@ -152,6 +157,7 @@ const MainToolbarContent = ({
 
       <ToolbarGroup>
         <ImageUploadButton text="Add" />
+        <YoutubeButton />
       </ToolbarGroup>
 
       <Spacer />
@@ -194,13 +200,103 @@ const MobileToolbarContent = ({
   </>
 )
 
-export function BlogSimpleEditor() {
+/**
+ * BlogSimpleEditor Props
+ */
+export interface BlogSimpleEditorProps {
+  /**
+   * 에디터 초기 content (HTML)
+   * @default ''
+   */
+  content?: string
+  /**
+   * Content 변경 시 호출되는 콜백
+   */
+  onChange?: (content: string) => void
+  /**
+   * 파일 ID 목록 변경 시 호출되는 콜백 (기존 호환성)
+   */
+  onFilesChange?: (fileIds: string[]) => void
+  /**
+   * placeholder 텍스트
+   * @default '내용을 입력하세요...'
+   */
+  placeholder?: string
+  /**
+   * 추가 CSS 클래스
+   */
+  className?: string
+  /**
+   * ImageUploadManager 기능 활성화 여부
+   * @default false
+   */
+  enableImageManager?: boolean
+  /**
+   * 최대 업로드 가능한 이미지 개수
+   * @default 5
+   */
+  maxImages?: number
+  /**
+   * 초기 이미지 목록
+   */
+  initialImages?: UploadedImageInfo[]
+  /**
+   * 이미지 목록 변경 시 호출되는 콜백
+   */
+  onImagesChange?: (images: UploadedImageInfo[]) => void
+  /**
+   * 썸네일 선택 시 호출되는 콜백
+   */
+  onThumbnailSelect?: (thumbnailId: string) => void
+  /**
+   * 선택된 썸네일 ID (외부에서 제어할 경우)
+   */
+  selectedThumbnailId?: string
+  /**
+   * 이미지 유효성 검사 상태 변경 시 호출되는 콜백
+   */
+  onValidationChange?: (isValid: boolean, reason?: string) => void
+}
+
+export function BlogSimpleEditor({
+  content: initialContent = '',
+  onChange,
+  onFilesChange,
+  placeholder = '내용을 입력하세요...',
+  className = '',
+  enableImageManager = false,
+  maxImages = 5,
+  initialImages = [],
+  onImagesChange,
+  onThumbnailSelect,
+  selectedThumbnailId: externalSelectedThumbnailId,
+  onValidationChange,
+}: BlogSimpleEditorProps = {}) {
   const isMobile = useIsMobile()
   const { height } = useWindowSize()
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
   const toolbarRef = useRef<HTMLDivElement>(null)
+
+  // ImageUploadManager 상태 관리
+  const [images, setImages] = useState<UploadedImageInfo[]>(initialImages)
+  const [internalSelectedThumbnailId, setInternalSelectedThumbnailId] = useState<string>('')
+
+  // 외부에서 제어하는 경우 외부 값 사용, 아니면 내부 상태 사용
+  const selectedThumbnailId = externalSelectedThumbnailId ?? internalSelectedThumbnailId
+
+  // 이미지 변경 핸들러 (외부 콜백과 내부 상태 동기화)
+  const handleImagesChange = useCallback((newImages: UploadedImageInfo[]) => {
+    setImages(newImages)
+    onImagesChange?.(newImages)
+  }, [onImagesChange])
+
+  // 썸네일 선택 핸들러
+  const handleThumbnailSelect = useCallback((thumbnailId: string) => {
+    setInternalSelectedThumbnailId(thumbnailId)
+    onThumbnailSelect?.(thumbnailId)
+  }, [onThumbnailSelect])
 
   // S3 파일 업로드 mutation
   const uploadMutation = useUploadFile()
@@ -240,7 +336,6 @@ export function BlogSimpleEditor() {
     }
   }, [uploadMutation])
 
-  // @ts-ignore - TipTap v2/v3 버전 충돌 임시 무시 (TODO: v3로 전체 업그레이드 고려)
   const editor = useEditor({
     immediatelyRender: false,
     shouldRerenderOnTransaction: false,
@@ -250,8 +345,13 @@ export function BlogSimpleEditor() {
         autocorrect: "off",
         autocapitalize: "off",
         "aria-label": "Main content area, start typing to enter text.",
-        class: "simple-editor",
+        class: `simple-editor ${className}`,
       },
+    },
+    onUpdate: ({ editor }) => {
+      // Content 변경 시 onChange 콜백 호출
+      const html = editor.getHTML()
+      onChange?.(html)
     },
     extensions: [
       StarterKit.configure({
@@ -266,7 +366,6 @@ export function BlogSimpleEditor() {
       // 텍스트 스타일 및 색상
       TextStyle,
       Color.configure({ types: ["textStyle"] }),
-      FontSize, // 커스텀 글자 크기 (작게/보통/크게)
       Highlight.configure({ multicolor: true }),
 
       // 이미지 - ResizableImage 사용
@@ -301,6 +400,7 @@ export function BlogSimpleEditor() {
 
       // ImageUploadNode - 빠른 이미지 삽입용
       ImageUploadNode.configure({
+        type: "resizableImage",  // ResizableImage extension과 매칭
         accept: "image/*",
         maxSize: 5 * 1024 * 1024,
         limit: 3,
@@ -311,10 +411,27 @@ export function BlogSimpleEditor() {
         },
         onSuccess: (url) => {
           console.log("Upload success:", url)
+          // ImageUploadManager 갤러리에도 추가하여 썸네일 선택 가능하게 함
+          const newImage: UploadedImageInfo = {
+            id: crypto.randomUUID(),
+            url: url,
+            order: images.length,
+            isUploading: false,
+          }
+          handleImagesChange([...images, newImage])
         },
       }),
     ],
-    content: '<p></p>',
+    content: initialContent || '<p></p>',
+  })
+
+  // ImageUploadManager 통합 - useImageUploadManager hook 사용
+  const imageManagerHandlers = useImageUploadManager({
+    editor,
+    images,
+    onImagesChange: handleImagesChange,
+    onThumbnailSelect: handleThumbnailSelect,
+    selectedThumbnailId,
   })
 
   const rect = useCursorVisibility({
@@ -327,6 +444,16 @@ export function BlogSimpleEditor() {
       setMobileView("main")
     }
   }, [isMobile, mobileView])
+
+  // onFilesChange 콜백 - images 변경 시 파일 ID 목록 추출
+  useEffect(() => {
+    if (onFilesChange) {
+      const fileIds = images
+        .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
+        .map(img => img.id)
+      onFilesChange(fileIds)
+    }
+  }, [images, onFilesChange])
 
   return (
     <div className="simple-editor-wrapper">
@@ -360,6 +487,21 @@ export function BlogSimpleEditor() {
           role="presentation"
           className="simple-editor-content"
         />
+
+        {/* ImageUploadManager - 에디터 하단에 렌더링 */}
+        {enableImageManager && editor && (
+          <ImageUploadManager
+            images={images}
+            maxImages={maxImages}
+            onImagesChange={imageManagerHandlers.handleGalleryImageChange}
+            onImagesUploaded={imageManagerHandlers.handleImagesUploaded}
+            onImagesReordered={imageManagerHandlers.handleImageReorder}
+            onThumbnailSelect={handleThumbnailSelect}
+            selectedThumbnailId={selectedThumbnailId}
+            onValidationChange={onValidationChange}
+            className="mt-6"
+          />
+        )}
       </EditorContext.Provider>
     </div>
   )
