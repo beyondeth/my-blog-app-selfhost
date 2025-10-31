@@ -59,8 +59,11 @@ export class CacheInvalidationListener {
   /**
    * 포스트 삭제 이벤트 처리
    * 모든 관련 피드에서 해당 포스트 제거
+   *
+   * async: false - 동기 처리로 Redis 캐시 무효화 완료 후 응답 반환
+   * 프론트엔드 refetch 시 이미 캐시가 무효화되어 있어 Race condition 방지
    */
-  @OnEvent('post.deleted', { async: true })
+  @OnEvent('post.deleted', { async: false })
   async handlePostDeleted(payload: { postId: string; blogSlug?: string }) {
     this.logger.debug(`🗑️ [Post Deleted] Invalidating cache for: ${payload.postId}`);
 

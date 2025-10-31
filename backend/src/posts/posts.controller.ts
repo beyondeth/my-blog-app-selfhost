@@ -412,17 +412,6 @@ export class PostsController {
 
     return result;
   }
-
-  @Get(':id')
-  @Public()
-  @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: '게시글 상세 조회' })
-  findOne(@Param('id') id: string, @Request() req: any) {
-    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
-    const user = req.user || null;
-    return this.postsService.findOne(id, user);
-  }
-
   @Patch(':id')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN, Role.USER)
@@ -707,5 +696,17 @@ export class PostsController {
   })
   async getAllPostsForSitemap(): Promise<Array<{ slug: string; blogSlug: string; updatedAt: Date }>> {
     return this.postsService.getAllPublishedPostsForSitemap();
+  }
+
+  // ⚠️ 주의: 이 라우트는 반드시 모든 정적 라우트 아래에 위치해야 합니다.
+  // 와일드카드 :id 파라미터가 /posts/categories, /posts/popular 등을 가로채지 않도록 함
+  @Get(':id')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: '게시글 상세 조회' })
+  findOne(@Param('id') id: string, @Request() req: any) {
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
+    const user = req.user || null;
+    return this.postsService.findOne(id, user);
   }
 } 

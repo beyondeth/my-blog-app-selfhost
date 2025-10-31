@@ -90,12 +90,12 @@ export function useCreatePost() {
         wordCount: newPost.content ? newPost.content.length : 0,
       });
 
-      // 1. 첫 페이지만 무효화 (새 포스트는 항상 첫 페이지에만 나타남)
-      // 검색이나 필터가 없는 기본 목록만 무효화하여 성능 최적화
+      // 1. 모든 list 캐시를 stale로 마킹 (홈, 블로그, 검색 등)
+      // setQueriesData에서 이미 낙관적 업데이트했으므로 즉시 refetch는 불필요
       queryClient.invalidateQueries({
-        queryKey: postQueryKeys.list({}), // 필터 없는 기본 목록
+        queryKey: postQueryKeys.lists(), // ['posts', 'list'] - 모든 list 쿼리
         exact: false,
-        refetchType: 'active' // 현재 활성화된 쿼리만 refetch
+        refetchType: 'none' // 즉시 refetch 안함, stale만 마킹
       });
 
       // 1-1. 작성자 블로그 캐시 무효화 및 즉시 업데이트 (작성자가 "내 블로그"에서 즉시 확인 가능)
@@ -212,18 +212,21 @@ export function useDeletePost() {
       const deletedId = typeof variables === 'string' ? variables : variables.postId;
       let blogSlug = typeof variables === 'string' ? undefined : variables.blogSlug;
 
-      // 삭제 전에 포스트 정보 백업 (blog 정보 필요)
-      // 1. 먼저 detail 캐시에서 찾기 (UUID로)
+      // 1. 진행 중인 리페치 취소 (Race condition 방지)
+      await queryClient.cancelQueries({ queryKey: postQueryKeys.lists() });
+
+      // 2. 삭제 전에 포스트 정보 백업 (롤백용)
+      // 2-1. detail 캐시에서 찾기 (UUID로)
       let previousPost = queryClient.getQueryData<Post>(
         postQueryKeys.detail(deletedId)
       );
 
-      // 2. blogSlug가 파라미터로 전달되지 않았고, detail 캐시에 있으면 사용
+      // 2-2. blogSlug가 파라미터로 전달되지 않았고, detail 캐시에 있으면 사용
       if (!blogSlug && previousPost?.blog?.slug) {
         blogSlug = previousPost.blog.slug;
       }
 
-      // 3. 여전히 blogSlug가 없으면 무한 스크롤 목록 캐시에서 찾기
+      // 2-3. 여전히 blogSlug가 없으면 무한 스크롤 목록 캐시에서 찾기
       if (!blogSlug) {
         const allPosts = queryClient.getQueriesData<any>({
           queryKey: postQueryKeys.lists()
@@ -245,64 +248,11 @@ export function useDeletePost() {
         }
       }
 
+      // 3. 이전 데이터 전체 백업 (롤백용)
+      const previousLists = queryClient.getQueriesData({ queryKey: postQueryKeys.lists() });
 
-      return { previousPost, blogSlug };
-    },
-    onSuccess: (_, variables, context) => {
-      const deletedId = typeof variables === 'string' ? variables : variables.postId;
-
-
-      // 1. 삭제된 포스트 상세 캐시 제거
-      queryClient.removeQueries({ queryKey: postQueryKeys.detail(deletedId) });
-
-      // 2. 블로그별 캐시에서 즉시 제거 (낙관적 업데이트 - 최우선)
-      if (context?.blogSlug) {
-
-        // predicate를 사용하여 blogSlug를 포함한 모든 쿼리 매칭 (search, category 무관)
-        queryClient.setQueriesData(
-          {
-            predicate: (query) => {
-              const queryKey = query.queryKey;
-              // ['posts', 'list', { ...filters }] 형태 확인
-              if (queryKey[0] === 'posts' && queryKey[1] === 'list' && queryKey[2]) {
-                // 타입 가드: queryKey[2]가 객체이고 blogSlug 속성을 가지는지 확인
-                const filters = queryKey[2] as Record<string, unknown>;
-                if (typeof filters === 'object' && filters !== null && 'blogSlug' in filters) {
-                  const matched = filters.blogSlug === context.blogSlug;
-                  return matched;
-                }
-              }
-              return false;
-            }
-          },
-          (oldData: any) => {
-            if (!oldData || !oldData.pages) {
-              return oldData;
-            }
-
-            const newPages = oldData.pages.map((page: any) => {
-              if (!page || !page.posts) return page;
-
-              const hasDeletedPost = page.posts.some((post: any) => post.id === deletedId);
-
-              return {
-                ...page,
-                posts: page.posts.filter((post: any) => post.id !== deletedId),
-                total: hasDeletedPost ? page.total - 1 : page.total
-              };
-            });
-
-            const result = {
-              ...oldData,
-              pages: newPages,
-            };
-
-            return result;
-          }
-        );
-      }
-
-      // 3. 홈 피드 및 기타 목록 캐시에서도 제거 (낙관적 업데이트)
+      // 4. 🚀 낙관적 업데이트: 모든 list 캐시에서 즉시 제거 (홈, 블로그, 검색 등 모든 목록)
+      // useUpdatePost, useTogglePostLike와 동일한 패턴 사용
       queryClient.setQueriesData(
         { queryKey: postQueryKeys.lists() },
         (oldData: any) => {
@@ -311,12 +261,12 @@ export function useDeletePost() {
           const newPages = oldData.pages.map((page: any) => {
             if (!page || !page.posts) return page;
 
+            const hasDeletedPost = page.posts.some((post: any) => post.id === deletedId);
+
             return {
               ...page,
               posts: page.posts.filter((post: any) => post.id !== deletedId),
-              total: page.posts.some((post: any) => post.id === deletedId)
-                ? page.total - 1
-                : page.total
+              total: hasDeletedPost ? page.total - 1 : page.total
             };
           });
 
@@ -327,35 +277,38 @@ export function useDeletePost() {
         }
       );
 
-      // 4. 모든 목록 무효화 - 서버와 동기화 (삭제 후 페이지 복귀 시 삭제된 글 다시 안 나타남)
-      queryClient.invalidateQueries({
-        queryKey: postQueryKeys.lists(),
-        refetchType: 'active'  // 현재 활성화된 쿼리만 즉시 refetch
-      });
+      // 5. 상세 캐시도 즉시 제거
+      queryClient.removeQueries({ queryKey: postQueryKeys.detail(deletedId) });
 
-      // 5. 블로그별 캐시도 무효화 (내 블로그에서도 즉시 반영)
-      // refetchType: 'none' - 즉시 refetch 안함, 낙관적 업데이트 상태 유지
-      // 사용자가 페이지를 떠났다 돌아올 때만 서버에서 최신 데이터 가져옴
-      if (context?.blogSlug) {
-        queryClient.invalidateQueries({
-          predicate: (query) => {
-            const queryKey = query.queryKey;
-            // ['posts', 'list', { ...filters }] 형태 확인
-            if (queryKey[0] === 'posts' && queryKey[1] === 'list' && queryKey[2]) {
-              // 타입 가드: queryKey[2]가 객체이고 blogSlug 속성을 가지는지 확인
-              const filters = queryKey[2] as Record<string, unknown>;
-              if (typeof filters === 'object' && filters !== null && 'blogSlug' in filters) {
-                return filters.blogSlug === context.blogSlug;
-              }
-            }
-            return false;
-          },
-          refetchType: 'none'  // 즉시 refetch 안함 - 낙관적 업데이트 유지
+      return { previousPost, blogSlug, previousLists };
+    },
+    onError: (err, variables, context) => {
+      // 롤백: 이전 데이터로 복구
+      if (context?.previousLists) {
+        context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
         });
+      }
 
+      // 상세 캐시 복구
+      const deletedId = typeof variables === 'string' ? variables : variables.postId;
+      if (context?.previousPost) {
+        queryClient.setQueryData(
+          postQueryKeys.detail(deletedId),
+          context.previousPost
+        );
       }
     },
-    retry: 1,
+    onSuccess: () => {
+      // 서버 동기화: stale 마킹하여 다음 접근 시 최신 데이터 가져오기
+      // refetchType: 'none' - 즉시 refetch 안함 (낙관적 업데이트 유지)
+      // 모든 list 캐시를 stale로 마킹 (홈, 블로그, 검색 등)
+      queryClient.invalidateQueries({
+        queryKey: postQueryKeys.lists(),
+        refetchType: 'none'
+      });
+    },
+    retry: 0,  // 삭제는 재시도 안 함 (이미 삭제된 포스트 재요청 방지)
   });
 }
 
