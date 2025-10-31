@@ -56,11 +56,11 @@ export class ApiKeyGuard implements CanActivate {
         blog: {
           id: mcpApiKey.blog.id,
           name: mcpApiKey.blog.name,
-          slug: mcpApiKey.blog.slug,
+          slug: mcpApiKey.blog.alias || mcpApiKey.blog.slug, // Phase 2: alias 우선
         },
       };
 
-      this.logger.debug(`✅ API Key validated: user=${mcpApiKey.userId.substring(0, 8)}, blog=${mcpApiKey.blog.slug}`);
+      this.logger.debug(`✅ API Key validated: user=${mcpApiKey.userId.substring(0, 8)}, blog=${mcpApiKey.blog.alias || mcpApiKey.blog.slug}`);
       return true;
     } catch (error: any) {
       this.logger.warn(`❌ API Key validation failed: ${error.message}`);

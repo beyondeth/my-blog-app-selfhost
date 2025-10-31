@@ -3,6 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User } from './entities/user.entity';
+import { Profile } from './entities/profile.entity';
+import { Subscription } from './entities/subscription.entity';
+import { AccountSettings } from './entities/account-settings.entity';
 import { UserIdentity } from './entities/user-identity.entity';
 import { UserDeletionLog } from './entities/user-deletion-log.entity';
 import { UserDeletionService } from './services/user-deletion.service';
@@ -26,6 +29,9 @@ import { AuditModule } from '../audit/audit.module';
   imports: [
     TypeOrmModule.forFeature([
       User,
+      Profile,
+      Subscription,
+      AccountSettings,
       UserIdentity,
       UserDeletionLog,
       EmailApproval,
