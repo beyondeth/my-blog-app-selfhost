@@ -25,8 +25,8 @@ import { useUserCategories } from '@/hooks/usePosts';
 import { toast } from 'sonner';
 
 // Dynamic import for editor - 초기 로딩 속도 개선 (976 KB 청크 제거)
-const BlogRichTextEditor = dynamic(
-  () => import('@/editor').then(mod => mod.BlogRichTextEditor),
+const BlogSimpleEditor = dynamic(
+  () => import('@/editor').then(mod => ({ default: mod.BlogSimpleEditor })),
   {
     ssr: false,
     loading: () => (
@@ -783,8 +783,8 @@ export default function EditPostForm({
                             </div>
                           )}
 
-                          <div className="min-h-[400px]">
-                            <BlogRichTextEditor
+                          <div className="h-[500px]">
+                            <BlogSimpleEditor
                               content={field.value}
                               onChange={field.onChange}
                               onFilesChange={(fileIds) => {

@@ -147,6 +147,7 @@ export function canColorHighlight(
     if (!isExtensionAvailable(editor, ["nodeBackground"])) return false
 
     try {
+      // @ts-expect-error - nodeBackground extension은 선택적 기능 (런타임에서 extension availability 체크로 처리)
       return editor.can().toggleNodeBackgroundColor("test")
     } catch {
       return false
@@ -202,6 +203,7 @@ export function removeHighlight(
   if (mode === "mark") {
     return editor.chain().focus().unsetMark("highlight").run()
   } else {
+    // @ts-expect-error - nodeBackground extension은 선택적 기능 (런타임에서 extension availability 체크로 처리)
     return editor.chain().focus().unsetNodeBackgroundColor().run()
   }
 }
@@ -294,6 +296,7 @@ export function useColorHighlight(config: UseColorHighlightConfig) {
       const success = editor
         .chain()
         .focus()
+        // @ts-expect-error - nodeBackground extension은 선택적 기능 (런타임에서 extension availability 체크로 처리)
         .toggleNodeBackgroundColor(highlightColor)
         .run()
 

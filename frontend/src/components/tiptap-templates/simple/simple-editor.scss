@@ -55,28 +55,30 @@ body,
 }
 
 .simple-editor-wrapper {
-  width: 100vw;
-  height: 100vh;
-  overflow: auto;
+  width: 100%;
+  height: 100%;  /* 부모의 고정 높이(400px)를 따름 */
+  display: flex;
+  flex-direction: column;  /* Toolbar, Content, ImageManager 세로 배치 */
+  overflow: hidden;  /* 자식이 부모 크기를 넘어가지 않도록 */
 }
 
 .simple-editor-content {
-  max-width: 648px;
   width: 100%;
-  margin: 0 auto;
-  height: 100%;
+  margin: 0;
+  flex: 1;  /* 남은 공간 모두 차지 */
+  overflow-y: auto;  /* 세로 스크롤 활성화 */
   display: flex;
   flex-direction: column;
-  flex: 1;
 }
 
 .simple-editor-content .tiptap.ProseMirror.simple-editor {
   flex: 1;
-  padding: 3rem 3rem 30vh;
+  padding: 1rem 0 2rem;
+  /* min-height 제거 - 부모가 높이 제어 */
 }
 
 @media screen and (max-width: 480px) {
   .simple-editor-content .tiptap.ProseMirror.simple-editor {
-    padding: 1rem 1.5rem 30vh;
+    padding: 1rem 0 2rem;
   }
 }

@@ -73,7 +73,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
     }
 
     return (
-      <Tooltip delay={200}>
+      <Tooltip delay={200} placement="bottom">
         <TooltipTrigger
           className={cn("tiptap-button", className)}
           ref={ref}

@@ -12,27 +12,37 @@ export const ResizableImage = Image.extend({
 
   addAttributes() {
     return {
-      ...this.parent?.(),
+      // v3: Image extension의 기본 속성들 (src, alt, title)
+      src: {
+        default: null,
+      },
+      alt: {
+        default: null,
+      },
+      title: {
+        default: null,
+      },
+      // 커스텀 속성 추가
       width: {
         default: null,
-        parseHTML: element => element.getAttribute('width'),
-        renderHTML: attributes => {
+        parseHTML: (element: HTMLElement) => element.getAttribute('width'),
+        renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.width) return {};
           return { width: attributes.width };
         },
       },
       height: {
         default: null,
-        parseHTML: element => element.getAttribute('height'),
-        renderHTML: attributes => {
+        parseHTML: (element: HTMLElement) => element.getAttribute('height'),
+        renderHTML: (attributes: Record<string, any>) => {
           if (!attributes.height) return {};
           return { height: attributes.height };
         },
       },
       'data-image-id': {
         default: null,
-        parseHTML: element => element.getAttribute('data-image-id'),
-        renderHTML: attributes => {
+        parseHTML: (element: HTMLElement) => element.getAttribute('data-image-id'),
+        renderHTML: (attributes: Record<string, any>) => {
           if (!attributes['data-image-id']) return {};
           return { 'data-image-id': attributes['data-image-id'] };
         },
