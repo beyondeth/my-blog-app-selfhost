@@ -130,8 +130,8 @@ function extractMermaidBlocks(html: string): {
   const patterns = {
     // 표준 코드 블록 형태
     standard: /<pre[^>]*><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
-    // data-language 속성 사용하는 경우
-    dataLang: /<pre[^>]*data-language="mermaid"[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+    // data-language 속성 사용하는 경우 (class 속성 있어도 매치되도록 수정)
+    dataLang: /<pre[^>]*data-language="mermaid"[^>]*><code[^>]*(?:class="[^"]*language-mermaid[^"]*")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
     // data-diagram 속성 사용하는 경우 (백엔드에서 생성된 형태)
     dataDiagram: /<pre[^>]*data-diagram="mermaid"[^>]*><code[^>]*(?:class="[^"]*language-mermaid[^"]*")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
   };
@@ -178,7 +178,8 @@ function extractWithPattern(
     const placeholderType = type.toUpperCase() as keyof typeof PLACEHOLDER_TYPES;
     if (content.includes(`${PLACEHOLDER_TYPES[placeholderType]}_PLACEHOLDER`)) continue;
 
-    const id = generateUniqueId(type, index++);
+    // 콘텐츠 기반 해시로 안정적인 ID 생성 (SSR 안전)
+    const id = generateUniqueId(type, index++, content);
     const placeholder = createPlaceholder(type, id);
 
     blocks.push({
@@ -198,11 +199,32 @@ function extractWithPattern(
 }
 
 /**
- * 유니크 ID 생성
- * 책임: 충돌 방지를 위한 고유 식별자 생성
+ * 간단한 문자열 해시 생성 (Java의 hashCode와 유사)
+ * SSR과 클라이언트에서 동일한 ID 생성을 보장합니다.
  */
-function generateUniqueId(prefix: string, index: number): string {
-  return `${prefix}_${Date.now()}_${index}_${Math.random().toString(36).substr(2, 5)}`;
+function simpleHash(str: string): string {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash; // Convert to 32-bit integer
+  }
+  return Math.abs(hash).toString(36);
+}
+
+/**
+ * 유니크 ID 생성 (SSR 안전)
+ * 책임: 충돌 방지를 위한 고유 식별자 생성
+ * 콘텐츠 기반 해시를 사용하여 서버/클라이언트 일관성 보장
+ */
+function generateUniqueId(prefix: string, index: number, content?: string): string {
+  if (content) {
+    // 콘텐츠가 있으면 해시 기반 ID 생성 (SSR 안전)
+    const contentHash = simpleHash(content.substring(0, 200)); // 처음 200자로 해시
+    return `${prefix}_${index}_${contentHash}`;
+  }
+  // fallback: 클라이언트 전용 (하이드레이션 후)
+  return `${prefix}_${index}_${Math.random().toString(36).substr(2, 9)}`;
 }
 
 /**
@@ -224,8 +246,8 @@ function extractCodeBlocks(html: string): {
   const blocks: Array<{ placeholder: string; part: ContentPart }> = [];
   let processedHtml = html;
 
-  // 코드 블록 패턴 - Mermaid를 명시적으로 제외
-  const codePattern = /<pre[^>]*(?:data-language="([^"]*)")?[^>]*><code[^>]*(?:class="[^"]*language-(?!mermaid)([^"]*)")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi;
+  // 코드 블록 패턴 - Mermaid를 명시적으로 제외, data-code-id 캡처 추가
+  const codePattern = /<pre[^>]*(?:data-code-id="([^"]*)")?[^>]*(?:data-language="([^"]*)")?[^>]*><code[^>]*(?:class="[^"]*language-(?!mermaid)([^"]*)")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi;
 
   let match;
   let index = 0;
@@ -234,13 +256,17 @@ function extractCodeBlocks(html: string): {
   codePattern.lastIndex = 0;
 
   while ((match = codePattern.exec(html)) !== null) {
-    const content = match[3];
+    const existingId = match[1]; // 백엔드에서 생성한 data-code-id
+    const dataLanguage = match[2];
+    const classLanguage = match[3];
+    const content = match[4];
 
     // 유효성 검사를 별도 함수로 분리
     if (!isValidCodeBlock(content)) continue;
 
-    const language = detectLanguage(match[1], match[2]);
-    const id = generateUniqueId('code', index++);
+    const language = detectLanguage(dataLanguage, classLanguage);
+    // 백엔드에서 생성한 ID가 있으면 사용, 없으면 콘텐츠 기반 해시로 생성 (SSR 안전)
+    const id = existingId || generateUniqueId('code', index++, content);
     const placeholder = createPlaceholder('code', id);
 
     blocks.push({

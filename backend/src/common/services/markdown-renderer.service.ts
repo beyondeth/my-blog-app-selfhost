@@ -8,13 +8,13 @@ export class MarkdownRendererService {
     marked.setOptions({
       // 표준 옵션들
       gfm: true,           // GitHub Flavored Markdown 지원
-      breaks: true,        // 줄바꿈을 <br>로 변환
+      breaks: false,       // 줄바꿈 자동 변환 비활성화 (코드 블록 파싱 방해 방지)
       pedantic: false,     // 표준 마크다운 호환성
     });
 
     // 커스텀 렌더러 설정 - 최소한의 처리만
     const renderer = new marked.Renderer();
-    
+
     // 코드 블록: language 클래스만 추가 (highlight.js를 위해)
     renderer.code = function({ text, lang }) {
       const language = lang || '';
@@ -22,10 +22,18 @@ export class MarkdownRendererService {
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;');
-      
+
+      // Mermaid 블록은 명시적으로 처리 (프론트엔드 렌더링용)
+      if (language === 'mermaid') {
+        return `<pre><code class="language-mermaid">${escapedCode}</code></pre>`;
+      }
+
+      // 기타 언어 코드 블록
       if (language) {
         return `<pre><code class="language-${language}">${escapedCode}</code></pre>`;
       }
+
+      // 언어 지정 없는 코드 블록
       return `<pre><code>${escapedCode}</code></pre>`;
     };
 
@@ -46,7 +54,29 @@ export class MarkdownRendererService {
      * 표준 marked 라이브러리를 사용한 마크다운 → HTML 변환
      * 모든 복잡한 파싱 로직은 marked가 처리
      */
-    return marked.parse(text) as string;
+
+    // 개발 환경에서 Mermaid 블록 입력 확인 (디버깅용)
+    if (process.env.NODE_ENV === 'development' && text.includes('```mermaid')) {
+      const mermaidMatches = text.match(/```mermaid[\s\S]*?```/g);
+      if (mermaidMatches) {
+        console.log('[Markdown Renderer] Mermaid blocks detected:', mermaidMatches.length);
+        console.log('[Markdown Renderer] First block preview:', mermaidMatches[0].substring(0, 100) + '...');
+      }
+    }
+
+    const html = marked.parse(text) as string;
+
+    // 개발 환경에서 변환 결과 확인 (디버깅용)
+    if (process.env.NODE_ENV === 'development' && text.includes('```mermaid')) {
+      const hasLanguageMermaid = html.includes('language-mermaid');
+      console.log('[Markdown Renderer] Output contains language-mermaid:', hasLanguageMermaid);
+      if (!hasLanguageMermaid) {
+        console.warn('[Markdown Renderer] WARNING: Mermaid blocks not properly converted!');
+        console.log('[Markdown Renderer] Output preview:', html.substring(0, 300));
+      }
+    }
+
+    return html;
   }
 
   parseMarkdown(content: string): { metadata: any; body: string } {
