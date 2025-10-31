@@ -3,5 +3,4 @@
  * 모든 커스텀 Extension을 통합 export
  */
 
-export { SlashCommands } from './SlashCommands.extension';
 export { ResizableImage } from './ResizableImage.extension';

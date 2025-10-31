@@ -25,7 +25,7 @@ import { common, createLowlight } from 'lowlight';
 import javascript from 'highlight.js/lib/languages/javascript';
 import typescript from 'highlight.js/lib/languages/typescript';
 import { EDITOR_DOCUMENT_CONFIG, YOUTUBE_CONFIG } from '../constants/editor.constants';
-import { SlashCommands, ResizableImage } from '../extensions';
+import { ResizableImage } from '../extensions';
 import { YoutubeAutoEmbed } from '../extensions/YoutubeAutoEmbed.extension';
 import { FontSize } from '../extensions/FontSize.extension';
 
@@ -131,10 +131,7 @@ export const getEditorExtensions = (placeholder?: string) => [
       class: 'hljs',
     },
   }),
-  
-  // 슬래시 커맨드
-  SlashCommands,
-  
+
   // 리스트
   ListItem,
   BulletList.configure({
