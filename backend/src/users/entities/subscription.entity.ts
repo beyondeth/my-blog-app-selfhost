@@ -119,6 +119,15 @@ export class Subscription {
   trialEndDate: Date;
 
   /**
+   * 무료 체험 사용 여부
+   * - 한 번만 체험 가능
+   * - true: 이미 체험을 사용함
+   * - false: 아직 체험 미사용
+   */
+  @Column({ default: false })
+  isTrialUsed: boolean;
+
+  /**
    * 결제 시스템 Customer ID (범용)
    * - Stripe, Toss, PayPal 등 모든 결제 시스템 지원
    * - 미래 확장성을 위한 범용 필드

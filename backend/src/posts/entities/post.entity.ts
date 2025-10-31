@@ -92,6 +92,21 @@ export class Post {
   content_markdown: string;
 
   /**
+   * 콘텐츠 타입
+   * - html: HTML 에디터 (기본값)
+   * - markdown: 마크다운 에디터
+   */
+  @Column({ name: 'content_type', default: 'html' })
+  content_type: string;
+
+  /**
+   * 콘텐츠 렌더링 시각
+   * - 마지막으로 content가 렌더링된 시점
+   */
+  @Column({ name: 'content_rendered_at', type: 'timestamp', nullable: true })
+  content_rendered_at: Date;
+
+  /**
    * 썸네일 이미지 URL
    * - 목록 표시용
    * - YouTube 썸네일 또는 콘텐츠 첫 이미지 자동 추출
@@ -335,36 +350,68 @@ export class Post {
   getOrderedImages?: () => Promise<(File & { imageOrder?: number })[]>;
 
   // =====================================
-  // Flattened 필드 (Transient - DB 저장 안 됨)
+  // 기존 posts 테이블 컬럼 (Phase 1 마이그레이션 전 호환성 유지)
   // =====================================
   /**
-   * Phase 1 리팩토링: 분리된 테이블의 필드를 flattening
-   * - 이 필드들은 DB에 저장되지 않음 (transient)
-   * - posts.service.ts에서 relations 조인 후 런타임에 할당
-   * - 기존 코드 호환성을 위해 존재
+   * Phase 1 리팩토링 계획:
+   * - 현재는 posts 테이블에 직접 저장됨
+   * - 향후 post_stats, post_metadata 테이블로 점진적 마이그레이션 예정
+   * - 지금은 호환성을 위해 posts 테이블 컬럼으로 유지
    */
-  // From post_stats
-  viewCount?: number;
-  likeCount?: number;
-  commentCount?: number;
-  qualityScore?: number;
 
-  // From post_metadata
-  excerpt?: string;
-  tagList?: string[];
-  category?: string;
-  isEditorsPick?: boolean;
-  isEditorPick?: boolean; // Alias for isEditorsPick (backward compatibility)
-  editorPickedAt?: Date;
+  // 통계 정보 (향후 post_stats로 이동 예정)
+  @Column({ default: 0 })
+  viewCount: number;
+
+  @Column({ default: 0 })
+  likeCount: number;
+
+  @Column({ default: 0 })
+  commentCount: number;
+
+  @Column({ nullable: true })
+  qualityScore: number;
+
+  @Column()
+  version: number;
+
+  // 메타데이터 정보 (향후 post_metadata로 이동 예정)
+  @Column('text', { nullable: true })
+  excerpt: string;
+
+  @Column('jsonb', { default: '[]' })
+  tagList: string[];
+
+  @Column({ default: '기타' })
+  category: string;
+
+  @Column({ default: false })
+  isEditorPick: boolean;
+
+  @Column({ type: 'timestamp', nullable: true })
+  editorPickedAt: Date;
+
+  @Column({ type: 'timestamp', nullable: true })
+  publishedAt: Date;
+
+  @Column({ type: 'tsvector', nullable: true, select: false })
+  search_vector: any; // PostgreSQL tsvector 타입
+
+  @Column({ name: 'indexed_at', type: 'timestamp', nullable: true })
+  indexedAt: Date;
+
+  @Column({ name: 'processing_error', type: 'text', nullable: true })
+  processingError: string;
+
+  @Column({ name: 'processing_completed_at', type: 'timestamp', nullable: true })
+  processingCompletedAt: Date;
+
+  // Transient 필드 (별도 테이블, @Column() 없음)
+  // post_metadata에만 존재하는 필드들
+  isEditorsPick?: boolean; // post_metadata.isEditorsPick (복수형)
   codeBlockCount?: number;
   imageCount?: number;
   isBackgroundProcessed?: boolean;
-  indexedAt?: Date;
-  content_type?: string;
-  content_rendered_at?: Date;
-  publishedAt?: Date;
-  processingCompletedAt?: Date;
-  processingError?: string;
 
   /**
    * 공개 JSON 변환
