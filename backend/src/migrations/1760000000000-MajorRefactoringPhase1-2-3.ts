@@ -50,9 +50,9 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
         await queryRunner.query(`CREATE INDEX "IDX_profiles_userId" ON "profiles" ("userId")`);
         await queryRunner.query(`CREATE INDEX "IDX_profiles_accountSecurityLevel" ON "profiles" ("accountSecurityLevel")`);
 
-        // 2. subscriptions 테이블 생성
+        // 2. user_subscriptions 테이블 생성 (subscriptions 테이블과 충돌 방지)
         await queryRunner.query(`
-            CREATE TABLE "subscriptions" (
+            CREATE TABLE "user_subscriptions" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "userId" uuid NOT NULL,
                 "subscriptionTier" character varying(20) NOT NULL DEFAULT 'FREE',
@@ -64,16 +64,16 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
                 "isTrialUsed" boolean NOT NULL DEFAULT false,
                 "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
                 "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
-                CONSTRAINT "PK_subscriptions" PRIMARY KEY ("id"),
-                CONSTRAINT "UQ_subscriptions_userId" UNIQUE ("userId"),
-                CONSTRAINT "FK_subscriptions_user" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
+                CONSTRAINT "PK_user_subscriptions" PRIMARY KEY ("id"),
+                CONSTRAINT "UQ_user_subscriptions_userId" UNIQUE ("userId"),
+                CONSTRAINT "FK_user_subscriptions_user" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE
             )
         `);
 
-        await queryRunner.query(`CREATE INDEX "IDX_subscriptions_userId" ON "subscriptions" ("userId")`);
-        await queryRunner.query(`CREATE INDEX "IDX_subscriptions_tier" ON "subscriptions" ("subscriptionTier")`);
-        await queryRunner.query(`CREATE INDEX "IDX_subscriptions_status" ON "subscriptions" ("subscriptionStatus")`);
-        await queryRunner.query(`CREATE INDEX "IDX_subscriptions_endDate" ON "subscriptions" ("subscriptionEndDate")`);
+        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_userId" ON "user_subscriptions" ("userId")`);
+        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_tier" ON "user_subscriptions" ("subscriptionTier")`);
+        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_status" ON "user_subscriptions" ("subscriptionStatus")`);
+        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_endDate" ON "user_subscriptions" ("subscriptionEndDate")`);
 
         // 3. account_settings 테이블 생성
         await queryRunner.query(`
@@ -213,11 +213,11 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
         await queryRunner.query(`DROP INDEX "public"."IDX_account_settings_userId"`);
         await queryRunner.query(`DROP TABLE "account_settings"`);
 
-        await queryRunner.query(`DROP INDEX "public"."IDX_subscriptions_endDate"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_subscriptions_status"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_subscriptions_tier"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_subscriptions_userId"`);
-        await queryRunner.query(`DROP TABLE "subscriptions"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_user_subscriptions_endDate"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_user_subscriptions_status"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_user_subscriptions_tier"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_user_subscriptions_userId"`);
+        await queryRunner.query(`DROP TABLE "user_subscriptions"`);
 
         await queryRunner.query(`DROP INDEX "public"."IDX_profiles_accountSecurityLevel"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_profiles_userId"`);

@@ -8,6 +8,7 @@ import { Profile } from './entities/profile.entity';
 import { Subscription } from './entities/subscription.entity';
 import { AccountSettings } from './entities/account-settings.entity';
 import { Role } from '../common/enums/role.enum';
+import { SubscriptionTier, SubscriptionStatus } from '../common/enums/subscription.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
@@ -88,8 +89,8 @@ export class UsersService {
 
         // Subscription 생성 (cascade) - 기본값으로 FREE 티어
         subscription: this.subscriptionRepository.create({
-          subscriptionTier: 'FREE',
-          subscriptionStatus: 'ACTIVE',
+          subscriptionTier: SubscriptionTier.FREE,
+          subscriptionStatus: null, // 무료 사용자는 null
           isTrialUsed: false,
         }),
 
