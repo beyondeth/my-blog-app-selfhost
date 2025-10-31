@@ -152,6 +152,7 @@ export class UsersService {
     // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
     // profiles 테이블 필드
     if (user.profile) {
+      user.name = user.profile.name;
       user.profileImage = user.profile.profileImage;
       user.bio = user.profile.bio;
       user.lastLoginProvider = user.profile.lastLoginProvider;
@@ -161,6 +162,11 @@ export class UsersService {
     if (user.subscription) {
       user.subscriptionTier = user.subscription.subscriptionTier;
       user.subscriptionStatus = user.subscription.subscriptionStatus;
+      user.subscriptionStartDate = user.subscription.subscriptionStartDate;
+      user.subscriptionEndDate = user.subscription.subscriptionEndDate;
+      user.stripeCustomerId = user.subscription.stripeCustomerId;
+      user.paymentCustomerId = user.subscription.paymentCustomerId;
+      user.paymentSubscriptionId = user.subscription.paymentSubscriptionId;
     }
 
     // account_settings 테이블 필드
@@ -206,6 +212,7 @@ export class UsersService {
     // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
     // profiles 테이블 필드
     if (user.profile) {
+      user.name = user.profile.name;
       user.profileImage = user.profile.profileImage;
       user.bio = user.profile.bio;
       user.lastLoginProvider = user.profile.lastLoginProvider;
@@ -215,6 +222,11 @@ export class UsersService {
     if (user.subscription) {
       user.subscriptionTier = user.subscription.subscriptionTier;
       user.subscriptionStatus = user.subscription.subscriptionStatus;
+      user.subscriptionStartDate = user.subscription.subscriptionStartDate;
+      user.subscriptionEndDate = user.subscription.subscriptionEndDate;
+      user.stripeCustomerId = user.subscription.stripeCustomerId;
+      user.paymentCustomerId = user.subscription.paymentCustomerId;
+      user.paymentSubscriptionId = user.subscription.paymentSubscriptionId;
     }
 
     // account_settings 테이블 필드
@@ -490,6 +502,7 @@ export class UsersService {
     // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
     // profiles 테이블 필드
     if (user.profile) {
+      user.name = user.profile.name;
       user.profileImage = user.profile.profileImage;
       user.bio = user.profile.bio;
       user.lastLoginProvider = user.profile.lastLoginProvider;
@@ -499,6 +512,11 @@ export class UsersService {
     if (user.subscription) {
       user.subscriptionTier = user.subscription.subscriptionTier;
       user.subscriptionStatus = user.subscription.subscriptionStatus;
+      user.subscriptionStartDate = user.subscription.subscriptionStartDate;
+      user.subscriptionEndDate = user.subscription.subscriptionEndDate;
+      user.stripeCustomerId = user.subscription.stripeCustomerId;
+      user.paymentCustomerId = user.subscription.paymentCustomerId;
+      user.paymentSubscriptionId = user.subscription.paymentSubscriptionId;
     }
 
     // account_settings 테이블 필드

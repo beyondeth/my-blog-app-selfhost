@@ -290,6 +290,7 @@ export class User {
    * - 프론트엔드 호환성을 위해 존재
    */
   // From profiles
+  name?: string;
   profileImage?: string;
   bio?: string;
   lastLoginProvider?: string;
@@ -314,6 +315,7 @@ export class User {
   // Payment fields (for subscription module compatibility)
   paymentCustomerId?: string;
   paymentSubscriptionId?: string;
+  stripeCustomerId?: string; // Stripe 전용 (호환성)
 
   // =====================================
   // 메서드 (Methods)
