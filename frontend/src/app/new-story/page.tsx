@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useCreatePost } from '@/hooks/usePosts';
+import { useCreatePost, useUserCategories } from '@/hooks/usePosts';
 import { useMyBlogs } from '@/hooks/useBlogs';
 import type { UploadedImageInfo } from '@/editor';
 import Spinner from '@/components/ui/Spinner';
@@ -25,7 +25,6 @@ import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Save, Plus } from 'lucide-react';
 import React from 'react';
-import CategoryAutocomplete from '@/components/ui/CategoryAutocomplete';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogRichTextEditor = dynamic(
@@ -46,14 +45,16 @@ const BlogRichTextEditor = dynamic(
 // Zod 스키마 정의
 const postSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요.'),
-  category: z.string()
-    .min(1, '카테고리를 입력해주세요.')
+  categories: z.array(
+      z.string()
+        .min(1, '카테고리는 최소 1글자 이상이어야 합니다.')
+        .max(15, '카테고리는 최대 15글자까지 입력 가능합니다.')
+    )
+    .min(1, '카테고리를 최소 1개 입력해주세요.')
+    .max(2, '카테고리는 최대 2개까지만 입력 가능합니다.')
     .refine(
-      (val) => {
-        const slashCount = (val.match(/\//g) || []).length;
-        return slashCount <= 1;
-      },
-      { message: '카테고리는 최대 2단계까지만 입력 가능합니다 (예: JavaScript/React)' }
+      (arr) => arr.every(cat => !cat.includes('/')),
+      { message: '카테고리에 슬래시(/)를 포함할 수 없습니다.' }
     ),
   content: z.string().min(1, '내용을 입력해주세요.'),
   tags: z.array(z.string()).optional(),
@@ -76,12 +77,14 @@ export default function NewStoryPage() {
   const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
   const [isUploadValid, setIsUploadValid] = useState<boolean>(true);
   const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false); // 중복 제출 방지용 로컬 플래그
+  const isSubmittingRef = useRef(false); // 동기적 중복 제출 방지 플래그 (setState의 비동기성 보완)
 
   const form = useForm<PostFormData>({
     resolver: zodResolver(postSchema),
     defaultValues: {
       title: '',
-      category: '',
+      categories: [],
       content: '',
       tags: [],
       fileIds: [],
@@ -131,7 +134,7 @@ export default function NewStoryPage() {
     setUploadValidationReason(reason);
   };
   
-  // 폼 제출 핸들러 (mutation.isPending 기반 중복 방지)
+  // 폼 제출 핸들러 (useRef + React Query isPending 이중 방어 - 댓글 시스템 패턴)
   const onSubmit = async (data: PostFormData) => {
     // 1차 방어: 업로드 유효성 검사
     if (!isUploadValid) {
@@ -139,15 +142,22 @@ export default function NewStoryPage() {
       return;
     }
 
-    // 2차 방어: 이미 제출 중이면 무시 (React Query 상태 기반)
-    if (createPostMutation.isPending) {
+    // 2차 방어: useRef를 통한 동기적 중복 제출 차단 (setState 비동기성 보완)
+    if (isSubmittingRef.current || createPostMutation.isPending) {
       return;
     }
 
+    // 제출 시작 - Ref를 먼저 설정 (동기적, 즉시 적용)
+    isSubmittingRef.current = true;
+    setIsSubmitting(true); // UI 업데이트용
+
     try {
+      // 카테고리 배열 → "메인/서브" 문자열로 변환 (백엔드 호환)
+      const categoryString = data.categories.join('/');
+
       const postData: any = {
         title: data.title,
-        category: data.category,
+        category: categoryString,
         content: data.content,
         tags: data.tags,
         attachedFileIds: data.fileIds,
@@ -167,12 +177,16 @@ export default function NewStoryPage() {
 
       const result = await createPostMutation.mutateAsync(postData);
 
-      // 성공 시 해당 블로그의 포스트로 이동
+      // 성공 시 해당 블로그의 포스트로 이동 (페이지 이동하므로 플래그 초기화 불필요)
       router.push(`/${blog!.slug}/${result.slug}`);
     } catch (error) {
+      // 에러 발생 시에만 플래그 초기화 (재시도 가능하도록)
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
       console.error('Failed to create post:', error);
       toast.error('포스트 저장에 실패했습니다.');
     }
+    // 성공 시 페이지가 이동되므로 finally 블록 불필요
   };
 
   // Loading states
@@ -231,7 +245,7 @@ export default function NewStoryPage() {
                                 <span className="text-xs text-gray-500 dark:text-gray-400">제목</span>
                               </div>
                               {/* 데스크톱 라벨 (왼쪽) */}
-                              <div className="hidden lg:flex absolute -left-24 top-0 items-start gap-2" style={{ height: textareaHeight + 'px' }}>
+                              <div className="hidden lg:flex absolute -left-24 top-1 items-start gap-2" style={{ height: textareaHeight + 'px' }}>
                                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                   <Plus className="h-3 w-3" />
                                   <span>제목</span>
@@ -242,39 +256,44 @@ export default function NewStoryPage() {
                           )}
 
                           {/* 제목 입력 영역 */}
-                          <Textarea
-                            ref={(el) => {
-                              hookFormRef(el);              // React Hook Form의 ref
-                              (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
-                            }}
-                            placeholder=" 일단 쓰시죠..."
-                            {...restField}
-                            disabled={createPostMutation.isPending}
-                            onFocus={(e) => {
-                              setIsFocused(true);
-                              field.onBlur();
-                            }}
-                            onBlur={(e) => {
-                              setIsFocused(false);
-                              field.onBlur();
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                e.preventDefault(); // 엔터 키로 줄바꿈 방지
-                              }
-                            }}
-                            rows={1}
-                            className="!text-lg border-0 border-b border-gray-300 dark:border-gray-600 rounded-none px-0 resize-none overflow-hidden focus-visible:ring-0 focus-visible:border-gray-900 dark:focus-visible:border-gray-100 min-h-0 py-1 w-full placeholder:!text-gray-400 dark:placeholder:!text-gray-500"
-                            style={{
-                              height: 'auto',
-                            }}
-                            onInput={(e) => {
-                              const target = e.target as HTMLTextAreaElement;
-                              target.style.height = 'auto';
-                              target.style.height = target.scrollHeight + 'px';
-                              setTextareaHeight(target.scrollHeight);
-                            }}
-                          />
+                          <div
+                            className="cursor-text"
+                            onClick={() => textareaRef.current?.focus()}
+                          >
+                            <Textarea
+                              ref={(el) => {
+                                hookFormRef(el);              // React Hook Form의 ref
+                                (textareaRef as React.MutableRefObject<HTMLTextAreaElement | null>).current = el;
+                              }}
+                              placeholder=" 당신의 이야기를 들려주세요..."
+                              {...restField}
+                              disabled={createPostMutation.isPending}
+                              onFocus={(e) => {
+                                setIsFocused(true);
+                                field.onBlur();
+                              }}
+                              onBlur={(e) => {
+                                setIsFocused(false);
+                                field.onBlur();
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  e.preventDefault(); // 엔터 키로 줄바꿈 방지
+                                }
+                              }}
+                              rows={1}
+                              className="!text-lg border-0 border-b border-gray-300 dark:border-gray-600 rounded-none px-0 resize-none overflow-hidden focus-visible:ring-0 focus-visible:border-gray-900 dark:focus-visible:border-gray-100 min-h-0 py-1 w-full placeholder:!text-gray-400 dark:placeholder:!text-gray-500"
+                              style={{
+                                height: 'auto',
+                              }}
+                              onInput={(e) => {
+                                const target = e.target as HTMLTextAreaElement;
+                                target.style.height = 'auto';
+                                target.style.height = target.scrollHeight + 'px';
+                                setTextareaHeight(target.scrollHeight);
+                              }}
+                            />
+                          </div>
                         </div>
                       </FormControl>
                       <FormMessage />
@@ -286,11 +305,108 @@ export default function NewStoryPage() {
               {/* 카테고리 */}
               <FormField
                 control={form.control}
-                name="category"
+                name="categories"
                 render={({ field }) => {
+                  const [inputValue, setInputValue] = React.useState('');
                   const [isFocused, setIsFocused] = React.useState(false);
+                  const [isComposing, setIsComposing] = React.useState(false);
+                  const [showDropdown, setShowDropdown] = React.useState(false);
                   const categoryInputRef = React.useRef<HTMLInputElement>(null);
-                  const showLabel = isFocused || field.value;
+                  const categories = field.value || [];
+                  const showLabel = isFocused || categories.length > 0 || inputValue;
+
+                  // 자동완성 데이터
+                  const { data: userCategories = [], isLoading: isCategoriesLoading } = useUserCategories();
+
+                  // 입력값으로 필터링된 자동완성 목록
+                  const filteredCategories = useMemo(() => {
+                    if (!inputValue.trim()) return userCategories;
+                    const lowerInput = inputValue.toLowerCase();
+                    return userCategories.filter(cat => cat.toLowerCase().includes(lowerInput));
+                  }, [userCategories, inputValue]);
+
+                  const handleInputChange = (value: string) => {
+                    // 콤마가 입력되면 카테고리로 변환
+                    if (value.endsWith(',')) {
+                      const newCategory = value.slice(0, -1).trim();
+                      // 길이 검증: 1~15자
+                      if (newCategory.length > 15) {
+                        toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
+                        setInputValue('');
+                        setShowDropdown(false);
+                        return;
+                      }
+                      if (newCategory && categories.length < 2 && !categories.includes(newCategory) && !newCategory.includes('/')) {
+                        field.onChange([...categories, newCategory]);
+                      }
+                      setInputValue('');
+                      setShowDropdown(false);
+                    } else {
+                      setInputValue(value);
+                    }
+                  };
+
+                  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+                    if ((e.key === 'Enter') && !isComposing) {
+                      e.preventDefault();
+                      const newCategory = inputValue.trim().replace(/,/g, '');
+
+                      // 길이 검증: 1~15자
+                      if (newCategory.length > 15) {
+                        toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
+                        setInputValue('');
+                        setShowDropdown(false);
+                        return;
+                      }
+
+                      if (newCategory && categories.length < 2 && !categories.includes(newCategory) && !newCategory.includes('/')) {
+                        field.onChange([...categories, newCategory]);
+                        setInputValue('');
+                        setShowDropdown(false);
+                      }
+                    } else if (e.key === 'Backspace' && !inputValue && categories.length > 0) {
+                      // 입력값이 없을 때 Backspace로 마지막 카테고리 삭제
+                      field.onChange(categories.slice(0, -1));
+                    }
+                  };
+
+                  // 자동완성 선택
+                  const selectCategory = (category: string) => {
+                    // "메인/서브" 형식이면 파싱
+                    const parts = category.split('/').map(s => s.trim()).filter(Boolean);
+
+                    // 각 카테고리 길이 검증: 1~15자
+                    const invalidPart = parts.find(part => part.length > 15);
+                    if (invalidPart) {
+                      toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
+                      setShowDropdown(false);
+                      return;
+                    }
+
+                    // 현재 카테고리 개수 + 추가할 개수가 2개 초과하면 차단
+                    if (categories.length + parts.length > 2) {
+                      toast.error('카테고리는 최대 2개까지만 입력 가능합니다.');
+                      setShowDropdown(false);
+                      return;
+                    }
+
+                    const newCategories = [...categories];
+                    parts.forEach(part => {
+                      if (!newCategories.includes(part)) {
+                        newCategories.push(part);
+                      }
+                    });
+
+                    field.onChange(newCategories.slice(0, 2));
+                    setInputValue('');
+                    setShowDropdown(false);
+                  };
+
+                  // 카테고리 삭제 (첫 번째 삭제 시 두 번째가 첫 번째로 승격)
+                  const removeCategory = (indexToRemove: number) => {
+                    const newCategories = categories.filter((_: string, i: number) => i !== indexToRemove);
+                    field.onChange(newCategories);
+                  };
 
                   return (
                     <FormItem>
@@ -304,7 +420,7 @@ export default function NewStoryPage() {
                                 <span className="text-xs text-gray-500 dark:text-gray-400">카테고리</span>
                               </div>
                               {/* 데스크톱 라벨 (왼쪽) */}
-                              <div className="hidden lg:block absolute -left-24 top-0">
+                              <div className="hidden lg:block absolute -left-24 top-4">
                                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                   <Plus className="h-3 w-3" />
                                   <span>카테고리</span>
@@ -313,32 +429,105 @@ export default function NewStoryPage() {
                             </>
                           )}
 
-                          {/* 카테고리 입력 영역 (자동완성) - 전체 영역 클릭 시 포커스 */}
+                          {/* 카테고리 입력 영역 */}
                           <div
-                            className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-pointer"
-                            onClick={() => categoryInputRef.current?.focus()}
+                            className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-text"
+                            onClick={(e) => {
+                              // 카테고리 삭제 버튼 클릭 시 포커스 방지
+                              if ((e.target as HTMLElement).closest('button')) {
+                                return;
+                              }
+                              categoryInputRef.current?.focus();
+                            }}
                           >
-                            <CategoryAutocomplete
+                            {/* 카테고리 칩 표시 (# 없이) */}
+                            <div className="flex flex-wrap gap-2 mb-2">
+                              {categories.map((category: string, index: number) => (
+                                <span
+                                  key={index}
+                                  className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 rounded-full text-sm"
+                                >
+                                  <span>{category}</span>
+                                  {index === 0 && <span className="text-xs text-gray-500 dark:text-gray-400">(메인)</span>}
+                                  {index === 1 && <span className="text-xs text-gray-500 dark:text-gray-400">(서브)</span>}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeCategory(index);
+                                    }}
+                                    className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* 입력 필드 */}
+                            <Input
                               ref={categoryInputRef}
-                              value={field.value}
-                              onChange={(value) => {
-                                field.onChange(value);
+                              value={inputValue}
+                              onChange={(e) => {
+                                handleInputChange(e.target.value);
+                                setShowDropdown(e.target.value.trim().length > 0);
                               }}
+                              onKeyDown={handleKeyDown}
+                              onCompositionStart={() => setIsComposing(true)}
+                              onCompositionEnd={() => setIsComposing(false)}
                               onFocus={() => {
                                 setIsFocused(true);
+                                setShowDropdown(inputValue.trim().length > 0);
                               }}
                               onBlur={() => {
+                                // 입력 중인 값이 있으면 자동으로 추가 (엔터/콤마 없이 저장 시)
+                                const trimmedValue = inputValue.trim().replace(/,/g, '');
+                                if (trimmedValue && categories.length < 2 && !categories.includes(trimmedValue) && !trimmedValue.includes('/')) {
+                                  // 길이 검증: 1~15자
+                                  if (trimmedValue.length >= 1 && trimmedValue.length <= 15) {
+                                    field.onChange([...categories, trimmedValue]);
+                                    setInputValue('');
+                                  }
+                                }
                                 setIsFocused(false);
+                                setTimeout(() => setShowDropdown(false), 200);
                                 field.onBlur();
                               }}
-                              disabled={createPostMutation.isPending}
-                              placeholder=" 카테고리 입력"
+                              disabled={categories.length >= 2 || createPostMutation.isPending}
+                              placeholder={categories.length >= 2
+                                ? " 최대 2개까지 입력 가능합니다"
+                                : " 입력 후 엔터 또는 콤마로 구분"
+                              }
                               className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
+                              style={{ width: inputValue ? `${Math.max(235, inputValue.length * 14)}px` : '235px' }}
                             />
-                            {/* 카테고리 입력 안내 문구 (Focus 시 또는 값이 없을 때) */}
-                            {isFocused && !field.value && (
+
+                            {/* 자동완성 드롭다운 */}
+                            {showDropdown && filteredCategories.length > 0 && (
+                              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                {filteredCategories.map((category, index) => (
+                                  <button
+                                    key={index}
+                                    type="button"
+                                    onClick={() => selectCategory(category)}
+                                    className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm"
+                                  >
+                                    <span className="mr-2">🏷️</span>
+                                    {category}
+                                  </button>
+                                ))}
+                              </div>
+                            )}
+
+                            {/* 안내 문구 */}
+                            {!inputValue && categories.length === 0 && (
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-0">
-                                💡 "/" 구분자로 최대 2단계까지 입력 가능 (예: JavaScript/React)
+                                💡 최대 2개 입력 가능 (메인, 서브)
+                              </p>
+                            )}
+                            {categories.length === 2 && (
+                              <p className="text-xs text-orange-500 dark:text-orange-400 mt-1 ml-0">
+                                ⚠️ 카테고리는 최대 2개까지만 입력 가능합니다
                               </p>
                             )}
                           </div>
@@ -406,7 +595,7 @@ export default function NewStoryPage() {
                                 <span className="text-xs text-gray-500 dark:text-gray-400">태그</span>
                               </div>
                               {/* 데스크톱 라벨 (왼쪽) */}
-                              <div className="hidden lg:block absolute -left-24 top-0">
+                              <div className="hidden lg:block absolute -left-24 top-4">
                                 <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                   <Plus className="h-3 w-3" />
                                   <span>태그</span>
@@ -417,8 +606,14 @@ export default function NewStoryPage() {
 
                           {/* 태그 표시 및 입력 영역 - 전체 영역 클릭 시 포커스 */}
                           <div
-                            className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-pointer"
-                            onClick={() => tagInputRef.current?.focus()}
+                            className="border-0 border-b border-gray-300 dark:border-gray-600 pb-2 cursor-text"
+                            onClick={(e) => {
+                              // 태그 삭제 버튼 클릭 시 포커스 방지
+                              if ((e.target as HTMLElement).closest('button')) {
+                                return;
+                              }
+                              tagInputRef.current?.focus();
+                            }}
                           >
                             <div className="flex flex-wrap gap-2 mb-2">
                               {tags.map((tag: string, index: number) => (
@@ -450,7 +645,7 @@ export default function NewStoryPage() {
                               onFocus={() => setIsFocused(true)}
                               onBlur={() => setIsFocused(false)}
                               disabled={createPostMutation.isPending}
-                              placeholder={!inputValue ? " 태그 입력 후 콤마(,) 또는 Enter" : ""}
+                              placeholder={!inputValue ? " 입력 후 엔터 또는 콤마로 구분" : ""}
                               className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"
                               style={{ width: inputValue ? `${Math.max(235, inputValue.length * 14)}px` : '235px' }}
                             />
@@ -535,20 +730,21 @@ export default function NewStoryPage() {
               type="submit"
               disabled={
                 !isUploadValid ||
+                isSubmitting ||
                 createPostMutation.isPending
               }
               onClick={(e) => {
                 // 3차 방어: 버튼 클릭 시 Form 제출 차단
-                if (createPostMutation.isPending) {
+                if (isSubmitting || createPostMutation.isPending) {
                   e.preventDefault();
                   e.stopPropagation();
                 }
               }}
               className="flex items-center justify-center gap-2 min-w-[120px]"
               title={!isUploadValid ? uploadValidationReason : undefined}
-              aria-label={createPostMutation.isPending ? "저장 중" : "저장"}
+              aria-label={isSubmitting || createPostMutation.isPending ? "저장 중" : "저장"}
             >
-              {createPostMutation.isPending ? (
+              {isSubmitting || createPostMutation.isPending ? (
                 <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
               ) : (
                 <>

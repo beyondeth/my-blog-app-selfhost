@@ -35,12 +35,12 @@ export class CreatePostDto {
   tags?: string[];
 
   @ApiProperty({
-    description: '카테고리 (필수, 최대 2단계)',
+    description: '카테고리 (필수, 최대 2단계, 각 카테고리는 1~15글자)',
     example: 'JavaScript/React',
   })
   @IsString()
-  @Matches(/^[^/]+$|^[^/]+\/[^/]+$/, {
-    message: '카테고리는 최대 2단계까지만 입력 가능합니다 (예: JavaScript/React)'
+  @Matches(/^.{1,15}$|^.{1,15}\/.{1,15}$/, {
+    message: '카테고리는 최대 2단계까지 가능하며, 각 카테고리는 1~15글자여야 합니다 (예: JavaScript/React)'
   })
   category: string;
 
