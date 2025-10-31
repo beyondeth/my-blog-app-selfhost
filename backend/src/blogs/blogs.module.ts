@@ -3,12 +3,13 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { BlogsService } from './blogs.service';
 import { BlogsController } from './blogs.controller';
 import { Blog } from './entities/blog.entity';
+import { OldAlias } from './entities/old-alias.entity';
 import { UsersModule } from '../users/users.module';
 import { PostsModule } from '../posts/posts.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Blog]),
+    TypeOrmModule.forFeature([Blog, OldAlias]),
     UsersModule,
     forwardRef(() => PostsModule), // 순환 참조 방지
   ],

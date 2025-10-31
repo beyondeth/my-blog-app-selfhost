@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Body, Param, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
 import { BlogsService } from './blogs.service';
 import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
@@ -36,12 +36,29 @@ export class BlogsController {
     return await this.blogsService.findByUserId(user.id);
   }
 
+  /**
+   * 블로그 조회 (alias/slug 통합) - 체크포인트 2
+   *
+   * @description
+   * alias, old_alias, slug 모두 지원하는 통합 조회 엔드포인트입니다.
+   * 우선순위: alias > old_alias (301 리다이렉트) > slug (폴백)
+   *
+   * @param slug - identifier (alias 또는 slug, @ 없이)
+   * @param user - 현재 로그인한 사용자 (OptionalJwtAuthGuard)
+   * @returns 블로그 정보 또는 리다이렉트 정보
+   *
+   * @example
+   * GET /blogs/slug/park - alias로 조회
+   * GET /blogs/slug/oldname - 301 리다이렉트 정보 반환
+   * GET /blogs/slug/luticek - slug로 폴백
+   */
   @Get('slug/:slug')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: '블로그 조회 (alias/slug 통합)' })
   async findOneBySlug(@Param('slug') slug: string, @CurrentUser() user?: User) {
-    console.log(`[BlogsController] findOneBySlug - slug: ${slug}, user: ${user?.id || 'none'}`);
-    return await this.blogsService.findOneBySlug(slug, user);
+    // findOneByIdentifier()를 사용하여 alias > old_alias > slug 순서로 조회
+    return await this.blogsService.findOneByIdentifier(slug, user);
   }
 
   @Get(':id')
@@ -127,5 +144,103 @@ export class BlogsController {
   })
   async getAllBlogsForSitemap(): Promise<Array<{ slug: string; updatedAt: Date }>> {
     return this.blogsService.getAllPublicBlogsForSitemap();
+  }
+
+  // =====================================
+  // Alias 시스템 API (체크포인트 2)
+  // =====================================
+
+  /**
+   * Alias 사용 가능 여부 확인
+   *
+   * **체크포인트 2: Alias 중복 확인 API**
+   *
+   * @description
+   * 사용자가 Settings에서 alias를 변경하기 전에 사용 가능한지 확인합니다.
+   * - 형식 검증: 3~30자, 영문/숫자/하이픈/언더스코어만
+   * - 예약어 체크
+   * - blogs 테이블 중복 확인
+   * - old_aliases 테이블 재사용 방지
+   *
+   * @param alias - 확인할 alias (@ 없이)
+   * @returns { available: true } 또는 ConflictException
+   *
+   * @example
+   * GET /blogs/check-alias/park → { available: true }
+   * GET /blogs/check-alias/admin → ConflictException (예약어)
+   */
+  @Get('check-alias/:alias')
+  @Public()
+  @ApiOperation({ summary: 'Alias 사용 가능 여부 확인' })
+  @ApiResponse({
+    status: 200,
+    description: 'Alias 사용 가능',
+    schema: {
+      type: 'object',
+      properties: {
+        available: { type: 'boolean', example: true },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Alias 사용 불가 (중복, 예약어, 형식 오류)',
+  })
+  async checkAlias(@Param('alias') alias: string) {
+    const available = await this.blogsService.checkAliasAvailability(alias);
+    return { available };
+  }
+
+  /**
+   * 블로그 Alias 변경
+   *
+   * **체크포인트 2: Alias 변경 API**
+   *
+   * @description
+   * 사용자가 Settings에서 블로그 주소(alias)를 변경합니다.
+   * - 본인 블로그만 변경 가능 (JWT 인증)
+   * - 기존 alias는 old_aliases로 이동 (SEO 보호)
+   * - 새 alias 저장
+   * - Redis 캐시 무효화
+   *
+   * @param body - { alias: string }
+   * @param user - 현재 로그인한 사용자
+   * @returns 업데이트된 블로그 정보
+   *
+   * @example
+   * PATCH /blogs/my-blog/alias
+   * Body: { "alias": "newname" }
+   * Response: { id, slug, alias: "newname", ... }
+   */
+  @Patch('my-blog/alias')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '내 블로그 Alias 변경' })
+  @ApiResponse({
+    status: 200,
+    description: 'Alias 변경 성공',
+  })
+  @ApiResponse({
+    status: 403,
+    description: '권한 없음 (본인 블로그가 아님)',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'Alias 사용 불가 (중복, 예약어 등)',
+  })
+  async updateMyBlogAlias(
+    @Body('alias') alias: string,
+    @CurrentUser() user: User,
+  ) {
+    // 사용자의 블로그 ID 조회
+    const blogs = await this.blogsService.findByUserId(user.id);
+
+    if (!blogs || blogs.length === 0) {
+      throw new UnauthorizedException('블로그가 없습니다.');
+    }
+
+    const blog = blogs[0]; // 한 사용자당 하나의 블로그
+
+    // Alias 업데이트
+    return await this.blogsService.updateAlias(blog.id, alias, user.id);
   }
 }
