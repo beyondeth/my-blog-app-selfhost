@@ -100,6 +100,8 @@ export class ExtendedApiClient extends ApiClient {
   async createBlog(data: any) { return this.blogs.createBlog(data); }
   async getMyBlogs() { return this.blogs.getMyBlogs(); }
   async getBlogBySlug(slug: string) { return this.blogs.getBlogBySlug(slug); }
+  async checkAlias(alias: string) { return this.blogs.checkAlias(alias); }
+  async updateAlias(alias: string) { return this.blogs.updateAlias(alias); }
   async updateBlog(id: string, data: any) { return this.blogs.updateBlog(id, data); }
   async deleteBlog(id: string) { return this.blogs.deleteBlog(id); }
 
@@ -225,6 +227,8 @@ export const getBlogs = (params?: any) => apiClient.getBlogs(params);
 export const createBlog = (data: any) => apiClient.createBlog(data);
 export const getMyBlogs = () => apiClient.getMyBlogs();
 export const getBlogBySlug = (slug: string) => apiClient.getBlogBySlug(slug);
+export const checkAlias = (alias: string) => apiClient.checkAlias(alias);
+export const updateAlias = (alias: string) => apiClient.updateAlias(alias);
 export const updateBlog = (slug: string, data: any) => apiClient.updateBlog(slug, data);
 export const deleteBlog = (slug: string) => apiClient.deleteBlog(slug);
 export const createUploadUrl = (data: any) => apiClient.createUploadUrl(data);
