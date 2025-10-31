@@ -334,6 +334,38 @@ export class Post {
    */
   getOrderedImages?: () => Promise<(File & { imageOrder?: number })[]>;
 
+  // =====================================
+  // Flattened 필드 (Transient - DB 저장 안 됨)
+  // =====================================
+  /**
+   * Phase 1 리팩토링: 분리된 테이블의 필드를 flattening
+   * - 이 필드들은 DB에 저장되지 않음 (transient)
+   * - posts.service.ts에서 relations 조인 후 런타임에 할당
+   * - 기존 코드 호환성을 위해 존재
+   */
+  // From post_stats
+  viewCount?: number;
+  likeCount?: number;
+  commentCount?: number;
+  qualityScore?: number;
+
+  // From post_metadata
+  excerpt?: string;
+  tagList?: string[];
+  category?: string;
+  isEditorsPick?: boolean;
+  isEditorPick?: boolean; // Alias for isEditorsPick (backward compatibility)
+  editorPickedAt?: Date;
+  codeBlockCount?: number;
+  imageCount?: number;
+  isBackgroundProcessed?: boolean;
+  indexedAt?: Date;
+  content_type?: string;
+  content_rendered_at?: Date;
+  publishedAt?: Date;
+  processingCompletedAt?: Date;
+  processingError?: string;
+
   /**
    * 공개 JSON 변환
    * - API 응답용

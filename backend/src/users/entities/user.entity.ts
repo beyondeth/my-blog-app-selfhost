@@ -281,6 +281,41 @@ export class User {
   identities?: UserIdentity[];
 
   // =====================================
+  // Flattened 필드 (Transient - DB 저장 안 됨)
+  // =====================================
+  /**
+   * Phase 1 리팩토링: 분리된 테이블의 필드를 flattening
+   * - 이 필드들은 DB에 저장되지 않음 (transient)
+   * - users.service.ts에서 relations 조인 후 런타임에 할당
+   * - 프론트엔드 호환성을 위해 존재
+   */
+  // From profiles
+  profileImage?: string;
+  bio?: string;
+  lastLoginProvider?: string;
+  accountVerifiedAt?: Date;
+
+  // From subscriptions
+  subscriptionTier?: string;
+  subscriptionStatus?: string;
+  subscriptionStartDate?: Date;
+  subscriptionEndDate?: Date;
+
+  // From account_settings
+  refreshToken?: string;
+  refreshTokenExpiresAt?: Date;
+  marketingOptIn?: boolean;
+  newsletterOptIn?: boolean;
+  termsAcceptedAt?: Date;
+  privacyAcceptedAt?: Date;
+  scheduledDeletionAt?: Date;
+  primaryIdentityId?: string;
+
+  // Payment fields (for subscription module compatibility)
+  paymentCustomerId?: string;
+  paymentSubscriptionId?: string;
+
+  // =====================================
   // 메서드 (Methods)
   // =====================================
 

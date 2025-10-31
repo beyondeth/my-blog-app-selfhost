@@ -14,25 +14,29 @@ import { User } from './user.entity';
 import { SubscriptionTier, SubscriptionStatus } from '../../common/enums/subscription.enum';
 
 /**
- * Subscription 엔티티
+ * UserSubscription 엔티티 (Phase 1-2-3 리팩토링)
  *
  * **설계 원칙 (체크포인트 1):**
- * - User 테이블에서 구독/결제 관련 정보만 분리
- * - Single Responsibility: 구독 관리 및 결제 시스템 연동
+ * - User 테이블에서 구독/결제 관련 기본 정보만 분리
+ * - Single Responsibility: 사용자 구독 상태 관리
  * - 1:1 관계로 User와 연결
  * - UUID v7 사용으로 시간순 정렬 및 구독 이력 추적 용이
  *
+ * **주의:**
+ * - subscription 모듈의 subscriptions 테이블과 구분하기 위해 user_subscriptions 사용
+ * - 간단한 구독 상태만 관리 (tier, status 등)
+ * - 복잡한 결제/플랜 정보는 subscription 모듈 사용
+ *
  * **비즈니스 요구사항:**
- * - SaaS 블로그 플랫폼의 구독 모델 (Free, Basic, Pro)
- * - Stripe 결제 시스템 통합
- * - 무료 체험 기간 관리
- * - 구독 자동 갱신 및 취소 처리
+ * - 사용자별 구독 티어 (Free, Basic, Pro)
+ * - 구독 상태 관리 (Active, Canceled, Expired)
+ * - Stripe 연동을 위한 최소 정보
  *
  * **확장성:**
- * - 미래에 다른 결제 시스템 추가 가능 (paymentCustomerId)
+ * - subscription 모듈과 통합 가능
  * - 구독 이력 추적 (별도 subscription_history 테이블로 확장 가능)
  */
-@Entity('subscriptions')
+@Entity('user_subscriptions')
 @Index(['userId'], { unique: true }) // 1:1 관계 보장
 @Index(['subscriptionStatus']) // 구독 상태별 조회 최적화
 @Index(['subscriptionEndDate']) // 만료 예정 구독 조회 최적화
