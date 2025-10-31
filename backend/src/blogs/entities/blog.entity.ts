@@ -2,13 +2,56 @@ import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDat
 import { User } from '../../users/entities/user.entity';
 import { Post } from '../../posts/entities/post.entity';
 
+/**
+ * Blog 엔티티
+ *
+ * **체크포인트 2: Alias 시스템**
+ * - slug: 이메일 기반 자동 생성 (변경 불가, 기존 시스템)
+ * - alias: 사용자 지정 주소 (변경 가능, @username 형식)
+ *
+ * **주소 시스템:**
+ * - 회원가입 시: slug 자동 생성 (예: luticek)
+ * - Settings: 사용자가 alias 변경 (예: @park)
+ * - URL 우선순위: alias > slug (fallback)
+ * - SEO 보호: old_aliases 테이블로 301 리다이렉트
+ */
 @Entity('blogs')
 export class Blog {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  /**
+   * Slug (기존 이메일 기반 주소)
+   * - 회원가입 시 이메일 앞부분에서 자동 생성
+   * - 중복 시 랜덤 4자 추가 (예: luticek-abcd)
+   * - 변경 불가 (기존 시스템 호환성)
+   * - unique 제약조건
+   *
+   * **역할:**
+   * - Fallback URL (alias 없을 때)
+   * - 기존 API 호환성 유지
+   */
   @Column({ unique: true, nullable: true })
-  slug: string; // URL 주소 (영문, 숫자, 하이픈만)
+  slug: string;
+
+  /**
+   * Alias (사용자 지정 주소) - 새로운 기능
+   * - 사용자가 Settings에서 변경 가능
+   * - @ 없이 저장 (예: 'park', '@park'로 표시)
+   * - unique 제약조건
+   * - nullable: 초기에는 null (slug만 사용)
+   *
+   * **규칙:**
+   * - 3~30자
+   * - 영문, 숫자, 하이픈, 언더스코어만 허용
+   * - 예약어 금지 (admin, api, settings 등)
+   *
+   * **우선순위:**
+   * - alias가 있으면 alias 사용
+   * - alias가 없으면 slug 사용 (기존 동작)
+   */
+  @Column({ unique: true, nullable: true })
+  alias: string;
 
   @Column({ nullable: true })
   name: string; // 블로그 이름
