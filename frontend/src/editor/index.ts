@@ -12,7 +12,6 @@ export { default as ImageUploadManager } from './components/ImageManager/ImageUp
 export * from './components/ImageManager/ResizableImageNode';
 export { default as EditorToolbar } from './components/Toolbar/EditorToolbar';
 export { default as EnhancedEditorToolbar } from './components/Toolbar/EnhancedEditorToolbar';
-export * from './components/SlashCommands/SlashCommands';
 
 // Hooks
 export { useImageUploadManager } from './hooks/useImageUploadManager';
