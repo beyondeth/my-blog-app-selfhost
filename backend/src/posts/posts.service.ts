@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, In, SelectQueryBuilder, MoreThan, DataSource, EntityManager } from 'typeorm';
 import { Post } from './entities/post.entity';
@@ -26,6 +26,7 @@ import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-processing.queue';
 import { EventEmitter2 } from '@nestjs/event-emitter';
+import { RedisLockService } from '../redis/redis-lock.service';
 
 /**
  * 포스트 Core 데이터 타입 (실시간 카운트/상태 제외)
@@ -59,6 +60,7 @@ export class PostsService {
     @InjectQueue(POST_PROCESSING_QUEUE)
     private postProcessingQueue: Queue<PostProcessingJobData>,
     private readonly eventEmitter: EventEmitter2,
+    private readonly redisLockService: RedisLockService,
   ) {}
 
   /**
@@ -388,131 +390,173 @@ export class PostsService {
   }
 
   async create(createPostDto: CreatePostDto, user: User): Promise<any> {
-    // 사용자의 블로그를 찾음 (한 사용자당 하나의 블로그)
-    const blog = await this.blogsRepository.findOne({
-      where: { userId: user.id },
-    });
+    // Redis Lock 먼저 획득 (동일 사용자의 중복 요청 직렬화)
+    const lockKey = `post:create:${user.id}`;
+    const lockId = await this.redisLockService.acquireLock(lockKey, 10000);
 
-    if (!blog) {
-      throw new BadRequestException('블로그를 먼저 생성해주세요.');
+    if (!lockId) {
+      throw new ConflictException('포스트 생성 요청이 처리 중입니다. 잠시 후 다시 시도해주세요.');
     }
 
-    // 하이브리드 저장 시스템: 마크다운과 HTML 모두 저장
-    let processedContent = createPostDto.content;
-    let markdownContent = null;
-    let contentType: 'markdown' | 'html' = 'html';
-    
-    // 마크다운 콘텐츠인지 확인 (MCP에서 오는 경우)
-    if (createPostDto.content_markdown) {
-      // MCP에서 content_markdown만 보낸 경우
-      markdownContent = createPostDto.content_markdown;
-      let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
-      // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
-      htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
-      // 백엔드에서 콘텐츠 처리 파이프라인 적용
-      const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-        sanitize: true,
-        processCode: true,
-        processImages: true,
-        preserveMermaid: true,
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
+
+    try {
+      // 중복 포스트 체크 (10초 이내 동일 제목 방지)
+      const existingPost = await queryRunner.manager.findOne(Post, {
+        where: {
+          authorId: user.id,
+          title: createPostDto.title,
+          createdAt: MoreThan(new Date(Date.now() - 10000)),
+          isDeleted: false,
+        },
       });
-      processedContent = processed.html;
-      contentType = 'markdown';
-    } else if (createPostDto.content && this.isMarkdownContent(createPostDto.content)) {
-      // content가 마크다운인 경우
-      markdownContent = createPostDto.content;
-      let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
-      // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
-      htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
-      // 백엔드에서 콘텐츠 처리 파이프라인 적용
-      const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-        sanitize: true,
-        processCode: true,
-        processImages: true,
-        preserveMermaid: true,
-      });
-      processedContent = processed.html;
-      contentType = 'markdown';
-    } else if (!createPostDto.content && !createPostDto.content_markdown) {
-      // content와 content_markdown 둘 다 없는 경우
-      throw new BadRequestException('게시글 내용이 필요합니다.');
-    }
 
-    // 태그를 JSONB로 저장
-    const tagList = createPostDto.tags || [];
-
-    // excerpt 생성 (HTML에서 태그 제거 후 200자 추출)
-    let excerpt = '';
-    if (processedContent) {
-      // HTML 태그 제거 및 공백 정리
-      const textContent = processedContent
-        .replace(/<[^>]+>/g, '') // HTML 태그 제거
-        .replace(/\s+/g, ' ') // 연속된 공백을 하나로
-        .trim();
-
-      // 첫 200자 추출
-      excerpt = textContent.length > 200
-        ? textContent.substring(0, 200)
-        : textContent;
-    }
-
-    // spread 연산자 대신 명시적 필드 설정
-    const post = this.postsRepository.create({
-      title: createPostDto.title,
-      category: createPostDto.category,
-      content: processedContent, // HTML 버전 (디스플레이용)
-      content_markdown: markdownContent, // 마크다운 원본 (편집용)
-      excerpt: excerpt, // 포스트 요약 (목록 표시용)
-      content_type: contentType,
-      content_rendered_at: contentType === 'markdown' ? new Date() : null,
-      thumbnail: createPostDto.thumbnail, // YouTube 썸네일 또는 일반 이미지 URL
-      author: user,
-      blog: blog,
-      blogId: blog.id,
-      isPublished: true, // Multi-user blog system - all posts are published
-      publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
-      tagList: tagList, // JSONB 태그 배열 저장
-      qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적)
-    });
-
-    // Entity의 @BeforeInsert에서 UUID로 고유 slug 생성됨
-    await this.postsRepository.save(post);
-
-    let attachedFiles: File[] = [];
-    if (createPostDto.attachedFileIds?.length) {
-      // 파일 개수 검증
-      if (createPostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
-        throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+      if (existingPost) {
+        throw new ConflictException('동일한 포스트가 최근에 생성되었습니다. 잠시 후 다시 시도해주세요.');
       }
 
-      attachedFiles = await this.filesRepository.find({
-        where: { id: In(createPostDto.attachedFileIds), userId: user.id },
+      // 사용자의 블로그를 찾음 (한 사용자당 하나의 블로그)
+      const blog = await queryRunner.manager.findOne(Blog, {
+        where: { userId: user.id },
       });
 
-      // 포스트당 총 파일 용량 검증
-      await this.validatePostTotalSize(attachedFiles);
+      if (!blog) {
+        throw new BadRequestException('블로그를 먼저 생성해주세요.');
+      }
 
-      post.attachedFiles = attachedFiles;
-      await this.postsRepository.save(post);
+        // 하이브리드 저장 시스템: 마크다운과 HTML 모두 저장
+        let processedContent = createPostDto.content;
+        let markdownContent = null;
+        let contentType: 'markdown' | 'html' = 'html';
+
+        // 마크다운 콘텐츠인지 확인 (MCP에서 오는 경우)
+        if (createPostDto.content_markdown) {
+          // MCP에서 content_markdown만 보낸 경우
+          markdownContent = createPostDto.content_markdown;
+          let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+          // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+          htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+          // 백엔드에서 콘텐츠 처리 파이프라인 적용
+          const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+            sanitize: true,
+            processCode: true,
+            processImages: true,
+            preserveMermaid: true,
+          });
+          processedContent = processed.html;
+          contentType = 'markdown';
+        } else if (createPostDto.content && this.isMarkdownContent(createPostDto.content)) {
+          // content가 마크다운인 경우
+          markdownContent = createPostDto.content;
+          let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+          // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+          htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+          // 백엔드에서 콘텐츠 처리 파이프라인 적용
+          const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+            sanitize: true,
+            processCode: true,
+            processImages: true,
+            preserveMermaid: true,
+          });
+          processedContent = processed.html;
+          contentType = 'markdown';
+        } else if (!createPostDto.content && !createPostDto.content_markdown) {
+          // content와 content_markdown 둘 다 없는 경우
+          throw new BadRequestException('게시글 내용이 필요합니다.');
+        }
+
+        // 태그를 JSONB로 저장
+        const tagList = createPostDto.tags || [];
+
+        // excerpt 생성 (HTML에서 태그 제거 후 200자 추출)
+        let excerpt = '';
+        if (processedContent) {
+          // HTML 태그 제거 및 공백 정리
+          const textContent = processedContent
+            .replace(/<[^>]+>/g, '') // HTML 태그 제거
+            .replace(/\s+/g, ' ') // 연속된 공백을 하나로
+            .trim();
+
+          // 첫 200자 추출
+          excerpt = textContent.length > 200
+            ? textContent.substring(0, 200)
+            : textContent;
+        }
+
+      // spread 연산자 대신 명시적 필드 설정
+      const post = queryRunner.manager.create(Post, {
+        title: createPostDto.title,
+        category: createPostDto.category,
+        content: processedContent, // HTML 버전 (디스플레이용)
+        content_markdown: markdownContent, // 마크다운 원본 (편집용)
+        excerpt: excerpt, // 포스트 요약 (목록 표시용)
+        content_type: contentType,
+        content_rendered_at: contentType === 'markdown' ? new Date() : null,
+        thumbnail: createPostDto.thumbnail, // YouTube 썸네일 또는 일반 이미지 URL
+        author: user,
+        blog: blog,
+        blogId: blog.id,
+        isPublished: true, // Multi-user blog system - all posts are published
+        publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
+        tagList: tagList, // JSONB 태그 배열 저장
+        qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적)
+      });
+
+      // Entity의 @BeforeInsert에서 UUID로 고유 slug 생성됨
+      await queryRunner.manager.save(post);
+
+      let attachedFiles: File[] = [];
+      if (createPostDto.attachedFileIds?.length) {
+        // 파일 개수 검증
+        if (createPostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
+          throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+        }
+
+        attachedFiles = await queryRunner.manager.find(File, {
+          where: { id: In(createPostDto.attachedFileIds), userId: user.id },
+        });
+
+        // 포스트당 총 파일 용량 검증
+        await this.validatePostTotalSize(attachedFiles);
+
+        post.attachedFiles = attachedFiles;
+        await queryRunner.manager.save(post);
+      }
+
+      // 트랜잭션 커밋
+      await queryRunner.commitTransaction();
+
+      // ★ 커밋 후 Redis Lock 해제 (중요: 커밋이 완료된 후에 해제!)
+      await this.redisLockService.releaseLock(lockKey, lockId);
+
+      // 트랜잭션 밖에서 후처리 (비차단)
+      // Lazy loading 방지: user.id를 직접 전달
+      await this.linkFilesFromContent(post, user.id);
+
+      // 포스트 생성 이벤트 발행 (캐시 무효화용)
+      this.eventEmitter.emit('post.created', {
+        postId: post.id,
+        blogSlug: blog.slug,
+      });
+
+      /**
+       * DTO 변환으로 spread operator 제거
+       * lazy loading 방지 및 성능 최적화
+       */
+      return this.toPostDto(post, {
+        user: user,
+        blog: blog,
+      });
+    } catch (error) {
+      // 에러 발생 시 롤백 및 락 해제
+      await queryRunner.rollbackTransaction();
+      await this.redisLockService.releaseLock(lockKey, lockId);
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // Lazy loading 방지: user.id를 직접 전달
-    await this.linkFilesFromContent(post, user.id);
-
-    // 포스트 생성 이벤트 발행 (캐시 무효화용)
-    this.eventEmitter.emit('post.created', {
-      postId: post.id,
-      blogSlug: blog.slug,
-    });
-
-    /**
-     * DTO 변환으로 spread operator 제거
-     * lazy loading 방지 및 성능 최적화
-     */
-    return this.toPostDto(post, {
-      user: user,
-      blog: blog,
-    });
   }
 
   /**

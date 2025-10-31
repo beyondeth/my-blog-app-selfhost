@@ -67,7 +67,8 @@ log_info "✓ 환경 변수 확인 완료"
 # 2. Docker 이미지 빌드 (병렬 - Backend, Frontend, MCP Proxy)
 log_info "Step 2: Docker 이미지 빌드 (병렬) - 캐시 무효화"
 # --no-cache: 항상 최신 코드로 빌드 보장
-docker compose -f docker-compose.prod.oracle.yml build --no-cache backend frontend mcp-proxy
+# --env-file: .env.production 파일의 환경변수를 빌드 인자로 사용
+docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache backend frontend mcp-proxy
 log_info "✓ 모든 이미지 빌드 완료 (최신 코드 반영)"
 
 # 2-1. 빌드 검증 - 이미지 생성 시간 확인
@@ -89,7 +90,7 @@ done
 log_info "Step 3: Backend PM2 Reload (Zero-downtime)"
 
 # 3-1. Backend 컨테이너 시작 (새 이미지) - 강제 재생성
-docker compose -f docker-compose.prod.oracle.yml up -d --force-recreate backend
+docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate backend
 
 # 3-2. PM2 reload 실행 (워커 하나씩 재시작)
 log_info "PM2 워커 reload 중..."
@@ -140,7 +141,7 @@ fi
 # 4. Frontend 재시작 (빠른 재시작)
 log_info "Step 4: Frontend 재시작"
 # 이미 Step 2에서 빌드했으므로 여기서는 재시작만
-docker compose -f docker-compose.prod.oracle.yml up -d --force-recreate frontend
+docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate frontend
 
 # 헬스체크 대기
 log_info "Frontend 헬스체크 대기 중..."
@@ -154,7 +155,7 @@ fi
 # 5. MCP Proxy 재시작
 log_info "Step 5: MCP Proxy 재시작"
 # 이미 Step 2에서 빌드했으므로 여기서는 재시작만
-docker compose -f docker-compose.prod.oracle.yml up -d --force-recreate mcp-proxy
+docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate mcp-proxy
 
 # 헬스체크 대기
 log_info "MCP Proxy 헬스체크 대기 중..."
