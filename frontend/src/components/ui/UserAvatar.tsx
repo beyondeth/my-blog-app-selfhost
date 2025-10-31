@@ -70,7 +70,7 @@ export default function UserAvatar({
           src={imageUrl}
           alt={username || 'User'}
           fill
-          className="object-contain"
+          className="object-cover"
           sizes={
             size === 'xs' ? '24px' :
             size === 'sm' ? '32px' :

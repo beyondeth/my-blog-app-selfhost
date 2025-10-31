@@ -1,7 +1,7 @@
 "use client";
 
 import { Editor } from '@tiptap/react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   FiBold,
   FiItalic,
@@ -67,8 +67,9 @@ const BG_COLOR_PRESETS = [
   { value: '#DCE3E9', label: '연한 회색' }, // user color light gray
 ];
 
-// 글꼴 크기 옵션 - 본문 전용 (17px 기본, 20px 강조)
+// 글꼴 크기 옵션 - 본문 전용 (기본 17px, 작게 14px, 크게 20px)
 const FONT_SIZES = [
+  { value: '14px', label: '작게' },
   { value: '17px', label: '보통' },
   { value: '20px', label: '크게' },
 ];
@@ -82,6 +83,10 @@ export default function EnhancedEditorToolbar({
   const [showTextColorPicker, setShowTextColorPicker] = useState(false);
   const [showBgColorPicker, setShowBgColorPicker] = useState(false);
   const [showFontSizeMenu, setShowFontSizeMenu] = useState(false);
+
+  const fontSizeMenuRef = useRef<HTMLDivElement>(null);
+  const textColorPickerRef = useRef<HTMLDivElement>(null);
+  const bgColorPickerRef = useRef<HTMLDivElement>(null);
 
   // 에디터 클릭 시 드롭다운 닫기
   useEffect(() => {
@@ -98,6 +103,28 @@ export default function EnhancedEditorToolbar({
       };
     }
   }, [editor]);
+
+  // 외부 클릭 시 드롭다운 닫기
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (fontSizeMenuRef.current && !fontSizeMenuRef.current.contains(event.target as Node)) {
+        setShowFontSizeMenu(false);
+      }
+      if (textColorPickerRef.current && !textColorPickerRef.current.contains(event.target as Node)) {
+        setShowTextColorPicker(false);
+      }
+      if (bgColorPickerRef.current && !bgColorPickerRef.current.contains(event.target as Node)) {
+        setShowBgColorPicker(false);
+      }
+    };
+
+    if (showFontSizeMenu || showTextColorPicker || showBgColorPicker) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [showFontSizeMenu, showTextColorPicker, showBgColorPicker]);
 
   if (!editor) return null;
 
@@ -137,18 +164,20 @@ export default function EnhancedEditorToolbar({
     </button>
   );
 
-  const DropdownButton = ({ 
-    label, 
-    isOpen, 
+  const DropdownButton = ({
+    label,
+    isOpen,
     onClick,
-    children 
+    children,
+    containerRef
   }: {
     label: string;
     isOpen: boolean;
     onClick: () => void;
     children: React.ReactNode;
+    containerRef?: React.RefObject<HTMLDivElement>;
   }) => (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <button
         type="button"
         onMouseDown={(e) => {
@@ -165,8 +194,20 @@ export default function EnhancedEditorToolbar({
     </div>
   );
 
+  // 현재 선택된 글자 크기 가져오기
+  const getCurrentFontSize = () => {
+    const { fontSize } = editor.getAttributes('textStyle');
+    return fontSize || '17px'; // 기본값 17px
+  };
+
   const handleSetFontSize = (size: string) => {
-    editor.chain().focus().setMark('textStyle', { fontSize: size }).run();
+    if (size === '17px') {
+      // 보통: 인라인 스타일 제거 (CSS 기본 17px로 복귀)
+      editor.chain().focus().unsetFontSize().run();
+    } else {
+      // 작게/크게: 인라인 스타일 적용
+      editor.chain().focus().setFontSize(size).run();
+    }
     setShowFontSizeMenu(false);
   };
 
@@ -204,23 +245,32 @@ export default function EnhancedEditorToolbar({
               setShowTextColorPicker(false);
               setShowBgColorPicker(false);
             }}
+            containerRef={fontSizeMenuRef}
           >
             <div className="absolute top-full left-0 mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg" style={{ zIndex: 9999 }}>
-              {FONT_SIZES.map((size) => (
-                <button
-                  key={size.value}
-                  type="button"
-                  onMouseDown={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    handleSetFontSize(size.value);
-                  }}
-                  className="block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300 whitespace-nowrap"
-                  style={{ fontSize: size.value }}
-                >
-                  {size.label}
-                </button>
-              ))}
+              {FONT_SIZES.map((size) => {
+                const isActive = getCurrentFontSize() === size.value;
+                return (
+                  <button
+                    key={size.value}
+                    type="button"
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleSetFontSize(size.value);
+                    }}
+                    className={`block w-full px-4 py-2 text-left text-sm hover:bg-gray-100 dark:hover:bg-gray-700 whitespace-nowrap flex items-center justify-between gap-2 ${
+                      isActive
+                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400'
+                        : 'text-gray-700 dark:text-gray-300'
+                    }`}
+                    style={{ fontSize: size.value }}
+                  >
+                    <span>{size.label}</span>
+                    {isActive && <FiCheck className="w-4 h-4" />}
+                  </button>
+                );
+              })}
             </div>
           </DropdownButton>
 
@@ -262,7 +312,7 @@ export default function EnhancedEditorToolbar({
           <div className="w-px h-6 bg-gray-300 dark:bg-gray-600 mx-1" />
 
           {/* 텍스트 색상 */}
-          <div className="relative">
+          <div className="relative" ref={textColorPickerRef}>
             <button
               type="button"
               onMouseDown={(e) => {
@@ -317,7 +367,7 @@ export default function EnhancedEditorToolbar({
           </div>
 
           {/* 배경색 (하이라이트) */}
-          <div className="relative">
+          <div className="relative" ref={bgColorPickerRef}>
             <button
               type="button"
               onMouseDown={(e) => {

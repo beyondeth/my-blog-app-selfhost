@@ -408,7 +408,8 @@ export class ContextualFileService {
     }
 
     if (context.maxFileSize && file.size > context.maxFileSize) {
-      throw new BadRequestException('File size limit exceeded');
+      const maxSizeMB = context.maxFileSize / 1024 / 1024;
+      throw new BadRequestException(`허용 크기를 초과했습니다 (최대 ${maxSizeMB}MB)`);
     }
 
     if (context.allowedTypes && !context.allowedTypes.includes(file.mimetype)) {

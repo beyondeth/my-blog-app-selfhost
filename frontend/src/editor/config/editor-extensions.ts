@@ -27,6 +27,7 @@ import typescript from 'highlight.js/lib/languages/typescript';
 import { EDITOR_DOCUMENT_CONFIG, YOUTUBE_CONFIG } from '../constants/editor.constants';
 import { SlashCommands, ResizableImage } from '../extensions';
 import { YoutubeAutoEmbed } from '../extensions/YoutubeAutoEmbed.extension';
+import { FontSize } from '../extensions/FontSize.extension';
 
 // lowlight 인스턴스 생성 및 언어 등록
 const lowlight = createLowlight(common);
@@ -88,6 +89,7 @@ export const getEditorExtensions = (placeholder?: string) => [
   Color.configure({
     types: ['textStyle'],
   }),
+  FontSize, // 글자 크기 (보통/크게)
   
   // 제목
   Heading.configure({
