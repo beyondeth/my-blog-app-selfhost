@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { useRouter, useSearchParams, useParams, redirect } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useBlogBySlug, useBlogCategories } from '@/hooks/useBlogs';
@@ -51,6 +51,23 @@ export default function BlogPage() {
     isLoading: blogLoading,
     error: blogError
   } = useBlogBySlug(blogSlug);
+
+  // 301 리다이렉트 처리 (체크포인트 2: Alias 시스템)
+  // old_alias로 접속한 경우 현재 alias로 영구 리다이렉트
+  useEffect(() => {
+    if (blog && 'shouldRedirect' in blog && blog.shouldRedirect && blog.redirectTo) {
+      // SEO를 위한 301 영구 리다이렉트
+      // router.replace는 클라이언트 사이드라 301 상태를 보낼 수 없음
+      // 따라서 redirect 함수 또는 window.location.replace 사용
+      const redirectPath = `/${blog.redirectTo}${searchParams ? `?${searchParams.toString()}` : ''}`;
+
+      // Next.js 클라이언트 컴포넌트에서는 window.location을 사용하여 리다이렉트
+      // 이는 브라우저가 새로운 요청을 생성하게 하며, 서버에서 301 상태 처리 가능
+      if (typeof window !== 'undefined') {
+        window.location.replace(redirectPath);
+      }
+    }
+  }, [blog, searchParams]);
 
   // 블로그의 카테고리별 포스트 개수 가져오기
   const {

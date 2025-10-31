@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { FiArrowLeft } from 'react-icons/fi';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
@@ -12,6 +12,7 @@ import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import CommentSectionPaginated from '@/components/comments/CommentSectionPaginated';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
+import { useBlogBySlug } from '@/hooks/useBlogs';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
@@ -76,6 +77,7 @@ interface BlogPostDetailClientProps {
 export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClientProps) {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAdmin } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -84,6 +86,23 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
   const blogSlug = params.blogSlug as string;
   const postSlug = params.postSlug as string;
+
+  // 블로그 정보 가져오기 (alias 리다이렉트 확인용)
+  const { data: blog } = useBlogBySlug(blogSlug);
+
+  // 301 리다이렉트 처리 (체크포인트 2: Alias 시스템)
+  // old_alias로 접속한 경우 현재 alias로 영구 리다이렉트
+  useEffect(() => {
+    if (blog && 'shouldRedirect' in blog && blog.shouldRedirect && blog.redirectTo) {
+      // SEO를 위한 301 영구 리다이렉트
+      const redirectPath = `/${blog.redirectTo}/${postSlug}${searchParams ? `?${searchParams.toString()}` : ''}`;
+
+      // Next.js 클라이언트 컴포넌트에서는 window.location을 사용하여 리다이렉트
+      if (typeof window !== 'undefined') {
+        window.location.replace(redirectPath);
+      }
+    }
+  }, [blog, postSlug, searchParams]);
 
   // Fetch post details - initialPost가 있으면 사용, 없으면 fetch
   const { data: post, error, isError, refetch } = usePost(postSlug, {

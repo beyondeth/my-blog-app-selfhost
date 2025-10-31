@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { getBlogBySlug, getMyBlogs, createBlog, updateBlog, deleteBlog } from '@/lib/api';
+import { getBlogBySlug, getMyBlogs, createBlog, updateBlog, deleteBlog, checkAlias, updateAlias } from '@/lib/api';
 import { toast } from 'sonner';
 
 // Get blog by slug
@@ -104,5 +104,73 @@ export function useBlogCategories(blogSlug: string) {
     enabled: !!blogSlug,
     staleTime: 5 * 60 * 1000, // 5분간 캐시
     gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+  });
+}
+
+/**
+ * Alias 사용 가능 여부 확인 훅 (체크포인트 2)
+ *
+ * @description
+ * Settings에서 사용자가 alias를 변경하기 전에 중복 여부를 확인합니다.
+ * - 형식 검증: 3~30자, 영문/숫자/하이픈/언더스코어
+ * - 예약어 체크 (admin, api, auth 등 23개)
+ * - 현재 사용 중인 alias 중복 확인
+ * - old_aliases 재사용 방지
+ *
+ * @param alias - 확인할 alias (@ 없이)
+ * @param enabled - 쿼리 활성화 여부 (debounce 처리용)
+ * @returns { available: boolean } 또는 에러
+ *
+ * @example
+ * const { data, isLoading, error } = useCheckAlias('park', enabled);
+ * // data = { available: true }
+ */
+export function useCheckAlias(alias: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: ['check-alias', alias],
+    queryFn: () => checkAlias(alias),
+    enabled: enabled && !!alias && alias.length >= 3, // 3자 이상일 때만 확인
+    staleTime: 30 * 1000, // 30초 캐싱 (중복 확인은 짧게)
+    gcTime: 60 * 1000, // 1분간 메모리 보관
+    retry: false, // 중복 확인은 재시도 불필요
+  });
+}
+
+/**
+ * Alias 변경 훅 (체크포인트 2)
+ *
+ * @description
+ * Settings에서 사용자의 블로그 alias를 변경합니다.
+ * - 본인 블로그만 변경 가능 (JWT 인증)
+ * - 기존 alias는 old_aliases 테이블로 이동 (SEO 보호)
+ * - Redis 캐시 무효화
+ * - 성공 시 블로그 쿼리 캐시 갱신
+ *
+ * @returns useMutation 객체 (mutate, isLoading, error)
+ *
+ * @example
+ * const { mutate: changeAlias, isLoading } = useUpdateAlias();
+ * changeAlias('newname');
+ * // 성공 시: 블로그 캐시 갱신, 토스트 표시
+ * // 실패 시: 에러 토스트 (중복, 예약어 등)
+ */
+export function useUpdateAlias() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (alias: string) => updateAlias(alias),
+    onSuccess: (updatedBlog) => {
+      // 블로그 캐시 무효화 (새 alias로 조회 가능하도록)
+      queryClient.invalidateQueries({ queryKey: ['blog'] });
+      queryClient.invalidateQueries({ queryKey: ['my-blogs'] });
+
+      // 성공 메시지
+      toast.success(`블로그 주소가 @${updatedBlog.alias}로 변경되었습니다.`);
+    },
+    onError: (error: any) => {
+      // 에러 메시지 (백엔드에서 ConflictException 등)
+      const errorMessage = error.message || 'Alias 변경에 실패했습니다.';
+      toast.error(errorMessage);
+    },
   });
 }
