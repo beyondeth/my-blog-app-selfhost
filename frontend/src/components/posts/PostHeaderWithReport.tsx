@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget } from 'react-icons/fi';
-import { BsFiletypePdf } from 'react-icons/bs';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui/avatar';
@@ -24,7 +23,6 @@ interface PostHeaderWithReportProps {
   onLike?: () => void;
   onShare?: () => void;
   onCopy?: () => void;
-  onPdfDownload?: () => void;
   onBookmark?: () => void;
   bookmarked?: boolean;
   bookmarkPending?: boolean;
@@ -46,7 +44,6 @@ export default function PostHeaderWithReport({
   onLike,
   onShare,
   onCopy,
-  onPdfDownload,
   onBookmark,
   bookmarked = false,
   bookmarkPending = false,
@@ -57,27 +54,11 @@ export default function PostHeaderWithReport({
   LikeButtonComponent
 }: PostHeaderWithReportProps) {
   const [showDropdown, setShowDropdown] = useState(false);
-  const [isPdfGenerating, setIsPdfGenerating] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
   const { user } = useAuth();
 
   // Check if current user is the post author
   const isAuthor = user?.id === post.author?.id;
-
-  // PDF 다운로드 핸들러 - 중복 클릭 방지 및 에러 격리
-  const handlePdfDownload = async () => {
-    if (!onPdfDownload || isPdfGenerating) return;
-
-    setIsPdfGenerating(true);
-    try {
-      await onPdfDownload();
-    } catch {
-      // 에러 완전 무시 - 사용자에게 알리지 않음
-    } finally {
-      // 3초 쿨다운
-      setTimeout(() => setIsPdfGenerating(false), 3000);
-    }
-  };
 
   const handleReport = () => {
     if (!user) return; // 로그인하지 않은 경우 실행 안 함
@@ -294,23 +275,6 @@ export default function PostHeaderWithReport({
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-              </button>
-            )}
-
-            {/* PDF 다운로드 버튼 - 작성자 본인만 표시 */}
-            {isAuthor && onPdfDownload && (
-              <button
-                onClick={handlePdfDownload}
-                disabled={isPdfGenerating}
-                className={`flex items-center justify-center p-1 rounded-full transition-colors ${
-                  isPdfGenerating
-                    ? 'text-gray-400 cursor-not-allowed opacity-50 dark:text-gray-600'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
-                }`}
-                title={isPdfGenerating ? "PDF 생성 중..." : "PDF로 다운로드"}
-                data-pdf-hide="true"
-              >
-                <BsFiletypePdf className="w-5 h-5" />
               </button>
             )}
 

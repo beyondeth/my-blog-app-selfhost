@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useMemo } from 'react';
-import DOMPurify from 'dompurify';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { stripUnderline } from '@/utils/stripUnderline';
 
@@ -63,42 +62,22 @@ export default function HtmlRenderer({ content, onImageClick, className = '' }: 
             .replace(/crossorigin=["'][^"']*["']/gi, '')
             .replace(/\s+/g, ' ')
             .trim();
-          return `<img ${cleanedAttributes} src="${normalizedSrc}" loading="lazy">`;
+
+          // loading 속성 중복 방지 (Hydration mismatch 해결)
+          // 이미 loading 속성이 있으면 유지, 없으면 추가
+          const hasLoading = /loading=/i.test(beforeSrc + afterSrc);
+          const loadingAttr = hasLoading ? '' : ' loading="lazy"';
+
+          return `<img ${cleanedAttributes} src="${normalizedSrc}"${loadingAttr}>`;
         } catch (error) {
           return match;
         }
       },
     );
 
-    // 클라이언트 사이드 살균 (백엔드에서 이미 처리되었지만 추가 보안)
-    // SSR 환경에서 DOMPurify 실행 방지
-    if (typeof window === 'undefined') {
-      return processed;
-    }
-
-    const sanitized = DOMPurify.sanitize(processed, {
-      ALLOWED_TAGS: [
-        'p', 'br', 'strong', 'em', 'u', 's', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-        'ul', 'ol', 'li', 'blockquote', 'a', 'img', 'code', 'pre', 'span', 'div',
-        'hr', 'mark', 'sub', 'sup', 'del', 'ins', 'kbd', 'samp', 'var',
-        'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
-        'button', 'svg', 'rect', 'path', 'polyline', 'use', 'g', 'defs', 'symbol',
-        'iframe',
-      ],
-      ALLOWED_ATTR: [
-        'href', 'src', 'alt', 'title', 'target', 'rel', 'data-*', 'width', 'height',
-        'class', 'style', 'viewBox', 'fill', 'stroke', 'stroke-width', 'stroke-linecap',
-        'stroke-linejoin', 'points', 'x', 'y', 'rx', 'ry', 'd', 'xmlns', 'transform',
-        'frameborder', 'allow', 'allowfullscreen', 'loading',
-      ],
-      ALLOW_DATA_ATTR: true,
-      KEEP_CONTENT: true,
-      ADD_TAGS: ['span', 'iframe'],
-      ADD_ATTR: ['class', 'frameborder', 'allow', 'allowfullscreen', 'xmlns'],
-      ALLOWED_URI_REGEXP: /^https?:\/\//i,
-    });
-
-    return sanitized;
+    // 백엔드에서 이미 HTML sanitization 처리됨
+    // Hydration mismatch 방지를 위해 클라이언트 사이드 DOMPurify 제거
+    return processed;
   }, [content]);
 
   if (!content) {

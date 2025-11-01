@@ -9,6 +9,7 @@ import CodeRenderer from './components/CodeRenderer';
 import YouTubeRenderer from './components/YouTubeRenderer';
 import { useModal } from '@/hooks/useModal';
 import Modal from '../Modal';
+import '@/editor/styles/editor.css';
 
 // Mermaid 컴포넌트를 동적 import로 로드 (클라이언트 사이드에서만)
 const MermaidRenderer = dynamic(() => import('./components/MermaidRenderer'), {
