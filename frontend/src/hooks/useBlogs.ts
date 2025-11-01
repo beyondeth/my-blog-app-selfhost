@@ -8,9 +8,9 @@ export function useBlogBySlug(slug: string) {
     queryKey: ['blog', slug],
     queryFn: () => getBlogBySlug(slug),
     enabled: !!slug,
-    staleTime: 5 * 60 * 1000,       // 5분간 캐싱 (블로그 정보는 자주 변경되지 않음)
+    staleTime: 1 * 60 * 1000,       // 1분간 캐싱 (프로필 이미지 변경 등 빠른 반영 필요)
     gcTime: 10 * 60 * 1000,          // 10분간 메모리 보관
-    refetchOnMount: false,           // 마운트 시 재요청 안함 (성능 최적화)
+    refetchOnMount: 'always',        // 마운트 시 stale 데이터면 재페칭 (아바타 즉시 반영)
     refetchOnWindowFocus: false,     // 포커스 시 재요청 안함
   });
 }
