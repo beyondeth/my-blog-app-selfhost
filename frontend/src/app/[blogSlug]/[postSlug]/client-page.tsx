@@ -227,37 +227,6 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
     }
   }, [post]);
 
-  // PDF 다운로드 핸들러 - html2canvas + jsPDF 사용 (Dynamic Import)
-  // 번들 사이즈 최적화: 클릭 시에만 라이브러리 로드 (350 KB 절약)
-  const handlePdfDownload = useCallback(async () => {
-    if (!post) return;
-
-    let toastId: string | number | undefined;
-
-    try {
-      // 진행 상태를 보여주는 toast
-      toastId = toast.loading('PDF 생성 준비 중...');
-
-      // 🚀 Dynamic Import: 첫 클릭 시에만 라이브러리 로드 (이후 캐시됨)
-      const { downloadPostAsPdf } = await import('@/utils/pdf');
-
-      const success = await downloadPostAsPdf(post.title, (status) => {
-        // 진행 상태 업데이트
-        if (toastId) {
-          toast.loading(status, { id: toastId });
-        }
-      });
-
-      if (success) {
-        toast.success('PDF 다운로드 완료!', { id: toastId });
-      } else {
-        toast.error('PDF 생성에 실패했습니다.', { id: toastId });
-      }
-    } catch (error) {
-      toast.error('PDF 생성 중 오류가 발생했습니다.', { id: toastId });
-    }
-  }, [post]);
-
   // 북마크 핸들러 추가
   const handleBookmark = useCallback(() => {
     if (!post?.id || !user) return; // post.id가 없거나 로그인하지 않은 경우 실행 안 함
@@ -483,7 +452,6 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
           }
           onShare={handleShare}
           onCopy={handleCopyContent}
-          onPdfDownload={handlePdfDownload}
           onBookmark={handleBookmark}
           bookmarked={post.bookmarked || false}
           bookmarkPending={bookmarkMutation.isPending}
