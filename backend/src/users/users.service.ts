@@ -4,7 +4,11 @@ import { Repository, DataSource } from 'typeorm';
 import { DateUtils } from '../common/utils/date.utils';
 import * as bcrypt from 'bcrypt';
 import { User, AuthProvider } from './entities/user.entity';
+import { Profile } from './entities/profile.entity';
+import { Subscription } from './entities/subscription.entity';
+import { AccountSettings } from './entities/account-settings.entity';
 import { Role } from '../common/enums/role.enum';
+import { SubscriptionTier, SubscriptionStatus } from '../common/enums/subscription.enum';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
@@ -21,6 +25,12 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private readonly usersRepository: Repository<User>,
+    @InjectRepository(Profile)
+    private readonly profileRepository: Repository<Profile>,
+    @InjectRepository(Subscription)
+    private readonly subscriptionRepository: Repository<Subscription>,
+    @InjectRepository(AccountSettings)
+    private readonly accountSettingsRepository: Repository<AccountSettings>,
     @InjectRepository(Post)
     private readonly postRepository: Repository<Post>,
     @InjectRepository(Comment)
@@ -46,10 +56,59 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto): Promise<User> {
     try {
-      const user = this.usersRepository.create(createUserDto);
+      // Phase 1 리팩토링: 필드를 분리된 테이블로 나누기
+      const {
+        // Profile 테이블 필드
+        profileImage,
+        bio,
+        accountVerifiedAt,
+
+        // AccountSettings 테이블 필드
+        termsAcceptedAt,
+        privacyAcceptedAt,
+        marketingOptIn,
+        marketingOptInAt,
+        newsletterOptIn,
+
+        // Users 테이블 필드 (나머지)
+        ...userData
+      } = createUserDto;
+
+      // User 엔티티 생성 (cascade: true로 관련 엔티티도 함께 저장됨)
+      const user = this.usersRepository.create({
+        ...userData,
+
+        // Profile 생성 (cascade)
+        profile: this.profileRepository.create({
+          profileImage,
+          bio,
+          accountVerifiedAt,
+          lastLoginProvider: null, // 회원가입 시에는 null
+          accountSecurityLevel: 'basic',
+        }),
+
+        // Subscription 생성 (cascade) - 기본값으로 FREE 티어
+        subscription: this.subscriptionRepository.create({
+          subscriptionTier: SubscriptionTier.FREE,
+          // subscriptionStatus는 DB 기본값 'ACTIVE' 사용 (마이그레이션에서 NOT NULL DEFAULT 'ACTIVE')
+          isTrialUsed: false,
+        }),
+
+        // AccountSettings 생성 (cascade)
+        accountSettings: this.accountSettingsRepository.create({
+          termsAcceptedAt,
+          privacyAcceptedAt,
+          marketingOptIn: marketingOptIn || false,
+          marketingOptInAt,
+          newsletterOptIn: newsletterOptIn || false,
+          loginAttempts: 0,
+          dataRetentionYears: 3,
+        }),
+      });
+
       const savedUser = await this.usersRepository.save(user);
-      
-      this.logger.log(`User created: ${savedUser.email}`);
+
+      this.logger.log(`User created with separated entities: ${savedUser.email}`);
       return savedUser;
     } catch (error) {
       this.logger.error(`Failed to create user: ${error.message}`);
@@ -71,26 +130,18 @@ export class UsersService {
   async findOne(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id },
+      relations: ['profile', 'subscription', 'accountSettings'], // Phase 1: 분리된 테이블 조인
       select: [
         'id',
         'email',
         'username',
         'role',
-        'profileImage',
         'isEmailVerified',
         'createdAt',
         'lastLoginAt',
         'isActive',
-        'bio',
         'authProvider',               // 최초 가입 방법
-        'lastLoginProvider',          // 현재 로그인 방법 (계정 삭제 UX용)
         'providerId',
-        'subscriptionTier',           // 구독 티어
-        'subscriptionStatus',         // 구독 상태
-        'marketingOptIn',
-        'newsletterOptIn',
-        'termsAcceptedAt',
-        'privacyAcceptedAt'
       ]
     });
 
@@ -98,8 +149,40 @@ export class UsersService {
       throw new NotFoundException('User not found');
     }
 
+    // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
+    // profiles 테이블 필드
+    if (user.profile) {
+      user.name = user.profile.name;
+      user.profileImage = user.profile.profileImage;
+      user.bio = user.profile.bio;
+      user.lastLoginProvider = user.profile.lastLoginProvider;
+    }
+
+    // subscriptions 테이블 필드
+    if (user.subscription) {
+      user.subscriptionTier = user.subscription.subscriptionTier;
+      user.subscriptionStatus = user.subscription.subscriptionStatus;
+      user.subscriptionStartDate = user.subscription.subscriptionStartDate;
+      user.subscriptionEndDate = user.subscription.subscriptionEndDate;
+      user.stripeCustomerId = user.subscription.stripeCustomerId;
+      user.paymentCustomerId = user.subscription.paymentCustomerId;
+      user.paymentSubscriptionId = user.subscription.paymentSubscriptionId;
+    }
+
+    // account_settings 테이블 필드
+    if (user.accountSettings) {
+      user.refreshToken = user.accountSettings.refreshToken;
+      user.refreshTokenExpiresAt = user.accountSettings.refreshTokenExpiresAt;
+      user.marketingOptIn = user.accountSettings.marketingOptIn;
+      user.newsletterOptIn = user.accountSettings.newsletterOptIn;
+      user.termsAcceptedAt = user.accountSettings.termsAcceptedAt;
+      user.privacyAcceptedAt = user.accountSettings.privacyAcceptedAt;
+      user.primaryIdentityId = user.accountSettings.primaryIdentityId;
+    }
+
     // 프로필 이미지를 CDN URL로 변환
     if (user.profileImage && user.profileImage.startsWith('v2/')) {
+      
       user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
       this.logger.debug(`Profile image CDN URL: ${user.profileImage}`);
     }
@@ -108,33 +191,63 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<User | null> {
-    // QueryBuilder 사용하여 blog relation과 필요한 모든 필드 포함
-    const user = await this.usersRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.blog', 'blog')
-      .select([
-        'user.id',
-        'user.email',
-        'user.password',
-        'user.username',
-        'user.role',
-        'user.authProvider',         // 최초 가입 방법
-        'user.lastLoginProvider',    // 현재 로그인 방법 (계정 삭제 UX용)
-        'user.isActive',
-        'user.profileImage',
-        'user.isEmailVerified',
-        'user.bio',
-        'user.subscriptionTier',     // 구독 티어
-        'user.subscriptionStatus',   // 구독 상태
-        'blog.slug',                 // blog의 slug만 선택
-      ])
-      .where('user.email = :email', { email })
-      .getOne();
+    // Phase 1 리팩토링: 분리된 테이블 조인
+    const user = await this.usersRepository.findOne({
+      where: { email },
+      relations: ['blog', 'profile', 'subscription', 'accountSettings'],
+      select: [
+        'id',
+        'email',
+        'password',
+        'username',
+        'role',
+        'authProvider',         // 최초 가입 방법
+        'isActive',
+        'isEmailVerified',
+        'isDeleted',
+        'deletedAt',
+      ]
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
+    // profiles 테이블 필드
+    if (user.profile) {
+      user.name = user.profile.name;
+      user.profileImage = user.profile.profileImage;
+      user.bio = user.profile.bio;
+      user.lastLoginProvider = user.profile.lastLoginProvider;
+    }
+
+    // subscriptions 테이블 필드
+    if (user.subscription) {
+      user.subscriptionTier = user.subscription.subscriptionTier;
+      user.subscriptionStatus = user.subscription.subscriptionStatus;
+      user.subscriptionStartDate = user.subscription.subscriptionStartDate;
+      user.subscriptionEndDate = user.subscription.subscriptionEndDate;
+      user.stripeCustomerId = user.subscription.stripeCustomerId;
+      user.paymentCustomerId = user.subscription.paymentCustomerId;
+      user.paymentSubscriptionId = user.subscription.paymentSubscriptionId;
+    }
+
+    // account_settings 테이블 필드
+    if (user.accountSettings) {
+      user.refreshToken = user.accountSettings.refreshToken;
+      user.refreshTokenExpiresAt = user.accountSettings.refreshTokenExpiresAt;
+      user.marketingOptIn = user.accountSettings.marketingOptIn;
+      user.newsletterOptIn = user.accountSettings.newsletterOptIn;
+      user.termsAcceptedAt = user.accountSettings.termsAcceptedAt;
+      user.privacyAcceptedAt = user.accountSettings.privacyAcceptedAt;
+      user.primaryIdentityId = user.accountSettings.primaryIdentityId;
+    }
 
     // 프로필 이미지를 CDN URL로 변환
-    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
+    if (user.profileImage && user.profileImage.startsWith('v2/')) {
       user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL (findById): ${user.profileImage}`);
+      this.logger.debug(`Profile image CDN URL (findByEmail): ${user.profileImage}`);
     }
 
     return user;
@@ -159,8 +272,10 @@ export class UsersService {
         'user.email',
         'user.isDeleted',
         'user.deletedAt',
-        'user.scheduledDeletionAt',
       ])
+      // Phase 1-2-3: scheduledDeletionAt는 account_settings 테이블로 이동
+      .leftJoin('user.accountSettings', 'accountSettings')
+      .addSelect(['accountSettings.scheduledDeletionAt'])
       .where('user.email = :email', { email })
       .getOne();
 
@@ -192,8 +307,10 @@ export class UsersService {
         'user.email',
         'user.isDeleted',
         'user.deletedAt',
-        'user.scheduledDeletionAt',
       ])
+      // Phase 1-2-3: scheduledDeletionAt는 account_settings 테이블로 이동
+      .leftJoin('user.accountSettings', 'accountSettings')
+      .addSelect(['accountSettings.scheduledDeletionAt'])
       .where('user.id = :userId', { userId: auditLog.userId })
       .andWhere('user.isDeleted = :isDeleted', { isDeleted: true })
       .getOne();
@@ -202,30 +319,39 @@ export class UsersService {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    const user = await this.usersRepository.findOne({
-      where: { username },
-      select: ['id', 'username', 'email', 'bio', 'profileImage', 'createdAt', 'isActive']
-    });
+    // Phase 1-2-3: bio, profileImage는 profiles 테이블로 이동
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.username', 'user.email', 'user.createdAt', 'user.isActive'])
+      .leftJoin('user.profile', 'profile')
+      .addSelect(['profile.bio', 'profile.profileImage'])
+      .where('user.username = :username', { username })
+      .getOne();
 
     // Transform profile image to CDN URL for public access
-    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
-      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profileImage}`);
+    if (user?.profile?.profileImage && user.profile.profileImage.startsWith('v2/')) {
+      user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
+      this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profile.profileImage}`);
     }
 
     return user;
   }
 
   async findByProviderId(providerId: string, provider: AuthProvider): Promise<User | null> {
-    const user = await this.usersRepository.findOne({
-      where: { providerId, authProvider: provider },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'authProvider', 'providerId', 'bio']
-    });
+    // Phase 1-2-3: bio, profileImage는 profiles 테이블로 이동
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.email', 'user.username', 'user.role', 'user.isEmailVerified', 'user.authProvider', 'user.providerId'])
+      .leftJoin('user.profile', 'profile')
+      .addSelect(['profile.profileImage', 'profile.bio'])
+      .where('user.providerId = :providerId', { providerId })
+      .andWhere('user.authProvider = :provider', { provider })
+      .getOne();
 
     // 프로필 이미지를 CDN URL로 변환
-    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
-      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profileImage}`);
+    if (user?.profile?.profileImage && user.profile.profileImage.startsWith('v2/')) {
+      user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
+      this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profile.profileImage}`);
     }
 
     return user;
@@ -234,25 +360,61 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
+    // Phase 1-2-3: 분리된 테이블의 필드 추출
+    const {
+      // Profile 테이블 필드
+      profileImage,
+      bio,
+      accountVerifiedAt,
+
+      // AccountSettings 테이블 필드
+      termsAcceptedAt,
+      privacyAcceptedAt,
+      marketingOptIn,
+      marketingOptInAt,
+      newsletterOptIn,
+
+      // Users 테이블 필드 (나머지)
+      ...userData
+    } = updateUserDto;
+
     // Cache Busting: 프로필 이미지 변경 시 타임스탬프 쿼리 파라미터 추가
-    // CDN 캐시 즉시 회피 (Cloudflare 최적화)
-    if (updateUserDto.profileImage && updateUserDto.profileImage !== user.profileImage) {
+    let processedProfileImage = profileImage;
+    if (profileImage && profileImage !== user.profile?.profileImage) {
       const timestamp = Date.now();
-
-      // 기존 쿼리 파라미터 제거
-      let cleanUrl = updateUserDto.profileImage.split('?')[0];
-
-      // 새 타임스탬프 추가
-      updateUserDto.profileImage = `${cleanUrl}?v=${timestamp}`;
-
+      const cleanUrl = profileImage.split('?')[0];
+      processedProfileImage = `${cleanUrl}?v=${timestamp}`;
       this.logger.log(`🔄 Profile image cache busting applied: ?v=${timestamp}`);
     }
 
-    // 패스워드는 엔티티에서 자동으로 해시됨
-    Object.assign(user, updateUserDto);
+    // 1. Users 테이블 업데이트
+    if (Object.keys(userData).length > 0) {
+      await this.usersRepository.update(id, userData);
+    }
 
-    const updatedUser = await this.usersRepository.save(user);
-    this.logger.log(`User updated: ${updatedUser.email}`);
+    // 2. Profile 테이블 업데이트 (필드가 있을 때만)
+    const profileData: any = {};
+    if (processedProfileImage !== undefined) profileData.profileImage = processedProfileImage;
+    if (bio !== undefined) profileData.bio = bio;
+    if (accountVerifiedAt !== undefined) profileData.accountVerifiedAt = accountVerifiedAt;
+
+    if (Object.keys(profileData).length > 0) {
+      await this.profileRepository.update({ userId: id }, profileData);
+    }
+
+    // 3. AccountSettings 테이블 업데이트 (필드가 있을 때만)
+    const settingsData: any = {};
+    if (termsAcceptedAt !== undefined) settingsData.termsAcceptedAt = termsAcceptedAt;
+    if (privacyAcceptedAt !== undefined) settingsData.privacyAcceptedAt = privacyAcceptedAt;
+    if (marketingOptIn !== undefined) settingsData.marketingOptIn = marketingOptIn;
+    if (marketingOptInAt !== undefined) settingsData.marketingOptInAt = marketingOptInAt;
+    if (newsletterOptIn !== undefined) settingsData.newsletterOptIn = newsletterOptIn;
+
+    if (Object.keys(settingsData).length > 0) {
+      await this.accountSettingsRepository.update({ userId: id }, settingsData);
+    }
+
+    this.logger.log(`User updated: ${user.email}`);
 
     // Redis 캐시 무효화 (JWT 검증 캐시)
     try {
@@ -261,10 +423,10 @@ export class UsersService {
       this.logger.debug(`User cache invalidated: ${cacheKey}`);
     } catch (error) {
       this.logger.error(`Failed to invalidate user cache: ${error.message}`);
-      // 캐시 무효화 실패해도 업데이트는 성공으로 처리
     }
 
-    return updatedUser;
+    // 업데이트된 사용자 정보 반환
+    return this.findOne(id);
   }
 
   /**
@@ -274,18 +436,24 @@ export class UsersService {
    *
    * UX 개선: 현재 세션의 로그인 방법을 기록하여
    * 계정 삭제 시 적절한 인증 방법을 요구할 수 있도록 함
+   *
+   * Phase 1 리팩토링:
+   * - lastLoginAt: users 테이블 (코어 필드)
+   * - lastLoginProvider: profiles 테이블 (프로필 필드)
    */
   async updateLastLogin(id: string, provider?: string): Promise<void> {
-    const updateData: any = {
+    // 1. lastLoginAt은 users 테이블에 저장
+    await this.usersRepository.update(id, {
       lastLoginAt: new Date()
-    };
+    });
 
-    // provider가 제공된 경우 lastLoginProvider도 업데이트
+    // 2. lastLoginProvider는 profiles 테이블에 저장
     if (provider) {
-      updateData.lastLoginProvider = provider;
+      await this.profileRepository.update(
+        { userId: id },
+        { lastLoginProvider: provider }
+      );
     }
-
-    await this.usersRepository.update(id, updateData);
   }
 
   async deactivate(id: string): Promise<void> {
@@ -362,52 +530,90 @@ export class UsersService {
 
   // UUID 지원을 위한 새로운 findById 메서드
   async findById(id: string): Promise<User | null> {
-    // QueryBuilder를 사용해서 필요한 필드만 선택 (리소스 최적화)
-    return this.usersRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.blog', 'blog')  // blog relation 조인
-      .select([
-        'user.id',
-        'user.email',
-        'user.username',
-        'user.role',
-        'user.authProvider',            // 최초 가입 방법 (계정 관리용)
-        'user.lastLoginProvider',       // 현재 로그인 방법 (계정 삭제 UX용)
-        'user.profileImage',
-        'user.isEmailVerified',
-        'user.createdAt',
-        'user.lastLoginAt',
-        'user.isActive',
-        'user.isDeleted',               // 삭제 플래그 (JwtStrategy 로그인 차단용)
-        'user.refreshToken',
-        'user.refreshTokenExpiresAt',
-        'user.subscriptionTier',        // 구독 티어
-        'user.subscriptionStatus',      // 구독 상태
-        'user.bio',                     // 사용자 소개
-        'user.marketingOptIn',          // 마케팅 정보 수신 동의
-        'user.newsletterOptIn',         // 뉴스레터 수신 동의
-        'user.termsAcceptedAt',         // 이용약관 동의 시각
-        'user.privacyAcceptedAt',       // 개인정보 처리방침 동의 시각
-        'blog.slug',                    // blog의 slug만 선택 (헤더 "내 블로그" 버튼용)
-      ])
-      .where('user.id = :id', { id })
-      .getOne();
+    // Phase 1 리팩토링: 분리된 테이블 조인
+    const user = await this.usersRepository.findOne({
+      where: { id },
+      relations: ['blog', 'profile', 'subscription', 'accountSettings'],
+      select: [
+        'id',
+        'email',
+        'username',
+        'role',
+        'authProvider',            // 최초 가입 방법 (계정 관리용)
+        'isEmailVerified',
+        'createdAt',
+        'lastLoginAt',
+        'isActive',
+        'isDeleted',               // 삭제 플래그 (JwtStrategy 로그인 차단용)
+        'deletedAt',
+      ]
+    });
+
+    if (!user) {
+      return null;
+    }
+
+    // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
+    // profiles 테이블 필드
+    if (user.profile) {
+      user.name = user.profile.name;
+      user.profileImage = user.profile.profileImage;
+      user.bio = user.profile.bio;
+      user.lastLoginProvider = user.profile.lastLoginProvider;
+    }
+
+    // subscriptions 테이블 필드
+    if (user.subscription) {
+      user.subscriptionTier = user.subscription.subscriptionTier;
+      user.subscriptionStatus = user.subscription.subscriptionStatus;
+      user.subscriptionStartDate = user.subscription.subscriptionStartDate;
+      user.subscriptionEndDate = user.subscription.subscriptionEndDate;
+      user.stripeCustomerId = user.subscription.stripeCustomerId;
+      user.paymentCustomerId = user.subscription.paymentCustomerId;
+      user.paymentSubscriptionId = user.subscription.paymentSubscriptionId;
+    }
+
+    // account_settings 테이블 필드
+    if (user.accountSettings) {
+      user.refreshToken = user.accountSettings.refreshToken;
+      user.refreshTokenExpiresAt = user.accountSettings.refreshTokenExpiresAt;
+      user.marketingOptIn = user.accountSettings.marketingOptIn;
+      user.newsletterOptIn = user.accountSettings.newsletterOptIn;
+      user.termsAcceptedAt = user.accountSettings.termsAcceptedAt;
+      user.privacyAcceptedAt = user.accountSettings.privacyAcceptedAt;
+    }
+
+    // 프로필 이미지를 CDN URL로 변환
+    if (user.profileImage && user.profileImage.startsWith('v2/')) {
+      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+      this.logger.debug(`Profile image CDN URL (findById): ${user.profileImage}`);
+    }
+
+    return user;
   }
 
   // Refresh Token 업데이트
+  // Phase 1 리팩토링: refreshToken은 account_settings 테이블에 저장
   async updateRefreshToken(id: string, refreshToken: string, expiresAt: Date): Promise<void> {
-    await this.usersRepository.update(id, { 
-      refreshToken,
-      refreshTokenExpiresAt: expiresAt
-    });
+    await this.accountSettingsRepository.update(
+      { userId: id },
+      {
+        refreshToken,
+        refreshTokenExpiresAt: expiresAt
+      }
+    );
   }
 
   // Refresh Token 삭제 (로그아웃시)
+  // Phase 1 리팩토링: refreshToken은 account_settings 테이블에 저장
   async clearRefreshToken(id: string): Promise<void> {
-    await this.usersRepository.update(id, { 
-      refreshToken: null,
-      refreshTokenExpiresAt: null
-    });
+    await this.accountSettingsRepository.update(
+      { userId: id },
+      {
+        refreshToken: null,
+        refreshTokenExpiresAt: null
+      }
+    );
   }
 
   // 비밀번호 업데이트 (비밀번호 재설정)
@@ -420,12 +626,19 @@ export class UsersService {
     // 비밀번호 해싱
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
+    // Phase 1 리팩토링: 비밀번호는 users 테이블, refreshToken은 account_settings 테이블
     await this.usersRepository.update(userId, {
       password: hashedPassword,
-      // 보안: 비밀번호 변경 시 모든 refresh token 무효화
-      refreshToken: null,
-      refreshTokenExpiresAt: null
     });
+
+    // 보안: 비밀번호 변경 시 모든 refresh token 무효화
+    await this.accountSettingsRepository.update(
+      { userId: String(userId) },
+      {
+        refreshToken: null,
+        refreshTokenExpiresAt: null
+      }
+    );
   }
 
   /**
