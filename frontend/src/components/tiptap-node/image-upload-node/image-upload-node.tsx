@@ -462,7 +462,6 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
           return {
             type: extension.options.type,
             attrs: {
-              ...extension.options,
               src: url,
               alt: filename,
               title: filename,
@@ -470,14 +469,31 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
           }
         })
 
-        props.editor
+        // mediumImage 노드로 삽입 (data-image-id 포함)
+        const mediumImageNodes = imageNodes.map((node, index) => ({
+          type: extension.options.type,
+          attrs: {
+            ...node.attrs,
+            size: 'default', // 기본 크기
+            caption: '', // 빈 caption
+            'data-image-id': `img_${Date.now()}_${index}`, // 고유 ID 생성
+          },
+        }));
+
+        // 드롭존 삭제 및 이미지 삽입을 한 트랜잭션으로 처리
+        const success = props.editor
           .chain()
           .focus()
           .deleteRange({ from: pos, to: pos + props.node.nodeSize })
-          .insertContentAt(pos, imageNodes)
+          .insertContentAt(pos, mediumImageNodes)
           .run()
 
-        focusNextNode(props.editor)
+        if (success) {
+          // 약간의 지연 후 포커스 이동 (DOM 업데이트 대기)
+          setTimeout(() => {
+            focusNextNode(props.editor)
+          }, 0)
+        }
       }
     }
   }

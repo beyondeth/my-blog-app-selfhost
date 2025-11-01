@@ -22,4 +22,14 @@ declare module '@tiptap/core' {
       unsetNodeBackgroundColor: () => ReturnType
     }
   }
+
+  /**
+   * Storage interface extension - 에디터 전역 상태 저장소
+   */
+  interface Storage {
+    /**
+     * 선택된 썸네일 이미지 ID (포스트의 대표 이미지)
+     */
+    thumbnailImageId?: string
+  }
 }
