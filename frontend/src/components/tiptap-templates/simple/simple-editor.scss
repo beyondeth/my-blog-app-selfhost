@@ -69,6 +69,18 @@ body,
   overflow-y: auto;  /* 세로 스크롤 활성화 */
   display: flex;
   flex-direction: column;
+
+  /* 스크롤바 숨기기 (스크롤 기능은 유지) */
+  /* Chrome, Safari, Opera */
+  &::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* IE, Edge */
+  -ms-overflow-style: none;
+
+  /* Firefox */
+  scrollbar-width: none;
 }
 
 .simple-editor-content .tiptap.ProseMirror.simple-editor {
