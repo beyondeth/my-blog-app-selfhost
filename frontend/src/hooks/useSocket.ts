@@ -72,6 +72,7 @@ export function useSocket(enabled: boolean = true) {
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
   const isConnecting = useRef(false);
+  const reconnectAttempts = useRef(0);
 
   useEffect(() => {
     // enabled가 false면 연결하지 않음 (채팅 모달이 닫혀있을 때)
