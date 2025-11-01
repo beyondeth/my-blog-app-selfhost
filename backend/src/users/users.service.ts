@@ -90,7 +90,7 @@ export class UsersService {
         // Subscription 생성 (cascade) - 기본값으로 FREE 티어
         subscription: this.subscriptionRepository.create({
           subscriptionTier: SubscriptionTier.FREE,
-          subscriptionStatus: null, // 무료 사용자는 null
+          // subscriptionStatus는 DB 기본값 'ACTIVE' 사용 (마이그레이션에서 NOT NULL DEFAULT 'ACTIVE')
           isTrialUsed: false,
         }),
 
@@ -171,10 +171,13 @@ export class UsersService {
 
     // account_settings 테이블 필드
     if (user.accountSettings) {
+      user.refreshToken = user.accountSettings.refreshToken;
+      user.refreshTokenExpiresAt = user.accountSettings.refreshTokenExpiresAt;
       user.marketingOptIn = user.accountSettings.marketingOptIn;
       user.newsletterOptIn = user.accountSettings.newsletterOptIn;
       user.termsAcceptedAt = user.accountSettings.termsAcceptedAt;
       user.privacyAcceptedAt = user.accountSettings.privacyAcceptedAt;
+      user.primaryIdentityId = user.accountSettings.primaryIdentityId;
     }
 
     // 프로필 이미지를 CDN URL로 변환
@@ -237,6 +240,7 @@ export class UsersService {
       user.newsletterOptIn = user.accountSettings.newsletterOptIn;
       user.termsAcceptedAt = user.accountSettings.termsAcceptedAt;
       user.privacyAcceptedAt = user.accountSettings.privacyAcceptedAt;
+      user.primaryIdentityId = user.accountSettings.primaryIdentityId;
     }
 
     // 프로필 이미지를 CDN URL로 변환
@@ -267,8 +271,10 @@ export class UsersService {
         'user.email',
         'user.isDeleted',
         'user.deletedAt',
-        'user.scheduledDeletionAt',
       ])
+      // Phase 1-2-3: scheduledDeletionAt는 account_settings 테이블로 이동
+      .leftJoin('user.accountSettings', 'accountSettings')
+      .addSelect(['accountSettings.scheduledDeletionAt'])
       .where('user.email = :email', { email })
       .getOne();
 
@@ -300,8 +306,10 @@ export class UsersService {
         'user.email',
         'user.isDeleted',
         'user.deletedAt',
-        'user.scheduledDeletionAt',
       ])
+      // Phase 1-2-3: scheduledDeletionAt는 account_settings 테이블로 이동
+      .leftJoin('user.accountSettings', 'accountSettings')
+      .addSelect(['accountSettings.scheduledDeletionAt'])
       .where('user.id = :userId', { userId: auditLog.userId })
       .andWhere('user.isDeleted = :isDeleted', { isDeleted: true })
       .getOne();
@@ -310,30 +318,39 @@ export class UsersService {
   }
 
   async findByUsername(username: string): Promise<User | null> {
-    const user = await this.usersRepository.findOne({
-      where: { username },
-      select: ['id', 'username', 'email', 'bio', 'profileImage', 'createdAt', 'isActive']
-    });
+    // Phase 1-2-3: bio, profileImage는 profiles 테이블로 이동
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.username', 'user.email', 'user.createdAt', 'user.isActive'])
+      .leftJoin('user.profile', 'profile')
+      .addSelect(['profile.bio', 'profile.profileImage'])
+      .where('user.username = :username', { username })
+      .getOne();
 
     // Transform profile image to CDN URL for public access
-    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
-      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profileImage}`);
+    if (user?.profile?.profileImage && user.profile.profileImage.startsWith('v2/')) {
+      user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
+      this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profile.profileImage}`);
     }
 
     return user;
   }
 
   async findByProviderId(providerId: string, provider: AuthProvider): Promise<User | null> {
-    const user = await this.usersRepository.findOne({
-      where: { providerId, authProvider: provider },
-      select: ['id', 'email', 'username', 'role', 'profileImage', 'isEmailVerified', 'authProvider', 'providerId', 'bio']
-    });
+    // Phase 1-2-3: bio, profileImage는 profiles 테이블로 이동
+    const user = await this.usersRepository
+      .createQueryBuilder('user')
+      .select(['user.id', 'user.email', 'user.username', 'user.role', 'user.isEmailVerified', 'user.authProvider', 'user.providerId'])
+      .leftJoin('user.profile', 'profile')
+      .addSelect(['profile.profileImage', 'profile.bio'])
+      .where('user.providerId = :providerId', { providerId })
+      .andWhere('user.authProvider = :provider', { provider })
+      .getOne();
 
     // 프로필 이미지를 CDN URL로 변환
-    if (user && user.profileImage && user.profileImage.startsWith('v2/')) {
-      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profileImage}`);
+    if (user?.profile?.profileImage && user.profile.profileImage.startsWith('v2/')) {
+      user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
+      this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profile.profileImage}`);
     }
 
     return user;
@@ -342,25 +359,67 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
     const user = await this.findOne(id);
 
+    // Phase 1-2-3: 분리된 테이블의 필드 추출
+    const {
+      // Profile 테이블 필드
+      profileImage,
+      bio,
+      accountVerifiedAt,
+
+      // AccountSettings 테이블 필드
+      termsAcceptedAt,
+      privacyAcceptedAt,
+      marketingOptIn,
+      marketingOptInAt,
+      newsletterOptIn,
+
+      // Users 테이블 필드 (나머지)
+      ...userData
+    } = updateUserDto;
+
     // Cache Busting: 프로필 이미지 변경 시 타임스탬프 쿼리 파라미터 추가
-    // CDN 캐시 즉시 회피 (Cloudflare 최적화)
-    if (updateUserDto.profileImage && updateUserDto.profileImage !== user.profileImage) {
-      const timestamp = Date.now();
-
-      // 기존 쿼리 파라미터 제거
-      let cleanUrl = updateUserDto.profileImage.split('?')[0];
-
-      // 새 타임스탬프 추가
-      updateUserDto.profileImage = `${cleanUrl}?v=${timestamp}`;
-
-      this.logger.log(`🔄 Profile image cache busting applied: ?v=${timestamp}`);
+    // 단, 정적 캐릭터 이미지(/character/)는 제외 (절대 변하지 않으므로 캐시 버스팅 불필요)
+    let processedProfileImage = profileImage;
+    if (profileImage && profileImage !== user.profile?.profileImage) {
+      // 캐릭터 이미지는 정적 파일이므로 캐시 버스팅 불필요
+      if (!profileImage.startsWith('/character/')) {
+        const timestamp = Date.now();
+        const cleanUrl = profileImage.split('?')[0];
+        processedProfileImage = `${cleanUrl}?v=${timestamp}`;
+        this.logger.log(`🔄 Profile image cache busting applied: ?v=${timestamp}`);
+      } else {
+        this.logger.log(`📸 Character image selected (no cache busting needed): ${profileImage}`);
+      }
     }
 
-    // 패스워드는 엔티티에서 자동으로 해시됨
-    Object.assign(user, updateUserDto);
+    // 1. Users 테이블 업데이트
+    if (Object.keys(userData).length > 0) {
+      await this.usersRepository.update(id, userData);
+    }
 
-    const updatedUser = await this.usersRepository.save(user);
-    this.logger.log(`User updated: ${updatedUser.email}`);
+    // 2. Profile 테이블 업데이트 (필드가 있을 때만)
+    const profileData: any = {};
+    if (processedProfileImage !== undefined) profileData.profileImage = processedProfileImage;
+    if (bio !== undefined) profileData.bio = bio;
+    if (accountVerifiedAt !== undefined) profileData.accountVerifiedAt = accountVerifiedAt;
+
+    if (Object.keys(profileData).length > 0) {
+      await this.profileRepository.update({ userId: id }, profileData);
+    }
+
+    // 3. AccountSettings 테이블 업데이트 (필드가 있을 때만)
+    const settingsData: any = {};
+    if (termsAcceptedAt !== undefined) settingsData.termsAcceptedAt = termsAcceptedAt;
+    if (privacyAcceptedAt !== undefined) settingsData.privacyAcceptedAt = privacyAcceptedAt;
+    if (marketingOptIn !== undefined) settingsData.marketingOptIn = marketingOptIn;
+    if (marketingOptInAt !== undefined) settingsData.marketingOptInAt = marketingOptInAt;
+    if (newsletterOptIn !== undefined) settingsData.newsletterOptIn = newsletterOptIn;
+
+    if (Object.keys(settingsData).length > 0) {
+      await this.accountSettingsRepository.update({ userId: id }, settingsData);
+    }
+
+    this.logger.log(`User updated: ${user.email}`);
 
     // Redis 캐시 무효화 (JWT 검증 캐시)
     try {
@@ -369,10 +428,10 @@ export class UsersService {
       this.logger.debug(`User cache invalidated: ${cacheKey}`);
     } catch (error) {
       this.logger.error(`Failed to invalidate user cache: ${error.message}`);
-      // 캐시 무효화 실패해도 업데이트는 성공으로 처리
     }
 
-    return updatedUser;
+    // 업데이트된 사용자 정보 반환
+    return this.findOne(id);
   }
 
   /**

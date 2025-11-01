@@ -889,16 +889,25 @@ export class ChatService {
     const messages: Message[] = [];
 
     // Get sender information for all messages
+    // Phase 1-2-3: profileImage는 profiles 테이블에서 조회
     const senderIds = [...new Set(cachedMessages.map(m => m.senderId))];
     const senders = await this.userRepository.find({
       where: senderIds.map(id => ({ id })),
-      select: ['id', 'username', 'email', 'profileImage'],
+      relations: ['profile'],
+      select: {
+        id: true,
+        username: true,
+        email: true,
+        profile: {
+          profileImage: true,
+        },
+      },
     });
 
     // 프로필 이미지를 CDN URL로 변환
     senders.forEach(sender => {
-      if (sender.profileImage && sender.profileImage.startsWith('v2/')) {
-        sender.profileImage = this.cdnService.generateCdnUrlFromKey(sender.profileImage);
+      if (sender.profile?.profileImage && sender.profile.profileImage.startsWith('v2/')) {
+        sender.profile.profileImage = this.cdnService.generateCdnUrlFromKey(sender.profile.profileImage);
       }
     });
 
