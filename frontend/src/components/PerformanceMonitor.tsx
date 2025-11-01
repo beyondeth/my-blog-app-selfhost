@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { authQueryKeys } from '@/lib/auth/queries';
+import { authQueryKeys } from '@/lib/profile-queries';
 
 /**
  * 성능 측정 컴포넌트
