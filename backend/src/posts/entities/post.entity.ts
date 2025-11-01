@@ -121,7 +121,7 @@ export class Post {
    * - files 테이블의 UUID
    * - nullable: 외부 URL 사용 시
    */
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ name: 'thumbnail_image_id', type: 'uuid', nullable: true })
   thumbnailImageId: string;
 
   /**
@@ -372,7 +372,7 @@ export class Post {
   @Column({ nullable: true })
   qualityScore: number;
 
-  @Column()
+  @Column({ default: 1 })
   version: number;
 
   // 메타데이터 정보 (향후 post_metadata로 이동 예정)

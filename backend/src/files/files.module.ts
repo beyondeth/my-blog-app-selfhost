@@ -11,6 +11,7 @@ import { CdnService } from './services/cdn.service';
 import { File } from './entities/file.entity';
 import { FileContext } from './entities/file-context.entity';
 import { User } from '../users/entities/user.entity';
+import { Profile } from '../users/entities/profile.entity';
 import { ContextualFileService } from './services/contextual-file.service';
 import { FileMigrationService } from './services/file-migration.service';
 import { FileMonitoringService } from './services/file-monitoring.service';
@@ -20,7 +21,7 @@ import cdnConfig from '../config/cdn.config';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([File, FileContext, User]),
+    TypeOrmModule.forFeature([File, FileContext, User, Profile]),
     ConfigModule.forFeature(s3Config),
     ConfigModule.forFeature(cdnConfig),
     ScheduleModule.forRoot(),

@@ -253,7 +253,7 @@ export class BlogsService {
     // 1. alias로 조회 시도
     let blog = await this.blogRepository.findOne({
       where: { alias: cleanIdentifier },
-      relations: ['owner'],
+      relations: ['owner', 'owner.profile'],
     });
 
     if (blog) {
@@ -264,7 +264,7 @@ export class BlogsService {
     // 2. old_aliases 테이블에서 조회 (SEO 보호)
     const oldAlias = await this.oldAliasRepository.findOne({
       where: { oldAlias: cleanIdentifier },
-      relations: ['blog', 'blog.owner'],
+      relations: ['blog', 'blog.owner', 'blog.owner.profile'],
     });
 
     if (oldAlias && oldAlias.blog) {
@@ -288,7 +288,7 @@ export class BlogsService {
     // 3. slug로 폴백 (기존 시스템 호환성)
     blog = await this.blogRepository.findOne({
       where: { slug: cleanIdentifier },
-      relations: ['owner'],
+      relations: ['owner', 'owner.profile'],
     });
 
     if (blog) {
