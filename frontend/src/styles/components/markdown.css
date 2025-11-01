@@ -282,12 +282,71 @@
   border-top: 2px solid rgb(var(--color-gray-200));
 }
 
-/* 이미지 */
-.prose img {
-  margin-top: var(--space-xl);
-  margin-bottom: var(--space-xl);
+/* ===================================================================
+   Medium 스타일 이미지 (포스트 렌더링)
+   ================================================================ */
+
+/* 이미지 크기별 스타일 */
+.prose img[data-size="small"] {
+  width: 300px;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: var(--space-xl) auto;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
+}
+
+.prose img[data-size="default"] {
+  width: 680px;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: var(--space-xl) auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+.prose img[data-size="full"] {
+  width: 1000px;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: var(--space-xl) auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* 기본 이미지 스타일 (data-size 없는 경우) */
+.prose img:not([data-size]) {
+  width: 680px;
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: var(--space-xl) auto;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+}
+
+/* Figure 컨테이너 (caption 있는 경우) */
+.prose figure {
+  margin: var(--space-xl) auto;
+  max-width: 100%;
+  text-align: center;
+}
+
+.prose figure img {
+  margin: 0 auto;
+}
+
+/* Caption 스타일 */
+.prose figcaption {
+  margin-top: var(--space-sm);
+  text-align: center;
+  font-size: 0.875rem; /* 14px */
+  color: rgb(var(--color-gray-500));
+  font-style: italic;
+  line-height: var(--leading-normal);
 }
 
 /* YouTube iframe 컨테이너 - 685x540 고정 크기 */
@@ -433,9 +492,24 @@
     padding: var(--space-xs) var(--space-sm);
   }
 
-  .prose img {
+  /* Medium 이미지 반응형 */
+  .prose img[data-size="small"],
+  .prose img[data-size="default"],
+  .prose img[data-size="full"],
+  .prose img:not([data-size]) {
+    width: 100% !important;
+    max-width: 100%;
     max-height: 60vh;
     object-fit: contain;
+  }
+
+  .prose figure {
+    margin: var(--space-lg) 0;
+  }
+
+  .prose figcaption {
+    font-size: 0.8125rem; /* 13px */
+    padding: 0 var(--space-sm);
   }
 }
 
