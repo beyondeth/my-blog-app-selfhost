@@ -4,6 +4,8 @@ import { BullModule } from '@nestjs/bullmq';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
 import { Post } from './entities/post.entity';
+import { PostStats } from './entities/post-stats.entity';
+import { PostMetadata } from './entities/post-metadata.entity';
 import { File } from '../files/entities/file.entity';
 import { FileContext } from '../files/entities/file-context.entity';
 import { Blog } from '../blogs/entities/blog.entity';
@@ -30,7 +32,8 @@ export const LIKE_QUEUE_NAME = 'post-likes';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, File, FileContext, Blog]),
+    // Phase 1-2-3 리팩토링: PostStats, PostMetadata 엔티티 추가
+    TypeOrmModule.forFeature([Post, PostStats, PostMetadata, File, FileContext, Blog]),
     // Like Queue (기존)
     BullModule.registerQueue({
       name: LIKE_QUEUE_NAME,

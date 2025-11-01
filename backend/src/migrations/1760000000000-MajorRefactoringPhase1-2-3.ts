@@ -28,9 +28,9 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
         // Phase 1: User 테이블 분리
         // ===============================================
 
-        // 1. profiles 테이블 생성
+        // 1. profiles 테이블 생성 (이미 존재하면 건너뜀)
         await queryRunner.query(`
-            CREATE TABLE "profiles" (
+            CREATE TABLE IF NOT EXISTS "profiles" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "userId" uuid NOT NULL,
                 "name" character varying(100),
@@ -47,12 +47,12 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
             )
         `);
 
-        await queryRunner.query(`CREATE INDEX "IDX_profiles_userId" ON "profiles" ("userId")`);
-        await queryRunner.query(`CREATE INDEX "IDX_profiles_accountSecurityLevel" ON "profiles" ("accountSecurityLevel")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_profiles_userId" ON "profiles" ("userId")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_profiles_accountSecurityLevel" ON "profiles" ("accountSecurityLevel")`);
 
-        // 2. user_subscriptions 테이블 생성 (subscriptions 테이블과 충돌 방지)
+        // 2. user_subscriptions 테이블 생성 (이미 존재하면 건너뜀)
         await queryRunner.query(`
-            CREATE TABLE "user_subscriptions" (
+            CREATE TABLE IF NOT EXISTS "user_subscriptions" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "userId" uuid NOT NULL,
                 "subscriptionTier" character varying(20) NOT NULL DEFAULT 'FREE',
@@ -70,14 +70,14 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
             )
         `);
 
-        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_userId" ON "user_subscriptions" ("userId")`);
-        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_tier" ON "user_subscriptions" ("subscriptionTier")`);
-        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_status" ON "user_subscriptions" ("subscriptionStatus")`);
-        await queryRunner.query(`CREATE INDEX "IDX_user_subscriptions_endDate" ON "user_subscriptions" ("subscriptionEndDate")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_user_subscriptions_userId" ON "user_subscriptions" ("userId")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_user_subscriptions_tier" ON "user_subscriptions" ("subscriptionTier")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_user_subscriptions_status" ON "user_subscriptions" ("subscriptionStatus")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_user_subscriptions_endDate" ON "user_subscriptions" ("subscriptionEndDate")`);
 
-        // 3. account_settings 테이블 생성
+        // 3. account_settings 테이블 생성 (이미 존재하면 건너뜀)
         await queryRunner.query(`
-            CREATE TABLE "account_settings" (
+            CREATE TABLE IF NOT EXISTS "account_settings" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "userId" uuid NOT NULL,
                 "refreshToken" character varying,
@@ -97,8 +97,8 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
             )
         `);
 
-        await queryRunner.query(`CREATE INDEX "IDX_account_settings_userId" ON "account_settings" ("userId")`);
-        await queryRunner.query(`CREATE INDEX "IDX_account_settings_lockedUntil" ON "account_settings" ("lockedUntil")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_account_settings_userId" ON "account_settings" ("userId")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_account_settings_lockedUntil" ON "account_settings" ("lockedUntil")`);
 
         // ===============================================
         // Phase 1: Post 테이블 분리
@@ -112,7 +112,7 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
                 "viewCount" integer NOT NULL DEFAULT 0,
                 "likeCount" integer NOT NULL DEFAULT 0,
                 "commentCount" integer NOT NULL DEFAULT 0,
-                "qualityScore" double precision NOT NULL DEFAULT 0,
+                "qualityScore" integer DEFAULT NULL,
                 "version" integer NOT NULL DEFAULT 0,
                 "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
                 "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
@@ -135,12 +135,18 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
                 "excerpt" character varying(500),
                 "tagList" jsonb NOT NULL DEFAULT '[]',
                 "category" character varying(100),
-                "isEditorsPick" boolean NOT NULL DEFAULT false,
+                "content_type" character varying(50) DEFAULT 'html',
+                "content_rendered_at" TIMESTAMP,
+                "publishedAt" TIMESTAMP,
+                "isEditorPick" boolean NOT NULL DEFAULT false,
                 "editorPickedAt" TIMESTAMP,
+                "processingError" text,
+                "processingCompletedAt" TIMESTAMP,
                 "codeBlockCount" integer,
                 "imageCount" integer,
                 "isBackgroundProcessed" boolean NOT NULL DEFAULT false,
                 "searchVector" tsvector,
+                "indexedAt" TIMESTAMP,
                 "createdAt" TIMESTAMP NOT NULL DEFAULT now(),
                 "updatedAt" TIMESTAMP NOT NULL DEFAULT now(),
                 CONSTRAINT "PK_post_metadata" PRIMARY KEY ("id"),
@@ -151,22 +157,30 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
 
         await queryRunner.query(`CREATE INDEX "IDX_post_metadata_postId" ON "post_metadata" ("postId")`);
         await queryRunner.query(`CREATE INDEX "IDX_post_metadata_category" ON "post_metadata" ("category")`);
-        await queryRunner.query(`CREATE INDEX "IDX_post_metadata_isEditorsPick" ON "post_metadata" ("isEditorsPick")`);
+        await queryRunner.query(`CREATE INDEX "IDX_post_metadata_isEditorPick_editorPickedAt" ON "post_metadata" ("isEditorPick", "editorPickedAt")`);
+        await queryRunner.query(`CREATE INDEX "IDX_post_metadata_indexedAt" ON "post_metadata" ("indexedAt")`);
         await queryRunner.query(`CREATE INDEX "IDX_post_metadata_searchVector" ON "post_metadata" USING gin ("searchVector")`);
 
         // ===============================================
         // Phase 2: Blog Alias 시스템
         // ===============================================
 
-        // 6. blogs 테이블에 alias 컬럼 추가
-        await queryRunner.query(`ALTER TABLE "blogs" ADD "alias" character varying(100)`);
-        await queryRunner.query(`ALTER TABLE "blogs" ADD CONSTRAINT "UQ_blogs_alias" UNIQUE ("alias")`);
-        await queryRunner.query(`CREATE INDEX "IDX_blogs_alias" ON "blogs" ("alias")`);
+        // 6. blogs 테이블에 alias 컬럼 추가 (이미 존재하면 건너뜀)
+        await queryRunner.query(`ALTER TABLE "blogs" ADD COLUMN IF NOT EXISTS "alias" character varying(100)`);
+        await queryRunner.query(`
+            DO $$ BEGIN
+                ALTER TABLE "blogs" ADD CONSTRAINT "UQ_blogs_alias" UNIQUE ("alias");
+            EXCEPTION
+                WHEN duplicate_table THEN NULL;
+                WHEN duplicate_object THEN NULL;
+            END $$;
+        `);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_blogs_alias" ON "blogs" ("alias")`);
         await queryRunner.query(`COMMENT ON COLUMN "blogs"."alias" IS '사용자 변경 가능 주소 (@username 형식)'`);
 
-        // 7. old_aliases 테이블 생성
+        // 7. old_aliases 테이블 생성 (이미 존재하면 건너뜀)
         await queryRunner.query(`
-            CREATE TABLE "old_aliases" (
+            CREATE TABLE IF NOT EXISTS "old_aliases" (
                 "id" uuid NOT NULL DEFAULT uuid_generate_v4(),
                 "blogId" uuid NOT NULL,
                 "oldAlias" character varying(100) NOT NULL,
@@ -178,9 +192,9 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
             )
         `);
 
-        await queryRunner.query(`CREATE INDEX "IDX_old_aliases_oldAlias" ON "old_aliases" ("oldAlias")`);
-        await queryRunner.query(`CREATE INDEX "IDX_old_aliases_blogId" ON "old_aliases" ("blogId")`);
-        await queryRunner.query(`CREATE INDEX "IDX_old_aliases_changedAt" ON "old_aliases" ("changedAt")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_old_aliases_oldAlias" ON "old_aliases" ("oldAlias")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_old_aliases_blogId" ON "old_aliases" ("blogId")`);
+        await queryRunner.query(`CREATE INDEX IF NOT EXISTS "IDX_old_aliases_changedAt" ON "old_aliases" ("changedAt")`);
         await queryRunner.query(`COMMENT ON TABLE "old_aliases" IS '이전 alias 보관 (SEO 301 리다이렉트용)'`);
     }
 
@@ -197,7 +211,8 @@ export class MajorRefactoringPhase1231760000000000 implements MigrationInterface
 
         // Phase 1: Post 테이블 분리 제거
         await queryRunner.query(`DROP INDEX "public"."IDX_post_metadata_searchVector"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_post_metadata_isEditorsPick"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_post_metadata_indexedAt"`);
+        await queryRunner.query(`DROP INDEX "public"."IDX_post_metadata_isEditorPick_editorPickedAt"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_post_metadata_category"`);
         await queryRunner.query(`DROP INDEX "public"."IDX_post_metadata_postId"`);
         await queryRunner.query(`DROP TABLE "post_metadata"`);
