@@ -1,12 +1,19 @@
 import { useEffect, useRef, useCallback } from 'react';
 import io, { Socket } from 'socket.io-client';
 import { useAuth } from '@/providers/AuthProviderV2';
-import toast from 'react-hot-toast';
 import { authEvents } from '@/lib/auth/events';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const IS_DEV = process.env.NODE_ENV === 'development';
 
-// 토큰 갱신 함수
+/**
+ * 토큰 갱신 함수 (Production-Safe)
+ *
+ * 개선 사항:
+ * - 타임아웃 설정 (10초)
+ * - Silent failure (프로덕션에서 조용히 실패)
+ * - 에러 로깅 환경별 분리
+ */
 async function refreshToken(): Promise<boolean> {
   try {
     const response = await fetch(`${API_URL}/auth/refresh`, {
@@ -15,59 +22,60 @@ async function refreshToken(): Promise<boolean> {
       headers: {
         'Content-Type': 'application/json',
       },
+      // 타임아웃 10초 (AbortSignal.timeout은 최신 브라우저에서만 지원)
+      signal: AbortSignal.timeout ? AbortSignal.timeout(10000) : undefined,
     });
 
     if (response.ok) {
-      console.log('[Socket] Token refreshed successfully');
+      // 개발 환경에서만 성공 로그
+      if (IS_DEV) {
+        console.log('[Socket] Token refreshed');
+      }
       return true;
     }
+
+    // 401/403: 정상적인 인증 실패 (로그인 필요)
+    if (response.status === 401 || response.status === 403) {
+      // 조용히 실패 (사용자에게 알릴 필요 없음)
+      return false;
+    }
+
+    // 다른 에러: 서버 문제
+    if (IS_DEV) {
+      console.warn('[Socket] Token refresh failed:', response.status);
+    }
     return false;
+
   } catch (error) {
-    console.error('[Socket] Token refresh failed:', error);
+    // Network error, timeout 등
+    // 프로덕션: 완전히 silent
+    if (IS_DEV) {
+      console.error('[Socket] Token refresh error:', error);
+    }
     return false;
   }
 }
 
-export function useSocket() {
+/**
+ * WebSocket Hook (Production-Grade)
+ *
+ * @param enabled - Socket 연결 활성화 여부 (default: true)
+ *
+ * 개선 사항:
+ * 1. enabled 파라미터로 조건부 연결 제어
+ * 2. 재연결 설정 conservative하게 변경 (1회만 시도, 5초 대기)
+ * 3. 에러 로깅 환경별 분리 (dev: verbose, prod: silent)
+ * 4. Toast 스팸 제거 (사용자 방해 금지)
+ * 5. 수동 재연결 로직 제거 (Socket.IO 자동 재연결 사용)
+ */
+export function useSocket(enabled: boolean = true) {
   const socketRef = useRef<Socket | null>(null);
   const { user } = useAuth();
   const isConnecting = useRef(false);
-  const reconnectAttempts = useRef(0);
-  const maxReconnectAttempts = 3;
-
-  // 재연결 함수
-  const reconnect = useCallback(async () => {
-    if (!user || isConnecting.current) return;
-
-    if (reconnectAttempts.current >= maxReconnectAttempts) {
-      console.log('[Socket] Max reconnection attempts reached');
-      toast.error('Chat connection lost. Please refresh the page.');
-      return;
-    }
-
-    isConnecting.current = true;
-    reconnectAttempts.current++;
-
-    console.log(`[Socket] Attempting to reconnect (attempt ${reconnectAttempts.current}/${maxReconnectAttempts})`);
-
-    // 토큰 갱신 시도
-    const tokenRefreshed = await refreshToken();
-
-    if (!tokenRefreshed) {
-      console.log('[Socket] Token refresh failed, cannot reconnect');
-      toast.error('Authentication expired. Please login again.');
-      isConnecting.current = false;
-      return;
-    }
-
-    // 소켓 재연결
-    if (socketRef.current) {
-      socketRef.current.connect();
-    }
-  }, [user]);
 
   useEffect(() => {
-    if (!user) return;
+    // enabled가 false면 연결하지 않음 (채팅 모달이 닫혀있을 때)
+    if (!user || !enabled) return;
 
     // Prevent duplicate connections
     if (isConnecting.current || socketRef.current?.connected) return;
@@ -77,7 +85,10 @@ export function useSocket() {
     // Initialize socket connection
     // The JWT token will be sent automatically via httpOnly cookie with withCredentials: true
     const socketUrl = process.env.NEXT_PUBLIC_API_URL?.replace('/api/v1', '') || 'http://localhost:3000';
-    console.log('[Socket] Connecting to:', `${socketUrl}/chat`);
+
+    if (IS_DEV) {
+      console.log('[Socket] Connecting to:', `${socketUrl}/chat`);
+    }
 
     const socket = io(`${socketUrl}/chat`, {
       withCredentials: true,
@@ -87,76 +98,101 @@ export function useSocket() {
       // 페이지 이동 시에도 연결 유지
       closeOnBeforeunload: false,
 
-      // 자동 재연결 설정
+      // 자동 재연결 설정 (Conservative)
       reconnection: true,
-      reconnectionAttempts: maxReconnectAttempts,
-      reconnectionDelay: 2000,
-      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 1, // 1회만 시도 (너무 aggressive하면 에러 스팸)
+      reconnectionDelay: 5000, // 5초 대기 (기존 2초 → 5초)
+      reconnectionDelayMax: 10000, // 최대 10초
+      timeout: 10000, // 연결 타임아웃 10초
     });
 
     socket.on('connect', () => {
-      console.log('[Socket] Connected successfully');
+      if (IS_DEV) {
+        console.log('[Socket] Connected successfully');
+      }
       isConnecting.current = false;
-      reconnectAttempts.current = 0; // Reset reconnection counter
-      toast.success('Chat connected');
+      // 연결 성공 시 Toast 제거 (사용자 방해 금지)
     });
 
     socket.on('disconnect', (reason) => {
-      console.log('[Socket] Disconnected:', reason);
+      if (IS_DEV) {
+        console.log('[Socket] Disconnected:', reason);
+      }
       isConnecting.current = false;
 
-      // Automatic reconnection for certain disconnect reasons
-      if (reason === 'io server disconnect' || reason === 'transport close') {
-        // Server disconnected us (possibly due to auth failure)
-        setTimeout(() => reconnect(), 2000);
-      }
+      // 수동 재연결 로직 제거
+      // Socket.IO가 reconnection 설정에 따라 자동으로 재시도함
+      // 우리가 또 시도하면 중복 재연결로 에러 스팸 발생
     });
 
     socket.on('connect_error', async (error) => {
-      console.error('[Socket] Connection error:', error.message);
+      // 프로덕션: 최소한의 로그
+      if (IS_DEV) {
+        console.error('[Socket] Connection error:', error.message);
+      }
       isConnecting.current = false;
 
       // If auth error, try to refresh token
       if (error.message && error.message.includes('Unauthorized')) {
-        console.log('[Socket] Auth error detected, attempting token refresh');
+        if (IS_DEV) {
+          console.log('[Socket] Auth error detected, attempting token refresh');
+        }
         const refreshed = await refreshToken();
 
         if (refreshed) {
           // Token refreshed, socket.io will automatically retry
-          console.log('[Socket] Token refreshed, waiting for automatic reconnection');
+          if (IS_DEV) {
+            console.log('[Socket] Token refreshed, waiting for automatic reconnection');
+          }
         } else {
           // Token refresh failed, stop trying
           socket.disconnect();
-          toast.error('Authentication expired. Please login again.');
+          // Toast 제거 - 프로덕션에서 조용히 실패
         }
       }
     });
 
     socket.on('reconnect_attempt', (attemptNumber) => {
-      console.log(`[Socket] Reconnection attempt ${attemptNumber}`);
+      if (IS_DEV) {
+        console.log(`[Socket] Reconnection attempt ${attemptNumber}`);
+      }
     });
 
     socket.on('reconnect', (attemptNumber) => {
-      console.log(`[Socket] Reconnected after ${attemptNumber} attempts`);
-      toast.success('Chat reconnected');
+      if (IS_DEV) {
+        console.log(`[Socket] Reconnected after ${attemptNumber} attempts`);
+      }
+      // Toast 제거 - 사용자 방해 금지
     });
 
     socket.on('reconnect_failed', () => {
-      console.log('[Socket] Reconnection failed');
-      toast.error('Failed to reconnect to chat. Please refresh the page.');
+      if (IS_DEV) {
+        console.log('[Socket] Reconnection failed');
+      }
+      // Toast 제거 - 프로덕션에서 조용히 실패
     });
 
     socketRef.current = socket;
 
+    /**
+     * Cleanup 함수 (완벽한 리소스 정리)
+     *
+     * 1. Socket disconnect
+     * 2. 모든 이벤트 리스너 자동 제거 (Socket.IO가 알아서 처리)
+     * 3. socketRef null 설정
+     * 4. isConnecting 플래그 리셋
+     */
     return () => {
-      if (socketRef.current && socketRef.current.connected) {
+      if (socketRef.current) {
+        if (IS_DEV) {
+          console.log('[Socket] Cleanup: disconnecting socket');
+        }
         socketRef.current.disconnect();
         socketRef.current = null;
         isConnecting.current = false;
-        reconnectAttempts.current = 0;
       }
     };
-  }, [user, reconnect]);
+  }, [user, enabled]); // enabled 의존성 추가, reconnect 제거
 
   // Listen for auth events
   useEffect(() => {
