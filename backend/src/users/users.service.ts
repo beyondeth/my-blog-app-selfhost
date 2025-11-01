@@ -182,6 +182,7 @@ export class UsersService {
 
     // 프로필 이미지를 CDN URL로 변환
     if (user.profileImage && user.profileImage.startsWith('v2/')) {
+      
       user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
       this.logger.debug(`Profile image CDN URL: ${user.profileImage}`);
     }
