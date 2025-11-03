@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState } from 'react';
 import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget } from 'react-icons/fi';
@@ -59,6 +59,7 @@ export default function PostHeaderWithReport({
 
   // Check if current user is the post author
   const isAuthor = user?.id === post.author?.id;
+  const displayProfileImage = isAuthor ? user?.profileImage : post.author?.profileImage;
 
   const handleReport = () => {
     if (!user) return; // 로그인하지 않은 경우 실행 안 함
@@ -79,7 +80,7 @@ export default function PostHeaderWithReport({
       <header className="mb-8">
         {/* Back Button */}
         {onBack && (
-          <div className="mb-6 -ml-8">
+          <div className="mb-6 -ml-8 overflow-visible">
             <button
               onClick={onBack}
               className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors text-xs font-medium"
@@ -118,7 +119,7 @@ export default function PostHeaderWithReport({
               >
                 <div className="flex items-center gap-3">
                   <Avatar
-                    src={post.author?.profileImage}
+                    src={displayProfileImage}
                     alt={post.author?.username || 'Author'}
                     fallback={post.author?.username || 'Author'}
                     size="md"
@@ -131,7 +132,7 @@ export default function PostHeaderWithReport({
             ) : (
               <div className="flex items-center gap-3">
                 <Avatar
-                  src={post.author?.profileImage}
+                  src={displayProfileImage}
                   alt={post.author?.username || 'Author'}
                   fallback={post.author?.username || 'Author'}
                   size="md"

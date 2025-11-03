@@ -5,6 +5,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import FollowButton from '../FollowButton';
 import { DMButton } from '../dm/DMButton';
 import UserAvatar from './UserAvatar';
+import { getBlogLinkFromUser } from '@/lib/utils/blogUrl';
 
 interface UserProfileCardWithActionsProps {
   user: {
@@ -48,7 +49,7 @@ export default function UserProfileCardWithActions({
     <div className="flex flex-col gap-5 p-6 max-w-sm">
       {/* Header with avatar and action buttons */}
       <div className="flex items-start justify-between gap-4">
-        <Link href={user.blog ? `/${user.blog.slug}` : '#'} className="group">
+        <Link href={getBlogLinkFromUser(user)} className="group">
           <UserAvatar
             profileImage={user.profileImage}
             username={user.username}

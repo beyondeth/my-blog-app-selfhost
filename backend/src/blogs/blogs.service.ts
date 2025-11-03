@@ -6,7 +6,10 @@ import { OldAlias } from './entities/old-alias.entity';
 import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
 import { User } from '../users/entities/user.entity';
+import { Follow } from '../follows/entities/follow.entity';
 import { RedisLockService } from '../redis/redis-lock.service';
+import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
+import { CdnService } from '../files/services/cdn.service';
 
 @Injectable()
 export class BlogsService {
@@ -18,33 +21,39 @@ export class BlogsService {
    * - 시스템 경로와 충돌 방지
    */
   private readonly RESERVED_ALIASES = [
-    'admin',
-    'api',
-    'auth',
-    'login',
-    'register',
-    'settings',
-    'blog',
-    'blogs',
-    'post',
-    'posts',
-    'user',
-    'users',
-    'search',
-    'about',
-    'terms',
-    'privacy',
-    'contact',
-    'help',
-    'support',
-    'docs',
-    'documentation',
-    'legal',
-    'sitemap',
-    'robots',
-    'feed',
-    'rss',
-    'atom',
+    // 시스템 경로
+    'admin', 'api', 'auth', 'login', 'register', 'settings',
+    'blog', 'blogs', 'post', 'posts', 'user', 'users',
+    'search', 'about', 'terms', 'privacy', 'contact',
+    'help', 'support', 'docs', 'documentation', 'legal',
+    'sitemap', 'robots', 'feed', 'rss', 'atom',
+
+    // HTTP 메서드 및 상태
+    'get', 'post', 'put', 'patch', 'delete', 'head', 'options',
+    '200', '201', '301', '302', '400', '401', '403', '404', '500',
+
+    // 기술 용어
+    'www', 'mail', 'ftp', 'ssh', 'ssl', 'tls', 'http', 'https',
+    'cdn', 'assets', 'static', 'media', 'img', 'css', 'js',
+    'node', 'npm', 'yarn', 'git', 'ssh', 'docker', 'k8s',
+
+    // 비즈니스 용어
+    'pricing', 'payment', 'billing', 'invoice', 'receipt',
+    'subscription', 'plan', 'free', 'pro', 'premium', 'enterprise',
+    'dashboard', 'analytics', 'metrics', 'stats', 'report',
+
+    // 소셜 관련
+    'profile', 'account', 'edit', 'update', 'delete', 'create',
+    'follow', 'unfollow', 'like', 'unlike', 'share', 'comment',
+    'message', 'chat', 'notification', 'alert',
+
+    // NSFW 및 부적절한 단어 (기본 목록)
+    'sex', 'porn', 'xxx', 'adult', 'drugs', 'gambling', 'casino',
+    'viagra', 'cialis', 'lottery', 'bitcoin', 'crypto', 'scam',
+
+    // 공격적인 단어 (기본 목록)
+    'fuck', 'shit', 'damn', 'hell', 'bitch', 'bastard',
+    'idiot', 'stupid', 'dumb', 'loser', 'hate', 'kill',
   ];
 
   constructor(
@@ -52,7 +61,11 @@ export class BlogsService {
     private blogRepository: Repository<Blog>,
     @InjectRepository(OldAlias)
     private oldAliasRepository: Repository<OldAlias>,
+    @InjectRepository(Follow)
+    private followRepository: Repository<Follow>,
     private redisLockService: RedisLockService,
+    private cacheService: CacheService,
+    private cdnService: CdnService,
   ) {}
 
   async create(createBlogDto: CreateBlogDto, user: User): Promise<Blog> {
@@ -250,22 +263,132 @@ export class BlogsService {
     // @ 제거 (프론트엔드에서 @park로 보낼 수 있음)
     const cleanIdentifier = identifier.replace('@', '');
 
-    // 1. alias로 조회 시도
-    let blog = await this.blogRepository.findOne({
-      where: { alias: cleanIdentifier },
-      relations: ['owner', 'owner.profile'],
-    });
+    // 1. 캐시에서 먼저 확인
+    const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(cleanIdentifier);
+    const cached = await this.cacheService.get(cacheKey);
 
-    if (blog) {
-      this.logger.debug(`[Alias System] Found by alias: ${cleanIdentifier}`);
+    if (cached) {
+      this.logger.debug(`[Alias Cache] Cache hit for: ${cleanIdentifier}`);
+
+      // 캐시된 데이터에 follow 정보가 없는 경우에만 추가 조회
+      const blog = cached as Blog;
+      const isOwner = user && String(user.id) === String(blog.userId);
+
+      // Follow 정보 추가 (팔로워 수 표시용) - 캐시에는 없는 경우
+      if (blog?.owner?.id && user && !isOwner && !(blog as any).followInfo) {
+        const [followersCount, followingCount] = await Promise.all([
+          this.followRepository.count({
+            where: { followingId: blog.owner.id }
+          }),
+          this.followRepository.count({
+            where: { followerId: blog.owner.id }
+          })
+        ]);
+
+        const isFollowing = await this.followRepository.findOne({
+          where: {
+            followerId: user.id,
+            followingId: blog.owner.id
+          }
+        });
+
+        (blog as any).followInfo = {
+          followersCount,
+          followingCount,
+          isFollowedByUser: !!isFollowing
+        };
+
+        // 캐시 업데이트 (follow 정보 포함)
+        await this.cacheService.set(cacheKey, blog, CacheTTL.SHORT);
+      }
+
+      // 캐시에서 가져온 데이터도 프로필 평탄화 필요 (캐시되기 전에 평탄화되었을 수 있음)
+      if (blog?.owner?.profile && !blog.owner.profileImage) {
+        blog.owner.name = blog.owner.profile.name;
+        blog.owner.profileImage = blog.owner.profile.profileImage;
+        blog.owner.bio = blog.owner.profile.bio;
+        blog.owner.lastLoginProvider = blog.owner.profile.lastLoginProvider;
+
+        // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+        if (blog.owner.profileImage) {
+          if (blog.owner.profileImage.startsWith('v2/') || blog.owner.profileImage.startsWith('uploads/')) {
+            // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+            blog.owner.profileImage = this.cdnService.generateCdnUrlFromKey(blog.owner.profileImage);
+            this.logger.debug(`Blog owner profile image CDN URL (from cache): ${blog.owner.profileImage}`);
+          }
+        }
+      }
+
       return this.checkBlogAccessAndReturn(blog, user);
     }
 
-    // 2. old_aliases 테이블에서 조회 (SEO 보호)
-    const oldAlias = await this.oldAliasRepository.findOne({
-      where: { oldAlias: cleanIdentifier },
-      relations: ['blog', 'blog.owner', 'blog.owner.profile'],
-    });
+    // 2. alias로 조회 시도 (QueryBuilder로 최적화)
+    const blogQueryBuilder = this.blogRepository
+      .createQueryBuilder('blog')
+      .leftJoinAndSelect('blog.owner', 'owner')
+      .leftJoinAndSelect('owner.profile', 'profile')
+      .where('blog.alias = :alias', { alias: cleanIdentifier });
+
+    let blog = await blogQueryBuilder.getOne();
+
+    if (blog) {
+      // Follow 정보 추가 (팔로워 수 표시용)
+      if (blog?.owner?.id && user && String(user.id) !== String(blog.userId)) {
+        const [followersCount, followingCount] = await Promise.all([
+          this.followRepository.count({
+            where: { followingId: blog.owner.id }
+          }),
+          this.followRepository.count({
+            where: { followerId: blog.owner.id }
+          })
+        ]);
+
+        const isFollowing = await this.followRepository.findOne({
+          where: {
+            followerId: user.id,
+            followingId: blog.owner.id
+          }
+        });
+
+        (blog as any).followInfo = {
+          followersCount,
+          followingCount,
+          isFollowedByUser: !!isFollowing
+        };
+      }
+
+      // 블로그 소유자 프로필 정보 평탄화 (users.service.ts와 동일한 패턴)
+      if (blog?.owner?.profile) {
+        blog.owner.name = blog.owner.profile.name;
+        blog.owner.profileImage = blog.owner.profile.profileImage;
+        blog.owner.bio = blog.owner.profile.bio;
+        blog.owner.lastLoginProvider = blog.owner.profile.lastLoginProvider;
+
+        // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+        if (blog.owner.profileImage) {
+          if (blog.owner.profileImage.startsWith('v2/') || blog.owner.profileImage.startsWith('uploads/')) {
+            // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+            blog.owner.profileImage = this.cdnService.generateCdnUrlFromKey(blog.owner.profileImage);
+            this.logger.debug(`Blog owner profile image CDN URL: ${blog.owner.profileImage}`);
+          }
+        }
+      }
+
+      // 캐시에 저장
+      await this.cacheService.set(cacheKey, blog, CacheTTL.SHORT);
+      this.logger.debug(`[Alias Cache] Cached blog for alias: ${cleanIdentifier}`);
+
+      return this.checkBlogAccessAndReturn(blog, user);
+    }
+
+    // 3. old_aliases 테이블에서 조회 (SEO 보호)
+    const oldAlias = await this.oldAliasRepository
+      .createQueryBuilder('oldAlias')
+      .leftJoinAndSelect('oldAlias.blog', 'blog')
+      .leftJoinAndSelect('blog.owner', 'owner')
+      .leftJoinAndSelect('owner.profile', 'profile')
+      .where('oldAlias.oldAlias = :oldAlias', { oldAlias: cleanIdentifier })
+      .getOne();
 
     if (oldAlias && oldAlias.blog) {
       this.logger.log(
@@ -273,6 +396,48 @@ export class BlogsService {
       );
 
       blog = oldAlias.blog;
+
+      // Follow 정보 추가 (팔로워 수 표시용)
+      if (blog?.owner?.id && user && String(user.id) !== String(blog.userId)) {
+        const [followersCount, followingCount] = await Promise.all([
+          this.followRepository.count({
+            where: { followingId: blog.owner.id }
+          }),
+          this.followRepository.count({
+            where: { followerId: blog.owner.id }
+          })
+        ]);
+
+        const isFollowing = await this.followRepository.findOne({
+          where: {
+            followerId: user.id,
+            followingId: blog.owner.id
+          }
+        });
+
+        (blog as any).followInfo = {
+          followersCount,
+          followingCount,
+          isFollowedByUser: !!isFollowing
+        };
+      }
+
+      // 블로그 소유자 프로필 정보 평탄화 (users.service.ts와 동일한 패턴)
+      if (blog?.owner?.profile) {
+        blog.owner.name = blog.owner.profile.name;
+        blog.owner.profileImage = blog.owner.profile.profileImage;
+        blog.owner.bio = blog.owner.profile.bio;
+        blog.owner.lastLoginProvider = blog.owner.profile.lastLoginProvider;
+
+        // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+        if (blog.owner.profileImage) {
+          if (blog.owner.profileImage.startsWith('v2/') || blog.owner.profileImage.startsWith('uploads/')) {
+            // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+            blog.owner.profileImage = this.cdnService.generateCdnUrlFromKey(blog.owner.profileImage);
+            this.logger.debug(`Blog owner profile image CDN URL (from old alias): ${blog.owner.profileImage}`);
+          }
+        }
+      }
 
       // 301 리다이렉트 정보와 함께 반환
       const blogWithAccess = this.checkBlogAccessAndReturn(blog, user);
@@ -285,13 +450,61 @@ export class BlogsService {
       };
     }
 
-    // 3. slug로 폴백 (기존 시스템 호환성)
-    blog = await this.blogRepository.findOne({
-      where: { slug: cleanIdentifier },
-      relations: ['owner', 'owner.profile'],
-    });
+    // 4. slug로 폴백 (기존 시스템 호환성)
+    blog = await this.blogRepository
+      .createQueryBuilder('blog')
+      .leftJoinAndSelect('blog.owner', 'owner')
+      .leftJoinAndSelect('owner.profile', 'profile')
+      .where('blog.slug = :slug', { slug: cleanIdentifier })
+      .getOne();
 
     if (blog) {
+      // Follow 정보 추가 (팔로워 수 표시용)
+      if (blog?.owner?.id && user && String(user.id) !== String(blog.userId)) {
+        const [followersCount, followingCount] = await Promise.all([
+          this.followRepository.count({
+            where: { followingId: blog.owner.id }
+          }),
+          this.followRepository.count({
+            where: { followerId: blog.owner.id }
+          })
+        ]);
+
+        const isFollowing = await this.followRepository.findOne({
+          where: {
+            followerId: user.id,
+            followingId: blog.owner.id
+          }
+        });
+
+        (blog as any).followInfo = {
+          followersCount,
+          followingCount,
+          isFollowedByUser: !!isFollowing
+        };
+      }
+
+      // 캐시에 저장
+      await this.cacheService.set(cacheKey, blog, CacheTTL.SHORT);
+      this.logger.debug(`[Alias Cache] Cached blog for slug: ${cleanIdentifier}`);
+
+      // FIX: slug로 찾았더라도, alias가 존재하면 항상 리다이렉트 (URL 정규화)
+      if (blog.alias) {
+        // slug나 @없는 alias로 접속했을 때 항상 @alias로 리다이렉트
+        if (cleanIdentifier !== blog.alias) {
+          this.logger.log(
+            `[Alias System] URL normalization: ${cleanIdentifier} → ${blog.alias}`
+          );
+          const blogWithAccess = this.checkBlogAccessAndReturn(blog, user);
+          return {
+            ...blogWithAccess,
+            shouldRedirect: true,
+            redirectTo: blog.alias,
+            redirectType: '301',
+          };
+        }
+      }
+
       this.logger.debug(`[Alias System] Found by slug (fallback): ${cleanIdentifier}`);
       return this.checkBlogAccessAndReturn(blog, user);
     }
@@ -384,15 +597,78 @@ export class BlogsService {
   }
 
   /**
-   * Alias 형식 검증
+   * Alias 형식 검증 (강화 버전)
    *
    * @param alias - 검증할 alias
    * @returns 유효한 형식인지 여부
    */
   private validateAliasFormat(alias: string): boolean {
-    // 3~30자, 영문/숫자/하이픈/언더스코어만 허용
+    // 1. 기본 길이 검증 (3~30자)
+    if (alias.length < 3 || alias.length > 30) {
+      return false;
+    }
+
+    // 2. 형식 검증 (영문/숫자/하이픈/언더스코어만 허용)
     const aliasRegex = /^[a-zA-Z0-9_-]{3,30}$/;
-    return aliasRegex.test(alias);
+    if (!aliasRegex.test(alias)) {
+      return false;
+    }
+
+    // 3. 연속된 하이픈/언더스코어 방지
+    if (alias.includes('--') || alias.includes('__') || alias.includes('-_') || alias.includes('_-')) {
+      return false;
+    }
+
+    // 4. 시작/끝 하이픈/언더스코어 방지
+    if (alias.startsWith('-') || alias.startsWith('_') ||
+        alias.endsWith('-') || alias.endsWith('_')) {
+      return false;
+    }
+
+    // 5. 숫자만으로 구성된 alias 방지
+    if (/^\d+$/.test(alias)) {
+      return false;
+    }
+
+    // 6. 소문자로 정규화 (대소문자 구분 없이 처리)
+    const normalizedAlias = alias.toLowerCase();
+
+    // 7. 예약어 검사 (대소문자 구분 없이)
+    if (this.RESERVED_ALIASES.includes(normalizedAlias)) {
+      return false;
+    }
+
+    // 8. 유니코드 및 특수문자 검사
+    // - 허용되지 않는 유니코드 문자 감지
+    const hasInvalidUnicode = /[\u{10000}-\u{10FFFF}]/u.test(alias);
+    if (hasInvalidUnicode) {
+      return false;
+    }
+
+    // 9. 동일 문자 반복 제한 (최대 2개)
+    if (/(.)\1{2,}/.test(alias)) {
+      return false;
+    }
+
+    // 10. IP 주소 형식 방지
+    const ipPattern = /^(?:\d{1,3}\.){3}\d{1,3}$/;
+    if (ipPattern.test(alias)) {
+      return false;
+    }
+
+    // 11. 도메인 형식 방지
+    const domainPattern = /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}$/;
+    if (domainPattern.test(alias)) {
+      return false;
+    }
+
+    // 12. 한국어/일본어/중국어 등 CJK 문자 방지 (영문만 허용)
+    const hasCJK = /[\u3040-\u309f\u30a0-\u30ff\u4e00-\u9faf\uac00-\ud7af]/.test(alias);
+    if (hasCJK) {
+      return false;
+    }
+
+    return true;
   }
 
   /**
@@ -423,37 +699,90 @@ export class BlogsService {
     // @ 제거
     const cleanAlias = newAlias.replace('@', '');
 
-    // 1. 블로그 조회 및 소유자 확인
-    const blog = await this.findOne(blogId);
+    // 트랜잭션으로 원자성 보장
+    const queryRunner = this.blogRepository.manager.connection.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    if (String(blog.userId) !== String(userId)) {
-      throw new ForbiddenException('본인의 블로그만 수정할 수 있습니다.');
-    }
-
-    // 2. 새 alias 사용 가능 여부 확인
-    await this.checkAliasAvailability(cleanAlias);
-
-    // 3. 기존 alias를 old_aliases로 이동 (있는 경우에만)
-    if (blog.alias) {
-      const oldAlias = this.oldAliasRepository.create({
-        blogId: blog.id,
-        oldAlias: blog.alias,
-        changedAt: new Date(),
+    try {
+      // 1. 블로그 조회 및 소유자 확인 (트랜잭션 내에서 FOR UPDATE 사용)
+      const blog = await queryRunner.manager.findOne(Blog, {
+        where: { id: blogId },
+        lock: { mode: 'pessimistic_write' }, // 비관적 락으로 동시 수정 방지
       });
 
-      await this.oldAliasRepository.save(oldAlias);
-      this.logger.log(`[Alias System] Saved old alias: ${blog.alias} → ${cleanAlias}`);
+      if (!blog) {
+        throw new NotFoundException('블로그를 찾을 수 없습니다.');
+      }
+
+      if (String(blog.userId) !== String(userId)) {
+        throw new ForbiddenException('본인의 블로그만 수정할 수 있습니다.');
+      }
+
+      // 2. 새 alias 사용 가능 여부 확인 (트랜잭션 내에서)
+      const existingBlog = await queryRunner.manager.findOne(Blog, {
+        where: { alias: cleanAlias },
+      });
+
+      if (existingBlog && existingBlog.id !== blogId) {
+        throw new ConflictException(`별칭 '${cleanAlias}'은(는) 이미 사용 중입니다.`);
+      }
+
+      const oldAlias = blog.alias;
+
+      // 3. 기존 alias를 old_aliases로 이동 (있는 경우에만)
+      if (oldAlias) {
+        // 먼저 이 블로그의 모든 old_aliases가 최신 alias를 가리키도록 업데이트
+        await queryRunner.manager.update(
+          OldAlias,
+          { blogId: blog.id },
+          {
+            redirectTo: cleanAlias, // 리다이렉트 대상을 최신 alias로 업데이트
+            changedAt: new Date() // 변경 시간 갱신
+          }
+        );
+
+        // 그 후 현재 alias를 old_aliases에 추가
+        const oldAliasEntity = this.oldAliasRepository.create({
+          blogId: blog.id,
+          oldAlias: oldAlias,
+          redirectTo: cleanAlias, // 현재 alias로 리다이렉트 명시
+          changedAt: new Date(),
+        });
+
+        await queryRunner.manager.save(oldAliasEntity);
+        this.logger.log(`[Alias System] Saved old alias: ${oldAlias} → ${cleanAlias}`);
+        this.logger.log(`[Alias System] Updated all old aliases to redirect to: ${cleanAlias}`);
+      }
+
+      // 4. 새 alias 저장
+      blog.alias = cleanAlias;
+      await queryRunner.manager.save(blog);
+
+      // 트랜잭션 커밋
+      await queryRunner.commitTransaction();
+
+      this.logger.log(`[Alias System] Alias updated for blog ${blogId}: ${cleanAlias}`);
+
+      // 5. Redis 캐시 무횠화 (트랜잭션 성공 후)
+      try {
+        // 통합된 캐시 무횠화 사용
+        await this.cacheService.invalidateAliasCache(oldAlias, cleanAlias, blog.id);
+
+        this.logger.log(`[Cache] Invalidated cache for alias change: ${oldAlias} → ${cleanAlias}`);
+      } catch (cacheError) {
+        this.logger.warn(`[Cache] Failed to invalidate cache for alias change:`, cacheError);
+      }
+
+      return blog;
+    } catch (error) {
+      // 에러 발생 시 롤백
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`[Alias System] Failed to update alias for blog ${blogId}:`, error);
+      throw error;
+    } finally {
+      // 항상 QueryRunner 해제
+      await queryRunner.release();
     }
-
-    // 4. 새 alias 저장
-    blog.alias = cleanAlias;
-    await this.blogRepository.save(blog);
-
-    this.logger.log(`[Alias System] Alias updated for blog ${blogId}: ${cleanAlias}`);
-
-    // 5. Redis 캐시 무효화 (TODO: Phase 2-4에서 구현)
-    // await this.cacheService.invalidateBlogCache(blogId);
-
-    return blog;
   }
 }

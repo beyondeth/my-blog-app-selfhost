@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, OneToMany, CreateDateColumn, UpdateDateColumn, JoinColumn, BeforeInsert } from 'typeorm';
+import { v7 as uuidv7 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
 import { Post } from '../../posts/entities/post.entity';
 
@@ -17,8 +18,25 @@ import { Post } from '../../posts/entities/post.entity';
  */
 @Entity('blogs')
 export class Blog {
+  /**
+   * 기본 키
+   * - UUID v7 (시간 순서 정렬 지원)
+   * - 블로그 생성 순서 보장
+   */
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  /**
+   * UUID v7 생성 (BeforeInsert 훅)
+   * - 시간 기반 UUID 생성
+   * - 블로그 순서 정렬 시 성능 향상
+   */
+  @BeforeInsert()
+  generateUuidV7() {
+    if (!this.id) {
+      this.id = uuidv7();
+    }
+  }
 
   /**
    * Slug (기존 이메일 기반 주소)

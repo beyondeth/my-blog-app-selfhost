@@ -4,7 +4,7 @@
       "type": "http",
       "url": "http://localhost:3002/mcp",
       "headers": {
-        "Authorization": "Bearer blog_sk_nren5irx_CG6l1z9kXWDxIw3nQrN4y7m4IbwsxpjF"
+        "Authorization": "Bearer blog_sk_2wjgze4z_amKx2FOBqyqG2L7B3dxxjigNlg0Atfqa"
       }
     }
   }

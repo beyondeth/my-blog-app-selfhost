@@ -206,6 +206,7 @@ export class ConversationRepository {
      * - 삭제 후 새 메시지가 오면 대화는 다시 나타나지만, 이전 메시지는 보이지 않음
      *
      * Phase 1-2-3: profileImage는 profiles 테이블에서 JOIN
+     * 표준 관계 쿼리 사용 (formatAuthorData 패턴과 호환)
      */
     return this.repository
       .createQueryBuilder('conversation')
@@ -218,9 +219,9 @@ export class ConversationRepository {
         // User 기본 필드
         ...this.CONVERSATION_SELECT.userFields.map(field => `user1.${field}`),
         ...this.CONVERSATION_SELECT.userFields.map(field => `user2.${field}`),
-        // Profile 이미지
-        'user1Profile.profileImage',
-        'user2Profile.profileImage',
+        // Profile 관계 전체 (formatAuthorData에서 flatten 처리)
+        'user1Profile',
+        'user2Profile',
       ])
       .where(
         new Brackets((qb) => {

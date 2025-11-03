@@ -85,12 +85,12 @@ body,
 
 .simple-editor-content .tiptap.ProseMirror.simple-editor {
   flex: 1;
-  padding: 1rem 0 2rem;
+  padding: 2.5rem 4rem 3rem;
   /* min-height 제거 - 부모가 높이 제어 */
 }
 
 @media screen and (max-width: 480px) {
   .simple-editor-content .tiptap.ProseMirror.simple-editor {
-    padding: 1rem 0 2rem;
+    padding: 2rem 2rem 2rem;
   }
 }

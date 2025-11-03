@@ -25,19 +25,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Save, Plus } from 'lucide-react';
 import React from 'react';
 
+import { EditorSkeleton } from '@/components/editor/EditorSkeleton';
+
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogSimpleEditor = dynamic(
   () => import('@/editor').then(mod => ({ default: mod.BlogSimpleEditor })),
   {
     ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-[400px] border rounded-lg bg-gray-50">
-        <div className="text-center">
-          <Spinner size="lg" />
-          <p className="mt-2 text-sm text-gray-500">에디터 로딩 중...</p>
-        </div>
-      </div>
-    )
+    loading: () => <EditorSkeleton height="750px" />
   }
 );
 
@@ -165,12 +160,12 @@ export default function NewStoryPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto px-3 py-6">
       {/* 폼 */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
           <Card className="border-0 shadow-none bg-transparent">
-            <CardContent className="space-y-4 pt-16">
+            <CardContent className="space-y-4 pt-16 px-4">
               {/* 제목 */}
               <FormField
                 control={form.control}
@@ -618,7 +613,7 @@ export default function NewStoryPage() {
 
           {/* 내용 */}
           <Card className="border-0 shadow-none bg-transparent">
-            <CardContent>
+            <CardContent className="px-4">
               <FormField
                 control={form.control}
                 name="content"
@@ -646,7 +641,30 @@ export default function NewStoryPage() {
                             </>
                           )}
 
-                          <div className="h-[400px] lg:h-[500px]">
+                          <div className="relative">
+      {/* 배경 블러 효과 - 외곽 흐릿하게 처리 */}
+      <div
+        className="absolute inset-0 rounded-lg pointer-events-none"
+        style={{
+          backdropFilter: 'blur(2px)',
+          WebkitBackdropFilter: 'blur(2px)',
+          background: 'rgba(0, 0, 0, 0.02)',
+          zIndex: -1
+        }}
+      />
+
+      {/* 실제 에디터 컨테이너 */}
+      <div
+        className="h-[500px] lg:h-[750px] bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-700 shadow-lg hover:shadow-xl transition-shadow duration-300 overflow-hidden focused-writing-mode relative z-10"
+        style={{
+          boxShadow: '0 8px 16px -4px rgba(0, 0, 0, 0.08), 0 2px 4px -1px rgba(0, 0, 0, 0.05)',
+          transitionTimingFunction: 'cubic-bezier(0.4, 0, 0.2, 1)',
+          transform: 'translateZ(0)'
+        }}
+        data-ui-effect="elevated-surface"
+        data-elevation="floating-editor"
+        data-focus-mode="writing"
+      >
                             <BlogSimpleEditor
                               content={field.value}
                               onChange={field.onChange}
@@ -655,6 +673,7 @@ export default function NewStoryPage() {
                               onThumbnailChange={setThumbnailImageId}
                             />
                           </div>
+                        </div>
                         </div>
                       </FormControl>
                       <FormMessage />

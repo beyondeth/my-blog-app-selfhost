@@ -6,6 +6,7 @@ import { PropsWithChildren } from 'react';
 import UserTooltip from './UserTooltip';
 import { queryKeys } from '@/lib/queries/keys';
 import { useAuth } from '@/providers/AuthProviderV2';
+import { getBlogUrl } from '@/lib/utils/blogUrl';
 
 interface UserLinkWithTooltipProps extends PropsWithChildren {
   userId: string;
@@ -73,14 +74,25 @@ export default function UserLinkWithTooltip({
     enabled: !!userId && !!user, // 로그인된 상태에서만 실행
   });
 
-  // blogSlug를 props에서 받거나 userData에서 가져옴
-  const effectiveBlogSlug = blogSlug || userData?.blog?.slug;
+  // 블로그 경로 결정 (userData의 blog 정보 우선, 없으면 props의 blogSlug)
+  const getBlogLink = () => {
+    if (userData?.blog) {
+      return getBlogUrl(userData.blog);
+    }
+    if (blogSlug) {
+      // props로 넘어온 blogSlug는 @없이 순수 slug만 있음
+      return `/${blogSlug}`;
+    }
+    return '#';
+  };
+
+  const blogLink = getBlogLink();
 
   // 데이터가 아직 없다면 기본 링크만 표시
   if (!userData) {
     return (
       <Link
-        href={effectiveBlogSlug ? `/${effectiveBlogSlug}` : '#'}
+        href={blogLink}
         className="inline-block cursor-pointer"
       >
         {children}
@@ -91,7 +103,7 @@ export default function UserLinkWithTooltip({
   return (
     <UserTooltip user={userData} followInfo={followInfo}>
       <Link
-        href={effectiveBlogSlug ? `/${effectiveBlogSlug}` : '#'}
+        href={blogLink}
         className="inline-block cursor-pointer"
       >
         {children}

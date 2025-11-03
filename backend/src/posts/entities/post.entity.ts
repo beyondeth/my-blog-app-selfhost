@@ -14,7 +14,7 @@ import {
   JoinColumn,
   Index,
 } from 'typeorm';
-import { v4 as uuidv4 } from 'uuid';
+import { v7 as uuidv7 } from 'uuid';
 import { User } from '../../users/entities/user.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { File } from '../../files/entities/file.entity';
@@ -50,11 +50,23 @@ import { PostMetadata } from './post-metadata.entity';
 export class Post {
   /**
    * 기본 키
-   * - UUID v4 (기존 포스트 호환성)
-   * - 신규 포스트는 애플리케이션 레벨에서 UUID v7 생성 가능 (향후 마이그레이션)
+   * - UUID v7 (시간 순서 정렬 지원)
+   * - K-정렬 가능: 포스트 목록 시 정렬 성능 향상
    */
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  /**
+   * UUID v7 생성 (BeforeInsert 훅)
+   * - 시간 기반 UUID 생성으로 포스트 순서 보장
+   * - 최신 포스트 우선 조회 시 인덱스 성능 향상
+   */
+  @BeforeInsert()
+  generateUuidV7() {
+    if (!this.id) {
+      this.id = uuidv7();
+    }
+  }
 
   /**
    * 제목
@@ -283,7 +295,7 @@ export class Post {
         .substring(0, 50); // UUID를 위한 공간 확보
 
       // UUID를 사용하여 완벽한 고유성 보장
-      const uniqueId = uuidv4().split('-')[0]; // UUID의 첫 부분만 사용 (8자)
+      const uniqueId = uuidv7().split('-')[0]; // UUID의 첫 부분만 사용 (8자)
       this.slug = `${baseSlug}-${uniqueId}`;
     }
 
@@ -379,8 +391,12 @@ export class Post {
   @Column('text', { nullable: true })
   excerpt: string;
 
-  @Column('jsonb', { default: '[]' })
-  tagList: string[];
+  @Column({
+    name: 'tags',
+    type: 'jsonb',
+    default: '[]'
+  })
+  tags: string[];
 
   @Column({ default: '기타' })
   category: string;
@@ -453,7 +469,7 @@ export class Post {
 
       // PostMetadata 데이터 (join 시에만 포함)
       excerpt: this.metadata?.excerpt || null,
-      tagList: this.metadata?.tagList || [],
+      tags: this.metadata?.tags || [],
       category: this.metadata?.category || '기타',
       content_type: this.metadata?.content_type || 'html',
       publishedAt: this.metadata?.publishedAt || null,

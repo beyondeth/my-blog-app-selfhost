@@ -117,9 +117,9 @@ export class PostsService {
     // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
     // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
 
-    // 태그 필드 호환성 (tagList → tags)
-    if (post.tagList) {
-      dto.tags = post.tagList;
+    // 태그 필드 호환성
+    if (post.tags) {
+      dto.tags = post.tags;
     }
 
     // 썸네일 URL 최적화
@@ -138,14 +138,12 @@ export class PostsService {
   private toUserDto(user: User): UserResponseDto {
     if (!user) return null;
 
-    const dto = plainToInstance(UserResponseDto, user, {
+    // 포맷된 author 데이터 사용 (profile 평탄화 및 CDN URL 변환 적용)
+    const formattedUser = this.formatAuthorData(user);
+
+    const dto = plainToInstance(UserResponseDto, formattedUser, {
       excludeExtraneousValues: true,
     });
-
-    // 프로필 이미지 URL 최적화
-    if (dto.profileImage) {
-      dto.profileImage = this.optimizeImageUrl(dto.profileImage);
-    }
 
     return dto;
   }
@@ -158,9 +156,14 @@ export class PostsService {
   private toBlogDto(blog: Blog): BlogResponseDto {
     if (!blog) return null;
 
-    return plainToInstance(BlogResponseDto, blog, {
+    const dto = plainToInstance(BlogResponseDto, blog, {
       excludeExtraneousValues: true,
     });
+
+    // Manually assign alias to ensure it's included
+    dto.alias = blog.alias; // <--- ADD THIS LINE
+
+    return dto;
   }
 
   /**
@@ -354,11 +357,13 @@ export class PostsService {
         .addOrderBy('pf.created_at', 'ASC') // 동일 순서인 경우 생성 순서
         .getRawMany();
 
-      // 각 이미지에 대해 액세스 URL 생성
+      // 각 이미지에 대해 액세스 URL 생성 - Temporarily disabled
       const imagesWithUrls = await Promise.all(
         images.map(async (image) => {
           try {
-            const accessUrl = await this.filesService.getDownloadUrl(image.file_id);
+            // Temporarily disabled FilesService
+            // const accessUrl = await this.filesService.getDownloadUrl(image.file_id);
+            const accessUrl = null; // Disabled for now
             return {
               id: image.file_id,
               fileName: image.file_fileName,
@@ -475,7 +480,7 @@ export class PostsService {
         }
 
         // 태그를 JSONB로 저장
-        const tagList = createPostDto.tags || [];
+        const tags = createPostDto.tags || [];
 
         // excerpt 생성 (HTML에서 태그 제거 후 200자 추출)
         let excerpt = '';
@@ -507,7 +512,7 @@ export class PostsService {
         blogId: blog.id,
         isPublished: true, // Multi-user blog system - all posts are published
         publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
-        tagList: tagList, // JSONB 태그 배열 저장 - 호환성 유지
+        tags: tags, // JSONB 태그 배열 저장 - 호환성 유지
         qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적) - 호환성 유지
         version: 1, // 포스트 버전 (낙관적 락킹용)
 
@@ -523,7 +528,7 @@ export class PostsService {
         // Phase 1-2-3 리팩토링: PostMetadata 초기화 (cascade: true로 자동 저장)
         metadata: queryRunner.manager.create(PostMetadata, {
           excerpt: excerpt,
-          tagList: tagList,
+          tags: tags,
           category: createPostDto.category,
           content_type: contentType,
           content_rendered_at: contentType === 'markdown' ? new Date() : null,
@@ -634,7 +639,7 @@ export class PostsService {
     }
 
     // 3. 태그 처리
-    const tagList = createPostDto.tags || [];
+    const tags = createPostDto.tags || [];
 
     // 4. 간단한 excerpt 생성 (제목 기반, 빠른 처리)
     // Worker에서 content 기반 excerpt로 교체됨
@@ -655,7 +660,7 @@ export class PostsService {
       blogId: blog.id,
       isPublished: true, // 공개 상태 (하지만 status='processing'이므로 목록에 안 보임)
       publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
-      tagList: tagList, // 호환성 유지
+      tags: tags, // 호환성 유지
       qualityScore: createPostDto.qualityScore || null, // 호환성 유지
       version: 1, // 포스트 버전 (낙관적 락킹용) - NOT NULL 제약조건 충족
       status: 'processing', // 핵심: 백그라운드 처리 대기 중
@@ -675,7 +680,7 @@ export class PostsService {
       // Worker가 완료되면 업데이트됨
       metadata: this.postsRepository.manager.create(PostMetadata, {
         excerpt: quickExcerpt, // 임시 (Worker에서 교체)
-        tagList: tagList,
+        tags: tags,
         category: createPostDto.category,
         content_type: 'markdown',
         content_rendered_at: null, // Worker에서 설정
@@ -699,7 +704,7 @@ export class PostsService {
       blogId: blog.id,
       title: post.title,
       content: markdownContent,
-      tags: tagList,
+      tags: tags,
       category: post.category,
     });
 
@@ -746,7 +751,7 @@ export class PostsService {
     limit: number = 10,
     search?: string,
     category?: string,
-    blogSlug?: string,
+    blogId?: string,
     user?: User,
     isPublished?: boolean,
     isForCache: boolean = false
@@ -775,7 +780,7 @@ export class PostsService {
         'post.likeCount',
         'post.commentCount',
         'post.qualityScore',
-        'post.tagList',
+        'post.tags',
         'post.category',
         'post.blogId',
         'post.authorId',
@@ -786,24 +791,14 @@ export class PostsService {
         'post.isEditorPick', // Editor's Pick 여부
         'post.editorPickedAt', // Editor's Pick 선정 시간
       ])
-      .addSelect([
-        'author.id',
-        'author.username',
-        // author.email 제외 - 보안상 제거
-        'author.role',
-      ])
-      // author의 profile 관계 설정 (Phase 1-2-3: profileImage, bio는 profiles 테이블로 이동)
-      .leftJoin('post.author', 'author')
-      .leftJoin('author.profile', 'profile')
-      .addSelect([
-        'profile.profileImage',
-        'profile.bio',
-      ])
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')
       .addSelect([
         'blog.id',
         'blog.slug',
         'blog.name',
         'blog.isPublic',
+        'blog.alias',
       ])
       .leftJoin('post.blog', 'blog') // 항상 blog 조인 (프론트엔드 필수)
       // Phase 1-2-3 리팩토링: PostStats, PostMetadata LEFT JOIN
@@ -835,8 +830,8 @@ export class PostsService {
       }
     }
 
-    if (blogSlug) {
-      query.andWhere('blog.slug = :blogSlug', { blogSlug });
+    if (blogId) {
+      query.andWhere('post.blogId = :blogId', { blogId });
     }
 
     // 카테고리 필터링 - 정확한 매칭
@@ -850,7 +845,7 @@ export class PostsService {
       const searchTerms = search.trim()
         .split(/\s+/) // 공백으로 분리
         .filter(term => term.length > 0) // 빈 문자열 제거
-        .map(term => term.replace(/['"\\]/g, '')) // 특수문자 제거
+        .map(term => term.replace(/[:'"\\]/g, '')) // 콜론을 포함한 특수문자 제거
         .join(' & '); // AND 연산자로 결합 (모든 단어가 포함되어야 함)
 
       if (searchTerms) {
@@ -930,20 +925,13 @@ export class PostsService {
         likeCount: post.likeCount || 0,
         viewCount: post.viewCount || 0,
         // 태그 필드 추가 (프론트엔드 호환성)
-        tags: post.tagList || [],
+        tags: post.tags || [],
         // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
         thumbnail: this.optimizeImageUrl(post.thumbnail),
         // 블로그 정보 (있으면)
         blog: post.blog || null,
         // 작성자 정보는 필요한 필드만 선택 (email 제외)
-        author: post.author ? {
-          id: post.author.id,
-          username: post.author.username,
-          // email 제외 - 보안상 제거
-          bio: post.author.profile?.bio || null, // Phase 1-2-3: profiles 테이블로 이동
-          role: post.author.role,
-          profileImage: this.optimizeImageUrl(post.author.profile?.profileImage), // Phase 1-2-3: profiles 테이블로 이동
-        } : null,
+        author: post.author ? this.formatAuthorData(post.author) : null,
         // 이미지 파일 정보는 별도 로드 시에만 포함
         images: [],
       };
@@ -1014,7 +1002,7 @@ export class PostsService {
         'post.viewCount',
         'post.likeCount',
         'post.commentCount',
-        'post.tagList',
+        'post.tags',
         'post.publishedAt',
         'post.createdAt',
         'post.updatedAt',
@@ -1103,19 +1091,12 @@ export class PostsService {
       updatedAt: post.updatedAt,
       publishedAt: post.publishedAt,
       // 태그와 썸네일
-      tags: post.tagList || [],
+      tags: post.tags || [],
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
       // 블로그 정보
       blog: post.blog || null,
       // 작성자 프로필 (email 제외)
-      author: post.author ? {
-        id: post.author.id,
-        username: post.author.username,
-        // email 제외 - 보안상 제거
-        bio: post.author.profile?.bio || null, // Phase 1-2-3: profiles 테이블로 이동
-        role: post.author.role,
-        profileImage: this.optimizeImageUrl(post.author.profile?.profileImage), // Phase 1-2-3: profiles 테이블로 이동
-      } : null,
+      author: post.author ? this.formatAuthorData(post.author) : null,
       // 인기도 점수 포함
       popularityScore: post.viewCount + (post.likeCount * 3) + (post.commentCount * 2)
     }));
@@ -1191,7 +1172,7 @@ export class PostsService {
       // likedBy JOIN을 제거하고 서브쿼리로 대체
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
         'author.id', 'author.username', 'author.role',
@@ -1269,7 +1250,7 @@ export class PostsService {
       content: result.content,
       thumbnail: result.thumbnail,
       isPublished: result.isPublished,
-      tagList: result.tagList,
+      tags: result.tags,
       category: result.category,
       publishedAt: result.publishedAt,
       createdAt: result.createdAt,
@@ -1307,7 +1288,7 @@ export class PostsService {
       // likedBy JOIN을 제거하고 서브쿼리로 대체
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
         'author.id', 'author.username', 'author.role',
@@ -1378,7 +1359,7 @@ export class PostsService {
 
     // 추가 필드 설정
     postDto.liked = liked; // 사용자 좋아요 상태
-    postDto.tags = post.tagList || []; // 태그 필드 추가 (프론트엔드 호환성)
+    postDto.tags = post.tags || []; // 태그 필드 추가 (프론트엔드 호환성)
     postDto.viewCount = post.viewCount + 1; // 증가된 조회수 반영
 
     // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화 (formatDate 제거)
@@ -1432,7 +1413,7 @@ export class PostsService {
     }
 
     // 태그 업데이트 (JSONB로 단순 저장)
-    const newTagList = updatePostDto.tags || post.tagList || [];
+    const newTagList = updatePostDto.tags || post.tags || [];
 
     // tags는 DTO에서 온 것이므로 별도로 처리
 
@@ -1461,7 +1442,7 @@ export class PostsService {
         : textContent;
     }
 
-    post.tagList = newTagList; // JSONB 태그 배열 업데이트
+    post.tags = newTagList; // JSONB 태그 배열 업데이트
 
     // Title 변경 시 slug는 변경하지 않음 (이미 고유한 UUID 포함)
     // SEO를 위해 기존 slug 유지가 더 좋음
@@ -1717,6 +1698,38 @@ export class PostsService {
       this.logger.error('Error extracting S3 key from URL:', error);
       return null;
     }
+  }
+
+  /**
+   * 작성자 데이터 포맷팅 (프로필 평탄화 및 CDN URL 변환)
+   * users.service.ts와 동일한 패턴 적용
+   */
+  private formatAuthorData(author: any): any {
+    // Phase 1 리팩토링: profiles 테이블 필드를 User 객체에 flatten (Frontend 호환성)
+    if (author.profile) {
+      author.name = author.profile.name;
+      author.profileImage = author.profile.profileImage;
+      author.bio = author.profile.bio;
+      author.lastLoginProvider = author.profile.lastLoginProvider;
+    }
+
+    // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+    if (author.profileImage) {
+      if (author.profileImage.startsWith('v2/') || author.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        author.profileImage = this.cdnService.generateCdnUrlFromKey(author.profileImage);
+        this.logger.debug(`Author profile image CDN URL: ${author.profileImage}`);
+      }
+    }
+
+    // 필요한 필드만 선택하여 반환 (email 제외)
+    return {
+      id: author.id,
+      username: author.username,
+      bio: author.bio || null,
+      role: author.role,
+      profileImage: this.optimizeImageUrl(author.profileImage),
+    };
   }
 
   // 좋아요 토글 (최적화된 원자적 업데이트)
@@ -2557,7 +2570,9 @@ export class PostsService {
 
     // S3 키 (uploads/, v2/ 등)는 CDN URL로 변환
     if (url.startsWith('uploads/') || url.startsWith('v2/')) {
-      return this.cdnService.generateCdnUrlFromKey(url);
+      // Temporarily disabled CDN service
+      // return this.cdnService.generateCdnUrlFromKey(url);
+      return url; // Return original URL for now
     }
 
     return url;
@@ -2571,11 +2586,11 @@ export class PostsService {
     // PostgreSQL JSONB 배열을 풀어서 집계하는 쿼리
     const result = await this.postsRepository
       .createQueryBuilder('post')
-      .select('jsonb_array_elements_text(post.tagList) as tag')
+      .select('jsonb_array_elements_text(post.tags) as tag')
       .addSelect('COUNT(*)', 'count')
       .where('post.isPublished = true')
       .andWhere('post.status = :status', { status: 'published' })
-      .andWhere('jsonb_array_length(post.tagList) > 0')
+      .andWhere('jsonb_array_length(post.tags) > 0')
       .groupBy('tag')
       .orderBy('count', 'DESC')
       .limit(limit)
@@ -2664,7 +2679,7 @@ export class PostsService {
         'post.likeCount',
         'post.commentCount',
         'post.qualityScore',
-        'post.tagList',
+        'post.tags',
         'post.category',
         'post.blogId',
         'post.authorId',
@@ -2858,7 +2873,7 @@ export class PostsService {
         'post.likeCount',
         'post.commentCount',
         'post.qualityScore',
-        'post.tagList',
+        'post.tags',
         'post.category',
         'post.blogId',
         'post.authorId',
@@ -2908,10 +2923,18 @@ export class PostsService {
 
     // 필터: 검색 (제목, 태그)
     if (dto.search) {
-      query.andWhere(
-        '(post.title ILIKE :search OR post.tagList::text ILIKE :search)',
-        { search: `%${dto.search}%` }
-      );
+      // 검색어 정리 및 길이 제한 (보안 강화)
+      const sanitizedSearch = dto.search
+        .trim()
+        .slice(0, 100) // 최대 100자 제한
+        .replace(/[<>\"'%;()&+]/g, ''); // 위험 문자 제거
+
+      if (sanitizedSearch) {
+        query.andWhere(
+          '(post.title ILIKE :search OR post.tags::text ILIKE :search)',
+          { search: `%${sanitizedSearch}%` }
+        );
+      }
     }
 
     // Cursor 조건 추가 (정렬 방식별)

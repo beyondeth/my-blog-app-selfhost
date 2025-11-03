@@ -43,6 +43,17 @@ export class BlogResponseDto {
   @Expose()
   updatedAt: Date;
 
+  @Expose()
+  alias: string; // Alias 필드 추가
+
+  // 팔로우 정보 (동적으로 추가되는 필드)
+  @Expose()
+  followInfo?: {
+    followersCount: number;
+    followingCount: number;
+    isFollowedByUser: boolean;
+  };
+
   // OneToOne, OneToMany 관계 제외 (lazy loading 방지)
   @Exclude()
   user: any;

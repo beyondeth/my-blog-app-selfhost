@@ -44,6 +44,21 @@ const SmallIcon: React.FC<{ className?: string }> = ({ className }) => (
   </svg>
 );
 
+const MediumIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    width="20"
+    height="20"
+    viewBox="0 0 20 20"
+    fill="currentColor"
+    className={className}
+  >
+    {/* Medium: 중간-작은 사각형 */}
+    <rect x="4" y="5.5" width="12" height="9" rx="1" fill="currentColor" />
+    <rect x="4" y="5.5" width="12" height="9" rx="1" stroke="currentColor" strokeWidth="1.5" fill="none" />
+  </svg>
+);
+
 const DefaultIcon: React.FC<{ className?: string }> = ({ className }) => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
@@ -86,33 +101,64 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
   onThumbnailToggle,
 }) => {
   return (
-    <div className="medium-image-toolbar-wrapper absolute -top-16 left-1/2 transform -translate-x-1/2 z-50">
-      {/* 검은 말풍선 툴바 */}
+    <div className="medium-image-toolbar-wrapper w-full flex justify-center mb-2">
+      {/* 흰색 배경의 툴바 */}
       <div
         className={cn(
           'medium-image-toolbar',
-          'flex items-center gap-3',
-          'bg-gray-900 rounded-lg shadow-xl',
-          'px-3 py-2',
-          'border border-gray-700'
+          'inline-flex items-center gap-3',
+          'bg-white/95 backdrop-blur-sm rounded-lg shadow-lg',
+          'px-4 py-2',
+          'border border-gray-200'
         )}
       >
         {/* 크기 버튼 그룹 */}
-        <div className="size-buttons flex items-center gap-1 border-r border-gray-700 pr-3">
+        <div className="size-buttons flex items-center gap-1 border-r border-gray-300 pr-3">
           {availableSizes.includes('small') && (
             <button
               type="button"
               onClick={() => onSizeChange('small')}
               className={cn(
                 'size-button',
-                'p-1.5 rounded transition-colors',
+                'p-1.5 rounded transition-colors relative',
                 currentSize === 'small'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-orange-400 text-gray-800 ring-2 ring-orange-200 ring-offset-1'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               )}
               title="작게 (300px)"
             >
               <SmallIcon />
+              {currentSize === 'small' && (
+                <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full p-0.5">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="white">
+                    <path d="M2 6L4.5 8.5L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                </div>
+              )}
+            </button>
+          )}
+
+          {availableSizes.includes('medium') && (
+            <button
+              type="button"
+              onClick={() => onSizeChange('medium')}
+              className={cn(
+                'size-button',
+                'p-1.5 rounded transition-colors relative',
+                currentSize === 'medium'
+                  ? 'bg-orange-400 text-gray-800 ring-2 ring-orange-200 ring-offset-1'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+              )}
+              title="중간 (500px)"
+            >
+              <MediumIcon />
+              {currentSize === 'medium' && (
+                <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full p-0.5">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="white">
+                    <path d="M2 6L4.5 8.5L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                </div>
+              )}
             </button>
           )}
 
@@ -122,14 +168,21 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
               onClick={() => onSizeChange('default')}
               className={cn(
                 'size-button',
-                'p-1.5 rounded transition-colors',
+                'p-1.5 rounded transition-colors relative',
                 currentSize === 'default'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-orange-400 text-gray-800 ring-2 ring-orange-200 ring-offset-1'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               )}
               title="기본 (680px)"
             >
               <DefaultIcon />
+              {currentSize === 'default' && (
+                <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full p-0.5">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="white">
+                    <path d="M2 6L4.5 8.5L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                </div>
+              )}
             </button>
           )}
 
@@ -139,14 +192,21 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
               onClick={() => onSizeChange('full')}
               className={cn(
                 'size-button',
-                'p-1.5 rounded transition-colors',
+                'p-1.5 rounded transition-colors relative',
                 currentSize === 'full'
-                  ? 'bg-emerald-600 text-white'
-                  : 'text-gray-400 hover:bg-gray-800 hover:text-white'
+                  ? 'bg-orange-400 text-gray-800 ring-2 ring-orange-200 ring-offset-1'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
               )}
               title="전체 (1000px)"
             >
               <FullIcon />
+              {currentSize === 'full' && (
+                <div className="absolute -top-1 -right-1 bg-orange-500 rounded-full p-0.5">
+                  <svg width="12" height="12" viewBox="0 0 12 12" fill="white">
+                    <path d="M2 6L4.5 8.5L10 3" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                </div>
+              )}
             </button>
           )}
         </div>
@@ -158,8 +218,8 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
           className={cn(
             'alt-text-button',
             'px-3 py-1.5 rounded',
-            'text-sm font-medium text-gray-300',
-            'hover:bg-gray-800 hover:text-white',
+            'text-sm font-medium text-gray-700',
+            'hover:bg-gray-100 hover:text-gray-900',
             'transition-colors'
           )}
           title="Alt text (접근성)"
@@ -176,22 +236,26 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
               'thumbnail-button',
               'px-3 py-1.5 rounded',
               'text-sm font-medium',
-              'border-l border-gray-700 pl-3 ml-2',
+              'border-l border-gray-300 pl-3 ml-2',
               'transition-colors',
               isThumbnail
-                ? 'bg-emerald-600 text-white'
-                : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+                ? 'bg-orange-400 text-gray-700'
+                : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
             )}
             title={isThumbnail ? '썸네일 해제' : '썸네일로 설정'}
           >
-            {isThumbnail ? '⭐ 썸네일' : '☆ 썸네일'}
+            <span className="relative">
+              {isThumbnail ? '⭐ 썸네일' : '☆ 썸네일'}
+              {isThumbnail && (
+                <div className="absolute -top-2 -right-2 bg-orange-500 rounded-full p-0.5">
+                  <svg width="10" height="10" viewBox="0 0 10 10" fill="white">
+                    <path d="M1.5 5L3.5 7L8.5 2" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" fill="none"/>
+                  </svg>
+                </div>
+              )}
+            </span>
           </button>
         )}
-      </div>
-
-      {/* 말풍선 꼬리 (아래 방향) */}
-      <div className="toolbar-arrow absolute left-1/2 transform -translate-x-1/2 top-full">
-        <div className="w-0 h-0 border-l-[8px] border-r-[8px] border-t-[8px] border-l-transparent border-r-transparent border-t-gray-900" />
       </div>
     </div>
   );

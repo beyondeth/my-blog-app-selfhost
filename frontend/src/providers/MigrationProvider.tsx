@@ -2,7 +2,6 @@
 
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { userBlogQueryKey } from '@/hooks/useUserBlogV2';
 
 /**
  * 마이그레이션 호환성 Provider
@@ -17,7 +16,7 @@ export function MigrationProvider({ children }: { children: React.ReactNode }) {
     const handleUserBlogRefresh = () => {
       console.log('[Migration] Legacy userBlogRefresh event detected, using query invalidation');
       // TanStack Query invalidation으로 대체
-      queryClient.invalidateQueries({ queryKey: userBlogQueryKey });
+      queryClient.invalidateQueries({ queryKey: ['user-blog'] });
       queryClient.invalidateQueries({ queryKey: ['blogs', 'my-blogs'] });
     };
 

@@ -97,9 +97,14 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       // SEO를 위한 301 영구 리다이렉트
       const redirectPath = `/${blog.redirectTo}/${postSlug}${searchParams ? `?${searchParams.toString()}` : ''}`;
 
+      // @ 접두사가 있는 경우 항상 추가
+      const finalRedirectPath = blog.redirectTo.startsWith('@')
+        ? redirectPath
+        : redirectPath.replace(`/${blog.redirectTo}`, `/@${blog.redirectTo}`);
+
       // Next.js 클라이언트 컴포넌트에서는 window.location을 사용하여 리다이렉트
       if (typeof window !== 'undefined') {
-        window.location.replace(redirectPath);
+        window.location.replace(finalRedirectPath);
       }
     }
   }, [blog, postSlug, searchParams]);
@@ -417,7 +422,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       <article
         id="post-content"
         className={cn(
-          "max-w-5xl mx-auto px-6 py-16 overflow-x-hidden transition-all duration-500 relative",
+          "max-w-5xl mx-auto px-6 py-16 overflow-x-visible transition-all duration-500 relative",
           isDeleting && "opacity-30 blur-sm pointer-events-none scale-[0.98]"
         )}
       >

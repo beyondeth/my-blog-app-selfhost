@@ -13,7 +13,7 @@ import Image from '@tiptap/extension-image';
 import { ReactNodeViewRenderer } from '@tiptap/react';
 import { MediumImageNode } from '../components/MediumImage/MediumImageNode';
 
-export type ImageSize = 'small' | 'default' | 'full';
+export type ImageSize = 'small' | 'medium' | 'default' | 'full';
 
 export const MediumStyleImage = Image.extend({
   name: 'mediumImage',

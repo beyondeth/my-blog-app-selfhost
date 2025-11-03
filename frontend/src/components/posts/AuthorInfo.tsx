@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useQuery } from '@tanstack/react-query';
 import { Avatar } from '@/components/ui/avatar';
@@ -19,6 +19,8 @@ interface AuthorInfoProps {
 
 export default function AuthorInfo({ author }: AuthorInfoProps) {
   const { user } = useAuth();
+  const isOwner = user?.id === author?.id;
+  const displayProfileImage = isOwner ? user?.profileImage : author?.profileImage;
 
   // 사용자 데이터 조회
   const { data: userData } = useQuery({
@@ -83,7 +85,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
             <TooltipTrigger asChild>
               <div className="flex items-start space-x-4 cursor-pointer">
                 <Avatar
-                  src={author.profileImage}
+                  src={displayProfileImage}
                   alt={author.username || 'Author'}
                   fallback={author.username || 'Author'}
                   size="md"
@@ -118,7 +120,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
     <div className="mt-12 p-6 bg-gray-50 dark:bg-[rgb(38,38,38)] rounded-lg">
       <div className="flex items-start space-x-4">
         <Avatar
-          src={author.profileImage}
+          src={displayProfileImage}
           alt={author.username || 'Author'}
           fallback={author.username || 'Author'}
           size="md"
@@ -135,4 +137,5 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
       </div>
     </div>
   );
-} 
+}
+ 

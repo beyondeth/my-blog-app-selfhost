@@ -63,6 +63,12 @@ export const CacheKeys = {
   BLOG_BY_USER: (userId: string) => `blog:user:${userId}`,
   BLOG_BY_ID: (id: string) => `blog:id:${id}`,
 
+  // Alias 관련 - @alias 시스템을 위한 통합된 캐시 키
+  ALIAS_MAPPING: (identifier: string) => `alias:map:${identifier}`,
+  IDENTIFIER_TO_BLOG: (identifier: string) => `blog:identifier:${identifier}`,
+  BLOG_FEED_BY_ALIAS: (alias: string, page: number) => `feed:blog:${alias}:page:${page}`,
+  BLOG_FEED_BY_ID: (blogId: string, page: number) => `feed:blog:${blogId}:page:${page}`,
+
   // Comment 관련
   COMMENT_TREE: (postId: string) => `comment:tree:${postId}`,
   COMMENT_COUNT: (postId: string) => `comment:count:${postId}`,
@@ -820,6 +826,86 @@ export class CacheService {
       this.invalidatePattern(pattern, options)
     );
     await Promise.all(promises);
+  }
+
+  /**
+   * @alias 시스템을 위한 통합된 캐시 무효화
+   * @param oldAlias - 이전 별칭
+   * @param newAlias - 새 별칭
+   * @param blogId - 블로그 ID
+   */
+  async invalidateAliasCache(oldAlias?: string, newAlias?: string, blogId?: string): Promise<void> {
+    try {
+      const keysToDelete: string[] = [];
+
+      // 1. Alias 관련 캐시 무효화
+      if (oldAlias) {
+        keysToDelete.push(
+          CacheKeys.ALIAS_MAPPING(oldAlias),
+          CacheKeys.IDENTIFIER_TO_BLOG(oldAlias),
+          CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 1),
+          CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 2),
+          CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 3),
+          CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 4),
+          CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 5)
+        );
+      }
+
+      if (newAlias) {
+        keysToDelete.push(
+          CacheKeys.ALIAS_MAPPING(newAlias),
+          CacheKeys.IDENTIFIER_TO_BLOG(newAlias),
+          CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 1),
+          CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 2),
+          CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 3),
+          CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 4),
+          CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 5)
+        );
+      }
+
+      // 2. BlogId 관련 캐시 무효화
+      if (blogId) {
+        // feed:blog:{blogId}:page:* 패턴 무효화 (와일드카드)
+        // SCAN 사용으로 KEYS 대체 (블로킹 방지)
+        const pattern = `cache:feed:blog:${blogId}:page:*`;
+        const keys = [];
+        let cursor = '0';
+
+        do {
+          const result = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+          cursor = result[0];
+          const scannedKeys = result[1];
+
+          if (scannedKeys.length > 0) {
+            keys.push(...scannedKeys);
+          }
+        } while (cursor !== '0');
+
+        if (keys.length > 0) {
+          await this.redis.del(...keys);
+          this.logger.debug(`[Cache] Invalidated ${keys.length} keys for pattern: ${pattern}`);
+        }
+
+        // 개별 페이지 키도 추가
+        for (let i = 1; i <= 5; i++) {
+          keysToDelete.push(CacheKeys.BLOG_FEED_BY_ID(blogId, i));
+        }
+      }
+
+      // 3. 개별 키 삭제
+      if (keysToDelete.length > 0) {
+        const deletePromises = keysToDelete.map(key =>
+          this.unifiedRedisService.del(`cache:${key}`).catch(err =>
+            this.logger.warn(`Failed to delete cache key ${key}:`, err)
+          )
+        );
+        await Promise.all(deletePromises);
+      }
+
+      this.logger.debug(`[Cache] Invalidated alias cache: old=${oldAlias}, new=${newAlias}, blogId=${blogId}`);
+    } catch (error) {
+      this.logger.error(`[Cache] Failed to invalidate alias cache:`, error);
+    }
   }
 
   /**

@@ -5,6 +5,7 @@ import {
   BadRequestException,
   forwardRef,
   MessageEvent,
+  Logger,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Brackets } from 'typeorm';
@@ -28,6 +29,7 @@ import { CdnService } from '../../files/services/cdn.service';
 
 @Injectable()
 export class ChatService {
+  private readonly logger = new Logger(ChatService.name);
   private chatGateway: ChatGateway;
   private notificationSubject = new Subject<{ userId: string; data: any }>();
 
@@ -139,6 +141,13 @@ export class ChatService {
       user2Username: conversation.user2?.username
     });
 
+    // 신규 대화방 생성 후 관련 사용자들의 캐시 즉시 무효화
+    // 대화 목록 캐시를 즉시 갱신하여 프론트엔드에서 빠르게 반영되도록 함
+    await this.invalidateUserConversationsCache(currentUserId);
+    await this.invalidateUserConversationsCache(targetUserId);
+
+    this.logger.debug(`[ChatService] Invalidated conversations cache for users: ${currentUserId}, ${targetUserId}`);
+
     return conversation;
   }
 
@@ -150,10 +159,7 @@ export class ChatService {
   }
 
   async getConversationForUser(conversationId: string, userId: string): Promise<Conversation> {
-    const conversation = await this.conversationRepository.findOne({
-      where: { id: conversationId },
-      relations: ['user1', 'user2'],
-    });
+    const conversation = await this.conversationRepo.findById(conversationId);
 
     if (!conversation) {
       throw new NotFoundException('Conversation not found');
@@ -164,12 +170,28 @@ export class ChatService {
       throw new ForbiddenException('Access denied to this conversation');
     }
 
+    // formatAuthorData 패턴 적용 (PostsService와 동일)
+    if (conversation.user1) {
+      this.formatAuthorData(conversation.user1);
+    }
+    if (conversation.user2) {
+      this.formatAuthorData(conversation.user2);
+    }
+
     // 디버그 로그 추가
-    console.log('[ChatService] getConversationForUser:', {
+    this.logger.debug('[ChatService] getConversationForUser:', {
       conversationId,
       userId,
-      user1: conversation.user1 ? { id: conversation.user1.id, username: conversation.user1.username } : null,
-      user2: conversation.user2 ? { id: conversation.user2.id, username: conversation.user2.username } : null,
+      user1: conversation.user1 ? {
+        id: conversation.user1.id,
+        username: conversation.user1.username,
+        hasProfileImage: !!(conversation.user1 as any).profileImage
+      } : null,
+      user2: conversation.user2 ? {
+        id: conversation.user2.id,
+        username: conversation.user2.username,
+        hasProfileImage: !!(conversation.user2 as any).profileImage
+      } : null,
     });
 
     // deletedAt과 상관없이 대화방 정보 반환
@@ -273,6 +295,14 @@ export class ChatService {
         // 맵에서 미리 조회된 lastMessage 가져오기 (N+1 문제 해결)
         const lastMessage = lastMessageMap.get(conv.id) || null;
 
+        // formatAuthorData 패턴 적용 (PostsService와 동일)
+        if (conv.user1) {
+          this.formatAuthorData(conv.user1);
+        }
+        if (conv.user2) {
+          this.formatAuthorData(conv.user2);
+        }
+
         return {
           ...conv,
           unreadCount,
@@ -371,6 +401,7 @@ export class ChatService {
     const queryBuilder = this.messageRepository
       .createQueryBuilder('message')
       .leftJoinAndSelect('message.sender', 'sender')
+      .leftJoinAndSelect('sender.profile', 'profile')
       .where('message.conversationId = :conversationId', { conversationId })
       .andWhere('message.isDeleted = false');
 
@@ -385,6 +416,15 @@ export class ChatService {
       .skip((page - 1) * limit)
       .take(limit)
       .getMany();
+
+    // 발신자 프로필 이미지 CDN URL 변환
+    messages.forEach(message => {
+      if (message.sender?.profile?.profileImage) {
+        message.sender.profile.profileImage = this.cdnService.generateCdnUrlFromKey(
+          message.sender.profile.profileImage
+        );
+      }
+    });
 
     // Cache recent messages (first page only)
     if (page === 1) {
@@ -906,7 +946,7 @@ export class ChatService {
 
     // 프로필 이미지를 CDN URL로 변환
     senders.forEach(sender => {
-      if (sender.profile?.profileImage && sender.profile.profileImage.startsWith('v2/')) {
+      if (sender.profile?.profileImage && (sender.profile.profileImage.startsWith('v2/') || sender.profile.profileImage.startsWith('uploads/'))) {
         sender.profile.profileImage = this.cdnService.generateCdnUrlFromKey(sender.profile.profileImage);
       }
     });
@@ -926,5 +966,62 @@ export class ChatService {
     }
 
     return messages;
+  }
+
+  /**
+   * Author 데이터 포맷팅 (PostsService와 동일한 패턴)
+   * @description profile 관계의 데이터를 User 객체에 flatten 하고 CDN URL로 변환
+   */
+  private formatAuthorData(author: any): any {
+    // 채팅에서 필요한 필드만 처리: 이미지와 이름
+    if (author.profile) {
+      author.name = author.profile.name;
+      author.profileImage = author.profile.profileImage;
+    }
+
+    // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+    if (author.profileImage) {
+      if (author.profileImage.startsWith('v2/') || author.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        author.profileImage = this.cdnService.generateCdnUrlFromKey(author.profileImage);
+        this.logger.debug(`[ChatService] Author profile image CDN URL: ${author.profileImage}`);
+      }
+    }
+
+    // 채팅에 필요한 필드만 선택
+    return {
+      id: author.id,
+      username: author.username,
+      profileImage: author.profileImage,
+    };
+  }
+
+  /**
+   * 이미지 URL 최적화 (PostsService와 동일)
+   */
+  private optimizeImageUrl(url?: string): string | null {
+    if (!url) return null;
+
+    // 이미 절대 URL이면 그대로 사용
+    if (url.startsWith('http')) {
+      return url;
+    }
+
+    // S3 키인 경우 CDN URL로 변환
+    if (url.startsWith('v2/') || url.startsWith('uploads/')) {
+      return this.cdnService.generateCdnUrlFromKey(url);
+    }
+
+    return url;
+  }
+
+  /**
+   * 사용자의 대화 목록 캐시 무효화
+   * 신규 대화방 생성 후 즉시 반영되도록 캐시 삭제
+   */
+  private async invalidateUserConversationsCache(userId: string): Promise<void> {
+    const cacheKey = `conversations:${userId}`;
+    await this.unifiedRedisService.delCache('chat', cacheKey);
+    this.logger.debug(`[ChatService] Invalidated conversations cache for user: ${userId}`);
   }
 }

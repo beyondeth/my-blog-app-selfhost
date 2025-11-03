@@ -21,6 +21,7 @@ import NotificationDropdown from '@/components/notifications/NotificationDropdow
 import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useDMModal } from '@/hooks/useDMModal';
+import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
 
 /**
  * 왼쪽 고정 사이드바 컴포넌트
@@ -39,6 +40,7 @@ export default function LeftSidebar() {
   const { openModal: openDMModal } = useDMModal();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { blog } = useUserBlogV2(); // 내 블로그 정보 가져오기
 
   // 클라이언트에서만 렌더링 (SSR 하이드레이션 불일치 방지)
   useEffect(() => {
@@ -76,6 +78,9 @@ export default function LeftSidebar() {
     return null;
   }
 
+  // 내 블로그 URL 결정 (alias 우선)
+  const myBlogUrl = blog ? (blog.alias ? `/@${blog.alias}` : `/${blog.slug}`) : '#';
+
   return (
     <aside
       className={`hidden lg:block fixed left-0 top-40 h-[calc(100vh-10rem)] w-20 bg-background z-40 ${
@@ -103,18 +108,18 @@ export default function LeftSidebar() {
         </Link>
 
         {/* My Blog 버튼 - 로그인 사용자만 표시 */}
-        {user && user.blogSlug && (
+        {user && blog && (
           <Link
-            href={`/${user.blogSlug}`}
+            href={myBlogUrl}
             prefetch={true}
             className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
-              pathname === `/${user.blogSlug}`
+              pathname === myBlogUrl
                 ? 'bg-accent text-accent-foreground'
                 : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
             }`}
             title="내 블로그"
           >
-            <MyBlogIcon className={pathname === `/${user.blogSlug}` ? 'opacity-100' : 'opacity-70'} size={24} />
+            <MyBlogIcon className={pathname === myBlogUrl ? 'opacity-100' : 'opacity-70'} size={24} />
             <span className="text-xs mt-1 font-medium">내블로그</span>
           </Link>
         )}
@@ -126,6 +131,10 @@ export default function LeftSidebar() {
             <Link
               href="/new-story"
               prefetch={true}
+              onMouseEnter={() => {
+                // 에디터 모듈 사전 로드
+                import('@/editor').catch(() => {});
+              }}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                 pathname === '/new-story' || pathname?.startsWith('/edit/')
                   ? 'bg-accent text-accent-foreground'

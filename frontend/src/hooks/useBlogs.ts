@@ -4,9 +4,17 @@ import { toast } from 'sonner';
 
 // Get blog by slug
 export function useBlogBySlug(slug: string) {
+  const queryClient = useQueryClient();
+
+  // 캐시 키 정규화 - @ 제거
+  const normalizedSlug = slug.replace('@', '');
+
   return useQuery({
-    queryKey: ['blog', slug],
-    queryFn: () => getBlogBySlug(slug),
+    queryKey: ['blog', normalizedSlug],
+    queryFn: async () => {
+      const blog = await getBlogBySlug(slug);
+      return blog;
+    },
     enabled: !!slug,
     staleTime: 1 * 60 * 1000,       // 1분간 캐싱 (프로필 이미지 변경 등 빠른 반영 필요)
     gcTime: 10 * 60 * 1000,          // 10분간 메모리 보관
@@ -87,8 +95,11 @@ export function useDeleteBlog() {
  * @returns 카테고리별 포스트 개수 (내림차순)
  */
 export function useBlogCategories(blogSlug: string) {
+  // 캐시 키 정규화 - @ 제거
+  const normalizedSlug = blogSlug.replace('@', '');
+
   return useQuery({
-    queryKey: ['blog-categories', blogSlug],
+    queryKey: ['blog-categories', normalizedSlug],
     queryFn: async (): Promise<Array<{ category: string; count: number }>> => {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}/categories`,
@@ -126,13 +137,14 @@ export function useBlogCategories(blogSlug: string) {
  * // data = { available: true }
  */
 export function useCheckAlias(alias: string, enabled: boolean = true) {
-  return useQuery({
+  return useQuery<{ available: boolean }>({
     queryKey: ['check-alias', alias],
     queryFn: () => checkAlias(alias),
     enabled: enabled && !!alias && alias.length >= 3, // 3자 이상일 때만 확인
     staleTime: 30 * 1000, // 30초 캐싱 (중복 확인은 짧게)
     gcTime: 60 * 1000, // 1분간 메모리 보관
     retry: false, // 중복 확인은 재시도 불필요
+    placeholderData: (previousData) => previousData, // v5에서 keepPreviousData 대체
   });
 }
 
@@ -159,15 +171,48 @@ export function useUpdateAlias() {
 
   return useMutation({
     mutationFn: (alias: string) => updateAlias(alias),
+    onMutate: async (newAlias) => {
+      // 낙관적 업데이트를 위해 진행 중인 쿼리 취소
+      await queryClient.cancelQueries({ queryKey: ['blog'] });
+      await queryClient.cancelQueries({ queryKey: ['my-blogs'] });
+
+      // 이전 데이터 저장
+      const previousBlogs = queryClient.getQueriesData({ queryKey: ['blog'] });
+      const previousMyBlogs = queryClient.getQueriesData({ queryKey: ['my-blogs'] });
+
+      return { previousBlogs, previousMyBlogs };
+    },
     onSuccess: (updatedBlog) => {
-      // 블로그 캐시 무효화 (새 alias로 조회 가능하도록)
+      // 모든 관련 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['blog'] });
       queryClient.invalidateQueries({ queryKey: ['my-blogs'] });
+
+      // 추가: 특정 쿼리들도 무효화
+      queryClient.invalidateQueries({ queryKey: ['check-alias'] });
+      queryClient.removeQueries({ queryKey: ['blog'] });
+      queryClient.removeQueries({ queryKey: ['my-blogs'] });
+
+      // 브라우저 URL 업데이트를 위한 리프레시
+      if (typeof window !== 'undefined') {
+        window.location.reload(); // 강제 새로고침으로 서버 상태와 동기화
+      }
 
       // 성공 메시지
       toast.success(`블로그 주소가 @${updatedBlog.alias}로 변경되었습니다.`);
     },
-    onError: (error: any) => {
+    onError: (error: any, variables, context) => {
+      // 에러 발생 시 이전 데이터 복원
+      if (context?.previousBlogs) {
+        context.previousBlogs.forEach(([queryKey, queryData]) => {
+          queryClient.setQueryData(queryKey, queryData);
+        });
+      }
+      if (context?.previousMyBlogs) {
+        context.previousMyBlogs.forEach(([queryKey, queryData]) => {
+          queryClient.setQueryData(queryKey, queryData);
+        });
+      }
+
       // 에러 메시지 (백엔드에서 ConflictException 등)
       const errorMessage = error.message || 'Alias 변경에 실패했습니다.';
       toast.error(errorMessage);
