@@ -6,6 +6,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { useChat } from '@/hooks/useChat';
 import { useDMModal } from '@/hooks/useDMModal';
 import { useCreateConversationMutation } from '@/hooks/chat/useChatsQuery';
+import toast from 'react-hot-toast';
 
 interface DMButtonProps {
   userId: string;
