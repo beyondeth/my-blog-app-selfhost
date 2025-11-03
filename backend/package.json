@@ -105,7 +105,8 @@
     "sharp": "^0.34.3",
     "socket.io": "^4.8.1",
     "typeorm": "^0.3.17",
-    "uuid": "^11.1.0"
+    "uuid": "^11.1.0",
+    "uuidv7": "^1.0.2"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

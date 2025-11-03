@@ -10,7 +10,9 @@ import { GetCommentsDto } from './dto/get-comments-query.dto';
 import { GetRepliesDto } from './dto/get-replies.dto';
 import { PaginatedCommentsDto } from './dto/paginated-comments.dto';
 import { User } from '../users/entities/user.entity';
+import { UserResponseDto } from '../users/dto/user-response.dto';
 import { PostsService } from '../posts/posts.service';
+import { BlogResolverService } from '../common/services/blog-resolver.service';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
 import { CacheMetricsService } from '../metrics/cache-metrics.service';
 
@@ -24,6 +26,7 @@ export class CommentsService {
     @InjectRepository(CommentLike)
     private commentLikesRepository: Repository<CommentLike>,
     private postsService: PostsService,
+    private blogResolverService: BlogResolverService,
     private cacheService: CacheService,
     private cacheMetricsService: CacheMetricsService,
     private eventEmitter: EventEmitter2,
@@ -45,6 +48,28 @@ export class CommentsService {
       excludeExtraneousValues: true, // @Expose가 없는 필드 제외
     });
 
+    // author가 있는 경우 처리
+    if (comment.author) {
+      // author가 이미 UserResponseDto 타입이면 그대로 사용 (Raw SQL 조회한 답글의 경우)
+      if (comment.author instanceof UserResponseDto) {
+        dto.author = comment.author;
+      }
+      // User 엔티티이고 profile이 있으면 profileImage를 설정 (부모 댓글의 경우)
+      else if (comment.author.profile) {
+        dto.author = plainToInstance(UserResponseDto, {
+          ...comment.author,
+          profileImage: comment.author.profile.profileImage || null
+        });
+      }
+      // profile이 없을 경우 null로 설정 (프론트엔드에서 FiUser 아이콘으로 fallback)
+      else {
+        dto.author = plainToInstance(UserResponseDto, {
+          ...comment.author,
+          profileImage: null
+        });
+      }
+    }
+
     // 추가 데이터가 있으면 설정
     if (additionalData) {
       Object.assign(dto, additionalData);
@@ -58,9 +83,12 @@ export class CommentsService {
 
     // 게시글 존재 확인 및 블로그 정보 가져오기
     const post = await this.postsService.findOne(postId);
+    if (!post) {
+      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+    }
 
     // 블로그의 댓글 허용 여부 확인
-    const blog = await this.postsService.getBlogByPostId(postId);
+    const blog = await this.blogResolverService.findBlogById(post.blogId);
     if (!blog.allowComments) {
       throw new ForbiddenException('이 블로그는 댓글을 허용하지 않습니다.');
     }
@@ -442,6 +470,7 @@ export class CommentsService {
     const queryBuilder = this.commentsRepository
       .createQueryBuilder('comment')
       .leftJoinAndSelect('comment.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')  // Profile 테이블 조인 추가
       .where('comment.postId = :postId', { postId })
       .andWhere('comment.parentCommentId IS NULL')
       .andWhere('comment.isDeleted = :isDeleted', { isDeleted: false });
@@ -674,10 +703,11 @@ export class CommentsService {
         ct.*,
         u.id as author_id,
         u.username as author_username,
-        u."profileImage" as author_profileImage,
-        u.email as author_email
+        u.email as author_email,
+        p."profileImage" as author_profileImage
       FROM comment_tree ct
       LEFT JOIN users u ON ct."authorId" = u.id
+      LEFT JOIN profiles p ON u.id = p."userId"
       ORDER BY ct."createdAt" ASC, ct.id ASC
       LIMIT ${limit + 1}
     `;
@@ -699,13 +729,13 @@ export class CommentsService {
       comment.createdAt = row.createdAt || row.createdat;
       comment.updatedAt = row.updatedAt || row.updatedat;
 
-      // Author 정보 설정
-      comment.author = {
+      // Author 정보 설정 - UserResponseDto를 사용하여 @Expose() 데코레이터 적용
+      comment.author = plainToInstance(UserResponseDto, {
         id: row.author_id,
         username: row.author_username,
         profileImage: row.author_profileImage || row.author_profileimage,
         email: row.author_email
-      } as any;
+      }) as any;
 
       return comment;
     });

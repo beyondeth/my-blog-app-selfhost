@@ -16,7 +16,7 @@ import { TextStyle } from "@tiptap/extension-text-style"
 import { Selection } from "@tiptap/extensions"
 
 // --- 커스텀 Extensions ---
-import { ResizableImage } from "@/editor/extensions/ResizableImage.extension"
+import { MediumStyleImage } from "@/editor/extensions/MediumStyleImage.extension"
 import { CustomYoutube } from "@/editor/extensions/CustomYoutube.extension"
 import { YoutubeAutoEmbed } from "@/editor/extensions/YoutubeAutoEmbed.extension"
 
@@ -63,7 +63,6 @@ import {
 import { MarkButton } from "@/components/tiptap-ui/mark-button"
 import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
-import { YoutubeButton } from "@/components/tiptap-ui/youtube-button"
 
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
@@ -75,15 +74,6 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { useWindowSize } from "@/hooks/use-window-size"
 import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 
-// --- Components ---
-import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
-import ImageUploadManager, { UploadedImageInfo } from "@/editor/components/ImageManager/ImageUploadManager"
-
-// --- Hooks ---
-import { useImageUploadManager } from "@/editor/hooks/useImageUploadManager"
-
-// --- Lib ---
-import { handleImageUpload as demoHandleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils"
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
@@ -157,17 +147,11 @@ const MainToolbarContent = ({
 
       <ToolbarGroup>
         <ImageUploadButton text="Add" />
-        <YoutubeButton />
       </ToolbarGroup>
 
       <Spacer />
 
-      {isMobile && <ToolbarSeparator />}
-
-      <ToolbarGroup>
-        <ThemeToggle />
-      </ToolbarGroup>
-    </>
+      </>
   )
 }
 
@@ -214,10 +198,6 @@ export interface BlogSimpleEditorProps {
    */
   onChange?: (content: string) => void
   /**
-   * 파일 ID 목록 변경 시 호출되는 콜백 (기존 호환성)
-   */
-  onFilesChange?: (fileIds: string[]) => void
-  /**
    * placeholder 텍스트
    * @default '내용을 입력하세요...'
    */
@@ -227,50 +207,22 @@ export interface BlogSimpleEditorProps {
    */
   className?: string
   /**
-   * ImageUploadManager 기능 활성화 여부
-   * @default false
+   * 선택된 썸네일 이미지 ID
    */
-  enableImageManager?: boolean
+  thumbnailImageId?: string
   /**
-   * 최대 업로드 가능한 이미지 개수
-   * @default 5
+   * 썸네일 변경 시 호출되는 콜백
    */
-  maxImages?: number
-  /**
-   * 초기 이미지 목록
-   */
-  initialImages?: UploadedImageInfo[]
-  /**
-   * 이미지 목록 변경 시 호출되는 콜백
-   */
-  onImagesChange?: (images: UploadedImageInfo[]) => void
-  /**
-   * 썸네일 선택 시 호출되는 콜백
-   */
-  onThumbnailSelect?: (thumbnailId: string) => void
-  /**
-   * 선택된 썸네일 ID (외부에서 제어할 경우)
-   */
-  selectedThumbnailId?: string
-  /**
-   * 이미지 유효성 검사 상태 변경 시 호출되는 콜백
-   */
-  onValidationChange?: (isValid: boolean, reason?: string) => void
+  onThumbnailChange?: (imageId: string) => void
 }
 
 export function BlogSimpleEditor({
   content: initialContent = '',
   onChange,
-  onFilesChange,
   placeholder = '내용을 입력하세요...',
   className = '',
-  enableImageManager = false,
-  maxImages = 5,
-  initialImages = [],
-  onImagesChange,
-  onThumbnailSelect,
-  selectedThumbnailId: externalSelectedThumbnailId,
-  onValidationChange,
+  thumbnailImageId,
+  onThumbnailChange,
 }: BlogSimpleEditorProps = {}) {
   const isMobile = useIsMobile()
   const { height } = useWindowSize()
@@ -278,25 +230,6 @@ export function BlogSimpleEditor({
     "main"
   )
   const toolbarRef = useRef<HTMLDivElement>(null)
-
-  // ImageUploadManager 상태 관리
-  const [images, setImages] = useState<UploadedImageInfo[]>(initialImages)
-  const [internalSelectedThumbnailId, setInternalSelectedThumbnailId] = useState<string>('')
-
-  // 외부에서 제어하는 경우 외부 값 사용, 아니면 내부 상태 사용
-  const selectedThumbnailId = externalSelectedThumbnailId ?? internalSelectedThumbnailId
-
-  // 이미지 변경 핸들러 (외부 콜백과 내부 상태 동기화)
-  const handleImagesChange = useCallback((newImages: UploadedImageInfo[]) => {
-    setImages(newImages)
-    onImagesChange?.(newImages)
-  }, [onImagesChange])
-
-  // 썸네일 선택 핸들러
-  const handleThumbnailSelect = useCallback((thumbnailId: string) => {
-    setInternalSelectedThumbnailId(thumbnailId)
-    onThumbnailSelect?.(thumbnailId)
-  }, [onThumbnailSelect])
 
   // S3 파일 업로드 mutation
   const uploadMutation = useUploadFile()
@@ -308,10 +241,10 @@ export function BlogSimpleEditor({
     abortSignal?: AbortSignal
   ): Promise<string> => {
     try {
-      // 파일 크기 체크 (5MB)
+      // 파일 크기 체크 (5MB) - 프론트엔드에서 사전 검증
       const MAX_FILE_SIZE = 5 * 1024 * 1024
       if (file.size > MAX_FILE_SIZE) {
-        throw new Error(`파일 크기가 최대 허용 크기(${MAX_FILE_SIZE / (1024 * 1024)}MB)를 초과했습니다`)
+        throw new Error(`이미지는 1개당 최대 ${MAX_FILE_SIZE / (1024 * 1024)}MB까지 업로드 가능합니다`)
       }
 
       // S3 업로드
@@ -368,16 +301,8 @@ export function BlogSimpleEditor({
       Color.configure({ types: ["textStyle"] }),
       Highlight.configure({ multicolor: true }),
 
-      // 이미지 - ResizableImage 사용
-      ResizableImage.configure({
-        inline: true,
-        allowBase64: true,
-        HTMLAttributes: {
-          class: 'editor-image',
-          style: 'max-width: 100%; height: auto; display: inline-block; margin: 4px 0; border-radius: 4px;',
-          loading: 'lazy',
-        },
-      }),
+      // 이미지 - MediumStyleImage 사용
+      MediumStyleImage,
 
       // YouTube 임베드
       CustomYoutube.configure({
@@ -400,38 +325,21 @@ export function BlogSimpleEditor({
 
       // ImageUploadNode - 빠른 이미지 삽입용
       ImageUploadNode.configure({
-        type: "resizableImage",  // ResizableImage extension과 매칭
+        type: "mediumImage",  // MediumStyleImage extension과 매칭
         accept: "image/*",
         maxSize: 5 * 1024 * 1024,
-        limit: 3,
+        limit: 10,  // 최대 10개 이미지
         upload: handleImageUpload,
         onError: (error) => {
-          console.error("Upload failed:", error)
-          toast.error('이미지 업로드 실패')
-        },
-        onSuccess: (url) => {
-          console.log("Upload success:", url)
-          // ImageUploadManager 갤러리에도 추가하여 썸네일 선택 가능하게 함
-          const newImage: UploadedImageInfo = {
-            id: crypto.randomUUID(),
-            url: url,
-            order: images.length,
-            isUploading: false,
+          // 개발 환경에서만 콘솔 에러 표시
+          if (process.env.NODE_ENV === 'development') {
+            console.error("Upload failed:", error)
           }
-          handleImagesChange([...images, newImage])
+          // 에러 메시지는 이미 ImageUploadNode에서 표시했으므로 중복 표시 안 함
         },
       }),
     ],
     content: initialContent || '<p></p>',
-  })
-
-  // ImageUploadManager 통합 - useImageUploadManager hook 사용
-  const imageManagerHandlers = useImageUploadManager({
-    editor,
-    images,
-    onImagesChange: handleImagesChange,
-    onThumbnailSelect: handleThumbnailSelect,
-    selectedThumbnailId,
   })
 
   const rect = useCursorVisibility({
@@ -439,25 +347,54 @@ export function BlogSimpleEditor({
     overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
   })
 
+  // 썸네일 선택 이벤트 리스너 (ResizableImageComponent에서 발생)
+  useEffect(() => {
+    const handleThumbnailSelected = (event: Event) => {
+      const customEvent = event as CustomEvent<{ imageId: string }>
+      const { imageId } = customEvent.detail
+
+      // 에디터 storage 업데이트
+      if (editor) {
+        (editor.storage as any).thumbnailImageId = imageId
+      }
+
+      // 부모 컴포넌트에 알림
+      onThumbnailChange?.(imageId)
+    }
+
+    window.addEventListener('thumbnail-selected', handleThumbnailSelected)
+
+    return () => {
+      window.removeEventListener('thumbnail-selected', handleThumbnailSelected)
+    }
+  }, [editor, onThumbnailChange])
+
+  // 에디터 storage 초기화 (부모로부터 받은 thumbnailImageId)
+  useEffect(() => {
+    if (editor && thumbnailImageId !== undefined) {
+      (editor.storage as any).thumbnailImageId = thumbnailImageId
+    }
+  }, [editor, thumbnailImageId])
+
   useEffect(() => {
     if (!isMobile && mobileView !== "main") {
       setMobileView("main")
     }
   }, [isMobile, mobileView])
 
-  // onFilesChange 콜백 - images 변경 시 파일 ID 목록 추출
+  const [isMounted, setIsMounted] = useState(false)
+
   useEffect(() => {
-    if (onFilesChange) {
-      const fileIds = images
-        .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
-        .map(img => img.id)
-      onFilesChange(fileIds)
-    }
-  }, [images, onFilesChange])
+    setIsMounted(true)
+  }, [])
+
+  if (!editor) {
+    return null
+  }
 
   return (
-    <div className="simple-editor-wrapper">
-      <EditorContext.Provider value={{ editor }}>
+    <EditorContext.Provider value={{ editor }}>
+      <div className="simple-editor-wrapper">
         <Toolbar
           ref={toolbarRef}
           style={{
@@ -482,27 +419,14 @@ export function BlogSimpleEditor({
           )}
         </Toolbar>
 
-        <EditorContent
-          editor={editor}
-          role="presentation"
-          className="simple-editor-content"
-        />
-
-        {/* ImageUploadManager - 에디터 하단에 렌더링 */}
-        {enableImageManager && editor && (
-          <ImageUploadManager
-            images={images}
-            maxImages={maxImages}
-            onImagesChange={imageManagerHandlers.handleGalleryImageChange}
-            onImagesUploaded={imageManagerHandlers.handleImagesUploaded}
-            onImagesReordered={imageManagerHandlers.handleImageReorder}
-            onThumbnailSelect={handleThumbnailSelect}
-            selectedThumbnailId={selectedThumbnailId}
-            onValidationChange={onValidationChange}
-            className="mt-6"
+        {isMounted && (
+          <EditorContent
+            editor={editor}
+            role="presentation"
+            className="simple-editor-content"
           />
         )}
-      </EditorContext.Provider>
-    </div>
+      </div>
+    </EditorContext.Provider>
   )
 }

@@ -1,14 +1,16 @@
-import { 
-  Injectable, 
-  ConflictException, 
+import {
+  Injectable,
+  ConflictException,
   NotFoundException,
   BadRequestException,
-  Logger 
+  Logger
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserIdentity, IdentityProvider } from '../entities/user-identity.entity';
 import { User } from '../entities/user.entity';
+import { AccountSettings } from '../entities/account-settings.entity';
+import { Profile } from '../entities/profile.entity';
 import { EmailService } from '../../email/email.service';
 
 export interface LinkIdentityDto {
@@ -38,6 +40,10 @@ export class IdentityService {
     private identityRepository: Repository<UserIdentity>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(AccountSettings)
+    private accountSettingsRepository: Repository<AccountSettings>,
+    @InjectRepository(Profile)
+    private profileRepository: Repository<Profile>,
     private emailService: EmailService,
   ) {}
 
@@ -182,8 +188,12 @@ export class IdentityService {
     }
 
     // Check if this is the primary identity
-    const user = await this.userRepository.findOne({ where: { id: userId } });
-    if (user?.primaryIdentityId === identityId) {
+    // Phase 1-2-3: primaryIdentityId는 account_settings 테이블로 이동
+    const user = await this.userRepository.findOne({
+      where: { id: userId },
+      relations: ['accountSettings']
+    });
+    if (user?.accountSettings?.primaryIdentityId === identityId) {
       // Set a new primary identity
       const newPrimaryIdentity = identities.find(i => i.id !== identityId);
       if (newPrimaryIdentity) {
@@ -223,10 +233,18 @@ export class IdentityService {
       throw new NotFoundException('Identity not found');
     }
 
-    await this.userRepository.update(userId, {
-      primaryIdentityId: identityId,
-      lastLoginProvider: identity.provider,
-    });
+    // Phase 1-2-3: primaryIdentityId는 account_settings, lastLoginProvider는 profiles 테이블로 이동
+    // AccountSettings 업데이트 (primaryIdentityId)
+    await this.accountSettingsRepository.update(
+      { userId },
+      { primaryIdentityId: identityId }
+    );
+
+    // Profile 업데이트 (lastLoginProvider)
+    await this.profileRepository.update(
+      { userId },
+      { lastLoginProvider: identity.provider }
+    );
 
     this.logger.log(`Set primary identity to ${identity.provider} for user ${userId}`);
   }

@@ -17,6 +17,7 @@ interface BlogOwnerCardProps {
   profileImage?: string | null;
   userId?: string;
   isOwner?: boolean;
+  followInfo?: FollowInfo; // 외부에서 전달받을 팔로우 정보
 }
 
 interface FollowInfo {
@@ -25,23 +26,29 @@ interface FollowInfo {
   isFollowedByUser: boolean;
 }
 
-const BlogOwnerCard = React.memo(function BlogOwnerCard({ 
+const BlogOwnerCard = React.memo(function BlogOwnerCard({
   name = "개발자",
   username,
   description,
   profileImage,
   userId,
-  isOwner = false
+  isOwner = false,
+  followInfo: externalFollowInfo // 외부에서 전달받은 팔로우 정보
 }: BlogOwnerCardProps) {
   const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   
   // 팔로우 정보 조회
-  const { data: followInfo, isLoading: isLoadingFollowInfo } = useQuery<FollowInfo>({
+  const {
+    data: followInfo,
+    isLoading: isLoadingFollowInfo,
+    error: followInfoError,
+    isError: isFollowInfoError
+  } = useQuery<FollowInfo>({
     queryKey: queryKeys.users.followInfo(userId!),
     queryFn: async () => {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${userId}/follow-info`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/follows/${userId}/follow-info`,
         {
           credentials: 'include',
           headers: {
@@ -49,16 +56,31 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
           },
         }
       );
-      
+
       if (!response.ok) {
+        console.error(`[BlogOwnerCard] Follow info API error: ${response.status} ${response.statusText}`);
         throw new Error(`Failed to fetch follow info: ${response.status}`);
       }
-      
+
       return response.json();
     },
-    enabled: !!userId,
+    enabled: !!userId && !isOwner && !externalFollowInfo, // isOwner가 아니고, 외부 정보가 없고, userId가 있을 때만
     staleTime: 30000, // 30초간 캐시 유지
+    retry: (failureCount, error) => {
+      // 404나 인증 에러는 재시도하지 않음
+      if (error?.message?.includes('404') || error?.message?.includes('401')) {
+        return false;
+      }
+      return failureCount < 3;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
+
+  // 외부에서 전달받은 팔로우 정보와 내부에서 조회한 정보 통합
+  const finalFollowInfo = externalFollowInfo || followInfo;
+
+  // isOwner일 경우 AuthProvider의 최신 user.profileImage를 우선 사용
+  const displayProfileImage = isOwner ? (user?.profileImage || profileImage) : profileImage;
 
   // 팔로워 수 포맷팅 (예: 17.4K)
   const formatFollowerCount = (count: number) => {
@@ -79,7 +101,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
         {/* Profile Image - Left aligned */}
         <div className="flex justify-start">
           <UserAvatar
-            profileImage={profileImage}
+            profileImage={displayProfileImage}
             username={name}
             size="xl"
             className="w-20 h-20"
@@ -92,19 +114,25 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
         </h2>
 
         {/* Followers Count */}
-        {followInfo && (
+        {(finalFollowInfo || isFollowInfoError) && (
           <div className="flex items-center gap-1.5 text-sm">
             <FiUsers className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-            <span className="font-medium text-gray-900 dark:text-gray-100">
-              {formatFollowerCount(followInfo.followersCount)}
-            </span>
-            <span className="text-gray-500 dark:text-gray-400">팔로워</span>
+            {isLoadingFollowInfo && !externalFollowInfo ? (
+              <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+            ) : (
+              <>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {finalFollowInfo ? formatFollowerCount(finalFollowInfo.followersCount) : '0'}
+                </span>
+                <span className="text-gray-500 dark:text-gray-400">팔로워</span>
+              </>
+            )}
           </div>
         )}
 
         {/* Bio/Description */}
         {description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
+          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap break-words">
             {description}
           </p>
         )}
@@ -114,7 +142,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
           <div className="flex gap-2 w-full">
             <FollowButton
               userId={userId}
-              initialState={followInfo}
+              initialState={finalFollowInfo}
               variant="minimal"
               className="flex-1"
             />

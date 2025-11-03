@@ -130,7 +130,7 @@ export class UsersService {
   async findOne(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id },
-      relations: ['profile', 'subscription', 'accountSettings'], // Phase 1: 분리된 테이블 조인
+      relations: ['profile', 'subscription', 'accountSettings', 'blog'], // Phase 1: 분리된 테이블 조인 + blog 추가
       select: [
         'id',
         'email',
@@ -180,11 +180,13 @@ export class UsersService {
       user.primaryIdentityId = user.accountSettings.primaryIdentityId;
     }
 
-    // 프로필 이미지를 CDN URL로 변환
-    if (user.profileImage && user.profileImage.startsWith('v2/')) {
-      
-      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL: ${user.profileImage}`);
+    // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+    if (user.profileImage) {
+      if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+        this.logger.debug(`Profile image CDN URL: ${user.profileImage}`);
+      }
     }
 
     return user;
@@ -244,10 +246,13 @@ export class UsersService {
       user.primaryIdentityId = user.accountSettings.primaryIdentityId;
     }
 
-    // 프로필 이미지를 CDN URL로 변환
-    if (user.profileImage && user.profileImage.startsWith('v2/')) {
-      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL (findByEmail): ${user.profileImage}`);
+    // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+    if (user.profileImage) {
+      if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+        this.logger.debug(`Profile image CDN URL (findByEmail): ${user.profileImage}`);
+      }
     }
 
     return user;
@@ -328,10 +333,13 @@ export class UsersService {
       .where('user.username = :username', { username })
       .getOne();
 
-    // Transform profile image to CDN URL for public access
-    if (user?.profile?.profileImage && user.profile.profileImage.startsWith('v2/')) {
-      user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
-      this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profile.profileImage}`);
+    // Transform profile image to CDN URL for public access (v2/, uploads/ 모두 처리)
+    if (user?.profile?.profileImage) {
+      if (user.profile.profileImage.startsWith('v2/') || user.profile.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
+        this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profile.profileImage}`);
+      }
     }
 
     return user;
@@ -348,10 +356,13 @@ export class UsersService {
       .andWhere('user.authProvider = :provider', { provider })
       .getOne();
 
-    // 프로필 이미지를 CDN URL로 변환
-    if (user?.profile?.profileImage && user.profile.profileImage.startsWith('v2/')) {
-      user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
-      this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profile.profileImage}`);
+    // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+    if (user?.profile?.profileImage) {
+      if (user.profile.profileImage.startsWith('v2/') || user.profile.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
+        this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profile.profileImage}`);
+      }
     }
 
     return user;
@@ -379,12 +390,18 @@ export class UsersService {
     } = updateUserDto;
 
     // Cache Busting: 프로필 이미지 변경 시 타임스탬프 쿼리 파라미터 추가
+    // 단, 정적 캐릭터 이미지(/character/)는 제외 (절대 변하지 않으므로 캐시 버스팅 불필요)
     let processedProfileImage = profileImage;
     if (profileImage && profileImage !== user.profile?.profileImage) {
-      const timestamp = Date.now();
-      const cleanUrl = profileImage.split('?')[0];
-      processedProfileImage = `${cleanUrl}?v=${timestamp}`;
-      this.logger.log(`🔄 Profile image cache busting applied: ?v=${timestamp}`);
+      // 캐릭터 이미지는 정적 파일이므로 캐시 버스팅 불필요
+      if (!profileImage.startsWith('/character/')) {
+        const timestamp = Date.now();
+        const cleanUrl = profileImage.split('?')[0];
+        processedProfileImage = `${cleanUrl}?v=${timestamp}`;
+        this.logger.log(`🔄 Profile image cache busting applied: ?v=${timestamp}`);
+      } else {
+        this.logger.log(`📸 Character image selected (no cache busting needed): ${profileImage}`);
+      }
     }
 
     // 1. Users 테이블 업데이트
@@ -416,13 +433,42 @@ export class UsersService {
 
     this.logger.log(`User updated: ${user.email}`);
 
-    // Redis 캐시 무효화 (JWT 검증 캐시)
+    // Redis 캐시 무효화 (프로필 이미지 업데이트 시 모든 관련 캐시 삭제)
     try {
-      const cacheKey = `user_validate_${id}`;
-      await this.redisService.deleteCache('sessions', cacheKey);
-      this.logger.debug(`User cache invalidated: ${cacheKey}`);
+      // 1. JWT 검증 캐시 삭제
+      const userValidateKey = `user_validate_${id}`;
+      await this.redisService.deleteCache('sessions', userValidateKey);
+
+      // 2. 사용자 정보 캐시 삭제 (다양한 조회 키)
+      const userCacheKeys = [
+        `user_${id}`,  // 기본 사용자 캐시
+        `user_by_username_${user.username}`,  // username으로 조회
+        `user_by_email_${user.email}`,  // email로 조회
+        `profile_${id}`,  // 프로필 캐시
+        `user_profile_${id}`  // 사용자 프로필 캐시
+      ];
+
+      for (const key of userCacheKeys) {
+        await this.redisService.deleteCache('users', key);
+      }
+
+      // 3. CDN 캐시 무효화 (프로필 이미지 URL)
+      if (processedProfileImage) {
+        try {
+          // 프로필 이미지 CDN 캐시 무효화
+          if (processedProfileImage.startsWith('v2/') || processedProfileImage.startsWith('uploads/')) {
+            await this.cdnService.invalidateCache([processedProfileImage]);
+            this.logger.debug(`Profile image CDN cache invalidated: ${processedProfileImage}`);
+          }
+        } catch (cdnError) {
+          // CDN 캐시 무효화 실패해도 사용자 업데이트는 계속 진행
+          this.logger.warn(`CDN cache invalidation failed: ${cdnError.message}`);
+        }
+      }
+
+      this.logger.debug(`All user profile caches invalidated for user: ${id}`);
     } catch (error) {
-      this.logger.error(`Failed to invalidate user cache: ${error.message}`);
+      this.logger.error(`Failed to invalidate user caches: ${error.message}`);
     }
 
     // 업데이트된 사용자 정보 반환
@@ -583,10 +629,13 @@ export class UsersService {
       user.privacyAcceptedAt = user.accountSettings.privacyAcceptedAt;
     }
 
-    // 프로필 이미지를 CDN URL로 변환
-    if (user.profileImage && user.profileImage.startsWith('v2/')) {
-      user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-      this.logger.debug(`Profile image CDN URL (findById): ${user.profileImage}`);
+    // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+    if (user.profileImage) {
+      if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+        this.logger.debug(`Profile image CDN URL (findById): ${user.profileImage}`);
+      }
     }
 
     return user;

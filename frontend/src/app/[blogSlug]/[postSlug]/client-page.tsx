@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { FiArrowLeft } from 'react-icons/fi';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
@@ -12,6 +12,7 @@ import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import CommentSectionPaginated from '@/components/comments/CommentSectionPaginated';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
+import { useBlogBySlug } from '@/hooks/useBlogs';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import LikeButton from '@/components/ui/LikeButton';
@@ -76,6 +77,7 @@ interface BlogPostDetailClientProps {
 export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClientProps) {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isAdmin } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -84,6 +86,28 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
   const blogSlug = params.blogSlug as string;
   const postSlug = params.postSlug as string;
+
+  // 블로그 정보 가져오기 (alias 리다이렉트 확인용)
+  const { data: blog } = useBlogBySlug(blogSlug);
+
+  // 301 리다이렉트 처리 (체크포인트 2: Alias 시스템)
+  // old_alias로 접속한 경우 현재 alias로 영구 리다이렉트
+  useEffect(() => {
+    if (blog && 'shouldRedirect' in blog && blog.shouldRedirect && blog.redirectTo) {
+      // SEO를 위한 301 영구 리다이렉트
+      const redirectPath = `/${blog.redirectTo}/${postSlug}${searchParams ? `?${searchParams.toString()}` : ''}`;
+
+      // @ 접두사가 있는 경우 항상 추가
+      const finalRedirectPath = blog.redirectTo.startsWith('@')
+        ? redirectPath
+        : redirectPath.replace(`/${blog.redirectTo}`, `/@${blog.redirectTo}`);
+
+      // Next.js 클라이언트 컴포넌트에서는 window.location을 사용하여 리다이렉트
+      if (typeof window !== 'undefined') {
+        window.location.replace(finalRedirectPath);
+      }
+    }
+  }, [blog, postSlug, searchParams]);
 
   // Fetch post details - initialPost가 있으면 사용, 없으면 fetch
   const { data: post, error, isError, refetch } = usePost(postSlug, {
@@ -205,37 +229,6 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
         duration: 3000,
         position: 'bottom-right',
       });
-    }
-  }, [post]);
-
-  // PDF 다운로드 핸들러 - html2canvas + jsPDF 사용 (Dynamic Import)
-  // 번들 사이즈 최적화: 클릭 시에만 라이브러리 로드 (350 KB 절약)
-  const handlePdfDownload = useCallback(async () => {
-    if (!post) return;
-
-    let toastId: string | number | undefined;
-
-    try {
-      // 진행 상태를 보여주는 toast
-      toastId = toast.loading('PDF 생성 준비 중...');
-
-      // 🚀 Dynamic Import: 첫 클릭 시에만 라이브러리 로드 (이후 캐시됨)
-      const { downloadPostAsPdf } = await import('@/utils/pdf');
-
-      const success = await downloadPostAsPdf(post.title, (status) => {
-        // 진행 상태 업데이트
-        if (toastId) {
-          toast.loading(status, { id: toastId });
-        }
-      });
-
-      if (success) {
-        toast.success('PDF 다운로드 완료!', { id: toastId });
-      } else {
-        toast.error('PDF 생성에 실패했습니다.', { id: toastId });
-      }
-    } catch (error) {
-      toast.error('PDF 생성 중 오류가 발생했습니다.', { id: toastId });
     }
   }, [post]);
 
@@ -429,7 +422,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       <article
         id="post-content"
         className={cn(
-          "max-w-5xl mx-auto px-6 py-16 overflow-x-hidden transition-all duration-500 relative",
+          "max-w-5xl mx-auto px-6 py-16 overflow-x-visible transition-all duration-500 relative",
           isDeleting && "opacity-30 blur-sm pointer-events-none scale-[0.98]"
         )}
       >
@@ -464,7 +457,6 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
           }
           onShare={handleShare}
           onCopy={handleCopyContent}
-          onPdfDownload={handlePdfDownload}
           onBookmark={handleBookmark}
           bookmarked={post.bookmarked || false}
           bookmarkPending={bookmarkMutation.isPending}

@@ -2,7 +2,7 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import { useUser } from '@/lib/auth/queries';
+import { useUser } from '@/lib/profile-queries';
 import type { Blog } from '@/types';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -15,7 +15,7 @@ const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1
  */
 
 // 쿼리 키
-export const userBlogQueryKey = ['user-blog'] as const;
+
 
 // 블로그 데이터 페칭 함수
 async function fetchUserBlog(): Promise<Blog | null> {
@@ -50,7 +50,7 @@ export function useUserBlogV2() {
     error,
     refetch,
   } = useQuery({
-    queryKey: userBlogQueryKey,
+    queryKey: ['user-blog', user?.id],
     queryFn: fetchUserBlog,
     enabled: !!user, // 사용자가 있을 때만 실행
     staleTime: 5 * 60 * 1000, // 5분간 fresh
@@ -100,7 +100,7 @@ export function useUserBlogV2() {
 
 // 블로그 정보 무효화 함수 (외부에서 사용)
 export function invalidateUserBlog(queryClient: any) {
-  queryClient.invalidateQueries({ queryKey: userBlogQueryKey });
+  queryClient.invalidateQueries({ queryKey: ['user-blog'] });
 }
 
 // window.dispatchEvent 대체 - TanStack Query invalidation 사용

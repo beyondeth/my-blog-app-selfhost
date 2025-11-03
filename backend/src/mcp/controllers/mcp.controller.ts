@@ -152,7 +152,7 @@ export class McpController {
         blog: {
           id: mcpApiKey.blog.id,
           name: mcpApiKey.blog.name,
-          slug: mcpApiKey.blog.slug,
+          slug: mcpApiKey.blog.alias || mcpApiKey.blog.slug, // Phase 2: alias 우선 표시
         },
       },
     };

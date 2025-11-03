@@ -8,12 +8,14 @@ import { UsersModule } from '../users/users.module';
 import { PostsModule } from '../posts/posts.module';
 import { CacheModule } from '../cache/cache.module';
 import { MetricsModule } from '../metrics/metrics.module';
+import { CommonModule } from '../common/common.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([Comment, CommentLike]),
     UsersModule,
     PostsModule,
+    CommonModule, // 공통 서비스 모듈 추가
     CacheModule,
     MetricsModule,
   ],

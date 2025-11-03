@@ -215,21 +215,32 @@ export class FilesController {
 
   @Get('proxy/*')
   @Public()
-  @ApiOperation({ summary: '이미지 프록시 - S3 파일로 리다이렉트 (UUID 기반)' })
-  @ApiResponse({ 
-    status: 302, 
+  @ApiOperation({
+    summary: '이미지 프록시 - S3 파일로 리다이렉트 (UUID 기반) - DEPRECATED',
+    description: '⚠️ 이 엔드포인트는 곧 제거될 예정입니다. 직접 CDN URL을 사용하세요 (https://cdn.codebase.blog/...)'
+  })
+  @ApiResponse({
+    status: 302,
     description: 'S3 파일로 리다이렉트',
   })
-  @ApiResponse({ 
-    status: 404, 
+  @ApiResponse({
+    status: 404,
     description: '파일을 찾을 수 없음',
   })
   async proxyImage(@Param('0') fileKey: string, @Res() res: Response, @Req() req: Request) {
+    // ⚠️ DEPRECATION WARNING: 프록시 엔드포인트 사용 로그 추적
+    const referer = req.headers.referer || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+    this.logger.warn(
+      `🚨 [DEPRECATED] Proxy endpoint accessed. File: ${fileKey}, ` +
+      `Referer: ${referer}, UA: ${userAgent.substring(0, 100)}`
+    );
+
     try {
       // UUID 기반 S3 키 처리
       let processedFileKey = fileKey;
-      
-      this.logger.log(`🔍 [PROXY] Raw fileKey from URL: ${fileKey}`);
+
+      this.logger.debug(`🔍 [PROXY] Raw fileKey from URL: ${fileKey}`);
       
       // URL 디코딩 (UUID는 일반적으로 ASCII이므로 간단한 처리)
       try {
@@ -350,29 +361,41 @@ export class FilesController {
    * 파일 경로에 따라 적절한 Cache-Control 헤더 반환
    * Cloudflare CDN 최적화: 용도별 차등 TTL 적용
    *
+   * 최적화된 캐시 전략:
+   * - 프로필 이미지: 1년 (변경 시 캐시 무효화로 관리)
+   * - 블로그 브랜딩: 1년 (거의 변경 없음)
+   * - 포스트 콘텐츠: 30일 (안정성 우선)
+   * - 기타 파일: 7일 (합리적인 타협)
+   *
    * @param fileKey - S3 파일 키
    * @returns Cache-Control 헤더 문자열
    */
   private getCacheControlHeader(fileKey: string): string {
-    // 프로필 이미지 (자주 변경됨): 24시간
+    // 프로필 이미지: 1년 (변경 시 CDN 캐시 무횡화로 관리)
     if (fileKey.includes('/profile/avatar/') || fileKey.includes('/profile/cover/')) {
-      return 'public, max-age=86400, s-maxage=86400, immutable';
+      return 'public, max-age=31536000, s-maxage=31536000, immutable';
     }
 
-    // 블로그 브랜딩 (거의 안 변경됨): 30일
+    // 블로그 브랜딩: 1년 (거의 변경 없음)
     if (fileKey.includes('/branding/logo/') ||
         fileKey.includes('/branding/banner/') ||
         fileKey.includes('/branding/favicon/')) {
+      return 'public, max-age=31536000, s-maxage=31536000, immutable';
+    }
+
+    // 포스트 이미지: 30일 (안정성 우선, 변경 시 캐시 무효화)
+    if (fileKey.includes('/posts/') || fileKey.includes('/content/')) {
       return 'public, max-age=2592000, s-maxage=2592000, immutable';
     }
 
-    // 포스트 이미지 (거의 안 변경됨): 7일
-    if (fileKey.includes('/posts/') || fileKey.includes('/content/')) {
-      return 'public, max-age=604800, s-maxage=604800, immutable';
+    // v2/ 경로의 프로필 이미지도 1년으로 처리
+    if (fileKey.startsWith('v2/') &&
+        (fileKey.includes('profile') || fileKey.includes('avatar'))) {
+      return 'public, max-age=31536000, s-maxage=31536000, immutable';
     }
 
-    // 기타 파일 (기본값): 1시간
-    return 'public, max-age=3600, s-maxage=3600, immutable';
+    // 기타 파일: 7일 (합리적인 타협)
+    return 'public, max-age=604800, s-maxage=604800, immutable';
   }
 
   // test/s3-connection, test/s3-files, test/db-files 등 테스트/디버깅 엔드포인트 삭제 또는 주석 처리

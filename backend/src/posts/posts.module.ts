@@ -1,14 +1,17 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { BullModule } from '@nestjs/bullmq';
 import { PostsService } from './posts.service';
 import { PostsController } from './posts.controller';
 import { Post } from './entities/post.entity';
+import { PostStats } from './entities/post-stats.entity';
+import { PostMetadata } from './entities/post-metadata.entity';
 import { File } from '../files/entities/file.entity';
 import { FileContext } from '../files/entities/file-context.entity';
 import { Blog } from '../blogs/entities/blog.entity';
 import { UsersModule } from '../users/users.module';
 import { FilesModule } from '../files/files.module';
+import { BlogsModule } from '../blogs/blogs.module';
 // TagsModule removed - using JSONB tags
 import { MonitoringModule } from '../monitoring/monitoring.module';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
@@ -19,6 +22,12 @@ import { CacheModule } from '../cache/cache.module';
 import { BookmarksModule } from '../bookmarks/bookmarks.module';
 import { RedisModule } from '../redis/redis.module';
 import { MetricsModule } from '../metrics/metrics.module';
+import { CommonModule } from '../common/common.module';
+import { EventsModule } from '../common/events/events.module';
+import { BlogStatsService } from '../common/services/blog-stats.service';
+
+// Event Handlers
+import { BlogStatsHandler } from './handlers/blog-stats.handler';
 
 // Queue System
 import { LikeQueueService } from './services/like-queue.service';
@@ -30,7 +39,8 @@ export const LIKE_QUEUE_NAME = 'post-likes';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Post, File, FileContext, Blog]),
+    // Phase 1-2-3 리팩토링: PostStats, PostMetadata 엔티티 추가
+    TypeOrmModule.forFeature([Post, PostStats, PostMetadata, File, FileContext, Blog]),
     // Like Queue (기존)
     BullModule.registerQueue({
       name: LIKE_QUEUE_NAME,
@@ -66,6 +76,8 @@ export const LIKE_QUEUE_NAME = 'post-likes';
     }),
     UsersModule,
     FilesModule,
+    CommonModule, // 공통 서비스 모듈 추가
+    EventsModule, // 이벤트 시스템 모듈 추가
     MonitoringModule,  // No more forwardRef needed
     ContentProcessingModule, // 콘텐츠 처리 모듈 추가
     CacheModule, // Redis 캐시 모듈 추가
@@ -81,8 +93,10 @@ export const LIKE_QUEUE_NAME = 'post-likes';
     LikeQueueService, // 좋아요 큐 서비스
     LikeBatchWorker, // 좋아요 배치 워커
     PostProcessingProcessor, // 포스트 처리 배치 워커 (Fast Path 최적화용)
+    BlogStatsService, // 블로그 통계 서비스 (PostsModule로 이동)
+    BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
   ],
   controllers: [PostsController],
-  exports: [PostsService, ViewCountService, SearchIndexingService, LikeQueueService],
+  exports: [PostsService, ViewCountService, SearchIndexingService, LikeQueueService, BlogStatsService],
 })
 export class PostsModule {} 

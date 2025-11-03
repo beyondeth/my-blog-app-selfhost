@@ -5,6 +5,7 @@ import { Post } from './entities/post.entity';
 import { Cron } from '@nestjs/schedule';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
+import { UnifiedRedisService } from '../redis/unified-redis.service';
 
 /**
  * 검색 인덱싱 배치 처리 서비스
@@ -27,6 +28,7 @@ export class SearchIndexingService {
     private postsRepository: Repository<Post>,
     @InjectRedis()
     private readonly redis: Redis,
+    private readonly unifiedRedisService: UnifiedRedisService,
   ) {}
 
   /**
@@ -110,7 +112,7 @@ export class SearchIndexingService {
         createdAt: 'ASC', // 오래된 포스트부터 처리
       },
       take: limit,
-      select: ['id', 'title', 'excerpt', 'tagList'], // content 제외
+      select: ['id', 'title', 'excerpt', 'tags'], // content 제외
     });
   }
 
@@ -143,7 +145,7 @@ export class SearchIndexingService {
         "search_vector" =
           setweight(to_tsvector('simple', COALESCE(title, '')), 'A') ||
           setweight(to_tsvector('simple', COALESCE(excerpt, '')), 'B') ||
-          setweight(to_tsvector('simple', COALESCE("tagList"::text, '')), 'C'),
+          setweight(to_tsvector('simple', COALESCE("tags"::text, '')), 'C'),
         "indexed_at" = NOW()
       WHERE
         id = ANY($1::uuid[])
@@ -165,14 +167,11 @@ export class SearchIndexingService {
    */
   private async acquireLock(): Promise<boolean> {
     try {
-      const result = await this.redis.set(
-        this.LOCK_KEY,
-        process.pid.toString(),
-        'PX', // 밀리초 단위 만료
-        this.LOCK_TTL,
-        'NX' // 키가 없을 때만 설정
+      const lockAcquired = await this.unifiedRedisService.acquireLock(
+        'search-indexing',
+        this.LOCK_TTL / 1000 // 초 단위로 변환
       );
-      return result === 'OK';
+      return lockAcquired;
     } catch (error) {
       this.logger.error('락 획득 실패:', error);
       return false;
@@ -184,11 +183,7 @@ export class SearchIndexingService {
    */
   private async releaseLock(): Promise<void> {
     try {
-      // 자신이 획득한 락인지 확인 후 해제
-      const lockValue = await this.redis.get(this.LOCK_KEY);
-      if (lockValue === process.pid.toString()) {
-        await this.redis.del(this.LOCK_KEY);
-      }
+      await this.unifiedRedisService.releaseLock('search-indexing');
     } catch (error) {
       this.logger.error('락 해제 실패:', error);
     }
@@ -248,7 +243,7 @@ export class SearchIndexingService {
   async forceIndexPost(postId: string): Promise<void> {
     const post = await this.postsRepository.findOne({
       where: { id: postId },
-      select: ['id', 'title', 'excerpt', 'tagList'],
+      select: ['id', 'title', 'excerpt', 'tags'],
     });
 
     if (!post) {

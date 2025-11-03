@@ -5,7 +5,6 @@
 
 import React, { useState, useCallback } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import imageCompression from 'browser-image-compression';
 
 // 환경변수에서 설정값 가져오기
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
@@ -236,9 +235,63 @@ export function validateImageFile(file: File): { valid: boolean; error?: string 
 }
 
 /**
+ * 고유한 파일명 생성 (환경설정 기반)
+ * - USE_UUID_FILENAMES가 true면 UUID 사용
+ * - false면 원본 파일명 + 타임스탬프 사용
+ */
+export function generateUniqueFileName(originalName: string, mimeType?: string): string {
+  const extension = mimeType ? getExtensionFromMimeType(mimeType) : getFileExtension(originalName);
+  const baseName = originalName.replace(/\.[^/.]+$/, ''); // 확장자 제거
+
+  if (USE_UUID_FILENAMES) {
+    // UUID 기반 파일명
+    const uuid = generateClientUuid();
+    return extension ? `${uuid}.${extension}` : uuid;
+  } else {
+    // 타임스탬프 기반 파일명
+    const timestamp = Date.now();
+    const randomSuffix = Math.random().toString(36).substring(2, 8);
+    const sanitizedName = baseName.replace(/[^a-zA-Z0-9-_]/g, '_').substring(0, 50);
+    return `${sanitizedName}_${timestamp}_${randomSuffix}.${extension}`;
+  }
+}
+
+/**
+ * MIME 타입에서 확장자 추출
+ */
+function getExtensionFromMimeType(mimeType: string): string {
+  const mimeToExt: { [key: string]: string } = {
+    'image/jpeg': 'jpg',
+    'image/jpg': 'jpg',
+    'image/png': 'png',
+    'image/gif': 'gif',
+    'image/webp': 'webp',
+    'image/svg+xml': 'svg',
+    'application/pdf': 'pdf',
+    'text/plain': 'txt',
+  };
+  return mimeToExt[mimeType.toLowerCase()] || 'bin';
+}
+
+/**
+ * 파일명에서 확장자 추출
+ */
+function getFileExtension(filename: string): string {
+  return filename.split('.').pop()?.toLowerCase() || '';
+}
+
+/**
  * UUID 파일명 생성 (클라이언트용)
+ * - crypto.randomUUID() 사용으로 보안 강화
+ * - Math.random() 대신 예측 불가능한 UUID 생성
  */
 export function generateClientUuid(): string {
+  // 브라우저 환경에서 crypto.randomUUID() 사용 (Node.js 15.6+, 브라우저 지원)
+  if (typeof window !== 'undefined' && window.crypto && window.crypto.randomUUID) {
+    return window.crypto.randomUUID();
+  }
+
+  // fallback: 기존 로직 (보안 등급은 낮지만 호환성 유지)
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
     const r = Math.random() * 16 | 0;
     const v = c == 'x' ? r : (r & 0x3 | 0x8);

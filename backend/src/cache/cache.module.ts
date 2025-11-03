@@ -8,13 +8,14 @@ import { CacheInvalidationListener } from './cache-invalidation.listener';
 import { RedisModule } from '../redis/redis.module';
 import { MetricsModule } from '../metrics/metrics.module';
 import { Post } from '../posts/entities/post.entity';
+import { User } from '../users/entities/user.entity';
 
 @Global()
 @Module({
   imports: [
     RedisModule, // UnifiedRedisService를 사용하기 위해 RedisModule import
     MetricsModule, // CacheMetricsService를 사용하기 위해 MetricsModule import
-    TypeOrmModule.forFeature([Post]), // Post 엔티티 직접 import
+    TypeOrmModule.forFeature([Post, User]), // Post, User 엔티티 등록 (CacheWarmingService에서 사용)
   ],
   controllers: [CacheController],
   providers: [

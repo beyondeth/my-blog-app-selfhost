@@ -18,6 +18,7 @@ import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '
 import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { User } from '../../users/entities/user.entity';
+import { Profile } from '../../users/entities/profile.entity';
 import { Express } from 'express';
 import 'multer';
 import { ContextualFileService } from '../services/contextual-file.service';
@@ -45,8 +46,8 @@ export class CompleteUploadDto {
 export class FilesV2Controller {
   constructor(
     private readonly contextualFileService: ContextualFileService,
-    @InjectRepository(User)
-    private readonly userRepository: Repository<User>,
+    @InjectRepository(Profile)
+    private readonly profileRepository: Repository<Profile>,
   ) {}
 
   /**
@@ -67,12 +68,13 @@ export class FilesV2Controller {
       'avatar',
     );
 
-    // 사용자 프로필에 이미지 URL 업데이트 (Repository 직접 사용)
+    // Phase 1-2-3: Profile 테이블에 이미지 URL 업데이트
     // s3Key를 그대로 저장 (예: v2/users/xxx/profile/avatar/xxx.png)
     // 프론트엔드에서 /api/v1/files/{s3Key} 형태로 접근
-    await this.userRepository.update(user.id, {
-      profileImage: result.s3Key,
-    });
+    await this.profileRepository.update(
+      { userId: user.id },
+      { profileImage: result.s3Key },
+    );
 
     return result;
   }

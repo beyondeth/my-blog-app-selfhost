@@ -31,6 +31,8 @@ import { MonitoringModule } from './monitoring/monitoring.module';
 import { RedisModule } from './redis/redis.module';
 import { ChatModule } from './chat/chat.module';
 import { MetricsModule } from './metrics/metrics.module';
+import { CommonModule } from './common/common.module';
+import { EventsModule } from './common/events/events.module';
 // import { AnalyticsModule } from './analytics/analytics.module';
 // FUTURE: 구독제 기능 활성화 시 주석 해제
 // import { SubscriptionModule } from './subscription/subscription.module';
@@ -46,6 +48,9 @@ import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
 import { BlocksModule } from './blocks/blocks.module';
+// import { TestBlogStatsController } from './test/test-blog-stats.controller'; // Temporarily disabled due to dependency issues
+// import { SimpleTestController } from './test/simple-test.controller';
+import { MinimalTestController } from './test/minimal-test.controller';
 
 @Module({
   imports: [
@@ -113,6 +118,8 @@ import { BlocksModule } from './blocks/blocks.module';
     // Feature modules
     RedisModule, // Global Redis module for distributed state management
     CacheModule, // Global cache module with Redis support
+    CommonModule, // Common services (BlogResolverService, UnifiedRedisService)
+    EventsModule, // Event system (BlogEventEmitter)
     MonitoringModule, // Global monitoring module for suspicious requests
     MetricsModule, // Prometheus metrics module
     // FUTURE: 구독제 기능 활성화 시 주석 해제
@@ -151,6 +158,10 @@ import { BlocksModule } from './blocks/blocks.module';
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
+    // Test controllers (개발 환경에서만 사용)
+    // TestBlogStatsController, // Temporarily disabled due to dependency issues
+    // SimpleTestController,
+    MinimalTestController,
   ],
 })
 export class AppModule implements NestModule {

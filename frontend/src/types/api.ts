@@ -15,7 +15,8 @@ export interface User {
 export interface Blog {
   id: string;
   name: string;
-  slug: string;
+  slug: string; // 이메일 기반 고유 식별자 (변경 불가)
+  alias?: string; // 사용자 변경 가능 주소 (Phase 2: Alias 시스템)
   description?: string;
   userId: string;
   user?: User;

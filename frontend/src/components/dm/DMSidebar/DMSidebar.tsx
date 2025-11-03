@@ -45,12 +45,6 @@ const DMSidebar: React.FC = memo(() => {
       label: '채팅',
       onClick: () => handleViewChange('chats'),
     },
-    {
-      id: 'settings' as const,
-      icon: Settings,
-      label: '설정',
-      onClick: () => handleViewChange('settings'),
-    },
   ];
 
   return (

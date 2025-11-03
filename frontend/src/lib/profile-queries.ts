@@ -6,7 +6,7 @@
 
 import { useMutation, useQuery, useQueryClient, QueryClient } from '@tanstack/react-query';
 import type { User, LoginForm, RegisterForm } from '@/types';
-import { authEvents, emitLogin, emitLogout, emitTokenRefreshed, emitAuthError } from './events';
+import { authEvents, emitLogin, emitLogout, emitTokenRefreshed, emitAuthError } from './auth/events';
 import { mixpanel } from '@/lib/mixpanel';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -394,22 +394,45 @@ export const useLogout = () => {
 };
 
 /**
- * 사용자 정보 새로고침
+ * 인증된 사용자 정보 새로고침
+ *
+ * 프로필 이미지 변경 등 사용자 정보 업데이트 시 호출됩니다.
+ * Auth 캐시뿐만 아니라 Blog, Post 캐시도 무효화하여
+ * 모든 아바타 컴포넌트에서 즉시 반영되도록 합니다.
+ *
  * @returns 새로고침 뮤테이션 객체
  */
-export const useRefreshUser = () => {
+export const useRefreshAuthenticatedUser = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: () => apiRequest<User>('/auth/me'),
     onSuccess: (data) => {
-      // 캐시에 새 데이터 저장 (mutationFn이 이미 서버에서 최신 데이터 가져옴)
+      // 1. Auth 캐시 갱신 (즉시 반영)
       queryClient.setQueryData(authQueryKeys.user(), { ...data });
 
-      // 모든 useUser() 사용 컴포넌트에 업데이트 알림 (서버 요청 없이 리렌더링만)
+      // 2. Auth 캐시 무효화 (Header 등 useUser() 사용 컴포넌트 업데이트)
       queryClient.invalidateQueries({
         queryKey: authQueryKeys.user(),
-        refetchType: 'none'  // refetch 하지 않고 stale만 마킹하여 타이밍 이슈 방지
+        refetchType: 'none'  // 즉시 refetch 안함 (이미 setQueryData로 갱신됨)
+      });
+
+      // 3. Blog 캐시 무효화 (Blog sidebar 아바타 업데이트)
+      queryClient.invalidateQueries({
+        queryKey: ['blog'],
+        refetchType: 'active'  // 현재 활성 쿼리만 즉시 refetch (페이지에 있으면 즉시 반영)
+      });
+
+      // 4. Post 캐시 무효화 (Post 작성자 아바타 업데이트)
+      queryClient.invalidateQueries({
+        queryKey: ['posts'],
+        refetchType: 'active'  // 현재 활성 쿼리만 즉시 refetch
+      });
+
+      // 5. 무한 스크롤 Post 캐시 무효화 (홈 피드 아바타 업데이트)
+      queryClient.invalidateQueries({
+        queryKey: ['infinite-posts'],
+        refetchType: 'active'  // 현재 활성 쿼리만 즉시 refetch
       });
     },
     onError: () => {
@@ -418,6 +441,11 @@ export const useRefreshUser = () => {
     },
   });
 };
+
+/**
+ * @deprecated useRefreshUser 대신 useRefreshAuthenticatedUser를 사용하세요
+ */
+export const useRefreshUser = useRefreshAuthenticatedUser;
 
 // ==================== 헬퍼 훅 ====================
 
