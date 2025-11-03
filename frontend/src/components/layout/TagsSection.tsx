@@ -46,11 +46,7 @@ const TagsSection = React.memo(function TagsSection({ tags, onTagClick }: TagsSe
                   handleTagClick(tag);
                 }
               }}
-              className={`px-3 py-2 sm:px-2 sm:py-1 text-[15px] sm:text-[13px] cursor-pointer rounded-lg transition-colors min-h-[44px] sm:min-h-auto flex items-center border ${
-                isAITag
-                  ? 'bg-destructive/10 text-destructive hover:bg-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 border-destructive/20 dark:border-destructive/30'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-black/30 dark:text-gray-300 dark:hover:bg-black/40 dark:hover:text-gray-200 border-gray-200 dark:border-gray-700'
-              }`}
+              className="px-3 py-2 sm:px-2 sm:py-1 text-[15px] sm:text-[13px] cursor-pointer rounded-lg transition-colors min-h-[44px] sm:min-h-auto flex items-center border bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-black/30 dark:text-gray-300 dark:hover:bg-black/40 dark:hover:text-gray-200 border-gray-200 dark:border-gray-700"
               role="button"
               tabIndex={0}
               aria-label={`${tag} 태그`}

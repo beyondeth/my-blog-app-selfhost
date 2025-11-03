@@ -156,9 +156,13 @@ export class ApiClient {
    */
   private handleError(error: any): ApiError {
     const status = error.response?.status;
+    const url = error.config?.url || '';
+
+    // 409 Conflict for check-alias is an expected validation error, not a system error.
+    const isAliasCheckConflict = status === 409 && url.includes('/blogs/check-alias/');
 
     // 401, 404는 정상적인 비즈니스 로직이므로 로그 제외
-    if (status !== 401 && status !== 404) {
+    if (status !== 401 && status !== 404 && !isAliasCheckConflict) {
       apiLogger.error('API 오류', {
         url: error.config?.url,
         method: error.config?.method,

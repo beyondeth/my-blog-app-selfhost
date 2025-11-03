@@ -7,7 +7,7 @@ import { Public } from '../common/decorators/public.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
-import { PostsService } from '../posts/posts.service';
+import { BlogStatsService } from '../common/services/blog-stats.service';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('blogs')
@@ -15,7 +15,7 @@ import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 export class BlogsController {
   constructor(
     private readonly blogsService: BlogsService,
-    private readonly postsService: PostsService,
+    private readonly blogStatsService: BlogStatsService,
   ) {}
 
   @Post()
@@ -109,7 +109,7 @@ export class BlogsController {
     },
   })
   async getBlogCategories(@Param('slug') slug: string): Promise<Array<{ category: string; count: number }>> {
-    return this.postsService.getBlogCategoriesWithCount(slug);
+    return this.blogStatsService.getBlogCategoriesWithCount(slug);
   }
 
   /**

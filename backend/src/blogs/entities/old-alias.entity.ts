@@ -86,6 +86,14 @@ export class OldAlias {
   changedAt: Date;
 
   /**
+   * 리다이렉트 대상 (최신 alias)
+   * - 다중 alias 변경 시 리다이렉트 체인 관리
+   * - 예: oldAlias='luticek', redirectTo='luticek3'
+   */
+  @Column({ name: 'redirectto', length: 100, nullable: true })
+  redirectTo: string;
+
+  /**
    * 생성 시각
    * - 데이터 추적용
    */

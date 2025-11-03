@@ -229,6 +229,26 @@ const PostArticle = React.memo(function PostArticle({
                 <FiMessageCircle className="w-5 h-5" />
                 {post.commentCount || 0}
               </span>
+
+              {/* 수정/삭제 버튼 - 댓글 카운트 오른쪽에 배치 */}
+              {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
+                <>
+                  <button
+                    onClick={() => onEdit(post.id)}
+                    className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap mr-3"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={() => onDelete(post.id)}
+                    disabled={isDeleting}
+                    className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap mr-3"
+                  >
+                    {isDeleting ? '삭제중...' : '삭제'}
+                  </button>
+                </>
+              )}
+
               {post.isEditorPick && (
                 <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   <FiTarget className="w-5 h-5" />
@@ -243,25 +263,6 @@ const PostArticle = React.memo(function PostArticle({
                 />
               )}
             </div>
-
-            {/* 수정/삭제 버튼 - 오른쪽 끝에 배치 */}
-            {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => onEdit(post.id)}
-                  className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
-                >
-                  수정
-                </button>
-                <button
-                  onClick={() => onDelete(post.id)}
-                  disabled={isDeleting}
-                  className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isDeleting ? '삭제중...' : '삭제'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </article>
@@ -366,6 +367,26 @@ const PostArticle = React.memo(function PostArticle({
                 <FiMessageCircle className="w-5 h-5" />
                 {post.commentCount || 0}
               </span>
+
+              {/* 수정/삭제 버튼 - 댓글 카운트 오른쪽에 배치 */}
+              {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
+                <>
+                  <button
+                    onClick={() => onEdit(post.id)}
+                    className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap mr-3"
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={() => onDelete(post.id)}
+                    disabled={isDeleting}
+                    className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap mr-3"
+                  >
+                    {isDeleting ? '삭제중...' : '삭제'}
+                  </button>
+                </>
+              )}
+
               {post.isEditorPick && (
                 <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   <FiTarget className="w-5 h-5" />
@@ -380,25 +401,6 @@ const PostArticle = React.memo(function PostArticle({
                 />
               )}
             </div>
-
-            {/* 수정/삭제 버튼 - 오른쪽 끝에 배치 */}
-            {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
-              <div className="flex items-center gap-2 sm:gap-3">
-                <button
-                  onClick={() => onEdit(post.id)}
-                  className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap"
-                >
-                  수정
-                </button>
-                <button
-                  onClick={() => onDelete(post.id)}
-                  disabled={isDeleting}
-                  className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap"
-                >
-                  {isDeleting ? '삭제중...' : '삭제'}
-                </button>
-              </div>
-            )}
           </div>
         </div>
         

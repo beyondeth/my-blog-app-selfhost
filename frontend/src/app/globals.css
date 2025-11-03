@@ -6,6 +6,41 @@
 /* TipTap Simple Editor 스타일 */
 @import '../styles/_variables.scss';
 @import '../styles/_keyframe-animations.scss';
+@import '../styles/elevated-editor.css';
+
+/* Sonner 토스트 겹침 방지 */
+[data-sonner-toaster] {
+  --width: 360px;
+}
+
+[data-sonner-toast] {
+  z-index: 999999 !important;
+}
+
+[data-sonner-toast]:nth-child(2) {
+  transform: translateY(60px) !important;
+}
+
+[data-sonner-toast]:nth-child(3) {
+  transform: translateY(120px) !important;
+}
+
+/* 토스트 텍스트 색상 강제 지정 */
+[data-sonner-toast] [data-description] {
+  color: #374151 !important; /* 다크 모드에서도 보이는 회색 */
+}
+
+.dark [data-sonner-toast] [data-description] {
+  color: #d1d5db !important; /* 라이트 모드에서도 보이는 회색 */
+}
+
+[data-sonner-toast] [data-title] {
+  color: #111827 !important; /* 다크 모드에서도 보이는 검은색 */
+}
+
+.dark [data-sonner-toast] [data-title] {
+  color: #f9fafb !important; /* 라이트 모드에서도 보이는 흰색 */
+}
 
 @tailwind base;
 @tailwind components;
@@ -55,7 +90,7 @@
 
 /* 테마 전환 시 border transition 비활성화 - border 깜빡임 방지 */
 * {
-  transition-property: background-color, color, fill, stroke, opacity, box-shadow, transform !important;
+  transition-property: background-color, color, fill, stroke, opacity, box-shadow !important;
 }
 
 /* floating-ui 기반 tooltip은 transform transition 제외 - 위치 계산 중 애니메이션 방지 */

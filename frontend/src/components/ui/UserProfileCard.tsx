@@ -6,6 +6,7 @@ import FollowButton from '../FollowButton';
 import { DMButton } from '../dm/DMButton';
 import UserAvatar from './UserAvatar';
 import { User, FollowInfo } from '@/types/api';
+import { getBlogLinkFromUser } from '@/lib/utils/blogUrl';
 
 interface UserProfileCardProps {
   user: Partial<User> & {
@@ -34,7 +35,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
     <div className="flex flex-col gap-5 p-6 max-w-sm">
       {/* Header with avatar and follow button */}
       <div className="flex items-start justify-between gap-4">
-        <Link href={user.blog ? `/${user.blog.slug}` : '#'} className="group">
+        <Link href={getBlogLinkFromUser(user)} className="group">
           <UserAvatar
             profileImage={user.profileImage}
             username={user.username}
@@ -62,7 +63,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
       {/* Name and stats */}
       <div className="-mt-2">
         <Link
-          href={user.blog ? `/${user.blog.slug}` : '#'}
+          href={getBlogLinkFromUser(user)}
           className="group block"
         >
           <h3 className="text-xl font-bold text-gray-900 dark:text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors duration-200 mb-2">

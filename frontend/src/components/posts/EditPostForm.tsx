@@ -22,22 +22,8 @@ import { Save, Plus } from 'lucide-react';
 import type { FileUpload } from '@/types';
 import { useUserCategories } from '@/hooks/usePosts';
 import { toast } from 'sonner';
-
-// Dynamic import for editor - 초기 로딩 속도 개선 (976 KB 청크 제거)
-const BlogSimpleEditor = dynamic(
-  () => import('@/editor').then(mod => ({ default: mod.BlogSimpleEditor })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-[400px] border rounded-lg bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-gray-900 dark:border-gray-600 dark:border-t-gray-100 mx-auto" />
-          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">에디터 로딩 중...</p>
-        </div>
-      </div>
-    )
-  }
-);
+import "@/styles/elevated-editor.css"; // elevated surface 스타일
+import { BlogSimpleEditor } from '@/editor'; // 정적 import로 변경하여 flushSync 문제 해결
 
 // 폼 스키마 정의
 const postFormSchema = z.object({
@@ -158,12 +144,12 @@ export default function EditPostForm({
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto px-3 py-6">
       {/* 폼 */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <Card className="border-0 shadow-none bg-transparent">
-            <CardContent className="space-y-4 pt-16">
+            <CardContent className="space-y-4 pt-16 px-4">
               {/* 제목 */}
               <FormField
                 control={form.control}
@@ -615,7 +601,13 @@ export default function EditPostForm({
                             </div>
                           )}
 
-                          <div className="h-[500px]">
+                          <div
+                            className="transition-shadow duration-300 transform translateZ(0)"
+                            data-ui-effect="elevated-surface"
+                            data-elevation="floating-editor"
+                            data-focus-mode="writing"
+                            style={{ height: '750px' }}
+                          >
                             <BlogSimpleEditor
                               content={field.value}
                               onChange={field.onChange}

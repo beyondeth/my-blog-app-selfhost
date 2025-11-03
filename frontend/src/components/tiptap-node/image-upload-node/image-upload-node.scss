@@ -32,6 +32,9 @@
 
 .tiptap-image-upload {
   margin: 2rem 0;
+  max-width: 500px; /* 드롭존 최대 너비 제한 */
+  margin-left: auto;
+  margin-right: auto;
 
   input[type="file"] {
     display: none;

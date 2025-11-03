@@ -234,7 +234,7 @@ export function formatFileSize(bytes: number): string {
 }
 
 /**
- * CDN URL 생성 (Cloudflare 준비)
+ * CDN URL 생성 (Cloudflare 직접 연동)
  */
 export function getCDNUrl(s3Key: string, options?: {
   width?: number;
@@ -242,21 +242,34 @@ export function getCDNUrl(s3Key: string, options?: {
   quality?: number;
   format?: 'auto' | 'webp' | 'avif' | 'json';
 }): string {
-  // 기본 URL (현재는 프록시 사용)
-  const baseUrl = process.env.NEXT_PUBLIC_CDN_URL || '/api/v1/files/proxy';
-  
-  // Cloudflare Image Resizing 파라미터 준비
+  // CDN 도메인 직접 사용 (백엔드 프록시 우회)
+  const CDN_DOMAIN = process.env.NEXT_PUBLIC_CDN_DOMAIN || 'cdn.codebase.blog';
+
+  // S3 키 정리
+  let cleanKey = s3Key;
+  if (!cleanKey.startsWith('uploads/') && !cleanKey.startsWith('v2/')) {
+    cleanKey = `uploads/${cleanKey}`;
+  }
+
+  // 기본 CDN URL
+  let url = `https://${CDN_DOMAIN}/${cleanKey}`;
+
+  // Cloudflare Image Resizing 파라미터 추가 (향후 확장용)
   // https://developers.cloudflare.com/images/image-resizing/url-format/
-  const params = new URLSearchParams();
-  
-  if (options?.width) params.append('w', options.width.toString());
-  if (options?.height) params.append('h', options.height.toString());
-  if (options?.quality) params.append('q', options.quality.toString());
-  if (options?.format) params.append('f', options.format);
-  
-  const queryString = params.toString();
-  const url = `${baseUrl}/${s3Key}${queryString ? `?${queryString}` : ''}`;
-  
+  if (options && (options.width || options.height || options.quality || options.format)) {
+    const params = new URLSearchParams();
+
+    if (options.width) params.append('width', options.width.toString());
+    if (options.height) params.append('height', options.height.toString());
+    if (options.quality) params.append('quality', options.quality.toString());
+    if (options.format) params.append('format', options.format);
+
+    const queryString = params.toString();
+    if (queryString) {
+      url += `?${queryString}`;
+    }
+  }
+
   return url;
 }
 

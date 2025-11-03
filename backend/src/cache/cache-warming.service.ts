@@ -50,13 +50,30 @@ export class CacheWarmingService {
   ) {}
 
   /**
-   * 우선순위 HIGH: 매 10분마다 워밍
+   * 우선순위 HIGH: 트래픽에 따라 적응형 워밍
+   * - 심야 시간(2-6시): 30분마다
+   * - 그 외 시간: 15분마다
    * - 홈 피드 1-3페이지
    * - 인기 포스트 (daily, weekly, monthly)
    * - 에디터스 픽
    */
-  @Cron('0 */10 * * * *')
-  async warmHighPriorityData() {
+  @Cron('0 */30 2-6 * * *')
+  async warmHighPriorityNight() {
+    await this.performHighPriorityWarming('NIGHT');
+  }
+
+  @Cron('0 */15 * * * *')
+  async warmHighPriorityDay() {
+    // 심야 시간(2-6시)에는 실행하지 않음
+    const hour = new Date().getHours();
+    if (hour >= 2 && hour < 6) {
+      this.logger.debug('⏭️ Skipping day warming during night hours');
+      return;
+    }
+    await this.performHighPriorityWarming('DAY');
+  }
+
+  private async performHighPriorityWarming(period: 'NIGHT' | 'DAY'): Promise<void> {
     if (!this.canStartWarming()) return;
 
     this.isWarming = true;
@@ -64,7 +81,7 @@ export class CacheWarmingService {
     const startTime = Date.now();
 
     try {
-      this.logger.log('🔥 [HIGH] Starting high-priority cache warming...');
+      this.logger.log(`🔥 [HIGH-${period}] Starting high-priority cache warming...`);
 
       // 병렬로 워밍 (독립적인 작업들)
       await Promise.all([
@@ -74,35 +91,52 @@ export class CacheWarmingService {
       ]);
 
       const duration = Date.now() - startTime;
-      this.logger.log(`✅ [HIGH] Cache warming completed in ${duration}ms`);
+      this.logger.log(`✅ [HIGH-${period}] Cache warming completed in ${duration}ms`);
     } catch (error) {
-      this.logger.error('❌ [HIGH] Cache warming failed:', error);
+      this.logger.error(`❌ [HIGH-${period}] Cache warming failed:`, error);
     } finally {
       this.isWarming = false;
     }
   }
 
   /**
-   * 우선순위 MEDIUM: 매 30분마다 워밍
+   * 우선순위 MEDIUM: 적응형 워밍
+   * - 심야 시간(2-6시): 1시간마다
+   * - 그 외 시간: 30분마다
    * - 인기 태그 TOP 20
    * - 카테고리별 인기 포스트
    */
+  @Cron('0 2-6/1 * * *')
+  async warmMediumPriorityNight() {
+    await this.performMediumPriorityWarming('NIGHT');
+  }
+
   @Cron('0 */30 * * * *')
-  async warmMediumPriorityData() {
+  async warmMediumPriorityDay() {
+    // 심야 시간에는 실행하지 않음
+    const hour = new Date().getHours();
+    if (hour >= 2 && hour < 6) {
+      this.logger.debug('⏭️ Skipping medium warming during night hours');
+      return;
+    }
+    await this.performMediumPriorityWarming('DAY');
+  }
+
+  private async performMediumPriorityWarming(period: 'NIGHT' | 'DAY'): Promise<void> {
     if (!this.canStartWarming()) return;
 
     this.isWarming = true;
     try {
-      this.logger.log('🔥 [MEDIUM] Starting medium-priority cache warming...');
+      this.logger.log(`🔥 [MEDIUM-${period}] Starting medium-priority cache warming...`);
 
       await Promise.all([
         this.warmPopularTags(),
         this.warmTrendingCategories(),
       ]);
 
-      this.logger.log('✅ [MEDIUM] Cache warming completed');
+      this.logger.log(`✅ [MEDIUM-${period}] Cache warming completed`);
     } catch (error) {
-      this.logger.error('❌ [MEDIUM] Cache warming failed:', error);
+      this.logger.error(`❌ [MEDIUM-${period}] Cache warming failed:`, error);
     } finally {
       this.isWarming = false;
     }
@@ -157,7 +191,7 @@ export class CacheWarmingService {
           'post.viewCount',
           'post.likeCount',
           'post.commentCount',
-          'post.tagList',
+          'post.tags',
           'post.category',
         ])
         .addSelect(['author.id', 'author.username'])
@@ -307,11 +341,11 @@ export class CacheWarmingService {
     // JSONB 배열 풀어서 집계
     const tags = await this.postRepository
       .createQueryBuilder('post')
-      .select('jsonb_array_elements_text(post.tagList)', 'tag')
+      .select('jsonb_array_elements_text(post.tags)', 'tag')
       .addSelect('COUNT(*)', 'count')
       .where('post.isPublished = true')
       .andWhere('post.status = :status', { status: 'published' })
-      .andWhere('jsonb_array_length(post.tagList) > 0')
+      .andWhere('jsonb_array_length(post.tags) > 0')
       .groupBy('tag')
       .orderBy('count', 'DESC')
       .limit(limit)
@@ -463,7 +497,7 @@ export class CacheWarmingService {
   ): Promise<void> {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        await this.warmHighPriorityData();
+        await this.performHighPriorityWarming('DAY');
         this.logger.log(
           `✅ Cache warming succeeded on attempt ${attempt}`,
         );

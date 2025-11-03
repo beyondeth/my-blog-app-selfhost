@@ -23,7 +23,7 @@ import { Post } from './post.entity';
  *
  * **SEO 최적화:**
  * - excerpt: 검색 결과 스니펫용 요약
- * - tagList: 콘텐츠 분류 및 관련 포스트 추천
+ * - tags: 콘텐츠 분류 및 관련 포스트 추천
  * - category: 카테고리별 필터링
  * - searchVector: PostgreSQL 전문 검색 (tsvector)
  *
@@ -76,7 +76,7 @@ export class PostMetadata {
    * - 예: ["TypeScript", "NestJS", "PostgreSQL"]
    */
   @Column('jsonb', { default: [] })
-  tagList: string[];
+  tags: string[];
 
   /**
    * 카테고리
@@ -158,7 +158,7 @@ export class PostMetadata {
 
   /**
    * 전문 검색 벡터 (PostgreSQL tsvector)
-   * - title + content + tagList의 텍스트를 벡터화
+   * - title + content + tags의 텍스트를 벡터화
    * - GIN 인덱스 적용으로 빠른 전문 검색
    * - select: false → 기본 조회에서 제외 (성능 최적화)
    *
@@ -256,9 +256,9 @@ export class PostMetadata {
    * - 최대 10개까지만 허용
    */
   addTag(tag: string): boolean {
-    if (this.tagList.length >= 10) return false;
-    if (this.tagList.includes(tag)) return false;
-    this.tagList.push(tag);
+    if (this.tags.length >= 10) return false;
+    if (this.tags.includes(tag)) return false;
+    this.tags.push(tag);
     return true;
   }
 
@@ -266,9 +266,9 @@ export class PostMetadata {
    * 태그 제거
    */
   removeTag(tag: string): boolean {
-    const index = this.tagList.indexOf(tag);
+    const index = this.tags.indexOf(tag);
     if (index === -1) return false;
-    this.tagList.splice(index, 1);
+    this.tags.splice(index, 1);
     return true;
   }
 
@@ -303,7 +303,7 @@ export class PostMetadata {
     return {
       id: this.id,
       excerpt: this.excerpt,
-      tagList: this.tagList,
+      tags: this.tags,
       category: this.category,
       content_type: this.content_type,
       publishedAt: this.publishedAt,

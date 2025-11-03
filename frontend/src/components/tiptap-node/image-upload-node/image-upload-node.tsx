@@ -5,6 +5,7 @@ import type { NodeViewProps } from "@tiptap/react"
 import { NodeViewWrapper } from "@tiptap/react"
 import { Button } from "@/components/tiptap-ui-primitive/button"
 import { CloseIcon } from "@/components/tiptap-icons/close-icon"
+import { toast } from "sonner"
 import "@/components/tiptap-node/image-upload-node/image-upload-node.scss"
 import { focusNextNode, isValidPosition } from "@/lib/tiptap-utils"
 
@@ -88,8 +89,9 @@ function useFileUpload(options: UploadOptions) {
   const uploadFile = async (file: File): Promise<string | null> => {
     if (file.size > options.maxSize) {
       const error = new Error(
-        `File size exceeds maximum allowed (${options.maxSize / 1024 / 1024}MB)`
+        `이미지는 1개당 최대 ${options.maxSize / 1024 / 1024}MB까지 업로드 가능합니다`
       )
+      toast.error(error.message)
       options.onError?.(error)
       return null
     }
@@ -148,6 +150,8 @@ function useFileUpload(options: UploadOptions) {
               : item
           )
         )
+        const errorMessage = error instanceof Error ? error.message : "업로드에 실패했습니다"
+        toast.error(errorMessage)
         options.onError?.(
           error instanceof Error ? error : new Error("Upload failed")
         )
@@ -158,16 +162,18 @@ function useFileUpload(options: UploadOptions) {
 
   const uploadFiles = async (files: File[]): Promise<string[]> => {
     if (!files || files.length === 0) {
-      options.onError?.(new Error("No files to upload"))
+      const error = new Error("업로드할 파일이 없습니다")
+      toast.error(error.message)
+      options.onError?.(error)
       return []
     }
 
     if (options.limit && files.length > options.limit) {
-      options.onError?.(
-        new Error(
-          `Maximum ${options.limit} file${options.limit === 1 ? "" : "s"} allowed`
-        )
+      const error = new Error(
+        `최대 ${options.limit}개의 이미지를 업로드할 수 있습니다`
       )
+      toast.error(error.message)
+      options.onError?.(error)
       return []
     }
 
@@ -426,7 +432,7 @@ const DropZoneContent: React.FC<{ maxSize: number; limit: number }> = ({
         <em>클릭하여 업로드</em> 또는 드래그 앤 드롭
       </span>
       <span className="tiptap-image-upload-subtext">
-        최대 {limit}개 파일, 각 {maxSize / 1024 / 1024}MB
+        이미지 {limit}개까지 업로드 가능 (1개당 {maxSize / 1024 / 1024}MB)
       </span>
     </div>
   </>
@@ -448,6 +454,14 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
 
   const { fileItems, uploadFiles, removeFileItem, clearAllFiles } =
     useFileUpload(uploadOptions)
+
+  // 업로드창 닫기 핸들러
+  const handleRemoveUploadNode = () => {
+    const pos = props.getPos()
+    if (pos !== undefined) {
+      props.editor.commands.deleteRange({ from: pos, to: pos + props.node.nodeSize })
+    }
+  }
 
   const handleUpload = async (files: File[]) => {
     const urls = await uploadFiles(files)
@@ -523,35 +537,65 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
       onClick={handleClick}
     >
       {!hasFiles && (
-        <ImageUploadDragArea onFile={handleUpload}>
-          <DropZoneContent maxSize={maxSize} limit={limit} />
-        </ImageUploadDragArea>
+        <div className="relative">
+          {/* 닫기 버튼 */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleRemoveUploadNode()
+            }}
+            className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-white dark:bg-gray-800 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="닫기"
+          >
+            <CloseIcon className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+          </button>
+
+          <ImageUploadDragArea onFile={handleUpload}>
+            <DropZoneContent maxSize={maxSize} limit={limit} />
+          </ImageUploadDragArea>
+        </div>
       )}
 
       {hasFiles && (
-        <div className="tiptap-image-upload-previews">
-          {fileItems.length > 1 && (
-            <div className="tiptap-image-upload-header">
-              <span>{fileItems.length}개 파일 업로드 중</span>
-              <Button
-                type="button"
-                data-style="ghost"
-                onClick={(e) => {
-                  e.stopPropagation()
-                  clearAllFiles()
-                }}
-              >
-                전체 삭제
-              </Button>
-            </div>
-          )}
-          {fileItems.map((fileItem) => (
-            <ImageUploadPreview
-              key={fileItem.id}
-              fileItem={fileItem}
-              onRemove={() => removeFileItem(fileItem.id)}
-            />
-          ))}
+        <div className="relative">
+          {/* 닫기 버튼 */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              handleRemoveUploadNode()
+            }}
+            className="absolute -top-2 -right-2 z-10 w-6 h-6 bg-white dark:bg-gray-800 rounded-full border border-gray-300 dark:border-gray-600 flex items-center justify-center hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            title="닫기"
+          >
+            <CloseIcon className="w-3 h-3 text-gray-600 dark:text-gray-400" />
+          </button>
+
+          <div className="tiptap-image-upload-previews">
+            {fileItems.length > 1 && (
+              <div className="tiptap-image-upload-header">
+                <span>{fileItems.length}개 파일 업로드 중</span>
+                <Button
+                  type="button"
+                  data-style="ghost"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    clearAllFiles()
+                  }}
+                >
+                  전체 삭제
+                </Button>
+              </div>
+            )}
+            {fileItems.map((fileItem) => (
+              <ImageUploadPreview
+                key={fileItem.id}
+                fileItem={fileItem}
+                onRemove={() => removeFileItem(fileItem.id)}
+              />
+            ))}
+          </div>
         </div>
       )}
 

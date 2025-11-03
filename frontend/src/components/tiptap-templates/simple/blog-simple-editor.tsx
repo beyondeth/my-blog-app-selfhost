@@ -63,7 +63,6 @@ import {
 import { MarkButton } from "@/components/tiptap-ui/mark-button"
 import { TextAlignButton } from "@/components/tiptap-ui/text-align-button"
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
-import { YoutubeButton } from "@/components/tiptap-ui/youtube-button"
 
 // --- Icons ---
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
@@ -75,8 +74,6 @@ import { useIsMobile } from "@/hooks/use-mobile"
 import { useWindowSize } from "@/hooks/use-window-size"
 import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
 
-// --- Components ---
-import { ThemeToggle } from "@/components/tiptap-templates/simple/theme-toggle"
 
 // --- Styles ---
 import "@/components/tiptap-templates/simple/simple-editor.scss"
@@ -150,17 +147,11 @@ const MainToolbarContent = ({
 
       <ToolbarGroup>
         <ImageUploadButton text="Add" />
-        <YoutubeButton />
       </ToolbarGroup>
 
       <Spacer />
 
-      {isMobile && <ToolbarSeparator />}
-
-      <ToolbarGroup>
-        <ThemeToggle />
-      </ToolbarGroup>
-    </>
+      </>
   )
 }
 
@@ -250,10 +241,10 @@ export function BlogSimpleEditor({
     abortSignal?: AbortSignal
   ): Promise<string> => {
     try {
-      // 파일 크기 체크 (5MB)
+      // 파일 크기 체크 (5MB) - 프론트엔드에서 사전 검증
       const MAX_FILE_SIZE = 5 * 1024 * 1024
       if (file.size > MAX_FILE_SIZE) {
-        throw new Error(`파일 크기가 최대 허용 크기(${MAX_FILE_SIZE / (1024 * 1024)}MB)를 초과했습니다`)
+        throw new Error(`이미지는 1개당 최대 ${MAX_FILE_SIZE / (1024 * 1024)}MB까지 업로드 가능합니다`)
       }
 
       // S3 업로드
@@ -337,11 +328,14 @@ export function BlogSimpleEditor({
         type: "mediumImage",  // MediumStyleImage extension과 매칭
         accept: "image/*",
         maxSize: 5 * 1024 * 1024,
-        limit: 3,
+        limit: 10,  // 최대 10개 이미지
         upload: handleImageUpload,
         onError: (error) => {
-          console.error("Upload failed:", error)
-          toast.error('이미지 업로드 실패')
+          // 개발 환경에서만 콘솔 에러 표시
+          if (process.env.NODE_ENV === 'development') {
+            console.error("Upload failed:", error)
+          }
+          // 에러 메시지는 이미 ImageUploadNode에서 표시했으므로 중복 표시 안 함
         },
       }),
     ],
@@ -388,9 +382,19 @@ export function BlogSimpleEditor({
     }
   }, [isMobile, mobileView])
 
+  const [isMounted, setIsMounted] = useState(false)
+
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+
+  if (!editor) {
+    return null
+  }
+
   return (
-    <div className="simple-editor-wrapper">
-      <EditorContext.Provider value={{ editor }}>
+    <EditorContext.Provider value={{ editor }}>
+      <div className="simple-editor-wrapper">
         <Toolbar
           ref={toolbarRef}
           style={{
@@ -415,12 +419,14 @@ export function BlogSimpleEditor({
           )}
         </Toolbar>
 
-        <EditorContent
-          editor={editor}
-          role="presentation"
-          className="simple-editor-content"
-        />
-      </EditorContext.Provider>
-    </div>
+        {isMounted && (
+          <EditorContent
+            editor={editor}
+            role="presentation"
+            className="simple-editor-content"
+          />
+        )}
+      </div>
+    </EditorContext.Provider>
   )
 }

@@ -24,6 +24,7 @@ import { cn } from '@/lib/utils';
 // ============================================
 const IMAGE_SIZE_CONFIG = {
   SMALL: 300,
+  MEDIUM: 500,
   DEFAULT: 680,
   FULL: 1000,
 } as const;
@@ -58,7 +59,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
   const imageId = node.attrs['data-image-id'] || '';
 
   // 사용 가능한 크기 옵션 계산
-  // 원본 이미지 크기에 따라 1~3개 옵션 제공
+  // 원본 이미지 크기에 따라 2~4개 옵션 제공
   const availableSizes = useMemo((): ImageSize[] => {
     if (!isImageLoaded || naturalWidth === 0) {
       return ['default']; // 로딩 중엔 기본값만
@@ -67,12 +68,15 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
     if (naturalWidth < IMAGE_SIZE_CONFIG.SMALL) {
       // 300px 미만: Small만
       return ['small'];
+    } else if (naturalWidth < IMAGE_SIZE_CONFIG.MEDIUM) {
+      // 300px ~ 500px: Small, Medium
+      return ['small', 'medium'];
     } else if (naturalWidth < IMAGE_SIZE_CONFIG.DEFAULT) {
-      // 300px ~ 680px: Small, Default
-      return ['small', 'default'];
+      // 500px ~ 680px: Small, Medium, Default
+      return ['small', 'medium', 'default'];
     } else {
       // 680px 이상: 전체 옵션
-      return ['small', 'default', 'full'];
+      return ['small', 'medium', 'default', 'full'];
     }
   }, [naturalWidth, isImageLoaded]);
 
@@ -167,7 +171,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       draggable={true}
       data-drag-handle
     >
-      {/* 이미지 툴바 (선택 시 표시) */}
+      {/* 이미지 툴바 (선택 시 표시) - 이미지 위에 위치 */}
       {selected && isImageLoaded && (
         <ImageToolbar
           currentSize={node.attrs.size}
@@ -204,7 +208,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       {/* Caption 입력 */}
       <input
         type="text"
-        placeholder="Type caption for image (optional)"
+        placeholder="이미지 캡션 (optional)"
         value={node.attrs.caption || ''}
         onChange={handleCaptionChange}
         onKeyDown={handleCaptionKeyDown}

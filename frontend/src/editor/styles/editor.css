@@ -56,6 +56,12 @@
   height: auto !important;
 }
 
+.medium-image-medium {
+  width: 500px !important;
+  max-width: 100% !important;
+  height: auto !important;
+}
+
 .medium-image-default {
   width: 680px !important;
   max-width: 100% !important;
@@ -313,6 +319,7 @@
 /* Medium 이미지 반응형 처리 */
 @media (max-width: 640px) {
   .medium-image-small,
+  .medium-image-medium,
   .medium-image-default,
   .medium-image-full {
     width: 100%;

@@ -86,6 +86,12 @@ export interface Blog {
   readonly postCount?: number;
   readonly isPublic?: boolean;
   readonly allowComments?: boolean;
+  // 팔로우 정보 (백엔드에서 동적으로 추가)
+  readonly followInfo?: {
+    followersCount: number;
+    followingCount: number;
+    isFollowedByUser: boolean;
+  };
 }
 
 // 게시글 관련 타입

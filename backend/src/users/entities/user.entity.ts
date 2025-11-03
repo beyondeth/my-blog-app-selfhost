@@ -12,6 +12,7 @@ import {
 } from 'typeorm';
 import { Exclude } from 'class-transformer';
 import * as bcrypt from 'bcryptjs';
+import { v7 as uuidv7 } from 'uuid';
 import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { CommentLike } from '../../comments/entities/comment-like.entity';
@@ -64,11 +65,23 @@ export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
 export class User {
   /**
    * 기본 키
-   * - UUID v4 (기존 사용자 호환성)
-   * - 신규 사용자는 애플리케이션 레벨에서 UUID v7 생성 가능 (향후 마이그레이션)
+   * - UUID v7 (시간 순서 정렬 지원)
+   * - K-정렬 가능: 시간 순서대로 정렬 시 데이터베이스 성능 향상
    */
   @PrimaryGeneratedColumn('uuid')
   id: string;
+
+  /**
+   * UUID v7 생성 (BeforeInsert 훅)
+   * - 시간 기반 UUID 생성으로 삽입 순서 보장
+   * - 인덱스 성능 향상 및 분산 환경에서의 충돌 최소화
+   */
+  @BeforeInsert()
+  generateUuidV7() {
+    if (!this.id) {
+      this.id = uuidv7();
+    }
+  }
 
   /**
    * 이메일 (고유)
@@ -365,7 +378,7 @@ export class User {
 
       // Profile 데이터 (join 시에만 포함)
       name: this.profile?.name || null,
-      profileImage: this.profile?.profileImage || null,
+      profileImage: this.profileImage || this.profile?.profileImage || null,
       bio: this.profile?.bio || null,
       lastLoginProvider: this.profile?.lastLoginProvider || null,
       accountSecurityLevel: this.profile?.accountSecurityLevel || 'basic',
@@ -382,6 +395,11 @@ export class User {
       newsletterOptIn: this.accountSettings?.newsletterOptIn || false,
 
       // Blog 데이터
+      blog: this.blog ? {
+        id: this.blog.id,
+        slug: this.blog.slug,
+        alias: this.blog.alias,
+      } : null,
       blogSlug: this.blog?.slug || null,
     };
   }

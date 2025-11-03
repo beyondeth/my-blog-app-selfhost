@@ -54,7 +54,7 @@ import { RedisModule } from '../redis/redis.module';
   controllers: [
     AdminDashboardController,
     AdminUsersController,
-    AdminFilesController,
+    // AdminFilesController, // Temporarily disabled due to S3 configuration issues
     AdminDebugController,
   ],
   providers: [

@@ -19,7 +19,8 @@ export interface GetPostsParams {
   limit?: number;
   search?: string;
   category?: string;
-  blogSlug?: string;
+  blogSlug?: string;  // 블로그 alias (@alias 형식)
+  blogId?: string;    // 블로그 UUID
 }
 
 /**

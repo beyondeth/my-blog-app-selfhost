@@ -477,7 +477,7 @@ export default function BlogSettingsPage() {
                       const value = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
                       setNewAlias(value);
                     }}
-                    placeholder="park"
+                    placeholder="영문, 숫자 조합"
                     maxLength={30}
                     className="w-full pl-8 pr-10 py-2 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
                   />
@@ -496,24 +496,27 @@ export default function BlogSettingsPage() {
                 </div>
 
                 {/* 실시간 피드백 */}
-                {newAlias.length > 0 && newAlias.length < 3 && (
-                  <div className="flex items-start text-xs text-gray-500 dark:text-gray-400">
-                    <FiAlertCircle className="mr-1 mt-0.5 flex-shrink-0" />
-                    <span>최소 3자 이상 입력해주세요</span>
-                  </div>
-                )}
-                {newAlias.length >= 3 && !isCheckingAlias && aliasCheck?.available && (
-                  <div className="flex items-start text-xs text-green-600 dark:text-green-400">
-                    <FiCheck className="mr-1 mt-0.5 flex-shrink-0" />
-                    <span>사용 가능한 주소입니다</span>
-                  </div>
-                )}
-                {newAlias.length >= 3 && !isCheckingAlias && aliasCheckError && (
-                  <div className="flex items-start text-xs text-red-600 dark:text-red-400">
-                    <FiX className="mr-1 mt-0.5 flex-shrink-0" />
-                    <span>이미 사용 중이거나 예약된 주소입니다</span>
-                  </div>
-                )}
+                <div className="min-h-[20px] mt-1 text-xs">
+                  {aliasCheckError ? (
+                    <div className="flex items-start text-red-600 dark:text-red-400">
+                      <FiX className="mr-1 mt-0.5 flex-shrink-0" />
+                      <span>{(aliasCheckError as any)?.message || '사용할 수 없는 주소입니다.'}</span>
+                    </div>
+                  ) : newAlias.length >= 3 && aliasCheck?.available ? (
+                    <div className="flex items-center text-green-600 dark:text-green-400">
+                      <FiCheck className="mr-1 flex-shrink-0" />
+                      <span>사용 가능한 주소입니다</span>
+                      {isCheckingAlias && (
+                        <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin ml-2" />
+                      )}
+                    </div>
+                  ) : newAlias.length > 0 && newAlias.length < 3 ? (
+                    <div className="flex items-start text-gray-500 dark:text-gray-400">
+                      <FiAlertCircle className="mr-1 mt-0.5 flex-shrink-0" />
+                      <span>최소 3자 이상 입력해주세요</span>
+                    </div>
+                  ) : null}
+                </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400">
                   3-30자, 영문 소문자/숫자/하이픈/언더스코어만 사용 가능
                 </p>
