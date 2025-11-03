@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from 'react';
 import { useSSEConnection } from './useSSEConnection';
-import { useSocket } from './useSocket';
 import { useDMStore } from '@/stores/dmStore';
 import { useAuth } from '@/providers/AuthProviderV2';
-import toast from 'react-hot-toast';
+
+const IS_DEV = process.env.NODE_ENV === 'development';
 
 interface NotificationData {
   type: 'new-message' | 'user-typing' | 'user-online' | 'user-offline';
@@ -13,64 +13,64 @@ interface NotificationData {
 }
 
 /**
- * Hook for managing DM notifications via SSE
- * Automatically connects/disconnects based on DM modal state
- * Handles WebSocket reconnection when messages arrive
+ * Hook for managing DM notifications via SSE (Production-Safe)
+ *
+ * @param enabled - SSE 연결 활성화 여부 (default: true)
+ *
+ * 개선 사항:
+ * 1. enabled 파라미터로 조건부 연결 제어
+ * 2. DM 모달이 열렸을 때만 SSE 연결
+ * 3. Toast 스팸 제거
+ * 4. 에러 로깅 환경별 분리
  */
-export const useDMNotifications = () => {
-  const socket = useSocket();
+export const useDMNotifications = (enabled: boolean = true) => {
   const { isDMModalOpen, activeConversationId } = useDMStore();
   const { user } = useAuth();
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
   const handleSSEMessage = useCallback((data: NotificationData) => {
-    console.log('[DM SSE] Received notification:', data);
+    if (IS_DEV) {
+      console.log('[DM SSE] Received notification:', data);
+    }
 
     switch (data.type) {
       case 'new-message':
         // New message arrived while DM is open
-        if (isDMModalOpen) {
-          // Check if WebSocket is disconnected
-          if (!socket?.connected) {
-            console.log('[DM SSE] WebSocket disconnected, attempting reconnection...');
-            socket?.connect();
-          }
-
-          // Show notification if message is for different conversation
-          if (data.conversationId && data.conversationId !== activeConversationId) {
-            toast('New message received', {
-              icon: '💬',
-              duration: 3000
-            });
-          }
-        }
+        // Socket 재연결은 useSocket에서 자동으로 처리함
+        // Toast 스팸 제거 (사용자 방해 금지)
         break;
 
       case 'user-typing':
-        // Handle typing indicator via SSE if WebSocket is down
-        if (isDMModalOpen && !socket?.connected) {
-          // Could update typing state here if needed
-        }
+        // Typing indicator - UI 업데이트만
         break;
 
       case 'user-online':
       case 'user-offline':
-        // Handle user presence changes
-        console.log(`[DM SSE] User ${data.userId} is ${data.type === 'user-online' ? 'online' : 'offline'}`);
+        // User presence changes
+        if (IS_DEV) {
+          console.log(`[DM SSE] User ${data.userId} is ${data.type === 'user-online' ? 'online' : 'offline'}`);
+        }
         break;
 
       default:
-        console.log('[DM SSE] Unknown notification type:', data.type);
+        if (IS_DEV) {
+          console.log('[DM SSE] Unknown notification type:', data.type);
+        }
     }
-  }, [socket, isDMModalOpen, activeConversationId]);
+  }, []);
 
   const handleSSEError = useCallback((error: Event) => {
-    console.error('[DM SSE] Connection error:', error);
+    // 프로덕션: 조용히 실패
+    if (IS_DEV) {
+      console.error('[DM SSE] Connection error:', error);
+    }
     // SSE will auto-reconnect, no need for manual intervention
   }, []);
 
   const handleSSEOpen = useCallback(() => {
-    console.log('[DM SSE] Connection established');
+    if (IS_DEV) {
+      console.log('[DM SSE] Connection established');
+    }
   }, []);
 
   // Initialize SSE connection
@@ -79,16 +79,25 @@ export const useDMNotifications = () => {
     onMessage: handleSSEMessage,
     onError: handleSSEError,
     onOpen: handleSSEOpen,
-    reconnectDelay: 3000
+    reconnectDelay: 5000 // 3초 → 5초 (conservative)
   });
 
-  // Manage SSE connection based on DM modal state and user authentication
+  /**
+   * SSE 연결 관리 (조건부)
+   *
+   * enabled && isDMModalOpen && user: 연결
+   * 그 외: 연결 해제
+   */
   useEffect(() => {
-    if (isDMModalOpen && user) {
-      console.log('[DM SSE] DM Modal opened, connecting SSE...');
+    if (enabled && isDMModalOpen && user) {
+      if (IS_DEV) {
+        console.log('[DM SSE] Connecting...');
+      }
       connect();
     } else {
-      console.log('[DM SSE] DM Modal closed or user not authenticated, disconnecting SSE...');
+      if (IS_DEV && (isDMModalOpen || user)) {
+        console.log('[DM SSE] Disconnecting...');
+      }
       disconnect();
     }
 
@@ -96,22 +105,7 @@ export const useDMNotifications = () => {
     return () => {
       disconnect();
     };
-  }, [isDMModalOpen, user, connect, disconnect]);
-
-  // Check WebSocket status periodically when DM is open
-  useEffect(() => {
-    if (!isDMModalOpen || !socket) return;
-
-    const checkInterval = setInterval(() => {
-      if (!socket.connected && isConnected()) {
-        console.log('[DM SSE] WebSocket disconnected but SSE active, considering reconnection...');
-        // Don't auto-reconnect WebSocket here, wait for actual message
-        // This prevents unnecessary reconnection attempts
-      }
-    }, 30000); // Check every 30 seconds
-
-    return () => clearInterval(checkInterval);
-  }, [isDMModalOpen, socket, isConnected]);
+  }, [enabled, isDMModalOpen, user, connect, disconnect]);
 
   return {
     isSSEConnected: isConnected

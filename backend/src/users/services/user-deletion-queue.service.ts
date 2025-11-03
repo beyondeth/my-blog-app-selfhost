@@ -4,6 +4,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import Redis from 'ioredis';
 import { UserDeletionLog } from '../entities/user-deletion-log.entity';
+import { UnifiedRedisService } from '../../redis/unified-redis.service';
 
 /**
  * 사용자 삭제 큐 서비스
@@ -35,6 +36,7 @@ export class UserDeletionQueueService {
     @InjectRedis() private readonly redis: Redis,
     @InjectRepository(UserDeletionLog)
     private readonly deletionLogRepository: Repository<UserDeletionLog>,
+    private readonly unifiedRedisService: UnifiedRedisService,
   ) {}
 
   /**
@@ -77,10 +79,10 @@ export class UserDeletionQueueService {
         jobs.push(job);
 
         // 처리 중 목록에 추가 (타임아웃 감지용)
-        await this.redis.setex(
+        await this.unifiedRedisService.setWithExpiry(
           `${this.PROCESSING_KEY}:${job.id}`,
-          3600, // 1시간 타임아웃
           data,
+          3600, // 1시간 타임아웃
         );
       } catch (error) {
         this.logger.error('Failed to parse deletion job:', error);
@@ -95,7 +97,7 @@ export class UserDeletionQueueService {
    * 작업 완료 처리
    */
   async markJobComplete(jobId: string): Promise<void> {
-    await this.redis.del(`${this.PROCESSING_KEY}:${jobId}`);
+    await this.unifiedRedisService.del(`${this.PROCESSING_KEY}:${jobId}`);
     await this.redis.hincrby(this.METRICS_KEY, 'totalProcessed', 1);
     this.logger.log(`Job completed: ${jobId}`);
   }
@@ -112,13 +114,13 @@ export class UserDeletionQueueService {
     // 재시도 횟수 초과 시 DLQ로 이동
     if (job.retryCount >= this.MAX_RETRIES) {
       await this.moveToDLQ(job, error);
-      await this.redis.del(`${this.PROCESSING_KEY}:${job.id}`);
+      await this.unifiedRedisService.del(`${this.PROCESSING_KEY}:${job.id}`);
       return;
     }
 
     // 재시도 (지수 백오프)
     const backoffSeconds = Math.pow(2, job.retryCount) * 60; // 2^n 분
-    await this.redis.del(`${this.PROCESSING_KEY}:${job.id}`);
+    await this.unifiedRedisService.del(`${this.PROCESSING_KEY}:${job.id}`);
 
     // 지연된 재시도를 위해 일정 시간 후 다시 큐에 추가
     setTimeout(async () => {
@@ -227,7 +229,7 @@ export class UserDeletionQueueService {
 
       // TTL이 10분 미만이면 타임아웃 임박
       if (ttl < 600 && ttl > 0) {
-        const data = await this.redis.get(key);
+        const data = await this.unifiedRedisService.get(key);
         if (data) {
           try {
             const job: DeletionJob = JSON.parse(data);

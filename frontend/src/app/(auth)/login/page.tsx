@@ -368,10 +368,17 @@ function LoginPageContent() {
 
 /**
  * 로그인 페이지 (Suspense 래퍼)
+ *
+ * Next.js 16: fallback={null}은 하이드레이션 에러 발생
+ * → 최소한의 로딩 상태를 제공해야 함
  */
 export default function LoginPage() {
   return (
-    <Suspense fallback={null}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
+        <div className="animate-spin h-8 w-8 border-4 border-indigo-600 border-t-transparent rounded-full" />
+      </div>
+    }>
       <LoginPageContent />
     </Suspense>
   );

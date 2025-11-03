@@ -11,6 +11,7 @@ import { useReport } from '@/hooks/useReport';
 import { useBlock } from '@/hooks/useBlock';
 import ReportDialog from '@/components/reports/ReportDialog';
 import BlockConfirmDialog from '@/components/blocks/BlockConfirmDialog';
+import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 
 interface ChatHeaderProps {
   otherUser?: User | null;
@@ -141,18 +142,20 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
 
         {/* User info */}
         <div className="flex items-center gap-3 relative" ref={actionsRef}>
-          <button
-            onClick={handleAvatarClick}
-            className="p-0 border-0 bg-transparent cursor-pointer rounded-full hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-blue-500"
-            type="button"
-          >
-            <Avatar
-              src={otherUser?.profileImage}
-              fallback={otherUser?.username?.[0]?.toUpperCase() || '?'}
-              size="md"
-              className={`ring-2 ring-white ${isLoading ? 'animate-pulse' : ''}`}
-            />
-          </button>
+          {/* 프로필 이미지 - 블로그 링크로 이동 */}
+          {otherUser && (
+            <UserLinkWithTooltip
+              userId={otherUser.id}
+              username={otherUser.username || ''}
+            >
+              <Avatar
+                src={otherUser?.profileImage}
+                fallback={otherUser?.username?.[0]?.toUpperCase() || '?'}
+                size="md"
+                className={`ring-2 ring-white ${isLoading ? 'animate-pulse' : ''}`}
+              />
+            </UserLinkWithTooltip>
+          )}
 
           <div>
             <h2 className="font-semibold text-gray-900">
@@ -186,24 +189,41 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
         </div>
       </div>
 
-      {/* 나가기 버튼 */}
-      <button
-        onClick={handleLeaveClick}
-        className="
-          px-4
-          py-2
-          rounded-lg
-          bg-gray-100
-          text-gray-700
-          hover:bg-gray-200
-          transition-colors
-          text-sm
-          font-medium
-          min-h-[44px]
-        "
-      >
-        나가기
-      </button>
+      {/* 오른쪽 버튼들 */}
+      <div className="flex items-center gap-3">
+        {/* 더보기 버튼 (kebab) */}
+        <button
+          onClick={handleAvatarClick}
+          className="p-1 border-0 bg-transparent cursor-pointer rounded-lg hover:bg-gray-100 transition-colors"
+          type="button"
+          aria-label="더보기"
+        >
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-gray-600">
+            <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
+            <circle cx="12" cy="12" r="1.5" fill="currentColor"/>
+            <circle cx="12" cy="19" r="1.5" fill="currentColor"/>
+          </svg>
+        </button>
+
+        {/* 나가기 버튼 */}
+        <button
+          onClick={handleLeaveClick}
+          className="
+            px-4
+            py-2
+            rounded-lg
+            bg-gray-100
+            text-gray-700
+            hover:bg-gray-200
+            transition-colors
+            text-sm
+            font-medium
+            min-h-[44px]
+          "
+        >
+          나가기
+        </button>
+      </div>
 
       {/* Leave Confirmation Modal */}
       <ConfirmModal

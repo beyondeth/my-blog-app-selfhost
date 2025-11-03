@@ -20,6 +20,7 @@ import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from '../entities/post.entity';
+import { PostMetadata } from '../entities/post-metadata.entity';
 import { File } from '../../files/entities/file.entity';
 import { FileContext, FileContextType, FilePurpose } from '../../files/entities/file-context.entity';
 import { MarkdownRendererService } from '../../common/services/markdown-renderer.service';
@@ -40,6 +41,8 @@ export class PostProcessingProcessor extends WorkerHost {
   constructor(
     @InjectRepository(Post)
     private readonly postRepository: Repository<Post>,
+    @InjectRepository(PostMetadata)
+    private readonly postMetadataRepository: Repository<PostMetadata>,
     @InjectRepository(File)
     private readonly fileRepository: Repository<File>,
     @InjectRepository(FileContext)
@@ -113,19 +116,34 @@ export class PostProcessingProcessor extends WorkerHost {
       // 5. File link 처리 (S3 key 추출 및 FileContext 업데이트)
       await this.processFileLinks(postId, userId, blogId, processedContent);
 
-      // 6. Post 업데이트 (status: 'published', content, excerpt)
+      // 6. Post 및 PostMetadata 업데이트
       // 참고: search_vector는 search-indexing.service.ts의 배치 처리가 담당 (30분마다)
+
+      // 6-1. Post 테이블 업데이트 (호환성 유지)
       await this.postRepository
         .createQueryBuilder()
         .update(Post)
         .set({
           content: processedContent,
-          excerpt: excerpt, // 실제 content 기반 excerpt로 업데이트
+          excerpt: excerpt, // 호환성 유지
           status: 'published',
           processingCompletedAt: new Date(),
           processingError: null,
         })
         .where('id = :id', { id: postId })
+        .execute();
+
+      // 6-2. PostMetadata 테이블 업데이트 (Phase 1-2-3 리팩토링)
+      await this.postMetadataRepository
+        .createQueryBuilder()
+        .update(PostMetadata)
+        .set({
+          excerpt: excerpt, // 실제 content 기반 excerpt로 업데이트
+          content_rendered_at: new Date(), // HTML 렌더링 완료 시각
+          processingCompletedAt: new Date(),
+          processingError: null,
+        })
+        .where('postId = :postId', { postId })
         .execute();
 
       const processingTime = Date.now() - startTime;
@@ -145,10 +163,20 @@ export class PostProcessingProcessor extends WorkerHost {
 
       // Post status를 'failed'로 업데이트 (최대 재시도 횟수 초과 시에만)
       if (job.attemptsMade + 1 >= job.opts.attempts) {
+        // Post 테이블 업데이트
         await this.postRepository.update(
           { id: postId },
           {
             status: 'failed',
+            processingError: error.message,
+            processingCompletedAt: new Date(),
+          },
+        );
+
+        // PostMetadata 테이블 업데이트 (Phase 1-2-3 리팩토링)
+        await this.postMetadataRepository.update(
+          { postId },
+          {
             processingError: error.message,
             processingCompletedAt: new Date(),
           },

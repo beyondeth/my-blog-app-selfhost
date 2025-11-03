@@ -201,7 +201,7 @@ export default function BookmarksPage() {
                         </h2>
 
                         {post.excerpt && (
-                          <p className="text-muted-foreground text-sm mb-3 line-clamp-3">
+                          <p className="text-muted-foreground text-sm mb-3 line-clamp-3 min-h-[4.5rem] max-h-[4.5rem] overflow-hidden">
                             {post.excerpt}
                           </p>
                         )}

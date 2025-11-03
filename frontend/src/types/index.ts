@@ -73,7 +73,8 @@ export interface AuthContextType {
 // 블로그 관련 타입
 export interface Blog {
   readonly id: string;
-  readonly slug: string;
+  readonly slug: string; // 이메일 기반 고유 식별자 (변경 불가)
+  readonly alias?: string; // 사용자 변경 가능 주소 (Phase 2: Alias 시스템)
   readonly name: string;
   readonly description?: string;
   readonly thumbnailUrl?: string;
@@ -85,6 +86,12 @@ export interface Blog {
   readonly postCount?: number;
   readonly isPublic?: boolean;
   readonly allowComments?: boolean;
+  // 팔로우 정보 (백엔드에서 동적으로 추가)
+  readonly followInfo?: {
+    followersCount: number;
+    followingCount: number;
+    isFollowedByUser: boolean;
+  };
 }
 
 // 게시글 관련 타입

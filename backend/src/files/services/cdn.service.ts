@@ -21,6 +21,10 @@ export class CdnService {
   private readonly cloudflareZoneId: string;
   private readonly cloudflareApiToken: string;
 
+  // LRU 캐시 for CDN URLs (메모리에 1000개까지 캐시)
+  private urlCache = new Map<string, string>();
+  private readonly maxCacheSize = 1000;
+
   constructor(private configService: ConfigService) {
     // 환경변수 직접 읽기 (S3Service와 동일한 패턴)
     const cdnEnabledRaw = this.configService.get('CDN_ENABLED', 'false');
@@ -83,15 +87,42 @@ export class CdnService {
   /**
    * S3 키만으로 CDN URL 생성 (File 엔티티 없이)
    * UsersService 등에서 프로필 이미지 URL 생성 시 사용
+   * LRU 캐시 적용으로 중복 생성 방지
    */
   generateCdnUrlFromKey(s3Key: string, mimeType: string = 'image/jpeg'): string {
-    if (!this.cdnEnabled) {
-      // CDN 비활성화 시 S3 직접 URL 반환
-      return this.generateS3Url(s3Key);
+    // 캐시 키 생성 (s3Key + mimeType로 고유 키)
+    const cacheKey = `${s3Key}:${mimeType}`;
+
+    // 캐시에 있으면 반환
+    if (this.urlCache.has(cacheKey)) {
+      return this.urlCache.get(cacheKey)!;
     }
 
     // CDN URL 생성
-    return `https://${this.cdnDomain}/${s3Key}`;
+    let url: string;
+    if (!this.cdnEnabled) {
+      // CDN 비활성화 시 S3 직접 URL 반환
+      url = this.generateS3Url(s3Key);
+    } else {
+      url = `https://${this.cdnDomain}/${s3Key}`;
+    }
+
+    // LRU 캐시 관리
+    if (this.urlCache.size >= this.maxCacheSize) {
+      // 가장 오래된 항목 삭제 (Map의 순서 보장)
+      const firstKey = this.urlCache.keys().next().value;
+      this.urlCache.delete(firstKey);
+    }
+
+    // 캐시에 저장
+    this.urlCache.set(cacheKey, url);
+
+    // 디버그 로그 (1% 확률로만 남기지 않으면 로그가 너무 많아짐)
+    if (Math.random() < 0.01) {
+      this.logger.debug(`CDN URL cache size: ${this.urlCache.size}/${this.maxCacheSize}`);
+    }
+
+    return url;
   }
 
   /**
@@ -252,6 +283,16 @@ export class CdnService {
    * Private: Object Storage 직접 URL 생성 (AWS S3 또는 OCI)
    */
   private generateS3Url(key: string): string {
+    // Docker 개발 환경 감지
+    const isDockerDev = process.env.NODE_ENV === 'development' &&
+                       process.env.DOCKERIZED === 'true';
+
+    if (isDockerDev) {
+      // Docker 환경에서는 내부 네트워크 URL을 통한 파일 프록시 사용
+      const backendUrl = process.env.INTERNAL_BACKEND_URL || 'http://backend:3000';
+      return `${backendUrl}/api/v1/files/proxy/${key}`;
+    }
+
     // 환경변수 직접 읽기 (ConfigService 네임스페이스가 없을 경우 대비)
     const bucket = this.configService.get('AWS_S3_BUCKET') || this.configService.get('s3.bucket');
     const region = this.configService.get('AWS_REGION') || this.configService.get('s3.region');

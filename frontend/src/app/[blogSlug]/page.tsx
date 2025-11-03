@@ -1,13 +1,14 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { useRouter, useSearchParams, useParams } from 'next/navigation';
+import { useRouter, useSearchParams, useParams, redirect } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useBlogBySlug, useBlogCategories } from '@/hooks/useBlogs';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 import { toast } from 'sonner';
+import { useQuery } from '@tanstack/react-query';
 
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
@@ -52,6 +53,39 @@ export default function BlogPage() {
     error: blogError
   } = useBlogBySlug(blogSlug);
 
+  // URL 정규화 처리 - 항상 올바른 형태로 리다이렉트
+  useEffect(() => {
+    if (!blog || !isClient) return;
+
+    // 1. old_alias 리다이렉트 (기존 로직 유지)
+    if (blog && 'shouldRedirect' in blog && blog.shouldRedirect && blog.redirectTo) {
+      const queryString = searchParams.toString();
+      const redirectPath = `/${blog.redirectTo}${queryString ? `?${queryString}` : ''}`;
+      router.replace(redirectPath);
+      return;
+    }
+
+    // 2. URL 정규화 - 항상 alias 우선
+    if (!('shouldRedirect' in blog) || !blog.shouldRedirect) {
+      const queryString = searchParams.toString();
+
+      // alias가 있는 경우 /@alias로, 없는 경우 /slug로 이동
+      if (blog.alias) {
+        const correctPath = `/@${blog.alias}${queryString ? `?${queryString}` : ''}`;
+        // 현재 URL과 정규화된 URL이 다른 경우에만 리다이렉트
+        if (window.location.pathname !== correctPath) {
+          router.replace(correctPath);
+        }
+      } else {
+        const correctPath = `/${blog.slug}${queryString ? `?${queryString}` : ''}`;
+        // 현재 URL과 정규화된 URL이 다른 경우에만 리다이렉트
+        if (window.location.pathname !== correctPath) {
+          router.replace(correctPath);
+        }
+      }
+    }
+  }, [blog, searchParams, router, isClient]);
+
   // 블로그의 카테고리별 포스트 개수 가져오기
   const {
     data: categories = [],
@@ -83,12 +117,13 @@ export default function BlogPage() {
   } = useInfinitePosts({
     search: currentParams.search,
     category: currentParams.category,
-    blogSlug: blogSlug, // 블로그별 포스트 필터링
-    enabled: isClient && !!blog
+    blogId: blog?.id, // blogSlug 대신 안정적인 blog.id 사용
+    enabled: isClient && !!blog?.id, // blog.id가 있을 때만 쿼리 실행
   });
 
   const deletePostMutation = useDeletePost();
 
+  
   // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)
   const toggleLikeMutation = useTogglePostLike(() => {
     router.push('/login');
@@ -303,9 +338,13 @@ export default function BlogPage() {
               name={blog.owner?.username || blog.owner?.email || blog.name}
               username={blog.owner?.username}
               description={blog.owner?.bio || blog.description}
-              profileImage={blog.owner?.profileImage || blog.thumbnailUrl}
+              profileImage={
+                blog.owner?.profileImage ||
+                blog.thumbnailUrl
+              }
               userId={blog.owner?.id}
               isOwner={isBlogOwner}
+              followInfo={blog?.followInfo} // 블로그 정보에 포함된 팔로우 정보 사용
             />
 
             {/* 카테고리별 현황 섹션 */}

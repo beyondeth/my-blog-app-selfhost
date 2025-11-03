@@ -20,6 +20,7 @@ import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { ConsentDto } from './dto/consent.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { User } from '../users/entities/user.entity';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
 
@@ -596,7 +597,7 @@ export class AuthController {
   ) {
     try {
       await this.authService.resetPassword(dto.token, dto.newPassword);
-      
+
       return res.json({
         success: true,
         message: '비밀번호가 성공적으로 변경되었습니다.'
@@ -605,6 +606,48 @@ export class AuthController {
       return res.status(400).json({
         success: false,
         message: error.message || '비밀번호 재설정에 실패했습니다.'
+      });
+    }
+  }
+
+  /**
+   * 비밀번호 변경 (로그인한 사용자)
+   * 현재 비밀번호를 입력하고 새 비밀번호로 변경
+   *
+   * 보안:
+   * - JWT 인증 필수
+   * - 현재 비밀번호 검증 필수
+   * - 소셜 로그인 계정은 불가
+   */
+  @Post('change-password')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '비밀번호 변경 (로그인한 사용자)' })
+  @ApiResponse({ status: 200, description: '비밀번호 변경 성공' })
+  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @ApiResponse({ status: 401, description: '인증 실패 또는 현재 비밀번호 불일치' })
+  async changePassword(
+    @CurrentUser() user: User,
+    @Body() dto: ChangePasswordDto,
+    @Res() res: Response
+  ) {
+    try {
+      await this.authService.changePassword(
+        user.id,
+        dto.currentPassword,
+        dto.newPassword
+      );
+
+      return res.json({
+        success: true,
+        message: '비밀번호가 성공적으로 변경되었습니다.'
+      });
+    } catch (error) {
+      // 상태 코드 결정
+      const statusCode = error.status || 400;
+
+      return res.status(statusCode).json({
+        success: false,
+        message: error.message || '비밀번호 변경에 실패했습니다.'
       });
     }
   }

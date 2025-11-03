@@ -6,6 +6,8 @@ import { X, Maximize2, Minimize2, MessageCircle } from 'lucide-react';
 import { useDMStore } from '@/stores/dmStore';
 import DMLayout from './DMLayout/DMLayout';
 import { useWindowSize } from '@/hooks/useWindowSize';
+import { useSocket } from '@/hooks/useSocket';
+import { useDMNotifications } from '@/hooks/useDMNotifications';
 
 interface DMModalProps {
   isOpen: boolean;
@@ -13,6 +15,15 @@ interface DMModalProps {
   mode?: 'modal' | 'fullscreen';
 }
 
+/**
+ * DM 모달 컴포넌트
+ *
+ * Production-Safe 설계 원칙:
+ * 1. Socket/SSE 연결은 모달이 열렸을 때만 수행 (isOpen === true)
+ * 2. 모달 닫힘 → 컴포넌트 언마운트 → useEffect cleanup 자동 실행
+ * 3. cleanup에서 소켓 disconnect, 모든 리스너 제거, 타이머 정리
+ * 4. 메모리 누수 방지, 불필요한 네트워크 연결 방지
+ */
 const DMModal: React.FC<DMModalProps> = ({
   isOpen,
   onClose,
@@ -28,6 +39,17 @@ const DMModal: React.FC<DMModalProps> = ({
   const [isDragging, setIsDragging] = React.useState(false);
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
   const [skipTransition, setSkipTransition] = React.useState(false);
+
+  /**
+   * 핵심: Socket & SSE 연결 (모달이 열렸을 때만)
+   *
+   * isOpen === true: 연결 시작
+   * isOpen === false: 컴포넌트 언마운트 → useEffect cleanup 자동 실행
+   *
+   * 이 방식으로 완벽한 리소스 정리 보장
+   */
+  const socket = useSocket(isOpen);
+  const { isSSEConnected } = useDMNotifications(isOpen);
 
   // ESC key handler removed - modal should not close on ESC
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { User } from '@/types';
 import {
@@ -34,7 +35,7 @@ import {
 } from '@/components/ui/tooltip';
 
 interface ProfileDropdownProps {
-  user: User;
+  user: User | null;
   onLogout: () => void;
 }
 
@@ -43,10 +44,23 @@ export default function ProfileDropdown({
   onLogout
 }: ProfileDropdownProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const handleNavigation = (path: string) => {
     router.push(path);
   };
+
+  if (!mounted) {
+    return null;
+  }
+
+  if (!user) {
+    return <div className="w-20 h-8 bg-muted rounded animate-pulse" />;
+  }
 
   return (
     <TooltipProvider delayDuration={300}>

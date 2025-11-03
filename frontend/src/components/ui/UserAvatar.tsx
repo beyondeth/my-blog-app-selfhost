@@ -66,20 +66,35 @@ export default function UserAvatar({
       )}
     >
       {imageUrl ? (
-        <Image
-          src={imageUrl}
-          alt={username || 'User'}
-          fill
-          className="object-contain"
-          sizes={
-            size === 'xs' ? '24px' :
-            size === 'sm' ? '32px' :
-            size === 'md' ? '40px' :
-            size === 'lg' ? '64px' :
-            '80px'
-          }
-          priority={priority} // LCP 최적화: priority=true 시 즉시 로드 (lazy loading 비활성화)
-        />
+        <>
+          {/* 스켈레톤 로딩: 이미지 로드 전까지 보여줌 */}
+          <div className="absolute inset-0 bg-gray-200 animate-pulse" />
+          <Image
+            src={imageUrl}
+            alt={username || 'User'}
+            fill
+            className="object-cover"
+            sizes={
+              size === 'xs' ? '24px' :
+              size === 'sm' ? '32px' :
+              size === 'md' ? '40px' :
+              size === 'lg' ? '64px' :
+              '80px'
+            }
+            priority={priority} // LCP 최적화: priority=true 시 즉시 로드 (lazy loading 비활성화)
+            onLoad={(e) => {
+              // 이미지 로드 완료 시 스켈레톤 제거
+              const target = e.target as HTMLImageElement;
+              target.parentElement?.querySelector('.animate-pulse')?.classList.add('hidden');
+            }}
+            onError={(e) => {
+              // 에러 발생 시 스켈레톤 제거하고 기본 아바타 표시
+              const target = e.target as HTMLImageElement;
+              target.style.display = 'none';
+              target.parentElement?.querySelector('.animate-pulse')?.classList.add('hidden');
+            }}
+          />
+        </>
       ) : (
         <DefaultAvatar />
       )}
