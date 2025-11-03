@@ -1021,7 +1021,7 @@ export class ChatService {
    */
   private async invalidateUserConversationsCache(userId: string): Promise<void> {
     const cacheKey = `conversations:${userId}`;
-    await this.unifiedRedisService.delCache('chat', cacheKey);
+    await this.unifiedRedisService.deleteCache('chat', cacheKey);
     this.logger.debug(`[ChatService] Invalidated conversations cache for user: ${userId}`);
   }
 }
