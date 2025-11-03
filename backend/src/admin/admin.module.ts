@@ -20,6 +20,7 @@ import { AdminDebugController } from './debug/admin-debug.controller';
 
 // Entities
 import { User } from '../users/entities/user.entity';
+import { Profile } from '../users/entities/profile.entity';
 import { Post } from '../posts/entities/post.entity';
 import { Comment } from '../comments/entities/comment.entity';
 import { Report } from '../reports/entities/report.entity';
@@ -37,6 +38,7 @@ import { RedisModule } from '../redis/redis.module';
   imports: [
     TypeOrmModule.forFeature([
       User,
+      Profile,
       Post,
       Comment,
       Report,
@@ -52,7 +54,7 @@ import { RedisModule } from '../redis/redis.module';
   controllers: [
     AdminDashboardController,
     AdminUsersController,
-    AdminFilesController,
+    // AdminFilesController, // Temporarily disabled due to S3 configuration issues
     AdminDebugController,
   ],
   providers: [

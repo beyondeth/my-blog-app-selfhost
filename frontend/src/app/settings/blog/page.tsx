@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
+import { useCheckAlias, useUpdateAlias } from '@/hooks/useBlogs';
 import { useRouter } from 'next/navigation';
-import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiSettings, FiCopy } from 'react-icons/fi';
+import { FiGlobe, FiLock, FiMessageSquare, FiLink, FiCalendar, FiSettings, FiCopy, FiCheck, FiX, FiAlertCircle } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Blog } from '@/types';
@@ -26,6 +27,38 @@ export default function BlogSettingsPage() {
     isPublic: true,
     allowComments: true,
   });
+
+  // Alias 관련 state (체크포인트 2)
+  const [newAlias, setNewAlias] = useState('');
+  const [debouncedAlias, setDebouncedAlias] = useState('');
+  const [aliasCheckEnabled, setAliasCheckEnabled] = useState(false);
+
+  // Alias 변경 mutation
+  const { mutate: updateAlias, isPending: isUpdatingAlias } = useUpdateAlias();
+
+  // Alias 중복 확인 (debounced)
+  const { data: aliasCheck, isLoading: isCheckingAlias, error: aliasCheckError } = useCheckAlias(
+    debouncedAlias,
+    aliasCheckEnabled
+  );
+
+  // Alias 입력 debounce 처리 (500ms)
+  useEffect(() => {
+    if (newAlias && newAlias.length >= 3) {
+      const timer = setTimeout(() => {
+        setDebouncedAlias(newAlias);
+        setAliasCheckEnabled(true);
+      }, 500);
+
+      return () => {
+        clearTimeout(timer);
+        setAliasCheckEnabled(false);
+      };
+    } else {
+      setDebouncedAlias('');
+      setAliasCheckEnabled(false);
+    }
+  }, [newAlias]);
 
   useEffect(() => {
     if (blog) {
@@ -123,6 +156,45 @@ export default function BlogSettingsPage() {
       setDescriptionLoading(false);
     }
   };
+
+  /**
+   * Alias 변경 핸들러 (체크포인트 2)
+   *
+   * @description
+   * 사용자가 새로운 alias를 입력하고 저장 버튼을 클릭하면 호출됩니다.
+   * - 형식 검증 (3-30자, 영문/숫자/하이픈/언더스코어)
+   * - 중복 확인 필수
+   * - 성공 시 블로그 캐시 갱신 및 페이지 새로고침
+   */
+  const handleAliasUpdate = useCallback(() => {
+    if (!newAlias || newAlias.length < 3) {
+      setError('주소는 최소 3자 이상이어야 합니다.');
+      return;
+    }
+
+    if (!/^[a-zA-Z0-9_-]{3,30}$/.test(newAlias)) {
+      setError('주소는 영문, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능합니다.');
+      return;
+    }
+
+    if (!aliasCheck?.available) {
+      setError('사용할 수 없는 주소입니다. 다른 주소를 입력해주세요.');
+      return;
+    }
+
+    updateAlias(newAlias, {
+      onSuccess: () => {
+        // 성공 시 블로그 정보 갱신 및 입력 필드 초기화
+        refreshBlog();
+        setNewAlias('');
+        setDebouncedAlias('');
+        setAliasCheckEnabled(false);
+      },
+      onError: (err: any) => {
+        setError(err.message || 'Alias 변경에 실패했습니다.');
+      }
+    });
+  }, [newAlias, aliasCheck, updateAlias, refreshBlog]);
 
   /**
    * 블로그 공개 설정 변경 핸들러
@@ -342,18 +414,18 @@ export default function BlogSettingsPage() {
                 <div className="min-w-0 flex-1">
                   <span className="text-gray-600 dark:text-gray-400 block sm:inline">전체 URL:</span>
                   <a
-                    href={`/${blog?.slug}`}
+                    href={`/${blog?.alias || blog?.slug}`}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="ml-0 sm:ml-2 text-gray-700 dark:text-gray-300 hover:text-black dark:hover:text-gray-100 break-all block sm:inline"
                   >
-                    {window.location.origin}/{blog?.slug}
+                    {window.location.origin}/{blog?.alias || blog?.slug}
                 </a>
               </div>
               </div>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/${blog?.slug}`);
+                  navigator.clipboard.writeText(`${window.location.origin}/${blog?.alias || blog?.slug}`);
                   setCopied(true);
                   setTimeout(() => setCopied(false), 2000);
                 }}
@@ -366,6 +438,106 @@ export default function BlogSettingsPage() {
                   <FiCopy className="w-4 h-4" />
                 )}
               </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Blog Alias Settings (체크포인트 2) */}
+        <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
+          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">블로그 주소 설정</h3>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">
+            블로그 주소를 변경할 수 있습니다. 이전 주소는 자동으로 리다이렉트됩니다. (SEO 보호)
+          </p>
+
+          <div className="space-y-4">
+            {/* 현재 주소 */}
+            <div className="flex items-center text-sm p-3 bg-gray-50 dark:bg-gray-800/50 rounded-md">
+              <FiLink className="mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" />
+              <span className="text-gray-600 dark:text-gray-400">현재 주소:</span>
+              <span className="ml-2 text-gray-900 dark:text-gray-100 font-medium">
+                @{blog?.alias || blog?.slug}
+              </span>
+            </div>
+
+            {/* 새 주소 입력 */}
+            <div>
+              <label htmlFor="newAlias" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                새로운 주소
+              </label>
+              <div className="flex flex-col gap-2">
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                    <span className="text-gray-500 dark:text-gray-400 text-sm">@</span>
+                  </div>
+                  <input
+                    type="text"
+                    id="newAlias"
+                    value={newAlias}
+                    onChange={(e) => {
+                      const value = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
+                      setNewAlias(value);
+                    }}
+                    placeholder="영문, 숫자 조합"
+                    maxLength={30}
+                    className="w-full pl-8 pr-10 py-2 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
+                  />
+                  {/* 검증 아이콘 */}
+                  {newAlias.length >= 3 && (
+                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                      {isCheckingAlias ? (
+                        <div className="w-4 h-4 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+                      ) : aliasCheck?.available ? (
+                        <FiCheck className="w-5 h-5 text-green-500" />
+                      ) : aliasCheckError ? (
+                        <FiX className="w-5 h-5 text-red-500" />
+                      ) : null}
+                    </div>
+                  )}
+                </div>
+
+                {/* 실시간 피드백 */}
+                <div className="min-h-[20px] mt-1 text-xs">
+                  {aliasCheckError ? (
+                    <div className="flex items-start text-red-600 dark:text-red-400">
+                      <FiX className="mr-1 mt-0.5 flex-shrink-0" />
+                      <span>{(aliasCheckError as any)?.message || '사용할 수 없는 주소입니다.'}</span>
+                    </div>
+                  ) : newAlias.length >= 3 && aliasCheck?.available ? (
+                    <div className="flex items-center text-green-600 dark:text-green-400">
+                      <FiCheck className="mr-1 flex-shrink-0" />
+                      <span>사용 가능한 주소입니다</span>
+                      {isCheckingAlias && (
+                        <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin ml-2" />
+                      )}
+                    </div>
+                  ) : newAlias.length > 0 && newAlias.length < 3 ? (
+                    <div className="flex items-start text-gray-500 dark:text-gray-400">
+                      <FiAlertCircle className="mr-1 mt-0.5 flex-shrink-0" />
+                      <span>최소 3자 이상 입력해주세요</span>
+                    </div>
+                  ) : null}
+                </div>
+                <p className="text-xs text-gray-500 dark:text-gray-400">
+                  3-30자, 영문 소문자/숫자/하이픈/언더스코어만 사용 가능
+                </p>
+
+                {/* 저장 버튼 */}
+                <button
+                  type="button"
+                  onClick={handleAliasUpdate}
+                  disabled={isUpdatingAlias || !aliasCheck?.available || newAlias.length < 3}
+                  className="w-full sm:w-auto min-h-[44px] px-6 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+                >
+                  {isUpdatingAlias ? (
+                    <>
+                      <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      변경 중...
+                    </>
+                  ) : (
+                    '주소 변경'
+                  )}
+                </button>
+              </div>
             </div>
           </div>
         </div>

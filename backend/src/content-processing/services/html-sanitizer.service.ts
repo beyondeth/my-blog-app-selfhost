@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import * as DOMPurify from 'isomorphic-dompurify';
+import DOMPurify from 'isomorphic-dompurify';
 import * as sanitizeHtml from 'sanitize-html';
 
 /**

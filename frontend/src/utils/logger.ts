@@ -8,6 +8,15 @@ const LOG_LEVEL = process.env.NEXT_PUBLIC_LOG_LEVEL || 'error';
 const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 const IS_DEVELOPMENT = process.env.NODE_ENV === 'development';
 
+// 프로덕션 환경에서는 console 메서드가 제거될 수 있으므로 안전한 대체 함수
+const safeConsole = {
+  log: IS_PRODUCTION ? () => {} : console.log,
+  info: IS_PRODUCTION ? () => {} : console.info,
+  warn: IS_PRODUCTION ? () => {} : console.warn,
+  error: console.error, // 에러는 프로덕션에서도 유지
+  debug: IS_PRODUCTION ? () => {} : console.debug,
+};
+
 // 민감한 필드 목록 (로깅에서 제외)
 const SENSITIVE_FIELDS = [
   'password',
@@ -35,29 +44,49 @@ const SENSITIVE_URLS = [
 ];
 
 /**
- * 객체에서 민감한 정보 제거
+ * 객체에서 민감한 정보 제거 (성능 최적화)
  */
 function sanitizeData(data: any): any {
-  if (!data) return data;
-  
+  // 레벨 체크 먼저 수행하여 불필요한 처리 방지
+  if (!data || typeof data === 'number' || typeof data === 'boolean') {
+    return data;
+  }
+
   if (typeof data === 'string') {
+    // 간단한 문자열 체크 먼저
+    if (data.length > 200) {
+      return data.substring(0, 200) + '...';
+    }
     // URL에서 민감한 파라미터 제거
-    if (data.includes('token=') || data.includes('key=')) {
+    if (data.includes('token=') || data.includes('key=') || data.includes('password=')) {
       return '[REDACTED_URL]';
     }
     return data;
   }
-  
+
+  // 배열은 길이 제한
   if (Array.isArray(data)) {
+    if (data.length > 10) {
+      return [...data.slice(0, 10).map(item => sanitizeData(item)), '...(' + (data.length - 10) + ' more items)'];
+    }
     return data.map(item => sanitizeData(item));
   }
-  
+
+  // 객체는 깊이 제한하여 재귀 방지
   if (typeof data === 'object') {
     const sanitized: any = {};
-    
+    let keyCount = 0;
+
     for (const key in data) {
+      // 최대 10개 키까지만 처리
+      if (keyCount >= 10) {
+        sanitized['...'] = 'more properties';
+        break;
+      }
+      keyCount++;
+
       const lowerKey = key.toLowerCase();
-      
+
       // 민감한 필드는 제거
       if (SENSITIVE_FIELDS.some(field => lowerKey.includes(field))) {
         sanitized[key] = '[REDACTED]';
@@ -68,10 +97,10 @@ function sanitizeData(data: any): any {
         sanitized[key] = sanitizeData(data[key]);
       }
     }
-    
+
     return sanitized;
   }
-  
+
   return data;
 }
 
@@ -116,31 +145,30 @@ class SecureLogger {
 
     const timestamp = new Date().toISOString();
     const prefix = `[${timestamp}] [${this.context}] [${level.toUpperCase()}]`;
-    
-    // 민감한 데이터 제거
-    const sanitizedArgs = args.map(arg => sanitizeData(arg));
-    
-    // 콘솔 출력 (프로덕션에서는 최소화)
+
+    // 콘솔 출력 (safeConsole 사용)
     if (IS_PRODUCTION) {
       // 프로덕션: 에러만 로깅, 상세 정보 제거
       if (level === 'error') {
-        console.error(`${prefix} ${message}`);
-        // 상세 정보는 로깅하지 않음
+        safeConsole.error(`${prefix} ${message}`);
       }
     } else if (IS_DEVELOPMENT) {
       // 개발 환경: 상세 로깅 (민감 정보는 제거된 상태)
+      // 민감한 데이터 제거 (개발 환경에서만)
+      const sanitizedArgs = args.map(arg => sanitizeData(arg));
+
       switch (level) {
         case 'error':
-          console.error(`${prefix} ${message}`, ...sanitizedArgs);
+          safeConsole.error(`${prefix} ${message}`, ...sanitizedArgs);
           break;
         case 'warn':
-          console.warn(`${prefix} ${message}`, ...sanitizedArgs);
+          safeConsole.warn(`${prefix} ${message}`, ...sanitizedArgs);
           break;
         case 'info':
-          console.info(`${prefix} ${message}`, ...sanitizedArgs);
+          safeConsole.info(`${prefix} ${message}`, ...sanitizedArgs);
           break;
         case 'debug':
-          console.log(`${prefix} ${message}`, ...sanitizedArgs);
+          safeConsole.log(`${prefix} ${message}`, ...sanitizedArgs);
           break;
       }
     }
@@ -163,9 +191,14 @@ class SecureLogger {
   }
 
   /**
-   * API 요청 로깅 (보안 강화)
+   * API 요청 로깅 (최소화)
    */
-  apiRequest(method: string, url: string, data?: any): void {
+  apiRequest(method: string, url: string, data?: any, shouldLog: boolean = false): void {
+    // 기본값을 false로 변경하여 필요한 경우에만 로깅
+    if (!shouldLog) {
+      return;
+    }
+
     if (IS_PRODUCTION) {
       // 프로덕션: API 요청 로깅 안 함
       return;
@@ -181,24 +214,20 @@ class SecureLogger {
   }
 
   /**
-   * API 응답 로깅 (보안 강화)
+   * API 응답 로깅 (에러만)
    */
   apiResponse(status: number, url: string, data?: any): void {
-    if (IS_PRODUCTION) {
-      // 프로덕션: 에러 응답만 로깅
-      if (status >= 400) {
+    // 에러 응답만 로깅
+    if (status >= 400) {
+      if (IS_PRODUCTION) {
+        // 프로덕션: 최소 정보만
         this.error(`API Error: ${status} ${url}`);
+      } else {
+        // 개발: 상세 정보 포함
+        this.error(`API Error: ${status} ${url}`, sanitizeData(data));
       }
-      return;
     }
-
-    if (isSensitiveUrl(url)) {
-      // 민감한 URL은 상태 코드만
-      this.debug(`API Response: ${status} [SENSITIVE_ENDPOINT]`);
-    } else {
-      // 일반 URL은 sanitized 데이터와 함께
-      this.debug(`API Response: ${status} ${url}`, sanitizeData(data));
-    }
+    // 성공 응답은 로깅하지 않음
   }
 }
 

@@ -63,7 +63,7 @@ export class PostResponseDto {
   qualityScore: number | null;
 
   @Expose()
-  tagList: string[];
+  tags: string[];
 
   @Expose()
   category: string;
@@ -96,9 +96,6 @@ export class PostResponseDto {
   blog?: BlogResponseDto;
 
   // 프론트엔드 호환성을 위한 추가 필드
-  @Expose()
-  tags?: string[]; // tagList 별칭
-
   @Expose()
   liked?: boolean; // 사용자 좋아요 상태
 

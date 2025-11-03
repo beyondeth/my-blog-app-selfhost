@@ -62,7 +62,7 @@ export default function ProfileSettingsPage() {
 
     // 파일 크기 체크 (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('파일 크기는 5MB 이하여야 합니다');
+      setError('허용 크기를 초과했습니다 (최대 5MB)');
       return;
     }
 
@@ -341,7 +341,7 @@ export default function ProfileSettingsPage() {
                   alt="Profile"
                   fill
                   sizes="80px"
-                  className="object-contain"
+                  className="object-cover"
                   priority
                   unoptimized
                   onError={(e) => {
@@ -389,6 +389,11 @@ export default function ProfileSettingsPage() {
               <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                 JPG, PNG, GIF (최대 5MB) 또는 캐릭터 선택
               </p>
+              {error && error.includes('크기') && (
+                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+                  {error}
+                </p>
+              )}
             </div>
           </div>
         </div>
@@ -579,7 +584,7 @@ export default function ProfileSettingsPage() {
         </div>
 
         {/* Error/Success Messages */}
-        {error && (
+        {error && !error.includes('크기') && (
           <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
             {error}
           </div>

@@ -1,0 +1,102 @@
+/* Elevated Editor UI - Focus Mode Styles */
+
+/* Base Elevated Surface */
+[data-ui-effect="elevated-surface"] {
+  /* Material Design inspired elevation level 6 */
+  background: var(--bg-primary);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform: translateY(0);
+}
+
+/* Floating Editor Effect */
+[data-elevation="floating-editor"] {
+  /* Creates subtle floating effect */
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -2px rgba(0, 0, 0, 0.1),
+    /* Subtle ambient shadow for depth */
+    0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+
+[data-elevation="floating-editor"]:hover {
+  transform: translateY(-1px);
+  box-shadow:
+    0 6px 10px -3px rgba(0, 0, 0, 0.08),
+    0 3px 5px -2px rgba(0, 0, 0, 0.06),
+    /* Enhanced ambient shadow */
+    0 0 0 1px rgba(0, 0, 0, 0.02);
+}
+
+/* Focus Mode - Writing Environment */
+[data-focus-mode="writing"] {
+  /* Neutral background for better text contrast */
+  background: #ffffff;
+  color: #1a1a1a;
+}
+
+.dark [data-focus-mode="writing"] {
+  background: #0a0a0a;
+  color: #f5f5f5;
+}
+
+/* Focus Ring - When editor is active */
+[data-focus-mode="writing"]:focus-within {
+  /* Subtle focus ring without disrupting flow */
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -2px rgba(0, 0, 0, 0.1),
+    0 0 0 1px rgba(59, 130, 246, 0.1),
+    /* Inner focus ring */
+    inset 0 0 0 1px rgba(59, 130, 246, 0.05);
+}
+
+/* Glassmorphism effect for toolbar (future enhancement) */
+.elevated-editor-toolbar {
+  backdrop-filter: blur(8px);
+  background: rgba(255, 255, 255, 0.95);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.dark .elevated-editor-toolbar {
+  background: rgba(10, 10, 10, 0.95);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Depth levels for different states */
+.depth-1 { box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05); }
+.depth-2 { box-shadow: 0 2px 4px 0 rgba(0, 0, 0, 0.06); }
+.depth-3 { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.07); }
+.depth-4 { box-shadow: 0 6px 8px -2px rgba(0, 0, 0, 0.08); }
+.depth-5 { box-shadow: 0 10px 12px -3px rgba(0, 0, 0, 0.09); }
+.depth-6 { box-shadow: 0 14px 16px -4px rgba(0, 0, 0, 0.1); }
+
+/* Floating Animation */
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-1px); }
+}
+
+[data-elevation="floating-editor"].animated {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* Ambient Background Blur for focus mode */
+.focused-writing-mode {
+  position: relative;
+}
+
+.focused-writing-mode::before {
+  content: '';
+  position: absolute;
+  inset: -20px;
+  background: rgba(0, 0, 0, 0.02);
+  backdrop-filter: blur(1px);
+  border-radius: 12px;
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.focused-writing-mode.focused::before {
+  opacity: 1;
+}

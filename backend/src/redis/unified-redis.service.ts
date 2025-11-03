@@ -386,6 +386,57 @@ export class UnifiedRedisService {
   }
 
   /**
+   * 여러 키 한 번에 삭제
+   * @param keys 삭제할 키 배열
+   * @returns 삭제된 키 개수
+   */
+  async deleteMany(keys: string[]): Promise<number> {
+    if (!keys || keys.length === 0) {
+      return 0;
+    }
+
+    try {
+      // Redis는 multi-key 삭제 지원
+      const result = await this.redis.del(...keys);
+      this.logger.debug(`Deleted ${result} keys out of ${keys.length} requested`);
+      return result;
+    } catch (error) {
+      this.logger.error(`Failed to delete multiple keys`, error);
+      return 0;
+    }
+  }
+
+  /**
+   * 네임스페이스 전체 삭제
+   * @param namespace 네임스페이스 (예: 'cache:', 'blog:')
+   * @returns 삭제된 키 개수
+   */
+  async deleteNamespace(namespace: string): Promise<number> {
+    try {
+      // SCAN을 사용하여 네임스페이스에 속한 모든 키 찾기
+      const keys: string[] = [];
+      let cursor = '0';
+
+      do {
+        const result = await this.redis.scan(cursor, 'MATCH', `${namespace}*`, 'COUNT', 100);
+        cursor = result[0];
+        keys.push(...result[1]);
+      } while (cursor !== '0');
+
+      if (keys.length > 0) {
+        const deletedCount = await this.deleteMany(keys);
+        this.logger.debug(`Deleted ${deletedCount} keys from namespace: ${namespace}`);
+        return deletedCount;
+      }
+
+      return 0;
+    } catch (error) {
+      this.logger.error(`Failed to delete namespace: ${namespace}`, error);
+      return 0;
+    }
+  }
+
+  /**
    * Rate Limiting 구현
    */
   async checkRateLimit(

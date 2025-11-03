@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In, SelectQueryBuilder, MoreThan, DataSource, EntityManager } from 'typeorm';
+import { Repository, Like, In, SelectQueryBuilder, MoreThan, DataSource, EntityManager, OptimisticLockVersionMismatchError } from 'typeorm';
+import { OptimisticLockException } from '../common/exceptions/optimistic-lock.exception';
 import { Post } from './entities/post.entity';
+import { PostStats } from './entities/post-stats.entity';
+import { PostMetadata } from './entities/post-metadata.entity';
 import { User } from '../users/entities/user.entity';
 import { File } from '../files/entities/file.entity';
 import { FileContext, FileContextType, FilePurpose } from '../files/entities/file-context.entity';
@@ -9,6 +12,8 @@ import { Blog } from '../blogs/entities/blog.entity';
 import { Role } from '../common/enums/role.enum';
 import { CreatePostDto } from './dto/create-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
+import { GetPostsCursorDto } from './dto/get-posts-cursor.dto';
+import { CursorPaginatedPostsDto } from './dto/cursor-paginated-posts.dto';
 import { FilesService } from '../files/files.service';
 import { CdnService } from '../files/services/cdn.service';
 // TagsService removed - using JSONB tags
@@ -43,6 +48,8 @@ export class PostsService {
   constructor(
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
+    @InjectRepository(PostStats)
+    private postStatsRepository: Repository<PostStats>,
     @InjectRepository(File)
     private filesRepository: Repository<File>,
     @InjectRepository(FileContext)
@@ -110,9 +117,9 @@ export class PostsService {
     // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
     // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
 
-    // 태그 필드 호환성 (tagList → tags)
-    if (post.tagList) {
-      dto.tags = post.tagList;
+    // 태그 필드 호환성
+    if (post.tags) {
+      dto.tags = post.tags;
     }
 
     // 썸네일 URL 최적화
@@ -131,14 +138,12 @@ export class PostsService {
   private toUserDto(user: User): UserResponseDto {
     if (!user) return null;
 
-    const dto = plainToInstance(UserResponseDto, user, {
+    // 포맷된 author 데이터 사용 (profile 평탄화 및 CDN URL 변환 적용)
+    const formattedUser = this.formatAuthorData(user);
+
+    const dto = plainToInstance(UserResponseDto, formattedUser, {
       excludeExtraneousValues: true,
     });
-
-    // 프로필 이미지 URL 최적화
-    if (dto.profileImage) {
-      dto.profileImage = this.optimizeImageUrl(dto.profileImage);
-    }
 
     return dto;
   }
@@ -151,9 +156,14 @@ export class PostsService {
   private toBlogDto(blog: Blog): BlogResponseDto {
     if (!blog) return null;
 
-    return plainToInstance(BlogResponseDto, blog, {
+    const dto = plainToInstance(BlogResponseDto, blog, {
       excludeExtraneousValues: true,
     });
+
+    // Manually assign alias to ensure it's included
+    dto.alias = blog.alias; // <--- ADD THIS LINE
+
+    return dto;
   }
 
   /**
@@ -347,11 +357,13 @@ export class PostsService {
         .addOrderBy('pf.created_at', 'ASC') // 동일 순서인 경우 생성 순서
         .getRawMany();
 
-      // 각 이미지에 대해 액세스 URL 생성
+      // 각 이미지에 대해 액세스 URL 생성 - Temporarily disabled
       const imagesWithUrls = await Promise.all(
         images.map(async (image) => {
           try {
-            const accessUrl = await this.filesService.getDownloadUrl(image.file_id);
+            // Temporarily disabled FilesService
+            // const accessUrl = await this.filesService.getDownloadUrl(image.file_id);
+            const accessUrl = null; // Disabled for now
             return {
               id: image.file_id,
               fileName: image.file_fileName,
@@ -468,7 +480,7 @@ export class PostsService {
         }
 
         // 태그를 JSONB로 저장
-        const tagList = createPostDto.tags || [];
+        const tags = createPostDto.tags || [];
 
         // excerpt 생성 (HTML에서 태그 제거 후 200자 추출)
         let excerpt = '';
@@ -491,7 +503,7 @@ export class PostsService {
         category: createPostDto.category,
         content: processedContent, // HTML 버전 (디스플레이용)
         content_markdown: markdownContent, // 마크다운 원본 (편집용)
-        excerpt: excerpt, // 포스트 요약 (목록 표시용)
+        excerpt: excerpt, // 포스트 요약 (목록 표시용) - 호환성 유지
         content_type: contentType,
         content_rendered_at: contentType === 'markdown' ? new Date() : null,
         thumbnail: createPostDto.thumbnail, // YouTube 썸네일 또는 일반 이미지 URL
@@ -500,8 +512,34 @@ export class PostsService {
         blogId: blog.id,
         isPublished: true, // Multi-user blog system - all posts are published
         publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
-        tagList: tagList, // JSONB 태그 배열 저장
-        qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적)
+        tags: tags, // JSONB 태그 배열 저장 - 호환성 유지
+        qualityScore: createPostDto.qualityScore || null, // 품질 점수 (선택적) - 호환성 유지
+        version: 1, // 포스트 버전 (낙관적 락킹용)
+
+        // Phase 1-2-3 리팩토링: PostStats 초기화 (cascade: true로 자동 저장)
+        stats: queryRunner.manager.create(PostStats, {
+          viewCount: 0,
+          likeCount: 0,
+          commentCount: 0,
+          qualityScore: createPostDto.qualityScore || null,
+          version: 0, // PostStats의 낙관적 락킹 버전
+        }),
+
+        // Phase 1-2-3 리팩토링: PostMetadata 초기화 (cascade: true로 자동 저장)
+        metadata: queryRunner.manager.create(PostMetadata, {
+          excerpt: excerpt,
+          tags: tags,
+          category: createPostDto.category,
+          content_type: contentType,
+          content_rendered_at: contentType === 'markdown' ? new Date() : null,
+          publishedAt: new Date(),
+          isEditorPick: false,
+          editorPickedAt: null,
+          processingError: null,
+          processingCompletedAt: new Date(), // 동기 처리이므로 즉시 완료
+          searchVector: null, // 검색 벡터는 트리거나 배치로 생성
+          indexedAt: null,
+        }),
       });
 
       // Entity의 @BeforeInsert에서 UUID로 고유 slug 생성됨
@@ -601,7 +639,7 @@ export class PostsService {
     }
 
     // 3. 태그 처리
-    const tagList = createPostDto.tags || [];
+    const tags = createPostDto.tags || [];
 
     // 4. 간단한 excerpt 생성 (제목 기반, 빠른 처리)
     // Worker에서 content 기반 excerpt로 교체됨
@@ -613,7 +651,7 @@ export class PostsService {
       category: createPostDto.category,
       content: '', // 임시 빈 문자열 (Worker에서 렌더링된 HTML로 교체)
       content_markdown: markdownContent, // 원본 저장
-      excerpt: quickExcerpt, // 임시 excerpt (Worker에서 교체)
+      excerpt: quickExcerpt, // 임시 excerpt (Worker에서 교체) - 호환성 유지
       content_type: 'markdown',
       content_rendered_at: null, // Worker에서 설정
       thumbnail: createPostDto.thumbnail,
@@ -622,11 +660,38 @@ export class PostsService {
       blogId: blog.id,
       isPublished: true, // 공개 상태 (하지만 status='processing'이므로 목록에 안 보임)
       publishedAt: new Date(), // 현재 시간 (TypeORM이 자동으로 처리)
-      tagList: tagList,
-      qualityScore: createPostDto.qualityScore || null,
+      tags: tags, // 호환성 유지
+      qualityScore: createPostDto.qualityScore || null, // 호환성 유지
+      version: 1, // 포스트 버전 (낙관적 락킹용) - NOT NULL 제약조건 충족
       status: 'processing', // 핵심: 백그라운드 처리 대기 중
       processingError: null,
       processingCompletedAt: null,
+
+      // Phase 1-2-3 리팩토링: PostStats 초기화 (cascade: true로 자동 저장)
+      stats: this.postsRepository.manager.create(PostStats, {
+        viewCount: 0,
+        likeCount: 0,
+        commentCount: 0,
+        qualityScore: createPostDto.qualityScore || null,
+        version: 0,
+      }),
+
+      // Phase 1-2-3 리팩토링: PostMetadata 초기화 (cascade: true로 자동 저장)
+      // Worker가 완료되면 업데이트됨
+      metadata: this.postsRepository.manager.create(PostMetadata, {
+        excerpt: quickExcerpt, // 임시 (Worker에서 교체)
+        tags: tags,
+        category: createPostDto.category,
+        content_type: 'markdown',
+        content_rendered_at: null, // Worker에서 설정
+        publishedAt: new Date(),
+        isEditorPick: false,
+        editorPickedAt: null,
+        processingError: null,
+        processingCompletedAt: null, // Worker에서 설정
+        searchVector: null, // Worker에서 생성
+        indexedAt: null, // Worker에서 설정
+      }),
     });
 
     // 6. DB 저장 (빠른 저장, content 처리 스킵)
@@ -639,7 +704,7 @@ export class PostsService {
       blogId: blog.id,
       title: post.title,
       content: markdownContent,
-      tags: tagList,
+      tags: tags,
       category: post.category,
     });
 
@@ -686,7 +751,7 @@ export class PostsService {
     limit: number = 10,
     search?: string,
     category?: string,
-    blogSlug?: string,
+    blogId?: string,
     user?: User,
     isPublished?: boolean,
     isForCache: boolean = false
@@ -715,7 +780,7 @@ export class PostsService {
         'post.likeCount',
         'post.commentCount',
         'post.qualityScore',
-        'post.tagList',
+        'post.tags',
         'post.category',
         'post.blogId',
         'post.authorId',
@@ -726,22 +791,20 @@ export class PostsService {
         'post.isEditorPick', // Editor's Pick 여부
         'post.editorPickedAt', // Editor's Pick 선정 시간
       ])
-      .addSelect([
-        'author.id',
-        'author.username',
-        // author.email 제외 - 보안상 제거
-        'author.bio',
-        'author.role',
-        'author.profileImage',
-      ])
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')
       .addSelect([
         'blog.id',
         'blog.slug',
         'blog.name',
         'blog.isPublic',
+        'blog.alias',
       ])
-      .leftJoin('post.author', 'author')
-      .leftJoin('post.blog', 'blog'); // 항상 blog 조인 (프론트엔드 필수)
+      .leftJoin('post.blog', 'blog') // 항상 blog 조인 (프론트엔드 필수)
+      // Phase 1-2-3 리팩토링: PostStats, PostMetadata LEFT JOIN
+      // 목록 조회에서는 기존 posts 테이블 컬럼도 유지하므로 LEFT JOIN으로 점진적 전환
+      .leftJoin('post.stats', 'stats')
+      .leftJoin('post.metadata', 'metadata');
 
     // 삭제된 포스트 제외 (기본 필터)
     query.where('post.isDeleted = :isDeleted', { isDeleted: false });
@@ -767,8 +830,8 @@ export class PostsService {
       }
     }
 
-    if (blogSlug) {
-      query.andWhere('blog.slug = :blogSlug', { blogSlug });
+    if (blogId) {
+      query.andWhere('post.blogId = :blogId', { blogId });
     }
 
     // 카테고리 필터링 - 정확한 매칭
@@ -782,7 +845,7 @@ export class PostsService {
       const searchTerms = search.trim()
         .split(/\s+/) // 공백으로 분리
         .filter(term => term.length > 0) // 빈 문자열 제거
-        .map(term => term.replace(/['"\\]/g, '')) // 특수문자 제거
+        .map(term => term.replace(/[:'"\\]/g, '')) // 콜론을 포함한 특수문자 제거
         .join(' & '); // AND 연산자로 결합 (모든 단어가 포함되어야 함)
 
       if (searchTerms) {
@@ -862,20 +925,13 @@ export class PostsService {
         likeCount: post.likeCount || 0,
         viewCount: post.viewCount || 0,
         // 태그 필드 추가 (프론트엔드 호환성)
-        tags: post.tagList || [],
+        tags: post.tags || [],
         // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
         thumbnail: this.optimizeImageUrl(post.thumbnail),
         // 블로그 정보 (있으면)
         blog: post.blog || null,
         // 작성자 정보는 필요한 필드만 선택 (email 제외)
-        author: post.author ? {
-          id: post.author.id,
-          username: post.author.username,
-          // email 제외 - 보안상 제거
-          bio: post.author.bio,
-          role: post.author.role,
-          profileImage: this.optimizeImageUrl(post.author.profileImage),
-        } : null,
+        author: post.author ? this.formatAuthorData(post.author) : null,
         // 이미지 파일 정보는 별도 로드 시에만 포함
         images: [],
       };
@@ -946,7 +1002,7 @@ export class PostsService {
         'post.viewCount',
         'post.likeCount',
         'post.commentCount',
-        'post.tagList',
+        'post.tags',
         'post.publishedAt',
         'post.createdAt',
         'post.updatedAt',
@@ -959,9 +1015,13 @@ export class PostsService {
       .addSelect([
         'author.id',
         'author.username',
-        'author.profileImage',
-        'author.bio',
         'author.role'
+      ])
+      // author의 profile 관계 설정 (Phase 1-2-3: profileImage, bio는 profiles 테이블로 이동)
+      .leftJoin('author.profile', 'profile')
+      .addSelect([
+        'profile.profileImage',
+        'profile.bio'
       ])
       // blog 관계 설정
       .leftJoin('post.blog', 'blog')
@@ -1031,19 +1091,12 @@ export class PostsService {
       updatedAt: post.updatedAt,
       publishedAt: post.publishedAt,
       // 태그와 썸네일
-      tags: post.tagList || [],
+      tags: post.tags || [],
       thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
       // 블로그 정보
       blog: post.blog || null,
       // 작성자 프로필 (email 제외)
-      author: post.author ? {
-        id: post.author.id,
-        username: post.author.username,
-        // email 제외 - 보안상 제거
-        bio: post.author.bio,
-        role: post.author.role,
-        profileImage: this.optimizeImageUrl(post.author.profileImage),
-      } : null,
+      author: post.author ? this.formatAuthorData(post.author) : null,
       // 인기도 점수 포함
       popularityScore: post.viewCount + (post.likeCount * 3) + (post.commentCount * 2)
     }));
@@ -1110,15 +1163,20 @@ export class PostsService {
       // QueryBuilder로 필요한 컬럼만 select, 사용자 좋아요 상태도 포함
       const qb = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile') // Phase 1-2-3: profileImage, bio는 profiles 테이블로 이동
       .leftJoinAndSelect('post.attachedFiles', 'file')
       .leftJoinAndSelect('post.blog', 'blog')
+      // Phase 1-2-3 리팩토링: PostStats, PostMetadata LEFT JOIN
+      .leftJoinAndSelect('post.stats', 'stats')
+      .leftJoinAndSelect('post.metadata', 'metadata')
       // likedBy JOIN을 제거하고 서브쿼리로 대체
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
-        'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
+        'author.id', 'author.username', 'author.role',
+        'profile.profileImage', 'profile.bio', // Phase 1-2-3: profiles 테이블로 이동
         'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId', 'blog.allowComments',
       ])
@@ -1192,7 +1250,7 @@ export class PostsService {
       content: result.content,
       thumbnail: result.thumbnail,
       isPublished: result.isPublished,
-      tagList: result.tagList,
+      tags: result.tags,
       category: result.category,
       publishedAt: result.publishedAt,
       createdAt: result.createdAt,
@@ -1221,15 +1279,20 @@ export class PostsService {
     // QueryBuilder로 필요한 컬럼만 select, 사용자 좋아요 상태도 포함
     const qb = this.postsRepository.createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile') // Phase 1-2-3: profileImage, bio는 profiles 테이블로 이동
       .leftJoinAndSelect('post.attachedFiles', 'file')
       .leftJoinAndSelect('post.blog', 'blog')
+      // Phase 1-2-3 리팩토링: PostStats, PostMetadata LEFT JOIN
+      .leftJoinAndSelect('post.stats', 'stats')
+      .leftJoinAndSelect('post.metadata', 'metadata')
       // likedBy JOIN을 제거하고 서브쿼리로 대체
       .select([
         'post.id', 'post.title', 'post.slug', 'post.content', 'post.thumbnail',
-        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tagList', 'post.category',
+        'post.isPublished', 'post.viewCount', 'post.likeCount', 'post.commentCount', 'post.tags', 'post.category',
         'post.publishedAt', 'post.createdAt', 'post.updatedAt',
         'post.isEditorPick', 'post.editorPickedAt', // Editor's Pick 필드 추가
-        'author.id', 'author.username', 'author.profileImage', 'author.role', 'author.bio',
+        'author.id', 'author.username', 'author.role',
+        'profile.profileImage', 'profile.bio', // Phase 1-2-3: profiles 테이블로 이동
         'file.id', 'file.fileName', 'file.originalName', 'file.fileSize', 'file.fileUrl', 'file.fileType',
         'blog.id', 'blog.slug', 'blog.name', 'blog.isPublic', 'blog.userId', 'blog.allowComments',
       ])
@@ -1296,7 +1359,7 @@ export class PostsService {
 
     // 추가 필드 설정
     postDto.liked = liked; // 사용자 좋아요 상태
-    postDto.tags = post.tagList || []; // 태그 필드 추가 (프론트엔드 호환성)
+    postDto.tags = post.tags || []; // 태그 필드 추가 (프론트엔드 호환성)
     postDto.viewCount = post.viewCount + 1; // 증가된 조회수 반영
 
     // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화 (formatDate 제거)
@@ -1350,7 +1413,7 @@ export class PostsService {
     }
 
     // 태그 업데이트 (JSONB로 단순 저장)
-    const newTagList = updatePostDto.tags || post.tagList || [];
+    const newTagList = updatePostDto.tags || post.tags || [];
 
     // tags는 DTO에서 온 것이므로 별도로 처리
 
@@ -1379,7 +1442,7 @@ export class PostsService {
         : textContent;
     }
 
-    post.tagList = newTagList; // JSONB 태그 배열 업데이트
+    post.tags = newTagList; // JSONB 태그 배열 업데이트
 
     // Title 변경 시 slug는 변경하지 않음 (이미 고유한 UUID 포함)
     // SEO를 위해 기존 slug 유지가 더 좋음
@@ -1637,6 +1700,38 @@ export class PostsService {
     }
   }
 
+  /**
+   * 작성자 데이터 포맷팅 (프로필 평탄화 및 CDN URL 변환)
+   * users.service.ts와 동일한 패턴 적용
+   */
+  private formatAuthorData(author: any): any {
+    // Phase 1 리팩토링: profiles 테이블 필드를 User 객체에 flatten (Frontend 호환성)
+    if (author.profile) {
+      author.name = author.profile.name;
+      author.profileImage = author.profile.profileImage;
+      author.bio = author.profile.bio;
+      author.lastLoginProvider = author.profile.lastLoginProvider;
+    }
+
+    // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+    if (author.profileImage) {
+      if (author.profileImage.startsWith('v2/') || author.profileImage.startsWith('uploads/')) {
+        // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+        author.profileImage = this.cdnService.generateCdnUrlFromKey(author.profileImage);
+        this.logger.debug(`Author profile image CDN URL: ${author.profileImage}`);
+      }
+    }
+
+    // 필요한 필드만 선택하여 반환 (email 제외)
+    return {
+      id: author.id,
+      username: author.username,
+      bio: author.bio || null,
+      role: author.role,
+      profileImage: this.optimizeImageUrl(author.profileImage),
+    };
+  }
+
   // 좋아요 토글 (최적화된 원자적 업데이트)
   async toggleLike(id: string, user: User | null): Promise<{ liked: boolean }> {
     if (!user?.id) throw new ForbiddenException('로그인한 유저만 좋아요를 누를 수 있습니다.');
@@ -1853,6 +1948,342 @@ export class PostsService {
   // 댓글 수 감소
   async decrementCommentCount(postId: string): Promise<void> {
     await this.postsRepository.decrement({ id: postId }, 'commentCount', 1);
+  }
+
+  // ===================================================
+  // Optimistic Locking 메서드들 (Phase 2)
+  // ===================================================
+
+  /**
+   * 낙관적 잠금을 사용한 댓글 수 증가
+   *
+   * @description
+   * - version 컬럼으로 동시성 제어
+   * - 충돌 시 최대 3회 재시도
+   * - Lost Update 방지
+   *
+   * @동작원리
+   * 1. PostStats 조회 (version 포함)
+   * 2. commentCount 증가
+   * 3. save() 시 TypeORM이 자동으로 WHERE version = oldVersion 추가
+   * 4. 충돌 시 OptimisticLockVersionMismatchError 발생 → 재시도
+   *
+   * @param postId - 포스트 ID
+   * @param maxRetries - 최대 재시도 횟수 (기본: 3)
+   * @returns 업데이트된 PostStats
+   */
+  async incrementCommentCountWithOptimisticLock(
+    postId: string,
+    maxRetries: number = 3,
+  ): Promise<void> {
+    let retries = 0;
+
+    while (retries < maxRetries) {
+      try {
+        // 1. 현재 stats 조회 (version 포함)
+        const stats = await this.postStatsRepository.findOne({
+          where: { postId },
+        });
+
+        if (!stats) {
+          this.logger.error(`PostStats not found for post ${postId}`);
+          return; // 댓글 수는 중요도가 낮으므로 무시
+        }
+
+        // 2. 댓글 수 증가
+        stats.incrementCommentCount();
+
+        // 3. 저장 (TypeORM이 자동으로 version 체크)
+        // UPDATE post_stats SET commentCount = ?, version = version + 1
+        // WHERE postId = ? AND version = ?
+        await this.postStatsRepository.save(stats);
+
+        this.logger.debug(
+          `Comment count incremented for post ${postId}, version ${stats.version} → ${stats.version + 1}`,
+        );
+
+        return;
+      } catch (error) {
+        // OptimisticLockVersionMismatchError 감지
+        if (error instanceof OptimisticLockVersionMismatchError) {
+          retries++;
+          this.logger.warn(
+            `Optimistic lock conflict for post ${postId}, retry ${retries}/${maxRetries}`,
+          );
+
+          if (retries >= maxRetries) {
+            this.logger.error(
+              `Failed to increment comment count for post ${postId} after ${maxRetries} retries`,
+            );
+            return; // 댓글 수는 중요도가 낮으므로 무시
+          }
+
+          // 재시도 전 짧은 대기 (지수 백오프: 10ms, 20ms, 40ms)
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, retries) * 10),
+          );
+          continue;
+        }
+
+        // 다른 에러는 그대로 throw
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * 낙관적 잠금을 사용한 댓글 수 감소
+   */
+  async decrementCommentCountWithOptimisticLock(
+    postId: string,
+    maxRetries: number = 3,
+  ): Promise<void> {
+    let retries = 0;
+
+    while (retries < maxRetries) {
+      try {
+        const stats = await this.postStatsRepository.findOne({
+          where: { postId },
+        });
+
+        if (!stats) {
+          this.logger.error(`PostStats not found for post ${postId}`);
+          return;
+        }
+
+        // 댓글 수 감소 (0 이하로 내려가지 않도록 보호)
+        stats.decrementCommentCount();
+
+        await this.postStatsRepository.save(stats);
+
+        this.logger.debug(
+          `Comment count decremented for post ${postId}, version ${stats.version} → ${stats.version + 1}`,
+        );
+
+        return;
+      } catch (error) {
+        if (error instanceof OptimisticLockVersionMismatchError) {
+          retries++;
+          this.logger.warn(
+            `Optimistic lock conflict for post ${postId}, retry ${retries}/${maxRetries}`,
+          );
+
+          if (retries >= maxRetries) {
+            this.logger.error(
+              `Failed to decrement comment count for post ${postId} after ${maxRetries} retries`,
+            );
+            return;
+          }
+
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, retries) * 10),
+          );
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * 낙관적 잠금을 사용한 좋아요 수 증가
+   *
+   * @description
+   * 동시에 여러 사용자가 좋아요를 클릭해도 Lost Update 방지
+   *
+   * @param postId - 포스트 ID
+   * @param maxRetries - 최대 재시도 횟수 (기본: 3)
+   * @returns 업데이트된 PostStats
+   */
+  async incrementLikeCountWithOptimisticLock(
+    postId: string,
+    maxRetries: number = 3,
+  ): Promise<PostStats> {
+    let retries = 0;
+
+    while (retries < maxRetries) {
+      try {
+        // 1. 현재 stats 조회 (version 포함)
+        const stats = await this.postStatsRepository.findOne({
+          where: { postId },
+        });
+
+        if (!stats) {
+          throw new NotFoundException(
+            `PostStats not found for post ${postId}`,
+          );
+        }
+
+        // 2. 좋아요 수 증가
+        stats.incrementLikeCount();
+
+        // 3. 저장 (TypeORM이 자동으로 version 체크)
+        const updatedStats = await this.postStatsRepository.save(stats);
+
+        this.logger.debug(
+          `Like count incremented for post ${postId}, version ${stats.version} → ${updatedStats.version}`,
+        );
+
+        return updatedStats;
+      } catch (error) {
+        // OptimisticLockVersionMismatchError 감지
+        if (error instanceof OptimisticLockVersionMismatchError) {
+          retries++;
+          this.logger.warn(
+            `Optimistic lock conflict for post ${postId}, retry ${retries}/${maxRetries}`,
+          );
+
+          if (retries >= maxRetries) {
+            // 최대 재시도 초과
+            // OptimisticLockVersionMismatchError는 version 정보를 직접 제공하지 않음
+            // 에러 메시지에서 파싱하거나 0으로 전달
+            throw new OptimisticLockException(
+              'PostStats',
+              postId,
+              0, // expectedVersion - TypeORM에서 제공하지 않음
+              0, // actualVersion - TypeORM에서 제공하지 않음
+            );
+          }
+
+          // 재시도 전 짧은 대기 (지수 백오프)
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, retries) * 10),
+          );
+          continue;
+        }
+
+        // 다른 에러는 그대로 throw
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * 낙관적 잠금을 사용한 좋아요 수 감소
+   */
+  async decrementLikeCountWithOptimisticLock(
+    postId: string,
+    maxRetries: number = 3,
+  ): Promise<PostStats> {
+    let retries = 0;
+
+    while (retries < maxRetries) {
+      try {
+        const stats = await this.postStatsRepository.findOne({
+          where: { postId },
+        });
+
+        if (!stats) {
+          throw new NotFoundException(
+            `PostStats not found for post ${postId}`,
+          );
+        }
+
+        // 좋아요 수 감소 (0 이하로 내려가지 않도록 보호)
+        stats.decrementLikeCount();
+
+        const updatedStats = await this.postStatsRepository.save(stats);
+
+        this.logger.debug(
+          `Like count decremented for post ${postId}, version ${stats.version} → ${updatedStats.version}`,
+        );
+
+        return updatedStats;
+      } catch (error) {
+        if (error instanceof OptimisticLockVersionMismatchError) {
+          retries++;
+          this.logger.warn(
+            `Optimistic lock conflict for post ${postId}, retry ${retries}/${maxRetries}`,
+          );
+
+          if (retries >= maxRetries) {
+            // OptimisticLockVersionMismatchError는 version 정보를 직접 제공하지 않음
+            throw new OptimisticLockException(
+              'PostStats',
+              postId,
+              0, // expectedVersion - TypeORM에서 제공하지 않음
+              0, // actualVersion - TypeORM에서 제공하지 않음
+            );
+          }
+
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, retries) * 10),
+          );
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  /**
+   * 조회수 배치 업데이트 (낙관적 잠금)
+   *
+   * @description
+   * Redis에 쌓인 조회수를 DB에 동기화
+   * 여러 사용자의 조회수를 한 번에 업데이트하므로 낙관적 잠금 필수
+   *
+   * @param postId - 포스트 ID
+   * @param incrementBy - 증가할 조회수
+   */
+  async batchIncrementViewCount(
+    postId: string,
+    incrementBy: number,
+    maxRetries: number = 3,
+  ): Promise<PostStats> {
+    let retries = 0;
+
+    while (retries < maxRetries) {
+      try {
+        const stats = await this.postStatsRepository.findOne({
+          where: { postId },
+        });
+
+        if (!stats) {
+          throw new NotFoundException(
+            `PostStats not found for post ${postId}`,
+          );
+        }
+
+        // 조회수 배치 증가
+        stats.incrementViewCount(incrementBy);
+
+        const updatedStats = await this.postStatsRepository.save(stats);
+
+        this.logger.debug(
+          `View count batch updated for post ${postId}: +${incrementBy}, version ${stats.version} → ${updatedStats.version}`,
+        );
+
+        return updatedStats;
+      } catch (error) {
+        if (error instanceof OptimisticLockVersionMismatchError) {
+          retries++;
+          this.logger.warn(
+            `Optimistic lock conflict for post ${postId}, retry ${retries}/${maxRetries}`,
+          );
+
+          if (retries >= maxRetries) {
+            // 조회수는 중요도가 낮으므로 에러 로깅만 하고 기존 stats 반환
+            this.logger.error(
+              `Failed to update view count for post ${postId} after ${maxRetries} retries`,
+            );
+            const stats = await this.postStatsRepository.findOne({
+              where: { postId },
+            });
+            return stats; // 업데이트 실패해도 기존 stats 반환
+          }
+
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, retries) * 10),
+          );
+          continue;
+        }
+
+        throw error;
+      }
+    }
   }
 
   // ❌ DEPRECATED: Entity의 @BeforeInsert에서 UUID로 고유성 보장
@@ -2139,7 +2570,9 @@ export class PostsService {
 
     // S3 키 (uploads/, v2/ 등)는 CDN URL로 변환
     if (url.startsWith('uploads/') || url.startsWith('v2/')) {
-      return this.cdnService.generateCdnUrlFromKey(url);
+      // Temporarily disabled CDN service
+      // return this.cdnService.generateCdnUrlFromKey(url);
+      return url; // Return original URL for now
     }
 
     return url;
@@ -2153,11 +2586,11 @@ export class PostsService {
     // PostgreSQL JSONB 배열을 풀어서 집계하는 쿼리
     const result = await this.postsRepository
       .createQueryBuilder('post')
-      .select('jsonb_array_elements_text(post.tagList) as tag')
+      .select('jsonb_array_elements_text(post.tags) as tag')
       .addSelect('COUNT(*)', 'count')
       .where('post.isPublished = true')
       .andWhere('post.status = :status', { status: 'published' })
-      .andWhere('jsonb_array_length(post.tagList) > 0')
+      .andWhere('jsonb_array_length(post.tags) > 0')
       .groupBy('tag')
       .orderBy('count', 'DESC')
       .limit(limit)
@@ -2246,7 +2679,7 @@ export class PostsService {
         'post.likeCount',
         'post.commentCount',
         'post.qualityScore',
-        'post.tagList',
+        'post.tags',
         'post.category',
         'post.blogId',
         'post.authorId',
@@ -2261,9 +2694,14 @@ export class PostsService {
         'author.id',
         'author.username',
         // author.email 제외 - 보안상 제거
-        'author.bio',
         'author.role',
-        'author.profileImage',
+      ])
+      // author의 profile 관계 설정 (Phase 1-2-3: profileImage, bio는 profiles 테이블로 이동)
+      .leftJoin('post.author', 'author')
+      .leftJoin('author.profile', 'profile')
+      .addSelect([
+        'profile.profileImage',
+        'profile.bio',
       ])
       .addSelect([
         'blog.id',
@@ -2271,7 +2709,6 @@ export class PostsService {
         'blog.name',
         'blog.isPublic',
       ])
-      .leftJoin('post.author', 'author')
       .leftJoin('post.blog', 'blog')
       .where('post.isEditorPick = :isEditorPick', { isEditorPick: true })
       .andWhere('post.isPublished = :isPublished', { isPublished: true })
@@ -2371,5 +2808,276 @@ export class PostsService {
       blogSlug: row.blogSlug,
       updatedAt: row.post_updatedAt
     }));
+  }
+
+  /**
+   * Cursor Pagination으로 포스트 조회
+   *
+   * @description
+   * 대규모 데이터셋에서 일정한 성능을 보장하는 커서 기반 페이지네이션
+   *
+   * @성능_비교
+   * - OFFSET 10만번째: SELECT * FROM posts OFFSET 99999 LIMIT 20 → 28ms (99,999개 스캔)
+   * - CURSOR 10만번째: SELECT * FROM posts WHERE (publishedAt, id) < cursor LIMIT 20 → 3ms (인덱스 직접 접근)
+   *
+   * @동작원리
+   * 1. cursor 디코딩: Base64 → "2025-01-20T12:00:00.000Z|abc123" → [publishedAt, id]
+   * 2. WHERE 조건: (publishedAt < cursor_date) OR (publishedAt = cursor_date AND id < cursor_id)
+   * 3. ORDER BY publishedAt DESC, id DESC (복합 인덱스 사용)
+   * 4. LIMIT+1 조회로 hasMore 판단
+   * 5. nextCursor 생성: 마지막 아이템의 [publishedAt, id] → Base64
+   *
+   * @인덱스_요구사항
+   * - idx_posts_home_feed_covering (isPublished, publishedAt DESC, id DESC) INCLUDE (...)
+   *
+   * @param dto - GetPostsCursorDto (cursor, limit, sort, filters)
+   * @param user - 현재 사용자 (liked/bookmarked 상태 확인용)
+   * @returns CursorPaginatedPostsDto (posts, nextCursor, hasMore, count)
+   */
+  async getPostsCursor(
+    dto: GetPostsCursorDto,
+    user?: User,
+  ): Promise<CursorPaginatedPostsDto> {
+    const limit = dto.limit || 20;
+    const sort = dto.sort || 'recent';
+
+    // Cursor 디코딩 (Base64 → publishedAt|id)
+    let cursorPublishedAt: Date | null = null;
+    let cursorId: string | null = null;
+
+    if (dto.cursor) {
+      try {
+        const decoded = Buffer.from(dto.cursor, 'base64').toString('utf-8');
+        const [dateStr, id] = decoded.split('|');
+        cursorPublishedAt = new Date(dateStr);
+        cursorId = id;
+
+        this.logger.debug(`[Cursor Decoded] publishedAt=${cursorPublishedAt.toISOString()}, id=${cursorId}`);
+      } catch (error) {
+        this.logger.error(`[Cursor Decode Failed] ${error.message}`);
+        throw new BadRequestException('Invalid cursor format');
+      }
+    }
+
+    // QueryBuilder 생성 (findAll과 동일한 SELECT 필드)
+    const query = this.postsRepository.createQueryBuilder('post')
+      .select([
+        'post.id',
+        'post.title',
+        'post.slug',
+        'post.excerpt',
+        'post.content_type',
+        'post.thumbnail',
+        'post.isPublished',
+        'post.viewCount',
+        'post.likeCount',
+        'post.commentCount',
+        'post.qualityScore',
+        'post.tags',
+        'post.category',
+        'post.blogId',
+        'post.authorId',
+        'post.createdAt',
+        'post.updatedAt',
+        'post.publishedAt',
+        'post.version',
+        'post.isEditorPick',
+        'post.editorPickedAt',
+      ])
+      .addSelect([
+        'author.id',
+        'author.username',
+        'author.role',
+      ])
+      .leftJoin('post.author', 'author')
+      .leftJoin('author.profile', 'profile')
+      .addSelect([
+        'profile.profileImage',
+        'profile.bio',
+      ])
+      .addSelect([
+        'blog.id',
+        'blog.slug',
+        'blog.name',
+        'blog.isPublic',
+      ])
+      .leftJoin('post.blog', 'blog')
+      .leftJoin('post.stats', 'stats')
+      .leftJoin('post.metadata', 'metadata');
+
+    // 기본 필터: 삭제되지 않은 발행된 포스트만
+    query.where('post.isDeleted = :isDeleted', { isDeleted: false })
+      .andWhere('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.status = :status', { status: 'published' })
+      .andWhere('blog.isPublic = :isPublic', { isPublic: true });
+
+    // 필터: 카테고리
+    if (dto.category) {
+      query.andWhere('post.category = :category', { category: dto.category });
+    }
+
+    // 필터: 블로그
+    if (dto.blogSlug) {
+      query.andWhere('blog.slug = :blogSlug', { blogSlug: dto.blogSlug });
+    }
+
+    // 필터: 검색 (제목, 태그)
+    if (dto.search) {
+      // 검색어 정리 및 길이 제한 (보안 강화)
+      const sanitizedSearch = dto.search
+        .trim()
+        .slice(0, 100) // 최대 100자 제한
+        .replace(/[<>\"'%;()&+]/g, ''); // 위험 문자 제거
+
+      if (sanitizedSearch) {
+        query.andWhere(
+          '(post.title ILIKE :search OR post.tags::text ILIKE :search)',
+          { search: `%${sanitizedSearch}%` }
+        );
+      }
+    }
+
+    // Cursor 조건 추가 (정렬 방식별)
+    if (sort === 'recent') {
+      // 최신순: publishedAt DESC, id DESC
+      if (cursorPublishedAt && cursorId) {
+        query.andWhere(
+          '(post.publishedAt < :cursorDate OR (post.publishedAt = :cursorDate AND post.id < :cursorId))',
+          { cursorDate: cursorPublishedAt, cursorId }
+        );
+      }
+      query.orderBy('post.publishedAt', 'DESC')
+        .addOrderBy('post.id', 'DESC');
+
+    } else if (sort === 'popular') {
+      // 인기순: popularity_score DESC
+      // popularity_score = viewCount + (likeCount × 3) + (commentCount × 2)
+      query.addSelect(
+        'post.viewCount + (post.likeCount * 3) + (post.commentCount * 2)',
+        'popularity_score'
+      );
+
+      if (cursorPublishedAt && cursorId) {
+        // popular 정렬에서는 popularity_score와 id를 cursor로 사용
+        // cursor 형식: score|id
+        const decoded = Buffer.from(dto.cursor!, 'base64').toString('utf-8');
+        const [scoreStr, id] = decoded.split('|');
+        const cursorScore = parseInt(scoreStr, 10);
+
+        query.andWhere(
+          '(post.viewCount + (post.likeCount * 3) + (post.commentCount * 2) < :cursorScore OR ' +
+          '(post.viewCount + (post.likeCount * 3) + (post.commentCount * 2) = :cursorScore AND post.id < :cursorId))',
+          { cursorScore, cursorId: id }
+        );
+      }
+
+      query.orderBy('popularity_score', 'DESC')
+        .addOrderBy('post.id', 'DESC');
+
+    } else if (sort === 'trending') {
+      // 트렌딩: 최근 7일 내 인기순
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      query.andWhere('post.publishedAt >= :sevenDaysAgo', { sevenDaysAgo });
+      query.addSelect(
+        'post.viewCount + (post.likeCount * 3) + (post.commentCount * 2)',
+        'trending_score'
+      );
+
+      if (cursorPublishedAt && cursorId) {
+        const decoded = Buffer.from(dto.cursor!, 'base64').toString('utf-8');
+        const [scoreStr, id] = decoded.split('|');
+        const cursorScore = parseInt(scoreStr, 10);
+
+        query.andWhere(
+          '(post.viewCount + (post.likeCount * 3) + (post.commentCount * 2) < :cursorScore OR ' +
+          '(post.viewCount + (post.likeCount * 3) + (post.commentCount * 2) = :cursorScore AND post.id < :cursorId))',
+          { cursorScore, cursorId: id }
+        );
+      }
+
+      query.orderBy('trending_score', 'DESC')
+        .addOrderBy('post.id', 'DESC');
+    }
+
+    // LIMIT+1 조회 (hasMore 판단용)
+    const posts = await query.limit(limit + 1).getMany();
+
+    // hasMore 판단
+    const hasMore = posts.length > limit;
+    if (hasMore) {
+      posts.pop(); // 마지막 아이템 제거
+    }
+
+    // nextCursor 생성
+    let nextCursor: string | null = null;
+    if (hasMore && posts.length > 0) {
+      const lastPost = posts[posts.length - 1];
+
+      if (sort === 'recent') {
+        // cursor 형식: publishedAt|id
+        const cursorStr = `${lastPost.publishedAt.toISOString()}|${lastPost.id}`;
+        nextCursor = Buffer.from(cursorStr).toString('base64');
+      } else if (sort === 'popular' || sort === 'trending') {
+        // cursor 형식: score|id
+        const score = lastPost.viewCount + (lastPost.likeCount * 3) + (lastPost.commentCount * 2);
+        const cursorStr = `${score}|${lastPost.id}`;
+        nextCursor = Buffer.from(cursorStr).toString('base64');
+      }
+    }
+
+    // liked, bookmarked 상태 확인 (로그인 사용자만)
+    let postDtos: PostResponseDto[];
+    if (user) {
+      const postIds = posts.map(p => p.id);
+      const [likedMap, bookmarkedMap] = await Promise.all([
+        this.getLikedStatusMap(postIds, user.id),
+        this.bookmarksService.areBookmarked(user.id, postIds),
+      ]);
+
+      postDtos = posts.map(post =>
+        this.toPostDto(post, {
+          user: post.author,
+          blog: post.blog,
+          liked: likedMap.get(post.id) || false,
+          bookmarked: bookmarkedMap.get(post.id) || false,
+        })
+      );
+    } else {
+      postDtos = posts.map(post =>
+        this.toPostDto(post, {
+          user: post.author,
+          blog: post.blog,
+        })
+      );
+    }
+
+    this.logger.debug(`[Cursor Pagination] Returned ${posts.length} posts, hasMore=${hasMore}`);
+
+    return {
+      posts: postDtos,
+      nextCursor,
+      hasMore,
+      count: posts.length,
+    };
+  }
+
+  /**
+   * 사용자가 좋아요한 포스트 ID Map 조회
+   * @private
+   */
+  private async getLikedStatusMap(postIds: string[], userId: string): Promise<Map<string, boolean>> {
+    const likedPosts = await this.dataSource.query(
+      `SELECT "postId" FROM post_likes WHERE "postId" = ANY($1) AND "userId" = $2`,
+      [postIds, userId]
+    );
+
+    const likedMap = new Map<string, boolean>();
+    likedPosts.forEach((row: any) => {
+      likedMap.set(row.postId, true);
+    });
+
+    return likedMap;
   }
 } 

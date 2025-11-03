@@ -4,15 +4,36 @@ import { Post } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRef, useCallback } from 'react';
 import { mixpanel } from '@/lib/mixpanel';
+import { useRouter } from 'next/navigation'; // useRouter 훅 추가
+import { getPostUrl } from '@/lib/utils/blogUrl';
 
-// Query 키 팩토리 패턴
+// Query 키 팩토리 패턴 (표준화)
 export const postQueryKeys = {
   all: ['posts'] as const,
   lists: () => [...postQueryKeys.all, 'list'] as const,
-  list: (filters: { search?: string; category?: string; blogSlug?: string }) => 
-    [...postQueryKeys.lists(), filters] as const,
+  list: (filters: {
+    search?: string;
+    category?: string;
+    blogSlug?: string;
+    blogId?: string;
+    page?: number;
+    limit?: number;
+  }) => {
+    // 정렬된 키 생성으로 캐시 일관성 보장
+    const sortedFilters = Object.entries(filters).reduce((acc, [key, value]) => {
+      if (value !== undefined && value !== null && value !== '') {
+        acc[key] = value;
+      }
+      return acc;
+    }, {} as Record<string, any>);
+
+    return [...postQueryKeys.lists(), sortedFilters] as const;
+  },
   details: () => [...postQueryKeys.all, 'detail'] as const,
   detail: (slugOrId: string) => [...postQueryKeys.details(), slugOrId] as const,
+  // 캐시 무효화를 위한 헬퍼 키
+  userPosts: (userId: string) => [...postQueryKeys.all, 'user', userId] as const,
+  blogPosts: (blogIdentifier: string) => [...postQueryKeys.all, 'blog', blogIdentifier] as const,
 };
 
 // 공통 쿼리 옵션
@@ -29,18 +50,20 @@ export function useInfinitePosts(options: {
   search?: string; 
   category?: string;
   blogSlug?: string;
+  blogId?: string;
   enabled?: boolean;
 } = {}) {
-  const { search, category, blogSlug, enabled = true } = options;
+  const { search, category, blogSlug, blogId, enabled = true } = options;
   
   return useInfiniteQuery({
-    queryKey: postQueryKeys.list({ search, category, blogSlug }),
+    queryKey: postQueryKeys.list({ search, category, blogSlug, blogId }),
     queryFn: ({ pageParam = 1 }) => postsAPI.getPosts({ 
       page: pageParam, 
       limit: 20,  // 한 번에 20개씩 로드하여 스크롤 빈도 감소
       search: search || undefined,
       category: category || undefined,
       blogSlug: blogSlug || undefined,
+      blogId: blogId || undefined,
     }),
     getNextPageParam: (lastPage, allPages) => {
       if (!lastPage || !allPages) return undefined;
@@ -79,6 +102,7 @@ export function usePost(
 // 포스트 생성 뮤테이션 훅
 export function useCreatePost() {
   const queryClient = useQueryClient();
+  const router = useRouter(); // useRouter 훅 추가
 
   return useMutation({
     mutationFn: postsAPI.createPost,
@@ -91,22 +115,18 @@ export function useCreatePost() {
       });
 
       // 1. 모든 list 캐시를 stale로 마킹 (홈, 블로그, 검색 등)
-      // setQueriesData에서 이미 낙관적 업데이트했으므로 즉시 refetch는 불필요
       queryClient.invalidateQueries({
-        queryKey: postQueryKeys.lists(), // ['posts', 'list'] - 모든 list 쿼리
+        queryKey: postQueryKeys.lists(),
         exact: false,
-        refetchType: 'none' // 즉시 refetch 안함, stale만 마킹
+        refetchType: 'none'
       });
 
-      // 1-1. 작성자 블로그 캐시 무효화 및 즉시 업데이트 (작성자가 "내 블로그"에서 즉시 확인 가능)
+      // 1-1. 작성자 블로그 캐시 무효화 및 즉시 업데이트
       if (newPost.blog?.slug) {
-        // 캐시 완전 제거 (staleTime 무시)
         queryClient.removeQueries({
           queryKey: postQueryKeys.list({ blogSlug: newPost.blog.slug }),
           exact: false
         });
-
-        // 즉시 무효화
         queryClient.invalidateQueries({
           queryKey: postQueryKeys.list({ blogSlug: newPost.blog.slug }),
           exact: false
@@ -119,7 +139,6 @@ export function useCreatePost() {
         (oldData: any) => {
           if (!oldData || !oldData.pages) return oldData;
           
-          // 첫 번째 페이지에 새 게시글을 맨 앞에 추가
           const newPages = [...oldData.pages];
           if (newPages[0]) {
             newPages[0] = {
@@ -135,10 +154,12 @@ export function useCreatePost() {
           };
         }
       );
-      
-      // 3. 생성된 게시글의 개별 캐시는 설정하지 않음
-      // 생성 직후 상세 페이지로 이동할 때 서버에서 완전한 데이터를 다시 가져오도록 함
-      // (create endpoint 응답과 findOne/findBySlug 응답 구조가 다를 수 있음)
+
+      // 3. 생성된 포스트의 상세 페이지로 이동
+      if (newPost.blog) {
+        const postUrl = getPostUrl(newPost.blog, { slug: newPost.slug, id: newPost.id });
+        router.push(postUrl);
+      }
     },
     retry: 1,
   });
@@ -531,4 +552,75 @@ export function useUserCategories() {
     staleTime: 5 * 60 * 1000, // 5분간 캐시
     gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
   });
-} 
+}
+
+/**
+ * 캐시 관리 유틸리티 함수
+ * - 메모리 누수 방지를 위한 캐시 클린업
+ * - 컴포넌트 언마운트 시 호출
+ */
+export const usePostCacheCleanup = () => {
+  const queryClient = useQueryClient();
+
+  return useCallback(() => {
+    // 1. 오래된 포스트 상세 캐시 정리 (10분 이상)
+    const queryCache = queryClient.getQueryCache();
+    const queries = queryCache.getAll();
+
+    queries.forEach(query => {
+      if (query.queryKey[0] === 'posts' &&
+          query.queryKey[1] === 'detail' &&
+          query.state.dataUpdatedAt &&
+          Date.now() - query.state.dataUpdatedAt > 10 * 60 * 1000) {
+        queryClient.removeQueries({ queryKey: query.queryKey });
+      }
+    });
+
+    // 2. 비활성 포스트 목록 캐시 정리
+    queryClient.removeQueries({
+      queryKey: postQueryKeys.lists(),
+      predicate: (query) => {
+        return !!(query.state.dataUpdatedAt &&
+               Date.now() - query.state.dataUpdatedAt > 30 * 60 * 1000); // 30분 이상
+      }
+    });
+
+    // 3. 메모리 사용량 최적화
+    if (queries.length > 100) {
+      // 가장 오래된 쿼리들 정리
+      const sortedQueries = queries
+        .filter(q => q.queryKey[0] === 'posts')
+        .sort((a, b) => (a.state.dataUpdatedAt || 0) - (b.state.dataUpdatedAt || 0));
+
+      const toRemove = sortedQueries.slice(0, 20);
+      toRemove.forEach(query => {
+        queryClient.removeQueries({ queryKey: query.queryKey });
+      });
+    }
+  }, [queryClient]);
+};
+
+/**
+ * 특정 블로그의 포스트 캐시 무효화
+ * - 블로그 alias 변경 시 사용
+ */
+export const useInvalidateBlogPosts = () => {
+  const queryClient = useQueryClient();
+
+  return useCallback((blogIdentifier: string) => {
+    // 블로그 관련 모든 캐시 무효화
+    queryClient.invalidateQueries({
+      queryKey: postQueryKeys.blogPosts(blogIdentifier)
+    });
+
+    // 목록 쿼리에서 해당 블로그 포스트들도 무효화
+    queryClient.invalidateQueries({
+      queryKey: postQueryKeys.lists(),
+      predicate: (query) => {
+        const filters = query.queryKey[2] as any;
+        return filters?.blogSlug === blogIdentifier ||
+               filters?.blogId === blogIdentifier;
+      }
+    });
+  }, [queryClient]);
+}; 
