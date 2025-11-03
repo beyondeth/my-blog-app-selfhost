@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { FiZap, FiEdit3 } from 'react-icons/fi';
+import { FiBell, FiEdit3 } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 import { Button } from '@/components/ui/button';
 
@@ -23,16 +23,16 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
   const slides = [
     {
       id: 'landing',
-      icon: FiZap,
+      icon: FiBell,
       title: 'AI 블로그 플랫폼',
       description: '대화만으로 완성되는 블로그. MCP 기반 자동 포스팅으로 생각을 글로 만들어보세요.',
-      ctaText: '플랫폼 알아보기',
+      ctaText: 'MCP 알아보기',
       ctaLink: '/landing',
       styles: [] as { name: string; emoji: string; color: string }[],
     },
     {
       id: 'writing-styles',
-      icon: FiEdit3,
+      icon: FiBell,
       title: 'Writing Styles',
       description: '다양한 스타일로 자동 포스팅',
       ctaText: '스타일 가이드 보기',
@@ -65,13 +65,7 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
 
   return (
     <div className="hidden lg:block">
-      <SidebarSection
-        title={
-          <div className="flex items-center gap-2">
-            <span>TIP</span>
-          </div>
-        }
-      >
+      <SidebarSection title={null}>
         {/* 캐러셀 컨테이너 */}
         <div
           className="relative"
@@ -127,15 +121,17 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
 
                       {/* CTA */}
                       {slide.id === 'landing' ? (
-                        <Link href={slide.ctaLink} className="block">
-                          <Button
-                            variant="default"
-                            className="w-full"
-                            size="sm"
-                          >
-                            {slide.ctaText}
-                          </Button>
-                        </Link>
+                        <div className="mx-16">
+                          <Link href={slide.ctaLink} className="block">
+                            <Button
+                              variant="default"
+                              className="w-full h-8 text-sm font-semibold"
+                              size="sm"
+                            >
+                              {slide.ctaText}
+                            </Button>
+                          </Link>
+                        </div>
                       ) : (
                         <Link
                           href={slide.ctaLink}

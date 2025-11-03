@@ -1,8 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { FiLock, FiEye, FiEyeOff, FiShield, FiCheck, FiAlertCircle } from 'react-icons/fi';
+import { validatePasswordStrength, getPasswordStrengthColor, getPasswordStrengthWidth, isCommonPassword, containsUserInfo } from '@/lib/password-utils';
 
 export default function SecuritySettingsPage() {
   const { user } = useAuth();
@@ -17,6 +18,50 @@ export default function SecuritySettingsPage() {
     newPassword: '',
     confirmPassword: '',
   });
+  const [passwordStrength, setPasswordStrength] = useState<any>(null);
+  const [passwordErrors, setPasswordErrors] = useState<string[]>([]);
+
+  // 비밀번호 실시간 검증
+  useEffect(() => {
+    if (passwordForm.newPassword) {
+      const validation = validatePasswordStrength(passwordForm.newPassword);
+      setPasswordStrength(validation);
+
+      // 에러 메시지 수집
+      const errors: string[] = [];
+
+      // 기본 검증
+      if (!validation.hasMinLength) {
+        errors.push('최소 8자 이상');
+      }
+      if (!validation.hasUpperCase) {
+        errors.push('대문자 포함');
+      }
+      if (!validation.hasLowerCase) {
+        errors.push('소문자 포함');
+      }
+      if (!validation.hasNumber) {
+        errors.push('숫자 포함');
+      }
+      if (validation.hasForbiddenChars) {
+        errors.push('사용 금지 문자 포함');
+      }
+
+      // 추가 보안 검증
+      if (isCommonPassword(passwordForm.newPassword)) {
+        errors.push('흔한 비밀번호 사용');
+      }
+
+      if (containsUserInfo(passwordForm.newPassword, user?.email, user?.username)) {
+        errors.push('개인정보 포함');
+      }
+
+      setPasswordErrors(errors);
+    } else {
+      setPasswordStrength(null);
+      setPasswordErrors([]);
+    }
+  }, [passwordForm.newPassword, user]);
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -26,14 +71,40 @@ export default function SecuritySettingsPage() {
       return;
     }
 
+    // 비밀번호 일치 확인
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
       setError('새 비밀번호가 일치하지 않습니다');
       return;
     }
 
-    if (passwordForm.newPassword.length < 8) {
-      setError('비밀번호는 최소 8자 이상이어야 합니다');
-      return;
+    // 비밀번호 강도 검증
+    if (passwordForm.newPassword) {
+      const validation = validatePasswordStrength(passwordForm.newPassword);
+
+      // 백엔드와 동일한 기본 요구사항 확인 (대문자, 소문자, 숫자)
+      if (!validation.hasMinLength) {
+        setError('비밀번호는 최소 8자 이상이어야 합니다');
+        return;
+      }
+      if (!validation.hasUpperCase || !validation.hasLowerCase || !validation.hasNumber) {
+        setError('비밀번호는 최소 하나의 소문자, 하나의 대문자, 그리고 하나의 숫자를 포함해야 합니다');
+        return;
+      }
+      if (validation.hasForbiddenChars) {
+        setError('비밀번호에 사용할 수 없는 문자가 포함되어 있습니다: " \' \\ < > ` 공백');
+        return;
+      }
+
+      // 추가 보안 검증
+      if (isCommonPassword(passwordForm.newPassword)) {
+        setError('너무 흔한 비밀번호는 사용할 수 없습니다');
+        return;
+      }
+
+      if (containsUserInfo(passwordForm.newPassword, user?.email, user?.username)) {
+        setError('비밀번호에 개인정보를 포함할 수 없습니다');
+        return;
+      }
     }
 
     setLoading(true);
@@ -66,6 +137,8 @@ export default function SecuritySettingsPage() {
         newPassword: '',
         confirmPassword: '',
       });
+      setPasswordStrength(null);
+      setPasswordErrors([]);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
@@ -227,7 +300,71 @@ export default function SecuritySettingsPage() {
                   )}
                 </button>
               </div>
-              <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">최소 8자 이상, 영문 대소문자와 숫자를 포함하세요</p>
+
+              {/* 비밀번호 강도 표시기 */}
+              {passwordStrength && (
+                <div className="mt-3 space-y-2">
+                  {/* 강도 프로그레스 바 */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">비밀번호 강도</span>
+                    <span className={`text-xs font-medium ${getPasswordStrengthColor(passwordStrength.strength).split(' ')[0]}`}>
+                      {passwordStrength.message}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                    <div
+                      className={`h-2 rounded-full transition-all duration-300 ${getPasswordStrengthColor(passwordStrength.strength).split(' ')[1].replace('border-', 'bg-')}`}
+                      style={{ width: getPasswordStrengthWidth(passwordStrength.score) }}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* 비밀번호 요구사항 체크리스트 */}
+              <div className="mt-3 p-3 bg-gray-50 dark:bg-gray-800 rounded-md">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">비밀번호 요구사항:</p>
+                <div className="space-y-1">
+                  <div className={`flex items-center text-xs ${passwordStrength?.hasMinLength ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <FiCheck className={`mr-1 ${passwordStrength?.hasMinLength ? 'block' : 'hidden'}`} />
+                    <span className={passwordStrength?.hasMinLength ? 'line-through' : ''}>최소 8자 이상</span>
+                  </div>
+                  <div className={`flex items-center text-xs ${passwordStrength?.hasUpperCase ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <FiCheck className={`mr-1 ${passwordStrength?.hasUpperCase ? 'block' : 'hidden'}`} />
+                    <span className={passwordStrength?.hasUpperCase ? 'line-through' : ''}>대문자 포함 (A-Z)</span>
+                  </div>
+                  <div className={`flex items-center text-xs ${passwordStrength?.hasLowerCase ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <FiCheck className={`mr-1 ${passwordStrength?.hasLowerCase ? 'block' : 'hidden'}`} />
+                    <span className={passwordStrength?.hasLowerCase ? 'line-through' : ''}>소문자 포함 (a-z)</span>
+                  </div>
+                  <div className={`flex items-center text-xs ${passwordStrength?.hasNumber ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <FiCheck className={`mr-1 ${passwordStrength?.hasNumber ? 'block' : 'hidden'}`} />
+                    <span className={passwordStrength?.hasNumber ? 'line-through' : ''}>숫자 포함 (0-9)</span>
+                  </div>
+                  <div className={`flex items-center text-xs ${passwordStrength?.hasSpecialChar ? 'text-green-600 dark:text-green-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                    <FiCheck className={`mr-1 ${passwordStrength?.hasSpecialChar ? 'block' : 'hidden'}`} />
+                    <span className={passwordStrength?.hasSpecialChar ? 'line-through' : ''}>특수문자 포함 (!@#$%^&* 등)</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* 에러 메시지 표시 */}
+              {passwordErrors.length > 0 && (
+                <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded-md">
+                  <p className="text-xs text-red-600 dark:text-red-400 font-medium mb-1">해결해야 할 항목:</p>
+                  <ul className="text-xs text-red-600 dark:text-red-400 space-y-0.5">
+                    {passwordErrors.map((error, index) => (
+                      <li key={index} className="flex items-start">
+                        <span className="mr-1">•</span>
+                        <span>{error}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                최소 8자 이상, 영문 대소문자와 숫자를 포함하세요
+              </p>
             </div>
 
             {/* Confirm Password */}

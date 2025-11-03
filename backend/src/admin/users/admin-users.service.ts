@@ -7,6 +7,7 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Like, Between, FindOptionsWhere, Not } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { Profile } from '../../users/entities/profile.entity';
 import { DateUtils } from '../../common/utils/date.utils';
 import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
@@ -43,6 +44,8 @@ export class AdminUsersService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(Profile)
+    private profileRepository: Repository<Profile>,
     @InjectRepository(Post)
     private postRepository: Repository<Post>,
     @InjectRepository(Comment)
@@ -349,10 +352,14 @@ export class AdminUsersService {
     user.email = `deleted_${userId}@deleted.com`;
     user.username = `deleted_${userId}`;
     user.password = null;
-    user.profileImage = null;
-    user.bio = null;
-    
+
     await this.userRepository.save(user);
+
+    // Phase 1-2-3: profiles 테이블의 데이터도 익명화
+    await this.profileRepository.update(
+      { userId },
+      { profileImage: null, bio: null }
+    );
 
     await this.auditService.logUserAction(
       AuditAction.USER_DELETED,

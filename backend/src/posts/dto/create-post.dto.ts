@@ -26,6 +26,14 @@ export class CreatePostDto {
   thumbnail?: string;
 
   @ApiPropertyOptional({
+    description: '썸네일 이미지 파일 ID (UUID)',
+    example: 'uuid-of-thumbnail-image',
+  })
+  @IsOptional()
+  @IsString()
+  thumbnailImageId?: string;
+
+  @ApiPropertyOptional({
     description: '태그 배열',
     example: ['javascript', 'nodejs', 'nestjs'],
   })

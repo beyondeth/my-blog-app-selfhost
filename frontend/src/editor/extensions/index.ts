@@ -3,4 +3,5 @@
  * 모든 커스텀 Extension을 통합 export
  */
 
-export { ResizableImage } from './ResizableImage.extension';
+export { MediumStyleImage } from './MediumStyleImage.extension';
+export type { ImageSize } from './MediumStyleImage.extension';

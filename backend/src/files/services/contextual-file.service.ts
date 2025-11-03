@@ -114,8 +114,42 @@ export class ContextualFileService {
     fileSize: number,
     mimeType: string,
   ): Promise<PresignedUrlResponse & { contextId: string }> {
-    // 컨텍스트 생성
-    const context = await this.createFileContext(uploadContext);
+    // 파일 크기 제한 확인
+    const maxFileSize = this.getMaxFileSizeForContext(uploadContext.contextType);
+    if (fileSize > maxFileSize) {
+      const maxSizeMB = maxFileSize / 1024 / 1024;
+      throw new BadRequestException(`이미지는 1개당 최대 ${maxSizeMB}MB까지 업로드 가능합니다`);
+    }
+
+    // 기존 컨텍스트 확인 또는 생성
+    let context = await this.contextRepository.findOne({
+      where: {
+        contextType: uploadContext.contextType,
+        contextId: uploadContext.contextId || null,
+        ownerId: uploadContext.ownerId,
+        purpose: uploadContext.purpose,
+        isActive: true,
+      },
+    });
+
+    if (!context) {
+      context = await this.createFileContext(uploadContext);
+    } else {
+      // 파일 개수 제한 확인 (POST 컨텍스트만)
+      if (uploadContext.contextType === FileContextType.POST) {
+        const currentFileCount = await this.fileRepository.count({
+          where: {
+            contextId: context.id,
+            expiresAt: null, // 활성 파일만 카운트
+          },
+        });
+
+        const maxFiles = this.getMaxFilesForContext(uploadContext.contextType);
+        if (currentFileCount >= maxFiles) {
+          throw new BadRequestException(`최대 ${maxFiles}개의 이미지를 업로드할 수 있습니다`);
+        }
+      }
+    }
     
     // S3 키 생성
     const s3Key = this.generateS3KeyFromContext(context, fileName);
@@ -758,11 +792,11 @@ export class ContextualFileService {
       case FileContextType.PROFILE:
         return 5 * 1024 * 1024; // 5MB
       case FileContextType.POST:
-        return 10 * 1024 * 1024; // 10MB
+        return 5 * 1024 * 1024; // 5MB (10MB에서 5MB로 수정)
       case FileContextType.BLOG:
         return 5 * 1024 * 1024; // 5MB
       default:
-        return 10 * 1024 * 1024;
+        return 5 * 1024 * 1024; // 기본값도 5MB로 통일
     }
   }
 

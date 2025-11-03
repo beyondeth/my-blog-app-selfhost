@@ -1,4 +1,4 @@
-import { IsString, IsEmail, IsOptional, MinLength, MaxLength, IsUrl } from 'class-validator';
+import { IsString, IsEmail, IsOptional, MinLength, MaxLength, IsUrl, Matches } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class UpdateProfileDto {
@@ -33,11 +33,13 @@ export class UpdateProfileDto {
   bio?: string;
 
   @ApiPropertyOptional({
-    description: 'Profile image URL',
-    example: 'https://example.com/avatar.jpg',
+    description: 'Profile image URL or character path',
+    example: 'https://example.com/avatar.jpg or /character/Bimmo.jpeg',
   })
   @IsOptional()
   @IsString()
-  @IsUrl({}, { message: 'Please provide a valid URL for profile image' })
+  @Matches(/^(https?:\/\/.+|\/character\/.+\.jpeg)$/, {
+    message: 'Profile image must be a valid URL or character path (/character/xxx.jpeg)',
+  })
   profileImage?: string;
 }

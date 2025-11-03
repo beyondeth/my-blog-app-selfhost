@@ -307,15 +307,15 @@ export class AdminPostsService {
    */
   async getPostsByTag() {
     const posts = await this.postRepository.find({
-      select: ['tagList'],
-      where: { tagList: Not(IsNull()) },
+      select: ['tags'],
+      where: { tags: Not(IsNull()) },
     });
 
     const tagCount = new Map<string, number>();
 
     posts.forEach(post => {
-      if (post.tagList && Array.isArray(post.tagList)) {
-        post.tagList.forEach(tag => {
+      if (post.tags && Array.isArray(post.tags)) {
+        post.tags.forEach(tag => {
           tagCount.set(tag, (tagCount.get(tag) || 0) + 1);
         });
       }
@@ -414,15 +414,15 @@ export class AdminPostsService {
 
   private async getUniqueTags(): Promise<number> {
     const posts = await this.postRepository.find({
-      select: ['tagList'],
-      where: { tagList: Not(IsNull()) },
+      select: ['tags'],
+      where: { tags: Not(IsNull()) },
     });
 
     const uniqueTags = new Set<string>();
 
     posts.forEach(post => {
-      if (post.tagList && Array.isArray(post.tagList)) {
-        post.tagList.forEach(tag => uniqueTags.add(tag));
+      if (post.tags && Array.isArray(post.tags)) {
+        post.tags.forEach(tag => uniqueTags.add(tag));
       }
     });
 

@@ -30,11 +30,6 @@ export default function LayoutClient({ children }: LayoutClientProps) {
   const [shouldHideLayout, setShouldHideLayout] = useState(false);
   const [isLandingPage, setIsLandingPage] = useState(false);
 
-  // Mixpanel 초기화 (앱 시작 시 1회만 실행)
-  useEffect(() => {
-    initMixpanel();
-  }, []);
-
   // 경로별 레이아웃 제어 로직
   useEffect(() => {
     // 랜딩페이지 - 헤더만 표시, 사이드바 제거
@@ -120,7 +115,12 @@ export default function LayoutClient({ children }: LayoutClientProps) {
               <BottomNavBar />
             </div>
           )}
-          <Toaster position="top-center" richColors />
+          <Toaster
+            position="top-center"
+            richColors
+            expand={false}
+            gap={16}
+          />
           {/* <PerformanceMonitor /> */}
         </DMModalProvider>
       </ClientProviders>

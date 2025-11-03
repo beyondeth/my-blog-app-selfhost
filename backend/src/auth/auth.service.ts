@@ -804,4 +804,45 @@ export class AuthService {
 
     this.logger.log(`Consent updated for OAuth user: ${user.email}`);
   }
+
+  /**
+   * 비밀번호 변경 (로그인한 사용자)
+   * 현재 비밀번호를 확인하고 새 비밀번호로 변경
+   *
+   * @param userId - 사용자 ID
+   * @param currentPassword - 현재 비밀번호
+   * @param newPassword - 새 비밀번호
+   * @throws UnauthorizedException - 현재 비밀번호가 일치하지 않을 경우
+   * @throws BadRequestException - 사용자를 찾을 수 없거나 소셜 로그인 계정인 경우
+   */
+  async changePassword(
+    userId: string,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    // 사용자 조회
+    const user = await this.usersService.findById(userId);
+    if (!user) {
+      throw new BadRequestException('사용자를 찾을 수 없습니다');
+    }
+
+    // 소셜 로그인 계정 체크 (비밀번호가 없음)
+    // providerId가 null이 아니면 소셜 로그인 계정 (Google, Kakao, GitHub 등)
+    if (user.providerId) {
+      throw new BadRequestException(
+        '소셜 로그인 계정은 비밀번호를 변경할 수 없습니다'
+      );
+    }
+
+    // 현재 비밀번호 검증
+    const isValid = await this.validateUser(user.email, currentPassword);
+    if (!isValid) {
+      throw new UnauthorizedException('현재 비밀번호가 일치하지 않습니다');
+    }
+
+    // 새 비밀번호로 업데이트
+    await this.usersService.updatePassword(userId, newPassword);
+
+    this.logger.log(`Password changed successfully for user: ${user.email}`);
+  }
 } 

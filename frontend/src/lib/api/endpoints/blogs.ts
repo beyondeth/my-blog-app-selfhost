@@ -63,13 +63,57 @@ export class BlogsAPI {
   }
 
   /**
-   * 슬러그로 블로그 조회
-   * @param slug - 블로그 슬러그
+   * 슬러그/Alias로 블로그 조회 (체크포인트 2)
+   *
+   * @param slug - 블로그 identifier (slug 또는 alias)
    * @returns 블로그 상세 정보
-   * @description 비공개 블로그는 소유자만 조회 가능
+   *
+   * @description
+   * - Backend는 alias > old_alias > slug 우선순위로 조회
+   * - old_alias인 경우 shouldRedirect=true 반환 (Frontend에서 처리)
+   * - 비공개 블로그는 소유자만 조회 가능
+   *
+   * @example
+   * // alias로 조회
+   * await getBlogBySlug('park');
+   *
+   * // 이전 alias로 조회 (301 리다이렉트 필요)
+   * const result = await getBlogBySlug('oldname');
+   * // result = { ...blog, shouldRedirect: true, redirectTo: 'park' }
    */
-  async getBlogBySlug(slug: string): Promise<Blog> {
-    return this.client.get<Blog>(`/blogs/slug/${slug}`);
+  async getBlogBySlug(slug: string): Promise<Blog & { shouldRedirect?: boolean; redirectTo?: string }> {
+    return this.client.get(`/blogs/slug/${slug}`);
+  }
+
+  /**
+   * Alias 사용 가능 여부 확인 (체크포인트 2)
+   *
+   * @param alias - 확인할 alias (@ 없이)
+   * @returns { available: true } 또는 에러
+   *
+   * @description
+   * Settings에서 alias 변경 전 중복 확인용
+   * - 형식 검증: 3~30자, 영문/숫자/하이픈/언더스코어
+   * - 예약어 체크
+   * - 중복 및 재사용 방지
+   */
+  async checkAlias(alias: string): Promise<{ available: boolean }> {
+    return this.client.get(`/blogs/check-alias/${alias}`);
+  }
+
+  /**
+   * 내 블로그 Alias 변경 (체크포인트 2)
+   *
+   * @param alias - 새로운 alias (@ 없이)
+   * @returns 업데이트된 블로그
+   *
+   * @description
+   * - 기존 alias는 old_aliases로 이동 (SEO 보호)
+   * - 새 alias 저장
+   * - 본인의 블로그만 변경 가능
+   */
+  async updateAlias(alias: string): Promise<Blog> {
+    return this.client.patch(`/blogs/my-blog/alias`, { alias });
   }
 
   /**

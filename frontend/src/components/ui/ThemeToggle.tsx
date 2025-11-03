@@ -1,8 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Moon, Sun } from "lucide-react";
 import { useTheme } from "next-themes";
+
+// 에디터 툴바와 동일한 아이콘 사용
+import { MoonStarIcon } from "@/components/tiptap-icons/moon-star-icon";
+import { SunIcon } from "@/components/tiptap-icons/sun-icon";
 
 /**
  * View Transition API를 사용한 부드러운 테마 전환
@@ -66,7 +69,7 @@ export function ThemeToggle() {
         className="p-2 rounded-lg transition-interactive hover:bg-muted"
         aria-label="테마 토글"
       >
-        <Sun className="h-5 w-5" />
+        <SunIcon className="tiptap-button-icon" />
       </button>
     );
   }
@@ -95,9 +98,9 @@ export function ThemeToggle() {
       aria-label={`${resolvedTheme === "dark" ? "라이트" : "다크"} 모드로 전환`}
     >
       {resolvedTheme === "dark" ? (
-        <Sun className="h-5 w-5 text-foreground" />
+        <MoonStarIcon className="tiptap-button-icon text-foreground" />
       ) : (
-        <Moon className="h-5 w-5 text-foreground" />
+        <SunIcon className="tiptap-button-icon text-foreground" />
       )}
     </button>
   );

@@ -19,26 +19,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
 import { Save, Plus } from 'lucide-react';
-import type { UploadedImageInfo } from '@/editor';
 import type { FileUpload } from '@/types';
 import { useUserCategories } from '@/hooks/usePosts';
 import { toast } from 'sonner';
-
-// Dynamic import for editor - 초기 로딩 속도 개선 (976 KB 청크 제거)
-const BlogSimpleEditor = dynamic(
-  () => import('@/editor').then(mod => ({ default: mod.BlogSimpleEditor })),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex items-center justify-center h-[400px] border rounded-lg bg-gray-50 dark:bg-gray-900">
-        <div className="text-center">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-gray-300 border-t-gray-900 dark:border-gray-600 dark:border-t-gray-100 mx-auto" />
-          <p className="mt-3 text-sm text-gray-500 dark:text-gray-400">에디터 로딩 중...</p>
-        </div>
-      </div>
-    )
-  }
-);
+import "@/styles/elevated-editor.css"; // elevated surface 스타일
+import { BlogSimpleEditor } from '@/editor'; // 정적 import로 변경하여 flushSync 문제 해결
 
 // 폼 스키마 정의
 const postFormSchema = z.object({
@@ -95,99 +80,12 @@ export default function EditPostForm({
   title = "게시글 수정",
   blogInfo
 }: EditPostFormProps) {
-  // 이미지 및 썸네일 상태 관리 (new-story/page.tsx와 동일)
-  const [images, setImages] = useState<UploadedImageInfo[]>([]);
-  const [selectedThumbnailId, setSelectedThumbnailId] = useState<string>('');
-  const [isUploadValid, setIsUploadValid] = useState<boolean>(true);
-  const [uploadValidationReason, setUploadValidationReason] = useState<string | undefined>();
-  const isSubmittingRef = useRef(false); // 동기적 중복 제출 방지 플래그 (props.isLoading의 비동기성 보완)
+  const isSubmittingRef = useRef(false); // 동기적 중복 제출 방지 플래그
 
-  // DB의 attachedFiles 중 content HTML에 실제로 있는 이미지만 추출 + content에서 모든 유튜브 iframe 추출 (useMemo 사용)
-  // 에디터 초기화 시 한 번만 사용되는 초기 이미지 데이터
-  const initialImages = useMemo(() => {
-    const result: UploadedImageInfo[] = [];
-
-    // 1) 기존 로직: attachedFiles에서 실제 사용중인 이미지 추출
-    if (initialData?.content && initialData?.attachedFiles && initialData.attachedFiles.length > 0) {
-      // content HTML에서 실제 사용중인 이미지 ID 추출
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(initialData.content, 'text/html');
-      const imageElements = doc.querySelectorAll('img');
-      const usedImageIds = new Set<string>();
-
-      imageElements.forEach(img => {
-        // data-image-id 속성에서 추출
-        const dataImageId = img.getAttribute('data-image-id');
-        if (dataImageId) {
-          usedImageIds.add(String(dataImageId));
-        }
-
-        // src에서 /api/v1/files/{id}/download 형식 ID 추출
-        const src = img.getAttribute('src');
-        if (src) {
-          const match = src.match(/\/files\/([^/]+)\//);
-          if (match) {
-            usedImageIds.add(match[1]);
-          }
-        }
-      });
-
-      console.log('[EditPostForm] Content에서 추출한 이미지 IDs:', Array.from(usedImageIds));
-      console.log('[EditPostForm] DB attachedFiles 개수:', initialData.attachedFiles.length);
-
-      // content에 실제로 있는 이미지만 필터링
-      const filtered = initialData.attachedFiles
-        .filter(file => usedImageIds.has(String(file.id)))
-        .map(file => {
-          // 모든 이미지를 /download 엔드포인트로 통일 (에디터와 일관성 유지)
-          // 이렇게 하면 갤러리 삭제 시 removeImageFromEditor의 URL 매칭이 정상 작동
-          return {
-            id: String(file.id),
-            url: `/api/v1/files/${file.id}/download`,
-            name: file.fileName || file.originalName || `file-${file.id}`,
-            size: file.fileSize || 0,
-            isUploading: false,
-          };
-        });
-
-      console.log('[EditPostForm] 필터링된 일반 이미지 개수:', filtered.length);
-      result.push(...filtered);
-    }
-
-    // 2) 새 로직: content에서 모든 유튜브 iframe 찾아서 썸네일 추가
-    if (initialData?.content) {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(initialData.content, 'text/html');
-      const youtubeIframes = doc.querySelectorAll('iframe.youtube-video');
-
-      console.log('[EditPostForm] Content에서 찾은 유튜브 iframe 개수:', youtubeIframes.length);
-
-      youtubeIframes.forEach((iframe) => {
-        const src = iframe.getAttribute('src');
-        if (src) {
-          // 비디오 ID 추출: /embed/{videoId} 패턴 (11자리)
-          const match = src.match(/\/embed\/([a-zA-Z0-9_-]{11})/);
-          if (match && match[1]) {
-            const videoId = match[1];
-            const thumbnailUrl = `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
-
-            console.log('[EditPostForm] 유튜브 썸네일 추가:', videoId);
-
-            result.push({
-              id: `yt_thumb_${videoId}`,
-              url: thumbnailUrl,
-              name: `YouTube 썸네일 - ${videoId}`,
-              size: 0,
-              isUploading: false,
-            });
-          }
-        }
-      });
-    }
-
-    console.log('[EditPostForm] 최종 initialImages 개수:', result.length);
-    return result;
-  }, [initialData?.attachedFiles, initialData?.content]);
+  // 썸네일 이미지 ID 상태 (기존 포스트의 thumbnailImageId 또는 빈 문자열)
+  const [thumbnailImageId, setThumbnailImageId] = useState<string>(
+    (initialData as any)?.thumbnailImageId || ''
+  );
 
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
@@ -213,59 +111,6 @@ export default function EditPostForm({
     }
   }, [initialData?.category, form]);
 
-  // 초기 썸네일 ID 설정 (유튜브 URL 포함)
-  useEffect(() => {
-    if (initialData?.thumbnail) {
-      // 유튜브 URL 체크
-      const isYouTube =
-        initialData.thumbnail.includes('youtube.com') ||
-        initialData.thumbnail.includes('ytimg.com') ||
-        initialData.thumbnail.includes('youtu.be');
-
-      if (isYouTube) {
-        // 유튜브 썸네일 URL에서 비디오 ID 추출: /vi/{videoId}/ 패턴
-        const videoIdMatch = initialData.thumbnail.match(/\/vi\/([a-zA-Z0-9_-]{11})\//);
-        if (videoIdMatch && videoIdMatch[1]) {
-          setSelectedThumbnailId(`yt_thumb_${videoIdMatch[1]}`);
-          console.log('[EditPostForm] 초기 유튜브 썸네일 ID 설정:', `yt_thumb_${videoIdMatch[1]}`);
-        }
-      } else {
-        // 일반 이미지: /api/v1/files/{id}/download 형식에서 ID 추출
-        const match = initialData.thumbnail.match(/\/files\/([^/]+)\//);
-        if (match) {
-          setSelectedThumbnailId(match[1]);
-          console.log('[EditPostForm] 초기 일반 이미지 썸네일 ID 설정:', match[1]);
-        }
-      }
-    }
-  }, [initialData?.thumbnail]);
-
-  // 이미지 목록이 변경될 때마다 form의 attachedFileIds를 업데이트 (new-story/page.tsx와 동일)
-  useEffect(() => {
-    const fileIds = images
-      .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
-      .map(img => img.id);
-    form.setValue('attachedFileIds', fileIds);
-
-    const allImageIds = images.filter(img => !img.isUploading).map(img => img.id);
-
-    if (allImageIds.length > 0) {
-      const currentSelectionValid = selectedThumbnailId && allImageIds.includes(selectedThumbnailId);
-
-      if (!currentSelectionValid) {
-        setSelectedThumbnailId(allImageIds[0]);
-      }
-    } else if (selectedThumbnailId) {
-      setSelectedThumbnailId('');
-    }
-  }, [images, selectedThumbnailId, form]);
-
-  // Upload validation handler (new-story/page.tsx와 동일)
-  const handleUploadValidationChange = (isValid: boolean, reason?: string) => {
-    setIsUploadValid(isValid);
-    setUploadValidationReason(reason);
-  };
-
   // isLoading 상태 변경 시 isSubmittingRef 동기화
   useEffect(() => {
     if (!isLoading) {
@@ -274,64 +119,37 @@ export default function EditPostForm({
   }, [isLoading]);
 
   const handleSubmit = (data: PostFormValues) => {
-    // 1차 방어: 업로드 유효성 검사
-    if (!isUploadValid) {
-      return;
-    }
-
-    // 2차 방어: useRef를 통한 동기적 중복 제출 차단 (isLoading의 비동기성 보완)
+    // useRef를 통한 동기적 중복 제출 차단
     if (isSubmittingRef.current || isLoading) {
       return;
     }
 
-    // 제출 시작 - Ref를 먼저 설정 (동기적, 즉시 적용)
+    // 제출 시작
     isSubmittingRef.current = true;
-
-    // 현재 images state에서 직접 attachedFileIds 계산 (React Form state 타이밍 이슈 회피)
-    const currentFileIds = images
-      .filter(img => !img.isUploading && !img.id.startsWith('yt_thumb_'))
-      .map(img => img.id);
 
     // 카테고리 배열 → 문자열 변환 (백엔드는 "메인/서브" 형식 기대)
     const categoryString = data.categories.join('/');
 
-    // 썸네일 처리
     const formData: any = {
       ...data,
-      category: categoryString, // 백엔드는 string 형식으로 받음
-      attachedFileIds: currentFileIds, // 명시적으로 최신 값 포함
+      category: categoryString,
+      // 썸네일 이미지 ID 추가 (선택된 경우에만)
+      ...(thumbnailImageId && { thumbnailImageId }),
     };
 
     // categories 필드 제거 (백엔드는 category 필드만 사용)
     delete formData.categories;
 
-    console.log('[EditPostForm] Submitting with attachedFileIds:', currentFileIds);
-
-    // 썸네일 처리: selectedThumbnailId가 있으면 설정, 없으면 명시적으로 null
-    if (selectedThumbnailId) {
-      if (selectedThumbnailId.startsWith('yt_thumb_')) {
-        const selectedImage = images.find(img => img.id === selectedThumbnailId);
-        if (selectedImage) {
-          formData.thumbnail = selectedImage.url;
-        }
-      } else {
-        formData.thumbnail = `/api/v1/files/${selectedThumbnailId}/download`;
-      }
-    } else {
-      // 썸네일이 없으면 명시적으로 null 전달 (기존 썸네일 제거)
-      formData.thumbnail = null;
-    }
-
     onSubmit(formData);
   };
 
   return (
-    <div className="max-w-4xl mx-auto px-4 py-6">
+    <div className="max-w-5xl mx-auto px-3 py-6">
       {/* 폼 */}
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
           <Card className="border-0 shadow-none bg-transparent">
-            <CardContent className="space-y-4 pt-16">
+            <CardContent className="space-y-4 pt-16 px-4">
               {/* 제목 */}
               <FormField
                 control={form.control}
@@ -783,21 +601,19 @@ export default function EditPostForm({
                             </div>
                           )}
 
-                          <div className="h-[500px]">
+                          <div
+                            className="transition-shadow duration-300 transform translateZ(0)"
+                            data-ui-effect="elevated-surface"
+                            data-elevation="floating-editor"
+                            data-focus-mode="writing"
+                            style={{ height: '750px' }}
+                          >
                             <BlogSimpleEditor
                               content={field.value}
                               onChange={field.onChange}
-                              onFilesChange={(fileIds) => {
-                                // File IDs are handled via images state
-                              }}
-                              onThumbnailSelect={setSelectedThumbnailId}
-                              selectedThumbnailId={selectedThumbnailId}
-                              onImagesChange={setImages}
-                              onValidationChange={handleUploadValidationChange}
-                              initialImages={initialImages}
-                              enableImageManager={true}
-                              maxImages={10}
                               placeholder=" 내용을 입력하세요..."
+                              thumbnailImageId={thumbnailImageId}
+                              onThumbnailChange={setThumbnailImageId}
                             />
                           </div>
                         </div>
@@ -822,7 +638,7 @@ export default function EditPostForm({
             </Button>
             <Button
               type="submit"
-              disabled={!isUploadValid || isLoading}
+              disabled={isLoading}
               onClick={(e) => {
                 // 3차 방어: 버튼 클릭 시 Form 제출 차단 (동기적 플래그 체크)
                 if (isSubmittingRef.current || isLoading) {
@@ -831,7 +647,6 @@ export default function EditPostForm({
                 }
               }}
               className="flex items-center gap-2 min-w-[120px]"
-              title={!isUploadValid ? uploadValidationReason : undefined}
               aria-label={isLoading ? "저장 중" : submitButtonText}
             >
               {isLoading ? (

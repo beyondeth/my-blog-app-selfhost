@@ -183,16 +183,15 @@ export default function Header() {
 
             {/* Desktop Auth Section */}
             <div className="flex items-center space-x-4">
-              {authLoading ? (
+              <ThemeSwitch />
+
+              {!mounted ? (
+                <div className="w-20 h-8 bg-muted rounded animate-pulse"></div>
+              ) : authLoading ? (
                 // 로딩 중일 때는 아무것도 표시하지 않거나 스켈레톤 UI
-                <div className="flex items-center space-x-4">
-                  <div className="w-20 h-8 bg-muted rounded animate-pulse"></div>
-                </div>
+                <div className="w-20 h-8 bg-muted rounded animate-pulse"></div>
               ) : user ? (
                 <>
-                  {/* Theme Switch */}
-                  <ThemeSwitch />
-
                   {/* Profile Dropdown */}
                   <ProfileDropdown
                     user={user}
@@ -204,9 +203,6 @@ export default function Header() {
                 </>
               ) : (
                 <>
-                  {/* Theme Switch for non-authenticated users */}
-                  <ThemeSwitch />
-
                   <Link
                     href={routes.login()}
                     className="inline-flex items-center justify-center px-4 py-2 text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
@@ -234,7 +230,9 @@ export default function Header() {
             {/* Theme Switch - Always visible */}
             <ThemeSwitch />
 
-            {authLoading ? (
+            {!mounted ? (
+              <div className="w-8 h-8 bg-muted rounded-full animate-pulse"></div>
+            ) : authLoading ? (
               // 로딩 중
               <div className="w-8 h-8 bg-muted rounded-full animate-pulse"></div>
             ) : user ? (

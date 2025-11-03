@@ -24,7 +24,8 @@ export class ConversationRepository {
       'conversation.createdAt',
       'conversation.updatedAt'
     ],
-    userFields: ['id', 'username', 'profileImage', 'isActive']
+    // Phase 1-2-3: profileImage는 profiles 테이블로 이동
+    userFields: ['id', 'username', 'isActive']
   };
 
   constructor(
@@ -38,7 +39,7 @@ export class ConversationRepository {
 
     let conversation = await this.repository.findOne({
       where: { user1Id: orderedUser1Id, user2Id: orderedUser2Id },
-      relations: ['user1', 'user2'],
+      relations: ['user1', 'user1.profile', 'user2', 'user2.profile'],
       select: {
         id: true,
         user1Id: true,
@@ -53,14 +54,18 @@ export class ConversationRepository {
         user1: {
           id: true,
           username: true,
-          profileImage: true,
           isActive: true,
+          profile: {
+            profileImage: true,
+          },
         },
         user2: {
           id: true,
           username: true,
-          profileImage: true,
           isActive: true,
+          profile: {
+            profileImage: true,
+          },
         }
       }
     });
@@ -77,7 +82,7 @@ export class ConversationRepository {
 
       conversation = await this.repository.findOne({
         where: { user1Id: orderedUser1Id, user2Id: orderedUser2Id },
-        relations: ['user1', 'user2'],
+        relations: ['user1', 'user1.profile', 'user2', 'user2.profile'],
         select: {
           id: true,
           user1Id: true,
@@ -92,14 +97,18 @@ export class ConversationRepository {
           user1: {
             id: true,
             username: true,
-            profileImage: true,
             isActive: true,
+            profile: {
+              profileImage: true,
+            },
           },
           user2: {
             id: true,
             username: true,
-            profileImage: true,
             isActive: true,
+            profile: {
+              profileImage: true,
+            },
           }
         }
       });
@@ -111,7 +120,7 @@ export class ConversationRepository {
   async findById(id: string): Promise<Conversation | null> {
     return this.repository.findOne({
       where: { id },
-      relations: ['user1', 'user2'],
+      relations: ['user1', 'user1.profile', 'user2', 'user2.profile'],
       select: {
         id: true,
         user1Id: true,
@@ -126,14 +135,18 @@ export class ConversationRepository {
         user1: {
           id: true,
           username: true,
-          profileImage: true,
           isActive: true,
+          profile: {
+            profileImage: true,
+          },
         },
         user2: {
           id: true,
           username: true,
-          profileImage: true,
           isActive: true,
+          profile: {
+            profileImage: true,
+          },
         }
       }
     });
@@ -142,7 +155,7 @@ export class ConversationRepository {
   async findByIdForUser(id: string, userId: string): Promise<Conversation | null> {
     const conversation = await this.repository.findOne({
       where: { id },
-      relations: ['user1', 'user2'],
+      relations: ['user1', 'user1.profile', 'user2', 'user2.profile'],
       select: {
         id: true,
         user1Id: true,
@@ -157,14 +170,18 @@ export class ConversationRepository {
         user1: {
           id: true,
           username: true,
-          profileImage: true,
           isActive: true,
+          profile: {
+            profileImage: true,
+          },
         },
         user2: {
           id: true,
           username: true,
-          profileImage: true,
           isActive: true,
+          profile: {
+            profileImage: true,
+          },
         }
       }
     });
@@ -187,15 +204,24 @@ export class ConversationRepository {
      * - 삭제하지 않은 대화 표시 (deletedAt IS NULL)
      * - 삭제했지만 새 메시지가 있는 대화도 표시 (lastMessageAt > deletedAt)
      * - 삭제 후 새 메시지가 오면 대화는 다시 나타나지만, 이전 메시지는 보이지 않음
+     *
+     * Phase 1-2-3: profileImage는 profiles 테이블에서 JOIN
+     * 표준 관계 쿼리 사용 (formatAuthorData 패턴과 호환)
      */
     return this.repository
       .createQueryBuilder('conversation')
       .leftJoin('conversation.user1', 'user1')
+      .leftJoin('user1.profile', 'user1Profile')
       .leftJoin('conversation.user2', 'user2')
+      .leftJoin('user2.profile', 'user2Profile')
       .select([
         ...this.CONVERSATION_SELECT.base,
+        // User 기본 필드
         ...this.CONVERSATION_SELECT.userFields.map(field => `user1.${field}`),
-        ...this.CONVERSATION_SELECT.userFields.map(field => `user2.${field}`)
+        ...this.CONVERSATION_SELECT.userFields.map(field => `user2.${field}`),
+        // Profile 관계 전체 (formatAuthorData에서 flatten 처리)
+        'user1Profile',
+        'user2Profile',
       ])
       .where(
         new Brackets((qb) => {

@@ -340,7 +340,7 @@ bearer_token = "${apiKey}"`;
               >
                 {userBlogs.map((blog) => (
                   <option key={blog.id} value={blog.id}>
-                    {blog.name} (@{blog.slug})
+                    {blog.name} (@{blog.alias || blog.slug})
                   </option>
                 ))}
               </select>

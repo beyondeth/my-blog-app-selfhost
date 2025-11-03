@@ -195,7 +195,8 @@ export class UserDeletionProcessorService {
     const errors: string[] = [];
     let successCount = 0;
 
-    // S3 파일 삭제
+    // S3 파일 삭제 - Temporarily disabled for testing
+    /*
     for (const s3Key of s3Keys) {
       try {
         await this.s3Service.deleteFile(s3Key);
@@ -207,6 +208,7 @@ export class UserDeletionProcessorService {
         errors.push(errorMsg);
       }
     }
+    */
 
     // File 엔티티 삭제 (S3 삭제 성공 여부와 무관하게 레코드는 삭제)
     await this.fileRepository.delete({ userId });

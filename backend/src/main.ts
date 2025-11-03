@@ -4,6 +4,7 @@ import { ValidationPipe, Logger, LogLevel } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
+import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import helmet from 'helmet';
 import * as compression from 'compression';
 import * as cookieParser from 'cookie-parser';
@@ -170,6 +171,9 @@ async function bootstrap() {
       errorHttpStatusCode: 422,
     }),
   );
+
+  // Global exception filter
+  app.useGlobalFilters(new AllExceptionsFilter(configService));
 
   // API prefix
   app.setGlobalPrefix('api/v1', {

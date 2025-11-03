@@ -11,7 +11,7 @@ export type { BlogSimpleEditorProps } from '../components/tiptap-templates/simpl
 
 // 컴포넌트들
 export { default as ImageUploadManager } from './components/ImageManager/ImageUploadManager';
-export * from './components/ImageManager/ResizableImageNode';
+export { MediumImageNode } from './components/MediumImage/MediumImageNode';
 export { default as EditorToolbar } from './components/Toolbar/EditorToolbar';
 export { default as EnhancedEditorToolbar } from './components/Toolbar/EnhancedEditorToolbar';
 

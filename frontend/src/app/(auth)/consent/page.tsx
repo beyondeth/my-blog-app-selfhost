@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import Link from 'next/link';
@@ -29,6 +29,26 @@ export default function ConsentPage() {
     allAccepted: false,
   });
 
+  // 리다이렉트 로직을 useEffect로 처리
+  useEffect(() => {
+    // 로딩 중이면 아무것도 하지 않음
+    if (isLoading) {
+      return;
+    }
+
+    // 로딩 완료 후 user가 없으면 로그인 페이지로 리다이렉트
+    if (!user) {
+      router.push('/login');
+      return;
+    }
+
+    // 이미 약관 동의를 완료한 경우 메인 페이지로 리다이렉트
+    if (user.termsAcceptedAt && user.privacyAcceptedAt) {
+      router.push('/');
+      return;
+    }
+  }, [user, isLoading, router]);
+
   // 로딩 중이면 로딩 화면 표시
   // OAuth 직후 user 정보가 로드될 때까지 대기
   if (isLoading) {
@@ -42,15 +62,8 @@ export default function ConsentPage() {
     );
   }
 
-  // 로딩 완료 후 user가 없으면 로그인 페이지로 리다이렉트
-  if (!user) {
-    router.push('/login');
-    return null;
-  }
-
-  // 이미 약관 동의를 완료한 경우 메인 페이지로 리다이렉트
-  if (user.termsAcceptedAt && user.privacyAcceptedAt) {
-    router.push('/');
+  // 로딩 완료 후 user가 없거나 약관 동의를 완료한 경우에는 useEffect에서 리다이렉트 처리하므로 null 반환
+  if (!user || (user.termsAcceptedAt && user.privacyAcceptedAt)) {
     return null;
   }
 
