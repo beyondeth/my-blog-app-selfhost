@@ -229,7 +229,7 @@ function ReplyItem({
                   }
                 }}
                 onCancel={() => setReplyingToId(null)}
-                isLoading={createReplyMutation.isPending}
+                isLoading={false}
                 placeholder={`@${reply.author.username}에게 답글...`}
                 submitText="답글 작성"
                 maxLength={1000}
@@ -306,7 +306,8 @@ export default function CommentItemPaginated({
   const deleteMutation = useDeleteCommentPaginated(postId);
   // 항상 최상위 부모 댓글 ID를 사용
   const parentIdForMutation = level === 0 ? comment.id : (rootParentId || comment.parentCommentId);
-  const createReplyMutation = useCreateCommentPaginated(postId, parentIdForMutation);
+  const createReplyMutation = useCreateCommentPaginated(postId);
+  const [isSubmittingReply, setIsSubmittingReply] = useState(false);
 
   // useInfiniteQuery는 { pages: [...] } 구조를 반환
   const flatReplies = flattenPaginatedComments(repliesData);
@@ -363,6 +364,7 @@ export default function CommentItemPaginated({
       ? `@${comment.author.username} ${content}`
       : content;
 
+    setIsSubmittingReply(true);
     try {
       await createReplyMutation.mutateAsync({
         content: finalContent,
@@ -384,6 +386,8 @@ export default function CommentItemPaginated({
       }
     } catch (error) {
       console.error('답글 작성 실패:', error);
+    } finally {
+      setIsSubmittingReply(false);
     }
   };
 
@@ -595,7 +599,7 @@ export default function CommentItemPaginated({
                 postId={postId}
                 onSubmit={handleReply}
                 onCancel={() => setIsReplying(false)}
-                isLoading={createReplyMutation.isPending}
+                isLoading={isSubmittingReply}
                 placeholder={level >= 1 ? `@${comment.author.username}에게 답글...` : "답글을 작성해주세요..."}
                 submitText="답글 작성"
                 maxLength={1000}

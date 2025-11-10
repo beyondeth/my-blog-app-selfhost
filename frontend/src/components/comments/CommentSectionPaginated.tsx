@@ -60,6 +60,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
 
   // 댓글 작성 mutation
   const createCommentMutation = useCreateCommentPaginated(postId, sortType === 'recent' ? 'newest' : sortType);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   // 스냅샷 타임스탬프 저장 (인기순 정렬 시)
   useEffect(() => {
@@ -114,11 +115,18 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
   };
 
   // 댓글 작성 핸들러
-  const handleCreateComment = (content: string) => {
-    createCommentMutation.mutate({
-      content,
-      postId,
-    });
+  const handleCreateComment = async (content: string) => {
+    setIsSubmittingComment(true);
+    try {
+      await createCommentMutation.mutateAsync({
+        content,
+        postId,
+      });
+    } catch (error) {
+      console.error('댓글 작성 실패:', error);
+    } finally {
+      setIsSubmittingComment(false);
+    }
   };
 
   // 평탄화된 댓글 목록
@@ -189,7 +197,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
         <CommentForm
           postId={postId}
           onSubmit={handleCreateComment}
-          isLoading={createCommentMutation.isPending}
+          isLoading={isSubmittingComment}
           placeholder="댓글을 작성해주세요..."
           maxLength={1000}
         />
