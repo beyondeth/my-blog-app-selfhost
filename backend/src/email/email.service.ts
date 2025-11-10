@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, UnauthorizedException, ConflictException } from '@nestjs/common';
+import { Injectable, BadRequestException, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
 import { MailerService } from '@nestjs-modules/mailer';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -11,6 +11,8 @@ import { DateUtils } from '../common/utils/date.utils';
 
 @Injectable()
 export class EmailService {
+  private readonly logger = new Logger(EmailService.name);
+
   constructor(
     private readonly mailerService: MailerService,
     @InjectRepository(EmailVerification)
@@ -158,15 +160,49 @@ export class EmailService {
     const html = getAWSStyleEmailTemplate(code);
 
     try {
-      await this.mailerService.sendMail({
+      // 개발 환경에서만 상세 로그 출력
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`이메일 발송 시도: ${email}`, {
+          email,
+          code: `${code.substring(0, 2)}****`,
+          timestamp: new Date().toISOString(),
+        });
+      }
+
+      const result = await this.mailerService.sendMail({
         to: email,
         subject: '[codebase.blog] 이메일 인증 코드',
         html,
         replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
       });
+
+      // 성공 로그
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`이메일 발송 성공: ${email}`, {
+          messageId: result.messageId,
+          response: result.response,
+        });
+      }
     } catch (error) {
-      console.error('Email sending error:', error);
-      throw new BadRequestException('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      // 상세 에러 로깅
+      this.logger.error('이메일 발송 실패:', {
+        email,
+        error: error.message,
+        code: error.code,
+        command: error.command,
+        response: error.response,
+        stack: error.stack,
+        timestamp: new Date().toISOString(),
+      });
+
+      // 사용자에게는 일반적인 에러 메시지 제공
+      if (error.code === 'EAUTH') {
+        throw new BadRequestException('이메일 인증에 실패했습니다. 관리자에게 문의해주세요.');
+      } else if (error.code === 'ECONNECTION') {
+        throw new BadRequestException('이메일 서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      } else {
+        throw new BadRequestException('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      }
     }
   }
 

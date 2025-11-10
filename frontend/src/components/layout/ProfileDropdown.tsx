@@ -148,15 +148,6 @@ export default function ProfileDropdown({
           <span>채팅 관리</span>
         </DropdownMenuItem>
 
-        {/* Customer Support */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/support')}
-          className="cursor-pointer"
-        >
-          <FiHelpCircle className="mr-2 h-4 w-4" />
-          <span>고객센터</span>
-        </DropdownMenuItem>
-
         <DropdownMenuSeparator />
 
         {/* Blog Settings */}
@@ -184,6 +175,15 @@ export default function ProfileDropdown({
         >
           <FiKey className="mr-2 h-4 w-4" />
           <span>API Keys</span>
+        </DropdownMenuItem>
+
+        {/* Customer Support */}
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/support')}
+          className="cursor-pointer"
+        >
+          <FiHelpCircle className="mr-2 h-4 w-4" />
+          <span>고객센터</span>
         </DropdownMenuItem>
 
         {/* Notifications (Feature Flag) */}

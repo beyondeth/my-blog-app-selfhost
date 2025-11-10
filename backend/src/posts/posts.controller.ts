@@ -9,7 +9,7 @@ import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { GetPostsCursorDto } from './dto/get-posts-cursor.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
-import { RolesGuard } from '../auth/guards/roles.guard';
+import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
 import { Role } from '../common/enums/role.enum';
 import { Public } from '../common/decorators/public.decorator';

@@ -237,7 +237,7 @@ export const useUser = () => {
   return useQuery({
     queryKey: authQueryKeys.user(),
     queryFn: () => apiRequest<User>('/auth/me'),
-    staleTime: 5 * 60 * 1000,     // 5분간 fresh 상태 유지
+    staleTime: 2 * 60 * 1000,     // 5분 → 2분으로 단축 (더 자주 갱신)
     gcTime: 10 * 60 * 1000,        // 10분간 캐시 보관
     retry: (failureCount, error) => {
       // 401 Unauthorized는 재시도 불필요 (정상 응답)
@@ -248,7 +248,7 @@ export const useUser = () => {
       return failureCount < 1;
     },
     refetchOnWindowFocus: false,   // 윈도우 포커스 시 재요청 안함
-    refetchOnMount: false,         // 마운트 시 재요청 안함 (성능 최적화 - staleTime 활용)
+    refetchOnMount: true,          // false → true로 변경 (핵심 수정)
     placeholderData: (previousData) => previousData,  // 리페칭 중에도 이전 데이터 유지 (깜빡임 방지)
     meta: {
       // 비로그인 상태의 401 에러는 예상된 동작이므로 에러 바운더리에서 처리 안함

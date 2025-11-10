@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Avatar } from '@/components/ui/avatar';
 import { toast } from 'sonner';
-import { FiSmile } from 'react-icons/fi';
+import { FiSmile, FiLoader } from 'react-icons/fi';
 
 interface CommentFormProps {
   postId: string;
@@ -204,13 +204,15 @@ export default function CommentForm({
               value={content}
               onChange={handleChange}
               onFocus={() => setIsFocused(true)}
-              placeholder={placeholder}
+              placeholder={isLoading ? '작성 중입니다...' : placeholder}
               disabled={isLoading}
               rows={1}
-              className={`w-full resize-none border-0 border-b-2 bg-transparent px-0 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none transition-colors ${
+              className={`w-full resize-none border-0 border-b-2 bg-transparent px-0 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none transition-all duration-200 ${
                 isFocused
                   ? 'border-gray-900 dark:border-gray-100'
                   : 'border-gray-300 dark:border-gray-700'
+              } ${
+                isLoading ? 'opacity-60 cursor-not-allowed' : ''
               }`}
               style={{
                 minHeight: '24px',
@@ -231,10 +233,14 @@ export default function CommentForm({
                   type="button"
                   onClick={() => setShowEmojiPicker(!showEmojiPicker)}
                   disabled={isLoading}
-                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-full transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                   title="이모티콘 추가"
                 >
-                  <FiSmile className="w-5 h-5" />
+                  {isLoading ? (
+                    <FiLoader className="w-5 h-5 animate-spin" />
+                  ) : (
+                    <FiSmile className="w-5 h-5" />
+                  )}
                 </button>
 
                 {/* 이모티콘 피커 */}
@@ -263,16 +269,23 @@ export default function CommentForm({
                   type="button"
                   onClick={handleCancel}
                   disabled={isLoading}
-                  className="px-4 py-2 text-sm font-medium rounded-full text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-medium rounded-full text-gray-900 dark:text-gray-100 hover:bg-gray-100 dark:hover:bg-gray-800 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   취소
                 </button>
                 <button
                   type="submit"
                   disabled={!content.trim() || isLoading}
-                  className="px-4 py-2 text-sm font-medium rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700"
+                  className="px-4 py-2 text-sm font-medium rounded-full bg-blue-600 text-white hover:bg-blue-700 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:bg-gray-300 dark:disabled:bg-gray-700 flex items-center gap-2"
                 >
-                  {isLoading ? '작성 중...' : submitText}
+                  {isLoading ? (
+                    <>
+                      <FiLoader className="w-4 h-4 animate-spin" />
+                      작성 중...
+                    </>
+                  ) : (
+                    submitText
+                  )}
                 </button>
               </div>
             </div>

@@ -23,6 +23,8 @@ import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Admin - Debug')
 @Controller('admin/debug')
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class AdminDebugController {
   constructor(
@@ -31,7 +33,6 @@ export class AdminDebugController {
   ) {}
 
   @Get('deletion/:userIdOrEmail')
-  @Public()
   @ApiOperation({ summary: '사용자 삭제 전 데이터 미리보기 (디버그용)' })
   async previewDeletion(@Param('userIdOrEmail') userIdOrEmail: string) {
     try {
@@ -108,7 +109,6 @@ export class AdminDebugController {
   }
 
   @Delete('deletion/:userIdOrEmail/execute')
-  @Public()  // 테스트용 임시 추가
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: '실제 사용자 삭제 실행 (디버그 모드)' })
   async executeRealDeletion(

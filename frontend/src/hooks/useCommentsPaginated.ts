@@ -93,145 +93,153 @@ export function useRepliesPaginated(
  * - 페이지네이션 캐시 무효화
  * - 첫 페이지만 refetch (이후 페이지는 그대로)
  */
-export function useCreateCommentPaginated(postId: string, rootParentId?: string) {
+export function useCreateCommentPaginated(postId: string, sort?: 'newest' | 'oldest' | 'popular') {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  return useMutation({
-    mutationFn: (data: any) => apiClient.createComment(data),
-    onMutate: async (variables) => {
-      // 기존 쿼리 취소
-      await queryClient.cancelQueries({ queryKey: ['comments'] });
+  const createComment = async (data: any) => {
+    // user 유효성 검사 - 1단계 개선으로 이제 항상 user가 있어야 함
+    if (!user) {
+      throw new Error('로그인이 필요합니다.');
+    }
 
-      // Optimistic comment 생성
-      const optimisticComment: Comment = {
-        id: `temp-${Date.now()}`,
-        content: variables.content,
-        postId: variables.postId,
-        parentCommentId: variables.parentCommentId || null,
-        post: {} as any,
-        author: {
-          id: user?.id || '',
-          username: user?.username || '익명',
-          profileImage: user?.profileImage || undefined,
-          email: user?.email || '',
-          role: user?.role || 'USER',
-          authProvider: user?.authProvider || 'local',
-          isEmailVerified: user?.isEmailVerified || false,
-          createdAt: user?.createdAt || new Date().toISOString(),
-          updatedAt: user?.updatedAt || new Date().toISOString(),
-        } as User,
-        likesCount: 0,
-        dislikesCount: 0,
-        repliesCount: 0,
-        userLiked: false,
-        userDisliked: false,
-        isDeleted: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+    // 1. Optimistic Update를 위한 임시 댓글 생성
+    const optimisticComment: Comment = {
+      id: `temp-${Date.now()}-${Math.random()}`,
+      content: data.content,
+      isDeleted: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      postId: data.postId,
+      parentCommentId: data.parentCommentId || undefined,
+      author: user, // useAuth의 user 객체 직접 사용 (신뢰성 보장)
+      post: {} as any,
+      replies: [],
+      likesCount: 0,
+      dislikesCount: 0,
+      userLiked: false,
+      userDisliked: false
+    };
+
+    // 2. 캐시 키 (sort와 일치시킴)
+    const cacheKey = ['comments', 'paginated', postId, sort || 'newest'];
+
+    // 3. 현재 캐시 데이터 가져오기
+    const previousData = queryClient.getQueryData<InfiniteData<PaginatedCommentsResponse>>(cacheKey);
+
+    // 4. Optimistic Update - 임시 댓글 추가
+    if (previousData) {
+      const updatedData = {
+        ...previousData,
+        pages: previousData.pages.map((page, pageIndex) => {
+          if (pageIndex === 0) {
+            // 첫 페이지에 댓글 추가
+            const updatedPage = { ...page };
+
+            if (!data.parentCommentId) {
+              // 최상위 댓글
+              updatedPage.comments = [optimisticComment, ...page.comments];
+              updatedPage.totalCount = page.totalCount + 1;
+            } else {
+              // 답글 - 부모 댓글 찾기
+              const addReplyToComment = (comments: Comment[]): Comment[] => {
+                return comments.map(comment => {
+                  if (comment.id === data.parentCommentId) {
+                    return {
+                      ...comment,
+                      replies: [optimisticComment, ...(comment.replies || [])],
+                      repliesCount: (comment.repliesCount || 0) + 1
+                    };
+                  }
+
+                  if (comment.replies) {
+                    return {
+                      ...comment,
+                      replies: addReplyToComment(comment.replies)
+                    };
+                  }
+
+                  return comment;
+                });
+              };
+
+              updatedPage.comments = addReplyToComment(updatedPage.comments);
+              // 전체 댓글 수도 증가
+              updatedPage.totalCount = page.totalCount + 1;
+            }
+
+            return updatedPage;
+          }
+          return page;
+        })
       };
 
-      // 부모 댓글인 경우
-      if (!variables.parentCommentId) {
-        const previousData = queryClient.getQueryData<InfiniteData<PaginatedCommentsResponse>>([
-          'comments',
-          'paginated',
-          postId,
-        ]);
+      // 캐시 업데이트
+      queryClient.setQueryData(cacheKey, updatedData);
+    }
 
-        if (previousData) {
-          const newData = {
-            ...previousData,
-            pages: previousData.pages.map((page, index) => {
-              if (index === 0) {
-                return {
-                  ...page,
-                  comments: [optimisticComment, ...page.comments],
-                };
-              }
-              return page;
-            }),
-          };
+    try {
+      // 5. 서버에 댓글 생성 요청
+      const response = await apiClient.createComment(data);
 
-          queryClient.setQueryData(['comments', 'paginated', postId], newData);
-        }
+      // 6. 성공 후 실제 데이터로 교체
+      queryClient.setQueryData(cacheKey, (old: InfiniteData<PaginatedCommentsResponse> | undefined) => {
+        if (!old) return old;
+
+        const updatedData = {
+          ...old,
+          pages: old.pages.map((page, pageIndex) => {
+            if (pageIndex === 0) {
+              const updatedPage = { ...page };
+
+              const replaceTempComment = (comments: Comment[]): Comment[] => {
+                return comments.map(comment => {
+                  // 임시 댓글 찾아서 실제 댓글로 교체
+                  if (comment.id.startsWith('temp-') && comment.content === response.content) {
+                    return {
+                      ...response,
+                      replies: [], // 서버에서는 replies가 오지 않으므로 빈 배열로 설정
+                      userLiked: false,
+                      userDisliked: false
+                    };
+                  }
+
+                  // 답글인 경우
+                  if (comment.replies) {
+                    return {
+                      ...comment,
+                      replies: replaceTempComment(comment.replies)
+                    };
+                  }
+
+                  return comment;
+                });
+              };
+
+              updatedPage.comments = replaceTempComment(updatedPage.comments);
+              return updatedPage;
+            }
+            return page;
+          })
+        };
+
+        return updatedData;
+      });
+
+      return response;
+    } catch (error) {
+      // 7. 에러 시 이전 상태로 롤백
+      if (previousData) {
+        queryClient.setQueryData(cacheKey, previousData);
       }
-      // 답글인 경우
-      else {
-        // rootParentId가 제공되면 사용, 아니면 parentCommentId 사용
-        const targetRootId = rootParentId || variables.parentCommentId;
+      throw error;
+    }
+  };
 
-        // 최상위 부모의 답글 목록에 추가
-        const previousReplies = queryClient.getQueryData<InfiniteData<PaginatedCommentsResponse>>([
-          'comments',
-          'replies',
-          targetRootId,
-        ]);
-
-        if (previousReplies) {
-          const newReplies = {
-            ...previousReplies,
-            pages: previousReplies.pages.map((page, index) => {
-              if (index === 0) {
-                return {
-                  ...page,
-                  comments: [optimisticComment, ...page.comments],
-                };
-              }
-              return page;
-            }),
-          };
-
-          queryClient.setQueryData(['comments', 'replies', targetRootId], newReplies);
-        }
-
-        // 최상위 부모 댓글의 repliesCount 증가
-        const parentData = queryClient.getQueryData<InfiniteData<PaginatedCommentsResponse>>([
-          'comments',
-          'paginated',
-          postId,
-        ]);
-
-        if (parentData) {
-          const newParentData = {
-            ...parentData,
-            pages: parentData.pages.map(page => ({
-              ...page,
-              comments: page.comments.map(comment =>
-                comment.id === targetRootId
-                  ? { ...comment, repliesCount: (comment.repliesCount || 0) + 1 }
-                  : comment
-              ),
-            })),
-          };
-
-          queryClient.setQueryData(['comments', 'paginated', postId], newParentData);
-        }
-      }
-    },
-    onError: () => {
-      // 에러 시 캐시 무효화로 롤백
-      queryClient.invalidateQueries({ queryKey: ['comments'] });
-    },
-    onSuccess: (newComment, variables) => {
-      // 서버 응답으로 최신 데이터 갱신
-      if (!variables.parentCommentId) {
-        queryClient.invalidateQueries({
-          queryKey: ['comments', 'paginated', postId],
-        });
-      } else {
-        // rootParentId가 있으면 그걸 사용, 없으면 parentCommentId 사용
-        const targetRootId = rootParentId || variables.parentCommentId;
-        queryClient.invalidateQueries({
-          queryKey: ['comments', 'replies', targetRootId],
-        });
-        // 부모 댓글 목록도 갱신 (카운트 업데이트를 위해)
-        queryClient.invalidateQueries({
-          queryKey: ['comments', 'paginated', postId],
-        });
-      }
-    },
-  });
+  return {
+    mutate: createComment,
+    mutateAsync: createComment,
+  };
 }
 
 /**
