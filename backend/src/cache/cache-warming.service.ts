@@ -219,6 +219,7 @@ export class CacheWarmingService {
         .leftJoin('post.blog', 'blog')
         .where('post.isPublished = :isPublished', { isPublished: true })
         .andWhere('post.status = :status', { status: 'published' })
+        .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
         .andWhere('blog.isPublic = :isPublic', { isPublic: true })
         .orderBy('post.publishedAt', 'DESC')
         .skip(offset)
@@ -287,6 +288,7 @@ export class CacheWarmingService {
         .where('post.isPublished = true')
         .andWhere('post.status = :status', { status: 'published' })
         .andWhere('blog.isPublic = true')
+        .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
         .andWhere('post.publishedAt >= :cutoffDate', { cutoffDate })
         .addSelect(
           'post.viewCount + (post.likeCount * 3) + (post.commentCount * 2)',
@@ -335,6 +337,7 @@ export class CacheWarmingService {
       .where('post.isEditorPick = true')
       .andWhere('post.isPublished = true')
       .andWhere('post.status = :status', { status: 'published' })
+      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
       .andWhere('blog.isPublic = true')
       .orderBy('post.publishedAt', 'DESC')
       .limit(limit)
@@ -361,6 +364,7 @@ export class CacheWarmingService {
       .addSelect('COUNT(*)', 'count')
       .where('post.isPublished = true')
       .andWhere('post.status = :status', { status: 'published' })
+      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
       .andWhere('jsonb_array_length(post.tags) > 0')
       .groupBy('tag')
       .orderBy('count', 'DESC')

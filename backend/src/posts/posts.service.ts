@@ -1034,6 +1034,7 @@ export class PostsService {
       ])
       .where('post.isPublished = :isPublished', { isPublished: true })
       .andWhere('post.status = :status', { status: 'published' })
+      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
       .andWhere('blog.isPublic = :isPublic', { isPublic: true });
 
     // 기간별 필터링
@@ -2734,6 +2735,7 @@ export class PostsService {
       .where('post.isEditorPick = :isEditorPick', { isEditorPick: true })
       .andWhere('post.isPublished = :isPublished', { isPublished: true })
       .andWhere('post.status = :status', { status: 'published' })
+      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
       .orderBy('post.editorPickedAt', 'DESC') // 최신 Pick 순
       .take(safeLimit);
 
