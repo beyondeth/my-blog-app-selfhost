@@ -141,7 +141,7 @@ export function useCheckAlias(alias: string, enabled: boolean = true) {
     queryKey: ['check-alias', alias],
     queryFn: () => checkAlias(alias),
     enabled: enabled && !!alias && alias.length >= 3, // 3자 이상일 때만 확인
-    staleTime: 30 * 1000, // 30초 캐싱 (중복 확인은 짧게)
+    staleTime: 10 * 1000, // 10초 캐싱
     gcTime: 60 * 1000, // 1분간 메모리 보관
     retry: false, // 중복 확인은 재시도 불필요
     placeholderData: (previousData) => previousData, // v5에서 keepPreviousData 대체

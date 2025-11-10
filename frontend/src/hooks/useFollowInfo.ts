@@ -35,7 +35,7 @@ export function useFollowInfo(userId: string, initialState?: FollowInfo) {
       return response.json();
     },
     initialData: initialState,
-    staleTime: 30000, // 30초간 캐시 유지
+    staleTime: 10000, // 10초간 캐시 유지
     enabled: !!userId && !!user, // 로그인된 상태에서만 실행
   });
 
