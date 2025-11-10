@@ -86,7 +86,13 @@ export class CacheInvalidationListener {
       'feed:editor-picks:*',  // 와일드카드 패턴
     ];
 
-    await this.batchInvalidate(patterns, { force: true }); // 삭제는 즉시 처리
+    // 사용자별 캐시도 무효화 (프론트엔드 React Query 키와 일치)
+    const userPatterns: string[] = [
+      `posts:*:${payload.postId}:*`,  // 개별 포스트 관련 캐시
+      'posts:list:*',  // 포스트 목록 캐시
+    ];
+
+    await this.batchInvalidate([...patterns, ...userPatterns], { force: true }); // 삭제는 즉시 처리
 
     // 개별 포스트 캐시 삭제
     await this.cacheService.delete(CacheKeys.POST_CORE(payload.postId));
