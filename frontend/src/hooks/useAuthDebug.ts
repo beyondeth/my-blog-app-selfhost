@@ -40,7 +40,6 @@ export function useAuthDebug() {
         isFetching: userQuery.isFetching,
         isRefetching: userQuery.isRefetching,
         lastUpdated: userQuery.dataUpdatedAt,
-        staleTime: userQuery.staleTime,
       },
 
       // Auth Context 상태
@@ -112,18 +111,20 @@ export function useAuthDebug() {
     // 초기 로깅
     console.log('🚀 Auth Debug initialized');
     console.log('Access via: window.__AUTH_DEBUG__');
-    window.__AUTH_DEBUG__.methods.logStates();
-    window.__AUTH_DEBUG__.methods.logProfileImage();
+    window.__AUTH_DEBUG__?.methods.logStates();
+    window.__AUTH_DEBUG__?.methods.logProfileImage();
 
     // 일정 간격으로 상태 변경 감지
     const interval = setInterval(() => {
-      const prevData = window.__AUTH_DEBUG__.userQuery.data;
+      const prevData = window.__AUTH_DEBUG__?.userQuery.data;
       const currData = userQuery.data;
 
       if (prevData !== currData) {
         console.log('📊 User data changed');
-        window.__AUTH_DEBUG__.userQuery.data = currData;
-        window.__AUTH_DEBUG__.methods.logStates();
+        if (window.__AUTH_DEBUG__) {
+          window.__AUTH_DEBUG__.userQuery.data = currData;
+          window.__AUTH_DEBUG__.methods.logStates();
+        }
       }
     }, 1000);
 
@@ -170,7 +171,6 @@ declare global {
         isFetching: boolean;
         isRefetching: boolean;
         lastUpdated: number;
-        staleTime: number;
       };
       authContext: {
         user: any;

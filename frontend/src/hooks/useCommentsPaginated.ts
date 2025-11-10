@@ -139,7 +139,7 @@ export function useCreateCommentPaginated(postId: string, sort?: 'newest' | 'old
             if (!data.parentCommentId) {
               // 최상위 댓글
               updatedPage.comments = [optimisticComment, ...page.comments];
-              updatedPage.totalCount = page.totalCount + 1;
+              updatedPage.totalCount = (page.totalCount || 0) + 1;
             } else {
               // 답글 - 부모 댓글 찾기
               const addReplyToComment = (comments: Comment[]): Comment[] => {
@@ -165,7 +165,7 @@ export function useCreateCommentPaginated(postId: string, sort?: 'newest' | 'old
 
               updatedPage.comments = addReplyToComment(updatedPage.comments);
               // 전체 댓글 수도 증가
-              updatedPage.totalCount = page.totalCount + 1;
+              updatedPage.totalCount = (page.totalCount || 0) + 1;
             }
 
             return updatedPage;
