@@ -48,7 +48,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
     queryKey: queryKeys.users.followInfo(userId!),
     queryFn: async () => {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/follows/${userId}/follow-info`,
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${userId}/follow-info`,
         {
           credentials: 'include',
           headers: {

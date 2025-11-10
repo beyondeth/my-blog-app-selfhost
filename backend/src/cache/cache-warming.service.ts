@@ -34,6 +34,10 @@ export class CacheWarmingService {
   private isWarming = false; // 동시 실행 방지 플래그
   private lastWarmingTime = 0; // 마지막 워밍 시간
 
+  // 캐시 무효화 시간 추적 (추가)
+  private readonly lastInvalidationTime = new Map<string, number>();
+  private readonly INVALIDATION_COOLDOWN = 5 * 60 * 1000; // 5분
+
   // 워밍 우선순위 정의
   private readonly WARMING_PRIORITY = {
     HIGH: ['home_feed', 'popular_posts', 'editor_picks'], // 매 10분
@@ -170,8 +174,20 @@ export class CacheWarmingService {
   private async warmHomeFeed(): Promise<void> {
     for (let page = 1; page <= 3; page++) {
       const cacheKey = CacheKeys.FEED_HOME(page);
+
+      // 캐시 무효화 후 5분 동안은 웜잍 건너뛰기 (수정)
+      const lastInvalidated = this.lastInvalidationTime.get(cacheKey) || 0;
+      const now = Date.now();
+      if (now - lastInvalidated < this.INVALIDATION_COOLDOWN) {
+        this.logger.debug(`⏭️ Skipping warmed cache ${cacheKey} - recently invalidated`);
+        continue;
+      }
+
       const existing = await this.cacheService.get(cacheKey);
-      if (existing) continue; // 캐시가 있으면 스킵
+      if (existing) {
+        this.logger.debug(`⏭️ Cache ${cacheKey} exists and not recently invalidated, skipping`);
+        continue; // 캐시가 있으면 스킵
+      }
 
       // 직접 DB 조회하여 데이터 생성
       const limit = 10;
@@ -430,6 +446,40 @@ export class CacheWarmingService {
   }
 
   // ========== 이벤트 기반 워밍 ==========
+
+  /**
+   * 캐시 무효화 이벤트 수신하여 무효화 시간 기록 (추가)
+   * 웜잍 서비스가 오래된 데이터로 캐시를 덮어쓰지 않도록 방지
+   */
+  @OnEvent(CacheInvalidationEvents.POST_CREATED, { async: true })
+  async handlePostCreatedInvalidation(payload: { postId: string; blogSlug?: string }) {
+    const now = Date.now();
+
+    // 홈 피드 무효화 시간 기록
+    this.lastInvalidationTime.set(CacheKeys.FEED_HOME(1), now);
+
+    // 블로그 피드 무효화 시간 기록
+    if (payload.blogSlug) {
+      this.lastInvalidationTime.set(CacheKeys.FEED_BLOG(payload.blogSlug, 1), now);
+    }
+
+    this.logger.debug(`📝 Recorded invalidation time for post creation: ${payload.postId}`);
+  }
+
+  @OnEvent(CacheInvalidationEvents.POST_UPDATED, { async: true })
+  async handlePostUpdatedInvalidation(payload: { postId: string; blogSlug?: string }) {
+    const now = Date.now();
+
+    // 홈 피드 무효화 시간 기록
+    this.lastInvalidationTime.set(CacheKeys.FEED_HOME(1), now);
+
+    // 블로그 피드 무효화 시간 기록
+    if (payload.blogSlug) {
+      this.lastInvalidationTime.set(CacheKeys.FEED_BLOG(payload.blogSlug, 1), now);
+    }
+
+    this.logger.debug(`📝 Recorded invalidation time for post update: ${payload.postId}`);
+  }
 
   /**
    * 신규 에디터스 픽 등록 시 즉시 워밍
