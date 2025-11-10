@@ -43,7 +43,6 @@ export class AddCoveringIndexes1761600000000 implements MigrationInterface {
       CREATE INDEX "idx_posts_home_feed_covering"
       ON "posts"("isPublished", "publishedAt" DESC NULLS LAST)
       INCLUDE (id, title, slug, excerpt, thumbnail, category)
-      WHERE "isPublished" = true
       WITH (FILLFACTOR = 90)
     `);
 
@@ -61,7 +60,6 @@ export class AddCoveringIndexes1761600000000 implements MigrationInterface {
       CREATE INDEX "idx_posts_blog_feed_covering"
       ON "posts"("blogId", "isPublished", "publishedAt" DESC NULLS LAST)
       INCLUDE (id, title, slug, excerpt, thumbnail, category)
-      WHERE "isPublished" = true
       WITH (FILLFACTOR = 90)
     `);
 
@@ -79,7 +77,6 @@ export class AddCoveringIndexes1761600000000 implements MigrationInterface {
       CREATE INDEX "idx_posts_category_feed_covering"
       ON "posts"("category", "isPublished", "publishedAt" DESC NULLS LAST)
       INCLUDE (id, title, slug, excerpt, thumbnail)
-      WHERE "isPublished" = true AND "category" IS NOT NULL
       WITH (FILLFACTOR = 90)
     `);
 
@@ -111,7 +108,6 @@ export class AddCoveringIndexes1761600000000 implements MigrationInterface {
       CREATE INDEX "idx_blogs_public_list_covering"
       ON "blogs"("isPublic", "createdAt" DESC NULLS LAST)
       INCLUDE (id, slug, name, description)
-      WHERE "isPublic" = true
       WITH (FILLFACTOR = 90)
     `);
 

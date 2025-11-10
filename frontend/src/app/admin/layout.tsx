@@ -11,6 +11,8 @@ import { Shield, AlertCircle } from 'lucide-react';
 
 // Admin 재인증 세션 키 (브라우저 탭 닫으면 자동 삭제)
 const ADMIN_SESSION_KEY = 'admin_reauth_verified';
+const ADMIN_SESSION_TIMESTAMP_KEY = 'admin_session_timestamp';
+const ADMIN_SESSION_TIMEOUT = 30 * 60 * 1000; // 30분 타임아웃
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -20,6 +22,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [password, setPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
+  const [sessionExpired, setSessionExpired] = useState(false);
   const MAX_LOGIN_ATTEMPTS = 5;
   const router = useRouter();
 
@@ -39,15 +42,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       if (response.ok) {
         const data = await response.json();
 
-        // Session Storage에서 재인증 플래그 확인
+        // Session Storage에서 재인증 플래그와 타임스탬프 확인
         const isReauthVerified = sessionStorage.getItem(ADMIN_SESSION_KEY);
+        const sessionTimestamp = sessionStorage.getItem(ADMIN_SESSION_TIMESTAMP_KEY);
 
-        if (data.role === 'admin' && isReauthVerified) {
-          // Admin 재인증 완료 상태 → 자동 접근 허용
+        // 세션 타임아웃 검사
+        const now = Date.now();
+        const isSessionExpired = sessionTimestamp &&
+          (now - parseInt(sessionTimestamp)) > ADMIN_SESSION_TIMEOUT;
+
+        if (isSessionExpired) {
+          // 세션 만료 - 클린업하고 재인증 필요
+          sessionStorage.removeItem(ADMIN_SESSION_KEY);
+          sessionStorage.removeItem(ADMIN_SESSION_TIMESTAMP_KEY);
+          setSessionExpired(true); // 세션 만료 상태 설정
+        }
+
+        if (data.role === 'admin' && isReauthVerified && !isSessionExpired) {
+          // Admin 재인증 완료 상태 & 세션 유효 → 자동 접근 허용
           setIsAuthenticated(true);
           setIsAdmin(true);
-        } else if (data.role === 'admin' && !isReauthVerified) {
-          // Admin이지만 재인증 필요 (2중 보안)
+        } else if (data.role === 'admin' && (!isReauthVerified || isSessionExpired)) {
+          // Admin이지만 재인증 필요 (2중 보안) 또는 세션 만료
           setIsAuthenticated(false);
           setIsAdmin(false);
         } else {
@@ -116,8 +132,9 @@ export default function Layout({ children }: { children: React.ReactNode }) {
         return;
       }
 
-      // Admin 재인증 성공 → Session Storage에 플래그 저장
+      // Admin 재인증 성공 → Session Storage에 플래그와 타임스탬프 저장
       sessionStorage.setItem(ADMIN_SESSION_KEY, 'true');
+      sessionStorage.setItem(ADMIN_SESSION_TIMESTAMP_KEY, Date.now().toString());
 
       // Do NOT store sensitive data in localStorage
       // Session is managed via HttpOnly cookies
@@ -125,6 +142,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       toast.success('관리자 로그인 성공!');
       setIsAuthenticated(true);
       setIsAdmin(true);
+      setSessionExpired(false); // 세션 만료 상태 리셋
       
       // Clear form data after successful login
       setEmail('');
@@ -163,6 +181,14 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
+            {sessionExpired && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3 flex items-start gap-2">
+                <AlertCircle className="h-4 w-4 text-yellow-600 mt-0.5" />
+                <div className="text-sm text-yellow-800">
+                  관리자 세션이 만료되었습니다. 다시 로그인해주세요.
+                </div>
+              </div>
+            )}
             {loginAttempts >= MAX_LOGIN_ATTEMPTS && (
               <div className="bg-red-50 border border-red-200 rounded p-3 flex items-start gap-2">
                 <AlertCircle className="h-4 w-4 text-red-600 mt-0.5" />

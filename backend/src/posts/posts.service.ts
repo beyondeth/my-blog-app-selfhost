@@ -1705,31 +1705,52 @@ export class PostsService {
    * users.service.ts와 동일한 패턴 적용
    */
   private formatAuthorData(author: any): any {
+    let profileImage: string | null = null;
+
+    // 디버그 로그 추가
+    this.logger.debug(`[formatAuthorData] Input author:`, {
+      id: author.id,
+      username: author.username,
+      hasProfile: !!author.profile,
+      profile: author.profile
+    });
+
     // Phase 1 리팩토링: profiles 테이블 필드를 User 객체에 flatten (Frontend 호환성)
     if (author.profile) {
-      author.name = author.profile.name;
-      author.profileImage = author.profile.profileImage;
-      author.bio = author.profile.bio;
-      author.lastLoginProvider = author.profile.lastLoginProvider;
+      profileImage = author.profile.profileImage;
+      this.logger.debug(`[formatAuthorData] Profile image from profile table:`, profileImage);
+    } else {
+      // profile이 없는 경우 author 객체 자체에 있는지 확인
+      profileImage = author.profileImage;
+      this.logger.debug(`[formatAuthorData] Profile image from author object:`, profileImage);
     }
 
     // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
-    if (author.profileImage) {
-      if (author.profileImage.startsWith('v2/') || author.profileImage.startsWith('uploads/')) {
+    if (profileImage) {
+      if (profileImage.startsWith('v2/') || profileImage.startsWith('uploads/')) {
         // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
-        author.profileImage = this.cdnService.generateCdnUrlFromKey(author.profileImage);
-        this.logger.debug(`Author profile image CDN URL: ${author.profileImage}`);
+        profileImage = this.cdnService.generateCdnUrlFromKey(profileImage);
+        this.logger.debug(`[formatAuthorData] CDN URL converted:`, profileImage);
       }
+    } else {
+      this.logger.debug(`[formatAuthorData] No profile image found for user:`, author.id);
     }
 
     // 필요한 필드만 선택하여 반환 (email 제외)
-    return {
+    const result = {
       id: author.id,
       username: author.username,
       bio: author.bio || null,
       role: author.role,
-      profileImage: this.optimizeImageUrl(author.profileImage),
+      profileImage: profileImage, // optimizeImageUrl 제거 - CDN URL이 이미 최적화됨
     };
+
+    this.logger.debug(`[formatAuthorData] Final result:`, {
+      id: result.id,
+      profileImage: result.profileImage
+    });
+
+    return result;
   }
 
   // 좋아요 토글 (최적화된 원자적 업데이트)

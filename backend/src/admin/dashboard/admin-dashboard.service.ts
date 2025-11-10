@@ -287,7 +287,7 @@ export class AdminDashboardService {
       )
       ORDER BY timestamp DESC
       LIMIT $1
-    `, [limit, limit, limit, limit, limit]);
+    `, [limit]);
 
     return activities;
   }

@@ -59,7 +59,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
   });
 
   // 댓글 작성 mutation
-  const createCommentMutation = useCreateCommentPaginated(postId);
+  const createCommentMutation = useCreateCommentPaginated(postId, sortType === 'recent' ? 'newest' : sortType);
 
   // 스냅샷 타임스탬프 저장 (인기순 정렬 시)
   useEffect(() => {

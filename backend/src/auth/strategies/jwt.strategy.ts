@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { UsersService } from '../../users/users.service';
+import { User } from '../../users/entities/user.entity';
 import { Request } from 'express';
 import { UnifiedRedisService } from '../../redis/unified-redis.service';
 
@@ -35,47 +36,52 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const userId = payload.sub || payload.id;
     const tokenType = payload.tokenType;
 
-    // 개발 환경에서도 너무 빈번한 로그는 제거
-    // 에러와 중요 이벤트만 로그로 남김
+    // 개발 환경에서 상세한 디버그 로그 추가
+    if (process.env.NODE_ENV === 'development') {
+      this.logger.debug(`[JWT] Starting validation for token type: ${tokenType}`);
+      this.logger.debug(`[JWT] User ID (masked): ${userId ? userId.substring(0, 8) + '...' : 'null'}`);
+    }
 
     if (!userId) {
-      this.logger.error('No userId found in JWT payload');
+      this.logger.error('[JWT] No userId found in JWT payload');
       return null;
     }
 
     if (tokenType !== 'access') {
-      this.logger.error(`Invalid token type: ${tokenType}`);
+      this.logger.error(`[JWT] Invalid token type: ${tokenType}`);
       return null;
     }
 
     const cacheKey = `user_validate_${userId}`;
 
-    // 1. 캐시에서 사용자 정보 조회 - 로그 제거 (너무 빈번함)
-    const cachedUser = await this.unifiedRedisService.getCache('sessions', cacheKey);
+    // 1. 캐시에서 사용자 정보 조회
+    const cachedUser: User = await this.unifiedRedisService.getCache('sessions', cacheKey);
     if (cachedUser) {
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`[JWT] Cache hit for user: ${cachedUser.email}, role: ${cachedUser.role}`);
+      }
       return cachedUser;
     }
 
-    // 2. 캐시에 없으면 DB에서 조회 - 중요 이벤트이므로 로그 유지
-    // userId는 민감정보이므로 마스킹하여 로깅
+    // 2. 캐시에 없으면 DB에서 조회
     if (process.env.NODE_ENV === 'development') {
-      this.logger.debug(`JWT cache miss for user ID: ${userId.substring(0, 8)}...`);
+      this.logger.debug(`[JWT] Cache miss for user ID: ${userId.substring(0, 8)}...`);
     }
     const user = await this.usersService.findById(userId);
 
     if (!user) {
-      this.logger.warn('User not found in database');
+      this.logger.warn('[JWT] User not found in database');
       return null;
     }
 
     if (!user.isActive) {
-      this.logger.warn('User account is not active');
+      this.logger.warn('[JWT] User account is not active');
       return null;
     }
 
     // 삭제된 사용자 로그인 차단 (소프트 삭제)
     if (user.isDeleted) {
-      this.logger.warn('User account has been deleted');
+      this.logger.warn('[JWT] User account has been deleted');
       return null;
     }
 
@@ -89,7 +95,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       cacheTTL
     );
 
-    // 성공 로그도 제거 (너무 빈번함)
+    // 디버그를 위해 관리자 로그 추가 (프로덕션에서는 비활성화)
+    if (process.env.NODE_ENV === 'development') {
+      this.logger.debug(`[JWT] User authenticated successfully: ${user.email}, role: ${user.role}`);
+    }
+
     return user;
   }
 } 

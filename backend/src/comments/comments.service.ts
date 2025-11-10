@@ -15,6 +15,7 @@ import { PostsService } from '../posts/posts.service';
 import { BlogResolverService } from '../common/services/blog-resolver.service';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
 import { CacheMetricsService } from '../metrics/cache-metrics.service';
+import { CdnService } from '../files/services/cdn.service';
 
 @Injectable()
 export class CommentsService {
@@ -30,6 +31,7 @@ export class CommentsService {
     private cacheService: CacheService,
     private cacheMetricsService: CacheMetricsService,
     private eventEmitter: EventEmitter2,
+    private cdnService: CdnService,
   ) {}
 
   /**
@@ -50,22 +52,29 @@ export class CommentsService {
 
     // author가 있는 경우 처리
     if (comment.author) {
+      let profileImage: string | null = null;
+
       // author가 이미 UserResponseDto 타입이면 그대로 사용 (Raw SQL 조회한 답글의 경우)
       if (comment.author instanceof UserResponseDto) {
         dto.author = comment.author;
       }
-      // User 엔티티이고 profile이 있으면 profileImage를 설정 (부모 댓글의 경우)
-      else if (comment.author.profile) {
-        dto.author = plainToInstance(UserResponseDto, {
-          ...comment.author,
-          profileImage: comment.author.profile.profileImage || null
-        });
-      }
-      // profile이 없을 경우 null로 설정 (프론트엔드에서 FiUser 아이콘으로 fallback)
+      // User 엔티티인 경우
       else {
+        // profile 테이블에서 profileImage 가져오기
+        if (comment.author.profile) {
+          profileImage = comment.author.profile.profileImage;
+        }
+        // profileImage가 있으면 CDN URL로 변환
+        if (profileImage) {
+          if (profileImage.startsWith('v2/') || profileImage.startsWith('uploads/')) {
+            profileImage = this.cdnService.generateCdnUrlFromKey(profileImage);
+            this.logger.debug(`Profile image CDN URL: ${profileImage}`);
+          }
+        }
+
         dto.author = plainToInstance(UserResponseDto, {
           ...comment.author,
-          profileImage: null
+          profileImage: profileImage
         });
       }
     }
@@ -78,7 +87,7 @@ export class CommentsService {
     return dto;
   }
 
-  async create(createCommentDto: any, user: User): Promise<Comment> {
+  async create(createCommentDto: any, user: User): Promise<CommentResponseDto> {
     const { postId, parentCommentId, ...commentData } = createCommentDto;
 
     // 게시글 존재 확인 및 블로그 정보 가져오기
@@ -126,7 +135,18 @@ export class CommentsService {
     // 페이지네이션 캐시 무효화
     await this.invalidateCommentsPaginationCache(postId, actualParentCommentId);
 
-    return savedComment;
+    // 작성된 댓글을 author와 profile 관계를 포함하여 다시 조회
+    const commentWithAuthor = await this.commentsRepository.findOne({
+      where: { id: savedComment.id },
+      relations: ['author', 'author.profile'],
+    });
+
+    if (!commentWithAuthor) {
+      throw new NotFoundException('작성된 댓글을 찾을 수 없습니다.');
+    }
+
+    // CommentResponseDto로 변환하여 반환
+    return this.toCommentDto(commentWithAuthor);
   }
 
   async findAllByPost(postId: string, user?: User): Promise<CommentResponseDto[]> {
@@ -729,11 +749,17 @@ export class CommentsService {
       comment.createdAt = row.createdAt || row.createdat;
       comment.updatedAt = row.updatedAt || row.updatedat;
 
+      // ProfileImage CDN URL 변환
+      let profileImage = row.author_profileImage || row.author_profileimage;
+      if (profileImage && (profileImage.startsWith('v2/') || profileImage.startsWith('uploads/'))) {
+        profileImage = this.cdnService.generateCdnUrlFromKey(profileImage);
+      }
+
       // Author 정보 설정 - UserResponseDto를 사용하여 @Expose() 데코레이터 적용
       comment.author = plainToInstance(UserResponseDto, {
         id: row.author_id,
         username: row.author_username,
-        profileImage: row.author_profileImage || row.author_profileimage,
+        profileImage: profileImage,
         email: row.author_email
       }) as any;
 
