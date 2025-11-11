@@ -806,14 +806,20 @@ export class PostsService {
       .leftJoin('post.stats', 'stats')
       .leftJoin('post.metadata', 'metadata');
 
-    // 삭제된 포스트 제외 (기본 필터)
-    query.where('post.isDeleted = :isDeleted', { isDeleted: false });
+    // 캐시용인지 여부에 따라 isDeleted 필터 다르게 적용
+    if (isForCache) {
+      // 홈 피드 캐시: isDeleted 정보 포함 (캐시 유지를 위해)
+      // 단, isPublished와 status 필터는 적용
+      query.where('post.isPublished = :isPublished', { isPublished: true })
+        .andWhere('post.status = :status', { status: 'published' });
+    } else {
+      // 실시간 조회: 삭제된 포스트 제외
+      query.where('post.isDeleted = :isDeleted', { isDeleted: false });
+    }
 
     // 캐시용이면 비공개 블로그 제외
     if (isForCache) {
-      query.andWhere('blog.isPublic = :isPublic', { isPublic: true })
-        .andWhere('post.isPublished = :isPublished', { isPublished: true })
-        .andWhere('post.status = :status', { status: 'published' });
+      query.andWhere('blog.isPublic = :isPublic', { isPublic: true });
     } else {
       // Admin can see all posts, regular users only see published posts
       if (user?.role === Role.ADMIN) {

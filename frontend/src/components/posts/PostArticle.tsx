@@ -7,7 +7,7 @@ import OptimizedImage from '@/components/ui/OptimizedImage';
 import { Avatar } from '@/components/ui/avatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
-import { FiHeart, FiMessageCircle, FiEye, FiTarget, FiTag } from 'react-icons/fi';
+import { FiHeart, FiMessageCircle, FiEye, FiTarget, FiTag, FiAlertCircle } from 'react-icons/fi';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
 
@@ -58,6 +58,33 @@ const PostArticle = React.memo(function PostArticle({
   searchQuery,
   priority = false, // 기본값: lazy loading
 }: PostArticleProps) {
+  // 삭제된 포스트 상태 확인
+  const isDeleted = post.isDeleted || post.status === 'deleted';
+
+  // 삭제된 포스트는 간단한 상태 UI만 표시
+  if (isDeleted) {
+    return (
+      <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-8 first:pt-0">
+        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg border-l-4 border-red-400 p-4">
+          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400 mb-2">
+            <FiAlertCircle className="w-5 h-5 text-red-400" />
+            <span className="font-medium">삭제된 게시물</span>
+          </div>
+          <p className="text-sm text-gray-400 dark:text-gray-500">
+            이 포스트는 작성자에 의해 삭제되었습니다
+          </p>
+          {post.title && (
+            <div className="mt-3">
+              <p className="text-xs text-gray-500 dark:text-gray-600 line-clamp-1">
+                제목: {post.title}
+              </p>
+            </div>
+          )}
+        </div>
+      </article>
+    );
+  }
+
   // excerpt가 있으면 사용, 없으면 content에서 추출
 
   // excerpt를 우선 사용 (홈/목록 페이지용)

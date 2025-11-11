@@ -14,6 +14,11 @@ export enum CacheTTL {
   POST_CORE = 1800,  // 30분 - 포스트 Core 데이터 (title, content, author 등)
   EXTRA_LONG = 1800, // 30분 - 프로필
   STATIC = 3600,     // 1시간 - 블로그 설정, 태그
+
+  // 새로운 분리된 TTL
+  HOME_FEED = 600,    // 10분 - 홈 피드 (성능 우선)
+  MY_BLOG = 30,       // 30초 - 내 블로그 (즉시 반영)
+  DELETED_POSTS_CLEANUP = 300, // 5분 - 삭제된 포스트 정리
 }
 
 // 표준화된 캐시 키 생성 헬퍼
@@ -331,16 +336,29 @@ export class CacheService {
       this.del(CacheKeys.USER_BY_ID(userId)),
       this.del(CacheKeys.USER_STATS(userId)),
     ];
-    
+
     if (username) {
       promises.push(this.del(CacheKeys.USER_PROFILE(username)));
     }
-    
+
     if (email) {
       promises.push(this.del(CacheKeys.USER_BY_EMAIL(email)));
     }
-    
+
     await Promise.all(promises);
+  }
+
+  /**
+   * 패턴으로 키 조회하기 (지연된 작업 처리용)
+   */
+  async getKeys(pattern: string): Promise<string[]> {
+    try {
+      const keys = await this.redis.keys(pattern);
+      return keys;
+    } catch (error) {
+      this.logger.error(`Failed to get keys for pattern ${pattern}:`, error);
+      return [];
+    }
   }
 
   /**
