@@ -15,10 +15,11 @@
  */
 
 import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleDestroy } from '@nestjs/common';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Post } from '../entities/post.entity';
 import { PostMetadata } from '../entities/post-metadata.entity';
 import { File } from '../../files/entities/file.entity';
@@ -35,7 +36,7 @@ import {
   concurrency: 1, // 한 번에 하나의 Job만 처리 (순차 처리)
   lockDuration: 30000, // 30초 잠금 유지 (Job 처리 타임아웃)
 })
-export class PostProcessingProcessor extends WorkerHost {
+export class PostProcessingProcessor extends WorkerHost implements OnModuleDestroy {
   private readonly logger = new Logger(PostProcessingProcessor.name);
 
   constructor(
@@ -49,6 +50,7 @@ export class PostProcessingProcessor extends WorkerHost {
     private readonly fileContextRepository: Repository<FileContext>,
     private readonly markdownRenderer: MarkdownRendererService,
     private readonly contentProcessing: ContentProcessingService,
+    private readonly eventEmitter: EventEmitter2,
   ) {
     super();
   }
@@ -145,6 +147,33 @@ export class PostProcessingProcessor extends WorkerHost {
         })
         .where('postId = :postId', { postId })
         .execute();
+
+      // 6-3. 포스트 발행 완료 후 캐시 무효화를 위한 이벤트 발생
+      // 블로그 정보를 포함해서 POST_UPDATED 이벤트 발생 (캐시 무효화에 필요)
+      // 메모리 최적화: 전체 blog 엔티티가 아닌 필요한 필드만 조회
+      const postData = await this.postRepository
+        .createQueryBuilder('post')
+        .leftJoin('post.blog', 'blog')
+        .select(['post.id', 'blog.slug', 'blog.userId'])
+        .where('post.id = :id', { id: postId })
+        .getOne();
+
+      if (postData?.blog) {
+        try {
+          // 포스트가 'published' 상태로 변경되었음을 알리는 이벤트 발생
+          this.eventEmitter.emit('post.updated', {
+            postId: postData.id,
+            blogSlug: postData.blog.slug,
+            userId: postData.blog.userId,
+            status: 'published',
+          });
+
+          this.logger.debug(`📢 POST_UPDATED 이벤트 발생: postId=${postId}, blogSlug=${postData.blog.slug}`);
+        } catch (eventError) {
+          // 이벤트 발생 실패 시 처리 실패로 기록하지만, 포스트 처리는 계속 진행
+          this.logger.warn(`POST_UPDATED 이벤트 발생 실패: postId=${postId}`, eventError);
+        }
+      }
 
       const processingTime = Date.now() - startTime;
 
@@ -325,5 +354,31 @@ export class PostProcessingProcessor extends WorkerHost {
   @OnWorkerEvent('active')
   onActive(job: Job<PostProcessingJobData>) {
     this.logger.debug(`Job ${job.id} activated for post ${job.data.postId}`);
+  }
+
+  /**
+   * 모듈 종료 시 리소스 정리
+   * BullMQ Worker 연결과 EventEmitter2 리소스 정리
+   */
+  async onModuleDestroy(): Promise<void> {
+    this.logger.log('🧹 PostProcessingProcessor 리소스 정리 시작...');
+
+    try {
+      // BullMQ Worker 종료
+      if (this.worker) {
+        await this.worker.close();
+        this.logger.debug('✅ BullMQ Worker 종료 완료');
+      }
+
+      // EventEmitter2 모든 리스너 제거
+      if (this.eventEmitter) {
+        this.eventEmitter.removeAllListeners();
+        this.logger.debug('✅ EventEmitter2 리스너 정리 완료');
+      }
+    } catch (error) {
+      this.logger.error('❌ PostProcessingProcessor 리소스 정리 중 오류 발생:', error);
+    }
+
+    this.logger.log('✅ PostProcessingProcessor 리소스 정리 완료');
   }
 }
