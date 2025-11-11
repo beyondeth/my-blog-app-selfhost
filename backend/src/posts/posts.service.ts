@@ -2918,24 +2918,9 @@ export class PostsService {
         'post.isEditorPick',
         'post.editorPickedAt',
       ])
-      .addSelect([
-        'author.id',
-        'author.username',
-        'author.role',
-      ])
-      .leftJoin('post.author', 'author')
-      .leftJoin('author.profile', 'profile')
-      .addSelect([
-        'profile.profileImage',
-        'profile.bio',
-      ])
-      .addSelect([
-        'blog.id',
-        'blog.slug',
-        'blog.name',
-        'blog.isPublic',
-      ])
-      .leftJoin('post.blog', 'blog')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')
+      .leftJoinAndSelect('post.blog', 'blog')
       .leftJoin('post.stats', 'stats')
       .leftJoin('post.metadata', 'metadata');
 
