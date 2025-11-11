@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource } from 'typeorm';
 import { DateUtils } from '../common/utils/date.utils';
@@ -17,6 +18,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuditAction } from '../audit/entities/audit-log.entity';
 import { Post } from '../posts/entities/post.entity';
 import { Comment } from '../comments/entities/comment.entity';
+import { UserProfileUpdatedEvent, CacheInvalidationEvents } from '../common/events/cache.events';
 
 @Injectable()
 export class UsersService {
@@ -39,6 +41,7 @@ export class UsersService {
     private readonly cdnService: CdnService,
     private readonly auditService: AuditService,
     private readonly dataSource: DataSource,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -433,42 +436,53 @@ export class UsersService {
 
     this.logger.log(`User updated: ${user.email}`);
 
-    // Redis 캐시 무효화 (프로필 이미지 업데이트 시 모든 관련 캐시 삭제)
-    try {
-      // 1. JWT 검증 캐시 삭제
-      const userValidateKey = `user_validate_${id}`;
-      await this.redisService.deleteCache('sessions', userValidateKey);
+    // 이벤트 기반 캐시 무효화로 전환 (수동 Redis 삭제 제거)
+    // - CacheInvalidationListener가 모든 관련 캐시를 무효화함
+    // - 중복 작업 방지 및 단일 책임 원칙 준수
 
-      // 2. 사용자 정보 캐시 삭제 (다양한 조회 키)
-      const userCacheKeys = [
-        `user_${id}`,  // 기본 사용자 캐시
-        `user_by_username_${user.username}`,  // username으로 조회
-        `user_by_email_${user.email}`,  // email로 조회
-        `profile_${id}`,  // 프로필 캐시
-        `user_profile_${id}`  // 사용자 프로필 캐시
-      ];
+    // 프로필 업데이트 이벤트 발생 (캐시 무효화용)
+    const changes: any = {};
+    const oldProfileImage = user.profile?.profileImage;
 
-      for (const key of userCacheKeys) {
-        await this.redisService.deleteCache('users', key);
-      }
+    if (processedProfileImage && processedProfileImage !== oldProfileImage) {
+      changes.profileImage = true;
+    }
+    if (bio !== undefined && bio !== user.profile?.bio) {
+      changes.bio = true;
+    }
 
-      // 3. CDN 캐시 무효화 (프로필 이미지 URL)
-      if (processedProfileImage) {
-        try {
-          // 프로필 이미지 CDN 캐시 무효화
-          if (processedProfileImage.startsWith('v2/') || processedProfileImage.startsWith('uploads/')) {
-            await this.cdnService.invalidateCache([processedProfileImage]);
-            this.logger.debug(`Profile image CDN cache invalidated: ${processedProfileImage}`);
-          }
-        } catch (cdnError) {
-          // CDN 캐시 무효화 실패해도 사용자 업데이트는 계속 진행
-          this.logger.warn(`CDN cache invalidation failed: ${cdnError.message}`);
+    if (Object.keys(changes).length > 0) {
+      try {
+        // 프로필 이미지 변경이 있으면 USER_AVATAR_UPDATED 이벤트도 발생
+        if (changes.profileImage) {
+          this.eventEmitter.emit('user.avatar.updated', {
+            userId: id,
+            username: user.username,
+            oldProfileImage,
+            newProfileImage: processedProfileImage,
+          });
+          this.logger.debug(`👤 User avatar updated event emitted for user: ${id}`);
         }
-      }
 
-      this.logger.debug(`All user profile caches invalidated for user: ${id}`);
-    } catch (error) {
-      this.logger.error(`Failed to invalidate user caches: ${error.message}`);
+        // 일반 프로필 변경 이벤트 (bio 등 기타 변경용)
+        this.eventEmitter.emit(
+          CacheInvalidationEvents.USER_PROFILE_UPDATED,
+          {
+            userId: id,
+            username: user.username, // Add username from user object
+            changes
+          }
+        );
+        this.logger.debug(`👤 User profile updated event emitted for user: ${id}`, changes);
+      } catch (error) {
+        // 이벤트 발생 실패 시 로그만 남기고 진행 (캐시 무효화 실패가 사용자 업데이트를 막아서는 안 됨)
+        this.logger.error(
+          `Failed to emit user profile updated event for user: ${id}`,
+          error.stack
+        );
+        // 실패한 이벤트를 큐에 저장하여 나중에 재시도할 수 있음
+        // 여기서는 간단히 실패 로그만 남김
+      }
     }
 
     // 업데이트된 사용자 정보 반환

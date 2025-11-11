@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, forwardRef, Inject } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { OnEvent } from '@nestjs/event-emitter';
 import { CacheService, CacheKeys, CacheTTL } from './cache.service';
+import { BlogsService } from '../blogs/blogs.service';
 import {
   CacheInvalidationEvents,
   CommentCreatedEvent,
@@ -22,6 +24,9 @@ export class CacheInvalidationListener {
 
   constructor(
     private readonly cacheService: CacheService,
+    @Inject(forwardRef(() => BlogsService))
+    private readonly blogsService: BlogsService,
+    private readonly moduleRef: ModuleRef,
   ) {}
 
   /**
@@ -239,6 +244,16 @@ export class CacheInvalidationListener {
       `blog:user:${payload.userId}`,
     ];
 
+    // 블로그 identifier 캐시도 무효화 (최적화된 조회 사용)
+    const blogIdentifier = await this.getUserBlogIdentifier(payload.userId);
+    if (blogIdentifier) {
+      patterns.push(
+        `blog:identifier:${blogIdentifier}`,  // identifier_to_blog 캐시 무효화
+        `blog:identifier:@${blogIdentifier}`  // @가 붙은 경우도 대비
+      );
+      this.logger.debug(`🔗 [Blog Cache] Added blog identifier cache invalidation: ${blogIdentifier}`);
+    }
+
     // 프로필 이미지나 이름 변경 시 포스트 목록도 무효화 (author 정보 포함)
     if (payload.changes.profileImage || payload.changes.displayName) {
       patterns.push(
@@ -255,12 +270,47 @@ export class CacheInvalidationListener {
   /**
    * 배치 캐시 무효화
    * CacheService의 invalidatePatterns 사용
+   * 실패 시 재시도 로직 포함
    */
   private async batchInvalidate(
     patterns: string[],
-    options?: { force?: boolean }
+    options?: { force?: boolean; maxRetries?: number }
   ): Promise<void> {
-    await this.cacheService.invalidatePatterns(patterns, options);
+    const maxRetries = options?.maxRetries || 2;
+    let retryCount = 0;
+
+    while (retryCount <= maxRetries) {
+      try {
+        await this.cacheService.invalidatePatterns(patterns, options);
+        // 성공 시 로그 남기고 종료
+        if (patterns.length > 0) {
+          this.logger.debug(`✅ Cache invalidated successfully: ${patterns.length} patterns`);
+        }
+        return;
+      } catch (error) {
+        retryCount++;
+
+        if (retryCount > maxRetries) {
+          // 최대 재시도 횟수 초과 시 에러 로그
+          this.logger.error(
+            `❌ Failed to invalidate cache after ${maxRetries} retries. Patterns: ${patterns.join(', ')}`,
+            error.stack
+          );
+
+          // 실패한 패턴을 Redis에 저장하여 나중에 재시도할 수 있음
+          // 여기서는 간단히 실패 로그만 남김
+          return;
+        }
+
+        // 재시도 전 대기 (지수 백오프)
+        const delay = Math.pow(2, retryCount) * 100; // 200ms, 400ms
+        this.logger.warn(
+          `⚠️ Cache invalidation failed (attempt ${retryCount}/${maxRetries}), retrying in ${delay}ms...`
+        );
+
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
   }
 
   /**
@@ -289,4 +339,88 @@ export class CacheInvalidationListener {
     this.logger.debug(`⏰ Scheduled delayed invalidation for post ${postId}`);
   }
 
+  /**
+   * 사용자의 블로그 정보를 캐시 포함하여 조회
+   * DB 쿼리 최적화를 위해 캐시를 먼저 확인
+   */
+  private async getUserBlogIdentifier(userId: string): Promise<string | null> {
+    try {
+      // 1. 캐시에서 먼저 조회
+      const cacheKey = CacheKeys.BLOG_BY_USER(userId);
+      let userBlog = await this.cacheService.get(cacheKey);
+
+      if (!userBlog) {
+        // 2. 캐시에 없으면 DB 조회
+        userBlog = await this.blogsService.findByUserId(userId);
+        // 3. 조회된 결과를 캐시에 저장 (30분)
+        if (userBlog) {
+          await this.cacheService.set(cacheKey, userBlog, CacheTTL.EXTRA_LONG);
+        }
+      }
+
+      return (userBlog as any)?.identifier || null;
+    } catch (error) {
+      this.logger.warn(`Failed to get user blog identifier: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * 사용자 아바타 업데이트 이벤트 처리
+   * 프로필 이미지 변경 시 관련 캐시를 즉시 무효화하고 CDN 캐시도 정리
+   */
+  @OnEvent(CacheInvalidationEvents.USER_AVATAR_UPDATED, { async: true })
+  async handleUserAvatarUpdated(payload: {
+    userId: string;
+    username?: string;
+    oldProfileImage?: string;
+    newProfileImage: string;
+  }) {
+    this.logger.debug(`👤 [User Avatar Updated] Invalidating cache for user: ${payload.userId}`);
+
+    const patterns = [
+      // 홈 피드 캐시 (프로필 이미지가 포함된 포스트)
+      `feed:home:*`,
+      // 인기 포스트 캐시
+      `posts:popular:*`,
+      // 사용자 관련 캐시 (표준화된 패턴)
+      `user:id:${payload.userId}`,
+      `user:profile:${payload.userId}`,
+      // JWT 검증 캐시
+      `user_validate_${payload.userId}`,
+      // 사용자 관련 모든 캐시
+      `user:${payload.userId}:*`,
+    ];
+
+    // 블로그 관련 캐시도 무효화 (최적화된 조회 사용)
+    const blogIdentifier = await this.getUserBlogIdentifier(payload.userId);
+    if (blogIdentifier) {
+      patterns.push(
+        `blog:identifier:${blogIdentifier}`,
+        `blog:identifier:@${blogIdentifier}`,
+        `feed:blog:${blogIdentifier}:*`
+      );
+    }
+
+    // 즉시 무효화 실행
+    await this.batchInvalidate(patterns, { force: true });
+
+    // CDN 캐시 무효화
+    if (payload.oldProfileImage) {
+      try {
+        // CDN 서비스 동적 가져오기
+        const { CdnService } = await import('../files/services/cdn.service');
+        const cdnService = this.moduleRef.get(CdnService, { strict: false });
+
+        if (cdnService && (payload.oldProfileImage.startsWith('v2/') || payload.oldProfileImage.startsWith('uploads/'))) {
+          await cdnService.invalidateCache([payload.oldProfileImage]);
+          this.logger.debug(`✅ CDN cache invalidated for old avatar: ${payload.oldProfileImage}`);
+        }
+      } catch (error) {
+        this.logger.warn(`CDN cache invalidation failed for avatar: ${error.message}`);
+      }
+    }
+
+    this.logger.log(`✅ Avatar update cache invalidated: ${patterns.length} patterns`);
+  }
 }

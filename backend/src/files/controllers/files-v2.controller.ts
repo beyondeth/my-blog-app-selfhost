@@ -21,6 +21,7 @@ import { User } from '../../users/entities/user.entity';
 import { Profile } from '../../users/entities/profile.entity';
 import { Express } from 'express';
 import 'multer';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { ContextualFileService } from '../services/contextual-file.service';
 import { FileContextType, FilePurpose } from '../entities/file-context.entity';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -48,6 +49,7 @@ export class FilesV2Controller {
     private readonly contextualFileService: ContextualFileService,
     @InjectRepository(Profile)
     private readonly profileRepository: Repository<Profile>,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -71,10 +73,21 @@ export class FilesV2Controller {
     // Phase 1-2-3: Profile 테이블에 이미지 URL 업데이트
     // s3Key를 그대로 저장 (예: v2/users/xxx/profile/avatar/xxx.png)
     // 프론트엔드에서 /api/v1/files/{s3Key} 형태로 접근
+    const existingProfile = await this.profileRepository.findOne({ where: { userId: user.id } });
+    const oldProfileImage = existingProfile?.profileImage || null;
+
     await this.profileRepository.update(
       { userId: user.id },
       { profileImage: result.s3Key },
     );
+
+    // 프로필 이미지 업데이트 이벤트 발생 (캐시 무효화용)
+    this.eventEmitter.emit('user.avatar.updated', {
+      userId: user.id,
+      username: user.username,
+      oldProfileImage,
+      newProfileImage: result.s3Key,
+    });
 
     return result;
   }

@@ -851,7 +851,12 @@ export class PostsService {
       const searchTerms = search.trim()
         .split(/\s+/) // 공백으로 분리
         .filter(term => term.length > 0) // 빈 문자열 제거
-        .map(term => term.replace(/[:'"\\]/g, '')) // 콜론을 포함한 특수문자 제거
+        .map(term => {
+          // 따옴표와 백슬래시만 제거, 콜론은 유지
+          const cleaned = term.replace(/["\\]/g, '');
+          // 콜론이 포함된 경우 따옴표로 감싸서 tsquery 처리
+          return cleaned.includes(':') ? `"${cleaned}"` : cleaned;
+        })
         .join(' & '); // AND 연산자로 결합 (모든 단어가 포함되어야 함)
 
       if (searchTerms) {
@@ -1747,7 +1752,7 @@ export class PostsService {
     const result = {
       id: author.id,
       username: author.username,
-      bio: author.bio || null,
+      bio: author.profile?.bio || author.bio || null, // profiles 테이블 우선, fallback으로 users 테이블
       role: author.role,
       profileImage: profileImage, // optimizeImageUrl 제거 - CDN URL이 이미 최적화됨
     };
