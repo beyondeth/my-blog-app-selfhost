@@ -135,6 +135,7 @@ export class UserDeletionDebugService {
         const postCount = await queryRunner.manager
           .createQueryBuilder(Post, 'post')
           .where('post.blogId = :blogId', { blogId: blog.id })
+          .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
           .getCount();
         blog.posts = Array(postCount).fill({}); // 포스트 수만큼 빈 배열 생성
       }
@@ -143,6 +144,7 @@ export class UserDeletionDebugService {
       const posts = await queryRunner.manager
         .createQueryBuilder(Post, 'post')
         .where('post."authorId" = :userId', { userId })
+        .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
         .select(['post.id', 'post.title', 'post.createdAt', 'post.viewCount'])
         .getMany();
 

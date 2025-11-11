@@ -455,12 +455,13 @@ export class AdminUsersService {
     });
 
     const [totalPosts, totalComments, totalLikes] = await Promise.all([
-      this.postRepository.count({ where: { authorId: userId } }),
+      this.postRepository.count({ where: { authorId: userId, isDeleted: false } }),
       this.commentRepository.count({ where: { authorId: userId } }),
       this.postRepository
         .createQueryBuilder('post')
         .select('SUM(post.likeCount)', 'total')
         .where('post.authorId = :userId', { userId })
+        .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
         .getRawOne()
         .then(r => parseInt(r?.total || '0')),
     ]);
@@ -481,7 +482,7 @@ export class AdminUsersService {
   private async getUserRecentActivity(userId: string, limit = 10) {
     const [recentPosts, recentComments] = await Promise.all([
       this.postRepository.find({
-        where: { authorId: userId },
+        where: { authorId: userId, isDeleted: false },
         order: { createdAt: 'DESC' },
         take: limit / 2,
         select: ['id', 'title', 'createdAt'],

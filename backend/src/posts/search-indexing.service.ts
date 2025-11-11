@@ -107,6 +107,7 @@ export class SearchIndexingService {
         indexedAt: IsNull(),
         isPublished: true, // 공개된 포스트만 인덱싱
         status: 'published', // Worker 처리 완료된 포스트만 인덱싱
+        isDeleted: false, // 삭제되지 않은 포스트만 인덱싱
       },
       order: {
         createdAt: 'ASC', // 오래된 포스트부터 처리
@@ -125,6 +126,7 @@ export class SearchIndexingService {
         indexedAt: IsNull(),
         isPublished: true,
         status: 'published', // Worker 처리 완료된 포스트만 카운트
+        isDeleted: false, // 삭제되지 않은 포스트만 카운트
       },
     });
   }
