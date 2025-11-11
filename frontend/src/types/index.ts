@@ -103,6 +103,8 @@ export interface Post {
   excerpt?: string;  // 포스트 요약 (목록 표시용)
   thumbnail?: string;
   isPublished: boolean;
+  status?: string;  // 포스트 상태 ('published', 'draft', 'deleted')
+  isDeleted?: boolean;  // 소프트 삭제 여부
   viewCount: number;
   likeCount: number;
   commentCount: number;
