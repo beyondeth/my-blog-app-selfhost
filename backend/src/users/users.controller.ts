@@ -28,8 +28,10 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '내 프로필 조회' })
   @ApiBearerAuth()
-  getProfile(@Request() req) {
-    return this.usersService.findOne(req.user.id);
+  async getProfile(@Request() req) {
+    const user = await this.usersService.findOne(req.user.id);
+    // UserResponseDto로 변환하여 반환 (profileImage는 이미 CDN URL로 변환됨)
+    return user; // ClassSerializerInterceptor가 없으므로 그대로 반환
   }
 
   @Get('characters')
