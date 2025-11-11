@@ -64,6 +64,39 @@ if [ ! -f .env.production ]; then
 fi
 log_info "✓ 환경 변수 확인 완료"
 
+# 1.5. 디스크 공간 확인 및 정리 (Oracle Free Tier 최적화)
+log_info "Step 1.5: 디스크 공간 확인 및 정리"
+DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
+log_info "현재 디스크 사용률: ${DISK_USAGE}%"
+
+# 디스크 사용률이 80% 이상이면 자동 정리
+if [ "$DISK_USAGE" -ge 80 ]; then
+    log_warn "디스크 사용률이 ${DISK_USAGE}%로 높습니다. 정리를 시작합니다..."
+
+    # Docker 시스템 정리 (dangling 이미지, 미사용 컨테이너, 빌드 캐시)
+    log_info "Docker 정리 중..."
+    DOCKER_CLEANED=$(docker system prune -a -f --volumes | grep -E 'Total reclaimed space| reclaimed' || echo "0B")
+    log_info "Docker 정리 완료: $DOCKER_CLEANED"
+
+    # 시스템 저널 로그 정리 (7일 이전)
+    log_info "시스템 로그 정리 중..."
+    sudo journalctl --vacuum-time=7d --quiet
+    log_info "시스템 로그 정리 완료"
+
+    # 최종 디스크 사용률 확인
+    NEW_DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
+    log_info "정리 후 디스크 사용률: ${NEW_DISK_USAGE}% (이전: ${DISK_USAGE}%)"
+
+    # 정리 후에도 90% 이상이면 배포 중지
+    if [ "$NEW_DISK_USAGE" -ge 90 ]; then
+        log_error "디스크 공간 부족 (${NEW_DISK_USAGE}%). 배포를 중단합니다."
+        log_error "수동으로 디스크 공간을 확보한 후 다시 시도하세요."
+        exit 1
+    fi
+else
+    log_info "✓ 디스크 공간 충분 (${DISK_USAGE}%)"
+fi
+
 # 2. Docker 이미지 빌드 (병렬 - Backend, Frontend, MCP Proxy)
 log_info "Step 2: Docker 이미지 빌드 (병렬) - 캐시 무효화"
 # --no-cache: 항상 최신 코드로 빌드 보장
