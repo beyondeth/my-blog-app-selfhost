@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { OnEvent } from '@nestjs/event-emitter';
-import { CacheService, CacheKeys } from './cache.service';
+import { CacheService, CacheKeys, CacheTTL } from './cache.service';
 import {
   CacheInvalidationEvents,
   CommentCreatedEvent,

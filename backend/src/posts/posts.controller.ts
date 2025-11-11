@@ -24,6 +24,7 @@ import { ViewCountService } from './view-count.service';
 import { CacheInterceptor } from '../cache/cache.interceptor';
 import { FilesService } from '../files/files.service';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
+import { CacheTTL as CacheTTLDecorator } from '../cache/cache.decorator';
 import { PaginationHelper } from '../common/dto/pagination.dto';
 import { MonitoringService } from '../monitoring/monitoring.service';
 import { InjectRedis } from '@nestjs-modules/ioredis';
@@ -386,7 +387,7 @@ export class PostsController {
   @Get('popular-tags')
   @Public()
   @UseInterceptors(CacheInterceptor)
-  @CacheTTL(3600) // 1시간 캐시
+  @CacheTTLDecorator(3600) // 1시간 캐시
   @ApiOperation({ summary: '인기 태그 목록 조회' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '반환할 태그 수 (기본값: 20)' })
   @ApiResponse({ status: 200, description: '인기 태그 목록 반환' })

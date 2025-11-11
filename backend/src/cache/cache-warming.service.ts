@@ -197,12 +197,12 @@ export class CacheWarmingService {
           batch.map(async (key) => {
             try {
               const data = await this.cacheService.get(key);
-              if (data && data.patterns) {
+              if (data && (data as any).patterns) {
                 // 지연된 캐시 무효화 실행
-                await this.cacheService.invalidatePatterns(data.patterns);
+                await this.cacheService.invalidatePatterns((data as any).patterns);
                 processedCount++;
 
-                this.logger.debug(`🗑️ [CLEANUP] Processed delayed invalidation for post ${data.postId}`);
+                this.logger.debug(`🗑️ [CLEANUP] Processed delayed invalidation for post ${(data as any).postId}`);
               }
 
               // 처리된 작업 삭제
