@@ -1,5 +1,6 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { User } from './entities/user.entity';
@@ -42,6 +43,7 @@ import { AuditModule } from '../audit/audit.module';
       Report,
       Follow,
     ]),
+    EventEmitterModule,
     forwardRef(() => EmailModule),
     FilesModule,
     AuditModule,

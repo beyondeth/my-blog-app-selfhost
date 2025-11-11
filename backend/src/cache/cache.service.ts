@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectRedis } from '@nestjs-modules/ioredis';
 import Redis from 'ioredis';
 import { UnifiedRedisService } from '../redis/unified-redis.service';
@@ -106,13 +106,16 @@ export const CacheKeys = {
 };
 
 @Injectable()
-export class CacheService {
+export class CacheService implements OnModuleInit {
   private readonly logger = new Logger(CacheService.name);
 
   // Debounce 메커니즘
   private readonly pendingInvalidations = new Map<string, NodeJS.Timeout>();
   private readonly defaultDebounce = 500; // 500ms
   private readonly defaultTTL = 300; // 5분
+
+  // 메모리 누수 방지를 위한 cleanup 인터벌
+  private cleanupInterval: NodeJS.Timeout;
 
   // 캐시 통계 추적
   private cacheHits = 0;
@@ -927,16 +930,79 @@ export class CacheService {
   }
 
   /**
+   * 모듈 초기화 시 cleanup 인터벌 설정
+   */
+  onModuleInit(): void {
+    // 5분마다 stale pending invalidations 정리
+    this.cleanupInterval = setInterval(
+      () => this.cleanupPendingInvalidations(),
+      5 * 60 * 1000 // 5분
+    );
+    this.logger.debug('🕐 [Init] Cache cleanup interval started (5min)');
+  }
+
+  /**
    * 서비스 종료 시 pending 패턴 정리
    */
   async onModuleDestroy(): Promise<void> {
-    // 모든 pending 타임아웃 취소
-    for (const [pattern, timeout] of this.pendingInvalidations) {
-      clearTimeout(timeout);
-      // 종료 시점에는 즉시 무효화 실행
-      await this.executeInvalidation(pattern);
+    // cleanup 인터벌 정리
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.logger.debug('🛑 [Shutdown] Cache cleanup interval stopped');
     }
-    this.pendingInvalidations.clear();
-    this.logger.log('🔚 [Shutdown] Cleared all pending cache invalidations');
+    // 모든 pending 타임아웃 취소
+    const pendingCount = this.pendingInvalidations.size;
+    if (pendingCount > 0) {
+      this.logger.log(`🔚 [Shutdown] Cleaning up ${pendingCount} pending cache invalidations...`);
+
+      for (const [pattern, timeout] of this.pendingInvalidations) {
+        clearTimeout(timeout);
+        // 종료 시점에는 즉시 무효화 실행
+        try {
+          await this.executeInvalidation(pattern);
+        } catch (error) {
+          this.logger.error(`Failed to execute pending invalidation on shutdown: ${pattern}`, error.message);
+        }
+      }
+      this.pendingInvalidations.clear();
+      this.logger.log('✅ [Shutdown] All pending cache invalidations cleared');
+    }
+  }
+
+  /**
+   * 수동으로 pending invalidations 정리 (메모리 누수 방지)
+   * 주기적으로 호출하여 미처리된 패턴 정리
+   */
+  async cleanupPendingInvalidations(): Promise<void> {
+    const now = Date.now();
+    const patternsToClean: string[] = [];
+
+    // 5분 이상 대기 중인 패턴 찾기
+    for (const [pattern, timeout] of this.pendingInvalidations) {
+      // 타임아웃 객체에서 남은 시간 확인 (간단한 heuristics)
+      if ((timeout as any)._idleStart) {
+        const elapsed = now - (timeout as any)._idleStart;
+        if (elapsed > 5 * 60 * 1000) { // 5분 초과
+          patternsToClean.push(pattern);
+        }
+      }
+    }
+
+    if (patternsToClean.length > 0) {
+      this.logger.warn(`🧹 [Cleanup] Force cleaning ${patternsToClean.length} stale pending invalidations`);
+      for (const pattern of patternsToClean) {
+        const timeout = this.pendingInvalidations.get(pattern);
+        if (timeout) {
+          clearTimeout(timeout);
+          this.pendingInvalidations.delete(pattern);
+          // 즉시 실행
+          try {
+            await this.executeInvalidation(pattern);
+          } catch (error) {
+            this.logger.error(`Failed to execute stale invalidation: ${pattern}`, error.message);
+          }
+        }
+      }
+    }
   }
 }
