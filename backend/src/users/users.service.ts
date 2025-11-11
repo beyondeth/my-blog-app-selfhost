@@ -822,7 +822,7 @@ export class UsersService {
       // 소프트 삭제 플래그
       isDeleted: true,
       deletedAt: now,
-      scheduledDeletionAt,
+      // scheduledDeletionAt은 account_settings 테이블에 저장
 
       // 개인정보 즉시 마스킹 (프론트엔드 비공개 처리)
       email: `deleted_${userId}@deleted.local`,
@@ -832,12 +832,21 @@ export class UsersService {
 
       // 인증 정보 무효화
       password: null,
-      refreshToken: null,
-      refreshTokenExpiresAt: null,
 
       // 활성화 상태 false로 변경 (로그인 차단)
       isActive: false,
     });
+
+    // account_settings 테이블에 scheduledDeletionAt 저장
+    await this.accountSettingsRepository.update(
+      { userId },
+      {
+        scheduledDeletionAt,
+        // refreshToken 관련 필드도 여기서 정리
+        refreshToken: null,
+        refreshTokenExpiresAt: null,
+      }
+    );
 
     this.logger.log(
       `User ${userId} soft deleted. Original data saved to audit_logs. ` +
