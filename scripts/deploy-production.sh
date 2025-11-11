@@ -127,7 +127,15 @@ docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -
 
 # 3-2. PM2 reload 실행 (워커 하나씩 재시작)
 log_info "PM2 워커 reload 중..."
-docker exec codebase-prod-backend pm2 reload all --update-env
+# timeout 60초로 PM2 reload 실행 (hang 방지)
+if timeout 60s docker exec codebase-prod-backend pm2 reload all --update-env; then
+    log_info "✓ PM2 reload 성공"
+else
+    log_warn "⚠️  PM2 reload 타임아웃 또는 실패, fallback으로 restart 실행"
+    # PM2 reload 실패 시 restart로 fallback
+    docker exec codebase-prod-backend pm2 restart all --update-env
+    log_info "✓ PM2 restart 완료"
+fi
 
 # 3-3. 헬스체크 대기 (최대 120초 - PM2 Cold Start 고려)
 log_info "헬스체크 대기 중..."
