@@ -195,17 +195,16 @@ export class PostsController {
       true   // isForCache: true - 공개 블로그만
     );
     
-    // 페이지별 차등 TTL 적용 개선
-    // 1페이지: 10분 (자주 접근하므로 더 길게)
-    // 2-3페이지: 30분 (가끔 접근)
-    // 4페이지 이상: 1시간 (거의 접근 안함)
+    // 홈 피드와 내 블로그에 따라 다른 TTL 적용
+    // 홈 피드(공개): 10분 (성능 우선)
+    // 내 블로그(개인): 30초 (즉시 반영)
     let ttl: number;
-    if (pageNumber === 1) {
-      ttl = 600;  // 10분 (기존 2분에서 연장)
-    } else if (pageNumber <= 3) {
-      ttl = 1800; // 30분
+    if (actualBlogId) {
+      // 내 블로그: 짧은 TTL
+      ttl = CacheTTL.MY_BLOG; // 30초
     } else {
-      ttl = 3600; // 1시간
+      // 홈 피드: 긴 TTL
+      ttl = pageNumber === 1 ? CacheTTL.HOME_FEED : CacheTTL.HOME_FEED * 2;
     }
     
     // 캐싱

@@ -166,6 +166,62 @@ export class CacheWarmingService {
     }
   }
 
+  /**
+   * 삭제된 포스트 정리 스케줄러
+   * 5분마다 지연된 캐시 무효화 작업 처리
+   */
+  @Cron('0 */5 * * * *')
+  async processDelayedInvalidations() {
+    try {
+      this.logger.debug('🔍 [CLEANUP] Processing delayed invalidations...');
+
+      // Redis에서 모든 지연 작업 조회
+      const pattern = 'delayed:invalidation:*';
+      const keys = await this.cacheService.getKeys(pattern);
+
+      if (keys.length === 0) {
+        this.logger.debug('✅ [CLEANUP] No delayed invalidations to process');
+        return;
+      }
+
+      // 배치로 처리 (최대 10개씩)
+      const batchSize = 10;
+      const batches = [];
+      for (let i = 0; i < keys.length; i += batchSize) {
+        batches.push(keys.slice(i, i + batchSize));
+      }
+
+      let processedCount = 0;
+      for (const batch of batches) {
+        await Promise.all(
+          batch.map(async (key) => {
+            try {
+              const data = await this.cacheService.get(key);
+              if (data && data.patterns) {
+                // 지연된 캐시 무효화 실행
+                await this.cacheService.invalidatePatterns(data.patterns);
+                processedCount++;
+
+                this.logger.debug(`🗑️ [CLEANUP] Processed delayed invalidation for post ${data.postId}`);
+              }
+
+              // 처리된 작업 삭제
+              await this.cacheService.delete(key);
+            } catch (error) {
+              this.logger.error(`❌ [CLEANUP] Failed to process delayed invalidation ${key}:`, error);
+            }
+          })
+        );
+      }
+
+      if (processedCount > 0) {
+        this.logger.log(`✅ [CLEANUP] Processed ${processedCount} delayed invalidations`);
+      }
+    } catch (error) {
+      this.logger.error('❌ [CLEANUP] Failed to process delayed invalidations:', error);
+    }
+  }
+
   // ========== 개별 워밍 함수 ==========
 
   /**

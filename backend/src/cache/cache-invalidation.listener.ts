@@ -65,40 +65,41 @@ export class CacheInvalidationListener {
 
   /**
    * 포스트 삭제 이벤트 처리
-   * 모든 관련 피드에서 해당 포스트 제거
+   * 내 블로그 캐시만 즉시 무효화 (성능 최적화)
    *
    * async: false - 동기 처리로 Redis 캐시 무효화 완료 후 응답 반환
-   * 프론트엔드 refetch 시 이미 캐시가 무효화되어 있어 Race condition 방지
    */
   @OnEvent(CacheInvalidationEvents.POST_DELETED, { async: false })
   async handlePostDeleted(payload: { postId: string; blogSlug?: string }) {
     this.logger.debug(`🗑️ [Post Deleted] Invalidating cache for: ${payload.postId}`);
 
-    // 삭제 시 영향받는 모든 캐시 패턴
-    const patterns: string[] = [
-      // 홈 피드 - 모든 페이지
-      CacheKeys.PATTERN_HOME_PAGES(),
-      // 블로그 피드 - 모든 페이지
+    // 즉시 무효화할 캐시 (내 블로그 + 개별 포스트)
+    const urgentPatterns: string[] = [
+      // 내 블로그 피드만 즉시 무효화
       ...(payload.blogSlug ? [CacheKeys.PATTERN_BLOG_FEEDS(payload.blogSlug)] : []),
+      // 개별 포스트 캐시
+      CacheKeys.POST_CORE(payload.postId),
+      CacheKeys.POST_DETAIL(payload.postId),
+      // 프론트엔드 React Query 키와 일치하는 패턴
+      `posts:*:${payload.postId}:*`,
+    ];
+
+    // 지연 무효화할 캐시 (홈 피드 - 배치 처리로 성능 유지)
+    const delayedPatterns: string[] = [
+      // 홈 피드 - 지연 무효화 목록에 추가
+      CacheKeys.PATTERN_HOME_PAGES(),
       // 인기 포스트
       CacheKeys.PATTERN_ALL_POPULAR(),
       // 에디터스 픽
-      'feed:editor-picks:*',  // 와일드카드 패턴
+      'feed:editor-picks:*',
     ];
 
-    // 사용자별 캐시도 무효화 (프론트엔드 React Query 키와 일치)
-    const userPatterns: string[] = [
-      `posts:*:${payload.postId}:*`,  // 개별 포스트 관련 캐시
-      'posts:list:*',  // 포스트 목록 캐시
-    ];
+    // 즉시 무효화 실행
+    await this.batchInvalidate(urgentPatterns, { force: true });
+    this.logger.log(`✅ Immediate cache invalidated for deleted post: ${payload.postId}`);
 
-    await this.batchInvalidate([...patterns, ...userPatterns], { force: true }); // 삭제는 즉시 처리
-
-    // 개별 포스트 캐시 삭제
-    await this.cacheService.delete(CacheKeys.POST_CORE(payload.postId));
-    await this.cacheService.delete(CacheKeys.POST_DETAIL(payload.postId));
-
-    this.logger.log(`✅ Cache invalidated for deleted post: ${payload.postId}`);
+    // 지연 무효화를 위한 큐에 추가 (5분 후 배치 처리)
+    await this.scheduleDelayedInvalidation(delayedPatterns, payload.postId);
   }
 
   /**
@@ -260,6 +261,32 @@ export class CacheInvalidationListener {
     options?: { force?: boolean }
   ): Promise<void> {
     await this.cacheService.invalidatePatterns(patterns, options);
+  }
+
+  /**
+   * 지연된 캐시 무효화 스케줄링
+   * 5분 후 홈 피드 캐시 정리 (배치 처리로 성능 유지)
+   */
+  private async scheduleDelayedInvalidation(
+    patterns: string[],
+    postId: string
+  ): Promise<void> {
+    // Redis에 지연 작업 큐에 추가
+    const delayedKey = `delayed:invalidation:${postId}`;
+    const delayedData = {
+      patterns,
+      scheduledAt: Date.now(),
+      postId,
+    };
+
+    // 5분 TTL로 저장 (5분 후 자동 정리)
+    await this.cacheService.set(
+      delayedKey,
+      delayedData,
+      CacheTTL.DELETED_POSTS_CLEANUP
+    );
+
+    this.logger.debug(`⏰ Scheduled delayed invalidation for post ${postId}`);
   }
 
 }
