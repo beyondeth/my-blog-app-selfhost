@@ -15,7 +15,7 @@ export class OptimizeDeletedPostsIndex1770000000000 implements MigrationInterfac
       // 삭제된 포스트 처리를 위한 복합 인덱스 생성
       await queryRunner.query(`
         CREATE INDEX idx_posts_deleted_published_publishedat
-        ON posts(isDeleted, isPublished, publishedAt DESC);
+        ON posts("isDeleted", "isPublished", "publishedAt" DESC);
       `);
       console.log('✅ Created idx_posts_deleted_published_publishedat');
     }
@@ -30,8 +30,8 @@ export class OptimizeDeletedPostsIndex1770000000000 implements MigrationInterfac
     if (homeFeedIndexExists.length === 0) {
       await queryRunner.query(`
         CREATE INDEX idx_posts_home_feed
-        ON posts(isPublished, status, isDeleted, publishedAt DESC)
-        WHERE isPublished = true AND status = 'published';
+        ON posts("isPublished", "status", "isDeleted", "publishedAt" DESC)
+        WHERE "isPublished" = true AND status = 'published';
       `);
       console.log('✅ Created idx_posts_home_feed');
     }
@@ -46,8 +46,8 @@ export class OptimizeDeletedPostsIndex1770000000000 implements MigrationInterfac
     if (blogPostsIndexExists.length === 0) {
       await queryRunner.query(`
         CREATE INDEX idx_posts_blog_published_deleted
-        ON posts(blogId, isDeleted, publishedAt DESC)
-        WHERE isDeleted = false;
+        ON posts("blogId", "isDeleted", "publishedAt" DESC)
+        WHERE "isDeleted" = false;
       `);
       console.log('✅ Created idx_posts_blog_published_deleted');
     }
