@@ -38,6 +38,8 @@ import { PostProcessingProcessor } from './processors/post-processing.processor'
 // Service Layer
 import { PostMapperService } from './services/post-mapper.service';
 import { PostCacheService } from './services/post-cache.service';
+import { PostFileService } from './services/post-file.service';
+import { PostContentService } from './services/post-content.service';
 
 export const LIKE_QUEUE_NAME = 'post-likes';
 
@@ -93,6 +95,8 @@ export const LIKE_QUEUE_NAME = 'post-likes';
     PostsService,
     PostMapperService, // DTO 변환 서비스
     PostCacheService, // 캐시 관리 서비스
+    PostFileService, // 파일 관리 서비스
+    PostContentService, // 콘텐츠 처리 서비스
     MarkdownRendererService,
     ViewCountService,
     SearchIndexingService, // 검색 인덱싱 배치 서비스 추가
