@@ -47,11 +47,17 @@ const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post |
         headers: {
           'Content-Type': 'application/json',
         },
+        // 서버 사이드에서도 쿠키를 포함해야 인증된 사용자의 포스트에 접근 가능
+        cache: 'no-store', // 항상 최신 데이터 가져오기
       }
     );
 
     if (!response.ok) {
       if (response.status === 404) {
+        return null;
+      }
+      if (response.status === 403) {
+        // 비공개 포스트는 메타데이터 생성하지 않음 (서버 사이드에서 접근 불가)
         return null;
       }
       throw new Error('Failed to fetch post');
@@ -61,6 +67,7 @@ const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post |
     // API가 직접 포스트 객체를 반환
     return data;
   } catch (error) {
+    // 에러 발생 시 기본 메타데이터 반환 (페이지 로드 방지)
     console.error('Error fetching post for metadata:', error);
     return null;
   }
