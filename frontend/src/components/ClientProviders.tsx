@@ -17,7 +17,10 @@ export default function ClientProviders({
   const [queryClient] = useState(() => createQueryClient());
 
   useEffect(() => {
-    initMixpanel();
+    // Mixpanel 초기화 (비동기)
+    initMixpanel().catch(error => {
+      console.error('[ClientProviders] Failed to initialize Mixpanel:', error);
+    });
   }, []);
 
   return (

@@ -157,6 +157,36 @@ export class PostMetadata {
   processingCompletedAt: Date;
 
   /**
+   * 단어 수
+   * - 읽기 시간 계산용
+   * - 콘텐츠 길이 통계
+   */
+  @Column({ type: 'int', default: 0 })
+  wordCount: number;
+
+  /**
+   * 예상 읽기 시간 (분)
+   * - 평균 200단어/분 기준
+   * - 목록 표시용
+   */
+  @Column({ type: 'int', default: 0 })
+  readingTimeMinutes: number;
+
+  /**
+   * 마지막 편집 시간
+   * - 편집 이력 추적
+   */
+  @Column({ type: 'timestamp', nullable: true })
+  lastEditedAt: Date;
+
+  /**
+   * 편집 횟수
+   * - 포스트 수정 횟수
+   */
+  @Column({ type: 'int', default: 0 })
+  editCount: number;
+
+  /**
    * 전문 검색 벡터 (PostgreSQL tsvector)
    * - title + content + tags의 텍스트를 벡터화
    * - GIN 인덱스 적용으로 빠른 전문 검색

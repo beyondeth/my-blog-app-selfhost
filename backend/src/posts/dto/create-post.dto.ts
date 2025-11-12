@@ -1,7 +1,8 @@
-import { IsString, IsOptional, IsArray, IsNumber, Min, Max, MaxLength, Matches } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, IsBoolean, Min, Max, MaxLength, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreatePostDto {
+export class 
+CreatePostDto {
   @ApiProperty({
     description: '게시글 제목',
     example: '블로그 포스트 제목',
@@ -81,4 +82,13 @@ export class CreatePostDto {
   @Min(0)
   @Max(100)
   qualityScore?: number;
+
+  @ApiPropertyOptional({
+    description: '발행 여부 (true면 즉시 발행, false면 초안으로 저장)',
+    example: true,
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isPublished?: boolean;
 } 

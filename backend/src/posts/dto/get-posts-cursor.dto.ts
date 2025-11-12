@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsDate, IsNumber } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -55,6 +55,39 @@ export class GetPostsCursorDto {
   @IsOptional()
   @IsIn(['recent', 'popular', 'trending'])
   sort?: 'recent' | 'popular' | 'trending' = 'recent';
+
+  // 호환성을 위한 필드들
+  @IsOptional()
+  @IsIn(['ASC', 'DESC'])
+  sortOrder?: 'ASC' | 'DESC' = 'DESC';
+
+  @IsOptional()
+  @IsIn(['recent', 'popular', 'trending', 'editorPicks', 'published', 'views', 'likes', 'comments', 'title'])
+  sortBy?: 'recent' | 'popular' | 'trending' | 'editorPicks' | 'published' | 'views' | 'likes' | 'comments' | 'title' = 'recent';
+
+  @ApiPropertyOptional({
+    description: '태그 필터',
+    example: 'javascript',
+  })
+  @IsOptional()
+  @IsString()
+  tag?: string;
+
+  @ApiPropertyOptional({
+    description: '시작일',
+  })
+  @IsOptional()
+  dateFrom?: Date;
+
+  @ApiPropertyOptional({
+    description: '종료일',
+  })
+  @IsOptional()
+  dateTo?: Date;
+
+  @IsOptional()
+  @IsNumber()
+  cursorRank?: number;
 
   @ApiPropertyOptional({
     description: '카테고리 필터 (예: JavaScript, JavaScript/React)',

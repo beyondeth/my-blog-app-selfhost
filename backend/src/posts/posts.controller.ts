@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, Header, UseInterceptors, Logger, ParseIntPipe, DefaultValuePipe, ForbiddenException, NotFoundException, Inject, forwardRef, Res } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, Header, UseInterceptors, Logger, ParseIntPipe, ParseUUIDPipe, DefaultValuePipe, ForbiddenException, NotFoundException, Inject, forwardRef, Res } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -6,6 +6,7 @@ import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
 import { PostsService } from './posts.service';
 import { LikeQueueService } from './services/like-queue.service';
 import { CreatePostDto } from './dto/create-post.dto';
+import { UpdatePostDto } from './dto/update-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
 import { GetPostsCursorDto } from './dto/get-posts-cursor.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -292,7 +293,7 @@ export class PostsController {
   @ApiResponse({ status: 200, description: '썸네일 설정/제거 성공' })
   @ApiResponse({ status: 404, description: '게시글 또는 파일을 찾을 수 없음' })
   async setThumbnail(
-    @Param('id') postId: string,
+    @Param('id', ParseUUIDPipe) postId: string,
     @CurrentUser() user: User,
     @Body() setThumbnailDto: SetThumbnailDto,
   ) {
@@ -382,6 +383,25 @@ export class PostsController {
     return this.postsService.findBySlug(sanitizedSlug, user);
   }
 
+  @Get(':blogId/:slug')
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: '블로그 ID와 슬러그로 게시글 조회 (프론트엔드 호환성)' })
+  findByBlogIdAndSlug(
+    @Param('blogId', ParseUUIDPipe) blogId: string,
+    @Param('slug') slug: string,
+    @Request() req: any,
+  ) {
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
+    const user = req.user || null;
+
+    // URL 파라미터 안전하게 디코딩 및 정제
+    const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
+
+    // blogId는 validation 용도로만 사용하고, 실제로는 slug로 조회
+    return this.postsService.findBySlug(sanitizedSlug, user);
+  }
+
   @Get('view-stats')
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -412,7 +432,7 @@ export class PostsController {
       },
     },
   })
-  async getPostImages(@Param('id') postId: string) {
+  async getPostImages(@Param('id', ParseUUIDPipe) postId: string) {
     return this.postsService.getPostImages(postId);
   }
 
@@ -467,7 +487,7 @@ export class PostsController {
   @Roles(Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '게시글 수정' })
   @ApiBearerAuth()
-  async update(@Param('id') id: string, @Body() updatePostDto: any, @CurrentUser() user: User) {
+  async update(@Param('id', ParseUUIDPipe) id: string, @Body() updatePostDto: UpdatePostDto, @CurrentUser() user: User) {
     const updated = await this.postsService.update(id, updatePostDto, user);
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return updated;
@@ -478,7 +498,7 @@ export class PostsController {
   @Roles(Role.ADMIN, Role.USER)
   @ApiOperation({ summary: '게시글 삭제' })
   @ApiBearerAuth()
-  async remove(@Param('id') id: string, @CurrentUser() user: User) {
+  async remove(@Param('id', ParseUUIDPipe) id: string, @CurrentUser() user: User) {
     const result = await this.postsService.remove(id, user);
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return result;
@@ -489,7 +509,7 @@ export class PostsController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: '게시글 좋아요 토글 (Redis Queue 시스템)' })
   async toggleLike(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
   ) {
     // OptionalJwtAuthGuard로 인증 확인
@@ -598,7 +618,7 @@ export class PostsController {
   @ApiResponse({ status: 403, description: '권한 없음' })
   @ApiResponse({ status: 404, description: '게시글을 찾을 수 없음' })
   async toggleEditorPick(
-    @Param('id') id: string,
+    @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
   ) {
     const result = await this.postsService.toggleEditorPick(id, user);
@@ -828,7 +848,7 @@ export class PostsController {
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: '게시글 상세 조회' })
-  async findOne(@Param('id') id: string, @Request() req: any) {
+  async findOne(@Param('id', ParseUUIDPipe) id: string, @Request() req: any) {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
     const post = await this.postsService.findOne(id, user);
