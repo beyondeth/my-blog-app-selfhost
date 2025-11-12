@@ -18,8 +18,6 @@ import { FilesService } from '../files/files.service';
 import { CdnService } from '../files/services/cdn.service';
 // TagsService removed - using JSONB tags
 import { generateSlug, extractImageUrlsFromContent } from './utils/post.utils';
-import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
-import { ContentProcessingService } from '../content-processing/services/content-processing.service';
 import { PostResponseDto } from './dto/post-response.dto';
 import { CacheKeys, CacheTTL } from '../cache/cache.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
@@ -33,6 +31,7 @@ import { CacheInvalidationEvents } from '../common/events/cache.events';
 import { PostMapperService } from './services/post-mapper.service';
 import { PostCacheService } from './services/post-cache.service';
 import { PostFileService } from './services/post-file.service';
+import { PostContentService } from './services/post-content.service';
 
 
 @Injectable()
@@ -52,8 +51,6 @@ export class PostsService {
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
     private cdnService: CdnService,
-    private markdownRenderer: MarkdownRendererService,
-    private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
     private bookmarksService: BookmarksService,
     private likeQueueService: LikeQueueService,
@@ -64,6 +61,7 @@ export class PostsService {
     private readonly postMapperService: PostMapperService,
     private readonly postCacheService: PostCacheService,
     private readonly postFileService: PostFileService,
+    private readonly postContentService: PostContentService,
   ) {}
 
   /**
@@ -280,37 +278,23 @@ export class PostsService {
         let markdownContent = null;
         let contentType: 'markdown' | 'html' = 'html';
 
-        // 마크다운 콘텐츠인지 확인 (MCP에서 오는 경우)
+        // 콘텐츠 처리
         if (createPostDto.content_markdown) {
           // MCP에서 content_markdown만 보낸 경우
-          markdownContent = createPostDto.content_markdown;
-          let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
-          // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
-          htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
-          // 백엔드에서 콘텐츠 처리 파이프라인 적용
-          const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-            sanitize: true,
-            processCode: true,
-            processImages: true,
-            preserveMermaid: true,
-          });
-          processedContent = processed.html;
+          const processed = await this.postContentService.processContent(createPostDto.content_markdown);
+          processedContent = processed.html.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+          markdownContent = processed.markdown;
           contentType = 'markdown';
-        } else if (createPostDto.content && this.isMarkdownContent(createPostDto.content)) {
-          // content가 마크다운인 경우
-          markdownContent = createPostDto.content;
-          let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
-          // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
-          htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
-          // 백엔드에서 콘텐츠 처리 파이프라인 적용
-          const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-            sanitize: true,
-            processCode: true,
-            processImages: true,
-            preserveMermaid: true,
-          });
+        } else if (createPostDto.content) {
+          // content가 있는 경우
+          const processed = await this.postContentService.processContent(createPostDto.content);
           processedContent = processed.html;
-          contentType = 'markdown';
+          if (processed.isMarkdown) {
+            markdownContent = processed.markdown;
+            contentType = 'markdown';
+            // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+            processedContent = processedContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+          }
         } else if (!createPostDto.content && !createPostDto.content_markdown) {
           // content와 content_markdown 둘 다 없는 경우
           throw new BadRequestException('게시글 내용이 필요합니다.');
@@ -319,20 +303,8 @@ export class PostsService {
         // 태그를 JSONB로 저장
         const tags = createPostDto.tags || [];
 
-        // excerpt 생성 (HTML에서 태그 제거 후 200자 추출)
-        let excerpt = '';
-        if (processedContent) {
-          // HTML 태그 제거 및 공백 정리
-          const textContent = processedContent
-            .replace(/<[^>]+>/g, '') // HTML 태그 제거
-            .replace(/\s+/g, ' ') // 연속된 공백을 하나로
-            .trim();
-
-          // 첫 200자 추출
-          excerpt = textContent.length > 200
-            ? textContent.substring(0, 200)
-            : textContent;
-        }
+        // excerpt 생성
+        const excerpt = this.postContentService.extractExcerpt(processedContent, 200);
 
       // spread 연산자 대신 명시적 필드 설정
       const post = queryRunner.manager.create(Post, {
@@ -1270,17 +1242,8 @@ export class PostsService {
     // 마크다운이 업데이트된 경우
     if (updatePostDto.content_markdown && updatePostDto.content_markdown !== post.content_markdown) {
       markdownContent = updatePostDto.content_markdown;
-      let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
-      // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
-      htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
-      // 백엔드에서 콘텐츠 처리 파이프라인 적용
-      const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-        sanitize: true,
-        processCode: true,
-        processImages: true,
-        preserveMermaid: true,
-      });
-      processedContent = processed.html;
+      const processed = await this.postContentService.processContent(markdownContent);
+      processedContent = processed.html.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
       post.content_type = 'markdown';
       post.content_rendered_at = new Date();
     }
@@ -1315,16 +1278,7 @@ export class PostsService {
 
     // excerpt 재생성 (content가 변경된 경우)
     if (processedContent) {
-      // HTML 태그 제거 및 공백 정리
-      const textContent = processedContent
-        .replace(/<[^>]+>/g, '') // HTML 태그 제거
-        .replace(/\s+/g, ' ') // 연속된 공백을 하나로
-        .trim();
-
-      // 첫 200자 추출
-      post.excerpt = textContent.length > 200
-        ? textContent.substring(0, 200)
-        : textContent;
+      post.excerpt = this.postContentService.extractExcerpt(processedContent, 200);
     }
 
     post.tags = newTagList; // JSONB 태그 배열 업데이트
@@ -1333,16 +1287,11 @@ export class PostsService {
     // SEO를 위해 기존 slug 유지가 더 좋음
 
     // thumbnail이 명시적으로 제공된 경우 사용, 그렇지 않으면 content에서 추출
+    post.thumbnail = this.postContentService.extractThumbnail(processedContent, updatePostDto.thumbnail);
     if (updatePostDto.thumbnail !== undefined) {
       this.logger.log(`[UPDATE] Post ${id} - Updating thumbnail to: ${updatePostDto.thumbnail}`);
-      post.thumbnail = updatePostDto.thumbnail;
-    } else if (processedContent) {
-      // Extract thumbnail from processed content
-      const imgRegex = /<img[^>]+src="([^">]+)"/i;
-      const match = processedContent.match(imgRegex);
-      const extractedThumbnail = match && match[1] ? match[1] : null;
-      this.logger.log(`[UPDATE] Post ${id} - Extracted thumbnail from content: ${extractedThumbnail}`);
-      post.thumbnail = extractedThumbnail;
+    } else {
+      this.logger.log(`[UPDATE] Post ${id} - Extracted thumbnail from content: ${post.thumbnail}`);
     }
 
     await this.postsRepository.save(post);
@@ -2221,28 +2170,7 @@ export class PostsService {
   }
 
   
-  // 마크다운 콘텐츠인지 확인하는 헬퍼 메소드
-  private isMarkdownContent(content: string): boolean {
-    if (!content) return false;
-    
-    // 마크다운 패턴 검사
-    const markdownPatterns = [
-      /^#{1,6}\s+/m, // 헤딩
-      /\*\*.*\*\*/, // 굵은 글씨
-      /\*.*\*/, // 기울임
-      /^\s*[-*+]\s+/m, // 리스트
-      /^\s*\d+\.\s+/m, // 번호 리스트
-      /```[\s\S]*?```/, // 코드 블록
-      /`[^`]+`/, // 인라인 코드
-      /\[.*?\]\(.*?\)/, // 링크
-      /!\[.*?\]\(.*?\)/, // 이미지
-      /^---$/m, // 수평선
-      /^>\s+/m, // 인용문
-    ];
-    
-    return markdownPatterns.some(pattern => pattern.test(content));
-  }
-
+  
   
   /**
    * 인기 태그 조회 (JSONB 컬럼에서 집계)
