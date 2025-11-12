@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState } from 'react';
-import { renderMermaidDiagram } from '@/lib/mermaid-config';
+import { renderMermaidDiagram, PieChartOptions } from '@/lib/mermaid-config';
 import { MermaidInfo } from '../types';
 
 interface MermaidRendererProps extends MermaidInfo {
@@ -14,6 +14,11 @@ interface MermaidRendererProps extends MermaidInfo {
    * 추가 CSS 클래스
    */
   className?: string;
+
+  /**
+   * 파이 차트 처리 옵션
+   */
+  pieChartOptions?: PieChartOptions;
 }
 
 /**
@@ -28,9 +33,11 @@ export default function MermaidRenderer({
   theme = 'default',
   onClick,
   className = '',
+  pieChartOptions,
 }: MermaidRendererProps) {
   const [svg, setSvg] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [errorDetails, setErrorDetails] = useState<{ negativeValues?: boolean, suggestions?: string[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -46,11 +53,26 @@ export default function MermaidRenderer({
         setError(null);
 
         // 전역 설정을 사용하여 렌더링
-        const renderedSvg = await renderMermaidDiagram(id, content);
+        const renderedSvg = await renderMermaidDiagram(id, content, pieChartOptions);
         setSvg(renderedSvg);
       } catch (err) {
         console.error('Mermaid rendering error:', err);
-        setError(err instanceof Error ? err.message : '다이어그램 렌더링 실패');
+        const errorMessage = err instanceof Error ? err.message : '다이어그램 렌더링 실패';
+        setError(errorMessage);
+
+        // 파이 차트 음수 값 오류 확인
+        if (content && content.toLowerCase().includes('pie') && errorMessage.includes('음수 값')) {
+          setErrorDetails({
+            negativeValues: true,
+            suggestions: [
+              '음수 값은 파이 차트에서 표시할 수 없습니다',
+              '양수 값으로 변경하거나 0으로 설정하세요',
+              '또는 막대 그래프(bar chart) 사용을 고려하세요'
+            ]
+          });
+        } else {
+          setErrorDetails(null);
+        }
       } finally {
         setIsLoading(false);
       }
@@ -99,8 +121,23 @@ export default function MermaidRenderer({
                 ⚠️ Mermaid 다이어그램 렌더링 실패
               </h4>
               <p className="text-red-700 text-xs mb-2">
-                다이어그램 구문에 오류가 있습니다. 아래 원본 코드를 확인해주세요.
+                {errorDetails?.negativeValues
+                  ? '파이 차트에 음수 값이 포함되어 있습니다.'
+                  : '다이어그램 구문에 오류가 있습니다. 아래 원본 코드를 확인해주세요.'
+                }
               </p>
+
+              {/* 파이 차트 특화된 제안 */}
+              {errorDetails?.negativeValues && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mb-2">
+                  <p className="text-yellow-800 text-xs font-medium mb-1">💡 파이 차트 제안:</p>
+                  <ul className="text-yellow-700 text-xs list-disc list-inside space-y-1">
+                    {errorDetails.suggestions?.map((suggestion, idx) => (
+                      <li key={idx}>{suggestion}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
               {process.env.NODE_ENV === 'development' && (
                 <details className="text-xs text-red-600 mt-2">
                   <summary className="cursor-pointer hover:text-red-800 font-medium">

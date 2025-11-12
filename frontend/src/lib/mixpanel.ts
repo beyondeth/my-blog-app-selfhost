@@ -8,39 +8,97 @@
 
 import mixpanelBrowser from 'mixpanel-browser';
 
-// Mixpanel 초기화 여부 확인
+// 초기화 상태 관리
 let isInitialized = false;
+let initPromise: Promise<void> | null = null;
+
+// 이벤트 큐 (초기화 전 이벤트들을 임시 저장)
+interface QueuedEvent {
+  eventName: string;
+  properties?: Record<string, any>;
+  timestamp: number;
+}
+
+const eventQueue: QueuedEvent[] = [];
 
 /**
- * Mixpanel 초기화
+ * Mixpanel 초기화 (Promise 기반)
  * - 클라이언트 사이드에서만 실행됨
  * - 토큰이 없으면 초기화하지 않음 (개발 환경 대응)
+ * @returns 초기화 Promise
  */
-export const initMixpanel = () => {
+export const initMixpanel = (): Promise<void> => {
   if (typeof window === 'undefined') {
-    return; // 서버 사이드에서는 실행하지 않음
+    return Promise.resolve(); // 서버 사이드에서는 실행하지 않음
   }
 
   if (isInitialized) {
-    return; // 이미 초기화됨
+    return Promise.resolve(); // 이미 초기화됨
+  }
+
+  if (initPromise) {
+    return initPromise; // 초기화 진행 중이면 기존 Promise 반환
   }
 
   const token = process.env.NEXT_PUBLIC_MIXPANEL_TOKEN;
 
   if (!token) {
     console.warn('⚠️  Mixpanel token이 설정되지 않았습니다. 환경변수 NEXT_PUBLIC_MIXPANEL_TOKEN을 추가하세요.');
-    return;
+    isInitialized = true; // 초기화 실패 처리 방지를 위해 true로 설정
+    return Promise.resolve();
   }
 
-  mixpanelBrowser.init(token, {
-    debug: process.env.NODE_ENV === 'development',
-    track_pageview: true, // 자동 페이지뷰 추적
-    persistence: 'localStorage', // 사용자 ID 저장 위치
-    ignore_dnt: false, // Do Not Track 존중
+  initPromise = new Promise((resolve) => {
+    try {
+      mixpanelBrowser.init(token, {
+        debug: process.env.NODE_ENV === 'development',
+        track_pageview: true, // 자동 페이지뷰 추적
+        persistence: 'localStorage', // 사용자 ID 저장 위치
+        ignore_dnt: false, // Do Not Track 존중
+      });
+
+      isInitialized = true;
+      console.log('📊 Mixpanel initialized');
+
+      // 큐에 있던 이벤트들 처리
+      if (eventQueue.length > 0) {
+        console.log(`📊 Processing ${eventQueue.length} queued events`);
+        eventQueue.forEach(({ eventName, properties, timestamp }) => {
+          const delay = Date.now() - timestamp;
+          if (process.env.NODE_ENV === 'development' && delay > 100) {
+            console.log(`⚠️ Event "${eventName}" was delayed by ${delay}ms`);
+          }
+          mixpanelBrowser.track(eventName, properties);
+        });
+        // 큐 비우기
+        eventQueue.length = 0;
+      }
+
+      resolve();
+    } catch (error) {
+      console.error('📊 Mixpanel initialization failed:', error);
+      // 실패해도 큐에 있는 이벤트들이 계속 쌓이지 않도록 처리
+      eventQueue.length = 0;
+      resolve(); // 실패해도 Promise는 resolve하여 앱이 멈추지 않음
+    }
   });
 
-  isInitialized = true;
-  console.log('📊 Mixpanel initialized');
+  return initPromise;
+};
+
+/**
+ * 초기화 상태 확인
+ */
+export const isMixpanelInitialized = (): boolean => isInitialized;
+
+/**
+ * 초기화 대기
+ */
+export const waitForInitialization = (): Promise<void> => {
+  if (isInitialized) {
+    return Promise.resolve();
+  }
+  return initMixpanel();
 };
 
 /**
@@ -48,72 +106,95 @@ export const initMixpanel = () => {
  */
 export const mixpanel = {
   /**
-   * 이벤트 추적
+   * 이벤트 추적 (큐 지원)
    * @param eventName 이벤트 이름 (예: 'Post Created', 'User Signup')
    * @param properties 이벤트 속성
    */
   track: (eventName: string, properties?: Record<string, any>) => {
-    if (!isInitialized) {
-      console.warn(`Mixpanel not initialized. Event "${eventName}" not tracked.`);
-      return;
+    if (isInitialized) {
+      // 이미 초기화됨: 바로 추적
+      mixpanelBrowser.track(eventName, properties);
+    } else {
+      // 초기화 안됨: 큐에 추가
+      eventQueue.push({
+        eventName,
+        properties,
+        timestamp: Date.now()
+      });
+
+      // 초기화 시도 (비동기)
+      initMixpanel().catch(error => {
+        console.error('Failed to initialize Mixpanel for queued event:', error);
+      });
     }
-    mixpanelBrowser.track(eventName, properties);
   },
 
   /**
-   * 사용자 식별
+   * 사용자 식별 (비동기)
    * @param userId 사용자 고유 ID
    */
-  identify: (userId: string) => {
-    if (!isInitialized) return;
-    mixpanelBrowser.identify(userId);
+  identify: async (userId: string) => {
+    await waitForInitialization();
+    if (isInitialized) {
+      mixpanelBrowser.identify(userId);
+    }
   },
 
   /**
-   * 사용자 속성 설정
+   * 사용자 속성 설정 (비동기)
    * @param properties 사용자 속성 (예: { name: 'John', email: 'john@example.com' })
    */
   people: {
-    set: (properties: Record<string, any>) => {
-      if (!isInitialized) return;
-      mixpanelBrowser.people.set(properties);
+    set: async (properties: Record<string, any>) => {
+      await waitForInitialization();
+      if (isInitialized) {
+        mixpanelBrowser.people.set(properties);
+      }
     },
 
     /**
-     * 숫자 속성 증가
+     * 숫자 속성 증가 (비동기)
      * @param property 속성 이름
      * @param value 증가할 값 (기본값: 1)
      */
-    increment: (property: string, value: number = 1) => {
-      if (!isInitialized) return;
-      mixpanelBrowser.people.increment(property, value);
+    increment: async (property: string, value: number = 1) => {
+      await waitForInitialization();
+      if (isInitialized) {
+        mixpanelBrowser.people.increment(property, value);
+      }
     },
   },
 
   /**
-   * 페이지뷰 추적
+   * 페이지뷰 추적 (비동기)
    * @param pageName 페이지 이름
    */
-  trackPageView: (pageName?: string) => {
-    if (!isInitialized) return;
-    mixpanelBrowser.track_pageview(pageName ? { page: pageName } : undefined);
+  trackPageView: async (pageName?: string) => {
+    await waitForInitialization();
+    if (isInitialized) {
+      mixpanelBrowser.track_pageview(pageName ? { page: pageName } : undefined);
+    }
   },
 
   /**
-   * 사용자 로그아웃 (세션 초기화)
+   * 사용자 로그아웃 (세션 초기화) (비동기)
    */
-  reset: () => {
-    if (!isInitialized) return;
-    mixpanelBrowser.reset();
+  reset: async () => {
+    await waitForInitialization();
+    if (isInitialized) {
+      mixpanelBrowser.reset();
+    }
   },
 
   /**
-   * 타이밍 이벤트 시작
+   * 타이밍 이벤트 시작 (비동기)
    * @param eventName 이벤트 이름
    */
-  timeEvent: (eventName: string) => {
-    if (!isInitialized) return;
-    mixpanelBrowser.time_event(eventName);
+  timeEvent: async (eventName: string) => {
+    await waitForInitialization();
+    if (isInitialized) {
+      mixpanelBrowser.time_event(eventName);
+    }
   },
 };
 
