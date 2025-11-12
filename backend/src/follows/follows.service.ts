@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, DataSource, EntityManager } from 'typeorm';
 import { Follow } from './entities/follow.entity';
@@ -6,9 +6,12 @@ import { User } from '../users/entities/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
 import { FollowInfoDto, PaginatedResponseDto } from './dto';
+import { CdnService } from '../files/services/cdn.service';
 
 @Injectable()
 export class FollowsService {
+  private readonly logger = new Logger(FollowsService.name);
+
   constructor(
     @InjectRepository(Follow)
     private followRepository: Repository<Follow>,
@@ -16,6 +19,7 @@ export class FollowsService {
     private userRepository: Repository<User>,
     private notificationsService: NotificationsService,
     private dataSource: DataSource,
+    private cdnService: CdnService,
   ) {}
 
   async follow(followerId: string, followingId: string): Promise<void> {
@@ -127,14 +131,36 @@ export class FollowsService {
   async getFollowers(userId: string, page = 1, limit = 20): Promise<PaginatedResponseDto<User>> {
     const [followers, total] = await this.followRepository.findAndCount({
       where: { followingId: userId },
-      relations: ['follower'],
+      relations: ['follower', 'follower.profile'],
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },
     });
 
+    // 프로필 정보 복사 및 CDN URL로 변환
+    const followersWithCdn = followers.map(f => {
+      const user = f.follower;
+
+      // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
+      // profiles 테이블 필드
+      if (user.profile) {
+        user.profileImage = user.profile.profileImage;
+      }
+
+      // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+      if (user.profileImage) {
+        if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+          // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+          user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+          this.logger.debug(`Profile image CDN URL for follower ${user.id}: ${user.profileImage}`);
+        }
+      }
+
+      return user;
+    });
+
     return {
-      data: followers.map(f => f.follower),
+      data: followersWithCdn,
       total,
       page,
       limit,
@@ -145,14 +171,36 @@ export class FollowsService {
   async getFollowing(userId: string, page = 1, limit = 20): Promise<PaginatedResponseDto<User>> {
     const [following, total] = await this.followRepository.findAndCount({
       where: { followerId: userId },
-      relations: ['following'],
+      relations: ['following', 'following.profile'],
       skip: (page - 1) * limit,
       take: limit,
       order: { createdAt: 'DESC' },
     });
 
+    // 프로필 정보 복사 및 CDN URL로 변환
+    const followingWithCdn = following.map(f => {
+      const user = f.following;
+
+      // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
+      // profiles 테이블 필드
+      if (user.profile) {
+        user.profileImage = user.profile.profileImage;
+      }
+
+      // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
+      if (user.profileImage) {
+        if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+          // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
+          user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+          this.logger.debug(`Profile image CDN URL for following ${user.id}: ${user.profileImage}`);
+        }
+      }
+
+      return user;
+    });
+
     return {
-      data: following.map(f => f.following),
+      data: followingWithCdn,
       total,
       page,
       limit,

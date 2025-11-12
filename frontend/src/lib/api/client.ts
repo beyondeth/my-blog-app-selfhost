@@ -167,7 +167,16 @@ export class ApiClient {
         url: error.config?.url,
         method: error.config?.method,
         status: status,
-        // 민감한 데이터는 로그에서 제외
+        response: error.response?.data,
+        message: error.response?.data?.message || error.message,
+        // 개발 환경에서는 더 상세한 정보
+        ...(process.env.NODE_ENV === 'development' && {
+          stack: error.stack,
+          config: {
+            params: error.config?.params,
+            data: error.config?.data,
+          }
+        })
       });
     }
 

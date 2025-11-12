@@ -18,7 +18,8 @@ const safeConsole = {
 };
 
 // 민감한 필드 목록 (로깅에서 제외)
-const SENSITIVE_FIELDS = [
+// 프로덕션 환경에서는 더 엄격한 필터링
+const SENSITIVE_FIELDS = process.env.NODE_ENV === 'production' ? [
   'password',
   'token',
   'access_token',
@@ -32,6 +33,15 @@ const SENSITIVE_FIELDS = [
   'credentials',
   'x-api-key',
   'x-session-token',
+  'jwt',
+  'bearer',
+] : [
+  'password',
+  'access_token',
+  'refresh_token',
+  'api_key',
+  'apiKey',
+  'secret',
 ];
 
 // 민감한 URL 패턴 (상세 로깅 제외)

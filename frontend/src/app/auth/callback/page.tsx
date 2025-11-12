@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AlertCircle, Home, UserPlus } from 'lucide-react';
 import Link from 'next/link';
+import { safeDecodeMessage, getSafeQueryParam } from '@/lib/utils/sanitize';
 
 /**
  * OAuth 콜백 페이지 메인 컴포넌트
@@ -30,16 +31,17 @@ function AuthCallbackPageContent() {
     const handleCallback = () => {
       hasProcessed.current = true;
 
-      const error = searchParams.get('error');
-      const message = searchParams.get('message');
-      const remainingDays = parseInt(searchParams.get('remainingDays') || '0');
+      const error = getSafeQueryParam(searchParams, 'error');
+      const message = getSafeQueryParam(searchParams, 'message');
+      const remainingDaysParam = getSafeQueryParam(searchParams, 'remainingDays', { defaultValue: '0' });
+      const remainingDays = parseInt(remainingDaysParam || '0');
 
       if (error) {
         // 삭제된 계정 에러면 전체 화면 UI 표시
         if (error === 'ACCOUNT_DELETED') {
           setErrorInfo({
             code: error,
-            message: decodeURIComponent(message || '계정이 삭제되었습니다.'),
+            message: safeDecodeMessage(message || '계정이 삭제되었습니다.'),
             remainingDays,
           });
         } else {

@@ -4,6 +4,7 @@ import {
   OnModuleInit,
   OnModuleDestroy,
 } from '@nestjs/common';
+import { QueryFailedError } from 'typeorm';
 import { LikeQueueService } from '../services/like-queue.service';
 import { PostsService } from '../posts.service';
 import { LikeMetricsService } from '../../metrics/like-metrics.service';
@@ -219,6 +220,47 @@ export class LikeBatchWorker implements OnModuleInit, OnModuleDestroy {
           processingTime,
         };
       } catch (dbError) {
+        // FK 위반 오류 특별 처리
+        if (dbError instanceof QueryFailedError &&
+            dbError.message.includes('violates foreign key constraint')) {
+
+          // FK 위반 로깅 및 메트릭
+          this.logger.warn(
+            `⚠️ [FK Violation] ${likes.length}개 좋아요 요청에 유효하지 않은 postId 포함됨`,
+            {
+              error: dbError.message,
+              samplePostIds: likes.slice(0, 3).map(l => l.postId),
+              totalInvalidLikes: likes.length
+            }
+          );
+
+          // FK 위반 항목만 DLQ로 이동 (전체 배치가 아닌 개별 처리)
+          if (this.config.dlqEnabled) {
+            await this.queueService.moveToDeadLetterQueue(likes);
+          }
+
+          // FK 위반은 연속 실패로 간주하지 않음 (데이터 정합성 문제, 서버 오류 아님)
+          // 이렇게 하면 서비스 계속 운영 가능
+          const processingTime = Date.now() - startTime;
+
+          // Prometheus 메트릭: FK 위반 기록
+          this.metricsService.recordForeignKeyViolation(likes.length);
+
+          // 큐 크기 업데이트
+          const metrics = await this.queueService.getMetrics();
+          this.metricsService.updateQueueMetrics(metrics.queueSize, metrics.dlqSize);
+
+          return {
+            success: false,
+            processedCount: 0,
+            failedCount: likes.length,
+            failedLikes: likes,
+            processingTime,
+            error: `Foreign Key Violation: ${likes.length} likes with invalid postIds`,
+          };
+        }
+
+        // 기타 DB 오류 처리
         this.logger.error('DB 처리 실패:', dbError);
 
         // DLQ로 이동

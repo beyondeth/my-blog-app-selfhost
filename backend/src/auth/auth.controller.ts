@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Res, Delete, Logger } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Res, Delete, Logger, Req } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -10,6 +10,7 @@ import { UserDeletionQueueService } from '../users/services/user-deletion-queue.
 import { UsersService } from '../users/users.service';
 import { SendCodeDto } from '../email/dto/send-code.dto';
 import { VerifyCodeDto } from '../email/dto/verify-code.dto';
+import { CheckEmailDto } from './dto/check-email.dto';
 import { GoogleAuthGuard } from './guards/google-auth.guard';
 import { KakaoAuthGuard } from './guards/kakao-auth.guard';
 import { GitHubAuthGuard } from './guards/github-auth.guard';
@@ -213,13 +214,16 @@ export class AuthController {
       // 에러 메시지 추출
       const errorMessage = error.response?.data?.message || error.message || 'Authentication failed';
 
-      // 삭제된 계정 에러인 경우 특별 처리
-      if (errorMessage.includes('계정이 삭제되었습니다')) {
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`);
-      }
+      // 헤더가 이미 전송되었는지 확인
+      if (!res.headersSent) {
+        // 삭제된 계정 에러인 경우 특별 처리
+        if (errorMessage.includes('계정이 삭제되었습니다')) {
+          return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`);
+        }
 
-      // 기본 에러 처리
-      return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent('로그인에 실패했습니다. 다시 시도해주세요.')}`);
+        // 기본 에러 처리
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent('로그인에 실패했습니다. 다시 시도해주세요.')}`);
+      }
     }
   }
 
@@ -236,33 +240,53 @@ export class AuthController {
   @UseGuards(KakaoAuthGuard)
   @ApiOperation({ summary: '카카오 로그인 콜백' })
   async kakaoAuthRedirect(@Request() req, @Res() res) {
-    // HttpOnly 쿠키로 토큰들 설정
-    res.cookie('access_token', req.user.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
-      path: '/',
-    });
+    try {
+      // HttpOnly 쿠키로 토큰들 설정
+      res.cookie('access_token', req.user.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+        path: '/',
+      });
 
-    res.cookie('refresh_token', req.user.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
-      path: '/',
-    });
+      res.cookie('refresh_token', req.user.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+        path: '/',
+      });
 
-    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
-    await this.createWebSessionInRedis(req.user.user.id);
+      // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+      await this.createWebSessionInRedis(req.user.user.id);
 
-    // 약관 동의 여부 확인
-    const user = req.user.user;
-    const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
+      // 약관 동의 여부 확인
+      const user = req.user.user;
+      const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
 
-    // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
-    const redirectPath = needsConsent ? '/consent' : '/';
-    res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+      // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
+      const redirectPath = needsConsent ? '/consent' : '/';
+
+      // 헤더가 이미 전송되었는지 확인
+      if (!res.headersSent) {
+        res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+      }
+    } catch (error) {
+      this.logger.error('카카오 로그인 콜백 처리 중 오류 발생:', error);
+
+      // 헤더가 이미 전송되었는지 확인
+      if (!res.headersSent) {
+        const errorMessage = error.message || '카카오 로그인 처리 중 오류가 발생했습니다.';
+
+        // 삭제된 계정 에러인 경우 특별 처리
+        if (errorMessage.includes('계정이 삭제되었습니다')) {
+          return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`);
+        }
+
+        res.redirect(`${process.env.FRONTEND_URL}/login?error=kakao_auth_failed&message=${encodeURIComponent(errorMessage)}`);
+      }
+    }
   }
 
   @Public()
@@ -319,13 +343,16 @@ export class AuthController {
       // 에러 메시지 추출
       const errorMessage = error.response?.data?.message || error.message || 'Authentication failed';
 
-      // 삭제된 계정 에러인 경우 특별 처리
-      if (errorMessage.includes('계정이 삭제되었습니다')) {
-        return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`);
-      }
+      // 헤더가 이미 전송되었는지 확인
+      if (!res.headersSent) {
+        // 삭제된 계정 에러인 경우 특별 처리
+        if (errorMessage.includes('계정이 삭제되었습니다')) {
+          return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`);
+        }
 
-      // 기본 에러 처리
-      return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent('로그인에 실패했습니다. 다시 시도해주세요.')}`);
+        // 기본 에러 처리
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent('로그인에 실패했습니다. 다시 시도해주세요.')}`);
+      }
     }
   }
 
@@ -560,6 +587,31 @@ export class AuthController {
     this.logger.log(`[Logout] 로그아웃 완료 - userId: ${user.id}`);
 
     return res.json({ message: '로그아웃되었습니다.' });
+  }
+
+  @Post('check-email')
+  @Public()
+  @Throttle({ default: { limit: 3, ttl: 60000 } }) // 1분에 3회 제한
+  @ApiOperation({ summary: '이메일 존재 여부 확인' })
+  @ApiResponse({ status: 200, description: '이메일 존재 여부 반환' })
+  async checkEmail(
+    @Body() dto: CheckEmailDto,
+    @Res() res: Response,
+    @Req() req: Request
+  ) {
+    try {
+      const result = await this.authService.checkEmailExists(dto.email);
+
+      return res.json({
+        success: true,
+        exists: result.exists
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: '이메일 확인 중 오류가 발생했습니다.'
+      });
+    }
   }
 
   @Post('forgot-password')

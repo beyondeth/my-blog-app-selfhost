@@ -69,6 +69,12 @@ export class LikeMetricsService {
    */
   public readonly likesFailed: Counter<string>;
 
+  /**
+   * FK 위반 카운터
+   * 유효하지 않은 postId로 인한 FK 제약 조건 위반 횟수
+   */
+  public readonly foreignKeyViolations: Counter<string>;
+
   // ========================================
   // Histogram 메트릭 (분포를 측정)
   // ========================================
@@ -138,6 +144,12 @@ export class LikeMetricsService {
       name: 'likes_failed_total',
       help: '처리 실패한 총 좋아요 요청 수',
       labelNames: ['error_type'],
+      registers: [register],
+    });
+
+    this.foreignKeyViolations = new Counter({
+      name: 'likes_foreign_key_violations_total',
+      help: '유효하지 않은 postId로 인한 FK 제약 조건 위반 횟수',
       registers: [register],
     });
 
@@ -285,5 +297,15 @@ export class LikeMetricsService {
    */
   updateRedisConnectionStatus(connected: boolean) {
     this.redisConnectionStatus.set(connected ? 1 : 0);
+  }
+
+  /**
+   * FK 위반 횟수 기록
+   * 유효하지 않은 postId로 인한 FK 제약 조건 위반 모니터링용
+   *
+   * @param count - FK 위반 횟수
+   */
+  recordForeignKeyViolation(count: number) {
+    this.foreignKeyViolations.inc(count);
   }
 }

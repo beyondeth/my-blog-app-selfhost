@@ -17,6 +17,7 @@ export default function ForgotPasswordPage() {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isSocialAccount, setIsSocialAccount] = useState(false);
   const [attemptCount, setAttemptCount] = useState(0);
+  const [emailError, setEmailError] = useState('');
   const MAX_ATTEMPTS = 3;
 
   const validateEmail = (email: string) => {
@@ -27,6 +28,9 @@ export default function ForgotPasswordPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Clear previous errors
+    setEmailError('');
+
     // Rate limiting
     if (attemptCount >= MAX_ATTEMPTS) {
       toast.error('너무 많은 시도입니다. 잠시 후 다시 시도해주세요.');
@@ -35,18 +39,45 @@ export default function ForgotPasswordPage() {
 
     // Email validation
     if (!email) {
-      toast.error('이메일을 입력해주세요');
+      setEmailError('이메일을 입력해주세요');
       return;
     }
 
     if (!validateEmail(email)) {
-      toast.error('올바른 이메일 형식이 아닙니다');
+      setEmailError('올바른 이메일 형식이 아닙니다');
       return;
     }
 
     setIsSubmitting(true);
 
     try {
+      // 먼저 이메일 존재 여부 확인
+      const checkResponse = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/check-email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ email }),
+        }
+      );
+
+      const checkData = await checkResponse.json();
+
+      if (!checkResponse.ok || !checkData.success) {
+        setEmailError('존재하지 않는 이메일입니다');
+        return;
+      }
+
+      // 이메일이 존재하지 않는 경우
+      if (!checkData.exists) {
+        setEmailError('존재하지 않는 이메일입니다');
+        setAttemptCount(prev => prev + 1);
+        return;
+      }
+
+      // 이메일이 존재하는 경우 비밀번호 재설정 요청
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/forgot-password`,
         {
@@ -62,15 +93,13 @@ export default function ForgotPasswordPage() {
 
       if (response.ok) {
         setIsSubmitted(true);
-        // 보안을 위해 계정 존재 여부와 관계없이 동일한 메시지 표시
         toast.success('이메일을 확인해주세요');
       } else {
-        // 소셜 로그인 계정인 경우
+        // 소셜 로그인 계정인 경우 (보안을 위해 일반 에러로 처리)
         if (response.status === 400 && data.message?.includes('소셜 로그인')) {
-          setIsSocialAccount(true);
-          toast.info('소셜 로그인 계정입니다');
+          setIsSubmitted(true);
+          toast.success('이메일을 확인해주세요'); // 소셜 계정임을 숨김
         } else {
-          // 일반적인 성공 메시지 (보안상 계정 존재 여부 숨김)
           setIsSubmitted(true);
           toast.success('이메일을 확인해주세요');
         }
@@ -83,6 +112,12 @@ export default function ForgotPasswordPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Clear error when email changes
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEmail(e.target.value);
+    setEmailError('');
   };
 
   // 소셜 로그인 계정 안내 화면
@@ -139,6 +174,7 @@ export default function ForgotPasswordPage() {
                   onClick={() => {
                     setIsSocialAccount(false);
                     setEmail('');
+                    setEmailError('');
                     setAttemptCount(0);
                   }}
                   variant="outline"
@@ -213,6 +249,7 @@ export default function ForgotPasswordPage() {
                   onClick={() => {
                     setIsSubmitted(false);
                     setEmail('');
+                    setEmailError('');
                     setAttemptCount(0);
                   }}
                   variant="outline"
@@ -282,10 +319,17 @@ export default function ForgotPasswordPage() {
                 <Input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={handleEmailChange}
                   placeholder="이메일을 입력하세요"
                   disabled={attemptCount >= MAX_ATTEMPTS}
+                  className={emailError ? 'border-red-500' : ''}
                 />
+                {emailError && (
+                  <p className="mt-1.5 text-sm text-red-600 flex items-start gap-1">
+                    <AlertCircle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    {emailError}
+                  </p>
+                )}
               </div>
 
               <button

@@ -262,6 +262,93 @@ export class LikeQueueService {
   }
 
   /**
+   * 특정 포스트의 모든 좋아요 요청 제거
+   *
+   * @description
+   * 포스트 삭제 시 관련 좋아요 큐 항목들을 정리하여 FK 위반 방지
+   * - 모든 샤드 큐에서 해당 포스트의 좋아요 검색 및 제거
+   * - pending 키도 정리
+   *
+   * @param postId - 삭제될 포스트 ID
+   */
+  async removeLikesForPost(postId: string): Promise<number> {
+    let removedCount = 0;
+
+    try {
+      // 1. 모든 샤드 큐에서 해당 포스트의 좋아요 검색 및 제거
+      for (const shardKey of this.QUEUE_KEYS.SHARDS) {
+        // 큐의 모든 항목 가져오기
+        const queueItems = await this.redis.lrange(shardKey, 0, -1);
+
+        // 제거할 항목 식별
+        const itemsToRemove: string[] = [];
+        for (const itemId of queueItems) {
+          // 데이터 확인
+          const data = await this.redis.hgetall(`${this.LIKE_PREFIX}${itemId}`);
+          if (data && data.postId === postId) {
+            itemsToRemove.push(itemId);
+          }
+        }
+
+        // 샤드 큐에서 제거
+        if (itemsToRemove.length > 0) {
+          const pipeline = this.redis.pipeline();
+          for (const itemId of itemsToRemove) {
+            // LREM으로 큐에서 제거 (value 기반)
+            pipeline.lrem(shardKey, 0, itemId);
+            // 데이터 삭제
+            pipeline.del(`${this.LIKE_PREFIX}${itemId}`);
+          }
+          await pipeline.exec();
+          removedCount += itemsToRemove.length;
+        }
+      }
+
+      // 2. DLQ에서도 제거
+      const dlqItems = await this.redis.lrange(this.DLQ_KEY, 0, -1);
+      const dlqItemsToRemove: string[] = [];
+
+      for (const itemId of dlqItems) {
+        const data = await this.redis.hgetall(`${this.LIKE_PREFIX}${itemId}`);
+        if (data && data.postId === postId) {
+          dlqItemsToRemove.push(itemId);
+        }
+      }
+
+      if (dlqItemsToRemove.length > 0) {
+        const pipeline = this.redis.pipeline();
+        for (const itemId of dlqItemsToRemove) {
+          pipeline.lrem(this.DLQ_KEY, 0, itemId);
+          pipeline.del(`${this.LIKE_PREFIX}${itemId}`);
+        }
+        await pipeline.exec();
+        removedCount += dlqItemsToRemove.length;
+      }
+
+      // 3. pending 키 정리 (패턴 매칭으로 일괄 삭제)
+      const pendingPattern = `${this.PENDING_KEY}*:${postId}`;
+      const pendingKeys = await this.redis.keys(pendingPattern);
+
+      if (pendingKeys.length > 0) {
+        await this.redis.del(...pendingKeys);
+        removedCount += pendingKeys.length;
+      }
+
+      this.logger.log(
+        `✅ Removed ${removedCount} like requests for deleted post ${postId}`,
+      );
+
+      return removedCount;
+    } catch (error) {
+      this.logger.error(
+        `Failed to remove likes for post ${postId}:`,
+        error,
+      );
+      throw error;
+    }
+  }
+
+  /**
    * 큐 메트릭 조회
    */
   async getMetrics(): Promise<LikeQueueMetrics> {

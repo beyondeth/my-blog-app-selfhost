@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams, useParams, redirect } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
+import { useInfiniteCursorPosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useBlogBySlug, useBlogCategories } from '@/hooks/useBlogs';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
@@ -106,7 +106,7 @@ export default function BlogPage() {
   // URL에서 검색 파라미터 파싱
   const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
 
-  // 블로그의 포스트 가져오기
+  // 블로그의 포스트 가져오기 (커서 페이지네이션 사용)
   const {
     data,
     fetchNextPage,
@@ -114,10 +114,12 @@ export default function BlogPage() {
     isFetchingNextPage,
     isLoading,
     error
-  } = useInfinitePosts({
+  } = useInfiniteCursorPosts({
     search: currentParams.search,
     category: currentParams.category,
-    blogId: blog?.id, // blogSlug 대신 안정적인 blog.id 사용
+    blogId: blog?.id, // blogId를 직접 전달하여 정확한 필터링
+    sort: 'recent',
+    limit: 20,
     enabled: isClient && !!blog?.id, // blog.id가 있을 때만 쿼리 실행
   });
 
@@ -134,14 +136,42 @@ export default function BlogPage() {
     return !!(blog && user && String(blog.owner?.id) === String(user.id));
   }, [blog, user]);
 
-  // 모든 포스트 플래튼
+  // 모든 포스트 플래튼 (커서 페이지네이션용)
   const allPosts = useMemo(() => {
     if (!data?.pages) return [];
-    return data.pages.flatMap(page => page?.posts || []).filter(post => post);
+
+    // 커서 페이지네이션은 각 페이지에 posts 배열이 있음
+    const postsMap = new Map();
+    data.pages.forEach((page: any) => {
+      if (page?.posts) {
+        page.posts.forEach((post: any) => {
+          if (post && post.id) {
+            postsMap.set(post.id, post);
+          }
+        });
+      }
+    });
+
+    return Array.from(postsMap.values());
   }, [data?.pages]);
 
+  // 총 포스트 수 (커서 페이지네이션 방식)
   const totalPosts = useMemo(() => {
-    return data?.pages[0]?.total || 0;
+    // 현재까지 로드된 포스트 수 계산
+    let loadedCount = 0;
+    let hasMore = false;
+
+    data?.pages?.forEach((page: any) => {
+      if (page?.posts) {
+        loadedCount += page.posts.length;
+      }
+      if (page?.hasMore) {
+        hasMore = true;
+      }
+    });
+
+    // hasMore가 true면 더 많은 데이터가 있다는 의미
+    return hasMore ? loadedCount + 1 : loadedCount;
   }, [data?.pages]);
 
   // 최근 포스트 (처음 5개)
@@ -313,7 +343,7 @@ export default function BlogPage() {
                   <LoadMoreSection
                     hasNextPage={hasNextPage}
                     isFetchingNextPage={isFetchingNextPage}
-                    totalPosts={totalPosts}
+                    totalPosts={allPosts.length} // 커서 페이지네이션에서는 현재 로드된 개수만 표시
                     allPostsCount={allPosts.length}
                     onLoadMore={loadMorePosts}
                   />

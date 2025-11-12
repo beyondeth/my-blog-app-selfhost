@@ -469,8 +469,8 @@ export class Post {
 
       // PostMetadata 데이터 (join 시에만 포함)
       excerpt: this.metadata?.excerpt || null,
-      tags: this.metadata?.tags || [],
-      category: this.metadata?.category || '기타',
+      tags: this.tags || this.metadata?.tags || [], // Post 엔티티의 tags를 우선적으로 사용
+      category: this.category || this.metadata?.category || '기타', // category도 동일하게 처리
       content_type: this.metadata?.content_type || 'html',
       publishedAt: this.metadata?.publishedAt || null,
       isEditorPick: this.metadata?.isEditorPick || false,

@@ -66,9 +66,9 @@ import { User } from '../users/entities/user.entity';
             tls: {
               rejectUnauthorized: false, // 개발 환경에서만
             },
-            // 디버그 옵션 추가
-            debug: process.env.NODE_ENV === 'development',
-            logger: process.env.NODE_ENV === 'development',
+            // 디버그 옵션 비활성화
+            debug: false,
+            logger: false,
             // 연결 타임아웃 설정
             connectionTimeout: 10000,
             greetingTimeout: 5000,

@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { safeDecodeMessage, getSafeQueryParam, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
 
 /**
  * 로그인 페이지 메인 컴포넌트
@@ -40,14 +41,24 @@ function LoginPageContent() {
     remainingDays: number;
   } | null>(null);
 
-  // OAuth 콜백 에러 처리
+  // OAuth 콜백 에러 및 리다이렉트 처리
   useEffect(() => {
     const error = searchParams.get('error');
     const message = searchParams.get('message');
+    const redirect = searchParams.get('redirect');
+
+    // 리다이렉트 URL 안전성 검증
+    if (redirect && !isSafeRedirectUrl(redirect)) {
+      console.warn('Unsafe redirect URL detected:', redirect);
+      // 안전하지 않은 URL은 제거
+      const url = new URL(window.location.href);
+      url.searchParams.delete('redirect');
+      window.history.replaceState({}, '', url.toString());
+    }
 
     if (error && message) {
-      // URL 파라미터에서 메시지 디코딩
-      const decodedMessage = decodeURIComponent(message);
+      // URL 파라미터에서 메시지 안전하게 디코딩
+      const decodedMessage = safeDecodeMessage(message);
 
       if (error === 'account_deleted') {
         setAccountDeletedError({
@@ -73,7 +84,13 @@ function LoginPageContent() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+    // 입력값 안전하게 정제
+    const sanitizedValue = name === 'email'
+      ? sanitizeUserInput(value).toLowerCase()  // 이메일은 소문자로 통일
+      : value; // 비밀번호는 원본 유지 (서버에서 처리)
+
+    setFormData(prev => ({ ...prev, [name]: sanitizedValue }));
 
     // Clear validation error when user starts typing
     if (validationErrors[name as keyof typeof validationErrors]) {

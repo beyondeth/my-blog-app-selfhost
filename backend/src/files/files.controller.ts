@@ -28,6 +28,7 @@ import { UploadCompleteDto } from './dto/upload-complete.dto';
 import { CreateBatchUploadUrlDto, BatchUploadCompleteDto } from './dto/batch-upload.dto';
 import { UpdateImageOrderDto } from './dto/update-image-order.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+import { UrlSanitizerUtil } from '../common/utils/url-sanitizer.util';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { Public } from '../common/decorators/public.decorator';
 import { Response, Request } from 'express';
@@ -158,13 +159,15 @@ export class FilesController {
     @Param('id') fileId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.filesService.getFileById(fileId as any, userId as any);
+    // 파일 ID 안전하게 정제 (UUID 형식 검증)
+    const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
+    return this.filesService.getFileById(sanitizedFileId as any, userId as any);
   }
 
   @Get(':id/download-url')
   @ApiOperation({ summary: '파일 다운로드 URL 생성' })
-  @ApiResponse({ 
-    status: 200, 
+  @ApiResponse({
+    status: 200,
     description: '다운로드 URL 생성 성공',
     schema: {
       type: 'object',
@@ -178,7 +181,9 @@ export class FilesController {
     @Param('id') fileId: string,
     @CurrentUser('id') userId: string,
   ) {
-    const downloadUrl = await this.filesService.getDownloadUrl(fileId as any, userId as any);
+    // 파일 ID 안전하게 정제
+    const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
+    const downloadUrl = await this.filesService.getDownloadUrl(sanitizedFileId as any, userId as any);
     return { downloadUrl };
   }
 
@@ -192,7 +197,9 @@ export class FilesController {
     @Res() res: Response,
   ) {
     try {
-      const downloadUrl = await this.filesService.getPublicDownloadUrl(fileId as any);
+      // 파일 ID 안전하게 정제
+      const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
+      const downloadUrl = await this.filesService.getPublicDownloadUrl(sanitizedFileId as any);
       return res.redirect(downloadUrl);
     } catch (error) {
       return res.status(404).json({ message: 'File not found' });
@@ -237,20 +244,12 @@ export class FilesController {
     );
 
     try {
-      // UUID 기반 S3 키 처리
-      let processedFileKey = fileKey;
+      // UUID 기반 S3 키 처리 - 안전하게 정제
+      let processedFileKey = UrlSanitizerUtil.sanitizeFilePath(fileKey);
 
       this.logger.debug(`🔍 [PROXY] Raw fileKey from URL: ${fileKey}`);
-      
-      // URL 디코딩 (UUID는 일반적으로 ASCII이므로 간단한 처리)
-      try {
-        processedFileKey = decodeURIComponent(fileKey);
-        this.logger.log(`🔄 [PROXY] After decode: ${processedFileKey}`);
-      } catch (e) {
-        this.logger.warn(`❌ [PROXY] Decode failed for: ${fileKey}`, e.message);
-        processedFileKey = fileKey; // 디코딩 실패 시 원본 사용
-      }
-      
+      this.logger.log(`🔄 [PROXY] After sanitization: ${processedFileKey}`);
+
       // 쿼리 파라미터 제거 (presigned URL 파라미터가 있을 수 있음)
       if (processedFileKey.includes('?')) {
         processedFileKey = processedFileKey.split('?')[0];
@@ -342,7 +341,9 @@ export class FilesController {
     @CurrentUser('id') userId: string,
     @Body() updateImageOrderDto: UpdateImageOrderDto,
   ) {
-    return this.filesService.updateImageOrder(postId, userId, updateImageOrderDto);
+    // 포스트 ID 안전하게 정제
+    const sanitizedPostId = UrlSanitizerUtil.sanitizePathParam(postId);
+    return this.filesService.updateImageOrder(sanitizedPostId, userId, updateImageOrderDto);
   }
 
   @Delete(':id')
@@ -354,7 +355,9 @@ export class FilesController {
     @Param('id') fileId: string,
     @CurrentUser('id') userId: string,
   ) {
-    return this.filesService.deleteFile(fileId, userId);
+    // 파일 ID 안전하게 정제
+    const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
+    return this.filesService.deleteFile(sanitizedFileId, userId);
   }
 
   /**
