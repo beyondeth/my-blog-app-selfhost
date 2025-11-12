@@ -20,10 +20,7 @@ import { CdnService } from '../files/services/cdn.service';
 import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ContentProcessingService } from '../content-processing/services/content-processing.service';
-import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto';
-import { UserResponseDto } from '../users/dto/user-response.dto';
-import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
 import { CacheMetricsService } from '../metrics/cache-metrics.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
@@ -34,6 +31,7 @@ import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-proc
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RedisLockService } from '../redis/redis-lock.service';
 import { CacheInvalidationEvents } from '../common/events/cache.events';
+import { PostMapperService } from './services/post-mapper.service';
 
 /**
  * 포스트 Core 데이터 타입 (실시간 카운트/상태 제외)
@@ -71,6 +69,7 @@ export class PostsService {
     private postProcessingQueue: Queue<PostProcessingJobData>,
     private readonly eventEmitter: EventEmitter2,
     private readonly redisLockService: RedisLockService,
+    private readonly postMapperService: PostMapperService,
   ) {}
 
   /**
@@ -81,92 +80,7 @@ export class PostsService {
    * class-transformer의 plainToInstance 활용
    */
 
-  /**
-   * Post Entity를 PostResponseDto로 변환
-   * @param post - Post 엔티티
-   * @param options - 추가 옵션 (liked 상태, tags 등)
-   * @returns PostResponseDto
-   */
-  private toPostDto(
-    post: Post,
-    options?: {
-      liked?: boolean;
-      bookmarked?: boolean;
-      user?: User;
-      blog?: Blog;
-    }
-  ): PostResponseDto {
-    // plainToInstance로 자동 변환 (@Expose 필드만 포함됨)
-    const dto = plainToInstance(PostResponseDto, post, {
-      excludeExtraneousValues: true, // @Expose가 없는 필드 제외
-    });
-
-    // 추가 필드 설정
-    if (options) {
-      if (options.liked !== undefined) {
-        dto.liked = options.liked;
-      }
-      if (options.bookmarked !== undefined) {
-        dto.bookmarked = options.bookmarked;
-      }
-      if (options.user) {
-        dto.author = this.toUserDto(options.user);
-      }
-      if (options.blog) {
-        dto.blog = this.toBlogDto(options.blog);
-      }
-    }
-
-    // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
-    // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
-
-    // 태그 필드 호환성 - Post 엔티티의 tags를 우선적으로 사용
-    dto.tags = post.tags || post.metadata?.tags || [];
-
-    // 썸네일 URL 최적화
-    if (dto.thumbnail) {
-      dto.thumbnail = this.optimizeImageUrl(dto.thumbnail);
-    }
-
-    return dto;
-  }
-
-  /**
-   * User Entity를 UserResponseDto로 변환
-   * @param user - User 엔티티
-   * @returns UserResponseDto
-   */
-  private toUserDto(user: User): UserResponseDto {
-    if (!user) return null;
-
-    // 포맷된 author 데이터 사용 (profile 평탄화 및 CDN URL 변환 적용)
-    const formattedUser = this.formatAuthorData(user);
-
-    const dto = plainToInstance(UserResponseDto, formattedUser, {
-      excludeExtraneousValues: true,
-    });
-
-    return dto;
-  }
-
-  /**
-   * Blog Entity를 BlogResponseDto로 변환
-   * @param blog - Blog 엔티티
-   * @returns BlogResponseDto
-   */
-  private toBlogDto(blog: Blog): BlogResponseDto {
-    if (!blog) return null;
-
-    const dto = plainToInstance(BlogResponseDto, blog, {
-      excludeExtraneousValues: true,
-    });
-
-    // Manually assign alias to ensure it's included
-    dto.alias = blog.alias; // <--- ADD THIS LINE
-
-    return dto;
-  }
-
+  
   /**
    * 포스트의 실시간 Counts + liked/bookmarked 조회
    * 최적화: 단일 쿼리로 합침 (DB Round Trip 감소)
@@ -589,7 +503,7 @@ export class PostsService {
        * DTO 변환으로 spread operator 제거
        * lazy loading 방지 및 성능 최적화
        */
-      return this.toPostDto(post, {
+      return this.postMapperService.toPostDto(post, {
         user: user,
         blog: blog,
       });
@@ -783,10 +697,10 @@ export class PostsService {
 
     // 8. 202 Accepted 응답 반환 (즉시 응답)
     return {
-      ...this.toPostDto(post, {
+      ...(await this.postMapperService.toPostDto(post, {
         user: user,
         blog: blog,
-      }),
+      })),
       // 추가 메타데이터
       _meta: {
         processingStatus: 'queued',
@@ -1338,7 +1252,7 @@ export class PostsService {
      * DTO 변환으로 spread operator 제거
      * lazy loading 방지 및 성능 최적화
      */
-    const result = this.toPostDto(post, {
+    const result = await this.postMapperService.toPostDto(post, {
       liked: liked,
       bookmarked: bookmarked,
       user: post.author,
@@ -1456,7 +1370,7 @@ export class PostsService {
 
     // DTO 변환으로 안전하게 처리 (spread 연산자 사용 금지)
     // 날짜 포맷팅은 DTO 변환 후 별도 처리
-    const postDto = this.toPostDto(post, {
+    const postDto = await this.postMapperService.toPostDto(post, {
       liked: liked,
       bookmarked: bookmarked,
       user: post.author,
@@ -1591,7 +1505,7 @@ export class PostsService {
       blogSlug: post.blog?.slug,
     });
 
-    return this.toPostDto(post, {
+    return this.postMapperService.toPostDto(post, {
       user: post.author,
       blog: post.blog,
       // attachedFiles는 이미 post에 포함되어 있음
@@ -2894,11 +2808,13 @@ export class PostsService {
     const [posts, total] = await query.getManyAndCount();
 
     // DTO 변환
-    const postDtos = posts.map(post =>
-      this.toPostDto(post, {
-        user: post.author,
-        blog: post.blog,
-      })
+    const postDtos = await Promise.all(
+      posts.map(post =>
+        this.postMapperService.toPostDto(post, {
+          user: post.author,
+          blog: post.blog,
+        })
+      )
     );
 
     return {
@@ -3239,20 +3155,24 @@ export class PostsService {
         this.bookmarksService.areBookmarked(user.id, postIds),
       ]);
 
-      postDtos = posts.map(post =>
-        this.toPostDto(post, {
-          user: post.author,
-          blog: post.blog,
-          liked: likedMap.get(post.id) || false,
-          bookmarked: bookmarkedMap.get(post.id) || false,
-        })
+      postDtos = await Promise.all(
+        posts.map(post =>
+          this.postMapperService.toPostDto(post, {
+            user: post.author,
+            blog: post.blog,
+            liked: likedMap.get(post.id) || false,
+            bookmarked: bookmarkedMap.get(post.id) || false,
+          })
+        )
       );
     } else {
-      postDtos = posts.map(post =>
-        this.toPostDto(post, {
-          user: post.author,
-          blog: post.blog,
-        })
+      postDtos = await Promise.all(
+        posts.map(post =>
+          this.postMapperService.toPostDto(post, {
+            user: post.author,
+            blog: post.blog,
+          })
+        )
       );
     }
 

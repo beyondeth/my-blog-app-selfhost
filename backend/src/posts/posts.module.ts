@@ -35,6 +35,9 @@ import { LikeBatchWorker } from './workers/like-batch.worker';
 import { POST_PROCESSING_QUEUE } from './queues/post-processing.queue';
 import { PostProcessingProcessor } from './processors/post-processing.processor';
 
+// Service Layer
+import { PostMapperService } from './services/post-mapper.service';
+
 export const LIKE_QUEUE_NAME = 'post-likes';
 
 @Module({
@@ -87,6 +90,7 @@ export const LIKE_QUEUE_NAME = 'post-likes';
   ],
   providers: [
     PostsService,
+    PostMapperService, // DTO 변환 서비스
     MarkdownRendererService,
     ViewCountService,
     SearchIndexingService, // 검색 인덱싱 배치 서비스 추가
