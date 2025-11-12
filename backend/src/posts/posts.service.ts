@@ -17,9 +17,15 @@ import { CursorPaginatedPostsDto } from './dto/cursor-paginated-posts.dto';
 import { FilesService } from '../files/files.service';
 import { CdnService } from '../files/services/cdn.service';
 // TagsService removed - using JSONB tags
-import { generateSlug, extractImageUrlsFromContent } from './utils/post.utils';
+import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
+import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
+import { ContentProcessingService } from '../content-processing/services/content-processing.service';
+import { plainToInstance } from 'class-transformer';
 import { PostResponseDto } from './dto/post-response.dto';
-import { CacheKeys, CacheTTL } from '../cache/cache.service';
+import { UserResponseDto } from '../users/dto/user-response.dto';
+import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
+import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
+import { CacheMetricsService } from '../metrics/cache-metrics.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
 import { LikeQueueService } from './services/like-queue.service';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -28,15 +34,18 @@ import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-proc
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RedisLockService } from '../redis/redis-lock.service';
 import { CacheInvalidationEvents } from '../common/events/cache.events';
-import { PostMapperService } from './services/post-mapper.service';
-import { PostCacheService } from './services/post-cache.service';
-import { PostFileService } from './services/post-file.service';
-import { PostContentService } from './services/post-content.service';
 
+/**
+ * 포스트 Core 데이터 타입 (실시간 카운트/상태 제외)
+ * 캐시에 저장되는 정적 데이터만 포함
+ */
+type PostCoreData = Omit<PostResponseDto, 'viewCount' | 'likeCount' | 'commentCount' | 'liked' | 'bookmarked'>;
 
 @Injectable()
 export class PostsService {
   private readonly logger = new Logger(PostsService.name);
+  private readonly MAX_POST_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
+  private readonly MAX_FILES_PER_POST = 10; // Maximum 10 files per post
 
   constructor(
     @InjectRepository(Post)
@@ -51,17 +60,17 @@ export class PostsService {
     private blogsRepository: Repository<Blog>,
     private filesService: FilesService,
     private cdnService: CdnService,
+    private markdownRenderer: MarkdownRendererService,
+    private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
+    private cacheService: CacheService,
+    private cacheMetricsService: CacheMetricsService,
     private bookmarksService: BookmarksService,
     private likeQueueService: LikeQueueService,
     @InjectQueue(POST_PROCESSING_QUEUE)
     private postProcessingQueue: Queue<PostProcessingJobData>,
     private readonly eventEmitter: EventEmitter2,
     private readonly redisLockService: RedisLockService,
-    private readonly postMapperService: PostMapperService,
-    private readonly postCacheService: PostCacheService,
-    private readonly postFileService: PostFileService,
-    private readonly postContentService: PostContentService,
   ) {}
 
   /**
@@ -72,7 +81,92 @@ export class PostsService {
    * class-transformer의 plainToInstance 활용
    */
 
-  
+  /**
+   * Post Entity를 PostResponseDto로 변환
+   * @param post - Post 엔티티
+   * @param options - 추가 옵션 (liked 상태, tags 등)
+   * @returns PostResponseDto
+   */
+  private toPostDto(
+    post: Post,
+    options?: {
+      liked?: boolean;
+      bookmarked?: boolean;
+      user?: User;
+      blog?: Blog;
+    }
+  ): PostResponseDto {
+    // plainToInstance로 자동 변환 (@Expose 필드만 포함됨)
+    const dto = plainToInstance(PostResponseDto, post, {
+      excludeExtraneousValues: true, // @Expose가 없는 필드 제외
+    });
+
+    // 추가 필드 설정
+    if (options) {
+      if (options.liked !== undefined) {
+        dto.liked = options.liked;
+      }
+      if (options.bookmarked !== undefined) {
+        dto.bookmarked = options.bookmarked;
+      }
+      if (options.user) {
+        dto.author = this.toUserDto(options.user);
+      }
+      if (options.blog) {
+        dto.blog = this.toBlogDto(options.blog);
+      }
+    }
+
+    // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
+    // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
+
+    // 태그 필드 호환성 - Post 엔티티의 tags를 우선적으로 사용
+    dto.tags = post.tags || post.metadata?.tags || [];
+
+    // 썸네일 URL 최적화
+    if (dto.thumbnail) {
+      dto.thumbnail = this.optimizeImageUrl(dto.thumbnail);
+    }
+
+    return dto;
+  }
+
+  /**
+   * User Entity를 UserResponseDto로 변환
+   * @param user - User 엔티티
+   * @returns UserResponseDto
+   */
+  private toUserDto(user: User): UserResponseDto {
+    if (!user) return null;
+
+    // 포맷된 author 데이터 사용 (profile 평탄화 및 CDN URL 변환 적용)
+    const formattedUser = this.formatAuthorData(user);
+
+    const dto = plainToInstance(UserResponseDto, formattedUser, {
+      excludeExtraneousValues: true,
+    });
+
+    return dto;
+  }
+
+  /**
+   * Blog Entity를 BlogResponseDto로 변환
+   * @param blog - Blog 엔티티
+   * @returns BlogResponseDto
+   */
+  private toBlogDto(blog: Blog): BlogResponseDto {
+    if (!blog) return null;
+
+    const dto = plainToInstance(BlogResponseDto, blog, {
+      excludeExtraneousValues: true,
+    });
+
+    // Manually assign alias to ensure it's included
+    dto.alias = blog.alias; // <--- ADD THIS LINE
+
+    return dto;
+  }
+
   /**
    * 포스트의 실시간 Counts + liked/bookmarked 조회
    * 최적화: 단일 쿼리로 합침 (DB Round Trip 감소)
@@ -153,12 +247,84 @@ export class PostsService {
    *
    * @returns UTC 시간을 로컬 timezone으로 표현한 Date 객체
    */
-  
+  private getUtcAsLocalDate(): Date {
+    const now = new Date();
+    return new Date(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate(),
+      now.getUTCHours(),
+      now.getUTCMinutes(),
+      now.getUTCSeconds(),
+      now.getUTCMilliseconds()
+    );
+  }
+
   /**
    * 게시글 썸네일 설정/제거
    */
   async setThumbnail(postId: string, userId: string, setThumbnailDto: SetThumbnailDto) {
-    return this.postFileService.setThumbnail(postId, userId, setThumbnailDto);
+    const { thumbnailFileId } = setThumbnailDto;
+
+    try {
+      // 게시글 소유권 확인
+      const post = await this.postsRepository.findOne({
+        where: { id: postId, authorId: userId },
+        relations: ['thumbnailImage'],
+      });
+
+      if (!post) {
+        throw new NotFoundException('게시글을 찾을 수 없거나 권한이 없습니다.');
+      }
+
+      // 썸네일 제거
+      if (!thumbnailFileId || thumbnailFileId === null) {
+        post.thumbnailImageId = null;
+        await this.postsRepository.save(post);
+        
+        this.logger.log(`Thumbnail removed for post ${postId}`);
+        return {
+          message: '썸네일이 제거되었습니다.',
+          postId,
+          thumbnailImageId: null,
+        };
+      }
+
+      // 썸네일 파일 존재 및 소유권 확인
+      const thumbnailFile = await this.filesRepository.findOne({
+        where: { id: thumbnailFileId, userId },
+      });
+
+      if (!thumbnailFile) {
+        throw new NotFoundException('썸네일 파일을 찾을 수 없거나 권한이 없습니다.');
+      }
+
+      // 이미지 파일인지 확인
+      if (!thumbnailFile.mimeType.startsWith('image/')) {
+        throw new BadRequestException('썸네일은 이미지 파일만 설정할 수 있습니다.');
+      }
+
+      // 썸네일 설정
+      post.thumbnailImageId = thumbnailFileId;
+      await this.postsRepository.save(post);
+
+      this.logger.log(`Thumbnail set for post ${postId}, file: ${thumbnailFileId}`);
+      
+      return {
+        message: '썸네일이 설정되었습니다.',
+        postId,
+        thumbnailImageId: thumbnailFileId,
+        thumbnailFile: {
+          id: thumbnailFile.id,
+          fileName: thumbnailFile.fileName,
+          fileKey: thumbnailFile.fileKey,
+          mimeType: thumbnailFile.mimeType,
+        },
+      };
+    } catch (error) {
+      this.logger.error(`Failed to set thumbnail: ${error.message}`, error.stack);
+      throw error;
+    }
   }
 
   /**
@@ -278,23 +444,37 @@ export class PostsService {
         let markdownContent = null;
         let contentType: 'markdown' | 'html' = 'html';
 
-        // 콘텐츠 처리
+        // 마크다운 콘텐츠인지 확인 (MCP에서 오는 경우)
         if (createPostDto.content_markdown) {
           // MCP에서 content_markdown만 보낸 경우
-          const processed = await this.postContentService.processContent(createPostDto.content_markdown);
-          processedContent = processed.html.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
-          markdownContent = processed.markdown;
-          contentType = 'markdown';
-        } else if (createPostDto.content) {
-          // content가 있는 경우
-          const processed = await this.postContentService.processContent(createPostDto.content);
+          markdownContent = createPostDto.content_markdown;
+          let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+          // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+          htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+          // 백엔드에서 콘텐츠 처리 파이프라인 적용
+          const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+            sanitize: true,
+            processCode: true,
+            processImages: true,
+            preserveMermaid: true,
+          });
           processedContent = processed.html;
-          if (processed.isMarkdown) {
-            markdownContent = processed.markdown;
-            contentType = 'markdown';
-            // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
-            processedContent = processedContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
-          }
+          contentType = 'markdown';
+        } else if (createPostDto.content && this.isMarkdownContent(createPostDto.content)) {
+          // content가 마크다운인 경우
+          markdownContent = createPostDto.content;
+          let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+          // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+          htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+          // 백엔드에서 콘텐츠 처리 파이프라인 적용
+          const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+            sanitize: true,
+            processCode: true,
+            processImages: true,
+            preserveMermaid: true,
+          });
+          processedContent = processed.html;
+          contentType = 'markdown';
         } else if (!createPostDto.content && !createPostDto.content_markdown) {
           // content와 content_markdown 둘 다 없는 경우
           throw new BadRequestException('게시글 내용이 필요합니다.');
@@ -303,8 +483,20 @@ export class PostsService {
         // 태그를 JSONB로 저장
         const tags = createPostDto.tags || [];
 
-        // excerpt 생성
-        const excerpt = this.postContentService.extractExcerpt(processedContent, 200);
+        // excerpt 생성 (HTML에서 태그 제거 후 200자 추출)
+        let excerpt = '';
+        if (processedContent) {
+          // HTML 태그 제거 및 공백 정리
+          const textContent = processedContent
+            .replace(/<[^>]+>/g, '') // HTML 태그 제거
+            .replace(/\s+/g, ' ') // 연속된 공백을 하나로
+            .trim();
+
+          // 첫 200자 추출
+          excerpt = textContent.length > 200
+            ? textContent.substring(0, 200)
+            : textContent;
+        }
 
       // spread 연산자 대신 명시적 필드 설정
       const post = queryRunner.manager.create(Post, {
@@ -357,9 +549,8 @@ export class PostsService {
       let attachedFiles: File[] = [];
       if (createPostDto.attachedFileIds?.length) {
         // 파일 개수 검증
-        const MAX_FILES_PER_POST = 10;
-        if (createPostDto.attachedFileIds.length > MAX_FILES_PER_POST) {
-          throw new BadRequestException(`포스트당 최대 ${MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+        if (createPostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
+          throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
         }
 
         attachedFiles = await queryRunner.manager.find(File, {
@@ -367,7 +558,7 @@ export class PostsService {
         });
 
         // 포스트당 총 파일 용량 검증
-        await this.postFileService.validatePostTotalSize(attachedFiles);
+        await this.validatePostTotalSize(attachedFiles);
 
         post.attachedFiles = attachedFiles;
         await queryRunner.manager.save(post);
@@ -381,7 +572,7 @@ export class PostsService {
 
       // 트랜잭션 밖에서 후처리 (비차단)
       // Lazy loading 방지: user.id를 직접 전달
-      await this.postFileService.linkFilesFromContent(post, user.id);
+      await this.linkFilesFromContent(post, user.id);
 
       // 포스트 생성 이벤트 발행 (캐시 무효화용)
       this.eventEmitter.emit(CacheInvalidationEvents.POST_CREATED, {
@@ -392,13 +583,13 @@ export class PostsService {
       });
 
       // 즉시 관련 캐시 삭제 (새로고침 시 데이터 일관성 보장)
-      await this.postCacheService.invalidateRelatedCache(blog.slug, blog.id);
+      await this.invalidateRelatedCache(blog.slug, blog.id);
 
       /**
        * DTO 변환으로 spread operator 제거
        * lazy loading 방지 및 성능 최적화
        */
-      return this.postMapperService.toPostDto(post, {
+      return this.toPostDto(post, {
         user: user,
         blog: blog,
       });
@@ -412,7 +603,59 @@ export class PostsService {
     }
   }
 
-  
+  /**
+   * 포스트 생성 후 관련 캐시 즉시 삭제
+   * @param blogSlug - 블로그 slug (패턴 삭제용)
+   * @param blogId - 블로그 ID (정확한 키 삭제용)
+   */
+  private async invalidateRelatedCache(blogSlug: string, blogId?: string): Promise<void> {
+    try {
+      // 1. 홈 피드 캐시 삭제 (처음 5페이지)
+      for (let i = 1; i <= 5; i++) {
+        await this.cacheService.del(CacheKeys.FEED_HOME(i));
+      }
+
+      // 2. 블로그 피드 캐시 삭제 (처음 5페이지)
+      // blogId가 있으면 blogId로 캐시 삭제 (실제 캐시 키와 일치)
+      if (blogId) {
+        for (let i = 1; i <= 5; i++) {
+          await this.cacheService.del(CacheKeys.FEED_BLOG(blogId, i));
+        }
+      }
+      // blogSlug도 삭제 (하위 호환성 및 패턴 일치)
+      if (blogSlug && blogSlug !== blogId) {
+        for (let i = 1; i <= 5; i++) {
+          await this.cacheService.del(CacheKeys.FEED_BLOG(blogSlug, i));
+        }
+      }
+
+      // 3. 패턴 기반 대규 삭제 (모든 관련 캐시)
+      // 홈 피드 패턴
+      await this.cacheService.deletePattern('feed:home:page:*');
+
+      // 블로그 피드 패턴 (blogId와 blogSlug 모두 삭제)
+      if (blogId) {
+        await this.cacheService.deletePattern(`feed:blog:${blogId}:page:*`);
+      }
+      if (blogSlug) {
+        await this.cacheService.deletePattern(`feed:blog:${blogSlug}:page:*`);
+      }
+
+      // 포스트 관련 패턴
+      await this.cacheService.deletePattern('post:*');
+      // 인기 포스트 패턴
+      await this.cacheService.deletePattern('feed:popular:*');
+
+      // 4. 인기 게시물 캐시 삭제
+      await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
+      await this.cacheService.deletePattern('feed:search:*');
+
+      this.logger.log(`✅ [Post Created] Invalidated all cache for blog: ${blogSlug}`);
+    } catch (error) {
+      this.logger.error(`Failed to invalidate cache after post creation: ${error.message}`, error.stack);
+    }
+  }
+
   /**
    * Fast Path 포스트 생성 (MCP 최적화용)
    *
@@ -536,14 +779,14 @@ export class PostsService {
     });
 
     // 즉시 관련 캐시 삭제 (새로고침 시 데이터 일관성 보장)
-    await this.postCacheService.invalidateRelatedCache(blog.slug, blog.id);
+    await this.invalidateRelatedCache(blog.slug, blog.id);
 
     // 8. 202 Accepted 응답 반환 (즉시 응답)
     return {
-      ...(await this.postMapperService.toPostDto(post, {
+      ...this.toPostDto(post, {
         user: user,
         blog: blog,
-      })),
+      }),
       // 추가 메타데이터
       _meta: {
         processingStatus: 'queued',
@@ -789,7 +1032,7 @@ export class PostsService {
         // 태그 필드 추가 (프론트엔드 호환성)
         tags: post.tags || [],
         // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
-        thumbnail: post.thumbnail, // CDN optimization temporarily disabled
+        thumbnail: this.optimizeImageUrl(post.thumbnail),
         // 블로그 정보 (있으면)
         blog: post.blog || null,
         // 작성자 정보는 필요한 필드만 선택 (email 제외)
@@ -838,8 +1081,11 @@ export class PostsService {
     const safeLimit = Math.min(Math.max(limit, 1), 10); // 인기 게시글은 최대 10개
 
     // Redis 캐시 체크
-    const cached = await this.postCacheService.getPopularPostsCache(period, safeLimit);
+    const cacheKey = CacheKeys.FEED_POPULAR(period, safeLimit);
+
+    const cached = await this.cacheService.get(cacheKey);
     if (cached) {
+      this.logger.debug(`Cache hit for popular posts: ${cacheKey}`);
       return cached;
     }
 
@@ -952,7 +1198,7 @@ export class PostsService {
       publishedAt: post.publishedAt,
       // 태그와 썸네일
       tags: post.tags || [],
-      thumbnail: post.thumbnail, // 이미지 URL 최적화 temporarily disabled
+      thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
       // 블로그 정보
       blog: post.blog || null,
       // 작성자 프로필 (email 제외)
@@ -968,7 +1214,8 @@ export class PostsService {
     };
 
     // Redis 캐시 저장 (TTL 활용)
-    await this.postCacheService.setPopularPostsCache(period, limit, result, ttl);
+    await this.cacheService.set(cacheKey, result, ttl);
+    this.logger.debug(`Cached popular posts: ${cacheKey} with TTL: ${ttl}s`);
 
     return result;
   }
@@ -980,10 +1227,11 @@ export class PostsService {
     const cacheKey = CacheKeys.POST_CORE(id);
     const lockKey = CacheKeys.POST_REBUILDING(id);
 
-    const cachedCore = await this.postCacheService.getPostCache(cacheKey);
+    const cachedCore = await this.cacheService.get<PostCoreData>(cacheKey);
 
     if (cachedCore) {
       this.logger.debug(`✅ Cache HIT: post core ${id}`);
+      this.cacheMetricsService.recordPostCacheHit();
 
       // 2. 실시간 Counts + liked/bookmarked 조회
       const counts = await this.getPostCounts(id, user);
@@ -995,17 +1243,18 @@ export class PostsService {
     }
 
     this.logger.debug(`❌ Cache MISS: post core ${id}`);
+    this.cacheMetricsService.recordPostCacheMiss();
 
     // 3. Cache Stampede 방지: 분산 락 획득
-    const lockAcquired = await this.postCacheService.acquireLock(lockKey, 5);
+    const lockAcquired = await this.cacheService.acquireLock(lockKey, 5);
 
     if (!lockAcquired) {
       // 다른 요청이 캐시 리빌딩 중 → 대기 후 재조회
       this.logger.debug(`⏳ Waiting for cache rebuild: ${id}`);
-      await this.postCacheService.waitForLock(lockKey, 5000);
+      await this.cacheService.waitForLock(lockKey, 5000);
 
       // 락 해제 후 캐시 재확인
-      const rebuiltCache = await this.postCacheService.getPostCache(cacheKey);
+      const rebuiltCache = await this.cacheService.get<PostCoreData>(cacheKey);
       if (rebuiltCache) {
         const counts = await this.getPostCounts(id, user);
         return { ...rebuiltCache, ...counts };
@@ -1089,7 +1338,7 @@ export class PostsService {
      * DTO 변환으로 spread operator 제거
      * lazy loading 방지 및 성능 최적화
      */
-    const result = await this.postMapperService.toPostDto(post, {
+    const result = this.toPostDto(post, {
       liked: liked,
       bookmarked: bookmarked,
       user: post.author,
@@ -1119,7 +1368,7 @@ export class PostsService {
       attachedFiles: result.attachedFiles,
     };
 
-    await this.postCacheService.setPostCache(cacheKey, coreData, CacheTTL.POST_DETAIL);
+    await this.cacheService.set(cacheKey, coreData, CacheTTL.POST_DETAIL);
     this.logger.debug(`💾 Cached post core: ${id}`);
 
     this.logger.log(`Returning post data with ${post.attachedFiles?.length || 0} attached files`);
@@ -1127,7 +1376,7 @@ export class PostsService {
     } finally {
       // 6. 락 해제 (반드시 실행)
       if (lockAcquired) {
-        await this.postCacheService.releaseLock(lockKey);
+        await this.cacheService.releaseLock(lockKey);
       }
     }
   }
@@ -1207,7 +1456,7 @@ export class PostsService {
 
     // DTO 변환으로 안전하게 처리 (spread 연산자 사용 금지)
     // 날짜 포맷팅은 DTO 변환 후 별도 처리
-    const postDto = await this.postMapperService.toPostDto(post, {
+    const postDto = this.toPostDto(post, {
       liked: liked,
       bookmarked: bookmarked,
       user: post.author,
@@ -1242,8 +1491,17 @@ export class PostsService {
     // 마크다운이 업데이트된 경우
     if (updatePostDto.content_markdown && updatePostDto.content_markdown !== post.content_markdown) {
       markdownContent = updatePostDto.content_markdown;
-      const processed = await this.postContentService.processContent(markdownContent);
-      processedContent = processed.html.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+      let htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
+      // 첫 H1 제거 (제목은 post.title에 이미 있으므로 본문에서 중복 방지)
+      htmlContent = htmlContent.replace(/<h1[^>]*>.*?<\/h1>\s*/i, '').trim();
+      // 백엔드에서 콘텐츠 처리 파이프라인 적용
+      const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+        sanitize: true,
+        processCode: true,
+        processImages: true,
+        preserveMermaid: true,
+      });
+      processedContent = processed.html;
       post.content_type = 'markdown';
       post.content_rendered_at = new Date();
     }
@@ -1257,7 +1515,7 @@ export class PostsService {
     }
 
     if (processedContent && processedContent !== post.content) {
-      await this.cleanupUnusedImages(post.id, post.content, processedContent);
+      await this.cleanupUnusedImages(post.id, post.content, processedContent, user.id);
     }
 
     // 태그 업데이트 (JSONB로 단순 저장)
@@ -1278,7 +1536,16 @@ export class PostsService {
 
     // excerpt 재생성 (content가 변경된 경우)
     if (processedContent) {
-      post.excerpt = this.postContentService.extractExcerpt(processedContent, 200);
+      // HTML 태그 제거 및 공백 정리
+      const textContent = processedContent
+        .replace(/<[^>]+>/g, '') // HTML 태그 제거
+        .replace(/\s+/g, ' ') // 연속된 공백을 하나로
+        .trim();
+
+      // 첫 200자 추출
+      post.excerpt = textContent.length > 200
+        ? textContent.substring(0, 200)
+        : textContent;
     }
 
     post.tags = newTagList; // JSONB 태그 배열 업데이트
@@ -1287,20 +1554,21 @@ export class PostsService {
     // SEO를 위해 기존 slug 유지가 더 좋음
 
     // thumbnail이 명시적으로 제공된 경우 사용, 그렇지 않으면 content에서 추출
-    post.thumbnail = this.postContentService.extractThumbnail(processedContent, updatePostDto.thumbnail);
     if (updatePostDto.thumbnail !== undefined) {
       this.logger.log(`[UPDATE] Post ${id} - Updating thumbnail to: ${updatePostDto.thumbnail}`);
-    } else {
-      this.logger.log(`[UPDATE] Post ${id} - Extracted thumbnail from content: ${post.thumbnail}`);
+      post.thumbnail = updatePostDto.thumbnail;
+    } else if (processedContent) {
+      const extractedThumbnail = this.extractThumbnailFromContent(processedContent);
+      this.logger.log(`[UPDATE] Post ${id} - Extracted thumbnail from content: ${extractedThumbnail}`);
+      post.thumbnail = extractedThumbnail;
     }
 
     await this.postsRepository.save(post);
 
     if (updatePostDto.attachedFileIds !== undefined) {
       // 파일 개수 검증
-      const MAX_FILES_PER_POST = 10;
-      if (updatePostDto.attachedFileIds.length > MAX_FILES_PER_POST) {
-        throw new BadRequestException(`포스트당 최대 ${MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+      if (updatePostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
+        throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
       }
       
       const files = await this.filesRepository.find({
@@ -1308,14 +1576,14 @@ export class PostsService {
       });
       
       // 포스트당 총 파일 용량 검증
-      await this.postFileService.validatePostTotalSize(files, post.id);
-
+      await this.validatePostTotalSize(files, post.id);
+      
       post.attachedFiles = files;
       await this.postsRepository.save(post);
     }
 
     // Lazy loading 방지: user.id를 직접 전달
-    await this.postFileService.linkFilesFromContent(post, user.id);
+    await this.linkFilesFromContent(post, user.id);
 
     // 이벤트 발행 (캐시 무효화는 리스너가 처리)
     this.eventEmitter.emit('post.updated', {
@@ -1323,7 +1591,7 @@ export class PostsService {
       blogSlug: post.blog?.slug,
     });
 
-    return this.postMapperService.toPostDto(post, {
+    return this.toPostDto(post, {
       user: post.author,
       blog: post.blog,
       // attachedFiles는 이미 post에 포함되어 있음
@@ -1446,9 +1714,108 @@ export class PostsService {
     };
   }
 
-  
-  
-  
+  private async attachFiles(postId: string, fileIds: string[], userId: string): Promise<void> {
+    const files = await this.filesRepository.find({
+      where: { id: In(fileIds), userId: userId },
+    });
+    await this.postsRepository.update(postId, { attachedFiles: files });
+  }
+
+  private async updateAttachedFiles(postId: string, fileIds: string[], userId: string): Promise<void> {
+    const files = fileIds && fileIds.length > 0
+      ? await this.filesRepository.find({ where: { id: In(fileIds), userId: userId } })
+      : [];
+    await this.postsRepository.update(postId, { attachedFiles: files });
+  }
+
+  private async linkFilesFromContent(post: Post, userId?: string): Promise<void> {
+    try {
+      const imageUrls = this.extractImageUrlsFromContent(post.content);
+      if (imageUrls.length === 0) return;
+      const s3Keys = imageUrls.map(url => this.extractS3KeyFromUrl(url)).filter(Boolean) as string[];
+      if (s3Keys.length === 0) return;
+      // Lazy loading 방지: userId를 직접 받거나 post.authorId 사용
+      const authorUserId = userId || post.authorId;
+      const files = await this.filesRepository.find({ where: { fileKey: In(s3Keys), userId: authorUserId } });
+      if (files.length > 0) {
+        const existingFileIds = post.attachedFiles?.map(f => f.id) || [];
+        const newFiles = files.filter(f => !existingFileIds.includes(f.id));
+        if (newFiles.length > 0) {
+          // 임시 context를 POST context로 변환
+          for (const file of newFiles) {
+            if (file.contextId) {
+              const context = await this.fileContextRepository.findOne({
+                where: { id: file.contextId }
+              });
+
+              if (context && context.contextId.startsWith('temp_')) {
+                // 임시 context를 POST context로 변환
+                context.contextType = FileContextType.POST;
+                context.contextId = post.id;
+                context.purpose = FilePurpose.CONTENT;
+                await this.fileContextRepository.save(context);
+
+                this.logger.log(`Converted temporary context ${context.id} to POST context for post ${post.id}`);
+              }
+            }
+          }
+
+          post.attachedFiles = [...(post.attachedFiles || []), ...newFiles];
+          await this.postsRepository.save(post);
+        }
+      }
+    } catch (error) {
+      this.logger.error(`Failed to link files from content for post ${post.id}:`, error.message);
+    }
+  }
+
+  // UUID 기반 S3 키 추출 개선
+  private extractS3KeyFromUrl(url: string): string | null {
+    if (!url) return null;
+    
+    try {
+      // 이미 S3 키인 경우 (uploads/로 시작)
+      if (url.startsWith('uploads/')) {
+        return url;
+      }
+      
+      // 프록시 URL인 경우 (/api/v1/files/proxy/ 포함)
+      if (url.includes('/api/v1/files/proxy/')) {
+        const proxyMatch = url.match(/\/api\/v1\/files\/proxy\/(.+)/);
+        if (proxyMatch) {
+          const s3Key = proxyMatch[1].split('?')[0]; // 쿼리 파라미터 제거
+          this.logger.log(`Extracted S3 key from proxy URL: ${url} -> ${s3Key}`);
+          return s3Key;
+        }
+      }
+      
+      // S3 직접 URL인 경우 (UUID 파일명 포함)
+      const s3Pattern = /https:\/\/[^\/]+\.s3\.[^\/]+\.amazonaws\.com\/(.+)/;
+      const match = url.match(s3Pattern);
+      if (match) {
+        const s3Key = match[1].split('?')[0]; // 쿼리 파라미터 제거 (presigned URL의 경우)
+        this.logger.log(`Extracted S3 key from S3 URL: ${url} -> ${s3Key}`);
+        return s3Key;
+      }
+      
+      // localhost 프록시 URL 처리 (개발 환경)
+      if (url.includes('localhost:3000/api/v1/files/proxy/')) {
+        const proxyMatch = url.match(/localhost:3000\/api\/v1\/files\/proxy\/(.+)/);
+        if (proxyMatch) {
+          const s3Key = proxyMatch[1].split('?')[0];
+          this.logger.log(`Extracted S3 key from localhost proxy URL: ${url} -> ${s3Key}`);
+          return s3Key;
+        }
+      }
+      
+      this.logger.warn(`Could not extract S3 key from URL: ${url}`);
+      return null;
+    } catch (error) {
+      this.logger.error('Error extracting S3 key from URL:', error);
+      return null;
+    }
+  }
+
   /**
    * 작성자 데이터 포맷팅 (프로필 평탄화 및 CDN URL 변환)
    * users.service.ts와 동일한 패턴 적용
@@ -1691,7 +2058,13 @@ export class PostsService {
   }
 
 
-  
+  // 조회수 증가 (로그인 유저만)
+  private async incrementViewCountForUser(post: Post, user: User) {
+    if (!user?.id) return;
+    post.viewCount = (post.viewCount || 0) + 1;
+    await this.postsRepository.save(post);
+  }
+
   // 조회수 증가 (모든 사용자)
   private async incrementViewCountForAll(postId: string): Promise<void> {
     await this.postsRepository.increment({ id: postId }, 'viewCount', 1);
@@ -2141,37 +2514,244 @@ export class PostsService {
       // author relation 제거 - authorId 직접 사용
     });
 
-    // Delegate to PostFileService
-    await this.postFileService.relinkContentFiles(posts);
+    this.logger.log(`Starting to relink content files for ${posts.length} posts`);
+
+    for (const post of posts) {
+      try {
+        // Lazy loading 방지: authorId 직접 사용
+        await this.linkFilesFromContent(post, post.authorId);
+        this.logger.log(`✅ Relinked files for post: ${post.title}`);
+      } catch (error) {
+        this.logger.error(`❌ Failed to relink files for post ${post.id}:`, error.message);
+      }
+    }
+
+    this.logger.log('Finished relinking content files');
   }
 
   // 사용되지 않는 이미지 파일 정리 (S3 + DB)
   // @deprecated 자동 삭제 비활성화 - 사용자가 수동으로 관리하도록 변경
-  private async cleanupUnusedImages(postId: string, oldContent: string, newContent: string): Promise<void> {
+  private async cleanupUnusedImages(postId: string, oldContent: string, newContent: string, userId: string): Promise<void> {
     // 자동 이미지 삭제 비활성화
     // 이유: 사용자가 나중에 재사용할 수 있는 이미지를 보존하기 위함
     // 추후 사용자 대시보드에서 수동 관리 기능 제공 예정
     this.logger.log('[Image Cleanup] Auto-cleanup disabled - preserving all uploaded images');
-
+    
     // 분석용 로깅만 수행 (실제 삭제는 하지 않음)
     try {
-      const oldImageUrls = extractImageUrlsFromContent(oldContent);
-      const newImageUrls = extractImageUrlsFromContent(newContent);
+      const oldImageUrls = this.extractImageUrlsFromContent(oldContent);
+      const newImageUrls = this.extractImageUrlsFromContent(newContent);
       const removedImageUrls = oldImageUrls.filter(url => !newImageUrls.includes(url));
-
+      
       if (removedImageUrls.length > 0) {
         this.logger.log(`[Image Cleanup] ${removedImageUrls.length} images removed from post ${postId} (not deleted):`, removedImageUrls);
       }
     } catch (error) {
       this.logger.error('[Image Cleanup] Analysis failed:', error.message);
     }
-
+    
     return;
   }
 
-  
-  
-  
+  // 콘텐츠에서 이미지 URL 추출 (img 태그의 src 속성)
+  private extractImageUrlsFromContent(content: string): string[] {
+    if (!content) return [];
+
+    const imgRegex = /<img[^>]+src="([^">]+)"/gi;
+    const urls: string[] = [];
+    let match;
+
+    while ((match = imgRegex.exec(content)) !== null) {
+      if (match[1]) {
+        // 쿼리 파라미터 제거
+        const cleanUrl = match[1].split('?')[0];
+        urls.push(cleanUrl);
+      }
+    }
+
+    return urls;
+  }
+
+  // 콘텐츠에서 썸네일 URL 추출
+  private extractThumbnailFromContent(content: string): string | null {
+    if (!content) return null;
+
+    // HTML에서 첫 번째 img 태그의 src 추출
+    const imgRegex = /<img[^>]+src="([^">]+)"/i;
+    const match = content.match(imgRegex);
+    
+    if (match && match[1]) {
+      return match[1];
+    }
+
+    return null;
+  }
+
+  /**
+   * 포스트당 총 파일 용량 검증
+   * @param files 업로드할 파일들
+   * @param existingPostId 기존 포스트 ID (수정 시)
+   */
+  async validatePostTotalSize(files: File[], existingPostId?: string): Promise<void> {
+    let totalSize = 0;
+
+    // 신규 파일들의 총 크기 계산
+    for (const file of files) {
+      totalSize += file.fileSize || 0;
+    }
+
+    // 기존 포스트 수정인 경우, 이미 업로드된 파일들의 크기도 포함
+    if (existingPostId) {
+      // Post와 연관된 파일들을 찾기 위해 FileContext를 통해 조회
+      const existingPost = await this.postsRepository.findOne({
+        where: { id: existingPostId },
+        relations: ['attachedFiles'],
+      });
+      
+      if (existingPost?.attachedFiles) {
+        for (const existingFile of existingPost.attachedFiles) {
+          // 새로 추가되는 파일과 중복되지 않는 경우만 계산
+          if (!files.some(f => f.id === existingFile.id)) {
+            totalSize += existingFile.fileSize || 0;
+          }
+        }
+      }
+    }
+
+    // 30MB 제한 체크
+    if (totalSize > this.MAX_POST_TOTAL_SIZE) {
+      const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+      const limitMB = (this.MAX_POST_TOTAL_SIZE / (1024 * 1024)).toFixed(0);
+      
+      throw new BadRequestException({
+        error: 'POST_SIZE_LIMIT_EXCEEDED',
+        message: `포스트당 최대 ${limitMB}MB까지 업로드 가능합니다. 현재 크기: ${totalSizeMB}MB`,
+        current: totalSize,
+        limit: this.MAX_POST_TOTAL_SIZE,
+      });
+    }
+  }
+
+  /**
+   * 신규 파일 업로드 시 포스트 용량 체크
+   */
+  async validateNewFileForPost(postId: string, newFileSize: number): Promise<void> {
+    // Post와 연관된 파일들을 찾기
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+      relations: ['attachedFiles'],
+    });
+
+    if (!post) {
+      throw new NotFoundException('Post not found');
+    }
+
+    const existingFiles = post.attachedFiles || [];
+    const totalSize = existingFiles.reduce((sum, file) => sum + (file.fileSize || 0), 0);
+
+    if (totalSize + newFileSize > this.MAX_POST_TOTAL_SIZE) {
+      const currentSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
+      const newSizeMB = (newFileSize / (1024 * 1024)).toFixed(2);
+      const limitMB = (this.MAX_POST_TOTAL_SIZE / (1024 * 1024)).toFixed(0);
+      
+      throw new BadRequestException({
+        error: 'POST_SIZE_LIMIT_EXCEEDED',
+        message: `포스트당 최대 ${limitMB}MB까지 업로드 가능합니다. 현재: ${currentSizeMB}MB, 추가하려는 파일: ${newSizeMB}MB`,
+        current: totalSize,
+        limit: this.MAX_POST_TOTAL_SIZE,
+        requested: newFileSize,
+      });
+    }
+  }
+
+  // 마크다운 콘텐츠인지 확인하는 헬퍼 메소드
+  private isMarkdownContent(content: string): boolean {
+    if (!content) return false;
+    
+    // 마크다운 패턴 검사
+    const markdownPatterns = [
+      /^#{1,6}\s+/m, // 헤딩
+      /\*\*.*\*\*/, // 굵은 글씨
+      /\*.*\*/, // 기울임
+      /^\s*[-*+]\s+/m, // 리스트
+      /^\s*\d+\.\s+/m, // 번호 리스트
+      /```[\s\S]*?```/, // 코드 블록
+      /`[^`]+`/, // 인라인 코드
+      /\[.*?\]\(.*?\)/, // 링크
+      /!\[.*?\]\(.*?\)/, // 이미지
+      /^---$/m, // 수평선
+      /^>\s+/m, // 인용문
+    ];
+    
+    return markdownPatterns.some(pattern => pattern.test(content));
+  }
+
+  // 마크다운 재렌더링 (필요시 호출)
+  async rerenderMarkdown(postId: string): Promise<void> {
+    const post = await this.postsRepository.findOne({ where: { id: postId } });
+    if (!post || !post.content_markdown) {
+      throw new NotFoundException('Post with markdown content not found');
+    }
+    
+    const htmlContent = this.markdownRenderer.convertToHtml(post.content_markdown);
+    // 백엔드에서 콘텐츠 처리 파이프라인 적용
+    const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
+      sanitize: true,
+      processCode: true,
+      processImages: true,
+      preserveMermaid: true,
+    });
+    post.content = processed.html;
+    post.content_rendered_at = new Date();
+    post.thumbnail = this.extractThumbnailFromContent(post.content);
+    
+    await this.postsRepository.save(post);
+  }
+
+  /**
+   * 이미지 URL 최적화 (캐싱으로 성능 개선)
+   * - YouTube 썸네일은 그대로 반환 (외부 CDN 활용)
+   * - S3 URL은 CloudFront CDN URL로 변환 (있는 경우)
+   * - 나머지는 프록시 URL 유지
+   *
+   * 성능 최적화:
+   * - 빠른 실패: null/YouTube 체크를 먼저 수행
+   * - 불필요한 문자열 연산 최소화
+   */
+  /**
+   * 이미지 URL 최적화 (CDN 사용)
+   * @param url - 원본 이미지 URL 또는 S3 키
+   * @returns CDN URL 또는 원본 URL
+   */
+  private optimizeImageUrl(url: string | null): string | null {
+    // 빠른 실패: null 체크
+    if (!url) return null;
+
+    // 빠른 실패: YouTube 썸네일은 YouTube CDN 활용
+    if (url.indexOf('youtube.com') !== -1 || url.indexOf('ytimg.com') !== -1) {
+      return url;
+    }
+
+    // CDN URL이 이미 있으면 그대로 반환
+    if (url.indexOf('cdn.codebase.blog') !== -1) {
+      return url;
+    }
+
+    // 외부 HTTP/HTTPS URL은 그대로 반환
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    // S3 키 (uploads/, v2/ 등)는 CDN URL로 변환
+    if (url.startsWith('uploads/') || url.startsWith('v2/')) {
+      // Temporarily disabled CDN service
+      // return this.cdnService.generateCdnUrlFromKey(url);
+      return url; // Return original URL for now
+    }
+
+    return url;
+  }
+
   /**
    * 인기 태그 조회 (JSONB 컬럼에서 집계)
    * 캐시를 통해 성능 최적화 (1시간)
@@ -2314,13 +2894,11 @@ export class PostsService {
     const [posts, total] = await query.getManyAndCount();
 
     // DTO 변환
-    const postDtos = await Promise.all(
-      posts.map(post =>
-        this.postMapperService.toPostDto(post, {
-          user: post.author,
-          blog: post.blog,
-        })
-      )
+    const postDtos = posts.map(post =>
+      this.toPostDto(post, {
+        user: post.author,
+        blog: post.blog,
+      })
     );
 
     return {
@@ -2661,24 +3239,20 @@ export class PostsService {
         this.bookmarksService.areBookmarked(user.id, postIds),
       ]);
 
-      postDtos = await Promise.all(
-        posts.map(post =>
-          this.postMapperService.toPostDto(post, {
-            user: post.author,
-            blog: post.blog,
-            liked: likedMap.get(post.id) || false,
-            bookmarked: bookmarkedMap.get(post.id) || false,
-          })
-        )
+      postDtos = posts.map(post =>
+        this.toPostDto(post, {
+          user: post.author,
+          blog: post.blog,
+          liked: likedMap.get(post.id) || false,
+          bookmarked: bookmarkedMap.get(post.id) || false,
+        })
       );
     } else {
-      postDtos = await Promise.all(
-        posts.map(post =>
-          this.postMapperService.toPostDto(post, {
-            user: post.author,
-            blog: post.blog,
-          })
-        )
+      postDtos = posts.map(post =>
+        this.toPostDto(post, {
+          user: post.author,
+          blog: post.blog,
+        })
       );
     }
 
