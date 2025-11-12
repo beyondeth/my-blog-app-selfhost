@@ -8,7 +8,7 @@ import { Avatar } from '@/components/ui/avatar';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { formatRelativeTime } from '@/utils/timeFormat';
+import RelativeTime from '@/components/ui/RelativeTime';
 import FollowButton from '@/components/FollowButton';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 
@@ -151,7 +151,7 @@ export default function PostHeaderWithReport({
             {/* 작성시간 */}
             <div className="flex items-center text-sm text-gray-500 dark:text-gray-400 mr-2">
               <span className="mx-2">·</span>
-              <span>{formatRelativeTime(post.publishedAt || post.createdAt)}</span>
+              <RelativeTime date={post.publishedAt || post.createdAt} />
             </div>
 
             {/* Editor's Pick 버튼 (Admin 전용) 또는 배지 */}
