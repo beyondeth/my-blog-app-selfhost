@@ -164,41 +164,63 @@ export class AuthController {
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: '구글 로그인 콜백' })
   async googleAuthRedirect(@Request() req, @Res() res) {
-    // 🔍 디버그: OAuth 콜백에서 받은 user 정보 확인
-    this.logger.log(`[Google OAuth Callback] User: ${req.user.user.email}, Role in response: ${req.user.user.role}`);
+    try {
+      // OAuth Guard가 이미 사용자를 찾았는지 확인
+      if (!req.user || !req.user.user) {
+        this.logger.error(`[Google OAuth Callback] No user found in request`);
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+      }
 
-    // HttpOnly 쿠키로 토큰들 설정
-    res.cookie('access_token', req.user.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
-      path: '/',
-    });
+      // 🔍 디버그: OAuth 콜백에서 받은 user 정보 확인
+      this.logger.log(`[Google OAuth Callback] User: ${req.user.user.email}, Role in response: ${req.user.user.role}`);
 
-    res.cookie('refresh_token', req.user.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
-      path: '/',
-    });
+      // HttpOnly 쿠키로 토큰들 설정
+      res.cookie('access_token', req.user.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+        path: '/',
+      });
 
-    // 🔍 디버그: 쿠키 설정 완료 로그
-    this.logger.log(`[Google OAuth Callback] Cookies set - access_token length: ${req.user.access_token.length}`);
+      res.cookie('refresh_token', req.user.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+        path: '/',
+      });
 
-    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
-    await this.createWebSessionInRedis(req.user.user.id);
+      // 🔍 디버그: 쿠키 설정 완료 로그
+      this.logger.log(`[Google OAuth Callback] Cookies set - access_token length: ${req.user.access_token.length}`);
 
-    // 약관 동의 여부 확인
-    const user = req.user.user;
-    const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
+      // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+      await this.createWebSessionInRedis(req.user.user.id);
 
-    this.logger.debug(`Google OAuth callback - User: ${user.id}, termsAcceptedAt: ${user.termsAcceptedAt}, needsConsent: ${needsConsent}`);
+      // 약관 동의 여부 확인
+      const user = req.user.user;
+      const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
 
-    // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
-    const redirectPath = needsConsent ? '/consent' : '/';
-    res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+      this.logger.debug(`Google OAuth callback - User: ${user.id}, termsAcceptedAt: ${user.termsAcceptedAt}, needsConsent: ${needsConsent}`);
+
+      // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
+      const redirectPath = needsConsent ? '/consent' : '/';
+      res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+
+    } catch (error) {
+      this.logger.error(`[Google OAuth Callback] Error:`, error);
+
+      // 에러 메시지 추출
+      const errorMessage = error.response?.data?.message || error.message || 'Authentication failed';
+
+      // 삭제된 계정 에러인 경우 특별 처리
+      if (errorMessage.includes('계정이 삭제되었습니다')) {
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`);
+      }
+
+      // 기본 에러 처리
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent('로그인에 실패했습니다. 다시 시도해주세요.')}`);
+    }
   }
 
   @Public()
@@ -256,40 +278,55 @@ export class AuthController {
   @UseGuards(GitHubAuthGuard)
   @ApiOperation({ summary: 'GitHub 로그인 콜백' })
   async githubAuthRedirect(@Request() req, @Res() res) {
-    if (!req.user) {
-      return res.status(401).json({
-        statusCode: 401,
-        message: 'GitHub authentication failed',
+    try {
+      // OAuth Guard가 이미 사용자를 찾았는지 확인
+      if (!req.user || !req.user.user) {
+        this.logger.error(`[GitHub OAuth Callback] No user found in request`);
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=auth_failed`);
+      }
+
+      // HttpOnly 쿠키로 토큰들 설정
+      res.cookie('access_token', req.user.access_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
+        path: '/',
       });
+
+      res.cookie('refresh_token', req.user.refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
+        path: '/',
+      });
+
+      // 웹 세션 생성 (MCP 세션과 동기화를 위해)
+      await this.createWebSessionInRedis(req.user.user.id);
+
+      // 약관 동의 여부 확인
+      const user = req.user.user;
+      const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
+
+      // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
+      const redirectPath = needsConsent ? '/consent' : '/';
+      res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+
+    } catch (error) {
+      this.logger.error(`[GitHub OAuth Callback] Error:`, error);
+
+      // 에러 메시지 추출
+      const errorMessage = error.response?.data?.message || error.message || 'Authentication failed';
+
+      // 삭제된 계정 에러인 경우 특별 처리
+      if (errorMessage.includes('계정이 삭제되었습니다')) {
+        return res.redirect(`${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`);
+      }
+
+      // 기본 에러 처리
+      return res.redirect(`${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent('로그인에 실패했습니다. 다시 시도해주세요.')}`);
     }
-
-    // HttpOnly 쿠키로 토큰들 설정
-    res.cookie('access_token', req.user.access_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
-      path: '/',
-    });
-
-    res.cookie('refresh_token', req.user.refresh_token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
-      path: '/',
-    });
-
-    // 웹 세션 생성 (MCP 세션과 동기화를 위해)
-    await this.createWebSessionInRedis(req.user.user.id);
-
-    // 약관 동의 여부 확인
-    const user = req.user.user;
-    const needsConsent = !user.termsAcceptedAt || !user.privacyAcceptedAt;
-
-    // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
-    const redirectPath = needsConsent ? '/consent' : '/';
-    res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
   }
 
   @Public()

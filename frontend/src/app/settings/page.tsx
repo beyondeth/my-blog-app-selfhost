@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, FiLoader, FiBell } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale/ko';
@@ -13,6 +14,7 @@ import CharacterSelector from '@/components/settings/CharacterSelector';
 export default function ProfileSettingsPage() {
   const { user, isLoading: authLoading, refreshUser, logout } = useAuth();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [usernameLoading, setUsernameLoading] = useState(false);
   const [bioLoading, setBioLoading] = useState(false);
   const [usernameSuccess, setUsernameSuccess] = useState(false);
@@ -260,6 +262,11 @@ export default function ProfileSettingsPage() {
       }
 
       await refreshUser();
+
+      // 블로그 관련 캐시 무효화
+      queryClient.invalidateQueries({ queryKey: ['blog'] });
+      queryClient.invalidateQueries({ queryKey: ['my-blogs'] });
+
       setBioLoading(false);
       setBioSuccess(true);
       setSuccess(true);

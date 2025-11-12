@@ -28,7 +28,7 @@ export class CacheInterceptor implements NestInterceptor {
     next: CallHandler,
   ): Promise<Observable<any>> {
     const request = context.switchToHttp().getRequest();
-    
+
     // GET 요청만 캐싱
     if (request.method !== 'GET') {
       return next.handle();
@@ -36,7 +36,13 @@ export class CacheInterceptor implements NestInterceptor {
 
     // 캐시 키 생성 (URL + 쿼리 파라미터 + 사용자 ID)
     const cacheKey = this.generateCacheKey(request);
-    
+
+    // 내 블로그인 경우 캐시 사용 안 함
+    if (cacheKey.startsWith('no-cache:')) {
+      this.logger.debug(`BYPASS cache for my-blog: ${request.url}`);
+      return next.handle();
+    }
+
     // 캐시 확인
     const cached = await this.cacheService.get(cacheKey);
     if (cached) {
@@ -46,7 +52,7 @@ export class CacheInterceptor implements NestInterceptor {
 
     // 캐시 미스 - 핸들러 실행 후 캐싱
     const ttl = this.getTTL(context);
-    
+
     return next.handle().pipe(
       tap(async (response) => {
         // 성공 응답만 캐싱
@@ -63,10 +69,10 @@ export class CacheInterceptor implements NestInterceptor {
    */
   private generateCacheKey(request: any): string {
     const { url, query, user } = request;
-    
+
     // URL 기반 기본 키
     let key = `http:${url}`;
-    
+
     // 쿼리 파라미터 추가
     if (query && Object.keys(query).length > 0) {
       const queryString = Object.keys(query)
@@ -75,13 +81,19 @@ export class CacheInterceptor implements NestInterceptor {
         .join('&');
       key += `:${queryString}`;
     }
-    
+
+    // 내 블로그인 경우 캐시 사용 안 함 (DB 직조회)
+    if (query.blogSlug && user && this.isMyBlog(user, query.blogSlug)) {
+      // 캐시 사용하지 않음 - 특별한 키로 표시
+      return `no-cache:my-blog:${user.id}:${query.blogSlug}`;
+    }
+
     // 사용자별 캐싱이 필요한 경우 (선택적)
     // 주의: 사용자별 캐싱은 캐시 효율을 떨어뜨릴 수 있음
     if (user && this.requiresUserSpecificCache(url)) {
       key += `:user:${user.id}`;
     }
-    
+
     return key;
   }
 
@@ -113,7 +125,23 @@ export class CacheInterceptor implements NestInterceptor {
       /\/api\/v1\/posts\/my-posts/,
       /\/api\/v1\/blogs\/my-blog/,
     ];
-    
+
     return userSpecificPatterns.some(pattern => pattern.test(url));
+  }
+
+  /**
+   * 내 블로그인지 확인 (간단 버전)
+   * TODO: BlogsService 주입받아 정확한 확인 로직으로 변경
+   */
+  private isMyBlog(user: any, blogSlug: string): boolean {
+    // 임시 구현: 사용자 이름과 blogSlug 비교
+    // 실제로는 BlogsService로 소유권 확인 필요
+    if (!user || !blogSlug) return false;
+
+    // blogSlug에서 @ 제거
+    const cleanSlug = blogSlug.replace('@', '');
+
+    // 사용자 username과 blogSlug가 같으면 내 블로그로 간주
+    return user.username === cleanSlug;
   }
 }

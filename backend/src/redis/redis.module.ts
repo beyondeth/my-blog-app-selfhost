@@ -24,6 +24,14 @@ import { UnifiedRedisService } from './unified-redis.service';
             }
             return Math.min(times * 50, 2000); // 지수 백오프
           },
+          // 메모리 최적화 설정
+          maxmemory: configService.get('REDIS_MAX_MEMORY') || '2gb',
+          maxmemoryPolicy: configService.get('REDIS_MAX_MEMORY_POLICY') || 'allkeys-lru',
+          // 커넥션 풀링
+          connectTimeout: 10000,
+          commandTimeout: 15000, // 5초에서 15초로 증가
+          lazyConnect: true,
+          keepAlive: 30000,
         },
       }),
       inject: [ConfigService],

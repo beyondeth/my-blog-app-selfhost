@@ -5,20 +5,29 @@ import { UnifiedRedisService } from '../redis/unified-redis.service';
 import { CacheMetricsService } from '../metrics/cache-metrics.service';
 import { createHash } from 'crypto';
 
-// 캐시 TTL 상수 (초 단위)
+// 캐시 TTL 상수 (초 단위) - 메모리 최적화 전략
 export enum CacheTTL {
+  // 핫 데이터 (높은 가치)
   VERY_SHORT = 10,   // 10초 - 댓글 트리 (실시간성 중요)
+
+  // 온 데이터 (중간 가치)
   SHORT = 60,        // 1분 - 실시간 데이터
-  MEDIUM = 300,      // 5분 - 포스트 목록
+  HOME_FEED = 300,   // 5분 - 홈 피드 (기존 600초에서 단축)
+  MEDIUM = 300,      // 5분 - 포스트 목록 (기존 그대로)
+
+  // 콜드 데이터 (낮은 가치)
   LONG = 600,        // 10분 - 기타 데이터
-  POST_CORE = 1800,  // 30분 - 포스트 Core 데이터 (title, content, author 등)
-  EXTRA_LONG = 1800, // 30분 - 프로필
+
+  // 정적 데이터 (고정 가치)
   STATIC = 3600,     // 1시간 - 블로그 설정, 태그
 
-  // 새로운 분리된 TTL
-  HOME_FEED = 600,    // 10분 - 홈 피드 (성능 우선)
-  MY_BLOG = 30,       // 30초 - 내 블로그 (즉시 반영)
-  DELETED_POSTS_CLEANUP = 300, // 5분 - 삭제된 포스트 정리
+  // 개선된 TTL - 단순화 및 최적화
+  POST_DETAIL = 60,  // 1분 - 포스트 상세 (기존 1800초에서 대폭 단축)
+  PROFILE = 300,     // 5분 - 프로필 (기존 1800초에서 단축)
+  MY_BLOG = 0,       // 캐시 안 함 - DB 직조회 (실시성 중요)
+
+  // 시스템 관리
+  DELETED_POSTS_CLEANUP = 60, // 1분 - 삭제된 포스트 정리 (기존 5분에서 단축)
 }
 
 // 표준화된 캐시 키 생성 헬퍼

@@ -337,7 +337,7 @@ export default function BlogPage() {
             <BlogOwnerCard
               name={blog.owner?.username || blog.owner?.email || blog.name}
               username={blog.owner?.username}
-              description={blog.description || blog.owner?.bio}
+              description={blog.owner?.bio}
               profileImage={
                 blog.owner?.profileImage ||
                 blog.thumbnailUrl

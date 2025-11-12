@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, Header, UseInterceptors, Logger, ParseIntPipe, DefaultValuePipe, ForbiddenException, Inject, forwardRef } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, Header, UseInterceptors, Logger, ParseIntPipe, DefaultValuePipe, ForbiddenException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
@@ -787,9 +787,16 @@ export class PostsController {
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: '게시글 상세 조회' })
-  findOne(@Param('id') id: string, @Request() req: any) {
+  async findOne(@Param('id') id: string, @Request() req: any) {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
-    return this.postsService.findOne(id, user);
+    const post = await this.postsService.findOne(id, user);
+
+    // 삭제된 포스트면 410 Gone 응답
+    if (post && post.isDeleted) {
+      throw new NotFoundException('삭제된 포스트입니다');
+    }
+
+    return post;
   }
 } 

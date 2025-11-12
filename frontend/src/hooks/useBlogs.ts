@@ -16,10 +16,10 @@ export function useBlogBySlug(slug: string) {
       return blog;
     },
     enabled: !!slug,
-    staleTime: 1 * 60 * 1000,       // 1분간 캐싱 (프로필 이미지 변경 등 빠른 반영 필요)
+    staleTime: 0,                     // 캐싱 안함 (즉시 반영)
     gcTime: 10 * 60 * 1000,          // 10분간 메모리 보관
-    refetchOnMount: 'always',        // 마운트 시 stale 데이터면 재페칭 (아바타 즉시 반영)
-    refetchOnWindowFocus: false,     // 포커스 시 재요청 안함
+    refetchOnMount: 'always',        // 마운트 시 항상 재페칭
+    refetchOnWindowFocus: true,      // 포커스 시 재요청
   });
 }
 

@@ -82,7 +82,7 @@ export class UserDeletionQueueService {
         await this.unifiedRedisService.setWithExpiry(
           `${this.PROCESSING_KEY}:${job.id}`,
           data,
-          3600, // 1시간 타임아웃
+          600, // 10분 타임아웃
         );
       } catch (error) {
         this.logger.error('Failed to parse deletion job:', error);

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
 
 export type OAuthProvider = 'google'  | 'github';
 
@@ -23,14 +24,6 @@ const providerConfig = {
       </svg>
     ),
   },
-  // kakao: {
-  //   name: 'Kakao',
-  //   icon: (
-  //     <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none">
-  //       <path d="M12 3C6.48 3 2 6.32 2 10.5c0 2.66 1.82 5 4.57 6.32l-.72 2.68c-.07.26.18.5.44.37l3.13-1.57c.52.07 1.05.1 1.58.1 5.52 0 10-3.32 10-7.4S17.52 3 12 3z" fill="#FEE500"/>
-  //     </svg>
-  //   ),
-  // },
   github: {
     name: 'GitHub',
     icon: (
@@ -43,25 +36,26 @@ const providerConfig = {
 
 export function SocialLoginButton({ provider, className = '', disabled = false }: SocialLoginButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
+  const router = useRouter();
   const config = providerConfig[provider];
 
-  const handleLogin = async () => {
+  const handleLogin = () => {
     if (isLoading || disabled) return;
-    
+
     try {
       setIsLoading(true);
-      
+
       // 현재 페이지 저장 (로그인 후 돌아올 페이지)
       const returnUrl = window.location.pathname;
       sessionStorage.setItem('redirectAfterLogin', returnUrl);
-      
-      // API URL 구성 (환경 변수 사용)
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-      const authUrl = `${baseUrl}/auth/${provider}`;
-      
+
+      // 백엔드 OAuth 엔드포인트로 직접 리디렉션
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const oauthUrl = `${backendUrl}/api/v1/auth/${provider}`;
+
       // OAuth 페이지로 이동 - replace 사용으로 히스토리 관리 개선
-      // 로그인 페이지는 히스토리에 남길 필요가 없음
-      window.location.replace(authUrl);
+      window.location.replace(oauthUrl);
+
     } catch (error) {
       console.error(`${provider} 로그인 실패:`, error);
       toast.error('로그인에 실패했습니다. 다시 시도해주세요.');
