@@ -248,4 +248,28 @@ export class BlogStatsService {
 
     this.logger.debug(`Invalidated blog stats cache: ${blogId}, slug: ${slug}`);
   }
+
+  /**
+   * 블로그 포스트 수 증가
+   * @param blogId 블로그 ID
+   */
+  async incrementPostCount(blogId: string): Promise<void> {
+    // postCount 컬럼이 없으므로 캐시 무효화만 처리
+    // 실제 포스트 수는 동적으로 계산됨
+    await this.invalidateBlogStatsCache('', blogId);
+
+    this.logger.debug(`Invalidated blog stats cache for blog: ${blogId}`);
+  }
+
+  /**
+   * 블로그 포스트 수 감소
+   * @param blogId 블로그 ID
+   */
+  async decrementPostCount(blogId: string): Promise<void> {
+    // postCount 컬럼이 없으므로 캐시 무효화만 처리
+    // 실제 포스트 수는 동적으로 계산됨
+    await this.invalidateBlogStatsCache('', blogId);
+
+    this.logger.debug(`Invalidated blog stats cache for blog: ${blogId}`);
+  }
 }

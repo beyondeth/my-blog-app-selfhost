@@ -40,6 +40,9 @@ import { PostMapperService } from './services/post-mapper.service';
 import { PostCacheService } from './services/post-cache.service';
 import { PostFileService } from './services/post-file.service';
 import { PostContentService } from './services/post-content.service';
+import { PostReadService } from './services/post-read.service';
+import { PostInteractionService } from './services/post-interaction.service';
+import { PostCreationService } from './services/post-creation.service';
 
 export const LIKE_QUEUE_NAME = 'post-likes';
 
@@ -97,6 +100,9 @@ export const LIKE_QUEUE_NAME = 'post-likes';
     PostCacheService, // 캐시 관리 서비스
     PostFileService, // 파일 관리 서비스
     PostContentService, // 콘텐츠 처리 서비스
+    PostReadService, // 조회 및 검색 서비스
+    PostInteractionService, // 상호작용 관리 서비스
+    PostCreationService, // 생성, 수정, 삭제 서비스
     MarkdownRendererService,
     ViewCountService,
     SearchIndexingService, // 검색 인덱싱 배치 서비스 추가
@@ -107,6 +113,6 @@ export const LIKE_QUEUE_NAME = 'post-likes';
     BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
   ],
   controllers: [PostsController],
-  exports: [PostsService, ViewCountService, SearchIndexingService, LikeQueueService, BlogStatsService],
+  exports: [PostsService, ViewCountService, SearchIndexingService, LikeQueueService, BlogStatsService, PostReadService, PostInteractionService, PostCreationService],
 })
 export class PostsModule {} 

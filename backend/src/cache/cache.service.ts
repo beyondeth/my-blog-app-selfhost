@@ -25,6 +25,7 @@ export enum CacheTTL {
   POST_DETAIL = 60,  // 1분 - 포스트 상세 (기존 1800초에서 대폭 단축)
   PROFILE = 300,     // 5분 - 프로필 (기존 1800초에서 단축)
   MY_BLOG = 10,      // 10초 - 내 블로그 피드 (실시성 + 성능 균형)
+  DAY = 86400,       // 24시간 - 사용자 조회 기록
 
   // 시스템 관리
   DELETED_POSTS_CLEANUP = 60, // 1분 - 삭제된 포스트 정리 (기존 5분에서 단축)
@@ -57,6 +58,7 @@ export const CacheKeys = {
   POST_RELATED: (id: string) => `post:${id}:related`,
   POST_BY_SLUG: (slug: string) => `post:slug:${slug}`,
   POST_REBUILDING: (id: string) => `rebuilding:post:${id}`,
+  POST_USER_VIEW: (postId: string, userId: string) => `post:${postId}:view:${userId}`,
 
   // User 관련
   USER_BY_ID: (id: string) => `user:id:${id}`,

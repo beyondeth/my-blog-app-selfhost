@@ -51,4 +51,18 @@ export class CursorPaginatedPostsDto {
     example: 20,
   })
   count: number;
+
+  @ApiProperty({
+    description: '다음 페이지 커서 랭크 (검색 결과용)',
+    example: 123.45,
+    required: false,
+  })
+  nextCursorRank?: number;
+
+  @ApiProperty({
+    description: '다음 페이지 존재 여부 (hasMore와 동일)',
+    example: true,
+    required: false,
+  })
+  hasNext?: boolean;
 }
