@@ -17,7 +17,7 @@ import { CursorPaginatedPostsDto } from './dto/cursor-paginated-posts.dto';
 import { FilesService } from '../files/files.service';
 import { CdnService } from '../files/services/cdn.service';
 // TagsService removed - using JSONB tags
-import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
+import { generateSlug, extractImageUrlsFromContent } from './utils/post.utils';
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ContentProcessingService } from '../content-processing/services/content-processing.service';
 import { PostResponseDto } from './dto/post-response.dto';
@@ -32,13 +32,12 @@ import { RedisLockService } from '../redis/redis-lock.service';
 import { CacheInvalidationEvents } from '../common/events/cache.events';
 import { PostMapperService } from './services/post-mapper.service';
 import { PostCacheService } from './services/post-cache.service';
+import { PostFileService } from './services/post-file.service';
 
 
 @Injectable()
 export class PostsService {
   private readonly logger = new Logger(PostsService.name);
-  private readonly MAX_POST_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
-  private readonly MAX_FILES_PER_POST = 10; // Maximum 10 files per post
 
   constructor(
     @InjectRepository(Post)
@@ -64,6 +63,7 @@ export class PostsService {
     private readonly redisLockService: RedisLockService,
     private readonly postMapperService: PostMapperService,
     private readonly postCacheService: PostCacheService,
+    private readonly postFileService: PostFileService,
   ) {}
 
   /**
@@ -155,84 +155,12 @@ export class PostsService {
    *
    * @returns UTC 시간을 로컬 timezone으로 표현한 Date 객체
    */
-  private getUtcAsLocalDate(): Date {
-    const now = new Date();
-    return new Date(
-      now.getUTCFullYear(),
-      now.getUTCMonth(),
-      now.getUTCDate(),
-      now.getUTCHours(),
-      now.getUTCMinutes(),
-      now.getUTCSeconds(),
-      now.getUTCMilliseconds()
-    );
-  }
-
+  
   /**
    * 게시글 썸네일 설정/제거
    */
   async setThumbnail(postId: string, userId: string, setThumbnailDto: SetThumbnailDto) {
-    const { thumbnailFileId } = setThumbnailDto;
-
-    try {
-      // 게시글 소유권 확인
-      const post = await this.postsRepository.findOne({
-        where: { id: postId, authorId: userId },
-        relations: ['thumbnailImage'],
-      });
-
-      if (!post) {
-        throw new NotFoundException('게시글을 찾을 수 없거나 권한이 없습니다.');
-      }
-
-      // 썸네일 제거
-      if (!thumbnailFileId || thumbnailFileId === null) {
-        post.thumbnailImageId = null;
-        await this.postsRepository.save(post);
-        
-        this.logger.log(`Thumbnail removed for post ${postId}`);
-        return {
-          message: '썸네일이 제거되었습니다.',
-          postId,
-          thumbnailImageId: null,
-        };
-      }
-
-      // 썸네일 파일 존재 및 소유권 확인
-      const thumbnailFile = await this.filesRepository.findOne({
-        where: { id: thumbnailFileId, userId },
-      });
-
-      if (!thumbnailFile) {
-        throw new NotFoundException('썸네일 파일을 찾을 수 없거나 권한이 없습니다.');
-      }
-
-      // 이미지 파일인지 확인
-      if (!thumbnailFile.mimeType.startsWith('image/')) {
-        throw new BadRequestException('썸네일은 이미지 파일만 설정할 수 있습니다.');
-      }
-
-      // 썸네일 설정
-      post.thumbnailImageId = thumbnailFileId;
-      await this.postsRepository.save(post);
-
-      this.logger.log(`Thumbnail set for post ${postId}, file: ${thumbnailFileId}`);
-      
-      return {
-        message: '썸네일이 설정되었습니다.',
-        postId,
-        thumbnailImageId: thumbnailFileId,
-        thumbnailFile: {
-          id: thumbnailFile.id,
-          fileName: thumbnailFile.fileName,
-          fileKey: thumbnailFile.fileKey,
-          mimeType: thumbnailFile.mimeType,
-        },
-      };
-    } catch (error) {
-      this.logger.error(`Failed to set thumbnail: ${error.message}`, error.stack);
-      throw error;
-    }
+    return this.postFileService.setThumbnail(postId, userId, setThumbnailDto);
   }
 
   /**
@@ -457,8 +385,9 @@ export class PostsService {
       let attachedFiles: File[] = [];
       if (createPostDto.attachedFileIds?.length) {
         // 파일 개수 검증
-        if (createPostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
-          throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+        const MAX_FILES_PER_POST = 10;
+        if (createPostDto.attachedFileIds.length > MAX_FILES_PER_POST) {
+          throw new BadRequestException(`포스트당 최대 ${MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
         }
 
         attachedFiles = await queryRunner.manager.find(File, {
@@ -466,7 +395,7 @@ export class PostsService {
         });
 
         // 포스트당 총 파일 용량 검증
-        await this.validatePostTotalSize(attachedFiles);
+        await this.postFileService.validatePostTotalSize(attachedFiles);
 
         post.attachedFiles = attachedFiles;
         await queryRunner.manager.save(post);
@@ -480,7 +409,7 @@ export class PostsService {
 
       // 트랜잭션 밖에서 후처리 (비차단)
       // Lazy loading 방지: user.id를 직접 전달
-      await this.linkFilesFromContent(post, user.id);
+      await this.postFileService.linkFilesFromContent(post, user.id);
 
       // 포스트 생성 이벤트 발행 (캐시 무효화용)
       this.eventEmitter.emit(CacheInvalidationEvents.POST_CREATED, {
@@ -888,7 +817,7 @@ export class PostsService {
         // 태그 필드 추가 (프론트엔드 호환성)
         tags: post.tags || [],
         // thumbnail 필드 명시적으로 포함 (YouTube 썸네일 지원) - 최적화 적용
-        thumbnail: this.optimizeImageUrl(post.thumbnail),
+        thumbnail: post.thumbnail, // CDN optimization temporarily disabled
         // 블로그 정보 (있으면)
         blog: post.blog || null,
         // 작성자 정보는 필요한 필드만 선택 (email 제외)
@@ -1051,7 +980,7 @@ export class PostsService {
       publishedAt: post.publishedAt,
       // 태그와 썸네일
       tags: post.tags || [],
-      thumbnail: this.optimizeImageUrl(post.thumbnail), // 이미지 URL 최적화
+      thumbnail: post.thumbnail, // 이미지 URL 최적화 temporarily disabled
       // 블로그 정보
       blog: post.blog || null,
       // 작성자 프로필 (email 제외)
@@ -1365,7 +1294,7 @@ export class PostsService {
     }
 
     if (processedContent && processedContent !== post.content) {
-      await this.cleanupUnusedImages(post.id, post.content, processedContent, user.id);
+      await this.cleanupUnusedImages(post.id, post.content, processedContent);
     }
 
     // 태그 업데이트 (JSONB로 단순 저장)
@@ -1408,7 +1337,10 @@ export class PostsService {
       this.logger.log(`[UPDATE] Post ${id} - Updating thumbnail to: ${updatePostDto.thumbnail}`);
       post.thumbnail = updatePostDto.thumbnail;
     } else if (processedContent) {
-      const extractedThumbnail = this.extractThumbnailFromContent(processedContent);
+      // Extract thumbnail from processed content
+      const imgRegex = /<img[^>]+src="([^">]+)"/i;
+      const match = processedContent.match(imgRegex);
+      const extractedThumbnail = match && match[1] ? match[1] : null;
       this.logger.log(`[UPDATE] Post ${id} - Extracted thumbnail from content: ${extractedThumbnail}`);
       post.thumbnail = extractedThumbnail;
     }
@@ -1417,8 +1349,9 @@ export class PostsService {
 
     if (updatePostDto.attachedFileIds !== undefined) {
       // 파일 개수 검증
-      if (updatePostDto.attachedFileIds.length > this.MAX_FILES_PER_POST) {
-        throw new BadRequestException(`포스트당 최대 ${this.MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
+      const MAX_FILES_PER_POST = 10;
+      if (updatePostDto.attachedFileIds.length > MAX_FILES_PER_POST) {
+        throw new BadRequestException(`포스트당 최대 ${MAX_FILES_PER_POST}개의 파일만 업로드할 수 있습니다.`);
       }
       
       const files = await this.filesRepository.find({
@@ -1426,14 +1359,14 @@ export class PostsService {
       });
       
       // 포스트당 총 파일 용량 검증
-      await this.validatePostTotalSize(files, post.id);
-      
+      await this.postFileService.validatePostTotalSize(files, post.id);
+
       post.attachedFiles = files;
       await this.postsRepository.save(post);
     }
 
     // Lazy loading 방지: user.id를 직접 전달
-    await this.linkFilesFromContent(post, user.id);
+    await this.postFileService.linkFilesFromContent(post, user.id);
 
     // 이벤트 발행 (캐시 무효화는 리스너가 처리)
     this.eventEmitter.emit('post.updated', {
@@ -1564,108 +1497,9 @@ export class PostsService {
     };
   }
 
-  private async attachFiles(postId: string, fileIds: string[], userId: string): Promise<void> {
-    const files = await this.filesRepository.find({
-      where: { id: In(fileIds), userId: userId },
-    });
-    await this.postsRepository.update(postId, { attachedFiles: files });
-  }
-
-  private async updateAttachedFiles(postId: string, fileIds: string[], userId: string): Promise<void> {
-    const files = fileIds && fileIds.length > 0
-      ? await this.filesRepository.find({ where: { id: In(fileIds), userId: userId } })
-      : [];
-    await this.postsRepository.update(postId, { attachedFiles: files });
-  }
-
-  private async linkFilesFromContent(post: Post, userId?: string): Promise<void> {
-    try {
-      const imageUrls = this.extractImageUrlsFromContent(post.content);
-      if (imageUrls.length === 0) return;
-      const s3Keys = imageUrls.map(url => this.extractS3KeyFromUrl(url)).filter(Boolean) as string[];
-      if (s3Keys.length === 0) return;
-      // Lazy loading 방지: userId를 직접 받거나 post.authorId 사용
-      const authorUserId = userId || post.authorId;
-      const files = await this.filesRepository.find({ where: { fileKey: In(s3Keys), userId: authorUserId } });
-      if (files.length > 0) {
-        const existingFileIds = post.attachedFiles?.map(f => f.id) || [];
-        const newFiles = files.filter(f => !existingFileIds.includes(f.id));
-        if (newFiles.length > 0) {
-          // 임시 context를 POST context로 변환
-          for (const file of newFiles) {
-            if (file.contextId) {
-              const context = await this.fileContextRepository.findOne({
-                where: { id: file.contextId }
-              });
-
-              if (context && context.contextId.startsWith('temp_')) {
-                // 임시 context를 POST context로 변환
-                context.contextType = FileContextType.POST;
-                context.contextId = post.id;
-                context.purpose = FilePurpose.CONTENT;
-                await this.fileContextRepository.save(context);
-
-                this.logger.log(`Converted temporary context ${context.id} to POST context for post ${post.id}`);
-              }
-            }
-          }
-
-          post.attachedFiles = [...(post.attachedFiles || []), ...newFiles];
-          await this.postsRepository.save(post);
-        }
-      }
-    } catch (error) {
-      this.logger.error(`Failed to link files from content for post ${post.id}:`, error.message);
-    }
-  }
-
-  // UUID 기반 S3 키 추출 개선
-  private extractS3KeyFromUrl(url: string): string | null {
-    if (!url) return null;
-    
-    try {
-      // 이미 S3 키인 경우 (uploads/로 시작)
-      if (url.startsWith('uploads/')) {
-        return url;
-      }
-      
-      // 프록시 URL인 경우 (/api/v1/files/proxy/ 포함)
-      if (url.includes('/api/v1/files/proxy/')) {
-        const proxyMatch = url.match(/\/api\/v1\/files\/proxy\/(.+)/);
-        if (proxyMatch) {
-          const s3Key = proxyMatch[1].split('?')[0]; // 쿼리 파라미터 제거
-          this.logger.log(`Extracted S3 key from proxy URL: ${url} -> ${s3Key}`);
-          return s3Key;
-        }
-      }
-      
-      // S3 직접 URL인 경우 (UUID 파일명 포함)
-      const s3Pattern = /https:\/\/[^\/]+\.s3\.[^\/]+\.amazonaws\.com\/(.+)/;
-      const match = url.match(s3Pattern);
-      if (match) {
-        const s3Key = match[1].split('?')[0]; // 쿼리 파라미터 제거 (presigned URL의 경우)
-        this.logger.log(`Extracted S3 key from S3 URL: ${url} -> ${s3Key}`);
-        return s3Key;
-      }
-      
-      // localhost 프록시 URL 처리 (개발 환경)
-      if (url.includes('localhost:3000/api/v1/files/proxy/')) {
-        const proxyMatch = url.match(/localhost:3000\/api\/v1\/files\/proxy\/(.+)/);
-        if (proxyMatch) {
-          const s3Key = proxyMatch[1].split('?')[0];
-          this.logger.log(`Extracted S3 key from localhost proxy URL: ${url} -> ${s3Key}`);
-          return s3Key;
-        }
-      }
-      
-      this.logger.warn(`Could not extract S3 key from URL: ${url}`);
-      return null;
-    } catch (error) {
-      this.logger.error('Error extracting S3 key from URL:', error);
-      return null;
-    }
-  }
-
+  
+  
+  
   /**
    * 작성자 데이터 포맷팅 (프로필 평탄화 및 CDN URL 변환)
    * users.service.ts와 동일한 패턴 적용
@@ -1908,13 +1742,7 @@ export class PostsService {
   }
 
 
-  // 조회수 증가 (로그인 유저만)
-  private async incrementViewCountForUser(post: Post, user: User) {
-    if (!user?.id) return;
-    post.viewCount = (post.viewCount || 0) + 1;
-    await this.postsRepository.save(post);
-  }
-
+  
   // 조회수 증가 (모든 사용자)
   private async incrementViewCountForAll(postId: string): Promise<void> {
     await this.postsRepository.increment({ id: postId }, 'viewCount', 1);
@@ -2364,156 +2192,35 @@ export class PostsService {
       // author relation 제거 - authorId 직접 사용
     });
 
-    this.logger.log(`Starting to relink content files for ${posts.length} posts`);
-
-    for (const post of posts) {
-      try {
-        // Lazy loading 방지: authorId 직접 사용
-        await this.linkFilesFromContent(post, post.authorId);
-        this.logger.log(`✅ Relinked files for post: ${post.title}`);
-      } catch (error) {
-        this.logger.error(`❌ Failed to relink files for post ${post.id}:`, error.message);
-      }
-    }
-
-    this.logger.log('Finished relinking content files');
+    // Delegate to PostFileService
+    await this.postFileService.relinkContentFiles(posts);
   }
 
   // 사용되지 않는 이미지 파일 정리 (S3 + DB)
   // @deprecated 자동 삭제 비활성화 - 사용자가 수동으로 관리하도록 변경
-  private async cleanupUnusedImages(postId: string, oldContent: string, newContent: string, userId: string): Promise<void> {
+  private async cleanupUnusedImages(postId: string, oldContent: string, newContent: string): Promise<void> {
     // 자동 이미지 삭제 비활성화
     // 이유: 사용자가 나중에 재사용할 수 있는 이미지를 보존하기 위함
     // 추후 사용자 대시보드에서 수동 관리 기능 제공 예정
     this.logger.log('[Image Cleanup] Auto-cleanup disabled - preserving all uploaded images');
-    
+
     // 분석용 로깅만 수행 (실제 삭제는 하지 않음)
     try {
-      const oldImageUrls = this.extractImageUrlsFromContent(oldContent);
-      const newImageUrls = this.extractImageUrlsFromContent(newContent);
+      const oldImageUrls = extractImageUrlsFromContent(oldContent);
+      const newImageUrls = extractImageUrlsFromContent(newContent);
       const removedImageUrls = oldImageUrls.filter(url => !newImageUrls.includes(url));
-      
+
       if (removedImageUrls.length > 0) {
         this.logger.log(`[Image Cleanup] ${removedImageUrls.length} images removed from post ${postId} (not deleted):`, removedImageUrls);
       }
     } catch (error) {
       this.logger.error('[Image Cleanup] Analysis failed:', error.message);
     }
-    
+
     return;
   }
 
-  // 콘텐츠에서 이미지 URL 추출 (img 태그의 src 속성)
-  private extractImageUrlsFromContent(content: string): string[] {
-    if (!content) return [];
-
-    const imgRegex = /<img[^>]+src="([^">]+)"/gi;
-    const urls: string[] = [];
-    let match;
-
-    while ((match = imgRegex.exec(content)) !== null) {
-      if (match[1]) {
-        // 쿼리 파라미터 제거
-        const cleanUrl = match[1].split('?')[0];
-        urls.push(cleanUrl);
-      }
-    }
-
-    return urls;
-  }
-
-  // 콘텐츠에서 썸네일 URL 추출
-  private extractThumbnailFromContent(content: string): string | null {
-    if (!content) return null;
-
-    // HTML에서 첫 번째 img 태그의 src 추출
-    const imgRegex = /<img[^>]+src="([^">]+)"/i;
-    const match = content.match(imgRegex);
-    
-    if (match && match[1]) {
-      return match[1];
-    }
-
-    return null;
-  }
-
-  /**
-   * 포스트당 총 파일 용량 검증
-   * @param files 업로드할 파일들
-   * @param existingPostId 기존 포스트 ID (수정 시)
-   */
-  async validatePostTotalSize(files: File[], existingPostId?: string): Promise<void> {
-    let totalSize = 0;
-
-    // 신규 파일들의 총 크기 계산
-    for (const file of files) {
-      totalSize += file.fileSize || 0;
-    }
-
-    // 기존 포스트 수정인 경우, 이미 업로드된 파일들의 크기도 포함
-    if (existingPostId) {
-      // Post와 연관된 파일들을 찾기 위해 FileContext를 통해 조회
-      const existingPost = await this.postsRepository.findOne({
-        where: { id: existingPostId },
-        relations: ['attachedFiles'],
-      });
-      
-      if (existingPost?.attachedFiles) {
-        for (const existingFile of existingPost.attachedFiles) {
-          // 새로 추가되는 파일과 중복되지 않는 경우만 계산
-          if (!files.some(f => f.id === existingFile.id)) {
-            totalSize += existingFile.fileSize || 0;
-          }
-        }
-      }
-    }
-
-    // 30MB 제한 체크
-    if (totalSize > this.MAX_POST_TOTAL_SIZE) {
-      const totalSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-      const limitMB = (this.MAX_POST_TOTAL_SIZE / (1024 * 1024)).toFixed(0);
-      
-      throw new BadRequestException({
-        error: 'POST_SIZE_LIMIT_EXCEEDED',
-        message: `포스트당 최대 ${limitMB}MB까지 업로드 가능합니다. 현재 크기: ${totalSizeMB}MB`,
-        current: totalSize,
-        limit: this.MAX_POST_TOTAL_SIZE,
-      });
-    }
-  }
-
-  /**
-   * 신규 파일 업로드 시 포스트 용량 체크
-   */
-  async validateNewFileForPost(postId: string, newFileSize: number): Promise<void> {
-    // Post와 연관된 파일들을 찾기
-    const post = await this.postsRepository.findOne({
-      where: { id: postId },
-      relations: ['attachedFiles'],
-    });
-
-    if (!post) {
-      throw new NotFoundException('Post not found');
-    }
-
-    const existingFiles = post.attachedFiles || [];
-    const totalSize = existingFiles.reduce((sum, file) => sum + (file.fileSize || 0), 0);
-
-    if (totalSize + newFileSize > this.MAX_POST_TOTAL_SIZE) {
-      const currentSizeMB = (totalSize / (1024 * 1024)).toFixed(2);
-      const newSizeMB = (newFileSize / (1024 * 1024)).toFixed(2);
-      const limitMB = (this.MAX_POST_TOTAL_SIZE / (1024 * 1024)).toFixed(0);
-      
-      throw new BadRequestException({
-        error: 'POST_SIZE_LIMIT_EXCEEDED',
-        message: `포스트당 최대 ${limitMB}MB까지 업로드 가능합니다. 현재: ${currentSizeMB}MB, 추가하려는 파일: ${newSizeMB}MB`,
-        current: totalSize,
-        limit: this.MAX_POST_TOTAL_SIZE,
-        requested: newFileSize,
-      });
-    }
-  }
-
+  
   // 마크다운 콘텐츠인지 확인하는 헬퍼 메소드
   private isMarkdownContent(content: string): boolean {
     if (!content) return false;
@@ -2536,72 +2243,7 @@ export class PostsService {
     return markdownPatterns.some(pattern => pattern.test(content));
   }
 
-  // 마크다운 재렌더링 (필요시 호출)
-  async rerenderMarkdown(postId: string): Promise<void> {
-    const post = await this.postsRepository.findOne({ where: { id: postId } });
-    if (!post || !post.content_markdown) {
-      throw new NotFoundException('Post with markdown content not found');
-    }
-    
-    const htmlContent = this.markdownRenderer.convertToHtml(post.content_markdown);
-    // 백엔드에서 콘텐츠 처리 파이프라인 적용
-    const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-      sanitize: true,
-      processCode: true,
-      processImages: true,
-      preserveMermaid: true,
-    });
-    post.content = processed.html;
-    post.content_rendered_at = new Date();
-    post.thumbnail = this.extractThumbnailFromContent(post.content);
-    
-    await this.postsRepository.save(post);
-  }
-
-  /**
-   * 이미지 URL 최적화 (캐싱으로 성능 개선)
-   * - YouTube 썸네일은 그대로 반환 (외부 CDN 활용)
-   * - S3 URL은 CloudFront CDN URL로 변환 (있는 경우)
-   * - 나머지는 프록시 URL 유지
-   *
-   * 성능 최적화:
-   * - 빠른 실패: null/YouTube 체크를 먼저 수행
-   * - 불필요한 문자열 연산 최소화
-   */
-  /**
-   * 이미지 URL 최적화 (CDN 사용)
-   * @param url - 원본 이미지 URL 또는 S3 키
-   * @returns CDN URL 또는 원본 URL
-   */
-  private optimizeImageUrl(url: string | null): string | null {
-    // 빠른 실패: null 체크
-    if (!url) return null;
-
-    // 빠른 실패: YouTube 썸네일은 YouTube CDN 활용
-    if (url.indexOf('youtube.com') !== -1 || url.indexOf('ytimg.com') !== -1) {
-      return url;
-    }
-
-    // CDN URL이 이미 있으면 그대로 반환
-    if (url.indexOf('cdn.codebase.blog') !== -1) {
-      return url;
-    }
-
-    // 외부 HTTP/HTTPS URL은 그대로 반환
-    if (url.startsWith('http://') || url.startsWith('https://')) {
-      return url;
-    }
-
-    // S3 키 (uploads/, v2/ 등)는 CDN URL로 변환
-    if (url.startsWith('uploads/') || url.startsWith('v2/')) {
-      // Temporarily disabled CDN service
-      // return this.cdnService.generateCdnUrlFromKey(url);
-      return url; // Return original URL for now
-    }
-
-    return url;
-  }
-
+  
   /**
    * 인기 태그 조회 (JSONB 컬럼에서 집계)
    * 캐시를 통해 성능 최적화 (1시간)
