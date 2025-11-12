@@ -54,19 +54,29 @@ export class PostMapperService {
       if (options.bookmarked !== undefined) {
         dto.bookmarked = options.bookmarked;
       }
-      if (options.user) {
+      // Post 엔티티에 이미 로드된 author가 있으면 사용
+      if (post.author) {
+        dto.author = this.toUserDto(post.author);
+      } else if (options.user) {
         dto.author = this.toUserDto(options.user);
       }
       if (options.blog) {
         dto.blog = this.toBlogDto(options.blog);
+      }
+    } else {
+      // options가 없어도 post에 author가 있으면 변환
+      if (post.author) {
+        dto.author = this.toUserDto(post.author);
       }
     }
 
     // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
     // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
 
-    // 태그 필드 호환성 - Post 엔티티의 tags를 우선적으로 사용
-    dto.tags = post.tags || post.metadata?.tags || [];
+    // 태그 필드 호환성 - Post 엔티티의 tags를 우선적으로 사용 (안전한 fallback)
+    dto.tags = post.tags ||
+                (post.metadata && post.metadata.tags) ||
+                [];
 
     // 썸네일 URL 최적화
     if (dto.thumbnail) {

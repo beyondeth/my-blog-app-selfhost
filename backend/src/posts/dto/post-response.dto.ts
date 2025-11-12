@@ -51,6 +51,9 @@ export class PostResponseDto {
   isPublished: boolean;
 
   @Expose()
+  isDeleted: boolean;
+
+  @Expose()
   viewCount: number;
 
   @Expose()

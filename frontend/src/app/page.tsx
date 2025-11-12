@@ -17,6 +17,7 @@ import EditorPickSection from '@/components/layout/EditorPickSection';
 import PopularPostsSection from '@/components/layout/PopularPostsSection';
 import TagsSection from '@/components/layout/TagsSection';
 import FollowingListSection from '@/components/FollowingListSection';
+import SidebarFooter from '@/components/home/SidebarFooter';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
 
@@ -296,6 +297,9 @@ function HomePageContent() {
             {user && (
               <FollowingListSection userId={user.id} />
             )}
+
+            {/* 사이드바 푸터 */}
+            <SidebarFooter />
           </div>
           </aside>
       </div>
