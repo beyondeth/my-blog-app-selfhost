@@ -21,8 +21,7 @@ import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from '
 import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
 import { ContentProcessingService } from '../content-processing/services/content-processing.service';
 import { PostResponseDto } from './dto/post-response.dto';
-import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
-import { CacheMetricsService } from '../metrics/cache-metrics.service';
+import { CacheKeys, CacheTTL } from '../cache/cache.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
 import { LikeQueueService } from './services/like-queue.service';
 import { InjectQueue } from '@nestjs/bullmq';
@@ -32,12 +31,8 @@ import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RedisLockService } from '../redis/redis-lock.service';
 import { CacheInvalidationEvents } from '../common/events/cache.events';
 import { PostMapperService } from './services/post-mapper.service';
+import { PostCacheService } from './services/post-cache.service';
 
-/**
- * 포스트 Core 데이터 타입 (실시간 카운트/상태 제외)
- * 캐시에 저장되는 정적 데이터만 포함
- */
-type PostCoreData = Omit<PostResponseDto, 'viewCount' | 'likeCount' | 'commentCount' | 'liked' | 'bookmarked'>;
 
 @Injectable()
 export class PostsService {
@@ -61,8 +56,6 @@ export class PostsService {
     private markdownRenderer: MarkdownRendererService,
     private contentProcessing: ContentProcessingService,
     private dataSource: DataSource,
-    private cacheService: CacheService,
-    private cacheMetricsService: CacheMetricsService,
     private bookmarksService: BookmarksService,
     private likeQueueService: LikeQueueService,
     @InjectQueue(POST_PROCESSING_QUEUE)
@@ -70,6 +63,7 @@ export class PostsService {
     private readonly eventEmitter: EventEmitter2,
     private readonly redisLockService: RedisLockService,
     private readonly postMapperService: PostMapperService,
+    private readonly postCacheService: PostCacheService,
   ) {}
 
   /**
@@ -497,7 +491,7 @@ export class PostsService {
       });
 
       // 즉시 관련 캐시 삭제 (새로고침 시 데이터 일관성 보장)
-      await this.invalidateRelatedCache(blog.slug, blog.id);
+      await this.postCacheService.invalidateRelatedCache(blog.slug, blog.id);
 
       /**
        * DTO 변환으로 spread operator 제거
@@ -517,59 +511,7 @@ export class PostsService {
     }
   }
 
-  /**
-   * 포스트 생성 후 관련 캐시 즉시 삭제
-   * @param blogSlug - 블로그 slug (패턴 삭제용)
-   * @param blogId - 블로그 ID (정확한 키 삭제용)
-   */
-  private async invalidateRelatedCache(blogSlug: string, blogId?: string): Promise<void> {
-    try {
-      // 1. 홈 피드 캐시 삭제 (처음 5페이지)
-      for (let i = 1; i <= 5; i++) {
-        await this.cacheService.del(CacheKeys.FEED_HOME(i));
-      }
-
-      // 2. 블로그 피드 캐시 삭제 (처음 5페이지)
-      // blogId가 있으면 blogId로 캐시 삭제 (실제 캐시 키와 일치)
-      if (blogId) {
-        for (let i = 1; i <= 5; i++) {
-          await this.cacheService.del(CacheKeys.FEED_BLOG(blogId, i));
-        }
-      }
-      // blogSlug도 삭제 (하위 호환성 및 패턴 일치)
-      if (blogSlug && blogSlug !== blogId) {
-        for (let i = 1; i <= 5; i++) {
-          await this.cacheService.del(CacheKeys.FEED_BLOG(blogSlug, i));
-        }
-      }
-
-      // 3. 패턴 기반 대규 삭제 (모든 관련 캐시)
-      // 홈 피드 패턴
-      await this.cacheService.deletePattern('feed:home:page:*');
-
-      // 블로그 피드 패턴 (blogId와 blogSlug 모두 삭제)
-      if (blogId) {
-        await this.cacheService.deletePattern(`feed:blog:${blogId}:page:*`);
-      }
-      if (blogSlug) {
-        await this.cacheService.deletePattern(`feed:blog:${blogSlug}:page:*`);
-      }
-
-      // 포스트 관련 패턴
-      await this.cacheService.deletePattern('post:*');
-      // 인기 포스트 패턴
-      await this.cacheService.deletePattern('feed:popular:*');
-
-      // 4. 인기 게시물 캐시 삭제
-      await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
-      await this.cacheService.deletePattern('feed:search:*');
-
-      this.logger.log(`✅ [Post Created] Invalidated all cache for blog: ${blogSlug}`);
-    } catch (error) {
-      this.logger.error(`Failed to invalidate cache after post creation: ${error.message}`, error.stack);
-    }
-  }
-
+  
   /**
    * Fast Path 포스트 생성 (MCP 최적화용)
    *
@@ -693,7 +635,7 @@ export class PostsService {
     });
 
     // 즉시 관련 캐시 삭제 (새로고침 시 데이터 일관성 보장)
-    await this.invalidateRelatedCache(blog.slug, blog.id);
+    await this.postCacheService.invalidateRelatedCache(blog.slug, blog.id);
 
     // 8. 202 Accepted 응답 반환 (즉시 응답)
     return {
@@ -995,11 +937,8 @@ export class PostsService {
     const safeLimit = Math.min(Math.max(limit, 1), 10); // 인기 게시글은 최대 10개
 
     // Redis 캐시 체크
-    const cacheKey = CacheKeys.FEED_POPULAR(period, safeLimit);
-
-    const cached = await this.cacheService.get(cacheKey);
+    const cached = await this.postCacheService.getPopularPostsCache(period, safeLimit);
     if (cached) {
-      this.logger.debug(`Cache hit for popular posts: ${cacheKey}`);
       return cached;
     }
 
@@ -1128,8 +1067,7 @@ export class PostsService {
     };
 
     // Redis 캐시 저장 (TTL 활용)
-    await this.cacheService.set(cacheKey, result, ttl);
-    this.logger.debug(`Cached popular posts: ${cacheKey} with TTL: ${ttl}s`);
+    await this.postCacheService.setPopularPostsCache(period, limit, result, ttl);
 
     return result;
   }
@@ -1141,11 +1079,10 @@ export class PostsService {
     const cacheKey = CacheKeys.POST_CORE(id);
     const lockKey = CacheKeys.POST_REBUILDING(id);
 
-    const cachedCore = await this.cacheService.get<PostCoreData>(cacheKey);
+    const cachedCore = await this.postCacheService.getPostCache(cacheKey);
 
     if (cachedCore) {
       this.logger.debug(`✅ Cache HIT: post core ${id}`);
-      this.cacheMetricsService.recordPostCacheHit();
 
       // 2. 실시간 Counts + liked/bookmarked 조회
       const counts = await this.getPostCounts(id, user);
@@ -1157,18 +1094,17 @@ export class PostsService {
     }
 
     this.logger.debug(`❌ Cache MISS: post core ${id}`);
-    this.cacheMetricsService.recordPostCacheMiss();
 
     // 3. Cache Stampede 방지: 분산 락 획득
-    const lockAcquired = await this.cacheService.acquireLock(lockKey, 5);
+    const lockAcquired = await this.postCacheService.acquireLock(lockKey, 5);
 
     if (!lockAcquired) {
       // 다른 요청이 캐시 리빌딩 중 → 대기 후 재조회
       this.logger.debug(`⏳ Waiting for cache rebuild: ${id}`);
-      await this.cacheService.waitForLock(lockKey, 5000);
+      await this.postCacheService.waitForLock(lockKey, 5000);
 
       // 락 해제 후 캐시 재확인
-      const rebuiltCache = await this.cacheService.get<PostCoreData>(cacheKey);
+      const rebuiltCache = await this.postCacheService.getPostCache(cacheKey);
       if (rebuiltCache) {
         const counts = await this.getPostCounts(id, user);
         return { ...rebuiltCache, ...counts };
@@ -1282,7 +1218,7 @@ export class PostsService {
       attachedFiles: result.attachedFiles,
     };
 
-    await this.cacheService.set(cacheKey, coreData, CacheTTL.POST_DETAIL);
+    await this.postCacheService.setPostCache(cacheKey, coreData, CacheTTL.POST_DETAIL);
     this.logger.debug(`💾 Cached post core: ${id}`);
 
     this.logger.log(`Returning post data with ${post.attachedFiles?.length || 0} attached files`);
@@ -1290,7 +1226,7 @@ export class PostsService {
     } finally {
       // 6. 락 해제 (반드시 실행)
       if (lockAcquired) {
-        await this.cacheService.releaseLock(lockKey);
+        await this.postCacheService.releaseLock(lockKey);
       }
     }
   }
