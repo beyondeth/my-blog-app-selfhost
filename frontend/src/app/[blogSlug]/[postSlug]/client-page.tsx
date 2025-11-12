@@ -252,12 +252,13 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       fetch(`/api/v1/posts/${post.id}/view`, { method: 'POST' }).catch(console.error);
 
       // Mixpanel: 포스트 조회 이벤트 추적
+      // 이제 자동으로 큐에 추가되므로 경고 메시지가 나오지 않음
       mixpanel.track('Post Viewed', {
         postId: post.id,
         slug: post.slug || postSlug,
       });
     }
-  }, [post?.id]);
+  }, [post?.id, post?.slug, postSlug]);
 
   if (isError) {
     // 에러 타입 구분

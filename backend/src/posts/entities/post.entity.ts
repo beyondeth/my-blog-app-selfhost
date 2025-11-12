@@ -4,6 +4,7 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  DeleteDateColumn,
   ManyToOne,
   OneToMany,
   OneToOne,
@@ -57,14 +58,47 @@ export class Post {
   id: string;
 
   /**
-   * UUID v7 생성 (BeforeInsert 훅)
+   * UUID v7 및 Slug 생성 (BeforeInsert 훅)
    * - 시간 기반 UUID 생성으로 포스트 순서 보장
    * - 최신 포스트 우선 조회 시 인덱스 성능 향상
+   * - Slug 자동 생성
    */
   @BeforeInsert()
-  generateUuidV7() {
+  generateUuidAndSlug() {
+    // UUID 생성
     if (!this.id) {
       this.id = uuidv7();
+    }
+
+    // Slug 생성
+    if (this.title && !this.slug) {
+      // SEO를 위해 제목을 슬러그로 변환
+      const baseSlug = this.title
+        .trim() // 앞뒤 공백 제거
+        .toLowerCase()
+        .replace(/[^a-zA-Z0-9가-힣\s]/g, '') // 특수문자 제거 (공백과 한글,영문,숫자 유지)
+        .replace(/\s+/g, '-') // 공백을 하이픈으로 변환
+        .replace(/-+/g, '-') // 중복 하이픈 제거
+        .replace(/^-|-$/g, '') // 시작/끝 하이픈 제거
+        .substring(0, 50); // UUID를 위한 공간 확보
+
+      // UUID를 사용하여 완벽한 고유성 보장
+      const uniqueId = uuidv7().split('-')[0]; // UUID의 첫 부분만 사용 (8자)
+
+      // baseSlug가 비어있는 경우를 대비한 fallback
+      const finalBaseSlug = baseSlug || 'post';
+      this.slug = `${finalBaseSlug}-${uniqueId}`;
+
+      // Debug 로깅 (개발 환경에서만)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Slug Generation]', {
+          title: this.title,
+          baseSlug,
+          finalBaseSlug,
+          uniqueId,
+          finalSlug: this.slug,
+        });
+      }
     }
   }
 
@@ -153,6 +187,14 @@ export class Post {
   @Column({ default: false })
   @Index()
   isDeleted: boolean;
+
+  /**
+   * 소프트 삭제 시간
+   * - isDeleted가 true로 변경된 시점
+   * - 180일 후 자동 물리 삭제 기준
+   */
+  @DeleteDateColumn({ type: 'timestamp', nullable: true })
+  deletedAt: Date;
 
   /**
    * 작성자 ID (User 참조)
@@ -277,28 +319,12 @@ export class Post {
   // =====================================
 
   /**
-   * Slug 자동 생성
-   * - title 기반으로 SEO 친화적 URL 생성
-   * - UUID 8자 추가로 고유성 보장
+   * Slug 및 썸네일 업데이트 (BeforeUpdate 훅)
+   * - 제목 변경 시 슬러그 업데이트 (선택적)
    * - 썸네일 자동 추출 (YouTube 또는 첫 이미지)
    */
-  @BeforeInsert()
   @BeforeUpdate()
   generateSlug() {
-    // Slug 생성
-    if (this.title && !this.slug) {
-      const baseSlug = this.title
-        .toLowerCase()
-        .replace(/[^a-z0-9가-힣]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .substring(0, 50); // UUID를 위한 공간 확보
-
-      // UUID를 사용하여 완벽한 고유성 보장
-      const uniqueId = uuidv7().split('-')[0]; // UUID의 첫 부분만 사용 (8자)
-      this.slug = `${baseSlug}-${uniqueId}`;
-    }
-
     // 썸네일 자동 추출
     // thumbnail이 명시적으로 설정되지 않은 경우에만 content에서 추출
     // YouTube 썸네일 등 외부 URL이 설정된 경우 유지

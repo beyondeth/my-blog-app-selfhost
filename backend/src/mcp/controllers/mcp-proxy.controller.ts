@@ -88,13 +88,53 @@ export class McpProxyController {
     // MCP에서 오는 content_markdown은 원본 마크다운 (base64 인코딩 없음)
     // PostsService.create는 user를 통해 blogId를 자동으로 찾으므로
     // 여기서는 CreatePostDto의 필드만 전달하면 됨
+
+    // Debug: MCP 요청 데이터 로깅
+    this.logger.debug(`[MCP Request Data]`, {
+      title: createPostDto.title,
+      hasContent_markdown: !!createPostDto.content_markdown,
+      contentLength: createPostDto.content_markdown?.length || 0,
+      tags: createPostDto.tags,
+      category: createPostDto.category,
+      qualityScore: createPostDto.qualityScore,
+      thumbnail: createPostDto.thumbnail,
+      hasContent: !!createPostDto.content,
+      thumbnailImageId: createPostDto.thumbnailImageId
+    });
+
+    // MCP 요청 필드 유효성 검사
+    if (!createPostDto.title) {
+      throw new BadRequestException('제목은 필수 항목입니다');
+    }
+
+    if (!createPostDto.content_markdown && !createPostDto.content) {
+      throw new BadRequestException('콘텐츠는 필수 항목입니다 (content 또는 content_markdown)');
+    }
+
+    if (!createPostDto.category) {
+      throw new BadRequestException('카테고리는 필수 항목입니다');
+    }
+
     const postData: CreatePostDto = {
       title: createPostDto.title,
       content_markdown: createPostDto.content_markdown,  // 원본 마크다운 콘텐츠 그대로 전달
-      tags: createPostDto.tags,
+      tags: createPostDto.tags,  // 태그는 그대로 전달 (PostCreationService에서 처리)
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore, // AI 품질 점수
+      ...(createPostDto.thumbnail && { thumbnail: createPostDto.thumbnail }),
+      ...(createPostDto.thumbnailImageId && { thumbnailImageId: createPostDto.thumbnailImageId }),
     };
+
+    // Debug: MCP 요청 데이터 태그 상세 확인
+    this.logger.debug(`[MCP Tags Analysis]`, {
+      title: createPostDto.title,
+      rawTags: createPostDto.tags,
+      tagsType: typeof createPostDto.tags,
+      isArray: Array.isArray(createPostDto.tags),
+      tagsLength: createPostDto.tags?.length,
+      tagsContent: createPostDto.tags,
+      finalPostDataTags: postData.tags
+    });
 
     try {
       // 1. 포스트 크기 검증 (글자수 + 바이트 크기)
@@ -131,7 +171,8 @@ export class McpProxyController {
       }
 
       // 4. 포스트 생성 (Fast Path: 150-200ms 응답, 백그라운드 처리)
-      const post = await this.postsService.createFast(postData, user);
+      const startTime = Date.now();
+      const postDto = await this.postsService.createFast(postData, user);
 
       // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
       await this.usageService.trackMcpPost(userId);
@@ -140,16 +181,34 @@ export class McpProxyController {
       // 캐시 무효화는 posts.service.ts의 createFast()에서 이벤트 발행을 통해 처리됨
       // CacheInvalidationListener가 'post.created' 이벤트를 받아 자동으로 처리
 
-      this.logger.log(`✅ [MCP Post Created - Fast Path] Post ID: ${post.id}, Blog: ${post.blog?.slug}, Processing: ${post._meta?.processingTime || 'N/A'}`);
+      this.logger.log(`✅ [MCP Post Created - Fast Path] Post ID: ${postDto.id}, Blog: ${postDto.blog?.slug || 'undefined'}`);
 
-      // MCP 응답 최적화: 최소 필수 정보 + Fast Path 메타데이터 반환
+      // Debug: 생성된 포스트의 태그 정보 확인
+      this.logger.debug(`[MCP Post Tags Check]`, {
+        postId: postDto.id,
+        inputTags: createPostDto.tags,
+        postDtoTags: postDto.tags,
+        inputTagsType: typeof createPostDto.tags,
+        postDtoTagsType: typeof postDto.tags,
+        tagsArrayCheck: Array.isArray(postDto.tags),
+        tagsMatch: JSON.stringify(postDto.tags) === JSON.stringify(createPostDto.tags)
+      });
+
+      // MCP 응답 최적화: 최소 필수 정보 반환
+      // blog 정보가 없을 경우를 대비한 fallback 처리
+      const blogAlias = postDto.blog?.alias || postDto.blog?.slug;
+      const url = blogAlias ? `/${blogAlias}/${postDto.slug}` : `/posts/${postDto.slug}`;
+
       return {
-        id: post.id,
-        slug: post.slug,
-        title: post.title,
-        url: `/${post.blog.alias || post.blog.slug}/${post.slug}`,  // Phase 2: alias 우선 사용
-        blog: post.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
-        _meta: post._meta,  // Fast Path 메타데이터 (처리 상태, 예상 완료 시간 등)
+        id: postDto.id,
+        slug: postDto.slug,
+        title: postDto.title,
+        url: url,
+        blog: postDto.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
+        _meta: {
+          processingTime: Date.now() - startTime,
+          status: 'created'
+        },  // Fast Path 메타데이터 (처리 상태, 예상 완료 시간 등)
       };
     } catch (error) {
       // 에러 로깅 (디버깅을 위해 전체 에러 출력)

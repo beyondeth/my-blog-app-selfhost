@@ -45,6 +45,23 @@ import { apiClient } from '@/lib/api';
 import type { DeletedUser } from '@/lib/api/endpoints/admin';
 import type { Post, Comment } from '@/types';
 
+// 날짜 포매팅 유틸리티 함수 - null, undefined, 잘못된 날짜 값 처리
+const formatDateSafely = (dateValue: any, formatStr: string = 'yyyy-MM-dd'): string => {
+  if (!dateValue || dateValue === null || dateValue === undefined) {
+    return 'N/A';
+  }
+
+  try {
+    const date = new Date(dateValue);
+    if (isNaN(date.getTime())) {
+      return 'N/A';
+    }
+    return format(date, formatStr, { locale: ko });
+  } catch {
+    return 'N/A';
+  }
+};
+
 export default function DeletedUsersPage() {
   const [deletedUsers, setDeletedUsers] = useState<DeletedUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -279,19 +296,13 @@ export default function DeletedUsersPage() {
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <Calendar className="w-4 h-4 text-gray-400" />
-                          {format(new Date(user.deletedAt), 'yyyy-MM-dd', {
-                            locale: ko,
-                          })}
+                          {formatDateSafely(user.deletedAt)}
                         </div>
                       </TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2 text-sm">
                           <Clock className="w-4 h-4 text-gray-400" />
-                          {format(
-                            new Date(user.scheduledDeletionAt),
-                            'yyyy-MM-dd',
-                            { locale: ko }
-                          )}
+                          {formatDateSafely(user.scheduledDeletionAt)}
                         </div>
                       </TableCell>
                       <TableCell>
@@ -588,21 +599,13 @@ export default function DeletedUsersPage() {
                   <div>
                     <span className="text-gray-500">삭제일:</span>
                     <p className="font-semibold mt-1">
-                      {legalDialog.data.deletedAt &&
-                        format(new Date(legalDialog.data.deletedAt), 'yyyy-MM-dd HH:mm', {
-                          locale: ko,
-                        })}
+                      {formatDateSafely(legalDialog.data.deletedAt, 'yyyy-MM-dd HH:mm')}
                     </p>
                   </div>
                   <div>
                     <span className="text-gray-500">완전 삭제 예정일:</span>
                     <p className="font-semibold mt-1">
-                      {legalDialog.data.scheduledDeletionAt &&
-                        format(
-                          new Date(legalDialog.data.scheduledDeletionAt),
-                          'yyyy-MM-dd HH:mm',
-                          { locale: ko }
-                        )}
+                      {formatDateSafely(legalDialog.data.scheduledDeletionAt, 'yyyy-MM-dd HH:mm')}
                     </p>
                   </div>
                 </div>
@@ -625,7 +628,7 @@ export default function DeletedUsersPage() {
                             <span>좋아요: {post.likeCount}</span>
                             <span>댓글: {post.commentCount}</span>
                           </div>
-                          <div>작성일: {format(new Date(post.createdAt), 'yyyy-MM-dd HH:mm', { locale: ko })}</div>
+                          <div>작성일: {formatDateSafely(post.createdAt, 'yyyy-MM-dd HH:mm')}</div>
                         </div>
 
                         {/* 내용 보기 버튼 */}
@@ -672,7 +675,7 @@ export default function DeletedUsersPage() {
                           <div>포스트 ID: {comment.postId}</div>
                           <div className="flex gap-3">
                             <span>좋아요: {comment.likesCount}</span>
-                            <span>작성일: {format(new Date(comment.createdAt), 'yyyy-MM-dd HH:mm', { locale: ko })}</span>
+                            <span>작성일: {formatDateSafely(comment.createdAt, 'yyyy-MM-dd HH:mm')}</span>
                           </div>
                         </div>
                       </div>

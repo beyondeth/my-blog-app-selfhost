@@ -66,7 +66,8 @@ export class CdnService {
       };
     }
 
-    let cdnPath = file.fileKey;
+    // 선행 슬래시 제거 (중복 슬래시 방지)
+    let cdnPath = file.fileKey.startsWith('/') ? file.fileKey.substring(1) : file.fileKey;
 
     // Cloudflare Image Resizing 파라미터 추가
     // https://developers.cloudflare.com/images/image-resizing/
@@ -104,7 +105,9 @@ export class CdnService {
       // CDN 비활성화 시 S3 직접 URL 반환
       url = this.generateS3Url(s3Key);
     } else {
-      url = `https://${this.cdnDomain}/${s3Key}`;
+      // 선행 슬래시 제거 (중복 슬래시 방지)
+      const cleanKey = s3Key.startsWith('/') ? s3Key.substring(1) : s3Key;
+      url = `https://${this.cdnDomain}/${cleanKey}`;
     }
 
     // LRU 캐시 관리
