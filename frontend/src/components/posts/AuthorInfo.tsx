@@ -76,8 +76,12 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
 
   if (!author) return null;
 
+  // 삭제된 사용자 처리
+  const isDeletedUser = author.username?.startsWith('deleted_');
+  const displayUsername = isDeletedUser ? '탈퇴한 사용자' : (author.username || 'Author');
+
   // 호버 툴팁에 사용할 사용자 데이터가 있는 경우에만 호버 기능 활성화
-  if (userData) {
+  if (userData && !isDeletedUser) {
     return (
       <TooltipProvider delayDuration={300}>
         <Tooltip>
@@ -86,14 +90,14 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
               <div className="flex items-start space-x-4 cursor-pointer">
                 <Avatar
                   src={displayProfileImage}
-                  alt={author.username || 'Author'}
-                  fallback={author.username || 'Author'}
+                  alt={displayUsername}
+                  fallback={displayUsername}
                   size="md"
                   className="flex-shrink-0 hover:opacity-80 transition-opacity"
                 />
                 <div className="flex-1">
                   <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                    {author.username || 'Author'}
+                    {displayUsername}
                   </h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     {author.bio || ''}
@@ -115,23 +119,23 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
     );
   }
 
-  // 데이터가 없는 경우 기존 디자인 그대로 표시 (호버 기능 없음)
+  // 데이터가 없는 경우 또는 삭제된 사용자의 경우 기존 디자인 그대로 표시 (호버 기능 없음)
   return (
     <div className="mt-12 p-6 bg-gray-50 dark:bg-[rgb(38,38,38)] rounded-lg">
       <div className="flex items-start space-x-4">
         <Avatar
-          src={displayProfileImage}
-          alt={author.username || 'Author'}
-          fallback={author.username || 'Author'}
+          src={isDeletedUser ? null : displayProfileImage}
+          alt={displayUsername}
+          fallback={displayUsername}
           size="md"
           className="flex-shrink-0"
         />
         <div className="flex-1">
           <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
-            {author.username || 'Author'}
+            {displayUsername}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            {author.bio || ''}
+            {isDeletedUser ? '' : (author.bio || '')}
           </p>
         </div>
       </div>

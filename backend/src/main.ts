@@ -147,13 +147,13 @@ async function bootstrap() {
       'Cache-Control',
       'Pragma',
     ],
+    credentials: true, // 쿠키 전송을 위해 필수
     exposedHeaders: [
       'Content-Type',
       'Content-Length',
       'ETag',
       'Cache-Control',
     ],
-    credentials: true, // 쿠키 전송을 위해 활성화
     maxAge: 86400, // 24 hours
     preflightContinue: false,
     optionsSuccessStatus: 204,

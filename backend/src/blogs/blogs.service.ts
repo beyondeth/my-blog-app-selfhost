@@ -169,6 +169,21 @@ export class BlogsService {
     });
   }
 
+  /**
+   * 사용자 ID로 블로그 조회 (단일 블로그 반환)
+   *
+   * @description
+   * 시스템은 사용자당 하나의 블로그만 허용하므로,
+   * 배열 대신 단일 Blog 객체를 반환합니다.
+   *
+   * @param userId 사용자 ID
+   * @returns Blog 객체 또는 null
+   */
+  async findBlogByUserId(userId: string): Promise<Blog | null> {
+    const blogs = await this.findByUserId(userId);
+    return blogs.length > 0 ? blogs[0] : null;
+  }
+
   async checkSlugAvailability(slug: string): Promise<boolean> {
     const count = await this.blogRepository.count({
       where: { slug }

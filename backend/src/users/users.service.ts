@@ -827,8 +827,7 @@ export class UsersService {
       // 개인정보 즉시 마스킹 (프론트엔드 비공개 처리)
       email: `deleted_${userId}@deleted.local`,
       username: `deleted_${userId}`,
-      profileImage: null,
-      bio: null,
+      // profileImage와 bio는 profiles 테이블에 저장
 
       // 인증 정보 무효화
       password: null,
@@ -836,6 +835,15 @@ export class UsersService {
       // 활성화 상태 false로 변경 (로그인 차단)
       isActive: false,
     });
+
+    // profiles 테이블에 개인정보 마스킹 적용
+    await this.profileRepository.update(
+      { userId },
+      {
+        profileImage: null,
+        bio: null,
+      }
+    );
 
     // account_settings 테이블에 scheduledDeletionAt 저장
     await this.accountSettingsRepository.update(

@@ -35,14 +35,13 @@ export class UserDeletionProcessorService {
   ) {}
 
   /**
-   * Cron 스케줄러: 30초마다 큐에서 작업 가져와 처리
+   * Cron 스케줄러: 5분마다 큐에서 작업 가져와 처리
    */
-  @Cron(CronExpression.EVERY_30_SECONDS)
+  @Cron('0 */5 * * * *') // 5분마다 실행
   async processQueue(): Promise<void> {
     // 이미 처리 중이면 스킵 (동시 처리 방지)
     if (this.isProcessing) {
-      this.logger.debug('Queue processing already in progress, skipping...');
-      return;
+      return; // 로그 제거
     }
 
     try {
@@ -52,8 +51,7 @@ export class UserDeletionProcessorService {
       const jobs = await this.queueService.dequeueJobs(10);
 
       if (jobs.length === 0) {
-        this.logger.debug('No deletion jobs in queue');
-        return;
+        return; // Job이 없으면 조용히 리턴 (디버그 로그 제거)
       }
 
       this.logger.log(`Processing ${jobs.length} deletion jobs`);
@@ -241,7 +239,7 @@ export class UserDeletionProcessorService {
   }
 
   /**
-   * Job Handler 3: Cascade 삭제 작업
+   * Job Handler 3: Cascade 삭제 작업 (배치 처리로 최적화)
    * - Blog, Posts, Comments, Subscriptions, Messages 등 삭제
    * - 트랜잭션으로 일관성 보장
    * - 삭제 완료 후 UserDeletionLog 상태 업데이트
@@ -250,14 +248,29 @@ export class UserDeletionProcessorService {
     const { userId, metadata } = job;
     const { deletionLogId } = metadata;
 
-    await this.dataSource.transaction(async (manager) => {
+    // 타임아웃 설정 (5분)
+    const timeoutMs = 5 * 60 * 1000;
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Cascade deletion timeout')), timeoutMs);
+    });
+
+    const deletionPromise = this.dataSource.transaction(async (manager) => {
       // 1. Blog 삭제 (CASCADE로 Posts도 함께 삭제됨)
       await manager.query(`DELETE FROM blogs WHERE "userId" = $1`, [userId]);
 
-      // 2. Comments 삭제
-      await manager.query(`DELETE FROM comments WHERE "authorId" = $1`, [
-        userId,
-      ]);
+      // 2. Comments 삭제 (배치로 나누어 처리)
+      const commentBatchSize = 1000;
+      let deletedComments = 0;
+      do {
+        const result = await manager.query(
+          `DELETE FROM comments WHERE "authorId" = $1 LIMIT $2`,
+          [userId, commentBatchSize]
+        );
+        deletedComments = result[1] || 0;
+        if (deletedComments > 0) {
+          this.logger.debug(`Deleted ${deletedComments} comments for user ${userId}`);
+        }
+      } while (deletedComments >= commentBatchSize);
 
       // 3. Follow 관계 삭제
       await manager.query(
@@ -265,34 +278,54 @@ export class UserDeletionProcessorService {
         [userId],
       );
 
-      // 4. Subscriptions는 SET NULL로 유지 (법적 보관)
-      // 이미 마이그레이션에서 SET NULL 설정했으므로 별도 처리 불필요
-
-      // 5. Messages는 senderDeletedAt 설정 (30일 보관)
-      await manager.query(
+      // 4. Messages는 senderDeletedAt 설정 (30일 보관)
+      const messageResult = await manager.query(
         `UPDATE messages SET "senderDeletedAt" = NOW() WHERE "senderId" = $1`,
         [userId],
       );
+      if (messageResult[1] > 0) {
+        this.logger.debug(`Marked ${messageResult[1]} messages as deleted for user ${userId}`);
+      }
 
-      // 6. Conversations는 SET NULL로 유지 (30일 보관)
-      // 이미 마이그레이션에서 SET NULL 설정했으므로 별도 처리 불필요
-
-      // 7. Reports 삭제
+      // 5. Reports 삭제
       await manager.query(
         `DELETE FROM reports WHERE "reporterId" = $1 OR "reportedUserId" = $1`,
         [userId],
       );
 
-      // 8. Bookmarks 삭제
-      await manager.query(`DELETE FROM bookmarks WHERE "userId" = $1`, [
-        userId,
-      ]);
+      // 6. Bookmarks 삭제 (배치로 나누어 처리)
+      const bookmarkBatchSize = 1000;
+      let deletedBookmarks = 0;
+      do {
+        const result = await manager.query(
+          `DELETE FROM bookmarks WHERE "userId" = $1 LIMIT $2`,
+          [userId, bookmarkBatchSize]
+        );
+        deletedBookmarks = result[1] || 0;
+        if (deletedBookmarks > 0) {
+          this.logger.debug(`Deleted ${deletedBookmarks} bookmarks for user ${userId}`);
+        }
+      } while (deletedBookmarks >= bookmarkBatchSize);
 
-      // 9. File 엔티티 삭제 (S3 파일은 이미 delete-files에서 삭제됨)
-      await manager.query(`DELETE FROM files WHERE user_id = $1`, [userId]);
+      // 7. File 엔티티 삭제 (S3 파일은 이미 delete-files에서 삭제됨)
+      const fileBatchSize = 1000;
+      let deletedFiles = 0;
+      do {
+        const result = await manager.query(
+          `DELETE FROM files WHERE user_id = $1 LIMIT $2`,
+          [userId, fileBatchSize]
+        );
+        deletedFiles = result[1] || 0;
+        if (deletedFiles > 0) {
+          this.logger.debug(`Deleted ${deletedFiles} files for user ${userId}`);
+        }
+      } while (deletedFiles >= fileBatchSize);
 
       this.logger.log(`Cascade deletion completed for user ${userId}`);
     });
+
+    // Promise.race로 타임아웃 처리
+    await Promise.race([deletionPromise, timeoutPromise]);
 
     // UserDeletionLog 상태 업데이트
     if (deletionLogId) {

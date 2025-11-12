@@ -1274,7 +1274,7 @@ export class PostsService {
       attachedFiles: result.attachedFiles,
     };
 
-    await this.cacheService.set(cacheKey, coreData, CacheTTL.POST_CORE);
+    await this.cacheService.set(cacheKey, coreData, CacheTTL.POST_DETAIL);
     this.logger.debug(`💾 Cached post core: ${id}`);
 
     this.logger.log(`Returning post data with ${post.attachedFiles?.length || 0} attached files`);

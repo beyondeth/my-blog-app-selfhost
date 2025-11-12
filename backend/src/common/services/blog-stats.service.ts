@@ -155,8 +155,8 @@ export class BlogStatsService {
       stats.averageViewsPerPost = Math.round(stats.totalViews / stats.totalPosts);
     }
 
-    // 캐싱 (30분)
-    await this.cacheService.set(cacheKey, stats, CacheTTL.EXTRA_LONG);
+    // 캐싱 (1시간)
+    await this.cacheService.set(cacheKey, stats, CacheTTL.STATIC);
 
     return stats;
   }

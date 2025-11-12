@@ -40,6 +40,32 @@ function LoginPageContent() {
     remainingDays: number;
   } | null>(null);
 
+  // OAuth 콜백 에러 처리
+  useEffect(() => {
+    const error = searchParams.get('error');
+    const message = searchParams.get('message');
+
+    if (error && message) {
+      // URL 파라미터에서 메시지 디코딩
+      const decodedMessage = decodeURIComponent(message);
+
+      if (error === 'account_deleted') {
+        setAccountDeletedError({
+          message: decodedMessage,
+          remainingDays: 0
+        });
+      } else {
+        toast.error(decodedMessage || '로그인에 실패했습니다.');
+      }
+
+      // URL에서 에러 파라미터 제거
+      const url = new URL(window.location.href);
+      url.searchParams.delete('error');
+      url.searchParams.delete('message');
+      window.history.replaceState({}, '', url.toString());
+    }
+  }, [searchParams]);
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
