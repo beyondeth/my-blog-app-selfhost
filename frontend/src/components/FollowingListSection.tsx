@@ -78,7 +78,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
         ) : followingData?.data?.length > 0 ? (
           <div className="space-y-4">
             {followingData.data.map((user: any) => (
-              <div key={user.id} className="flex items-center justify-between gap-3 p-2 rounded-lg text-gray-900 dark:text-[#9CA3AF] hover:bg-accent hover:text-accent-foreground transition-colors duration-200">
+              <div key={user.id} className="flex items-center justify-between gap-3 p-2 rounded-lg text-gray-900 dark:text-[#9CA3AF] transition-colors duration-200">
                 <UserLinkWithTooltip
                   userId={user.id}
                   username={user.username}
@@ -100,8 +100,8 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
                 </UserLinkWithTooltip>
                 {currentUser && currentUser.id !== user.id && (
                   <div className="flex-shrink-0">
-                    <FollowButton 
-                      userId={user.id} 
+                    <FollowButton
+                      userId={user.id}
                       variant="minimal"
                     />
                   </div>
@@ -141,7 +141,7 @@ export default function FollowingListSection({ userId }: FollowingListSectionPro
         ) : followersData?.data?.length > 0 ? (
           <div className="space-y-4">
             {followersData.data.map((user: any) => (
-              <div key={user.id} className="flex items-center justify-between gap-3 p-2 rounded-lg text-gray-900 dark:text-[#9CA3AF] hover:bg-accent hover:text-accent-foreground transition-colors duration-200">
+              <div key={user.id} className="flex items-center justify-between gap-3 p-2 rounded-lg text-gray-900 dark:text-[#9CA3AF] transition-colors duration-200">
                 <UserLinkWithTooltip
                   userId={user.id}
                   username={user.username}

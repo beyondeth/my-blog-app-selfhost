@@ -244,6 +244,7 @@ export const kakaoAuth = () => apiClient.kakaoAuth();
 // postsAPI 객체 (레거시 호환)
 export const postsAPI = {
   getPosts: (params?: any) => apiClient.getPosts(params),
+  getPostsCursor: (params?: any) => apiClient.posts.getPostsCursor(params), // 커서 페이지네이션 추가
   getPost: (id: string) => apiClient.getPost(id),
   getPostBySlug: (slug: string) => apiClient.getPostBySlug(slug),
   createPost: (data: any) => apiClient.createPost(data),

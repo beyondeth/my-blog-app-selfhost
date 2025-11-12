@@ -8,8 +8,9 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useCreatePost, useUserCategories } from '@/hooks/usePosts';
+import { useCreatePost, useUserCategories, postQueryKeys } from '@/hooks/usePosts';
 import { useMyBlogs } from '@/hooks/useBlogs';
+import { useQueryClient } from '@tanstack/react-query';
 import Spinner from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/button';
 import {
@@ -59,6 +60,7 @@ type PostFormData = z.infer<typeof postSchema>;
 
 export default function NewStoryPage() {
   const router = useRouter();
+  const queryClient = useQueryClient();
   const { user, isLoading: isUserLoading } = useAuth();
   const { data: blogs, isLoading: isBlogsLoading } = useMyBlogs();
   const createPostMutation = useCreatePost();
@@ -127,6 +129,11 @@ export default function NewStoryPage() {
       };
 
       const result = await createPostMutation.mutateAsync(postData);
+
+      // 즉시 관련 캐시 refetch (최신 데이터 보장)
+      queryClient.refetchQueries({
+        queryKey: postQueryKeys.lists()
+      });
 
       // 성공 시 해당 블로그의 포스트로 이동 (페이지 이동하므로 플래그 초기화 불필요)
       router.push(`/${blog!.slug}/${result.slug}`);
@@ -534,6 +541,16 @@ export default function NewStoryPage() {
                     field.onChange(tags.filter((_: string, index: number) => index !== indexToRemove));
                   };
 
+                  const handleInputBlur = () => {
+                    setIsFocused(false);
+                    // 입력 중인 태그가 있으면 자동으로 추가
+                    const newTag = inputValue.trim();
+                    if (newTag && !tags.includes(newTag)) {
+                      field.onChange([...tags, newTag]);
+                      setInputValue('');
+                    }
+                  };
+
                   return (
                     <FormItem>
                       <FormControl>
@@ -594,7 +611,7 @@ export default function NewStoryPage() {
                               onCompositionStart={() => setIsComposing(true)}
                               onCompositionEnd={() => setIsComposing(false)}
                               onFocus={() => setIsFocused(true)}
-                              onBlur={() => setIsFocused(false)}
+                              onBlur={handleInputBlur}
                               disabled={createPostMutation.isPending}
                               placeholder={!inputValue ? " 입력 후 엔터 또는 콤마로 구분" : ""}
                               className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[235px] !bg-transparent !rounded-none"

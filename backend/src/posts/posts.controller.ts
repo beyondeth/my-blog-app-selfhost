@@ -1,4 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, Header, UseInterceptors, Logger, ParseIntPipe, DefaultValuePipe, ForbiddenException, NotFoundException, Inject, forwardRef } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, UseGuards, Request, Ip, Headers, Header, UseInterceptors, Logger, ParseIntPipe, DefaultValuePipe, ForbiddenException, NotFoundException, Inject, forwardRef, Res } from '@nestjs/common';
+import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
@@ -18,6 +19,7 @@ import { User } from '../users/entities/user.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post as PostEntity } from './entities/post.entity';
+import { UrlSanitizerUtil } from '../common/utils/url-sanitizer.util';
 import { File as FileEntity } from '../files/entities/file.entity';
 import { S3Service } from '../files/services/s3.service';
 import { ViewCountService } from './view-count.service';
@@ -97,7 +99,6 @@ export class PostsController {
 
   @Get()
   @Public()
-  @Header('Cache-Control', 'public, max-age=120, s-maxage=120')
   @ApiOperation({ summary: '게시글 목록 조회' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '최대 20' })
@@ -108,6 +109,7 @@ export class PostsController {
   @ApiQuery({ name: 'isPublished', required: false, type: Boolean })
   async findAll(
     @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
@@ -120,6 +122,14 @@ export class PostsController {
     const pageNumber = PaginationHelper.getSafePage(page);
     const limitNumber = PaginationHelper.getSafeLimit(limit, 20); // 최대 20개
     const user = req.user || null;
+
+    // 인증된 사용자에게는 캐시 비활성화 헤더 설정 (즉시 반영 보장)
+    if (user) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    }
 
     // blogSlug가 있으면 blogId로 변환 (@alias 시스템 지원)
     let actualBlogId = blogId;
@@ -176,11 +186,15 @@ export class PostsController {
     try {
       const cached = await this.cacheService.get(cacheKey);
       if (cached) {
-        console.log(`✅ Cache hit for ${cacheKey}`);
+        // 캐시 히트 로깅 (성능 모니터링용)
+        const cacheType = actualBlogId ? 'MY_BLOG' : 'HOME_FEED';
+        console.log(`✅ [Cache HIT] ${cacheType} for ${cacheKey}`);
+        this.logger.log(`[Cache HIT] ${cacheType} - ${cacheKey}`);
         return cached;
       }
     } catch (error) {
       console.error('Cache get error:', error);
+      this.logger.error(`Cache get error for ${cacheKey}:`, error);
     }
     
     // DB 조회 (캐시용 - liked 필드 제외, 공개 블로그만)
@@ -196,23 +210,30 @@ export class PostsController {
     );
     
     // 홈 피드와 내 블로그에 따라 다른 TTL 적용
-    // 홈 피드(공개): 10분 (성능 우선)
-    // 내 블로그(개인): 30초 (즉시 반영)
+    // 홈 피드(공개): 30초 (성능 우선)
+    // 내 블로그(개인): 10초 (즉시 반영)
     let ttl: number;
     if (actualBlogId) {
       // 내 블로그: 짧은 TTL
-      ttl = CacheTTL.MY_BLOG; // 30초
+      ttl = CacheTTL.MY_BLOG; // 10초
     } else {
       // 홈 피드: 긴 TTL
       ttl = pageNumber === 1 ? CacheTTL.HOME_FEED : CacheTTL.HOME_FEED * 2;
     }
-    
+
+    // 캐시 미스 로깅
+    const cacheType = actualBlogId ? 'MY_BLOG' : 'HOME_FEED';
+    console.log(`❌ [Cache MISS] ${cacheType} for ${cacheKey} - Querying DB`);
+    this.logger.log(`[Cache MISS] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
+
     // 캐싱
     try {
       await this.cacheService.set(cacheKey, result, ttl);
-      console.log(`📦 Cached ${cacheKey} with TTL ${ttl}s`);
+      console.log(`📦 [Cache SET] ${cacheType} for ${cacheKey} with TTL ${ttl}s`);
+      this.logger.log(`[Cache SET] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
     } catch (error) {
       console.error('Cache set error:', error);
+      this.logger.error(`Cache set error for ${cacheKey}:`, error);
     }
     
     return result;
@@ -224,15 +245,20 @@ export class PostsController {
   @ApiOperation({ summary: '인기 게시글 조회 (기간별)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '조회할 개수 (기본: 5, 최대: 10)' })
   async getPopularPosts(
-    @Param('period') period: 'daily' | 'weekly' | 'monthly',
+    @Param('period') period: string,
     @Query('limit') limit?: string,
   ) {
+    // period 파라미터 안전하게 검증
+    const validPeriods = ['daily', 'weekly', 'monthly'];
+    const sanitizedPeriod = validPeriods.includes(period)
+      ? period as 'daily' | 'weekly' | 'monthly'
+      : 'weekly'; // 기본값: 주간
     const limitNumber = PaginationHelper.getSafeLimit(limit, 10); // 인기 게시글은 최대 10개
-    
+
     // 기간별 캐시 TTL 설정
-    const ttl = period === 'daily' ? 3600 : period === 'weekly' ? 10800 : 21600;
-    
-    return this.postsService.findPopularPosts(period, limitNumber);
+    const ttl = sanitizedPeriod === 'daily' ? 3600 : sanitizedPeriod === 'weekly' ? 10800 : 21600;
+
+    return this.postsService.findPopularPosts(sanitizedPeriod, limitNumber);
   }
 
   @Get('categories/public')
@@ -252,9 +278,11 @@ export class PostsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
+    // 카테고리 파라미터 안전하게 정제
+    const sanitizedCategory = UrlSanitizerUtil.sanitizeUserInput(category);
     const pageNumber = PaginationHelper.getSafePage(page);
     const limitNumber = PaginationHelper.getSafeLimit(limit, 20); // 최대 20개
-    return this.postsService.getPostsByCategory(category, pageNumber, limitNumber);
+    return this.postsService.getPostsByCategory(sanitizedCategory, pageNumber, limitNumber);
   }
 
   @Post(':id/thumbnail')
@@ -347,7 +375,11 @@ export class PostsController {
   findBySlug(@Param('slug') slug: string, @Request() req: any) {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
-    return this.postsService.findBySlug(slug, user);
+
+    // URL 파라미터 안전하게 디코딩 및 정제
+    const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
+
+    return this.postsService.findBySlug(sanitizedSlug, user);
   }
 
   @Get('view-stats')
@@ -712,7 +744,6 @@ export class PostsController {
   @Get('cursor')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
-  @Header('Cache-Control', 'public, max-age=60, s-maxage=60')
   @ApiOperation({
     summary: 'Cursor Pagination 포스트 목록 조회',
     description: '무한 스크롤을 위한 커서 기반 페이지네이션. 대규모 데이터셋에서도 일정한 성능 보장 (O(1))',
@@ -739,9 +770,19 @@ export class PostsController {
   async getPostsCursor(
     @Query() dto: GetPostsCursorDto,
     @Request() req: any,
+    @Res({ passthrough: true }) res: Response,
   ) {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
+
+    // 인증된 사용자에게는 캐시 비활성화 헤더 설정 (즉시 반영 보장)
+    if (user) {
+      res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+      res.setHeader('Expires', '0');
+      res.setHeader('Surrogate-Control', 'no-store');
+    }
+
     return this.postsService.getPostsCursor(dto, user);
   }
 

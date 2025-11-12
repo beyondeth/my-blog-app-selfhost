@@ -79,7 +79,7 @@ export class CacheInvalidationListener {
   private async invalidatePatterns(patterns: string[]): Promise<void> {
     try {
       const results = await Promise.allSettled(
-        patterns.map(pattern => this.cacheService.delete(pattern))
+        patterns.map(pattern => this.cacheService.deletePattern(pattern))
       );
 
       const failed = results.filter(r => r.status === 'rejected');

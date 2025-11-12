@@ -3,7 +3,7 @@
 import { useState, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useInfinitePosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
+import { useInfinitePosts, useInfiniteCursorPosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 
@@ -49,7 +49,9 @@ function HomePageContent() {
   // URL에서 검색 파라미터 파싱
   const currentParams = parseSearchParams(searchParams.toString());
 
-  // 커스텀 훅 사용
+  // 커서 페이지네이션 사용 (성능 최적화를 위해 항상 활성화)
+  const useCursorPagination = true; // 항상 커서 페이지네이션 사용 (대용량 데이터 처리)
+
   const {
     data,
     fetchNextPage,
@@ -57,10 +59,17 @@ function HomePageContent() {
     isFetchingNextPage,
     isLoading,
     error
-  } = useInfinitePosts({
-    search: currentParams.search,
-    enabled: true // 홈 페이지는 항상 포스트 로드
-  });
+  } = useCursorPagination
+    ? useInfiniteCursorPosts({
+        search: currentParams.search,
+        sort: 'recent',
+        limit: 20,
+        enabled: true
+      })
+    : useInfinitePosts({
+        search: currentParams.search,
+        enabled: true // 홈 페이지는 항상 포스트 로드
+      });
 
   // 디버깅 로그
   // console.log('🔍 [Home Debug] isLoading:', isLoading);
@@ -81,24 +90,59 @@ function HomePageContent() {
   const allPosts = useMemo(() => {
     if (!data?.pages) return [];
 
-    // Map을 사용하여 중복 제거 (post.id 기준)
-    const postsMap = new Map();
-    data.pages.forEach(page => {
-      if (page?.posts) {
-        page.posts.forEach(post => {
-          if (post && post.id) {
-            postsMap.set(post.id, post);
-          }
-        });
-      }
-    });
+    if (useCursorPagination) {
+      // 커서 페이지네이션: pages 배열의 posts 직접 합치
+      const postsMap = new Map();
+      data.pages.forEach((page: any) => {
+        if (page?.posts) {
+          page.posts.forEach((post: any) => {
+            if (post && post.id) {
+              postsMap.set(post.id, post);
+            }
+          });
+        }
+      });
+      return Array.from(postsMap.values());
+    } else {
+      // Offset 페이지네이션: 기존 로직 유지
+      const postsMap = new Map();
+      data.pages.forEach((page) => {
+        if ((page as { posts?: any[] })?.posts) {
+          (page as { posts: any[] }).posts.forEach(post => {
+            if (post && post.id) {
+              postsMap.set(post.id, post);
+            }
+          });
+        }
+      });
 
-    return Array.from(postsMap.values());
-  }, [data?.pages]);
+      return Array.from(postsMap.values());
+    }
+  }, [data?.pages, useCursorPagination]);
 
   const totalPosts = useMemo(() => {
-    return data?.pages[0]?.total || 0;
-  }, [data?.pages]);
+    if (useCursorPagination) {
+      // 커서 페이지네이션: hasMore 정보를 기반으로 추정
+      // 현재까지 로드된 포스트 수 + 더 불러올 데이터가 있는지 여부
+      let loadedCount = 0;
+      let hasMore = false;
+
+      data?.pages?.forEach((page: any) => {
+        if (page?.posts) {
+          loadedCount += page.posts.length;
+        }
+        if (page?.hasMore) {
+          hasMore = true;
+        }
+      });
+
+      // hasMore가 true면 '+' 표시로 더 많은 데이터가 있음을 알림
+      return hasMore ? loadedCount + 1 : loadedCount;
+    } else {
+      // Offset 페이지네이션: 첫 페이지의 total 값 사용
+      return (data?.pages[0] as { total?: number })?.total || 0;
+    }
+  }, [data?.pages, useCursorPagination]);
 
   // 실제 포스트에서 태그 추출 - 메모이제이션
   const tags = useMemo(() => {
@@ -221,7 +265,7 @@ function HomePageContent() {
                 <InfiniteScrollTrigger
                   hasNextPage={hasNextPage}
                   isFetchingNextPage={isFetchingNextPage}
-                  totalPosts={totalPosts}
+                  totalPosts={useCursorPagination ? allPosts.length : totalPosts}
                   currentPostsCount={allPosts.length}
                   onLoadMore={loadMorePosts}
                   error={error}

@@ -6,6 +6,7 @@ import { useRef, useCallback } from 'react';
 import { mixpanel } from '@/lib/mixpanel';
 import { useRouter } from 'next/navigation'; // useRouter 훅 추가
 import { getPostUrl } from '@/lib/utils/blogUrl';
+import type { GetPostsCursorParams } from '@/lib/api/endpoints/posts';
 
 // Query 키 팩토리 패턴 (표준화)
 export const postQueryKeys = {
@@ -18,6 +19,8 @@ export const postQueryKeys = {
     blogId?: string;
     page?: number;
     limit?: number;
+    sort?: string;
+    cursor?: boolean;
   }) => {
     // 정렬된 키 생성으로 캐시 일관성 보장
     const sortedFilters = Object.entries(filters).reduce((acc, [key, value]) => {
@@ -39,22 +42,22 @@ export const postQueryKeys = {
 // 공통 쿼리 옵션
 const commonQueryOptions = {
   gcTime: 5 * 60 * 1000, // 5분 (가비지 컬렉션 - 메모리 관리)
-  staleTime: 10 * 1000, // 10초 - 즉시 반영과 성능의 균형
+  staleTime: 0, // 항상 최신 데이터 (캐시 일관성 보장)
   refetchOnWindowFocus: true, // 탭 전환시 자동 갱신 (사용자가 탭으로 돌아올 때 최신 데이터 보장)
-  refetchOnMount: true, // stale 상태면 자동 refetch (항상 최신 데이터 유지)
+  refetchOnMount: true, // 항상 마운트 시 refetch (최신 데이터 보장)
   retry: 1,
 };
 
 // 무한 스크롤 포스트 목록 훅
-export function useInfinitePosts(options: { 
-  search?: string; 
+export function useInfinitePosts(options: {
+  search?: string;
   category?: string;
   blogSlug?: string;
   blogId?: string;
   enabled?: boolean;
 } = {}) {
   const { search, category, blogSlug, blogId, enabled = true } = options;
-  
+
   return useInfiniteQuery({
     queryKey: postQueryKeys.list({ search, category, blogSlug, blogId }),
     queryFn: ({ pageParam = 1 }) => postsAPI.getPosts({ 
@@ -114,24 +117,27 @@ export function useCreatePost() {
         wordCount: newPost.content ? newPost.content.length : 0,
       });
 
-      // 1. 모든 list 캐시를 stale로 마킹 (홈, 블로그, 검색 등)
+      // 1. 모든 캐시 즉시 무효화하고 강제 refetch (즉시 반영 보장)
       queryClient.invalidateQueries({
         queryKey: postQueryKeys.lists(),
-        exact: false,
-        refetchType: 'none'
+        refetchType: 'active'
       });
 
-      // 1-1. 작성자 블로그 캐시 무효화 및 즉시 업데이트
+      // 1-1. 작성자 블로그 캐시 즉시 무효화
       if (newPost.blog?.slug) {
-        queryClient.removeQueries({
-          queryKey: postQueryKeys.list({ blogSlug: newPost.blog.slug }),
-          exact: false
-        });
         queryClient.invalidateQueries({
           queryKey: postQueryKeys.list({ blogSlug: newPost.blog.slug }),
-          exact: false
+          refetchType: 'active'
         });
       }
+
+      // 1-2. 즉시 백그라운드에서 refetch 강제 실행
+      setTimeout(() => {
+        queryClient.refetchQueries({
+          queryKey: postQueryKeys.lists(),
+          exact: false
+        });
+      }, 100); // 100ms 후 추가 refetch (DB 트랜잭 보장)
 
       // 2. 무한 스크롤 쿼리의 첫 번째 페이지에 새 게시글 추가 (낙관적 업데이트)
       queryClient.setQueriesData(
@@ -598,6 +604,37 @@ export const usePostCacheCleanup = () => {
       });
     }
   }, [queryClient]);
+};
+
+// 커서 기반 무한 스크롤 포스트 목록 훅
+export function useInfiniteCursorPosts(options: {
+  search?: string;
+  category?: string;
+  blogSlug?: string;
+  blogId?: string;
+  sort?: 'recent' | 'popular' | 'trending';
+  limit?: number;
+  enabled?: boolean;
+} = {}) {
+  const { search, category, blogSlug, blogId, sort = 'recent', limit = 20, enabled = true } = options;
+
+  return useInfiniteQuery({
+    queryKey: postQueryKeys.list({ search, category, blogSlug, blogId, sort, cursor: true }),
+    queryFn: ({ pageParam }) => postsAPI.getPostsCursor({
+      cursor: pageParam || undefined, // pageParam이 string | undefined 타입이므로 처리
+      limit,
+      sort,
+      search,
+      category,
+      blogSlug,
+      blogId,
+    }),
+    getNextPageParam: (lastPage) => lastPage?.nextCursor || undefined,
+    initialPageParam: undefined as string | undefined, // 명시적인 타입 지정
+    enabled,
+    ...commonQueryOptions,
+    refetchOnMount: false, // 처음 마운트 시 refetch 방지 (새로고침 방지)
+  });
 };
 
 /**

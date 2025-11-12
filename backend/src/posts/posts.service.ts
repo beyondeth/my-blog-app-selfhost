@@ -27,11 +27,13 @@ import { BlogResponseDto } from '../blogs/dto/blog-response.dto';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
 import { CacheMetricsService } from '../metrics/cache-metrics.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
+import { LikeQueueService } from './services/like-queue.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-processing.queue';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { RedisLockService } from '../redis/redis-lock.service';
+import { CacheInvalidationEvents } from '../common/events/cache.events';
 
 /**
  * 포스트 Core 데이터 타입 (실시간 카운트/상태 제외)
@@ -64,6 +66,7 @@ export class PostsService {
     private cacheService: CacheService,
     private cacheMetricsService: CacheMetricsService,
     private bookmarksService: BookmarksService,
+    private likeQueueService: LikeQueueService,
     @InjectQueue(POST_PROCESSING_QUEUE)
     private postProcessingQueue: Queue<PostProcessingJobData>,
     private readonly eventEmitter: EventEmitter2,
@@ -117,10 +120,8 @@ export class PostsService {
     // 날짜는 TypeORM이 자동으로 ISO 8601 문자열로 직렬화
     // formatDate() 제거 - 시간 정보 보존을 위해 ISO 문자열 그대로 반환
 
-    // 태그 필드 호환성
-    if (post.tags) {
-      dto.tags = post.tags;
-    }
+    // 태그 필드 호환성 - Post 엔티티의 tags를 우선적으로 사용
+    dto.tags = post.tags || post.metadata?.tags || [];
 
     // 썸네일 URL 최적화
     if (dto.thumbnail) {
@@ -574,10 +575,15 @@ export class PostsService {
       await this.linkFilesFromContent(post, user.id);
 
       // 포스트 생성 이벤트 발행 (캐시 무효화용)
-      this.eventEmitter.emit('post.created', {
+      this.eventEmitter.emit(CacheInvalidationEvents.POST_CREATED, {
         postId: post.id,
         blogSlug: blog.slug,
+        authorId: user.id,  // 추가: 작성자 ID
+        blogId: blog.id,     // 추가: 블로그 ID
       });
+
+      // 즉시 관련 캐시 삭제 (새로고침 시 데이터 일관성 보장)
+      await this.invalidateRelatedCache(blog.slug, blog.id);
 
       /**
        * DTO 변환으로 spread operator 제거
@@ -594,6 +600,59 @@ export class PostsService {
       throw error;
     } finally {
       await queryRunner.release();
+    }
+  }
+
+  /**
+   * 포스트 생성 후 관련 캐시 즉시 삭제
+   * @param blogSlug - 블로그 slug (패턴 삭제용)
+   * @param blogId - 블로그 ID (정확한 키 삭제용)
+   */
+  private async invalidateRelatedCache(blogSlug: string, blogId?: string): Promise<void> {
+    try {
+      // 1. 홈 피드 캐시 삭제 (처음 5페이지)
+      for (let i = 1; i <= 5; i++) {
+        await this.cacheService.del(CacheKeys.FEED_HOME(i));
+      }
+
+      // 2. 블로그 피드 캐시 삭제 (처음 5페이지)
+      // blogId가 있으면 blogId로 캐시 삭제 (실제 캐시 키와 일치)
+      if (blogId) {
+        for (let i = 1; i <= 5; i++) {
+          await this.cacheService.del(CacheKeys.FEED_BLOG(blogId, i));
+        }
+      }
+      // blogSlug도 삭제 (하위 호환성 및 패턴 일치)
+      if (blogSlug && blogSlug !== blogId) {
+        for (let i = 1; i <= 5; i++) {
+          await this.cacheService.del(CacheKeys.FEED_BLOG(blogSlug, i));
+        }
+      }
+
+      // 3. 패턴 기반 대규 삭제 (모든 관련 캐시)
+      // 홈 피드 패턴
+      await this.cacheService.deletePattern('feed:home:page:*');
+
+      // 블로그 피드 패턴 (blogId와 blogSlug 모두 삭제)
+      if (blogId) {
+        await this.cacheService.deletePattern(`feed:blog:${blogId}:page:*`);
+      }
+      if (blogSlug) {
+        await this.cacheService.deletePattern(`feed:blog:${blogSlug}:page:*`);
+      }
+
+      // 포스트 관련 패턴
+      await this.cacheService.deletePattern('post:*');
+      // 인기 포스트 패턴
+      await this.cacheService.deletePattern('feed:popular:*');
+
+      // 4. 인기 게시물 캐시 삭제
+      await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
+      await this.cacheService.deletePattern('feed:search:*');
+
+      this.logger.log(`✅ [Post Created] Invalidated all cache for blog: ${blogSlug}`);
+    } catch (error) {
+      this.logger.error(`Failed to invalidate cache after post creation: ${error.message}`, error.stack);
     }
   }
 
@@ -712,10 +771,15 @@ export class PostsService {
     this.logger.log(`✅ Fast Path 완료: ${post.id} (${processingTime}ms) - Worker 처리 대기 중`);
 
     // 포스트 생성 이벤트 발행 (캐시 무효화용)
-    this.eventEmitter.emit('post.created', {
+    this.eventEmitter.emit(CacheInvalidationEvents.POST_CREATED, {
       postId: post.id,
       blogSlug: blog.slug,
+      authorId: user.id,  // 추가: 작성자 ID
+      blogId: blog.id,     // 추가: 블로그 ID
     });
+
+    // 즉시 관련 캐시 삭제 (새로고침 시 데이터 일관성 보장)
+    await this.invalidateRelatedCache(blog.slug, blog.id);
 
     // 8. 202 Accepted 응답 반환 (즉시 응답)
     return {
@@ -808,10 +872,10 @@ export class PostsService {
 
     // 캐시용인지 여부에 따라 isDeleted 필터 다르게 적용
     if (isForCache) {
-      // 홈 피드 캐시: isDeleted 정보 포함 (캐시 유지를 위해)
-      // 단, isPublished와 status 필터는 적용
+      // 홈 피드 캐시: 삭제된 포스트도 제외해야 함
       query.where('post.isPublished = :isPublished', { isPublished: true })
-        .andWhere('post.status = :status', { status: 'published' });
+        .andWhere('post.status = :status', { status: 'published' })
+        .andWhere('post.isDeleted = :isDeleted', { isDeleted: false });
     } else {
       // 실시간 조회: 삭제된 포스트 제외
       query.where('post.isDeleted = :isDeleted', { isDeleted: false });
@@ -852,24 +916,54 @@ export class PostsService {
         .split(/\s+/) // 공백으로 분리
         .filter(term => term.length > 0) // 빈 문자열 제거
         .map(term => {
-          // 따옴표와 백슬래시만 제거, 콜론은 유지
+          // 따옴표와 백슬래시만 제거
           const cleaned = term.replace(/["\\]/g, '');
-          // 콜론이 포함된 경우 따옴표로 감싸서 tsquery 처리
-          return cleaned.includes(':') ? `"${cleaned}"` : cleaned;
+          // 콜론이 포함된 경우 콜론을 하이픈으로 변경하여 tsquery 호환
+          const tsCompatible = cleaned.includes(':') ? cleaned.replace(/:/g, '-') : cleaned;
+          // 공백이 포함된 경우 따옴표로 감싸서 tsquery 처리
+          return tsCompatible.includes(' ') ? `"${tsCompatible}"` : tsCompatible;
         })
         .join(' & '); // AND 연산자로 결합 (모든 단어가 포함되어야 함)
 
+      this.logger.debug(`[Search] Original: "${search}", Processed: "${searchTerms}"`);
+
       if (searchTerms) {
-        // 전문 검색 쿼리 - ts_rank로 관련성 점수 계산
-        query
-          .addSelect(
-            `ts_rank(post.search_vector, to_tsquery('simple', :searchQuery))`,
-            'search_rank'
-          )
-          .andWhere(
-            `post.search_vector @@ to_tsquery('simple', :searchQuery)`,
-            { searchQuery: searchTerms }
+        try {
+          // 전문 검색 쿼리 - ts_rank로 관련성 점수 계산
+          // 태그 검색인 경우(단일 단어이고 콜론 포함) 별도 처리
+          const isTagSearch = search.includes(':') && !search.includes(' ');
+
+          if (isTagSearch) {
+            // 태그 검색: 정확히 일치하는 태그를 찾음 (콜론 보존)
+            query.andWhere(
+              `EXISTS (SELECT 1 FROM jsonb_array_elements_text(post.tags) as tag WHERE tag = :exactTag)`,
+              { exactTag: search.trim() }
+            );
+            this.logger.debug(`[Tag Search] Exact tag match for: "${search.trim()}"`);
+          } else {
+            // 일반 텍스트 검색: tsquery 사용 (콜론은 하이픈으로 변환)
+            query
+              .addSelect(
+                `ts_rank(post.search_vector, to_tsquery('simple', :searchQuery))`,
+                'search_rank'
+              )
+              .andWhere(
+                `post.search_vector @@ to_tsquery('simple', :searchQuery)`,
+                { searchQuery: searchTerms }
+              );
+
+            this.logger.debug(`[Search] Full-text search query executed for: ${searchTerms}`);
+          }
+        } catch (error) {
+          // tsquery 오류 발생 시 fallback으로 일반 텍스트 검색 사용
+          this.logger.warn(`[Search] Full-text search failed, falling back to ILIKE: ${error.message}`);
+
+          // 태그 JSONB 필드에서 직접 검색 (fallback)
+          query.andWhere(
+            `EXISTS (SELECT 1 FROM jsonb_array_elements_text(post.tags) as tag WHERE tag ILIKE :searchTerm)`,
+            { searchTerm: `%${search}%` }
           );
+        }
 
         // 검색 결과가 있을 때만 관련성 순으로 정렬 우선
         // 나중에 다른 정렬 조건이 추가될 수 있으므로 여기서는 설정하지 않음
@@ -1517,6 +1611,16 @@ export class PostsService {
     // JSONB 기반 태그는 카운트 관리가 불필요함
     // 태그 통계는 필요시 집계 쿼리로 처리
 
+    // 좋아요 큐 정리 (삭제될 포스트의 좋아요 요청 제거)
+    try {
+      // Redis 큐에서 이 포스트와 관련된 모든 좋아요 요청 제거
+      await this.likeQueueService.removeLikesForPost(id);
+      this.logger.log(`✅ Removed all pending likes for deleted post: ${id}`);
+    } catch (error) {
+      this.logger.error(`Failed to remove likes for post ${id}:`, error);
+      // 실패해도 포스트 삭제는 계속 진행 (데이터 정합성은 DB CASCADE가 처리)
+    }
+
     // 포스트 삭제 (CASCADE로 관련 데이터 자동 삭제)
     // post_tags, post_likes, post_files는 @JoinTable로 자동 처리됨
     await this.postsRepository.remove(post);
@@ -1851,9 +1955,46 @@ export class PostsService {
       postGroups.get(like.postId).push(like);
     }
 
-    // 3. 트랜잭션으로 일괄 처리
+    // 3. postId 유효성 검사 (FK 제약 조건 위반 방지)
+    const validPostIds = new Set<string>();
+    const invalidPostIds = new Set<string>();
+
+    // 모든 postId를 한 번에 조회하여 유효성 검사
+    if (postGroups.size > 0) {
+      const allPostIds = Array.from(postGroups.keys());
+      const existingPosts = await this.postsRepository
+        .createQueryBuilder('post')
+        .select(['post.id'])
+        .where('post.id IN (:...ids)', { ids: allPostIds })
+        .andWhere('post.isDeleted = :deleted', { deleted: false })
+        .getRawMany();
+
+      existingPosts.forEach(post => validPostIds.add(post.id));
+      allPostIds.forEach(id => {
+        if (!validPostIds.has(id)) {
+          invalidPostIds.add(id);
+        }
+      });
+
+      // 유효하지 않은 postId 로깅
+      if (invalidPostIds.size > 0) {
+        this.logger.warn(
+          `❌ [FK Violation Prevention] Skipping ${invalidPostIds.size} invalid postIds: ${Array.from(invalidPostIds).join(', ')}`,
+        );
+
+        // TODO: 나중에 모니터링 서비스에 메트릭 추가
+        // this.monitoringService?.incrementCounter('likes_invalid_post_id_total', invalidPostIds.size);
+      }
+    }
+
+    // 4. 트랜잭션으로 일괄 처리 (유효한 postId만)
     await this.postsRepository.manager.transaction(async (manager) => {
       for (const [postId, postLikes] of postGroups.entries()) {
+        // 유효하지 않은 postId는 건너뛰기
+        if (!validPostIds.has(postId)) {
+          this.logger.debug(`Skipping likes for invalid postId: ${postId}`);
+          continue;
+        }
         // 각 포스트의 현재 좋아요 상태 확인
         const existingLikes = await manager.query(
           'SELECT "userId" FROM post_likes WHERE "postId" = $1 AND "userId" = ANY($2)',
@@ -2949,10 +3090,53 @@ export class PostsService {
         .replace(/[<>\"'%;()&+]/g, ''); // 위험 문자 제거
 
       if (sanitizedSearch) {
-        query.andWhere(
-          '(post.title ILIKE :search OR post.tags::text ILIKE :search)',
-          { search: `%${sanitizedSearch}%` }
-        );
+        // 콜론을 하이픈으로 변경하여 tsquery 호환성 확보
+        const normalizedSearch = sanitizedSearch.replace(/:/g, '-');
+
+        this.logger.debug(`[Search] Original: "${dto.search}", Normalized: "${normalizedSearch}"`);
+
+        // 태그 검색인 경우(단일 단어이고 콜론 포함) 별도 처리
+        const isTagSearch = sanitizedSearch.includes(':') && !sanitizedSearch.includes(' ');
+
+        // Full-Text Search 시도
+        try {
+          if (isTagSearch) {
+            // 태그 검색: 정확히 일치하는 태그를 찾음 (콜론 보존)
+            query.andWhere(
+              `EXISTS (SELECT 1 FROM jsonb_array_elements_text(post.tags) as tag WHERE tag = :exactTag)`,
+              { exactTag: sanitizedSearch }
+            );
+            this.logger.debug(`[Tag Search - Cursor] Exact tag match for: "${sanitizedSearch}"`);
+          } else {
+            // 일반 텍스트 검색: tsquery 사용 (콜론은 하이픈으로 변환)
+            query
+              .addSelect(
+                `ts_rank(post.search_vector, to_tsquery('simple', :searchQuery))`,
+                'search_rank'
+              )
+              .andWhere(
+                `post.search_vector @@ to_tsquery('simple', :searchQuery)`,
+                { searchQuery: normalizedSearch }
+              );
+          }
+        } catch (error) {
+          // tsquery 오류 발생 시 fallback으로 일반 텍스트 검색 사용
+          this.logger.warn(`[Search] Full-text search failed, falling back to ILIKE: ${error.message}`);
+
+          if (isTagSearch) {
+            // 태그 검색 fallback: 정확히 일치하는 태그
+            query.andWhere(
+              `EXISTS (SELECT 1 FROM jsonb_array_elements_text(post.tags) as tag WHERE tag ILIKE :searchTerm)`,
+              { searchTerm: `${sanitizedSearch}` }
+            );
+          } else {
+            // 일반 텍스트 검색 fallback
+            query.andWhere(
+              '(post.title ILIKE :search OR post.tags::text ILIKE :search)',
+              { search: `%${normalizedSearch}%` }
+            );
+          }
+        }
       }
     }
 

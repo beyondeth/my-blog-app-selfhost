@@ -732,6 +732,11 @@ export class AuthService {
     return !!resetToken;
   }
 
+  async checkEmailExists(email: string): Promise<{ exists: boolean }> {
+    const user = await this.usersService.findByEmail(email);
+    return { exists: !!user };
+  }
+
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const hashedToken = crypto
       .createHmac('sha256', this.configService.get('JWT_SECRET'))

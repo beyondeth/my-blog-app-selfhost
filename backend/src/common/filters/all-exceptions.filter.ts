@@ -89,6 +89,12 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }),
     };
 
+    // 헤더가 이미 전송되었는지 확인 (OAuth 콜백 등에서 중요)
+    if (response.headersSent) {
+      this.logger.warn(`Response headers already sent for ${request.method} ${request.url}. Cannot send error response.`);
+      return;
+    }
+
     // CORS 헤더 추가
     response.setHeader('Access-Control-Allow-Origin', '*');
     response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');

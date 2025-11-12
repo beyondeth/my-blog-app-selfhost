@@ -12,6 +12,15 @@ import type {
 } from '../types';
 
 /**
+ * 커서 페이지네이션 응답 타입
+ */
+export interface CursorResponse<T> {
+  posts: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+
+/**
  * 포스트 조회 파라미터
  */
 export interface GetPostsParams {
@@ -21,6 +30,19 @@ export interface GetPostsParams {
   category?: string;
   blogSlug?: string;  // 블로그 alias (@alias 형식)
   blogId?: string;    // 블로그 UUID
+}
+
+/**
+ * 커서 페이지네이션 포스트 조회 파라미터
+ */
+export interface GetPostsCursorParams {
+  cursor?: string;     // Base64 encoded cursor
+  limit?: number;      // 페이지당 포스트 수 (기본값: 20, 최대: 50)
+  sort?: 'recent' | 'popular' | 'trending';
+  category?: string;   // 카테고리 필터
+  blogSlug?: string;    // 블로그 alias 필터
+  blogId?: string;      // 블로그 UUID 필터
+  search?: string;     // 검색어
 }
 
 /**
@@ -37,6 +59,15 @@ export class PostsAPI {
    */
   async getPosts(params?: GetPostsParams): Promise<PaginatedResponse<Post>> {
     return this.client.get<PaginatedResponse<Post>>('/posts', { params });
+  }
+
+  /**
+   * 커서 기반 포스트 목록 조회
+   * @param params - 조회 파라미터 (커서, 정렬, 필터 등)
+   * @returns 커서 페이지네이션된 포스트 목록
+   */
+  async getPostsCursor(params?: GetPostsCursorParams): Promise<CursorResponse<Post>> {
+    return this.client.get<CursorResponse<Post>>('/posts/cursor', { params });
   }
 
   /**
