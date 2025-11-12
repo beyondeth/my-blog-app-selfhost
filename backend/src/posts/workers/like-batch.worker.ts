@@ -5,9 +5,12 @@ import {
   OnModuleDestroy,
 } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { LikeQueueService } from '../services/like-queue.service';
 import { PostsService } from '../posts.service';
 import { LikeMetricsService } from '../../metrics/like-metrics.service';
+import { Post } from '../entities/post.entity';
 import {
   LikeBatchConfig,
   DEFAULT_LIKE_BATCH_CONFIG,
@@ -38,6 +41,8 @@ export class LikeBatchWorker implements OnModuleInit, OnModuleDestroy {
   private readonly MAX_CONSECUTIVE_FAILURES = 5;
 
   constructor(
+    @InjectRepository(Post)
+    private readonly postsRepository: Repository<Post>,
     private readonly queueService: LikeQueueService,
     private readonly postsService: PostsService,
     private readonly metricsService: LikeMetricsService,
@@ -183,8 +188,8 @@ export class LikeBatchWorker implements OnModuleInit, OnModuleDestroy {
 
       // 3. DB에 배치 처리
       try {
-        const processedCount =
-          await this.postsService.processBatchLikes(likes);
+        // Post 엔티티 직접 업데이트
+        const processedCount = await this.processBatchLikesDirectly(likes);
 
         // 4. 처리 완료된 데이터 정리
         await this.queueService.clearProcessedLikes(likes.map((l) => l.id));
@@ -415,5 +420,46 @@ export class LikeBatchWorker implements OnModuleInit, OnModuleDestroy {
     }
 
     this.logger.log('배치 설정 업데이트:', this.config);
+  }
+
+  /**
+   * 좋아요 배치 직접 처리 (DB 업데이트)
+   */
+  private async processBatchLikesDirectly(likes: QueuedLike[]): Promise<number> {
+    const postIdToLikes: Record<string, QueuedLike[]> = likes.reduce((acc, like) => {
+      if (!acc[like.postId]) {
+        acc[like.postId] = [];
+      }
+      acc[like.postId].push(like);
+      return acc;
+    }, {} as Record<string, QueuedLike[]>);
+
+    let processedCount = 0;
+
+    // 각 포스트별로 처리
+    for (const [postId, postLikes] of Object.entries(postIdToLikes)) {
+      try {
+        // 좋아요 수 계산
+        const incrementCount = postLikes.filter((l) => l.action === 'like').length;
+        const decrementCount = postLikes.filter((l) => l.action === 'unlike').length;
+        const netCount = incrementCount - decrementCount;
+
+        if (netCount !== 0) {
+          // Post 엔티티 직접 업데이트
+          await this.postsRepository.increment(
+            { id: postId },
+            'likeCount',
+            netCount
+          );
+          processedCount++;
+        }
+      } catch (error) {
+        this.logger.error(`Failed to process likes for post ${postId}:`, error);
+        // 실패한 좋아요는 DLQ로 이동
+        await this.queueService.moveToDeadLetterQueue(postLikes as QueuedLike[]);
+      }
+    }
+
+    return processedCount;
   }
 }

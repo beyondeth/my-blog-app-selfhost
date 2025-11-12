@@ -192,4 +192,40 @@ export class RedisLockService {
       await this.releaseLock(resource, lockId);
     }
   }
+
+  /**
+   * Redis 값 조회
+   * @param key 키
+   * @returns 값 또는 null
+   */
+  async get(key: string): Promise<string | null> {
+    try {
+      return await this.redis.get(key);
+    } catch (error) {
+      this.logger.error(`Failed to get key ${key}: ${error.message}`);
+      return null;
+    }
+  }
+
+  /**
+   * Redis 값 설정
+   * @param key 키
+   * @param value 값
+   * @param ttl 만료 시간 (초)
+   * @returns 설정 성공 여부
+   */
+  async set(key: string, value: string, ttl?: number): Promise<boolean> {
+    try {
+      if (ttl) {
+        const result = await this.redis.setex(key, ttl, value);
+        return result === 'OK';
+      } else {
+        const result = await this.redis.set(key, value);
+        return result === 'OK';
+      }
+    } catch (error) {
+      this.logger.error(`Failed to set key ${key}: ${error.message}`);
+      return false;
+    }
+  }
 }

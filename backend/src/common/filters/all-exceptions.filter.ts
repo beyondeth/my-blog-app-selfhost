@@ -148,11 +148,31 @@ export class AllExceptionsFilter implements ExceptionFilter {
   /**
    * 메시지에서 민감정보 제거
    */
-  private sanitizeMessage(message: string): string {
-    if (!message) return message;
+  private sanitizeMessage(message: string | object | any): string {
+    if (!message) return '';
+
+    // 메시지가 객체인 경우 문자열로 변환
+    let messageStr: string;
+    if (typeof message === 'string') {
+      messageStr = message;
+    } else if (typeof message === 'object') {
+      // ValidationPipe 에러 등 객체 메시지 처리
+      if (message.message && typeof message.message === 'string') {
+        messageStr = message.message;
+      } else {
+        // 객체를 JSON 문자열로 변환
+        try {
+          messageStr = JSON.stringify(message);
+        } catch {
+          messageStr = 'Validation error';
+        }
+      }
+    } else {
+      messageStr = String(message);
+    }
 
     // 이메일, 비밀번호, 토큰 등 민감정보 마스킹
-    return message
+    return messageStr
       .replace(/email["\s]*[:=]["\s]*([^\s"'}]+)/gi, 'email: "***@***.***"')
       .replace(/password["\s]*[:=]["\s]*([^\s"'}]+)/gi, 'password: "***"')
       .replace(/token["\s]*[:=]["\s]*([^\s"'}]+)/gi, 'token: "***"')

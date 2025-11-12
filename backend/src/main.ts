@@ -163,7 +163,7 @@ async function bootstrap() {
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
-      forbidNonWhitelisted: true,
+      forbidNonWhitelisted: false,  // 파라미터에 대해서는 허용
       transform: true,
       transformOptions: {
         enableImplicitConversion: true,

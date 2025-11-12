@@ -1,7 +1,8 @@
 import { IsString, IsOptional, IsArray, IsNumber, IsBoolean, Min, Max, MaxLength, Matches } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export class CreatePostDto {
+export class 
+CreatePostDto {
   @ApiProperty({
     description: '게시글 제목',
     example: '블로그 포스트 제목',

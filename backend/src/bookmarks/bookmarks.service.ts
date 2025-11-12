@@ -186,4 +186,51 @@ export class BookmarksService {
 
     return { total, recentCount };
   }
+
+  /**
+   * 단일 포스트 북마크 상태 확인
+   */
+  async findBookmark(postId: string, userId: string): Promise<Bookmark | null> {
+    return this.bookmarkRepository.findOne({
+      where: { postId, userId },
+    });
+  }
+
+  /**
+   * 여러 포스트의 북마크 상태 한번에 조회
+   * @param postIds 포스트 ID 목록
+   * @param userId 사용자 ID
+   * @returns 상태 맵 { postId: bookmarked }
+   */
+  async getMultipleBookmarkStatuses(
+    postIds: string[],
+    userId: string
+  ): Promise<Map<string, boolean>> {
+    const statusMap = new Map<string, boolean>();
+
+    // PostgreSQL을 사용하여 북마크 상태 한번에 조회
+    const result = await this.dataSource
+      .createQueryBuilder()
+      .select('post_id', 'postId')
+      .addSelect('COUNT(*)', 'count')
+      .from('bookmarks', 'b')
+      .where('b.post_id IN (:...postIds)', { postIds })
+      .andWhere('b.user_id = :userId', { userId })
+      .groupBy('post_id')
+      .getRawMany();
+
+    // 결과 맵핑
+    result.forEach(row => {
+      statusMap.set(row.postid, parseInt(row.count) > 0);
+    });
+
+    // 북마크하지 않은 포스트들도 false로 설정
+    postIds.forEach(postId => {
+      if (!statusMap.has(postId)) {
+        statusMap.set(postId, false);
+      }
+    });
+
+    return statusMap;
+  }
 }
