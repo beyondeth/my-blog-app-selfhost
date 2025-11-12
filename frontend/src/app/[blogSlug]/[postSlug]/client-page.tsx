@@ -255,10 +255,10 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       // 이제 자동으로 큐에 추가되므로 경고 메시지가 나오지 않음
       mixpanel.track('Post Viewed', {
         postId: post.id,
-        slug: post.slug || postSlug,
+        slug: post.slug || 'unknown',  // post.slug만 사용, postSlug 제거
       });
     }
-  }, [post?.id, post?.slug, postSlug]);
+  }, [post?.id]);  // post.id만 의존성으로 사용
 
   if (isError) {
     // 에러 타입 구분
