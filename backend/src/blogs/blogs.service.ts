@@ -472,7 +472,7 @@ export class BlogsService {
       return {
         ...blogWithAccess,
         shouldRedirect: true,
-        redirectTo: oldAlias.blog.alias || oldAlias.blog.slug,
+        redirectTo: oldAlias.blog.alias ? `@${oldAlias.blog.alias}` : oldAlias.blog.slug,
         redirectType: '301', // Permanent redirect (SEO 보호)
       };
     }
@@ -526,7 +526,7 @@ export class BlogsService {
           return {
             ...blogWithAccess,
             shouldRedirect: true,
-            redirectTo: blog.alias,
+            redirectTo: `@${blog.alias}`,
             redirectType: '301',
           };
         }

@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Blog } from '../../blogs/entities/blog.entity';
 import { OldAlias } from '../../blogs/entities/old-alias.entity';
-import { CacheService, CacheTTL } from '../../cache/cache.service';
+import { CacheService, CacheTTL, CacheKeys } from '../../cache/cache.service';
 
 /**
  * 블로그 식별자 해결 서비스
@@ -33,8 +33,8 @@ export class BlogResolverService {
       return null;
     }
 
-    // 캐시 키 생성
-    const cacheKey = `blog:resolver:${identifier}`;
+    // 캐시 키 생성 (CacheKeys.IDENTIFIER_TO_BLOG 사용 - BlogsService와 통합)
+    const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(identifier);
 
     // 캐시 확인
     const cached = await this.cacheService.get<Blog>(cacheKey);
@@ -91,7 +91,7 @@ export class BlogResolverService {
 
     // 캐시된 것들 먼저 확인
     for (const identifier of identifiers) {
-      const cacheKey = `blog:resolver:${identifier}`;
+      const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(identifier);  // 통합된 캐시 키 사용
       const cached = await this.cacheService.get<Blog>(cacheKey);
 
       if (cached) {
@@ -126,7 +126,7 @@ export class BlogResolverService {
    * @returns 블로그 정보
    */
   async findBlogById(blogId: string): Promise<Blog | null> {
-    const cacheKey = `blog:id:${blogId}`;
+    const cacheKey = CacheKeys.BLOG_BY_ID(blogId);  // 통합된 캐시 키 사용
 
     const cached = await this.cacheService.get<Blog>(cacheKey);
     if (cached) {
@@ -151,7 +151,7 @@ export class BlogResolverService {
    * @returns 블로그 정보
    */
   async findBlogByUserId(userId: string): Promise<Blog | null> {
-    const cacheKey = `blog:user:${userId}`;
+    const cacheKey = CacheKeys.BLOG_BY_USER(userId);  // 통합된 캐시 키 사용
 
     const cached = await this.cacheService.get<Blog>(cacheKey);
     if (cached) {
@@ -171,22 +171,47 @@ export class BlogResolverService {
   }
 
   /**
-   * 블로그 캐시 무효화
+   * 블로그 캐시 무효화 (개선된 버전)
    * @param blogId 블로그 ID
    * @param alias 블로그 별칭 (있을 경우)
+   * @param slug 블로그 슬러그 (있을 경우)
+   * @param oldAliases 이전 별칭 목록 (있을 경우)
    */
-  async invalidateBlogCache(blogId: string, alias?: string): Promise<void> {
-    const keysToDelete = [`blog:id:${blogId}`];
+  async invalidateBlogCache(
+    blogId: string,
+    alias?: string,
+    slug?: string,
+    oldAliases?: string[]
+  ): Promise<void> {
+    const keysToDelete = [
+      CacheKeys.BLOG_BY_ID(blogId),  // blog:id:${blogId}
+    ];
 
+    // alias 관련 캐시 무효화
     if (alias) {
-      keysToDelete.push(`blog:resolver:${alias}`);
+      keysToDelete.push(CacheKeys.IDENTIFIER_TO_BLOG(alias));  // blog:identifier:${alias}
+      keysToDelete.push(CacheKeys.ALIAS_MAPPING(alias));       // alias:map:${alias}
     }
 
-    // 캐시 삭제
+    // slug 관련 캐시 무효화
+    if (slug) {
+      keysToDelete.push(CacheKeys.IDENTIFIER_TO_BLOG(slug));  // blog:identifier:${slug}
+      keysToDelete.push(CacheKeys.BLOG_BY_SLUG(slug));         // blog:slug:${slug}
+    }
+
+    // old_aliases 관련 캐시 무효화
+    if (oldAliases && oldAliases.length > 0) {
+      for (const oldAlias of oldAliases) {
+        keysToDelete.push(CacheKeys.IDENTIFIER_TO_BLOG(oldAlias));  // blog:identifier:${oldAlias}
+        keysToDelete.push(CacheKeys.ALIAS_MAPPING(oldAlias));       // alias:map:${oldAlias}
+      }
+    }
+
+    // 캐시 삭제 (병렬 처리)
     await Promise.all(
       keysToDelete.map(key => this.cacheService.delete(key))
     );
 
-    this.logger.debug(`Invalidated blog cache: ${blogId}, alias: ${alias}`);
+    this.logger.debug(`Invalidated blog cache: ${keysToDelete.length} keys for blogId: ${blogId}`);
   }
 }

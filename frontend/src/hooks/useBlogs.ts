@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getBlogBySlug, getMyBlogs, createBlog, updateBlog, deleteBlog, checkAlias, updateAlias } from '@/lib/api';
 import { toast } from 'sonner';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 // Get blog by slug
 export function useBlogBySlug(slug: string) {
@@ -24,7 +25,7 @@ export function useBlogBySlug(slug: string) {
   });
 }
 
-// Get user's blogs
+// Get user's blog (단일 블로그 반환)
 export function useMyBlogs() {
   return useQuery({
     queryKey: ['my-blogs'],

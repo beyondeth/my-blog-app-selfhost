@@ -33,9 +33,9 @@ async function fetchUserBlog(): Promise<Blog | null> {
     throw new Error('Failed to fetch user blog');
   }
 
-  const blogs = await response.json();
-  // 사용자는 하나의 블로그만 가질 수 있음
-  return blogs && blogs.length > 0 ? blogs[0] : null;
+  const blog = await response.json();
+  // 이제 API는 단일 블로그 객체를 직접 반환
+  return blog;
 }
 
 export function useUserBlogV2() {
@@ -53,10 +53,10 @@ export function useUserBlogV2() {
     queryKey: ['user-blog', user?.id],
     queryFn: fetchUserBlog,
     enabled: !!user, // 사용자가 있을 때만 실행
-    staleTime: 5 * 60 * 1000, // 5분간 fresh
-    gcTime: 30 * 60 * 1000, // 30분간 메모리 캐시 보관
+    staleTime: 0, // 캐시를 즉시 만료시켜 최신 데이터 유지
+    gcTime: 0, // 캐시를 즉시 제거
     refetchOnWindowFocus: false,
-    refetchOnMount: false, // 마운트시 재요청 방지 (성능 향상)
+    refetchOnMount: true, // 마운트시 항상 재요청하여 최신 데이터 확보
     // 이전 데이터를 placeholderData로 사용하여 로딩 중에도 표시
     placeholderData: (previousData) => previousData,
   });
@@ -88,6 +88,13 @@ export function useUserBlogV2() {
     // TanStack Query의 refetch 사용
     return refetch();
   };
+
+  // Debug logging
+  if (user) {
+    console.log('[useUserBlogV2] User:', user.id, user.email);
+    console.log('[useUserBlogV2] Blog data:', blog);
+    console.log('[useUserBlogV2] Loading:', loading, 'Error:', error);
+  }
 
   return {
     blog: blog || null,

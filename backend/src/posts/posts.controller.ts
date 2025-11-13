@@ -772,7 +772,8 @@ export class PostsController {
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '페이지당 항목 수 (기본: 20, 최대: 50)' })
   @ApiQuery({ name: 'sort', required: false, enum: ['recent', 'popular', 'trending'], description: '정렬 방식 (기본: recent)' })
   @ApiQuery({ name: 'category', required: false, type: String, description: '카테고리 필터' })
-  @ApiQuery({ name: 'blogSlug', required: false, type: String, description: '블로그 필터' })
+  @ApiQuery({ name: 'blogSlug', required: false, type: String, description: '블로그 슬러그 필터' })
+  @ApiQuery({ name: 'blogId', required: false, type: String, description: '블로그 ID 필터' })
   @ApiQuery({ name: 'search', required: false, type: String, description: '검색 키워드' })
   @ApiResponse({
     status: 200,
