@@ -95,10 +95,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       return;
     }
 
-    // CORS 헤더 추가
-    response.setHeader('Access-Control-Allow-Origin', '*');
-    response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    response.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    // CORS 헤더는 main.ts에서만 관리 (credentials: true와 충돌 방지)
+    // Exception Filter에서는 CORS 헤더를 설정하지 않음
 
     response.status(status).json(errorResponse);
   }
