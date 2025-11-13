@@ -33,28 +33,31 @@ export class BlogResolverService {
       return null;
     }
 
+    // @ 기호 제거 (alias는 @ 없이 저장됨)
+    const cleanIdentifier = identifier.startsWith('@') ? identifier.substring(1) : identifier;
+
     // 캐시 키 생성 (CacheKeys.IDENTIFIER_TO_BLOG 사용 - BlogsService와 통합)
-    const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(identifier);
+    const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(cleanIdentifier);
 
     // 캐시 확인
     const cached = await this.cacheService.get<Blog>(cacheKey);
     if (cached) {
-      this.logger.debug(`Cache HIT for blog resolver: ${identifier}`);
+      this.logger.debug(`Cache HIT for blog resolver: ${cleanIdentifier}`);
       return cached;
     }
 
-    this.logger.debug(`Cache MISS for blog resolver: ${identifier}`);
+    this.logger.debug(`Cache MISS for blog resolver: ${cleanIdentifier}`);
 
     // 1. alias 조회 (우선순위 1)
     let blog = await this.blogRepository.findOne({
-      where: { alias: identifier },
+      where: { alias: cleanIdentifier },
       relations: ['owner', 'owner.profile'],
     });
 
     // 2. old_aliases 조회 (우선순위 2)
     if (!blog) {
       const oldAlias = await this.oldAliasRepository.findOne({
-        where: { oldAlias: identifier },
+        where: { oldAlias: cleanIdentifier },
         relations: ['blog', 'blog.owner', 'blog.owner.profile'],
       });
 
@@ -66,7 +69,7 @@ export class BlogResolverService {
     // 3. slug 조회 (우선순위 3 - 폴백)
     if (!blog) {
       blog = await this.blogRepository.findOne({
-        where: { slug: identifier },
+        where: { slug: cleanIdentifier },
         relations: ['owner', 'owner.profile'],
       });
     }
@@ -74,7 +77,7 @@ export class BlogResolverService {
     // 결과 캐싱
     if (blog) {
       await this.cacheService.set(cacheKey, blog, CacheTTL.MEDIUM);
-      this.logger.debug(`Cached blog resolver result: ${identifier} -> ${blog.id}`);
+      this.logger.debug(`Cached blog resolver result: ${cleanIdentifier} -> ${blog.id}`);
     }
 
     return blog || null;
@@ -91,7 +94,9 @@ export class BlogResolverService {
 
     // 캐시된 것들 먼저 확인
     for (const identifier of identifiers) {
-      const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(identifier);  // 통합된 캐시 키 사용
+      // @ 기호 제거
+      const cleanIdentifier = identifier.startsWith('@') ? identifier.substring(1) : identifier;
+      const cacheKey = CacheKeys.IDENTIFIER_TO_BLOG(cleanIdentifier);  // 통합된 캐시 키 사용
       const cached = await this.cacheService.get<Blog>(cacheKey);
 
       if (cached) {

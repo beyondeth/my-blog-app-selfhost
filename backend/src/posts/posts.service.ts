@@ -441,7 +441,7 @@ export class PostsService {
       limit,
       category,
       search,
-      blogSlug: blogId, // blogId를 blogSlug로 매핑
+      blogId, // blogId 그대로 전달
     };
 
     if (isForCache) {
