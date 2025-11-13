@@ -1,8 +1,10 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ScheduleModule } from '@nestjs/schedule';
 import { Blog } from '../blogs/entities/blog.entity';
 import { OldAlias } from '../blogs/entities/old-alias.entity';
 import { BlogResolverService } from './services/blog-resolver.service';
+import { MaterializedViewService } from './services/materialized-view.service';
 import { CacheModule } from '../cache/cache.module';
 
 /**
@@ -15,14 +17,17 @@ import { CacheModule } from '../cache/cache.module';
  */
 @Module({
   imports: [
+    ScheduleModule.forRoot(), // Cron job을 위한 ScheduleModule
     TypeOrmModule.forFeature([Blog, OldAlias]),
     CacheModule,
   ],
   providers: [
     BlogResolverService,
+    MaterializedViewService,
   ],
   exports: [
     BlogResolverService,
+    MaterializedViewService,
   ],
 })
 export class CommonModule {}
