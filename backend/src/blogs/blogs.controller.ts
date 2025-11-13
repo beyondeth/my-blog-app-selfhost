@@ -34,9 +34,13 @@ export class BlogsController {
   @UseGuards(JwtAuthGuard)
   async getMyBlogs(@CurrentUser() user: User) {
     console.log(`[BlogsController] getMyBlogs - Request from user: ${user.email} (ID: ${user.id.substring(0, 8)}...)`);
-    const blogs = await this.blogsService.findByUserId(user.id);
-    console.log(`[BlogsController] getMyBlogs - Returning ${blogs.length} blogs for user: ${user.email}`);
-    return blogs;
+    const blog = await this.blogsService.findBlogByUserId(user.id);
+    if (!blog) {
+      console.log(`[BlogsController] getMyBlogs - No blog found for user: ${user.email}`);
+      return null;
+    }
+    console.log(`[BlogsController] getMyBlogs - Returning blog: ${blog.slug} for user: ${user.email}`);
+    return blog;
   }
 
   /**

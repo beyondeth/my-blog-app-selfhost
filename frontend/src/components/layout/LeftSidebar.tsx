@@ -21,7 +21,8 @@ import NotificationDropdown from '@/components/notifications/NotificationDropdow
 import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useDMModal } from '@/hooks/useDMModal';
-import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
+import { useUserBlogV2, invalidateUserBlog } from '@/hooks/useUserBlogV2';
+import { useQueryClient } from '@tanstack/react-query';
 
 /**
  * 왼쪽 고정 사이드바 컴포넌트
@@ -40,12 +41,23 @@ export default function LeftSidebar() {
   const { openModal: openDMModal } = useDMModal();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
-  const { blog } = useUserBlogV2(); // 내 블로그 정보 가져오기
+  const queryClient = useQueryClient();
+  const { blog, loading } = useUserBlogV2(); // 내 블로그 정보 가져오기
 
   // 클라이언트에서만 렌더링 (SSR 하이드레이션 불일치 방지)
   useEffect(() => {
     setMounted(true);
-  }, []);
+
+    // 캐시 무효화하여 최신 데이터 확보
+    if (user) {
+      invalidateUserBlog(queryClient);
+    }
+  }, [user, queryClient]);
+
+  // Debug logging
+  console.log('[LeftSidebar] user:', user?.id, user?.email);
+  console.log('[LeftSidebar] blog:', blog);
+  console.log('[LeftSidebar] loading:', loading);
 
   // 읽지 않은 알림 수 조회 (로그인한 사용자 + Feature Flag 활성화 시에만)
   const { data: unreadCount = 0 } = useQuery({
@@ -80,6 +92,12 @@ export default function LeftSidebar() {
 
   // 내 블로그 URL 결정 (alias 우선)
   const myBlogUrl = blog ? (blog.alias ? `/@${blog.alias}` : `/${blog.slug}`) : '#';
+
+  // Debug logging for URL matching
+  console.log('[LeftSidebar] myBlogUrl:', myBlogUrl);
+  console.log('[LeftSidebar] pathname:', pathname);
+  console.log('[LeftSidebar] pathname === myBlogUrl:', pathname === myBlogUrl);
+  console.log('[LeftSidebar] user && blog condition:', !!user && !!blog);
 
   return (
     <aside

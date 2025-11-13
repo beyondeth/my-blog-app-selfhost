@@ -106,6 +106,14 @@ export class GetPostsCursorDto {
   blogSlug?: string;
 
   @ApiPropertyOptional({
+    description: '블로그 ID (특정 블로그의 포스트만 조회)',
+    example: '019a77ab-d4c1-7313-bd30-3485ae91e7af',
+  })
+  @IsOptional()
+  @IsString()
+  blogId?: string;
+
+  @ApiPropertyOptional({
     description: '검색 키워드 (제목, 내용, 태그 검색)',
     example: 'React Hooks',
   })

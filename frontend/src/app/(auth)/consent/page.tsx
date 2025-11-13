@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { ArrowLeft } from 'lucide-react';
+import { useRefreshAuthenticatedUser } from '@/lib/profile-queries';
 
 /**
  * OAuth 로그인 후 약관 동의 페이지
@@ -15,7 +16,8 @@ import { ArrowLeft } from 'lucide-react';
  */
 export default function ConsentPage() {
   const router = useRouter();
-  const { user, isLoading, refreshUser } = useAuth();
+  const { user, isLoading } = useAuth();
+  const refreshUserMutation = useRefreshAuthenticatedUser();
   const { resolvedTheme } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -148,15 +150,43 @@ export default function ConsentPage() {
 
       toast.success('약관 동의가 완료되었습니다!');
 
-      // 사용자 정보 새로고침
-      await refreshUser();
+      // 세션 스토리지에서 리디렉션 잠금 해제
+      sessionStorage.removeItem('consent_redirect_lock');
 
-      // 메인 페이지로 강제 이동 (ConsentGuard 우회)
-      window.location.href = '/';
+      // 사용자 정보 즉시 새로고침 (캐시 무효화)
+      await refreshUserMutation.mutateAsync();
+
+      // 즉시 메인 페이지로 이동
+      router.push('/');
     } catch (err: any) {
       setError(err.message || '약관 동의 처리 중 오류가 발생했습니다');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  /**
+   * 로그아웃 핸들러
+   */
+  const handleLogout = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/logout`,
+        {
+          method: 'POST',
+          credentials: 'include',
+        }
+      );
+
+      // 로그아웃 성공 여부와 상관없이 클라이언트 상태 정리
+      sessionStorage.clear();
+      localStorage.clear();
+
+      // 로그인 페이지로 이동
+      window.location.href = '/login';
+    } catch (error) {
+      // 에러가 발생해도 로그인 페이지로 이동
+      window.location.href = '/login';
     }
   };
 
@@ -358,8 +388,8 @@ export default function ConsentPage() {
 
             {/* Footer */}
             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
-              <p className="text-center text-xs text-gray-500 dark:text-gray-400">
-                동의함으로써{' '}
+              <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-4">
+                회원가입시{' '}
                 <Link href="/legal/terms" className="text-gray-700 dark:text-gray-300 underline">
                   이용약관
                 </Link>
@@ -369,6 +399,22 @@ export default function ConsentPage() {
                 </Link>
                 에 동의하게 됩니다.
               </p>
+
+              {/* 탈출 옵션 버튼 */}
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center justify-center">
+                  <button
+                    onClick={handleLogout}
+                    className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+                  >
+                    로그아웃
+                  </button>
+                </div>
+                <p className="text-center text-xs text-gray-400 dark:text-gray-500">
+                  동의하지 않으시면 로그아웃할 수 있습니다<br/>
+                  (계정은 보존되며 나중에 다시 로그인하여 동의할 수 있습니다)
+                </p>
+              </div>
             </div>
           </div>
         </div>

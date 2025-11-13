@@ -150,8 +150,11 @@ export class PostReadService {
       parameters.isPublished = true;
     }
 
-    // 특정 블로그 필터
-    if (dto.blogSlug) {
+    // 특정 블로그 필터 (blogId 우선)
+    if (dto.blogId) {
+      whereConditions.push('blog.id = :blogId');
+      parameters.blogId = dto.blogId;
+    } else if (dto.blogSlug) {
       whereConditions.push('blog.slug = :blogSlug');
       parameters.blogSlug = dto.blogSlug;
     }
