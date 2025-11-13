@@ -103,20 +103,35 @@ export function useBlogCategories(blogSlug: string) {
   return useQuery({
     queryKey: ['blog-categories', normalizedSlug],
     queryFn: async (): Promise<Array<{ category: string; count: number }>> => {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}/categories`,
-        {
-          credentials: 'include',
-        }
-      );
+      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}/categories`;
+      console.log('📡 [CATEGORIES API] Fetching from:', url);
+
+      const response = await fetch(url, {
+        credentials: 'include',
+      });
+
+      console.log('📡 [CATEGORIES API] Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error('Failed to fetch blog categories');
+        const errorText = await response.text();
+        console.error('📡 [CATEGORIES API] Error response:', errorText);
+        throw new Error(`Failed to fetch blog categories: ${response.status}`);
       }
-      return response.json();
+
+      const data = await response.json();
+      console.log('📡 [CATEGORIES API] Response data:', data);
+
+      return data;
     },
     enabled: !!blogSlug,
     staleTime: 5 * 60 * 1000, // 5분간 캐시
     gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
+    onError: (error) => {
+      console.error('📡 [CATEGORIES API] Query error:', error);
+    },
+    onSuccess: (data) => {
+      console.log('📡 [CATEGORIES API] Query success:', data);
+    },
   });
 }
 

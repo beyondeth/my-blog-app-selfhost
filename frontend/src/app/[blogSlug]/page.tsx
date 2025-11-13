@@ -39,7 +39,7 @@ export default function BlogPage() {
   const { user, isAuthenticated, isAdmin } = useAuth();
   const router = useRouter();
   const params = useParams();
-  const blogSlug = params.blogSlug as string;
+  const blogSlug = decodeURIComponent(params.blogSlug as string);
   // console.log('📝 [BLOG PAGE COMPONENT RENDERED] blogSlug:', blogSlug);
 
   const isClient = useIsClient();
@@ -89,8 +89,18 @@ export default function BlogPage() {
   // 블로그의 카테고리별 포스트 개수 가져오기
   const {
     data: categories = [],
-    isLoading: categoriesLoading
+    isLoading: categoriesLoading,
+    error: categoriesError
   } = useBlogCategories(blogSlug);
+
+  // 디버그 로그
+  console.log('🔍 [CATEGORIES DEBUG]', {
+    blogSlug,
+    categoriesLoading,
+    categoriesLength: categories?.length || 0,
+    categories,
+    error: categoriesError
+  });
 
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -378,12 +388,20 @@ export default function BlogPage() {
             />
 
             {/* 카테고리별 현황 섹션 */}
-            {!categoriesLoading && categories.length > 0 && (
-              <CategorySection
-                categories={categories}
-                onCategoryClick={handleCategoryClick}
-              />
-            )}
+            {(() => {
+              console.log('🔍 [CATEGORY RENDER CONDITION]', {
+                shouldRender: !categoriesLoading && categories.length > 0,
+                categoriesLoading,
+                categoriesLength: categories.length,
+                categories
+              });
+              return !categoriesLoading && categories.length > 0 && (
+                <CategorySection
+                  categories={categories}
+                  onCategoryClick={handleCategoryClick}
+                />
+              );
+            })()}
 
             <RecentPostsSection posts={recentPosts} />
 

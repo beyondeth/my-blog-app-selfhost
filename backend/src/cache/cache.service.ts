@@ -922,6 +922,14 @@ export class CacheService implements OnModuleInit {
         for (let i = 1; i <= 5; i++) {
           keysToDelete.push(CacheKeys.BLOG_FEED_BY_ID(blogId, i));
         }
+
+        // 블로그 통계 관련 캐시 무효화 (blogId 기반)
+        keysToDelete.push(
+          `blog:stats:categories:id:${blogId}`,  // blogId 기반 카테고리 캐시
+          `blog:stats:posts:${blogId}`,          // 블로그 포스트 수 캐시
+          `blog:stats:activity:${blogId}:30`,    // 블로그 활동 통계 캐시
+          `blog:stats:popular:${blogId}:5`       // 블로그 인기 포스트 캐시
+        );
       }
 
       // 3. 개별 키 삭제
