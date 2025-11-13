@@ -197,7 +197,7 @@ export class BookmarksService {
   }
 
   /**
-   * 여러 포스트의 북마크 상태 한번에 조회
+   * 여러 포스트의 북마크 상태 한번에 조회 (최적화)
    * @param postIds 포스트 ID 목록
    * @param userId 사용자 ID
    * @returns 상태 맵 { postId: bookmarked }
@@ -206,29 +206,27 @@ export class BookmarksService {
     postIds: string[],
     userId: string
   ): Promise<Map<string, boolean>> {
+    if (postIds.length === 0) {
+      return new Map<string, boolean>();
+    }
+
+    // TypeORM Query Builder 사용하여 최적화된 쿼리 실행
+    const bookmarks = await this.bookmarkRepository
+      .createQueryBuilder('bookmark')
+      .select('bookmark.postId')
+      .where('bookmark.userId = :userId', { userId })
+      .andWhere('bookmark.postId IN (:...postIds)', { postIds })
+      .getMany();
+
+    // 결과를 Set으로 변환하여 O(1) 조회 가능
+    const bookmarkedSet = new Set(
+      bookmarks.map(b => b.postId)
+    );
+
+    // 모든 포스트 ID에 대해 상태 맵 생성
     const statusMap = new Map<string, boolean>();
-
-    // PostgreSQL을 사용하여 북마크 상태 한번에 조회
-    const result = await this.dataSource
-      .createQueryBuilder()
-      .select('post_id', 'postId')
-      .addSelect('COUNT(*)', 'count')
-      .from('bookmarks', 'b')
-      .where('b.post_id IN (:...postIds)', { postIds })
-      .andWhere('b.user_id = :userId', { userId })
-      .groupBy('post_id')
-      .getRawMany();
-
-    // 결과 맵핑
-    result.forEach(row => {
-      statusMap.set(row.postid, parseInt(row.count) > 0);
-    });
-
-    // 북마크하지 않은 포스트들도 false로 설정
     postIds.forEach(postId => {
-      if (!statusMap.has(postId)) {
-        statusMap.set(postId, false);
-      }
+      statusMap.set(postId, bookmarkedSet.has(postId));
     });
 
     return statusMap;
