@@ -18,7 +18,17 @@ export class MaterializedViewService implements OnModuleInit {
   async onModuleInit() {
     // 서비스 시작 시 Materialized View 갱신
     this.logger.log('Materialized View Service initialized');
-    await this.refreshAllViews();
+
+    try {
+      await this.refreshAllViews();
+    } catch (error: any) {
+      // Materialized View가 아직 생성되지 않은 경우
+      if (error.code === '42P01') { // relation does not exist
+        this.logger.warn('Materialized view "mv_popular_posts" does not exist. Please run migrations first.');
+        return;
+      }
+      throw error;
+    }
   }
 
   /**
