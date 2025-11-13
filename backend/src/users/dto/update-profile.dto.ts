@@ -4,13 +4,13 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 export class UpdateProfileDto {
   @ApiPropertyOptional({
     description: 'Username',
-    minLength: 3,
+    minLength: 2,
     maxLength: 20,
     example: 'john_doe',
   })
   @IsOptional()
   @IsString()
-  @MinLength(3, { message: 'Username must be at least 3 characters long' })
+  @MinLength(2, { message: '닉네임은 최소 2자 이상 입력하세요' })
   @MaxLength(20, { message: 'Username must not exceed 20 characters' })
   username?: string;
 
