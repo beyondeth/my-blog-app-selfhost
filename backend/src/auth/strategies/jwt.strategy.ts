@@ -36,7 +36,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const userId = payload.sub || payload.id;
     const tokenType = payload.tokenType;
 
-    // 개발 환경에서 상세한 디버그 로그 추가
+    // 개발 환경 및 프로덕션에서 모두 로깅 (보안 마스킹 적용)
+    this.logger.log(`[JWT] Token validation - userId: ${userId ? userId.substring(0, 8) + '...' : 'null'}, type: ${tokenType}`);
+
+    // 개발 환경에서 더 상세한 디버그 로그 추가
     if (process.env.NODE_ENV === 'development') {
       this.logger.debug(`[JWT] Starting validation for token type: ${tokenType}`);
       this.logger.debug(`[JWT] User ID (masked): ${userId ? userId.substring(0, 8) + '...' : 'null'}`);
@@ -52,25 +55,21 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       return null;
     }
 
-    const cacheKey = `user_validate_${userId}`;
+    const cacheKey = `user_validate_${userId}_${tokenType}`; // 토큰 타입도 포함하여 격리 강화
 
     // 1. 캐시에서 사용자 정보 조회
     const cachedUser: User = await this.unifiedRedisService.getCache('sessions', cacheKey);
     if (cachedUser) {
-      if (process.env.NODE_ENV === 'development') {
-        this.logger.debug(`[JWT] Cache hit for user: ${cachedUser.email}, role: ${cachedUser.role}`);
-      }
+      this.logger.log(`[JWT] Cache HIT for user: ${cachedUser.email} (ID: ${cachedUser.id.substring(0, 8)}...), cacheKey: ${cacheKey}`);
       return cachedUser;
     }
 
     // 2. 캐시에 없으면 DB에서 조회
-    if (process.env.NODE_ENV === 'development') {
-      this.logger.debug(`[JWT] Cache miss for user ID: ${userId.substring(0, 8)}...`);
-    }
+    this.logger.log(`[JWT] Cache MISS for user ID: ${userId.substring(0, 8)}..., cacheKey: ${cacheKey}`);
     const user = await this.usersService.findById(userId);
 
     if (!user) {
-      this.logger.warn('[JWT] User not found in database');
+      this.logger.error('[JWT] User not found in database');
       return null;
     }
 

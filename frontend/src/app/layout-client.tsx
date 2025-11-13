@@ -13,6 +13,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { initMixpanel } from '@/lib/mixpanel';
 import Script from 'next/script';
 import { Debug } from '@/components/debug/Debug';
+import { CacheClearButton } from '@/components/CacheClearButton';
 
 interface LayoutClientProps {
   children: React.ReactNode;
@@ -82,6 +83,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
     >
       <ClientProviders>
         <DMModalProvider>
+          <CacheClearButton />
           <Debug />
           {shouldHideLayout ? (
             // 인증 페이지 또는 법적 문서 페이지(인증에서 온 경우): 헤더/사이드바 숨김

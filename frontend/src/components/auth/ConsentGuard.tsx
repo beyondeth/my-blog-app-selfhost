@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { needsConsent } from '@/types';
@@ -19,6 +19,8 @@ export default function ConsentGuard({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
   const { user, isLoading } = useAuth();
+  const isRedirecting = useRef(false);
+  const lastRedirectTime = useRef(0);
 
   useEffect(() => {
     // 로딩 중이거나 사용자가 없으면 무시
@@ -33,6 +35,7 @@ export default function ConsentGuard({ children }: { children: React.ReactNode }
       '/register',
       '/forgot-password',
       '/reset-password',
+      '/logout',  // 로그아웃 경로 추가
     ];
 
     // 제외할 경로 패턴
@@ -47,11 +50,46 @@ export default function ConsentGuard({ children }: { children: React.ReactNode }
       excludedPaths.includes(pathname) ||
       excludedPatterns.some((pattern) => pattern.test(pathname));
 
+    // 세션 스토리지에서 consent 리디렉션 방지 플래그 확인
+    const consentLock = sessionStorage.getItem('consent_redirect_lock');
+    const currentTime = Date.now();
+
+    // 5초 내의 중복 리디렉션 방지
+    if (consentLock && currentTime - parseInt(consentLock) < 5000) {
+      return;
+    }
+
+    // 이미 리디렉션 중이면 추가 리디렉션 방지
+    if (isRedirecting.current) {
+      return;
+    }
+
     // 제외 대상이 아니고 약관 동의가 필요한 경우 리다이렉트
     if (!isExcluded && needsConsent(user)) {
-      router.push('/consent');
+      // 리디렉션 상태 설정
+      isRedirecting.current = true;
+      lastRedirectTime.current = currentTime;
+
+      // 리디렉션 타임스탬프 저장
+      sessionStorage.setItem('consent_redirect_lock', currentTime.toString());
+
+      // 100ms 딜레이 후 리디렉션 (상태 업데이트 대기)
+      setTimeout(() => {
+        router.push('/consent');
+        // 1초 후 리디렉션 상태 초기화
+        setTimeout(() => {
+          isRedirecting.current = false;
+        }, 1000);
+      }, 100);
     }
   }, [user, isLoading, pathname, router]);
+
+  // 컴포넌트 언마운트 시 리디렉션 상태 초기화
+  useEffect(() => {
+    return () => {
+      isRedirecting.current = false;
+    };
+  }, []);
 
   return <>{children}</>;
 }

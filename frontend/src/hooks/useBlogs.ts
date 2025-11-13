@@ -1,16 +1,18 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getBlogBySlug, getMyBlogs, createBlog, updateBlog, deleteBlog, checkAlias, updateAlias } from '@/lib/api';
 import { toast } from 'sonner';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 // Get blog by slug
 export function useBlogBySlug(slug: string) {
   const queryClient = useQueryClient();
+  const { user } = useAuth(); // AuthProvider에서 사용자 정보 가져오기
 
   // 캐시 키 정규화 - @ 제거
   const normalizedSlug = slug.replace('@', '');
 
   return useQuery({
-    queryKey: ['blog', normalizedSlug],
+    queryKey: ['blog', normalizedSlug, user?.id || 'anonymous'], // 사용자 ID로 캐시 구분
     queryFn: async () => {
       const blog = await getBlogBySlug(slug);
       return blog;
@@ -23,7 +25,7 @@ export function useBlogBySlug(slug: string) {
   });
 }
 
-// Get user's blogs
+// Get user's blog (단일 블로그 반환)
 export function useMyBlogs() {
   return useQuery({
     queryKey: ['my-blogs'],
