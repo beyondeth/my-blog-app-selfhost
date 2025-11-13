@@ -29,9 +29,10 @@ services:
       target: runner
       # 빌드 타임 환경변수 (Next.js NEXT_PUBLIC_* 변수 주입)
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://www.codebase.blog/api/v1}
-        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://www.codebase.blog}
-        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://www.codebase.blog}
+        # 기본값 제거 - 프로덕션에서는 변수 필수
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+        NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
         NEXT_PUBLIC_MIXPANEL_TOKEN: ${NEXT_PUBLIC_MIXPANEL_TOKEN}
         NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-frontend
@@ -40,9 +41,9 @@ services:
     environment:
       NODE_ENV: production
       # Backend API는 내부 Docker 네트워크로 통신
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://www.codebase.blog/api/v1}
-      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL:-https://www.codebase.blog}
-      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL:-https://www.codebase.blog}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
+      NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
       NEXT_PUBLIC_MIXPANEL_TOKEN: ${NEXT_PUBLIC_MIXPANEL_TOKEN}
       NEXT_PUBLIC_GA_MEASUREMENT_ID: ${NEXT_PUBLIC_GA_MEASUREMENT_ID}
       HOSTNAME: "0.0.0.0"

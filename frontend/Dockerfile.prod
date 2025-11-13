@@ -62,6 +62,30 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_MIXPANEL_TOKEN=$NEXT_PUBLIC_MIXPANEL_TOKEN
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 
+# 필수 환경변수 유효성 검사
+RUN echo "Checking required environment variables..." && \
+    if [ -z "$NEXT_PUBLIC_API_URL" ]; then \
+        echo "❌ Error: NEXT_PUBLIC_API_URL is required for build"; \
+        exit 1; \
+    fi && \
+    if [ -z "$NEXT_PUBLIC_BACKEND_URL" ]; then \
+        echo "❌ Error: NEXT_PUBLIC_BACKEND_URL is required for build"; \
+        exit 1; \
+    fi && \
+    if [ -z "$NEXT_PUBLIC_MIXPANEL_TOKEN" ]; then \
+        echo "❌ Error: NEXT_PUBLIC_MIXPANEL_TOKEN is required for build"; \
+        exit 1; \
+    fi && \
+    if [ -z "$NEXT_PUBLIC_GA_MEASUREMENT_ID" ]; then \
+        echo "❌ Error: NEXT_PUBLIC_GA_MEASUREMENT_ID is required for build"; \
+        exit 1; \
+    fi && \
+    echo "✅ All required environment variables are set" && \
+    echo "   - API_URL: $NEXT_PUBLIC_API_URL" && \
+    echo "   - BACKEND_URL: $NEXT_PUBLIC_BACKEND_URL" && \
+    echo "   - MIXPANEL: [SET]" && \
+    echo "   - GA_MEASUREMENT_ID: [SET]"
+
 # Next.js 빌드 (Standalone 모드)
 # next.config.js에 output: 'standalone' 설정 필요
 RUN pnpm build
