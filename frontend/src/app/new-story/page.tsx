@@ -65,8 +65,8 @@ export default function NewStoryPage() {
   const { data: blogs, isLoading: isBlogsLoading } = useMyBlogs();
   const createPostMutation = useCreatePost();
   
-  // 사용자의 첫 번째 블로그 가져오기 (한 사용자당 하나의 블로그)
-  const blog = blogs && blogs.length > 0 ? blogs[0] : null;
+  // 사용자의 블로그 가져오기 (단일 객체 반환)
+  const blog = blogs || null;
 
   // 중복 제출 방지용 플래그
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);

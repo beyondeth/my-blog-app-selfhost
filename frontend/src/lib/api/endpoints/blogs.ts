@@ -54,12 +54,12 @@ export class BlogsAPI {
   }
 
   /**
-   * 내 블로그 목록 조회
-   * @returns 로그인한 사용자의 블로그 목록
-   * @description 현재는 사용자당 1개 블로그만 가능
+   * 내 블로그 조회
+   * @returns 로그인한 사용자의 블로그 (사용자당 1개)
+   * @description 사용자당 하나의 블로그만 반환
    */
-  async getMyBlogs(): Promise<Blog[]> {
-    return this.client.get<Blog[]>('/blogs/my-blogs');
+  async getMyBlogs(): Promise<Blog | null> {
+    return this.client.get<Blog | null>('/blogs/my-blogs');
   }
 
   /**

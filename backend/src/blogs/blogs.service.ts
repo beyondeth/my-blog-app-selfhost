@@ -163,10 +163,22 @@ export class BlogsService {
   }
 
   async findByUserId(userId: string): Promise<Blog[]> {
-    return await this.blogRepository.find({
+    this.logger.debug(`[BlogsService] findByUserId - Looking for blogs for user ID: ${userId.substring(0, 8)}...`);
+
+    const blogs = await this.blogRepository.find({
       where: { userId },
       order: { createdAt: 'DESC' }
     });
+
+    this.logger.debug(`[BlogsService] findByUserId - Found ${blogs.length} blogs for user ID: ${userId.substring(0, 8)}...`);
+
+    if (blogs.length > 0) {
+      blogs.forEach((blog, index) => {
+        this.logger.debug(`[BlogsService] Blog ${index + 1}: ID=${blog.id.substring(0, 8)}..., slug=${blog.slug}, userId=${blog.userId.substring(0, 8)}...`);
+      });
+    }
+
+    return blogs;
   }
 
   /**
@@ -460,7 +472,7 @@ export class BlogsService {
       return {
         ...blogWithAccess,
         shouldRedirect: true,
-        redirectTo: oldAlias.blog.alias || oldAlias.blog.slug,
+        redirectTo: oldAlias.blog.alias ? `@${oldAlias.blog.alias}` : oldAlias.blog.slug,
         redirectType: '301', // Permanent redirect (SEO 보호)
       };
     }
@@ -514,7 +526,7 @@ export class BlogsService {
           return {
             ...blogWithAccess,
             shouldRedirect: true,
-            redirectTo: blog.alias,
+            redirectTo: `@${blog.alias}`,
             redirectType: '301',
           };
         }
