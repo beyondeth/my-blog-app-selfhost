@@ -21,6 +21,7 @@ export default function ProfileSettingsPage() {
   const [bioSuccess, setBioSuccess] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [usernameError, setUsernameError] = useState('');
   const [formData, setFormData] = useState({
     username: '',
     email: '',
@@ -58,6 +59,14 @@ export default function ProfileSettingsPage() {
     }
   }, [user]);
 
+  // 컴포넌트 언마운트 시 에러 상태 초기화
+  useEffect(() => {
+    return () => {
+      setError('');
+      setUsernameError('');
+    };
+  }, []);
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -76,6 +85,7 @@ export default function ProfileSettingsPage() {
 
     setUploadingImage(true);
     setError('');
+    setUsernameError('');
 
     try {
       const formData = new FormData();
@@ -121,6 +131,7 @@ export default function ProfileSettingsPage() {
    */
   const handleSelectCharacter = async (characterPath: string) => {
     setError('');
+    setUsernameError('');
 
     try {
       const response = await fetch(
@@ -178,13 +189,14 @@ export default function ProfileSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        // 마케팅 설정 에러는 상단에 표시하지 않고 콘솔에만 기록
+        console.error('Marketing preference update failed:', error.message);
         throw new Error(error.message || '마케팅 정보 수신 설정 업데이트에 실패했습니다');
       }
 
       // 사용자 정보 새로고침 (JWT 토큰에 반영)
       await refreshUser();
     } catch (err: any) {
-      setError(err.message || '마케팅 정보 수신 설정 업데이트 중 오류가 발생했습니다');
       // 에러 발생 시 이전 상태로 되돌리기
       if (user) {
         setMarketingPreferences({
@@ -192,6 +204,7 @@ export default function ProfileSettingsPage() {
           newsletterOptIn: user.newsletterOptIn || false,
         });
       }
+      // 마케팅 설정 에러는 전역 에러 상태에 저장하지 않음 (다른 섹션에 영향 주지 않기 위해)
     }
   };
 
@@ -202,7 +215,15 @@ export default function ProfileSettingsPage() {
   const handleUsernameUpdate = async () => {
     setUsernameLoading(true);
     setError('');
+    setUsernameError('');
     setSuccess(false);
+
+    // 클라이언트 측에서 기본 유효성 검사
+    if (formData.username && formData.username.length < 2) {
+      setUsernameError('닉네임은 최소 2자 이상 입력하세요');
+      setUsernameLoading(false);
+      return;
+    }
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/profile`, {
@@ -218,6 +239,12 @@ export default function ProfileSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
+        // 닉네임 관련 에러인 경우 별도로 표시
+        if (error.message && error.message.includes('닉네임')) {
+          setUsernameError(error.message);
+        } else {
+          setError(error.message || '닉네임 업데이트에 실패했습니다');
+        }
         throw new Error(error.message || '닉네임 업데이트에 실패했습니다');
       }
 
@@ -225,12 +252,13 @@ export default function ProfileSettingsPage() {
       setUsernameLoading(false);
       setUsernameSuccess(true);
       setSuccess(true);
+      setUsernameError('');
       setTimeout(() => {
         setUsernameSuccess(false);
         setSuccess(false);
       }, 2000);
     } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다');
+      // 이미 setError나 setUsernameError가 위에서 처리됨
       setUsernameLoading(false);
     }
   };
@@ -242,6 +270,7 @@ export default function ProfileSettingsPage() {
   const handleBioUpdate = async () => {
     setBioLoading(true);
     setError('');
+    setUsernameError('');  // Bio 업데이트 시에도 닉네임 에러 초기화
     setSuccess(false);
 
     try {
@@ -283,6 +312,7 @@ export default function ProfileSettingsPage() {
   const handleDeleteAccount = async () => {
     setDeleteLoading(true);
     setError('');
+    setUsernameError('');
 
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/account`, {
@@ -415,14 +445,30 @@ export default function ProfileSettingsPage() {
               type="text"
               id="username"
               value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              className="flex-1 px-3 py-2 min-h-[44px] border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
+              onChange={(e) => {
+                const value = e.target.value;
+                setFormData({ ...formData, username: value });
+
+                // 실시간 유효성 검사
+                if (value && value.length < 2) {
+                  setUsernameError('닉네임은 최소 2자 이상 입력하세요');
+                } else if (value && value.length > 20) {
+                  setUsernameError('닉네임은 최대 20자까지 입력할 수 있습니다');
+                } else {
+                  setUsernameError('');
+                }
+              }}
+              className={`flex-1 px-3 py-2 min-h-[44px] border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none transition-colors ${
+                usernameError
+                  ? 'border-red-300 dark:border-red-600 focus:border-red-400 dark:focus:border-red-500'
+                  : 'border-gray-300 dark:border-gray-600 focus:border-gray-400 dark:focus:border-gray-500'
+              }`}
               placeholder="실명이 아닌 별명을 사용하세요"
             />
             <button
               type="button"
               onClick={handleUsernameUpdate}
-              disabled={usernameLoading || usernameSuccess}
+              disabled={usernameLoading || usernameSuccess || usernameError !== ''}
               className="w-full sm:w-[60px] min-h-[44px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
             >
               {usernameLoading ? (
@@ -434,6 +480,12 @@ export default function ProfileSettingsPage() {
               )}
             </button>
           </div>
+          {/* 닉네임 에러 메시지 */}
+          {usernameError && (
+            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
+              {usernameError}
+            </p>
+          )}
         </div>
 
         {/* Email */}
@@ -591,7 +643,7 @@ export default function ProfileSettingsPage() {
         </div>
 
         {/* Error/Success Messages */}
-        {error && !error.includes('크기') && (
+        {error && !error.includes('크기') && !error.includes('닉네임') && (
           <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
             {error}
           </div>
