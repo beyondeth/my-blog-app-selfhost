@@ -33,7 +33,10 @@ export class BlogsController {
   @Get('my-blogs')
   @UseGuards(JwtAuthGuard)
   async getMyBlogs(@CurrentUser() user: User) {
-    return await this.blogsService.findByUserId(user.id);
+    console.log(`[BlogsController] getMyBlogs - Request from user: ${user.email} (ID: ${user.id.substring(0, 8)}...)`);
+    const blogs = await this.blogsService.findByUserId(user.id);
+    console.log(`[BlogsController] getMyBlogs - Returning ${blogs.length} blogs for user: ${user.email}`);
+    return blogs;
   }
 
   /**

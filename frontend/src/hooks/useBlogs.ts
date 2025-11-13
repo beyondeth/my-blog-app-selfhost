@@ -5,12 +5,13 @@ import { toast } from 'sonner';
 // Get blog by slug
 export function useBlogBySlug(slug: string) {
   const queryClient = useQueryClient();
+  const { user } = useAuth(); // AuthProvider에서 사용자 정보 가져오기
 
   // 캐시 키 정규화 - @ 제거
   const normalizedSlug = slug.replace('@', '');
 
   return useQuery({
-    queryKey: ['blog', normalizedSlug],
+    queryKey: ['blog', normalizedSlug, user?.id || 'anonymous'], // 사용자 ID로 캐시 구분
     queryFn: async () => {
       const blog = await getBlogBySlug(slug);
       return blog;
