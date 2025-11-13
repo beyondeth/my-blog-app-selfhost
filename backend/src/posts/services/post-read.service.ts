@@ -15,13 +15,14 @@
 
 
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, SelectQueryBuilder, Like, In } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { Repository, SelectQueryBuilder, Like, In, DataSource } from 'typeorm';
 import { Post } from '../entities/post.entity';
 import { User } from '../../users/entities/user.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
 import { PostMapperService } from './post-mapper.service';
 import { BookmarksService } from '../../bookmarks/bookmarks.service';
+import { MaterializedViewService } from '../../common/services/materialized-view.service';
 import { GetPostsCursorDto } from '../dto/get-posts-cursor.dto';
 import { CursorPaginatedPostsDto } from '../dto/cursor-paginated-posts.dto';
 
@@ -45,6 +46,9 @@ export class PostReadService {
     private readonly blogsRepository: Repository<Blog>,
     private readonly postMapperService: PostMapperService,
     private readonly bookmarksService: BookmarksService,
+    private readonly materializedViewService: MaterializedViewService,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -96,11 +100,14 @@ export class PostReadService {
       });
     }
 
-    // 북마크 상태 확인 (로그인한 사용자만)
+    // 북마크 상태 확인 (배치 조회 방식)
     let bookmarked = false;
     if (user) {
-      const bookmark = await this.bookmarksService.findBookmark(post.id, user.id);
-      bookmarked = !!bookmark;
+      const bookmarkStatuses = await this.bookmarksService.getMultipleBookmarkStatuses(
+        [post.id],
+        user.id
+      );
+      bookmarked = bookmarkStatuses.get(post.id) || false;
     }
 
     // PostMapperService를 사용하여 DTO 변환
@@ -274,20 +281,21 @@ export class PostReadService {
     // 쿼리 실행
     const posts = await query.getMany();
 
+    // 포스트 ID 목록 추출 (배치 조회용)
+    const postIds = posts.map(post => post.id);
+
+    // 한 번의 쿼리로 모든 포스트의 북마크 상태 조회
+    const bookmarkStatuses = user
+      ? await this.bookmarksService.getMultipleBookmarkStatuses(postIds, user.id)
+      : new Map<string, boolean>();
+
     // 응답 데이터 변환
     const transformedPosts = [];
     for (const post of posts) {
-      // 북마크 상태 확인
-      let bookmarked = false;
-      if (user) {
-        const bookmark = await this.bookmarksService.findBookmark(post.id, user.id);
-        bookmarked = !!bookmark;
-      }
-
       const postDto = await this.postMapperService.toPostDto(post, {
         user: post.author,
         blog: post.blog,
-        bookmarked,
+        bookmarked: bookmarkStatuses.get(post.id) || false,
         liked: false, // TODO: 좋아요 상태 확인
       });
 
@@ -327,7 +335,7 @@ export class PostReadService {
   }
 
   /**
-   * 인기 포스트 목록 조회
+   * 인기 포스트 목록 조회 (Materialized View 사용)
    *
    * @param period 기간 (daily, weekly, monthly, all)
    * @param limit 조회 개수
@@ -339,58 +347,51 @@ export class PostReadService {
   ): Promise<Post[]> {
     this.logger.debug(`[findPopularPosts] Period: ${period}, Limit: ${limit}`);
 
-    // 기간 계산
-    const now = new Date();
-    let dateFrom: Date | null = null;
+    // Materialized View에서 기본 인기 포스트 조회 (최적화)
+    const popularPostIds = await this.materializedViewService.getPopularPosts(limit);
+    const postIds = popularPostIds.map(p => p.id);
 
-    switch (period) {
-      case 'daily':
-        dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000); // 24시간 전
-        break;
-      case 'weekly':
-        dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000); // 7일 전
-        break;
-      case 'monthly':
-        dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000); // 30일 전
-        break;
-      case 'all':
-        dateFrom = null;
-        break;
+    if (postIds.length === 0) {
+      return [];
     }
 
-    // 인기도 점수 계산: viewCount + (likeCount × 3) + (commentCount × 2)
-    const query = this.postsRepository
+    // 관계 데이터 포함하여 전체 포스트 정보 조회 (배치 조회)
+    const posts = await this.postsRepository
       .createQueryBuilder('post')
-      .leftJoin('post.stats', 'stats')
-      .select([
-        'post.*',
-        '(COALESCE(stats.viewCount, 0) + (COALESCE(stats.likeCount, 0) * 3) + (COALESCE(stats.commentCount, 0) * 2)) as popularity_score'
-      ])
-      .where('post.isPublished = :isPublished', { isPublished: true })
-      .orderBy('popularity_score', 'DESC')
-      .addOrderBy('post.publishedAt', 'DESC')
-      .limit(limit);
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')
+      .leftJoinAndSelect('post.blog', 'blog')
+      .leftJoinAndSelect('post.thumbnailImage', 'thumbnailImage')
+      .leftJoinAndSelect('post.stats', 'stats')
+      .leftJoinAndSelect('post.metadata', 'metadata')
+      .where('post.id IN (:...postIds)', { postIds })
+      .orderBy(`array_position(ARRAY[:...postIds], post.id)`) // Materialized View 순서 유지
+      .setParameter('postIds', postIds)
+      .getMany();
 
-    if (dateFrom) {
-      query.andWhere('post.publishedAt >= :dateFrom', { dateFrom });
+    // 기간 필터링이 필요한 경우 (daily, weekly, monthly)
+    if (period !== 'all') {
+      const now = new Date();
+      let dateFrom: Date | null = null;
+
+      switch (period) {
+        case 'daily':
+          dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          break;
+        case 'weekly':
+          dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          break;
+        case 'monthly':
+          dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          break;
+      }
+
+      if (dateFrom) {
+        return posts.filter(post => post.publishedAt >= dateFrom!);
+      }
     }
 
-    const posts = await query.getRawMany();
-
-    // 관계 데이터 로드
-    const postIds = posts.map(p => p.id);
-    const fullPosts = await this.postsRepository.find({
-      where: { id: In(postIds) },
-      relations: ['author', 'author.profile', 'blog', 'thumbnailImage'],
-    });
-
-    // popularity_score로 정렬
-    const postMap = new Map(fullPosts.map(p => [p.id, p]));
-    const sortedPosts = posts
-      .map(p => postMap.get(p.id))
-      .filter(Boolean) as Post[];
-
-    return sortedPosts;
+    return posts;
   }
 
   /**
