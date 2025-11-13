@@ -286,7 +286,7 @@ export class PostReadService {
 
     // 한 번의 쿼리로 모든 포스트의 북마크 상태 조회
     const bookmarkStatuses = user
-      ? await this.getMultipleBookmarkStatuses(postIds, user.id)
+      ? await this.bookmarksService.getMultipleBookmarkStatuses(postIds, user.id)
       : new Map<string, boolean>();
 
     // 응답 데이터 변환
