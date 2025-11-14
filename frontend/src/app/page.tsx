@@ -259,7 +259,7 @@ function HomePageContent() {
                     isDeleting={deletePostMutation.isPending && deleteDialog.postId === post.id}
                     searchQuery={currentParams.search}
                     priority={index < 3} // LCP 최적화: 상위 3개 포스트의 프로필 이미지는 즉시 로드
-                  />
+                    isHomeFeed={true}                  />
                 ))}
                 
                 {/* 무한 스크롤 트리거 */}

@@ -23,6 +23,7 @@ interface PostArticleProps {
   likePending?: boolean; // 좋아요 처리 중 상태
   searchQuery?: string; // 검색어 하이라이팅을 위한 prop
   priority?: boolean; // LCP 최적화: 프로필 이미지 우선 로드 (상위 3개 포스트)
+  isHomeFeed?: boolean; // 홈 피드 여부 (썸네일 스타일 적용용)
 }
 
 // HTML 태그를 제거하고 순수 텍스트만 반환하는 로컬 함수

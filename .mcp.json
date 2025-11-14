@@ -2,9 +2,9 @@
   "mcpServers": {
     "codebase-blog-mcp": {
       "type": "http",
-      "url": "https://mcp.codebase.blog/mcp",
+      "url": "http://localhost:3002/mcp",
       "headers": {
-        "Authorization": "Bearer blog_sk_8l37l27w_SqTZGpQAmIbGVif62fjmyMKcc0pQ4UwG"
+        "Authorization": "Bearer blog_sk_xf1ptdiy_e8aE2WcuPFlqhG0UdVrCHXBQ03Rjr8K4"
       }
     }
   }
