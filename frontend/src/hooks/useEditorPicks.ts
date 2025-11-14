@@ -108,13 +108,15 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
         exact: false
       });
 
-      // 성공 메시지 표시
+      // 성공 메시지 표시 (중복 방지를 위해 ID 사용)
       const isAdded = data.isEditorPick;
       const message = isAdded
         ? '게시글을 Editor\'s Pick에 추가했습니다.'
         : '게시글을 Editor\'s Pick에서 제거했습니다.';
 
+      const toastId = `editor-pick-${postId}`;
       toast.success(message, {
+        id: toastId,  // 고유 ID로 중복 토스트 방지
         duration: 3000,
         position: 'bottom-right',
       });
@@ -131,13 +133,15 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
     if (mutation.isError && mutation.error) {
       const error = mutation.error as Error;
 
-      // 에러 메시지 표시
+      // 에러 메시지 표시 (중복 방지를 위해 ID 사용)
+      const toastId = `editor-pick-error-${postId}`;
       toast.error(error.message || 'Editor\'s Pick 변경에 실패했습니다.', {
+        id: toastId,  // 고유 ID로 중복 토스트 방지
         duration: 3000,
         position: 'bottom-right',
       });
     }
-  }, [mutation.isError, mutation.error]);
+  }, [mutation.isError, mutation.error, postId]);
 
   return mutation;
 }
