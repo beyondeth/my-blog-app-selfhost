@@ -53,10 +53,10 @@ export function useUserBlogV2() {
     queryKey: ['user-blog', user?.id],
     queryFn: fetchUserBlog,
     enabled: !!user, // 사용자가 있을 때만 실행
-    staleTime: 0, // 캐시를 즉시 만료시켜 최신 데이터 유지
-    gcTime: 0, // 캐시를 즉시 제거
+    staleTime: 5 * 60 * 1000, // 5분 동안 데이터를 fresh 상태로 유지
+    gcTime: 10 * 60 * 1000, // 10분 동안 캐시 보관
     refetchOnWindowFocus: false,
-    refetchOnMount: true, // 마운트시 항상 재요청하여 최신 데이터 확보
+    refetchOnMount: false, // 불필요한 재요청 방지
     // 이전 데이터를 placeholderData로 사용하여 로딩 중에도 표시
     placeholderData: (previousData) => previousData,
   });
@@ -89,8 +89,8 @@ export function useUserBlogV2() {
     return refetch();
   };
 
-  // Debug logging
-  if (user) {
+  // Debug logging (개발 환경에서만 출력)
+  if (user && process.env.NODE_ENV === 'development') {
     console.log('[useUserBlogV2] User:', user.id, user.email);
     console.log('[useUserBlogV2] Blog data:', blog);
     console.log('[useUserBlogV2] Loading:', loading, 'Error:', error);

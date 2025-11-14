@@ -257,8 +257,8 @@ export function BlogSimpleEditor({
       const imageUrl = (result as any).url || (result as any).accessUrl
       const finalUrl = normalizeImageUrl(imageUrl)
 
-      // 성공 토스트
-      toast.success('이미지가 업로드되었습니다')
+      // 이미지 업로드는 여러 개일 수 있으므로 개별 토스트는 표시하지 않음
+      // ImageUploadManager에서 배치 토스트를 표시함
 
       return finalUrl
     } catch (error) {

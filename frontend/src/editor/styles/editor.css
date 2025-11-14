@@ -334,7 +334,6 @@
   height: 540px;
   max-width: 100%;
   margin: 1.5rem auto;
-  border-radius: 8px;
   overflow: hidden;
   display: block !important;
   background: transparent;
@@ -347,7 +346,6 @@
   width: 100%;
   height: 100%;
   border: none;
-  border-radius: 8px;
 }
 
 /* YouTube 노드 선택 시 */

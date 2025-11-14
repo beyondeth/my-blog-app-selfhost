@@ -50,7 +50,7 @@ function MockCheckoutPageContent() {
       );
 
       if (response.ok) {
-        toast.success('구독이 성공적으로 처리되었습니다!');
+        toast.success('구독이 완료되었습니다');
         // 구독 관리 페이지로 이동
         router.push('/account/subscription');
       } else {

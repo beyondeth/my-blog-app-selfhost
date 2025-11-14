@@ -459,7 +459,8 @@ export class AdminUsersService {
       this.commentRepository.count({ where: { authorId: userId } }),
       this.postRepository
         .createQueryBuilder('post')
-        .select('SUM(post.likeCount)', 'total')
+        .leftJoin('post.stats', 'stats')
+        .select('SUM(stats.likeCount)', 'total')
         .where('post.authorId = :userId', { userId })
         .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
         .getRawOne()
@@ -699,6 +700,7 @@ export class AdminUsersService {
         authorId: userId,
         isDeleted: true,
       },
+      relations: ['stats'],
       select: [
         'id',
         'title',
@@ -706,9 +708,6 @@ export class AdminUsersService {
         'content', // 법적 조회 시 가장 중요한 증거
         'category',
         'excerpt',
-        'viewCount',
-        'likeCount',
-        'commentCount',
         'createdAt',
         'publishedAt',
       ],

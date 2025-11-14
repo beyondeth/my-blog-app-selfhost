@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -130,30 +130,30 @@ export default function PostsManagement() {
   };
 
   const handleTogglePublish = async (postId: string, currentStatus: boolean) => {
-    updateStatusMutation.mutate(
-      { postId, isPublished: !currentStatus },
-      {
-        onSuccess: () => {
-          refetch();
-        },
-      }
-    );
+    updateStatusMutation.mutate({ postId, isPublished: !currentStatus });
   };
+
+  // 성공 처리를 위한 useEffect
+  React.useEffect(() => {
+    if (updateStatusMutation.isSuccess) {
+      refetch();
+    }
+  }, [updateStatusMutation.isSuccess, refetch]);
 
   const handleBulkAction = async () => {
     if (!bulkActionDialog.action || selectedPosts.length === 0) return;
 
-    bulkActionMutation.mutate(
-      { postIds: selectedPosts, action: bulkActionDialog.action },
-      {
-        onSuccess: () => {
-          setSelectedPosts([]);
-          setBulkActionDialog({ open: false, action: null });
-          refetch();
-        },
-      }
-    );
+    bulkActionMutation.mutate({ postIds: selectedPosts, action: bulkActionDialog.action });
   };
+
+  // 벌크 액션 성공 처리를 위한 useEffect
+  React.useEffect(() => {
+    if (bulkActionMutation.isSuccess) {
+      setSelectedPosts([]);
+      setBulkActionDialog({ open: false, action: null });
+      refetch();
+    }
+  }, [bulkActionMutation.isSuccess, refetch]);
 
   const handleSelectAll = () => {
     if (selectedPosts.length === allPosts.length) {
@@ -199,7 +199,7 @@ export default function PostsManagement() {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
 
-      toast.success('포스트를 성공적으로 내보냈습니다');
+      toast.success('포스트를 내보냈습니다');
     } catch (error) {
       console.error('Error exporting posts:', error);
       toast.error('포스트 내보내기에 실패했습니다');

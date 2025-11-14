@@ -126,12 +126,6 @@ export function useBlogCategories(blogSlug: string) {
     enabled: !!blogSlug,
     staleTime: 5 * 60 * 1000, // 5분간 캐시
     gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
-    onError: (error) => {
-      console.error('📡 [CATEGORIES API] Query error:', error);
-    },
-    onSuccess: (data) => {
-      console.log('📡 [CATEGORIES API] Query success:', data);
-    },
   });
 }
 

@@ -143,9 +143,10 @@ export class UserDeletionDebugService {
       // 포스트 정보 - QueryBuilder 사용
       const posts = await queryRunner.manager
         .createQueryBuilder(Post, 'post')
+        .leftJoinAndSelect('post.stats', 'stats')
         .where('post."authorId" = :userId', { userId })
         .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
-        .select(['post.id', 'post.title', 'post.createdAt', 'post.viewCount'])
+        .select(['post.id', 'post.title', 'post.createdAt', 'stats'])
         .getMany();
 
       // 댓글 정보 - QueryBuilder 사용
@@ -192,12 +193,12 @@ export class UserDeletionDebugService {
               postCount: b.posts?.length || 0 
             }))
           },
-          posts: { 
-            count: posts.length, 
-            items: posts.map(p => ({ 
-              id: p.id, 
-              title: p.title, 
-              viewCount: p.viewCount 
+          posts: {
+            count: posts.length,
+            items: posts.map(p => ({
+              id: p.id,
+              title: p.title,
+              viewCount: p.stats?.viewCount || 0
             }))
           },
           comments: { 

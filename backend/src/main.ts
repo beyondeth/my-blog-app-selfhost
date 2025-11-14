@@ -102,7 +102,7 @@ async function bootstrap() {
       cookie: {
         maxAge: 60 * 60 * 1000, // 1시간
         httpOnly: true,
-        sameSite: 'strict', // CSRF 방지
+        sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 개발 환경에서는 lax 사용
         secure: process.env.NODE_ENV === 'production',
       },
       name: 'session-id', // 세션 쿠키 이름

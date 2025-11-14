@@ -43,12 +43,12 @@ const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post |
       `${apiUrl}/posts/slug/${postSlug}`,
       {
         // 서버 컴포넌트에서는 revalidate 옵션 사용
-        next: { revalidate: 60 }, // 60초마다 재검증
+        next: { revalidate: 60 }, // 60초마다 재검증 (캐시 사용으로 성능 향상)
         headers: {
           'Content-Type': 'application/json',
         },
         // 서버 사이드에서도 쿠키를 포함해야 인증된 사용자의 포스트에 접근 가능
-        cache: 'no-store', // 항상 최신 데이터 가져오기
+        // cache: 'no-store' 제거 - revalidate과 함께 사용할 수 없음
       }
     );
 

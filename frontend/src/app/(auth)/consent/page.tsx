@@ -148,7 +148,7 @@ export default function ConsentPage() {
         throw new Error(data.message || '약관 동의 처리에 실패했습니다');
       }
 
-      toast.success('약관 동의가 완료되었습니다!');
+      toast.success('약관에 동의했습니다');
 
       // 세션 스토리지에서 리디렉션 잠금 해제
       sessionStorage.removeItem('consent_redirect_lock');
