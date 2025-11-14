@@ -596,7 +596,7 @@ export class PostsService {
   async findOne(id: string, user?: User): Promise<PostResponseDto> {
     this.logger.debug(`Finding post by id: ${id}`);
 
-    const post = await this.postReadService.findById(id, ['author', 'blog', 'stats']);
+    const post = await this.postReadService.findById(id, ['author', 'blog', 'stats', 'metadata']);
     if (!post) {
       throw new NotFoundException('포스트를 찾을 수 없습니다.');
     }
