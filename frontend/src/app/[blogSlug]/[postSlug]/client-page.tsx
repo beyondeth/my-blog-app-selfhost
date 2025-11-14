@@ -128,12 +128,8 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   });
 
   // Editor's Pick 토글 mutation (Admin 전용)
-  const editorPickMutation = useToggleEditorPick(post?.id || '', {
-    onSuccess: () => {
-      // 성공 시 포스트 데이터 즉시 refetch하여 UI 업데이트
-      refetch();
-    }
-  });
+  // React Query가 자동으로 캐시를 업데이트하므로 수동 refetch 제거 (무한 렌더링 방지)
+  const editorPickMutation = useToggleEditorPick(post?.id || '');
 
 
   const handleEdit = useCallback(() => {
@@ -246,25 +242,38 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
   // Editor's Pick 토글 핸들러 (Admin 전용)
   const handleToggleEditorPick = useCallback(() => {
+    // 기본 유효성 검사
     if (!post?.id) return;
+
+    // 이미 처리 중이면 추가 클릭 방지 (중복 호출 방지)
+    if (editorPickMutation.isPending) return;
+
     editorPickMutation.mutate();
   }, [post, editorPickMutation]);
 
 
   useEffect(() => {
-    if (!hasViewed.current && post?.id) {
-      hasViewed.current = true;
-      // Increment view count
-      fetch(`/api/v1/posts/${post.id}/view`, { method: 'POST' }).catch(console.error);
+    // 포스트 ID가 있고 아직 조회수를 증가시키지 않았을 때만 실행
+    // refetch로 인한 재렌더링 시 hasViewed.current가 true이면 중복 호출 방지
+    if (post?.id && !hasViewed.current) {
+      hasViewed.current = true;  // 가장 먼저 설정하여 중복 실행 방지
+
+      // Increment view count (에러 핸들링 개선)
+      fetch(`/api/v1/posts/${post.id}/view`, {
+        method: 'POST',
+        credentials: 'include'  // 일관성을 위해 credentials 추가
+      }).catch((error) => {
+        // 자산 오류만 기록, 사용자 경험에는 영향 주지 않음
+        console.error('Failed to increment view count:', error);
+      });
 
       // Mixpanel: 포스트 조회 이벤트 추적
-      // 이제 자동으로 큐에 추가되므로 경고 메시지가 나오지 않음
       mixpanel.track('Post Viewed', {
         postId: post.id,
-        slug: post.slug || 'unknown',  // post.slug만 사용, postSlug 제거
+        slug: post.slug || 'unknown',
       });
     }
-  }, [post?.id]);  // post.id만 의존성으로 사용
+  }, [post?.id]);  // post.id가 변경될 때만 실행
 
   if (isError) {
     // 에러 타입 구분
