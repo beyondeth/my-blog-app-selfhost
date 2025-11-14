@@ -15,6 +15,8 @@ import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
+import TagsSection from '@/components/layout/TagsSection';
+import SidebarFooter from '@/components/home/SidebarFooter';
 
 // 사이드바 컴포넌트 lazy loading (초기 로딩 최적화)
 const PromoCarouselSection = lazy(() => import('@/components/layout/PromoCarouselSection'));

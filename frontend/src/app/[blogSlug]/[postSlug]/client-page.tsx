@@ -109,10 +109,11 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
     }
   }, [blog, postSlug, searchParams]);
 
-  // Fetch post details - initialPost가 있으면 캐시에 저장하고 추가 fetch 방지
+  // Fetch post details - 항상 최신 데이터 가져오기
   const { data: post, error, isError, refetch } = usePost(postSlug, {
     initialData: initialPost,
-    // initialData가 있으면 자동으로 refetch 방지됨 (React Query 기본 동작)
+    refetchOnMount: 'always',  // initialData가 있어도 항상 refetch
+    staleTime: 0,              // 즉시 stale 처리하여 캐시 무효화 바로 반영
   });
   const deletePostMutation = useDeletePost();
   // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)
@@ -127,7 +128,12 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   });
 
   // Editor's Pick 토글 mutation (Admin 전용)
-  const editorPickMutation = useToggleEditorPick(post?.id || '');
+  const editorPickMutation = useToggleEditorPick(post?.id || '', {
+    onSuccess: () => {
+      // 성공 시 포스트 데이터 즉시 refetch하여 UI 업데이트
+      refetch();
+    }
+  });
 
 
   const handleEdit = useCallback(() => {

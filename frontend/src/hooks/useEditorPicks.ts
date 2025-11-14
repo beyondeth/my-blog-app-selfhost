@@ -54,8 +54,8 @@ export function useEditorPicks(limit: number = 5) {
 
       return response.json();
     },
-    staleTime: 24 * 60 * 60 * 1000,  // 24시간 동안 fresh 상태 유지
-    gcTime: 25 * 60 * 60 * 1000, // 25시간 동안 캐시 유지
+    staleTime: 5 * 60 * 1000,  // 5분 동안 fresh 상태 유지
+    gcTime: 10 * 60 * 1000,  // 10분 동안 캐시 유지
   });
 }
 
