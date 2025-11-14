@@ -2,10 +2,10 @@
 
 import React, { useState } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { FiBarChart2, FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 import { usePopularPosts } from '@/hooks/usePopularPosts';
-import OptimizedImage from '@/components/ui/OptimizedImage';
 
 const PopularPostsSection = React.memo(function PopularPostsSection() {
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
@@ -92,21 +92,23 @@ const PopularPostsSection = React.memo(function PopularPostsSection() {
                 {post.thumbnail && (
                   <div className="mb-2">
                     <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
-                      <OptimizedImage
+                      <Image
                         src={post.thumbnail}
                         alt={post.title}
+                        width={100}
+                        height={94}
                         className="w-full h-full rounded-lg object-contain"
-                        aspectRatio={100/94}
                         sizes="100px"
                         priority={index < 3}
                       />
                     </div>
                     <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
-                      <OptimizedImage
+                      <Image
                         src={post.thumbnail}
                         alt={post.title}
+                        width={210}
+                        height={197}
                         className="w-full h-full rounded-lg object-contain"
-                        aspectRatio={210/197}
                         sizes="210px"
                         priority={index < 3}
                       />
