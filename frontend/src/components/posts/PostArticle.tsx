@@ -57,7 +57,7 @@ const PostArticle = React.memo(function PostArticle({
   likePending = false,
   searchQuery,
   priority = false, // 기본값: lazy loading
-}: PostArticleProps) {
+  isHomeFeed = false,}: PostArticleProps) {
   // 삭제된 포스트 상태 확인
   const isDeleted = post.isDeleted || post.status === 'deleted';
 
@@ -438,7 +438,7 @@ const PostArticle = React.memo(function PostArticle({
               <OptimizedImage
                 src={post.thumbnail}
                 alt={post.title}
-                className="w-full h-full object-contain"
+                className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
                 aspectRatio={100/94}
                 sizes="100px"
                 priority={priority}
@@ -448,7 +448,7 @@ const PostArticle = React.memo(function PostArticle({
               <OptimizedImage
                 src={post.thumbnail}
                 alt={post.title}
-                className="w-full h-full object-contain"
+                className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
                 aspectRatio={210/197}
                 sizes="210px"
                 priority={priority}
