@@ -27,7 +27,7 @@ export default function PostActions({
         ) : (
           <button
             onClick={onLike}
-            className={`flex items-center space-x-2 px-3 py-1 rounded-full text-xs transition-colors ${
+            className={`flex items-center space-x-1 px-3 py-1 rounded-full text-xs transition-colors ${
               liked 
                 ? 'bg-red-50 text-red-600 hover:bg-red-100' 
                 : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'

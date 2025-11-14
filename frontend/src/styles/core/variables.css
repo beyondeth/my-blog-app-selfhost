@@ -42,6 +42,7 @@
   --background-secondary: 220 227 233;  /* #DCE3E9 - 연한 회색 */
   --background-tertiary: 253 253 253;   /* #FDFDFD - 거의 흰색 */
   --foreground: 24 24 24;               /* #181818 - 검정 텍스트 */
+  --color-text: 24 24 24;              /* #181818 - markdown 텍스트 */
 
   /* Card & Surfaces */
   --card: 253 253 253;                  /* #FDFDFD */
@@ -113,6 +114,7 @@
   --background-secondary: 31 31 31;     /* #1F1F1F - 카드/섹션 배경 */
   --background-tertiary: 38 38 38;      /* #262626 - 서페이스 */
   --foreground: 253 253 253;            /* #FDFDFD - 메인 텍스트 */
+  --color-text: 253 253 253;            /* #FDFDFD - markdown 텍스트 */
 
   /* Card & Surfaces */
   --card: 31 31 31;                     /* #1F1F1F - 카드 배경 (더 어두운 색) */

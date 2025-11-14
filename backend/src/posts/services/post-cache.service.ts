@@ -1,7 +1,9 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { OnEvent } from '@nestjs/event-emitter';
 import { CacheService, CacheKeys, CacheTTL } from '../../cache/cache.service';
 import { CacheMetricsService } from '../../metrics/cache-metrics.service';
 import { PostResponseDto } from '../dto/post-response.dto';
+import { CacheInvalidationEvents, EditorPickToggledEvent } from '../../common/events/cache.events';
 
 /**
  * 포스트 관련 캐시 관리 서비스
@@ -43,6 +45,17 @@ export class PostCacheService {
     const cacheKey = CacheKeys.POST_CORE(id);
     await this.cacheService.set(cacheKey, data, ttl);
     this.logger.debug(`✅ Cached post core data: ${id}`);
+  }
+
+  /**
+   * 포스트 캐시 삭제
+   *
+   * @param id 포스트 ID
+   */
+  async deletePostCache(id: string): Promise<void> {
+    const cacheKey = CacheKeys.POST_CORE(id);
+    await this.cacheService.del(cacheKey);
+    this.logger.debug(`❌ Deleted post cache: ${id}`);
   }
 
   /**
@@ -295,5 +308,41 @@ export class PostCacheService {
    */
   async deleteMultiple(keys: string[]): Promise<void> {
     await Promise.all(keys.map(key => this.cacheService.del(key)));
+  }
+
+  // ========== 이벤트 리스너 ==========
+
+  /**
+   * Editor's Pick 토글 이벤트 리스너
+   * Editor's Pick 상태 변경 시 관련 캐시 즉시 무효화
+   */
+  @OnEvent(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, { async: true })
+  async handleEditorPickToggled(payload: EditorPickToggledEvent): Promise<void> {
+    this.logger.log(`🎯 [Editor's Pick Cache] Handling toggle event for post: ${payload.postId}, isPicked: ${payload.isPicked}`);
+
+    try {
+      // 1. Editor's Pick 피드 캐시 전체 삭제 (모든 limit 변형 포함) - 필수
+      await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
+      await this.cacheService.deletePattern('feed:editor-picks:*');
+
+      // 특정 limit 값들도 삭제 (컨트롤러가 limit 파라미터로 키를 생성)
+      for (let limit = 1; limit <= 10; limit++) {
+        await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS(limit));
+      }
+
+      // 2. 특정 포스트 캐시 삭제 (Editor's Pick 배지 정보 업데이트용) - 필수
+      await this.cacheService.del(CacheKeys.POST_CORE(payload.postId));
+
+      // 홈 피드 및 인기 포스트 캐시는 Editor's Pick과 독립적이므로 삭제하지 않음
+      // - 홈 피드: 최신순 정렬 only (Editor's Pick 영향 없음)
+      // - 인기 포스트: 조회수/좋아요/댓글 기반 (Editor's Pick 미포함)
+
+      // Prometheus 메트릭 기록
+      this.cacheMetricsService.recordCacheInvalidation('editor_picks', 'event');
+
+      this.logger.log(`✅ [Editor's Pick Cache] Invalidated essential caches for post: ${payload.postId}`);
+    } catch (error) {
+      this.logger.error(`Failed to invalidate Editor's Pick cache: ${error.message}`, error.stack);
+    }
   }
 }

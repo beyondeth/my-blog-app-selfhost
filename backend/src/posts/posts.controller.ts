@@ -4,7 +4,7 @@ import { ApiTags, ApiOperation, ApiBearerAuth, ApiQuery, ApiResponse } from '@ne
 import { Throttle } from '@nestjs/throttler';
 import { PostsThrottlerGuard } from './guards/posts-throttler.guard';
 import { PostsService } from './posts.service';
-import { LikeQueueService } from './services/like-queue.service';
+import { LikeService } from './services/like.service';
 import { CreatePostDto } from './dto/create-post.dto';
 import { UpdatePostDto } from './dto/update-post.dto';
 import { SetThumbnailDto } from './dto/set-thumbnail.dto';
@@ -51,7 +51,7 @@ export class PostsController {
     private readonly viewCountService: ViewCountService,
     private readonly cacheService: CacheService,
     private readonly monitoringService: MonitoringService,
-    private readonly likeQueueService: LikeQueueService,
+    private readonly likeService: LikeService,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -242,7 +242,6 @@ export class PostsController {
 
   @Get('popular/:period')
   @Public()
-  @UseInterceptors(CacheInterceptor)
   @ApiOperation({ summary: '인기 게시글 조회 (기간별)' })
   @ApiQuery({ name: 'limit', required: false, type: Number, description: '조회할 개수 (기본: 5, 최대: 10)' })
   async getPopularPosts(
@@ -259,7 +258,16 @@ export class PostsController {
     // 기간별 캐시 TTL 설정
     const ttl = sanitizedPeriod === 'daily' ? 3600 : sanitizedPeriod === 'weekly' ? 10800 : 21600;
 
-    return this.postsService.findPopularPosts(sanitizedPeriod, limitNumber);
+    // DB 조회
+    const posts = await this.postsService.findPopularPosts(sanitizedPeriod, limitNumber);
+
+    // 응답 포맷팅 (프론트엔드에서 기대하는 형식: { posts: [...], total: number })
+    const result = {
+      posts: posts,
+      total: posts.length
+    };
+
+    return result;
   }
 
   @Get('categories/public')
@@ -470,12 +478,18 @@ export class PostsController {
     }
 
     // DB 조회
-    const result = await this.postsService.findEditorPicks(limitNumber);
+    const posts = await this.postsService.findEditorPicks(limitNumber);
 
-    // 캐싱 (TTL: 30분)
+    // 응답 포맷팅 (프론트엔드에서 기대하는 형식: { posts: [...], total: number })
+    const result = {
+      posts: posts,
+      total: posts.length
+    };
+
+    // 캐싱 (TTL: 24시간)
     try {
-      await this.cacheService.set(cacheKey, result, 1800);
-      this.logger.debug(`📦 Cached ${cacheKey} with TTL 1800s`);
+      await this.cacheService.set(cacheKey, result, 86400);
+      this.logger.debug(`📦 Cached ${cacheKey} with TTL 86400s (24 hours)`);
     } catch (error) {
       this.logger.error('Cache set error:', error);
     }
@@ -507,7 +521,7 @@ export class PostsController {
   @Post(':id/like')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({ summary: '게시글 좋아요 토글 (Redis Queue 시스템)' })
+  @ApiOperation({ summary: '게시글 좋아요 토글 (즉시 처리)' })
   async toggleLike(
     @Param('id', ParseUUIDPipe) id: string,
     @Request() req: any,
@@ -521,60 +535,15 @@ export class PostsController {
 
     console.log('toggleLike called with user:', `${user.username} (${user.id})`);
 
-    // Redis pending 키로 연속 클릭 감지 (Race Condition 방지)
-    const pendingKey = `likes:pending:${user.id}:${id}`;
-    const pendingData = await this.redis.get(pendingKey);
+    // 단순화된 좋아요 서비스로 즉시 처리
+    const result = await this.likeService.toggleLike(id, user.id);
 
-    let action: 'like' | 'unlike';
-    let actionDecided = false; // action이 이미 결정되었는지 추적
-
-    // 1. Pending 확인 및 action 결정
-    if (pendingData) {
-      try {
-        const { action: pendingAction } = JSON.parse(pendingData);
-        action = pendingAction === 'like' ? 'unlike' : 'like';
-        actionDecided = true;
-        console.log(`⚡ [Fast Toggle] pending=${pendingAction} → action=${action}`);
-      } catch (e) {
-        console.log(`⚠️ [Pending Parse Failed] Fallback to DB query`);
-      }
-    }
-
-    // 2. 원자적 쿼리로 isLiked와 likeCount를 동시에 조회 (Race Condition 방지)
-    const result = await this.postsRepository.manager.query(
-      `SELECT
-        EXISTS(SELECT 1 FROM post_likes WHERE "postId" = $1 AND "userId" = $2) as is_liked,
-        p."likeCount"
-       FROM posts p
-       WHERE p.id = $1`,
-      [id, user.id]
-    );
-
-    const isLiked = result[0]?.is_liked || false;
-    const currentLikeCount = parseInt(result[0]?.likeCount) || 0;
-
-    // 3. action이 아직 결정되지 않았으면 DB 결과로 결정 (첫 클릭 또는 pending 파싱 실패)
-    if (!actionDecided) {
-      action = isLiked ? 'unlike' : 'like';
-      console.log(`🔍 [First Toggle] isLiked=${isLiked} → action=${action}`);
-    }
-
-    const expectedLikeCount = action === 'like'
-      ? currentLikeCount + 1
-      : Math.max(0, currentLikeCount - 1);
-
-    // Redis 큐에 추가 (즉시 응답)
-    await this.likeQueueService.queueLike(id, user.id, action);
-
-    // 클라이언트에게 즉시 응답 (낙관적 업데이트용)
-    // liked: 토글 후 예상 상태 (action='like' → true, action='unlike' → false)
-    // likeCount: 토글 후 예상 개수
+    // 클라이언트에게 즉시 실제 응답
     return {
       success: true,
-      queued: true,
       postId: id,
-      liked: action === 'like',
-      likeCount: expectedLikeCount
+      liked: result.liked,
+      likeCount: result.likeCount
     };
   }
 
@@ -626,87 +595,7 @@ export class PostsController {
     return result;
   }
 
-  // ===================================================
-  // 좋아요 큐 모니터링 엔드포인트 (Grafana용)
-  // ===================================================
-
-  @Public()
-  @Get('queue/metrics')
-  @ApiOperation({
-    summary: '좋아요 큐 메트릭 조회',
-    description: 'Grafana 대시보드에서 사용할 좋아요 큐 메트릭 정보 (큐 크기, 처리율, 평균 처리 시간 등)'
-  })
-  @ApiResponse({
-    status: 200,
-    description: '큐 메트릭',
-    schema: {
-      type: 'object',
-      properties: {
-        queueSize: { type: 'number', description: '현재 큐에 대기 중인 좋아요 요청 수' },
-        dlqSize: { type: 'number', description: 'Dead Letter Queue 크기' },
-        processingRate: { type: 'number', description: '처리율 (requests/second)' },
-        averageProcessingTime: { type: 'number', description: '평균 처리 시간 (ms)' },
-        lastProcessedAt: { type: 'string', format: 'date-time', description: '마지막 처리 시간' },
-        failureRate: { type: 'number', description: '실패율 (0.0 ~ 1.0)' },
-      }
-    }
-  })
-  async getLikeQueueMetrics() {
-    return this.likeQueueService.getMetrics();
-  }
-
-  @Public()
-  @Get('queue/health')
-  @ApiOperation({
-    summary: '좋아요 큐 건강 상태 조회',
-    description: '큐의 건강 상태, 샤드별 분포, 경고 메시지 확인'
-  })
-  @ApiResponse({
-    status: 200,
-    description: '큐 건강 상태',
-    schema: {
-      type: 'object',
-      properties: {
-        healthy: { type: 'boolean', description: '건강 여부' },
-        totalSize: { type: 'number', description: '전체 큐 크기' },
-        distribution: {
-          type: 'object',
-          description: '샤드별 큐 크기 분포',
-          additionalProperties: { type: 'number' }
-        },
-        warnings: {
-          type: 'array',
-          items: { type: 'string' },
-          description: '경고 메시지 목록'
-        },
-      }
-    }
-  })
-  async getLikeQueueHealth() {
-    return this.likeQueueService.getQueueHealth();
-  }
-
-  @Post('queue/recover-dlq')
-  @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles(Role.ADMIN)
-  @ApiBearerAuth()
-  @ApiOperation({
-    summary: 'Dead Letter Queue에서 좋아요 요청 복구 (관리자 전용)',
-    description: '실패한 좋아요 요청을 DLQ에서 가져와 다시 큐에 추가'
-  })
-  @ApiResponse({ status: 200, description: '복구 완료' })
-  @ApiResponse({ status: 403, description: '권한 없음' })
-  async recoverDeadLetterQueue(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number
-  ) {
-    const recovered = await this.likeQueueService.recoverFromDeadLetterQueue(limit);
-    return {
-      recovered: recovered.length,
-      message: `${recovered.length}개 좋아요 요청이 복구되었습니다.`
-    };
-  }
-
-  /**
+    /**
    * 사용자의 모든 카테고리 목록 조회 (자동완성용)
    *
    * @description

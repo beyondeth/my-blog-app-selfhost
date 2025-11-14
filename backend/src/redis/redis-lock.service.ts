@@ -138,6 +138,41 @@ export class RedisLockService {
   }
 
   /**
+   * 락을 획득하고 작업을 실행한 후 락을 해제 (편의 메서드)
+   * @param resource 리소스 키
+   * @param callback 락을 획득한 후 실행할 콜백 함수
+   * @param options 락 옵션
+   * @returns 콜백 함수의 반환값
+   */
+  async withLock<T>(
+    resource: string,
+    callback: () => Promise<T>,
+    options: {
+      ttl?: number;
+      retryTimes?: number;
+      retryDelay?: number;
+    } = {}
+  ): Promise<T> {
+    const { ttl = 5000, retryTimes = 3, retryDelay = 100 } = options;
+
+    // 락 획득
+    const lockId = await this.waitForLock(resource, ttl, retryTimes, retryDelay);
+
+    if (!lockId) {
+      throw new Error(`Failed to acquire lock for resource: ${resource}`);
+    }
+
+    try {
+      // 콜백 실행
+      const result = await callback();
+      return result;
+    } finally {
+      // 락 해제
+      await this.releaseLock(resource, lockId);
+    }
+  }
+
+  /**
    * 락을 기다리면서 획득 시도 (with retry)
    * @param resource 리소스 키
    * @param ttl 락 유지 시간

@@ -398,14 +398,12 @@ export default function EditPostForm({
                               value={inputValue}
                               onChange={(e) => {
                                 handleInputChange(e.target.value);
-                                setShowDropdown(e.target.value.trim().length > 0);
                               }}
                               onKeyDown={handleKeyDown}
                               onCompositionStart={() => setIsComposing(true)}
                               onCompositionEnd={() => setIsComposing(false)}
                               onFocus={() => {
                                 setIsFocused(true);
-                                setShowDropdown(inputValue.trim().length > 0);
                               }}
                               onBlur={() => {
                                 // 입력 중인 값이 있으면 자동으로 추가 (엔터/콤마 없이 저장 시)
@@ -418,7 +416,6 @@ export default function EditPostForm({
                                   }
                                 }
                                 setIsFocused(false);
-                                setTimeout(() => setShowDropdown(false), 200);
                                 field.onBlur();
                               }}
                               disabled={categories.length >= 2 || isLoading}

@@ -1,5 +1,6 @@
 'use client';
 
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
 import type { Comment, CommentForm } from '@/types';
@@ -21,8 +22,8 @@ export function useComments(postId: string, options?: { enabled?: boolean }) {
 export function useCreateComment(postId: string, onReplyAdded?: (parentId: string) => void) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
-  
-  return useMutation({
+
+  const mutation = useMutation({
     mutationFn: (data: CommentForm) => apiClient.createComment(data),
     onMutate: async (newComment) => {
       // 진행 중인 리페치 취소
@@ -62,7 +63,7 @@ export function useCreateComment(postId: string, onReplyAdded?: (parentId: strin
       if (previousComments) {
         const updatedComments = addCommentToTree(previousComments, tempComment);
         queryClient.setQueryData(['comments', postId], updatedComments);
-        
+
         // 답글인 경우 콜백으로 부모 ID 전달
         if (newComment.parentCommentId && onReplyAdded) {
           // 부모 댓글 찾기
@@ -78,7 +79,7 @@ export function useCreateComment(postId: string, onReplyAdded?: (parentId: strin
             }
             return null;
           };
-          
+
           const rootParentId = findParentId(previousComments, newComment.parentCommentId);
           if (rootParentId) {
             onReplyAdded(rootParentId);
@@ -88,13 +89,25 @@ export function useCreateComment(postId: string, onReplyAdded?: (parentId: strin
 
       return { previousComments };
     },
-    onError: (err, newComment, context) => {
+  });
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error) {
+      const context = mutation.context as { previousComments?: Comment[] };
+
       // 에러 시 이전 상태로 롤백
       if (context?.previousComments) {
         queryClient.setQueryData(['comments', postId], context.previousComments);
       }
-    },
-    onSuccess: (data, variables, context) => {
+    }
+  }, [mutation.isError, mutation.error, mutation.context, postId, queryClient]);
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess && mutation.data) {
+      const data = mutation.data;
+
       // Mixpanel: 댓글 작성 이벤트 추적
       mixpanel.track('Comment Created', {
         postId: data.postId,
@@ -113,73 +126,99 @@ export function useCreateComment(postId: string, onReplyAdded?: (parentId: strin
         const updatedComments = replaceCommentInTree(previousComments, data);
         queryClient.setQueryData(['comments', postId], updatedComments);
       }
-    },
-  });
+    }
+  }, [mutation.isSuccess, mutation.data, postId, queryClient]);
+
+  return mutation;
 }
 
 // 댓글 수정 훅 - Optimistic Update
 export function useUpdateComment(postId: string) {
   const queryClient = useQueryClient();
-  
-  return useMutation({
-    mutationFn: ({ id, content }: { id: string; content: string }) => 
+
+  const mutation = useMutation({
+    mutationFn: ({ id, content }: { id: string; content: string }) =>
       apiClient.updateComment(id, content),
     onMutate: async ({ id, content }) => {
       await queryClient.cancelQueries({ queryKey: ['comments', postId] });
-      
+
       const previousComments = queryClient.getQueryData<Comment[]>(['comments', postId]);
-      
+
       if (previousComments) {
         const updatedComments = updateCommentInTree(previousComments, id, content);
         queryClient.setQueryData(['comments', postId], updatedComments);
       }
-      
+
       return { previousComments };
     },
-    onError: (err, variables, context) => {
+  });
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error) {
+      const context = mutation.context as { previousComments?: Comment[] };
+
       if (context?.previousComments) {
         queryClient.setQueryData(['comments', postId], context.previousComments);
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ 
+    }
+  }, [mutation.isError, mutation.error, mutation.context, postId, queryClient]);
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess) {
+      queryClient.invalidateQueries({
         queryKey: ['comments', postId],
         refetchType: 'none'
       });
-    },
-  });
+    }
+  }, [mutation.isSuccess, postId, queryClient]);
+
+  return mutation;
 }
 
 // 댓글 삭제 훅 - Optimistic Update
 export function useDeleteComment(postId: string) {
   const queryClient = useQueryClient();
-  
-  return useMutation({
+
+  const mutation = useMutation({
     mutationFn: (id: string) => apiClient.deleteComment(id),
     onMutate: async (id) => {
       await queryClient.cancelQueries({ queryKey: ['comments', postId] });
-      
+
       const previousComments = queryClient.getQueryData<Comment[]>(['comments', postId]);
-      
+
       if (previousComments) {
         const updatedComments = deleteCommentInTree(previousComments, id);
         queryClient.setQueryData(['comments', postId], updatedComments);
       }
-      
+
       return { previousComments };
     },
-    onError: (err, id, context) => {
+  });
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error) {
+      const context = mutation.context as { previousComments?: Comment[] };
+
       if (context?.previousComments) {
         queryClient.setQueryData(['comments', postId], context.previousComments);
       }
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ 
+    }
+  }, [mutation.isError, mutation.error, mutation.context, postId, queryClient]);
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess) {
+      queryClient.invalidateQueries({
         queryKey: ['comments', postId],
         refetchType: 'none'
       });
-    },
-  });
+    }
+  }, [mutation.isSuccess, postId, queryClient]);
+
+  return mutation;
 }
 
 // Helper functions for tree operations

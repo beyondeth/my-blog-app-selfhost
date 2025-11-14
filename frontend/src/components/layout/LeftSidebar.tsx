@@ -54,10 +54,12 @@ export default function LeftSidebar() {
     }
   }, [user, queryClient]);
 
-  // Debug logging
-  console.log('[LeftSidebar] user:', user?.id, user?.email);
-  console.log('[LeftSidebar] blog:', blog);
-  console.log('[LeftSidebar] loading:', loading);
+  // Debug logging (개발 환경에서만 출력)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[LeftSidebar] user:', user?.id, user?.email);
+    console.log('[LeftSidebar] blog:', blog);
+    console.log('[LeftSidebar] loading:', loading);
+  }
 
   // 읽지 않은 알림 수 조회 (로그인한 사용자 + Feature Flag 활성화 시에만)
   const { data: unreadCount = 0 } = useQuery({
@@ -93,11 +95,13 @@ export default function LeftSidebar() {
   // 내 블로그 URL 결정 (alias 우선)
   const myBlogUrl = blog ? (blog.alias ? `/@${blog.alias}` : `/${blog.slug}`) : '#';
 
-  // Debug logging for URL matching
-  console.log('[LeftSidebar] myBlogUrl:', myBlogUrl);
-  console.log('[LeftSidebar] pathname:', pathname);
-  console.log('[LeftSidebar] pathname === myBlogUrl:', pathname === myBlogUrl);
-  console.log('[LeftSidebar] user && blog condition:', !!user && !!blog);
+  // Debug logging for URL matching (개발 환경에서만 출력)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[LeftSidebar] myBlogUrl:', myBlogUrl);
+    console.log('[LeftSidebar] pathname:', pathname);
+    console.log('[LeftSidebar] pathname === myBlogUrl:', pathname === myBlogUrl);
+    console.log('[LeftSidebar] user && blog condition:', !!user && !!blog);
+  }
 
   return (
     <aside

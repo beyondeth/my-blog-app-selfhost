@@ -130,11 +130,17 @@ export class HtmlSanitizerService {
         );
       }
 
-      // DOMPurify로 살균
+      // DOMPurify로 살균 (안전성 체크 추가)
       const config = { ...this.domPurifyConfig };
 
       if (!allowComments) {
         config.ALLOW_COMMENTS = false;
+      }
+
+      // DOMPurify가 정상적으로 초기화되었는지 확인
+      if (!DOMPurify || typeof DOMPurify.sanitize !== 'function') {
+        console.error('DOMPurify is not properly initialized, falling back to sanitize-html');
+        return this.fallbackSanitize(html, options);
       }
 
       let sanitized = DOMPurify.sanitize(processedHtml, config);

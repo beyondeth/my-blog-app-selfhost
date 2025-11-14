@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useRouter } from 'next/navigation';
-import Toast, { ToastProps } from '@/components/ui/Toast';
+import { toast } from 'sonner';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
 import { CheckCircle2, AlertTriangle, Lightbulb, ChevronRight, ChevronDown, Copy } from 'lucide-react';
@@ -47,9 +47,6 @@ export default function ApiKeysPage() {
   const [selectedBlogId, setSelectedBlogId] = useState<string>('');
   const [keyName, setKeyName] = useState('My MCP Key');
   const [expandedEnv, setExpandedEnv] = useState<string | null>(null);
-
-  // Toast 상태
-  const [toast, setToast] = useState<ToastProps | null>(null);
 
   // 삭제 확인 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
@@ -95,10 +92,7 @@ export default function ApiKeysPage() {
 
   const createKey = async () => {
     if (!selectedBlogId) {
-      setToast({
-        message: '블로그를 선택해주세요.',
-        type: 'error',
-      });
+      toast.error('블로그를 선택해주세요.');
       return;
     }
 
@@ -118,16 +112,10 @@ export default function ApiKeysPage() {
 
       setNewKey(response.data.data);
       fetchKeys(); // 목록 갱신
-      setToast({
-        message: 'API Key가 생성되었습니다!',
-        type: 'success',
-      });
+      toast.success('API Key가 생성되었습니다!');
     } catch (error: any) {
       console.error('Failed to create API key:', error);
-      setToast({
-        message: 'API Key 생성 실패: ' + (error.response?.data?.message || error.message),
-        type: 'error',
-      });
+      toast.error('API Key 생성 실패: ' + (error.response?.data?.message || error.message));
     } finally {
       setCreating(false);
     }
@@ -143,17 +131,11 @@ export default function ApiKeysPage() {
       });
 
       fetchKeys(); // 목록 갱신
-      setToast({
-        message: 'API Key가 삭제되었습니다.',
-        type: 'success',
-      });
+      toast.success('API Key가 삭제되었습니다.');
       setDeleteDialog({ isOpen: false, keyId: null, keyName: '' });
     } catch (error: any) {
       console.error('Failed to delete API key:', error);
-      setToast({
-        message: 'API Key 삭제 실패: ' + (error.response?.data?.message || error.message),
-        type: 'error',
-      });
+      toast.error('API Key 삭제 실패: ' + (error.response?.data?.message || error.message));
     }
   };
 
@@ -167,10 +149,7 @@ export default function ApiKeysPage() {
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    setToast({
-      message: '클립보드에 복사되었습니다!',
-      type: 'success',
-    });
+    toast.success('클립보드에 복사되었습니다!');
   };
 
   const toggleEnv = (env: string) => {
@@ -745,16 +724,6 @@ bearer_token = "${apiKey}"`;
           </div>
         </div>
       </div>
-
-      {/* Toast 알림 */}
-      {toast && (
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          duration={toast.duration}
-          onClose={() => setToast(null)}
-        />
-      )}
 
       {/* 삭제 확인 다이얼로그 */}
       <DeleteConfirmDialog

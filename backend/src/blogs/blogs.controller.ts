@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, Param, UseGuards, Request, UnauthorizedException } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, UseGuards, Request, UnauthorizedException, Logger } from '@nestjs/common';
 import { BlogsService } from './blogs.service';
 import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
@@ -8,14 +8,18 @@ import { CurrentUser } from '../common/decorators/current-user.decorator';
 import { User } from '../users/entities/user.entity';
 import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { BlogStatsService } from '../common/services/blog-stats.service';
+import { BlogResolverService } from '../common/services/blog-resolver.service';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @ApiTags('blogs')
 @Controller('blogs')
 export class BlogsController {
+  private readonly logger = new Logger(BlogsController.name);
+
   constructor(
     private readonly blogsService: BlogsService,
     private readonly blogStatsService: BlogStatsService,
+    private readonly blogResolverService: BlogResolverService,
   ) {}
 
   @Post()
@@ -116,7 +120,21 @@ export class BlogsController {
     },
   })
   async getBlogCategories(@Param('slug') slug: string): Promise<Array<{ category: string; count: number }>> {
-    return this.blogStatsService.getBlogCategoriesWithCount(slug);
+    // BlogResolverService를 사용하여 식별자 우선순위(alias > old_alias > slug) 적용
+    this.logger.debug(`📡 [CATEGORIES API] Looking up blog with slug: ${slug}`);
+    const blog = await this.blogResolverService.resolveBlogByIdentifier(slug);
+
+    if (!blog) {
+      // 블로그를 찾지 못하면 빈 배열 반환
+      this.logger.warn(`📡 [CATEGORIES API] Blog not found for slug: ${slug}`);
+      return [];
+    }
+
+    this.logger.debug(`📡 [CATEGORIES API] Found blog: ${blog.id} (${blog.slug}, alias: ${blog.alias})`);
+    // blogId로 카테고리 조회 (안정적인 blogId 기반)
+    const result = await this.blogStatsService.getBlogCategoriesWithCountById(blog.id);
+    this.logger.debug(`📡 [CATEGORIES API] Categories result:`, result);
+    return result;
   }
 
   /**

@@ -2,8 +2,9 @@
 
 ## Critical Rules
 
+⏺ 이제 서버가 정상적으로 실행되는지 확인해보겠습니다. <-- 이런 행위 절대금지. 사용자에게 확인해달라고 요청.>
 ### Port Management
-- **Never start/restart servers** - User manages terminals manually
+- **Never start/restart servers** - User manages terminals manually !!!
 - Frontend: Port 3001 (`pnpm dev`)
 - Backend: Port 3000 (`pnpm start:dev`)
 

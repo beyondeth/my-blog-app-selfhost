@@ -78,6 +78,11 @@ export class PostMapperService {
                 (post.metadata && post.metadata.tags) ||
                 [];
 
+    // viewCount, likeCount, commentCount는 PostStats에서 가져오기
+    dto.viewCount = post.stats?.viewCount || 0;
+    dto.likeCount = post.stats?.likeCount || 0;
+    dto.commentCount = post.stats?.commentCount || 0;
+
     // 썸네일 URL 최적화
     if (dto.thumbnail) {
       // S3 키가 있으면 CDN URL로 변환

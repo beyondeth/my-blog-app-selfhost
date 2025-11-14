@@ -155,11 +155,24 @@ export class PostCreationService {
         post.status = 'draft';
       }
 
-      // 6. 포스트 저장
+      // 6. 포스트 저장 (search_vector는 null로 초기화)
+      post.search_vector = null; // 트리거 방지를 위해 명시적으로 null 설정
       const savedPost = await manager.save(post);
 
       // Debug: 저장된 포스트의 태그 확인
       this.logger.debug(`[PostCreationService] Post saved - ID: ${savedPost.id}, Tags: ${JSON.stringify(savedPost.tags)}, Input Tags: ${JSON.stringify(createPostDto.tags)}`);
+
+      // 6.1. 검색 벡터 업데이트 (트리거 없이 직접 처리)
+      if (savedPost.title || savedPost.content) {
+        const searchText = `${savedPost.title || ''} ${savedPost.content || ''}`.trim();
+        if (searchText) {
+          await manager.query(
+            `UPDATE posts SET search_vector = to_tsvector('simple', $1) WHERE id = $2`,
+            [searchText, savedPost.id]
+          );
+          this.logger.debug(`[PostCreationService] Search vector updated for post: ${savedPost.id}`);
+        }
+      }
 
       // 7. PostStats 생성
       const stats = manager.create(PostStats, {

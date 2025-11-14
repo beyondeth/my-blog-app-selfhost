@@ -8,17 +8,17 @@ export class CreateBookmarksTable1759400100000 implements MigrationInterface {
         name: 'bookmarks',
         columns: [
           {
-            name: 'user_id',
+            name: 'userId',
             type: 'uuid',
             isPrimary: true,
           },
           {
-            name: 'post_id',
+            name: 'postId',
             type: 'uuid',
             isPrimary: true,
           },
           {
-            name: 'created_at',
+            name: 'createdAt',
             type: 'timestamp',
             default: 'now()',
           },
@@ -26,14 +26,14 @@ export class CreateBookmarksTable1759400100000 implements MigrationInterface {
         foreignKeys: [
           {
             name: 'FK_bookmark_user',
-            columnNames: ['user_id'],
+            columnNames: ['userId'],
             referencedTableName: 'users',
             referencedColumnNames: ['id'],
             onDelete: 'CASCADE',
           },
           {
             name: 'FK_bookmark_post',
-            columnNames: ['post_id'],
+            columnNames: ['postId'],
             referencedTableName: 'posts',
             referencedColumnNames: ['id'],
             onDelete: 'CASCADE',
@@ -48,7 +48,7 @@ export class CreateBookmarksTable1759400100000 implements MigrationInterface {
       'bookmarks',
       new TableIndex({
         name: 'idx_bookmark_user_created',
-        columnNames: ['user_id', 'created_at'],
+        columnNames: ['userId', 'createdAt'],
       }),
     );
 
@@ -57,7 +57,7 @@ export class CreateBookmarksTable1759400100000 implements MigrationInterface {
       'bookmarks',
       new TableIndex({
         name: 'idx_bookmark_post',
-        columnNames: ['post_id'],
+        columnNames: ['postId'],
       }),
     );
   }

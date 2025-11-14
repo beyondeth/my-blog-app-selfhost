@@ -16,6 +16,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { Post } from '../../posts/entities/post.entity';
 import { Comment } from '../../comments/entities/comment.entity';
 import { CommentLike } from '../../comments/entities/comment-like.entity';
+import { PostLike } from '../../posts/entities/post-like.entity';
 import { Role } from '../../common/enums/role.enum';
 import { Follow } from '../../follows/entities/follow.entity';
 import { Notification } from '../../notifications/entities/notification.entity';
@@ -254,6 +255,12 @@ export class User {
    */
   @OneToMany(() => CommentLike, (commentLike) => commentLike.user)
   commentLikes?: CommentLike[];
+
+  /**
+   * PostLike 관계 (1:N)
+   */
+  @OneToMany(() => PostLike, (postLike) => postLike.user)
+  postLikes?: PostLike[];
 
   /**
    * Follow 관계 (1:N)
