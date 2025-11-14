@@ -60,6 +60,8 @@ export class PostsService {
     private postsRepository: Repository<Post>,
     @InjectRepository(PostStats)
     private postStatsRepository: Repository<PostStats>,
+    @InjectRepository(PostMetadata)
+    private postMetadataRepository: Repository<PostMetadata>,
     @InjectRepository(File)
     private filesRepository: Repository<File>,
     @InjectRepository(FileContext)
@@ -690,6 +692,27 @@ export class PostsService {
       throw new NotFoundException('포스트를 찾을 수 없습니다.');
     }
 
+    // PostMetadata 엔티티 업데이트 (주 데이터 소스)
+    let metadata = await this.postMetadataRepository.findOne({ where: { postId } });
+    if (!metadata) {
+      // PostMetadata가 없으면 새로 생성
+      metadata = this.postMetadataRepository.create({
+        postId,
+        isEditorPick,
+        editorPickedAt: isEditorPick ? new Date() : null,
+      });
+      await this.postMetadataRepository.save(metadata);
+    } else {
+      // 기존 PostMetadata 업데이트
+      if (isEditorPick) {
+        metadata.setAsEditorPick();
+      } else {
+        metadata.removeEditorPick();
+      }
+      await this.postMetadataRepository.save(metadata);
+    }
+
+    // Post 테이블도 함께 업데이트 (호환성 유지)
     await this.postsRepository.update(postId, {
       isEditorPick,
       editorPickedAt: isEditorPick ? new Date() : null,
