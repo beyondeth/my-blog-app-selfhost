@@ -89,27 +89,58 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
   // 성공 처리
   React.useEffect(() => {
     if (mutation.isSuccess && mutation.data) {
-      const data = mutation.data;
+      const post = mutation.data; // API가 이제 Post 전체 데이터를 반환
 
-      // 1. Editor's Pick 목록 캐시 무효화 (모든 limit 값)
+      // 1. Optimistic Update: 포스트 상세 캐시 즉시 업데이트
+      queryClient.setQueriesData(
+        {
+          queryKey: ['posts', 'detail'],
+          exact: false
+        },
+        (oldData: any) => {
+          if (!oldData) return oldData;
+
+          // 단일 포스트 데이터인 경우
+          if (oldData.id) {
+            return { ...oldData, isEditorPick: post.isEditorPick };
+          }
+
+          // 배열인 경우 (목록)
+          if (Array.isArray(oldData)) {
+            return oldData.map((p: any) =>
+              p.id === post.id ? { ...p, isEditorPick: post.isEditorPick } : p
+            );
+          }
+
+          return oldData;
+        }
+      );
+
+      // 2. Editor's Pick 목록 캐시 무효화 (모든 limit 값)
       for (let limit = 1; limit <= 10; limit++) {
         queryClient.invalidateQueries({ queryKey: ['editorPicks', limit] });
       }
 
-      // 2. 포스트 상세 캐시 무효화 (올바른 키 사용!)
-      queryClient.invalidateQueries({
-        queryKey: ['posts', 'detail'], // 'post'가 아니라 'posts'!
-        exact: false  // detail 하위의 모든 키 무효화
-      });
+      // 3. 포스트 목록 캐시도 업데이트 (댓글 옆 아이콘 업데이트용)
+      queryClient.setQueriesData(
+        {
+          queryKey: ['posts', 'list'],
+          exact: false
+        },
+        (oldData: any) => {
+          if (!oldData || !oldData.posts) return oldData;
 
-      // 3. 포스트 목록 캐시도 무효화 (댓글 옆 아이콘 업데이트용)
-      queryClient.invalidateQueries({
-        queryKey: ['posts', 'list'],
-        exact: false
-      });
+          return {
+            ...oldData,
+            posts: oldData.posts.map((p: any) =>
+              p.id === post.id ? { ...p, isEditorPick: post.isEditorPick } : p
+            )
+          };
+        }
+      );
 
       // 성공 메시지 표시 (중복 방지를 위해 ID 사용)
-      const isAdded = data.isEditorPick;
+      const isAdded = post.isEditorPick;
       const message = isAdded
         ? '게시글을 Editor\'s Pick에 추가했습니다.'
         : '게시글을 Editor\'s Pick에서 제거했습니다.';

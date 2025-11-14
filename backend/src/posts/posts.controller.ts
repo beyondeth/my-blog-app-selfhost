@@ -590,9 +590,21 @@ export class PostsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
   ) {
-    const result = await this.postsService.toggleEditorPick(id, user);
+    // Editor's Pick 토글 실행
+    await this.postsService.toggleEditorPick(id, user);
+
+    // 업데이트된 포스트 전체 데이터 반환 (isEditorPick 포함)
+    // 먼저 포스트를 찾아서 slug를 얻은 후, findBySlug로 전체 데이터 조회
+    const post = await this.postsService.findOne({ where: { id } });
+    if (!post) {
+      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+    }
+
+    // findBySlug를 사용하여 isEditorPick 필드가 포함된 전체 데이터 조회
+    const updatedPost = await this.postsService.findBySlug(post.slug, user);
+
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
-    return result;
+    return updatedPost;
   }
 
     /**
