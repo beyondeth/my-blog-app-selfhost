@@ -595,7 +595,7 @@ export class PostsController {
 
     // 업데이트된 포스트 전체 데이터 반환 (isEditorPick 포함)
     // 먼저 포스트를 찾아서 slug를 얻은 후, findBySlug로 전체 데이터 조회
-    const post = await this.postsService.findOne({ where: { id } });
+    const post = await this.postsService.findOne(id, user);
     if (!post) {
       throw new NotFoundException('포스트를 찾을 수 없습니다.');
     }
