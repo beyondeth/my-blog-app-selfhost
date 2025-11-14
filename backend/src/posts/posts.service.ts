@@ -712,11 +712,8 @@ export class PostsService {
       await this.postMetadataRepository.save(metadata);
     }
 
-    // Post 테이블도 함께 업데이트 (호환성 유지)
-    await this.postsRepository.update(postId, {
-      isEditorPick,
-      editorPickedAt: isEditorPick ? new Date() : null,
-    });
+    // Post 테이블 업데이트 제거 - 트리거 재귀 호출 방지
+    // PostMetadata가 단일 데이터 소스이므로 posts 테이블 업데이트 불필요
 
     // Editor's Pick 캐시 무효화 이벤트 발행
     this.eventEmitter.emit(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, {
