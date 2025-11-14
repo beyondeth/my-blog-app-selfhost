@@ -109,7 +109,12 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
       });
 
       // 성공 메시지 표시
-      toast.success(data.message || 'Editor\'s Pick이 변경되었습니다.', {
+      const isAdded = data.isEditorPick;
+      const message = isAdded
+        ? '게시글을 Editor\'s Pick에 추가했습니다.'
+        : '게시글을 Editor\'s Pick에서 제거했습니다.';
+
+      toast.success(message, {
         duration: 3000,
         position: 'bottom-right',
       });

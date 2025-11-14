@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useCallback, useMemo, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, Suspense, lazy } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useInfiniteCursorPosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
+import { useHomepagePosts } from '@/hooks/useHomepagePosts'; // 홈페이지 전용 훅
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 
@@ -12,14 +13,14 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostArticle from '@/components/posts/PostArticle';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
-import PromoCarouselSection from '@/components/layout/PromoCarouselSection';
-import EditorPickSection from '@/components/layout/EditorPickSection';
-import PopularPostsSection from '@/components/layout/PopularPostsSection';
-import TagsSection from '@/components/layout/TagsSection';
-import FollowingListSection from '@/components/FollowingListSection';
-import SidebarFooter from '@/components/home/SidebarFooter';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
+
+// 사이드바 컴포넌트 lazy loading (초기 로딩 최적화)
+const PromoCarouselSection = lazy(() => import('@/components/layout/PromoCarouselSection'));
+const EditorPickSection = lazy(() => import('@/components/layout/EditorPickSection'));
+const PopularPostsSection = lazy(() => import('@/components/layout/PopularPostsSection'));
+const FollowingListSection = lazy(() => import('@/components/FollowingListSection'));
 
 /**
  * 홈 페이지 메인 컴포넌트
@@ -50,9 +51,7 @@ function HomePageContent() {
   // URL에서 검색 파라미터 파싱
   const currentParams = parseSearchParams(searchParams.toString());
 
-  // 커서 페이지네이션 사용 (성능 최적화를 위해 항상 활성화)
-  const useCursorPagination = true; // 항상 커서 페이지네이션 사용 (대용량 데이터 처리)
-
+  // 홈페이지 최적화된 훅 사용 (로딩 속도 개선)
   const {
     data,
     fetchNextPage,
@@ -60,17 +59,13 @@ function HomePageContent() {
     isFetchingNextPage,
     isLoading,
     error
-  } = useCursorPagination
-    ? useInfiniteCursorPosts({
-        search: currentParams.search,
-        sort: 'recent',
-        limit: 20,
-        enabled: true
-      })
-    : useInfinitePosts({
-        search: currentParams.search,
-        enabled: true // 홈 페이지는 항상 포스트 로드
-      });
+  } = useHomepagePosts({
+    search: currentParams.search,
+    enabled: true
+  });
+
+  // 커서 페이지네이션 사용 (성능 최적화를 위해 항상 활성화)
+  const useCursorPagination = true; // 항상 커서 페이지네이션 사용 (대용량 데이터 처리)
 
   // 디버깅 로그
   // console.log('🔍 [Home Debug] isLoading:', isLoading);
@@ -284,18 +279,28 @@ function HomePageContent() {
           {/* Sidebar - fixed positioning with internal scroll */}
         <aside className="hidden lg:block lg:fixed lg:right-16 lg:top-40 lg:w-80 lg:h-[calc(100vh-8rem)] lg:overflow-y-auto sidebar-scroll">
           <div className="space-y-4 sm:space-y-6">
-            {/* 프로모션 캐러셀 섹션 (자동 슬라이드) */}
-            <PromoCarouselSection />
+            {/* 프로모션 캐러셀 섹션 (자동 슬라이드) - Lazy Loading */}
+            <Suspense fallback={<div className="h-48 bg-gray-100 animate-pulse rounded-lg" />}>
+              <PromoCarouselSection />
+            </Suspense>
 
-            {/* Editor's Pick 섹션 */}
-            <EditorPickSection />
+            {/* Editor's Pick 섹션 - Lazy Loading */}
+            <Suspense fallback={<div className="h-64 bg-gray-100 animate-pulse rounded-lg" />}>
+              <EditorPickSection />
+            </Suspense>
 
-            <PopularPostsSection />
+            {/* Popular Posts 섹션 - Lazy Loading */}
+            <Suspense fallback={<div className="h-96 bg-gray-100 animate-pulse rounded-lg" />}>
+              <PopularPostsSection />
+            </Suspense>
 
             <TagsSection tags={tags} onTagClick={handleTagClick} />
 
+            {/* Following List 섹션 - Lazy Loading */}
             {user && (
-              <FollowingListSection userId={user.id} />
+              <Suspense fallback={<div className="h-64 bg-gray-100 animate-pulse rounded-lg" />}>
+                <FollowingListSection userId={user.id} />
+              </Suspense>
             )}
 
             {/* 사이드바 푸터 */}
