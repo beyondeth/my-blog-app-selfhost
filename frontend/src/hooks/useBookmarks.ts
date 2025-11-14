@@ -1,3 +1,4 @@
+import React from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { mixpanel } from '@/lib/mixpanel';
@@ -55,7 +56,7 @@ const fetchBookmarks = async (page: number = 1, pageSize: number = 20) => {
 export const useToggleBookmark = (postId: string, onUnauthorized?: () => void) => {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: () => {
       // postId가 없거나 빈 문자열이면 에러 throw
       if (!postId) {
@@ -81,7 +82,13 @@ export const useToggleBookmark = (postId: string, onUnauthorized?: () => void) =
       // 롤백을 위해 이전 상태 반환
       return { previousBookmarkStatus };
     },
-    onSuccess: (data) => {
+  });
+
+  // 성공 및 에러 처리를 mutation 외부에서 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess && mutation.data) {
+      const data = mutation.data;
+
       // Mixpanel: 북마크 추가 이벤트 추적 (추가 시만)
       if (data.bookmarked) {
         mixpanel.track('Post Bookmarked', { postId });
@@ -115,8 +122,14 @@ export const useToggleBookmark = (postId: string, onUnauthorized?: () => void) =
 
       // 성공 메시지
       toast.success(data.message || (data.bookmarked ? '북마크에 추가되었습니다.' : '북마크가 제거되었습니다.'));
-    },
-    onError: (error: any, _, context) => {
+    }
+  }, [mutation.isSuccess, mutation.data, postId, queryClient]);
+
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error) {
+      const error = mutation.error as any;
+      const context = mutation.context as { previousBookmarkStatus?: any };
+
       // 옵티미스틱 업데이트 롤백: 이전 상태로 복원
       if (context?.previousBookmarkStatus) {
         queryClient.setQueryData(['bookmark-status', postId], context.previousBookmarkStatus);
@@ -130,8 +143,10 @@ export const useToggleBookmark = (postId: string, onUnauthorized?: () => void) =
 
       // 에러 메시지 표시
       toast.error(error.message || '북마크 처리 중 오류가 발생했습니다.');
-    },
-  });
+    }
+  }, [mutation.isError, mutation.error, mutation.context, postId, queryClient, onUnauthorized]);
+
+  return mutation;
 };
 
 /**
@@ -194,7 +209,7 @@ export const useIsBookmarked = (postId: string) => {
 export const useDeleteBookmark = () => {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async (postId: string) => {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/bookmarks/${postId}`,
@@ -209,7 +224,13 @@ export const useDeleteBookmark = () => {
         throw new Error(error.message || '북마크 삭제 중 오류가 발생했습니다.');
       }
     },
-    onSuccess: (_, postId) => {
+  });
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess && mutation.variables) {
+      const postId = mutation.variables;
+
       // 북마크 목록 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
 
@@ -223,9 +244,16 @@ export const useDeleteBookmark = () => {
       });
 
       toast.success('북마크가 삭제되었습니다.');
-    },
-    onError: (error: any) => {
+    }
+  }, [mutation.isSuccess, mutation.variables, queryClient]);
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error) {
+      const error = mutation.error as any;
       toast.error(error.message || '북마크 삭제 중 오류가 발생했습니다.');
-    },
-  });
+    }
+  }, [mutation.isError, mutation.error]);
+
+  return mutation;
 };

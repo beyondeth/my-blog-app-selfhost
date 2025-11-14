@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ForbiddenException, ConflictException } 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
+import { PostStats } from './entities/post-stats.entity';
 import { User } from '../users/entities/user.entity';
 
 @Injectable()
@@ -9,6 +10,8 @@ export class PostsServiceOptimized {
   constructor(
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
+    @InjectRepository(PostStats)
+    private postStatsRepository: Repository<PostStats>,
   ) {}
 
   /**
@@ -47,13 +50,17 @@ export class PostsServiceOptimized {
         if (isCurrentlyLiked) {
           // 좋아요 취소
           post.likedBy = post.likedBy.filter(u => u.id !== user.id);
-          post.likeCount = Math.max(0, post.likeCount - 1);
         } else {
           // 좋아요 추가
           if (!post.likedBy) post.likedBy = [];
           post.likedBy.push(user);
-          post.likeCount++;
         }
+
+        // likeCount는 PostStats에서 관리
+        // await this.postStatsRepository.update(
+        //   { postId: post.id },
+        //   { likeCount: isCurrentlyLiked ? Math.max(0, (await this.getLikeCount(post.id)) - 1) : (await this.getLikeCount(post.id)) + 1 }
+        // );
 
         // 4. 저장 시도 (version 자동 체크)
         // Optimistic Locking: version이 변경되었으면 에러 발생

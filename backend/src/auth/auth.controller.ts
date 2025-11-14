@@ -86,7 +86,7 @@ export class AuthController {
     res.cookie('access_token', authResponse.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // 프로덕션에서만 HTTPS 사용
-      sameSite: 'strict', // CSRF 방지를 위해 strict 사용
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 개발 환경에서는 lax 사용
       maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
@@ -94,7 +94,7 @@ export class AuthController {
     res.cookie('refresh_token', authResponse.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: '/',
     });
@@ -125,7 +125,7 @@ export class AuthController {
     res.cookie('access_token', authResponse.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // 프로덕션에서만 HTTPS 사용
-      sameSite: 'strict', // CSRF 방지를 위해 strict 사용
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax', // 개발 환경에서는 lax 사용
       maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: '/',
     });
@@ -133,7 +133,7 @@ export class AuthController {
     res.cookie('refresh_token', authResponse.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
+      sameSite: process.env.NODE_ENV === 'production' ? 'strict' : 'lax',
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: '/',
     });

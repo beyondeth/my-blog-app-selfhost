@@ -23,6 +23,7 @@ import { Blog } from '../../blogs/entities/blog.entity';
 import { Bookmark } from '../../bookmarks/entities/bookmark.entity';
 import { PostStats } from './post-stats.entity';
 import { PostMetadata } from './post-metadata.entity';
+import { PostLike } from './post-like.entity';
 
 /**
  * Post 엔티티 (슬림화 버전)
@@ -235,11 +236,10 @@ export class Post {
   /**
    * PostStats 관계 (1:1)
    * - 통계 정보 (viewCount, likeCount, commentCount, qualityScore)
-   * - cascade: true → Post 저장 시 PostStats도 함께 저장
+   * - cascade 제거: 무한 재귀 호출 방지를 위해 명시적으로 저장
    * - eager: false → 명시적으로 join 필요 (성능 최적화)
    */
   @OneToOne(() => PostStats, (stats) => stats.post, {
-    cascade: true,
     eager: false,
   })
   stats?: PostStats;
@@ -247,9 +247,9 @@ export class Post {
   /**
    * PostMetadata 관계 (1:1)
    * - 메타정보 (excerpt, tagList, category, SEO, 검색)
+   * - cascade 제거: 무한 재귀 호출 방지를 위해 명시적으로 저장
    */
   @OneToOne(() => PostMetadata, (metadata) => metadata.post, {
-    cascade: true,
     eager: false,
   })
   metadata?: PostMetadata;
@@ -307,6 +307,12 @@ export class Post {
     inverseJoinColumn: { name: 'fileId', referencedColumnName: 'id' },
   })
   attachedFiles?: File[];
+
+  /**
+   * PostLike 관계 (1:N)
+   */
+  @OneToMany(() => PostLike, (postLike) => postLike.post)
+  postLikes?: PostLike[];
 
   /**
    * Bookmark 관계 (1:N)
@@ -397,15 +403,15 @@ export class Post {
    * - 지금은 호환성을 위해 posts 테이블 컬럼으로 유지
    */
 
-  // 통계 정보 (향후 post_stats로 이동 예정)
-  @Column({ default: 0 })
-  viewCount: number;
+  // 통계 정보는 PostStats 엔티티로 이동 완료
+  // @Column({ default: 0 })
+  // viewCount: number; // PostStats.viewCount 사용
 
-  @Column({ default: 0 })
-  likeCount: number;
+  // @Column({ default: 0 })
+  // likeCount: number; // PostStats.likeCount 사용
 
-  @Column({ default: 0 })
-  commentCount: number;
+  // @Column({ default: 0 })
+  // commentCount: number; // PostStats.commentCount 사용
 
   @Column({ nullable: true })
   qualityScore: number;

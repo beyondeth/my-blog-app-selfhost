@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './entities/post.entity';
+import { PostStats } from './entities/post-stats.entity';
 import { Cron } from '@nestjs/schedule';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { CacheService } from '../cache/cache.service';
@@ -15,6 +16,8 @@ export class ViewCountService {
   constructor(
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
+    @InjectRepository(PostStats)
+    private postStatsRepository: Repository<PostStats>,
     private readonly cacheService: CacheService,
     private readonly eventEmitter: EventEmitter2,
   ) {}
@@ -40,11 +43,14 @@ export class ViewCountService {
     if (!count) return;
 
     try {
-      await this.postsRepository
+      await this.postStatsRepository
         .createQueryBuilder()
-        .update(Post)
-        .set({ viewCount: () => `"viewCount" + ${count}` })
-        .where('id = :id', { id: postId })
+        .update(PostStats)
+        .set({
+          viewCount: () => `"viewCount" + ${count}`,
+          updatedAt: () => 'CURRENT_TIMESTAMP'
+        })
+        .where('postId = :postId', { postId })
         .execute();
 
       this.viewCounts.delete(postId);
@@ -73,9 +79,12 @@ export class ViewCountService {
       for (const [postId, count] of entries) {
         await queryRunner.manager
           .createQueryBuilder()
-          .update(Post)
-          .set({ viewCount: () => `"viewCount" + ${count}` })
-          .where('id = :id', { id: postId })
+          .update(PostStats)
+          .set({
+            viewCount: () => `"viewCount" + ${count}`,
+            updatedAt: () => 'CURRENT_TIMESTAMP'
+          })
+          .where('postId = :postId', { postId })
           .execute();
       }
 

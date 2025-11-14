@@ -109,10 +109,10 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
     }
   }, [blog, postSlug, searchParams]);
 
-  // Fetch post details - initialPost가 있으면 사용, 없으면 fetch
+  // Fetch post details - initialPost가 있으면 캐시에 저장하고 추가 fetch 방지
   const { data: post, error, isError, refetch } = usePost(postSlug, {
     initialData: initialPost,
-    enabled: !initialPost, // initialPost가 있으면 fetch 안함
+    // initialData가 있으면 자동으로 refetch 방지됨 (React Query 기본 동작)
   });
   const deletePostMutation = useDeletePost();
   // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)

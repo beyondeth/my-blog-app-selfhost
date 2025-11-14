@@ -344,11 +344,6 @@ function LoginPageContent() {
                       validationErrors.password ? 'border-red-500 dark:border-red-400' : ''
                     } ${validationErrors.password ? 'shake' : ''}`}
                     disabled={isSubmitting}
-                    onKeyPress={(e) => {
-                      if (e.key === 'Enter') {
-                        handleSubmit(e as any);
-                      }
-                    }}
                   />
                   <button
                     type="button"

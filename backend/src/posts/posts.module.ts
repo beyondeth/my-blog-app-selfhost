@@ -6,6 +6,7 @@ import { PostsController } from './posts.controller';
 import { Post } from './entities/post.entity';
 import { PostStats } from './entities/post-stats.entity';
 import { PostMetadata } from './entities/post-metadata.entity';
+import { PostLike } from './entities/post-like.entity';
 import { File } from '../files/entities/file.entity';
 import { FileContext } from '../files/entities/file-context.entity';
 import { Blog } from '../blogs/entities/blog.entity';
@@ -29,9 +30,7 @@ import { BlogStatsService } from '../common/services/blog-stats.service';
 // Event Handlers
 import { BlogStatsHandler } from './handlers/blog-stats.handler';
 
-// Queue System
-import { LikeQueueService } from './services/like-queue.service';
-import { LikeBatchWorker } from './workers/like-batch.worker';
+// Queue System (Post Processing만 남기고 Like Queue 제거)
 import { POST_PROCESSING_QUEUE } from './queues/post-processing.queue';
 import { PostProcessingProcessor } from './processors/post-processing.processor';
 
@@ -43,26 +42,15 @@ import { PostContentService } from './services/post-content.service';
 import { PostReadService } from './services/post-read.service';
 import { PostInteractionService } from './services/post-interaction.service';
 import { PostCreationService } from './services/post-creation.service';
+import { PostLikeStatusService } from './services/post-like-status.service';
+import { PostInteractionStatusService } from './services/post-interaction-status.service';
+import { LikeService } from './services/like.service';
 
-export const LIKE_QUEUE_NAME = 'post-likes';
 
 @Module({
   imports: [
-    // Phase 1-2-3 리팩토링: PostStats, PostMetadata 엔티티 추가
-    TypeOrmModule.forFeature([Post, PostStats, PostMetadata, File, FileContext, Blog]),
-    // Like Queue (기존)
-    BullModule.registerQueue({
-      name: LIKE_QUEUE_NAME,
-      defaultJobOptions: {
-        removeOnComplete: true,
-        removeOnFail: false,
-        attempts: 3,
-        backoff: {
-          type: 'exponential',
-          delay: 1000,
-        },
-      },
-    }),
+    // Phase 1-2-3 리팩토링: PostStats, PostMetadata, PostLike 엔티티 추가
+    TypeOrmModule.forFeature([Post, PostStats, PostMetadata, PostLike, File, FileContext, Blog]),
     // Post Processing Queue (새로 추가 - Fast Path 최적화용)
     BullModule.registerQueue({
       name: POST_PROCESSING_QUEUE,
@@ -92,7 +80,7 @@ export const LIKE_QUEUE_NAME = 'post-likes';
     CacheModule, // Redis 캐시 모듈 추가
     BookmarksModule, // 북마크 모듈 추가
     RedisModule, // Redis 모듈 추가 (Queue용)
-    MetricsModule, // Prometheus 메트릭 모듈 추가 (LikeMetricsService 제공)
+    MetricsModule, // Prometheus 메트릭 모듈 추가
   ],
   providers: [
     PostsService,
@@ -103,16 +91,17 @@ export const LIKE_QUEUE_NAME = 'post-likes';
     PostReadService, // 조회 및 검색 서비스
     PostInteractionService, // 상호작용 관리 서비스
     PostCreationService, // 생성, 수정, 삭제 서비스
+    PostLikeStatusService, // 좋아요 상태 조회 서비스
+    PostInteractionStatusService, // 상호작용 상태 통합 서비스
+    LikeService, // 단순화된 좋아요 서비스
     MarkdownRendererService,
     ViewCountService,
     SearchIndexingService, // 검색 인덱싱 배치 서비스 추가
-    LikeQueueService, // 좋아요 큐 서비스
-    LikeBatchWorker, // 좋아요 배치 워커
     PostProcessingProcessor, // 포스트 처리 배치 워커 (Fast Path 최적화용)
     BlogStatsService, // 블로그 통계 서비스 (PostsModule로 이동)
     BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
   ],
   controllers: [PostsController],
-  exports: [PostsService, ViewCountService, SearchIndexingService, LikeQueueService, BlogStatsService, PostReadService, PostInteractionService, PostCreationService],
+  exports: [PostsService, ViewCountService, SearchIndexingService, BlogStatsService, PostReadService, PostInteractionService, PostCreationService],
 })
 export class PostsModule {} 

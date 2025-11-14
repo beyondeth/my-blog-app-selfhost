@@ -329,22 +329,25 @@ export class AdminDashboardService {
   async getPopularPosts(limit = 10) {
     const posts = await this.postRepository.find({
       where: { isPublished: true },
-      relations: ['author'],
-      order: {
-        viewCount: 'DESC',
-        likeCount: 'DESC',
-        commentCount: 'DESC',
-      },
+      relations: ['author', 'stats'],
       take: limit,
     });
 
-    return posts.map(post => ({
+    // PostStats를 기준으로 정렬 (viewCount, likeCount, commentCount)
+    const sortedPosts = posts
+      .sort((a, b) => {
+        const aScore = (a.stats?.viewCount || 0) + (a.stats?.likeCount || 0) + (a.stats?.commentCount || 0);
+        const bScore = (b.stats?.viewCount || 0) + (b.stats?.likeCount || 0) + (b.stats?.commentCount || 0);
+        return bScore - aScore;
+      });
+
+    return sortedPosts.map(post => ({
       id: post.id,
       title: post.title,
       author: post.author?.username || 'Unknown',
-      viewCount: post.viewCount,
-      likeCount: post.likeCount,
-      commentCount: post.commentCount,
+      viewCount: post.stats?.viewCount || 0,
+      likeCount: post.stats?.likeCount || 0,
+      commentCount: post.stats?.commentCount || 0,
       createdAt: post.createdAt,
     }));
   }
@@ -355,10 +358,11 @@ export class AdminDashboardService {
   async getTopContributors(limit = 10) {
     const result = await this.postRepository
       .createQueryBuilder('post')
+      .leftJoin('post.stats', 'stats')
       .select('post.authorId', 'userId')
       .addSelect('COUNT(*)', 'postCount')
-      .addSelect('SUM(post.viewCount)', 'totalViews')
-      .addSelect('SUM(post.likeCount)', 'totalLikes')
+      .addSelect('SUM(stats.viewCount)', 'totalViews')
+      .addSelect('SUM(stats.likeCount)', 'totalLikes')
       .groupBy('post.authorId')
       .orderBy('COUNT(*)', 'DESC')
       .limit(limit)
@@ -558,13 +562,15 @@ export class AdminDashboardService {
       this.commentRepository.count({ where }),
       this.postRepository
         .createQueryBuilder('post')
-        .select('SUM(post.viewCount)', 'total')
+        .leftJoin('post.stats', 'stats')
+        .select('SUM(stats.viewCount)', 'total')
         .where(where)
         .getRawOne()
         .then(r => parseInt(r?.total || '0')),
       this.postRepository
         .createQueryBuilder('post')
-        .select('SUM(post.likeCount)', 'total')
+        .leftJoin('post.stats', 'stats')
+        .select('SUM(stats.likeCount)', 'total')
         .where(where)
         .getRawOne()
         .then(r => parseInt(r?.total || '0')),

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -8,7 +8,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useCreatePost, useUserCategories, postQueryKeys } from '@/hooks/usePosts';
+import { useCreatePost, postQueryKeys } from '@/hooks/usePosts';
 import { useMyBlogs } from '@/hooks/useBlogs';
 import { useQueryClient } from '@tanstack/react-query';
 import Spinner from '@/components/ui/Spinner';
@@ -268,20 +268,9 @@ export default function NewStoryPage() {
                   const [inputValue, setInputValue] = React.useState('');
                   const [isFocused, setIsFocused] = React.useState(false);
                   const [isComposing, setIsComposing] = React.useState(false);
-                  const [showDropdown, setShowDropdown] = React.useState(false);
                   const categoryInputRef = React.useRef<HTMLInputElement>(null);
                   const categories = field.value || [];
                   const showLabel = isFocused || categories.length > 0 || inputValue;
-
-                  // 자동완성 데이터
-                  const { data: userCategories = [], isLoading: isCategoriesLoading } = useUserCategories();
-
-                  // 입력값으로 필터링된 자동완성 목록
-                  const filteredCategories = useMemo(() => {
-                    if (!inputValue.trim()) return userCategories;
-                    const lowerInput = inputValue.toLowerCase();
-                    return userCategories.filter(cat => cat.toLowerCase().includes(lowerInput));
-                  }, [userCategories, inputValue]);
 
                   const handleInputChange = (value: string) => {
                     // 콤마가 입력되면 카테고리로 변환
@@ -291,14 +280,12 @@ export default function NewStoryPage() {
                       if (newCategory.length > 15) {
                         toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
                         setInputValue('');
-                        setShowDropdown(false);
                         return;
                       }
                       if (newCategory && categories.length < 2 && !categories.includes(newCategory) && !newCategory.includes('/')) {
                         field.onChange([...categories, newCategory]);
                       }
                       setInputValue('');
-                      setShowDropdown(false);
                     } else {
                       setInputValue(value);
                     }
@@ -313,14 +300,12 @@ export default function NewStoryPage() {
                       if (newCategory.length > 15) {
                         toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
                         setInputValue('');
-                        setShowDropdown(false);
                         return;
                       }
 
                       if (newCategory && categories.length < 2 && !categories.includes(newCategory) && !newCategory.includes('/')) {
                         field.onChange([...categories, newCategory]);
                         setInputValue('');
-                        setShowDropdown(false);
                       }
                     } else if (e.key === 'Backspace' && !inputValue && categories.length > 0) {
                       // 입력값이 없을 때 Backspace로 마지막 카테고리 삭제
@@ -328,38 +313,7 @@ export default function NewStoryPage() {
                     }
                   };
 
-                  // 자동완성 선택
-                  const selectCategory = (category: string) => {
-                    // "메인/서브" 형식이면 파싱
-                    const parts = category.split('/').map(s => s.trim()).filter(Boolean);
-
-                    // 각 카테고리 길이 검증: 1~15자
-                    const invalidPart = parts.find(part => part.length > 15);
-                    if (invalidPart) {
-                      toast.error('카테고리는 최대 15글자까지 입력 가능합니다.');
-                      setShowDropdown(false);
-                      return;
-                    }
-
-                    // 현재 카테고리 개수 + 추가할 개수가 2개 초과하면 차단
-                    if (categories.length + parts.length > 2) {
-                      toast.error('카테고리는 최대 2개까지만 입력 가능합니다.');
-                      setShowDropdown(false);
-                      return;
-                    }
-
-                    const newCategories = [...categories];
-                    parts.forEach(part => {
-                      if (!newCategories.includes(part)) {
-                        newCategories.push(part);
-                      }
-                    });
-
-                    field.onChange(newCategories.slice(0, 2));
-                    setInputValue('');
-                    setShowDropdown(false);
-                  };
-
+                  
                   // 카테고리 삭제 (첫 번째 삭제 시 두 번째가 첫 번째로 승격)
                   const removeCategory = (indexToRemove: number) => {
                     const newCategories = categories.filter((_: string, i: number) => i !== indexToRemove);
@@ -428,14 +382,12 @@ export default function NewStoryPage() {
                               value={inputValue}
                               onChange={(e) => {
                                 handleInputChange(e.target.value);
-                                setShowDropdown(e.target.value.trim().length > 0);
                               }}
                               onKeyDown={handleKeyDown}
                               onCompositionStart={() => setIsComposing(true)}
                               onCompositionEnd={() => setIsComposing(false)}
                               onFocus={() => {
                                 setIsFocused(true);
-                                setShowDropdown(inputValue.trim().length > 0);
                               }}
                               onBlur={() => {
                                 // 입력 중인 값이 있으면 자동으로 추가 (엔터/콤마 없이 저장 시)
@@ -448,7 +400,6 @@ export default function NewStoryPage() {
                                   }
                                 }
                                 setIsFocused(false);
-                                setTimeout(() => setShowDropdown(false), 200);
                                 field.onBlur();
                               }}
                               disabled={categories.length >= 2 || createPostMutation.isPending}
@@ -460,23 +411,7 @@ export default function NewStoryPage() {
                               style={{ width: inputValue ? `${Math.max(235, inputValue.length * 14)}px` : '235px' }}
                             />
 
-                            {/* 자동완성 드롭다운 */}
-                            {showDropdown && filteredCategories.length > 0 && (
-                              <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                                {filteredCategories.map((category, index) => (
-                                  <button
-                                    key={index}
-                                    type="button"
-                                    onClick={() => selectCategory(category)}
-                                    className="w-full px-3 py-2 text-left hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors text-sm"
-                                  >
-                                    <span className="mr-2">🏷️</span>
-                                    {category}
-                                  </button>
-                                ))}
-                              </div>
-                            )}
-
+                            
                             {/* 안내 문구 */}
                             {!inputValue && categories.length === 0 && (
                               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 ml-0">

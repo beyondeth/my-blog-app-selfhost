@@ -6,11 +6,11 @@ export class FixDeletedUserBlogSlugs1763800000000 implements MigrationInterface 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 삭제된 사용자들의 블로그 slug를 'deleted-{original-slug}-{user-id-timestamp}' 형식으로 변경
     await queryRunner.query(`
-      UPDATE blogs
-      SET slug = 'deleted-' || b.slug || '-' || EXTRACT(EPOCH FROM u.updated_at)::bigint
+      UPDATE blogs b
+      SET slug = 'deleted-' || b.slug || '-' || EXTRACT(EPOCH FROM u."updatedAt")::bigint
       FROM users u
       WHERE b."userId" = u.id
-        AND u.isDeleted = true
+        AND u."isDeleted" = true
         AND b.slug NOT LIKE 'deleted-%'
     `);
 

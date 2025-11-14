@@ -24,7 +24,7 @@ import { PostResponseDto } from './dto/post-response.dto';
 import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
 import { CacheMetricsService } from '../metrics/cache-metrics.service';
 import { BookmarksService } from '../bookmarks/bookmarks.service';
-import { LikeQueueService } from './services/like-queue.service';
+import { LikeService } from './services/like.service';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-processing.queue';
@@ -73,7 +73,7 @@ export class PostsService {
     private cacheService: CacheService,
     private cacheMetricsService: CacheMetricsService,
     private bookmarksService: BookmarksService,
-    private likeQueueService: LikeQueueService,
+    private likeService: LikeService,
     @InjectQueue(POST_PROCESSING_QUEUE)
     private postProcessingQueue: Queue<PostProcessingJobData>,
     private readonly eventEmitter: EventEmitter2,
@@ -217,8 +217,8 @@ export class PostsService {
   async findPopularPosts(period: 'daily' | 'weekly' | 'monthly' | 'all' = 'weekly', limit: number = 10): Promise<PostResponseDto[]> {
     this.logger.debug(`Finding popular posts by period: ${period}, limit: ${limit}`);
 
-    // Editor's Pick 조회
-    const posts = await this.postReadService.getEditorPicks(limit);
+    // 인기 포스트 조회 (Materialized View 사용)
+    const posts = await this.postReadService.findPopularPosts(period, limit);
 
     // Post 엔티티를 DTO로 변환
     const dtos: PostResponseDto[] = [];
@@ -231,10 +231,19 @@ export class PostsService {
   }
 
   /**
-   * Editor's Pick 포스트 조회 (별칭)
+   * Editor's Pick 포스트 조회
    */
   async findEditorPicks(limit: number = 10): Promise<PostResponseDto[]> {
-    return this.findPopularPosts('all', limit);
+    this.logger.debug(`Getting Editor's Pick posts, limit: ${limit}`);
+
+    const posts = await this.postReadService.getEditorPicks(limit);
+
+    // PostResponseDto로 변환
+    const dtos = await Promise.all(
+      posts.map(post => this.postMapperService.toPostDto(post))
+    );
+
+    return dtos;
   }
 
   /**
@@ -261,16 +270,8 @@ export class PostsService {
   async toggleLike(postId: string, user: User): Promise<{ liked: boolean; likeCount: number }> {
     this.logger.debug(`Toggling like for post: ${postId} by user: ${user.id}`);
 
-    // 먼저 현재 좋아요 상태 확인
-    const currentlyLiked = await this.postInteractionService.getUserLikeStatus(postId, user.id);
-
-    // 좋아요 토글 실행
-    const newLikeCount = await this.postInteractionService.toggleLike(postId, user.id, !currentlyLiked);
-
-    return {
-      liked: !currentlyLiked,
-      likeCount: newLikeCount,
-    };
+    // LikeService를 사용하여 좋아요 토글 실행
+    return await this.likeService.toggleLike(postId, user.id);
   }
 
   /**
@@ -321,7 +322,7 @@ export class PostsService {
     };
 
     if (user) {
-      result.liked = await this.postInteractionService.getUserLikeStatus(postId, user.id);
+      result.liked = await this.likeService.isLiked(postId, user.id);
       result.bookmarked = await this.postInteractionService.getUserBookmarkStatus(postId, user.id);
     }
 
@@ -606,7 +607,11 @@ export class PostsService {
    */
   async incrementCommentCount(postId: string): Promise<void> {
     this.logger.debug(`Incrementing comment count for post: ${postId}`);
-    await this.postsRepository.increment({ id: postId }, 'commentCount', 1);
+    // PostStats 테이블의 commentCount 증가
+    await this.postStatsRepository.increment({ postId }, 'commentCount', 1);
+
+    // 캐시 무효화
+    await this.postCacheService.deletePostCache(postId);
   }
 
   /**
@@ -614,7 +619,18 @@ export class PostsService {
    */
   async decrementCommentCount(postId: string): Promise<void> {
     this.logger.debug(`Decrementing comment count for post: ${postId}`);
-    await this.postsRepository.decrement({ id: postId }, 'commentCount', 1);
+    // PostStats 테이블의 commentCount 감소 (음수 방지)
+    await this.postStatsRepository
+      .createQueryBuilder()
+      .update(PostStats)
+      .set({
+        commentCount: () => `GREATEST(0, "commentCount" - 1)`
+      })
+      .where('postId = :postId', { postId })
+      .execute();
+
+    // 캐시 무효화
+    await this.postCacheService.deletePostCache(postId);
   }
 
   // ========== Legacy Methods (하위 호환성용) ==========
@@ -679,7 +695,13 @@ export class PostsService {
       editorPickedAt: isEditorPick ? new Date() : null,
     });
 
-    // 캐시 무효화
+    // Editor's Pick 캐시 무효화 이벤트 발행
+    this.eventEmitter.emit(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, {
+      postId,
+      isPicked: isEditorPick,
+    });
+
+    // 기존 캐시 무효화
     this.eventEmitter.emit('cache.posts.invalidate', {
       postId,
       blogId: post.blogId,

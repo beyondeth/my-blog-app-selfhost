@@ -17,7 +17,7 @@ export default function LikeButton({
   return (
     <button
       type="button"
-      className={`flex items-center space-x-1 px-2 py-1 rounded-full text-xs transition-colors ${
+      className={`flex items-center space-x-0.5 px-2 py-1 rounded-full text-xs transition-colors ${
         liked
           ? 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/40'
           : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'

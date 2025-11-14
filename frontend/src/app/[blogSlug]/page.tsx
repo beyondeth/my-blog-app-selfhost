@@ -97,7 +97,7 @@ export default function BlogPage() {
   console.log('🔍 [CATEGORIES DEBUG]', {
     blogSlug,
     categoriesLoading,
-    categoriesLength: categories?.length || 0,
+    categoriesLength: (categories as any[])?.length || 0,
     categories,
     error: categoriesError
   });
@@ -390,14 +390,14 @@ export default function BlogPage() {
             {/* 카테고리별 현황 섹션 */}
             {(() => {
               console.log('🔍 [CATEGORY RENDER CONDITION]', {
-                shouldRender: !categoriesLoading && categories.length > 0,
+                shouldRender: !categoriesLoading && (categories as any[]).length > 0,
                 categoriesLoading,
-                categoriesLength: categories.length,
+                categoriesLength: (categories as any[]).length,
                 categories
               });
-              return !categoriesLoading && categories.length > 0 && (
+              return !categoriesLoading && (categories as any[]).length > 0 && (
                 <CategorySection
-                  categories={categories}
+                  categories={categories as any[]}
                   onCategoryClick={handleCategoryClick}
                 />
               );
