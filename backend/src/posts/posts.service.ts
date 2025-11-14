@@ -712,6 +712,23 @@ export class PostsService {
       await this.postMetadataRepository.save(metadata);
     }
 
+    // FIFO: Editor's Pick 제한 (최대 5개)
+    if (isEditorPick) {
+      // 현재 Editor's Pick 목록 조회 (최신순)
+      const currentPicks = await this.postMetadataRepository.find({
+        where: { isEditorPick: true },
+        order: { editorPickedAt: 'DESC' }
+      });
+
+      // 5개 초과 시 가장 오래된 pick 제거
+      if (currentPicks.length >= 5) {
+        const oldestPick = currentPicks[currentPicks.length - 1];
+        oldestPick.removeEditorPick();
+        await this.postMetadataRepository.save(oldestPick);
+        this.logger.log(`Removed oldest Editor's Pick: ${oldestPick.postId} (limit exceeded)`);
+      }
+    }
+
     // Post 테이블 업데이트 제거 - 트리거 재귀 호출 방지
     // PostMetadata가 단일 데이터 소스이므로 posts 테이블 업데이트 불필요
 
