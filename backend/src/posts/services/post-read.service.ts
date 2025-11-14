@@ -416,7 +416,9 @@ export class PostReadService {
       },
       relations: ['author', 'author.profile', 'blog', 'thumbnailImage', 'metadata'], // metadata 관계 추가
       order: {
-        'metadata.editorPickedAt': 'DESC',  // metadata 기준 정렬
+        metadata: {
+          editorPickedAt: 'DESC',  // metadata 기준 정렬
+        },
         publishedAt: 'DESC',
       },
       take: limit,

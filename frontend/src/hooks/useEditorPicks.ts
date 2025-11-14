@@ -92,29 +92,33 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
       const post = mutation.data; // API가 이제 Post 전체 데이터를 반환
 
       // 1. Optimistic Update: 포스트 상세 캐시 즉시 업데이트
-      queryClient.setQueriesData(
-        {
-          queryKey: ['posts', 'detail'],
-          exact: false
-        },
-        (oldData: any) => {
-          if (!oldData) return oldData;
-
-          // 단일 포스트 데이터인 경우
-          if (oldData.id) {
+      // usePost 훅의 실제 queryKey 패턴과 일치시킴
+      if (post.slug) {
+        queryClient.setQueriesData(
+          {
+            queryKey: ['posts', 'detail', post.slug],
+            exact: true
+          },
+          (oldData: any) => {
+            if (!oldData) return oldData;
             return { ...oldData, isEditorPick: post.isEditorPick };
           }
+        );
+      }
 
-          // 배열인 경우 (목록)
-          if (Array.isArray(oldData)) {
-            return oldData.map((p: any) =>
-              p.id === post.id ? { ...p, isEditorPick: post.isEditorPick } : p
-            );
+      // ID로도 시도 (다른 곳에서 ID를 사용할 경우)
+      if (post.id) {
+        queryClient.setQueriesData(
+          {
+            queryKey: ['posts', 'detail', post.id],
+            exact: true
+          },
+          (oldData: any) => {
+            if (!oldData) return oldData;
+            return { ...oldData, isEditorPick: post.isEditorPick };
           }
-
-          return oldData;
-        }
-      );
+        );
+      }
 
       // 2. Editor's Pick 목록 캐시 무효화 (모든 limit 값)
       for (let limit = 1; limit <= 10; limit++) {
