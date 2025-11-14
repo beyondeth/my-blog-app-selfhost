@@ -22,7 +22,7 @@ export enum CacheTTL {
   STATIC = 3600,     // 1시간 - 블로그 설정, 태그
 
   // 개선된 TTL - 단순화 및 최적화
-  POST_DETAIL = 60,  // 1분 - 포스트 상세 (기존 1800초에서 대폭 단축)
+  POST_DETAIL = 900, // 15분 - 포스트 상세 (캐시 효율화)
   PROFILE = 300,     // 5분 - 프로필 (기존 1800초에서 단축)
   MY_BLOG = 10,      // 10초 - 내 블로그 피드 (실시성 + 성능 균형)
   DAY = 86400,       // 24시간 - 사용자 조회 기록
@@ -922,6 +922,14 @@ export class CacheService implements OnModuleInit {
         for (let i = 1; i <= 5; i++) {
           keysToDelete.push(CacheKeys.BLOG_FEED_BY_ID(blogId, i));
         }
+
+        // 블로그 통계 관련 캐시 무효화 (blogId 기반)
+        keysToDelete.push(
+          `blog:stats:categories:id:${blogId}`,  // blogId 기반 카테고리 캐시
+          `blog:stats:posts:${blogId}`,          // 블로그 포스트 수 캐시
+          `blog:stats:activity:${blogId}:30`,    // 블로그 활동 통계 캐시
+          `blog:stats:popular:${blogId}:5`       // 블로그 인기 포스트 캐시
+        );
       }
 
       // 3. 개별 키 삭제

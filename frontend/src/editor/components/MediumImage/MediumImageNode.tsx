@@ -197,7 +197,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
           className={cn(
             'medium-image',
             `medium-image-${node.attrs.size}`,
-            'rounded-lg object-contain',
+            'object-contain',
             selected && 'ring-4 ring-emerald-500'
           )}
           onLoad={handleImageLoad}

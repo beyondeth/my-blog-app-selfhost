@@ -26,22 +26,11 @@ export class BlogStatsService {
 
   /**
    * 블로그의 카테고리별 포스트 개수 조회
-   * @param slug 블로그 slug
+   * @param slug 블로그 slug (하위 호환성을 위해 유지)
    * @returns 카테고리별 포스트 개수 배열
    */
   async getBlogCategoriesWithCount(slug: string): Promise<Array<{ category: string; count: number }>> {
-    const cacheKey = `blog:stats:categories:${slug}`;
-
-    // 캐시 확인
-    const cached = await this.cacheService.get<Array<{ category: string; count: number }>>(cacheKey);
-    if (cached) {
-      this.logger.debug(`Cache HIT for blog categories: ${slug}`);
-      return cached;
-    }
-
-    this.logger.debug(`Cache MISS for blog categories: ${slug}`);
-
-    // 블로그 ID 조회
+    // 내부적으로 getBlogCategoriesWithCountById 호출
     const blog = await this.blogRepository.findOne({
       where: { slug },
       select: ['id'],
@@ -51,13 +40,34 @@ export class BlogStatsService {
       return [];
     }
 
+    return this.getBlogCategoriesWithCountById(blog.id);
+  }
+
+  /**
+   * 블로그의 카테고리별 포스트 개수 조회 (blogId 기반)
+   * @param blogId 블로그 ID
+   * @returns 카테고리별 포스트 개수 배열
+   */
+  async getBlogCategoriesWithCountById(blogId: string): Promise<Array<{ category: string; count: number }>> {
+    const cacheKey = `blog:stats:categories:id:${blogId}`;
+
+    // 캐시 확인
+    const cached = await this.cacheService.get<Array<{ category: string; count: number }>>(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache HIT for blog categories by ID: ${blogId}`);
+      return cached;
+    }
+
+    this.logger.debug(`Cache MISS for blog categories by ID: ${blogId}`);
+
     // 카테고리별 포스트 개수 집계
     const result = await this.postRepository
       .createQueryBuilder('post')
       .select('post.category', 'category')
       .addSelect('COUNT(post.id)', 'count')
-      .where('post.blogId = :blogId', { blogId: blog.id })
+      .where('post.blogId = :blogId', { blogId })
       .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
+      .andWhere('post.isPublished = :isPublished', { isPublished: true })  // 발행된 포스트만
       .groupBy('post.category')
       .orderBy('count', 'DESC')
       .getRawMany();

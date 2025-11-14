@@ -1,5 +1,6 @@
 "use client";
 
+import React from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
@@ -53,8 +54,8 @@ export function useEditorPicks(limit: number = 5) {
 
       return response.json();
     },
-    staleTime: 30 * 60 * 1000, // 30분 동안 fresh 상태 유지
-    gcTime: 60 * 60 * 1000, // 1시간 동안 캐시 유지
+    staleTime: 24 * 60 * 60 * 1000,  // 24시간 동안 fresh 상태 유지
+    gcTime: 25 * 60 * 60 * 1000, // 25시간 동안 캐시 유지
   });
 }
 
@@ -66,7 +67,7 @@ export function useEditorPicks(limit: number = 5) {
 export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async () => {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/posts/${postId}/editor-pick`,
@@ -83,7 +84,13 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
 
       return response.json();
     },
-    onSuccess: (data) => {
+  });
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess && mutation.data) {
+      const data = mutation.data;
+
       // 1. Editor's Pick 목록 캐시 무효화 (모든 limit 값)
       for (let limit = 1; limit <= 10; limit++) {
         queryClient.invalidateQueries({ queryKey: ['editorPicks', limit] });
@@ -111,13 +118,21 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
       if (onSuccess) {
         onSuccess();
       }
-    },
-    onError: (error: Error) => {
+    }
+  }, [mutation.isSuccess, mutation.data, postId, queryClient, onSuccess]);
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error) {
+      const error = mutation.error as Error;
+
       // 에러 메시지 표시
       toast.error(error.message || 'Editor\'s Pick 변경에 실패했습니다.', {
         duration: 3000,
         position: 'bottom-right',
       });
-    },
-  });
+    }
+  }, [mutation.isError, mutation.error]);
+
+  return mutation;
 }

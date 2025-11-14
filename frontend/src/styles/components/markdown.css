@@ -293,7 +293,6 @@
   height: auto;
   display: block;
   margin: var(--space-xl) auto;
-  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }
 
@@ -303,7 +302,6 @@
   height: auto;
   display: block;
   margin: var(--space-xl) auto;
-  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }
 
@@ -313,7 +311,6 @@
   height: auto;
   display: block;
   margin: var(--space-xl) auto;
-  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }
 
@@ -324,7 +321,6 @@
   height: auto;
   display: block;
   margin: var(--space-xl) auto;
-  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
 }
 
@@ -368,7 +364,6 @@
   left: 0;
   width: 100% !important;
   height: 100% !important;
-  border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
   border: none;
 }
@@ -563,77 +558,35 @@
 }
 
 /* ===================================================================
-   PC 다크모드 - 시스템 설정 기반 (기존 방식 유지)
+   다크모드 스타일 - 웹사이트 테마 기반 (.dark 클래스 사용)
+   모든 기기에서 일관성 적용
    ================================================================ */
-@media (prefers-color-scheme: dark) {
-  .prose p,
-  .prose li {
-    color: rgb(var(--color-gray-300));
-  }
-
-  .prose code:not(pre code) {
-    background: rgb(var(--color-gray-800));
-    color: rgb(var(--color-gray-200));
-  }
-
-  .prose blockquote {
-    background: rgb(var(--color-gray-800));
-    border-left-color: rgb(var(--color-gray-600));
-    color: rgb(var(--color-gray-400));
-  }
-
-  .prose thead {
-    background: rgb(var(--color-gray-800));
-  }
-
-  .prose th {
-    color: rgb(var(--color-gray-200));
-  }
-
-  .prose tbody tr:hover {
-    background: rgb(var(--color-gray-800));
-  }
+.dark .prose p,
+.dark .prose li {
+  color: rgb(var(--color-gray-700));
 }
 
-/* ===================================================================
-   모바일 전용 - 웹사이트 테마 기반 (PC는 영향 없음)
-   시스템 다크모드 + 웹사이트 라이트모드 조합 문제 해결
-   ================================================================ */
-@media (max-width: 768px) {
-  /* 모바일 라이트 모드: 항상 진한 색상 (가독성 확보) */
-  .prose p,
-  .prose li {
-    color: rgb(var(--foreground)) !important;
-  }
+.dark .prose code:not(pre code) {
+  background: rgb(var(--color-gray-800));
+  color: rgb(var(--color-gray-200));
+}
 
-  /* 모바일 다크 모드: 밝은 회색으로 가독성 확보 */
-  .dark .prose p,
-  .dark .prose li {
-    color: rgb(var(--color-gray-700)) !important;
-  }
+.dark .prose blockquote {
+  background: rgb(var(--color-gray-800));
+  border-left-color: rgb(var(--color-gray-600));
+  color: rgb(var(--color-gray-400));
+}
 
-  .dark .prose code:not(pre code) {
-    background: rgb(var(--color-gray-800)) !important;
-    color: rgb(var(--color-gray-200)) !important;
-  }
+.dark .prose thead {
+  background: rgb(var(--color-gray-800));
+}
 
-  .dark .prose blockquote {
-    background: rgb(var(--color-gray-800)) !important;
-    border-left-color: rgb(var(--color-gray-600)) !important;
-    color: rgb(var(--color-gray-400)) !important;
-  }
+.dark .prose th {
+  color: rgb(var(--color-gray-200));
+}
 
-  .dark .prose thead {
-    background: rgb(var(--color-gray-800)) !important;
-  }
-
-  .dark .prose th {
-    color: rgb(var(--color-gray-200)) !important;
-  }
-
-  .dark .prose tbody tr:hover {
-    background: rgb(var(--color-gray-800)) !important;
-  }
+.dark .prose tbody tr:hover {
+  background: rgb(var(--color-gray-800));
 }
 
 /* ===================================================================

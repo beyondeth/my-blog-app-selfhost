@@ -66,7 +66,7 @@ export class AdminPostsService {
 
     const [posts, total] = await this.postRepository.findAndCount({
       where,
-      relations: ['author', 'blog'],
+      relations: ['author', 'blog', 'stats'],
       order: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
       take: limit,
@@ -82,8 +82,8 @@ export class AdminPostsService {
         return {
           ...post,
           stats: {
-            viewCount: post.viewCount,
-            likeCount: post.likeCount,
+            viewCount: post.stats?.viewCount || 0,
+            likeCount: post.stats?.likeCount || 0,
             commentCount,
           },
         };
@@ -105,7 +105,7 @@ export class AdminPostsService {
   async findOne(postId: string) {
     const post = await this.postRepository.findOne({
       where: { id: postId },
-      relations: ['author', 'blog', 'comments'],
+      relations: ['author', 'blog', 'comments', 'stats'],
     });
 
     if (!post) {
@@ -124,8 +124,8 @@ export class AdminPostsService {
       recentComments,
       stats: {
         totalComments: post.comments?.length || 0,
-        viewCount: post.viewCount,
-        likeCount: post.likeCount,
+        viewCount: post.stats?.viewCount || 0,
+        likeCount: post.stats?.likeCount || 0,
       },
     };
   }
@@ -271,16 +271,17 @@ export class AdminPostsService {
   async getPopularPosts(limit = 10) {
     const posts = await this.postRepository.find({
       where: { isPublished: true },
-      relations: ['author'],
-      order: {
-        viewCount: 'DESC',
-        likeCount: 'DESC',
-        commentCount: 'DESC',
-      },
+      relations: ['author', 'stats'],
       take: limit,
     });
 
-    return posts;
+    // PostStats를 기준으로 정렬
+    return posts
+      .sort((a, b) => {
+        const aScore = (a.stats?.viewCount || 0) + (a.stats?.likeCount || 0) + (a.stats?.commentCount || 0);
+        const bScore = (b.stats?.viewCount || 0) + (b.stats?.likeCount || 0) + (b.stats?.commentCount || 0);
+        return bScore - aScore;
+      });
   }
 
   /**
@@ -387,7 +388,8 @@ export class AdminPostsService {
   private async getAverageCommentsPerPost(): Promise<number> {
     const result = await this.postRepository
       .createQueryBuilder('post')
-      .select('AVG(post.commentCount)', 'avg')
+      .leftJoin('post.stats', 'stats')
+      .select('AVG(stats.commentCount)', 'avg')
       .getRawOne();
 
     return parseFloat(result?.avg || '0');
@@ -396,7 +398,8 @@ export class AdminPostsService {
   private async getAverageViewsPerPost(): Promise<number> {
     const result = await this.postRepository
       .createQueryBuilder('post')
-      .select('AVG(post.viewCount)', 'avg')
+      .leftJoin('post.stats', 'stats')
+      .select('AVG(stats.viewCount)', 'avg')
       .getRawOne();
 
     return parseFloat(result?.avg || '0');

@@ -18,11 +18,13 @@ import { Injectable, Logger, NotFoundException, BadRequestException } from '@nes
 import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
 import { Repository, SelectQueryBuilder, Like, In, DataSource } from 'typeorm';
 import { Post } from '../entities/post.entity';
+import { PostStats } from '../entities/post-stats.entity';
 import { User } from '../../users/entities/user.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
 import { PostMapperService } from './post-mapper.service';
 import { BookmarksService } from '../../bookmarks/bookmarks.service';
 import { MaterializedViewService } from '../../common/services/materialized-view.service';
+import { PostInteractionStatusService } from './post-interaction-status.service';
 import { GetPostsCursorDto } from '../dto/get-posts-cursor.dto';
 import { CursorPaginatedPostsDto } from '../dto/cursor-paginated-posts.dto';
 
@@ -42,11 +44,14 @@ export class PostReadService {
   constructor(
     @InjectRepository(Post)
     private readonly postsRepository: Repository<Post>,
+    @InjectRepository(PostStats)
+    private readonly postStatsRepository: Repository<PostStats>,
     @InjectRepository(Blog)
     private readonly blogsRepository: Repository<Blog>,
     private readonly postMapperService: PostMapperService,
     private readonly bookmarksService: BookmarksService,
     private readonly materializedViewService: MaterializedViewService,
+    private readonly postInteractionStatusService: PostInteractionStatusService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -100,22 +105,22 @@ export class PostReadService {
       });
     }
 
-    // 북마크 상태 확인 (배치 조회 방식)
-    let bookmarked = false;
+    // 사용자 상호작용 상태 확인 (북마크 + 좋아요 한 번에 조회)
+    let interactionStatus = { bookmarked: false, liked: false };
     if (user) {
-      const bookmarkStatuses = await this.bookmarksService.getMultipleBookmarkStatuses(
+      const interactionStatuses = await this.postInteractionStatusService.getMultipleInteractionStatuses(
         [post.id],
         user.id
       );
-      bookmarked = bookmarkStatuses.get(post.id) || false;
+      interactionStatus = interactionStatuses.get(post.id) || { bookmarked: false, liked: false };
     }
 
     // PostMapperService를 사용하여 DTO 변환
     return this.postMapperService.toPostDto(post, {
       user: post.author,
       blog: post.blog,
-      bookmarked,
-      liked: false, // TODO: 좋아요 상태 확인 로직 추가
+      bookmarked: interactionStatus.bookmarked,
+      liked: interactionStatus.liked,
     });
   }
 
@@ -368,7 +373,7 @@ export class PostReadService {
       .leftJoinAndSelect('post.stats', 'stats')
       .leftJoinAndSelect('post.metadata', 'metadata')
       .where('post.id IN (:...postIds)', { postIds })
-      .orderBy(`array_position(ARRAY[:...postIds], post.id)`) // Materialized View 순서 유지
+      .orderBy(`array_position(ARRAY[:...postIds]::uuid[], post.id)`) // Materialized View 순서 유지
       .setParameter('postIds', postIds)
       .getMany();
 
@@ -533,10 +538,21 @@ export class PostReadService {
 
   /**
    * 비동기 조회수 증가
+   * PostStats 테이블의 viewCount를 직접 업데이트하여 cascade 문제 방지
    *
    * @param postId 포스트 ID
    */
   private async incrementViewCount(postId: string): Promise<void> {
-    await this.postsRepository.increment({ id: postId }, 'viewCount', 1);
+    // PostStats 테이블의 viewCount만 직접 업데이트
+    // cascade 및 트리거 재귀 호출 문제 방지
+    await this.postStatsRepository
+      .createQueryBuilder()
+      .update(PostStats)
+      .set({
+        viewCount: () => "viewCount + 1",
+        updatedAt: () => "CURRENT_TIMESTAMP"
+      })
+      .where("postId = :postId", { postId })
+      .execute();
   }
 }

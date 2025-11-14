@@ -54,7 +54,7 @@ export class PostResponseDto {
   isDeleted: boolean;
 
   @Expose()
-  viewCount: number;
+  viewCount: number; // PostStats에서 관리되지만 프론트엔드 호환성을 위해 필드 유지
 
   @Expose()
   likeCount: number;

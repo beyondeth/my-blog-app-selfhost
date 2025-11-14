@@ -23,6 +23,7 @@ interface PostArticleProps {
   likePending?: boolean; // 좋아요 처리 중 상태
   searchQuery?: string; // 검색어 하이라이팅을 위한 prop
   priority?: boolean; // LCP 최적화: 프로필 이미지 우선 로드 (상위 3개 포스트)
+  isHomeFeed?: boolean; // 홈 피드 여부 (썸네일 스타일 적용용)
 }
 
 // HTML 태그를 제거하고 순수 텍스트만 반환하는 로컬 함수
@@ -57,7 +58,7 @@ const PostArticle = React.memo(function PostArticle({
   likePending = false,
   searchQuery,
   priority = false, // 기본값: lazy loading
-}: PostArticleProps) {
+  isHomeFeed = false,}: PostArticleProps) {
   // 삭제된 포스트 상태 확인
   const isDeleted = post.isDeleted || post.status === 'deleted';
 
@@ -177,7 +178,7 @@ const PostArticle = React.memo(function PostArticle({
                         size="sm"
                         priority={priority}
                       />
-                      <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
+                      <span className="text-[15px] text-gray-700 dark:text-gray-300 font-medium">
                         {post.author.username}
                       </span>
                     </div>
@@ -229,13 +230,13 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 메타 정보와 버튼을 한 줄에 배치 */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5">
-              <span className="whitespace-nowrap mr-3">
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-gray-400 gap-3 sm:gap-5">
+              <span className="whitespace-nowrap flex-shrink-0">
                 {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
               <span className="flex items-center gap-1 whitespace-nowrap mr-3">
                 <FiEye className="w-5 h-5" />
-                {post.viewCount || 0}
+                <span>{post.viewCount || 0}</span>
               </span>
               <button
                 onClick={() => onLike?.(post.id)}
@@ -254,7 +255,7 @@ const PostArticle = React.memo(function PostArticle({
               </button>
               <span className="flex items-center gap-1 whitespace-nowrap mr-3">
                 <FiMessageCircle className="w-5 h-5" />
-                {post.commentCount || 0}
+                <span>{post.commentCount || 0}</span>
               </span>
 
               {/* 수정/삭제 버튼 - 댓글 카운트 오른쪽에 배치 */}
@@ -321,7 +322,7 @@ const PostArticle = React.memo(function PostArticle({
                       priority={priority}
                     />
                     {/* Author Name */}
-                    <span className="text-[15px] text-gray-700 dark:text-[#9CA3AF] font-medium">
+                    <span className="text-[15px] text-gray-700 dark:text-gray-300 font-medium">
                       {post.author.username}
                     </span>
                   </div>
@@ -367,13 +368,13 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 메타 정보와 버튼을 한 줄에 배치 */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-[#cccccc] gap-3 sm:gap-5">
-              <span className="whitespace-nowrap mr-3">
+            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-gray-400 gap-3 sm:gap-5">
+              <span className="whitespace-nowrap flex-shrink-0">
                 {formatRelativeTime(post.publishedAt || post.createdAt)}
               </span>
               <span className="flex items-center gap-1 whitespace-nowrap mr-3">
                 <FiEye className="w-5 h-5" />
-                {post.viewCount || 0}
+                <span>{post.viewCount || 0}</span>
               </span>
               <button
                 onClick={() => onLike?.(post.id)}
@@ -392,7 +393,7 @@ const PostArticle = React.memo(function PostArticle({
               </button>
               <span className="flex items-center gap-1 whitespace-nowrap mr-3">
                 <FiMessageCircle className="w-5 h-5" />
-                {post.commentCount || 0}
+                <span>{post.commentCount || 0}</span>
               </span>
 
               {/* 수정/삭제 버튼 - 댓글 카운트 오른쪽에 배치 */}
@@ -438,7 +439,7 @@ const PostArticle = React.memo(function PostArticle({
               <OptimizedImage
                 src={post.thumbnail}
                 alt={post.title}
-                className="w-full h-full rounded-lg object-contain"
+                className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
                 aspectRatio={100/94}
                 sizes="100px"
                 priority={priority}
@@ -448,7 +449,7 @@ const PostArticle = React.memo(function PostArticle({
               <OptimizedImage
                 src={post.thumbnail}
                 alt={post.title}
-                className="w-full h-full rounded-lg object-contain"
+                className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
                 aspectRatio={210/197}
                 sizes="210px"
                 priority={priority}

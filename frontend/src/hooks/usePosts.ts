@@ -1,3 +1,4 @@
+import React from 'react';
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { postsAPI } from '@/lib/api';
 import { Post } from '@/types';
@@ -107,9 +108,16 @@ export function useCreatePost() {
   const queryClient = useQueryClient();
   const router = useRouter(); // useRouter 훅 추가
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: postsAPI.createPost,
-    onSuccess: (newPost) => {
+    retry: 1,
+  });
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess && mutation.data) {
+      const newPost = mutation.data;
+
       // Mixpanel: 포스트 생성 이벤트 추적
       mixpanel.track('Post Created', {
         categoryId: newPost.category,
@@ -144,7 +152,7 @@ export function useCreatePost() {
         { queryKey: postQueryKeys.lists() },
         (oldData: any) => {
           if (!oldData || !oldData.pages) return oldData;
-          
+
           const newPages = [...oldData.pages];
           if (newPages[0]) {
             newPages[0] = {
@@ -153,7 +161,7 @@ export function useCreatePost() {
               total: newPages[0].total + 1,
             };
           }
-          
+
           return {
             ...oldData,
             pages: newPages,
@@ -166,19 +174,27 @@ export function useCreatePost() {
         const postUrl = getPostUrl(newPost.blog, { slug: newPost.slug, id: newPost.id });
         router.push(postUrl);
       }
-    },
-    retry: 1,
-  });
+    }
+  }, [mutation.isSuccess, mutation.data, queryClient, router]);
+
+  return mutation;
 }
 
 // 포스트 수정 뮤테이션 훅
 export function useUpdatePost() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: ({ id, data }: { id: string; data: any }) =>
       postsAPI.updatePost(id, data),
-    onSuccess: (updatedPost) => {
+    retry: 1,
+  });
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess && mutation.data) {
+      const updatedPost = mutation.data;
+
       // 1. 개별 포스트 캐시 직접 업데이트
       queryClient.setQueryData(postQueryKeys.detail(updatedPost.id), updatedPost);
       if (updatedPost.slug) {
@@ -219,16 +235,17 @@ export function useUpdatePost() {
         queryKey: ['popular-posts'],
         refetchType: 'none', // stale만 마킹, 사용자가 다시 볼 때 자동 refetch
       });
-    },
-    retry: 1,
-  });
+    }
+  }, [mutation.isSuccess, mutation.data, queryClient]);
+
+  return mutation;
 }
 
 // 포스트 삭제 뮤테이션 훅
 export function useDeletePost() {
   const queryClient = useQueryClient();
 
-  return useMutation({
+  const mutation = useMutation({
     // mutationFn: 하위 호환성을 위해 string | { postId, blogSlug? } 모두 지원
     mutationFn: (variables: string | { postId: string; blogSlug?: string }) => {
       const postId = typeof variables === 'string' ? variables : variables.postId;
@@ -309,7 +326,15 @@ export function useDeletePost() {
 
       return { previousPost, blogSlug, previousLists };
     },
-    onError: (err, variables, context) => {
+    retry: 0,  // 삭제는 재시도 안 함 (이미 삭제된 포스트 재요청 방지)
+  });
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error && mutation.variables) {
+      const variables = mutation.variables;
+      const context = mutation.context as { previousPost?: Post; blogSlug?: string; previousLists?: Array<[any, any]> };
+
       // 롤백: 이전 데이터로 복구
       if (context?.previousLists) {
         context.previousLists.forEach(([queryKey, data]) => {
@@ -325,8 +350,12 @@ export function useDeletePost() {
           context.previousPost
         );
       }
-    },
-    onSuccess: () => {
+    }
+  }, [mutation.isError, mutation.error, mutation.variables, mutation.context, queryClient]);
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess) {
       // 서버 동기화: stale 마킹하여 다음 접근 시 최신 데이터 가져오기
       // refetchType: 'none' - 즉시 refetch 안함 (낙관적 업데이트 유지)
       // 모든 list 캐시를 stale로 마킹 (홈, 블로그, 검색 등)
@@ -334,9 +363,10 @@ export function useDeletePost() {
         queryKey: postQueryKeys.lists(),
         refetchType: 'none'
       });
-    },
-    retry: 0,  // 삭제는 재시도 안 함 (이미 삭제된 포스트 재요청 방지)
-  });
+    }
+  }, [mutation.isSuccess, queryClient]);
+
+  return mutation;
 }
 
 // 포스트 좋아요 토글 뮤테이션 훅 (Redis Queue 시스템 - postId 파라미터로 받기)
@@ -344,7 +374,7 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: (postId: string) => {
       if (!user) {
         if (onRequireLogin) onRequireLogin();
@@ -408,7 +438,14 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
 
       return { previousLists, previousDetails };
     },
-    onError: (err, variables, context) => {
+    retry: 1,
+  });
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (mutation.isError && mutation.error && mutation.variables) {
+      const context = mutation.context as { previousLists?: Array<[any, any]>; previousDetails?: Array<[any, any]> };
+
       // 롤백: 이전 데이터로 복구
       if (context?.previousLists) {
         context.previousLists.forEach(([queryKey, data]) => {
@@ -420,8 +457,15 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
           queryClient.setQueryData(queryKey, data);
         });
       }
-    },
-    onSuccess: (response, postId) => {
+    }
+  }, [mutation.isError, mutation.error, mutation.variables, mutation.context, queryClient]);
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (mutation.isSuccess && mutation.data && mutation.variables) {
+      const postId = mutation.variables;
+      const response = mutation.data;
+
       // Mixpanel: 좋아요 이벤트 추적
       mixpanel.track('Post Liked', { postId });
 
@@ -463,9 +507,10 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
           return { ...oldData, liked, likeCount };
         }
       );
-    },
-    retry: 1,
-  });
+    }
+  }, [mutation.isSuccess, mutation.data, mutation.variables, queryClient]);
+
+  return mutation;
 }
 
 // 포스트 프리페치 유틸리티

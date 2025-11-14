@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useMemo, Suspense } from 'react';
+import React, { useState, useCallback, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfinitePosts, useInfiniteCursorPosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
@@ -203,16 +203,16 @@ function HomePageContent() {
   const handleConfirmDelete = useCallback(() => {
     if (deleteDialog.postId) {
       // 새 인터페이스 사용 ({ postId } 형태)
-      deletePostMutation.mutate({ postId: deleteDialog.postId }, {
-        onSuccess: () => {
-          setDeleteDialog({ isOpen: false, postId: null, postTitle: '' });
-        },
-        onError: () => {
-          // 에러 시에도 다이얼로그는 열어둠 (재시도 가능)
-        }
-      });
+      deletePostMutation.mutate({ postId: deleteDialog.postId });
     }
   }, [deleteDialog.postId, deletePostMutation]);
+
+  // 성공 및 에러 처리를 위한 useEffect
+  React.useEffect(() => {
+    if (deletePostMutation.isSuccess) {
+      setDeleteDialog({ isOpen: false, postId: null, postTitle: '' });
+    }
+  }, [deletePostMutation.isSuccess]);
 
   // 삭제 다이얼로그 닫기
   const handleCloseDeleteDialog = useCallback(() => {
@@ -259,7 +259,7 @@ function HomePageContent() {
                     isDeleting={deletePostMutation.isPending && deleteDialog.postId === post.id}
                     searchQuery={currentParams.search}
                     priority={index < 3} // LCP 최적화: 상위 3개 포스트의 프로필 이미지는 즉시 로드
-                  />
+                    isHomeFeed={true}                  />
                 ))}
                 
                 {/* 무한 스크롤 트리거 */}

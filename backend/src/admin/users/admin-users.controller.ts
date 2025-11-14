@@ -330,9 +330,9 @@ export class AdminUsersController {
         content: post.content, // 법적 증거로 가장 중요
         category: post.category,
         excerpt: post.excerpt,
-        viewCount: post.viewCount,
-        likeCount: post.likeCount,
-        commentCount: post.commentCount,
+        viewCount: post.stats?.viewCount || 0,
+        likeCount: post.stats?.likeCount || 0,
+        commentCount: post.stats?.commentCount || 0,
         createdAt: post.createdAt,
         publishedAt: post.publishedAt,
       })),

@@ -8,7 +8,6 @@ import { Module } from '@nestjs/common';
 import { PrometheusModule } from '@willsoto/nestjs-prometheus';
 import { MetricsService } from './metrics.service';
 import { ChatMetricsService } from './chat-metrics.service';
-import { LikeMetricsService } from './like-metrics.service';
 import { CacheMetricsService } from './cache-metrics.service';
 import { AdminMetricsController } from './admin-metrics.controller';
 import { MetricsController } from './metrics.controller';
@@ -35,7 +34,7 @@ import { RedisModule } from '../redis/redis.module';
     RedisModule,
   ],
   controllers: [MetricsController, AdminMetricsController],
-  providers: [MetricsService, ChatMetricsService, LikeMetricsService, CacheMetricsService],
-  exports: [MetricsService, ChatMetricsService, LikeMetricsService, CacheMetricsService],
+  providers: [MetricsService, ChatMetricsService, CacheMetricsService],
+  exports: [MetricsService, ChatMetricsService, CacheMetricsService],
 })
 export class MetricsModule {}

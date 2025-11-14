@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-hot-toast';
 
@@ -64,16 +64,25 @@ export function useReport() {
 
       return response.json();
     },
-    onSuccess: () => {
+  });
+
+  // 성공 처리
+  React.useEffect(() => {
+    if (createReportMutation.isSuccess) {
       toast.success('신고가 접수되었습니다. 검토 후 조치하겠습니다.');
       setIsReportModalOpen(false);
       setReportTarget(null);
       queryClient.invalidateQueries({ queryKey: ['my-reports'] });
-    },
-    onError: (error: Error) => {
+    }
+  }, [createReportMutation.isSuccess, queryClient]);
+
+  // 에러 처리
+  React.useEffect(() => {
+    if (createReportMutation.isError && createReportMutation.error) {
+      const error = createReportMutation.error as Error;
       toast.error(error.message);
-    },
-  });
+    }
+  }, [createReportMutation.isError, createReportMutation.error]);
 
   const openReportModal = (type: ReportType, targetId: string, targetTitle?: string) => {
     setReportTarget({ type, targetId, targetTitle });

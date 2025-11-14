@@ -115,13 +115,14 @@ export default function BlogRichTextEditor({
         size: file.size,
         isUploading: false,
       };
-      
+
       // 갤러리 이미지 상태 업데이트 (동기화를 위해 setGalleryImages 사용)
       if (setGalleryImages) {
         setGalleryImages(prev => [...prev, newImage]);
       }
 
-      toast.success('이미지가 업로드되었습니다');
+      // 이미지 업로드는 여러 개일 수 있으므로 개별 토스트는 표시하지 않음
+      // ImageUploadManager에서 배치 토스트를 표시함
       return { url: finalUrl, id: imageId };
 
     } catch (error) {
