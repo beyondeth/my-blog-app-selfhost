@@ -38,6 +38,7 @@ import { PostContentService } from './services/post-content.service';
 import { PostReadService } from './services/post-read.service';
 import { PostInteractionService } from './services/post-interaction.service';
 import { PostCreationService } from './services/post-creation.service';
+import { CloudflareService } from '../cloudflare/cloudflare.service';
 
 /**
  * PostsService - Facade Pattern
@@ -87,6 +88,7 @@ export class PostsService {
     private readonly postReadService: PostReadService,
     private readonly postInteractionService: PostInteractionService,
     private readonly postCreationService: PostCreationService,
+    private readonly cloudflareService: CloudflareService,
   ) {}
 
   // ========== CRUD Operations (PostCreationService로 위임) ==========
@@ -744,6 +746,19 @@ export class PostsService {
       blogId: post.blogId,
       isPublished: post.isPublished,
     });
+
+    // Cloudflare 캐시 즉시 제거
+    try {
+      const success = await this.cloudflareService.purgeEditorPicksCache();
+      if (success) {
+        this.logger.log(`✅ Successfully purged Cloudflare cache for Editor's Pick`);
+      } else {
+        this.logger.warn(`⚠️ Failed to purge Cloudflare cache for Editor's Pick`);
+      }
+    } catch (error) {
+      this.logger.error(`❌ Error purging Cloudflare cache:`, error);
+      // 실패해도 Editor's Pick 동작은 계속됨 (에러 전파 방지)
+    }
 
     this.logger.log(`Set Editor's Pick for post: ${postId} to ${isEditorPick}`);
   }

@@ -54,8 +54,10 @@ export function useEditorPicks(limit: number = 5) {
 
       return response.json();
     },
-    staleTime: 5 * 60 * 1000,  // 5분 동안 fresh 상태 유지
-    gcTime: 10 * 60 * 1000,  // 10분 동안 캐시 유지
+    staleTime: 30 * 1000,  // 30초 동안 fresh 상태 유지 (실시간성 확보)
+    gcTime: 5 * 60 * 1000,  // 5분 동안 캐시 유지
+    refetchOnWindowFocus: true,  // 윈도우 포커스 시 자동 리프레시
+    refetchOnReconnect: true,   // 재연결 시 자동 리프레시
   });
 }
 
@@ -120,12 +122,16 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
         );
       }
 
-      // 2. Editor's Pick 목록 캐시 무효화 (모든 limit 값)
+      // 2. Editor's Pick 목록 캐시 무효화 (모든 limit 값) - 즉시 반영
       for (let limit = 1; limit <= 10; limit++) {
         queryClient.invalidateQueries({ queryKey: ['editorPicks', limit] });
       }
 
-      // 3. 포스트 목록 캐시도 업데이트 (댓글 옆 아이콘 업데이트용)
+      // 3. 홈페이지 피드 캐시 무효화 (즉시 반영)
+      queryClient.invalidateQueries({ queryKey: ['posts', 'home'] });
+      queryClient.invalidateQueries({ queryKey: ['posts', 'feed'] });
+
+      // 4. 포스트 목록 캐시도 업데이트 (댓글 옆 아이콘 업데이트용)
       queryClient.setQueriesData(
         {
           queryKey: ['posts', 'list'],
@@ -142,6 +148,19 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
           };
         }
       );
+
+      // 5. 홈페이지 관련 캐시들 무효화 (모든 페이지네이션)
+      queryClient.invalidateQueries({
+        queryKey: ['posts'],
+        predicate: (query) => {
+          // home, feed, list 관련 쿼리만 무효화
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) &&
+                 (queryKey.includes('home') ||
+                  queryKey.includes('feed') ||
+                  queryKey.includes('list'));
+        }
+      });
 
       // 성공 메시지 표시 (중복 방지를 위해 ID 사용)
       const isAdded = post.isEditorPick;
