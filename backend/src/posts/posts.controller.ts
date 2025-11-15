@@ -590,18 +590,23 @@ export class PostsController {
     @Param('id', ParseUUIDPipe) id: string,
     @CurrentUser() user: User,
   ) {
-    // Editor's Pick 토글 실행
-    await this.postsService.toggleEditorPick(id, user);
+    // Editor's Pick 토글 실행 - 정확한 값을 반환받음
+    const result = await this.postsService.toggleEditorPick(id, user);
 
-    // 업데이트된 포스트 전체 데이터 반환 (isEditorPick 포함)
-    // 먼저 포스트를 찾아서 slug를 얻은 후, findBySlug로 전체 데이터 조회
+    // 업데이트된 포스트 전체 데이터 반환
+    // 경쟁 상태를 피하기 위해 포스트를 다시 조회할 때는 캐시를 우회하거나
+    // 최신 데이터를 보장받아야 함
     const post = await this.postsService.findOne(id, user);
     if (!post) {
       throw new NotFoundException('포스트를 찾을 수 없습니다.');
     }
 
     // findBySlug를 사용하여 isEditorPick 필드가 포함된 전체 데이터 조회
+    // 단, toggleEditorPick에서 반환된 결과를 사용하여 isEditorPick 값을 보장
     const updatedPost = await this.postsService.findBySlug(post.slug, user);
+
+    // 서비스에서 반환된 최신값으로 isEditorPick 설정 (경쟁 상태 방지)
+    updatedPost.isEditorPick = result.isEditorPick;
 
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return updatedPost;

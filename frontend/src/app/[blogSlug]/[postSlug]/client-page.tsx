@@ -112,8 +112,6 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   // Fetch post details - 항상 최신 데이터 가져오기
   const { data: post, error, isError, refetch } = usePost(postSlug, {
     initialData: initialPost,
-    refetchOnMount: 'always',  // initialData가 있어도 항상 refetch
-    staleTime: 0,              // 즉시 stale 처리하여 캐시 무효화 바로 반영
   });
   const deletePostMutation = useDeletePost();
   // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)

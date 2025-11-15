@@ -22,7 +22,7 @@ export function useHomepagePosts(options: {
     queryKey: postQueryKeys.list({
       search,
       category,
-      page: 'homepage' // 홈페이지임을 식별하는 표식
+      sort: 'homepage' // 홈페이지임을 식별하는 표식 (sort 필드 활용)
     }),
     queryFn: ({ pageParam }) => postsAPI.getPostsCursor({
       cursor: pageParam || undefined,
@@ -35,9 +35,9 @@ export function useHomepagePosts(options: {
     initialPageParam: undefined as string | undefined,
     enabled,
     // 홈페이지 전용 최적화된 캐시 설정
-    staleTime: 2 * 60 * 1000, // 2간 데이터 신선도 유지 (로딩 속도 개선)
-    gcTime: 10 * 60 * 1000, // 10분간 메모리 캐시 보관
-    refetchOnWindowFocus: false, // 홈페이지에서는 포커스 시 리프레치 비활성화
+    staleTime: 30 * 1000, // 30초간 데이터 신선도 유지 (실시간성 확보)
+    gcTime: 5 * 60 * 1000, // 5분간 메모리 캐시 보관
+    refetchOnWindowFocus: true, // 포커스 시 리프레시 활성화 (실시간 업데이트)
     refetchOnMount: false, // 마운트 시 리프레치 방지 (하드 리프레시 최적화)
     refetchOnReconnect: true, // 오프라인 후 재접속 시는 리프레치
     retry: 1,

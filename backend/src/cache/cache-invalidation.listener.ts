@@ -46,6 +46,26 @@ export class CacheInvalidationListener {
   }
 
   /**
+   * 에디터스 픽 토글 시 캐시 무효화
+   */
+  @OnEvent(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, { async: true })
+  async handleEditorPickToggled(payload: { postId: string; isPicked: boolean }) {
+    this.logger.debug(`⭐ [Editor's Pick Toggled] Post: ${payload.postId}, Picked: ${payload.isPicked}`);
+
+    // 에디터스 픽 관련 캐시 즉시 무효화
+    const patterns = [
+      // 에디터스 픽 목록 (모든 limit)
+      'feed:editor-picks:*',
+      // 홈 피드 (에디터스 픽 섹션)
+      'feed:home:page:*',
+      // 개별 포스트 캐시 (isEditorPick 상태 변경)
+      `post:${payload.postId}:*`,
+    ];
+
+    await this.invalidatePatterns(patterns);
+  }
+
+  /**
    * 사용자 프로필 업데이트 시 캐시 무효화
    */
   @OnEvent(CacheInvalidationEvents.USER_PROFILE_UPDATED, { async: true })
