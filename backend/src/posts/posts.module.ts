@@ -45,6 +45,7 @@ import { PostCreationService } from './services/post-creation.service';
 import { PostLikeStatusService } from './services/post-like-status.service';
 import { PostInteractionStatusService } from './services/post-interaction-status.service';
 import { LikeService } from './services/like.service';
+import { CloudflareModule } from '../cloudflare/cloudflare.module';
 
 
 @Module({
@@ -81,6 +82,7 @@ import { LikeService } from './services/like.service';
     BookmarksModule, // 북마크 모듈 추가
     RedisModule, // Redis 모듈 추가 (Queue용)
     MetricsModule, // Prometheus 메트릭 모듈 추가
+    CloudflareModule, // Cloudflare 캐시 관리 모듈
   ],
   providers: [
     PostsService,

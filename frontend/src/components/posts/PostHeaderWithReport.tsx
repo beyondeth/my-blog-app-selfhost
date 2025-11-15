@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget } from 'react-icons/fi';
+import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget, FiPlus, FiMinus } from 'react-icons/fi';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui/avatar';
@@ -161,10 +161,10 @@ export default function PostHeaderWithReport({
                 disabled={editorPickPending}
                 className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full transition-all border ${
                   isEditorPick
-                    ? 'bg-gray-700 text-white border-gray-800 hover:bg-gray-800 dark:bg-gray-600 dark:border-gray-700 dark:hover:bg-gray-700'
-                    : 'bg-white text-gray-600 border-gray-300 hover:bg-gray-50 hover:border-gray-400 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-600 dark:hover:bg-gray-700 dark:hover:border-gray-500'
+                    ? 'bg-red-500 text-white border-red-600 hover:bg-red-600 dark:bg-red-600 dark:border-red-700 dark:hover:bg-red-700'
+                    : 'bg-green-500 text-white border-green-600 hover:bg-green-600 dark:bg-green-600 dark:border-green-700 dark:hover:bg-green-700'
                 } ${editorPickPending ? 'opacity-50 cursor-not-allowed' : ''}`}
-                title={isEditorPick ? 'Pick 선정 해제' : 'Pick으로 선정'}
+                title={isEditorPick ? 'Editor\'s Pick에서 제거' : 'Editor\'s Pick에 추가'}
               >
                 {editorPickPending ? (
                   <>
@@ -174,10 +174,15 @@ export default function PostHeaderWithReport({
                     </svg>
                     처리 중
                   </>
+                ) : isEditorPick ? (
+                  <>
+                    <FiMinus className="w-4 h-4 mr-1" />
+                    Remove Pick
+                  </>
                 ) : (
                   <>
-                    <FiTarget className="w-5 h-5 mr-1" />
-                    Pick
+                    <FiPlus className="w-4 h-4 mr-1" />
+                    Add Pick
                   </>
                 )}
               </button>

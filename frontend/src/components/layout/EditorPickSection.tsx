@@ -2,10 +2,10 @@
 
 import React from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { FiEye, FiHeart, FiMessageCircle, FiTarget } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 import { useEditorPicks } from '@/hooks/useEditorPicks';
-import OptimizedImage from '@/components/ui/OptimizedImage';
 
 /**
  * Editor's Pick 섹션 컴포넌트
@@ -70,11 +70,12 @@ const EditorPickSection = React.memo(function EditorPickSection() {
                   <div className="mb-2">
                     {/* 모바일 버전 */}
                     <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
-                      <OptimizedImage
+                      <Image
                         src={post.thumbnail}
                         alt={post.title}
+                        width={100}
+                        height={94}
                         className="w-full h-full rounded-lg object-contain"
-                        aspectRatio={100/94}
                         sizes="100px"
                         priority={index < 3} // 상위 3개는 우선 로딩
                       />
@@ -82,11 +83,12 @@ const EditorPickSection = React.memo(function EditorPickSection() {
 
                     {/* 데스크톱 버전 */}
                     <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
-                      <OptimizedImage
+                      <Image
                         src={post.thumbnail}
                         alt={post.title}
+                        width={210}
+                        height={197}
                         className="w-full h-full rounded-lg object-contain"
-                        aspectRatio={210/197}
                         sizes="210px"
                         priority={index < 3}
                       />
