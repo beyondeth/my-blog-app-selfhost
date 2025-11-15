@@ -38,6 +38,7 @@ import { PostContentService } from './services/post-content.service';
 import { PostReadService } from './services/post-read.service';
 import { PostInteractionService } from './services/post-interaction.service';
 import { PostCreationService } from './services/post-creation.service';
+import { CloudflareService } from '../cloudflare/cloudflare.service';
 
 /**
  * PostsService - Facade Pattern
@@ -87,6 +88,7 @@ export class PostsService {
     private readonly postReadService: PostReadService,
     private readonly postInteractionService: PostInteractionService,
     private readonly postCreationService: PostCreationService,
+    private readonly cloudflareService: CloudflareService,
   ) {}
 
   // ========== CRUD Operations (PostCreationService로 위임) ==========
@@ -596,7 +598,7 @@ export class PostsService {
   async findOne(id: string, user?: User): Promise<PostResponseDto> {
     this.logger.debug(`Finding post by id: ${id}`);
 
-    const post = await this.postReadService.findById(id, ['author', 'blog', 'stats']);
+    const post = await this.postReadService.findById(id, ['author', 'blog', 'stats', 'metadata']);
     if (!post) {
       throw new NotFoundException('포스트를 찾을 수 없습니다.');
     }
@@ -712,11 +714,25 @@ export class PostsService {
       await this.postMetadataRepository.save(metadata);
     }
 
-    // Post 테이블도 함께 업데이트 (호환성 유지)
-    await this.postsRepository.update(postId, {
-      isEditorPick,
-      editorPickedAt: isEditorPick ? new Date() : null,
-    });
+    // FIFO: Editor's Pick 제한 (최대 5개)
+    if (isEditorPick) {
+      // 현재 Editor's Pick 목록 조회 (최신순)
+      const currentPicks = await this.postMetadataRepository.find({
+        where: { isEditorPick: true },
+        order: { editorPickedAt: 'DESC' }
+      });
+
+      // 5개 초과 시 가장 오래된 pick 제거
+      if (currentPicks.length >= 5) {
+        const oldestPick = currentPicks[currentPicks.length - 1];
+        oldestPick.removeEditorPick();
+        await this.postMetadataRepository.save(oldestPick);
+        this.logger.log(`Removed oldest Editor's Pick: ${oldestPick.postId} (limit exceeded)`);
+      }
+    }
+
+    // Post 테이블 업데이트 제거 - 트리거 재귀 호출 방지
+    // PostMetadata가 단일 데이터 소스이므로 posts 테이블 업데이트 불필요
 
     // Editor's Pick 캐시 무효화 이벤트 발행
     this.eventEmitter.emit(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, {
@@ -730,6 +746,19 @@ export class PostsService {
       blogId: post.blogId,
       isPublished: post.isPublished,
     });
+
+    // Cloudflare 캐시 즉시 제거
+    try {
+      const success = await this.cloudflareService.purgeEditorPicksCache();
+      if (success) {
+        this.logger.log(`✅ Successfully purged Cloudflare cache for Editor's Pick`);
+      } else {
+        this.logger.warn(`⚠️ Failed to purge Cloudflare cache for Editor's Pick`);
+      }
+    } catch (error) {
+      this.logger.error(`❌ Error purging Cloudflare cache:`, error);
+      // 실패해도 Editor's Pick 동작은 계속됨 (에러 전파 방지)
+    }
 
     this.logger.log(`Set Editor's Pick for post: ${postId} to ${isEditorPick}`);
   }

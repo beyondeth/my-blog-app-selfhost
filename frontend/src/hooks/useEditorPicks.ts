@@ -54,8 +54,10 @@ export function useEditorPicks(limit: number = 5) {
 
       return response.json();
     },
-    staleTime: 24 * 60 * 60 * 1000,  // 24시간 동안 fresh 상태 유지
-    gcTime: 25 * 60 * 60 * 1000, // 25시간 동안 캐시 유지
+    staleTime: 30 * 1000,  // 30초 동안 fresh 상태 유지 (실시간성 확보)
+    gcTime: 5 * 60 * 1000,  // 5분 동안 캐시 유지
+    refetchOnWindowFocus: true,  // 윈도우 포커스 시 자동 리프레시
+    refetchOnReconnect: true,   // 재연결 시 자동 리프레시
   });
 }
 
@@ -89,27 +91,86 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
   // 성공 처리
   React.useEffect(() => {
     if (mutation.isSuccess && mutation.data) {
-      const data = mutation.data;
+      const post = mutation.data; // API가 이제 Post 전체 데이터를 반환
 
-      // 1. Editor's Pick 목록 캐시 무효화 (모든 limit 값)
+      // 1. Optimistic Update: 포스트 상세 캐시 즉시 업데이트
+      // usePost 훅의 실제 queryKey 패턴과 일치시킴
+      if (post.slug) {
+        queryClient.setQueriesData(
+          {
+            queryKey: ['posts', 'detail', post.slug],
+            exact: true
+          },
+          (oldData: any) => {
+            if (!oldData) return oldData;
+            return { ...oldData, isEditorPick: post.isEditorPick };
+          }
+        );
+      }
+
+      // ID로도 시도 (다른 곳에서 ID를 사용할 경우)
+      if (post.id) {
+        queryClient.setQueriesData(
+          {
+            queryKey: ['posts', 'detail', post.id],
+            exact: true
+          },
+          (oldData: any) => {
+            if (!oldData) return oldData;
+            return { ...oldData, isEditorPick: post.isEditorPick };
+          }
+        );
+      }
+
+      // 2. Editor's Pick 목록 캐시 무효화 (모든 limit 값) - 즉시 반영
       for (let limit = 1; limit <= 10; limit++) {
         queryClient.invalidateQueries({ queryKey: ['editorPicks', limit] });
       }
 
-      // 2. 포스트 상세 캐시 무효화 (올바른 키 사용!)
+      // 3. 홈페이지 피드 캐시 무효화 (즉시 반영)
+      queryClient.invalidateQueries({ queryKey: ['posts', 'home'] });
+      queryClient.invalidateQueries({ queryKey: ['posts', 'feed'] });
+
+      // 4. 포스트 목록 캐시도 업데이트 (댓글 옆 아이콘 업데이트용)
+      queryClient.setQueriesData(
+        {
+          queryKey: ['posts', 'list'],
+          exact: false
+        },
+        (oldData: any) => {
+          if (!oldData || !oldData.posts) return oldData;
+
+          return {
+            ...oldData,
+            posts: oldData.posts.map((p: any) =>
+              p.id === post.id ? { ...p, isEditorPick: post.isEditorPick } : p
+            )
+          };
+        }
+      );
+
+      // 5. 홈페이지 관련 캐시들 무효화 (모든 페이지네이션)
       queryClient.invalidateQueries({
-        queryKey: ['posts', 'detail'], // 'post'가 아니라 'posts'!
-        exact: false  // detail 하위의 모든 키 무효화
+        queryKey: ['posts'],
+        predicate: (query) => {
+          // home, feed, list 관련 쿼리만 무효화
+          const queryKey = query.queryKey;
+          return Array.isArray(queryKey) &&
+                 (queryKey.includes('home') ||
+                  queryKey.includes('feed') ||
+                  queryKey.includes('list'));
+        }
       });
 
-      // 3. 포스트 목록 캐시도 무효화 (댓글 옆 아이콘 업데이트용)
-      queryClient.invalidateQueries({
-        queryKey: ['posts', 'list'],
-        exact: false
-      });
+      // 성공 메시지 표시 (중복 방지를 위해 ID 사용)
+      const isAdded = post.isEditorPick;
+      const message = isAdded
+        ? '게시글을 Editor\'s Pick에 추가했습니다.'
+        : '게시글을 Editor\'s Pick에서 제거했습니다.';
 
-      // 성공 메시지 표시
-      toast.success(data.message || 'Editor\'s Pick이 변경되었습니다.', {
+      const toastId = `editor-pick-${postId}`;
+      toast.success(message, {
+        id: toastId,  // 고유 ID로 중복 토스트 방지
         duration: 3000,
         position: 'bottom-right',
       });
@@ -126,13 +187,15 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
     if (mutation.isError && mutation.error) {
       const error = mutation.error as Error;
 
-      // 에러 메시지 표시
+      // 에러 메시지 표시 (중복 방지를 위해 ID 사용)
+      const toastId = `editor-pick-error-${postId}`;
       toast.error(error.message || 'Editor\'s Pick 변경에 실패했습니다.', {
+        id: toastId,  // 고유 ID로 중복 토스트 방지
         duration: 3000,
         position: 'bottom-right',
       });
     }
-  }, [mutation.isError, mutation.error]);
+  }, [mutation.isError, mutation.error, postId]);
 
   return mutation;
 }

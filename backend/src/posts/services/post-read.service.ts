@@ -410,10 +410,15 @@ export class PostReadService {
    */
   async getEditorPicks(limit: number = 5): Promise<Post[]> {
     return this.postsRepository.find({
-      where: { isPublished: true, isEditorPick: true },
-      relations: ['author', 'author.profile', 'blog', 'thumbnailImage'],
+      where: {
+        isPublished: true,
+        isEditorPick: true  // posts 테이블의 필터링 유지 (호환성)
+      },
+      relations: ['author', 'author.profile', 'blog', 'thumbnailImage', 'metadata'], // metadata 관계 추가
       order: {
-        editorPickedAt: 'DESC',
+        metadata: {
+          editorPickedAt: 'DESC',  // metadata 기준 정렬
+        },
         publishedAt: 'DESC',
       },
       take: limit,
