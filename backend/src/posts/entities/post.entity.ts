@@ -327,14 +327,14 @@ export class Post {
   /**
    * Slug 및 썸네일 업데이트 (BeforeUpdate 훅)
    * - 제목 변경 시 슬러그 업데이트 (선택적)
-   * - 썸네일 자동 추출 (YouTube 또는 첫 이미지)
+   * - 썸네일 자동 추출 (YouTube 또는 첫 이미지) - 사용자 선택이 없는 경우에만
    */
   @BeforeUpdate()
   generateSlug() {
     // 썸네일 자동 추출
-    // thumbnail이 명시적으로 설정되지 않은 경우에만 content에서 추출
-    // YouTube 썸네일 등 외부 URL이 설정된 경우 유지
-    if (this.content && !this.thumbnail) {
+    // thumbnail과 thumbnailImageId가 모두 없는 경우에만 content에서 추출
+    // 사용자가 명시적으로 썸네일을 선택한 경우 자동 추출 방지
+    if (this.content && !this.thumbnail && !this.thumbnailImageId) {
       this.extractThumbnailFromContent();
     }
   }

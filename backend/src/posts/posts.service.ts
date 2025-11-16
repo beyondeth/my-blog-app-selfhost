@@ -122,15 +122,22 @@ export class PostsService {
    * 포스트 수정
    */
   async update(id: string, updatePostDto: UpdatePostDto, user: User, files?: File[]): Promise<PostResponseDto> {
-    this.logger.log(`Updating post: ${id} by user: ${user.id}`);
+    this.logger.log(`[POSTS_SERVICE] Updating post: ${id} by user: ${user.id}`);
+    this.logger.debug(`[POSTS_SERVICE] Update DTO keys: ${Object.keys(updatePostDto)}`);
 
     const post = await this.postCreationService.update(id, updatePostDto, user, files);
 
+    this.logger.log(`[POSTS_SERVICE] Post updated, calling PostMapperService.toPostDto`);
+    this.logger.debug(`[POSTS_SERVICE] Post has ${post.attachedFiles?.length || 0} attached files`);
+
     // 수정된 포스트를 DTO로 변환
-    return await this.postMapperService.toPostDto(post, {
+    const result = await this.postMapperService.toPostDto(post, {
       user: user,
       blog: post.blog,
     });
+
+    this.logger.log(`[POSTS_SERVICE] PostMapperService.toPostDto completed`);
+    return result;
   }
 
   /**

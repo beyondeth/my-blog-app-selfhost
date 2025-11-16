@@ -1,11 +1,13 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Post } from '../entities/post.entity';
 import { File } from '../../files/entities/file.entity';
 import { FileContext, FileContextType, FilePurpose } from '../../files/entities/file-context.entity';
 import { FilesService } from '../../files/files.service';
 import { extractImageUrlsFromContent, extractS3KeyFromUrl } from '../utils/post.utils';
+import { CacheInvalidationEvents } from '../../common/events/cache.events';
 
 /**
  * 포스트 파일 관리 서비스
@@ -30,6 +32,7 @@ export class PostFileService {
     @InjectRepository(FileContext)
     private readonly fileContextRepository: Repository<FileContext>,
     private readonly filesService: FilesService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
@@ -39,56 +42,141 @@ export class PostFileService {
    * @param userId 사용자 ID
    * @param setThumbnailDto 썸네일 설정 DTO
    */
-  async setThumbnail(postId: string, userId: string, setThumbnailDto: { thumbnailFileId?: string }) {
-    const { thumbnailFileId } = setThumbnailDto;
+  async setThumbnail(postId: string, userId: string, setThumbnailDto: { thumbnailFileId?: string, thumbnailUrl?: string }) {
+    const { thumbnailFileId, thumbnailUrl: providedThumbnailUrl } = setThumbnailDto;
 
     try {
-      // 게시글 소유권 확인
+      // 🎯 [THUMBNAIL_TRACK] DEBUG: 수신된 파라미터
+      this.logger.log(`🎯 [THUMBNAIL_TRACK] PostFileService.setThumbnail called with:`, {
+        postId,
+        userId,
+        thumbnailFileId,
+        thumbnailUrl: providedThumbnailUrl,
+        hasThumbnailFileId: !!thumbnailFileId,
+        hasThumbnailUrl: !!providedThumbnailUrl
+      });
+
+      // 게시글 소유권 확인 (blog 정보도 함께 조회)
       const post = await this.postsRepository.findOne({
         where: { id: postId, authorId: userId },
-        relations: ['thumbnailImage'],
+        relations: ['thumbnailImage', 'blog'],
       });
 
       if (!post) {
         throw new NotFoundException('게시글을 찾을 수 없거나 권한이 없습니다.');
       }
 
+      // 변경 전 원본 썸네일 값 저장
+      const oldThumbnailImageId = post.thumbnailImageId;
+      const oldThumbnailUrl = post.thumbnail;
+
       let thumbnailImageId = null;
-      let thumbnailUrl = null;
+      let thumbnailUrl = providedThumbnailUrl || null;
 
       // 썸네일 파일 ID가 제공된 경우
       if (thumbnailFileId) {
+        // 🎯 [THUMBNAIL_TRACK] DEBUG: 파일 검색 정보
+        this.logger.log(`🎯 [THUMBNAIL_TRACK] PostFileService searching for file: ${thumbnailFileId}, userId: ${userId}`);
+
         // 파일 소유권 확인
         const thumbnailFile = await this.filesRepository.findOne({
           where: { id: thumbnailFileId, userId },
         });
 
-        if (!thumbnailFile) {
-          throw new NotFoundException('썸네일 파일을 찾을 수 없거나 권한이 없습니다.');
+        // 🎯 [THUMBNAIL_TRACK] DEBUG: 검색 결과
+        this.logger.log(`🎯 [THUMBNAIL_TRACK] File search result: ${thumbnailFile ? 'FOUND' : 'NOT FOUND'}`);
+
+        if (thumbnailFile) {
+          thumbnailImageId = thumbnailFileId;
+          thumbnailUrl = thumbnailFile.fileUrl;
+
+          // 파일 컨텍스트 업데이트 제거 - posts 테이블에서만 썸네일 정보 관리
+          // await this.updateOrCreateFileContext(
+          //   thumbnailFile.id,
+          //   FilePurpose.THUMBNAIL,
+          //   postId,
+          //   FileContextType.POST
+          // );
+
+          this.logger.log(`썸네일 설정 완료: postId=${postId}, fileId=${thumbnailFileId}`);
+        } else {
+          // 파일이 없지만 CDN URL이 있는 경우 (기존 이미지 처리)
+          if (providedThumbnailUrl) {
+            this.logger.warn(`🎯 [THUMBNAIL_TRACK] File not found in DB, using provided CDN URL: ${providedThumbnailUrl}`);
+            this.logger.log(`🎯 [THUMBNAIL_TRACK] Using CDN URL as thumbnail: postId=${postId}`);
+            // 🔧 FIX: 파일이 없으면 thumbnailImageId는 null로 설정 (FK 제약 조건 위반 방지)
+            this.logger.log(`🎯 [THUMBNAIL_TRACK] File does not exist in DB, setting thumbnailImageId to null to avoid FK constraint violation`);
+            thumbnailImageId = null; // FK 제약 조건 때문에 null로 설정
+          } else {
+            // 추가 디버깅: 파일이 있는지 전체로 검색
+            const anyFile = await this.filesRepository.findOne({
+              where: { id: thumbnailFileId }
+            });
+
+            this.logger.error(`🎯 [THUMBNAIL_TRACK] ERROR: File not found for user and no CDN URL provided. File exists in DB: ${!!anyFile}`);
+            if (anyFile) {
+              this.logger.error(`  - File belongs to userId: ${anyFile.userId}`);
+              this.logger.error(`  - Requesting userId: ${userId}`);
+            }
+
+            // CDN URL도 없는 경우에만 에러 발생
+            if (!providedThumbnailUrl) {
+              throw new NotFoundException('썸네일 파일을 찾을 수 없거나 권한이 없습니다.');
+            }
+          }
         }
-
-        thumbnailImageId = thumbnailFileId;
-        thumbnailUrl = thumbnailFile.fileUrl;
-
-        // 파일 컨텍스트 업데이트 또는 생성
-        await this.updateOrCreateFileContext(
-          thumbnailFile.id,
-          FilePurpose.THUMBNAIL,
-          postId,
-          FileContextType.POST
-        );
-
-        this.logger.log(`썸네일 설정 완료: postId=${postId}, fileId=${thumbnailFileId}`);
+      } else if (providedThumbnailUrl) {
+        // CDN URL만 제공된 경우 (기존 이미지)
+        this.logger.log(`🎯 [THUMBNAIL_TRACK] Using provided CDN URL: ${providedThumbnailUrl}`);
       } else {
         // 썸네일 제거
-        this.logger.log(`썸네일 제거 완료: postId=${postId}`);
+        this.logger.log(`🎯 [THUMBNAIL_TRACK] 썸네일 제거 완료: postId=${postId}`);
       }
 
       // 포스트 업데이트
+      // 🎯 [THUMBNAIL_TRACK] DEBUG: DB 업데이트 전 값 확인
+      this.logger.log(`🎯 [THUMBNAIL_TRACK] Before DB update - thumbnailImageId: ${thumbnailImageId}, thumbnailUrl: ${thumbnailUrl}`);
+
       await this.postsRepository.update(postId, {
         thumbnailImageId,
         thumbnail: thumbnailUrl,
       });
+
+      // 🎯 [THUMBNAIL_TRACK] DEBUG: DB 업데이트 후 확인
+      const updatedPost = await this.postsRepository.findOne({
+        where: { id: postId },
+        select: ['id', 'thumbnailImageId', 'thumbnail']
+      });
+      this.logger.log(`🎯 [THUMBNAIL_TRACK] After DB update - saved thumbnailImageId: ${updatedPost?.thumbnailImageId}, saved thumbnail: ${updatedPost?.thumbnail}`);
+
+      // 썸네일 변경 감지 및 이벤트 발행
+      if (oldThumbnailImageId !== thumbnailImageId || oldThumbnailUrl !== thumbnailUrl) {
+        // 🎯 [THUMBNAIL_TRACK] STEP_5_DB_UPDATE_COMPLETE
+        this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_5_DB_UPDATE_COMPLETE: DB update successful');
+        this.logger.debug(`  - Post ID: ${postId}`);
+        this.logger.debug(`  - Blog Slug: ${post.blog?.slug || post.blogId}`);
+        this.logger.debug(`  - Old thumbnailImageId: ${oldThumbnailImageId} -> New: ${thumbnailImageId}`);
+        this.logger.debug(`  - Old thumbnailUrl: ${oldThumbnailUrl} -> New: ${thumbnailUrl}`);
+        this.logger.debug(`  - Timestamp: ${new Date().toISOString()}`);
+
+        // 🎯 [THUMBNAIL_TRACK] STEP_6_EVENT_EMITTED
+        this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_6_EVENT_EMITTED: Emitting POST_THUMBNAIL_UPDATED event');
+
+        // 썸네일 변경 이벤트 발행
+        this.eventEmitter.emit(CacheInvalidationEvents.POST_THUMBNAIL_UPDATED, {
+          postId,
+          blogSlug: post.blog?.slug || post.blogId,
+          oldThumbnailImageId,
+          newThumbnailImageId: thumbnailImageId,
+          oldThumbnailUrl,
+          newThumbnailUrl: thumbnailUrl,
+          authorId: userId,
+        });
+
+        this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_6_EVENT_EMITTED_COMPLETE: Event emitted successfully');
+      } else {
+        this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_5_NO_CHANGE: No thumbnail change detected');
+      }
 
       return { success: true, thumbnailUrl };
     } catch (error) {
@@ -365,10 +453,8 @@ export class PostFileService {
     contextId: string,
     contextType: FileContextType
   ): Promise<void> {
-    // 파일을 직접 업데이트
-    await this.filesRepository.update(fileId, {
-      contextId,
-    });
+    // 파일의 contextId 업데이트 제거 - foreign key constraint 위반 방지
+    // 썸네일 정보는 posts 테이블에서만 관리하면 충분함
 
     // 컨텍스트가 없으면 생성
     const existingContext = await this.fileContextRepository.findOne({
@@ -393,10 +479,11 @@ export class PostFileService {
    * @param contextType 컨텍스트 타입
    */
   private async deleteFileContext(fileId: string, contextType: FileContextType): Promise<void> {
-    // 파일의 컨텍스트 연결 해제
-    await this.filesRepository.update(fileId, {
-      contextId: null,
-    });
+    // 파일의 contextId 업데이트 제거 - foreign key constraint 위반 방지
+    // 썸네일 정보는 posts 테이블에서만 관리하면 충분함
+    // await this.filesRepository.update(fileId, {
+    //   contextId: null,
+    // });
   }
 
   /**

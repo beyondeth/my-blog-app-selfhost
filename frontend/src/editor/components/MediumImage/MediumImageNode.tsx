@@ -144,7 +144,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
 
     // 커스텀 이벤트 발생 - 부모 컴포넌트에서 감지
     const event = new CustomEvent('thumbnail-selected', {
-      detail: { imageId: isThumbnail ? '' : imageId }
+      detail: { imageId: isThumbnail ? '' : imageId } // 빈 문자열로 해제 처리
     });
     window.dispatchEvent(event);
 
@@ -157,7 +157,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
 
     const thumbnailId = (editor.storage as any)?.thumbnailImageId || '';
     setIsThumbnail(thumbnailId === imageId);
-  }, [editor, imageId, (editor?.storage as any)?.thumbnailImageId]);
+  }, [editor, imageId]); // storage thumbnailImageId 제거 - 무한 리렌더링 방지
 
   return (
     <NodeViewWrapper
@@ -179,7 +179,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
           onSizeChange={handleSizeChange}
           onAltTextClick={() => setAltModalOpen(true)}
           isThumbnail={isThumbnail}
-          onThumbnailToggle={imageId ? handleThumbnailToggle : undefined}
+          onThumbnailToggle={handleThumbnailToggle} // 항상 제공 - handleThumbnailToggle 내부에서 imageId 확인
         />
       )}
 

@@ -52,10 +52,6 @@ export class ImageProcessorService {
           img.setAttribute('alt', '');
         }
 
-        // 이미지 ID 추가 (추적용)
-        const imgId = this.generateImageId();
-        img.setAttribute('data-image-id', imgId);
-
         // 원본 크기 정보 보존 (있는 경우)
         const width = img.getAttribute('width');
         const height = img.getAttribute('height');
@@ -130,15 +126,7 @@ export class ImageProcessorService {
     return url;
   }
 
-  /**
-   * 이미지용 고유 ID를 생성합니다.
-   *
-   * @returns 고유 ID
-   */
-  private generateImageId(): string {
-    return `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
+  
   /**
    * HTML에서 모든 이미지 URL을 추출합니다.
    *

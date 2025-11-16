@@ -502,8 +502,24 @@ export class PostsController {
   @ApiOperation({ summary: '게시글 수정' })
   @ApiBearerAuth()
   async update(@Param('id', ParseUUIDPipe) id: string, @Body() updatePostDto: UpdatePostDto, @CurrentUser() user: User) {
+    // 🎯 [THUMBNAIL_TRACK] STEP_4_BACKEND_RECEIVE
+    if ('thumbnailImageId' in updatePostDto || 'thumbnail' in updatePostDto) {
+      this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_4_BACKEND_RECEIVE: Post update request received');
+      this.logger.debug(`  - Post ID: ${id}`);
+      this.logger.debug(`  - User ID: ${user.id}`);
+      this.logger.debug(`  - thumbnailImageId: ${updatePostDto.thumbnailImageId}`);
+      this.logger.debug(`  - thumbnail: ${updatePostDto.thumbnail}`);
+      this.logger.debug(`  - Timestamp: ${new Date().toISOString()}`);
+    }
+
     const updated = await this.postsService.update(id, updatePostDto, user);
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
+
+    // 🎯 [THUMBNAIL_TRACK] STEP_4_BACKEND_SUCCESS
+    if ('thumbnailImageId' in updatePostDto || 'thumbnail' in updatePostDto) {
+      this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_4_BACKEND_SUCCESS: Post update completed');
+    }
+
     return updated;
   }
 
