@@ -9,6 +9,7 @@ import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useCreatePost, postQueryKeys } from '@/hooks/usePosts';
+import { validateUUID } from '@/lib/utils/uuid';
 import { useMyBlogs } from '@/hooks/useBlogs';
 import { useQueryClient } from '@tanstack/react-query';
 import Spinner from '@/components/ui/Spinner';
@@ -115,8 +116,13 @@ export default function NewStoryPage() {
     setIsSubmitting(true); // UI 업데이트용
 
     try {
+      // TODO: BlogSimpleEditor에서 이미지 업로드 상태를 받아올 수 있도록 개선 필요
+      // 현재는 업로드 상태 확인을 건너뜁니다
       // 카테고리 배열 → "메인/서브" 문자열로 변환 (백엔드 호환)
       const categoryString = data.categories.join('/');
+
+      // 썸네일 ID 유효성 검증
+      const validThumbnailId = validateUUID(thumbnailImageId);
 
       const postData: any = {
         title: data.title,
@@ -124,9 +130,14 @@ export default function NewStoryPage() {
         content: data.content,
         tags: data.tags,
         attachedFileIds: data.fileIds,
-        // 썸네일 이미지 ID 추가 (선택된 경우에만)
-        ...(thumbnailImageId && { thumbnailImageId }),
+        // 썸네일 이미지 ID 추가 (유효한 UUID인 경우에만)
+        ...(validThumbnailId && { thumbnailImageId: validThumbnailId }),
       };
+
+      // 유효하지 않은 썸네일 ID가 선택된 경우 (개발 환경에서만 로그 출력)
+      if (thumbnailImageId && !validThumbnailId && process.env.NODE_ENV === 'development') {
+        console.warn('Invalid thumbnail ID format, ignoring thumbnail:', thumbnailImageId);
+      }
 
       const result = await createPostMutation.mutateAsync(postData);
 

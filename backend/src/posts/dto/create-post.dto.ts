@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsArray, IsNumber, IsBoolean, Min, Max, MaxLength, Matches } from 'class-validator';
+import { IsString, IsOptional, IsArray, IsNumber, IsBoolean, Min, Max, MaxLength, Matches, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class 
@@ -28,10 +28,10 @@ CreatePostDto {
 
   @ApiPropertyOptional({
     description: '썸네일 이미지 파일 ID (UUID)',
-    example: 'uuid-of-thumbnail-image',
+    example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @IsOptional()
-  @IsString()
+  @IsUUID('4', { message: '썸네일 ID는 유효한 UUID v4 형식이어야 합니다' })
   thumbnailImageId?: string;
 
   @ApiPropertyOptional({
@@ -55,11 +55,11 @@ CreatePostDto {
 
   @ApiPropertyOptional({
     description: '첨부 파일 ID 배열 (UUID)',
-    example: ['uuid1', 'uuid2', 'uuid3'],
+    example: ['550e8400-e29b-41d4-a716-446655440000', '550e8400-e29b-41d4-a716-446655440001'],
   })
   @IsOptional()
   @IsArray()
-  @IsString({ each: true })
+  @IsUUID('4', { each: true, message: '첨부 파일 ID는 유효한 UUID v4 형식이어야 합니다' })
   attachedFileIds?: string[];
 
   @ApiPropertyOptional({

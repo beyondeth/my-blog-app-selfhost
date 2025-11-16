@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,6 +24,7 @@ import { useUserCategories } from '@/hooks/usePosts';
 import { toast } from 'sonner';
 import "@/styles/elevated-editor.css"; // elevated surface 스타일
 import { BlogSimpleEditor } from '@/editor'; // 정적 import로 변경하여 flushSync 문제 해결
+import { validateUUID } from '@/lib/utils/uuid';
 
 // 폼 스키마 정의
 const postFormSchema = z.object({
@@ -87,6 +88,17 @@ export default function EditPostForm({
     (initialData as any)?.thumbnailImageId || ''
   );
 
+  // 🎯 [THUMBNAIL_TRACK] 썸네일 변경 감지 래퍼
+  const handleThumbnailChange = useCallback((newImageId: string) => {
+    console.log('🎯 [THUMBNAIL_TRACK] STEP_2_THUMBNAIL_SELECTED');
+    console.log('  - Previous thumbnailImageId:', thumbnailImageId);
+    console.log('  - New thumbnailImageId:', newImageId);
+    console.log('  - Post ID:', initialData?.id);
+    console.log('  - Timestamp:', new Date().toISOString());
+
+    setThumbnailImageId(newImageId);
+  }, [thumbnailImageId, initialData?.id]);
+
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
     defaultValues: {
@@ -130,15 +142,38 @@ export default function EditPostForm({
     // 카테고리 배열 → 문자열 변환 (백엔드는 "메인/서브" 형식 기대)
     const categoryString = data.categories.join('/');
 
+    // 썸네일 ID 유효성 검증
+    const validThumbnailId = validateUUID(thumbnailImageId);
+
     const formData: any = {
       ...data,
       category: categoryString,
-      // 썸네일 이미지 ID 추가 (선택된 경우에만)
-      ...(thumbnailImageId && { thumbnailImageId }),
+      // 썸네일 이미지 ID 추가 (유효한 UUID인 경우에만)
+      ...(validThumbnailId && { thumbnailImageId: validThumbnailId }),
     };
+
+    // 🎯 [THUMBNAIL_TRACK] STEP_3_FORM_SUBMIT
+    console.log('🎯 [THUMBNAIL_TRACK] STEP_3_FORM_SUBMIT: Preparing form submission');
+    console.log('  - Current thumbnailImageId state:', thumbnailImageId);
+    console.log('  - Validated thumbnailId:', validThumbnailId);
+    console.log('  - Will be sent to API:', validThumbnailId || '(none)');
+    console.log('  - Timestamp:', new Date().toISOString());
+
+    // 유효하지 않은 썸네일 ID가 선택된 경우 (개발 환경에서만 로그 출력)
+    if (thumbnailImageId && !validThumbnailId && process.env.NODE_ENV === 'development') {
+      console.warn('Invalid thumbnail ID format, ignoring thumbnail:', thumbnailImageId);
+    }
 
     // categories 필드 제거 (백엔드는 category 필드만 사용)
     delete formData.categories;
+
+    // 🎯 [THUMBNAIL_TRACK] STEP_3_FORM_SUBMIT_COMPLETE
+    console.log('🎯 [THUMBNAIL_TRACK] STEP_3_FORM_SUBMIT_COMPLETE: Submitting form with data:', {
+      hasThumbnailImageId: !!formData.thumbnailImageId,
+      thumbnailImageId: formData.thumbnailImageId,
+      postId: initialData?.id,
+      timestamp: new Date().toISOString()
+    });
 
     onSubmit(formData);
   };
@@ -610,7 +645,7 @@ export default function EditPostForm({
                               onChange={field.onChange}
                               placeholder=" 내용을 입력하세요..."
                               thumbnailImageId={thumbnailImageId}
-                              onThumbnailChange={setThumbnailImageId}
+                              onThumbnailChange={handleThumbnailChange}
                             />
                           </div>
                         </div>

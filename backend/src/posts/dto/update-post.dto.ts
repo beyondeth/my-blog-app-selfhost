@@ -17,9 +17,8 @@ export class UpdatePostDto extends PartialType(CreatePostDto) {
   @IsBoolean()
   isEditorPick?: boolean;
 
-  @IsOptional()
-  @IsString()
-  thumbnail?: string;
+  // thumbnail은 CreatePostDto에서 이미 정의되어 있으므로 중복 정의 제거
+  // thumbnailImageId도 CreatePostDto에서 상속받음
 
   @IsOptional()
   @IsBoolean()

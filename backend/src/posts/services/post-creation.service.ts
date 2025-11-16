@@ -14,7 +14,7 @@ import { UpdatePostDto } from '../dto/update-post.dto';
 import { PostContentService } from './post-content.service';
 import { PostFileService } from './post-file.service';
 import { PostCacheService } from './post-cache.service';
-// import { CacheInvalidationEvents } from '../../common/events/cache.events'; // 사용하지 않음
+import { CacheInvalidationEvents } from '../../common/events/cache.events';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
@@ -125,8 +125,30 @@ export class PostCreationService {
         }
       );
 
-      // 4. 썸네일 추출
-      const thumbnail = this.postContentService.extractThumbnail(processedContent.html);
+      // 4. 썸네일 설정 (우선순위: 명시적 thumbnailImageId > 명시적 thumbnail > content 추출)
+      let thumbnail: string | null = null;
+
+      // thumbnailImageId가 있는 경우 파일 테이블에서 URL 조회
+      if (createPostDto.thumbnailImageId) {
+        const thumbnailFile = await manager.findOne(File, {
+          where: { id: createPostDto.thumbnailImageId, userId: author.id }
+        });
+
+        if (thumbnailFile) {
+          thumbnail = thumbnailFile.fileUrl;
+          this.logger.log(`[PostCreationService] Using thumbnailImageId: ${createPostDto.thumbnailImageId}`);
+        } else {
+          this.logger.warn(`[PostCreationService] Thumbnail file not found: ${createPostDto.thumbnailImageId}`);
+        }
+      } else if (createPostDto.thumbnail) {
+        // 명시적으로 thumbnail URL이 제공된 경우
+        thumbnail = createPostDto.thumbnail;
+        this.logger.log(`[PostCreationService] Using explicit thumbnail URL`);
+      } else {
+        // 명시적 썸네일이 없는 경우에만 content에서 추출
+        thumbnail = this.postContentService.extractThumbnail(processedContent.html);
+        this.logger.log(`[PostCreationService] Extracted thumbnail from content: ${thumbnail ? 'found' : 'not found'}`);
+      }
 
       // 5. 포스트 엔티티 생성
       const post = manager.create(Post, {
@@ -135,7 +157,7 @@ export class PostCreationService {
         content: processedContent.html,  // 처리된 HTML 콘텐츠 저장
         contentMarkdown: createPostDto.content_markdown,  // 원본 마크다운 저장
         excerpt: this.postContentService.extractExcerpt(rawContent),
-        thumbnail: thumbnail || createPostDto.thumbnail,
+        thumbnail: thumbnail,
         thumbnailImageId: createPostDto.thumbnailImageId,
         category: createPostDto.category,
         tags: createPostDto.tags || [],
@@ -302,6 +324,10 @@ export class PostCreationService {
         ? updatePostDto.isPublished
         : post.isPublished;
 
+      // 3.1. 썸네일 변경 감지를 위한 원본 값 저장 (업데이트 전)
+      const oldThumbnailImageId = post.thumbnailImageId;
+      const oldThumbnailUrl = post.thumbnail;
+
       // 4. 콘텐츠 업데이트
       if (updatePostDto.content !== undefined) {
         const processedContent = await this.postContentService.processContent(
@@ -314,10 +340,26 @@ export class PostCreationService {
           }
         );
 
-        const thumbnail = this.postContentService.extractThumbnail(processedContent.html);
+        // 기존 포스트의 잘못된 data-image-id 속성 정리
+        // ImageProcessorService가 생성한 랜덤 UUID들이 DB에 없는 경우 제거
+        let cleanedContent = updatePostDto.content;
+        if (cleanedContent) {
+          // data-image-id 속성을 모두 제거 (PostMapperService에서 올바른 ID로 다시 추가됨)
+          cleanedContent = cleanedContent.replace(/\s+data-image-id=["'][^"']*["']/g, '');
+          this.logger.debug(`[PostCreationService] Cleaned invalid data-image-id attributes from content`);
+        }
 
-        post.content = updatePostDto.content;
-        post.thumbnail = thumbnail || post.thumbnail;
+        post.content = cleanedContent;
+        // 썸네일 업데이트 로직:
+        // - 명시적으로 thumbnailImageId가 제공된 경우: 그대로 유지 (나중에 setThumbnail 호출에서 처리)
+        // - 명시적으로 thumbnail이 제공된 경우: 그대로 유지
+        // - 기존 썸네일이 있고 명시적 변경이 없는 경우: 기존 썸네일 유지
+        // - 썸네일이 전혀 없는 경우에만 content에서 추출
+        if (!post.thumbnailImageId && !post.thumbnail && !updatePostDto.thumbnailImageId && !updatePostDto.thumbnail) {
+          const thumbnail = this.postContentService.extractThumbnail(processedContent.html);
+          post.thumbnail = thumbnail;
+          this.logger.log(`[PostCreationService] Auto-extracted thumbnail from content for post ${id}`);
+        }
         post.excerpt = this.postContentService.extractExcerpt(updatePostDto.content);
 
         // 메타데이터 업데이트
@@ -355,11 +397,7 @@ export class PostCreationService {
         }
       }
 
-      // 7. 썸네일 명시적 설정
-      if (updatePostDto.thumbnail !== undefined) {
-        post.thumbnail = updatePostDto.thumbnail;
-      }
-
+  
       // 8. Editor's Pick (관리자만)
       if (updatePostDto.isEditorPick !== undefined && user.role === Role.ADMIN) {
         post.isEditorPick = updatePostDto.isEditorPick;
@@ -370,28 +408,76 @@ export class PostCreationService {
         }
       }
 
-      // 9. 버전 증가
+      // 9. 썸네일 설정 (PostFileService를 통한 처리) - 트랜잭션 내에서 처리
+      if (updatePostDto.thumbnailImageId !== undefined || updatePostDto.thumbnail !== undefined) {
+        // 🎯 [THUMBNAIL_TRACK] PostFileService를 통해 썸네일 처리
+        this.logger.log(`[PostCreationService] Calling PostFileService.setThumbnail for postId=${id}, thumbnailImageId=${updatePostDto.thumbnailImageId}`);
+
+        // 트랜잭션 내에서 setThumbnail 호출 - 실패 시 전체 트랜잭션이 롤백됨
+        await this.postFileService.setThumbnail(id, user.id, {
+          thumbnailFileId: updatePostDto.thumbnailImageId,
+          thumbnailUrl: updatePostDto.thumbnail
+        });
+
+        // PostFileService에서 post를 직접 업데이트하므로 여기서는 다시 설정할 필요 없음
+        // 썸네일 변경 후 post 객체를 다시 조회하여 최신 상태 유지
+        const updatedPostAfterThumbnail = await this.postsRepository.findOne({
+          where: { id },
+          relations: ['thumbnailImage']
+        });
+
+        if (updatedPostAfterThumbnail) {
+          post.thumbnailImageId = updatedPostAfterThumbnail.thumbnailImageId;
+          post.thumbnail = updatedPostAfterThumbnail.thumbnail;
+        }
+      }
+
+      // 10. 버전 증가
       post.version = (post.version || 0) + 1;
       post.updatedAt = new Date();
 
-      // 10. 저장
+      // 11. 저장
       const updatedPost = await manager.save(post);
 
-      // 11. 파일 처리
+      // 12. 파일 처리
       if (files) {
         const fileIds = files.map(f => f.id);
         await this.postFileService.unlinkUnusedFiles(id, user.id, fileIds);
         await this.postFileService.linkFilesFromContent(updatedPost, user.id);
       }
 
-      // 12. 캐시 무효화
-      this.eventEmitter.emit('cache.posts.invalidate', {
-        postId: updatedPost.id,
-        blogId: post.blogId,
-        isPublished: updatedPost.isPublished,
-      });
+      // 13. 썸네일 변경 시 특정 이벤트 발행
+      // newThumbnail 값은 업데이트된 post 객체에서 가져옴
+      const newThumbnailImageId = post.thumbnailImageId;
+      const newThumbnailUrl = post.thumbnail;
 
-      // 13. 발행 상태 변경 이벤트
+      // 썸네일이 실제로 변경된 경우에만 이벤트 발행
+      if (oldThumbnailImageId !== newThumbnailImageId || oldThumbnailUrl !== newThumbnailUrl) {
+        // 디버깅용 상세 로그
+        this.logger.log(`[POST_THUMBNAIL_UPDATED] Thumbnail change detected for post: ${updatedPost.id}`);
+        this.logger.debug(`  Old thumbnailImageId: ${oldThumbnailImageId} -> New: ${newThumbnailImageId}`);
+        this.logger.debug(`  Old thumbnailUrl: ${oldThumbnailUrl} -> New: ${newThumbnailUrl}`);
+        this.logger.debug(`  Blog slug: ${post.blog?.slug || post.blogId}`);
+
+        this.eventEmitter.emit(CacheInvalidationEvents.POST_THUMBNAIL_UPDATED, {
+          postId: updatedPost.id,
+          blogSlug: post.blog?.slug || post.blogId,
+          oldThumbnailImageId,
+          newThumbnailImageId,
+          oldThumbnailUrl,
+          newThumbnailUrl,
+          authorId: user.id,
+        });
+      }
+
+      // 14. 일반 캐시 무효화 (다른 변경들도 고려)
+      await this.postCacheService.invalidatePostUpdateCache(
+        updatedPost.id,
+        post.blog?.slug || post.blogId,
+        post.blogId
+      );
+
+      // 15. 발행 상태 변경 이벤트
       if (!wasPublished && willBePublished) {
         await this.postProcessingQueue.add(
           'process-published-post',
@@ -418,7 +504,14 @@ export class PostCreationService {
       }
 
       this.logger.log(`Post updated successfully: ${updatedPost.id}`);
-      return updatedPost;
+
+      // PostMapperService에서 data-image-id를 추가하기 위해 attachedFiles 관계 포함하여 조회
+      const finalPost = await this.postsRepository.findOne({
+        where: { id: updatedPost.id },
+        relations: ['attachedFiles', 'thumbnailImage', 'blog', 'author', 'stats', 'metadata']
+      });
+
+      return finalPost || updatedPost;
     }).catch(error => {
       if (error instanceof OptimisticLockVersionMismatchError) {
         throw new ConflictException('포스트가 다른 사용자에 의해 수정되었습니다. 새로고침 후 다시 시도해주세요.');

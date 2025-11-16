@@ -226,6 +226,13 @@ export function BlogSimpleEditor({
 }: BlogSimpleEditorProps = {}) {
   const isMobile = useIsMobile()
   const { height } = useWindowSize()
+
+  // 🎯 [THUMBNAIL_TRACK] DEBUG: onThumbnailChange prop 확인
+  console.log('🎯 [THUMBNAIL_TRACK] BlogSimpleEditor mounted with props:', {
+    hasOnThumbnailChange: !!onThumbnailChange,
+    onThumbnailChangeType: typeof onThumbnailChange,
+    thumbnailImageId: thumbnailImageId
+  });
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
@@ -239,7 +246,7 @@ export function BlogSimpleEditor({
     file: File,
     onProgress?: (event: { progress: number }) => void,
     abortSignal?: AbortSignal
-  ): Promise<string> => {
+  ): Promise<{url: string, fileId: string}> => {
     try {
       // 파일 크기 체크 (5MB) - 프론트엔드에서 사전 검증
       const MAX_FILE_SIZE = 5 * 1024 * 1024
@@ -253,14 +260,19 @@ export function BlogSimpleEditor({
         fileType: 'image' as const,
       })
 
-      // URL 추출 및 정규화
-      const imageUrl = (result as any).url || (result as any).accessUrl
+      // 파일 ID와 URL 추출
+      const fileId = (result as any).id || (result as any).fileId
+      const imageUrl = (result as any).url || (result as any).accessUrl || (result as any).fileUrl
       const finalUrl = normalizeImageUrl(imageUrl)
+
+      if (!fileId) {
+        console.warn('[BlogSimpleEditor] No file ID found in upload result:', result)
+      }
 
       // 이미지 업로드는 여러 개일 수 있으므로 개별 토스트는 표시하지 않음
       // ImageUploadManager에서 배치 토스트를 표시함
 
-      return finalUrl
+      return { url: finalUrl, fileId }
     } catch (error) {
       console.error('Image upload failed:', error)
       const errorMessage = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다'
@@ -347,19 +359,38 @@ export function BlogSimpleEditor({
     overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
   })
 
-  // 썸네일 선택 이벤트 리스너 (ResizableImageComponent에서 발생)
+  // 썸네일 선택 이벤트 리스너 (MediumImageNode에서 발생)
   useEffect(() => {
     const handleThumbnailSelected = (event: Event) => {
       const customEvent = event as CustomEvent<{ imageId: string }>
       const { imageId } = customEvent.detail
 
+      // 🎯 [THUMBNAIL_TRACK] STEP_1_USER_CLICK
+      console.log('🎯 [THUMBNAIL_TRACK] STEP_1_USER_CLICK: User clicked thumbnail button');
+      console.log('  - Selected imageId:', imageId);
+      console.log('  - Timestamp:', new Date().toISOString());
+      console.log('  - onThumbnailChange exists:', !!onThumbnailChange);
+      console.log('  - onThumbnailChange type:', typeof onThumbnailChange);
+
       // 에디터 storage 업데이트
       if (editor) {
         (editor.storage as any).thumbnailImageId = imageId
+        console.log('  - Editor storage updated with:', imageId);
       }
 
       // 부모 컴포넌트에 알림
-      onThumbnailChange?.(imageId)
+      console.log('  - About to call onThumbnailChange...');
+      if (onThumbnailChange) {
+        try {
+          console.log('  - onThumbnailChange is defined, calling with imageId:', imageId);
+          onThumbnailChange(imageId);
+          console.log('  - onThumbnailChange called successfully');
+        } catch (error) {
+          console.error('  - Error calling onThumbnailChange:', error);
+        }
+      } else {
+        console.error('  - ERROR: onThumbnailChange is undefined!');
+      }
     }
 
     window.addEventListener('thumbnail-selected', handleThumbnailSelected)
