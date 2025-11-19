@@ -147,13 +147,8 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
         // getPos()를 사용하여 현재 노드 위치를 찾고 그 다음으로 포커스 이동
         const pos = getPos();
         if (pos !== undefined) {
-          const view = editor.view;
-          const tr = view.state.tr.setSelection(
-            // @ts-ignore - ProseMirror selection types
-            view.state.tr.selection.from(pos + node.nodeSize)
-          );
-          view.dispatch(tr);
-          view.focus();
+          // TipTap의 chain() API를 사용하여 더 안전하게 처리
+          editor.chain().focus().setTextSelection(pos + node.nodeSize).run();
         }
       }
       // 텍스트 중간에서 엔터 누르면 무시 (한 줄만 입력)
