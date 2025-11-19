@@ -227,6 +227,8 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       contentEditable={false}
       draggable={true}
       data-drag-handle
+      as="figure"
+      data-medium-image=""
     >
       {/* 이미지 툴바 (선택 시 표시) - 이미지 위에 위치 */}
       {selected && isImageLoaded && (
@@ -266,22 +268,23 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       </div>
 
       {/* Caption 입력 */}
-      <input
-        type="text"
-        placeholder="이미지 캡션 (optional)"
-        value={node.attrs.caption || ''}
-        onChange={handleCaptionChange}
-        onKeyDown={handleCaptionKeyDown}
-        className={cn(
-          'medium-image-caption-input',
-          'w-full border-none outline-none',
-          'text-center text-sm text-gray-500 italic',
-          'px-4 py-2 mt-2',
-          'placeholder:text-gray-400',
-          'focus:text-gray-600'
-        )}
-      />
+      <figcaption className="medium-image-caption">
+        <input
+          type="text"
+          placeholder="이미지 캡션 (optional)"
+          value={node.attrs.caption || ''}
+          onChange={handleCaptionChange}
+          onKeyDown={handleCaptionKeyDown}
+          className={cn(
+            'medium-image-caption-input',
+            'w-full border-none outline-none bg-transparent text-center text-sm text-gray-500 italic px-4 py-2 mt-2',
+            'placeholder:text-gray-400',
+            'focus:text-gray-600'
+          )}
+        />
+      </figcaption>
 
+    
       {/* Alt Text 모달 */}
       {altModalOpen && (
         <AltTextModal

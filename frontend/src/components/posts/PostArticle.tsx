@@ -300,7 +300,7 @@ const PostArticle = React.memo(function PostArticle({
   // 일반 포스트 레이아웃 (기존 코드)
   return (
     <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-4 first:pt-0">
-      <div className={`flex ${post.thumbnail ? 'flex-row gap-6 sm:gap-12' : 'flex-col'}`}>
+      <div className={`flex ${post.thumbnail ? 'flex-col sm:flex-row gap-6 sm:gap-12' : 'flex-col'}`}>
         {/* Content */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Author Info - 제목 위에 배치 */}
@@ -431,10 +431,16 @@ const PostArticle = React.memo(function PostArticle({
             </div>
           </div>
         </div>
-        
-        {/* Thumbnail - 모바일에서 제목 위치에 맞춰 정렬, 데스크톱 210x197 */}
+
+        {/* Thumbnail - 모바일(375px-420px)에서는 콘텐츠 아래로, 421px 이상에서는 오른쪽에 */}
         {post.thumbnail && (
-          <div className="flex-shrink-0 mt-[52px] sm:mt-0 sm:self-center">
+          <div className={`
+            ${post.thumbnail
+              ? 'flex-shrink-0 mt-4 mx-auto sm:mt-0 sm:self-center sm:ml-6 sm:mr-0'
+              : ''
+            }
+          `}>
+            {/* 모바일 (375px-420px): 썸네일을 콘텐츠 아래 중앙 정렬 */}
             <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
               <Image
                 src={post.thumbnail}
@@ -446,6 +452,7 @@ const PostArticle = React.memo(function PostArticle({
                 priority={priority}
               />
             </div>
+            {/* 데스크톱 (421px 이상): 썸네일을 오른쪽에 배치 */}
             <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
               <Image
                 src={post.thumbnail}
