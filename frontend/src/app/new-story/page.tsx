@@ -191,7 +191,7 @@ export default function NewStoryPage() {
           fileIdsCount: data.fileIds?.length,
           'form.thumbnailIndex': data.thumbnailIndex, // 폼 데이터 값
           'local.thumbnailIndex': currentThumbnailIndex, // 로컬 상태 값
-          'fileIds[thumbnailIndex]': currentThumbnailIndex >= 0 ? data.fileIds[currentThumbnailIndex] : 'N/A',
+          'fileIds[thumbnailIndex]': currentThumbnailIndex >= 0 && data.fileIds ? data.fileIds[currentThumbnailIndex] : 'N/A',
           thumbnailImageId,
           hasThumbnail: !!thumbnailImageId,
           postData: {

@@ -3,8 +3,7 @@
  * Medium 스타일 이미지 노드를 제공하는 TipTap Extension
  *
  * 기능:
- * - 3가지 크기 옵션 (small: 300px, default: 680px, full: 1000px)
- * - Alt text 지원 (접근성)
+ * - 4가지 크기 옵션 (small: 300px, medium: 500px, default: 680px, full: 1000px)
  * - Caption 지원 (이미지 설명)
  * - 썸네일 선택 (data-image-id)
  */
@@ -25,11 +24,6 @@ export const MediumStyleImage = Image.extend({
       // 기본 Image 속성
       src: {
         default: null,
-      },
-
-      // Alt text (접근성)
-      alt: {
-        default: '',
       },
 
       // 이미지 크기
@@ -62,7 +56,6 @@ export const MediumStyleImage = Image.extend({
 
           return {
             src: img.getAttribute('src'),
-            alt: img.getAttribute('alt') || '',
             size: img.getAttribute('data-size') || 'default',
             caption: dom.querySelector('figcaption')?.textContent || '',
             'data-image-id': img.getAttribute('data-image-id'),
@@ -77,7 +70,6 @@ export const MediumStyleImage = Image.extend({
 
           return {
             src: dom.getAttribute('src'),
-            alt: dom.getAttribute('alt') || '',
             size: dom.getAttribute('data-size') || 'default',
             caption: '',
             'data-image-id': dom.getAttribute('data-image-id'),
@@ -88,13 +80,13 @@ export const MediumStyleImage = Image.extend({
   },
 
   renderHTML({ HTMLAttributes }: { HTMLAttributes: Record<string, any> }) {
-    const { src, alt, size, caption } = HTMLAttributes;
+    const { src, size, caption } = HTMLAttributes;
     const imageId = HTMLAttributes['data-image-id'];
 
     // figure 구조로 렌더링
     const imgAttrs: Record<string, any> = {
       src,
-      alt,
+      alt: '',
       'data-size': size,
       class: `medium-image medium-image-${size}`,
     };
@@ -120,8 +112,8 @@ export const MediumStyleImage = Image.extend({
   },
 
   // NodeView에서 DOM 생성을 제어하기 위한 toDOM 메소드
-  toDOM(node) {
-    const { src, alt, size, caption, 'data-image-id': imageId } = node.attrs;
+  toDOM(node: any) {
+    const { src, size, caption, 'data-image-id': imageId } = node.attrs;
 
     // figure 요소 생성
     const figure = document.createElement('figure');
@@ -131,7 +123,7 @@ export const MediumStyleImage = Image.extend({
     // img 요소 생성
     const img = document.createElement('img');
     img.src = src;
-    img.alt = alt || '';
+    img.alt = '';
     img.setAttribute('data-size', size || 'default');
     img.className = `medium-image medium-image-${size || 'default'}`;
 
@@ -168,11 +160,6 @@ export const MediumStyleImage = Image.extend({
         (caption: string) =>
         ({ commands }: any) => {
           return commands.updateAttributes(this.name, { caption });
-        },
-      setImageAlt:
-        (alt: string) =>
-        ({ commands }: any) => {
-          return commands.updateAttributes(this.name, { alt });
         },
     };
   },
