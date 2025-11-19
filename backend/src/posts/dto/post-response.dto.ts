@@ -42,10 +42,10 @@ export class PostResponseDto {
   content_rendered_at: Date;
 
   @Expose()
-  thumbnail: string;
+  thumbnail: string | null;  // thumbnailImageId에서 생성된 URL
 
   @Expose()
-  thumbnail_image_id: string;
+  thumbnailImageId: string | null;  // 썸네일 파일 ID
 
   @Expose()
   isPublished: boolean;

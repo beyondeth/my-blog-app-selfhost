@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -38,6 +38,9 @@ const BlogSimpleEditor = dynamic(
   }
 );
 
+// Memoized editor to prevent unnecessary re-mounts
+const MemoizedBlogSimpleEditor = React.memo(BlogSimpleEditor);
+
 // Zod 스키마 정의
 const postSchema = z.object({
   title: z.string().min(1, '제목을 입력해주세요.'),
@@ -55,6 +58,7 @@ const postSchema = z.object({
   content: z.string().min(1, '내용을 입력해주세요.'),
   tags: z.array(z.string()).optional(),
   fileIds: z.array(z.string()).optional(),
+  thumbnailIndex: z.number().optional(), // 썸네일 인덱스 (0-based, -1 = 미선택)
 });
 
 type PostFormData = z.infer<typeof postSchema>;
@@ -73,8 +77,8 @@ export default function NewStoryPage() {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const isSubmittingRef = useRef(false);
 
-  // 썸네일 이미지 ID 상태
-  const [thumbnailImageId, setThumbnailImageId] = useState<string>('');
+  // 썸네일 인덱스 상태
+  const [thumbnailIndex, setThumbnailIndex] = useState<number>(-1);
 
   const form = useForm<PostFormData>({
     resolver: zodResolver(postSchema),
@@ -84,9 +88,49 @@ export default function NewStoryPage() {
       content: '',
       tags: [],
       fileIds: [],
+      thumbnailIndex: -1, // 초기값: 미선택
     },
   });
-  
+
+  // 썸네일 변경 핸들러 (인덱스 기반)
+  const handleThumbnailChange = useCallback((index: number) => {
+    console.log('🎯 [DEBUG] Thumbnail index changed:', { index, timestamp: new Date().toISOString() });
+
+    // React Hook Form의 setValue를 사용하여 form state 업데이트
+    form.setValue('thumbnailIndex', index, {
+      shouldValidate: true,
+      shouldDirty: true
+    });
+
+    // 상태 업데이트
+    setThumbnailIndex(index);
+
+    // 디버깅: 현재 파일 IDs 확인
+    if (process.env.NODE_ENV === 'development') {
+      const currentFileIds = form.getValues('fileIds');
+      console.log('📋 [DEBUG] Current form fileIds:', currentFileIds);
+      console.log('📋 [DEBUG] Selected index:', index, '-> fileId:', currentFileIds?.[index]);
+    }
+  }, [form]);
+
+  // thumbnailIndex 변경 시 디버깅 로그
+  useEffect(() => {
+    console.log('🔄 [DEBUG] Page thumbnailIndex updated:', {
+      thumbnailIndex,
+      timestamp: new Date().toISOString()
+    });
+  }, [thumbnailIndex]);
+
+  // 파일 ID 변경 핸들러
+  const handleFileIdsChange = useCallback((fileIds: string[]) => {
+    console.log('🎯 [DEBUG] File IDs updated:', fileIds);
+    // React Hook Form의 setValue를 사용하여 form state 업데이트
+    form.setValue('fileIds', fileIds, {
+      shouldValidate: true,
+      shouldDirty: true
+    });
+  }, [form]);
+
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -121,8 +165,14 @@ export default function NewStoryPage() {
       // 카테고리 배열 → "메인/서브" 문자열로 변환 (백엔드 호환)
       const categoryString = data.categories.join('/');
 
-      // 썸네일 ID 유효성 검증
-      const validThumbnailId = validateUUID(thumbnailImageId);
+      // 인덱스를 파일 ID로 변환
+      // 🐛 FIX: local state thumbnailIndex를 사용해야 최신 선택 값이 반영됨
+      let thumbnailImageId = null;
+      const currentThumbnailIndex = thumbnailIndex; // 로컬 상태 사용 (항상 최신 값)
+
+      if (currentThumbnailIndex >= 0 && data.fileIds && data.fileIds.length > currentThumbnailIndex) {
+        thumbnailImageId = data.fileIds[currentThumbnailIndex];
+      }
 
       const postData: any = {
         title: data.title,
@@ -130,13 +180,26 @@ export default function NewStoryPage() {
         content: data.content,
         tags: data.tags,
         attachedFileIds: data.fileIds,
-        // 썸네일 이미지 ID 추가 (유효한 UUID인 경우에만)
-        ...(validThumbnailId && { thumbnailImageId: validThumbnailId }),
+        // 썸네일 파일 ID (인덱스 변환)
+        ...(thumbnailImageId && { thumbnailImageId }),
       };
 
-      // 유효하지 않은 썸네일 ID가 선택된 경우 (개발 환경에서만 로그 출력)
-      if (thumbnailImageId && !validThumbnailId && process.env.NODE_ENV === 'development') {
-        console.warn('Invalid thumbnail ID format, ignoring thumbnail:', thumbnailImageId);
+      // 디버깅: 썸네일 정보 로깅
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎯 [DEBUG] Creating post:', {
+          title: data.title,
+          fileIdsCount: data.fileIds?.length,
+          'form.thumbnailIndex': data.thumbnailIndex, // 폼 데이터 값
+          'local.thumbnailIndex': currentThumbnailIndex, // 로컬 상태 값
+          'fileIds[thumbnailIndex]': currentThumbnailIndex >= 0 ? data.fileIds[currentThumbnailIndex] : 'N/A',
+          thumbnailImageId,
+          hasThumbnail: !!thumbnailImageId,
+          postData: {
+            ...postData,
+            attachedFileIds: postData.attachedFileIds,
+            thumbnailImageId: postData.thumbnailImageId
+          }
+        });
       }
 
       const result = await createPostMutation.mutateAsync(postData);
@@ -628,12 +691,14 @@ export default function NewStoryPage() {
         data-elevation="floating-editor"
         data-focus-mode="writing"
       >
-                            <BlogSimpleEditor
+                            <MemoizedBlogSimpleEditor
+                              key="blog-editor-stable"
                               content={field.value}
                               onChange={field.onChange}
                               placeholder=" 내용을 입력하세요..."
-                              thumbnailImageId={thumbnailImageId}
-                              onThumbnailChange={setThumbnailImageId}
+                              initialThumbnailIndex={thumbnailIndex}
+                              onThumbnailIndexChange={handleThumbnailChange}
+                              onFileIdsChange={handleFileIdsChange}
                             />
                           </div>
                         </div>

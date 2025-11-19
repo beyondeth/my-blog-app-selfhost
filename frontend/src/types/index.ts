@@ -102,6 +102,7 @@ export interface Post {
   content: string;
   excerpt?: string;  // 포스트 요약 (목록 표시용)
   thumbnail?: string;
+  thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   isPublished: boolean;
   status?: string;  // 포스트 상태 ('published', 'draft', 'deleted')
   isDeleted?: boolean;  // 소프트 삭제 여부
@@ -190,6 +191,7 @@ export interface PostForm {
   title: string;
   content: string;
   thumbnail?: string;
+  thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   tags?: string[];
   category: string;  // 카테고리 (필수)
   attachedFileIds?: string[];
@@ -239,7 +241,7 @@ export const FileType = {
 export type FileTypeType = typeof FileType[keyof typeof FileType];
 
 export interface FileUpload {
-  readonly id: number;
+  readonly id: string; // 백엔드와 타입 맞춤 (string)
   readonly originalName: string;
   readonly fileName: string;
   readonly fileKey: string;
@@ -247,10 +249,11 @@ export interface FileUpload {
   readonly fileSize: number;
   readonly mimeType: string;
   readonly fileType: FileTypeType;
-  readonly userId: number;
+  readonly userId: string; // 백엔드와 타입 맞춤 (string)
   readonly user?: User;
   readonly createdAt: string;
   readonly updatedAt: string;
+  readonly accessUrl?: string; // CDN URL (uploadComplete 시 추가되는 필드)
 }
 
 export interface CreateUploadUrlDto {

@@ -202,7 +202,7 @@ export function useUpdatePost() {
       }
 
       // 2. 모든 상세 페이지 쿼리 즉시 무효화 (강제로 fresh 데이터 가져오도록)
-      queryClient.invalidateQueries({ queryKey: postQueryKeys.detail() });
+      queryClient.invalidateQueries({ queryKey: postQueryKeys.details() });
 
       // 3. Active 목록 캐시에서 해당 포스트 업데이트 (Optimistic Update - 서버 refetch 없음)
       // 사용자 브라우저의 메모리에 있는 포스트 목록만 업데이트 (보통 20~40개)

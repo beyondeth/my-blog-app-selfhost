@@ -18,14 +18,7 @@ CreatePostDto {
   @IsString()
   content?: string;
 
-  @ApiPropertyOptional({
-    description: '썸네일 이미지 URL',
-    example: 'https://example.com/thumbnail.jpg',
-  })
-  @IsOptional()
-  @IsString()
-  thumbnail?: string;
-
+  
   @ApiPropertyOptional({
     description: '썸네일 이미지 파일 ID (UUID)',
     example: '550e8400-e29b-41d4-a716-446655440000',
@@ -33,6 +26,15 @@ CreatePostDto {
   @IsOptional()
   @IsUUID('4', { message: '썸네일 ID는 유효한 UUID v4 형식이어야 합니다' })
   thumbnailImageId?: string;
+
+  @ApiPropertyOptional({
+    description: '썸네일 이미지 인덱스 (첨부 파일 배열의 인덱스, 0-based)',
+    example: 0,
+  })
+  @IsOptional()
+  @IsNumber({}, { message: '썸네일 인덱스는 숫자여야 합니다' })
+  @Min(0, { message: '썸네일 인덱스는 0 이상이어야 합니다' })
+  thumbnailIndex?: number;
 
   @ApiPropertyOptional({
     description: '태그 배열',

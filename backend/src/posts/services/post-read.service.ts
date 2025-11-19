@@ -4,6 +4,7 @@ import { Repository, SelectQueryBuilder, Like, In, DataSource } from 'typeorm';
 import { Post } from '../entities/post.entity';
 import { PostStats } from '../entities/post-stats.entity';
 import { User } from '../../users/entities/user.entity';
+import { Role } from '../../common/enums/role.enum';
 import { Blog } from '../../blogs/entities/blog.entity';
 import { PostMapperService } from './post-mapper.service';
 import { BookmarksService } from '../../bookmarks/bookmarks.service';
@@ -45,12 +46,71 @@ export class PostReadService {
    *
    * @param id 포스트 ID
    * @param relations 로드할 관계 데이터
-   * @returns 포스트 엔티티
+   * @param user 사용자 정보 (썸네일, 좋아요 상태 확인용)
+   * @returns 포스트 응답 DTO
    */
-  async findById(id: string, relations: string[] = []): Promise<Post> {
-    return this.postsRepository.findOne({
-      where: { id },
-      relations,
+  async findById(id: string, relations: string[] = [], user?: User): Promise<any> {
+    // 쿼리 빌더로 최적화 - 필요한 관계만 선택적으로 로드
+    let query = this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')
+      .leftJoinAndSelect('post.blog', 'blog')
+      .leftJoinAndSelect('post.thumbnailImage', 'thumbnailImage')
+      .leftJoinAndSelect('post.attachedFiles', 'attachedFiles')  // 상세 페이지에 필요
+      .leftJoinAndSelect('post.stats', 'stats')
+      // metadata에서 필요한 컬럼만 선택
+      .leftJoin('post.metadata', 'metadata')
+      .addSelect([
+        'metadata.excerpt',
+        'metadata.tags',
+        'metadata.category',
+        'metadata.content_rendered_at',
+        'metadata.isEditorPick',
+        'metadata.wordCount',
+        'metadata.readingTimeMinutes'
+      ])
+      .where('post.id = :id', { id });
+
+    // 추가 관계가 있으면 추가 (필요 시에만)
+    if (relations.length > 0) {
+      relations.forEach(relation => {
+        if (!['author', 'author.profile', 'blog', 'thumbnailImage', 'attachedFiles', 'stats', 'metadata'].includes(relation)) {
+          query.leftJoinAndSelect(`post.${relation}`, relation);
+        }
+      });
+    }
+
+    const post = await query.getOne();
+
+    if (!post) {
+      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+    }
+
+    // 게시글이 비공개인 경우
+    if (!post.isPublished) {
+      // 작성자 본인 또는 블로그 소유자만 접근 가능
+      if (!user || (post.authorId !== user.id && post.blog.userId !== user.id && user.role !== Role.ADMIN)) {
+        throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      }
+    }
+
+    // 사용자 상호작용 상태 확인 (북마크 + 좋아요 한 번에 조회)
+    let interactionStatus = { bookmarked: false, liked: false };
+    if (user) {
+      const interactionStatuses = await this.postInteractionStatusService.getMultipleInteractionStatuses(
+        [post.id],
+        user.id
+      );
+      interactionStatus = interactionStatuses.get(post.id) || { bookmarked: false, liked: false };
+    }
+
+    // PostMapperService를 사용하여 DTO 변환
+    return this.postMapperService.toPostDto(post, {
+      user: post.author,
+      blog: post.blog,
+      bookmarked: interactionStatus.bookmarked,
+      liked: interactionStatus.liked,
     });
   }
 
@@ -118,16 +178,23 @@ export class PostReadService {
   async getPostsCursor(dto: GetPostsCursorDto, user?: User): Promise<CursorPaginatedPostsDto> {
     this.logger.debug(`[getPostsCursor] Query: ${JSON.stringify(dto)}`);
 
-    // 기본 쿼리 빌더
+    // 최적화된 쿼리 빌더 (필수 관계만 로드)
     let query = this.postsRepository
       .createQueryBuilder('post')
       .leftJoinAndSelect('post.author', 'author')
       .leftJoinAndSelect('author.profile', 'profile')
       .leftJoinAndSelect('post.blog', 'blog')
       .leftJoinAndSelect('post.thumbnailImage', 'thumbnailImage')
-      .leftJoinAndSelect('post.attachedFiles', 'attachedFiles')
       .leftJoinAndSelect('post.stats', 'stats')
-      .leftJoinAndSelect('post.metadata', 'metadata');
+      // 성능 최적화: metadata에서 필요한 컬럼만 선택
+      .leftJoin('post.metadata', 'metadata')
+      .addSelect([
+        'metadata.excerpt',
+        'metadata.tags',
+        'metadata.category',
+        'metadata.isEditorPick'
+      ])
+      // 성능 최적화: attachedFiles는 필요할 때만 별도 조회 (파일 목록은 상세 페이지에서만 필요)
 
     // where 조건 배열
     const whereConditions: string[] = [];
@@ -136,7 +203,11 @@ export class PostReadService {
     // 게시된 글만 조회 (인증하지 않은 경우)
     if (!user) {
       whereConditions.push('post.isPublished = :isPublished');
+      whereConditions.push('blog.isPublic = :isPublic');
+      whereConditions.push('post.isDeleted = :isDeleted');
       parameters.isPublished = true;
+      parameters.isPublic = true;
+      parameters.isDeleted = false;
     }
 
     // 특정 블로그 필터 (blogId 우선)
@@ -281,23 +352,24 @@ export class PostReadService {
       ? await this.bookmarksService.getMultipleBookmarkStatuses(postIds, user.id)
       : new Map<string, boolean>();
 
-    // 응답 데이터 변환
-    const transformedPosts = [];
-    for (const post of posts) {
-      const postDto = await this.postMapperService.toPostDto(post, {
-        user: post.author,
-        blog: post.blog,
-        bookmarked: bookmarkStatuses.get(post.id) || false,
-        liked: false, // TODO: 좋아요 상태 확인
-      });
+    // 응답 데이터 병렬 변환 (성능 최적화)
+    const transformedPosts = await Promise.all(
+      posts.map(async (post) => {
+        const postDto = await this.postMapperService.toPostDto(post, {
+          user: post.author,
+          blog: post.blog,
+          bookmarked: bookmarkStatuses.get(post.id) || false,
+          liked: false, // TODO: 좋아요 상태 확인
+        });
 
-      // 검색 랭크 추가 (검색인 경우)
-      if (dto.search && (post as any).search_rank) {
-        (postDto as any).searchRank = (post as any).search_rank;
-      }
+        // 검색 랭크 추가 (검색인 경우)
+        if (dto.search && (post as any).search_rank) {
+          (postDto as any).searchRank = (post as any).search_rank;
+        }
 
-      transformedPosts.push(postDto);
-    }
+        return postDto;
+      })
+    );
 
     // hasNext 확인
     const hasNext = posts.length > limit;
@@ -393,20 +465,30 @@ export class PostReadService {
    * @returns Editor's Pick 포스트 목록
    */
   async getEditorPicks(limit: number = 5): Promise<Post[]> {
-    return this.postsRepository.find({
-      where: {
-        isPublished: true,
-        isEditorPick: true  // posts 테이블의 필터링 유지 (호환성)
-      },
-      relations: ['author', 'author.profile', 'blog', 'thumbnailImage', 'metadata'], // metadata 관계 추가
-      order: {
-        metadata: {
-          editorPickedAt: 'DESC',  // metadata 기준 정렬
-        },
-        publishedAt: 'DESC',
-      },
-      take: limit,
-    });
+    // 쿼리 빌더로 최적화 - 필요한 컬럼만 선택
+    let query = this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')
+      .leftJoinAndSelect('post.blog', 'blog')
+      .leftJoinAndSelect('post.thumbnailImage', 'thumbnailImage')
+      .leftJoinAndSelect('post.stats', 'stats')
+      // metadata에서 필요한 컬럼만 선택
+      .leftJoin('post.metadata', 'metadata')
+      .addSelect([
+        'metadata.excerpt',
+        'metadata.tags',
+        'metadata.category',
+        'metadata.isEditorPick',
+        'metadata.editorPickedAt'
+      ])
+      .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.isEditorPick = :isEditorPick', { isEditorPick: true })
+      .orderBy('metadata.editorPickedAt', 'DESC')
+      .addOrderBy('post.publishedAt', 'DESC')
+      .take(limit);
+
+    return query.getMany();
   }
 
   /**
@@ -440,17 +522,35 @@ export class PostReadService {
     page: number = 1,
     limit: number = 10
   ): Promise<{ posts: Post[]; total: number }> {
-    const [posts, total] = await this.postsRepository.findAndCount({
+    // 쿼리 빌더로 최적화
+    let query = this.postsRepository
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.author', 'author')
+      .leftJoinAndSelect('author.profile', 'profile')
+      .leftJoinAndSelect('post.blog', 'blog')
+      .leftJoinAndSelect('post.thumbnailImage', 'thumbnailImage')
+      .leftJoinAndSelect('post.stats', 'stats')
+      // metadata에서 필요한 컬럼만 선택
+      .leftJoin('post.metadata', 'metadata')
+      .addSelect([
+        'metadata.excerpt',
+        'metadata.tags',
+        'metadata.category'
+      ])
+      .where('post.isPublished = :isPublished', { isPublished: true })
+      .andWhere('post.category = :category', { category })
+      .orderBy('post.publishedAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    const posts = await query.getMany();
+
+    // 전체 개수는 간단히 카운트
+    const total = await this.postsRepository.count({
       where: {
         isPublished: true,
         category,
       },
-      relations: ['author', 'author.profile', 'blog', 'thumbnailImage'],
-      order: {
-        publishedAt: 'DESC',
-      },
-      skip: (page - 1) * limit,
-      take: limit,
     });
 
     return { posts, total };

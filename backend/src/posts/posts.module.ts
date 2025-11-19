@@ -45,6 +45,7 @@ import { PostCreationService } from './services/post-creation.service';
 import { PostLikeStatusService } from './services/post-like-status.service';
 import { PostInteractionStatusService } from './services/post-interaction-status.service';
 import { LikeService } from './services/like.service';
+import { ThumbnailService } from './services/thumbnail.service';
 import { CloudflareModule } from '../cloudflare/cloudflare.module';
 
 
@@ -102,6 +103,7 @@ import { CloudflareModule } from '../cloudflare/cloudflare.module';
     PostProcessingProcessor, // 포스트 처리 배치 워커 (Fast Path 최적화용)
     BlogStatsService, // 블로그 통계 서비스 (PostsModule로 이동)
     BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
+    ThumbnailService, // 썸네일 관리 서비스
   ],
   controllers: [PostsController],
   exports: [PostsService, ViewCountService, SearchIndexingService, BlogStatsService, PostReadService, PostInteractionService, PostCreationService],

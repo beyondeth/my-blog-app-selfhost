@@ -308,6 +308,19 @@ export class PostsController {
     return this.postsService.setThumbnail(postId, user.id, setThumbnailDto);
   }
 
+  @Get(':id/thumbnail/candidates')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: '게시글 썸네일 후보 이미지 조회' })
+  @ApiBearerAuth()
+  @ApiResponse({ status: 200, description: '썸네일 후보 목록 반환' })
+  @ApiResponse({ status: 404, description: '게시글을 찾을 수 없음' })
+  async getThumbnailCandidates(
+    @Param('id', ParseUUIDPipe) postId: string,
+    @CurrentUser() user: User,
+  ) {
+    return this.postsService.getThumbnailCandidates(postId, user.id);
+  }
+
   @Get('read')
   @Public()
   @ApiOperation({ summary: 'MCP용 포스트 읽기 (공개 포스트 검색)' })
@@ -508,7 +521,7 @@ export class PostsController {
       this.logger.debug(`  - Post ID: ${id}`);
       this.logger.debug(`  - User ID: ${user.id}`);
       this.logger.debug(`  - thumbnailImageId: ${updatePostDto.thumbnailImageId}`);
-      this.logger.debug(`  - thumbnail: ${updatePostDto.thumbnail}`);
+      this.logger.debug(`  - thumbnail: (removed - using thumbnailImageId only)`);
       this.logger.debug(`  - Timestamp: ${new Date().toISOString()}`);
     }
 

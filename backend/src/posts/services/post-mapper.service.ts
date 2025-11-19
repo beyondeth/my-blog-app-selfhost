@@ -1,5 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
 import { plainToInstance } from 'class-transformer';
+import { Repository } from 'typeorm';
 import { Post } from '../entities/post.entity';
 import { User } from '../../users/entities/user.entity';
 import { Blog } from '../../blogs/entities/blog.entity';
@@ -9,7 +11,6 @@ import { UserResponseDto } from '../../users/dto/user-response.dto';
 import { BlogResponseDto } from '../../blogs/dto/blog-response.dto';
 import { FilesService } from '../../files/files.service';
 import { CdnService } from '../../files/services/cdn.service';
-import { extractImageUrlsFromContent } from '../utils/post.utils';
 
 /**
  * Post 관련 DTO 변환을 담당하는 서비스
@@ -25,6 +26,8 @@ export class PostMapperService {
   private readonly logger = new Logger(PostMapperService.name);
 
   constructor(
+    @InjectRepository(File)
+    private readonly filesRepository: Repository<File>,
     private readonly filesService: FilesService,
     private readonly cdnService: CdnService,
   ) {}
@@ -87,51 +90,166 @@ export class PostMapperService {
     dto.likeCount = post.stats?.likeCount || 0;
     dto.commentCount = post.stats?.commentCount || 0;
 
-    // 썸네일 URL 처리 - 모든 경우를 명확하게 처리
-    if (dto.thumbnail) {
-      // 1. 이미 완전한 URL인 경우 (외부 URL, 기존 CDN URL 등)
-      if (dto.thumbnail.startsWith('http://') || dto.thumbnail.startsWith('https://')) {
-        // 이미 외부 URL이면 그대로 사용
-        // 버전 파라미터는 캐시 무효화를 위해 추가
-        if (post.updatedAt && !dto.thumbnail.includes('v=')) {
-          const timestamp = new Date(post.updatedAt).getTime();
-          const separator = dto.thumbnail.includes('?') ? '&' : '?';
-          dto.thumbnail = `${dto.thumbnail}${separator}v=${timestamp}`;
+    // 썸네일 URL 처리
+    if (process.env.NODE_ENV === 'development') {
+      this.logger.debug(`[POST_MAPPER] Processing thumbnail for post ${post.id}: thumbnailImageId=${post.thumbnailImageId}`);
+    }
+
+    // thumbnailImageId가 있으면 동적으로 생성
+    if (post.thumbnailImageId && post.thumbnailImage) {
+      try {
+        // fileKey가 없고 fileUrl이 있는 경우, fileUrl에서 fileKey를 추출 시도
+        let fileKey = post.thumbnailImage.fileKey;
+        if (!fileKey && post.thumbnailImage.fileUrl) {
+          // fileUrl이 S3 URL 형식인 경우 key를 추출
+          const s3UrlMatch = post.thumbnailImage.fileUrl.match(/\/([^\/]+)$/);
+          if (s3UrlMatch) {
+            fileKey = s3UrlMatch[1];
+            if (process.env.NODE_ENV === 'development') {
+            this.logger.debug(`  - Extracted fileKey from fileUrl: ${fileKey}`);
+          }
+          }
+        }
+
+        if (!fileKey) {
+          this.logger.warn(`[POST_MAPPER] No fileKey available for post ${post.id}, thumbnailImageId: ${post.thumbnailImageId}`);
+          dto.thumbnail = null;
+        } else {
+          const thumbnailUrl = this.cdnService.generateCdnUrlFromKey(
+            fileKey,
+            post.thumbnailImage.mimeType || 'image/jpeg'
+          );
+
+          if (process.env.NODE_ENV === 'development') {
+            this.logger.debug(`  - Generated CDN URL: ${thumbnailUrl}`);
+          }
+
+          // 캐시 버스팅을 위한 타임스탬프 추가
+          if (post.updatedAt && thumbnailUrl && !thumbnailUrl.includes('v=')) {
+            const timestamp = new Date(post.updatedAt).getTime();
+            const separator = thumbnailUrl.includes('?') ? '&' : '?';
+            dto.thumbnail = `${thumbnailUrl}${separator}v=${timestamp}`;
+          } else {
+            dto.thumbnail = thumbnailUrl;
+          }
+
+          if (process.env.NODE_ENV === 'development') {
+            this.logger.log(`[POST_MAPPER] Generated thumbnail for post ${post.id}: ${dto.thumbnail?.substring(0, 100)}...`);
+          }
+        }
+      } catch (error) {
+        this.logger.error(`[POST_MAPPER] Failed to generate thumbnail from thumbnailImageId: ${post.thumbnailImageId}`, error.stack);
+        dto.thumbnail = null;
+      }
+    }
+    // thumbnailImageId는 있지만 thumbnailImage 관계가 없는 경우 (로드 실패)
+    else if (post.thumbnailImageId && !post.thumbnailImage) {
+      this.logger.warn(`[POST_MAPPER] thumbnailImageId exists but thumbnailImage not loaded for post ${post.id}. thumbnailImageId: ${post.thumbnailImageId}`);
+
+      // thumbnailImageId가 있으면 직접 파일을 조회해서 썸네일 URL 생성
+      try {
+        // Repository를 통해 파일 조회
+        const thumbnailFile = await this.filesRepository.findOne({
+          where: { id: post.thumbnailImageId }
+        });
+
+        if (thumbnailFile) {
+          // fileKey 또는 fileUrl로 CDN URL 생성
+          let fileKey = thumbnailFile.fileKey;
+
+          // fileKey가 없고 fileUrl이 있는 경우, fileUrl에서 key를 추출 시도
+          if (!fileKey && thumbnailFile.fileUrl) {
+            const s3UrlMatch = thumbnailFile.fileUrl.match(/\/([^\/]+)$/);
+            if (s3UrlMatch) {
+              fileKey = s3UrlMatch[1];
+            }
+          }
+
+          if (fileKey) {
+            const thumbnailUrl = this.cdnService.generateCdnUrlFromKey(
+              fileKey,
+              thumbnailFile.mimeType || 'image/jpeg'
+            );
+
+            // 캐시 버스팅을 위한 타임스탬프 추가
+            if (post.updatedAt && thumbnailUrl && !thumbnailUrl.includes('v=')) {
+              const timestamp = new Date(post.updatedAt).getTime();
+              const separator = thumbnailUrl.includes('?') ? '&' : '?';
+              dto.thumbnail = `${thumbnailUrl}${separator}v=${timestamp}`;
+            } else {
+              dto.thumbnail = thumbnailUrl;
+            }
+
+            if (process.env.NODE_ENV === 'development') {
+              this.logger.log(`[POST_MAPPER] Loaded thumbnail image directly for post ${post.id}: ${dto.thumbnail?.substring(0, 100)}...`);
+            }
+          } else {
+            this.logger.error(`[POST_MAPPER] No fileKey found for thumbnail ${post.thumbnailImageId}`);
+            dto.thumbnail = null;
+          }
+        } else {
+          this.logger.error(`[POST_MAPPER] Thumbnail file not found: ${post.thumbnailImageId}`);
+          dto.thumbnail = null;
+        }
+      } catch (error) {
+        this.logger.error(`[POST_MAPPER] Failed to load thumbnail image ${post.thumbnailImageId}`, error.stack);
+        dto.thumbnail = null;
+      }
+    }
+    // 3. 썸네일이 선택되지 않은 경우에만 첫 번째 이미지를 썸네일로 사용
+    else if (post.content) {
+      const extractedUrl = this.extractFirstImageFromContent(post.content);
+      dto.thumbnail = extractedUrl;
+      if (process.env.NODE_ENV === 'development') {
+        if (extractedUrl) {
+          this.logger.debug(`[POST_MAPPER] No thumbnail selected, using first image from content for post ${post.id}: ${extractedUrl.substring(0, 100)}...`);
+        } else {
+          this.logger.debug(`[POST_MAPPER] No image found in content for post ${post.id}`);
         }
       }
-      // 2. S3 키인 경우 (relative path)
-      else if (post.thumbnailImageId) {
-        // thumbnailImageId가 있으면 S3 키로 CDN URL 생성
-        try {
-          dto.thumbnail = this.cdnService.generateCdnUrlFromKey(dto.thumbnail, 'image/jpeg');
-
-          // 버전 파라미터 추가
-          if (post.updatedAt) {
-            const timestamp = new Date(post.updatedAt).getTime();
-            const separator = dto.thumbnail.includes('?') ? '&' : '?';
-            dto.thumbnail = `${dto.thumbnail}${separator}v=${timestamp}`;
-          }
-        } catch (error) {
-          // CDN URL 생성 실패 시 원래 값 유지
-          this.logger.warn(`Failed to generate CDN URL for thumbnail: ${dto.thumbnail}`, error);
-        }
+    }
+    // 4. 썸네일이 없는 경우 (콘텐츠도 없는 경우)
+    else {
+      dto.thumbnail = null;
+      if (process.env.NODE_ENV === 'development') {
+        this.logger.debug(`[POST_MAPPER] No thumbnail for post ${post.id} - no content`);
       }
     }
 
     // 첨부 파일 처리
     if (post.attachedFiles) {
-      dto.attachedFiles = post.attachedFiles.map(file => ({
-        id: file.id,
-        fileName: file.fileName,
-        originalName: file.originalName,
-        fileUrl: file.fileUrl,
-        fileKey: file.fileKey,
-        fileSize: file.fileSize,
-        mimeType: file.mimeType,
-        fileType: file.fileType,
-        createdAt: file.createdAt,
-        updatedAt: file.updatedAt,
-      }));
+      dto.attachedFiles = post.attachedFiles.map(file => {
+        // fileUrl이 CDN URL이 아니면 S3 key로 간주하고 CDN URL 생성
+        let cdnFileUrl = file.fileUrl;
+
+        // fileUrl이 이미 full CDN URL이 아니면 CDN URL로 변환
+        if (file.fileUrl && !file.fileUrl.startsWith('http')) {
+          try {
+            cdnFileUrl = this.cdnService.generateCdnUrlFromKey(
+              file.fileUrl,
+              file.mimeType
+            );
+            this.logger.debug(`[POST_MAPPER] Converted S3 key to CDN URL: ${file.fileUrl} -> ${cdnFileUrl}`);
+          } catch (error) {
+            this.logger.warn(`[POST_MAPPER] Failed to convert S3 key to CDN URL: ${file.fileUrl}`, error);
+            // 실패 시 원래 URL 사용
+            cdnFileUrl = file.fileUrl;
+          }
+        }
+
+        return {
+          id: file.id,
+          fileName: file.fileName,
+          originalName: file.originalName,
+          fileUrl: cdnFileUrl,
+          fileKey: file.fileKey,
+          fileSize: file.fileSize,
+          mimeType: file.mimeType,
+          fileType: file.fileType,
+          createdAt: file.createdAt,
+          updatedAt: file.updatedAt,
+        };
+      });
     }
 
     // 포스트 내용의 이미지에 data-image-id 속성 추가 (기존 이미지들)
@@ -231,6 +349,23 @@ export class PostMapperService {
   }
 
   /**
+   * URL에서 쿼리 파라미터를 제거하여 기본 URL을 추출
+   * @param url 원본 URL
+   * @returns 쿼리 파라미터가 제거된 URL
+   */
+  private normalizeUrl(url: string): string {
+    if (!url) return url;
+
+    try {
+      const urlObj = new URL(url);
+      return urlObj.origin + urlObj.pathname;
+    } catch {
+      // URL 파싱 실패 시 간단한 방식으로 쿼리 파라미터 제거
+      return url.split('?')[0];
+    }
+  }
+
+  /**
    * 포스트 내용의 이미지에 data-image-id 속성 추가
    * 기존 이미지들이 썸네일로 선택될 수 있도록 함
    *
@@ -238,7 +373,7 @@ export class PostMapperService {
    * @param attachedFiles 첨부 파일 목록
    * @returns data-image-id 속성이 추가된 HTML 내용
    */
-  private addImageIdAttributes(content: string, attachedFiles: File[]): string {
+  addImageIdAttributes(content: string, attachedFiles: File[]): string {
     if (!content) {
       return content;
     }
@@ -259,6 +394,10 @@ export class PostMapperService {
       const cleanBeforeSrc = beforeSrc.replace(/\s+data-image-id=["'][^"']*["']/g, '');
       const cleanAfterSrc = afterSrc.replace(/\s+data-image-id=["'][^"']*["']/g, '');
 
+      // URL 정규화 (쿼리 파라미터 제거)
+      const normalizedSrc = this.normalizeUrl(src);
+      this.logger.debug(`[ADD_IMAGE_ID] Original src: ${src}, Normalized: ${normalizedSrc}`);
+
       // 첨부 파일에서 URL로 파일 찾기
       const matchedFile = attachedFiles.find(file => {
         if (!file.fileUrl) return false;
@@ -266,15 +405,33 @@ export class PostMapperService {
         // 정확한 URL 매칭
         if (file.fileUrl === src) return true;
 
+        // 정규화된 URL 매칭 (쿼리 파라미터 무시)
+        const normalizedFileUrl = this.normalizeUrl(file.fileUrl);
+        if (normalizedFileUrl === normalizedSrc) {
+          this.logger.debug(`[ADD_IMAGE_ID] URL match found: ${normalizedFileUrl} === ${normalizedSrc}`);
+          return true;
+        }
+
         // CDN URL 매칭 (파일 이름으로)
         try {
           const srcUrl = new URL(src);
           const fileUrl = new URL(file.fileUrl);
-          return srcUrl.pathname.includes(fileUrl.pathname.split('/').pop() || '');
+          const srcFilename = srcUrl.pathname.split('/').pop();
+          const fileFilename = fileUrl.pathname.split('/').pop();
+
+          if (srcFilename && fileFilename && srcFilename === fileFilename) {
+            this.logger.debug(`[ADD_IMAGE_ID] Filename match found: ${srcFilename} === ${fileFilename}`);
+            return true;
+          }
         } catch {
           // URL 파싱 실패 시 문자열 포함 여부 확인
-          return src.includes(file.fileUrl) || file.fileUrl.includes(src);
+          if (src.includes(file.fileUrl) || file.fileUrl.includes(src)) {
+            this.logger.debug(`[ADD_IMAGE_ID] String match found`);
+            return true;
+          }
         }
+
+        return false;
       });
 
       // 파일을 찾았으면 data-image-id 추가
@@ -289,5 +446,34 @@ export class PostMapperService {
     });
 
     return processedContent;
+  }
+
+  /**
+   * 콘텐츠에서 첫 번째 이미지 URL을 추출하여 썸네일로 사용
+   *
+   * @param content HTML 콘텐츠
+   * @returns 첫 번째 이미지 URL 또는 null
+   */
+  private extractFirstImageFromContent(content: string): string | null {
+    if (!content) {
+      return null;
+    }
+
+    // 정규식으로 img 태그의 src 속성 추출
+    // data: URL은 제외
+    const imgTagRegex = /<img[^>]+src\s*=\s*["']([^"']+)["'][^>]*>/gi;
+    const match = imgTagRegex.exec(content);
+
+    if (match && match[1]) {
+      // 이미지 URL을 찾았으면 반환
+      const imageUrl = match[1];
+
+      // data: URL이 아닌 실제 URL만 반환
+      if (!imageUrl.startsWith('data:')) {
+        return imageUrl;
+      }
+    }
+
+    return null;
   }
 }

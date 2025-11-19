@@ -14,21 +14,55 @@ export function extractImageUrlsFromContent(content: string): string[] {
 
 export function extractS3KeyFromUrl(url: string): string | null {
   if (!url) return null;
+
   try {
-    if (url.startsWith('uploads/')) return url;
-    if (url.includes('/api/v1/files/proxy/')) {
-      const proxyMatch = url.match(/\/api\/v1\/files\/proxy\/(.+)/);
-      if (proxyMatch) return proxyMatch[1].split('?')[0];
+    // Remove query parameters first (version parameters, etc.)
+    const cleanUrl = url.split('?')[0];
+
+    // Direct S3 key (already in correct format)
+    if (cleanUrl.startsWith('uploads/')) return cleanUrl;
+
+    // CDN URLs: https://cdn.codebase.blog/uploads/...
+    if (cleanUrl.includes('cdn.codebase.blog/uploads/')) {
+      const pathMatch = cleanUrl.match(/cdn\.codebase\.blog\/(.+)/);
+      if (pathMatch) return pathMatch[1];
     }
+
+    // Generic CDN pattern: https://cdn.domain.com/...
+    const genericCdnMatch = cleanUrl.match(/https:\/\/cdn\.[^\/]+\/(.+)/);
+    if (genericCdnMatch) return genericCdnMatch[1];
+
+    // Proxy URLs: /api/v1/files/proxy/...
+    if (cleanUrl.includes('/api/v1/files/proxy/')) {
+      const proxyMatch = cleanUrl.match(/\/api\/v1\/files\/proxy\/(.+)/);
+      if (proxyMatch) return proxyMatch[1];
+    }
+
+    // AWS S3 URLs: https://bucket.s3.region.amazonaws.com/...
     const s3Pattern = /https:\/\/[^\/]+\.s3\.[^\/]+\.amazonaws\.com\/(.+)/;
-    const match = url.match(s3Pattern);
-    if (match) return match[1].split('?')[0];
-    if (url.includes('localhost:3000/api/v1/files/proxy/')) {
-      const proxyMatch = url.match(/localhost:3000\/api\/v1\/files\/proxy\/(.+)/);
-      if (proxyMatch) return proxyMatch[1].split('?')[0];
+    const s3Match = cleanUrl.match(s3Pattern);
+    if (s3Match) return s3Match[1];
+
+    // Oracle Cloud Object Storage: https://namespace.compat.objectstorage.region.oraclecloud.com/...
+    const oraclePattern = /https:\/\/[^\/]+\.compat\.objectstorage\.[^\/]+\.oraclecloud\.com\/(.+)/;
+    const oracleMatch = cleanUrl.match(oraclePattern);
+    if (oracleMatch) return oracleMatch[1];
+
+    // Local development: localhost:3000/api/v1/files/proxy/...
+    if (cleanUrl.includes('localhost:3000/api/v1/files/proxy/')) {
+      const localMatch = cleanUrl.match(/localhost:3000\/api\/v1\/files\/proxy\/(.+)/);
+      if (localMatch) return localMatch[1];
     }
+
+    // Docker internal: http://backend:3000/api/v1/files/proxy/...
+    if (cleanUrl.includes('backend:3000/api/v1/files/proxy/')) {
+      const dockerMatch = cleanUrl.match(/backend:3000\/api\/v1\/files\/proxy\/(.+)/);
+      if (dockerMatch) return dockerMatch[1];
+    }
+
     return null;
-  } catch {
+  } catch (error) {
+    console.error('Error extracting S3 key from URL:', url, error);
     return null;
   }
 }
