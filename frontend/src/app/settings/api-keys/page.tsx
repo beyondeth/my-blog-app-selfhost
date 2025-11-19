@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useUserBlogV2 } from '@/hooks/useUserBlogV2';
-import { CheckCircle2, AlertTriangle, Lightbulb, ChevronRight, ChevronDown, Copy } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Lightbulb, ChevronRight, ChevronDown, Copy, X } from 'lucide-react';
 
 /**
  * MCP API Key 관리 페이지
@@ -69,9 +69,25 @@ export default function ApiKeysPage() {
     }
   }, [blog, selectedBlogId]);
 
-  // API Keys 조회
+  // API Keys 조회 및 sessionStorage에서 newKey 복원
   useEffect(() => {
     fetchKeys();
+
+    // sessionStorage에서 생성된 API Key 복원
+    const storedKey = sessionStorage.getItem('mcp-new-key');
+    if (storedKey) {
+      try {
+        const parsedKey = JSON.parse(storedKey);
+        // 24시간 경과 확인
+        if (new Date(parsedKey.expiresAt).getTime() > Date.now()) {
+          setNewKey(parsedKey);
+        } else {
+          sessionStorage.removeItem('mcp-new-key');
+        }
+      } catch (error) {
+        sessionStorage.removeItem('mcp-new-key');
+      }
+    }
   }, []);
 
   const fetchKeys = async () => {
@@ -111,6 +127,8 @@ export default function ApiKeysPage() {
       );
 
       setNewKey(response.data.data);
+      // sessionStorage에 생성된 API Key 저장 (24시간 동안)
+      sessionStorage.setItem('mcp-new-key', JSON.stringify(response.data.data));
       fetchKeys(); // 목록 갱신
       toast.success('API Key가 생성되었습니다!');
     } catch (error: any) {
@@ -156,8 +174,18 @@ export default function ApiKeysPage() {
     setExpandedEnv(expandedEnv === env ? null : env);
   };
 
-  const getMcpJsonConfig = (apiKey: string) => {
-    return `{
+  const closeNewKey = () => {
+    setNewKey(null);
+    sessionStorage.removeItem('mcp-new-key');
+  };
+
+  // 현재 사용 가능한 API Key 가져오기 (newKey 우선, 없으면 placeholder)
+  const getCurrentApiKey = () => {
+    return newKey?.apiKey || '[YOUR-API-KEY]';
+  };
+
+  const getMcpJsonConfig = (apiKey: string, includeComment: boolean = true) => {
+    const config = `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "type": "http",
@@ -168,11 +196,11 @@ export default function ApiKeysPage() {
     }
   }
 }`;
+    return config;
   };
 
-  const getCursorConfig = (apiKey: string) => {
-    return `// 설정 위치: ~/.cursor/mcp.json
-{
+  const getCursorConfig = (apiKey: string, includeComment: boolean = true) => {
+    const config = `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "url": "https://mcp.codebase.blog/mcp",
@@ -182,16 +210,16 @@ export default function ApiKeysPage() {
     }
   }
 }`;
+    return includeComment ? `// 설정 위치: ~/.cursor/mcp.json\n${config}` : config;
   };
 
-  const getClaudeCodeConfig = (apiKey: string) => {
-    return `# 터미널에서 실행
-claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`;
+  const getClaudeCodeConfig = (apiKey: string, includeComment: boolean = true) => {
+    const command = `claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`;
+    return includeComment ? `# 터미널에서 실행\n${command}` : command;
   };
 
-  const getWindsurfConfig = (apiKey: string) => {
-    return `// 설정 위치: ~/.windsurf/mcp.json
-{
+  const getWindsurfConfig = (apiKey: string, includeComment: boolean = true) => {
+    const config = `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "serverUrl": "https://mcp.codebase.blog/mcp",
@@ -201,11 +229,11 @@ claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "A
     }
   }
 }`;
+    return includeComment ? `// 설정 위치: ~/.windsurf/mcp.json\n${config}` : config;
   };
 
-  const getVSCodeConfig = (apiKey: string) => {
-    return `// 설정 위치: 프로젝트 루트/.mcp.json
-{
+  const getVSCodeConfig = (apiKey: string, includeComment: boolean = true) => {
+    const config = `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "url": "https://mcp.codebase.blog/mcp",
@@ -215,11 +243,11 @@ claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "A
     }
   }
 }`;
+    return includeComment ? `// 설정 위치: 프로젝트 루트/.mcp.json\n${config}` : config;
   };
 
-  const getGeminiConfig = (apiKey: string) => {
-    return `// 설정 위치: ~/.gemini/mcp.json
-{
+  const getGeminiConfig = (apiKey: string, includeComment: boolean = true) => {
+    const config = `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "httpUrl": "https://mcp.codebase.blog/mcp",
@@ -230,11 +258,11 @@ claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "A
     }
   }
 }`;
+    return includeComment ? `// 설정 위치: ~/.gemini/mcp.json\n${config}` : config;
   };
 
-  const getQwenConfig = (apiKey: string) => {
-    return `// 설정 위치: ~/.qwen/mcp.json
-{
+  const getQwenConfig = (apiKey: string, includeComment: boolean = true) => {
+    const config = `{
   "mcpServers": {
     "codebase-blog-mcp": {
       "httpUrl": "https://mcp.codebase.blog/mcp",
@@ -245,16 +273,16 @@ claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "A
     }
   }
 }`;
+    return includeComment ? `// 설정 위치: ~/.qwen/mcp.json\n${config}` : config;
   };
 
-  const getCodexConfig = (apiKey: string) => {
-    return `# 설정 위치: ~/.config/openai/config.toml
-# Streamable HTTP 서버 활성화
-experimental_use_rmcp_client = true
+  const getCodexConfig = (apiKey: string, includeComment: boolean = true) => {
+    const config = `experimental_use_rmcp_client = true
 
 [mcp_servers.codebase-blog-mcp]
 url = "https://mcp.codebase.blog/mcp"
 bearer_token = "${apiKey}"`;
+    return includeComment ? `# 설정 위치: ~/.config/openai/config.toml\n# Streamable HTTP 서버 활성화\n${config}` : config;
   };
 
   // 블로그 로딩 중
@@ -370,15 +398,24 @@ bearer_token = "${apiKey}"`;
       {/* 새로 생성된 키 표시 (1회만) */}
       {newKey && (
         <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6 mb-6 sm:mb-8">
-          <div className="flex items-start sm:items-center gap-2 mb-4">
-            <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-500" />
-            <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
-              API Key가 생성되었습니다!
-            </h2>
+          <div className="flex items-start sm:items-center justify-between gap-2 mb-4">
+            <div className="flex items-start sm:items-center gap-2">
+              <CheckCircle2 className="w-6 h-6 text-green-600 dark:text-green-500" />
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
+                API Key가 생성되었습니다!
+              </h2>
+            </div>
+            <button
+              onClick={closeNewKey}
+              className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition"
+              title="닫기"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
           <div className="mb-4">
-            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">API Key (1회만 표시됩니다)</p>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">API Key</p>
             <div className="relative bg-gray-100 dark:bg-gray-700 px-3 py-2 rounded">
               <code className="block pr-12 text-xs sm:text-sm font-mono break-all text-gray-900 dark:text-gray-100">
                 {newKey.apiKey}
@@ -397,9 +434,24 @@ bearer_token = "${apiKey}"`;
           <div>
             <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">.mcp.json 설정 예시</p>
             <div className="relative bg-gray-900 dark:bg-gray-950 rounded overflow-hidden">
-              <pre className="text-gray-100 p-3 sm:p-4 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getMcpJsonConfig('[YOUR-API-KEY]')}</pre>
+              <pre className="text-gray-100 p-3 sm:p-4 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getMcpJsonConfig(getCurrentApiKey())}</pre>
               <button
-                onClick={() => copyToClipboard(getMcpJsonConfig(newKey.apiKey))}
+                onClick={() => copyToClipboard(getMcpJsonConfig(getCurrentApiKey()))}
+                className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-500 transition"
+                title="복사"
+                aria-label="설정 복사"
+              >
+                <Copy className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">.claude.json 설정 예시</p>
+            <div className="relative bg-gray-900 dark:bg-gray-950 rounded overflow-hidden">
+              <pre className="text-gray-100 p-3 sm:p-4 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getMcpJsonConfig(getCurrentApiKey())}</pre>
+              <button
+                onClick={() => copyToClipboard(getMcpJsonConfig(getCurrentApiKey()))}
                 className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-600 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-500 transition"
                 title="복사"
                 aria-label="설정 복사"
@@ -481,7 +533,7 @@ bearer_token = "${apiKey}"`;
           MCP 설정 가이드
         </h2>
         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mb-4">
-          사용 중인 AI 에이전트를 선택하여 설정 방법을 확인하세요. 생성한 API Key를 <code className="bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 text-xs rounded">[YOUR-API-KEY]</code> 위치에 입력하세요.
+          사용 중인 AI 에이전트를 선택하여 설정 방법을 확인하세요. API Key가 자동으로 입력됩니다. 복사 버튼을 클릭하여 설정을 복사하세요.
         </p>
 
         <div className="space-y-2">
@@ -506,9 +558,9 @@ bearer_token = "${apiKey}"`;
             </button>
             {expandedEnv === 'cursor' && (
               <div className="relative bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 overflow-hidden">
-                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getCursorConfig('[YOUR-API-KEY]')}</pre>
+                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getCursorConfig(getCurrentApiKey())}</pre>
                 <button
-                  onClick={() => copyToClipboard(getCursorConfig('[YOUR-API-KEY]'))}
+                  onClick={() => copyToClipboard(getCursorConfig(getCurrentApiKey(), false))}
                   className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
                   title="복사"
                   aria-label="Cursor 설정 복사"
@@ -540,9 +592,9 @@ bearer_token = "${apiKey}"`;
             </button>
             {expandedEnv === 'claude-code' && (
               <div className="relative bg-gray-900 dark:bg-gray-900 p-3 pb-4 sm:p-4 sm:pb-6 overflow-hidden">
-                <pre className="text-gray-100 pr-12 pb-3 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-500">{getClaudeCodeConfig('[YOUR-API-KEY]')}</pre>
+                <pre className="text-gray-100 pr-12 pb-3 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch [&::-webkit-scrollbar]:h-2 [&::-webkit-scrollbar-track]:bg-gray-800 [&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:hover:bg-gray-500">{getClaudeCodeConfig(getCurrentApiKey())}</pre>
                 <button
-                  onClick={() => copyToClipboard(getClaudeCodeConfig('[YOUR-API-KEY]'))}
+                  onClick={() => copyToClipboard(getClaudeCodeConfig(getCurrentApiKey(), false))}
                   className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
                   title="복사"
                   aria-label="Claude Code 설정 복사"
@@ -574,9 +626,9 @@ bearer_token = "${apiKey}"`;
             </button>
             {expandedEnv === 'windsurf' && (
               <div className="relative bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 overflow-hidden">
-                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getWindsurfConfig('[YOUR-API-KEY]')}</pre>
+                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getWindsurfConfig(getCurrentApiKey())}</pre>
                 <button
-                  onClick={() => copyToClipboard(getWindsurfConfig('[YOUR-API-KEY]'))}
+                  onClick={() => copyToClipboard(getWindsurfConfig(getCurrentApiKey(), false))}
                   className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
                   title="복사"
                   aria-label="Windsurf 설정 복사"
@@ -608,9 +660,9 @@ bearer_token = "${apiKey}"`;
             </button>
             {expandedEnv === 'vscode' && (
               <div className="relative bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 overflow-hidden">
-                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getVSCodeConfig('[YOUR-API-KEY]')}</pre>
+                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getVSCodeConfig(getCurrentApiKey())}</pre>
                 <button
-                  onClick={() => copyToClipboard(getVSCodeConfig('[YOUR-API-KEY]'))}
+                  onClick={() => copyToClipboard(getVSCodeConfig(getCurrentApiKey(), false))}
                   className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
                   title="복사"
                   aria-label="VS Code 설정 복사"
@@ -642,9 +694,9 @@ bearer_token = "${apiKey}"`;
             </button>
             {expandedEnv === 'gemini' && (
               <div className="relative bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 overflow-hidden">
-                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getGeminiConfig('[YOUR-API-KEY]')}</pre>
+                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getGeminiConfig(getCurrentApiKey())}</pre>
                 <button
-                  onClick={() => copyToClipboard(getGeminiConfig('[YOUR-API-KEY]'))}
+                  onClick={() => copyToClipboard(getGeminiConfig(getCurrentApiKey(), false))}
                   className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
                   title="복사"
                   aria-label="Gemini CLI 설정 복사"
@@ -676,9 +728,9 @@ bearer_token = "${apiKey}"`;
             </button>
             {expandedEnv === 'qwen' && (
               <div className="relative bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 overflow-hidden">
-                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getQwenConfig('[YOUR-API-KEY]')}</pre>
+                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getQwenConfig(getCurrentApiKey())}</pre>
                 <button
-                  onClick={() => copyToClipboard(getQwenConfig('[YOUR-API-KEY]'))}
+                  onClick={() => copyToClipboard(getQwenConfig(getCurrentApiKey(), false))}
                   className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
                   title="복사"
                   aria-label="Qwen Coder 설정 복사"
@@ -710,9 +762,9 @@ bearer_token = "${apiKey}"`;
             </button>
             {expandedEnv === 'codex' && (
               <div className="relative bg-gray-900 dark:bg-gray-900 p-3 pb-4 sm:p-4 sm:pb-6 overflow-hidden">
-                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getCodexConfig('[YOUR-API-KEY]')}</pre>
+                <pre className="text-gray-100 pr-12 font-mono text-[10px] sm:text-xs overflow-x-auto -webkit-overflow-scrolling-touch">{getCodexConfig(getCurrentApiKey())}</pre>
                 <button
-                  onClick={() => copyToClipboard(getCodexConfig('[YOUR-API-KEY]'))}
+                  onClick={() => copyToClipboard(getCodexConfig(getCurrentApiKey(), false))}
                   className="absolute top-2 right-2 p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center bg-gray-700 dark:bg-gray-700 text-white rounded hover:bg-gray-600 dark:hover:bg-gray-600 transition"
                   title="복사"
                   aria-label="OpenAI Codex 설정 복사"

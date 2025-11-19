@@ -28,8 +28,8 @@ export class HtmlSanitizerService {
       'blockquote',
       // 링크
       'a',
-      // 이미지
-      'img',
+      // 이미지 및 캡션
+      'img', 'figure', 'figcaption',
       // 코드
       'code', 'pre', 'span', 'kbd', 'samp', 'var',
       // 컨테이너
@@ -69,7 +69,7 @@ export class HtmlSanitizerService {
       'ul', 'ol', 'li',
       'blockquote',
       'a',
-      'img',
+      'img', 'figure', 'figcaption',
       'code', 'pre', 'span', 'kbd', 'samp', 'var',
       'div',
       'hr',

@@ -7,7 +7,7 @@ export type UploadFunction = (
   file: File,
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal
-) => Promise<string>
+) => Promise<string | { url: string; fileId: string }>
 
 export interface ImageUploadNodeOptions {
   /**

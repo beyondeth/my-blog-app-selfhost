@@ -97,7 +97,7 @@ export class McpProxyController {
       tags: createPostDto.tags,
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore,
-      thumbnail: createPostDto.thumbnail,
+      thumbnail: null, // thumbnail field removed - using thumbnailImageId only
       hasContent: !!createPostDto.content,
       thumbnailImageId: createPostDto.thumbnailImageId
     });
@@ -121,7 +121,7 @@ export class McpProxyController {
       tags: createPostDto.tags,  // 태그는 그대로 전달 (PostCreationService에서 처리)
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore, // AI 품질 점수
-      ...(createPostDto.thumbnail && { thumbnail: createPostDto.thumbnail }),
+      // thumbnail field removed - using thumbnailImageId only
       ...(createPostDto.thumbnailImageId && { thumbnailImageId: createPostDto.thumbnailImageId }),
     };
 

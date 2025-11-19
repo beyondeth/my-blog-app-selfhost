@@ -93,6 +93,7 @@
     "lru-cache": "^11.2.1",
     "marked": "^16.2.1",
     "mime-types": "^3.0.1",
+    "morgan": "^1.10.1",
     "multer": "1.4.5-lts.2",
     "nanoid": "^5.1.6",
     "node-fetch": "2",

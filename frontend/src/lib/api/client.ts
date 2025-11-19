@@ -221,7 +221,10 @@ export class ApiClient {
    * @param config - 추가 설정
    */
   async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ ...config, method: 'POST', url, data });
+    const headers = data instanceof FormData
+      ? { ...config?.headers, 'Content-Type': undefined }
+      : config?.headers;
+    return this.request<T>({ ...config, method: 'POST', url, data, headers });
   }
 
   /**
@@ -231,7 +234,10 @@ export class ApiClient {
    * @param config - 추가 설정
    */
   async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ ...config, method: 'PUT', url, data });
+    const headers = data instanceof FormData
+      ? { ...config?.headers, 'Content-Type': undefined }
+      : config?.headers;
+    return this.request<T>({ ...config, method: 'PUT', url, data, headers });
   }
 
   /**
@@ -241,7 +247,10 @@ export class ApiClient {
    * @param config - 추가 설정
    */
   async patch<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
-    return this.request<T>({ ...config, method: 'PATCH', url, data });
+    const headers = data instanceof FormData
+      ? { ...config?.headers, 'Content-Type': undefined }
+      : config?.headers;
+    return this.request<T>({ ...config, method: 'PATCH', url, data, headers });
   }
 
   /**

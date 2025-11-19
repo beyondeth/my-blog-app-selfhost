@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useRef, useState, useCallback } from "react"
+import React, { useEffect, useRef, useState, useCallback } from "react"
 import { EditorContent, EditorContext, useEditor } from "@tiptap/react"
 import { toast } from "sonner"
 
@@ -207,29 +207,65 @@ export interface BlogSimpleEditorProps {
    */
   className?: string
   /**
-   * 선택된 썸네일 이미지 ID
+   * 선택된 썸네일 이미지 ID (for edit mode)
    */
   thumbnailImageId?: string
   /**
-   * 썸네일 변경 시 호출되는 콜백
+   * 썸네일 변경 시 호출되는 콜백 (for edit mode)
    */
   onThumbnailChange?: (imageId: string) => void
+  /**
+   * 초기 썸네일 인덱스 (for new post mode)
+   */
+  initialThumbnailIndex?: number
+  /**
+   * 썸네일 인덱스 변경 시 호출되는 콜백 (for new post mode)
+   */
+  onThumbnailIndexChange?: (index: number) => void
+  /**
+   * 파일 ID 목록 변경 시 호출되는 콜백
+   */
+  onFileIdsChange?: (fileIds: string[]) => void
 }
 
-export function BlogSimpleEditor({
+export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   content: initialContent = '',
   onChange,
   placeholder = '내용을 입력하세요...',
   className = '',
   thumbnailImageId,
   onThumbnailChange,
+  initialThumbnailIndex,
+  onThumbnailIndexChange,
+  onFileIdsChange,
 }: BlogSimpleEditorProps = {}) {
   const isMobile = useIsMobile()
   const { height } = useWindowSize()
+
+  // 디버깅: 썸네일 관련 prop 확인 (개발 환경에서만)
+  if (process.env.NODE_ENV === 'development') {
+    console.log('🎯 [THUMBNAIL_TRACK] BlogSimpleEditor mounted with props:', {
+      hasOnThumbnailChange: !!onThumbnailChange,
+      onThumbnailChangeType: typeof onThumbnailChange,
+      hasOnThumbnailIndexChange: !!onThumbnailIndexChange,
+      thumbnailImageId: thumbnailImageId,
+      initialThumbnailIndex: initialThumbnailIndex
+    });
+  }
+
   const [mobileView, setMobileView] = useState<"main" | "highlighter" | "link">(
     "main"
   )
   const toolbarRef = useRef<HTMLDivElement>(null)
+
+  // 이미지 목록 추적 상태 (new post mode용)
+  const [uploadedImages, setUploadedImages] = useState<Array<{id: string, url: string}>>([]);
+  const [urlToIdMap, setUrlToIdMap] = useState<Map<string, string>>(new Map());
+  const thumbnailIndexRef = useRef(initialThumbnailIndex || -1);
+
+  // 🐛 BUG FIX: uploadedImages 항상 최신 상태에 접근하기 위한 ref
+  const uploadedImagesRef = useRef(uploadedImages);
+  uploadedImagesRef.current = uploadedImages;
 
   // S3 파일 업로드 mutation
   const uploadMutation = useUploadFile()
@@ -253,9 +289,41 @@ export function BlogSimpleEditor({
         fileType: 'image' as const,
       })
 
-      // URL 추출 및 정규화
-      const imageUrl = (result as any).url || (result as any).accessUrl
+      // FileUpload 객체에서 정보 추출
+      const fileId = result.id
+      const imageUrl = result.accessUrl || result.fileUrl
       const finalUrl = normalizeImageUrl(imageUrl)
+
+      console.log('[BlogSimpleEditor] Upload completed:', {
+        fileId,
+        imageUrl,
+        finalUrl,
+        hasFileId: !!fileId
+      });
+
+      // 이미지 목록에 추가 (new post mode)
+      if (fileId) {
+        setUploadedImages(prev => {
+          const newImages = [...prev, { id: fileId, url: finalUrl }];
+
+          // fileIds 목록을 부모에게 알림
+          if (onFileIdsChange) {
+            const fileIds = newImages.map(img => img.id);
+            onFileIdsChange(fileIds);
+          }
+
+          return newImages;
+        });
+
+        // URL to ID 매핑 업데이트 (ImageUploadNode에서 사용)
+        setUrlToIdMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(finalUrl, fileId);
+          return newMap;
+        });
+      } else {
+        console.error('[BlogSimpleEditor] No file ID in upload result:', result);
+      }
 
       // 이미지 업로드는 여러 개일 수 있으므로 개별 토스트는 표시하지 않음
       // ImageUploadManager에서 배치 토스트를 표시함
@@ -267,7 +335,7 @@ export function BlogSimpleEditor({
       toast.error(errorMessage)
       throw error
     }
-  }, [uploadMutation])
+  }, [uploadMutation, onFileIdsChange, setUploadedImages, setUrlToIdMap])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -284,6 +352,20 @@ export function BlogSimpleEditor({
     onUpdate: ({ editor }) => {
       // Content 변경 시 onChange 콜백 호출
       const html = editor.getHTML()
+
+      // 디버그: 캡션이 HTML에 포함되는지 확인
+      if (process.env.NODE_ENV === 'development') {
+        const hasFigcaption = html.includes('<figcaption');
+        const hasFigure = html.includes('<figure');
+        console.log('🖼️ [CAPTION_DEBUG] Editor content updated:', {
+          htmlLength: html.length,
+          hasFigure,
+          hasFigcaption,
+          figcaptionCount: (html.match(/<figcaption/g) || []).length,
+          preview: html.substring(0, 200) + (html.length > 200 ? '...' : '')
+        });
+      }
+
       onChange?.(html)
     },
     extensions: [
@@ -329,13 +411,68 @@ export function BlogSimpleEditor({
         accept: "image/*",
         maxSize: 5 * 1024 * 1024,
         limit: 10,  // 최대 10개 이미지
-        upload: handleImageUpload,
+        upload: async (file: File, onProgress?: (event: { progress: number }) => void, abortSignal?: AbortSignal) => {
+          // 파일 업로드 직접 처리 (handleImageUpload를 우회)
+          try {
+            const MAX_FILE_SIZE = 5 * 1024 * 1024;
+            if (file.size > MAX_FILE_SIZE) {
+              throw new Error(`이미지는 1개당 최대 ${MAX_FILE_SIZE / (1024 * 1024)}MB까지 업로드 가능합니다`);
+            }
+
+            const result = await uploadMutation.mutateAsync({
+              file,
+              fileType: 'image' as const,
+            });
+
+            const fileId = result.id;
+            const imageUrl = result.accessUrl || result.fileUrl;
+            const finalUrl = normalizeImageUrl(imageUrl);
+
+            console.log('[BlogSimpleEditor] Direct upload completed:', {
+              fileId,
+              finalUrl,
+              hasFileId: !!fileId
+            });
+
+            if (fileId) {
+              // uploadedImages 상태 업데이트
+              setUploadedImages(prev => {
+                const newImages = [...prev, { id: fileId, url: finalUrl }];
+
+                // fileIds 목록을 부모에게 알림
+                if (onFileIdsChange) {
+                  const fileIds = newImages.map(img => img.id);
+                  onFileIdsChange(fileIds);
+                }
+
+                return newImages;
+              });
+
+              // URL to ID 매핑 업데이트
+              setUrlToIdMap(prev => {
+                const newMap = new Map(prev);
+                newMap.set(finalUrl, fileId);
+                return newMap;
+              });
+
+              // ImageUploadNode가 fileId를 사용할 수 있도록 객체로 반환
+              return { url: finalUrl, fileId };
+            } else {
+              throw new Error('Failed to get file ID from upload result');
+            }
+          } catch (error) {
+            console.error('Direct upload failed:', error);
+            const errorMessage = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다';
+            toast.error(errorMessage);
+            throw error;
+          }
+        },
         onError: (error) => {
           // 개발 환경에서만 콘솔 에러 표시
           if (process.env.NODE_ENV === 'development') {
             console.error("Upload failed:", error)
           }
-          // 에러 메시지는 이미 ImageUploadNode에서 표시했으므로 중복 표시 안 함
+          // 에러 메시지는 이미 표시했으므로 중복 표시 안 함
         },
       }),
     ],
@@ -347,27 +484,78 @@ export function BlogSimpleEditor({
     overlayHeight: toolbarRef.current?.getBoundingClientRect().height ?? 0,
   })
 
-  // 썸네일 선택 이벤트 리스너 (ResizableImageComponent에서 발생)
+  // 썸네일 선택 이벤트 리스너 (MediumImageNode에서 발생)
   useEffect(() => {
+    console.log('🎯 [THUMBNAIL_TRACK] Setting up thumbnail event listener');
+
     const handleThumbnailSelected = (event: Event) => {
       const customEvent = event as CustomEvent<{ imageId: string }>
       const { imageId } = customEvent.detail
+
+      // 디버깅: 썸네일 선택 이벤트 (개발 환경에서만)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎯 [THUMBNAIL_TRACK] User clicked thumbnail button:', {
+          imageId,
+          hasOnThumbnailChange: !!onThumbnailChange,
+          hasOnThumbnailIndexChange: !!onThumbnailIndexChange
+        });
+      }
 
       // 에디터 storage 업데이트
       if (editor) {
         (editor.storage as any).thumbnailImageId = imageId
       }
 
-      // 부모 컴포넌트에 알림
-      onThumbnailChange?.(imageId)
+      // Edit 모드: imageId를 직접 전달
+      if (onThumbnailChange) {
+        try {
+          onThumbnailChange(imageId);
+        } catch (error) {
+          console.error('Error calling onThumbnailChange:', error);
+        }
+      }
+
+      // New Post 모드: imageId를 index로 변환하여 전달
+      if (onThumbnailIndexChange) {
+        // 🐛 BUG FIX: ref를 통해 항상 최신 uploadedImages 상태에 접근
+        const currentUploadedImages = uploadedImagesRef.current;
+        const imageIndex = currentUploadedImages.findIndex(img => img.id === imageId);
+
+        // 디버깅: 인덱스 찾기 과정 (개발 환경에서만)
+        if (process.env.NODE_ENV === 'development') {
+          console.log('🎯 [THUMBNAIL_TRACK] Converting imageId to index:', {
+            selectedImageId: imageId,
+            totalImages: currentUploadedImages.length,
+            foundIndex: imageIndex,
+            availableIds: currentUploadedImages.map(img => img.id)
+          });
+        }
+
+        if (imageIndex !== -1) {
+          thumbnailIndexRef.current = imageIndex;
+          console.log('✅ [THUMBNAIL_TRACK] Selected thumbnail at index:', imageIndex, 'imageId:', imageId);
+          onThumbnailIndexChange(imageIndex);
+        } else {
+          // 찾지 못하면 미선택 상태로 설정 (사용자가 다시 선택하도록 유도)
+          thumbnailIndexRef.current = -1;
+          onThumbnailIndexChange(-1);
+
+          // 개발 환경에서만 경고 표시
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('⚠️ [THUMBNAIL_TRACK] Image ID not found in uploaded images:', imageId);
+            console.warn('⚠️ [THUMBNAIL_TRACK] Available image IDs:', currentUploadedImages.map(img => img.id));
+          }
+        }
+      }
     }
 
     window.addEventListener('thumbnail-selected', handleThumbnailSelected)
 
     return () => {
+      console.log('🎯 [THUMBNAIL_TRACK] Cleaning up thumbnail event listener');
       window.removeEventListener('thumbnail-selected', handleThumbnailSelected)
     }
-  }, [editor, onThumbnailChange])
+  }, [editor, onThumbnailChange, onThumbnailIndexChange])
 
   // 에디터 storage 초기화 (부모로부터 받은 thumbnailImageId)
   useEffect(() => {
@@ -429,4 +617,4 @@ export function BlogSimpleEditor({
       </div>
     </EditorContext.Provider>
   )
-}
+})

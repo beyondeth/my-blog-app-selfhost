@@ -3,6 +3,7 @@
  * 이미지 업로드 관련 유틸리티 함수
  */
 
+import { v4 as uuidv4 } from 'uuid';
 import { IMAGE_UPLOAD_CONFIG, ERROR_MESSAGES } from '../constants/editor.constants';
 
 /**
@@ -78,9 +79,10 @@ export const uploadImage = async (file: File): Promise<{ url: string; id: string
 
 /**
  * 이미지 ID 생성
+ * UUID v4 형식으로 고유한 ID 생성
  */
 export const generateImageId = (): string => {
-  return `img_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return uuidv4();
 };
 
 /**

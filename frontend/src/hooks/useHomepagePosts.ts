@@ -35,7 +35,7 @@ export function useHomepagePosts(options: {
     initialPageParam: undefined as string | undefined,
     enabled,
     // 홈페이지 전용 최적화된 캐시 설정
-    staleTime: 30 * 1000, // 30초간 데이터 신선도 유지 (실시간성 확보)
+    staleTime: 30 * 1000, // 30초간 데이터 신선도 유지
     gcTime: 5 * 60 * 1000, // 5분간 메모리 캐시 보관
     refetchOnWindowFocus: true, // 포커스 시 리프레시 활성화 (실시간 업데이트)
     refetchOnMount: false, // 마운트 시 리프레치 방지 (하드 리프레시 최적화)

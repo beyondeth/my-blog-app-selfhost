@@ -11,6 +11,7 @@ import * as cookieParser from 'cookie-parser';
 import * as session from 'express-session';
 import { join } from 'path';
 import * as hbs from 'hbs';
+import * as morgan from 'morgan';
 
 async function bootstrap() {
   // 서버 시작 시 타임존을 한국 시간으로 설정
@@ -89,6 +90,11 @@ async function bootstrap() {
 
   // Compression middleware
   app.use(compression());
+
+  // HTTP request logging middleware (development only)
+  if (isDevelopment) {
+    app.use(morgan('dev'));
+  }
 
   // Cookie parser middleware
   app.use(cookieParser());

@@ -3,7 +3,7 @@ import { OnEvent } from '@nestjs/event-emitter';
 import { CacheService, CacheKeys, CacheTTL } from '../../cache/cache.service';
 import { CacheMetricsService } from '../../metrics/cache-metrics.service';
 import { PostResponseDto } from '../dto/post-response.dto';
-import { CacheInvalidationEvents, EditorPickToggledEvent } from '../../common/events/cache.events';
+import { CacheInvalidationEvents, EditorPickToggledEvent, PostThumbnailUpdatedEvent } from '../../common/events/cache.events';
 
 /**
  * 포스트 관련 캐시 관리 서비스
@@ -109,21 +109,15 @@ export class PostCacheService {
     postId?: string
   ): Promise<void> {
     try {
-      // 1. 홈 피드 캐시 삭제 (처음 5페이지)
-      for (let i = 1; i <= 5; i++) {
-        await this.cacheService.del(CacheKeys.FEED_HOME(i));
-      }
+      // 1. 홈 피드 캐시 삭제 (처음 1페이지만)
+      await this.cacheService.del(CacheKeys.FEED_HOME(1));
 
-      // 2. 블로그 피드 캐시 삭제 (처음 5페이지)
+      // 2. 블로그 피드 캐시 삭제 (처음 1페이지만)
       if (blogId) {
-        for (let i = 1; i <= 5; i++) {
-          await this.cacheService.del(CacheKeys.FEED_BLOG(blogId, i));
-        }
+        await this.cacheService.del(CacheKeys.FEED_BLOG(blogId, 1));
       }
       if (blogSlug && blogSlug !== blogId) {
-        for (let i = 1; i <= 5; i++) {
-          await this.cacheService.del(CacheKeys.FEED_BLOG(blogSlug, i));
-        }
+        await this.cacheService.del(CacheKeys.FEED_BLOG(blogSlug, 1));
       }
 
       // 3. 패턴 기반 대규모 삭제 (모든 관련 캐시)
@@ -142,7 +136,6 @@ export class PostCacheService {
 
       // 4. 인기 게시물 캐시 삭제
       await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
-      await this.cacheService.deletePattern('feed:search:*');
 
       // 5. 특정 포스트 캐시 삭제 (postId가 있는 경우)
       if (postId) {
@@ -343,6 +336,73 @@ export class PostCacheService {
       this.logger.log(`✅ [Editor's Pick Cache] Invalidated essential caches for post: ${payload.postId}`);
     } catch (error) {
       this.logger.error(`Failed to invalidate Editor's Pick cache: ${error.message}`, error.stack);
+    }
+  }
+
+  /**
+   * 포스트 썸네일 업데이트 이벤트 리스너
+   * 썸네일 변경 시 홈 피드와 관련 캐시만 집중적으로 무효화
+   */
+  @OnEvent(CacheInvalidationEvents.POST_THUMBNAIL_UPDATED, { async: true })
+  async handlePostThumbnailUpdated(payload: PostThumbnailUpdatedEvent): Promise<void> {
+    // 🎯 [THUMBNAIL_TRACK] STEP_7_EVENT_RECEIVED
+    this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_7_EVENT_RECEIVED: Cache service received thumbnail update event');
+    this.logger.debug(`  - Post ID: ${payload.postId}`);
+    this.logger.debug(`  - Blog Slug: ${payload.blogSlug}`);
+    this.logger.debug(`  - Old ImageId: ${payload.oldThumbnailImageId}`);
+    this.logger.debug(`  - New ImageId: ${payload.newThumbnailImageId}`);
+    this.logger.debug(`  - Timestamp: ${new Date().toISOString()}`);
+
+    try {
+      // 🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_START
+      this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_START: Starting cache invalidation');
+
+      // 1. 홈 피드 캐시 삭제 (썸네일이 표시되는 핵심 위치)
+      // - 처음 3페이지만 삭제하여 성능 최적화
+      const homeFeedKeys = [];
+      for (let page = 1; page <= 3; page++) {
+        const key = CacheKeys.FEED_HOME(page);
+        homeFeedKeys.push(key);
+        await this.cacheService.del(key);
+      }
+      this.logger.debug(`  - Deleted home feed keys: ${homeFeedKeys.join(', ')}`);
+
+      // 2. 블로그 피드 캐시 삭제 (해당 블로그의 피드)
+      const blogFeedKeys = [];
+      if (payload.blogSlug) {
+        for (let page = 1; page <= 3; page++) {
+          const key = CacheKeys.FEED_BLOG(payload.blogSlug, page);
+          blogFeedKeys.push(key);
+          await this.cacheService.del(key);
+        }
+        this.logger.debug(`  - Deleted blog feed keys: ${blogFeedKeys.join(', ')}`);
+
+        // 블로그 ID와 slug가 다른 경우를 대비한 패턴 삭제
+        await this.cacheService.deletePattern(`feed:blog:${payload.blogSlug}:page:*`);
+      }
+
+      // 3. 특정 포스트 캐시 삭제 (썸네일 URL 업데이트용)
+      const postKey = CacheKeys.POST_CORE(payload.postId);
+      await this.cacheService.del(postKey);
+      this.logger.debug(`  - Deleted post cache key: ${postKey}`);
+
+      // 4. 패턴 기반 추가 삭제 (안전장치)
+      // - 홈 피드 전체 패턴 삭제
+      await this.cacheService.deletePattern('feed:home:page:*');
+
+      // - 관련 블로그 피드 패턴 삭제
+      if (payload.blogSlug) {
+        await this.cacheService.deletePattern(`feed:blog:${payload.blogSlug}:page:*`);
+      }
+
+      // Prometheus 메트릭 기록
+      this.cacheMetricsService.recordCacheInvalidation('thumbnail_update', 'event');
+
+      // 🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_COMPLETE
+      this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_COMPLETE: All caches invalidated successfully');
+      this.logger.log(`✅ [Thumbnail Cache] Successfully invalidated caches for thumbnail update on post: ${payload.postId}`);
+    } catch (error) {
+      this.logger.error(`🎯 [THUMBNAIL_TRACK] STEP_8_ERROR: Cache invalidation failed: ${error.message}`, error.stack);
     }
   }
 }

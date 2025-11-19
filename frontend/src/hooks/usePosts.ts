@@ -201,7 +201,10 @@ export function useUpdatePost() {
         queryClient.setQueryData(postQueryKeys.detail(updatedPost.slug), updatedPost);
       }
 
-      // 2. Active 목록 캐시에서 해당 포스트 업데이트 (Optimistic Update - 서버 refetch 없음)
+      // 2. 모든 상세 페이지 쿼리 즉시 무효화 (강제로 fresh 데이터 가져오도록)
+      queryClient.invalidateQueries({ queryKey: postQueryKeys.details() });
+
+      // 3. Active 목록 캐시에서 해당 포스트 업데이트 (Optimistic Update - 서버 refetch 없음)
       // 사용자 브라우저의 메모리에 있는 포스트 목록만 업데이트 (보통 20~40개)
       // 다른 사용자나 서버 DB에는 영향 없음
       queryClient.setQueriesData(
@@ -223,18 +226,31 @@ export function useUpdatePost() {
         }
       );
 
-      // 3. Inactive 쿼리들을 stale로 표시 (사용자가 돌아갈 때 자동 refetch)
-      // refetchType: 'none' → 즉시 refetch 안함, stale만 표시
+      // 4. Active 쿼리들 즉시 refetch (최신 데이터 보장)
+      queryClient.refetchQueries({
+        queryKey: postQueryKeys.lists(),
+        type: 'active',
+      });
+
+      // 5. Inactive 쿼리들은 stale로 표시 (사용자가 돌아갈 때 자동 refetch)
       queryClient.invalidateQueries({
         queryKey: postQueryKeys.lists(),
         refetchType: 'none',
       });
 
-      // 4. 인기포스트 캐시 무효화 (포스트 수정 시 인기포스트도 업데이트 필요)
+      // 6. 인기포스트 캐시 무효화 (포스트 수정 시 인기포스트도 업데이트 필요)
       queryClient.invalidateQueries({
         queryKey: ['popular-posts'],
         refetchType: 'none', // stale만 마킹, 사용자가 다시 볼 때 자동 refetch
       });
+
+      // 7. 블로그 관련 캐시도 무효화
+      if (updatedPost.blog?.slug) {
+        queryClient.invalidateQueries({ queryKey: ['blog', updatedPost.blog.slug] });
+        queryClient.invalidateQueries({
+          queryKey: postQueryKeys.list({ blogSlug: updatedPost.blog.slug })
+        });
+      }
     }
   }, [mutation.isSuccess, mutation.data, queryClient]);
 
