@@ -59,6 +59,37 @@ const PostArticle = React.memo(function PostArticle({
   searchQuery,
   priority = false, // 기본값: lazy loading
   isHomeFeed = false,}: PostArticleProps) {
+  // 화면 크기에 따른 썸네일 크기 계산
+  const [thumbnailSize, setThumbnailSize] = React.useState({ width: 120, height: 113 });
+  const [isDesktop, setIsDesktop] = React.useState(false);
+
+  React.useEffect(() => {
+    const handleResize = () => {
+      const width = window.innerWidth;
+      if (width >= 421) {
+        // 데스크톱 (421px 이상)
+        setThumbnailSize({ width: 210, height: 197 });
+        setIsDesktop(true);
+      } else if (width >= 375 && width <= 420) {
+        // 모바일 중간 (375px-420px)
+        setThumbnailSize({ width: 140, height: 132 });
+        setIsDesktop(false);
+      } else {
+        // 작은 모바일 (~374px)
+        setThumbnailSize({ width: 120, height: 113 });
+        setIsDesktop(false);
+      }
+    };
+
+    // 초기 설정
+    handleResize();
+
+    // 리사이즈 이벤트 리스너
+    window.addEventListener('resize', handleResize);
+
+    // 클린업
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
   // 삭제된 포스트 상태 확인
   const isDeleted = post.isDeleted || post.status === 'deleted';
 
@@ -300,7 +331,7 @@ const PostArticle = React.memo(function PostArticle({
   // 일반 포스트 레이아웃 (기존 코드)
   return (
     <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-4 first:pt-0">
-      <div className={`flex ${post.thumbnail ? 'flex-col sm:flex-row gap-6 sm:gap-12' : 'flex-col'}`}>
+      <div className={`flex ${post.thumbnail ? (isDesktop ? 'flex-row gap-6 sm:gap-12' : 'flex-col') : 'flex-col'}`}>
         {/* Content */}
         <div className="flex-1 min-w-0 flex flex-col">
           {/* Author Info - 제목 위에 배치 */}
@@ -432,39 +463,41 @@ const PostArticle = React.memo(function PostArticle({
           </div>
         </div>
 
-        {/* Thumbnail - 모바일(375px-420px)에서는 콘텐츠 아래로, 421px 이상에서는 오른쪽에 */}
+        {/* Thumbnail - 동적 크기 조절 */}
         {post.thumbnail && (
-          <div className={`
-            ${post.thumbnail
-              ? 'flex-shrink-0 mt-4 mx-auto sm:mt-0 sm:self-center sm:ml-6 sm:mr-0'
-              : ''
-            }
-          `}>
-            {/* 모바일 (375px-420px): 썸네일을 콘텐츠 아래 중앙 정렬 */}
-            <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
+          <>
+            {/* 모바일 레이아웃 - 썸네일을 콘텐츠 아래로 */}
+            <div
+              className={`flex-shrink-0 mt-4 mx-auto ${isDesktop ? 'hidden' : 'block'}`}
+              style={{ width: thumbnailSize.width, height: thumbnailSize.height }}
+            >
               <Image
                 src={post.thumbnail}
                 alt={post.title}
-                width={100}
-                height={94}
+                width={thumbnailSize.width}
+                height={thumbnailSize.height}
                 className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
-                sizes="100px"
+                sizes={`${thumbnailSize.width}px`}
                 priority={priority}
               />
             </div>
-            {/* 데스크톱 (421px 이상): 썸네일을 오른쪽에 배치 */}
-            <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
+
+            {/* 데스크톱 레이아웃 - 썸네일을 오른쪽에 */}
+            <div
+              className={`flex-shrink-0 ${isDesktop ? 'flex mt-0 self-center ml-6 mr-0' : 'hidden'}`}
+              style={{ width: thumbnailSize.width, height: thumbnailSize.height }}
+            >
               <Image
                 src={post.thumbnail}
                 alt={post.title}
-                width={210}
-                height={197}
+                width={thumbnailSize.width}
+                height={thumbnailSize.height}
                 className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
-                sizes="210px"
+                sizes={`${thumbnailSize.width}px`}
                 priority={priority}
               />
             </div>
-          </div>
+          </>
         )}
       </div>
     </article>
