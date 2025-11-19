@@ -119,6 +119,39 @@ export const MediumStyleImage = Image.extend({
     ];
   },
 
+  // NodeView에서 DOM 생성을 제어하기 위한 toDOM 메소드
+  toDOM(node) {
+    const { src, alt, size, caption, 'data-image-id': imageId } = node.attrs;
+
+    // figure 요소 생성
+    const figure = document.createElement('figure');
+    figure.setAttribute('data-medium-image', '');
+    figure.className = 'medium-image-wrapper';
+
+    // img 요소 생성
+    const img = document.createElement('img');
+    img.src = src;
+    img.alt = alt || '';
+    img.setAttribute('data-size', size || 'default');
+    img.className = `medium-image medium-image-${size || 'default'}`;
+
+    if (imageId) {
+      img.setAttribute('data-image-id', imageId);
+    }
+
+    figure.appendChild(img);
+
+    // caption이 있으면 figcaption 생성
+    if (caption) {
+      const figcaption = document.createElement('figcaption');
+      figcaption.className = 'medium-image-caption';
+      figcaption.textContent = caption;
+      figure.appendChild(figcaption);
+    }
+
+    return figure;
+  },
+
   addNodeView() {
     return ReactNodeViewRenderer(MediumImageNode);
   },
