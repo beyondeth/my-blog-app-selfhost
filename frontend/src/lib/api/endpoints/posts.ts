@@ -100,7 +100,11 @@ export class PostsAPI {
    * @description 로그인한 사용자의 블로그에 포스트 생성
    */
   async createPost(data: PostForm): Promise<Post> {
-    return this.client.post<Post>('/posts', data);
+    return this.client.post<Post>('/posts', data, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   }
 
   /**
@@ -111,7 +115,21 @@ export class PostsAPI {
    * @description 본인의 포스트만 수정 가능
    */
   async updatePost(id: string, data: Partial<PostForm>): Promise<Post> {
-    return this.client.patch<Post>(`/posts/${id}`, data);
+    // 🎯 [DEBUG] 포스트 수정 요청 로그
+    console.log('🎯 [API] updatePost called with:');
+    console.log('  - Post ID:', id);
+    console.log('  - Data keys:', Object.keys(data));
+    console.log('  - Full data:', JSON.stringify(data, null, 2));
+    console.log('  - thumbnailImageId:', data.thumbnailImageId);
+    console.log('  - thumbnail:', data.thumbnail);
+    console.log('  - Timestamp:', new Date().toISOString());
+
+    // FormData 대신 JSON으로 전송 (NestJS 파싱 문제 해결)
+    return this.client.patch<Post>(`/posts/${id}`, data, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
   }
 
   /**

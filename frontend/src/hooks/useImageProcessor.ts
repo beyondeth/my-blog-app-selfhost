@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 
 interface AttachedFile {
-  id: number;
+  id: string; // FileUpload와 타입 맞춤
   fileKey: string;
   fileUrl: string;
   originalName: string;

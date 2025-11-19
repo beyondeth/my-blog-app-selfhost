@@ -109,21 +109,15 @@ export class PostCacheService {
     postId?: string
   ): Promise<void> {
     try {
-      // 1. 홈 피드 캐시 삭제 (처음 5페이지)
-      for (let i = 1; i <= 5; i++) {
-        await this.cacheService.del(CacheKeys.FEED_HOME(i));
-      }
+      // 1. 홈 피드 캐시 삭제 (처음 1페이지만)
+      await this.cacheService.del(CacheKeys.FEED_HOME(1));
 
-      // 2. 블로그 피드 캐시 삭제 (처음 5페이지)
+      // 2. 블로그 피드 캐시 삭제 (처음 1페이지만)
       if (blogId) {
-        for (let i = 1; i <= 5; i++) {
-          await this.cacheService.del(CacheKeys.FEED_BLOG(blogId, i));
-        }
+        await this.cacheService.del(CacheKeys.FEED_BLOG(blogId, 1));
       }
       if (blogSlug && blogSlug !== blogId) {
-        for (let i = 1; i <= 5; i++) {
-          await this.cacheService.del(CacheKeys.FEED_BLOG(blogSlug, i));
-        }
+        await this.cacheService.del(CacheKeys.FEED_BLOG(blogSlug, 1));
       }
 
       // 3. 패턴 기반 대규모 삭제 (모든 관련 캐시)
@@ -142,7 +136,6 @@ export class PostCacheService {
 
       // 4. 인기 게시물 캐시 삭제
       await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
-      await this.cacheService.deletePattern('feed:search:*');
 
       // 5. 특정 포스트 캐시 삭제 (postId가 있는 경우)
       if (postId) {

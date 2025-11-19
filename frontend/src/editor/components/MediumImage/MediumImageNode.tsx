@@ -18,6 +18,8 @@ import { ImageToolbar } from './ImageToolbar';
 import { AltTextModal } from './AltTextModal';
 import { ImageSize } from '../../extensions/MediumStyleImage.extension';
 import { cn } from '@/lib/utils';
+import { normalizeImageUrl } from '@/utils/imageUtils';
+import { toast } from 'sonner';
 
 // ============================================
 // 설정 상수 (Configuration Constants)
@@ -54,10 +56,19 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
   const [naturalWidth, setNaturalWidth] = useState(0);
   const [altModalOpen, setAltModalOpen] = useState(false);
 
-  // 썸네일 상태 관리 (editor storage 사용)
-  const [isThumbnail, setIsThumbnail] = useState(false);
+  // 썸네일 상태
   const imageId = node.attrs['data-image-id'] || '';
+  const [isThumbnail, setIsThumbnail] = useState(false);
 
+  // 디버깅: 이미지 속성 출력
+  console.log('🎯 [MEDIUM_IMAGE_NODE] Rendered with attrs:', {
+    allAttrs: node.attrs,
+    imageId,
+    hasImageId: !!imageId,
+    src: node.attrs.src
+  });
+
+  
   // 사용 가능한 크기 옵션 계산
   // 원본 이미지 크기에 따라 2~4개 옵션 제공
   const availableSizes = useMemo((): ImageSize[] => {
@@ -127,37 +138,82 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       // 커서가 텍스트 끝에 있을 때만 다음 입력칸(에디터)으로 이동
       if (cursorPosition === textLength) {
         // Caption 입력 완료 → 에디터 본문으로 포커스 이동
-        if (editor) {
-          editor.commands.focus('end');
+        // getPos()를 사용하여 현재 노드 위치를 찾고 그 다음으로 포커스 이동
+        const pos = getPos();
+        if (pos !== undefined) {
+          const view = editor.view;
+          const tr = view.state.tr.setSelection(
+            // @ts-ignore - ProseMirror selection types
+            view.state.tr.selection.from(pos + node.nodeSize)
+          );
+          view.dispatch(tr);
+          view.focus();
         }
       }
       // 텍스트 중간에서 엔터 누르면 무시 (한 줄만 입력)
     }
-  }, [node.attrs.caption, editor]);
+  }, [node.attrs.caption, editor, getPos, node.nodeSize]);
 
-  // 썸네일 토글 핸들러
-  const handleThumbnailToggle = useCallback(() => {
-    if (!imageId) {
-      console.warn('[MediumImage] No image ID found');
-      return;
-    }
-
-    // 커스텀 이벤트 발생 - 부모 컴포넌트에서 감지
-    const event = new CustomEvent('thumbnail-selected', {
-      detail: { imageId: isThumbnail ? '' : imageId } // 빈 문자열로 해제 처리
-    });
-    window.dispatchEvent(event);
-
-    setIsThumbnail(!isThumbnail);
-  }, [imageId, isThumbnail]);
-
-  // 에디터 storage에서 썸네일 ID 확인
+  // 썸네일 상태 동기화
   useEffect(() => {
     if (!editor || !imageId) return;
 
-    const thumbnailId = (editor.storage as any)?.thumbnailImageId || '';
-    setIsThumbnail(thumbnailId === imageId);
-  }, [editor, imageId]); // storage thumbnailImageId 제거 - 무한 리렌더링 방지
+    const storage = editor.storage;
+    if (!storage) return;
+
+    // 현재 선택된 썸네일 ID 확인
+    const thumbnailImageId = (storage as any).thumbnailImageId;
+    const isCurrentThumbnail = thumbnailImageId === imageId;
+
+    setIsThumbnail(isCurrentThumbnail);
+  }, [editor, imageId]);
+
+  // 썸네일 토글 핸들러
+  const handleThumbnailToggle = useCallback(() => {
+    console.log('🎯 [THUMBNAIL_TOGGLE] Thumbnail button clicked!', {
+      imageId,
+      isThumbnail,
+      hasEditor: !!editor
+    });
+
+    if (!editor || !imageId) {
+      console.warn('🎯 [THUMBNAIL_TOGGLE] Missing editor or imageId', { editor: !!editor, imageId });
+      return;
+    }
+
+    // 썸네일 상태 토글
+    const newThumbnailId = isThumbnail ? null : imageId;
+
+    console.log('🎯 [THUMBNAIL_TOGGLE] Toggling thumbnail:', {
+      from: isThumbnail ? imageId : null,
+      to: newThumbnailId
+    });
+
+    // 에디터 스토리지 업데이트
+    if (editor.storage) {
+      (editor.storage as any).thumbnailImageId = newThumbnailId;
+      console.log('🎯 [THUMBNAIL_TOGGLE] Updated editor.storage.thumbnailImageId:', newThumbnailId);
+    }
+
+    // 커스텀 이벤트 발생 (BlogSimpleEditor에서 수신)
+    if (newThumbnailId) {
+      const event = new CustomEvent('thumbnail-selected', {
+        detail: { imageId: newThumbnailId }
+      });
+      window.dispatchEvent(event);
+      console.log('🎯 [THUMBNAIL_TOGGLE] Dispatched thumbnail-selected event:', { imageId: newThumbnailId });
+    }
+
+    // 로컬 상태 업데이트
+    setIsThumbnail(!isThumbnail);
+
+    // 사용자 피드백
+    if (isThumbnail) {
+      toast.success('썸네일이 해제되었습니다.');
+    } else {
+      toast.success('썸네일로 설정되었습니다.');
+    }
+  }, [editor, imageId, isThumbnail]);
 
   return (
     <NodeViewWrapper
@@ -173,14 +229,17 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
     >
       {/* 이미지 툴바 (선택 시 표시) - 이미지 위에 위치 */}
       {selected && isImageLoaded && (
-        <ImageToolbar
-          currentSize={node.attrs.size}
-          availableSizes={availableSizes}
-          onSizeChange={handleSizeChange}
-          onAltTextClick={() => setAltModalOpen(true)}
-          isThumbnail={isThumbnail}
-          onThumbnailToggle={handleThumbnailToggle} // 항상 제공 - handleThumbnailToggle 내부에서 imageId 확인
-        />
+        <>
+          <ImageToolbar
+            currentSize={node.attrs.size}
+            availableSizes={availableSizes}
+            onSizeChange={handleSizeChange}
+            onAltTextClick={() => setAltModalOpen(true)}
+            isThumbnail={isThumbnail}
+            onThumbnailToggle={handleThumbnailToggle}
+          />
+
+          </>
       )}
 
       {/* 이미지 */}
@@ -192,7 +251,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       >
         <img
           ref={imgRef}
-          src={node.attrs.src}
+          src={normalizeImageUrl(node.attrs.src)}
           alt={node.attrs.alt || ''}
           className={cn(
             'medium-image',

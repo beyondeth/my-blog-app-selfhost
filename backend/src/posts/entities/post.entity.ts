@@ -1,3 +1,4 @@
+
 import {
   Entity,
   PrimaryGeneratedColumn,
@@ -146,27 +147,12 @@ export class Post {
   @Column({ name: 'content_type', default: 'html' })
   content_type: string;
 
-  /**
-   * 콘텐츠 렌더링 시각
-   * - 마지막으로 content가 렌더링된 시점
-   */
-  @Column({ name: 'content_rendered_at', type: 'timestamp', nullable: true })
-  content_rendered_at: Date;
-
-  /**
-   * 썸네일 이미지 URL
-   * - 목록 표시용
-   * - YouTube 썸네일 또는 콘텐츠 첫 이미지 자동 추출
-   * - nullable: 이미지 없는 포스트
-   */
-  @Column({ nullable: true })
-  thumbnail: string;
-
+  
   /**
    * 썸네일 이미지 ID (File 참조)
    * - S3 업로드 이미지 참조
    * - files 테이블의 UUID
-   * - nullable: 외부 URL 사용 시
+   * - nullable: 썸네일 없는 포스트
    */
   @Column({ name: 'thumbnail_image_id', type: 'uuid', nullable: true })
   thumbnailImageId: string;
@@ -325,66 +311,12 @@ export class Post {
   // =====================================
 
   /**
-   * Slug 및 썸네일 업데이트 (BeforeUpdate 훅)
+   * Slug 업데이트 (BeforeUpdate 훅)
    * - 제목 변경 시 슬러그 업데이트 (선택적)
-   * - 썸네일 자동 추출 (YouTube 또는 첫 이미지) - 사용자 선택이 없는 경우에만
    */
   @BeforeUpdate()
   generateSlug() {
-    // 썸네일 자동 추출
-    // thumbnail과 thumbnailImageId가 모두 없는 경우에만 content에서 추출
-    // 사용자가 명시적으로 썸네일을 선택한 경우 자동 추출 방지
-    if (this.content && !this.thumbnail && !this.thumbnailImageId) {
-      this.extractThumbnailFromContent();
-    }
-  }
-
-  /**
-   * 콘텐츠에서 썸네일 추출
-   * - 우선순위 1: YouTube 비디오 → YouTube 썸네일
-   * - 우선순위 2: HTML img 태그 → S3 프록시 URL
-   * - 없으면 null
-   */
-  private extractThumbnailFromContent() {
-    // 1. YouTube 비디오 확인
-    const youtubeRegex = /<iframe[^>]+class="youtube-video"[^>]+src="[^"]*\/embed\/([a-zA-Z0-9_-]+)/i;
-    const youtubeMatch = this.content.match(youtubeRegex);
-
-    if (youtubeMatch && youtubeMatch[1]) {
-      const videoId = youtubeMatch[1];
-      const youtubeUrlPattern = process.env.YOUTUBE_THUMBNAIL_URL || 'https://img.youtube.com/vi/{id}/maxresdefault.jpg';
-      this.thumbnail = youtubeUrlPattern.replace('{id}', videoId);
-      return;
-    }
-
-    // 2. HTML img 태그 확인
-    const imgRegex = /<img[^>]+src="([^">]+)"/i;
-    const match = this.content.match(imgRegex);
-
-    if (match && match[1]) {
-      let imageUrl = match[1];
-
-      // S3 URL을 프록시 URL로 변환
-      if (imageUrl.includes('amazonaws.com') || imageUrl.startsWith('uploads/')) {
-        // S3 키 추출
-        let s3Key = imageUrl;
-        if (imageUrl.includes('amazonaws.com')) {
-          const urlParts = imageUrl.split('/');
-          const uploadsIndex = urlParts.findIndex((part) => part === 'uploads');
-          if (uploadsIndex !== -1) {
-            s3Key = urlParts.slice(uploadsIndex).join('/');
-          }
-        }
-
-        // 프록시 URL로 변환
-        imageUrl = `http://localhost:3001/api/v1/files/proxy/${s3Key}`;
-      }
-
-      this.thumbnail = imageUrl;
-    } else {
-      // 콘텐츠에 이미지가 없으면 썸네일 제거
-      this.thumbnail = null;
-    }
+    // 썸네일 자동 추출 로직 제거 - 사용자가 직접 선택하도록 변경
   }
 
   /**
@@ -473,7 +405,6 @@ export class Post {
       slug: this.slug,
       content: this.content,
       content_markdown: this.content_markdown,
-      thumbnail: this.thumbnail,
       isPublished: this.isPublished,
       status: this.status,
       createdAt: this.createdAt,
@@ -490,6 +421,10 @@ export class Post {
       // Blog 데이터
       blogId: this.blogId,
       blogSlug: this.blog?.slug || null,
+
+      // 썸네일 데이터 (thumbnailImage 관계를 통해)
+      thumbnailImageId: this.thumbnailImageId,
+      thumbnailUrl: this.thumbnailImage?.fileUrl || null,
 
       // PostStats 데이터 (join 시에만 포함)
       viewCount: this.stats?.viewCount || 0,

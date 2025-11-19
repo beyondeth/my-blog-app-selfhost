@@ -35,6 +35,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       status = exception.getStatus();
       const exceptionResponse = exception.getResponse();
 
+      // ValidationPipe 에러 디버깅용 로그
+      if (status === HttpStatus.UNPROCESSABLE_ENTITY) {
+        this.logger.debug('ValidationPipe Error Details:', JSON.stringify(exceptionResponse, null, 2));
+      }
+
       if (typeof exceptionResponse === 'string') {
         message = exceptionResponse;
       } else if (typeof exceptionResponse === 'object') {

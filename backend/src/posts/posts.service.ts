@@ -38,6 +38,7 @@ import { PostContentService } from './services/post-content.service';
 import { PostReadService } from './services/post-read.service';
 import { PostInteractionService } from './services/post-interaction.service';
 import { PostCreationService } from './services/post-creation.service';
+import { ThumbnailService } from './services/thumbnail.service';
 import { CloudflareService } from '../cloudflare/cloudflare.service';
 
 /**
@@ -88,6 +89,7 @@ export class PostsService {
     private readonly postReadService: PostReadService,
     private readonly postInteractionService: PostInteractionService,
     private readonly postCreationService: PostCreationService,
+    private readonly thumbnailService: ThumbnailService,
     private readonly cloudflareService: CloudflareService,
   ) {}
 
@@ -231,12 +233,10 @@ export class PostsService {
     // 인기 포스트 조회 (Materialized View 사용)
     const posts = await this.postReadService.findPopularPosts(period, limit);
 
-    // Post 엔티티를 DTO로 변환
-    const dtos: PostResponseDto[] = [];
-    for (const post of posts) {
-      const dto = await this.postMapperService.toPostDto(post);
-      dtos.push(dto);
-    }
+      // Post 엔티티를 DTO로 병렬 변환 (성능 최적화)
+    const dtos = await Promise.all(
+      posts.map(post => this.postMapperService.toPostDto(post))
+    );
 
     return dtos;
   }
@@ -349,21 +349,49 @@ export class PostsService {
     this.logger.debug(`Setting thumbnail for post: ${postId}`);
 
     // 오버로드 처리: 첫 번째 파라미터가 string이면 userId, User 객체이면 user
+    let fileId: string;
     if (typeof userIdOrThumbnail === 'string') {
       // 구래 방식: setThumbnail(postId, userId, thumbnailFileId)
-      return await this.postFileService.setThumbnail(postId, userIdOrThumbnail, { thumbnailFileId: thumbnailFileId as string });
+      fileId = thumbnailFileId as string;
+      await this.thumbnailService.setThumbnail(postId, fileId, userIdOrThumbnail);
     } else {
       // 새 방식: setThumbnail(postId, user, setThumbnailDto)
       const user = userIdOrThumbnail as User;
       const dto = thumbnailFileId as SetThumbnailDto;
-      return await this.postFileService.setThumbnail(postId, user.id, { thumbnailFileId: dto.thumbnailFileId });
+      fileId = dto.thumbnailFileId;
+      await this.thumbnailService.setThumbnail(postId, fileId, user.id);
     }
+
+    // File 엔티티에서 직접 URL 조회
+    const thumbnailFile = await this.filesRepository.findOne({
+      where: { id: fileId },
+      select: ['fileUrl']
+    });
+
+    return {
+      success: true,
+      thumbnailUrl: thumbnailFile?.fileUrl || null
+    };
   }
 
   /**
    * 포스트 썸네일 제거
    */
   async removeThumbnail(postId: string, user: User): Promise<{ success: boolean }> {
+    this.logger.debug(`Removing thumbnail for post: ${postId}`);
+
+    await this.thumbnailService.removeThumbnail(postId, user.id);
+    return { success: true };
+  }
+
+  /**
+   * 포스트에서 사용 가능한 썸네일 후보 이미지들 조회
+   */
+  async getThumbnailCandidates(postId: string, userId: string): Promise<File[]> {
+    return await this.thumbnailService.getThumbnailCandidates(postId, userId);
+  }
+
+  async removeThumbnailOld(postId: string, user: User): Promise<{ success: boolean }> {
     this.logger.debug(`Removing thumbnail for post: ${postId}`);
 
     const post = await this.postsRepository.findOne({
@@ -376,7 +404,6 @@ export class PostsService {
 
     await this.postsRepository.update(postId, {
       thumbnailImageId: null,
-      thumbnail: null,
     });
 
     return { success: true };
@@ -456,12 +483,11 @@ export class PostsService {
       blogId, // blogId 그대로 전달
     };
 
-    if (isForCache) {
-      // 캐시용은 liked/bookmarked 없이 조회
-      return await this.postReadService.getPostsCursor(query);
-    } else {
-      return await this.postReadService.getPostsCursor(query, user);
-    }
+    // getPostsCursor는 CursorPaginatedPostsDto를 반환하므로 posts 속성만 추출
+    const result = await this.postReadService.getPostsCursor(query, user);
+
+    // 호환성을 위해 posts 배열만 반환 (controller에서 기대하는 형식)
+    return result.posts;
   }
 
   /**
@@ -754,19 +780,7 @@ export class PostsService {
       isPublished: post.isPublished,
     });
 
-    // Cloudflare 캐시 즉시 제거
-    try {
-      const success = await this.cloudflareService.purgeEditorPicksCache();
-      if (success) {
-        this.logger.log(`✅ Successfully purged Cloudflare cache for Editor's Pick`);
-      } else {
-        this.logger.warn(`⚠️ Failed to purge Cloudflare cache for Editor's Pick`);
-      }
-    } catch (error) {
-      this.logger.error(`❌ Error purging Cloudflare cache:`, error);
-      // 실패해도 Editor's Pick 동작은 계속됨 (에러 전파 방지)
-    }
-
+  
     this.logger.log(`Set Editor's Pick for post: ${postId} to ${isEditorPick}`);
   }
 

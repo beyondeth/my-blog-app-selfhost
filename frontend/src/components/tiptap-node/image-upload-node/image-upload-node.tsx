@@ -141,7 +141,7 @@ function useFileUpload(options: UploadOptions) {
         setFileItems((prev) =>
           prev.map((item) =>
             item.id === fileId
-              ? { ...item, status: "success", url, fileId: serverFileId, progress: 100 }
+              ? { ...item, status: "success", url, fileId: serverFileId || undefined, progress: 100 }
               : item
           )
         )
@@ -223,12 +223,12 @@ function useFileUpload(options: UploadOptions) {
         setFileItems((prev) =>
           prev.map((item) =>
             item.id === fileId
-              ? { ...item, status: "success", url, fileId: serverFileId, progress: 100 }
+              ? { ...item, status: "success", url, fileId: serverFileId || undefined, progress: 100 }
               : item
           )
         )
 
-        return { url, fileId: serverFileId }
+        return { url, fileId: serverFileId || undefined }
       } catch (error) {
         setFileItems((prev) =>
           prev.map((item) =>
