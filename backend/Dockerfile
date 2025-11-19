@@ -49,6 +49,11 @@ WORKDIR /app
 # pnpm 설치
 RUN npm install -g pnpm@latest
 
+# 빌드 도구 설치 (native 모듈 컴파일을 위해)
+RUN apt-get update && \
+    apt-get install -y python3 make g++ build-essential && \
+    rm -rf /var/lib/apt/lists/*
+
 # package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml* ./
 
