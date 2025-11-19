@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -24,6 +24,8 @@ import { useUserCategories } from '@/hooks/usePosts';
 import { toast } from 'sonner';
 import "@/styles/elevated-editor.css"; // elevated surface 스타일
 import { BlogSimpleEditor } from '@/editor'; // 정적 import로 변경하여 flushSync 문제 해결
+import { validateUUID } from '@/lib/utils/uuid';
+import { normalizeImageUrl } from '@/utils/imageUtils';
 
 // 폼 스키마 정의
 const postFormSchema = z.object({
@@ -45,6 +47,7 @@ const postFormSchema = z.object({
     .min(1, { message: "내용을 입력해주세요." }),
   tags: z.array(z.string()).optional(),
   thumbnail: z.string().optional(),
+  thumbnailImageId: z.string().optional(),
   attachedFileIds: z.array(z.string()).optional(),
 });
 
@@ -52,11 +55,13 @@ type PostFormValues = z.infer<typeof postFormSchema>;
 
 interface EditPostFormProps {
   initialData?: {
+    id?: string;
     title: string;
     category: string;
     content: string;
     tags?: string[];
     thumbnail?: string;
+    thumbnailImageId?: string;
     attachedFiles?: FileUpload[];
   };
   isLoading?: boolean;
@@ -82,11 +87,8 @@ export default function EditPostForm({
 }: EditPostFormProps) {
   const isSubmittingRef = useRef(false); // 동기적 중복 제출 방지 플래그
 
-  // 썸네일 이미지 ID 상태 (기존 포스트의 thumbnailImageId 또는 빈 문자열)
-  const [thumbnailImageId, setThumbnailImageId] = useState<string>(
-    (initialData as any)?.thumbnailImageId || ''
-  );
-
+  
+  
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
     defaultValues: {
@@ -95,6 +97,7 @@ export default function EditPostForm({
       content: initialData?.content || '',
       tags: initialData?.tags || [],
       thumbnail: initialData?.thumbnail || '',
+      thumbnailImageId: initialData?.thumbnailImageId || '', // 초기값 설정
       attachedFileIds: [],
     },
   });
@@ -110,6 +113,18 @@ export default function EditPostForm({
       form.setValue('categories', categories);
     }
   }, [initialData?.category, form]);
+
+  // 썸네일 변경 핸들러
+  const handleThumbnailChange = useCallback((thumbnailImageId: string | null) => {
+    console.log('🎯 [EditPostForm] Thumbnail changed:', {
+      thumbnailImageId,
+      postId: initialData?.id,
+      timestamp: new Date().toISOString()
+    });
+
+    // 폼 값 업데이트 - thumbnailImageId 필드를 직접 업데이트
+    form.setValue('thumbnailImageId', thumbnailImageId || '');
+  }, [form, initialData?.id]);
 
   // isLoading 상태 변경 시 isSubmittingRef 동기화
   useEffect(() => {
@@ -133,13 +148,12 @@ export default function EditPostForm({
     const formData: any = {
       ...data,
       category: categoryString,
-      // 썸네일 이미지 ID 추가 (선택된 경우에만)
-      ...(thumbnailImageId && { thumbnailImageId }),
     };
 
     // categories 필드 제거 (백엔드는 category 필드만 사용)
     delete formData.categories;
 
+    
     onSubmit(formData);
   };
 
@@ -609,8 +623,8 @@ export default function EditPostForm({
                               content={field.value}
                               onChange={field.onChange}
                               placeholder=" 내용을 입력하세요..."
-                              thumbnailImageId={thumbnailImageId}
-                              onThumbnailChange={setThumbnailImageId}
+                              thumbnailImageId={initialData?.thumbnailImageId}
+                              onThumbnailChange={handleThumbnailChange}
                             />
                           </div>
                         </div>
@@ -623,6 +637,7 @@ export default function EditPostForm({
             </CardContent>
           </Card>
 
+  
           {/* 제출 버튼 */}
           <div className="flex justify-end gap-3 pt-4">
             <Button

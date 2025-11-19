@@ -25,6 +25,7 @@ import { FiImage, FiUpload, FiCheck, FiMove, FiMenu } from 'react-icons/fi';
 import { toast } from 'sonner';
 import { validateImageFile } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface UploadedImageInfo {
   id: string;
@@ -308,7 +309,7 @@ export default function ImageUploadManager({
     setUploadingCount(files.length);
     
     const newImages: UploadedImageInfo[] = files.map((file, index) => ({
-      id: `temp-${Date.now()}-${index}`,
+      id: uuidv4(), // UUID v4 형식으로 임시 ID 생성
       url: '',
       name: file.name,
       size: file.size,

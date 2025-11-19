@@ -34,6 +34,11 @@ export interface FileItem {
    */
   url?: string
   /**
+   * Server-side file ID after successful upload
+   * @optional
+   */
+  fileId?: string
+  /**
    * Controller that can be used to abort the upload process
    * @optional
    */
@@ -59,13 +64,13 @@ export interface UploadOptions {
    * @param {File} file - The file to be uploaded
    * @param {Function} onProgress - Callback function to report upload progress
    * @param {AbortSignal} signal - Signal that can be used to abort the upload
-   * @returns {Promise<string>} Promise resolving to the URL of the uploaded file
+   * @returns {Promise<string | {url: string, fileId: string}>} Promise resolving to the URL of the uploaded file or an object with URL and file ID
    */
   upload: (
     file: File,
     onProgress: (event: { progress: number }) => void,
     signal: AbortSignal
-  ) => Promise<string>
+  ) => Promise<string | {url: string, fileId: string}>
   /**
    * Callback triggered when a file is uploaded successfully
    * @param {string} url - URL of the successfully uploaded file
@@ -114,7 +119,7 @@ function useFileUpload(options: UploadOptions) {
         throw new Error("Upload function is not defined")
       }
 
-      const url = await options.upload(
+      const result = await options.upload(
         file,
         (event: { progress: number }) => {
           setFileItems((prev) =>
@@ -126,13 +131,17 @@ function useFileUpload(options: UploadOptions) {
         abortController.signal
       )
 
+      // Handle both old string format and new object format
+      const url = typeof result === 'string' ? result : result?.url
+      const serverFileId = typeof result === 'string' ? null : result?.fileId
+
       if (!url) throw new Error("Upload failed: No URL returned")
 
       if (!abortController.signal.aborted) {
         setFileItems((prev) =>
           prev.map((item) =>
             item.id === fileId
-              ? { ...item, status: "success", url, progress: 100 }
+              ? { ...item, status: "success", url, fileId: serverFileId || undefined, progress: 100 }
               : item
           )
         )
@@ -160,7 +169,7 @@ function useFileUpload(options: UploadOptions) {
     }
   }
 
-  const uploadFiles = async (files: File[]): Promise<string[]> => {
+  const uploadFiles = async (files: File[]): Promise<Array<{url: string, fileId?: string}>> => {
     if (!files || files.length === 0) {
       const error = new Error("업로드할 파일이 없습니다")
       toast.error(error.message)
@@ -177,12 +186,67 @@ function useFileUpload(options: UploadOptions) {
       return []
     }
 
-    // Upload all files concurrently
-    const uploadPromises = files.map((file) => uploadFile(file))
+    // Upload all files concurrently and track which file corresponds to which result
+    const uploadPromises = files.map(async (file, index) => {
+      // Create a unique ID for this upload session
+      const fileId = `upload_${Date.now()}_${index}`
+      const fileItem = {
+        id: fileId,
+        file,
+        progress: 0,
+        status: "uploading" as const,
+        abortController: new AbortController(),
+      }
+
+      // Add to fileItems for tracking
+      setFileItems(prev => [...prev, fileItem])
+
+      try {
+        const result = await options.upload(
+          file,
+          (event: { progress: number }) => {
+            setFileItems((prev) =>
+              prev.map((item) =>
+                item.id === fileId ? { ...item, progress: event.progress } : item
+              )
+            )
+          },
+          fileItem.abortController!.signal
+        )
+
+        // Handle both old string format and new object format
+        const url = typeof result === 'string' ? result : result?.url
+        const serverFileId = typeof result === 'string' ? null : result?.fileId
+
+        if (!url) throw new Error("Upload failed: No URL returned")
+
+        setFileItems((prev) =>
+          prev.map((item) =>
+            item.id === fileId
+              ? { ...item, status: "success", url, fileId: serverFileId || undefined, progress: 100 }
+              : item
+          )
+        )
+
+        return { url, fileId: serverFileId || undefined }
+      } catch (error) {
+        setFileItems((prev) =>
+          prev.map((item) =>
+            item.id === fileId
+              ? { ...item, status: "error" }
+              : item
+          )
+        )
+        throw error
+      }
+    })
+
     const results = await Promise.all(uploadPromises)
 
-    // Filter out null results (failed uploads)
-    return results.filter((url): url is string => url !== null)
+    // Remove file items after successful upload
+    setFileItems([])
+
+    return results
   }
 
   const removeFileItem = (fileId: string) => {
@@ -464,42 +528,35 @@ export const ImageUploadNode: React.FC<NodeViewProps> = (props) => {
   }
 
   const handleUpload = async (files: File[]) => {
-    const urls = await uploadFiles(files)
+    const uploadResults = await uploadFiles(files)
 
-    if (urls.length > 0) {
+    if (uploadResults.length > 0) {
       const pos = props.getPos()
 
       if (isValidPosition(pos)) {
-        const imageNodes = urls.map((url, index) => {
+        // Create image nodes with both URL and file ID
+        const imageNodes = uploadResults.map((result, index) => {
           const filename =
             files[index]?.name.replace(/\.[^/.]+$/, "") || "unknown"
           return {
             type: extension.options.type,
             attrs: {
-              src: url,
+              src: result.url,
               alt: filename,
               title: filename,
+              'data-image-id': result.fileId || `temp_${Date.now()}_${index}`, // 파일 ID 사용 또는 임시 ID 생성
+              size: 'default', // 기본 크기
+              caption: '', // 빈 caption
             },
           }
         })
-
-        // mediumImage 노드로 삽입 (data-image-id 포함)
-        const mediumImageNodes = imageNodes.map((node, index) => ({
-          type: extension.options.type,
-          attrs: {
-            ...node.attrs,
-            size: 'default', // 기본 크기
-            caption: '', // 빈 caption
-            'data-image-id': `img_${Date.now()}_${index}`, // 고유 ID 생성
-          },
-        }));
 
         // 드롭존 삭제 및 이미지 삽입을 한 트랜잭션으로 처리
         const success = props.editor
           .chain()
           .focus()
           .deleteRange({ from: pos, to: pos + props.node.nodeSize })
-          .insertContentAt(pos, mediumImageNodes)
+          .insertContentAt(pos, imageNodes)
           .run()
 
         if (success) {

@@ -34,11 +34,11 @@ export function useEditorImageMonitor({
     const imageIds = new Set<string>();
     
     editor.state.doc.descendants((node) => {
-      // Handle regular images (resizableImage is our custom image extension)
-      if (node.type.name === 'resizableImage') {
+      // Handle regular images (mediumImage is our custom image extension)
+      if (node.type.name === 'mediumImage') {
         // Try to get image ID from data attribute first
         const dataImageId = node.attrs['data-image-id'];
-        // console.log('[EditorMonitor] 🔍 Checking resizableImage node, attrs:', node.attrs);
+        // console.log('[EditorMonitor] 🔍 Checking mediumImage node, attrs:', node.attrs);
         if (dataImageId) {
           const normalizedId = String(dataImageId).trim();
           // console.log('[EditorMonitor] ✅ Found image with data-image-id:', normalizedId);

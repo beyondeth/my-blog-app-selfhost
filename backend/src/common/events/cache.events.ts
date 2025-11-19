@@ -67,6 +67,13 @@ export enum CacheInvalidationEvents {
    */
   POST_POPULARITY_UPDATED = 'post.popularity.updated',
 
+  /**
+   * 포스트 썸네일 업데이트 시 발생
+   * @payload PostThumbnailUpdatedEvent
+   * @무효화_대상 홈 피드, 관련 블로그 피드
+   */
+  POST_THUMBNAIL_UPDATED = 'post.thumbnail.updated',
+
   // ===================================================
   // Comment 관련 이벤트
   // ===================================================
@@ -173,6 +180,19 @@ export interface PostUpdatedEvent {
     tags?: boolean;
     isPublished?: boolean;
   };
+}
+
+/**
+ * 포스트 썸네일 업데이트 이벤트 페이로드
+ */
+export interface PostThumbnailUpdatedEvent {
+  postId: string;
+  blogSlug: string;
+  oldThumbnailImageId?: string;
+  newThumbnailImageId?: string;
+  oldThumbnailUrl?: string;
+  newThumbnailUrl?: string;
+  authorId: string;
 }
 
 /**

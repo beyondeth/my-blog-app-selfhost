@@ -75,6 +75,15 @@ export function normalizeImageUrl(url: string): string {
     return '';
   }
 
+  // 이미 완전한 HTTP/HTTPS URL인 경우, 추가 처리 없이 즉시 반환합니다.
+  // 이 가드 코드는 'http://localhost...' 같은 로컬 개발 URL이 잘못 처리되는 것을 방지합니다.
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    // 단, 일반적인 AWS S3 URL(서명되지 않은)은 프록시를 타도록 예외 처리할 수 있습니다.
+    // 하지만 현재 로직에서는 대부분의 외부 URL을 그대로 반환하는 것이 더 안전합니다.
+    if (DEBUG_MODE) console.log('[normalizeImageUrl] Absolute URL detected, returning directly:', url);
+    return url;
+  }
+
   try {
     // 디버깅을 위한 입력 로그
     if (DEBUG_MODE) console.log('[normalizeImageUrl] Input:', url);

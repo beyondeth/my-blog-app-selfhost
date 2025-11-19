@@ -7,7 +7,7 @@
  * 기능:
  * - 이미지 크기 버튼 (Small / Default / Full)
  * - Alt text 버튼
- * - 썸네일 선택 버튼 (선택사항)
+ * - 썸네일 선택 버튼
  */
 
 import React from 'react';
@@ -21,7 +21,6 @@ interface ImageToolbarProps {
   currentSize: ImageSize;
   availableSizes: ImageSize[];
   onSizeChange: (size: ImageSize) => void;
-  onAltTextClick: () => void;
   isThumbnail?: boolean;
   onThumbnailToggle?: () => void;
 }
@@ -96,8 +95,7 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
   currentSize,
   availableSizes,
   onSizeChange,
-  onAltTextClick,
-  isThumbnail,
+  isThumbnail = false,
   onThumbnailToggle,
 }) => {
   return (
@@ -211,27 +209,15 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
           )}
         </div>
 
-        {/* Alt text 버튼 */}
-        <button
-          type="button"
-          onClick={onAltTextClick}
-          className={cn(
-            'alt-text-button',
-            'px-3 py-1.5 rounded',
-            'text-sm font-medium text-gray-700',
-            'hover:bg-gray-100 hover:text-gray-900',
-            'transition-colors'
-          )}
-          title="Alt text (접근성)"
-        >
-          Alt text
-        </button>
-
-        {/* 썸네일 선택 버튼 (선택사항) */}
+        {/* 썸네일 선택 버튼 */}
         {onThumbnailToggle && (
           <button
             type="button"
-            onClick={onThumbnailToggle}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              onThumbnailToggle();
+            }}
             className={cn(
               'thumbnail-button',
               'px-3 py-1.5 rounded',
@@ -242,7 +228,10 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
                 ? 'bg-orange-400 text-gray-700'
                 : 'text-gray-700 hover:bg-gray-100 hover:text-gray-900'
             )}
-            title={isThumbnail ? '썸네일 해제' : '썸네일로 설정'}
+            title={isThumbnail
+              ? '썸네일 해제'
+              : '썸네일로 설정'
+            }
           >
             <span className="relative">
               {isThumbnail ? '⭐ 썸네일' : '☆ 썸네일'}

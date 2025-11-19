@@ -1,11 +1,14 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
+import { Repository, In, EntityManager } from 'typeorm';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 import { Post } from '../entities/post.entity';
 import { File } from '../../files/entities/file.entity';
 import { FileContext, FileContextType, FilePurpose } from '../../files/entities/file-context.entity';
 import { FilesService } from '../../files/files.service';
+import { CdnService } from '../../files/services/cdn.service';
 import { extractImageUrlsFromContent, extractS3KeyFromUrl } from '../utils/post.utils';
+import { CacheInvalidationEvents } from '../../common/events/cache.events';
 
 /**
  * 포스트 파일 관리 서비스
@@ -30,31 +33,31 @@ export class PostFileService {
     @InjectRepository(FileContext)
     private readonly fileContextRepository: Repository<FileContext>,
     private readonly filesService: FilesService,
+    private readonly cdnService: CdnService,
+    private readonly eventEmitter: EventEmitter2,
   ) {}
 
   /**
-   * 게시글 썸네일 설정/제거
+   * 게시글 썸네일 설정 - thumbnailImageId만 설정
    *
    * @param postId 포스트 ID
    * @param userId 사용자 ID
    * @param setThumbnailDto 썸네일 설정 DTO
    */
   async setThumbnail(postId: string, userId: string, setThumbnailDto: { thumbnailFileId?: string }) {
-    const { thumbnailFileId } = setThumbnailDto;
-
     try {
+      const { thumbnailFileId } = setThumbnailDto;
+
       // 게시글 소유권 확인
       const post = await this.postsRepository.findOne({
         where: { id: postId, authorId: userId },
-        relations: ['thumbnailImage'],
       });
 
       if (!post) {
         throw new NotFoundException('게시글을 찾을 수 없거나 권한이 없습니다.');
       }
 
-      let thumbnailImageId = null;
-      let thumbnailUrl = null;
+      let thumbnailImageId: string | null = null;
 
       // 썸네일 파일 ID가 제공된 경우
       if (thumbnailFileId) {
@@ -68,29 +71,25 @@ export class PostFileService {
         }
 
         thumbnailImageId = thumbnailFileId;
-        thumbnailUrl = thumbnailFile.fileUrl;
-
-        // 파일 컨텍스트 업데이트 또는 생성
-        await this.updateOrCreateFileContext(
-          thumbnailFile.id,
-          FilePurpose.THUMBNAIL,
-          postId,
-          FileContextType.POST
-        );
-
-        this.logger.log(`썸네일 설정 완료: postId=${postId}, fileId=${thumbnailFileId}`);
-      } else {
-        // 썸네일 제거
-        this.logger.log(`썸네일 제거 완료: postId=${postId}`);
       }
 
-      // 포스트 업데이트
+      // thumbnailImageId만 설정 (thumbnail 필드는 삭제됨)
       await this.postsRepository.update(postId, {
-        thumbnailImageId,
-        thumbnail: thumbnailUrl,
+        thumbnailImageId
       });
 
-      return { success: true, thumbnailUrl };
+      // 썸네일 변경 감지 및 이벤트 발행
+      if (post.thumbnailImageId !== thumbnailImageId) {
+        this.eventEmitter.emit(CacheInvalidationEvents.POST_THUMBNAIL_UPDATED, {
+          postId,
+          blogSlug: post.blog?.slug || post.blogId,
+          oldThumbnailImageId: post.thumbnailImageId,
+          newThumbnailImageId: thumbnailImageId,
+          authorId: userId,
+        });
+      }
+
+      return { success: true, thumbnailImageId };
     } catch (error) {
       this.logger.error(`썸네일 설정 실패: ${error.message}`, error.stack);
       throw error;
@@ -102,47 +101,122 @@ export class PostFileService {
    *
    * @param post 포스트 엔티티
    * @param userId 사용자 ID (선택사항)
+   * @param manager 트랜잭션 EntityManager (선택사항)
    */
-  async linkFilesFromContent(post: Post, userId?: string): Promise<void> {
+  async linkFilesFromContent(post: Post, userId?: string, manager?: EntityManager): Promise<void> {
+    const postId = post.id;
+
+    // Repository 선택 - 트랜잭션 EntityManager가 있으면 사용
+    const filesRepository = manager ? manager.getRepository(File) : this.filesRepository;
+
+    this.logger.debug(`[LINK_FILES] Starting linkFilesFromContent for postId=${postId}`);
+    this.logger.debug(`[LINK_FILES] Post content preview: ${post.content ? post.content.substring(0, 200) + '...' : 'No content'}`);
+
     try {
+      // 1. 이미지 URL 추출
       const imageUrls = this.extractImageUrlsFromContent(post.content);
-      if (imageUrls.length === 0) return;
+      this.logger.log(`[LINK_FILES] Extracted ${imageUrls.length} image URLs from content`);
+      if (imageUrls.length > 0) {
+        imageUrls.forEach((url, index) => {
+          this.logger.debug(`[LINK_FILES]   URL ${index + 1}: ${url}`);
+        });
+      }
 
+      if (imageUrls.length === 0) {
+        this.logger.debug(`[LINK_FILES] No images found in content, skipping file linking`);
+        return;
+      }
+
+      // 2. S3 키 추출
       const s3Keys = imageUrls.map(url => this.extractS3KeyFromUrl(url)).filter(Boolean) as string[];
-      if (s3Keys.length === 0) return;
+      this.logger.log(`[LINK_FILES] Extracted ${s3Keys.length} S3 keys from URLs`);
+      if (s3Keys.length > 0) {
+        s3Keys.forEach((key, index) => {
+          this.logger.debug(`[LINK_FILES]   S3 Key ${index + 1}: ${key}`);
+        });
+      }
 
-      // Lazy loading 방지: userId를 직접 받거나 post.authorId 사용
+      if (s3Keys.length === 0) {
+        this.logger.warn(`[LINK_FILES] No valid S3 keys extracted from URLs. URL format might be incompatible.`);
+        return;
+      }
+
+      // 3. 사용자 ID 확인
       const authorUserId = userId || post.authorId;
-      const files = await this.filesRepository.find({
+      this.logger.debug(`[LINK_FILES] Using userId=${authorUserId} for file lookup`);
+
+      // 4. DB에서 파일 검색
+      this.logger.debug(`[LINK_FILES] Searching for files with keys: ${JSON.stringify(s3Keys)} and userId=${authorUserId}`);
+      const files = await filesRepository.find({
         where: { fileKey: In(s3Keys), userId: authorUserId }
       });
 
+      this.logger.log(`[LINK_FILES] Found ${files.length} files in database`);
       if (files.length > 0) {
+        files.forEach((file, index) => {
+          this.logger.debug(`[LINK_FILES]   File ${index + 1}: id=${file.id}, fileKey=${file.fileKey}, originalName=${file.originalName}`);
+        });
+      }
+
+      if (files.length > 0) {
+        // 5. 기존 연결된 파일 확인
         const existingFileIds = post.attachedFiles?.map(f => f.id) || [];
+        this.logger.debug(`[LINK_FILES] Post already has ${existingFileIds.length} attached files: ${JSON.stringify(existingFileIds)}`);
+
+        // 6. 새로운 파일 필터링
         const newFiles = files.filter(f => !existingFileIds.includes(f.id));
+        this.logger.log(`[LINK_FILES] ${newFiles.length} new files to link`);
 
         if (newFiles.length > 0) {
-          // 임시 context를 POST context로 변환
-          for (const file of newFiles) {
-            await this.updateOrCreateFileContext(
-              file.id,
-              FilePurpose.CONTENT,
-              post.id,
-              FileContextType.POST
-            );
+          // 7. 포스트당 파일 컨텍스트 하나만 생성
+          const fileContextRepository = manager ? manager.getRepository(FileContext) : this.fileContextRepository;
+
+          // 이미 컨텍스트가 있는지 확인
+          const existingContext = await fileContextRepository.findOne({
+            where: {
+              contextId: postId,
+              contextType: FileContextType.POST
+            }
+          });
+
+          if (!existingContext) {
+            // 포스트당 FileContext 하나만 생성
+            const newContext = fileContextRepository.create({
+              contextId: postId,
+              contextType: FileContextType.POST,
+              purpose: FilePurpose.CONTENT,
+              ownerId: authorUserId,
+              version: 1,
+              isActive: true,
+              fileCount: newFiles.length,
+              totalSize: newFiles.reduce((sum, file) => sum + (file.fileSize || 0), 0)
+            });
+
+            await fileContextRepository.save(newContext);
+            this.logger.log(`[LINK_FILES] Created single FileContext for postId=${postId} with ${newFiles.length} files`);
           }
 
-          // 포스트에 파일 연결
-          post.attachedFiles = [...(post.attachedFiles || []), ...newFiles];
-          await this.postsRepository.save(post);
+          // 8. 포스트에 파일 연결 (성능 최적화된 방식으로 구현)
+          // 🔥 [FIX] Batch insertion using QueryBuilder for better performance
+          await this.linkFilesToPostOptimized(postId, newFiles, manager);
+          this.logger.log(`[LINK_FILES] ✅ Linked ${newFiles.length} files using optimized batch operation`);
 
           this.logger.log(
-            `Content에서 파일 링크 완료: postId=${post.id}, linkedCount=${newFiles.length}`
+            `[LINK_FILES] ✅ Successfully linked ${newFiles.length} files to postId=${postId}`
           );
+          newFiles.forEach(file => {
+            this.logger.debug(`[LINK_FILES]   Linked: fileId=${file.id}, fileKey=${file.fileKey}`);
+          });
+        } else {
+          this.logger.debug(`[LINK_FILES] All files already linked to post`);
         }
+      } else {
+        this.logger.warn(`[LINK_FILES] ⚠️ No files found in database for the extracted S3 keys`);
+        this.logger.warn(`[LINK_FILES]    This might indicate URL format mismatch or files not properly saved`);
       }
     } catch (error) {
-      this.logger.error(`Content 파일 링크 실패 (postId: ${post.id}):`, error.message);
+      this.logger.error(`[LINK_FILES] ❌ Failed to link files for postId=${postId}:`, error.stack);
+      throw error;
     }
   }
 
@@ -318,6 +392,66 @@ export class PostFileService {
   }
 
   /**
+   * 파일을 포스트에 효율적으로 연결 (성능 최적화 버전)
+   *
+   * @param postId 포스트 ID
+   * @param files 연결할 파일들
+   * @param manager 트랜잭션 EntityManager (선택사항)
+   */
+  private async linkFilesToPostOptimized(
+    postId: string,
+    files: File[],
+    manager?: EntityManager
+  ): Promise<void> {
+    if (files.length === 0) {
+      this.logger.debug(`[LINK_FILES_OPTIMIZED] No files to link for postId=${postId}`);
+      return;
+    }
+
+    try {
+      // Repository 선택 - 트랜잭션 EntityManager가 있으면 사용
+      const postsRepository = manager ? manager.getRepository(Post) : this.postsRepository;
+      const filesRepository = manager ? manager.getRepository(File) : this.filesRepository;
+      const fileContextRepository = manager ? manager.getRepository(FileContext) : this.fileContextRepository;
+
+      // 성능 최적화: postId가 유효한지 먼저 확인
+      const postExists = await postsRepository.findOne({
+        where: { id: postId },
+        select: ['id']
+      });
+
+      if (!postExists) {
+        throw new Error(`Post not found: ${postId}`);
+      }
+
+      // 성능 최적화: QueryBuilder를 사용한 대량 삽입
+      // raw SQL을 사용하여 N+1 문제 방지
+      const fileIds = files.map(f => f.id);
+      const values = fileIds.map(fileId => `('${postId}', '${fileId}')`).join(',');
+
+      const query = `
+        INSERT INTO "post_files" ("postId", "fileId")
+        VALUES ${values}
+        ON CONFLICT ("postId", "fileId") DO NOTHING
+      `;
+
+      await postsRepository.query(query);
+      this.logger.log(`[LINK_FILES_OPTIMIZED] Batch inserted ${files.length} file relations for postId=${postId}`);
+
+      // File 엔티티의 contextId 업데이트는 건너뜀
+      // PostFiles 중간 테이블로만 관계를 관리함으로써 외래 키 제약 조건 문제 방지
+      this.logger.debug(`[LINK_FILES_OPTIMIZED] Skipping File contextId update to avoid FK constraints`);
+
+      // 인메모리 관계 업데이트 제거 - 타임아웃 방지
+      // 데이터베이스에 이미 저장되었으므로 추가 작업 불필요
+      this.logger.debug(`[LINK_FILES_OPTIMIZED] Skipping in-memory relation update to prevent timeouts`);
+    } catch (error) {
+      this.logger.error(`[LINK_FILES_OPTIMIZED] Failed to batch insert file relations:`, error.stack);
+      throw new Error(`Failed to link files to post: ${error.message}`);
+    }
+  }
+
+  /**
    * 포스트에 연결된 파일들 가져오기
    *
    * @param postId 포스트 ID
@@ -358,17 +492,17 @@ export class PostFileService {
    * @param purpose 파일 용도
    * @param contextId 컨텍스트 ID
    * @param contextType 컨텍스트 타입
+   * @param userId 사용자 ID
    */
   private async updateOrCreateFileContext(
     fileId: string,
     purpose: FilePurpose,
     contextId: string,
-    contextType: FileContextType
+    contextType: FileContextType,
+    userId?: string
   ): Promise<void> {
-    // 파일을 직접 업데이트
-    await this.filesRepository.update(fileId, {
-      contextId,
-    });
+    // 파일의 contextId 업데이트 제거 - foreign key constraint 위반 방지
+    // 썸네일 정보는 posts 테이블에서만 관리하면 충분함
 
     // 컨텍스트가 없으면 생성
     const existingContext = await this.fileContextRepository.findOne({
@@ -380,7 +514,7 @@ export class PostFileService {
         contextId,
         contextType,
         purpose,
-        ownerId: '', // TODO: 실제 owner ID 설정 필요
+        ownerId: userId || '00000000-0000-0000-0000-000000000000', // 빈 문자열 대신 기본 UUID 값 사용
       });
       await this.fileContextRepository.save(fileContext);
     }
@@ -393,10 +527,11 @@ export class PostFileService {
    * @param contextType 컨텍스트 타입
    */
   private async deleteFileContext(fileId: string, contextType: FileContextType): Promise<void> {
-    // 파일의 컨텍스트 연결 해제
-    await this.filesRepository.update(fileId, {
-      contextId: null,
-    });
+    // 파일의 contextId 업데이트 제거 - foreign key constraint 위반 방지
+    // 썸네일 정보는 posts 테이블에서만 관리하면 충분함
+    // await this.filesRepository.update(fileId, {
+    //   contextId: null,
+    // });
   }
 
   /**
@@ -432,6 +567,7 @@ export class PostFileService {
     });
 
     let totalSize = 0;
+    
     for (const context of fileContexts) {
       if (context.files) {
         for (const file of context.files) {
@@ -441,5 +577,62 @@ export class PostFileService {
     }
 
     return totalSize;
+  }
+
+  /**
+   * 파일 컨텍스트 배치 생성 (성능 최적화)
+   * 여러 파일 컨텍스트를 한 번의 쿼리로 생성
+   */
+  private async createFileContextsBatch(contexts: Array<{
+    fileId: string;
+    purpose: FilePurpose;
+    contextId: string;
+    contextType: FileContextType;
+    userId?: string;
+  }>, manager?: EntityManager): Promise<void> {
+    if (contexts.length === 0) return;
+
+    try {
+      // Repository 선택 - 트랜잭션 EntityManager가 있으면 사용
+      const fileContextRepository = manager ? manager.getRepository(FileContext) : this.fileContextRepository;
+
+      // contextId + contextType 조합으로 이미 존재하는 컨텍스트 조회
+      const existingContexts = await fileContextRepository.find({
+        where: {
+          contextId: In(contexts.map(c => c.contextId)),
+          contextType: contexts[0].contextType
+        }
+      });
+
+      const existingKeys = new Set(
+        existingContexts.map(c => `${c.contextId}-${c.contextType}`)
+      );
+
+      // 생성이 필요한 컨텍스트만 필터링
+      const newContexts = contexts.filter(
+        c => !existingKeys.has(`${c.contextId}-${c.contextType}`)
+      );
+
+      if (newContexts.length > 0) {
+        const entities = newContexts.map(context =>
+          fileContextRepository.create({
+            contextId: context.contextId,
+            contextType: context.contextType,
+            purpose: context.purpose,
+            ownerId: context.userId || '00000000-0000-0000-0000-000000000000',
+            version: 1,
+            isActive: true,
+            fileCount: 1,
+            totalSize: 0 // TODO: 실제 파일 크기로 업데이트 필요
+          })
+        );
+
+        await fileContextRepository.save(entities);
+        this.logger.log(`[FILE_CONTEXT] Created ${entities.length} file contexts in batch`);
+      }
+    } catch (error) {
+      this.logger.error(`[FILE_CONTEXT] Batch creation failed:`, error.stack);
+      throw error;
+    }
   }
 }

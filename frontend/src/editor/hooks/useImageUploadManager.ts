@@ -337,7 +337,7 @@ export function useImageUploadManager({
       setTimeout(() => {
         let foundId = false;
         editor.state.doc.descendants((node) => {
-          if (node.type.name === 'resizableImage' && node.attrs.src === imageUrl) {
+          if (node.type.name === 'mediumImage' && node.attrs.src === imageUrl) {
             console.log('[insertImageIntoEditor] 🔍 Verification - Image node attrs after insert:', node.attrs);
             if (node.attrs['data-image-id']) {
               console.log('[insertImageIntoEditor] ✅ data-image-id was successfully set:', node.attrs['data-image-id']);
@@ -394,7 +394,7 @@ export function useImageUploadManager({
     // Find all current image positions in the editor (not iframes)
     const imagePositions: number[] = [];
     editor.state.doc.descendants((node, pos) => {
-      if (node.type.name === 'resizableImage') {
+      if (node.type.name === 'mediumImage') {
         imagePositions.push(pos);
       }
     });
@@ -450,11 +450,11 @@ export function useImageUploadManager({
       const existingMedia: Map<string, any> = new Map();
       
       editor.state.doc.descendants((node) => {
-        if (node.type.name === 'resizableImage') {
+        if (node.type.name === 'mediumImage') {
           const imageId = node.attrs['data-image-id'];
           if (imageId) {
             existingMedia.set(imageId, {
-              type: 'resizableImage',
+              type: 'mediumImage',
               attrs: { ...node.attrs }
             });
           }
@@ -521,7 +521,7 @@ export function useImageUploadManager({
         } else if (item.url && existingNode) {
           // Regular image
           newContent.push({
-            type: 'resizableImage',
+            type: 'mediumImage',
             attrs: existingNode.attrs
           });
           console.log(`[updateAllEditorMedia] Added image: ${item.id}`);
@@ -615,7 +615,7 @@ export function useImageUploadManager({
     
     // Find all image nodes with matching URL
     doc.descendants((node, pos) => {
-      if (node.type.name === 'resizableImage') {
+      if (node.type.name === 'mediumImage') {
         const src = node.attrs.src;
         // Check if URL matches (handle both full URL and relative paths)
         if (src === imageUrl || 

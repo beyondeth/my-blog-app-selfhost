@@ -5,10 +5,12 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost } from '@/hooks/usePosts';
 import { useUpdatePost } from '@/hooks/useUpdatePost';
+import { useQueryClient } from '@tanstack/react-query';
 import EditPostForm from '@/components/posts/EditPostForm';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import { toast } from 'sonner';
+import { validateUUID } from '@/lib/utils/uuid';
 
 /**
  * 통합 수정 페이지
@@ -22,6 +24,7 @@ export default function EditPostPage() {
   const { postId } = useParams();
   const router = useRouter();
   const { user, isAdmin } = useAuth();
+  const queryClient = useQueryClient();
   // Next.js 16: useParams()의 반환값이 undefined일 수 있음
   const postIdOrSlug = Array.isArray(postId) ? postId[0] : (postId || '');
   const { data: post, isLoading, error } = usePost(postIdOrSlug);
@@ -58,7 +61,33 @@ export default function EditPostPage() {
     <EditPostForm
       initialData={post}
       isLoading={updatePost.isPending}
-      onSubmit={(formData) => updatePost.mutate({ id: post.id, data: formData })}
+      onSubmit={(formData) => {
+        // thumbnailImageId 유효성 검사 및 처리
+        const validFormData = {
+          ...formData,
+          // thumbnailImageId가 있고 유효한 UUID인 경우에만 포함
+          ...(formData.thumbnailImageId && {
+            thumbnailImageId: validateUUID(formData.thumbnailImageId)
+          }),
+        };
+
+        // 디버그 로그
+        console.log('🎯 [EDIT_PAGE] Submitting form with data:', {
+          formData,
+          validFormData,
+          originalPostThumbnailId: post.thumbnailImageId
+        });
+
+        updatePost.mutate({ id: post.id, data: validFormData });
+        // 수정 성공 후 추가적인 refetch를 위해 약간의 지연 후 실행
+        setTimeout(() => {
+          // 도착한 페이지에서 즉시 fresh 데이터를 가져오도록 캐시 무효화
+          if (post?.slug) {
+            queryClient.invalidateQueries({ queryKey: ['posts', 'detail', post.slug] });
+            queryClient.invalidateQueries({ queryKey: ['posts', 'detail', post.id] });
+          }
+        }, 100);
+      }}
       onCancel={() => window.history.back()}
       blogInfo={blogInfo}
     />
