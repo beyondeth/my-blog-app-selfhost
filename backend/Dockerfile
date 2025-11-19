@@ -54,6 +54,9 @@ RUN apt-get update && \
     apt-get install -y python3 make g++ build-essential && \
     rm -rf /var/lib/apt/lists/*
 
+# msgpackr-extract 비활성화 (Node.js 22 호환성 문제 해결)
+ENV MSGPACKR_NO_EXTRACT=1
+
 # package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml* ./
 

@@ -98,11 +98,32 @@ else
 fi
 
 # 2. Docker 이미지 빌드 (병렬 - Backend, Frontend, MCP Proxy)
-log_info "Step 2: Docker 이미지 빌드 (병렬) - 캐시 무효화"
-# --no-cache: 항상 최신 코드로 빌드 보장
+log_info "Step 2: Docker 이미지 빌드 (병렬 처리) - Docker 캐시 활성화"
+# --pull: 최신 베이스 이미지 사용, 캐시 활용으로 빌드 속도 향상
 # --env-file: .env.production 파일의 환경변수를 빌드 인자로 사용
-docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache backend frontend mcp-proxy
-log_info "✓ 모든 이미지 빌드 완료 (최신 코드 반영)"
+
+# 병렬 빌드 시작 (백그라운드 실행)
+log_info "Backend 이미지 빌드 시작..."
+docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --pull backend &
+BACKEND_PID=$!
+
+log_info "Frontend 이미지 빌드 시작..."
+docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --pull frontend &
+FRONTEND_PID=$!
+
+log_info "MCP Proxy 이미지 빌드 시작..."
+docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --pull mcp-proxy &
+MCP_PID=$!
+
+# 모든 빌드가 완료될 때까지 대기
+wait $BACKEND_PID
+log_info "✓ Backend 빌드 완료"
+wait $FRONTEND_PID
+log_info "✓ Frontend 빌드 완료"
+wait $MCP_PID
+log_info "✓ MCP Proxy 빌드 완료"
+
+log_info "✓ 모든 이미지 병렬 빌드 완료"
 
 # 2-1. 빌드 검증 - 이미지 생성 시간 확인
 log_info "Step 2-1: 빌드 검증 - 이미지 생성 시간 확인"
@@ -125,33 +146,35 @@ log_info "Step 3: Backend PM2 Reload (Zero-downtime)"
 # 3-1. Backend 컨테이너 시작 (새 이미지) - 강제 재생성
 docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate backend
 
-# 3-2. PM2 reload 실행 (워커 하나씩 재시작)
+# 3-2. PM2 reload 실행 (빠른 reload)
 log_info "PM2 워커 reload 중..."
-# timeout 60초로 PM2 reload 실행 (hang 방지)
-if timeout 60s docker exec codebase-prod-backend pm2 reload all --update-env; then
-    log_info "✓ PM2 reload 성공"
+# timeout 20초로 단축하여 PM2 reload 실행
+if timeout 20s docker exec codebase-prod-backend pm2 reload codebase-backend --update-env; then
+    log_info "✓ PM2 reload 성공 (20초 내)"
 else
     log_warn "⚠️  PM2 reload 타임아웃 또는 실패, fallback으로 restart 실행"
-    # PM2 reload 실패 시 restart로 fallback
-    docker exec codebase-prod-backend pm2 restart all --update-env
+    # PM2 reload 실패 시 restart로 fallback (특정 앱만)
+    docker exec codebase-prod-backend pm2 restart codebase-backend --update-env
     log_info "✓ PM2 restart 완료"
 fi
 
-# 3-3. 헬스체크 대기 (최대 120초 - PM2 Cold Start 고려)
+# 3-3. 헬스체크 대기 (최대 60초로 단축)
 log_info "헬스체크 대기 중..."
-MAX_WAIT=120
+MAX_WAIT=60  # 120초에서 60초로 단축
 WAITED=0
+CHECK_INTERVAL=3  # 2초에서 3초로 변경 (API 호출 부하 감소)
+
 while [ $WAITED -lt $MAX_WAIT ]; do
     if docker exec codebase-prod-backend node -e "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))" 2>/dev/null; then
-        log_info "✓ Backend 헬스체크 통과 ($WAITED초)"
+        log_info "✓ Backend 헬스체크 통과 (${WAITED}초)"
         break
     fi
-    sleep 2
-    WAITED=$((WAITED + 2))
+    sleep $CHECK_INTERVAL
+    WAITED=$((WAITED + CHECK_INTERVAL))
 done
 
 if [ $WAITED -ge $MAX_WAIT ]; then
-    log_error "Backend 헬스체크 실패 (120초 타임아웃)"
+    log_error "Backend 헬스체크 실패 (60초 타임아웃)"
     log_error "롤백을 실행하세요: ./scripts/rollback.sh"
     exit 1
 fi
