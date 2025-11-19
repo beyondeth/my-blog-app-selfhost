@@ -15,7 +15,6 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { NodeViewWrapper, NodeViewProps } from '@tiptap/react';
 import { ImageToolbar } from './ImageToolbar';
-import { AltTextModal } from './AltTextModal';
 import { ImageSize } from '../../extensions/MediumStyleImage.extension';
 import { cn } from '@/lib/utils';
 import { normalizeImageUrl } from '@/utils/imageUtils';
@@ -54,7 +53,6 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
   // 상태 관리
   const [isImageLoaded, setIsImageLoaded] = useState(false);
   const [naturalWidth, setNaturalWidth] = useState(0);
-  const [altModalOpen, setAltModalOpen] = useState(false);
 
   // 썸네일 상태
   const imageId = node.attrs['data-image-id'] || '';
@@ -115,11 +113,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
     updateAttributes({ size });
   }, [updateAttributes]);
 
-  // Alt text 변경 핸들러
-  const handleAltChange = useCallback((alt: string) => {
-    updateAttributes({ alt });
-  }, [updateAttributes]);
-
+  
   // Caption 변경 핸들러
   const handleCaptionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const captionValue = e.target.value;
@@ -232,17 +226,13 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
     >
       {/* 이미지 툴바 (선택 시 표시) - 이미지 위에 위치 */}
       {selected && isImageLoaded && (
-        <>
-          <ImageToolbar
-            currentSize={node.attrs.size}
-            availableSizes={availableSizes}
-            onSizeChange={handleSizeChange}
-            onAltTextClick={() => setAltModalOpen(true)}
-            isThumbnail={isThumbnail}
-            onThumbnailToggle={handleThumbnailToggle}
-          />
-
-          </>
+        <ImageToolbar
+          currentSize={node.attrs.size}
+          availableSizes={availableSizes}
+          onSizeChange={handleSizeChange}
+          isThumbnail={isThumbnail}
+          onThumbnailToggle={handleThumbnailToggle}
+        />
       )}
 
       {/* 이미지 */}
@@ -255,7 +245,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
         <img
           ref={imgRef}
           src={normalizeImageUrl(node.attrs.src)}
-          alt={node.attrs.alt || ''}
+          alt=""
           className={cn(
             'medium-image',
             `medium-image-${node.attrs.size}`,
@@ -284,16 +274,6 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
         />
       </figcaption>
 
-    
-      {/* Alt Text 모달 */}
-      {altModalOpen && (
-        <AltTextModal
-          isOpen={altModalOpen}
-          onClose={() => setAltModalOpen(false)}
-          value={node.attrs.alt || ''}
-          onChange={handleAltChange}
-        />
-      )}
-    </NodeViewWrapper>
+  </NodeViewWrapper>
   );
 };

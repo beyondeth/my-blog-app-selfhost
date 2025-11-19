@@ -85,7 +85,6 @@ export interface ProcessedContent {
      */
     imageStats?: {
       total: number;
-      withAlt: number;
       withCaption: number;
       formats: Record<string, number>;
     };
@@ -337,12 +336,7 @@ export class ContentProcessingService {
       });
     }
 
-    // 이미지 alt 텍스트 누락 경고
-    const imgWithoutAlt = (html.match(/<img(?![^>]*alt=)[^>]*>/gi) || []).length;
-    if (imgWithoutAlt > 0) {
-      warnings.push(`${imgWithoutAlt}개의 이미지에 alt 텍스트가 없습니다.`);
-    }
-
+    
     return {
       isValid: errors.length === 0,
       errors,

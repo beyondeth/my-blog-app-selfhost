@@ -21,7 +21,6 @@ interface ImageToolbarProps {
   currentSize: ImageSize;
   availableSizes: ImageSize[];
   onSizeChange: (size: ImageSize) => void;
-  onAltTextClick: () => void;
   isThumbnail?: boolean;
   onThumbnailToggle?: () => void;
 }
@@ -96,7 +95,6 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
   currentSize,
   availableSizes,
   onSizeChange,
-  onAltTextClick,
   isThumbnail = false,
   onThumbnailToggle,
 }) => {
@@ -210,22 +208,6 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
             </button>
           )}
         </div>
-
-        {/* Alt text 버튼 */}
-        <button
-          type="button"
-          onClick={onAltTextClick}
-          className={cn(
-            'alt-text-button',
-            'px-3 py-1.5 rounded',
-            'text-sm font-medium text-gray-700',
-            'hover:bg-gray-100 hover:text-gray-900',
-            'transition-colors'
-          )}
-          title="Alt text (접근성)"
-        >
-          Alt text
-        </button>
 
         {/* 썸네일 선택 버튼 */}
         {onThumbnailToggle && (

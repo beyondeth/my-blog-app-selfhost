@@ -164,13 +164,11 @@ export class ImageProcessorService {
    */
   getImageStats(html: string): {
     total: number;
-    withAlt: number;
     withCaption: number;
     formats: Record<string, number>;
   } {
     const stats = {
       total: 0,
-      withAlt: 0,
       withCaption: 0,
       formats: {} as Record<string, number>,
     };
@@ -185,12 +183,6 @@ export class ImageProcessorService {
       stats.total = images.length;
 
       images.forEach((img) => {
-        // Alt 텍스트 확인
-        const alt = img.getAttribute('alt');
-        if (alt && alt.trim() !== '') {
-          stats.withAlt++;
-        }
-
         // 이미지 형식 추출
         const src = img.getAttribute('src');
         if (src) {
