@@ -368,6 +368,7 @@ export class PostMapperService {
   /**
    * 포스트 내용의 이미지에 data-image-id 속성 추가
    * 기존 이미지들이 썸네일로 선택될 수 있도록 함
+   * figure-figcaption 구조도 지원
    *
    * @param content 포스트 HTML 내용
    * @param attachedFiles 첨부 파일 목록
@@ -379,24 +380,101 @@ export class PostMapperService {
     }
 
     this.logger.debug(`[ADD_IMAGE_ID] Processing content with ${attachedFiles.length} attached files`);
+    this.logger.debug(`[CAPTION_DEBUG] Content before processing:`, {
+      hasFigure: content.includes('<figure'),
+      hasFigcaption: content.includes('<figcaption'),
+      figcaptionCount: (content.match(/<figcaption/g) || []).length
+    });
+
     attachedFiles.forEach(file => {
       this.logger.debug(`[ADD_IMAGE_ID] File: ID=${file.id}, URL=${file.fileUrl}`);
     });
 
     let processedContent = content;
 
-    // 기존의 잘못된 data-image-id 속성 제거하고 새로 설정
-    // 정규식을 사용하여 img 태그 찾기
-    const imgTagRegex = /<img([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi;
+    // 먼저 figure 태그 처리 (Medium 스타일 이미지)
+    const figureTagRegex = /<figure([^>]*?)>(.*?)<\/figure>/gis;
+    processedContent = processedContent.replace(figureTagRegex, (match, figureAttrs, figureContent) => {
+      // figure 내용에서 img 태그 찾기
+      const imgMatch = figureContent.match(/<img([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/i);
+      if (!imgMatch) return match; // img 태그가 없으면 그대로 반환
 
-    processedContent = processedContent.replace(imgTagRegex, (match, beforeSrc, src, afterSrc) => {
+      const [fullImgMatch, beforeSrc, src, afterSrc] = imgMatch;
+
       // 기존 data-image-id 속성 제거
       const cleanBeforeSrc = beforeSrc.replace(/\s+data-image-id=["'][^"']*["']/g, '');
       const cleanAfterSrc = afterSrc.replace(/\s+data-image-id=["'][^"']*["']/g, '');
 
       // URL 정규화 (쿼리 파라미터 제거)
       const normalizedSrc = this.normalizeUrl(src);
-      this.logger.debug(`[ADD_IMAGE_ID] Original src: ${src}, Normalized: ${normalizedSrc}`);
+
+      // 첨부 파일에서 URL로 파일 찾기
+      const matchedFile = attachedFiles.find(file => {
+        if (!file.fileUrl) return false;
+
+        // 정확한 URL 매칭
+        if (file.fileUrl === src) return true;
+
+        // 정규화된 URL 매칭 (쿼리 파라미터 무시)
+        const normalizedFileUrl = this.normalizeUrl(file.fileUrl);
+        if (normalizedFileUrl === normalizedSrc) {
+          return true;
+        }
+
+        // CDN URL 매칭 (파일 이름으로)
+        try {
+          const srcUrl = new URL(src);
+          const fileUrl = new URL(file.fileUrl);
+          const srcFilename = srcUrl.pathname.split('/').pop();
+          const fileFilename = fileUrl.pathname.split('/').pop();
+
+          if (srcFilename && fileFilename && srcFilename === fileFilename) {
+            return true;
+          }
+        } catch {
+          // URL 파싱 실패 시 문자열 포함 여부 확인
+          if (src.includes(file.fileUrl) || file.fileUrl.includes(src)) {
+            return true;
+          }
+        }
+
+        return false;
+      });
+
+      // 파일을 찾았으면 data-image-id 추가
+      if (matchedFile && matchedFile.id) {
+        // img 태그에 data-image-id 추가
+        const updatedImg = figureContent.replace(fullImgMatch,
+          `<img${cleanBeforeSrc}src="${src}"${cleanAfterSrc} data-image-id="${matchedFile.id}">`);
+
+        // 전체 figure 태그 반환 (figcaption 유지)
+        return `<figure${figureAttrs}>${updatedImg}</figure>`;
+      }
+
+      // 파일을 찾지 못했으면 기존 data-image-id만 제거하고 반환
+      const updatedImg = figureContent.replace(fullImgMatch,
+        `<img${cleanBeforeSrc}src="${src}"${cleanAfterSrc}>`);
+
+      return `<figure${figureAttrs}>${updatedImg}</figure>`;
+    });
+
+    // 일반 img 태그 처리 (figure가 아닌 독립적인 img)
+    const imgTagRegex = /<img([^>]*?)src\s*=\s*["']([^"']+)["']([^>]*?)>/gi;
+
+    processedContent = processedContent.replace(imgTagRegex, (match, beforeSrc, src, afterSrc) => {
+      // 이미 figure 태그 안에 있는 img는 건너뛰기
+      if (match.includes('data-image-id=')) {
+        // 이미 data-image-id가 있으면 패스
+        return match;
+      }
+
+      // 기존 data-image-id 속성 제거
+      const cleanBeforeSrc = beforeSrc.replace(/\s+data-image-id=["'][^"']*["']/g, '');
+      const cleanAfterSrc = afterSrc.replace(/\s+data-image-id=["'][^"']*["']/g, '');
+
+      // URL 정규화 (쿼리 파라미터 제거)
+      const normalizedSrc = this.normalizeUrl(src);
+      this.logger.debug(`[ADD_IMAGE_ID] Processing standalone img: Original src: ${src}, Normalized: ${normalizedSrc}`);
 
       // 첨부 파일에서 URL로 파일 찾기
       const matchedFile = attachedFiles.find(file => {
@@ -443,6 +521,12 @@ export class PostMapperService {
       // 파일을 찾지 못했으면 기존 data-image-id만 제거하고 반환
       this.logger.debug(`[ADD_IMAGE_ID] No match found for image src: ${src}`);
       return `<img${cleanBeforeSrc}src="${src}"${cleanAfterSrc}>`;
+    });
+
+    this.logger.debug(`[CAPTION_DEBUG] Content after processing:`, {
+      hasFigure: processedContent.includes('<figure'),
+      hasFigcaption: processedContent.includes('<figcaption'),
+      figcaptionCount: (processedContent.match(/<figcaption/g) || []).length
     });
 
     return processedContent;

@@ -174,6 +174,15 @@ export class PostCreationService {
         this.logger.log(`[PostCreationService] No thumbnailImageId provided - will auto-detect from content after post creation`);
       }
 
+      // 캡션 디버그: 저장되는 HTML에 캡션 포함 여부 확인
+      this.logger.debug(`[CAPTION_DEBUG] Saving post content:`, {
+        hasFigcaption: processedContent.html.includes('<figcaption'),
+        hasFigure: processedContent.html.includes('<figure'),
+        figcaptionCount: (processedContent.html.match(/<figcaption/g) || []).length,
+        contentLength: processedContent.html.length,
+        contentPreview: processedContent.html.substring(0, 300) + (processedContent.html.length > 300 ? '...' : '')
+      });
+
       // 5. 포스트 엔티티 생성
       const post = manager.create(Post, {
         title: createPostDto.title,

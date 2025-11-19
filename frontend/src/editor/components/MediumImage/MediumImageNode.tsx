@@ -122,8 +122,14 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
 
   // Caption 변경 핸들러
   const handleCaptionChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    updateAttributes({ caption: e.target.value });
-  }, [updateAttributes]);
+    const captionValue = e.target.value;
+    console.log('🖼️ [CAPTION_DEBUG] Caption input changed:', {
+      newCaption: captionValue,
+      imageId,
+      previousCaption: node.attrs.caption
+    });
+    updateAttributes({ caption: captionValue });
+  }, [updateAttributes, node.attrs.caption, imageId]);
 
   // Caption 입력에서 엔터 키 처리
   const handleCaptionKeyDown = useCallback((e: React.KeyboardEvent<HTMLInputElement>) => {

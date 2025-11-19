@@ -34,6 +34,17 @@ export default function HtmlRenderer({ content, onImageClick, className = '' }: 
   const processedHtml = useMemo(() => {
     if (!content) return '';
 
+    // 디버그: 캡션 포함 여부 확인
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🖼️ [CAPTION_DEBUG] HtmlRenderer received content:', {
+        hasFigure: content.includes('<figure'),
+        hasFigcaption: content.includes('<figcaption'),
+        figcaptionCount: (content.match(/<figcaption/g) || []).length,
+        contentLength: content.length,
+        preview: content.substring(0, 300) + (content.length > 300 ? '...' : '')
+      });
+    }
+
     // 밑줄 제거
     let processed = stripUnderline(content);
 
