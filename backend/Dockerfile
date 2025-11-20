@@ -56,6 +56,7 @@ RUN apt-get update && \
 
 # msgpackr-extract 비활성화 (Node.js 22 호환성 문제 해결)
 ENV MSGPACKR_NO_EXTRACT=1
+ENV SKIP_NODE_GYP_BUILD=1
 
 # package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml* ./
@@ -77,6 +78,10 @@ RUN rm -rf node_modules && \
 # Stage 3: Production (최적화된 런타임)
 # ============================================
 FROM node:22-slim AS production
+
+# msgpackr-extract 및 node-gyp 비활성화 (전역 적용)
+ENV MSGPACKR_NO_EXTRACT=1
+ENV SKIP_NODE_GYP_BUILD=1
 
 # 보안 강화: 비-루트 사용자 생성 (Debian 방식)
 RUN groupadd -g 1001 nodejs && \
