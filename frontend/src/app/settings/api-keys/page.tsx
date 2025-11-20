@@ -253,7 +253,7 @@ export default function ApiKeysPage() {
       "httpUrl": "https://mcp.codebase.blog/mcp",
       "headers": {
         "Authorization": "Bearer ${apiKey}",
-        "Accept": "application/json"
+        "Accept": "application/json, text/event-stream"
       }
     }
   }
@@ -268,7 +268,7 @@ export default function ApiKeysPage() {
       "httpUrl": "https://mcp.codebase.blog/mcp",
       "headers": {
         "Authorization": "Bearer ${apiKey}",
-        "Accept": "application/json"
+        "Accept": "application/json, text/event-stream"
       }
     }
   }
