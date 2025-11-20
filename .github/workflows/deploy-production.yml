@@ -11,7 +11,7 @@ jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 10  # 10분으로 단축 (최적화 적용)
+    timeout-minutes: 15  # 15분으로 증가 (빌드 안정성 확보)
     environment: production  # Environment Secrets 사용
 
     steps:
