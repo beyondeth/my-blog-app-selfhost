@@ -98,36 +98,193 @@ else
 fi
 
 # 2. Docker 이미지 빌드 (순차 - BuildKit 비활성화)
-log_info "Step 2: Docker 이미지 빌드 (순차 처리 - BuildKit 비활성화)"
-export DOCKER_BUILDKIT=0
-export COMPOSE_DOCKER_CLI_BUILD=0
+log_info "Step 2: Docker 이미지 준비 (기본: pull 우선 — 풀 실패 시 빌드로 폴백)"
 
-# 순차적 빌드 (리소스 집중)
-log_info "1/3 Backend 이미지 빌드 시작..."
-if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build backend; then
-    log_info "✓ Backend 빌드 완료"
+# 기본 동작: 레지스트리에서 이미지를 pull하여 빌드 시간을 피함
+# 환경변수로 동작 변경 가능:
+# - PULL_IMAGES=true : 항상 pull 시도 (권장)
+# - FORCE_BUILD=true : pull 시도 없이 강제 빌드
+# - PARALLEL_BUILD=true : docker compose build --parallel 사용 (compose v2)
+
+if [ "${FORCE_BUILD}" = "true" ]; then
+    log_info "강제 빌드 모드: FORCE_BUILD=true"
+    DO_PULL=false
+elif [ "${PULL_IMAGES}" = "true" ]; then
+    log_info "이미지 pull 우선 모드: PULL_IMAGES=true"
+    DO_PULL=true
 else
-    log_error "✗ Backend 빌드 실패"
-    exit 1
+    # 기본: 시도해보고 실패하면 빌드
+    DO_PULL=true
 fi
 
-log_info "2/3 Frontend 이미지 빌드 시작..."
-if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build frontend; then
-    log_info "✓ Frontend 빌드 완료"
+if [ "${DO_PULL}" = "true" ]; then
+    log_info "이미지 pull 시도: frontend, backend, mcp-proxy"
+    if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production pull frontend backend mcp-proxy; then
+        log_info "✓ 이미지 pull 성공 — 빌드 단계 건너뜀"
+    else
+        log_warn "이미지 pull 실패 또는 일부 이미지 없음 — 빌드로 폴백"
+        DO_BUILD=true
+    fi
 else
-    log_error "✗ Frontend 빌드 실패"
-    exit 1
+    DO_BUILD=true
 fi
 
-log_info "3/3 MCP Proxy 이미지 빌드 시작..."
-if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build mcp-proxy; then
-    log_info "✓ MCP Proxy 빌드 완료"
-else
-    log_error "✗ MCP Proxy 빌드 실패"
-    exit 1
-fi
+if [ "${DO_BUILD}" = "true" ]; then
+    log_info "이미지 빌드 시작 (서버에서 빌드)"
+    # BuildKit/Buildx 최적화 분기
+    if [ "${USE_BUILDX}" = "true" ]; then
+        log_info "Buildx 모드 활성화: USE_BUILDX=true"
+        export DOCKER_BUILDKIT=1
+        export COMPOSE_DOCKER_CLI_BUILD=1
 
-log_info "✓ 모든 이미지 순차 빌드 완료"
+        # 빌드 캐시 디렉토리 (서버에 유지되어 다음 빌드에 재사용됨)
+        BUILD_CACHE_DIR=${BUILD_CACHE_DIR:-/home/ubuntu/.buildx-cache}
+        mkdir -p "$BUILD_CACHE_DIR"
+
+        # 빌더 존재 확인 후 생성
+        BUILDER_NAME=${BUILDER_NAME:-deploy-builder}
+        if ! docker buildx inspect "$BUILDER_NAME" >/dev/null 2>&1; then
+            log_info "buildx 빌더 생성: $BUILDER_NAME"
+            docker buildx create --name "$BUILDER_NAME" --use || true
+        else
+            docker buildx use "$BUILDER_NAME" || true
+        fi
+
+        # .env.production의 빌드 인자 로드 (이미 파일 존재 확인됨)
+        set -o allexport
+        # shellcheck disable=SC1091
+        [ -f .env.production ] && source .env.production || true
+        set +o allexport
+
+        IMAGE_TAG=${IMAGE_TAG:-latest}
+        PROJECT=${COMPOSE_PROJECT_NAME:-codebase-prod}
+
+        # Backend 빌드
+        log_info "1/3 Backend 이미지 (buildx) 빌드 시작..."
+        if docker buildx build --builder "$BUILDER_NAME" \
+            --cache-from=type=local,src="$BUILD_CACHE_DIR" \
+            --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
+            --load --progress=plain \
+            -t "${PROJECT}-backend:${IMAGE_TAG}" -f backend/Dockerfile ./backend; then
+            log_info "✓ Backend buildx 빌드 완료"
+        else
+            log_warn "⚠️ Backend buildx 빌드 실패 — compose 빌드로 폴백"
+            DO_BUILDX_FALLBACK=true
+        fi
+
+        # Frontend 빌드 (build-args 전달)
+        if [ -z "$DO_BUILDX_FALLBACK" ]; then
+            log_info "2/3 Frontend 이미지 (buildx) 빌드 시작..."
+            if docker buildx build --builder "$BUILDER_NAME" \
+                --cache-from=type=local,src="$BUILD_CACHE_DIR" \
+                --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
+                --load --progress=plain \
+                --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
+                --build-arg NEXT_PUBLIC_BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL}" \
+                --build-arg NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
+                --build-arg NEXT_PUBLIC_MIXPANEL_TOKEN="${NEXT_PUBLIC_MIXPANEL_TOKEN}" \
+                --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${NEXT_PUBLIC_GA_MEASUREMENT_ID}" \
+                -t "${PROJECT}-frontend:${IMAGE_TAG}" -f frontend/Dockerfile.prod ./frontend; then
+                log_info "✓ Frontend buildx 빌드 완료"
+            else
+                log_warn "⚠️ Frontend buildx 빌드 실패 — compose 빌드로 폴백"
+                DO_BUILDX_FALLBACK=true
+            fi
+        fi
+
+        # MCP Proxy 빌드
+        if [ -z "$DO_BUILDX_FALLBACK" ]; then
+            log_info "3/3 MCP Proxy 이미지 (buildx) 빌드 시작..."
+            if docker buildx build --builder "$BUILDER_NAME" \
+                --cache-from=type=local,src="$BUILD_CACHE_DIR" \
+                --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
+                --load --progress=plain \
+                -t "${PROJECT}-mcp-proxy:${IMAGE_TAG}" -f mcp-proxy-server/Dockerfile ./mcp-proxy-server; then
+                log_info "✓ MCP Proxy buildx 빌드 완료"
+            else
+                log_warn "⚠️ MCP Proxy buildx 빌드 실패 — compose 빌드로 폴백"
+                DO_BUILDX_FALLBACK=true
+            fi
+        fi
+
+        # buildx에서 실패가 있었으면 기존 compose 빌드로 폴백
+        if [ "$DO_BUILDX_FALLBACK" = "true" ]; then
+            log_info "buildx 빌드 실패로 compose 빌드로 폴백합니다"
+            BUILD_CMD_BASE=(docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build)
+            if [ "${PARALLEL_BUILD}" = "true" ]; then
+                BUILD_CMD_BASE+=(--parallel)
+            fi
+            log_info "compose: Backend 빌드"
+            if "${BUILD_CMD_BASE[@]}" backend; then
+                log_info "✓ Backend 빌드 완료"
+            else
+                log_error "✗ Backend 빌드 실패"
+                exit 1
+            fi
+            log_info "compose: Frontend 빌드"
+            if "${BUILD_CMD_BASE[@]}" frontend; then
+                log_info "✓ Frontend 빌드 완료"
+            else
+                log_error "✗ Frontend 빌드 실패"
+                exit 1
+            fi
+            log_info "compose: MCP Proxy 빌드"
+            if "${BUILD_CMD_BASE[@]}" mcp-proxy; then
+                log_info "✓ MCP Proxy 빌드 완료"
+            else
+                log_error "✗ MCP Proxy 빌드 실패"
+                exit 1
+            fi
+        fi
+
+        log_info "✓ 모든 이미지 빌드/로드 완료 (buildx 경로 완료 또는 compose 폴백 완료)"
+    else
+        # 기존 compose 빌드 경로 (변경 없음)
+        # BuildKit 사용 여부 제어 (CI에서 buildx 쓰면 더 빠름)
+        if [ "${USE_BUILDKIT}" = "true" ]; then
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+            log_info "BuildKit 활성화 (DOCKER_BUILDKIT=1)"
+        else
+            export DOCKER_BUILDKIT=0
+            export COMPOSE_DOCKER_CLI_BUILD=0
+            log_info "BuildKit 비활성화 (기본)"
+        fi
+
+        BUILD_CMD_BASE=(docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build)
+
+        if [ "${PARALLEL_BUILD}" = "true" ]; then
+            log_info "병렬 빌드 사용: PARALLEL_BUILD=true"
+            BUILD_CMD_BASE+=(--parallel)
+        fi
+
+        log_info "1/3 Backend 이미지 빌드 시작..."
+        if "${BUILD_CMD_BASE[@]}" backend; then
+            log_info "✓ Backend 빌드 완료"
+        else
+            log_error "✗ Backend 빌드 실패"
+            exit 1
+        fi
+
+        log_info "2/3 Frontend 이미지 빌드 시작..."
+        if "${BUILD_CMD_BASE[@]}" frontend; then
+            log_info "✓ Frontend 빌드 완료"
+        else
+            log_error "✗ Frontend 빌드 실패"
+            exit 1
+        fi
+
+        log_info "3/3 MCP Proxy 이미지 빌드 시작..."
+        if "${BUILD_CMD_BASE[@]}" mcp-proxy; then
+            log_info "✓ MCP Proxy 빌드 완료"
+        else
+            log_error "✗ MCP Proxy 빌드 실패"
+            exit 1
+        fi
+
+        log_info "✓ 모든 이미지 빌드 완료"
+    fi
+fi
 
 # 2-1. 빌드 검증 - 이미지 생성 시간 확인
 log_info "Step 2-1: 빌드 검증 - 이미지 생성 시간 확인"
