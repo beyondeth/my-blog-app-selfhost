@@ -4,6 +4,7 @@ import { CacheService, CacheKeys, CacheTTL } from '../../cache/cache.service';
 import { CacheMetricsService } from '../../metrics/cache-metrics.service';
 import { PostResponseDto } from '../dto/post-response.dto';
 import { CacheInvalidationEvents, EditorPickToggledEvent, PostThumbnailUpdatedEvent } from '../../common/events/cache.events';
+import { CloudflareService } from '../../cloudflare/cloudflare.service';
 
 /**
  * 포스트 관련 캐시 관리 서비스
@@ -21,6 +22,7 @@ export class PostCacheService {
   constructor(
     private readonly cacheService: CacheService,
     private readonly cacheMetricsService: CacheMetricsService,
+    private readonly cloudflareService: CloudflareService,
   ) {}
 
   /**
@@ -325,6 +327,15 @@ export class PostCacheService {
 
       // 2. 특정 포스트 캐시 삭제 (Editor's Pick 배지 정보 업데이트용) - 필수
       await this.cacheService.del(CacheKeys.POST_CORE(payload.postId));
+
+      // 3. Cloudflare CDN 캐시 무효화 - 필수
+      this.logger.log(`🌐 [CDN Cache] Purging Cloudflare cache for Editor's Picks...`);
+      const cloudflareSuccess = await this.cloudflareService.purgeEditorPicksCache();
+      if (cloudflareSuccess) {
+        this.logger.log(`✅ [CDN Cache] Successfully purged Cloudflare cache for Editor's Picks`);
+      } else {
+        this.logger.warn(`⚠️ [CDN Cache] Failed to purge Cloudflare cache for Editor's Picks`);
+      }
 
       // 홈 피드 및 인기 포스트 캐시는 Editor's Pick과 독립적이므로 삭제하지 않음
       // - 홈 피드: 최신순 정렬 only (Editor's Pick 영향 없음)
