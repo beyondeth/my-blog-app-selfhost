@@ -286,16 +286,28 @@ if [ "${DO_BUILD}" = "true" ]; then
     fi
 fi
 
-# 2-1. 빌드 검증 - 이미지 생성 시간 확인
-log_info "Step 2-1: 빌드 검증 - 이미지 생성 시간 확인"
+# 2-1. 빌드 검증 - 이미지 생성 시간 및 커밋 정보 확인
+log_info "Step 2-1: 빌드 검증 - 이미지 생성 시간 및 커밋 정보 확인"
 BUILD_TIME=$(date +"%Y-%m-%d %H:%M:%S")
 log_info "빌드 완료 시간: $BUILD_TIME"
+
+# 현재 커밋 해시 가져오기
+CURRENT_COMMIT=$(git rev-parse HEAD 2>/dev/null || echo "unknown")
+log_info "현재 커밋 해시: $CURRENT_COMMIT"
 
 # 각 이미지 생성 시간 확인 (5분 이내여야 함)
 for IMAGE in "codebase-prod-frontend" "codebase-prod-backend" "codebase-prod-mcp-proxy"; do
     IMAGE_CREATED=$(docker inspect $IMAGE --format='{{.Created}}' 2>/dev/null | cut -d'T' -f1,2 | tr 'T' ' ' | cut -d'.' -f1)
     if [ -n "$IMAGE_CREATED" ]; then
         log_info "✓ $IMAGE 이미지 생성: $IMAGE_CREATED"
+
+        # 이미지에 커밋 레이블이 있는지 확인 (빌드 시점 확인)
+        IMAGE_LABEL=$(docker inspect $IMAGE --format='{{index .Config.Labels "com.github.commit"}}' 2>/dev/null || echo "none")
+        if [ "$IMAGE_LABEL" != "none" ]; then
+            log_info "  - 빌드 커밋: $IMAGE_LABEL"
+        else
+            log_info "  - 커밋 레이블 없음"
+        fi
     else
         log_warn "⚠️  $IMAGE 이미지를 찾을 수 없습니다"
     fi
@@ -411,12 +423,42 @@ for CONTAINER in "codebase-prod-backend" "codebase-prod-frontend" "codebase-prod
     fi
 done
 
-# 9. 배포 완료
+# 9. 배포 검증 - 민감정보 노출 확인
+log_info "Step 9: 배포 검증 - 민감정보 노출 확인"
+log_info "API 응답에서 민감정보가 제외되었는지 확인..."
+
+# 테스트용 포스트 ID (실제 존재하는 ID로 변경 필요)
+TEST_POST_ID="019a9cdf-b46f-726c-8d6f-e4f931245b40"
+
+# API 테스트 - 민감정보 제외 확인
+log_info "포스트 상세 API 테스트 중..."
+API_RESPONSE=$(docker exec codebase-prod-backend curl -s "http://localhost:3000/api/v1/posts/$TEST_POST_ID" 2>/dev/null || echo "{}")
+
+# 민감정보 필드 확인 (email, role, authorId, blogId, userId)
+SENSITIVE_FIELDS=("email" "role" "authorId" "blogId" "userId")
+SENSITIVE_FOUND=false
+
+for field in "${SENSITIVE_FIELDS[@]}"; do
+    if echo "$API_RESPONSE" | grep -q "\"$field\""; then
+        log_error "❌ 민감정보 노출 감지: $field 필드가 응답에 포함되어 있습니다!"
+        SENSITIVE_FOUND=true
+    fi
+done
+
+if [ "$SENSITIVE_FOUND" = false ]; then
+    log_info "✓ 민감정보 제외 확인 완료 (email, role, authorId, blogId, userId)"
+else
+    log_error "⚠️  민감정보가 노출되고 있습니다. DTO 설정을 확인하세요."
+    log_error "응답 샘플: $(echo "$API_RESPONSE" | head -c 500)..."
+fi
+
+# 10. 배포 완료
 DEPLOY_END_TIME=$(date +%s)
 DEPLOY_DURATION=$((DEPLOY_END_TIME - DEPLOY_START_TIME))
 log_info "=========================================="
 log_info "배포 완료: $(date)"
 log_info "소요 시간: ${DEPLOY_DURATION}초"
+log_info "커밋: $CURRENT_COMMIT"
 log_info "=========================================="
 
 # 10. 슬랙/디스코드 알림 (선택사항)
