@@ -113,9 +113,17 @@ elif [ "${PULL_IMAGES}" = "true" ]; then
     log_info "이미지 pull 우선 모드: PULL_IMAGES=true"
     DO_PULL=true
 else
-    # 기본: 시도해보고 실패하면 빌드
-    DO_PULL=true
+    # 기본 동작: 빌드 우선 (pull은 명시적일 때만 수행)
+    DO_PULL=false
 fi
+
+# 현재 커밋 SHA를 기본 이미지 태그로 사용 (코드 변경이 이미지에 반영되도록)
+if command -v git >/dev/null 2>&1; then
+    COMMIT_SHA=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+else
+    COMMIT_SHA="unknown"
+fi
+IMAGE_TAG=${IMAGE_TAG:-$COMMIT_SHA}
 
 if [ "${DO_PULL}" = "true" ]; then
     log_info "이미지 pull 시도: frontend, backend, mcp-proxy"
@@ -167,6 +175,8 @@ if [ "${DO_BUILD}" = "true" ]; then
             --load --progress=plain \
             -t "${PROJECT}-backend:${IMAGE_TAG}" -f backend/Dockerfile ./backend; then
             log_info "✓ Backend buildx 빌드 완료"
+            # tag with :latest so docker-compose (which may use latest) picks up this image
+            docker tag "${PROJECT}-backend:${IMAGE_TAG}" "${PROJECT}-backend:latest" || true
         else
             log_warn "⚠️ Backend buildx 빌드 실패 — compose 빌드로 폴백"
             DO_BUILDX_FALLBACK=true
@@ -186,6 +196,7 @@ if [ "${DO_BUILD}" = "true" ]; then
                 --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${NEXT_PUBLIC_GA_MEASUREMENT_ID}" \
                 -t "${PROJECT}-frontend:${IMAGE_TAG}" -f frontend/Dockerfile.prod ./frontend; then
                 log_info "✓ Frontend buildx 빌드 완료"
+                docker tag "${PROJECT}-frontend:${IMAGE_TAG}" "${PROJECT}-frontend:latest" || true
             else
                 log_warn "⚠️ Frontend buildx 빌드 실패 — compose 빌드로 폴백"
                 DO_BUILDX_FALLBACK=true
@@ -201,6 +212,7 @@ if [ "${DO_BUILD}" = "true" ]; then
                 --load --progress=plain \
                 -t "${PROJECT}-mcp-proxy:${IMAGE_TAG}" -f mcp-proxy-server/Dockerfile ./mcp-proxy-server; then
                 log_info "✓ MCP Proxy buildx 빌드 완료"
+                docker tag "${PROJECT}-mcp-proxy:${IMAGE_TAG}" "${PROJECT}-mcp-proxy:latest" || true
             else
                 log_warn "⚠️ MCP Proxy buildx 빌드 실패 — compose 빌드로 폴백"
                 DO_BUILDX_FALLBACK=true
