@@ -98,7 +98,7 @@ export class AdminFilesController {
   @Get('stats')
   @ApiOperation({ summary: '파일 통계 조회 (관리자)' })
   async getFileStats() {
-    // 전체 파일 수와 용량...
+    // 전체 파일 수와 용량.....
     const totalStats = await this.filesRepository
       .createQueryBuilder('file')
       .select('COUNT(*)', 'totalFiles')
