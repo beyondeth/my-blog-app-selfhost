@@ -11,7 +11,7 @@ jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 45  # 45분으로 대폭 증가 (msgpackr-extract 컴파일 시간 고려)
+    timeout-minutes: 120  # Increased to 120 minutes to allow server-side builds to finish
     environment: production  # Environment Secrets 사용
 
     steps:

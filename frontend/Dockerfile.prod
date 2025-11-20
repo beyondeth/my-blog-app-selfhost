@@ -14,13 +14,28 @@
 # ============================================
 # Stage 1: Dependencies (의존성 설치)
 # ============================================
-FROM node:22-alpine AS deps
+FROM node:22-slim AS deps
 
 # 작업 디렉토리
 WORKDIR /app
 
+# 시스템 패키지 설치: 빌드 도구 및 libvips (sharp 빌드/바이너리 관련)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ca-certificates \
+        python3 \
+        build-essential \
+        make \
+        g++ \
+        libvips-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # pnpm 설치
 RUN npm install -g pnpm@latest
+
+# Prevent native extraction/build for problematic packages during CI/container builds
+# This helps avoid long node-gyp compile times for optional native modules (msgpackr-extract, etc.)
+ENV MSGPACKR_NO_EXTRACT=1
+ENV SKIP_NODE_GYP_BUILD=1
 
 # package.json과 pnpm-lock.yaml 복사 (캐싱 최적화)
 COPY frontend/package.json frontend/pnpm-lock.yaml* ./
@@ -31,9 +46,18 @@ RUN pnpm install --no-frozen-lockfile --prod=false
 # ============================================
 # Stage 2: Builder (Next.js 빌드)
 # ============================================
-FROM node:22-alpine AS builder
+
+FROM node:22-slim AS builder
 
 WORKDIR /app
+
+# 빌드에 필요한 시스템 패키지 (이미 deps에서 설치했지만 안전하게 보장)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        python3 \
+        build-essential \
+        make \
+        g++ \
+    && rm -rf /var/lib/apt/lists/*
 
 # pnpm 설치
 RUN npm install -g pnpm@latest
@@ -93,11 +117,11 @@ RUN pnpm build
 # ============================================
 # Stage 3: Runner (최종 런타임)
 # ============================================
-FROM node:22-alpine AS runner
+FROM node:22-slim AS runner
 
 # 보안: 비-루트 사용자 생성
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
+RUN groupadd --system --gid 1001 nodejs && \
+    useradd --system --uid 1001 --gid 1001 --create-home nextjs
 
 WORKDIR /app
 
