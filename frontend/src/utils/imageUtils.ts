@@ -120,8 +120,24 @@ export function normalizeImageUrl(url: string): string {
       }
     }
 
-    // 외부 HTTPS URL은 그대로 사용
-    if (url.startsWith('https://') && !url.includes('amazonaws.com') && !url.includes('oraclecloud.com') && !url.includes('/api/v1/files/')) {
+    // Google Cloud Storage URL 처리
+    if (url.includes('storage.googleapis.com')) {
+      // Google Storage URL에서 키 추출
+      // 형식: https://storage.googleapis.com/{bucket}/{key} 또는 https://bucket.storage.googleapis.com/{key}
+      const match = url.match(/(?:storage\.googleapis\.com\/)[^\/]+\/(.+?)(\?|$)/);
+      if (match && match[1]) {
+        const s3Key = match[1];
+        const proxyUrl = getProxyImageUrl(s3Key);
+        if (DEBUG_MODE) console.log('[normalizeImageUrl] Google Storage URL → Proxy:', { input: url, key: s3Key, output: proxyUrl });
+        return proxyUrl;
+      }
+      // 처리 실패 시 직접 사용
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] Google Storage URL, using directly:', url);
+      return url;
+    }
+
+    // 외부 HTTPS URL은 그대로 사용 (storage.googleapis.com는 위에서 처리했으므로 제외)
+    if (url.startsWith('https://') && !url.includes('amazonaws.com') && !url.includes('oraclecloud.com') && !url.includes('storage.googleapis.com') && !url.includes('/api/v1/files/')) {
       if (DEBUG_MODE) console.log('[normalizeImageUrl] External HTTPS URL, using directly');
       return url;
     }

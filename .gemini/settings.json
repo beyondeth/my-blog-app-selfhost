@@ -1,9 +1,9 @@
 {
   "mcpServers": {
     "codebase-blog-mcp": {
-      "httpUrl": "http://localhost:3002/mcp",
+      "httpUrl": "https://mcp.codebase.blog/mcp",
       "headers": {
-        "Authorization": "Bearer blog_sk_7g29ym84_GPC2xtUjS3VgeqEobCbwL8Nok8N9J1vD",
+        "Authorization": "Bearer blog_sk_38eeou74_lyLZ4ITUTamwIxT9XTI5OzJaWGGcp5is",
         "Accept": "application/json, text/event-stream"
       }
     }

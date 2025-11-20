@@ -48,6 +48,11 @@ export function extractS3KeyFromUrl(url: string): string | null {
     const oracleMatch = cleanUrl.match(oraclePattern);
     if (oracleMatch) return oracleMatch[1];
 
+    // Google Cloud Storage: https://storage.googleapis.com/... or https://bucket.storage.googleapis.com/...
+    const googlePattern = /https:\/\/(?:[^\/]+\.)?storage\.googleapis\.com\/(.+)/;
+    const googleMatch = cleanUrl.match(googlePattern);
+    if (googleMatch) return googleMatch[1];
+
     // Local development: localhost:3000/api/v1/files/proxy/...
     if (cleanUrl.includes('localhost:3000/api/v1/files/proxy/')) {
       const localMatch = cleanUrl.match(/localhost:3000\/api\/v1\/files\/proxy\/(.+)/);
