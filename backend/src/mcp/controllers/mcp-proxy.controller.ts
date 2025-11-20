@@ -18,6 +18,7 @@ import { CreatePostDto } from '../../posts/dto/create-post.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from '../../users/entities/user.entity';
+import { ExternalImageDownloadService } from '../../files/services/external-image-download.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { UsageService } from '../../usage/usage.service';
 
@@ -42,6 +43,7 @@ export class McpProxyController {
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly usageService: UsageService,
+    private readonly externalImageDownloadService: ExternalImageDownloadService,
   ) {}
 
   /**
@@ -170,9 +172,69 @@ export class McpProxyController {
         throw new BadRequestException('사용자를 찾을 수 없습니다');
       }
 
-      // 4. 포스트 생성 (Fast Path: 150-200ms 응답, 백그라운드 처리)
+      // 4. 외부 이미지 처리 (Gemini 등 외부 URL에서 이미지 다운로드)
+      let processedContent = postData.content_markdown;
+      const urlMapping = new Map<string, string>();
+
+      if (postData.content_markdown) {
+        try {
+          this.logger.log(`[External Images] Starting to process external images...`);
+
+          // 콘텐츠에서 외부 이미지 URL 추출
+          const externalImageUrls = this.externalImageDownloadService.extractExternalImageUrls(
+            postData.content_markdown
+          );
+
+          if (externalImageUrls.length > 0) {
+            this.logger.log(`[External Images] Found ${externalImageUrls.length} external image(s):`, externalImageUrls);
+
+            // 외부 이미지 다운로드 및 S3 업로드
+            const downloadedFiles = await this.externalImageDownloadService.downloadExternalImages(
+              externalImageUrls,
+              userId
+            );
+
+            // 성공적으로 다운로드된 이미지들에 대해 URL 매핑 생성
+            if (downloadedFiles.length > 0) {
+              this.logger.log(`[External Images] Successfully downloaded ${downloadedFiles.length} image(s)`);
+
+              downloadedFiles.forEach((file, index) => {
+                const originalUrl = externalImageUrls[index];
+                // CDN URL 생성 (https://cdn.codebase.blog/uploads/...)
+                const cdnUrl = `https://cdn.codebase.blog/${file.fileKey}`;
+                urlMapping.set(originalUrl, cdnUrl);
+
+                this.logger.debug(`[External Images] URL mapping: ${originalUrl} → ${cdnUrl}`);
+              });
+
+              // 콘텐츠의 외부 이미지 URL을 CDN URL로 변환
+              processedContent = this.externalImageDownloadService.replaceImageUrls(
+                postData.content_markdown,
+                urlMapping
+              );
+
+              this.logger.log(`[External Images] Content updated with CDN URLs`);
+            }
+          } else {
+            this.logger.log(`[External Images] No external images found in content`);
+          }
+        } catch (error) {
+          this.logger.error(`[External Images] Error processing external images:`, error.stack);
+          // 외부 이미지 처리 실패 시 원본 콘텐츠 사용 (포스트 생성 실패하지 않도록)
+          processedContent = postData.content_markdown;
+        }
+      }
+
+      // 5. 포스트 생성 (처리된 콘텐츠 사용) (Fast Path: 150-200ms 응답, 백그라운드 처리)
       const startTime = Date.now();
-      const postDto = await this.postsService.createFast(postData, user);
+
+      // 처리된 콘텐츠로 postData 업데이트
+      const finalPostData = {
+        ...postData,
+        content_markdown: processedContent,
+      };
+
+      const postDto = await this.postsService.createFast(finalPostData, user);
 
       // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
       await this.usageService.trackMcpPost(userId);
