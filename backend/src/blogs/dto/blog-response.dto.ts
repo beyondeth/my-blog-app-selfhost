@@ -34,7 +34,8 @@ export class BlogResponseDto {
   @Expose()
   allowComments: boolean;
 
-  @Expose()
+  // 내부 userId는 민감정보로 간주하여 제외
+  @Exclude()
   userId: string;
 
   @Expose()
