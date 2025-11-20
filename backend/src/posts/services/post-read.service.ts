@@ -440,7 +440,10 @@ export class PostReadService {
 
       switch (period) {
         case 'daily':
-          dateFrom = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+          // 오늘 UTC 0시부터 시작되도록 수정 (타임존 문제 해결)
+          const today = new Date();
+          today.setUTCHours(0, 0, 0, 0);
+          dateFrom = today;
           break;
         case 'weekly':
           dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -483,7 +486,7 @@ export class PostReadService {
         'metadata.editorPickedAt'
       ])
       .where('post.isPublished = :isPublished', { isPublished: true })
-      .andWhere('post.isEditorPick = :isEditorPick', { isEditorPick: true })
+      .andWhere('metadata.isEditorPick = :isEditorPick', { isEditorPick: true })
       .orderBy('metadata.editorPickedAt', 'DESC')
       .addOrderBy('post.publishedAt', 'DESC')
       .take(limit);
