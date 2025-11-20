@@ -305,21 +305,37 @@ export class ExternalImageDownloadService {
   }
 
   /**
-   * HTML 콘텐츠에서 외부 이미지 URL 추출
-   * @param content HTML 콘텐츠
+   * 콘텐츠에서 외부 이미지 URL 추출 (HTML 및 Markdown 모두 지원)
+   * @param content HTML 또는 Markdown 콘텐츠
    * @returns 외부 이미지 URL 배열
    */
   extractExternalImageUrls(content: string): string[] {
     const imageUrls: string[] = [];
-    const urlPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+
+    // Pattern 1: HTML img 태그
+    const htmlPattern = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
     let match;
 
-    while ((match = urlPattern.exec(content)) !== null) {
+    // HTML 이미지 URL 추출
+    while ((match = htmlPattern.exec(content)) !== null) {
       const url = match[1];
-
-      // 내부 URL 필터링
       if (this.isExternalImageUrl(url)) {
         imageUrls.push(url);
+      }
+    }
+
+    // Pattern 2: Markdown 이미지 문법 ![alt](url)
+    const markdownPattern = /!\[.*?\]\(([^)]+)\)/gi;
+
+    // Markdown 이미지 URL 추출
+    while ((match = markdownPattern.exec(content)) !== null) {
+      const url = match[1].trim(); // 공백 제거
+
+      // URL이 아닌 경우 제외 (예: ![alt](./local-image.png))
+      if (url.startsWith('http://') || url.startsWith('https://')) {
+        if (this.isExternalImageUrl(url)) {
+          imageUrls.push(url);
+        }
       }
     }
 
@@ -361,10 +377,10 @@ export class ExternalImageDownloadService {
   }
 
   /**
-   * HTML 콘텐츠의 외부 이미지 URL을 CDN URL로 변환
-   * @param content HTML 콘텐츠
+   * HTML 및 Markdown 콘텐츠의 외부 이미지 URL을 CDN URL로 변환
+   * @param content HTML 또는 Markdown 콘텐츠
    * @param urlMapping 원본 URL → CDN URL 매핑
-   * @returns 변환된 HTML 콘텐츠
+   * @returns 변환된 콘텐츠
    */
   replaceImageUrls(content: string, urlMapping: Map<string, string>): string {
     let updatedContent = content;
@@ -372,9 +388,17 @@ export class ExternalImageDownloadService {
     for (const [originalUrl, cdnUrl] of urlMapping.entries()) {
       // 정규식 이스케이프 처리
       const escapedUrl = originalUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`src=["']${escapedUrl}["']`, 'g');
 
-      updatedContent = updatedContent.replace(regex, `src="${cdnUrl}"`);
+      // Pattern 1: HTML img 태그의 src 속성
+      const htmlRegex = new RegExp(`src=["']${escapedUrl}["']`, 'g');
+      updatedContent = updatedContent.replace(htmlRegex, `src="${cdnUrl}"`);
+
+      // Pattern 2: Markdown 이미지 문법 ![alt](url)
+      // markdownRegex는 `!\[([^\]]*)\]\(([^)]+)\)` 형식
+      // 첫 번째 캡처: alt text
+      // 두 번째 캡처: URL
+      const markdownRegex = new RegExp(`(!\\[[^\\]]*\\]\\()${escapedUrl}(\\))`, 'g');
+      updatedContent = updatedContent.replace(markdownRegex, `$1${cdnUrl}$2`);
     }
 
     return updatedContent;
