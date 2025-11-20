@@ -76,7 +76,7 @@ RUN rm -rf dist && pnpm run build
 
 # 프로덕션 의존성만 재설치 (선택적 의존성 제외)
 RUN rm -rf node_modules && \
-    pnpm install --frozen-lockfile --prod --ignore-optional
+    pnpm install --frozen-lockfile --prod --no-optional
 
 # ============================================
 # Stage 3: Production (최적화된 런타임)
