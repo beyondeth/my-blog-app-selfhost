@@ -69,6 +69,7 @@ async function bootstrap() {
           "http://localhost:*",
           "*.s3.amazonaws.com",        // AWS S3
           "*.oraclecloud.com",         // Oracle OCI Object Storage
+          "*.storage.googleapis.com",   // Google Cloud Storage (Gemini AI images)
           // Cloudflare CDN (계정 생성 후 실제 도메인으로 교체 필요)
           // 예: "cdn.yourdomain.com"
         ],
@@ -78,6 +79,7 @@ async function bootstrap() {
           "https:",
           "*.s3.amazonaws.com",        // AWS S3
           "*.oraclecloud.com",         // Oracle OCI Object Storage
+          "*.storage.googleapis.com",   // Google Cloud Storage (Gemini AI images)
           // Cloudflare CDN (계정 생성 후 실제 도메인으로 교체 필요)
           // 예: "cdn.yourdomain.com"
         ],
