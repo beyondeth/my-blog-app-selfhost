@@ -11,7 +11,7 @@ jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 25  # 25분으로 대폭 증가 (Oracle Free Tier 대응)
+    timeout-minutes: 45  # 45분으로 대폭 증가 (msgpackr-extract 컴파일 시간 고려)
     environment: production  # Environment Secrets 사용
 
     steps:
@@ -51,7 +51,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 25m
+          timeout: 45m
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
