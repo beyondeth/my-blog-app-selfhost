@@ -97,33 +97,37 @@ else
     log_info "✓ 디스크 공간 충분 (${DISK_USAGE}%)"
 fi
 
-# 2. Docker 이미지 빌드 (병렬 - Backend, Frontend, MCP Proxy)
-log_info "Step 2: Docker 이미지 빌드 (병렬 처리) - Docker 캐시 활성화"
-# --pull: 최신 베이스 이미지 사용, 캐시 활용으로 빌드 속도 향상
-# --env-file: .env.production 파일의 환경변수를 빌드 인자로 사용
+# 2. Docker 이미지 빌드 (순차 - BuildKit 비활성화)
+log_info "Step 2: Docker 이미지 빌드 (순차 처리 - BuildKit 비활성화)"
+export DOCKER_BUILDKIT=0
+export COMPOSE_DOCKER_CLI_BUILD=0
 
-# 병렬 빌드 시작 (백그라운드 실행)
-log_info "Backend 이미지 빌드 시작..."
-docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --pull backend &
-BACKEND_PID=$!
+# 순차적 빌드 (리소스 집중)
+log_info "1/3 Backend 이미지 빌드 시작..."
+if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache backend; then
+    log_info "✓ Backend 빌드 완료"
+else
+    log_error "✗ Backend 빌드 실패"
+    exit 1
+fi
 
-log_info "Frontend 이미지 빌드 시작..."
-docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --pull frontend &
-FRONTEND_PID=$!
+log_info "2/3 Frontend 이미지 빌드 시작..."
+if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache frontend; then
+    log_info "✓ Frontend 빌드 완료"
+else
+    log_error "✗ Frontend 빌드 실패"
+    exit 1
+fi
 
-log_info "MCP Proxy 이미지 빌드 시작..."
-docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --pull mcp-proxy &
-MCP_PID=$!
+log_info "3/3 MCP Proxy 이미지 빌드 시작..."
+if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache mcp-proxy; then
+    log_info "✓ MCP Proxy 빌드 완료"
+else
+    log_error "✗ MCP Proxy 빌드 실패"
+    exit 1
+fi
 
-# 모든 빌드가 완료될 때까지 대기
-wait $BACKEND_PID
-log_info "✓ Backend 빌드 완료"
-wait $FRONTEND_PID
-log_info "✓ Frontend 빌드 완료"
-wait $MCP_PID
-log_info "✓ MCP Proxy 빌드 완료"
-
-log_info "✓ 모든 이미지 병렬 빌드 완료"
+log_info "✓ 모든 이미지 순차 빌드 완료"
 
 # 2-1. 빌드 검증 - 이미지 생성 시간 확인
 log_info "Step 2-1: 빌드 검증 - 이미지 생성 시간 확인"
