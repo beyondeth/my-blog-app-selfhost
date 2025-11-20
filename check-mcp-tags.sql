@@ -1,4 +1,4 @@
--- Check recent posts (last 10) to see if tags are being saved
+-- Check recent posts (last 10) to see if tags are being saved.
 SELECT
     p.id,
     p.title,
