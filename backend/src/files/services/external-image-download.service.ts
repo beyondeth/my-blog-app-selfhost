@@ -3,9 +3,12 @@ import { ConfigService } from '@nestjs/config';
 import axios, { AxiosResponse } from 'axios';
 import { v4 as uuidv4 } from 'uuid';
 import * as sharp from 'sharp';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { FilesService } from '../files.service';
 import { S3Service } from './s3.service';
 import { File } from '../entities/file.entity';
+import { FileContext, FileContextType, FilePurpose } from '../entities/file-context.entity';
 
 @Injectable()
 export class ExternalImageDownloadService {
@@ -17,6 +20,10 @@ export class ExternalImageDownloadService {
     private readonly configService: ConfigService,
     private readonly filesService: FilesService,
     private readonly s3Service: S3Service,
+    @InjectRepository(File)
+    private readonly fileRepository: Repository<File>,
+    @InjectRepository(FileContext)
+    private readonly fileContextRepository: Repository<FileContext>,
   ) {}
 
   /**
@@ -35,8 +42,8 @@ export class ExternalImageDownloadService {
 
     for (const imageUrl of imageUrls) {
       try {
-        // 중복 URL 건너뛰기
-        if (results.some(file => file.originalUrl === imageUrl)) {
+        // 중복 URL 건너뛰기 (metadata에 originalUrl 저장)
+        if (results.some(file => file.metadata?.originalUrl === imageUrl)) {
           continue;
         }
 
@@ -209,19 +216,24 @@ export class ExternalImageDownloadService {
     const fileKey = `uploads/external/${fileName}`;
 
     // S3에 업로드
-    await this.s3Service.uploadFile(fileKey, buffer, 'image/webp', [
-      {
-        key: 'originalUrl',
-        value: originalUrl,
-      },
-      {
-        key: 'downloadedAt',
-        value: new Date().toISOString(),
-      },
-    ]);
+    try {
+      await this.s3Service.uploadBuffer(
+        fileKey,
+        buffer,
+        'image/webp',
+        {
+          'original-url': originalUrl,
+          'downloaded-at': new Date().toISOString(),
+          'source': 'external_download',
+        }
+      );
 
-    this.logger.debug(`Uploaded to S3: ${fileKey}`);
-    return fileKey;
+      this.logger.debug(`Uploaded to S3: ${fileKey}`);
+      return fileKey;
+    } catch (error) {
+      this.logger.error(`Failed to upload to S3: ${error.message}`, error);
+      throw error;
+    }
   }
 
   /**
@@ -239,10 +251,15 @@ export class ExternalImageDownloadService {
     userId: string,
   ): Promise<File> {
     // 임시 FileContext 생성
-    const tempContext = await this.filesService.createTemporaryContext(userId);
+    const tempContext = this.fileContextRepository.create({
+      contextType: FileContextType.SYSTEM,
+      purpose: FilePurpose.GENERAL,
+      ownerId: userId,
+    });
+    const savedContext = await this.fileContextRepository.save(tempContext);
 
     // 파일 정보 DB에 저장
-    const file = await this.filesService.fileRepository.create({
+    const file = this.fileRepository.create({
       fileName: fileKey.split('/').pop(),
       originalName: this.extractOriginalFilename(originalUrl),
       fileKey, // S3 키 (전체 경로)
@@ -251,7 +268,7 @@ export class ExternalImageDownloadService {
       mimeType: 'image/webp',
       fileType: 'image',
       userId,
-      contextId: tempContext.id, // 임시 context 추가
+      contextId: savedContext.id, // 임시 context 추가
       metadata: {
         originalUrl,
         downloadedAt: new Date().toISOString(),
@@ -259,7 +276,7 @@ export class ExternalImageDownloadService {
       },
     });
 
-    const savedFile = await this.filesService.fileRepository.save(file);
+    const savedFile = await this.fileRepository.save(file);
 
     this.logger.debug(`File entity created: ${savedFile.id}, originalUrl: ${originalUrl}`);
     return savedFile;
