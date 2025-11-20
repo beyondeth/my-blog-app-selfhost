@@ -75,7 +75,6 @@ export default function ProfileDropdown({
                     alt={user.username}
                     fallback={user.username}
                     size="sm"
-                    priority={true}
                   />
                   <span className="font-medium">{user.username}</span>
                   <FiChevronDown className="w-4 h-4" />
