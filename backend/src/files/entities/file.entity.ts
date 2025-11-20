@@ -81,6 +81,9 @@ export class File {
     format?: string;
     optimized?: boolean;
     optimizedAt?: string;
+    originalUrl?: string;
+    downloadedAt?: string;
+    source?: string;
   };
 
   @Column({ type: 'timestamp', nullable: true })

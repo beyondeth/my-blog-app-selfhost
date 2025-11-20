@@ -199,6 +199,28 @@ export class S3Service {
   }
 
   /**
+   * 버퍼를 S3에 직접 업로드 (외부 이미지 다운로드용)
+   */
+  async uploadBuffer(fileKey: string, buffer: Buffer, contentType: string, metadata?: Record<string, string>): Promise<void> {
+    try {
+      const putObjectCommand = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+        Body: buffer,
+        ContentType: contentType,
+        ContentLength: buffer.length,
+        Metadata: metadata || {},
+      });
+
+      await this.s3Client.send(putObjectCommand);
+      this.logger.log(`Buffer uploaded to S3: ${fileKey} (${buffer.length} bytes)`);
+    } catch (error) {
+      this.logger.error(`Failed to upload buffer to S3: ${error.message}`, error.stack);
+      throw error;
+    }
+  }
+
+  /**
    * Upload file to Object Storage (AWS S3 또는 OCI)
    */
   async uploadFile(file: Express.Multer.File | null, s3Key: string): Promise<{ location?: string }> {
