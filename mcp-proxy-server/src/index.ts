@@ -371,14 +371,41 @@ app.post('/mcp', async (req, res) => {
 });
 
 /**
- * GET /mcp - SSE Stream (현재 미지원)
+ * GET /mcp - Server Discovery
  *
- * API Key 인증에서는 SSE 스트림을 지원하지 않습니다.
- * 모든 통신은 POST /mcp로 처리됩니다.
+ * MCP 서버 정보와 capabilities를 반환합니다.
+ * 클라이언트는 이 정보를 통해 서버와의 통신 방식을 결정합니다.
  */
 app.get('/mcp', (req, res) => {
-  res.status(501).json({
-    error: 'SSE streaming not supported in API Key mode. Use POST /mcp with Bearer token.',
+  // MCP 서버 Discovery 응답
+  res.json({
+    name: 'codebase-blog-mcp',
+    version: '8.0.0',
+    description: 'Codebase.blog Auto-posting MCP Server',
+    capabilities: {
+      tools: true,
+      prompts: false,
+      resources: false,
+      logging: false
+    },
+    endpoints: {
+      jsonrpc: '/mcp'
+    },
+    authentication: ['bearer'],
+    tools: [
+      {
+        name: 'check_auth',
+        description: 'Verify authentication status'
+      },
+      {
+        name: 'get_writing_style_guide',
+        description: 'Retrieve writing style guidelines'
+      },
+      {
+        name: 'create_post',
+        description: 'Create and publish blog posts to codebase.blog'
+      }
+    ]
   });
 });
 

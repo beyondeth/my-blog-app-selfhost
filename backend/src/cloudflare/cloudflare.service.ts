@@ -79,21 +79,48 @@ export class CloudflareService {
   }
 
   /**
-   * Editor's Pick 관련 캐시 즉시 제거
+   * Editor's Pick 캐시 제거
    *
    * @returns 성공 여부
    */
   async purgeEditorPicksCache(): Promise<boolean> {
-    const baseUrl = process.env.FRONTEND_URL || 'https://your-domain.com';
-    const urls = [
-      // Editor's Pick API (모든 limit 파라미터)
-      `${baseUrl}/api/v1/posts/editor-picks*`,
-      // 홈페이지 (Editor's Pick 섹션이 있는)
-      `${baseUrl}/`,
-    ];
+    if (!this.isEnabled) {
+      this.logger.debug('Cloudflare Editor Picks purge skipped (not configured)');
+      return true;
+    }
 
-    this.logger.debug(`🗑️ Purging Editor's Pick cache...`);
-    return await this.purgeByUrl(urls);
+    try {
+      // Editor's Pick 엔드포인트의 캐시 제거
+      const frontendUrl = process.env.FRONTEND_URL || 'https://localhost:3001';
+      const editorPicksUrl = `${frontendUrl}/api/v1/posts/editor-picks*`;
+
+      const response = await fetch(
+        `https://api.cloudflare.com/client/v4/zones/${this.zoneId}/purge_cache`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${this.apiToken}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            files: [editorPicksUrl],
+          }),
+        }
+      );
+
+      const data: CloudflarePurgeResponse = await response.json();
+
+      if (data.success) {
+        this.logger.log(`✅ Successfully purged Editor's Pick cache: ${editorPicksUrl}`);
+        return true;
+      } else {
+        this.logger.error(`❌ Failed to purge Editor's Pick cache:`, data.errors);
+        return false;
+      }
+    } catch (error) {
+      this.logger.error('❌ Error purging Editor\'s Pick cache:', error);
+      return false;
+    }
   }
 
   /**
