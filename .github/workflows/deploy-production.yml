@@ -11,19 +11,17 @@ jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 15  # 15분으로 증가 (빌드 안정성 확보)
+    timeout-minutes: 25  # 25분으로 대폭 증가 (Oracle Free Tier 대응)
     environment: production  # Environment Secrets 사용
 
     steps:
-      # 0. Docker BuildKit 활성화 (빌드 속도 향상)
-      - name: Set up Docker BuildKit
+      # 0. BuildKit 비활성화 (안정성 확보)
+      - name: Disable Docker BuildKit
         run: |
-          sudo docker buildx install
-          sudo docker buildx create --use --driver docker-container
-          echo '{"builder":{"gc":{"defaultKeepStorage":"20GB"},"enabled":true}}' | sudo tee /etc/docker/daemon.json
-          sudo systemctl restart docker
+          echo "DOCKER_BUILDKIT=0" >> $GITHUB_ENV
+          echo "COMPOSE_DOCKER_CLI_BUILD=0" >> $GITHUB_ENV
 
-      # 1. 코드 체크아웃 (선택사항, 서버에서 git pull 수행)
+      # 1. 코드 체크아웃
       - name: Checkout code
         uses: actions/checkout@v4
 
@@ -53,7 +51,7 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 15m
+          timeout: 25m
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
