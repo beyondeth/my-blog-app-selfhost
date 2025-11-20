@@ -1,0 +1,8 @@
+registry=https://registry.npmmirror.com
+fetch-timeout=60000
+prefer-frozen-lockfile=true
+strict-peer-dependencies=false
+network-concurrency=6
+fetch-retries=3
+fetch-retry-mintimeout=1000
+fetch-retry-maxtimeout=30000
