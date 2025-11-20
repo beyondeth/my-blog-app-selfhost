@@ -18,28 +18,13 @@ export class UserResponseDto {
   @Expose()
   id: string;
 
-  @Expose()
+  // 민감한 정보는 명시적으로 제외
+  @Exclude()
   email: string;
 
-  @Expose()
-  username: string;
-
-  @Expose()
-  profileImage: string;
-
-  @Expose()
-  bio: string;
-
-  @Expose()
+  @Exclude()
   role: Role;
 
-  @Expose()
-  createdAt: Date;
-
-  @Expose()
-  updatedAt: Date;
-
-  // 민감한 정보는 명시적으로 제외
   @Exclude()
   password: string;
 
