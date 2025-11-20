@@ -58,6 +58,10 @@ RUN apt-get update && \
 ENV MSGPACKR_NO_EXTRACT=1
 ENV SKIP_NODE_GYP_BUILD=1
 
+# 추가 네이티브 모듈 컴파일 방지
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV AVOID_NATIVE=1
+
 # package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml* ./
 
@@ -70,9 +74,9 @@ COPY . .
 # 빌드 전 dist 폴더 정리 및 NestJS 빌드
 RUN rm -rf dist && pnpm run build
 
-# 프로덕션 의존성만 재설치
+# 프로덕션 의존성만 재설치 (선택적 의존성 제외)
 RUN rm -rf node_modules && \
-    pnpm install --frozen-lockfile --prod
+    pnpm install --frozen-lockfile --prod --ignore-optional
 
 # ============================================
 # Stage 3: Production (최적화된 런타임)
