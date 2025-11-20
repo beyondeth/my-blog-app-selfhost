@@ -7,12 +7,17 @@ on:
       - main
   workflow_dispatch:  # 수동 실행 허용
 
+# Concurrency control - 동시 실행 방지
+concurrency:
+  group: deploy-production-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
     timeout-minutes: 120  # Increased to 120 minutes to allow server-side builds to finish
-    environment: production  # Environment Secrets 사용
+    environment: production  # Environment Secrets使用
 
     steps:
       # 0. BuildKit 비활성화 (안정성 확보)
@@ -67,8 +72,13 @@ jobs:
             git reset --hard origin/main
             echo "✓ Git Pull 완료"
 
-            # 배포 스크립트 실행
-            bash scripts/deploy-production.sh
+            # 현재 커밋 해시 기록
+            CURRENT_COMMIT=$(git rev-parse HEAD)
+            echo "현재 커밋: $CURRENT_COMMIT"
+
+            # 강제 빌드 모드로 배포 스크립트 실행
+            echo "FORCE_BUILD=true 설정으로 강제 빌드"
+            FORCE_BUILD=true bash scripts/deploy-production.sh
 
             echo "=========================================="
             echo "배포 완료: $(date)"
