@@ -9,7 +9,7 @@
 - Backend: Port 3000 (`pnpm start:dev`)
 
 ### Code Comments
-- Add detailed Korean comments explaining code functionality
+- Add detailed Korean comments explaining code functionality.
 - Focus on complex logic and business rules
 
 ## Framework Principles
