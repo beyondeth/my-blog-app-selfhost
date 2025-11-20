@@ -7,3 +7,5 @@ network-concurrency=2
 fetch-retries=3
 fetch-retry-mintimeout=1000
 fetch-retry-maxtimeout=120000
+cache-dir=/tmp/.pnpm-store
+global-dir=/tmp/.pnpm-global
