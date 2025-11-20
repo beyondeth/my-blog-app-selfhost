@@ -104,7 +104,7 @@ export COMPOSE_DOCKER_CLI_BUILD=0
 
 # 순차적 빌드 (리소스 집중)
 log_info "1/3 Backend 이미지 빌드 시작..."
-if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache backend; then
+if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build backend; then
     log_info "✓ Backend 빌드 완료"
 else
     log_error "✗ Backend 빌드 실패"
@@ -112,7 +112,7 @@ else
 fi
 
 log_info "2/3 Frontend 이미지 빌드 시작..."
-if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache frontend; then
+if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build frontend; then
     log_info "✓ Frontend 빌드 완료"
 else
     log_error "✗ Frontend 빌드 실패"
@@ -120,7 +120,7 @@ else
 fi
 
 log_info "3/3 MCP Proxy 이미지 빌드 시작..."
-if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build --no-cache mcp-proxy; then
+if docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build mcp-proxy; then
     log_info "✓ MCP Proxy 빌드 완료"
 else
     log_error "✗ MCP Proxy 빌드 실패"
