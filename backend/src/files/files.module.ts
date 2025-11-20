@@ -16,6 +16,7 @@ import { ContextualFileService } from './services/contextual-file.service';
 import { FileMigrationService } from './services/file-migration.service';
 import { FileMonitoringService } from './services/file-monitoring.service';
 import { FileLifecycleService } from './services/file-lifecycle.service';
+import { ExternalImageDownloadService } from './services/external-image-download.service';
 import s3Config from '../config/s3.config';
 import cdnConfig from '../config/cdn.config';
 
@@ -39,6 +40,7 @@ import cdnConfig from '../config/cdn.config';
     FileMigrationService,
     FileMonitoringService,
     FileLifecycleService,
+    ExternalImageDownloadService,
   ],
   exports: [
     FilesService,
@@ -46,6 +48,7 @@ import cdnConfig from '../config/cdn.config';
     CdnService,
     ContextualFileService,
     FileLifecycleService,
+    ExternalImageDownloadService,
   ],
 })
 export class FilesModule {} 
