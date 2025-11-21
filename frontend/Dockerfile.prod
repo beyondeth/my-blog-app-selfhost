@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # pnpm 설치
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@9
 
 # 네이티브 모듈 빌드 허용 (Next.js 필수)
 # ENV MSGPACKR_NO_EXTRACT=1
@@ -50,6 +50,9 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
     --mount=type=cache,id=pnpm-node-modules,target=/app/node_modules \
     pnpm install --offline --frozen-lockfile --no-optional
 
+# Verify Next.js installation
+RUN ls -la /app/node_modules/.bin/next || (echo "Next.js not found!" && exit 1)
+
 # ============================================
 # Stage 2: Builder (Next.js 빌드)
 # ============================================
@@ -67,7 +70,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # pnpm 설치
-RUN npm install -g pnpm@latest
+RUN npm install -g pnpm@9
 
 # 이전 단계에서 설치한 node_modules 복사
 COPY --from=deps /app/node_modules ./node_modules
