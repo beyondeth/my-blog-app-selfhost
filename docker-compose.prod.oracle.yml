@@ -25,14 +25,10 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: ./frontend/Dockerfile.prod
+      dockerfile: Dockerfile.prod
       target: runner
-      # BuildKit 내부 캐시만 사용 (parallel 빌드와 호환)
       # 빌드 타임 환경변수 (Next.js NEXT_PUBLIC_* 변수 주입)
       args:
-        # BuildKit 인라인 캐시 활성화
-        BUILDKIT_INLINE_CACHE: 1
-        # 기본값 제거 - 프로덕션에서는 변수 필수
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
         NEXT_PUBLIC_BACKEND_URL: ${NEXT_PUBLIC_BACKEND_URL}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
@@ -74,11 +70,6 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-      # BuildKit 내부 캐시만 사용 (parallel 빌드와 호환)
-      # 빌드 인자
-      args:
-        # BuildKit 인라인 캐시 활성화
-        BUILDKIT_INLINE_CACHE: 1
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-backend
     env_file:
       - .env.production
@@ -244,11 +235,6 @@ services:
       context: ./mcp-proxy-server
       dockerfile: Dockerfile
       target: production
-      # BuildKit 내부 캐시만 사용 (parallel 빌드와 호환)
-      # 빌드 인자
-      args:
-        # BuildKit 인라인 캐시 활성화
-        BUILDKIT_INLINE_CACHE: 1
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-mcp-proxy
     env_file:
       - .env.production
