@@ -120,7 +120,8 @@ RUN echo "Checking required environment variables..." && \
 
 # Next.js 빌드 (Standalone 모드)
 # next.config.js에 output: 'standalone' 설정 필요
-RUN npx next build
+# Turbopack 비활성화 및 프로젝트 루트 명확히 지정
+RUN cd /app && NEXT_TURBOPACK=0 npx next build
 
 # ============================================
 # Stage 3: Runner (최종 런타임)
