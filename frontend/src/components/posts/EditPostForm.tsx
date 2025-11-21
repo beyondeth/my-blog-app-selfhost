@@ -97,7 +97,7 @@ export default function EditPostForm({
       content: initialData?.content || '',
       tags: initialData?.tags || [],
       thumbnail: initialData?.thumbnail || '',
-      thumbnailImageId: initialData?.thumbnailImageId || '', // 초기값 설정
+      thumbnailImageId: initialData?.thumbnailImageId || undefined, // 빈 문자열 대신 undefined 사용
       attachedFileIds: [],
     },
   });
