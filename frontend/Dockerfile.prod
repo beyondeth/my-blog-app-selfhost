@@ -19,7 +19,7 @@ FROM node:22-slim AS deps
 # 작업 디렉토리
 WORKDIR /app
 
-# 시스템 패키지 설치: 빌드 도구 및 libvips (sharp 빌드/바이너리 관련)
+# 시스템 패키지 설치
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         python3 \
@@ -29,58 +29,40 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libvips-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# pnpm 설치
-RUN npm install -g pnpm@9
+# package.json과 package-lock.json 복사
+COPY package.json package-lock.json* ./
 
-# 네이티브 모듈 빌드 허용 (Next.js 필수)
-# ENV MSGPACKR_NO_EXTRACT=1
-# ENV SKIP_NODE_GYP_BUILD=1
-
-# package.json과 pnpm-lock.yaml 복사 (캐싱 최적화)
-COPY package.json pnpm-lock.yaml* ./
-
-# Use BuildKit cache mounts to speed up pnpm store and node_modules writes.
-# First fetch packages into the pnpm store (cacheable), then install offline
-# into a cached node_modules mount. This dramatically reduces I/O on repeated builds.
-RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
-    pnpm fetch
-
-# Install dependencies (online mode for reliability)
-RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
-    --mount=type=cache,id=pnpm-node-modules,target=/app/node_modules \
-    pnpm install --frozen-lockfile
-
-# Verify Next.js installation
-RUN ls -la /app/node_modules/.bin/next || (echo "Next.js not found!" && exit 1)
+# 모든 의존성 설치 (devDependencies 포함)
+RUN npm ci
 
 # ============================================
 # Stage 2: Builder (Next.js 빌드)
 # ============================================
-
 FROM node:22-slim AS builder
 
 WORKDIR /app
 
-# 빌드에 필요한 시스템 패키지 (이미 deps에서 설치했지만 안전하게 보장)
+# 빌드에 필요한 시스템 패키지
 RUN apt-get update && apt-get install -y --no-install-recommends \
         python3 \
         build-essential \
         make \
         g++ \
+        libvips-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# pnpm 설치
-RUN npm install -g pnpm@9
-
-# 이전 단계에서 설치한 node_modules 복사
-COPY --from=deps /app/node_modules ./node_modules
-
-# 소스 코드 복사 (빌드 컨텍스트가 ./frontend 임을 가정)
+# 소스 코드 복사 (의존성 설치 전)
 COPY . .
+
+# 의존성 복사
+COPY --from=deps /app/node_modules ./node_modules
 
 # Next.js 환경 변수 (빌드 타임)
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
+
+# Turbopack 비활성화 (ARM 환경 안정성)
+ENV NEXT_TURBOPACK=0
 
 # 빌드 인자로 API URL 받기
 ARG NEXT_PUBLIC_API_URL
@@ -96,33 +78,8 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_MIXPANEL_TOKEN=$NEXT_PUBLIC_MIXPANEL_TOKEN
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 
-# 필수 환경변수 유효성 검사
-RUN echo "Checking required environment variables..." && \
-    if [ -z "$NEXT_PUBLIC_API_URL" ]; then \
-        echo "❌ Error: NEXT_PUBLIC_API_URL is required for build"; \
-        exit 1; \
-    fi && \
-    if [ -z "$NEXT_PUBLIC_BACKEND_URL" ]; then \
-        echo "❌ Error: NEXT_PUBLIC_BACKEND_URL is required for build"; \
-        exit 1; \
-    fi && \
-    if [ -z "$NEXT_PUBLIC_MIXPANEL_TOKEN" ]; then \
-        echo "❌ Error: NEXT_PUBLIC_MIXPANEL_TOKEN is required for build"; \
-        exit 1; \
-    fi && \
-    if [ -z "$NEXT_PUBLIC_GA_MEASUREMENT_ID" ]; then \
-        echo "❌ Error: NEXT_PUBLIC_GA_MEASUREMENT_ID is required for build"; \
-        exit 1; \
-    fi && \
-    echo "✅ All required environment variables are set" && \
-    echo "   - API_URL: $NEXT_PUBLIC_API_URL" && \
-    echo "   - BACKEND_URL: $NEXT_PUBLIC_BACKEND_URL" && \
-    echo "   - MIXPANEL: [SET]" && \
-    echo "   - GA_MEASUREMENT_ID: [SET]"
-
-# Next.js 빌드 (Standalone 모드)
-# next.config.js에 output: 'standalone' 설정 필요
-RUN pnpm build
+# Next.js 빌드 (Standalone 모드, Webpack 사용)
+RUN npm run build
 
 # ============================================
 # Stage 3: Runner (최종 런타임)
@@ -139,14 +96,14 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HOSTNAME="0.0.0.0"
+ENV PORT=3000
 
 # Next.js Standalone 빌드 결과 복사
-# .next/standalone 디렉토리에 최소한의 파일만 포함됨
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/public ./public
 
-# Sharp 복사 (Next.js 이미지 최적화용 - native 모듈)
+# Sharp 복사 (이미지 최적화용)
 COPY --from=builder --chown=nextjs:nodejs /app/node_modules/sharp ./node_modules/sharp
 
 # 비-루트 사용자로 전환
@@ -154,9 +111,6 @@ USER nextjs
 
 # 포트 노출
 EXPOSE 3000
-
-# 환경 변수 (런타임)
-ENV PORT=3000
 
 # Standalone 서버 실행
 CMD ["node", "server.js"]
