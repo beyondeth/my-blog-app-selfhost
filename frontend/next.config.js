@@ -70,9 +70,8 @@ const nextConfig = {
 
   // Turbopack 설정 (Next.js 16 기본값)
   turbopack: {
-    // frontend 디렉토리를 워크스페이스 루트로 명시 (중복 lockfile 경고 해결)
-    // 상대 경로 사용으로 CI/CD 빌드 환경과 무관하게 일관성 보장
-    root: '.',
+    // Docker 환경에서 절대 경로로 명시적으로 워크스페이스 루트 지정
+    root: process.cwd(),
     // Turbopack은 require.resolve() 절대 경로를 처리 못함 → 패키지명만 사용
     resolveAlias: {
       cytoscape: 'cytoscape',
