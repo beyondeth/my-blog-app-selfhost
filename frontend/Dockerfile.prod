@@ -68,9 +68,9 @@ ENV NODE_ENV=production
 # Turbopack 비활성화 (Next.js 16 호환성 문제 해결)
 ENV NEXT_TURBOPACK=0
 
-# 빌드 최적화 환경 변수 (ARM64 네이티브 컴파일 완전 방지)
-ENV NODE_OPTIONS="--max-old-space-size=4096"
-ENV NEXT_BUILD_WORKERS=1
+# 빌드 최적화 환경 변수 (병렬 빌드 및 메모리 최적화)
+ENV NODE_OPTIONS="--max-old-space-size=3072"
+ENV NEXT_BUILD_WORKERS=4
 ENV npm_config_build_from_source=false
 ENV npm_config_platform=linux
 ENV npm_config_platform_linux=linux

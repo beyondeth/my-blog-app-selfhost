@@ -10,6 +10,7 @@ import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
 import { FiHeart, FiMessageCircle, FiEye, FiTarget, FiTag, FiAlertCircle } from 'react-icons/fi';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
+import { isGeminiImageUrl } from '@/utils/imageUtils';
 
 interface PostArticleProps {
   post: Post;
@@ -479,6 +480,7 @@ const PostArticle = React.memo(function PostArticle({
                 className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
                 sizes={`${thumbnailSize.width}px`}
                 priority={priority}
+                unoptimized={isGeminiImageUrl(post.thumbnail)}
               />
             </div>
 
@@ -495,6 +497,7 @@ const PostArticle = React.memo(function PostArticle({
                 className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
                 sizes={`${thumbnailSize.width}px`}
                 priority={priority}
+                unoptimized={isGeminiImageUrl(post.thumbnail)}
               />
             </div>
           </>
