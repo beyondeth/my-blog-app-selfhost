@@ -24,8 +24,8 @@ fetch-retry-maxtimeout=10000
 cache-dir=/home/ubuntu/.pnpm-store
 global-dir=/home/ubuntu/.pnpm-global
 
-# 불필요한 패키지 건너뛰기 (빌드 속도)
-ignore-optional=true
+# 불필요한 패키지 건너뛰기 (빌드 속도) - Oracle ARM64에서는 필수
+# ignore-optional=true
 
 # 빌드 스크립트 건너뛰기 (설치 시간 단축)
 ignore-scripts=false
