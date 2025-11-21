@@ -16,7 +16,7 @@ jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # 타임아웃 60분으로 단축 (최적화 후)
+    timeout-minutes: 30  # 타임아웃 30분으로 단축 (최적화 완료)
     environment: production  # Environment Secrets 사용
 
     steps:
@@ -31,18 +31,19 @@ jobs:
           ${{ secrets.ENV_FILE }}
           EOF
 
-      # 3. .env.production 파일을 서버에 업로드
-      - name: Upload .env.production to server
+      # 3. 배포 스크립트 및 환경 파일 업로드
+      - name: Upload deployment files to server
         uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ secrets.DEPLOY_HOST }}
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: ".env.production"
+          source: ".env.production,scripts/deploy-production-optimized.sh"
           target: "/home/ubuntu/my-blog-app/"
           overwrite: true
+          strip_components: 0
 
-      # 4. SSH로 프로덕션 서버 접속 및 배포
+      # 4. SSH로 배포 스크립트 실행
       - name: Deploy via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -50,9 +51,8 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 3600s  # 60분 SSH 타임아웃 (최적화로 단축)
-          # Keep SSH connection alive
-          command_timeout: 3600s
+          timeout: 900s  # 15분 SSH 타임아웃
+          command_timeout: 900s
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
@@ -60,103 +60,15 @@ jobs:
             echo "프로덕션 배포 시작: $(date)"
             echo "=========================================="
 
+            # 스크립트 실행 권한 설정
+            chmod +x /home/ubuntu/my-blog-app/scripts/deploy-production-optimized.sh
+
+            # 최적화된 배포 스크립트 실행
             cd /home/ubuntu/my-blog-app
-
-            # 최신 코드 가져오기
-            echo "Step 0: Git Pull (main 브랜치)"
-            git fetch origin main
-            git reset --hard origin/main
-            echo "✓ Git Pull 완료"
-
-            # 현재 커밋 해시 기록
-            CURRENT_COMMIT=$(git rev-parse HEAD)
-            echo "현재 커밋: $CURRENT_COMMIT"
-
-            # 환경 설정 (BuildKit 최적화)
-            export DOCKER_BUILDKIT=1
-            export COMPOSE_DOCKER_CLI_BUILD=1
-            export BUILDKIT_INLINE_CACHE=1
-            export BUILDKIT_PROGRESS=plain
-
-            # 사전 체크
-            echo "사전 체크 시작..."
-
-            # 디스크 공간 확인
-            DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
-            if [ "$DISK_USAGE" -ge 85 ]; then
-              echo "디스크 공간 부족 (${DISK_USAGE}%). 정리 중..."
-              # 오래된 이미지만 삭제, 캐시는 보존
-              docker image prune -f --filter "until=24h" || true
-              sleep 2
-            fi
-
-            # 메모리 확인
-            AVAILABLE_MEM=$(free -m | awk 'NR==2{printf "%.0f", $7}')
-            if [ "$AVAILABLE_MEM" -lt 4096 ]; then
-              echo "경고: 사용 가능한 메모리가 4GB 미만입니다 (${AVAILABLE_MEM}MB)"
-            fi
-
-            # Docker Buildx 설정 및 캐시 활용 준비
-            docker buildx version || docker buildx install
-            docker buildx use default || docker buildx create --use
-
-            # 병렬 빌드 실행 (캐시 최대 활용, CACHEBUST 제거)
-            echo "=== 병렬 빌드 시작 ==="
-            echo "Backend, Frontend, MCP Proxy 동시 빌드 중..."
-            echo "Docker 캐시 활용 중..."
-
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build \
-              --parallel \
-              backend frontend mcp-proxy
-
-            echo "✅ 모든 이미지 빌드 완료"
-
-            # 컨테이너 재시작 (병렬 처리 최적화)
-            echo "=== 컨테이너 재시작 시작 (병렬 처리) ==="
-
-            # 데이터베이스 및 캐시 먼저 시작
-            echo "Step 1: 데이터베이스 및 캐시 서비스 시작..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d postgres redis pgbouncer
-
-            # 데이터베이스 헬스 체크 대기 (시간 단축)
-            echo "Step 2: 데이터베이스 초기화 대기 (최대 30초)..."
-            timeout 30 bash -c "until docker compose -f docker-compose.prod.oracle.yml --env-file .env.production exec -T postgres pg_isready -U \${DB_USER:-postgres}; do sleep 1; done"
-
-            # 모든 앱 서비스 동시 시작 (병렬)
-            echo "Step 3: 모든 애플리케이션 서비스 동시 시작..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d \
-              backend frontend mcp-proxy victoriametrics grafana redis-exporter
-
-            # 병렬 헬스 체크 (백엔드와 프론트엔드 동시에 체크)
-            echo "Step 4: 서비스 헬스 체크 (병렬)..."
-
-            # 백엔드 헬스 체크 (백그라운드)
-            (timeout 60 bash -c "until curl -sf http://localhost:3000/health > /dev/null 2>&1; do sleep 2; done" && echo "✓ Backend 준비 완료") &
-            BACKEND_PID=$!
-
-            # 프론트엔드 헬스 체크 (백그라운드)
-            (timeout 60 bash -c "until curl -sf http://localhost:3001 > /dev/null 2>&1; do sleep 2; done" && echo "✓ Frontend 준비 완료") &
-            FRONTEND_PID=$!
-
-            # MCP Proxy 헬스 체크 (백그라운드)
-            (timeout 30 bash -c "until curl -sf http://localhost:4001/health > /dev/null 2>&1; do sleep 2; done" && echo "✓ MCP Proxy 준비 완료") &
-            MCP_PID=$!
-
-            # 모든 헬스 체크 완료 대기
-            wait $BACKEND_PID || echo "⚠️ Backend 헬스체크 실패 (계속 진행)"
-            wait $FRONTEND_PID || echo "⚠️ Frontend 헬스체크 실패 (계속 진행)"
-            wait $MCP_PID || echo "⚠️ MCP Proxy 헬스체크 실패 (계속 진행)"
-
-            # 최종 상태 확인 및 헬스 체크
-            echo "=== 최종 상태 확인 ==="
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production ps
-
-            # 데이터베이스 마이그레이션 상태 확인
-            echo "데이터베이스 마이그레이션 상태 확인..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production exec -T backend pnpm migration:status || echo "⚠️ 마이그레이션 상태 확인 실패"
+            bash scripts/deploy-production-optimized.sh
 
             echo "=========================================="
-            echo "✅ 배포 완료: $(date)"
+            echo "✅ GitHub Actions 배포 완료"
             echo "=========================================="
 
       # 5. 배포 실패 시 알림
