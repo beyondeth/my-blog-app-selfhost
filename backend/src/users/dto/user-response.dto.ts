@@ -18,6 +18,15 @@ export class UserResponseDto {
   @Expose()
   id: string;
 
+  @Expose()
+  username: string;
+
+  @Expose()
+  profileImage?: string;
+
+  @Expose()
+  bio?: string;
+
   // 민감한 정보는 명시적으로 제외
   @Exclude()
   email: string;

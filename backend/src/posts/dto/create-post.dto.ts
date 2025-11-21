@@ -1,5 +1,6 @@
 import { IsString, IsOptional, IsArray, IsNumber, IsBoolean, Min, Max, MaxLength, Matches, IsUUID } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { Transform } from 'class-transformer';
 
 export class 
 CreatePostDto {
@@ -24,6 +25,13 @@ CreatePostDto {
     example: '550e8400-e29b-41d4-a716-446655440000',
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    // 빈 문자열, null, undefined를 모두 undefined로 통일
+    if (value === '' || value === null || value === undefined) {
+      return undefined;
+    }
+    return value;
+  })
   @IsUUID('4', { message: '썸네일 ID는 유효한 UUID v4 형식이어야 합니다' })
   thumbnailImageId?: string;
 
