@@ -46,7 +46,7 @@ module.exports = {
       // Graceful Shutdown/Reload 설정
       kill_timeout: 5000, // SIGINT 후 5초 대기 후 SIGKILL
       wait_ready: true, // 앱에서 process.send('ready') 신호 대기
-      listen_timeout: 20000, // ready 신호 대기 시간 (20초, Cold Start 고려)
+      listen_timeout: 10000, // ready 신호 대기 시간 (10초로 단축, Cold Start 고려)
 
       // 로그 설정
       error_file: '/app/logs/pm2-error.log', // 에러 로그 경로
