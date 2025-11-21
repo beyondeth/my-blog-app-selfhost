@@ -1,14 +1,10 @@
 name: Deploy to Production (Oracle Free Tier)
 
-# 자동배포 트리거 변경: 프론트엔드 빌드( GHCR push ) 완료 후 실행
+# 메인 브랜치 푸시 시 자동 배포
 on:
-  workflow_run:
-    workflows:
-      - "Build and Push Frontend (GHCR)"
-      - "Build and Push Backend (GHCR)"
-      - "Build and Push MCP Proxy (GHCR)"
-    types:
-      - completed
+  push:
+    branches:
+      - main
   workflow_dispatch:  # 수동 실행 허용
 
 # Concurrency control - 동시 실행 방지
@@ -18,19 +14,12 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # Reduced timeout as we are not building
-    environment: production  # Environment Secrets使用
+    timeout-minutes: 60  # 타임아웃 60분으로 단축
+    environment: production  # Environment Secrets 사용
 
     steps:
-      # 0. BuildKit 비활성화 (안정성 확보)
-      - name: Disable Docker BuildKit
-        run: |
-          echo "DOCKER_BUILDKIT=0" >> $GITHUB_ENV
-          echo "COMPOSE_DOCKER_CLI_BUILD=0" >> $GITHUB_ENV
-
       # 1. 코드 체크아웃
       - name: Checkout code
         uses: actions/checkout@v4
@@ -61,10 +50,9 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          # Timeout in seconds (30 minutes = 1800s)
-          timeout: 1800
-          # Keep SSH connection alive to prevent idle timeouts on long-running commands
-          ssh_options: -o ServerAliveInterval=30 -o ServerAliveCountMax=3
+          timeout: 3600  # 60분 타임아웃
+          # Keep SSH connection alive
+          command_timeout: 3600
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
@@ -74,7 +62,7 @@ jobs:
 
             cd /home/ubuntu/my-blog-app
 
-            # 최신 코드 가져오기 (배포 스크립트 포함)
+            # 최신 코드 가져오기
             echo "Step 0: Git Pull (main 브랜치)"
             git fetch origin main
             git reset --hard origin/main
@@ -83,40 +71,24 @@ jobs:
             # 현재 커밋 해시 기록
             CURRENT_COMMIT=$(git rev-parse HEAD)
             echo "현재 커밋: $CURRENT_COMMIT"
-            
-            # Triggering commit SHA (image tag)
-            TRIGGER_COMMIT="${{ github.event.workflow_run.head_sha }}"
-            if [ -z "$TRIGGER_COMMIT" ]; then
-              TRIGGER_COMMIT="$CURRENT_COMMIT"
-            fi
-            echo "이미지 태그 (Commit SHA): $TRIGGER_COMMIT"
 
-            # 이미지 Pull 모드로 배포 스크립트 실행
-            echo "PULL_IMAGES=true 설정으로 배포"
-            export IMAGE_TAG=$TRIGGER_COMMIT
-            PULL_IMAGES=true bash scripts/deploy-production.sh
+            # 배포 스크립트 실행 (BuildKit + 병렬 빌드)
+            echo "배포 스크립트 실행 중..."
+            bash scripts/deploy-production.sh
 
             echo "=========================================="
             echo "배포 완료: $(date)"
             echo "=========================================="
 
-      # 3. 배포 실패 시 알림 (선택사항)
+      # 5. 배포 실패 시 알림
       - name: Notify on failure
         if: failure()
         run: |
           echo "❌ 프로덕션 배포 실패!"
           echo "롤백을 실행하세요: ssh ubuntu@server 'cd /home/ubuntu/my-blog-app && bash scripts/rollback.sh'"
-          # Slack/Discord 알림 (선택사항)
-          # curl -X POST -H 'Content-type: application/json' \
-          #   --data '{"text":"❌ 프로덕션 배포 실패"}' \
-          #   ${{ secrets.SLACK_WEBHOOK_URL }}
 
-      # 4. 배포 성공 시 알림 (선택사항)
+      # 6. 배포 성공 시 알림
       - name: Notify on success
         if: success()
         run: |
           echo "✅ 프로덕션 배포 성공!"
-          # Slack/Discord 알림 (선택사항)
-          # curl -X POST -H 'Content-type: application/json' \
-          #   --data '{"text":"✅ 프로덕션 배포 성공"}' \
-          #   ${{ secrets.SLACK_WEBHOOK_URL }}
