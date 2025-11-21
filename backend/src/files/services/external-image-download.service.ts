@@ -13,8 +13,10 @@ import { FileContext, FileContextType, FilePurpose } from '../entities/file-cont
 @Injectable()
 export class ExternalImageDownloadService {
   private readonly logger = new Logger(ExternalImageDownloadService.name);
-  private readonly downloadTimeout = 30000; // 30초
+  private readonly downloadTimeout = 10000; // 10초로 단축 (Gemini URL 만료 대비)
   private readonly maxFileSize = 10 * 1024 * 1024; // 10MB
+  private readonly maxRetries = 3; // 재시도 횟수
+  private readonly retryDelay = 1000; // 재시도 간격 (ms)
 
   constructor(
     private readonly configService: ConfigService,
@@ -28,6 +30,7 @@ export class ExternalImageDownloadService {
 
   /**
    * 외부 이미지 URL 목록을 다운로드하여 S3에 업로드하고 File 엔티티 배열 반환
+   * 모니터링 통계 수집 포함
    * @param imageUrls 외부 이미지 URL 배열
    * @param userId 사용자 ID
    * @returns 성공적으로 업로드된 File 엔티티 배열
@@ -37,80 +40,200 @@ export class ExternalImageDownloadService {
       return [];
     }
 
-    this.logger.log(`Starting download of ${imageUrls.length} external images for user: ${userId}`);
+    const startTime = Date.now();
+    const downloadStats = {
+      total: imageUrls.length,
+      successful: 0,
+      failed: 0,
+      geminiUrls: 0,
+      duplicates: 0,
+      totalBytes: 0,
+      errors: [] as { url: string; error: string }[],
+    };
+
+    // Gemini URL 카운트
+    downloadStats.geminiUrls = imageUrls.filter(url => this.isGeminiImageUrl(url)).length;
+
+    this.logger.log(`Starting download of ${imageUrls.length} external images`, {
+      userId,
+      geminiCount: downloadStats.geminiUrls,
+      totalUrls: downloadStats.total,
+    });
+
     const results: File[] = [];
 
     for (const imageUrl of imageUrls) {
       try {
         // 중복 URL 건너뛰기 (metadata에 originalUrl 저장)
         if (results.some(file => file.metadata?.originalUrl === imageUrl)) {
+          downloadStats.duplicates++;
+          this.logger.debug(`Skipping duplicate URL: ${imageUrl}`);
           continue;
         }
 
         const file = await this.downloadAndProcessImage(imageUrl, userId);
         if (file) {
           results.push(file);
-          this.logger.log(`Successfully downloaded and processed: ${imageUrl}`);
+          downloadStats.successful++;
+          downloadStats.totalBytes += file.fileSize || 0;
+          this.logger.log(`Successfully downloaded: ${imageUrl}`, {
+            fileId: file.id,
+            size: file.fileSize,
+            isGemini: this.isGeminiImageUrl(imageUrl),
+          });
+        } else {
+          downloadStats.failed++;
+          downloadStats.errors.push({
+            url: imageUrl,
+            error: 'Download failed after retries',
+          });
         }
       } catch (error) {
-        this.logger.error(`Failed to download image: ${imageUrl}`, error.stack);
+        downloadStats.failed++;
+        downloadStats.errors.push({
+          url: imageUrl,
+          error: error.message || 'Unknown error',
+        });
+        this.logger.error(`Failed to download image: ${imageUrl}`, {
+          error: error.message,
+          stack: error.stack,
+        });
         // 개별 이미지 실패는 전체 프로세스를 중단시키지 않음
       }
     }
 
-    this.logger.log(`Downloaded ${results.length}/${imageUrls.length} images successfully`);
+    const duration = Date.now() - startTime;
+
+    // 최종 통계 로깅
+    this.logger.log(`Image download batch completed`, {
+      ...downloadStats,
+      duration: `${duration}ms`,
+      successRate: `${((downloadStats.successful / downloadStats.total) * 100).toFixed(2)}%`,
+      averageSize: downloadStats.successful > 0
+        ? `${Math.round(downloadStats.totalBytes / downloadStats.successful / 1024)}KB`
+        : '0KB',
+    });
+
+    // 실패한 URL이 있으면 경고 로그
+    if (downloadStats.errors.length > 0) {
+      this.logger.warn(`Failed to download ${downloadStats.errors.length} images`, {
+        errors: downloadStats.errors,
+      });
+    }
+
     return results;
   }
 
   /**
-   * 단일 외부 이미지를 다운로드하고 처리
+   * 단일 외부 이미지를 다운로드하고 처리 (재시도 로직 포함)
    * @param imageUrl 이미지 URL
    * @param userId 사용자 ID
    * @returns File 엔티티 또는 null (실패 시)
    */
   private async downloadAndProcessImage(imageUrl: string, userId: string): Promise<File | null> {
-    try {
-      // 1. 이미지 다운로드
-      const response = await axios.get(imageUrl, {
-        responseType: 'arraybuffer',
-        timeout: this.downloadTimeout,
-        headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; CodebaseBlog/1.0; +https://codebase.blog)',
-        },
-      });
-
-      // 2. 응답 검증
-      if (!this.isValidImageResponse(response)) {
-        throw new Error(`Invalid image response: ${response.status} ${response.statusText}`);
-      }
-
-      // 3. 파일 크기 검증
-      const buffer = Buffer.from(response.data);
-      if (buffer.length > this.maxFileSize) {
-        throw new Error(`File too large: ${buffer.length} bytes`);
-      }
-
-      // 4. 이미지 포맷 확인 및 변환
-      const processedBuffer = await this.processImage(buffer);
-      if (!processedBuffer) {
-        throw new Error('Failed to process image');
-      }
-
-      // 5. WebP 포맷으로 변환
-      const webpBuffer = await this.convertToWebP(processedBuffer);
-
-      // 6. S3에 업로드
-      const fileKey = await this.uploadToS3(webpBuffer, imageUrl);
-
-      // 7. File 엔티티 생성
-      const file = await this.createFileEntity(fileKey, webpBuffer, imageUrl, userId);
-
-      return file;
-
-    } catch (error) {
-      this.logger.error(`Error processing image ${imageUrl}:`, error.message);
-      return null;
+    // Gemini URL 감지
+    const isGeminiUrl = this.isGeminiImageUrl(imageUrl);
+    if (isGeminiUrl) {
+      this.logger.log(`Detected Gemini image URL: ${imageUrl}`);
     }
+
+    // 재시도 로직
+    for (let attempt = 1; attempt <= this.maxRetries; attempt++) {
+      try {
+        // 1. 이미지 다운로드
+        this.logger.debug(`Downloading image (attempt ${attempt}/${this.maxRetries}): ${imageUrl}`);
+        const response = await axios.get(imageUrl, {
+          responseType: 'arraybuffer',
+          timeout: this.downloadTimeout,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (compatible; CodebaseBlog/1.0; +https://codebase.blog)',
+            // Gemini URL의 경우 추가 헤더
+            ...(isGeminiUrl && {
+              'Accept': 'image/webp,image/avif,image/*,*/*;q=0.8',
+              'Cache-Control': 'no-cache',
+            }),
+          },
+        });
+
+        // 2. 응답 검증
+        if (!this.isValidImageResponse(response)) {
+          throw new Error(`Invalid image response: ${response.status} ${response.statusText}`);
+        }
+
+        // 3. 파일 크기 검증
+        const buffer = Buffer.from(response.data);
+        if (buffer.length > this.maxFileSize) {
+          throw new Error(`File too large: ${buffer.length} bytes (max: ${this.maxFileSize})`);
+        }
+
+        // 4. 이미지 포맷 확인 및 변환
+        const processedBuffer = await this.processImage(buffer);
+        if (!processedBuffer) {
+          throw new Error('Failed to process image');
+        }
+
+        // 5. WebP 포맷으로 변환
+        const webpBuffer = await this.convertToWebP(processedBuffer);
+
+        // 6. S3에 업로드
+        const fileKey = await this.uploadToS3(webpBuffer, imageUrl);
+
+        // 7. File 엔티티 생성
+        const file = await this.createFileEntity(fileKey, webpBuffer, imageUrl, userId);
+
+        this.logger.log(`Successfully processed image (attempt ${attempt}): ${imageUrl}`);
+        return file;
+
+      } catch (error) {
+        const errorMessage = error.response?.statusText || error.message || 'Unknown error';
+        const statusCode = error.response?.status;
+
+        this.logger.warn(
+          `Failed to download image (attempt ${attempt}/${this.maxRetries}): ${imageUrl}`,
+          {
+            error: errorMessage,
+            statusCode,
+            isGemini: isGeminiUrl,
+            responseData: error.response?.data ? 'Data received' : 'No data',
+          }
+        );
+
+        // 마지막 시도가 아니면 대기 후 재시도
+        if (attempt < this.maxRetries) {
+          const delay = this.retryDelay * attempt; // 점진적 지연
+          this.logger.debug(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
+        } else {
+          // 모든 시도 실패
+          this.logger.error(
+            `All attempts failed for image: ${imageUrl}`,
+            {
+              error: errorMessage,
+              statusCode,
+              isGemini: isGeminiUrl,
+              attempts: attempt,
+            }
+          );
+          return null;
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Gemini 생성 이미지 URL인지 확인
+   * @param url 확인할 URL
+   * @returns Gemini URL 여부
+   */
+  private isGeminiImageUrl(url: string): boolean {
+    return (
+      url.includes('storage.googleapis.com/gemini') ||
+      url.includes('gemini') && url.includes('googleapis.com') ||
+      url.includes('X-Goog-Signature') ||
+      url.includes('X-Goog-Algorithm')
+    );
   }
 
   /**

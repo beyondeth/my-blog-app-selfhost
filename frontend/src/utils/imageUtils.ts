@@ -120,19 +120,47 @@ export function normalizeImageUrl(url: string): string {
       }
     }
 
-    // Google Cloud Storage URL 처리
-    if (url.includes('storage.googleapis.com')) {
-      // Google Storage URL에서 키 추출
-      // 형식: https://storage.googleapis.com/{bucket}/{key} 또는 https://bucket.storage.googleapis.com/{key}
-      const match = url.match(/(?:storage\.googleapis\.com\/)[^\/]+\/(.+?)(\?|$)/);
-      if (match && match[1]) {
-        const s3Key = match[1];
-        const proxyUrl = getProxyImageUrl(s3Key);
-        if (DEBUG_MODE) console.log('[normalizeImageUrl] Google Storage URL → Proxy:', { input: url, key: s3Key, output: proxyUrl });
-        return proxyUrl;
+    // Google Cloud Storage URL 처리 (Gemini 이미지 포함)
+    // Gemini는 보통 임시 서명된 URL을 생성하므로 특별 처리 필요
+    if (url.includes('storage.googleapis.com') || url.includes('gemini') && url.includes('googleapis.com')) {
+      // Gemini 이미지는 프록시 사용 불가 (임시 토큰, 만료 시간 있음)
+      // CDN에 이미 업로드된 버전이 있는지 확인하는 로직이 필요
+      // 현재는 googleapis URL을 그대로 반환하되, Next.js Image 컴포넌트에서 unoptimized 사용 권장
+      if (DEBUG_MODE) {
+        console.log('[normalizeImageUrl] Google Storage/Gemini URL detected:', url);
+        console.log('[normalizeImageUrl] Note: Gemini URLs require unoptimized Image component');
       }
-      // 처리 실패 시 직접 사용
-      if (DEBUG_MODE) console.log('[normalizeImageUrl] Google Storage URL, using directly:', url);
+
+      // 더 강력한 regex 패턴으로 다양한 googleapis URL 형식 지원
+      // 1. https://storage.googleapis.com/{bucket}/{key}
+      // 2. https://{bucket}.storage.googleapis.com/{key}
+      // 3. https://storage.googleapis.com/gemini-generative-ai-dev-tools-prod/{uuid}
+      const patterns = [
+        /storage\.googleapis\.com\/([^\/]+)\/(.+?)(\?|$)/,  // 표준 형식
+        /([^.]+)\.storage\.googleapis\.com\/(.+?)(\?|$)/,    // 버킷 서브도메인 형식
+        /storage\.googleapis\.com\/gemini-[^\/]+\/(.+?)(\?|$)/  // Gemini 특수 형식
+      ];
+
+      for (const pattern of patterns) {
+        const match = url.match(pattern);
+        if (match) {
+          // Gemini URL의 경우 프록시 시도하지 않고 직접 사용
+          // (백엔드에서 이미 다운로드하여 CDN에 저장하는 로직이 있음)
+          if (url.includes('gemini')) {
+            console.warn('[normalizeImageUrl] Gemini image detected. Use unoptimized prop in Next.js Image component:', url);
+            return url;
+          }
+          // 일반 Google Storage URL은 프록시 시도
+          const s3Key = match[match.length - 2];
+          const proxyUrl = getProxyImageUrl(s3Key);
+          if (DEBUG_MODE) console.log('[normalizeImageUrl] Google Storage URL → Proxy:', { input: url, key: s3Key, output: proxyUrl });
+          return proxyUrl;
+        }
+      }
+
+      // 패턴 매칭 실패 시에도 googleapis URL은 그대로 사용
+      // (Next.js Image 컴포넌트에서 unoptimized 처리 필요)
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] Google Storage URL pattern not matched, using directly:', url);
       return url;
     }
 
@@ -543,7 +571,7 @@ export function getImageExtension(url: string): string {
  */
 export function isValidImageUrl(url: string): boolean {
   if (!url) return false;
-  
+
   try {
     new URL(url);
     return true;
@@ -551,6 +579,45 @@ export function isValidImageUrl(url: string): boolean {
     // 상대 경로나 S3 키인 경우도 유효할 수 있음
     return url.includes('/') || url.includes('.');
   }
+}
+
+/**
+ * Gemini 생성 이미지 URL인지 확인
+ * Gemini 이미지는 Next.js Image 최적화를 비활성화해야 함 (unoptimized prop 사용)
+ */
+export function isGeminiImageUrl(url: string): boolean {
+  if (!url) return false;
+
+  // Gemini가 생성하는 URL 패턴들
+  return (
+    // storage.googleapis.com/gemini-* 패턴
+    (url.includes('storage.googleapis.com') && url.includes('gemini')) ||
+    // gemini-*.googleapis.com 패턴
+    (url.includes('gemini') && url.includes('googleapis.com')) ||
+    // Google Cloud Storage 임시 서명된 URL (X-Goog-* 파라미터)
+    (url.includes('storage.googleapis.com') &&
+     (url.includes('X-Goog-Signature') || url.includes('X-Goog-Algorithm')))
+  );
+}
+
+/**
+ * 이미지 URL이 최적화 가능한지 확인
+ * CDN이나 자체 서버의 이미지만 최적화, 외부 임시 URL은 최적화 비활성화
+ */
+export function shouldOptimizeImage(url: string): boolean {
+  if (!url) return false;
+
+  // Gemini 이미지는 최적화 불가
+  if (isGeminiImageUrl(url)) return false;
+
+  // CDN 이미지는 최적화 가능
+  if (url.includes('cdn.codebase.blog')) return true;
+
+  // 자체 프록시 URL은 최적화 가능
+  if (url.includes('/api/v1/files/proxy/')) return true;
+
+  // 기타 외부 URL은 최적화 불가
+  return false;
 }
 
 /**

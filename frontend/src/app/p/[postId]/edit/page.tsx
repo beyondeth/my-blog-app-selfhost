@@ -65,8 +65,8 @@ export default function EditPostPage() {
         // thumbnailImageId 유효성 검사 및 처리
         const validFormData = {
           ...formData,
-          // thumbnailImageId가 있고 유효한 UUID인 경우에만 포함
-          ...(formData.thumbnailImageId && {
+          // thumbnailImageId가 있고 빈 문자열이 아니고 유효한 UUID인 경우에만 포함
+          ...(formData.thumbnailImageId && formData.thumbnailImageId.trim() !== '' && {
             thumbnailImageId: validateUUID(formData.thumbnailImageId)
           }),
         };

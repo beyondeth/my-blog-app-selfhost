@@ -16,7 +16,7 @@ jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 90  # 타임아웃 90분으로 증가 (Next.js 16 빌드 시간 고려)
+    timeout-minutes: 60  # 타임아웃 60분으로 단축 (최적화 후)
     environment: production  # Environment Secrets 사용
 
     steps:
@@ -50,9 +50,9 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 7200s  # 120분 SSH 타임아웃
+          timeout: 3600s  # 60분 SSH 타임아웃 (최적화로 단축)
           # Keep SSH connection alive
-          command_timeout: 7200s
+          command_timeout: 3600s
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
@@ -72,10 +72,11 @@ jobs:
             CURRENT_COMMIT=$(git rev-parse HEAD)
             echo "현재 커밋: $CURRENT_COMMIT"
 
-            # 환경 설정
+            # 환경 설정 (BuildKit 최적화)
             export DOCKER_BUILDKIT=1
             export COMPOSE_DOCKER_CLI_BUILD=1
             export BUILDKIT_INLINE_CACHE=1
+            export BUILDKIT_PROGRESS=plain
 
             # 사전 체크
             echo "사전 체크 시작..."
@@ -84,8 +85,9 @@ jobs:
             DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
             if [ "$DISK_USAGE" -ge 85 ]; then
               echo "디스크 공간 부족 (${DISK_USAGE}%). 정리 중..."
-              docker system prune -a -f --volumes || true
-              sleep 5
+              # 오래된 이미지만 삭제, 캐시는 보존
+              docker image prune -f --filter "until=24h" || true
+              sleep 2
             fi
 
             # 메모리 확인
@@ -94,51 +96,56 @@ jobs:
               echo "경고: 사용 가능한 메모리가 4GB 미만입니다 (${AVAILABLE_MEM}MB)"
             fi
 
-            # Docker Buildx 확인 및 설정
+            # Docker Buildx 설정 및 캐시 활용 준비
             docker buildx version || docker buildx install
             docker buildx use default || docker buildx create --use
 
-            # 병렬 빌드 실행 (캐시 활용)
+            # 병렬 빌드 실행 (캐시 최대 활용, CACHEBUST 제거)
             echo "=== 병렬 빌드 시작 ==="
             echo "Backend, Frontend, MCP Proxy 동시 빌드 중..."
+            echo "Docker 캐시 활용 중..."
 
             docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build \
               --parallel \
-              --build-arg CACHEBUST=$(date +%s) \
               backend frontend mcp-proxy
 
             echo "✅ 모든 이미지 빌드 완료"
 
-            # 컨테이너 재시작 (의존성 순서 고려)
-            echo "=== 컨테이너 재시작 시작 ==="
+            # 컨테이너 재시작 (병렬 처리 최적화)
+            echo "=== 컨테이너 재시작 시작 (병렬 처리) ==="
 
             # 데이터베이스 및 캐시 먼저 시작
-            echo "데이터베이스 및 캐시 서비스 시작 중..."
+            echo "Step 1: 데이터베이스 및 캐시 서비스 시작..."
             docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d postgres redis pgbouncer
 
-            # 데이터베이스 헬스 체크 대기
-            echo "데이터베이스 초기화 대기 (최대 60초)..."
-            timeout 60 bash -c 'until docker compose -f docker-compose.prod.oracle.yml --env-file .env.production exec -T postgres pg_isready -U ${DB_USER}; do sleep 2; done'
+            # 데이터베이스 헬스 체크 대기 (시간 단축)
+            echo "Step 2: 데이터베이스 초기화 대기 (최대 30초)..."
+            timeout 30 bash -c "until docker compose -f docker-compose.prod.oracle.yml --env-file .env.production exec -T postgres pg_isready -U \${DB_USER:-postgres}; do sleep 1; done"
 
-            # 백엔드 시작
-            echo "백엔드 서비스 시작 중..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d backend
+            # 모든 앱 서비스 동시 시작 (병렬)
+            echo "Step 3: 모든 애플리케이션 서비스 동시 시작..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d \
+              backend frontend mcp-proxy victoriametrics grafana redis-exporter
 
-            # 백엔드 헬스 체크 대기
-            echo "백엔드 헬스 체크 대기 (최대 120초)..."
-            timeout 120 bash -c 'until curl -f http://localhost:3000/health; do sleep 3; done' || echo "⚠️ 백엔드 헬스체크 타임아웃 (계속 진행)"
+            # 병렬 헬스 체크 (백엔드와 프론트엔드 동시에 체크)
+            echo "Step 4: 서비스 헬스 체크 (병렬)..."
 
-            # 프론트엔드 시작
-            echo "프론트엔드 서비스 시작 중..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d frontend
+            # 백엔드 헬스 체크 (백그라운드)
+            (timeout 60 bash -c "until curl -sf http://localhost:3000/health > /dev/null 2>&1; do sleep 2; done" && echo "✓ Backend 준비 완료") &
+            BACKEND_PID=$!
 
-            # MCP Proxy 시작
-            echo "MCP Proxy 시작 중..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d mcp-proxy
+            # 프론트엔드 헬스 체크 (백그라운드)
+            (timeout 60 bash -c "until curl -sf http://localhost:3001 > /dev/null 2>&1; do sleep 2; done" && echo "✓ Frontend 준비 완료") &
+            FRONTEND_PID=$!
 
-            # 모니터링 서비스 시작
-            echo "모니터링 서비스 시작 중..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d victoriametrics grafana redis-exporter
+            # MCP Proxy 헬스 체크 (백그라운드)
+            (timeout 30 bash -c "until curl -sf http://localhost:4001/health > /dev/null 2>&1; do sleep 2; done" && echo "✓ MCP Proxy 준비 완료") &
+            MCP_PID=$!
+
+            # 모든 헬스 체크 완료 대기
+            wait $BACKEND_PID || echo "⚠️ Backend 헬스체크 실패 (계속 진행)"
+            wait $FRONTEND_PID || echo "⚠️ Frontend 헬스체크 실패 (계속 진행)"
+            wait $MCP_PID || echo "⚠️ MCP Proxy 헬스체크 실패 (계속 진행)"
 
             # 최종 상태 확인 및 헬스 체크
             echo "=== 최종 상태 확인 ==="
