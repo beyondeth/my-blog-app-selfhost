@@ -69,6 +69,7 @@ services:
   # Backend (NestJS + PM2 Cluster)
   # ============================================
   backend:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GHCR_USERNAME:-codebase}/my-blog-backend:${IMAGE_TAG:-latest}
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -234,6 +235,7 @@ services:
   # MCP Proxy (MCP 자동 포스팅 API)
   # ============================================
   mcp-proxy:
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GHCR_USERNAME:-codebase}/my-blog-mcp-proxy:${IMAGE_TAG:-latest}
     build:
       context: ./mcp-proxy-server
       dockerfile: Dockerfile
