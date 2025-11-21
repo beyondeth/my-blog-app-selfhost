@@ -16,7 +16,7 @@ jobs:
   deploy:
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 60  # 타임아웃 60분으로 단축
+    timeout-minutes: 90  # 타임아웃 90분으로 증가 (Next.js 16 빌드 시간 고려)
     environment: production  # Environment Secrets 사용
 
     steps:
@@ -50,9 +50,9 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 3600s  # 60분 타임아웃 (단위 필수)
+          timeout: 7200s  # 120분 SSH 타임아웃
           # Keep SSH connection alive
-          command_timeout: 3600s
+          command_timeout: 7200s
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
@@ -75,38 +75,81 @@ jobs:
             # 환경 설정
             export DOCKER_BUILDKIT=1
             export COMPOSE_DOCKER_CLI_BUILD=1
+            export BUILDKIT_INLINE_CACHE=1
+
+            # 사전 체크
+            echo "사전 체크 시작..."
 
             # 디스크 공간 확인
             DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
-            if [ "$DISK_USAGE" -ge 90 ]; then
+            if [ "$DISK_USAGE" -ge 85 ]; then
               echo "디스크 공간 부족 (${DISK_USAGE}%). 정리 중..."
               docker system prune -a -f --volumes || true
+              sleep 5
             fi
 
-            # 순차적 빌드 실행
-            echo "Backend 빌드 시작..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build backend
+            # 메모리 확인
+            AVAILABLE_MEM=$(free -m | awk 'NR==2{printf "%.0f", $7}')
+            if [ "$AVAILABLE_MEM" -lt 4096 ]; then
+              echo "경고: 사용 가능한 메모리가 4GB 미만입니다 (${AVAILABLE_MEM}MB)"
+            fi
 
-            echo "Frontend 빌드 시작..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build frontend
+            # Docker Buildx 확인 및 설정
+            docker buildx version || docker buildx install
+            docker buildx use default || docker buildx create --use
 
-            echo "MCP Proxy 빌드 시작..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build mcp-proxy
+            # 병렬 빌드 실행 (캐시 활용)
+            echo "=== 병렬 빌드 시작 ==="
+            echo "Backend, Frontend, MCP Proxy 동시 빌드 중..."
 
-            echo "모든 이미지 빌드 완료"
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build \
+              --parallel \
+              --build-arg CACHEBUST=$(date +%s) \
+              backend frontend mcp-proxy
 
-            # 컨테이너 재시작
-            echo "컨테이너 재시작 중..."
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate backend
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate frontend
-            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate mcp-proxy
+            echo "✅ 모든 이미지 빌드 완료"
 
-            # 최종 상태 확인
-            echo "배포 완료!"
+            # 컨테이너 재시작 (의존성 순서 고려)
+            echo "=== 컨테이너 재시작 시작 ==="
+
+            # 데이터베이스 및 캐시 먼저 시작
+            echo "데이터베이스 및 캐시 서비스 시작 중..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d postgres redis pgbouncer
+
+            # 데이터베이스 헬스 체크 대기
+            echo "데이터베이스 초기화 대기 (최대 60초)..."
+            timeout 60 bash -c 'until docker compose -f docker-compose.prod.oracle.yml --env-file .env.production exec -T postgres pg_isready -U ${DB_USER}; do sleep 2; done'
+
+            # 백엔드 시작
+            echo "백엔드 서비스 시작 중..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d backend
+
+            # 백엔드 헬스 체크 대기
+            echo "백엔드 헬스 체크 대기 (최대 120초)..."
+            timeout 120 bash -c 'until curl -f http://localhost:3000/health; do sleep 3; done' || echo "⚠️ 백엔드 헬스체크 타임아웃 (계속 진행)"
+
+            # 프론트엔드 시작
+            echo "프론트엔드 서비스 시작 중..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d frontend
+
+            # MCP Proxy 시작
+            echo "MCP Proxy 시작 중..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d mcp-proxy
+
+            # 모니터링 서비스 시작
+            echo "모니터링 서비스 시작 중..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d victoriametrics grafana redis-exporter
+
+            # 최종 상태 확인 및 헬스 체크
+            echo "=== 최종 상태 확인 ==="
             docker compose -f docker-compose.prod.oracle.yml --env-file .env.production ps
 
+            # 데이터베이스 마이그레이션 상태 확인
+            echo "데이터베이스 마이그레이션 상태 확인..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production exec -T backend pnpm migration:status || echo "⚠️ 마이그레이션 상태 확인 실패"
+
             echo "=========================================="
-            echo "배포 완료: $(date)"
+            echo "✅ 배포 완료: $(date)"
             echo "=========================================="
 
       # 5. 배포 실패 시 알림

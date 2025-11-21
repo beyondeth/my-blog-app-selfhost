@@ -54,13 +54,14 @@ RUN apt-get update && \
     apt-get install -y python3 make g++ build-essential && \
     rm -rf /var/lib/apt/lists/*
 
-# msgpackr-extract 비활성화 (Node.js 22 호환성 문제 해결)
+# msgpackr-extract 비활성화 (Node.js 22 + ARM64 호환성)
 ENV MSGPACKR_NO_EXTRACT=1
 ENV SKIP_NODE_GYP_BUILD=1
 
-# 추가 네이티브 모듈 컴파일 방지
-ENV NODE_OPTIONS="--max-old-space-size=4096"
+# 추가 네이티브 모듈 컴파일 방지 (ARM64 최적화)
+ENV NODE_OPTIONS="--max-old-space-size=3072"
 ENV AVOID_NATIVE=1
+ENV npm_config_build_from_source=false
 
 # package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml* ./
@@ -86,6 +87,7 @@ FROM node:22-slim AS production
 # msgpackr-extract 및 node-gyp 비활성화 (전역 적용)
 ENV MSGPACKR_NO_EXTRACT=1
 ENV SKIP_NODE_GYP_BUILD=1
+ENV npm_config_build_from_source=false
 
 # 보안 강화: 비-루트 사용자 생성 (Debian 방식)
 RUN groupadd -g 1001 nodejs && \
