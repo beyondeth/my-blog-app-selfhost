@@ -1,10 +1,12 @@
 name: Deploy to Production (Oracle Free Tier)
 
-# main 브랜치에 push 시 자동 배포
+# 자동배포 트리거 변경: 프론트엔드 빌드( GHCR push ) 완료 후 실행
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - "Build and Push Frontend (GHCR)"
+    types:
+      - completed
   workflow_dispatch:  # 수동 실행 허용
 
 # Concurrency control - 동시 실행 방지
@@ -14,6 +16,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Deploy to Production Server
     runs-on: ubuntu-latest
     timeout-minutes: 120  # Increased to 120 minutes to allow server-side builds to finish
