@@ -32,10 +32,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pnpm 설치
 RUN npm install -g pnpm@latest
 
-# Prevent! native extraction/build for problematic packages during CI/container builds
-# This helps avoid long node-gyp compile times for optional native modules (msgpackr-extract, etc.)
-ENV MSGPACKR_NO_EXTRACT=1
-ENV SKIP_NODE_GYP_BUILD=1
+# 네이티브 모듈 빌드 허용 (Next.js 필수)
+# ENV MSGPACKR_NO_EXTRACT=1
+# ENV SKIP_NODE_GYP_BUILD=1
 
 # package.json과 pnpm-lock.yaml 복사 (캐싱 최적화)
 COPY package.json pnpm-lock.yaml* ./
@@ -120,8 +119,7 @@ RUN echo "Checking required environment variables..." && \
 
 # Next.js 빌드 (Standalone 모드)
 # next.config.js에 output: 'standalone' 설정 필요
-# node_modules/.bin/next 직접 실행
-RUN ./node_modules/.bin/next build
+RUN pnpm build
 
 # ============================================
 # Stage 3: Runner (최종 런타임)
