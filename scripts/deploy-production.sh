@@ -89,13 +89,10 @@ else
     log_info "✓ 디스크 공간 충분 (${DISK_USAGE}%)"
 fi
 
-# 4. 캐시 디렉토리 생성
-log_info "Step 4: BuildKit 캐시 디렉토리 설정"
-BUILD_CACHE_DIR=${BUILD_CACHE_DIR:-/home/ubuntu/.docker-cache}
-mkdir -p "$BUILD_CACHE_DIR/frontend"
-mkdir -p "$BUILD_CACHE_DIR/backend"
-mkdir -p "$BUILD_CACHE_DIR/mcp-proxy"
-log_info "✓ 캐시 디렉토리 생성: $BUILD_CACHE_DIR"
+# 4. BuildKit 캐시 설정
+log_info "Step 4: BuildKit 캐시 설정"
+# BuildKit은 자동으로 내부 캐시를 사용합니다
+log_info "✓ BuildKit 내부 캐시 활성화"
 
 # 5. 현재 커밋 정보 확인
 CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
