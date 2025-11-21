@@ -50,9 +50,9 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 3600  # 60분 타임아웃
+          timeout: 3600s  # 60분 타임아웃 (단위 필수)
           # Keep SSH connection alive
-          command_timeout: 3600
+          command_timeout: 3600s
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
