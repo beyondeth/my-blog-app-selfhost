@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # pnpm 설치
 RUN npm install -g pnpm@latest
 
-# Prevent native extraction/build for problematic packages during CI/container builds
+# Prevent! native extraction/build for problematic packages during CI/container builds
 # This helps avoid long node-gyp compile times for optional native modules (msgpackr-extract, etc.)
 ENV MSGPACKR_NO_EXTRACT=1
 ENV SKIP_NODE_GYP_BUILD=1
