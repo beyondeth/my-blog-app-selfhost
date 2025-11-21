@@ -66,8 +66,9 @@ ENV npm_config_build_from_source=false
 # package.json과 pnpm-lock.yaml 복사
 COPY package.json pnpm-lock.yaml* ./
 
-# 의존성 설치 (프로덕션 전용)
-RUN pnpm install --frozen-lockfile --prod=false
+# 의존성 설치 (프로덕션 전용, 캐시 마운트)
+RUN --mount=type=cache,target=/root/.npm \
+    pnpm install --frozen-lockfile --prod=false --ignore-scripts
 
 # 소스 코드 복사
 COPY . .
@@ -75,9 +76,10 @@ COPY . .
 # 빌드 전 dist 폴더 정리 및 NestJS 빌드
 RUN rm -rf dist && pnpm run build
 
-# 프로덕션 의존성만 재설치 (선택적 의존성 제외)
-RUN rm -rf node_modules && \
-    pnpm install --frozen-lockfile --prod --no-optional
+# 프로덕션 의존성만 재설치 (캐시 마운트, 선택적 의존성 제외)
+RUN --mount=type=cache,target=/root/.npm \
+    rm -rf node_modules && \
+    pnpm install --frozen-lockfile --prod --no-optional --ignore-scripts
 
 # ============================================
 # Stage 3: Production (최적화된 런타임)

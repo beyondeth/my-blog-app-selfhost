@@ -35,8 +35,9 @@ COPY package.json pnpm-lock.yaml* ./
 # pnpm 설치
 RUN npm install -g pnpm@9
 
-# 모든 의존성 설치 (devDependencies 포함)
-RUN pnpm install
+# 모든 의존성 설치 (캐시 마운트로 속도 최적화)
+RUN --mount=type=cache,target=/root/.npm \
+    pnpm install --ignore-scripts --frozen-lockfile
 
 # ============================================
 # Stage 2: Builder (Next.js 빌드)
@@ -57,7 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # 소스 코드 복사 (의존성 설치 전)
 COPY . .
 
-# 의존성 복사
+# 의존성 복사 (캐시 마운트 사용)
 COPY --from=deps /app/node_modules ./node_modules
 
 # Next.js 환경 변수 (빌드 타임)
@@ -67,10 +68,19 @@ ENV NODE_ENV=production
 # Turbopack 비활성화 (Next.js 16 호환성 문제 해결)
 ENV NEXT_TURBOPACK=0
 
-# 빌드 최적화 환경 변수
+# 빌드 최적화 환경 변수 (ARM64 네이티브 컴파일 완전 방지)
 ENV NODE_OPTIONS="--max-old-space-size=4096"
 ENV NEXT_BUILD_WORKERS=1
 ENV npm_config_build_from_source=false
+ENV npm_config_platform=linux
+ENV npm_config_platform_linux=linux
+ENV npm_config_arch=arm64
+ENV npm_config_target_arch=arm64
+ENV npm_config_target_platform=linux
+ENV npm_config_target_libc=glibc
+ENV npm_config_sharp_binary_host="https://github.com/lovell/sharp/releases"
+ENV npm_config_sharp_libvips_binary_host="https://github.com/lovell/sharp-libvips/releases"
+ENV SKIP_NATIVE_COMPILATION=1
 
 # 빌드 인자로 API URL 받기
 ARG NEXT_PUBLIC_API_URL
@@ -86,8 +96,8 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_MIXPANEL_TOKEN=$NEXT_PUBLIC_MIXPANEL_TOKEN
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 
-# Next.js 빌드 (Standalone 모드, Webpack 명시적 사용)
-RUN npm run build -- --no-turbopack
+# Next.js 빌드 (Standalone 모드, NEXT_TURBOPACK=0으로 Webpack 사용)
+RUN npm run build
 
 # ============================================
 # Stage 3: Runner (최종 런타임)
