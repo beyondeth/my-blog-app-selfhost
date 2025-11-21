@@ -45,10 +45,10 @@ COPY package.json pnpm-lock.yaml* ./
 RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
     pnpm fetch
 
-# Install using the cached store and cache node_modules to speed subsequent builds
+# Install dependencies (online mode for reliability)
 RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
     --mount=type=cache,id=pnpm-node-modules,target=/app/node_modules \
-    pnpm install --offline --frozen-lockfile
+    pnpm install --frozen-lockfile
 
 # Verify Next.js installation
 RUN ls -la /app/node_modules/.bin/next || (echo "Next.js not found!" && exit 1)
