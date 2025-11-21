@@ -68,16 +68,7 @@ const nextConfig = {
 
   transpilePackages: ['mermaid'],
 
-  // Turbopack 설정 (Next.js 16 기본값)
-  turbopack: {
-    // Docker 환경에서 절대 경로로 명시적으로 워크스페이스 루트 지정
-    root: process.cwd(),
-    // Turbopack은 require.resolve() 절대 경로를 처리 못함 → 패키지명만 사용
-    resolveAlias: {
-      cytoscape: 'cytoscape',
-    },
-  },
-
+  
   // Webpack 설정 (fallback - webpack 사용 시)
   webpack: (config) => {
     // Mermaid와 cytoscape 관련 문제 해결
