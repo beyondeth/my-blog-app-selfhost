@@ -120,7 +120,8 @@ RUN echo "Checking required environment variables..." && \
 
 # Next.js 빌드 (Standalone 모드)
 # next.config.js에 output: 'standalone' 설정 필요
-RUN pnpm build
+# node_modules/.bin/next 직접 실행
+RUN ./node_modules/.bin/next build
 
 # ============================================
 # Stage 3: Runner (최종 런타임)
