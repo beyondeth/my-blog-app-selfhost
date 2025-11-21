@@ -25,8 +25,8 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod.v3
-      # v3는 단일 스테이지이므로 target 제거
+      dockerfile: Dockerfile.prod
+      target: runner
       # 빌드 타임 환경변수 (Next.js NEXT_PUBLIC_* 변수 주입)
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
