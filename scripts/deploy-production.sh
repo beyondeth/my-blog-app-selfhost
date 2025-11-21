@@ -15,6 +15,9 @@
 # ============================================
 
 set -e  # 에러 발생 시 즉시 종료
+# Enable shell command tracing so the SSH action receives regular stdout/stderr output
+# This helps prevent the SSH/Action connection from idling out during long-running steps.
+set -x
 
 # 색상 정의
 RED='\033[0;31m'
@@ -158,23 +161,47 @@ else
     DO_BUILD=true
 fi
 
-# If GHCR_USERNAME is set, attempt to pull frontend image from GHCR specifically
+# If GHCR_USERNAME is set, attempt to pull images from GHCR
 if [ -n "${GHCR_USERNAME:-}" ]; then
-    FRONTEND_REGISTRY=${GHCR_REGISTRY:-ghcr.io}
-    FRONTEND_IMAGE="${FRONTEND_REGISTRY}/${GHCR_USERNAME}/my-blog-frontend:${IMAGE_TAG:-latest}"
+    REGISTRY=${GHCR_REGISTRY:-ghcr.io}
+    
+    # Frontend
+    FRONTEND_IMAGE="${REGISTRY}/${GHCR_USERNAME}/my-blog-frontend:${IMAGE_TAG:-latest}"
     log_info "GHCR frontend pull 시도: ${FRONTEND_IMAGE}"
     if docker pull "${FRONTEND_IMAGE}"; then
-        log_info "✓ GHCR에서 frontend 이미지 pull 성공: ${FRONTEND_IMAGE}"
-        # Tag as compose image if compose uses different name (we set compose image to same pattern)
+        log_info "✓ GHCR에서 frontend 이미지 pull 성공"
         PULLED_FRONTEND=true
-        # ensure docker-compose environment vars align
-        export GHCR_REGISTRY=${FRONTEND_REGISTRY}
-        export GHCR_USERNAME=${GHCR_USERNAME}
-        export IMAGE_TAG=${IMAGE_TAG:-latest}
     else
-        log_warn "GHCR frontend pull 실패: ${FRONTEND_IMAGE} — 로컬 빌드로 폴백"
+        log_warn "GHCR frontend pull 실패 — 로컬 빌드로 폴백"
         PULLED_FRONTEND=false
     fi
+
+    # Backend
+    BACKEND_IMAGE="${REGISTRY}/${GHCR_USERNAME}/my-blog-backend:${IMAGE_TAG:-latest}"
+    log_info "GHCR backend pull 시도: ${BACKEND_IMAGE}"
+    if docker pull "${BACKEND_IMAGE}"; then
+        log_info "✓ GHCR에서 backend 이미지 pull 성공"
+        PULLED_BACKEND=true
+    else
+        log_warn "GHCR backend pull 실패 — 로컬 빌드로 폴백"
+        PULLED_BACKEND=false
+    fi
+
+    # MCP Proxy
+    MCP_PROXY_IMAGE="${REGISTRY}/${GHCR_USERNAME}/my-blog-mcp-proxy:${IMAGE_TAG:-latest}"
+    log_info "GHCR mcp-proxy pull 시도: ${MCP_PROXY_IMAGE}"
+    if docker pull "${MCP_PROXY_IMAGE}"; then
+        log_info "✓ GHCR에서 mcp-proxy 이미지 pull 성공"
+        PULLED_MCP_PROXY=true
+    else
+        log_warn "GHCR mcp-proxy pull 실패 — 로컬 빌드로 폴백"
+        PULLED_MCP_PROXY=false
+    fi
+    
+    # Export variables for docker-compose
+    export GHCR_REGISTRY=${REGISTRY}
+    export GHCR_USERNAME=${GHCR_USERNAME}
+    export IMAGE_TAG=${IMAGE_TAG:-latest}
 fi
 
 if [ "${DO_BUILD}" = "true" ]; then
@@ -208,18 +235,24 @@ if [ "${DO_BUILD}" = "true" ]; then
         PROJECT=${COMPOSE_PROJECT_NAME:-codebase-prod}
 
         # Backend 빌드
-        log_info "1/3 Backend 이미지 (buildx) 빌드 시작..."
-        if docker buildx build --builder "$BUILDER_NAME" \
-            --cache-from=type=local,src="$BUILD_CACHE_DIR" \
-            --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
-            --load --progress=plain \
-            -t "${PROJECT}-backend:${IMAGE_TAG}" -f backend/Dockerfile ./backend; then
-            log_info "✓ Backend buildx 빌드 완료"
-            # tag with :latest so docker-compose (which may use latest) picks up this image
-            docker tag "${PROJECT}-backend:${IMAGE_TAG}" "${PROJECT}-backend:latest" || true
-        else
-            log_warn "⚠️ Backend buildx 빌드 실패 — compose 빌드로 폴백"
-            DO_BUILDX_FALLBACK=true
+        if [ -z "$DO_BUILDX_FALLBACK" ]; then
+            if [ "${PULLED_BACKEND}" = "true" ]; then
+                log_info "Backend 이미지를 GHCR에서 가져왔으므로 buildx 빌드 스킵"
+            else
+                log_info "1/3 Backend 이미지 (buildx) 빌드 시작..."
+                if docker buildx build --builder "$BUILDER_NAME" \
+                    --cache-from=type=local,src="$BUILD_CACHE_DIR" \
+                    --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
+                    --load --progress=plain \
+                    -t "${PROJECT}-backend:${IMAGE_TAG}" -f backend/Dockerfile ./backend; then
+                    log_info "✓ Backend buildx 빌드 완료"
+                    # tag with :latest so docker-compose (which may use latest) picks up this image
+                    docker tag "${PROJECT}-backend:${IMAGE_TAG}" "${PROJECT}-backend:latest" || true
+                else
+                    log_warn "⚠️ Backend buildx 빌드 실패 — compose 빌드로 폴백"
+                    DO_BUILDX_FALLBACK=true
+                fi
+            fi
         fi
 
         # Frontend 빌드 (build-args 전달) — GHCR에서 pull한 경우 스킵
@@ -249,17 +282,21 @@ if [ "${DO_BUILD}" = "true" ]; then
 
         # MCP Proxy 빌드
         if [ -z "$DO_BUILDX_FALLBACK" ]; then
-            log_info "3/3 MCP Proxy 이미지 (buildx) 빌드 시작..."
-            if docker buildx build --builder "$BUILDER_NAME" \
-                --cache-from=type=local,src="$BUILD_CACHE_DIR" \
-                --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
-                --load --progress=plain \
-                -t "${PROJECT}-mcp-proxy:${IMAGE_TAG}" -f mcp-proxy-server/Dockerfile ./mcp-proxy-server; then
-                log_info "✓ MCP Proxy buildx 빌드 완료"
-                docker tag "${PROJECT}-mcp-proxy:${IMAGE_TAG}" "${PROJECT}-mcp-proxy:latest" || true
+            if [ "${PULLED_MCP_PROXY}" = "true" ]; then
+                log_info "MCP Proxy 이미지를 GHCR에서 가져왔으므로 buildx 빌드 스킵"
             else
-                log_warn "⚠️ MCP Proxy buildx 빌드 실패 — compose 빌드로 폴백"
-                DO_BUILDX_FALLBACK=true
+                log_info "3/3 MCP Proxy 이미지 (buildx) 빌드 시작..."
+                if docker buildx build --builder "$BUILDER_NAME" \
+                    --cache-from=type=local,src="$BUILD_CACHE_DIR" \
+                    --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
+                    --load --progress=plain \
+                    -t "${PROJECT}-mcp-proxy:${IMAGE_TAG}" -f mcp-proxy-server/Dockerfile ./mcp-proxy-server; then
+                    log_info "✓ MCP Proxy buildx 빌드 완료"
+                    docker tag "${PROJECT}-mcp-proxy:${IMAGE_TAG}" "${PROJECT}-mcp-proxy:latest" || true
+                else
+                    log_warn "⚠️ MCP Proxy buildx 빌드 실패 — compose 빌드로 폴백"
+                    DO_BUILDX_FALLBACK=true
+                fi
             fi
         fi
 
@@ -270,13 +307,19 @@ if [ "${DO_BUILD}" = "true" ]; then
             if [ "${PARALLEL_BUILD}" = "true" ]; then
                 BUILD_CMD_BASE+=(--parallel)
             fi
-            log_info "compose: Backend 빌드"
-            if "${BUILD_CMD_BASE[@]}" backend; then
-                log_info "✓ Backend 빌드 완료"
+            
+            if [ "${PULLED_BACKEND}" = "true" ]; then
+                log_info "Backend 이미지를 GHCR에서 가져왔으므로 compose 빌드 스킵"
             else
-                log_error "✗ Backend 빌드 실패"
-                exit 1
+                log_info "compose: Backend 빌드"
+                if "${BUILD_CMD_BASE[@]}" backend; then
+                    log_info "✓ Backend 빌드 완료"
+                else
+                    log_error "✗ Backend 빌드 실패"
+                    exit 1
+                fi
             fi
+
             if [ "${PULLED_FRONTEND}" = "true" ]; then
                 log_info "Frontend 이미지를 GHCR에서 가져왔으므로 compose 빌드 스킵"
             else
@@ -288,12 +331,17 @@ if [ "${DO_BUILD}" = "true" ]; then
                     exit 1
                 fi
             fi
-            log_info "compose: MCP Proxy 빌드"
-            if "${BUILD_CMD_BASE[@]}" mcp-proxy; then
-                log_info "✓ MCP Proxy 빌드 완료"
+
+            if [ "${PULLED_MCP_PROXY}" = "true" ]; then
+                log_info "MCP Proxy 이미지를 GHCR에서 가져왔으므로 compose 빌드 스킵"
             else
-                log_error "✗ MCP Proxy 빌드 실패"
-                exit 1
+                log_info "compose: MCP Proxy 빌드"
+                if "${BUILD_CMD_BASE[@]}" mcp-proxy; then
+                    log_info "✓ MCP Proxy 빌드 완료"
+                else
+                    log_error "✗ MCP Proxy 빌드 실패"
+                    exit 1
+                fi
             fi
         fi
 
@@ -318,12 +366,16 @@ if [ "${DO_BUILD}" = "true" ]; then
             BUILD_CMD_BASE+=(--parallel)
         fi
 
-        log_info "1/3 Backend 이미지 빌드 시작..."
-        if "${BUILD_CMD_BASE[@]}" backend; then
-            log_info "✓ Backend 빌드 완료"
+        if [ "${PULLED_BACKEND}" = "true" ]; then
+            log_info "Backend 이미지를 GHCR에서 가져왔으므로 compose 빌드 스킵"
         else
-            log_error "✗ Backend 빌드 실패"
-            exit 1
+            log_info "1/3 Backend 이미지 빌드 시작..."
+            if "${BUILD_CMD_BASE[@]}" backend; then
+                log_info "✓ Backend 빌드 완료"
+            else
+                log_error "✗ Backend 빌드 실패"
+                exit 1
+            fi
         fi
 
         if [ "${PULLED_FRONTEND}" = "true" ]; then
@@ -338,12 +390,16 @@ if [ "${DO_BUILD}" = "true" ]; then
             fi
         fi
 
-        log_info "3/3 MCP Proxy 이미지 빌드 시작..."
-        if "${BUILD_CMD_BASE[@]}" mcp-proxy; then
-            log_info "✓ MCP Proxy 빌드 완료"
+        if [ "${PULLED_MCP_PROXY}" = "true" ]; then
+            log_info "MCP Proxy 이미지를 GHCR에서 가져왔으므로 compose 빌드 스킵"
         else
-            log_error "✗ MCP Proxy 빌드 실패"
-            exit 1
+            log_info "3/3 MCP Proxy 이미지 빌드 시작..."
+            if "${BUILD_CMD_BASE[@]}" mcp-proxy; then
+                log_info "✓ MCP Proxy 빌드 완료"
+            else
+                log_error "✗ MCP Proxy 빌드 실패"
+                exit 1
+            fi
         fi
 
         log_info "✓ 모든 이미지 빌드 완료"

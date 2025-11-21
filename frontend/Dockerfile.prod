@@ -40,8 +40,16 @@ ENV SKIP_NODE_GYP_BUILD=1
 # package.json과 pnpm-lock.yaml 복사 (캐싱 최적화)
 COPY package.json pnpm-lock.yaml* ./
 
-# 프로덕션 의존성 설치 (lockfile 자동 업데이트 허용)
-RUN pnpm install --no-frozen-lockfile --prod=false
+# Use BuildKit cache mounts to speed up pnpm store and node_modules writes.
+# First fetch packages into the pnpm store (cacheable), then install offline
+# into a cached node_modules mount. This dramatically reduces I/O on repeated builds.
+RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
+    pnpm fetch
+
+# Install using the cached store and cache node_modules to speed subsequent builds
+RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
+    --mount=type=cache,id=pnpm-node-modules,target=/app/node_modules \
+    pnpm install --offline --frozen-lockfile --no-optional
 
 # ============================================
 # Stage 2: Builder (Next.js 빌드)
