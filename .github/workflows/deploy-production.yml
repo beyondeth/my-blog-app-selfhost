@@ -5,6 +5,8 @@ on:
   workflow_run:
     workflows:
       - "Build and Push Frontend (GHCR)"
+      - "Build and Push Backend (GHCR)"
+      - "Build and Push MCP Proxy (GHCR)"
     types:
       - completed
   workflow_dispatch:  # 수동 실행 허용
@@ -19,7 +21,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     name: Deploy to Production Server
     runs-on: ubuntu-latest
-    timeout-minutes: 120  # Increased to 120 minutes to allow server-side builds to finish
+    timeout-minutes: 30  # Reduced timeout as we are not building
     environment: production  # Environment Secrets使用
 
     steps:
@@ -59,7 +61,10 @@ jobs:
           username: ${{ secrets.DEPLOY_USER }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
           port: 22
-          timeout: 45m
+          # Timeout in seconds (30 minutes = 1800s)
+          timeout: 1800
+          # Keep SSH connection alive to prevent idle timeouts on long-running commands
+          ssh_options: -o ServerAliveInterval=30 -o ServerAliveCountMax=3
           script_stop: true  # 에러 발생 시 즉시 중단
           script: |
             set -e
@@ -78,10 +83,18 @@ jobs:
             # 현재 커밋 해시 기록
             CURRENT_COMMIT=$(git rev-parse HEAD)
             echo "현재 커밋: $CURRENT_COMMIT"
+            
+            # Triggering commit SHA (image tag)
+            TRIGGER_COMMIT="${{ github.event.workflow_run.head_sha }}"
+            if [ -z "$TRIGGER_COMMIT" ]; then
+              TRIGGER_COMMIT="$CURRENT_COMMIT"
+            fi
+            echo "이미지 태그 (Commit SHA): $TRIGGER_COMMIT"
 
-            # 강제 빌드 모드로 배포 스크립트 실행
-            echo "FORCE_BUILD=true 설정으로 강제 빌드"
-            FORCE_BUILD=true bash scripts/deploy-production.sh
+            # 이미지 Pull 모드로 배포 스크립트 실행
+            echo "PULL_IMAGES=true 설정으로 배포"
+            export IMAGE_TAG=$TRIGGER_COMMIT
+            PULL_IMAGES=true bash scripts/deploy-production.sh
 
             echo "=========================================="
             echo "배포 완료: $(date)"
