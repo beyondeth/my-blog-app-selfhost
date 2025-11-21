@@ -48,7 +48,7 @@ RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
 # Install using the cached store and cache node_modules to speed subsequent builds
 RUN --mount=type=cache,id=pnpm-store,target=/root/.pnpm-store \
     --mount=type=cache,id=pnpm-node-modules,target=/app/node_modules \
-    pnpm install --offline --frozen-lockfile --no-optional
+    pnpm install --offline --frozen-lockfile
 
 # Verify Next.js installation
 RUN ls -la /app/node_modules/.bin/next || (echo "Next.js not found!" && exit 1)
