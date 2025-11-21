@@ -38,7 +38,7 @@ ENV MSGPACKR_NO_EXTRACT=1
 ENV SKIP_NODE_GYP_BUILD=1
 
 # package.json과 pnpm-lock.yaml 복사 (캐싱 최적화)
-COPY frontend/package.json frontend/pnpm-lock.yaml* ./
+COPY package.json pnpm-lock.yaml* ./
 
 # 프로덕션 의존성 설치 (lockfile 자동 업데이트 허용)
 RUN pnpm install --no-frozen-lockfile --prod=false
@@ -65,8 +65,8 @@ RUN npm install -g pnpm@latest
 # 이전 단계에서 설치한 node_modules 복사
 COPY --from=deps /app/node_modules ./node_modules
 
-# 소스 코드 복사
-COPY frontend/ .
+# 소스 코드 복사 (빌드 컨텍스트가 ./frontend 임을 가정)
+COPY . .
 
 # Next.js 환경 변수 (빌드 타임)
 ENV NEXT_TELEMETRY_DISABLED=1
