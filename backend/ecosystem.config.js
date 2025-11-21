@@ -23,17 +23,17 @@ module.exports = {
       // 실행할 스크립트 (NestJS 빌드 결과물)
       script: 'dist/src/main.js',
 
-      // 클러스터 모드 설정
-      instances: 2, // 시작 시 2개 워커 (빠른 시작, 배포 후 4개로 증가)
+      // 클러스터 모드 설정 (Oracle Free Tier 최적화)
+      instances: 2, // 시작 시 2개 워커 (고정, 메모리 절약)
       exec_mode: 'cluster', // cluster 모드 (단일 컨테이너 내 멀티 프로세스)
 
-      // 동적 스케일링 설정
-      min_instances: 1, // 최소 1개 워커 (심야 시간)
-      max_instances: 4, // 최대 4개 워커 (피크 타임)
+      // 동적 스케일링 설정 (배포 안정성 위해 고정)
+      min_instances: 2, // 최소 2개 워커 (안정성 확보)
+      max_instances: 2, // 최대 2개 워커 (메모리 제한)
 
       // 메모리 제한 (워커당)
-      max_memory_restart: '900M', // 워커가 900MB 초과 시 자동 재시작
-      // 4 워커 × 900MB = 3.6GB (백엔드 컨테이너 4GB 내)
+      max_memory_restart: '700M', // 워커가 700MB 초과 시 자동 재시작
+      // 2 워커 × 700MB = 1.4GB (백엔드 컨테이너 3GB 내 여유 확보)
 
       // 프로세스 관리
       autorestart: true, // 크래시 시 자동 재시작
@@ -59,8 +59,8 @@ module.exports = {
       env_production: {
         NODE_ENV: 'production',
 
-        // Node.js 최적화 옵션
-        NODE_OPTIONS: '--max-old-space-size=800', // 워커당 힙 메모리 800MB
+        // Node.js 최적화 옵션 (ARM64 + 메모리 최적화)
+        NODE_OPTIONS: '--max-old-space-size=700', // 워커당 힙 메모리 700MB
 
         // PM2 Graceful Shutdown
         PM2_GRACEFUL_LISTEN_TIMEOUT: 5000,

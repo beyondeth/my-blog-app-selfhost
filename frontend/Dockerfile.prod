@@ -64,8 +64,13 @@ COPY --from=deps /app/node_modules ./node_modules
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 
-# Turbopack 비활성화 (ARM 환경 안정성)
+# Turbopack 비활성화 (Next.js 16 호환성 문제 해결)
 ENV NEXT_TURBOPACK=0
+
+# 빌드 최적화 환경 변수
+ENV NODE_OPTIONS="--max-old-space-size=4096"
+ENV NEXT_BUILD_WORKERS=1
+ENV npm_config_build_from_source=false
 
 # 빌드 인자로 API URL 받기
 ARG NEXT_PUBLIC_API_URL
@@ -81,8 +86,8 @@ ENV NEXT_PUBLIC_SITE_URL=$NEXT_PUBLIC_SITE_URL
 ENV NEXT_PUBLIC_MIXPANEL_TOKEN=$NEXT_PUBLIC_MIXPANEL_TOKEN
 ENV NEXT_PUBLIC_GA_MEASUREMENT_ID=$NEXT_PUBLIC_GA_MEASUREMENT_ID
 
-# Next.js 빌드 (Standalone 모드, Webpack 사용)
-RUN npm run build
+# Next.js 빌드 (Standalone 모드, Webpack 명시적 사용)
+RUN npm run build -- --no-turbopack
 
 # ============================================
 # Stage 3: Runner (최종 런타임)

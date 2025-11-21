@@ -60,7 +60,7 @@ services:
     # 리소스 제한 (SSR 중심 Next.js)
     cpus: 1.0
     mem_limit: 2g
-    mem_reservation: 1.5g
+    mem_reservation: 1g
 
   # ============================================
   # Backend (NestJS + PM2 Cluster)
@@ -79,8 +79,8 @@ services:
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@pgbouncer:5432/${DB_NAME:-blog_prod}
       REDIS_URL: redis://redis:6379
       # PM2 워커당 힙 메모리 (ecosystem.config.js와 일치)
-      NODE_OPTIONS: "--max-old-space-size=800"
-      UV_THREADPOOL_SIZE: 8
+      NODE_OPTIONS: "--max-old-space-size=700"
+      UV_THREADPOOL_SIZE: 4
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
@@ -98,10 +98,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 90s  # PM2 Cold Start 고려 (daemon spawning + 워커 시작)
-    # 리소스 제한 (PM2 4 워커)
-    cpus: 3.0
-    mem_limit: 4g
-    mem_reservation: 3g
+    # 리소스 제한 (PM2 4 워커 → 2 워커 최적화)
+    cpus: 2.0
+    mem_limit: 3g
+    mem_reservation: 2.5g
 
   # ============================================
   # PostgreSQL 18 (Async I/O, ARM64 최적화)
@@ -117,8 +117,8 @@ services:
       # 성능 최적화 환경변수
       POSTGRES_INITDB_ARGS: "--encoding=UTF8 --locale=C.UTF-8"
     volumes:
-      # Block Volume 사용 (100GB)
-      - /mnt/data/postgres:/var/lib/postgresql
+      # Block Volume 사용 (환경 변수로 경로 제어)
+      - ${POSTGRES_DATA_DIR:-/mnt/data/postgres}:/var/lib/postgresql
       # 최적화된 PostgreSQL 설정 (shared_buffers 조정 필요)
       - ./postgres/postgresql.conf:/etc/postgresql/postgresql.conf:ro
       - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
@@ -132,10 +132,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
-    # 리소스 제한 (CPU 무제한, 피크 타임만 사용)
-    mem_limit: 7.5g
-    mem_reservation: 5g
-    shm_size: 512mb  # 공유 메모리
+    # 리소스 제한 (CPU 무제한, 메모리 최적화)
+    mem_limit: 6g
+    mem_reservation: 4g
+    shm_size: 256mb  # 공유 메모리 감소
 
   # ============================================
   # PgBouncer (연결 풀링) - edoburu 이미지 (ARM64/AMD64 지원)
@@ -200,7 +200,7 @@ services:
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-redis
     command: >
       redis-server
-      --maxmemory 4000mb
+      --maxmemory 3500mb
       --maxmemory-policy allkeys-lru
       --appendonly yes
       --appendfsync everysec
@@ -213,7 +213,7 @@ services:
       --io-threads 2
       --io-threads-do-reads yes
     volumes:
-      - /mnt/data/redis:/data
+      - ${REDIS_DATA_DIR:-/mnt/data/redis}:/data
     networks:
       - codebase_network
     restart: unless-stopped
@@ -222,10 +222,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
-    # 리소스 제한 (4GB maxmemory + 여유)
-    cpus: 1.5
-    mem_limit: 4.5g
-    mem_reservation: 3.5g
+    # 리소스 제한 (3.5GB maxmemory + 여유)
+    cpus: 1.0
+    mem_limit: 4g
+    mem_reservation: 3g
 
   # ============================================
   # MCP Proxy (MCP 자동 포스팅 API)
@@ -277,7 +277,7 @@ services:
       # 메모리 최적화
       - '--memory.allowedPercent=80'
     volumes:
-      - /mnt/data/victoriametrics:/storage
+      - ${VICTORIAMETRICS_DATA_DIR:-/mnt/data/victoriametrics}:/storage
       - ./victoriametrics/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
       - ./victoriametrics/alerts.yml:/etc/victoriametrics/alerts.yml:ro
     networks:
@@ -302,7 +302,7 @@ services:
     env_file:
       - .env.production
     volumes:
-      - /mnt/data/grafana:/var/lib/grafana
+      - ${GRAFANA_DATA_DIR:-/mnt/data/grafana}:/var/lib/grafana
       # VictoriaMetrics 데이터소스 설정
       - ./grafana/provisioning/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml:ro
       - ./grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
@@ -368,10 +368,10 @@ networks:
 # 별도 Named Volume 불필요
 
 # ============================================
-# 리소스 사용 요약 (PM2 Cluster + 자동 스케일링)
+# 리소스 사용 요약 (최적화된 PM2 Cluster)
 # ============================================
-# 총 CPU: ~7.1 OCPU 설정 (PostgreSQL 무제한, 피크 타임만 사용)
-# 총 RAM: 19.38 GB (24 GB 중 80.7%, 4.62 GB 여유)
+# 총 CPU: ~4.3 OCPU 설정 (PostgreSQL 무제한, 피크 타임만 사용)
+# 총 RAM: 15.5 GB (24 GB 중 64.6%, 8.5 GB 여유)
 #
 # 🎯 Oracle Free Tier 할당량:
 #   - 월 3,000 OCPU시간 (평균 4.17 OCPU)
@@ -389,9 +389,10 @@ networks:
 #   grafana:          0.2 OCPU, 300 MB
 #   redis-exporter:   0.1 OCPU, 50 MB
 #
-# 🔄 동적 스케일링 시나리오:
-#   - 피크 타임: PM2 4 워커 → ~4.1 OCPU (8시간/일)
+# 🔄 동적 스케일링 시나리오 (최적화):
+#   - 피크 타임: PM2 2 워커 → ~3.1 OCPU (8시간/일)
 #   - 일반 시간: PM2 2 워커 → ~3.1 OCPU (10시간/일)
 #   - 심야 시간: PM2 1 워커 → ~2.1 OCPU (6시간/일)
-#   - 월 평균: ~2,016 OCPU시간 (< 3,000 안전, 67% 사용)
+#   - 월 평균: ~2,184 OCPU시간 (< 3,000 안전, 73% 사용)
+#   - 메모리 여유: 8.5GB (OOM 방지)
 # ============================================
