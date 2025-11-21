@@ -81,7 +81,7 @@ COPY . .
 # 빌드 전 dist 폴더 정리 및 NestJS 빌드
 RUN rm -rf dist && pnpm run build
 
-# 프로덕션 의존성만 재설치 (캐시 마운트, 선택적 의존성 제외)
+# 프로덕션 의존성만 재설치 (캐시 마운트, Sharp의 선택적 의존성 포함)
 # Sharp 네이티브 모듈 빌드를 위해 플랫폼별로 재빌드
 RUN --mount=type=cache,target=/root/.npm \
     rm -rf node_modules && \
@@ -89,7 +89,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm_config_platform=linux \
     npm_config_libc=glibc \
     SHARP_IGNORE_GLOBAL_LIBVIPS=1 \
-    pnpm install --frozen-lockfile --prod --no-optional
+    pnpm install --frozen-lockfile --prod
 
 # ============================================
 # Stage 3: Production (최적화된 런타임)
