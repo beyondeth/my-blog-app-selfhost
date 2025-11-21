@@ -29,11 +29,14 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         libvips-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# package.json과 package-lock.json 복사
-COPY package.json package-lock.json* ./
+# package.json과 pnpm-lock.yaml 복사
+COPY package.json pnpm-lock.yaml* ./
+
+# pnpm 설치
+RUN npm install -g pnpm@9
 
 # 모든 의존성 설치 (devDependencies 포함)
-RUN npm ci
+RUN pnpm install
 
 # ============================================
 # Stage 2: Builder (Next.js 빌드)
