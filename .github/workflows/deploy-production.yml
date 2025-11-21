@@ -72,9 +72,38 @@ jobs:
             CURRENT_COMMIT=$(git rev-parse HEAD)
             echo "현재 커밋: $CURRENT_COMMIT"
 
-            # 배포 스크립트 실행 (BuildKit + 병렬 빌드)
-            echo "배포 스크립트 실행 중..."
-            bash scripts/deploy-production.sh
+            # 환경 설정
+            export DOCKER_BUILDKIT=1
+            export COMPOSE_DOCKER_CLI_BUILD=1
+
+            # 디스크 공간 확인
+            DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
+            if [ "$DISK_USAGE" -ge 90 ]; then
+              echo "디스크 공간 부족 (${DISK_USAGE}%). 정리 중..."
+              docker system prune -a -f --volumes || true
+            fi
+
+            # 순차적 빌드 실행
+            echo "Backend 빌드 시작..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build backend
+
+            echo "Frontend 빌드 시작..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build frontend
+
+            echo "MCP Proxy 빌드 시작..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production build mcp-proxy
+
+            echo "모든 이미지 빌드 완료"
+
+            # 컨테이너 재시작
+            echo "컨테이너 재시작 중..."
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate backend
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate frontend
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d --force-recreate mcp-proxy
+
+            # 최종 상태 확인
+            echo "배포 완료!"
+            docker compose -f docker-compose.prod.oracle.yml --env-file .env.production ps
 
             echo "=========================================="
             echo "배포 완료: $(date)"
