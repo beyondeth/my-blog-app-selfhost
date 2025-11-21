@@ -27,11 +27,7 @@ services:
       context: ./frontend
       dockerfile: ./frontend/Dockerfile.prod
       target: runner
-      # BuildKit 캐시 설정
-      cache_from:
-        - type=local,src=/home/ubuntu/.docker-cache/frontend
-      cache_to:
-        - type=local,dest=/home/ubuntu/.docker-cache/frontend,mode=max
+      # BuildKit 내부 캐시만 사용 (parallel 빌드와 호환)
       # 빌드 타임 환경변수 (Next.js NEXT_PUBLIC_* 변수 주입)
       args:
         # BuildKit 인라인 캐시 활성화
@@ -78,11 +74,7 @@ services:
       context: ./backend
       dockerfile: Dockerfile
       target: production
-      # BuildKit 캐시 설정
-      cache_from:
-        - type=local,src=/home/ubuntu/.docker-cache/backend
-      cache_to:
-        - type=local,dest=/home/ubuntu/.docker-cache/backend,mode=max
+      # BuildKit 내부 캐시만 사용 (parallel 빌드와 호환)
       # 빌드 인자
       args:
         # BuildKit 인라인 캐시 활성화
@@ -252,11 +244,7 @@ services:
       context: ./mcp-proxy-server
       dockerfile: Dockerfile
       target: production
-      # BuildKit 캐시 설정
-      cache_from:
-        - type=local,src=/home/ubuntu/.docker-cache/mcp-proxy
-      cache_to:
-        - type=local,dest=/home/ubuntu/.docker-cache/mcp-proxy,mode=max
+      # BuildKit 내부 캐시만 사용 (parallel 빌드와 호환)
       # 빌드 인자
       args:
         # BuildKit 인라인 캐시 활성화
