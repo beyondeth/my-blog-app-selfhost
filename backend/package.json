@@ -112,7 +112,8 @@
     "socket.io": "^4.8.1",
     "typeorm": "^0.3.17",
     "uuid": "^11.1.0",
-    "uuidv7": "^1.0.2"
+    "uuidv7": "^1.0.2",
+    "axios": "^1.11.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -132,7 +133,6 @@
     "@types/supertest": "^2.0.12",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "axios": "^1.11.0",
     "chalk": "^4.1.2",
     "dotenv": "^17.2.1",
     "eslint": "^8.42.0",
