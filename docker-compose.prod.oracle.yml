@@ -25,8 +25,8 @@ services:
   frontend:
     build:
       context: ./frontend
-      dockerfile: Dockerfile.prod
-      target: runner
+      dockerfile: Dockerfile.prod.v3
+      # v3는 단일 스테이지이므로 target 제거
       # 빌드 타임 환경변수 (Next.js NEXT_PUBLIC_* 변수 주입)
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
@@ -53,14 +53,14 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 2
-      start_period: 30s
-    # 리소스 제한 (빌드 시 증가, 런타임 최적화)
-    cpus: 2.0
-    mem_limit: 2.5g
-    mem_reservation: 1.5g
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # 리소스 제한 (Oracle Free Tier 최적 활용)
+    cpus: 1.5
+    mem_limit: 3g
+    mem_reservation: 2g
 
   # ============================================
   # Backend (NestJS + PM2 Cluster)
@@ -94,12 +94,12 @@ services:
     # PM2는 Dockerfile CMD에서 실행 (pm2-runtime)
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 2
-      start_period: 60s  # PM2 Cold Start 시간 단축
-    # 리소스 제한 (빌드 및 런타임 최적화)
-    cpus: 3.0
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s  # PM2 Cold Start 고려 (daemon spawning + 워커 시작)
+    # 리소스 제한 (PM2 워커 및 Oracle Free Tier 최적 활용)
+    cpus: 2.5
     mem_limit: 4g
     mem_reservation: 3g
 
@@ -253,10 +253,10 @@ services:
     command: node dist/index.js
     healthcheck:
       test: ["CMD", "node", "-e", "require('http').get('http://localhost:3002/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
-      interval: 10s
-      timeout: 5s
-      retries: 2
-      start_period: 30s
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
     # 리소스 제한
     cpus: 1.0
     mem_limit: 800m
@@ -285,9 +285,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:8428/-/healthy"]
-      interval: 15s
-      timeout: 5s
-      retries: 2
+      interval: 30s
+      timeout: 10s
+      retries: 3
     # 리소스 제한 (Prometheus 400MB → VictoriaMetrics 100MB)
     cpus: 0.1
     mem_limit: 100m
@@ -326,9 +326,9 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3000/api/health"]
-      interval: 15s
-      timeout: 5s
-      retries: 2
+      interval: 30s
+      timeout: 10s
+      retries: 3
     # 리소스 제한
     cpus: 0.2
     mem_limit: 300m
