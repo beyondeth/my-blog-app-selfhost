@@ -69,8 +69,11 @@ COPY package.json pnpm-lock.yaml* ./
 # 의존성 설치 (프로덕션 전용, 캐시 마운트)
 # Sharp를 위한 플랫폼별 빌드 활성화
 RUN --mount=type=cache,target=/root/.npm \
-    pnpm install --frozen-lockfile --prod=false && \
-    npm rebuild sharp --arch=arm64 --platform=linux
+    npm_config_arch=arm64 \
+    npm_config_platform=linux \
+    npm_config_libc=glibc \
+    SHARP_IGNORE_GLOBAL_LIBVIPS=1 \
+    pnpm install --frozen-lockfile --prod=false
 
 # 소스 코드 복사
 COPY . .
@@ -82,8 +85,11 @@ RUN rm -rf dist && pnpm run build
 # Sharp 네이티브 모듈 빌드를 위해 플랫폼별로 재빌드
 RUN --mount=type=cache,target=/root/.npm \
     rm -rf node_modules && \
-    pnpm install --frozen-lockfile --prod --no-optional --ignore-scripts && \
-    npm rebuild sharp --arch=arm64 --platform=linux
+    npm_config_arch=arm64 \
+    npm_config_platform=linux \
+    npm_config_libc=glibc \
+    SHARP_IGNORE_GLOBAL_LIBVIPS=1 \
+    pnpm install --frozen-lockfile --prod --no-optional
 
 # ============================================
 # Stage 3: Production (최적화된 런타임)
