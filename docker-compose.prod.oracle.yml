@@ -23,6 +23,8 @@ services:
   # Frontend (Next.js Standalone)
   # ============================================
   frontend:
+    # Image is published to GHCR by CI. Compose will prefer the image if present.
+    image: ${GHCR_REGISTRY:-ghcr.io}/${GHCR_USERNAME:-codebase}/my-blog-frontend:${IMAGE_TAG:-latest}
     build:
       context: .
       dockerfile: ./frontend/Dockerfile.prod

@@ -64,6 +64,27 @@ if [ ! -f .env.production ]; then
 fi
 log_info "✓ 환경 변수 확인 완료"
 
+# Load production env into environment for compose/image names and build args
+log_info "환경 변수 로드: .env.production"
+set -o allexport
+# shellcheck disable=SC1091
+[ -f .env.production ] && source .env.production || true
+set +o allexport
+
+# 1.1 GHCR 로그인 (옵션) - .env.production에서 GHCR_USERNAME / GHCR_TOKEN 로드 후 실행
+log_info "Step 1.1: GHCR 인증 확인"
+if [ -n "${GHCR_USERNAME:-}" ] && [ -n "${GHCR_TOKEN:-}" ]; then
+    log_info "GHCR 자격증명 존재 - ghcr.io에 로그인 시도: ${GHCR_USERNAME}"
+    # docker login을 통해 private registry에서 이미지 pull 가능하게 함
+    if echo "${GHCR_TOKEN}" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin >/dev/null 2>&1; then
+        log_info "✓ ghcr.io에 로그인 성공"
+    else
+        log_warn "ghcr.io 로그인 실패 - 프라이빗 이미지를 pull할 수 없습니다"
+    fi
+else
+    log_warn "GHCR_USERNAME 또는 GHCR_TOKEN이 설정되어 있지 않습니다. 프라이빗 GHCR 이미지를 pull하려면 시크릿을 설정하세요."
+fi
+
 # 1.5. 디스크 공간 확인 및 정리 (Oracle Free Tier 최적화)
 log_info "Step 1.5: 디스크 공간 확인 및 정리"
 DISK_USAGE=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
@@ -137,6 +158,25 @@ else
     DO_BUILD=true
 fi
 
+# If GHCR_USERNAME is set, attempt to pull frontend image from GHCR specifically
+if [ -n "${GHCR_USERNAME:-}" ]; then
+    FRONTEND_REGISTRY=${GHCR_REGISTRY:-ghcr.io}
+    FRONTEND_IMAGE="${FRONTEND_REGISTRY}/${GHCR_USERNAME}/my-blog-frontend:${IMAGE_TAG:-latest}"
+    log_info "GHCR frontend pull 시도: ${FRONTEND_IMAGE}"
+    if docker pull "${FRONTEND_IMAGE}"; then
+        log_info "✓ GHCR에서 frontend 이미지 pull 성공: ${FRONTEND_IMAGE}"
+        # Tag as compose image if compose uses different name (we set compose image to same pattern)
+        PULLED_FRONTEND=true
+        # ensure docker-compose environment vars align
+        export GHCR_REGISTRY=${FRONTEND_REGISTRY}
+        export GHCR_USERNAME=${GHCR_USERNAME}
+        export IMAGE_TAG=${IMAGE_TAG:-latest}
+    else
+        log_warn "GHCR frontend pull 실패: ${FRONTEND_IMAGE} — 로컬 빌드로 폴백"
+        PULLED_FRONTEND=false
+    fi
+fi
+
 if [ "${DO_BUILD}" = "true" ]; then
     log_info "이미지 빌드 시작 (서버에서 빌드)"
     # BuildKit/Buildx 최적화 분기
@@ -182,24 +222,28 @@ if [ "${DO_BUILD}" = "true" ]; then
             DO_BUILDX_FALLBACK=true
         fi
 
-        # Frontend 빌드 (build-args 전달)
+        # Frontend 빌드 (build-args 전달) — GHCR에서 pull한 경우 스킵
         if [ -z "$DO_BUILDX_FALLBACK" ]; then
-            log_info "2/3 Frontend 이미지 (buildx) 빌드 시작..."
-            if docker buildx build --builder "$BUILDER_NAME" \
-                --cache-from=type=local,src="$BUILD_CACHE_DIR" \
-                --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
-                --load --progress=plain \
-                --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
-                --build-arg NEXT_PUBLIC_BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL}" \
-                --build-arg NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
-                --build-arg NEXT_PUBLIC_MIXPANEL_TOKEN="${NEXT_PUBLIC_MIXPANEL_TOKEN}" \
-                --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${NEXT_PUBLIC_GA_MEASUREMENT_ID}" \
-                -t "${PROJECT}-frontend:${IMAGE_TAG}" -f frontend/Dockerfile.prod ./frontend; then
-                log_info "✓ Frontend buildx 빌드 완료"
-                docker tag "${PROJECT}-frontend:${IMAGE_TAG}" "${PROJECT}-frontend:latest" || true
+            if [ "${PULLED_FRONTEND}" = "true" ]; then
+                log_info "Frontend 이미지를 GHCR에서 가져왔으므로 buildx 빌드 스킵"
             else
-                log_warn "⚠️ Frontend buildx 빌드 실패 — compose 빌드로 폴백"
-                DO_BUILDX_FALLBACK=true
+                log_info "2/3 Frontend 이미지 (buildx) 빌드 시작..."
+                if docker buildx build --builder "$BUILDER_NAME" \
+                    --cache-from=type=local,src="$BUILD_CACHE_DIR" \
+                    --cache-to=type=local,dest="$BUILD_CACHE_DIR",mode=max \
+                    --load --progress=plain \
+                    --build-arg NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL}" \
+                    --build-arg NEXT_PUBLIC_BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL}" \
+                    --build-arg NEXT_PUBLIC_SITE_URL="${NEXT_PUBLIC_SITE_URL}" \
+                    --build-arg NEXT_PUBLIC_MIXPANEL_TOKEN="${NEXT_PUBLIC_MIXPANEL_TOKEN}" \
+                    --build-arg NEXT_PUBLIC_GA_MEASUREMENT_ID="${NEXT_PUBLIC_GA_MEASUREMENT_ID}" \
+                    -t "${PROJECT}-frontend:${IMAGE_TAG}" -f frontend/Dockerfile.prod ./frontend; then
+                    log_info "✓ Frontend buildx 빌드 완료"
+                    docker tag "${PROJECT}-frontend:${IMAGE_TAG}" "${PROJECT}-frontend:latest" || true
+                else
+                    log_warn "⚠️ Frontend buildx 빌드 실패 — compose 빌드로 폴백"
+                    DO_BUILDX_FALLBACK=true
+                fi
             fi
         fi
 
@@ -233,12 +277,16 @@ if [ "${DO_BUILD}" = "true" ]; then
                 log_error "✗ Backend 빌드 실패"
                 exit 1
             fi
-            log_info "compose: Frontend 빌드"
-            if "${BUILD_CMD_BASE[@]}" frontend; then
-                log_info "✓ Frontend 빌드 완료"
+            if [ "${PULLED_FRONTEND}" = "true" ]; then
+                log_info "Frontend 이미지를 GHCR에서 가져왔으므로 compose 빌드 스킵"
             else
-                log_error "✗ Frontend 빌드 실패"
-                exit 1
+                log_info "compose: Frontend 빌드"
+                if "${BUILD_CMD_BASE[@]}" frontend; then
+                    log_info "✓ Frontend 빌드 완료"
+                else
+                    log_error "✗ Frontend 빌드 실패"
+                    exit 1
+                fi
             fi
             log_info "compose: MCP Proxy 빌드"
             if "${BUILD_CMD_BASE[@]}" mcp-proxy; then
@@ -278,12 +326,16 @@ if [ "${DO_BUILD}" = "true" ]; then
             exit 1
         fi
 
-        log_info "2/3 Frontend 이미지 빌드 시작..."
-        if "${BUILD_CMD_BASE[@]}" frontend; then
-            log_info "✓ Frontend 빌드 완료"
+        if [ "${PULLED_FRONTEND}" = "true" ]; then
+            log_info "Frontend 이미지를 GHCR에서 가져왔으므로 compose 빌드 스킵"
         else
-            log_error "✗ Frontend 빌드 실패"
-            exit 1
+            log_info "2/3 Frontend 이미지 빌드 시작..."
+            if "${BUILD_CMD_BASE[@]}" frontend; then
+                log_info "✓ Frontend 빌드 완료"
+            else
+                log_error "✗ Frontend 빌드 실패"
+                exit 1
+            fi
         fi
 
         log_info "3/3 MCP Proxy 이미지 빌드 시작..."
