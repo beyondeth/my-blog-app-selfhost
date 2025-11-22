@@ -174,7 +174,7 @@ export class McpProxyController {
 
       // 4. 외부 이미지 처리 (Gemini 등 외부 URL에서 이미지 다운로드)
       let processedContent = postData.content_markdown;
-      const urlMapping = new Map<string, string>();
+      let firstDownloadedImageId: string | undefined;
 
       if (postData.content_markdown) {
         try {
@@ -188,23 +188,35 @@ export class McpProxyController {
           if (externalImageUrls.length > 0) {
             this.logger.log(`[External Images] Found ${externalImageUrls.length} external image(s):`, externalImageUrls);
 
-            // 외부 이미지 다운로드 및 S3 업로드
-            const downloadedFiles = await this.externalImageDownloadService.downloadExternalImages(
+            // 외부 이미지 다운로드 및 S3 업로드 (상세 결과 반환)
+            const downloadResults = await this.externalImageDownloadService.downloadExternalImages(
               externalImageUrls,
               userId
             );
 
-            // 성공적으로 다운로드된 이미지들에 대해 URL 매핑 생성
-            if (downloadedFiles.length > 0) {
-              this.logger.log(`[External Images] Successfully downloaded ${downloadedFiles.length} image(s)`);
+            // 성공/실패 분리
+            const successfulDownloads = downloadResults.filter(r => r.success);
+            const failedDownloads = downloadResults.filter(r => !r.success);
 
-              downloadedFiles.forEach((file, index) => {
-                const originalUrl = externalImageUrls[index];
-                // CDN URL 생성 (https://cdn.codebase.blog/uploads/...)
-                const cdnUrl = `https://cdn.codebase.blog/${file.fileKey}`;
-                urlMapping.set(originalUrl, cdnUrl);
+            // 성공한 이미지 처리
+            if (successfulDownloads.length > 0) {
+              this.logger.log(`[External Images] Successfully downloaded ${successfulDownloads.length}/${externalImageUrls.length} image(s)`);
 
-                this.logger.debug(`[External Images] URL mapping: ${originalUrl} → ${cdnUrl}`);
+              // URL 매핑 생성 (원본 URL 기반으로 정확하게 매핑)
+              const urlMapping = new Map<string, string>();
+
+              // 첫 번째 성공한 이미지를 썸네일로 사용 (thumbnailImageId가 없는 경우)
+              if (!postData.thumbnailImageId && successfulDownloads[0]?.file) {
+                firstDownloadedImageId = successfulDownloads[0].file.id;
+                this.logger.log(`[Auto Thumbnail] Setting first downloaded image as thumbnail: ${firstDownloadedImageId}`);
+              }
+
+              // 성공한 이미지의 URL 매핑
+              successfulDownloads.forEach(result => {
+                if (result.cdnUrl) {
+                  urlMapping.set(result.originalUrl, result.cdnUrl);
+                  this.logger.debug(`[External Images] URL mapping: ${result.originalUrl} → ${result.cdnUrl}`);
+                }
               });
 
               // 콘텐츠의 외부 이미지 URL을 CDN URL로 변환
@@ -214,6 +226,27 @@ export class McpProxyController {
               );
 
               this.logger.log(`[External Images] Content updated with CDN URLs`);
+            }
+
+            // 실패한 이미지 처리 (404 등)
+            if (failedDownloads.length > 0) {
+              this.logger.warn(`[External Images] Failed to download ${failedDownloads.length} image(s)`);
+
+              // 실패한 이미지 URL 목록
+              const failedUrls = failedDownloads.map(r => r.originalUrl);
+
+              // 에러 로깅
+              failedDownloads.forEach(result => {
+                this.logger.warn(`[External Images] Failed: ${result.originalUrl} - ${result.error}`);
+              });
+
+              // 실패한 이미지 태그를 콘텐츠에서 제거
+              processedContent = this.externalImageDownloadService.removeFailedImages(
+                processedContent,
+                failedUrls
+              );
+
+              this.logger.log(`[External Images] Removed ${failedUrls.length} failed image tag(s) from content`);
             }
           } else {
             this.logger.log(`[External Images] No external images found in content`);
@@ -229,9 +262,13 @@ export class McpProxyController {
       const startTime = Date.now();
 
       // 처리된 콘텐츠로 postData 업데이트
+      // 자동포스팅 시 첫 번째 이미지를 썸네일로 설정 (기존 thumbnailImageId가 없는 경우)
       const finalPostData = {
         ...postData,
         content_markdown: processedContent,
+        ...(firstDownloadedImageId && !postData.thumbnailImageId && {
+          thumbnailImageId: firstDownloadedImageId
+        }),
       };
 
       const postDto = await this.postsService.createFast(finalPostData, user);
