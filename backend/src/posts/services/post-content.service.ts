@@ -213,8 +213,14 @@ export class PostContentService {
   extractExcerpt(content: string, maxLength: number = 150): string {
     if (!content) return '';
 
+    // 마크다운 이미지 문법 제거 (![alt text](url) 형식)
+    // 이미지 파일명이 excerpt에 노출되지 않도록 처리
+    const contentWithoutImages = content
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // 마크다운 이미지 완전 제거
+      .replace(/!\[[^\]]*\]/g, ''); // 이미지 참조 형식도 제거
+
     // HTML 태그 제거
-    const textContent = content
+    const textContent = contentWithoutImages
       .replace(/<[^>]*>/g, '')
       .replace(/\s+/g, ' ')
       .trim();

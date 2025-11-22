@@ -602,7 +602,7 @@ export function isGeminiImageUrl(url: string): boolean {
 
 /**
  * 이미지 URL이 최적화 가능한지 확인
- * CDN이나 자체 서버의 이미지만 최적화, 외부 임시 URL은 최적화 비활성화
+ * 알려진 도메인만 최적화하고, 나머지는 모두 unoptimized 처리
  */
 export function shouldOptimizeImage(url: string): boolean {
   if (!url) return false;
@@ -610,14 +610,24 @@ export function shouldOptimizeImage(url: string): boolean {
   // Gemini 이미지는 최적화 불가
   if (isGeminiImageUrl(url)) return false;
 
-  // CDN 이미지는 최적화 가능
-  if (url.includes('cdn.codebase.blog')) return true;
+  // 최적화 가능한 도메인 목록 (next.config.js remotePatterns에 등록된 도메인)
+  const optimizedDomains = [
+    'cdn.codebase.blog',
+    'lh3.googleusercontent.com',
+    '/api/v1/files/proxy/',
+    'axricjc5utqz.compat.objectstorage.ap-singapore-1.oraclecloud.com'
+  ];
 
-  // 자체 프록시 URL은 최적화 가능
-  if (url.includes('/api/v1/files/proxy/')) return true;
+  // 알려진 도메인인 경우만 최적화
+  return optimizedDomains.some(domain => url.includes(domain));
+}
 
-  // 기타 외부 URL은 최적화 불가
-  return false;
+/**
+ * 이미지가 최적화되지 않아야 하는지 확인 (shouldOptimizeImage의 반대)
+ * PostArticle 등에서 unoptimized prop 값으로 직접 사용
+ */
+export function shouldDisableOptimization(url: string): boolean {
+  return !shouldOptimizeImage(url);
 }
 
 /**

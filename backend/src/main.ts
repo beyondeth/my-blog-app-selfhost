@@ -239,11 +239,43 @@ async function bootstrap() {
   const port = configService.get<number>('PORT', 3000);
   
   await app.listen(port, '0.0.0.0');
-  
+
+  // PM2 ready 신호 - PM2가 wait_ready: true로 설정되어 있을 때 필요
+  // 앱이 성공적으로 시작되고 요청을 받을 준비가 되었음을 알림
+  if (process.send) {
+    process.send('ready');
+    logger.log('✅ PM2 ready signal sent');
+  }
+
   logger.log(`🚀 Application is running on: http://localhost:${port}`);
   logger.log(`📚 API Documentation: http://localhost:${port}/api-docs`);
   logger.log(`🏥 Health Check: http://localhost:${port}/health`);
   logger.log(`🌍 Environment: ${configService.get('NODE_ENV', 'development')}`);
+
+  // Graceful shutdown 신호 처리
+  // SIGTERM: Kubernetes, Docker, PM2 reload 등에서 사용하는 정상 종료 신호
+  // SIGINT: Ctrl+C로 프로세스를 종료할 때 발생하는 신호
+  const handleShutdown = async (signal: string) => {
+    logger.log(`${signal} signal received. Starting graceful shutdown...`);
+
+    try {
+      // PM2에 shutdown 시작 알림
+      if (process.send) {
+        process.send('shutdown');
+      }
+
+      // NestJS 앱 종료 (모든 연결 정리)
+      await app.close();
+      logger.log('Application closed successfully');
+      process.exit(0);
+    } catch (error) {
+      logger.error('Error during shutdown:', error);
+      process.exit(1);
+    }
+  };
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
 }
 
 bootstrap().catch((error) => {
