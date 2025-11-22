@@ -10,6 +10,17 @@ import { S3Service } from './s3.service';
 import { File } from '../entities/file.entity';
 import { FileContext, FileContextType, FilePurpose } from '../entities/file-context.entity';
 
+/**
+ * 이미지 다운로드 결과 인터페이스
+ */
+export interface ImageDownloadResult {
+  originalUrl: string;
+  success: boolean;
+  file?: File;
+  cdnUrl?: string;
+  error?: string;
+}
+
 @Injectable()
 export class ExternalImageDownloadService {
   private readonly logger = new Logger(ExternalImageDownloadService.name);
@@ -29,13 +40,13 @@ export class ExternalImageDownloadService {
   ) {}
 
   /**
-   * 외부 이미지 URL 목록을 다운로드하여 S3에 업로드하고 File 엔티티 배열 반환
-   * 모니터링 통계 수집 포함
+   * 외부 이미지 URL 목록을 다운로드하여 S3에 업로드하고 상세 결과 반환
+   * 성공/실패 정보와 원본 URL을 포함한 결과 반환
    * @param imageUrls 외부 이미지 URL 배열
    * @param userId 사용자 ID
-   * @returns 성공적으로 업로드된 File 엔티티 배열
+   * @returns 이미지 다운로드 결과 배열 (성공/실패 모두 포함)
    */
-  async downloadExternalImages(imageUrls: string[], userId: string): Promise<File[]> {
+  async downloadExternalImages(imageUrls: string[], userId: string): Promise<ImageDownloadResult[]> {
     if (!imageUrls || imageUrls.length === 0) {
       return [];
     }
@@ -60,28 +71,44 @@ export class ExternalImageDownloadService {
       totalUrls: downloadStats.total,
     });
 
-    const results: File[] = [];
+    const results: ImageDownloadResult[] = [];
+    const processedUrls = new Set<string>();
 
     for (const imageUrl of imageUrls) {
-      try {
-        // 중복 URL 건너뛰기 (metadata에 originalUrl 저장)
-        if (results.some(file => file.metadata?.originalUrl === imageUrl)) {
-          downloadStats.duplicates++;
-          this.logger.debug(`Skipping duplicate URL: ${imageUrl}`);
-          continue;
-        }
+      // 중복 URL 건너뛰기
+      if (processedUrls.has(imageUrl)) {
+        downloadStats.duplicates++;
+        this.logger.debug(`Skipping duplicate URL: ${imageUrl}`);
+        continue;
+      }
+      processedUrls.add(imageUrl);
 
+      try {
         const file = await this.downloadAndProcessImage(imageUrl, userId);
         if (file) {
-          results.push(file);
+          // 성공한 경우
+          const cdnUrl = `https://cdn.codebase.blog/${file.fileKey}`;
+          results.push({
+            originalUrl: imageUrl,
+            success: true,
+            file,
+            cdnUrl,
+          });
           downloadStats.successful++;
           downloadStats.totalBytes += file.fileSize || 0;
           this.logger.log(`Successfully downloaded: ${imageUrl}`, {
             fileId: file.id,
             size: file.fileSize,
+            cdnUrl,
             isGemini: this.isGeminiImageUrl(imageUrl),
           });
         } else {
+          // 다운로드 실패 (재시도 후에도)
+          results.push({
+            originalUrl: imageUrl,
+            success: false,
+            error: 'Download failed after retries',
+          });
           downloadStats.failed++;
           downloadStats.errors.push({
             url: imageUrl,
@@ -89,13 +116,20 @@ export class ExternalImageDownloadService {
           });
         }
       } catch (error) {
+        // 예외 발생
+        const errorMessage = error.message || 'Unknown error';
+        results.push({
+          originalUrl: imageUrl,
+          success: false,
+          error: errorMessage,
+        });
         downloadStats.failed++;
         downloadStats.errors.push({
           url: imageUrl,
-          error: error.message || 'Unknown error',
+          error: errorMessage,
         });
         this.logger.error(`Failed to download image: ${imageUrl}`, {
-          error: error.message,
+          error: errorMessage,
           stack: error.stack,
         });
         // 개별 이미지 실패는 전체 프로세스를 중단시키지 않음
@@ -125,6 +159,18 @@ export class ExternalImageDownloadService {
   }
 
   /**
+   * 이전 버전과의 호환성을 위한 헬퍼 메서드
+   * File 배열만 반환 (성공한 것만)
+   * @deprecated downloadExternalImages를 직접 사용하세요
+   */
+  async downloadExternalImagesLegacy(imageUrls: string[], userId: string): Promise<File[]> {
+    const results = await this.downloadExternalImages(imageUrls, userId);
+    return results
+      .filter(result => result.success && result.file)
+      .map(result => result.file!);
+  }
+
+  /**
    * 단일 외부 이미지를 다운로드하고 처리 (재시도 로직 포함)
    * @param imageUrl 이미지 URL
    * @param userId 사용자 ID
@@ -145,11 +191,13 @@ export class ExternalImageDownloadService {
         const response = await axios.get(imageUrl, {
           responseType: 'arraybuffer',
           timeout: this.downloadTimeout,
+          maxRedirects: 2, // 리다이렉트 제한 (최대 2회)
+          validateStatus: (status) => status === 200, // 200 상태만 성공으로 처리
           headers: {
             'User-Agent': 'Mozilla/5.0 (compatible; CodebaseBlog/1.0; +https://codebase.blog)',
+            'Accept': 'image/webp,image/avif,image/*,*/*;q=0.8',
             // Gemini URL의 경우 추가 헤더
             ...(isGeminiUrl && {
-              'Accept': 'image/webp,image/avif,image/*,*/*;q=0.8',
               'Cache-Control': 'no-cache',
             }),
           },
@@ -242,18 +290,46 @@ export class ExternalImageDownloadService {
    * @returns 유효 여부
    */
   private isValidImageResponse(response: AxiosResponse): boolean {
-    // 상태 코드 확인
+    // 상태 코드 확인 (200만 허용)
     if (response.status !== 200) {
+      this.logger.warn(`Invalid status code: ${response.status} for URL: ${response.config?.url}`);
+      return false;
+    }
+
+    // 최종 URL이 에러 페이지인지 확인
+    const finalUrl = response.request?.res?.responseUrl || response.config?.url || '';
+    if (this.isErrorPageUrl(finalUrl)) {
+      this.logger.warn(`Detected error page URL: ${finalUrl}`);
       return false;
     }
 
     // Content-Type 확인
     const contentType = response.headers['content-type'];
     if (!contentType || !contentType.startsWith('image/')) {
+      this.logger.warn(`Invalid content-type: ${contentType} for URL: ${finalUrl}`);
       return false;
     }
 
     return true;
+  }
+
+  /**
+   * URL이 에러 페이지인지 확인
+   * @param url 확인할 URL
+   * @returns 에러 페이지 여부
+   */
+  private isErrorPageUrl(url: string): boolean {
+    const errorPatterns = [
+      /error\.(php|html|htm|asp|aspx|jsp)/i,
+      /\/error\//i,
+      /403\.(php|html|htm)/i,
+      /404\.(php|html|htm)/i,
+      /denied\.(php|html|htm)/i,
+      /forbidden\.(php|html|htm)/i,
+      /cloudflare.*challenge/i,
+    ];
+
+    return errorPatterns.some(pattern => pattern.test(url));
   }
 
   /**
@@ -263,6 +339,12 @@ export class ExternalImageDownloadService {
    */
   private async processImage(buffer: Buffer): Promise<Buffer> {
     try {
+      // HTML/PHP 콘텐츠 감지 (버퍼 시작 부분 검사)
+      const bufferStart = buffer.toString('utf8', 0, Math.min(1000, buffer.length));
+      if (this.isHtmlContent(bufferStart)) {
+        throw new Error('Detected HTML/PHP content instead of image');
+      }
+
       // Sharp로 이미지 메타데이터 확인
       const metadata = await sharp(buffer).metadata();
 
@@ -270,6 +352,16 @@ export class ExternalImageDownloadService {
       const supportedFormats = ['jpeg', 'jpg', 'png', 'gif', 'webp', 'avif'];
       if (!metadata.format || !supportedFormats.includes(metadata.format.toLowerCase())) {
         throw new Error(`Unsupported image format: ${metadata.format}`);
+      }
+
+      // 이미지 크기 검증 (너무 작거나 큰 이미지 거부)
+      if (metadata.width && metadata.height) {
+        if (metadata.width < 10 || metadata.height < 10) {
+          throw new Error(`Image too small: ${metadata.width}x${metadata.height}`);
+        }
+        if (metadata.width > 10000 || metadata.height > 10000) {
+          throw new Error(`Image too large: ${metadata.width}x${metadata.height}`);
+        }
       }
 
       // 이미지 정보 로깅
@@ -286,6 +378,29 @@ export class ExternalImageDownloadService {
       this.logger.error('Error processing image:', error);
       throw error;
     }
+  }
+
+  /**
+   * 버퍼가 HTML/PHP 콘텐츠인지 확인
+   * @param content 버퍼 시작 부분의 문자열
+   * @returns HTML/PHP 여부
+   */
+  private isHtmlContent(content: string): boolean {
+    const htmlPatterns = [
+      /<!DOCTYPE/i,
+      /<html/i,
+      /<head/i,
+      /<body/i,
+      /<?php/i,
+      /<script/i,
+      /<meta/i,
+      /error\s*:/i,
+      /forbidden/i,
+      /access\s*denied/i,
+      /cloudflare/i,
+    ];
+
+    return htmlPatterns.some(pattern => pattern.test(content));
   }
 
   /**
@@ -472,10 +587,16 @@ export class ExternalImageDownloadService {
    * @returns 외부 URL 여부
    */
   private isExternalImageUrl(url: string): boolean {
+    // localhost:3000/user_images는 외부 URL로 처리 (MCP 자동포스팅에서 사용)
+    if (/^https?:\/\/localhost:\d+\/user_images\//.test(url)) {
+      this.logger.debug(`[External Image] localhost user_images URL detected as external: ${url}`);
+      return true;
+    }
+
     // 내부 CDN URL 패턴
     const internalPatterns = [
       /^https:\/\/cdn\.codebase\.blog\//,
-      /^https?:\/\/localhost:\d+\//,
+      /^https?:\/\/localhost:\d+\//, // localhost의 다른 경로는 여전히 내부로 처리
       /^\/api\/v1\/files\//,
       /^uploads\//,
       /^data:image\//,
@@ -496,7 +617,8 @@ export class ExternalImageDownloadService {
 
     // 외부 스토리지이거나 일반 외부 URL이면 true
     return externalPatterns.some(pattern => pattern.test(url)) ||
-           (url.startsWith('https://') && !url.includes('codebase.blog'));
+           (url.startsWith('https://') && !url.includes('codebase.blog')) ||
+           (url.startsWith('http://') && !url.includes('localhost')); // http 외부 URL도 처리
   }
 
   /**
@@ -525,5 +647,58 @@ export class ExternalImageDownloadService {
     }
 
     return updatedContent;
+  }
+
+  /**
+   * 다운로드 실패한 이미지 태그를 콘텐츠에서 제거
+   * 404 에러 등으로 다운로드 실패한 이미지를 완전히 제거
+   * @param content HTML 또는 Markdown 콘텐츠
+   * @param failedUrls 실패한 이미지 URL 목록
+   * @returns 실패한 이미지가 제거된 콘텐츠
+   */
+  removeFailedImages(content: string, failedUrls: string[]): string {
+    if (!failedUrls || failedUrls.length === 0) {
+      return content;
+    }
+
+    let updatedContent = content;
+
+    for (const failedUrl of failedUrls) {
+      // 정규식 이스케이프 처리
+      const escapedUrl = failedUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+      // Pattern 1: HTML img 태그 전체 제거
+      // <img ... src="url" ... > 형태를 찾아 제거 (속성 순서 무관)
+      const htmlImgRegex = new RegExp(`<img[^>]*\\ssrc=["']${escapedUrl}["'][^>]*>`, 'gi');
+      updatedContent = updatedContent.replace(htmlImgRegex, '');
+
+      // Pattern 2: HTML img 태그 (src가 먼저 오는 경우)
+      const htmlImgRegex2 = new RegExp(`<img\\s+src=["']${escapedUrl}["'][^>]*>`, 'gi');
+      updatedContent = updatedContent.replace(htmlImgRegex2, '');
+
+      // Pattern 3: Markdown 이미지 문법 제거 ![alt text](url)
+      const markdownRegex = new RegExp(`!\\[[^\\]]*\\]\\(${escapedUrl}\\)`, 'g');
+      updatedContent = updatedContent.replace(markdownRegex, '');
+
+      // Pattern 4: Figure/Image 태그 조합 제거 (필요한 경우)
+      // <figure>...<img src="url">...</figure> 형태
+      const figureRegex = new RegExp(
+        `<figure[^>]*>.*?<img[^>]*\\ssrc=["']${escapedUrl}["'][^>]*>.*?</figure>`,
+        'gis'
+      );
+      updatedContent = updatedContent.replace(figureRegex, '');
+
+      // 연속된 빈 줄 정리 (이미지 제거 후 남은 공백)
+      updatedContent = updatedContent.replace(/\n\s*\n\s*\n/g, '\n\n');
+    }
+
+    // 실패한 이미지 제거 로깅
+    if (failedUrls.length > 0) {
+      this.logger.log(`Removed ${failedUrls.length} failed image(s) from content`, {
+        failedUrls,
+      });
+    }
+
+    return updatedContent.trim();
   }
 }
