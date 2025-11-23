@@ -1,10 +1,10 @@
-import { 
-  Controller, 
-  Post, 
-  Delete, 
-  Get, 
-  Param, 
-  UseGuards, 
+import {
+  Controller,
+  Post,
+  Delete,
+  Get,
+  Param,
+  UseGuards,
   Request,
   Query,
   HttpCode,
@@ -24,6 +24,8 @@ import { FollowInfoDto, PaginationQueryDto, PaginatedResponseDto } from './dto';
 import { User } from '../users/entities/user.entity';
 import { Throttle } from '@nestjs/throttler';
 import { Request as ExpressRequest } from 'express';
+import { plainToInstance } from 'class-transformer';
+import { UserResponseDto } from '../users/dto/user-response.dto';
 
 @ApiTags('follows')
 @Controller('users')
@@ -71,8 +73,18 @@ export class FollowsController {
   async getFollowers(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Query(ValidationPipe) query: PaginationQueryDto,
-  ): Promise<PaginatedResponseDto<User>> {
-    return this.followsService.getFollowers(userId, query.page, query.limit);
+  ): Promise<PaginatedResponseDto<UserResponseDto>> {
+    const result = await this.followsService.getFollowers(userId, query.page, query.limit);
+
+    // DTO 변환: User 엔티티 → UserResponseDto (민감정보 제외)
+    return {
+      ...result,
+      data: result.data.map(user =>
+        plainToInstance(UserResponseDto, user, {
+          excludeExtraneousValues: true,
+        })
+      ),
+    };
   }
 
   @Get(':userId/following')
@@ -82,8 +94,18 @@ export class FollowsController {
   async getFollowing(
     @Param('userId', ParseUUIDPipe) userId: string,
     @Query(ValidationPipe) query: PaginationQueryDto,
-  ): Promise<PaginatedResponseDto<User>> {
-    return this.followsService.getFollowing(userId, query.page, query.limit);
+  ): Promise<PaginatedResponseDto<UserResponseDto>> {
+    const result = await this.followsService.getFollowing(userId, query.page, query.limit);
+
+    // DTO 변환: User 엔티티 → UserResponseDto (민감정보 제외)
+    return {
+      ...result,
+      data: result.data.map(user =>
+        plainToInstance(UserResponseDto, user, {
+          excludeExtraneousValues: true,
+        })
+      ),
+    };
   }
 
   @Get(':userId/follow-info')

@@ -15,6 +15,8 @@ import { Role } from '../../common/enums/role.enum';
  */
 @Exclude() // 기본적으로 모든 필드 제외
 export class UserResponseDto {
+  // id 필드 공개 (프론트엔드 호환성: React key prop, 권한 체크 등)
+  // UUID는 예측 불가능하므로 보안상 큰 위험 없음
   @Expose()
   id: string;
 

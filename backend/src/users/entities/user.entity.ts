@@ -68,8 +68,10 @@ export class User {
    * 기본 키
    * - UUID v7 (시간 순서 정렬 지원)
    * - K-정렬 가능: 시간 순서대로 정렬 시 데이터베이스 성능 향상
+   * - @Exclude: API 응답에서 제외 (보안상 사용자 UUID 노출 방지)
    */
   @PrimaryGeneratedColumn('uuid')
+  @Exclude({ toPlainOnly: true })
   id: string;
 
   /**
@@ -88,8 +90,10 @@ export class User {
    * 이메일 (고유)
    * - 로그인 ID 역할
    * - 소셜 로그인도 이메일 기반 통합
+   * - @Exclude: API 응답에서 제외 (개인정보 보호)
    */
   @Column({ unique: true, length: 255 })
+  @Exclude({ toPlainOnly: true })
   email: string;
 
   /**
@@ -116,12 +120,14 @@ export class User {
    * - USER: 일반 사용자 (기본값)
    * - ADMIN: 관리자
    * - MODERATOR: 운영자
+   * - @Exclude: API 응답에서 제외 (권한 정보 보호)
    */
   @Column({
     type: 'enum',
     enum: Role,
     default: Role.USER,
   })
+  @Exclude({ toPlainOnly: true })
   role: Role;
 
   /**
@@ -130,12 +136,14 @@ export class User {
    * - GOOGLE: 구글 소셜 로그인
    * - KAKAO: 카카오 소셜 로그인
    * - GITHUB: 깃허브 소셜 로그인
+   * - @Exclude: API 응답에서 제외 (인증 방법 보호)
    */
   @Column({
     type: 'enum',
     enum: AuthProvider,
     default: AuthProvider.LOCAL,
   })
+  @Exclude({ toPlainOnly: true })
   authProvider: AuthProvider;
 
   /**
@@ -144,32 +152,40 @@ export class User {
    * - Kakao: id
    * - GitHub: id
    * - null: 로컬 가입자
+   * - @Exclude: API 응답에서 제외 (OAuth ID 보호)
    */
   @Column({ nullable: true, length: 255 })
+  @Exclude({ toPlainOnly: true })
   providerId: string;
 
   /**
    * 이메일 인증 여부
    * - 로컬 가입: 이메일 인증 링크 클릭 시 true
    * - 소셜 로그인: 자동 true (OAuth 제공자가 인증 보장)
+   * - @Exclude: API 응답에서 제외 (내부 상태 정보 보호)
    */
   @Column({ default: false })
+  @Exclude({ toPlainOnly: true })
   isEmailVerified: boolean;
 
   /**
    * 계정 활성 상태
    * - false: 정지된 계정 (로그인 차단)
    * - 관리자가 수동으로 변경 가능
+   * - @Exclude: API 응답에서 제외 (계정 상태 보호)
    */
   @Column({ default: true })
+  @Exclude({ toPlainOnly: true })
   isActive: boolean;
 
   /**
    * 마지막 로그인 시각
    * - 미사용 계정 감지 (3년 미접속 시 개인정보 파기 안내)
    * - 보안: 비정상적인 로그인 시간대 감지
+   * - @Exclude: API 응답에서 제외 (활동 정보 보호)
    */
   @Column({ nullable: true })
+  @Exclude({ toPlainOnly: true })
   lastLoginAt: Date;
 
   @CreateDateColumn()

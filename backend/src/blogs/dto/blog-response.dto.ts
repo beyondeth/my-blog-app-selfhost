@@ -1,4 +1,5 @@
-import { Exclude, Expose } from 'class-transformer';
+import { Exclude, Expose, Type } from 'class-transformer';
+import { UserResponseDto } from '../../users/dto/user-response.dto';
 
 /**
  * Blog 응답 DTO
@@ -34,8 +35,8 @@ export class BlogResponseDto {
   @Expose()
   allowComments: boolean;
 
-  // 내부 userId는 민감정보로 간주하여 제외
-  @Exclude()
+  // userId는 권한 체크용으로 필요 (프론트엔드에서 blog.userId === user.id 비교)
+  @Expose()
   userId: string;
 
   @Expose()
@@ -47,6 +48,11 @@ export class BlogResponseDto {
   @Expose()
   alias: string; // Alias 필드 추가
 
+  // 블로그 소유자 정보 (UserResponseDto로 자동 변환)
+  @Expose()
+  @Type(() => UserResponseDto)
+  owner?: UserResponseDto;
+
   // 팔로우 정보 (동적으로 추가되는 필드)
   @Expose()
   followInfo?: {
@@ -54,6 +60,23 @@ export class BlogResponseDto {
     followingCount: number;
     isFollowedByUser: boolean;
   };
+
+  // 리다이렉트 정보 (alias 시스템용)
+  @Expose()
+  shouldRedirect?: boolean;
+
+  @Expose()
+  redirectTo?: string;
+
+  @Expose()
+  redirectType?: string;
+
+  // 비공개 블로그 메시지
+  @Expose()
+  isPrivate?: boolean;
+
+  @Expose()
+  message?: string;
 
   // OneToOne, OneToMany 관계 제외 (lazy loading 방지)
   @Exclude()
