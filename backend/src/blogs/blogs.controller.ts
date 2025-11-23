@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Put, Patch, Body, Param, UseGuards, Request, UnauthorizedException, Logger } from '@nestjs/common';
+import { Controller, Get, Post, Put, Patch, Body, Param, UseGuards, Request, UnauthorizedException, Logger, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
 import { BlogsService } from './blogs.service';
 import { CreateBlogDto } from './dto/create-blog.dto';
 import { UpdateBlogDto } from './dto/update-blog.dto';
@@ -10,6 +10,8 @@ import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
 import { BlogStatsService } from '../common/services/blog-stats.service';
 import { BlogResolverService } from '../common/services/blog-resolver.service';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { plainToInstance } from 'class-transformer';
+import { BlogResponseDto } from './dto/blog-response.dto';
 
 @ApiTags('blogs')
 @Controller('blogs')
@@ -66,16 +68,30 @@ export class BlogsController {
   @Get('slug/:slug')
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
+  @UseInterceptors(ClassSerializerInterceptor)
   @ApiOperation({ summary: '블로그 조회 (alias/slug 통합)' })
   async findOneBySlug(@Param('slug') slug: string, @CurrentUser() user?: User) {
     // findOneByIdentifier()를 사용하여 alias > old_alias > slug 순서로 조회
-    return await this.blogsService.findOneByIdentifier(slug, user);
+    const blog = await this.blogsService.findOneByIdentifier(slug, user);
+
+    // DTO 변환: owner 필드의 민감정보 자동 제외
+    return plainToInstance(BlogResponseDto, blog, {
+      excludeExtraneousValues: false,
+      enableImplicitConversion: true,
+    });
   }
 
   @Get(':id')
   @Public()
+  @UseInterceptors(ClassSerializerInterceptor)
   async findOne(@Param('id') id: string) {
-    return await this.blogsService.findOne(id);
+    const blog = await this.blogsService.findOne(id);
+
+    // DTO 변환: owner 필드의 민감정보 자동 제외
+    return plainToInstance(BlogResponseDto, blog, {
+      excludeExtraneousValues: false,
+      enableImplicitConversion: true,
+    });
   }
 
   @Put(':id')
