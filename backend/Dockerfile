@@ -105,8 +105,8 @@ ENV npm_config_build_from_source=false
 RUN groupadd -g 1001 nodejs && \
     useradd -r -u 1001 -g nodejs -m nestjs
 
-# PM2 전역 설치 (클러스터 모드 지원)
-RUN npm install -g pm2@latest
+# pnpm 및 PM2 전역 설치 (마이그레이션 실행 및 클러스터 모드 지원)
+RUN npm install -g pnpm@latest pm2@latest
 
 WORKDIR /app
 
