@@ -102,7 +102,7 @@ docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -
 # 9. 마이그레이션 실행 (Backend 준비 후)
 log "Step 6: 데이터베이스 마이그레이션"
 docker compose -f docker-compose.prod.oracle.yml --env-file .env.production exec -T backend \
-    pnpm migration:run || warning "마이그레이션 실패 (이미 적용됨)"
+    pnpm migration:run:prod:nobuild || warning "마이그레이션 실패 (이미 적용됨)"
 
 # 10. 최종 상태 확인
 log "Step 7: 최종 상태 확인"
