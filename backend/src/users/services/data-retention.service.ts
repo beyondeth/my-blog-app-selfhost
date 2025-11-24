@@ -4,6 +4,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, LessThan, IsNull } from 'typeorm';
 import { User } from '../entities/user.entity';
 import { EmailApproval } from '../../email/entities/email-approval.entity';
+import { Post } from '../../posts/entities/post.entity';
+import { Comment } from '../../comments/entities/comment.entity';
 
 /**
  * 개인정보 보유기간 관리 서비스
@@ -21,6 +23,10 @@ export class DataRetentionService {
     private readonly userRepository: Repository<User>,
     @InjectRepository(EmailApproval)
     private readonly emailApprovalRepository: Repository<EmailApproval>,
+    @InjectRepository(Post)
+    private readonly postRepository: Repository<Post>,
+    @InjectRepository(Comment)
+    private readonly commentRepository: Repository<Comment>,
   ) {}
 
   /**
@@ -206,13 +212,16 @@ DevLog 드림
       this.logger.log(`Deleted ${deletedMessagesCount} expired messages`);
 
       // 2. 사용자 완전 삭제 (scheduledDeletionAt 도래)
-      const usersToDelete = await this.userRepository.find({
-        where: {
-          isDeleted: true,
-          scheduledDeletionAt: LessThan(now),
-        },
-        select: ['id', 'email', 'scheduledDeletionAt'],
-      });
+      // accountSettings 테이블과 조인하여 scheduledDeletionAt 조회
+      const usersToDelete = await this.userRepository
+        .createQueryBuilder('user')
+        .leftJoinAndSelect('user.accountSettings', 'settings')
+        .where('user.isDeleted = :isDeleted', { isDeleted: true })
+        .andWhere('settings.scheduledDeletionAt < :now', { now })
+        .andWhere('settings.scheduledDeletionAt IS NOT NULL')
+        .select(['user.id', 'user.email'])
+        .addSelect(['settings.scheduledDeletionAt'])
+        .getMany();
 
       if (usersToDelete.length > 0) {
         this.logger.log(
@@ -224,7 +233,7 @@ DevLog 드림
             // 사용자 완전 삭제 (CASCADE로 관련 데이터 자동 삭제)
             await this.userRepository.delete(user.id);
             this.logger.log(
-              `Permanently deleted user ${user.id} (scheduled at ${user.scheduledDeletionAt})`,
+              `Permanently deleted user ${user.id} (scheduled at ${user.accountSettings?.scheduledDeletionAt})`,
             );
           } catch (error) {
             this.logger.error(
@@ -236,6 +245,43 @@ DevLog 드림
       } else {
         this.logger.log('No users scheduled for permanent deletion');
       }
+
+      // 3. Soft delete된 Posts 완전 삭제 (180일 경과)
+      const oneHundredEightyDaysAgo = new Date(now);
+      oneHundredEightyDaysAgo.setDate(
+        oneHundredEightyDaysAgo.getDate() - 180,
+      );
+
+      const deletedPostsResult = await this.postRepository
+        .createQueryBuilder()
+        .delete()
+        .where('isDeleted = :isDeleted', { isDeleted: true })
+        .andWhere('deletedAt IS NOT NULL')
+        .andWhere('deletedAt < :oneHundredEightyDaysAgo', {
+          oneHundredEightyDaysAgo,
+        })
+        .execute();
+
+      const deletedPostsCount = deletedPostsResult.affected || 0;
+      this.logger.log(
+        `Deleted ${deletedPostsCount} soft-deleted posts (180+ days old)`,
+      );
+
+      // 4. Soft delete된 Comments 완전 삭제 (180일 경과)
+      const deletedCommentsResult = await this.commentRepository
+        .createQueryBuilder()
+        .delete()
+        .where('isDeleted = :isDeleted', { isDeleted: true })
+        .andWhere('deletedAt IS NOT NULL')
+        .andWhere('deletedAt < :oneHundredEightyDaysAgo', {
+          oneHundredEightyDaysAgo,
+        })
+        .execute();
+
+      const deletedCommentsCount = deletedCommentsResult.affected || 0;
+      this.logger.log(
+        `Deleted ${deletedCommentsCount} soft-deleted comments (180+ days old)`,
+      );
 
       this.logger.log('Expired data deletion completed');
     } catch (error) {

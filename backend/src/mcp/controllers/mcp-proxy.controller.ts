@@ -175,6 +175,7 @@ export class McpProxyController {
       // 4. 외부 이미지 처리 (Gemini 등 외부 URL에서 이미지 다운로드)
       let processedContent = postData.content_markdown;
       let firstDownloadedImageId: string | undefined;
+      let downloadedFileIds: string[] = []; // 다운로드한 모든 이미지 ID 수집 (post_files 연결용)
 
       if (postData.content_markdown) {
         try {
@@ -204,6 +205,13 @@ export class McpProxyController {
 
               // URL 매핑 생성 (원본 URL 기반으로 정확하게 매핑)
               const urlMapping = new Map<string, string>();
+
+              // 다운로드한 모든 이미지 ID 수집 (post_files 테이블 연결을 위해)
+              downloadedFileIds = successfulDownloads
+                .filter(r => r.file?.id)
+                .map(r => r.file.id);
+
+              this.logger.log(`[External Images] Collected ${downloadedFileIds.length} file IDs for post attachment`);
 
               // 첫 번째 성공한 이미지를 썸네일로 사용 (thumbnailImageId가 없는 경우)
               if (!postData.thumbnailImageId && successfulDownloads[0]?.file) {
@@ -263,13 +271,25 @@ export class McpProxyController {
 
       // 처리된 콘텐츠로 postData 업데이트
       // 자동포스팅 시 첫 번째 이미지를 썸네일로 설정 (기존 thumbnailImageId가 없는 경우)
+      // 다운로드한 이미지들을 attachedFileIds에 포함 (수동 포스팅과 동일한 동작)
       const finalPostData = {
         ...postData,
         content_markdown: processedContent,
+        ...(downloadedFileIds.length > 0 && {
+          attachedFileIds: downloadedFileIds
+        }),
         ...(firstDownloadedImageId && !postData.thumbnailImageId && {
           thumbnailImageId: firstDownloadedImageId
         }),
       };
+
+      // 디버그: 최종 포스트 데이터 확인
+      this.logger.debug(`[MCP Post Data]`, {
+        hasAttachedFileIds: !!finalPostData.attachedFileIds,
+        attachedFileIdsCount: finalPostData.attachedFileIds?.length || 0,
+        thumbnailImageId: finalPostData.thumbnailImageId,
+        contentLength: finalPostData.content_markdown?.length || 0
+      });
 
       const postDto = await this.postsService.createFast(finalPostData, user);
 
