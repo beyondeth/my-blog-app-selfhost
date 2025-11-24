@@ -411,54 +411,91 @@ export class PostReadService {
   ): Promise<Post[]> {
     this.logger.debug(`[findPopularPosts] Period: ${period}, Limit: ${limit}`);
 
-    // Materialized View에서 기본 인기 포스트 조회 (최적화)
-    const popularPostIds = await this.materializedViewService.getPopularPosts(limit);
-    const postIds = popularPostIds.map(p => p.id);
+    // Materialized View에서 모든 데이터 조회 (author, blog 정보 포함)
+    // 더 이상 재조회 불필요!
+    const popularPosts = await this.materializedViewService.getPopularPosts(limit * 2); // 날짜 필터링 고려하여 여유있게 조회
 
-    if (postIds.length === 0) {
+    if (popularPosts.length === 0) {
       return [];
     }
 
-    // 관계 데이터 포함하여 전체 포스트 정보 조회 (배치 조회)
-    const posts = await this.postsRepository
-      .createQueryBuilder('post')
-      .leftJoinAndSelect('post.author', 'author')
-      .leftJoinAndSelect('author.profile', 'profile')
-      .leftJoinAndSelect('post.blog', 'blog')
-      .leftJoinAndSelect('post.thumbnailImage', 'thumbnailImage')
-      .leftJoinAndSelect('post.stats', 'stats')
-      .leftJoinAndSelect('post.metadata', 'metadata')
-      .where('post.id IN (:...postIds)', { postIds })
-      .orderBy(`array_position(ARRAY[:...postIds]::uuid[], post.id)`) // Materialized View 순서 유지
-      .setParameter('postIds', postIds)
-      .getMany();
+    // 기간 필터링 (메모리에서 처리)
+    let filteredPosts = popularPosts;
 
-    // 기간 필터링이 필요한 경우 (daily, weekly, monthly)
     if (period !== 'all') {
       const now = new Date();
-      let dateFrom: Date | null = null;
+      let dateFrom: Date;
 
       switch (period) {
         case 'daily':
-          // 오늘 UTC 0시부터 시작되도록 수정 (타임존 문제 해결)
-          const today = new Date();
-          today.setUTCHours(0, 0, 0, 0);
-          dateFrom = today;
+          // 오늘 0시 (KST 기준)
+          dateFrom = new Date(now);
+          dateFrom.setHours(0, 0, 0, 0);
           break;
         case 'weekly':
+          // 7일 전
           dateFrom = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
           break;
         case 'monthly':
+          // 30일 전
           dateFrom = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
           break;
       }
 
-      if (dateFrom) {
-        return posts.filter(post => post.publishedAt >= dateFrom!);
-      }
+      // 날짜 필터링
+      filteredPosts = popularPosts.filter(post => {
+        const publishedAt = new Date(post.publishedAt);
+        return publishedAt >= dateFrom;
+      });
     }
 
-    return posts;
+    // limit 적용
+    const limitedPosts = filteredPosts.slice(0, limit);
+
+    // MV 데이터를 Post 엔티티 형식으로 변환
+    return limitedPosts.map(mvPost => {
+      // Post 엔티티로 매핑
+      const post = new Post();
+      post.id = mvPost.id;
+      post.title = mvPost.title;
+      post.slug = mvPost.slug;
+      post.excerpt = mvPost.excerpt;
+      post.publishedAt = new Date(mvPost.publishedAt);
+      post.createdAt = new Date(mvPost.createdAt);
+
+      // 최소 Author 정보 매핑 (username만)
+      const user = new User();
+      user.id = mvPost.authorId;
+      user.username = mvPost.authorUsername;
+
+      post.author = user;
+
+      // 최소 Blog 정보 매핑 (slug만 - URL 생성용)
+      if (mvPost.blogId) {
+        const blog = {
+          id: mvPost.blogId,
+          slug: mvPost.blogSlug,
+        };
+        post.blog = blog as any;
+      }
+
+      // Thumbnail 정보 매핑
+      if (mvPost.thumbnail) {
+        post.thumbnailImage = {
+          id: mvPost.thumbnailImageId,
+          fileUrl: mvPost.thumbnail,
+        } as any;
+      }
+
+      // Stats 정보 매핑
+      post.stats = {
+        viewCount: mvPost.viewCount || 0,
+        likeCount: mvPost.likeCount || 0,
+        commentCount: mvPost.commentCount || 0,
+      } as any;
+
+      return post;
+    });
   }
 
   /**

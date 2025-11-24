@@ -255,10 +255,18 @@ export class PostsController {
       : 'weekly'; // 기본값: 주간
     const limitNumber = PaginationHelper.getSafeLimit(limit, 10); // 인기 게시글은 최대 10개
 
-    // 기간별 캐시 TTL 설정
-    const ttl = sanitizedPeriod === 'daily' ? 3600 : sanitizedPeriod === 'weekly' ? 10800 : 21600;
+    // 캐시 키 생성
+    const cacheKey = CacheKeys.FEED_POPULAR(sanitizedPeriod, limitNumber);
 
-    // DB 조회
+    // 캐시 확인
+    const cached = await this.cacheService.get(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit: ${cacheKey}`);
+      return cached;
+    }
+
+    // 캐시 미스 - DB 조회
+    this.logger.debug(`Cache miss: ${cacheKey}`);
     const posts = await this.postsService.findPopularPosts(sanitizedPeriod, limitNumber);
 
     // 응답 포맷팅 (프론트엔드에서 기대하는 형식: { posts: [...], total: number })
@@ -266,6 +274,11 @@ export class PostsController {
       posts: posts,
       total: posts.length
     };
+
+    // 기간별 캐시 TTL 설정 후 캐싱
+    const ttl = sanitizedPeriod === 'daily' ? 3600 : sanitizedPeriod === 'weekly' ? 10800 : 21600;
+    await this.cacheService.set(cacheKey, result, ttl);
+    this.logger.debug(`Cached: ${cacheKey} (TTL: ${ttl}s)`);
 
     return result;
   }
