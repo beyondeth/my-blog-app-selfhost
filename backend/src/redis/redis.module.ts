@@ -28,8 +28,8 @@ import { UnifiedRedisService } from './unified-redis.service';
           maxmemory: configService.get('REDIS_MAX_MEMORY') || '2gb',
           maxmemoryPolicy: configService.get('REDIS_MAX_MEMORY_POLICY') || 'allkeys-lru',
           // 커넥션 풀링
-          connectTimeout: 10000,
-          commandTimeout: 15000, // 5초에서 15초로 증가
+          connectTimeout: 30000, // 10초에서 30초로 증가
+          commandTimeout: 30000, // 15초에서 30초로 증가 (cascade 삭제 대응)
           lazyConnect: true,
           keepAlive: 30000,
         },

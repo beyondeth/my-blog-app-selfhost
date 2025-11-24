@@ -6,7 +6,6 @@ import { Throttle } from '@nestjs/throttler';
 import { AuthService } from './auth.service';
 import { EmailService } from '../email/email.service';
 import { UserDeletionService } from '../users/services/user-deletion.service';
-import { UserDeletionQueueService } from '../users/services/user-deletion-queue.service';
 import { UsersService } from '../users/users.service';
 import { SendCodeDto } from '../email/dto/send-code.dto';
 import { VerifyCodeDto } from '../email/dto/verify-code.dto';
@@ -34,7 +33,6 @@ export class AuthController {
     private readonly authService: AuthService,
     private readonly emailService: EmailService,
     private readonly userDeletionService: UserDeletionService,
-    private readonly userDeletionQueueService: UserDeletionQueueService,
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly redisService: UnifiedRedisService,
@@ -790,16 +788,9 @@ export class AuthController {
       await this.usersService.softDelete(user.id);
       this.logger.log(`User ${user.id} soft deleted, personal data masked`);
 
-      // 2. 백그라운드 큐에 삭제 작업 추가
-      await this.userDeletionQueueService.addDeletionJob(
-        user.id,
-        'soft-delete',
-        {
-          reason: dto.reason || 'User requested account deletion',
-          requestedAt: new Date().toISOString(),
-        }
-      );
-      this.logger.log(`Deletion job queued for user ${user.id}`);
+      // 2. 180일 후 자동 완전 삭제 (DataRetentionService가 매일 자정 처리)
+      // scheduledDeletionAt이 account_settings 테이블에 저장됨
+      this.logger.log(`User ${user.id} scheduled for permanent deletion in 180 days`);
 
       // 3. 웹 세션 삭제 (MCP 세션도 무효화되도록)
       try {

@@ -22,7 +22,6 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { Role } from '../../common/enums/role.enum';
 import { DataRetentionService } from '../../users/services/data-retention.service';
-import { UserDeletionQueueService } from '../../users/services/user-deletion-queue.service';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EmailApproval } from '../../email/entities/email-approval.entity';
@@ -36,7 +35,6 @@ export class AdminUsersController {
   constructor(
     private readonly adminUsersService: AdminUsersService,
     private readonly dataRetentionService: DataRetentionService,
-    private readonly deletionQueueService: UserDeletionQueueService,
     private readonly auditService: AuditService,
     @InjectRepository(EmailApproval)
     private readonly emailApprovalRepository: Repository<EmailApproval>,
@@ -196,17 +194,17 @@ export class AdminUsersController {
 
   /**
    * Task 25: 삭제 실패 목록 조회
+   * Note: UserDeletionQueue 시스템이 제거되어 더 이상 사용되지 않음
    */
   @Get('deletion-failures')
   async getDeletionFailures() {
-    const metrics = await this.deletionQueueService.getMetrics();
-
     return {
-      dlqSize: metrics.dlqSize,
-      totalFailed: metrics.totalFailed,
-      queueSize: metrics.queueSize,
-      processingCount: metrics.processingCount,
-      note: 'Use recoverFromDLQ to retry failed jobs',
+      dlqSize: 0,
+      totalFailed: 0,
+      queueSize: 0,
+      processingCount: 0,
+      note: 'UserDeletionQueue system has been removed. User deletion is now handled automatically by DataRetentionService (daily at midnight).',
+      migrationNote: '180일 후 자동 삭제는 DataRetentionService.deleteExpiredData()가 담당합니다.',
     };
   }
 
@@ -400,18 +398,18 @@ export class AdminUsersController {
 
   /**
    * Task 25: 삭제 실패 작업 재시도
+   * Note: UserDeletionQueue 시스템이 제거되어 더 이상 사용되지 않음
    */
   @Post('deletion-failures/retry')
   async retryDeletionFailures(
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit?: number,
   ) {
-    const recoveredJobs = await this.deletionQueueService.recoverFromDLQ(limit);
-
     return {
-      success: true,
-      message: `${recoveredJobs.length} jobs recovered from DLQ`,
-      recoveredCount: recoveredJobs.length,
-      jobs: recoveredJobs,
+      success: false,
+      message: 'UserDeletionQueue system has been removed',
+      recoveredCount: 0,
+      jobs: [],
+      note: 'User deletion is now handled automatically by DataRetentionService. Check logs for any issues.',
     };
   }
 
