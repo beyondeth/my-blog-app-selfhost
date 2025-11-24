@@ -157,23 +157,35 @@ export class MaterializedViewService implements OnModuleInit {
 
   /**
    * 인기 포스트 데이터 직접 조회 (Materialized View 사용)
+   * MV에서 author, blog 정보 포함하여 조회 (재조회 불필요)
    */
   async getPopularPosts(limit: number = 10): Promise<any[]> {
     try {
       const result = await this.dataSource.query(`
         SELECT
+          -- 포스트 정보
           id,
           title,
           slug,
           excerpt,
           thumbnail,
+          "thumbnail_image_id" AS "thumbnailImageId",
           "blogId",
           "authorId",
           "publishedAt",
+          "createdAt",
+
+          -- 통계 정보
           "viewCount",
           "likeCount",
           "commentCount",
-          "popularityScore"
+          "popularityScore",
+
+          -- 최소 Author 정보 (username만)
+          "authorUsername",
+
+          -- 최소 Blog 정보 (slug만 - URL 생성용)
+          "blogSlug"
         FROM mv_popular_posts
         ORDER BY "popularityScore" DESC, "publishedAt" DESC
         LIMIT $1
