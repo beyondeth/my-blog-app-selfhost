@@ -79,6 +79,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
    - --tutorial → 'tutorial'
    - --comedy → 'comedy'
    - --podcast → 'podcast'
+   - --vibe → 'vibe'
    - --default or no flag → 'default'
 3. Write content following the retrieved style guide
 4. **Select a category** that best describes the post content (REQUIRED)
@@ -93,6 +94,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
 - **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
 - **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
 - **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
+- **vibe**: Developer learning guide (friendly, conversational, concept-focused)
 - **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
 
 ## Important Requirements
@@ -130,7 +132,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
           },
           style: {
             type: 'string',
-            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast'],
+            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast', 'vibe'],
             default: 'default',
             description: 'Preset style (used if customMarkdown not provided)',
           },
@@ -162,7 +164,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
           },
           writingStyle: {
             type: 'string',
-            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast'],
+            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast', 'vibe'],
             default: 'default',
             description: 'Writing style preset',
           },

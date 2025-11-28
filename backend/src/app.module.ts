@@ -48,6 +48,7 @@ import { FollowsModule } from './follows/follows.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BookmarksModule } from './bookmarks/bookmarks.module';
 import { BlocksModule } from './blocks/blocks.module';
+import { MusicModule } from './music/music.module';
 // import { TestBlogStatsController } from './test/test-blog-stats.controller'; // Temporarily disabled due to dependency issues
 // import { SimpleTestController } from './test/simple-test.controller';
 import { MinimalTestController } from './test/minimal-test.controller';
@@ -141,6 +142,7 @@ import { MinimalTestController } from './test/minimal-test.controller';
     NotificationsModule,
     BlocksModule,
     ChatModule,
+    MusicModule, // BGM 플레이어 기능
     // AnalyticsModule,
     // FUTURE: 구독제 기능 활성화 시 주석 해제
     // SubscriptionModule, // UsersModule 이후에 로드

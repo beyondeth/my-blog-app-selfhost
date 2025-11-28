@@ -102,11 +102,10 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
         ? redirectPath
         : redirectPath.replace(`/${blog.redirectTo}`, `/@${blog.redirectTo}`);
 
-      // Next.js 클라이언트 컴포넌트에서는 window.location을 사용하여 리다이렉트
-      if (typeof window !== 'undefined') {
-        window.location.replace(finalRedirectPath);
-      }
+      // Next.js router를 사용하여 소프트 네비게이션 (음악 플레이어 상태 유지)
+      router.replace(finalRedirectPath);
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- router는 stable reference
   }, [blog, postSlug, searchParams]);
 
   // Fetch post details - 항상 최신 데이터 가져오기

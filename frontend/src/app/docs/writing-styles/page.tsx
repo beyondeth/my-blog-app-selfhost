@@ -41,6 +41,11 @@ const WRITING_STYLES: StyleGuide[] = [
     description: '대화형 팟캐스트 스타일. 음성으로 듣기 좋게 구성되며 시각적 요소에 의존하지 않습니다.',
   },
   {
+    id: 'vibe',
+    name: 'Vibe',
+    description: '개발자 학습 가이드 스타일. 선임 개발자가 후임에게 조언하는 멘토링 톤으로 학습 방법론과 성장 마인드셋을 다룹니다.',
+  },
+  {
     id: '_common',
     name: 'Common Rules',
     description: '모든 스타일에 공통으로 적용되는 기본 규칙과 가이드라인입니다.',
@@ -112,6 +117,13 @@ export default function WritingStylesPage() {
               <code className="text-sm font-mono text-gray-900 dark:text-gray-100 font-medium">--podcast</code>
               <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
                 대화형 팟캐스트. 음성으로 듣기 좋은 스타일.
+              </p>
+            </div>
+
+            <div className="border-l-2 border-gray-300 dark:border-gray-700 pl-4">
+              <code className="text-sm font-mono text-gray-900 dark:text-gray-100 font-medium">--vibe</code>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                개발자 학습 가이드. 멘토링 톤의 성장 조언.
               </p>
             </div>
           </div>

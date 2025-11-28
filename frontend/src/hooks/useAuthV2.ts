@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   useUser,
@@ -102,19 +102,36 @@ export function useAuthV2(): AuthContextType {
     registerMutation.reset();
   }, [loginMutation, registerMutation]);
 
-  return {
-    user: user || null,
-    isLoading,
-    isAuthenticated,
-    isAdmin,
-    login,
-    register,
-    logout,
-    refreshUser,
-    checkAuth,
-    clearError,
-    error: error as string | null,
-  };
+  // 반환값 메모이제이션: 의존성이 변경되지 않으면 동일한 객체 참조 유지
+  // → Context consumer 불필요한 리렌더링 방지
+  return useMemo(
+    () => ({
+      user: user || null,
+      isLoading,
+      isAuthenticated,
+      isAdmin,
+      login,
+      register,
+      logout,
+      refreshUser,
+      checkAuth,
+      clearError,
+      error: error as string | null,
+    }),
+    [
+      user,
+      isLoading,
+      isAuthenticated,
+      isAdmin,
+      login,
+      register,
+      logout,
+      refreshUser,
+      checkAuth,
+      clearError,
+      error,
+    ]
+  );
 }
 
 /**

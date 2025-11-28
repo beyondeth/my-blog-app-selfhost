@@ -353,19 +353,6 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       // Content 변경 시 onChange 콜백 호출
       const html = editor.getHTML()
 
-      // 디버그: 캡션이 HTML에 포함되는지 확인
-      if (process.env.NODE_ENV === 'development') {
-        const hasFigcaption = html.includes('<figcaption');
-        const hasFigure = html.includes('<figure');
-        console.log('🖼️ [CAPTION_DEBUG] Editor content updated:', {
-          htmlLength: html.length,
-          hasFigure,
-          hasFigcaption,
-          figcaptionCount: (html.match(/<figcaption/g) || []).length,
-          preview: html.substring(0, 200) + (html.length > 200 ? '...' : '')
-        });
-      }
-
       onChange?.(html)
     },
     extensions: [

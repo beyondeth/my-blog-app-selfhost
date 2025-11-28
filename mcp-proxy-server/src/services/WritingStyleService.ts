@@ -39,7 +39,7 @@ export interface WritingStyle {
 }
 
 export class WritingStyleService {
-  private readonly PRESETS = ['novel', 'tutorial', 'comedy', 'podcast', 'default'];
+  private readonly PRESETS = ['novel', 'tutorial', 'comedy', 'podcast', 'default', 'vibe'];
   private readonly STYLES_DIR = path.join(__dirname, '../../writing-styles');
   private styleCache: Map<string, WritingStyle> = new Map();  // 스타일 캐시
   private commonInstructionsCache: string | null = null;  // 공통 지침 캐시
@@ -217,7 +217,8 @@ export class WritingStyleService {
           sections['CORE NARRATIVE PRINCIPLES'] || '',
           sections['CORE TUTORIAL PRINCIPLES'] || '',
           sections['CORE COMEDY PRINCIPLES'] || '',
-          sections['CORE PODCAST PRINCIPLES'] || ''
+          sections['CORE PODCAST PRINCIPLES'] || '',
+          sections['CORE VIBE PRINCIPLES'] || ''
         ),
         createPostDescription: sections['WRITING GUIDELINES'] || '',
         qualityGuidelinesPrompt: sections['QUALITY ENHANCEMENT GUIDE'] || '',

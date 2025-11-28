@@ -18,10 +18,12 @@ export function useBlogBySlug(slug: string) {
       return blog;
     },
     enabled: !!slug,
-    staleTime: 0,                     // 캐싱 안함 (즉시 반영)
+    // 캐싱 최적화: 페이지 이동 시 불필요한 API 호출 방지
+    // 블로그 정보 변경 시에는 invalidateQueries로 명시적 갱신
+    staleTime: 30 * 1000,            // 30초간 fresh 유지 (페이지 이동 시 리페치 방지)
     gcTime: 10 * 60 * 1000,          // 10분간 메모리 보관
-    refetchOnMount: 'always',        // 마운트 시 항상 재페칭
-    refetchOnWindowFocus: true,      // 포커스 시 재요청
+    refetchOnMount: true,            // stale일 때만 마운트 시 재페칭
+    refetchOnWindowFocus: false,     // 포커스 시 재요청 안함 (수동 갱신)
   });
 }
 

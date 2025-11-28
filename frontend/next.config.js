@@ -3,9 +3,11 @@ const nextConfig = {
   // Standalone 빌드 모드 (Docker 최적화: 메모리 49% 절감)
   output: 'standalone',
 
-  // Next.js 16: Turbopack 비활성화 (ARM64 호환성)
-  experimental: {
-    turbopack: false,  // Webpack 명시적 사용
+  // Next.js 16: Turbopack 설정
+  // - webpack 설정과 함께 사용 시 빈 turbopack 설정 필요
+  // - root: 다중 lockfile 경고 해결
+  turbopack: {
+    root: __dirname,
   },
 
   // 프로덕션 빌드 최적화: console 제거
