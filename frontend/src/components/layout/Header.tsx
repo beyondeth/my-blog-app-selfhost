@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import Image from 'next/image';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, memo, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { FiSearch } from 'react-icons/fi';
@@ -11,18 +11,38 @@ import ProfileDropdown from './ProfileDropdown';
 import MobileProfileDropdown from './MobileProfileDropdown';
 import SubscriptionBadge from '../subscription/SubscriptionBadge';
 import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
+import { MusicPlayerButton } from '@/components/music';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useTheme } from 'next-themes';
 
-export default function Header() {
+// ============================================
+// SearchParamsSync: useSearchParams 사용 컴포넌트 (Suspense 필요)
+// Header 전체가 아닌 이 컴포넌트만 Suspense 경계 내에 있음
+// ============================================
+interface SearchParamsSyncProps {
+  onSearchQueryChange: (query: string) => void;
+}
+
+function SearchParamsSync({ onSearchQueryChange }: SearchParamsSyncProps) {
+  const searchParams = useSearchParams();
+
+  useEffect(() => {
+    const currentParams = parseSearchParams(searchParams.toString());
+    onSearchQueryChange(currentParams.search || '');
+  }, [searchParams, onSearchQueryChange]);
+
+  return null; // UI 없음, 동기화 역할만
+}
+
+function HeaderComponent() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
   const { toggleSidebar } = useSidebarStore();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  // useSearchParams는 SearchParamsSync 컴포넌트로 분리 (Suspense 경계 내에서만 사용)
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -46,11 +66,10 @@ export default function Header() {
     }
   };
 
-  // Initialize search query from URL params
-  useEffect(() => {
-    const currentParams = parseSearchParams(searchParams.toString());
-    setSearchQuery(currentParams.search || '');
-  }, [searchParams]);
+  // SearchParamsSync 콜백 (useCallback으로 안정적인 참조 유지)
+  const handleSearchQueryFromParams = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, []);
 
   // Handle search submit
   const handleSearch = useCallback((e: React.FormEvent) => {
@@ -109,6 +128,13 @@ export default function Header() {
 
   return (
     <header className="border-b border-border sticky top-0 z-50 bg-background">
+      {/* SearchParamsSync: useSearchParams를 사용하는 컴포넌트 (Suspense 필요)
+          Header 전체가 아닌 이 작은 컴포넌트만 Suspense 경계 영향을 받음
+          음악 플레이어 등 다른 요소는 영향받지 않음 */}
+      <Suspense fallback={null}>
+        <SearchParamsSync onSearchQueryChange={handleSearchQueryFromParams} />
+      </Suspense>
+
       <div className="max-w-full ml-0 px-2 xs:px-3 sm:px-4 md:px-4 lg:pl-[43px] lg:pr-32 py-4 sm:py-5">
         <div className="flex items-center justify-between relative">
           {/* Hamburger Menu & Logo */}
@@ -183,6 +209,10 @@ export default function Header() {
 
             {/* Desktop Auth Section */}
             <div className="flex items-center space-x-4">
+              {/* 음악 플레이어 버튼 - 자체 상태 관리 (Header 리렌더링과 분리) */}
+              {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
+              <MusicPlayerButton />
+
               <ThemeSwitch />
 
               {!mounted ? (
@@ -227,6 +257,10 @@ export default function Header() {
 
           {/* Mobile Auth Section */}
           <div className="md:hidden absolute right-2 xs:right-3 sm:right-4 flex items-center space-x-3">
+            {/* 음악 플레이어 버튼 (모바일) - 자체 상태 관리 */}
+            {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
+            <MusicPlayerButton />
+
             {/* Theme Switch - Always visible */}
             <ThemeSwitch />
 
@@ -286,4 +320,8 @@ export default function Header() {
       </div>
     </header>
   );
-} 
+}
+
+// React.memo로 래핑하여 props 변경 없이 부모 리렌더링 시 재렌더링 방지
+// 음악 플레이어 상태 유지에 기여
+export default memo(HeaderComponent);

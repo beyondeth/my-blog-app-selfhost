@@ -18,7 +18,8 @@ import {
   Database,
   AlertTriangle,
   Key,
-  UserX
+  UserX,
+  Music,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -40,6 +41,7 @@ const navigation: NavigationItem[] = [
   { name: '삭제된 사용자', href: '/admin/users/deleted', icon: UserX, adminOnly: true },
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
+  { name: '음악 관리', href: '/admin/music', icon: Music, adminOnly: true },
   { name: 'MCP 대시보드', href: '/admin/mcp', icon: Key, adminOnly: true, badge: 'New' },
   { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
   { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true },

@@ -248,7 +248,7 @@ export const useUser = () => {
       return failureCount < 1;
     },
     refetchOnWindowFocus: false,   // 윈도우 포커스 시 재요청 안함
-    refetchOnMount: true,          // false → true로 변경 (핵심 수정)
+    refetchOnMount: true,          // 페이지 이동 시 최신 사용자 정보 반영
     placeholderData: (previousData) => previousData,  // 리페칭 중에도 이전 데이터 유지 (깜빡임 방지)
     meta: {
       // 비로그인 상태의 401 에러는 예상된 동작이므로 에러 바운더리에서 처리 안함

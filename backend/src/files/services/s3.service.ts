@@ -136,6 +136,37 @@ export class S3Service {
   }
 
   /**
+   * S3에서 파일 스트림 가져오기 (메타데이터 추출 등에 사용)
+   */
+  async getObjectStream(fileKey: string): Promise<{
+    stream: NodeJS.ReadableStream;
+    contentType?: string;
+    contentLength?: number;
+  }> {
+    try {
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+      });
+
+      const response = await this.s3Client.send(getObjectCommand);
+
+      if (!response.Body) {
+        throw new Error('Empty response body from S3');
+      }
+
+      return {
+        stream: response.Body as NodeJS.ReadableStream,
+        contentType: response.ContentType,
+        contentLength: response.ContentLength,
+      };
+    } catch (error) {
+      this.logger.error(`Failed to get object stream: ${error.message}`, error.stack);
+      throw new InternalServerErrorException('Failed to get file from storage');
+    }
+  }
+
+  /**
    * 파일 접근용 Presigned URL 생성
    */
   async generatePresignedDownloadUrl(fileKey: string): Promise<string> {
