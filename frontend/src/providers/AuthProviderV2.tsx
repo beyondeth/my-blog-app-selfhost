@@ -25,6 +25,57 @@ export function AuthProviderV2({ children }: { children: React.ReactNode }) {
     // 첫 렌더링시 자동으로 /auth/me 호출됨
   }, []);
 
+  // 소셜 로그인 후 MCP OAuth 자동 완료 처리
+  // sessionStorage에 mcpOAuth 데이터가 있고, 인증된 상태면 MCP OAuth 완료 처리
+  useEffect(() => {
+    const handleMcpOAuthCompletion = async () => {
+      // 서버 사이드에서는 실행하지 않음
+      if (typeof window === 'undefined') return;
+
+      const mcpOAuthData = sessionStorage.getItem('mcpOAuth');
+
+      // MCP OAuth 데이터가 있고, 인증된 상태인 경우에만 처리
+      if (mcpOAuthData && authValue.isAuthenticated) {
+        // 즉시 삭제하여 중복 처리 방지
+        sessionStorage.removeItem('mcpOAuth');
+
+        try {
+          const { state, callback_url } = JSON.parse(mcpOAuthData);
+
+          // state와 callback_url이 모두 있어야 유효한 MCP OAuth 요청
+          if (!state || !callback_url) {
+            console.warn('Invalid MCP OAuth data in sessionStorage');
+            return;
+          }
+
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+          const response = await fetch(`${apiUrl}/auth/oauth/mcp/complete`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ state, callback_url }),
+          });
+
+          if (!response.ok) {
+            throw new Error('MCP OAuth 완료 실패');
+          }
+
+          const data = await response.json();
+
+          if (data.success && data.redirect_url) {
+            // MCP Proxy callback으로 리다이렉트 (Claude로 돌아감)
+            window.location.href = data.redirect_url;
+          }
+        } catch (error) {
+          console.error('MCP OAuth completion error:', error);
+          // 에러 발생 시 일반 흐름으로 계속 진행 (사용자에게 알림 없음)
+        }
+      }
+    };
+
+    handleMcpOAuthCompletion();
+  }, [authValue.isAuthenticated]);
+
   return (
     <AuthContext.Provider value={authValue}>
       {children}

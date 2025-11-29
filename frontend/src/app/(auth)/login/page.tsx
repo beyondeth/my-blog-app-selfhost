@@ -41,6 +41,13 @@ function LoginPageContent() {
     remainingDays: number;
   } | null>(null);
 
+  // MCP OAuth 파라미터 (Claude 커스텀 커넥터 연결용)
+  const isMcpOAuth = searchParams.get('mcp_oauth') === 'true';
+  const mcpState = searchParams.get('state');
+  const mcpCallbackUrl = searchParams.get('callback_url');
+  const mcpClientName = searchParams.get('client_name') || 'Claude';
+  const mcpScope = searchParams.get('scope') || 'mcp:tools';
+
   // OAuth 콜백 에러 및 리다이렉트 처리
   useEffect(() => {
     const error = searchParams.get('error');
@@ -146,6 +153,38 @@ function LoginPageContent() {
       // ConsentGuard 타이밍 이슈 방지 (회원가입과 동일한 처리)
       await refreshUser();
 
+      // MCP OAuth 로그인인 경우 (Claude 커스텀 커넥터 연결)
+      if (isMcpOAuth && mcpState && mcpCallbackUrl) {
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+          const response = await fetch(`${apiUrl}/auth/oauth/mcp/complete`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              state: mcpState,
+              callback_url: mcpCallbackUrl,
+            }),
+          });
+
+          if (!response.ok) {
+            throw new Error('MCP OAuth 완료 실패');
+          }
+
+          const data = await response.json();
+
+          if (data.success && data.redirect_url) {
+            // MCP Proxy callback으로 리다이렉트 (Claude로 돌아감)
+            window.location.href = data.redirect_url;
+            return;
+          }
+        } catch (mcpError) {
+          console.error('MCP OAuth error:', mcpError);
+          toast.error('MCP 연결에 실패했습니다. 다시 시도해주세요.');
+          // MCP OAuth 실패 시 일반 로그인 흐름으로 계속 진행
+        }
+      }
+
       // OAuth 콜백 URL인 경우 직접 리다이렉트 (localhost:7777/callback)
       if (returnUrl && returnUrl.includes('localhost:7777/callback')) {
         window.location.href = returnUrl;
@@ -233,6 +272,30 @@ function LoginPageContent() {
                 계정으로 <span className="font-medium">로그인</span>하세요
               </p>
             </div>
+
+            {/* MCP OAuth 연결 요청 안내 (Claude 커스텀 커넥터) */}
+            {isMcpOAuth && mcpState && mcpCallbackUrl && (
+              <div className="mb-3 sm:mb-6 p-4 sm:p-5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 w-full">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center">
+                    <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                    </svg>
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm sm:text-base font-semibold text-indigo-900 dark:text-indigo-100">
+                      {mcpClientName} 연결 요청
+                    </h3>
+                    <p className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300 mt-1">
+                      로그인하여 {mcpClientName}에 블로그 접근 권한을 부여합니다.
+                    </p>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
+                      요청된 권한: {mcpScope.split(' ').join(', ')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 삭제된 계정 경고 */}
             {accountDeletedError && (
