@@ -75,8 +75,10 @@ async function oauthMiddleware(
   }
 
   // 리소스(audience) 검증 (RFC 8707)
+  // URL 정규화 - trailing slash 제거하여 비교
+  const normalizeUrl = (url: string) => url.replace(/\/$/, '');
   const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
-  if (accessToken.resource !== serverUrl) {
+  if (normalizeUrl(accessToken.resource) !== normalizeUrl(serverUrl)) {
     logger.warn({
       expected: serverUrl,
       actual: accessToken.resource,
