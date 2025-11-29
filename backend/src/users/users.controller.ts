@@ -52,6 +52,38 @@ export class UsersController {
     return this.usersService.findOne(id);
   }
 
+  /**
+   * MCP용 사용자 정보 조회
+   *
+   * MCP Proxy Server에서 OAuth 인증 후 사용자 정보를 조회할 때 사용
+   * 내부 서비스 간 통신용 (MCP Proxy → Backend)
+   */
+  @Get(':id/mcp-info')
+  @Public()  // 내부 통신용 - 실제 인증은 MCP Proxy에서 처리됨
+  @ApiOperation({ summary: 'MCP용 사용자 정보 조회 (내부 API)' })
+  async getMcpInfo(@Param('id') id: string) {
+    // findOne은 이미 blog 관계를 포함
+    const user = await this.usersService.findOne(id);
+
+    if (!user) {
+      return null;
+    }
+
+    // MCP에서 필요한 최소 정보만 반환
+    return {
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+      },
+      blog: user.blog ? {
+        id: user.blog.id,
+        name: user.blog.name,
+        slug: user.blog.slug,
+      } : null,
+    };
+  }
+
   @Put('profile')
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: '내 프로필 수정' })

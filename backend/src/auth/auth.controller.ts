@@ -1,4 +1,4 @@
-import { Controller, Post, Body, UseGuards, Request, Get, Res, Delete, Logger, Req } from '@nestjs/common';
+import { Controller, Post, Body, UseGuards, Request, Get, Res, Delete, Logger, Req, Query } from '@nestjs/common';
 import { Response } from 'express';
 import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
@@ -833,6 +833,119 @@ export class AuthController {
         message: error.message || '계정 삭제 중 오류가 발생했습니다.'
       });
     }
+  }
+
+  // ===== MCP OAuth 관련 엔드포인트 =====
+
+  /**
+   * MCP OAuth 로그인 페이지
+   *
+   * MCP Proxy Server에서 OAuth 인증 시작 시 사용자를 이 URL로 리다이렉트
+   * 이미 로그인된 사용자는 바로 MCP Proxy callback으로 전달
+   * 로그인되지 않은 사용자는 로그인 페이지로 리다이렉트
+   *
+   * 쿼리 파라미터:
+   * - state: MCP OAuth 세션 상태
+   * - client_name: 연결하려는 클라이언트 이름 (예: "Claude")
+   * - scope: 요청 스코프
+   * - callback_url: MCP Proxy의 콜백 URL
+   */
+  @Get('oauth/mcp/login')
+  @Public()
+  @ApiOperation({ summary: 'MCP OAuth 로그인 (Claude 커스텀 커넥터용)' })
+  async mcpOAuthLogin(
+    @Query('state') state: string,
+    @Query('client_name') clientName: string,
+    @Query('scope') scope: string,
+    @Query('callback_url') callbackUrl: string,
+    @Request() req,
+    @Res() res: Response,
+  ) {
+    this.logger.debug({
+      state: state?.substring(0, 8),
+      clientName,
+      scope,
+    }, '🔐 MCP OAuth login request');
+
+    // 필수 파라미터 검증
+    if (!state || !callbackUrl) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Missing required parameters: state, callback_url',
+      });
+    }
+
+    // 쿠키에서 access_token 확인 (이미 로그인된 사용자)
+    const accessToken = req.cookies?.access_token;
+
+    if (accessToken) {
+      try {
+        // JWT 검증하여 사용자 정보 추출
+        const user = await this.authService.validateAccessToken(accessToken);
+
+        if (user) {
+          // 이미 로그인된 사용자 - MCP Proxy callback으로 리다이렉트
+          this.logger.log(`✅ MCP OAuth - Already logged in, userId: ${user.id.substring(0, 8)}, clientName: ${clientName}`);
+
+          const redirectUrl = new URL(callbackUrl);
+          redirectUrl.searchParams.set('state', state);
+          redirectUrl.searchParams.set('user_id', user.id);
+
+          return res.redirect(redirectUrl.toString());
+        }
+      } catch (error) {
+        // 토큰 검증 실패 - 로그인 페이지로 이동
+        this.logger.debug('Token validation failed, redirecting to login');
+      }
+    }
+
+    // 로그인되지 않은 사용자 - Frontend 로그인 페이지로 리다이렉트
+    // MCP OAuth 파라미터를 쿼리스트링으로 전달
+    const frontendLoginUrl = new URL(`${process.env.FRONTEND_URL}/login`);
+    frontendLoginUrl.searchParams.set('mcp_oauth', 'true');
+    frontendLoginUrl.searchParams.set('state', state);
+    frontendLoginUrl.searchParams.set('client_name', clientName || 'MCP Client');
+    frontendLoginUrl.searchParams.set('scope', scope || 'mcp:tools');
+    frontendLoginUrl.searchParams.set('callback_url', callbackUrl);
+
+    this.logger.debug({ frontendLoginUrl: frontendLoginUrl.toString() }, '➡️ Redirecting to frontend login');
+    return res.redirect(frontendLoginUrl.toString());
+  }
+
+  /**
+   * MCP OAuth 로그인 완료 (Frontend에서 호출)
+   *
+   * Frontend에서 로그인 성공 후 MCP OAuth 콜백을 처리
+   * 이 엔드포인트는 로그인된 사용자만 호출 가능
+   */
+  @Post('oauth/mcp/complete')
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: 'MCP OAuth 로그인 완료 (Frontend에서 호출)' })
+  async mcpOAuthComplete(
+    @Body() body: { state: string; callback_url: string },
+    @CurrentUser() user: User,
+    @Res() res: Response,
+  ) {
+    const { state, callback_url } = body;
+
+    if (!state || !callback_url) {
+      return res.status(400).json({
+        error: 'invalid_request',
+        error_description: 'Missing required parameters',
+      });
+    }
+
+    this.logger.log(`✅ MCP OAuth login completed - userId: ${user.id.substring(0, 8)}, state: ${state.substring(0, 8)}`);
+
+    // MCP Proxy callback URL 생성
+    const redirectUrl = new URL(callback_url);
+    redirectUrl.searchParams.set('state', state);
+    redirectUrl.searchParams.set('user_id', user.id);
+
+    return res.json({
+      success: true,
+      redirect_url: redirectUrl.toString(),
+    });
   }
 
   /**
