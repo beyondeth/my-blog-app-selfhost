@@ -49,6 +49,18 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
       const returnUrl = window.location.pathname;
       sessionStorage.setItem('redirectAfterLogin', returnUrl);
 
+      // MCP OAuth 파라미터가 있으면 sessionStorage에 저장 (소셜 로그인 후 처리용)
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('mcp_oauth') === 'true') {
+        const mcpOAuthData = {
+          state: urlParams.get('state'),
+          callback_url: urlParams.get('callback_url'),
+          client_name: urlParams.get('client_name'),
+          scope: urlParams.get('scope'),
+        };
+        sessionStorage.setItem('mcpOAuth', JSON.stringify(mcpOAuthData));
+      }
+
       // 백엔드 OAuth 엔드포인트로 직접 리디렉션
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
       const oauthUrl = `${backendUrl}/api/v1/auth/${provider}`;

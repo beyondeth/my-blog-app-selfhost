@@ -10,6 +10,7 @@
 
 import express from 'express';
 import crypto from 'crypto';
+import Redis from 'ioredis';
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger, httpLogger } from './utils/logger.js';
@@ -17,6 +18,7 @@ import { config } from './config/env.validation.js';
 import { registerAllTools } from './tools/index.js';
 import { RedisCacheService } from './services/RedisCacheService.js';
 import { MetricsService } from './services/MetricsService.js';
+import { createOAuthRouter } from './oauth/index.js';
 import axios from 'axios';
 
 // Express 앱 초기화
@@ -25,6 +27,15 @@ const port = config.MCP_PROXY_PORT;
 
 // Prometheus 메트릭 서비스 초기화 (먼저 생성)
 const metricsService = new MetricsService();
+
+// Redis 인스턴스 생성 (OAuth + 캐시 공유)
+const redis = new Redis({
+  host: config.REDIS_HOST,
+  port: config.REDIS_PORT,
+  password: config.REDIS_PASSWORD,
+  maxRetriesPerRequest: 3,
+  retryStrategy: (times) => Math.min(times * 100, 3000),
+});
 
 // Redis 캐시 서비스 초기화 (메트릭 서비스 주입)
 const redisCache = new RedisCacheService(
@@ -37,22 +48,26 @@ const redisCache = new RedisCacheService(
   metricsService
 );
 
+// OAuth 라우터 초기화 (Redis 인스턴스 공유)
+const { wellKnownRouter, oauthRouter, mcpRemoteRouter } = createOAuthRouter(redis, metricsService);
+
 // Redis 연결 상태 모니터링 (10초마다)
 setInterval(() => {
   const isConnected = redisCache.getConnectionStatus();
   metricsService.updateRedisConnection(isConnected);
 }, 10000);
 
-// 미들웨어 (⚠️ /mcp 경로는 제외 - StreamableHTTPServerTransport가 raw stream 필요)
+// 미들웨어 (⚠️ MCP 경로는 제외 - StreamableHTTPServerTransport가 raw stream 필요)
+const skipBodyParsing = ['/mcp', '/mcp-remote'];
 app.use((req, res, next) => {
-  if (req.path === '/mcp') {
-    // /mcp는 body parsing 건너뛰기 (StreamableHTTPServerTransport가 직접 처리)
+  if (skipBodyParsing.includes(req.path)) {
+    // MCP 경로는 body parsing 건너뛰기 (StreamableHTTPServerTransport가 직접 처리)
     return next();
   }
   express.json({ limit: '10mb' })(req, res, next);
 });
 app.use((req, res, next) => {
-  if (req.path === '/mcp') {
+  if (skipBodyParsing.includes(req.path)) {
     return next();
   }
   express.urlencoded({ extended: true, limit: '10mb' })(req, res, next);
@@ -215,20 +230,40 @@ async function createMcpServer(userData: {
   return server;
 }
 
-// ===== 라우트 =====
+// ===== OAuth 라우터 마운트 (Claude 커스텀 커넥터용) =====
+
+// RFC 9728, 8414 메타데이터 엔드포인트
+app.use('/.well-known', wellKnownRouter);
+
+// OAuth 인증 엔드포인트 (DCR, authorize, token, revoke)
+app.use('/oauth', oauthRouter);
+
+// OAuth 인증된 MCP 엔드포인트
+app.use('/mcp-remote', mcpRemoteRouter);
+
+// ===== 기존 라우트 (API Key 인증) =====
 
 /**
  * 헬스 체크
  */
 app.get('/health', (req, res) => {
+  const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
   res.json({
     status: 'healthy',
     service: 'MCP Proxy Server',
     version: '8.0.0',
-    pattern: 'Stateless API Key (Context7 style)',
+    pattern: 'Stateless API Key + OAuth 2.1',
     timestamp: new Date().toISOString(),
     environment: config.NODE_ENV,
     redis: redisCache.getConnectionStatus() ? 'connected' : 'disconnected',
+    endpoints: {
+      apiKey: '/mcp',
+      oauth: '/mcp-remote',
+      metadata: {
+        resource: `${serverUrl}/.well-known/oauth-protected-resource`,
+        authServer: `${serverUrl}/.well-known/oauth-authorization-server`,
+      },
+    },
   });
 });
 
@@ -473,8 +508,9 @@ server.on('error', (error: NodeJS.ErrnoException) => {
 const shutdown = async (signal: string) => {
   logger.info({ signal }, '📴 Shutting down...');
 
-  // Redis 연결 종료
+  // Redis 연결 종료 (캐시 + OAuth 공유 인스턴스)
   await redisCache.disconnect();
+  await redis.quit();
 
   server.close(() => {
     logger.info('✅ Server closed');

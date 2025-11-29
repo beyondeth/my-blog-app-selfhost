@@ -850,4 +850,38 @@ export class AuthService {
 
     this.logger.log(`Password changed successfully for user: ${user.email}`);
   }
+
+  /**
+   * Access Token 검증 (MCP OAuth용)
+   *
+   * JWT 토큰을 검증하고 사용자 정보를 반환
+   * MCP OAuth 로그인 시 이미 로그인된 사용자를 확인할 때 사용
+   *
+   * @param token JWT access token
+   * @returns 사용자 정보 또는 null
+   */
+  async validateAccessToken(token: string): Promise<User | null> {
+    try {
+      // JWT 토큰 검증
+      const payload = this.jwtService.verify<JwtPayload>(token, {
+        secret: this.configService.get('JWT_SECRET'),
+      });
+
+      if (!payload || !payload.sub) {
+        return null;
+      }
+
+      // 사용자 조회
+      const user = await this.usersService.findOne(payload.sub);
+
+      if (!user || !user.isActive) {
+        return null;
+      }
+
+      return user;
+    } catch (error) {
+      this.logger.debug(`Access token validation failed: ${error.message}`);
+      return null;
+    }
+  }
 } 
