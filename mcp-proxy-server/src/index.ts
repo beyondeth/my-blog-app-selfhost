@@ -79,21 +79,33 @@ if (config.NODE_ENV === 'development' || config.LOG_LEVEL === 'debug') {
 }
 
 // CORS 설정
+// MCP/OAuth 엔드포인트는 Bearer 토큰으로 보호되므로 모든 origin 허용
+// Claude 커스텀 커넥터 등 다양한 클라이언트 지원을 위해 필요
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = config.CORS_ORIGINS.split(',').map(o => o.trim());
+
+  // MCP/OAuth 엔드포인트는 모든 origin 허용 (Bearer 토큰으로 보안)
+  const mcpPaths = ['/mcp', '/mcp-remote', '/oauth', '/.well-known'];
+  const isMcpEndpoint = mcpPaths.some(p => req.path.startsWith(p));
 
   // Origin 검증
   let isAllowed = false;
 
   if (origin) {
-    for (const allowed of allowedOrigins) {
-      const pattern = allowed.replace(/\*/g, '.*');
-      const regex = new RegExp(`^${pattern}$`);
+    // MCP 엔드포인트는 모든 origin 허용
+    if (isMcpEndpoint) {
+      isAllowed = true;
+    } else {
+      // 다른 엔드포인트는 whitelist 검증
+      for (const allowed of allowedOrigins) {
+        const pattern = allowed.replace(/\*/g, '.*');
+        const regex = new RegExp(`^${pattern}$`);
 
-      if (regex.test(origin)) {
-        isAllowed = true;
-        break;
+        if (regex.test(origin)) {
+          isAllowed = true;
+          break;
+        }
       }
     }
 
@@ -110,9 +122,9 @@ app.use((req, res, next) => {
     return res.sendStatus(isAllowed ? 204 : 403);
   }
 
-  // 프로덕션에서 허용되지 않은 Origin 차단
+  // 프로덕션에서 허용되지 않은 Origin 차단 (MCP 엔드포인트 제외)
   if (origin && !isAllowed && config.NODE_ENV === 'production') {
-    logger.warn({ origin }, '⚠️ CORS: Blocked origin');
+    logger.warn({ origin, path: req.path }, '⚠️ CORS: Blocked origin');
     return res.status(403).json({ error: 'Origin not allowed' });
   }
 
