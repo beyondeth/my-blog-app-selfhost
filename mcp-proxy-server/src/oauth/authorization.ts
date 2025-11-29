@@ -146,7 +146,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
 
       // 7. Backend 로그인 페이지로 리다이렉트
       // Backend에서 로그인 후 /oauth/callback으로 돌아옴
-      const backendAuthUrl = new URL(`${config.BACKEND_PUBLIC_URL}/oauth/mcp/login`);
+      const backendAuthUrl = new URL(`${config.BACKEND_API_URL}/auth/oauth/mcp/login`);
       backendAuthUrl.searchParams.set('state', session.state);
       backendAuthUrl.searchParams.set('client_name', client.clientName || 'MCP Client');
       backendAuthUrl.searchParams.set('scope', session.scope);
