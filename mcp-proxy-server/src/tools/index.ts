@@ -23,7 +23,7 @@ import axios from 'axios';
 import { MetricsService } from '../services/MetricsService.js';
 
 /**
- * 도구 컨텍스트 (API Key 검증 결과)
+ * 도구 컨텍스트 (API Key 또는 OAuth 인증 결과)
  */
 interface ToolContext {
   userData: {
@@ -33,7 +33,8 @@ interface ToolContext {
     user: { id: string; username: string; email: string };
     blog: { id: string; name: string; slug: string };
   };
-  apiKey: string; // 원본 API Key (Backend 인증용)
+  apiKey: string | null;     // API Key 인증 시 사용 (Backend 인증용)
+  oauthToken?: string;       // OAuth 인증 시 사용 (Claude 커스텀 커넥터용)
   metricsService: MetricsService; // 메트릭 서비스 (도구 호출 추적용)
   config: {
     MCP_BASE_URL: string;
@@ -302,9 +303,12 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
  * 이 함수는 인증된 사용자 정보를 표시하는 역할만 합니다.
  */
 async function handleCheckAuth(context: ToolContext): Promise<any> {
+  const authMode = context.oauthToken ? 'OAuth 2.1' : 'API Key';
+
   logger.info({
     userId: context.userData.userId.substring(0, 8),
     blogSlug: context.userData.blog.slug,
+    authMode,
   }, '🔐 Authentication check');
 
   return {
@@ -313,7 +317,8 @@ async function handleCheckAuth(context: ToolContext): Promise<any> {
         type: 'text',
         text: `✅ *** CODEBASE.BLOG 유저 인증이 완료됨 ***
 ✅ ${context.userData.user.username} (${context.userData.user.email})
-✅ 블로그 주소 : https://www.codebase.blog/${context.userData.blog.slug}`,
+✅ 블로그 주소 : https://www.codebase.blog/${context.userData.blog.slug}
+✅ 인증 방식 : ${authMode}`,
       },
     ],
   };
@@ -391,8 +396,20 @@ async function handleCreatePost(
       blogSlug: context.userData.blog.slug,
     }, '📝 Creating post...');
 
-    // Backend MCP API 호출 (포스트 생성 - API Key 인증)
-    // /api/v1/mcp/posts 엔드포인트 사용 (Fast Path, API Key 인증)
+    // Backend MCP API 호출 (포스트 생성)
+    // API Key 또는 OAuth 토큰 인증
+    const headers: Record<string, string> = {};
+
+    if (context.apiKey) {
+      // API Key 인증 모드 (기존 방식)
+      headers['X-API-Key'] = context.apiKey;
+    } else if (context.oauthToken) {
+      // OAuth 인증 모드 (Claude 커스텀 커넥터)
+      headers['Authorization'] = `Bearer ${context.oauthToken}`;
+      headers['X-OAuth-User-Id'] = context.userData.userId;
+      headers['X-OAuth-Blog-Id'] = context.userData.blogId;
+    }
+
     const response = await axios.post(
       `${context.config.BACKEND_BASE_URL}/api/v1/mcp/posts`,
       {
@@ -402,9 +419,7 @@ async function handleCreatePost(
         category: args.category,
       },
       {
-        headers: {
-          'X-API-Key': context.apiKey, // API Key 인증
-        },
+        headers,
         timeout: 30000,
       }
     );
@@ -414,9 +429,12 @@ async function handleCreatePost(
     const post = response.data;
 
     // MCP API Key의 postsCreated 카운트 증가 (비동기, 블로킹 안 함)
-    incrementPostsCreated(context.userData.keyId, context.config.BACKEND_BASE_URL).catch((err) => {
-      logger.warn({ error: err.message }, '⚠️ Failed to increment postsCreated');
-    });
+    // OAuth 모드에서는 API Key가 없으므로 건너뜀
+    if (context.apiKey && !context.userData.keyId.startsWith('oauth:')) {
+      incrementPostsCreated(context.userData.keyId, context.config.BACKEND_BASE_URL).catch((err) => {
+        logger.warn({ error: err.message }, '⚠️ Failed to increment postsCreated');
+      });
+    }
 
     logger.info({
       postId: post.id.substring(0, 8),
