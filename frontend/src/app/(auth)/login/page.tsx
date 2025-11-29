@@ -225,7 +225,8 @@ function LoginPageContent() {
 
       toast.error(displayMessage);
       setValidationErrors(prev => ({ ...prev, password: displayMessage }));
-    } finally {
+
+      // 에러 발생 시에만 버튼 활성화 (성공 시에는 리다이렉트 전까지 비활성화 유지)
       setIsSubmitting(false);
     }
   };
