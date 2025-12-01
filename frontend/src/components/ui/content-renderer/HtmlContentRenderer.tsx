@@ -115,7 +115,7 @@ export default function HtmlContentRenderer({
    */
   return (
     <>
-      <div className={`prose prose-sm max-w-none ${className}`}>
+      <div className={`prose prose-sm max-w-full overflow-x-hidden ${className}`}>
         {parts.map((part, index) => {
           switch (part.type) {
             case 'html':

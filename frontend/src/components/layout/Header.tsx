@@ -161,19 +161,19 @@ function HeaderComponent() {
               onClick={handleHomeNavigation}
               className="hover:opacity-80 transition-opacity cursor-pointer flex items-center space-x-2"
             >
-              {/* Logo Image - 벡터 로고 */}
-              <div className="flex items-center justify-center min-w-[48px] min-h-[48px]">
+              {/* Logo Image - 벡터 로고 (모바일: 36px, 데스크톱: 48px) */}
+              <div className="flex items-center justify-center min-w-[36px] min-h-[36px] md:min-w-[48px] md:min-h-[48px]">
                 <Image
                   src="/assets/logo.svg"
                   alt="Codebase Blog Logo"
-                  width={48}
-                  height={48}
-                  className="object-contain"
+                  width={36}
+                  height={36}
+                  className="object-contain w-9 h-9 md:w-12 md:h-12"
                   priority
                 />
               </div>
-              {/* Text - Orbitron 폰트 적용 */}
-              <span className="text-2xl font-bold text-foreground leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>
+              {/* Text - Orbitron 폰트 적용 (모바일: text-lg, 데스크톱: text-2xl) */}
+              <span className="text-lg md:text-2xl font-bold text-foreground leading-tight" style={{ fontFamily: 'Orbitron, sans-serif' }}>
                 Codebase
               </span>
             </a>
@@ -255,8 +255,8 @@ function HeaderComponent() {
             </div>
           </nav>
 
-          {/* Mobile Auth Section */}
-          <div className="md:hidden absolute right-2 xs:right-3 sm:right-4 flex items-center space-x-3">
+          {/* Mobile Auth Section - 간격 축소 (space-x-1, xs:space-x-2) */}
+          <div className="md:hidden absolute right-2 xs:right-3 sm:right-4 flex items-center space-x-1 xs:space-x-2">
             {/* 음악 플레이어 버튼 (모바일) - 자체 상태 관리 */}
             {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
             <MusicPlayerButton />
