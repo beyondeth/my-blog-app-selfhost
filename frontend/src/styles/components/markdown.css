@@ -206,8 +206,7 @@
   display: block;
   overflow-x: auto;
   white-space: pre;
-  /* 코드는 원본 길이 유지하되 최소 부모 너비는 채우기 */
-  max-width: max-content;
+  /* 코드는 부모(pre) 너비 내에서 스크롤 - 모바일 overflow 방지 */
   min-width: 100%;
 }
 
