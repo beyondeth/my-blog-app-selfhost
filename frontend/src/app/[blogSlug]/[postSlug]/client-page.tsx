@@ -435,7 +435,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       <article
         id="post-content"
         className={cn(
-          "max-w-5xl mx-auto px-6 py-16 overflow-x-visible transition-all duration-500 relative",
+          "max-w-5xl mx-auto px-6 py-16 overflow-x-hidden transition-all duration-500 relative",
           isDeleting && "opacity-30 blur-sm pointer-events-none scale-[0.98]"
         )}
       >
