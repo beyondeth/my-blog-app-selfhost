@@ -206,8 +206,9 @@
   display: block;
   overflow-x: auto;
   white-space: pre;
-  /* 코드는 부모(pre) 너비 내에서 스크롤 - 모바일 overflow 방지 */
-  min-width: 100%;
+  /* min-width 제거 - 모바일 overflow 근본 원인이었음 */
+  /* 코드 내용이 컨테이너보다 길면 min-width가 확장시켜서 overflow 발생 */
+  width: 100%;
 }
 
 /* highlight.js 적용 후에도 일관된 스타일 유지 */
