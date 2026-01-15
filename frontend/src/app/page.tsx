@@ -105,7 +105,7 @@ function HomePageContent() {
   const editorPickWrapperClass = activePickImage
     ? 'cursor-pointer relative border border-[#D9E0EA] bg-white shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#0E141B]'
     : 'cursor-pointer relative border border-[#D9E0EA] bg-[#F7F9FC] shadow-sm dark:border-[#4B5563] dark:bg-[#131A22]';
-  const pickContentSpacingClass = activePickImage ? 'mt-0' : 'px-8 pb-8 pt-16';
+  const pickContentSpacingClass = activePickImage ? 'mt-0' : 'px-8';
 
   useEffect(() => {
     if (activePickIndex >= editorPickPosts.length) {
@@ -504,16 +504,10 @@ function HomePageContent() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <div
-                        className={
-                          activePickImage
-                            ? 'relative min-h-[360px] w-full'
-                            : 'relative pt-6'
-                        }
-                      >
+                      <div className="relative h-[360px] w-full">
                         {activePickImage ? (
                           <>
-                            <div className="relative min-h-[360px] w-full">
+                            <div className="relative h-full w-full">
                               <Image
                                 src={activePickImage}
                                 alt={activePick?.title || 'Editor pick'}
@@ -573,16 +567,16 @@ function HomePageContent() {
                             </div>
                           </>
                         ) : (
-                          <div className="flex flex-col gap-4">
-                            <div>
+                          <div className="flex h-full flex-col pt-16 pb-4">
+                            <div className="space-y-3">
                               <h3 className="text-2xl font-semibold tracking-[-0.01em] leading-tight sm:text-3xl">
                                 {activePick?.title}
                               </h3>
                               <p
-                                className="mt-3 text-[15px] text-[#3F4A59] dark:text-[#E1E8F0] leading-relaxed"
+                                className="text-[15px] text-[#3F4A59] dark:text-[#E1E8F0] leading-relaxed"
                                 style={{
                                   display: '-webkit-box',
-                                  WebkitLineClamp: 5,
+                                  WebkitLineClamp: 4,
                                   WebkitBoxOrient: 'vertical',
                                   overflow: 'hidden',
                                 }}
@@ -590,7 +584,7 @@ function HomePageContent() {
                                 {activePick?.editorPickExcerpt || activePick?.excerpt || '요약이 없는 포스트입니다.'}
                               </p>
                             </div>
-                            <div className="flex items-center justify-between">
+                            <div className="mt-auto space-y-4">
                               <div className="flex items-center gap-2 text-xs text-[#4B5563] dark:text-[#A9B4C2]">
                                 <Avatar
                                   src={activePickAuthorImage}
@@ -600,13 +594,38 @@ function HomePageContent() {
                                 />
                                 <span className="font-medium">{activePickAuthorName}</span>
                               </div>
-                              <Link
-                                href={editorPickHref}
-                                onClick={(e) => e.stopPropagation()}
-                                className="rounded-full border border-[#111827] px-4 py-2 text-sm font-semibold text-[#111827] transition-colors hover:bg-[#111827] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F87171] focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-[#E6EDF3] dark:text-[#E6EDF3] dark:hover:bg-[#E6EDF3] dark:hover:text-[#0E141B] dark:focus-visible:ring-[#F87171] dark:focus-visible:ring-offset-[#0E141B]"
-                              >
-                                바로 가기
-                              </Link>
+                              <div className="grid grid-cols-[1fr_auto_1fr] items-center">
+                                <div />
+                                {shouldShowPickIndicators && (
+                                  <div className="flex items-center gap-2">
+                                    {editorPickPosts.map((_, index) => (
+                                      <button
+                                        key={`editor-pick-dot-${index}`}
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setActivePickIndex(index);
+                                        }}
+                                        className={`transition-all duration-300 rounded-full ${
+                                          activePickIndex === index
+                                            ? 'w-6 h-2 bg-[#264653] dark:bg-[#6CC3B2]'
+                                            : 'w-2 h-2 bg-[#D9E0EA] dark:bg-[#2A3645] hover:bg-[#C9D3E0] dark:hover:bg-[#223040]'
+                                        }`}
+                                        aria-label={`Editor&apos;s Pick ${index + 1}로 이동`}
+                                      />
+                                    ))}
+                                  </div>
+                                )}
+                                <div className="justify-self-end">
+                                  <Link
+                                    href={editorPickHref}
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="rounded-full border border-[#111827] px-4 py-2 text-sm font-semibold text-[#111827] transition-colors hover:bg-[#111827] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F87171] focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-[#E6EDF3] dark:text-[#E6EDF3] dark:hover:bg-[#E6EDF3] dark:hover:text-[#0E141B] dark:focus-visible:ring-[#F87171] dark:focus-visible:ring-offset-[#0E141B]"
+                                  >
+                                    바로 가기
+                                  </Link>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         )}
@@ -630,26 +649,6 @@ function HomePageContent() {
                             <ChevronRight className="h-5 w-5" />
                           </button>
                         </>
-                      )}
-                      {!activePickImage && shouldShowPickIndicators && (
-                        <div className="flex items-center justify-center gap-2">
-                          {editorPickPosts.map((_, index) => (
-                            <button
-                              key={`editor-pick-dot-${index}`}
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setActivePickIndex(index);
-                              }}
-                              className={`transition-all duration-300 rounded-full ${
-                                activePickIndex === index
-                                  ? 'w-6 h-2 bg-[#264653] dark:bg-[#6CC3B2]'
-                                  : 'w-2 h-2 bg-[#D9E0EA] dark:bg-[#2A3645] hover:bg-[#C9D3E0] dark:hover:bg-[#223040]'
-                              }`}
-                              aria-label={`Editor&apos;s Pick ${index + 1}로 이동`}
-                            />
-                          ))}
-                        </div>
                       )}
                     </div>
                   )}
