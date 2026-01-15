@@ -30,7 +30,7 @@ export default {
 
       // OPTIONS 요청 처리 (CORS Preflight)
       if (request.method === 'OPTIONS') {
-        return handleCORS();
+        return handleCORS(request);
       }
 
       // Oracle OCI PAR URL 구성
@@ -69,9 +69,7 @@ export default {
         headers: {
           'Content-Type': contentType,
           'Cache-Control': cacheControl,
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          ...getCorsHeaders(request),
           'Cross-Origin-Resource-Policy': 'cross-origin',
           'X-Content-Type-Options': 'nosniff',
         },
@@ -104,16 +102,32 @@ export default {
  * CORS Preflight 요청 처리
  * @returns {Response} - CORS 헤더가 포함된 응답
  */
-function handleCORS() {
+function handleCORS(request) {
   return new Response(null, {
     status: 204,
     headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+      ...getCorsHeaders(request),
       'Access-Control-Max-Age': '86400',
     },
   });
+}
+
+function getCorsHeaders(request) {
+  const allowedOrigins = new Set([
+    'https://codebase.blog',
+    'https://www.codebase.blog',
+  ]);
+  const origin = request.headers.get('Origin');
+  const allowOrigin =
+    origin && allowedOrigins.has(origin) ? origin : 'https://codebase.blog';
+
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    'Access-Control-Allow-Credentials': 'true',
+    'Vary': 'Origin',
+  };
 }
 
 /**
