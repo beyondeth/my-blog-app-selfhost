@@ -41,6 +41,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 
         if (response.ok) {
           const data = await response.json();
+          if (!data) {
+            setIsAuthenticated(false);
+            setIsAdmin(false);
+            return;
+          }
 
           // Session Storage에서 재인증 플래그와 타임스탬프 확인
           const isReauthVerified = sessionStorage.getItem(ADMIN_SESSION_KEY);
