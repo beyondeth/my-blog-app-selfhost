@@ -62,6 +62,11 @@ export default function AdminDebugPage() {
         
         if (response.ok) {
           const user = await response.json();
+          if (!user) {
+            toast.error('로그인이 필요합니다');
+            router.push('/login');
+            return;
+          }
           setCurrentUser(user);
           
           // Admin 권한 확인

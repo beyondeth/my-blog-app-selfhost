@@ -26,6 +26,7 @@ import { GoogleAuthGuard } from "./guards/google-auth.guard";
 import { KakaoAuthGuard } from "./guards/kakao-auth.guard";
 import { GitHubAuthGuard } from "./guards/github-auth.guard";
 import { JwtAuthGuard } from "./guards/jwt-auth.guard";
+import { OptionalJwtAuthGuard } from "./guards/optional-jwt-auth.guard";
 import { Public } from "../common/decorators/public.decorator";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { LoginDto } from "./dto/login.dto";
@@ -563,10 +564,14 @@ export class AuthController {
   }
 
   @Get("me")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "현재 사용자 정보 조회" })
   @ApiResponse({ status: 200, description: "사용자 정보 조회 성공" })
   async getCurrentUser(@CurrentUser() user: any) {
+    if (!user) {
+      return null;
+    }
+
     // UsersService를 통해 CDN URL이 적용된 사용자 정보 가져오기
     const fullUser = await this.usersService.findOne(user.id);
 
