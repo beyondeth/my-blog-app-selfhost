@@ -4,14 +4,14 @@
  * 채팅 큐 시스템의 성능 및 상태 모니터링
  */
 
-import { Module } from '@nestjs/common';
-import { PrometheusModule } from '@willsoto/nestjs-prometheus';
-import { MetricsService } from './metrics.service';
-import { ChatMetricsService } from './chat-metrics.service';
-import { CacheMetricsService } from './cache-metrics.service';
-import { AdminMetricsController } from './admin-metrics.controller';
-import { MetricsController } from './metrics.controller';
-import { RedisModule } from '../redis/redis.module';
+import { Module } from "@nestjs/common";
+import { PrometheusModule } from "@willsoto/nestjs-prometheus";
+import { MetricsService } from "./metrics.service";
+import { ChatMetricsService } from "./chat-metrics.service";
+import { CacheMetricsService } from "./cache-metrics.service";
+import { AdminMetricsController } from "./admin-metrics.controller";
+import { MetricsController } from "./metrics.controller";
+import { RedisModule } from "../redis/redis.module";
 
 @Module({
   imports: [
@@ -22,13 +22,13 @@ import { RedisModule } from '../redis/redis.module';
       defaultMetrics: {
         enabled: true,
         config: {
-          prefix: 'nodejs_',
+          prefix: "nodejs_",
         },
       },
       // 글로벌 레이블 설정
       defaultLabels: {
-        app: 'chat-queue-system',
-        version: '1.0.0',
+        app: "chat-queue-system",
+        version: "1.0.0",
       },
     }),
     RedisModule,

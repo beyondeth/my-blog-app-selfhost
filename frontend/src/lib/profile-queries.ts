@@ -195,14 +195,54 @@ async function apiRequest<T>(
   }
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: '요청 실패' }));
-
-    // /auth/me의 401은 비로그인 상태를 의미하므로 예상된 동작 (에러 메시지 간소화)
+    // 401 Unauthorized for /auth/me is expected (not logged in)
     if (endpoint === '/auth/me' && response.status === 401) {
       throw new Error('Unauthorized');
     }
 
-    throw new Error(error.message || `HTTP ${response.status}`);
+    const error = await response.json().catch(() => ({}));
+
+    // Create a custom error object with response data
+    const customError: any = new Error((error as any).message || `HTTP ${response.status}`);
+    customError.response = { data: error, status: response.status };
+    customError.status = response.status;
+    customError.code = (error as any).code || (error as any).error || 'UNKNOWN_ERROR';
+    
+    // Specific properties for suspension/ban
+    if ((error as any).code === 'ACCOUNT_SUSPENDED' || (error as any).code === 'ACCOUNT_BANNED') {
+        customError.reason = (error as any).reason;
+        customError.suspensionUntil = (error as any).suspensionUntil;
+        customError.bannedAt = (error as any).bannedAt;
+        customError.remainingDays = (error as any).remainingDays;
+
+        // If we are suspended, we should Force Logout and Redirect to Login
+        // except when we are already on the login page (to avoid infinite reload loops) or making a login request
+        if (typeof window !== 'undefined' && 
+            !endpoint.includes('/auth/login') && 
+            !window.location.pathname.startsWith('/login')) {
+            
+            // Clean up storage
+            localStorage.removeItem('access_token');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            
+            // Redirect with error info
+            const params = new URLSearchParams();
+            if ((error as any).code === 'ACCOUNT_SUSPENDED') {
+               params.append('error', 'account_suspended');
+               if ((error as any).reason) params.append('reason', (error as any).reason);
+               if ((error as any).suspensionUntil) params.append('until', (error as any).suspensionUntil);
+            } else {
+               params.append('error', 'account_banned');
+               if ((error as any).reason) params.append('reason', (error as any).reason);
+            }
+            if ((error as any).message) params.append('message', (error as any).message);
+
+            window.location.href = `/login?${params.toString()}`;
+        }
+    }
+
+    throw customError;
   }
 
   return response.json();
@@ -377,6 +417,8 @@ export const useLogout = () => {
         localStorage.removeItem('access_token');
         localStorage.removeItem('token');
         localStorage.removeItem('user');
+        sessionStorage.removeItem('redirectAfterLogin');
+        sessionStorage.removeItem('mcpOAuth');
       }
 
       // Mixpanel: 로그아웃 이벤트 추적 및 세션 초기화
@@ -454,7 +496,8 @@ export const useRefreshUser = useRefreshAuthenticatedUser;
  * @returns 로그인 여부
  */
 export const useIsAuthenticated = () => {
-  const { data: user } = useUser();
+  const { data: user, error } = useUser();
+  if (error?.message === 'Unauthorized') return false;
   return !!user;
 };
 
@@ -463,7 +506,8 @@ export const useIsAuthenticated = () => {
  * @returns 관리자 여부
  */
 export const useIsAdmin = () => {
-  const { data: user } = useUser();
+  const { data: user, error } = useUser();
+  if (error?.message === 'Unauthorized') return false;
   return user?.role?.toLowerCase() === 'admin';
 };
 

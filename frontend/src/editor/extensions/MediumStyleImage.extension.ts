@@ -14,6 +14,22 @@ import { MediumImageNode } from '../components/MediumImage/MediumImageNode';
 
 export type ImageSize = 'small' | 'medium' | 'default' | 'full';
 
+// TipTap Commands 타입 확장
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    mediumImage: {
+      /**
+       * 이미지 크기 변경 커맨드
+       */
+      setImageSize: (size: ImageSize) => ReturnType;
+      /**
+       * 이미지 캡션 설정 커맨드
+       */
+      setImageCaption: (caption: string) => ReturnType;
+    };
+  }
+}
+
 export const MediumStyleImage = Image.extend({
   name: 'mediumImage',
 

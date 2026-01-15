@@ -79,6 +79,11 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
    * - React state로 관리하여 렌더링과 동기화
    */
   const [isInChatRoom, setIsInChatRoom] = useState(false);
+  const isInChatRoomRef = useRef(isInChatRoom);
+
+  useEffect(() => {
+    isInChatRoomRef.current = isInChatRoom;
+  }, [isInChatRoom]);
   const [isTabVisible, setIsTabVisible] = useState(!document.hidden);
 
   /**
@@ -320,7 +325,7 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
         messageId: message.id,
         conversationId: message.conversationId,
         senderId: message.senderId,
-        isInChatRoom
+        isInChatRoom: isInChatRoomRef.current
       });
 
       measurePerformance('handleNewMessage', async () => {
@@ -354,8 +359,8 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
             return old.map(conv => {
               if (conv.id === message.conversationId) {
                 // 채팅방에 있으면 무조건 0
-                const newUnreadCount = isInChatRoom ? 0 : (conv.unreadCount || 0);
-                console.log('[채팅] 🔄 현재 방 새 메시지 - unreadCount:', newUnreadCount, 'isInChatRoom:', isInChatRoom);
+                const newUnreadCount = isInChatRoomRef.current ? 0 : (conv.unreadCount || 0);
+                console.log('[채팅] 🔄 현재 방 새 메시지 - unreadCount:', newUnreadCount, 'isInChatRoom:', isInChatRoomRef.current);
                 return {
                   ...conv,
                   lastMessage: message,
@@ -487,11 +492,11 @@ export function useChatWithQuery(conversationId?: string): UseChatWithQueryRetur
     }) => {
       // 현재 채팅방의 알림은 무시 (백엔드 버그 방어)
       // isInChatRoom state도 확인하여 이중 체크
-      if (msgConvId === conversationId || (msgConvId === conversationId && isInChatRoom)) {
+      if (msgConvId === conversationId || (msgConvId === conversationId && isInChatRoomRef.current)) {
         console.log('[채팅] ⚠️ 경고: 현재 방 메시지 알림 받음 - 무시', {
           msgConvId,
           currentConvId: conversationId,
-          isInChatRoom,
+          isInChatRoom: isInChatRoomRef.current,
           같은방: msgConvId === conversationId
         });
 

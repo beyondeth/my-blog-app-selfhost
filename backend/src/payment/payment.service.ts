@@ -1,25 +1,25 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { User } from '../users/entities/user.entity';
-import { PaymentHistory } from '../subscription/entities/payment-history.entity';
-import { PaymentProvider } from './interfaces/payment-provider.interface';
-import { MockProvider } from './providers/mock.provider';
+import { Injectable, BadRequestException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { User } from "../users/entities/user.entity";
+import { PaymentHistory } from "../subscription/entities/payment-history.entity";
+import { PaymentProvider } from "./interfaces/payment-provider.interface";
+import { MockProvider } from "./providers/mock.provider";
 import {
   SubscriptionTier,
   BillingCycle,
-  PaymentStatus
-} from '../common/enums/subscription.enum';
-import { PaymentEvents } from './enums/payment-events.enum';
+  PaymentStatus,
+} from "../common/enums/subscription.enum";
+import { PaymentEvents } from "./enums/payment-events.enum";
 import {
   PaymentSuccessPayload,
   PaymentFailedPayload,
   RefundPayload,
   WebhookPayload,
   InvoicePaymentPayload,
-} from './interfaces/payment-event-payloads.interface';
+} from "./interfaces/payment-event-payloads.interface";
 
 /**
  * 결제 처리 서비스
@@ -47,7 +47,7 @@ export class PaymentService {
    */
   private initializeProviders() {
     // Mock Provider는 항상 등록 (개발/테스트용)
-    this.providers.set('mock', new MockProvider());
+    this.providers.set("mock", new MockProvider());
 
     // Stripe Provider (추후 구현)
     // if (this.configService.get('STRIPE_SECRET_KEY')) {
@@ -75,7 +75,10 @@ export class PaymentService {
    * 플랜별 가격 계산
    * 티어와 결제 주기에 따른 가격 반환
    */
-  private calculatePrice(tier: SubscriptionTier, billingCycle: BillingCycle): number {
+  private calculatePrice(
+    tier: SubscriptionTier,
+    billingCycle: BillingCycle,
+  ): number {
     const prices = {
       [SubscriptionTier.FREE]: 0,
       [SubscriptionTier.STARTER]: {
@@ -110,14 +113,14 @@ export class PaymentService {
     });
 
     if (!user) {
-      throw new BadRequestException('사용자를 찾을 수 없습니다');
+      throw new BadRequestException("사용자를 찾을 수 없습니다");
     }
 
     const provider = this.getProvider(options.provider);
     const price = this.calculatePrice(options.tier, options.billingCycle);
 
     // 고객 ID가 없으면 생성
-    if (!user.stripeCustomerId && options.provider === 'stripe') {
+    if (!user.stripeCustomerId && options.provider === "stripe") {
       const customerId = await provider.createCustomer({
         email: user.email,
         name: user.name || user.email,
@@ -132,7 +135,7 @@ export class PaymentService {
     const session = await provider.createCheckoutSession({
       customerId: user.stripeCustomerId,
       priceAmount: price,
-      currency: 'usd',
+      currency: "usd",
       productName: `${options.tier.toUpperCase()} Plan`,
       billingCycle: options.billingCycle,
       metadata: {
@@ -140,15 +143,15 @@ export class PaymentService {
         tier: options.tier,
         billingCycle: options.billingCycle,
       },
-      successUrl: `${this.configService.get('FRONTEND_URL')}/subscription/success`,
-      cancelUrl: `${this.configService.get('FRONTEND_URL')}/subscription/cancel`,
+      successUrl: `${this.configService.get("FRONTEND_URL")}/subscription/success`,
+      cancelUrl: `${this.configService.get("FRONTEND_URL")}/subscription/cancel`,
     });
 
     // 결제 기록 생성 (pending 상태)
     await this.paymentHistoryRepository.save({
       user,
       amount: price,
-      currency: 'usd',
+      currency: "usd",
       status: PaymentStatus.PENDING,
       provider: options.provider,
       providerId: session.id,
@@ -175,7 +178,7 @@ export class PaymentService {
     }
 
     // 현재는 Mock provider만 있으므로 Mock 데이터 반환
-    const provider = this.getProvider('mock');
+    const provider = this.getProvider("mock");
     return await provider.listPaymentMethods(user.stripeCustomerId);
   }
 
@@ -188,11 +191,14 @@ export class PaymentService {
     });
 
     if (!user || !user.stripeCustomerId) {
-      throw new BadRequestException('결제 고객 정보가 없습니다');
+      throw new BadRequestException("결제 고객 정보가 없습니다");
     }
 
-    const provider = this.getProvider('mock'); // 실제로는 동적으로 선택
-    await provider.setDefaultPaymentMethod(user.stripeCustomerId, paymentMethodId);
+    const provider = this.getProvider("mock"); // 실제로는 동적으로 선택
+    await provider.setDefaultPaymentMethod(
+      user.stripeCustomerId,
+      paymentMethodId,
+    );
   }
 
   /**
@@ -210,30 +216,34 @@ export class PaymentService {
         id: paymentId,
         userId: userId,
       },
-      relations: ['user'],
+      relations: ["user"],
     });
 
     if (!payment) {
-      throw new BadRequestException('결제 기록을 찾을 수 없습니다');
+      throw new BadRequestException("결제 기록을 찾을 수 없습니다");
     }
 
     if (payment.status !== PaymentStatus.SUCCEEDED) {
-      throw new BadRequestException('환불 가능한 결제가 아닙니다');
+      throw new BadRequestException("환불 가능한 결제가 아닙니다");
     }
 
     // 환불 금액 계산 (부분 환불 또는 전액 환불)
     const refundAmount = amount || payment.amount;
     if (refundAmount > payment.amount) {
-      throw new BadRequestException('환불 금액이 결제 금액보다 큽니다');
+      throw new BadRequestException("환불 금액이 결제 금액보다 큽니다");
     }
 
     const provider = this.getProvider(payment.provider);
-    const refund = await provider.createRefund(payment.providerId, refundAmount);
+    const refund = await provider.createRefund(
+      payment.providerId,
+      refundAmount,
+    );
 
     // 결제 기록 업데이트
-    payment.status = refundAmount === payment.amount
-      ? PaymentStatus.REFUNDED
-      : PaymentStatus.PARTIALLY_REFUNDED;
+    payment.status =
+      refundAmount === payment.amount
+        ? PaymentStatus.REFUNDED
+        : PaymentStatus.PARTIALLY_REFUNDED;
     payment.refundedAmount = (payment.refundedAmount || 0) + refundAmount;
     payment.refundReason = reason;
     await this.paymentHistoryRepository.save(payment);
@@ -246,7 +256,7 @@ export class PaymentService {
         refundId: refund.id,
         amount: refundAmount,
         reason,
-        status: 'success',
+        status: "success",
         timestamp: new Date(),
       };
 
@@ -270,8 +280,11 @@ export class PaymentService {
     const paymentProvider = this.getProvider(provider);
 
     // 서명 검증
-    if (signature && !paymentProvider.verifyWebhookSignature(payload, signature)) {
-      throw new BadRequestException('Invalid webhook signature');
+    if (
+      signature &&
+      !paymentProvider.verifyWebhookSignature(payload, signature)
+    ) {
+      throw new BadRequestException("Invalid webhook signature");
     }
 
     // 이벤트 파싱
@@ -279,28 +292,28 @@ export class PaymentService {
 
     // 이벤트 타입별 처리
     switch (event.type) {
-      case 'checkout.session.completed':
-      case 'payment_intent.succeeded':
+      case "checkout.session.completed":
+      case "payment_intent.succeeded":
         await this.handlePaymentSuccess(event.data);
         break;
 
-      case 'payment_intent.payment_failed':
+      case "payment_intent.payment_failed":
         await this.handlePaymentFailed(event.data);
         break;
 
-      case 'customer.subscription.updated':
+      case "customer.subscription.updated":
         await this.handleSubscriptionUpdated(event.data);
         break;
 
-      case 'customer.subscription.deleted':
+      case "customer.subscription.deleted":
         await this.handleSubscriptionCanceled(event.data);
         break;
 
-      case 'invoice.payment_succeeded':
+      case "invoice.payment_succeeded":
         await this.handleInvoicePaymentSuccess(event.data);
         break;
 
-      case 'invoice.payment_failed':
+      case "invoice.payment_failed":
         await this.handleInvoicePaymentFailed(event.data);
         break;
 
@@ -336,8 +349,8 @@ export class PaymentService {
         userId,
         paymentId: data.id,
         amount: payment?.amount || 0,
-        currency: data.currency || 'usd',
-        provider: payment?.provider || 'unknown',
+        currency: data.currency || "usd",
+        provider: payment?.provider || "unknown",
         metadata: {
           tier,
           billingCycle,
@@ -363,15 +376,15 @@ export class PaymentService {
       payment.status = PaymentStatus.FAILED;
       payment.metadata = {
         ...payment.metadata,
-        failureReason: data.failure_message || 'Payment failed',
+        failureReason: data.failure_message || "Payment failed",
       };
       await this.paymentHistoryRepository.save(payment);
 
       // 결제 실패 이벤트 발행
       const failedPayload: PaymentFailedPayload = {
-        userId: payment.userId || '0',
+        userId: payment.userId || "0",
         paymentId: data.id,
-        reason: data.failure_message || 'Payment failed',
+        reason: data.failure_message || "Payment failed",
         provider: payment.provider,
         metadata: payment.metadata,
         timestamp: new Date(),
@@ -386,7 +399,7 @@ export class PaymentService {
    */
   private async handleSubscriptionUpdated(data: any) {
     // 구독 상태 업데이트 로직
-    console.log('Subscription updated:', data);
+    console.log("Subscription updated:", data);
   }
 
   /**
@@ -399,7 +412,7 @@ export class PaymentService {
       this.eventEmitter.emit(PaymentEvents.SUBSCRIPTION_CANCELLED, {
         userId,
         subscriptionId: data.id,
-        reason: 'Provider subscription cancelled',
+        reason: "Provider subscription cancelled",
         immediately: true,
         timestamp: new Date(),
       });
@@ -411,7 +424,7 @@ export class PaymentService {
    */
   private async handleInvoicePaymentSuccess(data: any) {
     // 정기 결제 성공 처리
-    console.log('Invoice payment succeeded:', data);
+    console.log("Invoice payment succeeded:", data);
   }
 
   /**
@@ -420,6 +433,6 @@ export class PaymentService {
   private async handleInvoicePaymentFailed(data: any) {
     // 정기 결제 실패 처리
     // 재시도 또는 구독 일시 정지 등
-    console.log('Invoice payment failed:', data);
+    console.log("Invoice payment failed:", data);
   }
 }

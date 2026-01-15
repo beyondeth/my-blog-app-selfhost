@@ -1,15 +1,22 @@
-import { Injectable, Logger, BadRequestException, NotFoundException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource, SelectQueryBuilder } from 'typeorm';
-import { Post } from '../entities/post.entity';
-import { PostStats } from '../entities/post-stats.entity';
-import { User } from '../../users/entities/user.entity';
-import { BookmarksService } from '../../bookmarks/bookmarks.service';
-import { LikeService } from './like.service';
-import { RedisLockService } from '../../redis/redis-lock.service';
-import { CacheKeys, CacheTTL } from '../../cache/cache.service';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { PostInteractionEvents } from '../events/post-interaction.events';
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  NotFoundException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource, SelectQueryBuilder } from "typeorm";
+import { Post } from "../entities/post.entity";
+import { PostStats } from "../entities/post-stats.entity";
+import { User } from "../../users/entities/user.entity";
+import { BookmarksService } from "../../bookmarks/bookmarks.service";
+import { LikeService } from "./like.service";
+import { RedisLockService } from "../../redis/redis-lock.service";
+import { CacheKeys, CacheTTL } from "../../cache/cache.service";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { PostInteractionEvents } from "../events/post-interaction.events";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import Redis from "ioredis";
 
 /**
  * 포스트 상호작용 서비스
@@ -25,6 +32,7 @@ import { PostInteractionEvents } from '../events/post-interaction.events';
 @Injectable()
 export class PostInteractionService {
   private readonly logger = new Logger(PostInteractionService.name);
+  private readonly uniqueViewTtlSeconds = 60 * 60 * 24 * 120;
 
   constructor(
     @InjectRepository(Post)
@@ -36,9 +44,9 @@ export class PostInteractionService {
     private readonly redisLockService: RedisLockService,
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
+    @InjectRedis() private readonly redis: Redis,
   ) {}
 
-  
   /**
    * 포스트 조회수 증가 (사용자 기반 중복 방지)
    *
@@ -60,13 +68,13 @@ export class PostInteractionService {
           // 이미 조회한 사용자이면 기존 조회수 반환
           const post = await this.postsRepository.findOne({
             where: { id: postId },
-            relations: ['stats'],
+            relations: ["stats"],
           });
           return post?.stats?.viewCount || 0;
         }
 
         // 24시간 동안 사용자 조회 기록 저장
-        await this.redisLockService.set(userViewKey, '1', CacheTTL.DAY);
+        await this.redisLockService.set(userViewKey, "1", CacheTTL.DAY);
       }
 
       // PostStats에서 조회수 증가
@@ -74,20 +82,22 @@ export class PostInteractionService {
         .createQueryBuilder()
         .update(PostStats)
         .set({
-          viewCount: () => 'viewCount + 1',
-          updatedAt: new Date()
+          viewCount: () => "viewCount + 1",
+          updatedAt: new Date(),
         })
-        .where('postId = :postId', { postId })
+        .where("postId = :postId", { postId })
         .execute();
 
       // 업데이트된 포스트 정보 조회
       const post = await this.postsRepository.findOne({
         where: { id: postId },
-        relations: ['stats'],
+        relations: ["stats"],
       });
 
       const newViewCount = post?.stats?.viewCount || 0;
-      this.logger.debug(`View incremented: postId=${postId}, newCount=${newViewCount}`);
+      this.logger.debug(
+        `View incremented: postId=${postId}, newCount=${newViewCount}`,
+      );
 
       // 이벤트 발행
       this.eventEmitter.emit(PostInteractionEvents.VIEW_INCREMENTED, {
@@ -96,6 +106,8 @@ export class PostInteractionService {
         viewCount: newViewCount,
         timestamp: new Date(),
       });
+
+      await this.trackUniqueView(post, userId);
 
       return newViewCount;
     } finally {
@@ -112,26 +124,33 @@ export class PostInteractionService {
    */
   async getInteractionStatusMap(
     postIds: string[],
-    userId?: string
+    userId?: string,
   ): Promise<Map<string, { liked: boolean; bookmarked: boolean }>> {
     if (!userId || postIds.length === 0) {
       return new Map();
     }
 
-    const statusMap = new Map<string, { liked: boolean; bookmarked: boolean }>();
+    const statusMap = new Map<
+      string,
+      { liked: boolean; bookmarked: boolean }
+    >();
 
     try {
       // 좋아요 상태 한번에 조회 (LikeService 사용)
-      const likeStatuses = await this.likeService.getMultipleLikeStatus(postIds, userId);
-
-      // 북마크 상태 한번에 조회
-      const bookmarkStatuses = await this.bookmarksService.getMultipleBookmarkStatuses(
+      const likeStatuses = await this.likeService.getMultipleLikeStatus(
         postIds,
-        userId
+        userId,
       );
 
+      // 북마크 상태 한번에 조회
+      const bookmarkStatuses =
+        await this.bookmarksService.getMultipleBookmarkStatuses(
+          postIds,
+          userId,
+        );
+
       // 결과 조합
-      postIds.forEach(postId => {
+      postIds.forEach((postId) => {
         statusMap.set(postId, {
           liked: likeStatuses.get(postId) || false,
           bookmarked: bookmarkStatuses.get(postId) || false,
@@ -140,12 +159,13 @@ export class PostInteractionService {
 
       return statusMap;
     } catch (error) {
-      this.logger.error(`Failed to get interaction status map: ${error.message}`);
+      this.logger.error(
+        `Failed to get interaction status map: ${error.message}`,
+      );
       return new Map();
     }
   }
 
-  
   /**
    * 사용자의 북마크 상태 확인
    *
@@ -153,7 +173,10 @@ export class PostInteractionService {
    * @param userId 사용자 ID
    * @returns 북마크 여부
    */
-  async getUserBookmarkStatus(postId: string, userId: string): Promise<boolean> {
+  async getUserBookmarkStatus(
+    postId: string,
+    userId: string,
+  ): Promise<boolean> {
     const bookmark = await this.bookmarksService.findBookmark(postId, userId);
     return !!bookmark;
   }
@@ -167,7 +190,7 @@ export class PostInteractionService {
    */
   async getPostInteractions(
     postId: string,
-    user?: User
+    user?: User,
   ): Promise<{
     viewCount: number;
     likeCount: number;
@@ -178,11 +201,11 @@ export class PostInteractionService {
     // 포스트 기본 정보 조회
     const post = await this.postsRepository.findOne({
       where: { id: postId },
-      relations: ['stats'],
+      relations: ["stats"],
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException("Post not found");
     }
 
     // 사용자가 없는 경우 기본 카운트만 반환
@@ -211,7 +234,6 @@ export class PostInteractionService {
     };
   }
 
-  
   /**
    * 포스트 상호작통계 조회
    *
@@ -226,11 +248,11 @@ export class PostInteractionService {
   }> {
     const post = await this.postsRepository.findOne({
       where: { id: postId },
-      relations: ['stats'],
+      relations: ["stats"],
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException("Post not found");
     }
 
     const viewCount = post.stats?.viewCount || 0;
@@ -238,9 +260,8 @@ export class PostInteractionService {
     const commentCount = post.stats?.commentCount || 0;
 
     // 참여율 계산: (좋아요 + 댓글) / 조회수 * 100
-    const engagementRate = viewCount > 0
-      ? ((likeCount + commentCount) / viewCount) * 100
-      : 0;
+    const engagementRate =
+      viewCount > 0 ? ((likeCount + commentCount) / viewCount) * 100 : 0;
 
     return {
       totalViews: viewCount,
@@ -259,15 +280,42 @@ export class PostInteractionService {
    */
   async getInteractionTrends(
     postId: string,
-    period: 'daily' | 'weekly' | 'monthly' = 'daily'
-  ): Promise<Array<{
-    date: string;
-    views: number;
-    likes: number;
-    comments: number;
-  }>> {
+    period: "daily" | "weekly" | "monthly" = "daily",
+  ): Promise<
+    Array<{
+      date: string;
+      views: number;
+      likes: number;
+      comments: number;
+    }>
+  > {
     // TODO: 구현 필요 - Analytics 모듈과 연동
-    this.logger.warn(`Interaction trends not implemented for period: ${period}`);
+    this.logger.warn(
+      `Interaction trends not implemented for period: ${period}`,
+    );
     return [];
+  }
+
+  private async trackUniqueView(post: Post | null, userId?: string) {
+    if (!post || !userId || !post.blogId) {
+      return;
+    }
+
+    const key = this.buildBlogUniqueViewKey(post.blogId, new Date());
+    try {
+      await this.redis.pfadd(key, userId);
+      await this.redis.expire(key, this.uniqueViewTtlSeconds);
+    } catch (error) {
+      this.logger.warn(
+        `Failed to record unique view (postId=${post.id}, userId=${userId})`,
+        error as Error,
+      );
+    }
+  }
+
+  private buildBlogUniqueViewKey(blogId: string, date: Date): string {
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    return `blog:uniqueViews:${blogId}:${year}${month}`;
   }
 }

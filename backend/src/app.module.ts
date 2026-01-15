@@ -1,38 +1,39 @@
-import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { APP_GUARD } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
-import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
-import { BullModule } from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { Module, MiddlewareConsumer, NestModule } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { APP_GUARD } from "@nestjs/core";
+import { JwtModule } from "@nestjs/jwt";
+import { ThrottlerModule } from "@nestjs/throttler";
+import { BullModule } from "@nestjs/bullmq";
+import { ScheduleModule } from "@nestjs/schedule";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 
 // Configuration imports
-import databaseConfig from './config/database.config';
-import jwtConfig from './config/jwt.config';
-import s3Config from './config/s3.config';
+import databaseConfig from "./config/database.config";
+import jwtConfig from "./config/jwt.config";
+import s3Config from "./config/s3.config";
+import rateLimitConfig from "./config/rate-limit.config";
 
 // Module imports
-import { AuthModule } from './auth/auth.module';
-import { UsersModule } from './users/users.module';
-import { PostsModule } from './posts/posts.module';
-import { CommentsModule } from './comments/comments.module';
-import { FilesModule } from './files/files.module';
-import { BlogsModule } from './blogs/blogs.module';
-import { TagsModule } from './tags/tags.module';
-import { McpModule } from './mcp/mcp.module';
-import { EmailModule } from './email/email.module';
-import { ReportsModule } from './reports/reports.module';
-import { AuditModule } from './audit/audit.module';
-import { AdminModule } from './admin/admin.module';
-import { CacheModule } from './cache/cache.module';
-import { MonitoringModule } from './monitoring/monitoring.module';
-import { RedisModule } from './redis/redis.module';
-import { ChatModule } from './chat/chat.module';
-import { MetricsModule } from './metrics/metrics.module';
-import { CommonModule } from './common/common.module';
-import { EventsModule } from './common/events/events.module';
+import { AuthModule } from "./auth/auth.module";
+import { UsersModule } from "./users/users.module";
+import { PostsModule } from "./posts/posts.module";
+import { CommentsModule } from "./comments/comments.module";
+import { FilesModule } from "./files/files.module";
+import { BlogsModule } from "./blogs/blogs.module";
+import { TagsModule } from "./tags/tags.module";
+import { McpModule } from "./mcp/mcp.module";
+import { EmailModule } from "./email/email.module";
+import { ReportsModule } from "./reports/reports.module";
+import { AuditModule } from "./audit/audit.module";
+import { AdminModule } from "./admin/admin.module";
+import { CacheModule } from "./cache/cache.module";
+import { MonitoringModule } from "./monitoring/monitoring.module";
+import { RedisModule } from "./redis/redis.module";
+import { ChatModule } from "./chat/chat.module";
+import { MetricsModule } from "./metrics/metrics.module";
+import { CommonModule } from "./common/common.module";
+import { EventsModule } from "./common/events/events.module";
 // import { AnalyticsModule } from './analytics/analytics.module';
 // FUTURE: 구독제 기능 활성화 시 주석 해제
 // import { SubscriptionModule } from './subscription/subscription.module';
@@ -42,32 +43,41 @@ import { EventsModule } from './common/events/events.module';
 // import { SharedSubscriptionModule } from './shared/shared-subscription.module';
 
 // Guards
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
-import { RolesGuard } from './common/guards/roles.guard';
-import { FollowsModule } from './follows/follows.module';
-import { NotificationsModule } from './notifications/notifications.module';
-import { BookmarksModule } from './bookmarks/bookmarks.module';
-import { BlocksModule } from './blocks/blocks.module';
-import { MusicModule } from './music/music.module';
+import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
+import { RolesGuard } from "./common/guards/roles.guard";
+import { FollowsModule } from "./follows/follows.module";
+import { NotificationsModule } from "./notifications/notifications.module";
+import { BookmarksModule } from "./bookmarks/bookmarks.module";
+import { BlocksModule } from "./blocks/blocks.module";
+import { MusicModule } from "./music/music.module";
+import { CommunitiesModule } from "./communities/communities.module";
+import { FeedModule } from "./feed/feed.module";
+import { OpenGraphModule } from "./opengraph/opengraph.module";
+import { RateLimitModule } from "./rate-limit/rate-limit.module";
+import { ReputationModule } from "./reputation/reputation.module"; // 사용자 평판(Ranking) 시스템
+import { ModerationModule } from "./moderation/moderation.module"; // 모더레이션 시스템
+import { RateLimitGuard } from "./rate-limit/rate-limit.guard";
 // import { TestBlogStatsController } from './test/test-blog-stats.controller'; // Temporarily disabled due to dependency issues
 // import { SimpleTestController } from './test/simple-test.controller';
-import { MinimalTestController } from './test/minimal-test.controller';
+// import { MinimalTestController } from "./test/minimal-test.controller";
+
+import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
 
 @Module({
   imports: [
     // Global configuration
     ConfigModule.forRoot({
       isGlobal: true,
-      load: [databaseConfig, jwtConfig, s3Config],
-      envFilePath: ['.env.local', '.env'],
+      load: [databaseConfig, jwtConfig, s3Config, rateLimitConfig],
+      // 루트 .env 파일을 우선 읽음 (Docker에서는 환경변수로 전달됨)
+      envFilePath: ["../.env.local", "../.env", ".env.local", ".env"],
       cache: true,
     }),
-
     // Database configuration
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (configService: ConfigService) => ({
-        ...configService.get('database'),
+        ...configService.get("database"),
         synchronize: false,
         logging: false,
       }),
@@ -85,28 +95,28 @@ import { MinimalTestController } from './test/minimal-test.controller';
     ThrottlerModule.forRoot({
       throttlers: [
         {
-          name: 'minute',
-          ttl: 60000,      // 1분 (60초)
-          limit: 20,       // 분당 20회
+          name: "minute",
+          ttl: 60000, // 1분 (60초)
+          limit: 20, // 분당 20회
         },
         {
-          name: 'hour',
-          ttl: 3600000,    // 1시간 (3600초)
-          limit: 30,       // 시간당 30회
+          name: "hour",
+          ttl: 3600000, // 1시간 (3600초)
+          limit: 30, // 시간당 30회
         },
         {
-          name: 'day',
-          ttl: 86400000,   // 1일 (86400초)
-          limit: 50,       // 하루 50회
-        }
-      ]
+          name: "day",
+          ttl: 86400000, // 1일 (86400초)
+          limit: 50, // 하루 50회
+        },
+      ],
     }),
 
     // BullMQ configuration for Redis connection
     BullModule.forRoot({
       connection: {
-        host: process.env.REDIS_HOST || 'localhost',
-        port: parseInt(process.env.REDIS_PORT || '6379'),
+        host: process.env.REDIS_HOST || "localhost",
+        port: parseInt(process.env.REDIS_PORT || "6379"),
       },
     }),
 
@@ -123,6 +133,7 @@ import { MinimalTestController } from './test/minimal-test.controller';
     EventsModule, // Event system (BlogEventEmitter)
     MonitoringModule, // Global monitoring module for suspicious requests
     MetricsModule, // Prometheus metrics module
+    RateLimitModule,
     // FUTURE: 구독제 기능 활성화 시 주석 해제
     // PaymentEventsModule, // Global payment events module (Event-Driven Architecture)
     AuthModule,
@@ -143,6 +154,11 @@ import { MinimalTestController } from './test/minimal-test.controller';
     BlocksModule,
     ChatModule,
     MusicModule, // BGM 플레이어 기능
+    CommunitiesModule, // Reddit 스타일 커뮤니티 시스템
+    FeedModule, // 통합 피드 (블로그 + 커뮤니티 포스트)
+    OpenGraphModule, // URL 메타데이터 추출 (링크 카드용)
+    ReputationModule, // 사용자 평판(Ranking) 시스템
+    ModerationModule, // 모더레이션 시스템
     // AnalyticsModule,
     // FUTURE: 구독제 기능 활성화 시 주석 해제
     // SubscriptionModule, // UsersModule 이후에 로드
@@ -160,14 +176,20 @@ import { MinimalTestController } from './test/minimal-test.controller';
       provide: APP_GUARD,
       useClass: RolesGuard,
     },
+    {
+      provide: APP_GUARD,
+      useClass: RateLimitGuard,
+    },
     // Test controllers (개발 환경에서만 사용)
     // TestBlogStatsController, // Temporarily disabled due to dependency issues
     // SimpleTestController,
-    MinimalTestController,
+    // MinimalTestController,
   ],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    // Add middleware configuration here if needed
+    consumer
+      .apply(IpBlockMiddleware)
+      .forRoutes('*');
   }
-} 
+}

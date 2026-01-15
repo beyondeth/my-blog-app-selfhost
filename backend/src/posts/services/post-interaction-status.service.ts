@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { BookmarksService } from '../../bookmarks/bookmarks.service';
-import { PostLikeStatusService } from './post-like-status.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { BookmarksService } from "../../bookmarks/bookmarks.service";
+import { PostLikeStatusService } from "./post-like-status.service";
+import { VoteType } from "../enums/vote-type.enum";
 
 /**
  * 포스트 상호작용 상태 통합 서비스
@@ -10,6 +11,7 @@ import { PostLikeStatusService } from './post-like-status.service';
 export interface PostInteractionStatus {
   bookmarked: boolean;
   liked: boolean;
+  userVote: VoteType | null;
 }
 
 @Injectable()
@@ -35,8 +37,12 @@ export class PostInteractionStatusService {
     if (!postIds.length || !userId) {
       // 사용자가 없는 경우 모두 false인 Map 반환
       const emptyMap = new Map<string, PostInteractionStatus>();
-      postIds.forEach(postId => {
-        emptyMap.set(postId, { bookmarked: false, liked: false });
+      postIds.forEach((postId) => {
+        emptyMap.set(postId, {
+          bookmarked: false,
+          liked: false,
+          userVote: null,
+        });
       });
       return emptyMap;
     }
@@ -45,24 +51,30 @@ export class PostInteractionStatusService {
       `[getMultipleInteractionStatuses] Getting statuses for ${postIds.length} posts for user ${userId}`,
     );
 
-    // 병렬로 북마크와 좋아요 상태 조회
-    const [bookmarkStatuses, likeStatuses] = await Promise.all([
+    // 병렬로 북마크와 투표 상태 조회
+    const [bookmarkStatuses, voteStatuses] = await Promise.all([
       this.bookmarksService.getMultipleBookmarkStatuses(postIds, userId),
-      this.postLikeStatusService.getMultipleLikeStatuses(postIds, userId),
+      this.postLikeStatusService.getMultipleVoteStatuses(postIds, userId),
     ]);
 
     // 결과를 통합
     const interactionMap = new Map<string, PostInteractionStatus>();
 
-    postIds.forEach(postId => {
+    postIds.forEach((postId) => {
+      const userVote = voteStatuses.get(postId) ?? null;
       interactionMap.set(postId, {
         bookmarked: bookmarkStatuses.get(postId) || false,
-        liked: likeStatuses.get(postId) || false,
+        liked: userVote === VoteType.UPVOTE,
+        userVote,
       });
     });
 
-    const bookmarkedCount = Array.from(bookmarkStatuses.values()).filter(Boolean).length;
-    const likedCount = Array.from(likeStatuses.values()).filter(Boolean).length;
+    const bookmarkedCount = Array.from(bookmarkStatuses.values()).filter(
+      Boolean,
+    ).length;
+    const likedCount = Array.from(voteStatuses.values()).filter(
+      (vote) => vote === VoteType.UPVOTE,
+    ).length;
 
     this.logger.debug(
       `[getMultipleInteractionStatuses] Completed: ${bookmarkedCount} bookmarked, ${likedCount} liked`,
@@ -83,15 +95,19 @@ export class PostInteractionStatusService {
     userId: string,
   ): Promise<PostInteractionStatus> {
     if (!postId || !userId) {
-      return { bookmarked: false, liked: false };
+      return { bookmarked: false, liked: false, userVote: null };
     }
 
-    const [bookmarked, liked] = await Promise.all([
+    const [bookmarked, userVote] = await Promise.all([
       this.bookmarksService.isBookmarked(postId, userId),
-      this.postLikeStatusService.getLikeStatus(postId, userId),
+      this.postLikeStatusService.getVoteStatus(postId, userId),
     ]);
 
-    return { bookmarked, liked };
+    return {
+      bookmarked,
+      liked: userVote === VoteType.UPVOTE,
+      userVote,
+    };
   }
 
   /**

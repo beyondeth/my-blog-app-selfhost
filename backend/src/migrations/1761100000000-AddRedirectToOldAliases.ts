@@ -1,18 +1,20 @@
-import { MigrationInterface, QueryRunner, TableColumn } from 'typeorm';
+import { MigrationInterface, QueryRunner, TableColumn } from "typeorm";
 
-export class AddRedirectToOldAliases1761100000000 implements MigrationInterface {
-  name = 'AddRedirectToOldAliases1761100000000';
+export class AddRedirectToOldAliases1761100000000
+  implements MigrationInterface
+{
+  name = "AddRedirectToOldAliases1761100000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.addColumn(
-      'old_aliases',
+      "old_aliases",
       new TableColumn({
-        name: 'redirectto',
-        type: 'varchar',
-        length: '100',
+        name: "redirectto",
+        type: "varchar",
+        length: "100",
         isNullable: true,
         default: null,
-      })
+      }),
     );
 
     // 기존 데이터가 있다면 blog의 현재 alias로 redirectto를 채움
@@ -26,6 +28,6 @@ export class AddRedirectToOldAliases1761100000000 implements MigrationInterface 
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.dropColumn('old_aliases', 'redirectto');
+    await queryRunner.dropColumn("old_aliases", "redirectto");
   }
 }

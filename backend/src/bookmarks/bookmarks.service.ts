@@ -1,10 +1,21 @@
-import { Injectable, NotFoundException, BadRequestException, ConflictException, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { Bookmark } from './entities/bookmark.entity';
-import { Post } from '../posts/entities/post.entity';
-import { BookmarkedPostDto, BookmarksResponseDto, ToggleBookmarkResponseDto } from './dto/bookmark-response.dto';
-import { plainToClass } from 'class-transformer';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  ConflictException,
+  Logger,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { Bookmark } from "./entities/bookmark.entity";
+import { Post } from "../posts/entities/post.entity";
+import {
+  BookmarkedPostDto,
+  BookmarksResponseDto,
+  ToggleBookmarkResponseDto,
+} from "./dto/bookmark-response.dto";
+import { plainToClass } from "class-transformer";
+import { EventEmitter2 } from "@nestjs/event-emitter";
 
 /**
  * 북마크 서비스 - 북마크 CRUD 및 동시성 처리
@@ -19,28 +30,32 @@ export class BookmarksService {
     @InjectRepository(Post)
     private postRepository: Repository<Post>,
     private dataSource: DataSource,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   /**
    * 북마크 토글 (추가/제거) - 트랜잭션과 동시성 처리
    */
-  async toggle(userId: string, postId: string): Promise<ToggleBookmarkResponseDto> {
+  async toggle(
+    userId: string,
+    postId: string,
+  ): Promise<ToggleBookmarkResponseDto> {
     // 먼저 포스트가 존재하는지 확인
     const post = await this.postRepository.findOne({
-      where: { id: postId, isPublished: true }
+      where: { id: postId, isPublished: true },
     });
 
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
     // 트랜잭션으로 동시성 처리
-    return await this.dataSource.transaction(async manager => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const bookmarkRepo = manager.getRepository(Bookmark);
 
       // 기존 북마크 확인
       const existingBookmark = await bookmarkRepo.findOne({
-        where: { userId, postId }
+        where: { userId, postId },
       });
 
       if (existingBookmark) {
@@ -50,7 +65,7 @@ export class BookmarksService {
 
         return {
           bookmarked: false,
-          message: '북마크가 제거되었습니다.'
+          message: "북마크가 제거되었습니다.",
         };
       } else {
         // 북마크 추가
@@ -61,27 +76,43 @@ export class BookmarksService {
 
           return {
             bookmarked: true,
-            message: '북마크에 추가되었습니다.'
+            message: "북마크에 추가되었습니다.",
           };
         } catch (error) {
           // 동시에 같은 북마크를 추가하려고 시도한 경우 (unique constraint violation)
-          if (error.code === '23505') {
-            this.logger.warn(`Duplicate bookmark attempt: user=${userId}, post=${postId}`);
+          if (error.code === "23505") {
+            this.logger.warn(
+              `Duplicate bookmark attempt: user=${userId}, post=${postId}`,
+            );
             return {
               bookmarked: true,
-              message: '이미 북마크에 추가되어 있습니다.'
+              message: "이미 북마크에 추가되어 있습니다.",
             };
           }
           throw error;
         }
       }
     });
+
+    // 평판 시스템용 이벤트 발행 (BOOKMARK_TOGGLED)
+    this.eventEmitter.emit("post.bookmark.toggled", {
+      postId,
+      userId,
+      bookmarked: result.bookmarked,
+      timestamp: new Date(),
+    });
+
+    return result;
   }
 
   /**
    * 사용자의 북마크 목록 조회 (페이지네이션)
    */
-  async findAll(userId: string, page: number = 1, pageSize: number = 20): Promise<BookmarksResponseDto> {
+  async findAll(
+    userId: string,
+    page: number = 1,
+    pageSize: number = 20,
+  ): Promise<BookmarksResponseDto> {
     const skip = (page - 1) * pageSize;
 
     // 북마크와 포스트 정보를 함께 조회
@@ -91,19 +122,23 @@ export class BookmarksService {
         post: {
           author: true,
           blog: true,
-        }
+        },
       },
-      order: { createdAt: 'DESC' },  // 최신 북마크순
+      order: { createdAt: "DESC" }, // 최신 북마크순
       skip,
       take: pageSize,
     });
 
     // DTO로 변환
-    const items = bookmarks.map(bookmark => {
-      const dto = plainToClass(BookmarkedPostDto, {
-        ...bookmark.post,
-        bookmarkedAt: bookmark.createdAt,
-      }, { excludeExtraneousValues: true });
+    const items = bookmarks.map((bookmark) => {
+      const dto = plainToClass(
+        BookmarkedPostDto,
+        {
+          ...bookmark.post,
+          bookmarkedAt: bookmark.createdAt,
+        },
+        { excludeExtraneousValues: true },
+      );
       return dto;
     });
 
@@ -121,7 +156,7 @@ export class BookmarksService {
    */
   async isBookmarked(userId: string, postId: string): Promise<boolean> {
     const count = await this.bookmarkRepository.count({
-      where: { userId, postId }
+      where: { userId, postId },
     });
     return count > 0;
   }
@@ -129,20 +164,23 @@ export class BookmarksService {
   /**
    * 여러 포스트의 북마크 여부 확인 (벌크 조회)
    */
-  async areBookmarked(userId: string, postIds: string[]): Promise<Map<string, boolean>> {
+  async areBookmarked(
+    userId: string,
+    postIds: string[],
+  ): Promise<Map<string, boolean>> {
     if (!postIds.length) return new Map();
 
     const bookmarks = await this.bookmarkRepository
-      .createQueryBuilder('bookmark')
-      .where('bookmark.userId = :userId', { userId })
-      .andWhere('bookmark.postId IN (:...postIds)', { postIds })
-      .select(['bookmark.postId'])
+      .createQueryBuilder("bookmark")
+      .where("bookmark.userId = :userId", { userId })
+      .andWhere("bookmark.postId IN (:...postIds)", { postIds })
+      .select(["bookmark.postId"])
       .getMany();
 
-    const bookmarkedSet = new Set(bookmarks.map(b => b.postId));
+    const bookmarkedSet = new Set(bookmarks.map((b) => b.postId));
     const result = new Map<string, boolean>();
 
-    postIds.forEach(postId => {
+    postIds.forEach((postId) => {
       result.set(postId, bookmarkedSet.has(postId));
     });
 
@@ -156,7 +194,7 @@ export class BookmarksService {
     const result = await this.bookmarkRepository.delete({ userId, postId });
 
     if (result.affected === 0) {
-      throw new NotFoundException('북마크를 찾을 수 없습니다.');
+      throw new NotFoundException("북마크를 찾을 수 없습니다.");
     }
   }
 
@@ -171,7 +209,9 @@ export class BookmarksService {
   /**
    * 북마크 통계
    */
-  async getStats(userId: string): Promise<{ total: number; recentCount: number }> {
+  async getStats(
+    userId: string,
+  ): Promise<{ total: number; recentCount: number }> {
     const total = await this.bookmarkRepository.count({ where: { userId } });
 
     // 최근 7일간 북마크 수
@@ -179,9 +219,9 @@ export class BookmarksService {
     sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
     const recentCount = await this.bookmarkRepository
-      .createQueryBuilder('bookmark')
-      .where('bookmark.userId = :userId', { userId })
-      .andWhere('bookmark.createdAt > :date', { date: sevenDaysAgo })
+      .createQueryBuilder("bookmark")
+      .where("bookmark.userId = :userId", { userId })
+      .andWhere("bookmark.createdAt > :date", { date: sevenDaysAgo })
       .getCount();
 
     return { total, recentCount };
@@ -204,7 +244,7 @@ export class BookmarksService {
    */
   async getMultipleBookmarkStatuses(
     postIds: string[],
-    userId: string
+    userId: string,
   ): Promise<Map<string, boolean>> {
     if (postIds.length === 0) {
       return new Map<string, boolean>();
@@ -212,20 +252,18 @@ export class BookmarksService {
 
     // TypeORM Query Builder 사용하여 최적화된 쿼리 실행
     const bookmarks = await this.bookmarkRepository
-      .createQueryBuilder('bookmark')
-      .select('bookmark.postId')
-      .where('bookmark.userId = :userId', { userId })
-      .andWhere('bookmark.postId IN (:...postIds)', { postIds })
+      .createQueryBuilder("bookmark")
+      .select("bookmark.postId")
+      .where("bookmark.userId = :userId", { userId })
+      .andWhere("bookmark.postId IN (:...postIds)", { postIds })
       .getMany();
 
     // 결과를 Set으로 변환하여 O(1) 조회 가능
-    const bookmarkedSet = new Set(
-      bookmarks.map(b => b.postId)
-    );
+    const bookmarkedSet = new Set(bookmarks.map((b) => b.postId));
 
     // 모든 포스트 ID에 대해 상태 맵 생성
     const statusMap = new Map<string, boolean>();
-    postIds.forEach(postId => {
+    postIds.forEach((postId) => {
       statusMap.set(postId, bookmarkedSet.has(postId));
     });
 

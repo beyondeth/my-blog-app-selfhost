@@ -1,46 +1,46 @@
 "use client";
 
-import { FiHeart, FiShare2 } from 'react-icons/fi';
-import LikeButton from '@/components/ui/LikeButton';
-import { ReactNode } from 'react';
+import { FiShare2 } from 'react-icons/fi';
+import VoteButton from '@/components/ui/VoteButton';
+import type { VoteType } from '@/types';
 
 interface PostActionsProps {
-  liked?: boolean;
-  likeCount?: number;
-  onLike?: () => void;
+  /** 업보트 수 */
+  upvoteCount: number;
+  /** 다운보트 수 */
+  downvoteCount: number;
+  /** 현재 사용자의 투표 상태 */
+  userVote: VoteType;
+  /** 투표 핸들러 */
+  onVote: (voteType: 'upvote' | 'downvote') => void;
+  /** 투표 로딩 상태 */
+  isVotePending?: boolean;
+  /** 공유 핸들러 */
   onShare?: () => void;
-  LikeButtonComponent?: ReactNode;
 }
 
 export default function PostActions({
-  liked = false,
-  likeCount = 0,
-  onLike,
+  upvoteCount,
+  downvoteCount,
+  userVote,
+  onVote,
+  isVotePending = false,
   onShare,
-  LikeButtonComponent,
 }: PostActionsProps) {
   return (
-    <div className="flex items-center justify-between border-t border-b border-gray-100 py-4">
+    <div className="flex items-center justify-between border-t border-b border-gray-400 dark:border-gray-500 py-4">
       <div className="flex items-center space-x-6">
-        {LikeButtonComponent ? (
-          LikeButtonComponent
-        ) : (
-          <button
-            onClick={onLike}
-            className={`flex items-center space-x-1 px-3 py-1 rounded-full text-xs transition-colors ${
-              liked 
-                ? 'bg-red-50 text-red-600 hover:bg-red-100' 
-                : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700'
-            }`}
-          >
-            <FiHeart className={`w-4 h-4 ${liked ? 'fill-current' : ''}`} />
-            <span>{likeCount}</span>
-          </button>
-        )}
-        
+        <VoteButton
+          upvoteCount={upvoteCount}
+          downvoteCount={downvoteCount}
+          userVote={userVote}
+          onVote={onVote}
+          disabled={isVotePending}
+        />
+
         <button
           onClick={onShare}
-          className="flex items-center space-x-2 px-3 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 transition-colors"
+          className="flex items-center space-x-2 px-3 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
         >
           <FiShare2 className="w-4 h-4" />
           <span>공유</span>

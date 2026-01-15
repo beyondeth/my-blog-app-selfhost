@@ -1,9 +1,10 @@
 'use client';
 
-import { createContext, useContext, useEffect } from 'react';
+import { createContext, useContext, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAuthV2 } from '@/hooks/useAuthV2';
-import { prefetchAuth } from '@/lib/profile-queries';
+import { authQueryKeys, prefetchAuth } from '@/lib/profile-queries';
+import { emitLogout } from '@/lib/auth/events';
 import type { AuthContextType } from '@/types';
 
 /**
@@ -18,12 +19,26 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProviderV2({ children }: { children: React.ReactNode }) {
   const queryClient = useQueryClient();
   const authValue = useAuthV2();
+  const wasAuthenticatedRef = useRef(false);
 
   // 초기 인증 상태 확인 (한 번만)
   useEffect(() => {
     // TanStack Query가 자동으로 처리하므로 추가 로직 불필요
     // 첫 렌더링시 자동으로 /auth/me 호출됨
   }, []);
+
+  // 인증 실패(401) 시 캐시/상태 정리
+  useEffect(() => {
+    if (authValue.isUnauthorized) {
+      queryClient.setQueryData(authQueryKeys.user(), null);
+
+      if (wasAuthenticatedRef.current) {
+        emitLogout();
+      }
+    }
+
+    wasAuthenticatedRef.current = authValue.isAuthenticated;
+  }, [authValue.isAuthenticated, authValue.isUnauthorized, queryClient]);
 
   // 소셜 로그인 후 MCP OAuth 자동 완료 처리
   // sessionStorage에 mcpOAuth 데이터가 있고, 인증된 상태면 MCP OAuth 완료 처리
@@ -86,11 +101,8 @@ export function AuthProviderV2({ children }: { children: React.ReactNode }) {
 // 기존 코드와의 호환성을 위한 export
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
-  if (context === undefined) {
-    // Context 없이도 작동하도록 fallback
-    return useAuthV2();
-  }
-  return context;
+  const fallbackAuth = useAuthV2();
+  return context ?? fallbackAuth;
 }
 
 // SSR/SSG를 위한 프리페치 함수

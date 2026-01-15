@@ -2,9 +2,8 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
-import { FiBell, FiEdit3 } from 'react-icons/fi';
+import { FiBell } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
-import { Button } from '@/components/ui/button';
 
 /**
  * 프로모션 캐러셀 섹션 컴포넌트
@@ -22,10 +21,10 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
   // 슬라이드 데이터
   const slides = [
     {
-      id: 'landing',
+      id: 'mcp-auto-posting',
       icon: FiBell,
-      title: 'AI 블로그 플랫폼',
-      description: '대화만으로 완성되는 블로그. MCP 기반 자동 포스팅으로 생각을 글로 만들어보세요.',
+      title: 'MCP 자동 포스팅',
+      description: 'AI 와 MCP 를 연결하여 Idea 를 자동으로 포스팅 할 수 있습니다.',
       ctaText: 'MCP 알아보기',
       ctaLink: '/landing',
       styles: [] as { name: string; emoji: string; color: string }[],
@@ -38,9 +37,21 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
       ctaText: '스타일 가이드 보기',
       ctaLink: '/docs/writing-styles',
       styles: [
-        { name: 'Novel', emoji: '📖', color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
-        { name: 'Tutorial', emoji: '📚', color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/30 dark:text-cyan-300' },
-        { name: 'Comedy', emoji: '😄', color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300' },
+        {
+          name: 'Novel',
+          emoji: '📖',
+          color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
+        },
+        {
+          name: 'Tutorial',
+          emoji: '📚',
+          color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
+        },
+        {
+          name: 'Comedy',
+          emoji: '😄',
+          color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
+        },
       ],
     },
   ];
@@ -93,14 +104,14 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
                     <div className="space-y-4">
                       {/* 아이콘 + 제목 */}
                       <div className="flex items-center gap-2">
-                        <Icon className="w-5 h-5 text-gray-700 dark:text-gray-300" />
+                        <Icon className="w-5 h-5 text-[#264653] dark:text-[#6CC3B2]" />
                         <h4 className="text-base font-semibold text-foreground">
                           {slide.title}
                         </h4>
                       </div>
 
                       {/* 설명 */}
-                      <p className="text-sm text-muted-foreground leading-relaxed">
+                      <p className="text-sm text-[#4B5563] dark:text-[#C7D1DD] leading-relaxed">
                         {slide.description}
                       </p>
 
@@ -120,27 +131,13 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
                       )}
 
                       {/* CTA */}
-                      {slide.id === 'landing' ? (
-                        <div className="mx-16">
-                          <Link href={slide.ctaLink} className="block">
-                            <Button
-                              variant="default"
-                              className="w-full h-8 text-sm font-semibold"
-                              size="sm"
-                            >
-                              {slide.ctaText}
-                            </Button>
-                          </Link>
-                        </div>
-                      ) : (
-                        <Link
-                          href={slide.ctaLink}
-                          className="text-sm text-primary hover:underline font-medium inline-flex items-center gap-1"
-                        >
-                          {slide.ctaText}
-                          <span className="text-xs">→</span>
-                        </Link>
-                      )}
+                      <Link
+                        href={slide.ctaLink}
+                        className="inline-flex items-center gap-1 text-sm font-medium text-[#264653] dark:text-[#6CC3B2] hover:underline"
+                      >
+                        {slide.ctaText}
+                        <span className="text-xs">→</span>
+                      </Link>
                     </div>
                   </div>
                 );
@@ -156,8 +153,8 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
                 onClick={() => handleDotClick(index)}
                 className={`transition-all duration-300 rounded-full ${
                   currentSlide === index
-                    ? 'w-6 h-2 bg-gray-700 dark:bg-gray-300'
-                    : 'w-2 h-2 bg-gray-300 dark:bg-gray-600 hover:bg-gray-400 dark:hover:bg-gray-500'
+                    ? 'w-6 h-2 bg-[#264653] dark:bg-[#6CC3B2]'
+                    : 'w-2 h-2 bg-[#D9E0EA] dark:bg-[#2A3645] hover:bg-[#C9D3E0] dark:hover:bg-[#223040]'
                 }`}
                 aria-label={`슬라이드 ${index + 1}로 이동`}
               />

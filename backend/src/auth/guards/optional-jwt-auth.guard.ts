@@ -1,7 +1,5 @@
-import { Injectable, ExecutionContext } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Reflector } from '@nestjs/core';
-import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
+import { Injectable, ExecutionContext } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
 
 /**
  * Optional JWT 인증 가드
@@ -9,24 +7,16 @@ import { IS_PUBLIC_KEY } from '../../common/decorators/public.decorator';
  * OAuth 승인 페이지처럼 인증이 선택적인 경우 사용
  */
 @Injectable()
-export class OptionalJwtAuthGuard extends AuthGuard('jwt') {
-  constructor(private reflector: Reflector) {
-    super();
-  }
-
-  canActivate(context: ExecutionContext) {
-    // Public 데코레이터가 적용된 경우 JWT 인증 우회
-    const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
-
-    if (isPublic) {
-      return true;
+export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    // OptionalJwtAuthGuard는 @Public() 여부와 관계없이 항상 JWT 인증을 시도
+    // 인증 성공 시 req.user에 사용자 정보 설정, 실패해도 요청은 통과
+    try {
+      await super.canActivate(context);
+    } catch {
+      // 인증 실패해도 통과 (Optional이므로)
     }
-
-    // JWT 인증 시도하지만 실패해도 계속 진행
-    return super.canActivate(context);
+    return true;
   }
 
   handleRequest(err, user, info, context: ExecutionContext) {

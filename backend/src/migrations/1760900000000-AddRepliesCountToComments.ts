@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 댓글 답글 개수 컬럼 추가
@@ -18,7 +18,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - 개선: 부모 댓글 조회 시 repliesCount 컬럼 사용
  * - DB 부하 감소: COUNT 쿼리 제거
  */
-export class AddRepliesCountToComments1760900000000 implements MigrationInterface {
+export class AddRepliesCountToComments1760900000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. repliesCount 컬럼 추가
     await queryRunner.query(`

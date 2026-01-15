@@ -1,5 +1,5 @@
-import { Exclude, Expose, Type } from 'class-transformer';
-import { UserResponseDto } from '../../users/dto/user-response.dto';
+import { Exclude, Expose, Type } from "class-transformer";
+import { UserResponseDto } from "../../users/dto/user-response.dto";
 
 /**
  * Blog 응답 DTO
@@ -77,6 +77,49 @@ export class BlogResponseDto {
 
   @Expose()
   message?: string;
+
+  // =====================================
+  // 브랜딩 필드 (로고/아이콘/커버/브랜드 색상)
+  // =====================================
+
+  @Expose()
+  logoUrl?: string;
+
+  @Expose()
+  logoImageFit?: "cover" | "contain";
+
+  @Expose()
+  iconUrl?: string;
+
+  @Expose()
+  iconImageFit?: "cover" | "contain";
+
+  @Expose()
+  iconPlacement?: "inline" | "badge";
+
+  @Expose()
+  iconTextEnabled?: boolean;
+
+  @Expose()
+  iconLabel?: string | null;
+
+  @Expose()
+  iconLabelEnabled?: boolean;
+
+  @Expose()
+  iconSubtitle?: string | null;
+
+  @Expose()
+  iconSubtitleEnabled?: boolean;
+
+  @Expose()
+  coverImageUrl?: string;
+
+  @Expose()
+  coverImageFit?: "cover" | "contain";
+
+  @Expose()
+  brandColor?: string;
 
   // OneToOne, OneToMany 관계 제외 (lazy loading 방지)
   @Exclude()

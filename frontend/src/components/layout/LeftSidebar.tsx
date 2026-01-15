@@ -11,7 +11,7 @@ import { NotificationBellIcon } from '@/components/icons/NotificationBellIcon';
 import { MyBlogIcon } from '@/components/icons/MyBlogIcon';
 import { BookmarkIcon } from '@/components/icons/BookmarkIcon';
 import { SettingsIcon } from '@/components/icons/SettingsIcon';
-import { MessageCircle } from 'lucide-react';
+import { MessageCircle, Users } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +43,8 @@ export default function LeftSidebar() {
   const [mounted, setMounted] = useState(false);
   const queryClient = useQueryClient();
   const { blog, loading } = useUserBlogV2(); // 내 블로그 정보 가져오기
+  const inactiveNavClass =
+    'text-[#4B5563] dark:text-[#D5DEE8] hover:bg-[#E7ECF3] hover:text-[#1B2430] dark:hover:bg-[#1A232E] dark:hover:text-[#F5F7FA]';
 
   // 클라이언트에서만 렌더링 (SSR 하이드레이션 불일치 방지)
   useEffect(() => {
@@ -55,11 +57,15 @@ export default function LeftSidebar() {
   }, [user, queryClient]);
 
   // Debug logging (개발 환경에서만 출력)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[LeftSidebar] user:', user?.id, user?.email);
-    console.log('[LeftSidebar] blog:', blog);
-    console.log('[LeftSidebar] loading:', loading);
-  }
+  const logDebug = (...args: any[]) => {
+    if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
+      console.log(...args);
+    }
+  };
+
+  logDebug('[LeftSidebar] user:', user?.id, user?.email);
+  logDebug('[LeftSidebar] blog:', blog);
+  logDebug('[LeftSidebar] loading:', loading);
 
   // 읽지 않은 알림 수 조회 (로그인한 사용자 + Feature Flag 활성화 시에만)
   const { data: unreadCount = 0 } = useQuery({
@@ -96,16 +102,14 @@ export default function LeftSidebar() {
   const myBlogUrl = blog ? (blog.alias ? `/@${blog.alias}` : `/${blog.slug}`) : '#';
 
   // Debug logging for URL matching (개발 환경에서만 출력)
-  if (process.env.NODE_ENV === 'development') {
-    console.log('[LeftSidebar] myBlogUrl:', myBlogUrl);
-    console.log('[LeftSidebar] pathname:', pathname);
-    console.log('[LeftSidebar] pathname === myBlogUrl:', pathname === myBlogUrl);
-    console.log('[LeftSidebar] user && blog condition:', !!user && !!blog);
-  }
+  logDebug('[LeftSidebar] myBlogUrl:', myBlogUrl);
+  logDebug('[LeftSidebar] pathname:', pathname);
+  logDebug('[LeftSidebar] pathname === myBlogUrl:', pathname === myBlogUrl);
+  logDebug('[LeftSidebar] user && blog condition:', !!user && !!blog);
 
   return (
     <aside
-      className={`hidden lg:block fixed left-0 top-40 h-[calc(100vh-10rem)] w-20 bg-background z-40 ${
+      className={`hidden lg:block fixed left-0 top-40 h-[calc(100vh-10rem)] w-20 bg-white dark:bg-[#0E141B] border-r border-[#D9E0EA] dark:border-[#2A3645] z-40 ${
         isOpen ? 'translate-x-[23px]' : '-translate-x-full'
       }`}
       style={{
@@ -120,13 +124,28 @@ export default function LeftSidebar() {
           prefetch={true}
           className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
             pathname === '/'
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+              ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+              : inactiveNavClass
           }`}
           title="홈"
         >
           <HomeIcon className={pathname === '/' ? 'opacity-100' : 'opacity-70'} size={24} />
           <span className="text-xs mt-1 font-medium">홈</span>
+        </Link>
+
+        {/* 커뮤니티 버튼 */}
+        <Link
+          href="/c"
+          prefetch={true}
+          className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
+            pathname === '/c' || pathname?.startsWith('/c/')
+              ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+              : inactiveNavClass
+          }`}
+          title="커뮤니티"
+        >
+          <Users className={pathname === '/c' || pathname?.startsWith('/c/') ? 'opacity-100' : 'opacity-70'} size={24} />
+          <span className="text-xs mt-1 font-medium">커뮤니티</span>
         </Link>
 
         {/* My Blog 버튼 - 로그인 사용자만 표시 */}
@@ -136,8 +155,8 @@ export default function LeftSidebar() {
             prefetch={true}
             className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
               pathname === myBlogUrl
-                ? 'bg-accent text-accent-foreground'
-                : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+                : inactiveNavClass
             }`}
             title="내 블로그"
           >
@@ -159,8 +178,8 @@ export default function LeftSidebar() {
               }}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                 pathname === '/new-story' || pathname?.startsWith('/edit/')
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                  ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+                  : inactiveNavClass
               }`}
               title="글쓰기"
             >
@@ -174,8 +193,8 @@ export default function LeftSidebar() {
               prefetch={true}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                 pathname === '/bookmarks'
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                  ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+                  : inactiveNavClass
               }`}
               title="북마크"
             >
@@ -187,7 +206,7 @@ export default function LeftSidebar() {
             <button
               type="button"
               onClick={() => openDMModal()}
-              className="relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors text-muted-foreground hover:bg-accent/50 hover:text-foreground"
+              className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${inactiveNavClass}`}
               title="채팅"
             >
               <MessageCircle className="opacity-70" size={24} />
@@ -206,8 +225,8 @@ export default function LeftSidebar() {
               prefetch={true}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                 pathname === '/settings' || pathname?.startsWith('/settings/')
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                  ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+                  : inactiveNavClass
               }`}
               title="설정"
             >
@@ -222,8 +241,8 @@ export default function LeftSidebar() {
                 <button
                   className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                     isNotificationOpen
-                      ? 'bg-accent text-accent-foreground'
-                      : 'text-muted-foreground hover:bg-accent/50 hover:text-foreground'
+                      ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+                      : inactiveNavClass
                   }`}
                   title="알림"
                 >

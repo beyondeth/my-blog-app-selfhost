@@ -24,7 +24,9 @@ import {
   FiMessageCircle,
   FiCreditCard,
   FiTrendingUp,
-  FiKey
+  FiKey,
+  FiFileText,
+  FiBookmark
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
 import {
@@ -33,6 +35,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { useMyCommunities } from '@/hooks/community/useCommunities';
 
 interface ProfileDropdownProps {
   user: User | null;
@@ -53,6 +56,14 @@ export default function ProfileDropdown({
   const handleNavigation = (path: string) => {
     router.push(path);
   };
+
+  const { data: myCommunities } = useMyCommunities({ enabled: !!user && mounted });
+
+  // 관리 중인 커뮤니티 필터링 (Owner or Moderator)
+  const managedCommunities = myCommunities?.filter(community => 
+    community.userMembership?.isMember && 
+    ['owner', 'moderator'].includes(community.userMembership?.role || '')
+  );
 
   if (!mounted) {
     return null;
@@ -129,26 +140,6 @@ export default function ProfileDropdown({
           <span>프로필 설정</span>
         </DropdownMenuItem>
 
-        {/* Relationships */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/settings/relationships')}
-          className="cursor-pointer"
-        >
-          <FiUsers className="mr-2 h-4 w-4" />
-          <span>관계 설정</span>
-        </DropdownMenuItem>
-
-        {/* DM Management */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/settings/dm')}
-          className="cursor-pointer"
-        >
-          <FiMessageCircle className="mr-2 h-4 w-4" />
-          <span>채팅 관리</span>
-        </DropdownMenuItem>
-
-        <DropdownMenuSeparator />
-
         {/* Blog Settings */}
         <DropdownMenuItem 
           onClick={() => handleNavigation('/settings/blog')}
@@ -158,23 +149,49 @@ export default function ProfileDropdown({
           <span>블로그 설정</span>
         </DropdownMenuItem>
 
-        {/* Security */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/settings/security')}
+        <DropdownMenuSeparator />
+
+        {/* 내 초안 */}
+        <DropdownMenuItem 
+          onClick={() => handleNavigation('/drafts')}
           className="cursor-pointer"
         >
-          <FiShield className="mr-2 h-4 w-4" />
-          <span>보안</span>
+          <FiFileText className="mr-2 h-4 w-4" />
+          <span>내 초안</span>
         </DropdownMenuItem>
 
-        {/* API Keys */}
-        <DropdownMenuItem
-          onClick={() => handleNavigation('/settings/api-keys')}
+        {/* 북마크 */}
+        <DropdownMenuItem 
+          onClick={() => handleNavigation('/bookmarks')}
           className="cursor-pointer"
         >
-          <FiKey className="mr-2 h-4 w-4" />
-          <span>API Keys</span>
+          <FiBookmark className="mr-2 h-4 w-4" />
+          <span>북마크</span>
         </DropdownMenuItem>
+        
+        {/* Managed Communities */}
+        {managedCommunities && managedCommunities.length > 0 && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs text-muted-foreground font-normal px-2 py-1.5">
+              커뮤니티 관리
+            </DropdownMenuLabel>
+            {managedCommunities.map((community) => (
+              <DropdownMenuItem
+                key={community.id}
+                onClick={() => handleNavigation(`/c/${community.slug}/settings`)}
+                className="cursor-pointer"
+              >
+                <FiSettings className="mr-2 h-4 w-4" />
+                <span className="truncate">{community.name}</span>
+              </DropdownMenuItem>
+            ))}
+          </>
+        )}
+
+
+
+        <DropdownMenuSeparator />
 
         {/* Customer Support */}
         <DropdownMenuItem

@@ -1,4 +1,4 @@
-import { Logger } from '@nestjs/common';
+import { Logger } from "@nestjs/common";
 
 /**
  * URL 파라미터 안전 처리 유틸리티
@@ -22,12 +22,12 @@ export class UrlSanitizerUtil {
 
   // 위험한 패턴 (Path Traversal, Directory Traversal 등)
   private static readonly DANGEROUS_PATTERNS = [
-    /\.\./,  // 상위 디렉토리 접근
-    /\//,   // 경로 구분자
-    /\\/,   // Windows 경로 구분자
-    /%2e%2e/i,  // URL 인코딩된 ../
-    /%2f/i,     // URL 인코딩된 /
-    /%5c/i,     // URL 인코딩된 \
+    /\.\./, // 상위 디렉토리 접근
+    /\//, // 경로 구분자
+    /\\/, // Windows 경로 구분자
+    /%2e%2e/i, // URL 인코딩된 ../
+    /%2f/i, // URL 인코딩된 /
+    /%5c/i, // URL 인코딩된 \
   ];
 
   /**
@@ -37,7 +37,7 @@ export class UrlSanitizerUtil {
    */
   static safeDecodeURIComponent(encoded: string): string {
     if (!encoded) {
-      return '';
+      return "";
     }
 
     // 길이 검증
@@ -51,7 +51,9 @@ export class UrlSanitizerUtil {
 
       // 위험한 패턴 검사
       if (this.containsDangerousPatterns(decoded)) {
-        this.logger.warn(`Dangerous pattern detected in URL parameter: ${decoded}`);
+        this.logger.warn(
+          `Dangerous pattern detected in URL parameter: ${decoded}`,
+        );
         return this.sanitizeString(decoded);
       }
 
@@ -69,7 +71,7 @@ export class UrlSanitizerUtil {
    */
   static sanitizeSlug(slug: string): string {
     if (!slug) {
-      return '';
+      return "";
     }
 
     const sanitized = this.safeDecodeURIComponent(slug);
@@ -78,7 +80,7 @@ export class UrlSanitizerUtil {
     if (!this.SLUG_PATTERN.test(sanitized)) {
       this.logger.warn(`Invalid slug format: ${sanitized}`);
       // 허용되지 않는 문자 제거
-      return sanitized.replace(/[^a-zA-Z0-9가-힣\-_]/g, '');
+      return sanitized.replace(/[^a-zA-Z0-9가-힣\-_]/g, "");
     }
 
     return sanitized;
@@ -91,13 +93,13 @@ export class UrlSanitizerUtil {
    */
   static sanitizeFilePath(path: string): string {
     if (!path) {
-      return '';
+      return "";
     }
 
     const sanitized = this.safeDecodeURIComponent(path);
 
     // 파일명 패턴 검증 및 정제
-    const filename = sanitized.split('/').pop() || '';
+    const filename = sanitized.split("/").pop() || "";
     if (!this.FILENAME_PATTERN.test(filename)) {
       this.logger.warn(`Invalid filename format: ${filename}`);
       // 안전한 파일명으로 대체
@@ -116,7 +118,7 @@ export class UrlSanitizerUtil {
    */
   static sanitizePathParam(param: string): string {
     if (!param) {
-      return '';
+      return "";
     }
 
     const sanitized = this.safeDecodeURIComponent(param);
@@ -137,21 +139,33 @@ export class UrlSanitizerUtil {
    */
   static sanitizeUserInput(input: string): string {
     if (!input) {
-      return '';
+      return "";
     }
 
-    // HTML 태그 제거
-    let sanitized = input.replace(/<[^>]*>/g, '');
-
-    // 스크립트 이벤트 핸들러 제거
-    sanitized = sanitized.replace(/on\w+\s*=/gi, '');
-
-    // 자바스크립트 프로토콜 제거
-    sanitized = sanitized.replace(/javascript:/gi, '');
+    let sanitized = this.stripDangerousContent(input);
 
     // 길이 제한
     if (sanitized.length > this.MAX_PARAM_LENGTH) {
       sanitized = sanitized.substring(0, this.MAX_PARAM_LENGTH);
+    }
+
+    return sanitized.trim();
+  }
+
+  /**
+   * 화면 표시에 사용할 텍스트 정제 (길이 제한 완화)
+   * @param input - 사용자 입력
+   * @param maxLength - 허용할 최대 길이 (기본 5000)
+   */
+  static sanitizeDisplayText(input: string, maxLength: number = 5000): string {
+    if (!input) {
+      return "";
+    }
+
+    let sanitized = this.stripDangerousContent(input);
+
+    if (maxLength > 0 && sanitized.length > maxLength) {
+      sanitized = sanitized.substring(0, maxLength);
     }
 
     return sanitized.trim();
@@ -163,7 +177,14 @@ export class UrlSanitizerUtil {
    * @returns 위험한 패턴 포함 여부
    */
   private static containsDangerousPatterns(str: string): boolean {
-    return this.DANGEROUS_PATTERNS.some(pattern => pattern.test(str));
+    return this.DANGEROUS_PATTERNS.some((pattern) => pattern.test(str));
+  }
+
+  private static stripDangerousContent(value: string): string {
+    let sanitized = value.replace(/<[^>]*>/g, "");
+    sanitized = sanitized.replace(/on\w+\s*=/gi, "");
+    sanitized = sanitized.replace(/javascript:/gi, "");
+    return sanitized;
   }
 
   /**
@@ -173,9 +194,9 @@ export class UrlSanitizerUtil {
    */
   private static sanitizeString(str: string): string {
     return str
-      .replace(/[\/\\]/g, '')  // 경로 구분자 제거
-      .replace(/\.\./g, '')    // 상위 디렉토리 참조 제거
-      .replace(/[<>]/g, '')    // HTML 태그 꺽쇠 제거
+      .replace(/[\/\\]/g, "") // 경로 구분자 제거
+      .replace(/\.\./g, "") // 상위 디렉토리 참조 제거
+      .replace(/[<>]/g, "") // HTML 태그 꺽쇠 제거
       .trim();
   }
 

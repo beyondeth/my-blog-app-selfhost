@@ -1,5 +1,5 @@
-import { Injectable, ExecutionContext } from '@nestjs/common';
-import { ThrottlerGuard } from '@nestjs/throttler';
+import { Injectable, ExecutionContext } from "@nestjs/common";
+import { ThrottlerGuard } from "@nestjs/throttler";
 
 @Injectable()
 export class PostsThrottlerGuard extends ThrottlerGuard {
@@ -12,13 +12,14 @@ export class PostsThrottlerGuard extends ThrottlerGuard {
     if (req.user && req.user.id) {
       return `user_${req.user.id}`;
     }
-    
+
     // 비로그인 사용자는 IP 주소 사용
-    const ip = req.ip || 
-               req.connection?.remoteAddress || 
-               req.headers['x-forwarded-for'] || 
-               'unknown';
-    
+    const ip =
+      req.ip ||
+      req.connection?.remoteAddress ||
+      req.headers["x-forwarded-for"] ||
+      "unknown";
+
     return `ip_${ip}`;
   }
 
@@ -27,16 +28,19 @@ export class PostsThrottlerGuard extends ThrottlerGuard {
    */
   protected async throwThrottlingException(
     context: ExecutionContext,
-    throttlerLimitDetail: any
+    throttlerLimitDetail: any,
   ): Promise<void> {
     const response = context.switchToHttp().getResponse();
     const { totalHits, limit, timeToExpire } = throttlerLimitDetail;
-    
+
     // Rate limit 정보를 헤더에 추가
-    response.setHeader('X-RateLimit-Limit', limit);
-    response.setHeader('X-RateLimit-Remaining', Math.max(0, limit - totalHits));
-    response.setHeader('X-RateLimit-Reset', new Date(Date.now() + timeToExpire).toISOString());
-    
+    response.setHeader("X-RateLimit-Limit", limit);
+    response.setHeader("X-RateLimit-Remaining", Math.max(0, limit - totalHits));
+    response.setHeader(
+      "X-RateLimit-Reset",
+      new Date(Date.now() + timeToExpire).toISOString(),
+    );
+
     await super.throwThrottlingException(context, throttlerLimitDetail);
   }
 }

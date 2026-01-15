@@ -8,9 +8,9 @@ import {
   JoinColumn,
   BeforeInsert,
   Index,
-} from 'typeorm';
-import { v7 as uuidv7 } from 'uuid';
-import { User } from './user.entity';
+} from "typeorm";
+import { v7 as uuidv7 } from "uuid";
+import { User } from "./user.entity";
 
 /**
  * Profile 엔티티
@@ -26,8 +26,8 @@ import { User } from './user.entity';
  * - 사용자가 직접 수정 가능한 정보
  * - 인증/보안과 무관한 정보
  */
-@Entity('profiles')
-@Index(['userId'], { unique: true }) // 1:1 관계 보장
+@Entity("profiles")
+@Index(["userId"], { unique: true }) // 1:1 관계 보장
 export class Profile {
   /**
    * 기본 키 (UUID v7)
@@ -35,7 +35,7 @@ export class Profile {
    * - B-tree 인덱스 성능 최적화
    * - 애플리케이션 레벨에서 생성 (DB 독립성)
    */
-  @PrimaryColumn('uuid')
+  @PrimaryColumn("uuid")
   id: string;
 
   /**
@@ -43,11 +43,11 @@ export class Profile {
    * - onDelete: 'CASCADE' → User 삭제 시 Profile도 자동 삭제
    * - nullable: false → User 없이 Profile 존재 불가 (데이터 무결성)
    */
-  @OneToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @OneToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: "uuid", nullable: false })
   userId: string;
 
   /**
@@ -75,6 +75,21 @@ export class Profile {
   bio: string;
 
   /**
+   * 소셜 링크 목록
+   * - 확장 가능한 SNS/외부 링크 저장
+   */
+  @Column("jsonb", { default: [] })
+  socialLinks: Array<{ platform: string; url: string }>;
+
+  /**
+   * 직업/역할 정보
+   * - 최대 30자
+   * - 블로그 사이드바 카드 등에 표시
+   */
+  @Column({ length: 30, nullable: true })
+  jobTitle: string;
+
+  /**
    * 마지막 로그인 Provider
    * - 'local', 'google', 'github', 'kakao'
    * - UX: 계정 삭제 시 어떤 소셜 로그인인지 표시
@@ -87,7 +102,7 @@ export class Profile {
    * - 이메일 인증 또는 소셜 로그인 인증
    * - null: 미인증 상태
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   accountVerifiedAt: Date;
 
   /**
@@ -98,13 +113,37 @@ export class Profile {
    *
    * 기본값: 'basic'
    */
-  @Column({ length: 20, default: 'basic' })
+  @Column({ length: 20, default: "basic" })
   accountSecurityLevel: string;
 
-  @CreateDateColumn({ name: 'createdAt' })
+  /**
+   * 생년월일 (성인 인증용)
+   * - DATE 타입으로 저장
+   * - NSFW 커뮤니티 접근 시 18세 이상 확인
+   */
+  @Column({ type: "date", nullable: true })
+  birthdate: Date;
+
+  /**
+   * 성인 인증 여부
+   * - 생년월일 기반 18세 이상 확인 후 true로 설정
+   * - 부분 인덱스로 인증 사용자 빠른 조회
+   */
+  @Column({ type: "boolean", default: false })
+  isAdultVerified: boolean;
+
+  /**
+   * 성인 인증 완료 시각
+   * - 언제 인증했는지 기록
+   * - null: 미인증 상태
+   */
+  @Column({ type: "timestamptz", nullable: true })
+  adultVerifiedAt: Date;
+
+  @CreateDateColumn({ name: "createdAt" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updatedAt' })
+  @UpdateDateColumn({ name: "updatedAt" })
   updatedAt: Date;
 
   /**
@@ -131,8 +170,34 @@ export class Profile {
       name: this.name,
       profileImage: this.profileImage,
       bio: this.bio,
+      jobTitle: this.jobTitle,
+      socialLinks: this.socialLinks || [],
       accountSecurityLevel: this.accountSecurityLevel,
       accountVerifiedAt: this.accountVerifiedAt,
+      isAdultVerified: this.isAdultVerified,
     };
+  }
+
+  /**
+   * 18세 이상인지 확인
+   * @returns 생년월일 기준 18세 이상 여부
+   */
+  isAdult(): boolean {
+    if (!this.birthdate) return false;
+
+    const today = new Date();
+    const birthDate = new Date(this.birthdate);
+    const age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+
+    // 생일이 아직 안 지났으면 나이에서 1을 뺌
+    if (
+      monthDiff < 0 ||
+      (monthDiff === 0 && today.getDate() < birthDate.getDate())
+    ) {
+      return age - 1 >= 18;
+    }
+
+    return age >= 18;
   }
 }

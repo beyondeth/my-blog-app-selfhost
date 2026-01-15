@@ -1,5 +1,5 @@
-import { Exclude, Expose, Type } from 'class-transformer';
-import { IsString, IsDate, IsNumber } from 'class-validator';
+import { Exclude, Expose, Type } from "class-transformer";
+import { IsString, IsDate, IsNumber } from "class-validator";
 
 /**
  * 북마크된 포스트 정보 DTO
@@ -63,7 +63,7 @@ export class BookmarkedPostDto {
   publishedAt: Date;
 
   @Expose()
-  bookmarkedAt: Date;  // 북마크한 시간
+  bookmarkedAt: Date; // 북마크한 시간
 }
 
 export class BookmarksResponseDto {
@@ -86,7 +86,7 @@ export class BookmarksResponseDto {
 
 export class ToggleBookmarkResponseDto {
   @Expose()
-  bookmarked: boolean;  // true: 북마크 추가됨, false: 북마크 제거됨
+  bookmarked: boolean; // true: 북마크 추가됨, false: 북마크 제거됨
 
   @Expose()
   message: string;

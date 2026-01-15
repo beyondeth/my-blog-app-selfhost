@@ -77,6 +77,7 @@ export default function OptimizedImage({
 
   return (
     <div className={`relative overflow-hidden ${className}`} style={style}>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={normalizedSrc}
         alt={alt}

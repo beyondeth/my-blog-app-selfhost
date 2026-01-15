@@ -45,9 +45,17 @@ function AuthCallbackPageContent() {
             remainingDays,
           });
         } else {
-          // 다른 에러는 로그인 페이지로 리다이렉트
+          // 다른 에러는 로그인 페이지로 리다이렉트 (상세 정보 포함)
           console.error('OAuth login error:', error);
-          router.replace(`/login?error=${encodeURIComponent(error)}`);
+          const reason = getSafeQueryParam(searchParams, 'reason');
+          const until = getSafeQueryParam(searchParams, 'until');
+          
+          let loginUrl = `/login?error=${encodeURIComponent(error)}`;
+          if (message) loginUrl += `&message=${encodeURIComponent(message)}`;
+          if (reason) loginUrl += `&reason=${encodeURIComponent(reason)}`;
+          if (until) loginUrl += `&until=${encodeURIComponent(until)}`;
+          
+          router.replace(loginUrl);
         }
       } else {
         // 정상적인 경우 백엔드에서 이미 /consent 또는 /로 리다이렉트했으므로

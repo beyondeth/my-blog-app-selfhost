@@ -37,7 +37,7 @@ export const getAWSStyleEmailTemplate = (code: string): string => {
           </p>
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center;">
             <p style="font-size: 12px; color: #687078; margin: 0; line-height: 1.6;">
-              © ${process.env.EMAIL_COPYRIGHT_YEAR || '2025'} codebase.blog. All rights reserved.<br>
+              © ${process.env.EMAIL_COPYRIGHT_YEAR || "2025"} codebase.blog. All rights reserved.<br>
               이 메시지는 codebase.blog에서 전송되었습니다.
             </p>
           </div>
@@ -48,7 +48,10 @@ export const getAWSStyleEmailTemplate = (code: string): string => {
   `;
 };
 
-export const getAWSStylePasswordResetTemplate = (username: string, resetUrl: string): string => {
+export const getAWSStylePasswordResetTemplate = (
+  username: string,
+  resetUrl: string,
+): string => {
   return `
     <!DOCTYPE html>
     <html>
@@ -63,7 +66,7 @@ export const getAWSStylePasswordResetTemplate = (username: string, resetUrl: str
         </div>
         <div style="background: #ffffff; border: 1px solid #d5d9d9; border-top: none; border-radius: 0 0 8px 8px; padding: 40px;">
           <h1 style="font-size: 24px; font-weight: 700; color: #232f3e; margin: 0 0 8px;">비밀번호 재설정</h1>
-          <p style="font-size: 14px; color: #687078; margin: 0 0 32px;">안녕하세요, ${username || '사용자'}님</p>
+          <p style="font-size: 14px; color: #687078; margin: 0 0 32px;">안녕하세요, ${username || "사용자"}님</p>
           <p style="font-size: 14px; color: #232f3e; line-height: 1.8; margin: 0 0 24px;">
             귀하의 codebase.blog 계정에 대한 비밀번호 재설정 요청을 받았습니다.
           </p>
@@ -87,7 +90,7 @@ export const getAWSStylePasswordResetTemplate = (username: string, resetUrl: str
           </p>
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb; text-align: center;">
             <p style="font-size: 12px; color: #687078; margin: 0; line-height: 1.6;">
-              © ${process.env.EMAIL_COPYRIGHT_YEAR || '2025'} codebase.blog. All rights reserved.<br>
+              © ${process.env.EMAIL_COPYRIGHT_YEAR || "2025"} codebase.blog. All rights reserved.<br>
               이 메시지는 codebase.blog에서 전송되었습니다.
             </p>
           </div>
@@ -102,12 +105,15 @@ export const getAWSStylePasswordResetTemplate = (username: string, resetUrl: str
  * 계정 연결 알림 이메일 템플릿 (Google 스타일)
  * OAuth Provider 계정이 기존 계정에 연결되었을 때 발송
  */
-export const getModernAccountLinkTemplate = (provider: string, linkedEmail: string): string => {
+export const getModernAccountLinkTemplate = (
+  provider: string,
+  linkedEmail: string,
+): string => {
   // Provider 이름을 한글로 매핑
   const providerNames: { [key: string]: string } = {
-    'google': 'Google',
-    'kakao': 'Kakao',
-    'github': 'GitHub',
+    google: "Google",
+    kakao: "Kakao",
+    github: "GitHub",
   };
 
   const providerName = providerNames[provider.toLowerCase()] || provider;
@@ -159,7 +165,7 @@ export const getModernAccountLinkTemplate = (provider: string, linkedEmail: stri
           <div style="margin-top: 32px; padding-top: 24px; border-top: 1px solid #e5e7eb;">
             <p style="font-size: 12px; color: #687078; margin: 0; line-height: 1.6;">
               이 메일은 보안 알림입니다.<br>
-              © ${process.env.EMAIL_COPYRIGHT_YEAR || '2025'} codebase.blog. All rights reserved.
+              © ${process.env.EMAIL_COPYRIGHT_YEAR || "2025"} codebase.blog. All rights reserved.
             </p>
           </div>
         </div>

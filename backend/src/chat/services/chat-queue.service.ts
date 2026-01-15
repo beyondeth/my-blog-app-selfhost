@@ -1,12 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
-import { v4 as uuidv4 } from 'uuid';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import Redis from "ioredis";
+import { v4 as uuidv4 } from "uuid";
 import {
   QueuedMessage,
   RedisMessageData,
   QueueMetrics,
-} from '../interfaces/message-queue.interface';
+} from "../interfaces/message-queue.interface";
 
 @Injectable()
 export class ChatQueueService {
@@ -22,13 +22,13 @@ export class ChatQueueService {
     // 샤드별 큐 (0~3)
     SHARDS: Array.from({ length: 4 }, (_, i) => `chat:queue:shard:${i}`),
     // 기본 큐 (하위 호환성용)
-    DEFAULT: 'chat:queue:messages',
+    DEFAULT: "chat:queue:messages",
   };
 
-  private readonly DLQ_KEY = 'chat:queue:dlq';
-  private readonly MESSAGE_PREFIX = 'chat:msg:';
-  private readonly CONVERSATION_PREFIX = 'chat:conv:';
-  private readonly METRICS_KEY = 'chat:metrics';
+  private readonly DLQ_KEY = "chat:queue:dlq";
+  private readonly MESSAGE_PREFIX = "chat:msg:";
+  private readonly CONVERSATION_PREFIX = "chat:conv:";
+  private readonly METRICS_KEY = "chat:metrics";
 
   // 샤드 선택을 위한 라운드 로빈 카운터
   private shardCounter = 0;
@@ -97,14 +97,13 @@ export class ChatQueueService {
     pipeline.expire(`${this.MESSAGE_PREFIX}${messageId}`, 86400);
 
     // Update metrics
-    pipeline.hincrby(this.METRICS_KEY, 'totalQueued', 1);
+    pipeline.hincrby(this.METRICS_KEY, "totalQueued", 1);
 
     await pipeline.exec();
 
     this.logger.debug(`Message queued: ${messageId}`);
     return queuedMessage;
   }
-
 
   /**
    * Get messages from queue for batch processing
@@ -118,14 +117,16 @@ export class ChatQueueService {
      * 샤드별로 메시지 수집
      * - 각 샤드에서 균등하게 가져와서 공정성 보장
      */
-    const messagesPerShard = Math.ceil(remainingBatch / this.QUEUE_KEYS.SHARDS.length);
+    const messagesPerShard = Math.ceil(
+      remainingBatch / this.QUEUE_KEYS.SHARDS.length,
+    );
 
     for (const shardKey of this.QUEUE_KEYS.SHARDS) {
       if (remainingBatch <= 0) break;
 
       const shardMessages = await this.dequeueFromQueue(
         shardKey,
-        Math.min(messagesPerShard, remainingBatch)
+        Math.min(messagesPerShard, remainingBatch),
       );
       messages.push(...shardMessages);
       remainingBatch -= shardMessages.length;
@@ -138,16 +139,13 @@ export class ChatQueueService {
     if (remainingBatch > 0) {
       const defaultMessages = await this.dequeueFromQueue(
         this.QUEUE_KEYS.DEFAULT,
-        remainingBatch
+        remainingBatch,
       );
       messages.push(...defaultMessages);
     }
 
-
     if (messages.length > 0) {
-      this.logger.debug(
-        `[큐 처리] ${messages.length}개 메시지 수집 완료`
-      );
+      this.logger.debug(`[큐 처리] ${messages.length}개 메시지 수집 완료`);
     }
 
     return messages;
@@ -159,7 +157,10 @@ export class ChatQueueService {
    * @param count 가져올 개수
    * @returns 메시지 배열
    */
-  private async dequeueFromQueue(queueKey: string, count: number): Promise<QueuedMessage[]> {
+  private async dequeueFromQueue(
+    queueKey: string,
+    count: number,
+  ): Promise<QueuedMessage[]> {
     const messages: QueuedMessage[] = [];
 
     if (count <= 0) return messages;
@@ -202,7 +203,7 @@ export class ChatQueueService {
     }
 
     // Update metrics
-    pipeline.hincrby(this.METRICS_KEY, 'totalFailed', messages.length);
+    pipeline.hincrby(this.METRICS_KEY, "totalFailed", messages.length);
 
     await pipeline.exec();
 
@@ -299,13 +300,10 @@ export class ChatQueueService {
      * - 샤드별 큐 크기
      * - 기본 큐 크기 (하위 호환)
      */
-    const allQueues = [
-      ...this.QUEUE_KEYS.SHARDS,
-      this.QUEUE_KEYS.DEFAULT,
-    ];
+    const allQueues = [...this.QUEUE_KEYS.SHARDS, this.QUEUE_KEYS.DEFAULT];
 
     const queueSizes = await Promise.all(
-      allQueues.map(key => this.redis.llen(key))
+      allQueues.map((key) => this.redis.llen(key)),
     );
 
     const totalQueueSize = queueSizes.reduce((sum, size) => sum + size, 0);
@@ -319,19 +317,20 @@ export class ChatQueueService {
     if (totalQueueSize > 100) {
       this.logger.debug(
         `[큐 상태] 총: ${totalQueueSize}, ` +
-        `샤드별: ${this.QUEUE_KEYS.SHARDS.map((key, i) => `S${i}:${queueSizes[i]}`).join(', ')}`
+          `샤드별: ${this.QUEUE_KEYS.SHARDS.map((key, i) => `S${i}:${queueSizes[i]}`).join(", ")}`,
       );
     }
 
-    const totalQueued = parseInt(metrics.totalQueued || '0', 10);
-    const totalProcessed = parseInt(metrics.totalProcessed || '0', 10);
-    const totalFailed = parseInt(metrics.totalFailed || '0', 10);
-    const totalProcessingTime = parseFloat(metrics.totalProcessingTime || '0');
+    const totalQueued = parseInt(metrics.totalQueued || "0", 10);
+    const totalProcessed = parseInt(metrics.totalProcessed || "0", 10);
+    const totalFailed = parseInt(metrics.totalFailed || "0", 10);
+    const totalProcessingTime = parseFloat(metrics.totalProcessingTime || "0");
 
     return {
       queueSize: totalQueueSize,
       dlqSize,
-      processingRate: totalProcessed > 0 ? totalProcessed / (Date.now() / 1000) : 0,
+      processingRate:
+        totalProcessed > 0 ? totalProcessed / (Date.now() / 1000) : 0,
       averageProcessingTime:
         totalProcessed > 0 ? totalProcessingTime / totalProcessed : 0,
       lastProcessedAt: metrics.lastProcessedAt
@@ -344,12 +343,23 @@ export class ChatQueueService {
   /**
    * Update processing metrics
    */
-  async updateMetrics(processedCount: number, processingTime: number): Promise<void> {
+  async updateMetrics(
+    processedCount: number,
+    processingTime: number,
+  ): Promise<void> {
     const pipeline = this.redis.pipeline();
 
-    pipeline.hincrby(this.METRICS_KEY, 'totalProcessed', processedCount);
-    pipeline.hincrbyfloat(this.METRICS_KEY, 'totalProcessingTime', processingTime);
-    pipeline.hset(this.METRICS_KEY, 'lastProcessedAt', new Date().toISOString());
+    pipeline.hincrby(this.METRICS_KEY, "totalProcessed", processedCount);
+    pipeline.hincrbyfloat(
+      this.METRICS_KEY,
+      "totalProcessingTime",
+      processingTime,
+    );
+    pipeline.hset(
+      this.METRICS_KEY,
+      "lastProcessedAt",
+      new Date().toISOString(),
+    );
 
     await pipeline.exec();
   }
@@ -357,7 +367,9 @@ export class ChatQueueService {
   /**
    * Recover messages from DLQ
    */
-  async recoverFromDeadLetterQueue(limit: number = 10): Promise<QueuedMessage[]> {
+  async recoverFromDeadLetterQueue(
+    limit: number = 10,
+  ): Promise<QueuedMessage[]> {
     const messages: QueuedMessage[] = [];
 
     for (let i = 0; i < limit; i++) {
@@ -368,7 +380,7 @@ export class ChatQueueService {
         const message = JSON.parse(data);
         messages.push(message);
       } catch (error) {
-        this.logger.error('Failed to parse DLQ message:', error);
+        this.logger.error("Failed to parse DLQ message:", error);
       }
     }
 
@@ -416,7 +428,10 @@ export class ChatQueueService {
       warnings.push(`Dead Letter Queue에 ${dlqSize}개 실패 메시지`);
     }
 
-    const totalSize = Object.values(distribution).reduce((sum, size) => sum + size, 0);
+    const totalSize = Object.values(distribution).reduce(
+      (sum, size) => sum + size,
+      0,
+    );
     const healthy = totalSize < 1000 && dlqSize < 100;
 
     return {
@@ -437,18 +452,16 @@ export class ChatQueueService {
       this.DLQ_KEY,
     ];
 
-    await Promise.all(
-      allQueues.map(key => this.redis.del(key))
-    );
+    await Promise.all(allQueues.map((key) => this.redis.del(key)));
 
-    this.logger.warn('[큐 초기화] 모든 큐가 삭제되었습니다');
+    this.logger.warn("[큐 초기화] 모든 큐가 삭제되었습니다");
   }
 
   private objectToHash(obj: Record<string, any>): Record<string, string> {
     const hash: Record<string, string> = {};
     for (const [key, value] of Object.entries(obj)) {
       if (value !== undefined && value !== null) {
-        hash[key] = typeof value === 'string' ? value : JSON.stringify(value);
+        hash[key] = typeof value === "string" ? value : JSON.stringify(value);
       }
     }
     return hash;

@@ -7,9 +7,11 @@ import { ContentProcessingOptions, ContentMetadata } from './types';
 import HtmlRenderer from './components/HtmlRenderer';
 import CodeRenderer from './components/CodeRenderer';
 import YouTubeRenderer from './components/YouTubeRenderer';
+import VideoRenderer from './components/VideoRenderer';
+import LinkCard from '../LinkCard';
 import { useModal } from '@/hooks/useModal';
 import Modal from '../Modal';
-import '@/editor/styles/editor.css';
+// editor.css는 layout.tsx에서 전역 로드 (CSS preload 경고 해결)
 
 // Mermaid 컴포넌트를 동적 import로 로드 (클라이언트 사이드에서만)
 const MermaidRenderer = dynamic(() => import('./components/MermaidRenderer'), {
@@ -185,6 +187,23 @@ export default function HtmlContentRenderer({
                   videoId={part.videoId}
                   title={part.title}
                 />
+              );
+
+            case 'video':
+              return (
+                <VideoRenderer
+                  key={`video-${part.videoId}-${index}`}
+                  videoId={part.videoId}
+                  src={part.src}
+                  caption={part.caption}
+                />
+              );
+
+            case 'link-card':
+              return (
+                <div key={`link-card-${index}`} className="my-5 not-prose flex justify-center">
+                  <LinkCard url={part.url} />
+                </div>
               );
 
             default:

@@ -1,15 +1,15 @@
-import { DataSource } from 'typeorm';
-import { SubscriptionTier } from '../common/enums/subscription.enum';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
+import { DataSource } from "typeorm";
+import { SubscriptionTier } from "../common/enums/subscription.enum";
+import * as dotenv from "dotenv";
+import * as path from "path";
 
 // Load environment variables
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 async function seed() {
   // Create direct database connection
   const dataSource = new DataSource({
-    type: 'postgres',
+    type: "postgres",
     url: process.env.DATABASE_URL,
     entities: [],
     synchronize: false,
@@ -17,16 +17,18 @@ async function seed() {
 
   await dataSource.initialize();
 
-  console.log('🌱 시작: 구독 플랜 시드 데이터 생성...\n');
+  console.log("🌱 시작: 구독 플랜 시드 데이터 생성...\n");
 
   try {
     // Check if plans already exist
     const existingPlans = await dataSource.query(
-      `SELECT * FROM subscription_plans WHERE tier IN ('free', 'starter', 'pro')`
+      `SELECT * FROM subscription_plans WHERE tier IN ('free', 'starter', 'pro')`,
     );
 
     if (existingPlans.length > 0) {
-      console.log('⚠️  구독 플랜이 이미 존재합니다. 기존 데이터를 유지합니다.\n');
+      console.log(
+        "⚠️  구독 플랜이 이미 존재합니다. 기존 데이터를 유지합니다.\n",
+      );
       return;
     }
 
@@ -51,7 +53,7 @@ async function seed() {
         NOW()
       )
     `);
-    console.log('✅ Free 플랜 생성 완료');
+    console.log("✅ Free 플랜 생성 완료");
 
     // Starter Plan
     await dataSource.query(`
@@ -74,7 +76,7 @@ async function seed() {
         NOW()
       )
     `);
-    console.log('✅ Starter 플랜 생성 완료');
+    console.log("✅ Starter 플랜 생성 완료");
 
     // Pro Plan
     await dataSource.query(`
@@ -97,9 +99,9 @@ async function seed() {
         NOW()
       )
     `);
-    console.log('✅ Pro 플랜 생성 완료');
+    console.log("✅ Pro 플랜 생성 완료");
 
-    console.log('\n🎉 구독 플랜 시드 데이터 생성 완료!');
+    console.log("\n🎉 구독 플랜 시드 데이터 생성 완료!");
 
     // Show created plans
     const plans = await dataSource.query(`
@@ -111,11 +113,10 @@ async function seed() {
       ORDER BY sort_order
     `);
 
-    console.log('\n📋 생성된 플랜:');
+    console.log("\n📋 생성된 플랜:");
     console.table(plans);
-
   } catch (error) {
-    console.error('❌ 시드 생성 중 오류 발생:', error);
+    console.error("❌ 시드 생성 중 오류 발생:", error);
     throw error;
   } finally {
     await dataSource.destroy();

@@ -3,11 +3,11 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { UsageService } from '../../usage/usage.service';
-import { ResourceType } from '../../common/enums/subscription.enum';
-import { CHECK_USAGE_KEY } from '../decorators/check-usage.decorator';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { UsageService } from "../../usage/usage.service";
+import { ResourceType } from "../../common/enums/subscription.enum";
+import { CHECK_USAGE_KEY } from "../decorators/check-usage.decorator";
 
 @Injectable()
 export class UsageLimitGuard implements CanActivate {
@@ -32,7 +32,7 @@ export class UsageLimitGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException('인증이 필요합니다');
+      throw new ForbiddenException("인증이 필요합니다");
     }
 
     // 사용량 제한 확인
@@ -49,8 +49,8 @@ export class UsageLimitGuard implements CanActivate {
 
       throw new ForbiddenException(
         `${this.getResourceDisplayName(resourceType)} 제한에 도달했습니다. ` +
-        `(${currentUsage}/${limit === -1 ? '무제한' : limit}) ` +
-        `더 많은 사용량이 필요하시면 플랜을 업그레이드하세요.`
+          `(${currentUsage}/${limit === -1 ? "무제한" : limit}) ` +
+          `더 많은 사용량이 필요하시면 플랜을 업그레이드하세요.`,
       );
     }
 
@@ -67,13 +67,13 @@ export class UsageLimitGuard implements CanActivate {
    */
   private getResourceDisplayName(resourceType: ResourceType): string {
     const names = {
-      [ResourceType.POST]: '일반 포스트',
-      [ResourceType.MCP_POST]: 'MCP 자동포스팅',
-      [ResourceType.BLOG]: '블로그',
-      [ResourceType.STORAGE]: '저장공간',
-      [ResourceType.VIEWS]: '조회수',
-      [ResourceType.API_CALLS]: 'API 호출',
-      [ResourceType.AI_CREDITS]: 'AI 크레딧',
+      [ResourceType.POST]: "일반 포스트",
+      [ResourceType.MCP_POST]: "MCP 자동포스팅",
+      [ResourceType.BLOG]: "블로그",
+      [ResourceType.STORAGE]: "저장공간",
+      [ResourceType.VIEWS]: "조회수",
+      [ResourceType.API_CALLS]: "API 호출",
+      [ResourceType.AI_CREDITS]: "AI 크레딧",
     };
     return names[resourceType] || resourceType;
   }

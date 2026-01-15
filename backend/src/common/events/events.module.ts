@@ -1,6 +1,6 @@
-import { Module } from '@nestjs/common';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { BlogEventEmitter } from './blog-event-emitter.service';
+import { Module } from "@nestjs/common";
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { BlogEventEmitter } from "./blog-event-emitter.service";
 
 /**
  * 이벤트 시스템 모듈
@@ -19,8 +19,6 @@ import { BlogEventEmitter } from './blog-event-emitter.service';
     // 이벤트 핸들러들은 해당 서비스가 있는 모듈에서 관리
     // BlogStatsHandler는 PostsModule에서 관리
   ],
-  exports: [
-    BlogEventEmitter,
-  ],
+  exports: [BlogEventEmitter],
 })
 export class EventsModule {}

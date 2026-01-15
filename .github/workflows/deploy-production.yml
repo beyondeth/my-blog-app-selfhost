@@ -31,6 +31,26 @@ jobs:
           ${{ secrets.ENV_FILE }}
           EOF
 
+      # 2-1. 공개 환경변수(NEXT_PUBLIC_*) 누락 여부 사전 검증
+      - name: Validate public env vars
+        run: |
+          set -e
+          required_vars=(
+            NEXT_PUBLIC_API_URL
+            NEXT_PUBLIC_BACKEND_URL
+            NEXT_PUBLIC_SITE_URL
+            NEXT_PUBLIC_MIXPANEL_TOKEN
+            NEXT_PUBLIC_GA_MEASUREMENT_ID
+          )
+          for var in "${required_vars[@]}"; do
+            value="$(grep -E "^${var}=" .env.production | cut -d= -f2- || true)"
+            if [ -z "$value" ]; then
+              echo "::error::${var} is missing or empty in .env.production"
+              exit 1
+            fi
+          done
+          echo "✅ All required NEXT_PUBLIC env vars found."
+
       # 3. 배포 스크립트 및 환경 파일 업로드
       - name: Upload deployment files to server
         uses: appleboy/scp-action@v0.1.7

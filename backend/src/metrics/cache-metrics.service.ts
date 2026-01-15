@@ -4,13 +4,8 @@
  * Chat/Like 큐 시스템(ChatMetricsService/LikeMetricsService)의 패턴을 그대로 적용
  */
 
-import { Injectable } from '@nestjs/common';
-import {
-  Counter,
-  Gauge,
-  Histogram,
-  register,
-} from 'prom-client';
+import { Injectable } from "@nestjs/common";
+import { Counter, Gauge, Histogram, register } from "prom-client";
 
 @Injectable()
 export class CacheMetricsService {
@@ -108,49 +103,49 @@ export class CacheMetricsService {
     // ========================================
 
     this.postCacheHits = new Counter({
-      name: 'cache_post_hits_total',
-      help: '포스트 캐시 히트 총 횟수',
-      labelNames: ['type'],
+      name: "cache_post_hits_total",
+      help: "포스트 캐시 히트 총 횟수",
+      labelNames: ["type"],
       registers: [register],
     });
 
     this.postCacheMisses = new Counter({
-      name: 'cache_post_misses_total',
-      help: '포스트 캐시 미스 총 횟수',
-      labelNames: ['type'],
+      name: "cache_post_misses_total",
+      help: "포스트 캐시 미스 총 횟수",
+      labelNames: ["type"],
       registers: [register],
     });
 
     this.commentsCacheHits = new Counter({
-      name: 'cache_comments_hits_total',
-      help: '댓글 캐시 히트 총 횟수',
+      name: "cache_comments_hits_total",
+      help: "댓글 캐시 히트 총 횟수",
       registers: [register],
     });
 
     this.commentsCacheMisses = new Counter({
-      name: 'cache_comments_misses_total',
-      help: '댓글 캐시 미스 총 횟수',
+      name: "cache_comments_misses_total",
+      help: "댓글 캐시 미스 총 횟수",
       registers: [register],
     });
 
     this.cacheInvalidations = new Counter({
-      name: 'cache_invalidations_total',
-      help: '캐시 무효화 총 횟수',
-      labelNames: ['type', 'reason'],
+      name: "cache_invalidations_total",
+      help: "캐시 무효화 총 횟수",
+      labelNames: ["type", "reason"],
       registers: [register],
     });
 
     this.cacheLockAcquired = new Counter({
-      name: 'cache_lock_acquired_total',
-      help: 'Cache Stampede 방지 락 획득 총 횟수',
-      labelNames: ['type'],
+      name: "cache_lock_acquired_total",
+      help: "Cache Stampede 방지 락 획득 총 횟수",
+      labelNames: ["type"],
       registers: [register],
     });
 
     this.cacheLockWaited = new Counter({
-      name: 'cache_lock_waited_total',
-      help: 'Cache Stampede 방지 락 대기 총 횟수',
-      labelNames: ['type'],
+      name: "cache_lock_waited_total",
+      help: "Cache Stampede 방지 락 대기 총 횟수",
+      labelNames: ["type"],
       registers: [register],
     });
 
@@ -159,14 +154,14 @@ export class CacheMetricsService {
     // ========================================
 
     this.postCacheHitRate = new Gauge({
-      name: 'cache_post_hit_rate',
-      help: '포스트 캐시 히트율 (0.0 ~ 1.0)',
+      name: "cache_post_hit_rate",
+      help: "포스트 캐시 히트율 (0.0 ~ 1.0)",
       registers: [register],
     });
 
     this.commentsCacheHitRate = new Gauge({
-      name: 'cache_comments_hit_rate',
-      help: '댓글 캐시 히트율 (0.0 ~ 1.0)',
+      name: "cache_comments_hit_rate",
+      help: "댓글 캐시 히트율 (0.0 ~ 1.0)",
       registers: [register],
     });
 
@@ -175,18 +170,18 @@ export class CacheMetricsService {
     // ========================================
 
     this.cacheRebuildDuration = new Histogram({
-      name: 'cache_rebuild_duration_seconds',
-      help: '캐시 재구축 시간 (초)',
+      name: "cache_rebuild_duration_seconds",
+      help: "캐시 재구축 시간 (초)",
       buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1],
-      labelNames: ['type'],
+      labelNames: ["type"],
       registers: [register],
     });
 
     this.cacheLockWaitDuration = new Histogram({
-      name: 'cache_lock_wait_duration_seconds',
-      help: '캐시 락 대기 시간 (초)',
+      name: "cache_lock_wait_duration_seconds",
+      help: "캐시 락 대기 시간 (초)",
       buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5],
-      labelNames: ['type'],
+      labelNames: ["type"],
       registers: [register],
     });
 
@@ -201,16 +196,16 @@ export class CacheMetricsService {
   private initializeMetrics() {
     // Counter 메트릭 초기화 (Prometheus에 즉시 노출하기 위해)
     // 초기값 0으로 설정하여 Grafana에서 "No data" 방지
-    this.postCacheHits.inc({ type: 'core' }, 0);
-    this.postCacheMisses.inc({ type: 'core' }, 0);
+    this.postCacheHits.inc({ type: "core" }, 0);
+    this.postCacheMisses.inc({ type: "core" }, 0);
     this.commentsCacheHits.inc(0);
     this.commentsCacheMisses.inc(0);
-    this.cacheInvalidations.inc({ type: 'post_core', reason: 'update' }, 0);
-    this.cacheInvalidations.inc({ type: 'comments_tree', reason: 'create' }, 0);
-    this.cacheLockAcquired.inc({ type: 'post' }, 0);
-    this.cacheLockAcquired.inc({ type: 'comments' }, 0);
-    this.cacheLockWaited.inc({ type: 'post' }, 0);
-    this.cacheLockWaited.inc({ type: 'comments' }, 0);
+    this.cacheInvalidations.inc({ type: "post_core", reason: "update" }, 0);
+    this.cacheInvalidations.inc({ type: "comments_tree", reason: "create" }, 0);
+    this.cacheLockAcquired.inc({ type: "post" }, 0);
+    this.cacheLockAcquired.inc({ type: "comments" }, 0);
+    this.cacheLockWaited.inc({ type: "post" }, 0);
+    this.cacheLockWaited.inc({ type: "comments" }, 0);
 
     // Gauge 메트릭 초기화
     this.postCacheHitRate.set(0);
@@ -226,7 +221,7 @@ export class CacheMetricsService {
    * 캐시에서 데이터를 성공적으로 가져왔을 때 호출
    */
   recordPostCacheHit() {
-    this.postCacheHits.inc({ type: 'core' });
+    this.postCacheHits.inc({ type: "core" });
     this.updatePostCacheHitRate();
   }
 
@@ -235,7 +230,7 @@ export class CacheMetricsService {
    * 캐시에 데이터가 없어서 DB 조회가 필요할 때 호출
    */
   recordPostCacheMiss() {
-    this.postCacheMisses.inc({ type: 'core' });
+    this.postCacheMisses.inc({ type: "core" });
     this.updatePostCacheHitRate();
   }
 
@@ -307,12 +302,25 @@ export class CacheMetricsService {
   private async updatePostCacheHitRate() {
     try {
       const metrics = await register.getMetricsAsJSON();
-      const hitsMetric = metrics.find((m: any) => m.name === 'cache_post_hits_total');
-      const missesMetric = metrics.find((m: any) => m.name === 'cache_post_misses_total');
+      const hitsMetric = metrics.find(
+        (m: any) => m.name === "cache_post_hits_total",
+      );
+      const missesMetric = metrics.find(
+        (m: any) => m.name === "cache_post_misses_total",
+      );
 
-      if (hitsMetric && missesMetric && hitsMetric.values && missesMetric.values) {
-        const hits = hitsMetric.values.find((v: any) => v.labels?.type === 'core')?.value || 0;
-        const misses = missesMetric.values.find((v: any) => v.labels?.type === 'core')?.value || 0;
+      if (
+        hitsMetric &&
+        missesMetric &&
+        hitsMetric.values &&
+        missesMetric.values
+      ) {
+        const hits =
+          hitsMetric.values.find((v: any) => v.labels?.type === "core")
+            ?.value || 0;
+        const misses =
+          missesMetric.values.find((v: any) => v.labels?.type === "core")
+            ?.value || 0;
         const total = hits + misses;
 
         if (total > 0) {
@@ -331,10 +339,19 @@ export class CacheMetricsService {
   private async updateCommentsCacheHitRate() {
     try {
       const metrics = await register.getMetricsAsJSON();
-      const hitsMetric = metrics.find((m: any) => m.name === 'cache_comments_hits_total');
-      const missesMetric = metrics.find((m: any) => m.name === 'cache_comments_misses_total');
+      const hitsMetric = metrics.find(
+        (m: any) => m.name === "cache_comments_hits_total",
+      );
+      const missesMetric = metrics.find(
+        (m: any) => m.name === "cache_comments_misses_total",
+      );
 
-      if (hitsMetric && missesMetric && hitsMetric.values && missesMetric.values) {
+      if (
+        hitsMetric &&
+        missesMetric &&
+        hitsMetric.values &&
+        missesMetric.values
+      ) {
         const hits = hitsMetric.values[0]?.value || 0;
         const misses = missesMetric.values[0]?.value || 0;
         const total = hits + misses;
@@ -363,17 +380,24 @@ export class CacheMetricsService {
    * @param count 삭제된 키 개수
    * @param duration 소요 시간 (ms)
    */
-  recordPatternDeletion(pattern: string, count: number, duration: number): void {
+  recordPatternDeletion(
+    pattern: string,
+    count: number,
+    duration: number,
+  ): void {
     // 캐시 무효화 카운터 증가
-    this.cacheInvalidations.inc({
-      type: 'pattern',
-      reason: 'batch_delete'
-    }, count);
+    this.cacheInvalidations.inc(
+      {
+        type: "pattern",
+        reason: "batch_delete",
+      },
+      count,
+    );
 
     // 삭제 소요 시간 히스토그램 기록
     this.cacheRebuildDuration.observe(
-      { type: 'pattern_deletion' },
-      duration / 1000 // ms to seconds
+      { type: "pattern_deletion" },
+      duration / 1000, // ms to seconds
     );
   }
 }

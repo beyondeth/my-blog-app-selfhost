@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * Full-Text Search GIN 인덱스 재생성
@@ -26,10 +26,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  */
 export class RecreateSearchIndexes1761500000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
-    console.log('🔍 Starting Full-Text Search index recreation for PostgreSQL 18...');
+    console.log(
+      "🔍 Starting Full-Text Search index recreation for PostgreSQL 18...",
+    );
 
     // Step 1: 기존 인덱스 확인 및 제거 (존재하면)
-    console.log('📋 Dropping existing indexes if they exist...');
+    console.log("📋 Dropping existing indexes if they exist...");
 
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_search_vector;`);
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_search_published;`);
@@ -38,14 +40,14 @@ export class RecreateSearchIndexes1761500000000 implements MigrationInterface {
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_blog;`);
 
     // Step 2: GIN 인덱스 생성 (Full-Text Search)
-    console.log('🚀 Creating GIN indexes for full-text search...');
+    console.log("🚀 Creating GIN indexes for full-text search...");
 
     // 2-1. 전체 포스트 Full-text search GIN 인덱스
     await queryRunner.query(`
       CREATE INDEX idx_posts_search_vector_gin
       ON posts USING gin(search_vector);
     `);
-    console.log('  ✅ idx_posts_search_vector_gin created');
+    console.log("  ✅ idx_posts_search_vector_gin created");
 
     // 2-2. 공개 포스트 Full-text search GIN 인덱스 (Partial)
     // 인덱스 크기 50% 절감 (공개 포스트만 인덱싱)
@@ -54,10 +56,10 @@ export class RecreateSearchIndexes1761500000000 implements MigrationInterface {
       ON posts USING gin(search_vector)
       WHERE "isPublished" = true;
     `);
-    console.log('  ✅ idx_posts_search_published_gin created (Partial)');
+    console.log("  ✅ idx_posts_search_published_gin created (Partial)");
 
     // Step 3: B-tree 인덱스 재생성 (최적화)
-    console.log('📊 Creating optimized B-tree indexes...');
+    console.log("📊 Creating optimized B-tree indexes...");
 
     // 3-1. 공개 포스트 날짜순 조회 (Partial Index)
     await queryRunner.query(`
@@ -65,24 +67,24 @@ export class RecreateSearchIndexes1761500000000 implements MigrationInterface {
       ON posts("isPublished", "publishedAt" DESC NULLS LAST)
       WHERE "isPublished" = true;
     `);
-    console.log('  ✅ idx_posts_published_date_btree created (Partial)');
+    console.log("  ✅ idx_posts_published_date_btree created (Partial)");
 
     // 3-2. 작성자별 포스트 조회
     await queryRunner.query(`
       CREATE INDEX idx_posts_author_btree
       ON posts("authorId", "isPublished", "createdAt" DESC);
     `);
-    console.log('  ✅ idx_posts_author_btree created');
+    console.log("  ✅ idx_posts_author_btree created");
 
     // 3-3. 블로그별 포스트 조회
     await queryRunner.query(`
       CREATE INDEX idx_posts_blog_btree
       ON posts("blogId", "isPublished", "publishedAt" DESC NULLS LAST);
     `);
-    console.log('  ✅ idx_posts_blog_btree created');
+    console.log("  ✅ idx_posts_blog_btree created");
 
     // Step 4: 통계 갱신 (쿼리 플래너 최적화)
-    console.log('📈 Updating table statistics...');
+    console.log("📈 Updating table statistics...");
     await queryRunner.query(`ANALYZE posts;`);
 
     // Step 5: 인덱스 정보 출력
@@ -98,29 +100,35 @@ export class RecreateSearchIndexes1761500000000 implements MigrationInterface {
       ORDER BY indexname;
     `);
 
-    console.log('\n📦 Created indexes:');
+    console.log("\n📦 Created indexes:");
     indexInfo.forEach((idx: any) => {
       console.log(`  - ${idx.indexname}: ${idx.index_size}`);
     });
 
-    console.log('\n✅ Full-Text Search index recreation completed!');
+    console.log("\n✅ Full-Text Search index recreation completed!");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    console.log('⬇️  Rolling back search indexes...');
+    console.log("⬇️  Rolling back search indexes...");
 
     // GIN 인덱스 제거
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_search_published_gin;`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_search_vector_gin;`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_posts_search_published_gin;`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_posts_search_vector_gin;`,
+    );
 
     // B-tree 인덱스 제거
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_blog_btree;`);
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_author_btree;`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_published_date_btree;`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_posts_published_date_btree;`,
+    );
 
     // 통계 갱신
     await queryRunner.query(`ANALYZE posts;`);
 
-    console.log('✅ Rollback completed');
+    console.log("✅ Rollback completed");
   }
 }

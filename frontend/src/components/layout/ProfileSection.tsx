@@ -24,11 +24,12 @@ const ProfileSection = React.memo(function ProfileSection({
   isOwner = false
 }: ProfileSectionProps) {
   const { isAuthenticated } = useAuth();
-  const followInfo = userId ? useFollowInfo(userId, {
+  // userId가 없어도 훅은 항상 호출 (Rules of Hooks 준수)
+  const followInfo = useFollowInfo(userId ?? '', {
     followersCount: 0,
     followingCount: 0,
     isFollowedByUser: false,
-  }) : null;
+  });
 
   return (
     <SidebarSection title="프로필">

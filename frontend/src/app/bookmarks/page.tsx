@@ -19,6 +19,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import { toast } from 'sonner';
+import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 
 export default function BookmarksPage() {
   const router = useRouter();
@@ -35,6 +36,13 @@ export default function BookmarksPage() {
       router.push('/login?redirect=/bookmarks');
     }
   }, [user, authLoading, router]);
+
+  useEffect(() => {
+    if (!showDeleteMenu) return;
+    const handleOutsideClick = () => setShowDeleteMenu(null);
+    document.addEventListener('click', handleOutsideClick);
+    return () => document.removeEventListener('click', handleOutsideClick);
+  }, [showDeleteMenu]);
 
   // 북마크 목록 가져오기
   const { data, isLoading, error } = useBookmarks(page, 20);
@@ -173,7 +181,7 @@ export default function BookmarksPage() {
                             e.stopPropagation();
                             setShowDeleteMenu(showDeleteMenu === post.id ? null : post.id);
                           }}
-                          className="p-1.5 text-muted-foreground hover:text-foreground hover:bg-muted rounded opacity-0 group-hover:opacity-100 transition-opacity"
+                          className="rounded p-1.5 text-muted-foreground transition hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                         >
                           <FiMoreVertical className="w-4 h-4" />
                         </button>
@@ -185,7 +193,7 @@ export default function BookmarksPage() {
                                 e.stopPropagation();
                                 handleDeleteBookmark(post.id);
                               }}
-                              className="flex items-center w-full px-4 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                              className={`flex items-center w-full px-4 py-2 text-sm font-medium transition ${DESTRUCTIVE_ACTION_CLASS}`}
                             >
                               <FiTrash2 className="mr-2 w-4 h-4" />
                               북마크 삭제

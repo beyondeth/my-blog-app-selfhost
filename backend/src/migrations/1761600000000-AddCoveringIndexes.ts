@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 커버링 인덱스 추가 마이그레이션
@@ -27,7 +27,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - INSERT/UPDATE 속도: 약 10-15% 느려짐
  */
 export class AddCoveringIndexes1761600000000 implements MigrationInterface {
-  name = 'AddCoveringIndexes1761600000000';
+  name = "AddCoveringIndexes1761600000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ===================================================

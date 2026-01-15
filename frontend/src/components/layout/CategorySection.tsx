@@ -1,12 +1,16 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { FiTag, FiFolder, FiChevronDown, FiChevronRight } from 'react-icons/fi';
 import SidebarSection from './SidebarSection';
 
 interface CategorySectionProps {
   categories: Array<{ category: string; count: number }>;
   onCategoryClick?: (category: string) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  isLoadingMore?: boolean;
+  className?: string;
 }
 
 // 카테고리 파싱 헬퍼: "JavaScript/React" → { parent: "JavaScript", child: "React" }
@@ -39,16 +43,50 @@ interface CategoryTreeNode {
  */
 const CategorySection = React.memo(function CategorySection({
   categories,
-  onCategoryClick
+  onCategoryClick,
+  hasMore = false,
+  onLoadMore,
+  isLoadingMore = false,
+  className,
 }: CategorySectionProps) {
   // 확장/축소 상태 관리 (parent 이름을 key로 사용)
   const [expandedParents, setExpandedParents] = useState<Set<string>>(new Set());
+  const [collapseBaseCount, setCollapseBaseCount] = useState(0);
+  const [isCollapsedView, setIsCollapsedView] = useState(false);
+
+  // 최초 로드된 카테고리 개수를 기준으로 접기/펼치기 제어
+  useEffect(() => {
+    setCollapseBaseCount((prev) => {
+      if (categories.length === 0) {
+        if (prev !== 0) {
+          setIsCollapsedView(false);
+        }
+        return 0;
+      }
+      if (prev === 0 || categories.length < prev) {
+        setIsCollapsedView(false);
+        return categories.length;
+      }
+      return prev;
+    });
+  }, [categories.length]);
+
+  const visibleCategories = useMemo(() => {
+    if (
+      isCollapsedView &&
+      collapseBaseCount > 0 &&
+      categories.length > collapseBaseCount
+    ) {
+      return categories.slice(0, collapseBaseCount);
+    }
+    return categories;
+  }, [categories, collapseBaseCount, isCollapsedView]);
 
   // 카테고리를 트리 구조로 변환
   const categoryTree = useMemo(() => {
     const tree = new Map<string, CategoryTreeNode>();
 
-    categories.forEach((item) => {
+    visibleCategories.forEach((item) => {
       const { parent, child } = parseCategory(item.category);
 
       if (!tree.has(parent)) {
@@ -79,7 +117,7 @@ const CategorySection = React.memo(function CategorySection({
     });
 
     return Array.from(tree.values());
-  }, [categories]);
+  }, [visibleCategories]);
 
   const handleCategoryClick = (category: string) => {
     if (onCategoryClick) {
@@ -99,8 +137,18 @@ const CategorySection = React.memo(function CategorySection({
     });
   };
 
+  const handleLoadMoreClick = () => {
+    if (onLoadMore) {
+      onLoadMore();
+    }
+    setIsCollapsedView(false);
+  };
+
+  const canCollapse = collapseBaseCount > 0 && categories.length > collapseBaseCount;
+
   return (
     <SidebarSection
+      className={className}
       title={
         <div className="flex items-center gap-2">
           <FiTag className="w-4 h-4 text-gray-700 dark:text-gray-300" />
@@ -188,6 +236,31 @@ const CategorySection = React.memo(function CategorySection({
         {categories.length === 0 && (
           <div className="text-center py-4 text-gray-500 w-full">
             <p className="text-[15px]">카테고리가 없습니다.</p>
+          </div>
+        )}
+
+        {hasMore && onLoadMore && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={handleLoadMoreClick}
+              disabled={isLoadingMore}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-black/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoadingMore ? '불러오는 중...' : '카테고리 더보기'}
+            </button>
+          </div>
+        )}
+
+        {canCollapse && (
+          <div className="pt-2">
+            <button
+              type="button"
+              onClick={() => setIsCollapsedView((prev) => !prev)}
+              className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-black/20 transition-colors"
+            >
+              {isCollapsedView ? '카테고리 펼치기' : '카테고리 접기'}
+            </button>
           </div>
         )}
       </div>

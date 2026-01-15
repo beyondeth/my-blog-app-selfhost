@@ -1,14 +1,14 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from 'typeorm';
-import { DateUtils } from '../../common/utils/date.utils';
-import { User } from '../../users/entities/user.entity';
-import { Post } from '../../posts/entities/post.entity';
-import { Comment } from '../../comments/entities/comment.entity';
-import { Report } from '../../reports/entities/report.entity';
-import { AuditLog } from '../../audit/entities/audit-log.entity';
-import { UnifiedRedisService } from '../../redis/unified-redis.service';
-import { ReportStatus } from '../../reports/enums/report.enum';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from "typeorm";
+import { DateUtils } from "../../common/utils/date.utils";
+import { User } from "../../users/entities/user.entity";
+import { Post } from "../../posts/entities/post.entity";
+import { Comment } from "../../comments/entities/comment.entity";
+import { Report } from "../../reports/entities/report.entity";
+import { AuditLog } from "../../audit/entities/audit-log.entity";
+import { UnifiedRedisService } from "../../redis/unified-redis.service";
+import { ReportStatus } from "../../reports/enums/report.enum";
 
 export interface DashboardStats {
   users: {
@@ -48,7 +48,7 @@ export interface DashboardStats {
 }
 
 export interface ActivityFeed {
-  type: 'user_signup' | 'post_created' | 'comment_created' | 'report_created';
+  type: "user_signup" | "post_created" | "comment_created" | "report_created";
   message: string;
   timestamp: Date;
   metadata?: Record<string, any>;
@@ -93,7 +93,8 @@ export class AdminDashboardService {
 
     // 최적화된 단일 쿼리: CTE를 사용한 조건부 집계 (FILTER 사용)
     // 16개의 개별 COUNT 쿼리를 1개의 통합 쿼리로 통합
-    const [statsResult] = await this.userRepository.query(`
+    const [statsResult] = await this.userRepository.query(
+      `
       WITH user_stats AS (
         SELECT
           COUNT(*) FILTER (WHERE TRUE) as total,
@@ -150,7 +151,9 @@ export class AdminDashboardService {
         r.resolved::integer as resolved_reports,
         r.today::integer as today_reports
       FROM user_stats u, post_stats p, comment_stats c, report_stats r
-    `, [thirtyDaysAgo, sevenDaysAgo, today]);
+    `,
+      [thirtyDaysAgo, sevenDaysAgo, today],
+    );
 
     // 별도 쿼리: DAU, MAU (다른 로직을 사용하므로 분리)
     const [dau, mau] = await Promise.all([
@@ -181,12 +184,26 @@ export class AdminDashboardService {
 
     const avgPostsPerUser = totalUsers > 0 ? totalPosts / totalUsers : 0;
     const avgCommentsPerPost = totalPosts > 0 ? totalComments / totalPosts : 0;
-    
+
     // Calculate change percentages
-    const userChangePercent = lastWeekUsers > 0 ? Math.round(((newUsers - lastWeekUsers) / lastWeekUsers) * 100) : 0;
-    const postChangePercent = lastWeekPosts > 0 ? Math.round(((todayPosts - (lastWeekPosts / 7)) / (lastWeekPosts / 7)) * 100) : 0;
-    const commentChangePercent = lastWeekComments > 0 ? Math.round(((todayComments - (lastWeekComments / 7)) / (lastWeekComments / 7)) * 100) : 0;
-    
+    const userChangePercent =
+      lastWeekUsers > 0
+        ? Math.round(((newUsers - lastWeekUsers) / lastWeekUsers) * 100)
+        : 0;
+    const postChangePercent =
+      lastWeekPosts > 0
+        ? Math.round(
+            ((todayPosts - lastWeekPosts / 7) / (lastWeekPosts / 7)) * 100,
+          )
+        : 0;
+    const commentChangePercent =
+      lastWeekComments > 0
+        ? Math.round(
+            ((todayComments - lastWeekComments / 7) / (lastWeekComments / 7)) *
+              100,
+          )
+        : 0;
+
     // Calculate session and bounce rate (mock data for now)
     const avgSessionDuration = 245; // seconds
     const bounceRate = 42.5; // percentage
@@ -237,7 +254,8 @@ export class AdminDashboardService {
     // 최적화된 단일 쿼리: UNION ALL을 사용하여 4개 테이블의 최신 활동을 한 번에 조회
     // 기존 Promise.all로 4개 쿼리를 병렬 실행하던 것을 단일 쿼리로 통합
     // 각 엔티티 타입별로 최신 N개를 가져온 후 timestamp 기준으로 정렬하여 최종 limit 적용
-    const activities = await this.userRepository.query(`
+    const activities = await this.userRepository.query(
+      `
       (
         SELECT
           'user_signup' as type,
@@ -287,7 +305,9 @@ export class AdminDashboardService {
       )
       ORDER BY timestamp DESC
       LIMIT $1
-    `, [limit]);
+    `,
+      [limit],
+    );
 
     return activities;
   }
@@ -299,7 +319,8 @@ export class AdminDashboardService {
   async getTrendData(days = 7): Promise<TrendData[]> {
     // 최적화된 단일 쿼리: generate_series를 사용하여 날짜 범위 생성 후 각 날짜별 누적 카운트 계산
     // 기존 for 루프에서 Promise.all을 7번 실행 (7×4=28개 쿼리) 대신 단일 쿼리로 모든 데이터 조회
-    const trends = await this.userRepository.query(`
+    const trends = await this.userRepository.query(
+      `
       WITH dates AS (
         -- 최근 N일간의 날짜 시리즈 생성
         SELECT
@@ -318,7 +339,9 @@ export class AdminDashboardService {
         (SELECT COUNT(*) FROM reports WHERE "createdAt"::date <= d.date)::integer as reports
       FROM dates d
       ORDER BY d.date
-    `, [days]);
+    `,
+      [days],
+    );
 
     return trends;
   }
@@ -329,22 +352,27 @@ export class AdminDashboardService {
   async getPopularPosts(limit = 10) {
     const posts = await this.postRepository.find({
       where: { isPublished: true },
-      relations: ['author', 'stats'],
+      relations: ["author", "stats"],
       take: limit,
     });
 
     // PostStats를 기준으로 정렬 (viewCount, likeCount, commentCount)
-    const sortedPosts = posts
-      .sort((a, b) => {
-        const aScore = (a.stats?.viewCount || 0) + (a.stats?.likeCount || 0) + (a.stats?.commentCount || 0);
-        const bScore = (b.stats?.viewCount || 0) + (b.stats?.likeCount || 0) + (b.stats?.commentCount || 0);
-        return bScore - aScore;
-      });
+    const sortedPosts = posts.sort((a, b) => {
+      const aScore =
+        (a.stats?.viewCount || 0) +
+        (a.stats?.likeCount || 0) +
+        (a.stats?.commentCount || 0);
+      const bScore =
+        (b.stats?.viewCount || 0) +
+        (b.stats?.likeCount || 0) +
+        (b.stats?.commentCount || 0);
+      return bScore - aScore;
+    });
 
-    return sortedPosts.map(post => ({
+    return sortedPosts.map((post) => ({
       id: post.id,
       title: post.title,
-      author: post.author?.username || 'Unknown',
+      author: post.author?.username || "Unknown",
       viewCount: post.stats?.viewCount || 0,
       likeCount: post.stats?.likeCount || 0,
       commentCount: post.stats?.commentCount || 0,
@@ -357,30 +385,30 @@ export class AdminDashboardService {
    */
   async getTopContributors(limit = 10) {
     const result = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.stats', 'stats')
-      .select('post.authorId', 'userId')
-      .addSelect('COUNT(*)', 'postCount')
-      .addSelect('SUM(stats.viewCount)', 'totalViews')
-      .addSelect('SUM(stats.likeCount)', 'totalLikes')
-      .groupBy('post.authorId')
-      .orderBy('COUNT(*)', 'DESC')
+      .createQueryBuilder("post")
+      .leftJoin("post.stats", "stats")
+      .select("post.authorId", "userId")
+      .addSelect("COUNT(*)", "postCount")
+      .addSelect("SUM(stats.viewCount)", "totalViews")
+      .addSelect("SUM(stats.likeCount)", "totalLikes")
+      .groupBy("post.authorId")
+      .orderBy("COUNT(*)", "DESC")
       .limit(limit)
       .getRawMany();
 
     // Get user details
-    const userIds = result.map(r => r.userId);
+    const userIds = result.map((r) => r.userId);
     const users = await this.userRepository.findByIds(userIds);
-    const userMap = new Map(users.map(u => [u.id, u]));
+    const userMap = new Map(users.map((u) => [u.id, u]));
 
-    return result.map(r => {
+    return result.map((r) => {
       const user = userMap.get(r.userId);
       return {
         userId: r.userId,
-        username: user?.username || user?.email || 'Unknown',
+        username: user?.username || user?.email || "Unknown",
         postCount: parseInt(r.postCount),
-        totalViews: parseInt(r.totalViews || '0'),
-        totalLikes: parseInt(r.totalLikes || '0'),
+        totalViews: parseInt(r.totalViews || "0"),
+        totalLikes: parseInt(r.totalLikes || "0"),
       };
     });
   }
@@ -396,15 +424,16 @@ export class AdminDashboardService {
 
       // Redis 상태 및 응답시간 계산
       const startTime = Date.now();
-      await this.unifiedRedisService.getCache('temp', 'health-check');
+      await this.unifiedRedisService.getCache("temp", "health-check");
       const redisResponseTime = Date.now() - startTime;
 
       // Redis 메모리 사용량 계산 (메모리 문자열을 숫자로 변환)
       const memoryUsage = redisStats.memoryUsage;
       const memoryBytes = this.parseRedisMemory(memoryUsage);
-      const maxMemory = redisInfo?.memory?.maxmemory || '0';
+      const maxMemory = redisInfo?.memory?.maxmemory || "0";
       const maxMemoryBytes = parseInt(maxMemory) || 6442450944; // 기본 6GB
-      const memoryUsageRatio = maxMemoryBytes > 0 ? memoryBytes / maxMemoryBytes : 0;
+      const memoryUsageRatio =
+        maxMemoryBytes > 0 ? memoryBytes / maxMemoryBytes : 0;
 
       // 데이터베이스 응답시간 체크 (간단한 쿼리 실행)
       const dbStartTime = Date.now();
@@ -422,14 +451,14 @@ export class AdminDashboardService {
         redisStats.hitRate > 0.5;
 
       return {
-        status: isHealthy ? 'healthy' : 'degraded',
+        status: isHealthy ? "healthy" : "degraded",
         services: {
           database: {
-            status: dbResponseTime < 100 ? 'operational' : 'slow',
+            status: dbResponseTime < 100 ? "operational" : "slow",
             responseTime: dbResponseTime,
           },
           cache: {
-            status: redisResponseTime < 50 ? 'operational' : 'slow',
+            status: redisResponseTime < 50 ? "operational" : "slow",
             hitRate: redisStats.hitRate,
             responseTime: redisResponseTime,
             keys: redisStats.totalKeys,
@@ -437,7 +466,7 @@ export class AdminDashboardService {
             patterns: redisStats.patterns,
           },
           storage: {
-            status: storageUsage < 0.8 ? 'operational' : 'warning',
+            status: storageUsage < 0.8 ? "operational" : "warning",
             usage: storageUsage,
           },
         },
@@ -451,13 +480,13 @@ export class AdminDashboardService {
       };
     } catch (error) {
       // 에러 발생 시 기본값 반환
-      console.error('시스템 상태 조회 실패:', error);
+      console.error("시스템 상태 조회 실패:", error);
       return {
-        status: 'error',
+        status: "error",
         services: {
-          database: { status: 'unknown', responseTime: null },
-          cache: { status: 'unknown', hitRate: null },
-          storage: { status: 'unknown', usage: null },
+          database: { status: "unknown", responseTime: null },
+          cache: { status: "unknown", hitRate: null },
+          storage: { status: "unknown", usage: null },
         },
         metrics: {
           avgResponseTime: null,
@@ -473,12 +502,12 @@ export class AdminDashboardService {
    * 예: "1.5M" -> 1572864, "2G" -> 2147483648
    */
   private parseRedisMemory(memory: string): number {
-    if (!memory || memory === 'N/A') return 0;
+    if (!memory || memory === "N/A") return 0;
 
     const units = {
-      'K': 1024,
-      'M': 1024 * 1024,
-      'G': 1024 * 1024 * 1024,
+      K: 1024,
+      M: 1024 * 1024,
+      G: 1024 * 1024 * 1024,
     };
 
     const match = memory.match(/^([\d.]+)([KMG])?/);
@@ -521,15 +550,11 @@ export class AdminDashboardService {
    * Get content moderation queue
    */
   async getModerationQueue() {
-    const [
-      pendingReports,
-      flaggedPosts,
-      flaggedComments,
-    ] = await Promise.all([
+    const [pendingReports, flaggedPosts, flaggedComments] = await Promise.all([
       this.reportRepository.find({
         where: { status: ReportStatus.PENDING },
-        relations: ['reportedBy'],
-        order: { priority: 'DESC', createdAt: 'ASC' },
+        relations: ["reportedBy"],
+        order: { priority: "DESC", createdAt: "ASC" },
         take: 10,
       }),
       // TODO: Implement flagged content detection
@@ -550,31 +575,26 @@ export class AdminDashboardService {
   async getAnalyticsSummary(startDate: Date, endDate: Date) {
     const where = { createdAt: Between(startDate, endDate) };
 
-    const [
-      newUsers,
-      newPosts,
-      newComments,
-      totalViews,
-      totalLikes,
-    ] = await Promise.all([
-      this.userRepository.count({ where }),
-      this.postRepository.count({ where }),
-      this.commentRepository.count({ where }),
-      this.postRepository
-        .createQueryBuilder('post')
-        .leftJoin('post.stats', 'stats')
-        .select('SUM(stats.viewCount)', 'total')
-        .where(where)
-        .getRawOne()
-        .then(r => parseInt(r?.total || '0')),
-      this.postRepository
-        .createQueryBuilder('post')
-        .leftJoin('post.stats', 'stats')
-        .select('SUM(stats.likeCount)', 'total')
-        .where(where)
-        .getRawOne()
-        .then(r => parseInt(r?.total || '0')),
-    ]);
+    const [newUsers, newPosts, newComments, totalViews, totalLikes] =
+      await Promise.all([
+        this.userRepository.count({ where }),
+        this.postRepository.count({ where }),
+        this.commentRepository.count({ where }),
+        this.postRepository
+          .createQueryBuilder("post")
+          .leftJoin("post.stats", "stats")
+          .select("SUM(stats.viewCount)", "total")
+          .where(where)
+          .getRawOne()
+          .then((r) => parseInt(r?.total || "0")),
+        this.postRepository
+          .createQueryBuilder("post")
+          .leftJoin("post.stats", "stats")
+          .select("SUM(stats.likeCount)", "total")
+          .where(where)
+          .getRawOne()
+          .then((r) => parseInt(r?.total || "0")),
+      ]);
 
     return {
       period: {
@@ -587,7 +607,8 @@ export class AdminDashboardService {
         newComments,
         totalViews,
         totalLikes,
-        engagementRate: newPosts > 0 ? (newComments + totalLikes) / newPosts : 0,
+        engagementRate:
+          newPosts > 0 ? (newComments + totalLikes) / newPosts : 0,
       },
     };
   }

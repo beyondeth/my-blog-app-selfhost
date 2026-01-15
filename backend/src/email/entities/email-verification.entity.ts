@@ -1,17 +1,17 @@
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
-  CreateDateColumn, 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
   UpdateDateColumn,
-  Index
-} from 'typeorm';
+  Index,
+} from "typeorm";
 
-@Entity('email_verifications')
-@Index(['email', 'code'])
-@Index(['expiresAt'])
+@Entity("email_verifications")
+@Index(["email", "code"])
+@Index(["expiresAt"])
 export class EmailVerification {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   @Column({ length: 255 })

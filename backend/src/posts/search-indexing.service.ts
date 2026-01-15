@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, IsNull } from 'typeorm';
-import { Post } from './entities/post.entity';
-import { Cron } from '@nestjs/schedule';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
-import { UnifiedRedisService } from '../redis/unified-redis.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, IsNull } from "typeorm";
+import { Post } from "./entities/post.entity";
+import { Cron } from "@nestjs/schedule";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import Redis from "ioredis";
+import { UnifiedRedisService } from "../redis/unified-redis.service";
 
 /**
  * 검색 인덱싱 배치 처리 서비스
@@ -18,7 +18,7 @@ import { UnifiedRedisService } from '../redis/unified-redis.service';
 @Injectable()
 export class SearchIndexingService {
   private readonly logger = new Logger(SearchIndexingService.name);
-  private readonly LOCK_KEY = 'search:indexing:lock';
+  private readonly LOCK_KEY = "search:indexing:lock";
   private readonly LOCK_TTL = 1800000; // 30분 (밀리초)
   private readonly BATCH_SIZE = 100; // 한 번에 처리할 포스트 수
   private isRunning = false;
@@ -35,7 +35,7 @@ export class SearchIndexingService {
    * 30분마다 실행되는 크론 작업
    * 인덱싱 안 된 포스트를 찾아서 배치로 처리
    */
-  @Cron('0 */30 * * * *') // 매 30분마다 (정시와 30분)
+  @Cron("0 */30 * * * *") // 매 30분마다 (정시와 30분)
   async handleCron() {
     await this.indexPendingPosts();
   }
@@ -46,7 +46,7 @@ export class SearchIndexingService {
   async indexPendingPosts(): Promise<void> {
     // 이미 실행 중이면 스킵
     if (this.isRunning) {
-      this.logger.warn('이전 인덱싱이 아직 실행 중입니다. 스킵합니다.');
+      this.logger.warn("이전 인덱싱이 아직 실행 중입니다. 스킵합니다.");
       return;
     }
 
@@ -54,7 +54,7 @@ export class SearchIndexingService {
       // Redis 락 획득
       const lockAcquired = await this.acquireLock();
       if (!lockAcquired) {
-        this.logger.log('다른 인스턴스가 인덱싱 중입니다. 스킵합니다.');
+        this.logger.log("다른 인스턴스가 인덱싱 중입니다. 스킵합니다.");
         return;
       }
 
@@ -64,11 +64,13 @@ export class SearchIndexingService {
       // 메트릭 수집
       const unindexedCount = await this.countUnindexedPosts();
       if (unindexedCount === 0) {
-        this.logger.debug('인덱싱할 포스트가 없습니다.');
+        this.logger.debug("인덱싱할 포스트가 없습니다.");
         return;
       }
 
-      this.logger.log(`🔄 검색 인덱싱 시작: ${unindexedCount}개 포스트 대기 중`);
+      this.logger.log(
+        `🔄 검색 인덱싱 시작: ${unindexedCount}개 포스트 대기 중`,
+      );
 
       // 배치로 처리
       let totalProcessed = 0;
@@ -83,14 +85,14 @@ export class SearchIndexingService {
       }
 
       const elapsedTime = Date.now() - startTime;
-      this.logger.log(`✅ 검색 인덱싱 완료: ${totalProcessed}개 처리 (${elapsedTime}ms)`);
+      this.logger.log(
+        `✅ 검색 인덱싱 완료: ${totalProcessed}개 처리 (${elapsedTime}ms)`,
+      );
 
       // 인덱싱 메트릭 로깅
       await this.logIndexingMetrics();
-
     } catch (error) {
-      
-      this.logger.error('검색 인덱싱 실패:', error);
+      this.logger.error("검색 인덱싱 실패:", error);
       throw error;
     } finally {
       this.isRunning = false;
@@ -106,14 +108,14 @@ export class SearchIndexingService {
       where: {
         indexedAt: IsNull(),
         isPublished: true, // 공개된 포스트만 인덱싱
-        status: 'published', // Worker 처리 완료된 포스트만 인덱싱
+        status: "published", // Worker 처리 완료된 포스트만 인덱싱
         isDeleted: false, // 삭제되지 않은 포스트만 인덱싱
       },
       order: {
-        createdAt: 'ASC', // 오래된 포스트부터 처리
+        createdAt: "ASC", // 오래된 포스트부터 처리
       },
       take: limit,
-      select: ['id', 'title', 'excerpt', 'tags'], // content 제외
+      select: ["id", "title", "excerpt", "tags"], // content 제외
     });
   }
 
@@ -125,7 +127,7 @@ export class SearchIndexingService {
       where: {
         indexedAt: IsNull(),
         isPublished: true,
-        status: 'published', // Worker 처리 완료된 포스트만 카운트
+        status: "published", // Worker 처리 완료된 포스트만 카운트
         isDeleted: false, // 삭제되지 않은 포스트만 카운트
       },
     });
@@ -138,7 +140,7 @@ export class SearchIndexingService {
   private async batchUpdateSearchVectors(posts: Post[]): Promise<void> {
     if (posts.length === 0) return;
 
-    const postIds = posts.map(p => p.id);
+    const postIds = posts.map((p) => p.id);
 
     // PostgreSQL의 tsvector 생성 (content 제외)
     const query = `
@@ -158,7 +160,7 @@ export class SearchIndexingService {
       const result = await this.postsRepository.query(query, [postIds]);
       this.logger.debug(`배치 업데이트 완료: ${result[1]}개 포스트`);
     } catch (error) {
-      this.logger.error('배치 업데이트 실패:', error);
+      this.logger.error("배치 업데이트 실패:", error);
       throw error;
     }
   }
@@ -170,12 +172,12 @@ export class SearchIndexingService {
   private async acquireLock(): Promise<boolean> {
     try {
       const lockAcquired = await this.unifiedRedisService.acquireLock(
-        'search-indexing',
-        this.LOCK_TTL / 1000 // 초 단위로 변환
+        "search-indexing",
+        this.LOCK_TTL / 1000, // 초 단위로 변환
       );
       return lockAcquired;
     } catch (error) {
-      this.logger.error('락 획득 실패:', error);
+      this.logger.error("락 획득 실패:", error);
       return false;
     }
   }
@@ -185,9 +187,9 @@ export class SearchIndexingService {
    */
   private async releaseLock(): Promise<void> {
     try {
-      await this.unifiedRedisService.releaseLock('search-indexing');
+      await this.unifiedRedisService.releaseLock("search-indexing");
     } catch (error) {
-      this.logger.error('락 해제 실패:', error);
+      this.logger.error("락 해제 실패:", error);
     }
   }
 
@@ -226,15 +228,14 @@ export class SearchIndexingService {
       this.logger.log(`   - 총 인덱싱됨: ${indexedCount}개`);
 
       // Redis에 메트릭 저장 (모니터링용)
-      await this.redis.hset('search:metrics', {
+      await this.redis.hset("search:metrics", {
         unindexedCount: unindexedCount.toString(),
         avgDelayMinutes: avgDelayMinutes.toString(),
         indexedCount: indexedCount.toString(),
         lastRun: new Date().toISOString(),
       });
-
     } catch (error) {
-      this.logger.error('메트릭 로깅 실패:', error);
+      this.logger.error("메트릭 로깅 실패:", error);
     }
   }
 
@@ -245,7 +246,7 @@ export class SearchIndexingService {
   async forceIndexPost(postId: string): Promise<void> {
     const post = await this.postsRepository.findOne({
       where: { id: postId },
-      select: ['id', 'title', 'excerpt', 'tags'],
+      select: ["id", "title", "excerpt", "tags"],
     });
 
     if (!post) {
@@ -261,15 +262,15 @@ export class SearchIndexingService {
    * 주의: 시스템 부하가 크므로 오프피크 시간에만 실행
    */
   async reindexAll(): Promise<void> {
-    this.logger.warn('⚠️  모든 포스트 재인덱싱 시작 - 시스템 부하 주의!');
+    this.logger.warn("⚠️  모든 포스트 재인덱싱 시작 - 시스템 부하 주의!");
 
     // indexed_at을 모두 null로 리셋 (Worker 처리 완료된 포스트만)
     await this.postsRepository.update(
       {
         isPublished: true,
-        status: 'published'
+        status: "published",
       },
-      { indexedAt: null }
+      { indexedAt: null },
     );
 
     // 배치 인덱싱 실행
@@ -278,4 +279,4 @@ export class SearchIndexingService {
 }
 
 // Not 연산자 import 추가
-import { Not } from 'typeorm';
+import { Not } from "typeorm";

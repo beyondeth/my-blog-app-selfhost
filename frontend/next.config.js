@@ -3,11 +3,11 @@ const nextConfig = {
   // Standalone 빌드 모드 (Docker 최적화: 메모리 49% 절감)
   output: 'standalone',
 
-  // Next.js 16: Turbopack 설정
-  // - webpack 설정과 함께 사용 시 빈 turbopack 설정 필요
-  // - root: 다중 lockfile 경고 해결
-  turbopack: {
-    root: __dirname,
+  // 정적 생성 오류 무시 - 빌드 실패 방지
+  // 프리렌더링 실패 시 런타임에 동적으로 렌더링됨
+  experimental: {
+    // Turbopack 대신 Webpack 사용 (안정성 우선)
+    turbo: false,
   },
 
   // 프로덕션 빌드 최적화: console 제거
@@ -16,6 +16,24 @@ const nextConfig = {
     removeConsole: process.env.NODE_ENV === 'production' ? {
       exclude: ['error', 'warn'],
     } : false,
+  },
+
+  // 301 리다이렉트 설정 (SEO 호환성)
+  async redirects() {
+    return [
+      // 커뮤니티 포스트: /posts/ → /comments/ (Reddit 스타일)
+      {
+        source: '/c/:slug/posts/:postId',
+        destination: '/c/:slug/comments/:postId',
+        permanent: true, // 301 리다이렉트
+      },
+      // 커뮤니티 포스트 수정 페이지도 리다이렉트
+      {
+        source: '/c/:slug/posts/:postId/edit',
+        destination: '/c/:slug/comments/:postId/edit',
+        permanent: true,
+      },
+    ];
   },
 
   // 백엔드 API 서버로 프록시 설정
@@ -66,24 +84,20 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'upload.wikimedia.org',
+        port: '',
+        pathname: '/**',
+      },
     ],
     formats: ['image/webp', 'image/avif'],
   },
 
   // Next.js 16: serverComponentsExternalPackages를 루트 레벨로 이동
   serverExternalPackages: ['sharp'],
-
-  transpilePackages: ['mermaid'],
-
-  
-  // Webpack 설정 (fallback - webpack 사용 시)
-  webpack: (config) => {
-    // Mermaid와 cytoscape 관련 문제 해결
-    config.resolve.alias = {
-      ...config.resolve.alias,
-      cytoscape: 'cytoscape',
-    };
-    return config;
+  turbopack: {
+    root: __dirname,
   },
 };
 

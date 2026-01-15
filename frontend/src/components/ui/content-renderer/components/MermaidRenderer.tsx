@@ -79,7 +79,7 @@ export default function MermaidRenderer({
     };
 
     renderDiagram();
-  }, [id, content]); // theme 제거 - 전역 설정 사용
+  }, [id, content, pieChartOptions]); // theme 제거 - 전역 설정 사용
 
   /**
    * 다이어그램 클릭 핸들러

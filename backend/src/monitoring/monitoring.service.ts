@@ -1,12 +1,17 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, MoreThan } from 'typeorm';
-import { SuspiciousRequest } from './entities/suspicious-request.entity';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { Queue, Worker, Job } from 'bullmq';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import { Redis } from 'ioredis';
-import { DateUtils } from '../common/utils/date.utils';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Between, MoreThan } from "typeorm";
+import { SuspiciousRequest } from "./entities/suspicious-request.entity";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { Queue, Worker, Job } from "bullmq";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import { Redis, RedisOptions } from "ioredis";
+import { DateUtils } from "../common/utils/date.utils";
 
 export interface SuspiciousRequestDto {
   requestType: string;
@@ -17,7 +22,7 @@ export interface SuspiciousRequestDto {
   requestDetails: any;
   userAgent?: string;
   reason: string;
-  severity?: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' | 'WARNING';
+  severity?: "LOW" | "MEDIUM" | "HIGH" | "CRITICAL" | "WARNING";
 }
 
 @Injectable()
@@ -32,14 +37,28 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
+  /**
+   * BullMQ 전용 Redis 커넥션 생성
+   * commandTimeout을 해제해 블로킹 명령(BRPOP 등)에서도 타임아웃이 발생하지 않도록 함
+   */
+  private createBullConnection(): Redis {
+    const overrides: RedisOptions = {
+      maxRetriesPerRequest: null,
+      commandTimeout: undefined,
+    };
+    return this.redis.duplicate(overrides);
+  }
+
   async onModuleInit() {
     // BullMQ Queue 초기화
-    this.suspiciousQueue = new Queue('suspicious-requests', {
-      connection: this.redis.duplicate(),
+    const queueConnection = this.createBullConnection();
+    const workerConnection = this.createBullConnection();
+    this.suspiciousQueue = new Queue("suspicious-requests", {
+      connection: queueConnection,
       defaultJobOptions: {
         attempts: 3,
         backoff: {
-          type: 'exponential',
+          type: "exponential",
           delay: 2000,
         },
         removeOnComplete: true,
@@ -49,12 +68,12 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
 
     // Worker 초기화 - Queue 처리
     this.worker = new Worker(
-      'suspicious-requests',
+      "suspicious-requests",
       async (job: Job<SuspiciousRequestDto>) => {
         await this.processSuspiciousRequest(job.data);
       },
       {
-        connection: this.redis.duplicate(),
+        connection: workerConnection,
         concurrency: 10, // 동시 처리 개수
         limiter: {
           max: 100,
@@ -64,33 +83,38 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
     );
 
     // Worker 이벤트 핸들러
-    this.worker.on('completed', (job) => {
+    this.worker.on("completed", (job) => {
       this.logger.debug(`Job ${job.id} completed`);
     });
 
-    this.worker.on('failed', (job, err) => {
+    this.worker.on("failed", (job, err) => {
       this.logger.error(`Job ${job?.id} failed:`, err);
     });
+    this.worker.on("error", (error) => {
+      this.logger.error("BullMQ worker connection error:", error);
+    });
 
-    this.logger.log('MonitoringService initialized with BullMQ');
+    this.logger.log("MonitoringService initialized with BullMQ");
   }
 
   async onModuleDestroy() {
     // Graceful shutdown
     await this.worker?.close();
     await this.suspiciousQueue?.close();
-    this.logger.log('MonitoringService shutdown completed');
+    this.logger.log("MonitoringService shutdown completed");
   }
 
   /**
    * Process a single suspicious request (배치 처리에서 호출)
    */
-  private async processSuspiciousRequest(data: SuspiciousRequestDto): Promise<void> {
+  private async processSuspiciousRequest(
+    data: SuspiciousRequestDto,
+  ): Promise<void> {
     try {
       await this.suspiciousRequestRepository.save(data);
       this.logger.debug(`Processed suspicious request: ${data.requestType}`);
     } catch (error) {
-      this.logger.error('Failed to save suspicious request:', error);
+      this.logger.error("Failed to save suspicious request:", error);
       throw error; // BullMQ가 재시도 처리
     }
   }
@@ -101,7 +125,7 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
   async logSuspiciousRequest(data: SuspiciousRequestDto): Promise<void> {
     try {
       // Queue에 추가
-      await this.suspiciousQueue.add('suspicious-request', data, {
+      await this.suspiciousQueue.add("suspicious-request", data, {
         priority: this.getPriorityBySeverity(data.severity),
       });
 
@@ -110,12 +134,15 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
         `Suspicious request queued: ${data.requestType} from ${data.ipAddress} - ${data.reason}`,
       );
     } catch (error) {
-      this.logger.error('Failed to queue suspicious request:', error);
+      this.logger.error("Failed to queue suspicious request:", error);
       // 큐 추가 실패 시 직접 저장 (fallback)
       try {
         await this.suspiciousRequestRepository.save(data);
       } catch (saveError) {
-        this.logger.error('Failed to save suspicious request directly:', saveError);
+        this.logger.error(
+          "Failed to save suspicious request directly:",
+          saveError,
+        );
       }
     }
   }
@@ -125,15 +152,15 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
    */
   private getPriorityBySeverity(severity?: string): number {
     switch (severity) {
-      case 'CRITICAL':
+      case "CRITICAL":
         return 1;
-      case 'HIGH':
+      case "HIGH":
         return 2;
-      case 'MEDIUM':
+      case "MEDIUM":
         return 3;
-      case 'LOW':
+      case "LOW":
         return 4;
-      case 'WARNING':
+      case "WARNING":
       default:
         return 5;
     }
@@ -183,33 +210,33 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
       isResolved,
     } = options;
 
-    const query = this.suspiciousRequestRepository.createQueryBuilder('sr');
+    const query = this.suspiciousRequestRepository.createQueryBuilder("sr");
 
     if (requestType) {
-      query.andWhere('sr.requestType = :requestType', { requestType });
+      query.andWhere("sr.requestType = :requestType", { requestType });
     }
 
     if (severity) {
-      query.andWhere('sr.severity = :severity', { severity });
+      query.andWhere("sr.severity = :severity", { severity });
     }
 
     if (ipAddress) {
-      query.andWhere('sr.ipAddress = :ipAddress', { ipAddress });
+      query.andWhere("sr.ipAddress = :ipAddress", { ipAddress });
     }
 
     if (isResolved !== undefined) {
-      query.andWhere('sr.isResolved = :isResolved', { isResolved });
+      query.andWhere("sr.isResolved = :isResolved", { isResolved });
     }
 
     if (startDate && endDate) {
-      query.andWhere('sr.createdAt BETWEEN :startDate AND :endDate', {
+      query.andWhere("sr.createdAt BETWEEN :startDate AND :endDate", {
         startDate,
         endDate,
       });
     }
 
     query
-      .orderBy('sr.createdAt', 'DESC')
+      .orderBy("sr.createdAt", "DESC")
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -243,16 +270,16 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
 
     // 오늘 발생한 요청 수
     const todayCount = await this.suspiciousRequestRepository
-      .createQueryBuilder('sr')
-      .where('sr.createdAt >= :today', { today })
+      .createQueryBuilder("sr")
+      .where("sr.createdAt >= :today", { today })
       .getCount();
 
     // 심각도별 통계
     const severityStats = await this.suspiciousRequestRepository
-      .createQueryBuilder('sr')
-      .select('sr.severity', 'severity')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('sr.severity')
+      .createQueryBuilder("sr")
+      .select("sr.severity", "severity")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("sr.severity")
       .getRawMany();
 
     // 심각도별 카운트 객체 생성
@@ -264,7 +291,7 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
       WARNING: 0,
     };
 
-    severityStats.forEach(stat => {
+    severityStats.forEach((stat) => {
       if (stat.severity in severityCounts) {
         severityCounts[stat.severity] = parseInt(stat.count);
       }
@@ -272,34 +299,34 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
 
     // 상위 IP 주소
     const topIPs = await this.suspiciousRequestRepository
-      .createQueryBuilder('sr')
-      .select('sr.ipAddress', 'ip')
-      .addSelect('COUNT(*)', 'count')
-      .where('sr.createdAt > :since', { since })
-      .groupBy('sr.ipAddress')
-      .orderBy('count', 'DESC')
+      .createQueryBuilder("sr")
+      .select("sr.ipAddress", "ip")
+      .addSelect("COUNT(*)", "count")
+      .where("sr.createdAt > :since", { since })
+      .groupBy("sr.ipAddress")
+      .orderBy("count", "DESC")
       .limit(5)
       .getRawMany();
 
     // 상위 엔드포인트
     const topEndpoints = await this.suspiciousRequestRepository
-      .createQueryBuilder('sr')
-      .select('sr.endpoint', 'endpoint')
-      .addSelect('COUNT(*)', 'count')
-      .where('sr.createdAt > :since', { since })
-      .groupBy('sr.endpoint')
-      .orderBy('count', 'DESC')
+      .createQueryBuilder("sr")
+      .select("sr.endpoint", "endpoint")
+      .addSelect("COUNT(*)", "count")
+      .where("sr.createdAt > :since", { since })
+      .groupBy("sr.endpoint")
+      .orderBy("count", "DESC")
       .limit(5)
       .getRawMany();
 
     // 시간별 추세
     const hourlyTrend = await this.suspiciousRequestRepository
-      .createQueryBuilder('sr')
-      .select(`DATE_TRUNC('hour', sr."createdAt")`, 'hour')
-      .addSelect('COUNT(*)', 'count')
-      .where('sr.createdAt > :since', { since })
-      .groupBy('hour')
-      .orderBy('hour', 'ASC')
+      .createQueryBuilder("sr")
+      .select(`DATE_TRUNC('hour', sr."createdAt")`, "hour")
+      .addSelect("COUNT(*)", "count")
+      .where("sr.createdAt > :since", { since })
+      .groupBy("hour")
+      .orderBy("hour", "ASC")
       .getRawMany();
 
     // Queue 통계 추가
@@ -321,7 +348,11 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
   /**
    * Mark request as resolved or unresolved
    */
-  async resolveRequest(id: string, note: string, isResolved: boolean = true): Promise<void> {
+  async resolveRequest(
+    id: string,
+    note: string,
+    isResolved: boolean = true,
+  ): Promise<void> {
     await this.suspiciousRequestRepository.update(id, {
       isResolved,
       resolvedNote: note,
@@ -339,10 +370,12 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
     const result = await this.suspiciousRequestRepository
       .createQueryBuilder()
       .delete()
-      .where('createdAt < :date', { date: thirtyDaysAgo })
+      .where("createdAt < :date", { date: thirtyDaysAgo })
       .execute();
 
-    this.logger.log(`Cleaned up ${result.affected} old suspicious request records`);
+    this.logger.log(
+      `Cleaned up ${result.affected} old suspicious request records`,
+    );
 
     // BullMQ 큐에서도 오래된 완료된 작업 정리
     await this.suspiciousQueue.clean(30 * 24 * 60 * 60 * 1000, 100); // 30일 이상 된 작업 100개씩 삭제
@@ -360,19 +393,24 @@ export class MonitoringService implements OnModuleInit, OnModuleDestroy {
     userEmail?: string,
   ): Promise<void> {
     await this.logSuspiciousRequest({
-      requestType: 'EXCESSIVE_LIMIT',
+      requestType: "EXCESSIVE_LIMIT",
       ipAddress,
       endpoint,
       userId,
       userEmail,
       requestDetails: {
-        method: 'GET',
+        method: "GET",
         query: { limit: attemptedLimit },
         attemptedLimit,
         actualLimit,
       },
       reason: `Attempted to request ${attemptedLimit} items (max allowed: ${actualLimit})`,
-      severity: attemptedLimit > 1000 ? 'HIGH' : attemptedLimit > 100 ? 'MEDIUM' : 'LOW',
+      severity:
+        attemptedLimit > 1000
+          ? "HIGH"
+          : attemptedLimit > 100
+            ? "MEDIUM"
+            : "LOW",
     });
   }
 }

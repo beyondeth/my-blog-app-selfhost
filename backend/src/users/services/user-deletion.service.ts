@@ -1,15 +1,15 @@
-import { 
-  Injectable, 
-  NotFoundException, 
+import {
+  Injectable,
+  NotFoundException,
   BadRequestException,
   Logger,
-  Optional
-} from '@nestjs/common';
-import { DataSource } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { EmailService } from '../../email/email.service';
-import { S3Service } from '../../files/services/s3.service';
-import { File } from '../../files/entities/file.entity';
+  Optional,
+} from "@nestjs/common";
+import { DataSource } from "typeorm";
+import { User } from "../entities/user.entity";
+import { EmailService } from "../../email/email.service";
+import { S3Service } from "../../files/services/s3.service";
+import { File } from "../../files/entities/file.entity";
 
 export interface DeletionOptions {
   softDelete?: boolean;
@@ -47,18 +47,18 @@ export class UserDeletionService {
    */
   async deleteUserAccount(
     userId: string,
-    options: DeletionOptions = {}
+    options: DeletionOptions = {},
   ): Promise<DeletionResult> {
-    const { 
+    const {
       softDelete = false,
       backupData = false,
-      notifyByEmail = true 
+      notifyByEmail = true,
     } = options;
 
     try {
       // 1. 사용자 존재 확인
       const user = await this.validateUserExists(userId);
-      
+
       // 2. 백업 생성 (선택적)
       let backupId: string | undefined;
       if (backupData) {
@@ -90,12 +90,12 @@ export class UserDeletionService {
         userId: user.id,
         email: user.email,
         affectedRecords,
-        backupId
+        backupId,
       };
     } catch (error) {
       this.logger.error(`Failed to delete user ${userId}:`, error);
       throw new BadRequestException(
-        `Failed to delete user account: ${error.message}`
+        `Failed to delete user account: ${error.message}`,
       );
     }
   }
@@ -104,11 +104,9 @@ export class UserDeletionService {
    * 사용자 존재 확인
    */
   private async validateUserExists(userId: string): Promise<User> {
-    const user = await this.dataSource
-      .getRepository(User)
-      .findOne({ 
-        where: { id: userId }
-      });
+    const user = await this.dataSource.getRepository(User).findOne({
+      where: { id: userId },
+    });
 
     if (!user) {
       throw new NotFoundException(`User with ID ${userId} not found`);
@@ -130,21 +128,21 @@ export class UserDeletionService {
       },
       blogs: await this.dataSource.query(
         `SELECT * FROM blogs WHERE "userId" = $1`,
-        [user.id]
+        [user.id],
       ),
       posts: await this.dataSource.query(
         `SELECT p.* FROM posts p 
          JOIN blogs b ON p."blogId" = b.id 
          WHERE b."userId" = $1`,
-        [user.id]
+        [user.id],
       ),
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     };
 
     // 백업을 JSON으로 저장 (실제로는 S3나 별도 저장소에 저장)
     const backupId = `backup_${user.id}_${Date.now()}`;
     // TODO: S3에 백업 저장 구현
-    
+
     return backupId;
   }
 
@@ -154,7 +152,7 @@ export class UserDeletionService {
   private async deleteUserFiles(userId: string): Promise<void> {
     // S3Service가 없으면 파일 삭제 건너뛰기
     if (!this.s3Service) {
-      this.logger.warn('S3Service not available, skipping file deletion');
+      this.logger.warn("S3Service not available, skipping file deletion");
       return;
     }
 
@@ -187,9 +185,12 @@ export class UserDeletionService {
    * Hard Delete 수행 (CASCADE로 자동 삭제)
    */
   private async performHardDelete(user: User) {
-    return this.dataSource.transaction(async manager => {
+    return this.dataSource.transaction(async (manager) => {
       // 삭제 전 영향받을 레코드 수 계산
-      const affectedRecords = await this.calculateAffectedRecords(user.id, manager);
+      const affectedRecords = await this.calculateAffectedRecords(
+        user.id,
+        manager,
+      );
 
       // 사용자 삭제 (CASCADE가 관련 데이터 자동 삭제)
       await manager.delete(User, { id: user.id });
@@ -204,31 +205,31 @@ export class UserDeletionService {
   private async calculateAffectedRecords(userId: string, manager: any) {
     const blogs = await manager.query(
       `SELECT COUNT(*) FROM blogs WHERE "userId" = $1`,
-      [userId]
+      [userId],
     );
-    
+
     const posts = await manager.query(
       `SELECT COUNT(*) FROM posts p 
        JOIN blogs b ON p."blogId" = b.id 
        WHERE b."userId" = $1`,
-      [userId]
+      [userId],
     );
 
     const comments = await manager.query(
       `SELECT COUNT(*) FROM comments WHERE "authorId" = $1`,
-      [userId]
+      [userId],
     );
 
     const files = await manager.query(
       `SELECT COUNT(*) FROM files WHERE user_id = $1`,
-      [userId]
+      [userId],
     );
 
     return {
       blogs: parseInt(blogs[0].count),
       posts: parseInt(posts[0].count),
       comments: parseInt(comments[0].count),
-      files: parseInt(files[0].count)
+      files: parseInt(files[0].count),
     };
   }
 
@@ -240,7 +241,10 @@ export class UserDeletionService {
       await this.emailService.sendAccountDeletionNotification(email);
       this.logger.log(`Deletion notification sent to ${email}`);
     } catch (error) {
-      this.logger.error(`Failed to send deletion notification to ${email}:`, error);
+      this.logger.error(
+        `Failed to send deletion notification to ${email}:`,
+        error,
+      );
       // 이메일 발송 실패는 무시하고 계속 진행
     }
   }
@@ -260,7 +264,7 @@ export class UserDeletionService {
         await this.deleteUserAccount(userId, {
           softDelete: false,
           backupData: true,
-          notifyByEmail: false
+          notifyByEmail: false,
         });
         successful.push(userId);
       } catch (error) {

@@ -18,17 +18,19 @@ interface BlogRecommendation {
 
 interface BlogRecommendationsProps {
   blogs?: BlogRecommendation[];
+  className?: string;
 }
 
 const BlogRecommendations = React.memo(function BlogRecommendations({ 
-  blogs = []
+  blogs = [],
+  className,
 }: BlogRecommendationsProps) {
   if (blogs.length === 0) {
     return null;
   }
 
   return (
-    <SidebarSection title="다른 블로그">
+    <SidebarSection title="다른 블로그" className={className}>
       <div className="space-y-3">
         {blogs.map((blog) => (
           <Link

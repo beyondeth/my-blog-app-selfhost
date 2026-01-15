@@ -9,6 +9,7 @@ interface UseInfiniteScrollOptions {
   onLoadMore: () => void;    // 다음 페이지 로드 콜백
   hasMore?: boolean;         // 더 로드할 콘텐츠 여부
   loading?: boolean;         // 현재 로딩 상태
+  cooldownMs?: number;       // 연속 호출 방지 쿨다운
 }
 
 export function useInfiniteScroll({
@@ -18,10 +19,12 @@ export function useInfiniteScroll({
   onLoadMore,
   hasMore = false,
   loading = false,
+  cooldownMs = 400,
 }: UseInfiniteScrollOptions) {
   const observerRef = useRef<IntersectionObserver | null>(null);
   const targetRef = useRef<HTMLDivElement | null>(null);
   const loadingRef = useRef(false);
+  const lastTriggerTimeRef = useRef(0);
 
   const handleIntersect = useCallback(
     (entries: IntersectionObserverEntry[]) => {
@@ -29,11 +32,16 @@ export function useInfiniteScroll({
       
       // 타겟이 보이고, 더 로드할 수 있고, 현재 로딩 중이 아닐 때
       if (target.isIntersecting && hasMore && !loadingRef.current) {
+        const now = performance.now();
+        if (now - lastTriggerTimeRef.current < cooldownMs) {
+          return;
+        }
+        lastTriggerTimeRef.current = now;
         loadingRef.current = true;
         onLoadMore();
       }
     },
-    [hasMore, onLoadMore]
+    [hasMore, onLoadMore, cooldownMs]
   );
 
   // 로딩 상태 동기화

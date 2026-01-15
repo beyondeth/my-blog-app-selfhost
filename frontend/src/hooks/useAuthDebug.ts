@@ -46,7 +46,7 @@ export function useAuthDebug() {
       authContext: {
         user: authContext.user,
         isLoading: authContext.isLoading,
-        isAuthenticated: !!authContext.user,
+        isAuthenticated: authContext.isAuthenticated,
       },
 
       // 편의 메서드
@@ -62,7 +62,7 @@ export function useAuthDebug() {
           });
           console.log('Auth Context State:', {
             user: authContext.user,
-            isAuthenticated: !!authContext.user,
+            isAuthenticated: authContext.isAuthenticated,
           });
           console.groupEnd();
         },
@@ -135,6 +135,7 @@ export function useAuthDebug() {
   }, [userQuery, authContext]);
 
   // React Query 상태 변경 감지
+  const hasData = !!userQuery.data;
   useEffect(() => {
     if (process.env.NODE_ENV !== 'development') return;
 
@@ -142,9 +143,9 @@ export function useAuthDebug() {
       isLoading: userQuery.isLoading,
       isFetching: userQuery.isFetching,
       fetchStatus: userQuery.fetchStatus,
-      hasData: !!userQuery.data,
+      hasData,
     });
-  }, [userQuery.isLoading, userQuery.isFetching, userQuery.fetchStatus, !!userQuery.data]);
+  }, [userQuery.isLoading, userQuery.isFetching, userQuery.fetchStatus, hasData]);
 
   // Auth Context 상태 변경 감지
   useEffect(() => {

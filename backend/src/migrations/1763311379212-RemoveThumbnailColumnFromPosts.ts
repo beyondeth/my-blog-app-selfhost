@@ -1,7 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class RemoveThumbnailColumnFromPosts1763311379212 implements MigrationInterface {
-  name = 'RemoveThumbnailColumnFromPosts1763311379212';
+export class RemoveThumbnailColumnFromPosts1763311379212
+  implements MigrationInterface
+{
+  name = "RemoveThumbnailColumnFromPosts1763311379212";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. 먼저 thumbnail 컬럼을 사용하는 materialized view 드랍

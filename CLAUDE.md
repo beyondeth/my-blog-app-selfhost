@@ -369,3 +369,9 @@ try {
 **Project**: Multi-user Blog Platform with Subscription System
 - 이 프로젝트는 개인 프로젝트가 아닌 엔터프라이즈급 saas 블로그 플랫폼이면서 mcp 를 활용한 자동블로그 시스템을 구축하기 위한 프로젝트이다. 그렇기 때문에 코드는 항상 클린하며, 여러 사용자가 사용하는만큼 최적화가 필수여야한다. 메모리 누수 방지, 클린업, 에러처리 필수.\
 또한 함수형 코드, OOP 코드 작성이 적절하게 시기 적절하게 적용되어야한다.
+
+# migration 상태 확인
+pnpm exec ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:show -d src/data-source.ts
+
+# migration 되돌리기
+pnpm exec ts-node -r tsconfig-paths/register ./node_modules/typeorm/cli.js migration:revert -d src/data-source.ts

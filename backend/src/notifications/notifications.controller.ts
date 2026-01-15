@@ -1,22 +1,22 @@
-import { 
-  Controller, 
-  Get, 
-  Put, 
+import {
+  Controller,
+  Get,
+  Put,
   Delete,
-  Param, 
-  UseGuards, 
+  Param,
+  UseGuards,
   Request,
   Query,
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
   ParseIntPipe,
-  DefaultValuePipe
-} from '@nestjs/common';
-import { NotificationsService } from './notifications.service';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
+  DefaultValuePipe,
+} from "@nestjs/common";
+import { NotificationsService } from "./notifications.service";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 
-@Controller('notifications')
+@Controller("notifications")
 @UseGuards(JwtAuthGuard)
 export class NotificationsController {
   constructor(private readonly notificationsService: NotificationsService) {}
@@ -24,37 +24,37 @@ export class NotificationsController {
   @Get()
   async getNotifications(
     @Request() req: any,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query("page", new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query("limit", new DefaultValuePipe(20), ParseIntPipe) limit: number,
   ) {
     return this.notificationsService.getNotifications(req.user.id, page, limit);
   }
 
-  @Get('unread')
+  @Get("unread")
   async getUnreadCount(@Request() req: any) {
     const count = await this.notificationsService.getUnreadCount(req.user.id);
     return { count };
   }
 
-  @Put(':id/read')
+  @Put(":id/read")
   @HttpCode(HttpStatus.NO_CONTENT)
   async markAsRead(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Request() req: any,
   ) {
     await this.notificationsService.markAsRead(id, req.user.id);
   }
 
-  @Put('read-all')
+  @Put("read-all")
   @HttpCode(HttpStatus.NO_CONTENT)
   async markAllAsRead(@Request() req: any) {
     await this.notificationsService.markAllAsRead(req.user.id);
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
   async deleteNotification(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Request() req: any,
   ) {
     await this.notificationsService.delete(id, req.user.id);

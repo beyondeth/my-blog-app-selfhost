@@ -50,6 +50,23 @@ export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 export BUILDKIT_INLINE_CACHE=1
 
+# 1-1. 필수 NEXT_PUBLIC 환경변수 검증
+log "Step 0: 공개 환경변수 검증"
+REQUIRED_NEXT_PUBLIC_VARS=(
+    "NEXT_PUBLIC_API_URL"
+    "NEXT_PUBLIC_BACKEND_URL"
+    "NEXT_PUBLIC_SITE_URL"
+    "NEXT_PUBLIC_MIXPANEL_TOKEN"
+    "NEXT_PUBLIC_GA_MEASUREMENT_ID"
+)
+for var in "${REQUIRED_NEXT_PUBLIC_VARS[@]}"; do
+    value="$(grep -E "^${var}=" .env.production | cut -d= -f2- || true)"
+    if [ -z "$value" ]; then
+        error "필수 환경변수 ${var} 가 .env.production에 없습니다. Secrets를 확인하세요."
+    fi
+done
+success "필수 NEXT_PUBLIC 환경변수 확인 완료"
+
 # 2. 최신 코드 가져오기
 log "Step 1: Git Pull"
 git fetch origin main

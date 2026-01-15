@@ -1,4 +1,9 @@
-import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeorm';
+import {
+  MigrationInterface,
+  QueryRunner,
+  TableColumn,
+  TableIndex,
+} from "typeorm";
 
 /**
  * Posts 테이블에 isDeleted 컬럼 추가
@@ -16,14 +21,14 @@ export class AddIsDeletedToPosts1761465000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. isDeleted 컬럼 추가
     await queryRunner.addColumn(
-      'posts',
+      "posts",
       new TableColumn({
-        name: 'isDeleted',
-        type: 'boolean',
+        name: "isDeleted",
+        type: "boolean",
         default: false,
         isNullable: false,
-        comment: '소프트 삭제 플래그: 법적 조회용 데이터 보존',
-      })
+        comment: "소프트 삭제 플래그: 법적 조회용 데이터 보존",
+      }),
     );
 
     // 2. 기존 데이터에 기본값 적용 (이미 default로 처리됨)
@@ -33,29 +38,29 @@ export class AddIsDeletedToPosts1761465000000 implements MigrationInterface {
 
     // 3. isDeleted + authorId 복합 인덱스 추가 (삭제된 포스트 조회 최적화)
     await queryRunner.createIndex(
-      'posts',
+      "posts",
       new TableIndex({
-        name: 'IDX_posts_isDeleted_authorId',
-        columnNames: ['isDeleted', 'authorId'],
-      })
+        name: "IDX_posts_isDeleted_authorId",
+        columnNames: ["isDeleted", "authorId"],
+      }),
     );
 
     // 4. isDeleted 단일 인덱스 추가 (전체 삭제 목록 조회)
     await queryRunner.createIndex(
-      'posts',
+      "posts",
       new TableIndex({
-        name: 'IDX_posts_isDeleted',
-        columnNames: ['isDeleted'],
-      })
+        name: "IDX_posts_isDeleted",
+        columnNames: ["isDeleted"],
+      }),
     );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 인덱스 먼저 제거
-    await queryRunner.dropIndex('posts', 'IDX_posts_isDeleted');
-    await queryRunner.dropIndex('posts', 'IDX_posts_isDeleted_authorId');
+    await queryRunner.dropIndex("posts", "IDX_posts_isDeleted");
+    await queryRunner.dropIndex("posts", "IDX_posts_isDeleted_authorId");
 
     // 컬럼 제거
-    await queryRunner.dropColumn('posts', 'isDeleted');
+    await queryRunner.dropColumn("posts", "isDeleted");
   }
 }

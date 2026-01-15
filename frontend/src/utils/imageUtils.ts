@@ -9,6 +9,7 @@ import { useQuery } from '@tanstack/react-query';
 // 환경변수에서 설정값 가져오기
 const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const CDN_BASE_URL = (process.env.NEXT_PUBLIC_CDN_BASE_URL || 'https://cdn.codebase.blog').replace(/\/$/, '');
 const USE_UUID_FILENAMES = process.env.NEXT_PUBLIC_USE_UUID_FILENAMES === 'true';
 // 디버그 로그 비활성화 (필요 시 true로 변경)
 const DEBUG_MODE = false;
@@ -211,9 +212,9 @@ export function normalizeImageUrl(url: string): string {
 
     // 이미 S3 키인 경우 (uploads/로 시작)
     if (url.startsWith('uploads/') || url.startsWith('v2/')) {
-      const proxyUrl = getProxyImageUrl(url);
-      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → Proxy:', proxyUrl);
-      return proxyUrl;
+      const cdnUrl = `${CDN_BASE_URL}/${url}`;
+      if (DEBUG_MODE) console.log('[normalizeImageUrl] S3 key → CDN:', cdnUrl);
+      return cdnUrl;
     }
 
     // Bare 파일명 감지 (경로 구분자가 없고 확장자만 있는 경우)
@@ -239,6 +240,58 @@ export function normalizeImageUrl(url: string): string {
     console.error('[imageUtils] Error normalizing URL:', url, error);
     return url;
   }
+}
+
+/**
+ * 업로드된 이미지의 논리적 키(uploads/... 형태)를 추출
+ * - CDN/프록시/상대경로 모두 동일한 키로 식별 가능
+ */
+export function extractImageKey(url: string): string | null {
+  if (!url) return null;
+
+  const extractFromPath = (path: string) => {
+    const uploadsIndex = path.indexOf('uploads/');
+    if (uploadsIndex !== -1) {
+      return path.slice(uploadsIndex);
+    }
+    if (path.startsWith('v2/')) {
+      return path;
+    }
+    const proxyIndex = path.indexOf('/api/v1/files/proxy/');
+    if (proxyIndex !== -1) {
+      return path.slice(proxyIndex + '/api/v1/files/proxy/'.length);
+    }
+    return null;
+  };
+
+  try {
+    if (url.startsWith('uploads/') || url.startsWith('v2/')) {
+      return url;
+    }
+
+    if (url.startsWith('/')) {
+      return extractFromPath(url);
+    }
+
+    const parsed = new URL(url);
+    const fromPath = extractFromPath(parsed.pathname);
+    if (fromPath) {
+      return fromPath;
+    }
+    const keyParam = parsed.searchParams.get('key');
+    if (keyParam) {
+      return keyParam.startsWith('uploads/') || keyParam.startsWith('v2/')
+        ? keyParam
+        : `uploads/${keyParam}`;
+    }
+  } catch {
+    // URL 생성 실패 시 단순 패턴만 확인
+    if (url.includes('uploads/')) {
+      return url.slice(url.indexOf('uploads/'));
+    }
+  }
+
+  return null;
 }
 
 /**

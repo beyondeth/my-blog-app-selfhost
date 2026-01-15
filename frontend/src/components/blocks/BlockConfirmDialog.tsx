@@ -1,14 +1,16 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { FiAlertCircle } from 'react-icons/fi';
+import { FiSlash, FiCheck, FiX } from 'react-icons/fi'; // 아이콘 변경 (AlertCircle -> Slash for block)
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogClose,
 } from '@/components/ui/dialog';
+import { cn } from '@/lib/utils'; // shadcn utils 가정
 
 interface BlockConfirmDialogProps {
   open: boolean;
@@ -19,8 +21,8 @@ interface BlockConfirmDialogProps {
 }
 
 /**
- * 사용자 차단 확인 다이얼로그 (Radix Dialog 기반)
- * 차단 효과를 안내하고 확인을 받는 컴포넌트
+ * 사용자 차단 확인 다이얼로그 (Redesign)
+ * Premium Aesthetic: Clean, Minimal, Dark Mode Support
  */
 export default function BlockConfirmDialog({
   open,
@@ -35,7 +37,6 @@ export default function BlockConfirmDialog({
   // 모달이 닫힐 때 상태 초기화
   useEffect(() => {
     if (!open) {
-      // 애니메이션 완료 후 초기화
       const timer = setTimeout(() => {
         setReason('');
         setIsSuccess(false);
@@ -50,7 +51,6 @@ export default function BlockConfirmDialog({
       const timer = setTimeout(() => {
         onOpenChange(false);
       }, 1500);
-
       return () => clearTimeout(timer);
     }
   }, [isSuccess, onOpenChange]);
@@ -58,7 +58,7 @@ export default function BlockConfirmDialog({
   const handleConfirm = async () => {
     try {
       await onConfirm(reason || undefined);
-      setIsSuccess(true); // 성공 상태로 전환
+      setIsSuccess(true);
     } catch (error) {
       // 에러는 useBlock hook에서 처리됨
     }
@@ -67,109 +67,102 @@ export default function BlockConfirmDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-md"
+        className="max-w-[400px] p-0 overflow-hidden bg-white dark:bg-zinc-900 border-zinc-200 dark:border-zinc-800 shadow-2xl gap-0"
         onOpenAutoFocus={(e) => {
-          // DropdownMenu 트리거 버튼에서 포커스 제거
           if (document.activeElement instanceof HTMLElement) {
             document.activeElement.blur();
           }
         }}
       >
         {isSuccess ? (
-          /* Success Screen */
-          <div className="text-center py-8">
-            <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-green-100 mb-4">
-              <svg
-                className="h-10 w-10 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M5 13l4 4L19 7"
-                />
-              </svg>
+          /* Success Screen - Minimal & Elegant */
+          <div className="flex flex-col items-center justify-center py-12 px-6 animate-in fade-in zoom-in-95 duration-200">
+            <div className="w-12 h-12 rounded-full bg-zinc-100 dark:bg-zinc-800 flex items-center justify-center mb-4">
+              <FiCheck className="w-6 h-6 text-zinc-900 dark:text-white" />
             </div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">
-              차단되었습니다
+            <h3 className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-1">
+              차단 완료
             </h3>
-            <p className="text-sm text-gray-600">
-              이제 이 사용자로부터 메시지를 받지 않습니다
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">
+              이제 이 사용자의 활동이 숨겨집니다.
             </p>
           </div>
         ) : (
           /* Confirm Screen */
-          <>
-            <DialogHeader>
-              <div className="flex items-center space-x-2">
-                <FiAlertCircle className="w-5 h-5 text-red-500" />
-                <DialogTitle>사용자 차단</DialogTitle>
+          <div className="flex flex-col">
+            {/* Header Area */}
+            <div className="px-6 pt-6 pb-2">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/20 flex items-center justify-center flex-shrink-0">
+                  <FiSlash className="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <DialogTitle className="text-lg font-semibold text-zinc-900 dark:text-zinc-100">
+                    사용자 차단
+                  </DialogTitle>
+                  <DialogDescription className="text-sm text-zinc-500 dark:text-zinc-400 mt-0.5">
+                    <span className="font-medium text-zinc-900 dark:text-zinc-200">{username}</span>
+                    님을 차단하시겠습니까?
+                  </DialogDescription>
+                </div>
               </div>
-              {username && (
-                <DialogDescription className="text-base">
-                  <span className="font-semibold text-gray-900">{username}</span>
-                  님을 차단하시겠습니까?
-                </DialogDescription>
-              )}
-            </DialogHeader>
+            </div>
 
-            <div className="space-y-4">
-              {/* Warning Box */}
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-sm font-medium text-red-900 mb-2">
-                  차단 시 다음과 같은 효과가 있습니다:
+            {/* Warning Content - Subtle styling instead of heavy box */}
+            <div className="px-6 py-4">
+              <div className="text-sm text-zinc-600 dark:text-zinc-300 space-y-3 leading-relaxed">
+                <p>
+                  차단 후에는 서로의 포스트를 볼 수 없으며,
+                  <br />
+                  <span className="text-red-600 dark:text-red-400 font-medium">메시지 수신이 영구적으로 차단됩니다.</span>
                 </p>
-                <ul className="list-disc list-inside space-y-1 text-sm text-red-800">
-                  <li>이 사용자로부터 메시지를 받을 수 없습니다</li>
-                  <li>이 사용자가 내 콘텐츠를 볼 수 없습니다</li>
-                  <li>차단은 언제든지 해제할 수 있습니다</li>
-                </ul>
+                <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                  * 차단 목록에서 언제든지 해제할 수 있습니다.
+                </p>
               </div>
 
-              {/* Optional Reason */}
-              <div>
-                <label
-                  htmlFor="block-reason"
-                  className="block text-sm font-medium text-gray-700 mb-2"
-                >
-                  차단 사유 (선택사항)
-                </label>
+              {/* Input Area */}
+              <div className="mt-5">
                 <textarea
-                  id="block-reason"
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                   rows={3}
                   maxLength={500}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 text-sm resize-none"
-                  placeholder="차단 사유를 입력해주세요 (선택사항)"
+                  className="w-full px-3 py-2 text-sm bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg 
+                    focus:outline-none focus:ring-2 focus:ring-zinc-900 dark:focus:ring-zinc-100 focus:border-transparent
+                    placeholder:text-zinc-400 dark:placeholder:text-zinc-600 resize-none transition-all"
+                  placeholder="차단 사유를 입력하세요 (선택)"
                 />
-                <p className="mt-1 text-xs text-gray-500">{reason.length}/500</p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end space-x-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => onOpenChange(false)}
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors min-h-[44px]"
-                  disabled={isBlocking}
-                >
-                  취소
-                </button>
-                <button
-                  type="button"
-                  onClick={handleConfirm}
-                  disabled={isBlocking}
-                  className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors min-h-[44px]"
-                >
-                  {isBlocking ? '차단 중...' : '차단하기'}
-                </button>
               </div>
             </div>
-          </>
+
+            {/* Footer Buttons */}
+            <div className="px-6 py-4 bg-zinc-50 dark:bg-zinc-900/50 border-t border-zinc-100 dark:border-zinc-800 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                disabled={isBlocking}
+                className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-800 rounded-md transition-colors"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={isBlocking}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800 rounded-md shadow-sm transition-all flex items-center gap-2"
+              >
+                {isBlocking ? (
+                  <>
+                    <span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    처리 중
+                  </>
+                ) : (
+                  '차단하기'
+                )}
+              </button>
+            </div>
+          </div>
         )}
       </DialogContent>
     </Dialog>

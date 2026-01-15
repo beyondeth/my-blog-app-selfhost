@@ -1,11 +1,13 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { UsageService } from './usage.service';
-import { UsageTracking } from './entities/usage-tracking.entity';
-import { User } from '../users/entities/user.entity';
-import { Subscription } from '../subscription/entities/subscription.entity';
-import { UsersModule } from '../users/users.module';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { UsageService } from "./usage.service";
+import { UsageTracking } from "./entities/usage-tracking.entity";
+import { User } from "../users/entities/user.entity";
+import { Subscription } from "../subscription/entities/subscription.entity";
+import { Blog } from "../blogs/entities/blog.entity";
+import { UsersModule } from "../users/users.module";
+import { RedisModule } from "../redis/redis.module";
 
 /**
  * 사용량 추적 모듈
@@ -15,9 +17,10 @@ import { UsersModule } from '../users/users.module';
  */
 @Module({
   imports: [
-    TypeOrmModule.forFeature([UsageTracking, User, Subscription]),
+    TypeOrmModule.forFeature([UsageTracking, User, Subscription, Blog]),
     EventEmitterModule.forRoot(), // 이벤트 기반 통신을 위해 추가
     UsersModule, // UsersService 사용을 위해 import
+    RedisModule,
     // SubscriptionModule 제거 - 순환 의존성 방지
   ],
   providers: [UsageService],

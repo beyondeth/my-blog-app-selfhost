@@ -8,10 +8,10 @@ import {
   JoinColumn,
   BeforeInsert,
   Index,
-} from 'typeorm';
-import { Exclude } from 'class-transformer';
-import { v7 as uuidv7 } from 'uuid';
-import { User } from './user.entity';
+} from "typeorm";
+import { Exclude } from "class-transformer";
+import { v7 as uuidv7 } from "uuid";
+import { User } from "./user.entity";
 
 /**
  * AccountSettings 엔티티
@@ -34,16 +34,16 @@ import { User } from './user.entity';
  * - 개인정보 보유기간 관리
  * - 마케팅 동의 관리
  */
-@Entity('account_settings')
-@Index(['userId'], { unique: true }) // 1:1 관계 보장
-@Index(['lockedUntil']) // 잠긴 계정 조회 최적화
-@Index(['scheduledDeletionAt']) // 삭제 예정 계정 배치 작업용
+@Entity("account_settings")
+@Index(["userId"], { unique: true }) // 1:1 관계 보장
+@Index(["lockedUntil"]) // 잠긴 계정 조회 최적화
+@Index(["scheduledDeletionAt"]) // 삭제 예정 계정 배치 작업용
 export class AccountSettings {
   /**
    * 기본 키 (UUID v7)
    * - 시간순 정렬로 계정 설정 변경 이력 추적 용이
    */
-  @PrimaryColumn('uuid')
+  @PrimaryColumn("uuid")
   id: string;
 
   /**
@@ -51,11 +51,11 @@ export class AccountSettings {
    * - onDelete: 'CASCADE' → User 삭제 시 AccountSettings도 자동 삭제
    * - nullable: false → User 없이 AccountSettings 존재 불가
    */
-  @OneToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @OneToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: "uuid", nullable: false })
   userId: string;
 
   /**
@@ -74,7 +74,7 @@ export class AccountSettings {
    * - 기본 7일 후 만료
    * - 만료된 토큰은 자동 재로그인 불가
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   @Exclude({ toPlainOnly: true })
   refreshTokenExpiresAt: Date;
 
@@ -84,7 +84,7 @@ export class AccountSettings {
    * - user_identities 테이블의 기본 인증 수단 ID
    * - 사용자가 여러 소셜 로그인 연결 시 메인 계정 식별
    */
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: "uuid", nullable: true })
   primaryIdentityId: string;
 
   /**
@@ -93,7 +93,7 @@ export class AccountSettings {
    * - 배치 작업에서 이 날짜가 지난 계정 물리적 삭제
    * - GDPR "잊혀질 권리" 준수
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   scheduledDeletionAt: Date;
 
   /**
@@ -101,7 +101,7 @@ export class AccountSettings {
    * - 3년 미사용 시 개인정보 파기 안내 발송
    * - 발송 후 30일 내 로그인 없으면 자동 파기
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   dataRetentionNotifiedAt: Date;
 
   /**
@@ -110,7 +110,7 @@ export class AccountSettings {
    * - 법적 근거: 개인정보보호법 제21조
    * - 사용자가 설정 변경 가능 (1년 ~ 10년)
    */
-  @Column({ type: 'int', default: 3 })
+  @Column({ type: "int", default: 3 })
   dataRetentionYears: number;
 
   /**
@@ -119,7 +119,7 @@ export class AccountSettings {
    * - ConsentGuard에서 검증
    * - null: 미동의 상태 (서비스 이용 불가)
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   termsAcceptedAt: Date;
 
   /**
@@ -128,7 +128,7 @@ export class AccountSettings {
    * - ConsentGuard에서 검증
    * - null: 미동의 상태 (서비스 이용 불가)
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   privacyAcceptedAt: Date;
 
   /**
@@ -145,7 +145,7 @@ export class AccountSettings {
    * - 동의 철회 이력 추적용
    * - null: 미동의
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   marketingOptInAt: Date;
 
   /**
@@ -163,7 +163,7 @@ export class AccountSettings {
    * - 5회 실패 시 계정 잠금 (15분)
    * - 성공 로그인 시 0으로 리셋
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   loginAttempts: number;
 
   /**
@@ -172,13 +172,13 @@ export class AccountSettings {
    * - 이 시간 이후 자동 해제
    * - null: 잠금 해제 상태
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   lockedUntil: Date;
 
-  @CreateDateColumn({ name: 'createdAt' })
+  @CreateDateColumn({ name: "createdAt" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updatedAt' })
+  @UpdateDateColumn({ name: "updatedAt" })
   updatedAt: Date;
 
   /**
@@ -228,7 +228,8 @@ export class AccountSettings {
   shouldBeDeleted(): boolean {
     if (!this.dataRetentionNotifiedAt) return false;
     const daysSinceNotified = Math.ceil(
-      (Date.now() - this.dataRetentionNotifiedAt.getTime()) / (1000 * 60 * 60 * 24)
+      (Date.now() - this.dataRetentionNotifiedAt.getTime()) /
+        (1000 * 60 * 60 * 24),
     );
     return daysSinceNotified > 30;
   }
@@ -259,7 +260,9 @@ export class AccountSettings {
    */
   setRefreshToken(token: string, expiresInDays: number = 7): void {
     this.refreshToken = token;
-    this.refreshTokenExpiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000);
+    this.refreshTokenExpiresAt = new Date(
+      Date.now() + expiresInDays * 24 * 60 * 60 * 1000,
+    );
   }
 
   /**

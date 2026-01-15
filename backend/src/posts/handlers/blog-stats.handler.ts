@@ -1,13 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { BlogEventHandler } from '../../common/events/blog-event-emitter.service';
-import { BlogEvent } from '../../common/events/blog-events.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { BlogEventHandler } from "../../common/events/blog-event-emitter.service";
+import { BlogEvent } from "../../common/events/blog-events.enum";
 import {
   BlogCreatedEvent,
   BlogPostEvent,
   BlogPostInteractionEvent,
   BlogStatsUpdateEvent,
-} from '../../common/events/dto/blog-event.dto';
-import { BlogStatsService } from '../../common/services/blog-stats.service';
+} from "../../common/events/dto/blog-event.dto";
+import { BlogStatsService } from "../../common/services/blog-stats.service";
 
 /**
  * 블로그 통계 이벤트 핸들러
@@ -36,7 +36,9 @@ export class BlogStatsHandler {
    */
   @BlogEventHandler(BlogEvent.BLOG_POST_CREATED)
   async handlePostCreated(data: BlogPostEvent): Promise<void> {
-    this.logger.debug(`Updating stats for new post: ${data.postId} in blog: ${data.blogId}`);
+    this.logger.debug(
+      `Updating stats for new post: ${data.postId} in blog: ${data.blogId}`,
+    );
 
     // 포스트 카운트 증가
     await this.blogStatsService.invalidateBlogStatsCache(data.blogId);
@@ -47,7 +49,9 @@ export class BlogStatsHandler {
    */
   @BlogEventHandler(BlogEvent.BLOG_POST_UPDATED)
   async handlePostUpdated(data: BlogPostEvent): Promise<void> {
-    this.logger.debug(`Updating stats for updated post: ${data.postId} in blog: ${data.blogId}`);
+    this.logger.debug(
+      `Updating stats for updated post: ${data.postId} in blog: ${data.blogId}`,
+    );
 
     // 카테고리 변경이 있을 경우 캐시 무효화
     await this.blogStatsService.invalidateBlogStatsCache(data.blogId);
@@ -58,7 +62,9 @@ export class BlogStatsHandler {
    */
   @BlogEventHandler(BlogEvent.BLOG_POST_DELETED)
   async handlePostDeleted(data: BlogPostEvent): Promise<void> {
-    this.logger.debug(`Updating stats for deleted post: ${data.postId} in blog: ${data.blogId}`);
+    this.logger.debug(
+      `Updating stats for deleted post: ${data.postId} in blog: ${data.blogId}`,
+    );
 
     // 포스트 카운트 감소
     await this.blogStatsService.invalidateBlogStatsCache(data.blogId);
@@ -69,7 +75,9 @@ export class BlogStatsHandler {
    */
   @BlogEventHandler(BlogEvent.BLOG_POST_LIKED)
   async handlePostLiked(data: BlogPostInteractionEvent): Promise<void> {
-    this.logger.debug(`Updating like stats for post: ${data.postId} in blog: ${data.blogId}`);
+    this.logger.debug(
+      `Updating like stats for post: ${data.postId} in blog: ${data.blogId}`,
+    );
 
     // 좋아요 통계는 PostStatsService에서 처리하므로 여기서는 캐시만 무효화
     await this.blogStatsService.invalidateBlogStatsCache(data.blogId);
@@ -80,7 +88,9 @@ export class BlogStatsHandler {
    */
   @BlogEventHandler(BlogEvent.BLOG_POST_VIEWED)
   async handlePostViewed(data: BlogPostInteractionEvent): Promise<void> {
-    this.logger.debug(`Updating view stats for post: ${data.postId} in blog: ${data.blogId}`);
+    this.logger.debug(
+      `Updating view stats for post: ${data.postId} in blog: ${data.blogId}`,
+    );
 
     // 조회 통계는 PostStatsService에서 처리하므로 여기서는 캐시만 무효화
     // 주기적인 배치 업데이트를 위해 이벤트는 발행하지만 캐시는 즉시 무효화
@@ -91,7 +101,9 @@ export class BlogStatsHandler {
    */
   @BlogEventHandler(BlogEvent.BLOG_STATS_UPDATE_REQUIRED)
   async handleStatsUpdateRequired(data: BlogStatsUpdateEvent): Promise<void> {
-    this.logger.debug(`Processing stats update request for blog: ${data.blogId}, type: ${data.updateType}`);
+    this.logger.debug(
+      `Processing stats update request for blog: ${data.blogId}, type: ${data.updateType}`,
+    );
 
     // TODO: 여기서는 실제 통계 재계산 로직 구현
     // 예: 배치 작업으로 등록하거나 즉시 계산

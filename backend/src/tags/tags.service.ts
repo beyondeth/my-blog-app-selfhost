@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { Tag } from './entities/tag.entity';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, In } from "typeorm";
+import { Tag } from "./entities/tag.entity";
 
 @Injectable()
 export class TagsService {
@@ -19,19 +19,21 @@ export class TagsService {
       return [];
     }
 
-    const normalizedNames = tagNames.map(name => name.trim().toLowerCase());
-    
+    const normalizedNames = tagNames.map((name) => name.trim().toLowerCase());
+
     // 기존 태그 찾기
     const existingTags = await this.tagsRepository.find({
       where: { name: In(normalizedNames) },
     });
 
-    const existingTagNames = new Set(existingTags.map(tag => tag.name));
-    const newTagNames = normalizedNames.filter(name => !existingTagNames.has(name));
+    const existingTagNames = new Set(existingTags.map((tag) => tag.name));
+    const newTagNames = normalizedNames.filter(
+      (name) => !existingTagNames.has(name),
+    );
 
     // 새 태그 생성
     const newTags = await Promise.all(
-      newTagNames.map(async name => {
+      newTagNames.map(async (name) => {
         const slug = this.generateSlug(name);
         const tag = this.tagsRepository.create({
           name,
@@ -39,7 +41,7 @@ export class TagsService {
           postCount: 0,
         });
         return this.tagsRepository.save(tag);
-      })
+      }),
     );
 
     return [...existingTags, ...newTags];
@@ -50,11 +52,11 @@ export class TagsService {
    */
   async incrementPostCount(tagIds: string[]): Promise<void> {
     if (tagIds.length === 0) return;
-    
+
     await this.tagsRepository
       .createQueryBuilder()
       .update(Tag)
-      .set({ postCount: () => 'postCount + 1' })
+      .set({ postCount: () => "postCount + 1" })
       .whereInIds(tagIds)
       .execute();
   }
@@ -64,11 +66,11 @@ export class TagsService {
    */
   async decrementPostCount(tagIds: string[]): Promise<void> {
     if (tagIds.length === 0) return;
-    
+
     await this.tagsRepository
       .createQueryBuilder()
       .update(Tag)
-      .set({ postCount: () => 'GREATEST(postCount - 1, 0)' })
+      .set({ postCount: () => "GREATEST(postCount - 1, 0)" })
       .whereInIds(tagIds)
       .execute();
   }
@@ -78,9 +80,9 @@ export class TagsService {
    */
   async findByPost(postId: string): Promise<Tag[]> {
     return this.tagsRepository
-      .createQueryBuilder('tag')
-      .innerJoin('tag.posts', 'post')
-      .where('post.id = :postId', { postId })
+      .createQueryBuilder("tag")
+      .innerJoin("tag.posts", "post")
+      .where("post.id = :postId", { postId })
       .getMany();
   }
 
@@ -89,9 +91,9 @@ export class TagsService {
    */
   async searchTags(pattern: string): Promise<Tag[]> {
     return this.tagsRepository
-      .createQueryBuilder('tag')
-      .where('tag.name LIKE :pattern', { pattern: `%${pattern}%` })
-      .orderBy('tag.postCount', 'DESC')
+      .createQueryBuilder("tag")
+      .where("tag.name LIKE :pattern", { pattern: `%${pattern}%` })
+      .orderBy("tag.postCount", "DESC")
       .limit(10)
       .getMany();
   }
@@ -102,7 +104,7 @@ export class TagsService {
   async getPopularTags(limit = 20): Promise<Tag[]> {
     return this.tagsRepository.find({
       order: {
-        postCount: 'DESC',
+        postCount: "DESC",
       },
       take: limit,
     });
@@ -114,8 +116,8 @@ export class TagsService {
   private generateSlug(name: string): string {
     return name
       .toLowerCase()
-      .replace(/[^a-z0-9가-힣]/g, '-')
-      .replace(/-+/g, '-')
-      .replace(/^-|-$/g, '');
+      .replace(/[^a-z0-9가-힣]/g, "-")
+      .replace(/-+/g, "-")
+      .replace(/^-|-$/g, "");
   }
 }

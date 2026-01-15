@@ -3,22 +3,22 @@
  */
 export const PostInteractionEvents = {
   /** 좋아요 토글 (추가/삭제) */
-  LIKE_TOGGLED: 'post.like.toggled',
+  LIKE_TOGGLED: "post.like.toggled",
 
   /** 조회수 증가 */
-  VIEW_INCREMENTED: 'post.view.incremented',
+  VIEW_INCREMENTED: "post.view.incremented",
 
   /** 북마크 토글 (추가/삭제) */
-  BOOKMARK_TOGGLED: 'post.bookmark.toggled',
+  BOOKMARK_TOGGLED: "post.bookmark.toggled",
 
   /** 댓글 추가 */
-  COMMENT_ADDED: 'post.comment.added',
+  COMMENT_ADDED: "post.comment.added",
 
   /** 댓글 삭제 */
-  COMMENT_REMOVED: 'post.comment.removed',
+  COMMENT_REMOVED: "post.comment.removed",
 
   /** 공유 */
-  SHARED: 'post.shared',
+  SHARED: "post.shared",
 };
 
 /**

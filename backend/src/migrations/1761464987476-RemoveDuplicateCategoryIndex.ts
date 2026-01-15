@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 중복된 category 단순 인덱스 제거 마이그레이션
@@ -29,11 +29,9 @@ export class RemoveDuplicateCategoryIndex1761464987476
     `);
 
     console.log(
-      '✅ 중복 category 인덱스 제거 완료: IDX_c81be77ac4b528ea4f2c94fcfb',
+      "✅ 중복 category 인덱스 제거 완료: IDX_c81be77ac4b528ea4f2c94fcfb",
     );
-    console.log(
-      '   복합 인덱스 idx_posts_category_published로 모든 쿼리 처리',
-    );
+    console.log("   복합 인덱스 idx_posts_category_published로 모든 쿼리 처리");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -43,6 +41,6 @@ export class RemoveDuplicateCategoryIndex1761464987476
       ON "posts" ("category")
     `);
 
-    console.log('⬇️  Rollback: 단순 category 인덱스 재생성 완료');
+    console.log("⬇️  Rollback: 단순 category 인덱스 재생성 완료");
   }
 }

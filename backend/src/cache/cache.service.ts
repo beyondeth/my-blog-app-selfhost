@@ -1,31 +1,32 @@
-import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
-import { UnifiedRedisService } from '../redis/unified-redis.service';
-import { CacheMetricsService } from '../metrics/cache-metrics.service';
-import { createHash } from 'crypto';
+import { Injectable, Logger, OnModuleInit } from "@nestjs/common";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import Redis from "ioredis";
+import { UnifiedRedisService } from "../redis/unified-redis.service";
+import { CacheMetricsService } from "../metrics/cache-metrics.service";
+import { createHash } from "crypto";
 
 // 캐시 TTL 상수 (초 단위) - 메모리 최적화 전략
 export enum CacheTTL {
   // 핫 데이터 (높은 가치)
-  VERY_SHORT = 5,    // 5초 - 댓글 트리 (실시간성 중요)
+  VERY_SHORT = 5, // 5초 - 댓글 트리 (실시간성 중요)
 
   // 온 데이터 (중간 가치)
-  SHORT = 30,        // 30초 - 실시간 데이터
-  HOME_FEED = 30,    // 30초 - 홈 피드 (5분에서 10초로 대폭 단축)
-  MEDIUM = 30,       // 30초 - 포스트 목록 (5분에서 10초로 대폭 단축)
+  SHORT = 30, // 30초 - 실시간 데이터
+  HOME_FEED = SHORT, // 홈 피드 (30초)
+  MEDIUM = 120, // 2분 - 블로그/커뮤니티 정보 등 중간 가치 데이터
+
 
   // 콜드 데이터 (낮은 가치)
-  LONG = 180,        // 3분 - 기타 데이터
+  LONG = 180, // 3분 - 기타 데이터
 
   // 정적 데이터 (고정 가치)
-  STATIC = 3600,     // 1시간 - 블로그 설정, 태그
+  STATIC = 3600, // 1시간 - 블로그 설정, 태그
 
   // 개선된 TTL - 단순화 및 최적화
   POST_DETAIL = 900, // 15분 - 포스트 상세 (캐시 효율화)
-  PROFILE = 300,     // 5분 - 프로필 (기존 1800초에서 단축)
-  MY_BLOG = 10,      // 10초 - 내 블로그 피드 (실시성 + 성능 균형)
-  DAY = 86400,       // 24시간 - 사용자 조회 기록
+  PROFILE = 300, // 5분 - 프로필 (기존 1800초에서 단축)
+  MY_BLOG = 10, // 10초 - 내 블로그 피드 (실시성 + 성능 균형)
+  DAY = 86400, // 24시간 - 사용자 조회 기록
 
   // 시스템 관리
   DELETED_POSTS_CLEANUP = 60, // 1분 - 삭제된 포스트 정리 (기존 5분에서 단축)
@@ -35,19 +36,30 @@ export enum CacheTTL {
 export const CacheKeys = {
   // Feed 관련 - 표준화된 패턴
   FEED_HOME: (page: number = 1) => `feed:home:page:${page}`,
-  FEED_BLOG: (slug: string, page: number = 1) => `feed:blog:${slug}:page:${page}`,
+  FEED_BLOG: (slug: string, page: number = 1) =>
+    `feed:blog:${slug}:page:${page}`,
+  FEED_UNIFIED: (
+    filter: string,
+    sort: string,
+    options: { cursor?: string | null; limit?: number } = {},
+  ) => {
+    const limit = options.limit ?? 20;
+    const cursorToken = options.cursor
+      ? createHash("md5").update(options.cursor).digest("hex").substring(0, 8)
+      : "first";
+    return `feed:unified:${filter}:${sort}:limit:${limit}:cursor:${cursorToken}`;
+  },
   FEED_EDITOR_PICKS: (limit?: number) =>
-    limit ? `feed:editor-picks:limit:${limit}` : 'feed:editor-picks',
-  FEED_POPULAR: (period: 'daily' | 'weekly' | 'monthly', limit?: number) =>
+    limit ? `feed:editor-picks:v2:limit:${limit}` : "feed:editor-picks:v2",
+  FEED_POPULAR: (period: "daily" | "weekly" | "monthly", limit?: number) =>
     limit ? `feed:popular:${period}:limit:${limit}` : `feed:popular:${period}`,
   FEED_SEARCH: (query: string, page: number = 1) => {
-    const hash = createHash('md5').update(query).digest('hex').substring(0, 8);
+    const hash = createHash("md5").update(query).digest("hex").substring(0, 8);
     return `feed:search:${hash}:page:${page}`;
   },
   FEED_CATEGORY: (category: string, page: number = 1) =>
     `feed:category:${category}:page:${page}`,
-  FEED_TAG: (tag: string, page: number = 1) =>
-    `feed:tag:${tag}:page:${page}`,
+  FEED_TAG: (tag: string, page: number = 1) => `feed:tag:${tag}:page:${page}`,
 
   // Post 관련
   POST_DETAIL: (id: string) => `post:${id}`,
@@ -58,13 +70,13 @@ export const CacheKeys = {
   POST_RELATED: (id: string) => `post:${id}:related`,
   POST_BY_SLUG: (slug: string) => `post:slug:${slug}`,
   POST_REBUILDING: (id: string) => `rebuilding:post:${id}`,
-  POST_USER_VIEW: (postId: string, userId: string) => `post:${postId}:view:${userId}`,
+  POST_USER_VIEW: (postId: string, userId: string) =>
+    `post:${postId}:view:${userId}`,
 
   // User 관련
   USER_BY_ID: (id: string) => `user:id:${id}`,
   USER_PROFILE: (id: string) => `user:${id}:profile`,
-  USER_POSTS: (id: string, page: number = 1) =>
-    `user:${id}:posts:page:${page}`,
+  USER_POSTS: (id: string, page: number = 1) => `user:${id}:posts:page:${page}`,
   USER_COMMENTS: (id: string, page: number = 1) =>
     `user:${id}:comments:page:${page}`,
   USER_STATS: (id: string) => `user:${id}:stats`,
@@ -82,8 +94,10 @@ export const CacheKeys = {
   // Alias 관련 - @alias 시스템을 위한 통합된 캐시 키
   ALIAS_MAPPING: (identifier: string) => `alias:map:${identifier}`,
   IDENTIFIER_TO_BLOG: (identifier: string) => `blog:identifier:${identifier}`,
-  BLOG_FEED_BY_ALIAS: (alias: string, page: number) => `feed:blog:${alias}:page:${page}`,
-  BLOG_FEED_BY_ID: (blogId: string, page: number) => `feed:blog:${blogId}:page:${page}`,
+  BLOG_FEED_BY_ALIAS: (alias: string, page: number) =>
+    `feed:blog:${alias}:page:${page}`,
+  BLOG_FEED_BY_ID: (blogId: string, page: number) =>
+    `feed:blog:${blogId}:page:${page}`,
 
   // Comment 관련
   COMMENT_TREE: (postId: string) => `comment:tree:${postId}`,
@@ -141,23 +155,84 @@ export class CacheService implements OnModuleInit {
   ) {}
 
   /**
+   * Set에 값 추가 (SADD)
+   */
+  async addToSet(key: string, value: string): Promise<void> {
+    try {
+      // cache 네임스페이스 사용
+      const fullKey = `cache:${key}`;
+      await this.redis.sadd(fullKey, value);
+      this.logger.debug(`Cache SADD: ${key} -> ${value}`);
+      this.cacheSets++;
+    } catch (error) {
+      this.logger.error(`Cache SADD error for key ${key}:`, error);
+    }
+  }
+
+  /**
+   * Set에서 값 제거 (SREM)
+   */
+  async removeFromSet(key: string, value: string): Promise<void> {
+    try {
+      const fullKey = `cache:${key}`;
+      await this.redis.srem(fullKey, value);
+      this.logger.debug(`Cache SREM: ${key} -> ${value}`);
+      this.cacheDeletes++;
+    } catch (error) {
+      this.logger.error(`Cache SREM error for key ${key}:`, error);
+    }
+  }
+
+  /**
+   * Set 멤버 여부 확인 (SISMEMBER)
+   */
+  async isSetMember(key: string, value: string): Promise<boolean> {
+    try {
+      const fullKey = `cache:${key}`;
+      const result = await this.redis.sismember(fullKey, value);
+      if (result === 1) {
+        this.cacheHits++;
+        return true;
+      }
+      this.cacheMisses++;
+      return false;
+    } catch (error) {
+      this.logger.error(`Cache SISMEMBER error for key ${key}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Set 멤버 전체 조회 (SMEMBERS)
+   */
+  async getSetMembers(key: string): Promise<string[]> {
+    try {
+      const fullKey = `cache:${key}`;
+      return await this.redis.smembers(fullKey);
+    } catch (error) {
+      this.logger.error(`Cache SMEMBERS error for key ${key}:`, error);
+      return [];
+    }
+  }
+
+  /**
    * 키 패턴으로 캐시 타입 감지
    * @param key - 캐시 키
    * @returns 'post' | 'comments' | 'other'
    */
-  private detectCacheType(key: string): 'post' | 'comments' | 'other' {
-    if (key.includes('post:core') || key.includes('rebuilding:post')) {
-      return 'post';
+  private detectCacheType(key: string): "post" | "comments" | "other" {
+    if (key.includes("post:core") || key.includes("rebuilding:post")) {
+      return "post";
     }
     if (
-      key.includes('comments:page') ||
-      key.includes('comments:replies') ||
-      key.includes('comments:total') ||
-      key.includes('rebuilding:comments')
+      key.includes("comments:page") ||
+      key.includes("comments:replies") ||
+      key.includes("comments:total") ||
+      key.includes("rebuilding:comments")
     ) {
-      return 'comments';
+      return "comments";
     }
-    return 'other';
+    return "other";
   }
 
   /**
@@ -166,16 +241,16 @@ export class CacheService implements OnModuleInit {
   async get<T>(key: string): Promise<T | null> {
     try {
       // 기본 네임스페이스를 'cache'로 사용
-      const cached = await this.unifiedRedisService.getCache<T>('cache', key);
+      const cached = await this.unifiedRedisService.getCache<T>("cache", key);
       if (cached) {
         this.cacheHits++;
         this.logger.debug(`Cache HIT: ${key}`);
 
         // Prometheus 메트릭 기록
         const cacheType = this.detectCacheType(key);
-        if (cacheType === 'post') {
+        if (cacheType === "post") {
           this.cacheMetricsService.recordPostCacheHit();
-        } else if (cacheType === 'comments') {
+        } else if (cacheType === "comments") {
           this.cacheMetricsService.recordCommentsCacheHit();
         }
 
@@ -186,9 +261,9 @@ export class CacheService implements OnModuleInit {
 
       // Prometheus 메트릭 기록
       const cacheType = this.detectCacheType(key);
-      if (cacheType === 'post') {
+      if (cacheType === "post") {
         this.cacheMetricsService.recordPostCacheMiss();
-      } else if (cacheType === 'comments') {
+      } else if (cacheType === "comments") {
         this.cacheMetricsService.recordCommentsCacheMiss();
       }
 
@@ -206,7 +281,7 @@ export class CacheService implements OnModuleInit {
     try {
       // TTL이 없으면 기본값 사용 (5분)
       const finalTtl = ttl || CacheTTL.MEDIUM;
-      await this.unifiedRedisService.setCache('cache', key, value, finalTtl);
+      await this.unifiedRedisService.setCache("cache", key, value, finalTtl);
 
       this.cacheSets++;
       this.logger.debug(`Cache SET: ${key} (TTL: ${finalTtl}s)`);
@@ -220,17 +295,20 @@ export class CacheService implements OnModuleInit {
    */
   async del(key: string): Promise<void> {
     try {
-      await this.unifiedRedisService.deleteCache('cache', key);
+      await this.unifiedRedisService.deleteCache("cache", key);
 
       this.cacheDeletes++;
       this.logger.debug(`Cache DEL: ${key}`);
 
       // Prometheus 메트릭 기록 - 캐시 무효화
       const cacheType = this.detectCacheType(key);
-      if (cacheType === 'post') {
-        this.cacheMetricsService.recordCacheInvalidation('post_core', 'manual');
-      } else if (cacheType === 'comments') {
-        this.cacheMetricsService.recordCacheInvalidation('comments_tree', 'manual');
+      if (cacheType === "post") {
+        this.cacheMetricsService.recordCacheInvalidation("post_core", "manual");
+      } else if (cacheType === "comments") {
+        this.cacheMetricsService.recordCacheInvalidation(
+          "comments_tree",
+          "manual",
+        );
       }
     } catch (error) {
       this.logger.error(`Cache DEL error for key ${key}:`, error);
@@ -267,7 +345,7 @@ export class CacheService implements OnModuleInit {
   async reset(): Promise<void> {
     try {
       // cache 네임스페이스만 초기화
-      await this.unifiedRedisService.clearNamespace('cache');
+      await this.unifiedRedisService.clearNamespace("cache");
 
       // 통계 초기화
       this.cacheHits = 0;
@@ -275,9 +353,9 @@ export class CacheService implements OnModuleInit {
       this.cacheSets = 0;
       this.cacheDeletes = 0;
 
-      this.logger.warn('Cache RESET: cache namespace cleared');
+      this.logger.warn("Cache RESET: cache namespace cleared");
     } catch (error) {
-      this.logger.error('Cache RESET error:', error);
+      this.logger.error("Cache RESET error:", error);
     }
   }
 
@@ -297,12 +375,12 @@ export class CacheService implements OnModuleInit {
 
     // 캐시 미스 - 데이터 생성
     const data = await factory();
-    
+
     // 캐시 저장
     if (data !== null && data !== undefined) {
       await this.set(key, data, ttl);
     }
-    
+
     return data;
   }
 
@@ -310,17 +388,15 @@ export class CacheService implements OnModuleInit {
    * 블로그 관련 캐시 무효화
    */
   async invalidateBlogCache(blogId: string, slug?: string): Promise<void> {
-    const promises = [
-      this.del(CacheKeys.BLOG_BY_ID(blogId)),
-    ];
-    
+    const promises = [this.del(CacheKeys.BLOG_BY_ID(blogId))];
+
     if (slug) {
       promises.push(this.del(CacheKeys.BLOG_BY_SLUG(slug)));
     }
-    
+
     // 관련 포스트 목록 캐시도 무효화
     await this.deletePattern(`posts:list:*:*:${slug || blogId}`);
-    
+
     await Promise.all(promises);
   }
 
@@ -330,22 +406,26 @@ export class CacheService implements OnModuleInit {
   async invalidatePostCache(postId: string, blogSlug?: string): Promise<void> {
     // 특정 포스트 캐시 삭제
     await this.del(CacheKeys.POST_DETAIL(postId));
-    
+
     // 포스트 목록 캐시 무효화
     if (blogSlug) {
       await this.deletePattern(`posts:list:*:*:${blogSlug}`);
     } else {
-      await this.deletePattern('posts:list:*');
+      await this.deletePattern("posts:list:*");
     }
-    
+
     // 통계 캐시 무효화
-    await this.deletePattern('stats:*');
+    await this.deletePattern("stats:*");
   }
 
   /**
    * 사용자 관련 캐시 무효화
    */
-  async invalidateUserCache(userId: string, username?: string, email?: string): Promise<void> {
+  async invalidateUserCache(
+    userId: string,
+    username?: string,
+    email?: string,
+  ): Promise<void> {
     const promises = [
       this.del(CacheKeys.USER_BY_ID(userId)),
       this.del(CacheKeys.USER_STATS(userId)),
@@ -396,10 +476,10 @@ export class CacheService implements OnModuleInit {
       recommendations: string[];
       inefficientPatterns: string[];
     };
-    uptime?: number;  // Redis 서버 가동 시간 (초)
-    uptimeHuman?: string;  // 사람이 읽기 쉬운 형태의 가동 시간
-    hitsPerHour?: number;  // 시간당 히트 수
-    missesPerHour?: number;  // 시간당 미스 수
+    uptime?: number; // Redis 서버 가동 시간 (초)
+    uptimeHuman?: string; // 사람이 읽기 쉬운 형태의 가동 시간
+    hitsPerHour?: number; // 시간당 히트 수
+    missesPerHour?: number; // 시간당 미스 수
     redisInfo?: {
       version?: string;
       connectedClients?: number;
@@ -422,10 +502,10 @@ export class CacheService implements OnModuleInit {
       // 메모리 사용률 계산 (6GB 기준)
       const memoryBytes = this.parseRedisMemory(stats.memoryUsage);
       const maxMemory = 6 * 1024 * 1024 * 1024; // 6GB
-      const usagePercent = memoryBytes / maxMemory * 100;
+      const usagePercent = (memoryBytes / maxMemory) * 100;
 
       // cache 네임스페이스의 키 개수만 추출
-      const cacheKeys = stats.patterns['cache'] || 0;
+      const cacheKeys = stats.patterns["cache"] || 0;
 
       // 전체 키 개수 (모든 네임스페이스 포함)
       const totalKeys = stats.totalKeys || 0;
@@ -433,8 +513,10 @@ export class CacheService implements OnModuleInit {
       // 서버 가동 시간 및 시간당 통계 계산
       const uptime = stats.uptime || 0;
       const uptimeHours = uptime / 3600;
-      const hitsPerHour = uptimeHours > 0 ? Math.round(redisHits / uptimeHours) : 0;
-      const missesPerHour = uptimeHours > 0 ? Math.round(redisMisses / uptimeHours) : 0;
+      const hitsPerHour =
+        uptimeHours > 0 ? Math.round(redisHits / uptimeHours) : 0;
+      const missesPerHour =
+        uptimeHours > 0 ? Math.round(redisMisses / uptimeHours) : 0;
 
       // 사람이 읽기 쉬운 가동 시간 포맷
       const uptimeHuman = this.formatUptime(uptime);
@@ -444,33 +526,33 @@ export class CacheService implements OnModuleInit {
 
       return {
         itemCount: totalKeys, // 전체 키 개수 표시
-        estimatedSize: stats.memoryUsage || '0 B',
+        estimatedSize: stats.memoryUsage || "0 B",
         maxItems: 100000, // Redis는 더 많은 키 허용
-        maxSize: '6 GB',
+        maxSize: "6 GB",
         usagePercent: parseFloat(usagePercent.toFixed(2)),
-        cacheType: 'redis',
-        hits: redisHits,  // Redis의 실제 히트 수 사용
-        misses: redisMisses,  // Redis의 실제 미스 수 사용
-        sets: this.cacheSets,  // 애플리케이션 레벨 SET 작업 수
-        deletes: this.cacheDeletes,  // 애플리케이션 레벨 DELETE 작업 수
+        cacheType: "redis",
+        hits: redisHits, // Redis의 실제 히트 수 사용
+        misses: redisMisses, // Redis의 실제 미스 수 사용
+        sets: this.cacheSets, // 애플리케이션 레벨 SET 작업 수
+        deletes: this.cacheDeletes, // 애플리케이션 레벨 DELETE 작업 수
         hitRate: parseFloat(hitRate.toFixed(2)),
         patternAnalysis: patternStats, // 패턴별 분석 추가
         namespaces: stats.patterns, // 네임스페이스별 통계 추가
-        uptime,  // Redis 서버 가동 시간 (초)
-        uptimeHuman,  // 사람이 읽기 쉬운 형태
-        hitsPerHour,  // 시간당 히트 수
-        missesPerHour,  // 시간당 미스 수
+        uptime, // Redis 서버 가동 시간 (초)
+        uptimeHuman, // 사람이 읽기 쉬운 형태
+        hitsPerHour, // 시간당 히트 수
+        missesPerHour, // 시간당 미스 수
       };
     } catch (error) {
-      this.logger.error('Failed to get memory usage:', error);
+      this.logger.error("Failed to get memory usage:", error);
       // Redis 연결 실패 시에도 기본값 반환
       return {
         itemCount: 0,
-        estimatedSize: '0 B',
+        estimatedSize: "0 B",
         maxItems: 100000,
-        maxSize: '6 GB',
+        maxSize: "6 GB",
         usagePercent: 0,
-        cacheType: 'redis',
+        cacheType: "redis",
         hits: this.cacheHits,
         misses: this.cacheMisses,
         sets: this.cacheSets,
@@ -485,9 +567,9 @@ export class CacheService implements OnModuleInit {
    * 바이트를 읽기 쉬운 형식으로 변환
    */
   private formatBytes(bytes: number): string {
-    if (bytes === 0) return '0 B';
+    if (bytes === 0) return "0 B";
 
-    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const sizes = ["B", "KB", "MB", "GB"];
     const i = Math.floor(Math.log(bytes) / Math.log(1024));
     const size = bytes / Math.pow(1024, i);
 
@@ -499,12 +581,12 @@ export class CacheService implements OnModuleInit {
    * 예: "1.5M" -> 1572864, "2G" -> 2147483648
    */
   private parseRedisMemory(memory: string): number {
-    if (!memory || memory === 'N/A') return 0;
+    if (!memory || memory === "N/A") return 0;
 
     const units = {
-      'K': 1024,
-      'M': 1024 * 1024,
-      'G': 1024 * 1024 * 1024,
+      K: 1024,
+      M: 1024 * 1024,
+      G: 1024 * 1024 * 1024,
     };
 
     const match = memory.match(/^([\d.]+)([KMG])?/);
@@ -521,7 +603,7 @@ export class CacheService implements OnModuleInit {
    * 예: 3661 -> "1시간 1분 1초"
    */
   private formatUptime(seconds: number): string {
-    if (!seconds || seconds === 0) return '0초';
+    if (!seconds || seconds === 0) return "0초";
 
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
@@ -534,7 +616,7 @@ export class CacheService implements OnModuleInit {
     if (minutes > 0) parts.push(`${minutes}분`);
     if (secs > 0) parts.push(`${secs}초`);
 
-    return parts.join(' ') || '0초';
+    return parts.join(" ") || "0초";
   }
 
   /**
@@ -543,7 +625,7 @@ export class CacheService implements OnModuleInit {
    */
   private analyzePatternStatistics(patterns: Record<string, number>) {
     const analysis = {
-      mostUsed: { pattern: '', count: 0 },
+      mostUsed: { pattern: "", count: 0 },
       recommendations: [] as string[],
       inefficientPatterns: [] as string[],
     };
@@ -555,7 +637,7 @@ export class CacheService implements OnModuleInit {
       }
 
       // 비효율적인 패턴 식별
-      if (pattern.includes('socket') || pattern.includes('msg')) {
+      if (pattern.includes("socket") || pattern.includes("msg")) {
         analysis.inefficientPatterns.push(pattern);
       }
     }
@@ -563,19 +645,19 @@ export class CacheService implements OnModuleInit {
     // 개선 권장사항 생성
     if (analysis.inefficientPatterns.length > 0) {
       analysis.recommendations.push(
-        '일회성 키(socket, msg)가 많습니다. TTL을 더 짧게 설정하거나 제거를 고려하세요.'
+        "일회성 키(socket, msg)가 많습니다. TTL을 더 짧게 설정하거나 제거를 고려하세요.",
       );
     }
 
-    if (patterns['cache'] < patterns['chat']) {
+    if (patterns["cache"] < patterns["chat"]) {
       analysis.recommendations.push(
-        '채팅 캐시가 일반 캐시보다 많습니다. 채팅 TTL을 검토하세요.'
+        "채팅 캐시가 일반 캐시보다 많습니다. 채팅 TTL을 검토하세요.",
       );
     }
 
-    if (!patterns['feed']) {
+    if (!patterns["feed"]) {
       analysis.recommendations.push(
-        '피드 캐시가 없습니다. 캐시 워밍이 제대로 작동하는지 확인하세요.'
+        "피드 캐시가 없습니다. 캐시 워밍이 제대로 작동하는지 확인하세요.",
       );
     }
 
@@ -591,7 +673,11 @@ export class CacheService implements OnModuleInit {
       // UnifiedRedisService의 increment 기능 사용
       const current = await this.unifiedRedisService.get(fullKey);
       const newValue = current ? parseInt(current) + 1 : 1;
-      await this.unifiedRedisService.setWithExpiry(fullKey, String(newValue), 86400 * 7); // 7일
+      await this.unifiedRedisService.setWithExpiry(
+        fullKey,
+        String(newValue),
+        86400 * 7,
+      ); // 7일
       return newValue;
     } catch (error) {
       this.logger.error(`Cache INCREMENT error for key ${key}:`, error);
@@ -641,7 +727,7 @@ export class CacheService implements OnModuleInit {
       const redisStats = await this.unifiedRedisService.getCacheStatistics();
 
       // cache 네임스페이스 키만 필터링
-      const cacheKeys = redisStats.patterns['cache'] || 0;
+      const cacheKeys = redisStats.patterns["cache"] || 0;
 
       // Redis의 실제 히트/미스 값 사용
       const redisHits = redisStats.hits || 0;
@@ -649,27 +735,28 @@ export class CacheService implements OnModuleInit {
 
       // Hit rate 계산 - Redis의 실제 통계 사용
       const totalRequests = redisHits + redisMisses;
-      const hitRatePercent = totalRequests > 0
-        ? ((redisHits / totalRequests) * 100).toFixed(2) + '%'
-        : '0%';
+      const hitRatePercent =
+        totalRequests > 0
+          ? ((redisHits / totalRequests) * 100).toFixed(2) + "%"
+          : "0%";
 
       return {
         totalKeys: cacheKeys,
         patterns: redisStats.patterns,
-        hits: redisHits,  // Redis의 실제 히트 수 사용
-        misses: redisMisses,  // Redis의 실제 미스 수 사용
-        sets: this.cacheSets,  // 애플리케이션 레벨 SET 작업 수
-        deletes: this.cacheDeletes,  // 애플리케이션 레벨 DELETE 작업 수
+        hits: redisHits, // Redis의 실제 히트 수 사용
+        misses: redisMisses, // Redis의 실제 미스 수 사용
+        sets: this.cacheSets, // 애플리케이션 레벨 SET 작업 수
+        deletes: this.cacheDeletes, // 애플리케이션 레벨 DELETE 작업 수
         hitRate: hitRatePercent,
-        redisHitRate: (redisStats.hitRate * 100).toFixed(2) + '%',
+        redisHitRate: (redisStats.hitRate * 100).toFixed(2) + "%",
         memoryUsage: redisStats.memoryUsage,
       };
     } catch (error) {
-      this.logger.error('Failed to get cache stats:', error);
+      this.logger.error("Failed to get cache stats:", error);
       return {
         totalKeys: 0,
         patterns: {},
-        error: 'Failed to get cache stats'
+        error: "Failed to get cache stats",
       };
     }
   }
@@ -694,12 +781,12 @@ export class CacheService implements OnModuleInit {
       }
 
       // Redis SET with TTL: 키가 없을 때만 설정
-      await this.unifiedRedisService.setWithExpiry(fullKey, '1', ttl);
+      await this.unifiedRedisService.setWithExpiry(fullKey, "1", ttl);
       this.logger.debug(`Lock acquired: ${key} (TTL: ${ttl}s)`);
 
       // Prometheus 메트릭 기록 - 락 획득
       const cacheType = this.detectCacheType(key);
-      if (cacheType === 'post' || cacheType === 'comments') {
+      if (cacheType === "post" || cacheType === "comments") {
         this.cacheMetricsService.recordCacheLockAcquired(cacheType);
       }
 
@@ -739,11 +826,13 @@ export class CacheService implements OnModuleInit {
       const locked = await this.unifiedRedisService.get(fullKey);
       if (!locked) {
         const waitTime = Date.now() - startTime;
-        this.logger.debug(`Lock released, proceeding: ${key} (waited ${waitTime}ms)`);
+        this.logger.debug(
+          `Lock released, proceeding: ${key} (waited ${waitTime}ms)`,
+        );
 
         // Prometheus 메트릭 기록 - 락 대기
         const cacheType = this.detectCacheType(key);
-        if (cacheType === 'post' || cacheType === 'comments') {
+        if (cacheType === "post" || cacheType === "comments") {
           this.cacheMetricsService.recordCacheLockWaited(cacheType, waitTime);
         }
 
@@ -751,14 +840,14 @@ export class CacheService implements OnModuleInit {
       }
 
       // 100ms 대기 후 재시도
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     this.logger.warn(`Lock wait timeout (${maxWaitMs}ms): ${key}`);
 
     // Prometheus 메트릭 기록 - 타임아웃도 기록
     const cacheType = this.detectCacheType(key);
-    if (cacheType === 'post' || cacheType === 'comments') {
+    if (cacheType === "post" || cacheType === "comments") {
       this.cacheMetricsService.recordCacheLockWaited(cacheType, maxWaitMs);
     }
   }
@@ -767,7 +856,10 @@ export class CacheService implements OnModuleInit {
    * 패턴 기반 캐시 무효화 (Debounce 지원)
    * 여러 요청이 동시에 들어와도 한 번만 실행
    */
-  async invalidatePattern(pattern: string, options?: { force?: boolean; debounce?: number }): Promise<void> {
+  async invalidatePattern(
+    pattern: string,
+    options?: { force?: boolean; debounce?: number },
+  ): Promise<void> {
     // Force 옵션이 있으면 즉시 실행
     if (options?.force) {
       return this.executeInvalidation(pattern);
@@ -780,7 +872,9 @@ export class CacheService implements OnModuleInit {
     const existingTimeout = this.pendingInvalidations.get(pattern);
     if (existingTimeout) {
       clearTimeout(existingTimeout);
-      this.logger.debug(`🔄 [Debounce] Cancelled previous invalidation for: ${pattern}`);
+      this.logger.debug(
+        `🔄 [Debounce] Cancelled previous invalidation for: ${pattern}`,
+      );
     }
 
     // 새로운 타임아웃 설정
@@ -792,7 +886,9 @@ export class CacheService implements OnModuleInit {
     }, debounceTime);
 
     this.pendingInvalidations.set(pattern, timeout);
-    this.logger.debug(`⏳ [Debounce] Scheduled invalidation for: ${pattern} in ${debounceTime}ms`);
+    this.logger.debug(
+      `⏳ [Debounce] Scheduled invalidation for: ${pattern} in ${debounceTime}ms`,
+    );
   }
 
   /**
@@ -815,34 +911,44 @@ export class CacheService implements OnModuleInit {
 
       const keysToDelete: string[] = [];
 
-      stream.on('data', (keys: string[]) => {
+      stream.on("data", (keys: string[]) => {
         if (keys.length > 0) {
           keysToDelete.push(...keys);
-          this.logger.debug(`🔍 Found ${keys.length} keys matching: ${scanPattern}`);
+          this.logger.debug(
+            `🔍 Found ${keys.length} keys matching: ${scanPattern}`,
+          );
         }
       });
 
       await new Promise<void>((resolve, reject) => {
-        stream.on('end', async () => {
+        stream.on("end", async () => {
           if (keysToDelete.length > 0) {
             // UNLINK를 사용한 비차단 삭제
             deletedCount = await this.redis.unlink(...keysToDelete);
-            this.logger.log(`🧹 Deleted ${deletedCount} keys for pattern: ${scanPattern}`);
+            this.logger.log(
+              `🧹 Deleted ${deletedCount} keys for pattern: ${scanPattern}`,
+            );
           } else {
             this.logger.debug(`⚠️ No keys found matching: ${scanPattern}`);
           }
           resolve();
         });
 
-        stream.on('error', reject);
+        stream.on("error", reject);
       });
 
       // 메트릭 기록
       const duration = Date.now() - startTime;
-      this.cacheMetricsService.recordPatternDeletion(pattern, deletedCount, duration);
+      this.cacheMetricsService.recordPatternDeletion(
+        pattern,
+        deletedCount,
+        duration,
+      );
 
       if (deletedCount > 0) {
-        this.logger.log(`✅ Cache invalidation completed for: ${pattern} (${deletedCount} keys, ${duration}ms)`);
+        this.logger.log(
+          `✅ Cache invalidation completed for: ${pattern} (${deletedCount} keys, ${duration}ms)`,
+        );
       }
     } catch (error) {
       this.logger.error(`❌ Failed to invalidate pattern ${pattern}:`, error);
@@ -853,9 +959,12 @@ export class CacheService implements OnModuleInit {
   /**
    * 여러 패턴을 배치로 무효화
    */
-  async invalidatePatterns(patterns: string[], options?: { force?: boolean; debounce?: number }): Promise<void> {
-    const promises = patterns.map(pattern =>
-      this.invalidatePattern(pattern, options)
+  async invalidatePatterns(
+    patterns: string[],
+    options?: { force?: boolean; debounce?: number },
+  ): Promise<void> {
+    const promises = patterns.map((pattern) =>
+      this.invalidatePattern(pattern, options),
     );
     await Promise.all(promises);
   }
@@ -866,7 +975,11 @@ export class CacheService implements OnModuleInit {
    * @param newAlias - 새 별칭
    * @param blogId - 블로그 ID
    */
-  async invalidateAliasCache(oldAlias?: string, newAlias?: string, blogId?: string): Promise<void> {
+  async invalidateAliasCache(
+    oldAlias?: string,
+    newAlias?: string,
+    blogId?: string,
+  ): Promise<void> {
     try {
       const keysToDelete: string[] = [];
 
@@ -879,7 +992,7 @@ export class CacheService implements OnModuleInit {
           CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 2),
           CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 3),
           CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 4),
-          CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 5)
+          CacheKeys.BLOG_FEED_BY_ALIAS(oldAlias, 5),
         );
       }
 
@@ -891,7 +1004,7 @@ export class CacheService implements OnModuleInit {
           CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 2),
           CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 3),
           CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 4),
-          CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 5)
+          CacheKeys.BLOG_FEED_BY_ALIAS(newAlias, 5),
         );
       }
 
@@ -901,21 +1014,29 @@ export class CacheService implements OnModuleInit {
         // SCAN 사용으로 KEYS 대체 (블로킹 방지)
         const pattern = `cache:feed:blog:${blogId}:page:*`;
         const keys = [];
-        let cursor = '0';
+        let cursor = "0";
 
         do {
-          const result = await this.redis.scan(cursor, 'MATCH', pattern, 'COUNT', 100);
+          const result = await this.redis.scan(
+            cursor,
+            "MATCH",
+            pattern,
+            "COUNT",
+            100,
+          );
           cursor = result[0];
           const scannedKeys = result[1];
 
           if (scannedKeys.length > 0) {
             keys.push(...scannedKeys);
           }
-        } while (cursor !== '0');
+        } while (cursor !== "0");
 
         if (keys.length > 0) {
           await this.redis.del(...keys);
-          this.logger.debug(`[Cache] Invalidated ${keys.length} keys for pattern: ${pattern}`);
+          this.logger.debug(
+            `[Cache] Invalidated ${keys.length} keys for pattern: ${pattern}`,
+          );
         }
 
         // 개별 페이지 키도 추가
@@ -925,24 +1046,28 @@ export class CacheService implements OnModuleInit {
 
         // 블로그 통계 관련 캐시 무효화 (blogId 기반)
         keysToDelete.push(
-          `blog:stats:categories:id:${blogId}`,  // blogId 기반 카테고리 캐시
-          `blog:stats:posts:${blogId}`,          // 블로그 포스트 수 캐시
-          `blog:stats:activity:${blogId}:30`,    // 블로그 활동 통계 캐시
-          `blog:stats:popular:${blogId}:5`       // 블로그 인기 포스트 캐시
+          `blog:stats:categories:id:${blogId}`, // blogId 기반 카테고리 캐시
+          `blog:stats:posts:${blogId}`, // 블로그 포스트 수 캐시
+          `blog:stats:activity:${blogId}:30`, // 블로그 활동 통계 캐시
+          `blog:stats:popular:${blogId}:5`, // 블로그 인기 포스트 캐시
         );
       }
 
       // 3. 개별 키 삭제
       if (keysToDelete.length > 0) {
-        const deletePromises = keysToDelete.map(key =>
-          this.unifiedRedisService.del(`cache:${key}`).catch(err =>
-            this.logger.warn(`Failed to delete cache key ${key}:`, err)
-          )
+        const deletePromises = keysToDelete.map((key) =>
+          this.unifiedRedisService
+            .del(`cache:${key}`)
+            .catch((err) =>
+              this.logger.warn(`Failed to delete cache key ${key}:`, err),
+            ),
         );
         await Promise.all(deletePromises);
       }
 
-      this.logger.debug(`[Cache] Invalidated alias cache: old=${oldAlias}, new=${newAlias}, blogId=${blogId}`);
+      this.logger.debug(
+        `[Cache] Invalidated alias cache: old=${oldAlias}, new=${newAlias}, blogId=${blogId}`,
+      );
     } catch (error) {
       this.logger.error(`[Cache] Failed to invalidate alias cache:`, error);
     }
@@ -955,9 +1080,9 @@ export class CacheService implements OnModuleInit {
     // 5분마다 stale pending invalidations 정리
     this.cleanupInterval = setInterval(
       () => this.cleanupPendingInvalidations(),
-      5 * 60 * 1000 // 5분
+      5 * 60 * 1000, // 5분
     );
-    this.logger.debug('🕐 [Init] Cache cleanup interval started (5min)');
+    this.logger.debug("🕐 [Init] Cache cleanup interval started (5min)");
   }
 
   /**
@@ -967,12 +1092,14 @@ export class CacheService implements OnModuleInit {
     // cleanup 인터벌 정리
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
-      this.logger.debug('🛑 [Shutdown] Cache cleanup interval stopped');
+      this.logger.debug("🛑 [Shutdown] Cache cleanup interval stopped");
     }
     // 모든 pending 타임아웃 취소
     const pendingCount = this.pendingInvalidations.size;
     if (pendingCount > 0) {
-      this.logger.log(`🔚 [Shutdown] Cleaning up ${pendingCount} pending cache invalidations...`);
+      this.logger.log(
+        `🔚 [Shutdown] Cleaning up ${pendingCount} pending cache invalidations...`,
+      );
 
       for (const [pattern, timeout] of this.pendingInvalidations) {
         clearTimeout(timeout);
@@ -980,11 +1107,14 @@ export class CacheService implements OnModuleInit {
         try {
           await this.executeInvalidation(pattern);
         } catch (error) {
-          this.logger.error(`Failed to execute pending invalidation on shutdown: ${pattern}`, error.message);
+          this.logger.error(
+            `Failed to execute pending invalidation on shutdown: ${pattern}`,
+            error.message,
+          );
         }
       }
       this.pendingInvalidations.clear();
-      this.logger.log('✅ [Shutdown] All pending cache invalidations cleared');
+      this.logger.log("✅ [Shutdown] All pending cache invalidations cleared");
     }
   }
 
@@ -1001,14 +1131,17 @@ export class CacheService implements OnModuleInit {
       // 타임아웃 객체에서 남은 시간 확인 (간단한 heuristics)
       if ((timeout as any)._idleStart) {
         const elapsed = now - (timeout as any)._idleStart;
-        if (elapsed > 5 * 60 * 1000) { // 5분 초과
+        if (elapsed > 5 * 60 * 1000) {
+          // 5분 초과
           patternsToClean.push(pattern);
         }
       }
     }
 
     if (patternsToClean.length > 0) {
-      this.logger.warn(`🧹 [Cleanup] Force cleaning ${patternsToClean.length} stale pending invalidations`);
+      this.logger.warn(
+        `🧹 [Cleanup] Force cleaning ${patternsToClean.length} stale pending invalidations`,
+      );
       for (const pattern of patternsToClean) {
         const timeout = this.pendingInvalidations.get(pattern);
         if (timeout) {
@@ -1018,7 +1151,10 @@ export class CacheService implements OnModuleInit {
           try {
             await this.executeInvalidation(pattern);
           } catch (error) {
-            this.logger.error(`Failed to execute stale invalidation: ${pattern}`, error.message);
+            this.logger.error(
+              `Failed to execute stale invalidation: ${pattern}`,
+              error.message,
+            );
           }
         }
       }

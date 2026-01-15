@@ -11,31 +11,31 @@
  * /frontend/public/character 폴더에 실제로 존재하는 파일들
  */
 export const AVAILABLE_CHARACTERS = [
-  'Bimmo',
-  'Bubo',
-  'Dopi',
-  'Flynko',
-  'Jooli',
-  'Kappi',
-  'KuruPie',
-  'LumoPop',
-  'Meloon',
-  'Mippy',
-  'NibbiJoy',
-  'Paffi',
-  'Roroa',
-  'Tinko',
-  'TokaBun',
-  'Wibbo',
-  'Yuniq',
-  'Zimzo',
-  'Zupin',
+  "Bimmo",
+  "Bubo",
+  "Dopi",
+  "Flynko",
+  "Jooli",
+  "Kappi",
+  "KuruPie",
+  "LumoPop",
+  "Meloon",
+  "Mippy",
+  "NibbiJoy",
+  "Paffi",
+  "Roroa",
+  "Tinko",
+  "TokaBun",
+  "Wibbo",
+  "Yuniq",
+  "Zimzo",
+  "Zupin",
 ] as const;
 
 /**
  * 캐릭터 타입 정의
  */
-export type CharacterName = typeof AVAILABLE_CHARACTERS[number];
+export type CharacterName = (typeof AVAILABLE_CHARACTERS)[number];
 
 /**
  * 랜덤 캐릭터 선택
@@ -68,9 +68,11 @@ export function getCharacterPath(name: CharacterName): string {
  * @param {string} imagePath - 확인할 이미지 경로
  * @returns {boolean} 캐릭터 이미지 여부
  */
-export function isCharacterImage(imagePath: string | null | undefined): boolean {
+export function isCharacterImage(
+  imagePath: string | null | undefined,
+): boolean {
   if (!imagePath) return false;
-  return imagePath.startsWith('/character/') && imagePath.endsWith('.jpeg');
+  return imagePath.startsWith("/character/") && imagePath.endsWith(".jpeg");
 }
 
 /**
@@ -82,23 +84,25 @@ export function isCharacterImage(imagePath: string | null | undefined): boolean 
  * @param {string} imagePath - 확인할 이미지 경로
  * @returns {boolean} OAuth 제공자 이미지 여부
  */
-export function isOAuthProviderImage(imagePath: string | null | undefined): boolean {
+export function isOAuthProviderImage(
+  imagePath: string | null | undefined,
+): boolean {
   if (!imagePath) return false;
 
   // 외부 URL 감지 (http:// 또는 https://)
-  if (!imagePath.includes('://')) return false;
+  if (!imagePath.includes("://")) return false;
 
   // OAuth 제공자 도메인 확인
   const oauthDomains = [
-    'googleapis.com',      // Google
-    'googleusercontent.com', // Google
-    'githubusercontent.com', // GitHub
-    'github.com',          // GitHub
-    'kakaocdn.net',        // Kakao
-    'kakao.com',           // Kakao
+    "googleapis.com", // Google
+    "googleusercontent.com", // Google
+    "githubusercontent.com", // GitHub
+    "github.com", // GitHub
+    "kakaocdn.net", // Kakao
+    "kakao.com", // Kakao
   ];
 
-  return oauthDomains.some(domain => imagePath.includes(domain));
+  return oauthDomains.some((domain) => imagePath.includes(domain));
 }
 
 /**
@@ -118,8 +122,11 @@ export function isValidCharacterName(name: string): name is CharacterName {
  *
  * @returns {Array<{name: string, path: string}>} 캐릭터 이름과 경로 배열
  */
-export function getAllCharacters(): Array<{ name: CharacterName; path: string }> {
-  return AVAILABLE_CHARACTERS.map(name => ({
+export function getAllCharacters(): Array<{
+  name: CharacterName;
+  path: string;
+}> {
+  return AVAILABLE_CHARACTERS.map((name) => ({
     name,
     path: `/character/${name}.jpeg`,
   }));

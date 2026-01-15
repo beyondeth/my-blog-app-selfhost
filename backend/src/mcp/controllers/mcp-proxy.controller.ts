@@ -9,18 +9,23 @@ import {
   ForbiddenException,
   BadRequestException,
   Logger,
-} from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
-import { ThrottlerGuard } from '@nestjs/throttler';
-import { ApiKeyGuard } from '../guards/api-key.guard';
-import { PostsService } from '../../posts/posts.service';
-import { CreatePostDto } from '../../posts/dto/create-post.dto';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { ExternalImageDownloadService } from '../../files/services/external-image-download.service';
-import { Public } from '../../common/decorators/public.decorator';
-import { UsageService } from '../../usage/usage.service';
+} from "@nestjs/common";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
+import { ThrottlerGuard } from "@nestjs/throttler";
+import { ApiKeyGuard } from "../guards/api-key.guard";
+import { PostsService } from "../../posts/posts.service";
+import { CreatePostDto } from "../../posts/dto/create-post.dto";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { User } from "../../users/entities/user.entity";
+import { ExternalImageDownloadService } from "../../files/services/external-image-download.service";
+import { Public } from "../../common/decorators/public.decorator";
+import { UsageService } from "../../usage/usage.service";
 
 /**
  * MCP Proxy 컨트롤러
@@ -30,8 +35,8 @@ import { UsageService } from '../../usage/usage.service';
  * Rate Limit: 분당 3회, 시간당 10회, 하루 20회 (ThrottlerGuard 사용)
  * 인증: API Key (X-API-Key 헤더)
  */
-@ApiTags('MCP')
-@Controller('mcp')
+@ApiTags("MCP")
+@Controller("mcp")
 @Public() // JWT 가드를 우회
 @UseGuards(ThrottlerGuard) // Rate Limit 적용 (분당 3회, 시간당 10회, 하루 20회)
 @ApiBearerAuth()
@@ -50,18 +55,18 @@ export class McpProxyController {
    * MCP 헬스체크 엔드포인트
    * 연결 상태 확인용
    */
-  @Post('health')
+  @Post("health")
   @HttpCode(HttpStatus.OK)
   @ApiOperation({
-    summary: 'MCP 헬스체크',
-    description: 'MCP 서버와의 연결 상태를 확인합니다.',
+    summary: "MCP 헬스체크",
+    description: "MCP 서버와의 연결 상태를 확인합니다.",
   })
-  @ApiResponse({ status: 200, description: '정상 작동 중' })
+  @ApiResponse({ status: 200, description: "정상 작동 중" })
   health() {
     return {
-      status: 'ok',
+      status: "ok",
       timestamp: new Date().toISOString(),
-      message: 'MCP 서버가 정상 작동 중입니다.'
+      message: "MCP 서버가 정상 작동 중입니다.",
     };
   }
 
@@ -69,21 +74,22 @@ export class McpProxyController {
    * MCP를 통한 포스트 생성
    * API Key로 인증된 블로그에만 포스트 생성 가능
    */
-  @Post('posts')
+  @Post("posts")
   @UseGuards(ApiKeyGuard)
   @HttpCode(HttpStatus.ACCEPTED)
   @ApiOperation({
-    summary: 'MCP 포스트 생성 (Fast Path)',
-    description: 'MCP 클라이언트가 API Key 인증을 통해 블로그에 포스트를 생성합니다. Fast Path 방식으로 즉시 응답하고 백그라운드에서 처리합니다.',
+    summary: "MCP 포스트 생성 (Fast Path)",
+    description:
+      "MCP 클라이언트가 API Key 인증을 통해 블로그에 포스트를 생성합니다. Fast Path 방식으로 즉시 응답하고 백그라운드에서 처리합니다.",
   })
-  @ApiResponse({ status: 202, description: '포스트 생성 요청 접수 (백그라운드 처리 중)' })
-  @ApiResponse({ status: 401, description: '인증 실패' })
-  @ApiResponse({ status: 403, description: '권한 없음' })
-  @ApiResponse({ status: 400, description: '잘못된 요청' })
-  async createPost(
-    @Req() req: any,
-    @Body() createPostDto: CreatePostDto,
-  ) {
+  @ApiResponse({
+    status: 202,
+    description: "포스트 생성 요청 접수 (백그라운드 처리 중)",
+  })
+  @ApiResponse({ status: 401, description: "인증 실패" })
+  @ApiResponse({ status: 403, description: "권한 없음" })
+  @ApiResponse({ status: 400, description: "잘못된 요청" })
+  async createPost(@Req() req: any, @Body() createPostDto: CreatePostDto) {
     // API Key 정보 추출 (ApiKeyGuard에서 설정)
     const { userId, blogId } = req.apiKey;
 
@@ -101,30 +107,34 @@ export class McpProxyController {
       qualityScore: createPostDto.qualityScore,
       thumbnail: null, // thumbnail field removed - using thumbnailImageId only
       hasContent: !!createPostDto.content,
-      thumbnailImageId: createPostDto.thumbnailImageId
+      thumbnailImageId: createPostDto.thumbnailImageId,
     });
 
     // MCP 요청 필드 유효성 검사
     if (!createPostDto.title) {
-      throw new BadRequestException('제목은 필수 항목입니다');
+      throw new BadRequestException("제목은 필수 항목입니다");
     }
 
     if (!createPostDto.content_markdown && !createPostDto.content) {
-      throw new BadRequestException('콘텐츠는 필수 항목입니다 (content 또는 content_markdown)');
+      throw new BadRequestException(
+        "콘텐츠는 필수 항목입니다 (content 또는 content_markdown)",
+      );
     }
 
     if (!createPostDto.category) {
-      throw new BadRequestException('카테고리는 필수 항목입니다');
+      throw new BadRequestException("카테고리는 필수 항목입니다");
     }
 
     const postData: CreatePostDto = {
       title: createPostDto.title,
-      content_markdown: createPostDto.content_markdown,  // 원본 마크다운 콘텐츠 그대로 전달
-      tags: createPostDto.tags,  // 태그는 그대로 전달 (PostCreationService에서 처리)
+      content_markdown: createPostDto.content_markdown, // 원본 마크다운 콘텐츠 그대로 전달
+      tags: createPostDto.tags, // 태그는 그대로 전달 (PostCreationService에서 처리)
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore, // AI 품질 점수
       // thumbnail field removed - using thumbnailImageId only
-      ...(createPostDto.thumbnailImageId && { thumbnailImageId: createPostDto.thumbnailImageId }),
+      ...(createPostDto.thumbnailImageId && {
+        thumbnailImageId: createPostDto.thumbnailImageId,
+      }),
     };
 
     // Debug: MCP 요청 데이터 태그 상세 확인
@@ -135,7 +145,7 @@ export class McpProxyController {
       isArray: Array.isArray(createPostDto.tags),
       tagsLength: createPostDto.tags?.length,
       tagsContent: createPostDto.tags,
-      finalPostDataTags: postData.tags
+      finalPostDataTags: postData.tags,
     });
 
     try {
@@ -144,32 +154,43 @@ export class McpProxyController {
         // 글자수 체크 (200,000자 제한)
         const contentLength = createPostDto.content_markdown.length;
         if (contentLength > 200000) {
-          throw new BadRequestException(`포스트 내용은 최대 200,000자까지 가능합니다 (현재: ${contentLength.toLocaleString()}자)`);
+          throw new BadRequestException(
+            `포스트 내용은 최대 200,000자까지 가능합니다 (현재: ${contentLength.toLocaleString()}자)`,
+          );
         }
 
         // 바이트 크기 체크 (1MB 제한)
-        const contentSize = Buffer.byteLength(createPostDto.content_markdown, 'utf8');
+        const contentSize = Buffer.byteLength(
+          createPostDto.content_markdown,
+          "utf8",
+        );
         const maxSizeMB = 1;
         const maxSizeBytes = maxSizeMB * 1024 * 1024;
         if (contentSize > maxSizeBytes) {
           const sizeMB = (contentSize / (1024 * 1024)).toFixed(2);
-          throw new BadRequestException(`포스트 크기는 최대 ${maxSizeMB}MB까지 가능합니다 (현재: ${sizeMB}MB)`);
+          throw new BadRequestException(
+            `포스트 크기는 최대 ${maxSizeMB}MB까지 가능합니다 (현재: ${sizeMB}MB)`,
+          );
         }
 
-        this.logger.log(`[MCP Post Size Check] Length: ${contentLength.toLocaleString()} chars, Size: ${(contentSize / 1024).toFixed(2)} KB`);
+        this.logger.log(
+          `[MCP Post Size Check] Length: ${contentLength.toLocaleString()} chars, Size: ${(contentSize / 1024).toFixed(2)} KB`,
+        );
       }
 
       // 2. MCP 포스트 제한 체크 (월간 제한 확인)
       const limitCheck = await this.usageService.checkMcpPostLimit(userId);
       if (!limitCheck.canPost) {
-        this.logger.warn(`[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`);
+        this.logger.warn(
+          `[MCP Post Limit] User ${userId} exceeded limit: ${limitCheck.reason}`,
+        );
         throw new ForbiddenException(limitCheck.reason);
       }
 
       // 3. User 객체 조회 (PostsService가 User를 필요로 함)
       const user = await this.userRepository.findOne({ where: { id: userId } });
       if (!user) {
-        throw new BadRequestException('사용자를 찾을 수 없습니다');
+        throw new BadRequestException("사용자를 찾을 수 없습니다");
       }
 
       // 4. 외부 이미지 처리 (Gemini 등 외부 URL에서 이미지 다운로드)
@@ -179,88 +200,120 @@ export class McpProxyController {
 
       if (postData.content_markdown) {
         try {
-          this.logger.log(`[External Images] Starting to process external images...`);
-
-          // 콘텐츠에서 외부 이미지 URL 추출
-          const externalImageUrls = this.externalImageDownloadService.extractExternalImageUrls(
-            postData.content_markdown
+          this.logger.log(
+            `[External Images] Starting to process external images...`,
           );
 
-          if (externalImageUrls.length > 0) {
-            this.logger.log(`[External Images] Found ${externalImageUrls.length} external image(s):`, externalImageUrls);
-
-            // 외부 이미지 다운로드 및 S3 업로드 (상세 결과 반환)
-            const downloadResults = await this.externalImageDownloadService.downloadExternalImages(
-              externalImageUrls,
-              userId
+          // 콘텐츠에서 외부 이미지 URL 추출
+          const externalImageUrls =
+            this.externalImageDownloadService.extractExternalImageUrls(
+              postData.content_markdown,
             );
 
+          if (externalImageUrls.length > 0) {
+            this.logger.log(
+              `[External Images] Found ${externalImageUrls.length} external image(s):`,
+              externalImageUrls,
+            );
+
+            // 외부 이미지 다운로드 및 S3 업로드 (상세 결과 반환)
+            const downloadResults =
+              await this.externalImageDownloadService.downloadExternalImages(
+                externalImageUrls,
+                userId,
+              );
+
             // 성공/실패 분리
-            const successfulDownloads = downloadResults.filter(r => r.success);
-            const failedDownloads = downloadResults.filter(r => !r.success);
+            const successfulDownloads = downloadResults.filter(
+              (r) => r.success,
+            );
+            const failedDownloads = downloadResults.filter((r) => !r.success);
 
             // 성공한 이미지 처리
             if (successfulDownloads.length > 0) {
-              this.logger.log(`[External Images] Successfully downloaded ${successfulDownloads.length}/${externalImageUrls.length} image(s)`);
+              this.logger.log(
+                `[External Images] Successfully downloaded ${successfulDownloads.length}/${externalImageUrls.length} image(s)`,
+              );
 
               // URL 매핑 생성 (원본 URL 기반으로 정확하게 매핑)
               const urlMapping = new Map<string, string>();
 
               // 다운로드한 모든 이미지 ID 수집 (post_files 테이블 연결을 위해)
               downloadedFileIds = successfulDownloads
-                .filter(r => r.file?.id)
-                .map(r => r.file.id);
+                .filter((r) => r.file?.id)
+                .map((r) => r.file.id);
 
-              this.logger.log(`[External Images] Collected ${downloadedFileIds.length} file IDs for post attachment`);
+              this.logger.log(
+                `[External Images] Collected ${downloadedFileIds.length} file IDs for post attachment`,
+              );
 
               // 첫 번째 성공한 이미지를 썸네일로 사용 (thumbnailImageId가 없는 경우)
               if (!postData.thumbnailImageId && successfulDownloads[0]?.file) {
                 firstDownloadedImageId = successfulDownloads[0].file.id;
-                this.logger.log(`[Auto Thumbnail] Setting first downloaded image as thumbnail: ${firstDownloadedImageId}`);
+                this.logger.log(
+                  `[Auto Thumbnail] Setting first downloaded image as thumbnail: ${firstDownloadedImageId}`,
+                );
               }
 
               // 성공한 이미지의 URL 매핑
-              successfulDownloads.forEach(result => {
+              successfulDownloads.forEach((result) => {
                 if (result.cdnUrl) {
                   urlMapping.set(result.originalUrl, result.cdnUrl);
-                  this.logger.debug(`[External Images] URL mapping: ${result.originalUrl} → ${result.cdnUrl}`);
+                  this.logger.debug(
+                    `[External Images] URL mapping: ${result.originalUrl} → ${result.cdnUrl}`,
+                  );
                 }
               });
 
               // 콘텐츠의 외부 이미지 URL을 CDN URL로 변환
-              processedContent = this.externalImageDownloadService.replaceImageUrls(
-                postData.content_markdown,
-                urlMapping
-              );
+              processedContent =
+                this.externalImageDownloadService.replaceImageUrls(
+                  postData.content_markdown,
+                  urlMapping,
+                );
 
-              this.logger.log(`[External Images] Content updated with CDN URLs`);
+              this.logger.log(
+                `[External Images] Content updated with CDN URLs`,
+              );
             }
 
             // 실패한 이미지 처리 (404 등)
             if (failedDownloads.length > 0) {
-              this.logger.warn(`[External Images] Failed to download ${failedDownloads.length} image(s)`);
+              this.logger.warn(
+                `[External Images] Failed to download ${failedDownloads.length} image(s)`,
+              );
 
               // 실패한 이미지 URL 목록
-              const failedUrls = failedDownloads.map(r => r.originalUrl);
+              const failedUrls = failedDownloads.map((r) => r.originalUrl);
 
               // 에러 로깅
-              failedDownloads.forEach(result => {
-                this.logger.warn(`[External Images] Failed: ${result.originalUrl} - ${result.error}`);
+              failedDownloads.forEach((result) => {
+                this.logger.warn(
+                  `[External Images] Failed: ${result.originalUrl} - ${result.error}`,
+                );
               });
 
               // 실패한 이미지 태그를 콘텐츠에서 제거
-              processedContent = this.externalImageDownloadService.removeFailedImages(
-                processedContent,
-                failedUrls
-              );
+              processedContent =
+                this.externalImageDownloadService.removeFailedImages(
+                  processedContent,
+                  failedUrls,
+                );
 
-              this.logger.log(`[External Images] Removed ${failedUrls.length} failed image tag(s) from content`);
+              this.logger.log(
+                `[External Images] Removed ${failedUrls.length} failed image tag(s) from content`,
+              );
             }
           } else {
-            this.logger.log(`[External Images] No external images found in content`);
+            this.logger.log(
+              `[External Images] No external images found in content`,
+            );
           }
         } catch (error) {
-          this.logger.error(`[External Images] Error processing external images:`, error.stack);
+          this.logger.error(
+            `[External Images] Error processing external images:`,
+            error.stack,
+          );
           // 외부 이미지 처리 실패 시 원본 콘텐츠 사용 (포스트 생성 실패하지 않도록)
           processedContent = postData.content_markdown;
         }
@@ -276,11 +329,12 @@ export class McpProxyController {
         ...postData,
         content_markdown: processedContent,
         ...(downloadedFileIds.length > 0 && {
-          attachedFileIds: downloadedFileIds
+          attachedFileIds: downloadedFileIds,
         }),
-        ...(firstDownloadedImageId && !postData.thumbnailImageId && {
-          thumbnailImageId: firstDownloadedImageId
-        }),
+        ...(firstDownloadedImageId &&
+          !postData.thumbnailImageId && {
+            thumbnailImageId: firstDownloadedImageId,
+          }),
       };
 
       // 디버그: 최종 포스트 데이터 확인
@@ -288,19 +342,23 @@ export class McpProxyController {
         hasAttachedFileIds: !!finalPostData.attachedFileIds,
         attachedFileIdsCount: finalPostData.attachedFileIds?.length || 0,
         thumbnailImageId: finalPostData.thumbnailImageId,
-        contentLength: finalPostData.content_markdown?.length || 0
+        contentLength: finalPostData.content_markdown?.length || 0,
       });
 
       const postDto = await this.postsService.createFast(finalPostData, user);
 
       // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
       await this.usageService.trackMcpPost(userId);
-      this.logger.log(`✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`);
+      this.logger.log(
+        `✅ [MCP Usage Tracked] User ${userId} - MCP post count incremented`,
+      );
 
       // 캐시 무효화는 posts.service.ts의 createFast()에서 이벤트 발행을 통해 처리됨
       // CacheInvalidationListener가 'post.created' 이벤트를 받아 자동으로 처리
 
-      this.logger.log(`✅ [MCP Post Created - Fast Path] Post ID: ${postDto.id}, Blog: ${postDto.blog?.slug || 'undefined'}`);
+      this.logger.log(
+        `✅ [MCP Post Created - Fast Path] Post ID: ${postDto.id}, Blog: ${postDto.blog?.slug || "undefined"}`,
+      );
 
       // Debug: 생성된 포스트의 태그 정보 확인
       this.logger.debug(`[MCP Post Tags Check]`, {
@@ -310,44 +368,52 @@ export class McpProxyController {
         inputTagsType: typeof createPostDto.tags,
         postDtoTagsType: typeof postDto.tags,
         tagsArrayCheck: Array.isArray(postDto.tags),
-        tagsMatch: JSON.stringify(postDto.tags) === JSON.stringify(createPostDto.tags)
+        tagsMatch:
+          JSON.stringify(postDto.tags) === JSON.stringify(createPostDto.tags),
       });
 
       // MCP 응답 최적화: 최소 필수 정보 반환
       // blog 정보가 없을 경우를 대비한 fallback 처리
       const blogAlias = postDto.blog?.alias || postDto.blog?.slug;
-      const url = blogAlias ? `/${blogAlias}/${postDto.slug}` : `/posts/${postDto.slug}`;
+      const url = blogAlias
+        ? `/${blogAlias}/${postDto.slug}`
+        : `/posts/${postDto.slug}`;
 
       return {
         id: postDto.id,
         slug: postDto.slug,
         title: postDto.title,
         url: url,
-        blog: postDto.blog,  // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
+        blog: postDto.blog, // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
         _meta: {
           processingTime: Date.now() - startTime,
-          status: 'created'
-        },  // Fast Path 메타데이터 (처리 상태, 예상 완료 시간 등)
+          status: "created",
+        }, // Fast Path 메타데이터 (처리 상태, 예상 완료 시간 등)
       };
     } catch (error) {
       // 에러 로깅 (디버깅을 위해 전체 에러 출력)
-      this.logger.error(`[MCP Post Creation Error] ${error.message}`, error.stack);
+      this.logger.error(
+        `[MCP Post Creation Error] ${error.message}`,
+        error.stack,
+      );
 
       // 에러 처리 - 민감한 정보는 숨기고 일반적인 메시지만 반환
-      if (error.message.includes('already exists')) {
-        throw new BadRequestException('이미 존재하는 슬러그입니다');
+      if (error.message.includes("already exists")) {
+        throw new BadRequestException("이미 존재하는 슬러그입니다");
       }
-      if (error.message.includes('not found')) {
-        throw new BadRequestException('블로그를 찾을 수 없습니다');
+      if (error.message.includes("not found")) {
+        throw new BadRequestException("블로그를 찾을 수 없습니다");
       }
 
       // 원래 에러가 이미 HTTP Exception이면 그대로 던지기
-      if (error instanceof ForbiddenException || error instanceof BadRequestException) {
+      if (
+        error instanceof ForbiddenException ||
+        error instanceof BadRequestException
+      ) {
         throw error;
       }
 
-      throw new BadRequestException('포스트 생성 실패');
+      throw new BadRequestException("포스트 생성 실패");
     }
   }
-
 }

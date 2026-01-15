@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
-import { BlogEvent } from './blog-events.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { EventEmitter2, OnEvent } from "@nestjs/event-emitter";
+import { BlogEvent } from "./blog-events.enum";
 import {
   BlogCreatedEvent,
   BlogUpdatedEvent,
@@ -8,7 +8,7 @@ import {
   BlogPostEvent,
   BlogPostInteractionEvent,
   BlogStatsUpdateEvent,
-} from './dto/blog-event.dto';
+} from "./dto/blog-event.dto";
 
 /**
  * 블로그 이벤트 발행 서비스

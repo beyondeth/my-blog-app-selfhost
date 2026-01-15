@@ -1,4 +1,4 @@
-import { Conversation } from '../entities/conversation.entity';
+import { Conversation } from "../entities/conversation.entity";
 
 export interface ConversationWithUnread extends Conversation {
   unreadCount: number;

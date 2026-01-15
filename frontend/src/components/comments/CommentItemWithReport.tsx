@@ -5,6 +5,7 @@ import { FiMoreVertical, FiFlag, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { Avatar } from '@/components/ui/avatar';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
+import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 
 interface Comment {
   id: string;
@@ -141,7 +142,7 @@ export default function CommentItemWithReport({
                                 onDelete(comment.id);
                                 setShowDropdown(false);
                               }}
-                              className="flex items-center w-full px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                              className={`flex items-center w-full px-3 py-2 text-sm transition-colors ${DESTRUCTIVE_ACTION_CLASS}`}
                             >
                               <FiTrash2 className="mr-2 w-3 h-3" />
                               삭제

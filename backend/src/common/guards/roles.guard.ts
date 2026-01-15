@@ -1,8 +1,13 @@
-import { Injectable, CanActivate, ExecutionContext, Logger } from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { Role } from '../enums/role.enum';
-import { ROLES_KEY } from '../decorators/roles.decorator';
-import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  Logger,
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { Role } from "../enums/role.enum";
+import { ROLES_KEY } from "../decorators/roles.decorator";
+import { IS_PUBLIC_KEY } from "../decorators/public.decorator";
 
 @Injectable()
 export class RolesGuard implements CanActivate {
@@ -22,7 +27,9 @@ export class RolesGuard implements CanActivate {
 
     // If it's a public route, skip role checking
     if (isPublic) {
-      this.logger.debug(`[RolesGuard] Route "${route}" is public, skipping role check`);
+      this.logger.debug(
+        `[RolesGuard] Route "${route}" is public, skipping role check`,
+      );
       return true;
     }
 
@@ -32,34 +39,46 @@ export class RolesGuard implements CanActivate {
     ]);
 
     if (!requiredRoles) {
-      this.logger.debug(`[RolesGuard] Route "${route}" has no required roles, allowing access`);
+      this.logger.debug(
+        `[RolesGuard] Route "${route}" has no required roles, allowing access`,
+      );
       return true;
     }
 
     const { user } = request;
 
     if (!user) {
-      this.logger.error(`[RolesGuard] No user found in request for route "${route}"`);
+      this.logger.error(
+        `[RolesGuard] No user found in request for route "${route}"`,
+      );
       return false;
     }
 
     // 사용자 정보 상세 로깅 (민감정보 마스킹)
-    const userId = user.id ? user.id.substring(0, 8) + '...' : 'unknown';
-    const userEmail = user.email ? user.email.split('@')[0] + '***' : 'unknown';
+    const userId = user.id ? user.id.substring(0, 8) + "..." : "unknown";
+    const userEmail = user.email ? user.email.split("@")[0] + "***" : "unknown";
 
     this.logger.debug(`[RolesGuard] Route: "${route}"`);
     this.logger.debug(`[RolesGuard] User ID: ${userId}, Email: ${userEmail}`);
-    this.logger.debug(`[RolesGuard] User role: "${user.role}" (type: ${typeof user.role})`);
-    this.logger.debug(`[RolesGuard] Required roles: ${JSON.stringify(requiredRoles)}`);
+    this.logger.debug(
+      `[RolesGuard] User role: "${user.role}" (type: ${typeof user.role})`,
+    );
+    this.logger.debug(
+      `[RolesGuard] Required roles: ${JSON.stringify(requiredRoles)}`,
+    );
 
     const hasRole = requiredRoles.some((role) => user.role === role);
 
     if (hasRole) {
-      this.logger.debug(`[RolesGuard] Access granted for user "${userEmail}" with role "${user.role}"`);
+      this.logger.debug(
+        `[RolesGuard] Access granted for user "${userEmail}" with role "${user.role}"`,
+      );
     } else {
-      this.logger.warn(`[RolesGuard] Access denied for user "${userEmail}" with role "${user.role}", required: ${JSON.stringify(requiredRoles)}`);
+      this.logger.warn(
+        `[RolesGuard] Access denied for user "${userEmail}" with role "${user.role}", required: ${JSON.stringify(requiredRoles)}`,
+      );
     }
 
     return hasRole;
   }
-} 
+}

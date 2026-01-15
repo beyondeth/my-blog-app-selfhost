@@ -1,11 +1,15 @@
 "use client";
 
-import React from 'react';
+import React, { useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { FiEye, FiHeart, FiMessageCircle, FiTarget } from 'react-icons/fi';
+import { FiEye, FiMessageCircle, FiTarget } from 'react-icons/fi';
+import { useQueryClient } from '@tanstack/react-query';
 import SidebarSection from './SidebarSection';
 import { useEditorPicks } from '@/hooks/useEditorPicks';
+import { useVote } from '@/hooks/useVote';
+import { VoteButton } from '@/components/ui/VoteButton';
+import type { VoteType } from '@/types';
 
 /**
  * Editor's Pick 섹션 컴포넌트
@@ -14,8 +18,73 @@ import { useEditorPicks } from '@/hooks/useEditorPicks';
  */
 const EditorPickSection = React.memo(function EditorPickSection() {
   const { data, isLoading, error } = useEditorPicks(5); // 최대 5개 노출
+  const queryClient = useQueryClient();
+  const { mutate: vote } = useVote();
 
   const posts = data?.posts || [];
+
+  /**
+   * 투표 핸들러
+   * - 낙관적 업데이트로 에디터 픽 캐시 즉시 업데이트
+   * - useVote 훅을 통해 API 호출 및 다른 캐시 동기화
+   */
+  const handleVote = useCallback(
+    (postId: string, voteType: 'upvote' | 'downvote', currentPost: any) => {
+      // 에디터 픽 캐시 낙관적 업데이트
+      queryClient.setQueryData(['editorPicks', 5], (oldData: any) => {
+        if (!oldData?.posts) return oldData;
+
+        return {
+          ...oldData,
+          posts: oldData.posts.map((post: any) => {
+            if (post.id !== postId) return post;
+
+            const currentVote = post.userVote || null;
+            let nextVote: VoteType = null;
+            let upvoteCount = post.upvoteCount || 0;
+            let downvoteCount = post.downvoteCount || 0;
+
+            // 같은 투표 → 취소
+            if (currentVote === voteType) {
+              nextVote = null;
+              if (voteType === 'upvote') upvoteCount--;
+              else downvoteCount--;
+            }
+            // 투표 없음 → 새 투표
+            else if (currentVote === null) {
+              nextVote = voteType;
+              if (voteType === 'upvote') upvoteCount++;
+              else downvoteCount++;
+            }
+            // 다른 투표 → 전환
+            else {
+              nextVote = voteType;
+              if (voteType === 'upvote') {
+                upvoteCount++;
+                downvoteCount--;
+              } else {
+                upvoteCount--;
+                downvoteCount++;
+              }
+            }
+
+            return {
+              ...post,
+              userVote: nextVote,
+              upvoteCount,
+              downvoteCount,
+              score: upvoteCount - downvoteCount,
+              likeCount: upvoteCount,
+            };
+          }),
+        };
+      });
+
+      // API 호출
+      vote({ postId, voteType });
+    },
+    [queryClient, vote]
+  );
 
   return (
     <SidebarSection
@@ -106,16 +175,21 @@ const EditorPickSection = React.memo(function EditorPickSection() {
                   </h4>
                 </Link>
 
-                {/* 통계 정보 (조회수, 좋아요, 댓글) */}
+                {/* 통계 정보 (조회수, 투표, 댓글) */}
                 <div className="flex items-center gap-3 text-[13px] text-gray-500 dark:text-[#cccccc] mt-2">
                   <div className="flex items-center gap-1">
                     <FiEye className="w-3 h-3" />
                     <span>{post.viewCount || 0}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <FiHeart className="w-3 h-3" />
-                    <span>{post.likeCount || 0}</span>
-                  </div>
+                  <VoteButton
+                    upvoteCount={post.upvoteCount || 0}
+                    downvoteCount={post.downvoteCount || 0}
+                    userVote={post.userVote || null}
+                    onVote={(voteType) => handleVote(post.id, voteType, post)}
+                    layout="horizontal"
+                    compact={true}
+                    displayMode="separated"
+                  />
                   <div className="flex items-center gap-1">
                     <FiMessageCircle className="w-3 h-3" />
                     <span>{post.commentCount || 0}</span>

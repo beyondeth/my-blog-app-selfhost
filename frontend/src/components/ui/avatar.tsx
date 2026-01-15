@@ -14,6 +14,7 @@ interface AvatarProps {
   className?: string;
   onClick?: () => void;
   priority?: boolean; // LCP 최적화: 헤더 프로필 이미지 우선 로드
+  imageFit?: 'cover' | 'contain';
 }
 
 const sizeClasses = {
@@ -39,7 +40,8 @@ export function Avatar({
   size = 'sm',
   className,
   onClick,
-  priority = false // 기본값: lazy loading
+  priority = false, // 기본값: lazy loading
+  imageFit = 'cover',
 }: AvatarProps) {
   const [imageError, setImageError] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -74,7 +76,10 @@ export function Avatar({
     <div
       className={cn(
         sizeClasses[size],
-        'rounded-full overflow-hidden bg-gray-200 relative',
+        'rounded-full overflow-hidden relative flex items-center justify-center',
+        imageFit === 'cover'
+          ? 'bg-gray-200'
+          : 'bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 p-0.5',
         onClick && 'cursor-pointer hover:opacity-90 transition-opacity',
         className
       )}
@@ -88,7 +93,7 @@ export function Avatar({
         alt={alt}
         fill
         sizes={size === 'xs' ? '24px' : size === 'sm' ? '32px' : size === 'md' ? '40px' : size === 'lg' ? '48px' : '64px'}
-        className="object-contain"
+        className={cn(imageFit === 'cover' ? 'object-cover' : 'object-contain')}
         priority={priority}
         onLoad={() => setIsLoading(false)}
         onError={() => {

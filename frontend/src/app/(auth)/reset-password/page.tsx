@@ -33,8 +33,34 @@ function ResetPasswordPageContent() {
     special: false,
   });
 
+  const [error, setError] = useState<string | null>(null);
+
   // Token validation on mount
   useEffect(() => {
+    const validateToken = async () => {
+      try {
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/validate-reset-token`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ token }),
+          }
+        );
+
+        if (response.ok) {
+          setTokenValid(true);
+        } else {
+          setTokenValid(false);
+        }
+      } catch (error) {
+        console.error('Token validation failed:', error);
+        setTokenValid(false);
+      }
+    };
+
     if (!token) {
       setTokenValid(false);
       return;
@@ -43,55 +69,35 @@ function ResetPasswordPageContent() {
     validateToken();
   }, [token]);
 
-  // Password strength checker
+  // Password strength calculation
   useEffect(() => {
-    setPasswordStrength({
+    const strength = {
       length: password.length >= 8,
       uppercase: /[A-Z]/.test(password),
       lowercase: /[a-z]/.test(password),
       number: /[0-9]/.test(password),
       special: /[!@#$%^&*(),.?":{}|<>]/.test(password),
-    });
+    };
+    setPasswordStrength(strength);
+    if (error) setError(null); // Clear error on input change
   }, [password]);
 
-  const validateToken = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/validate-reset-token`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token }),
-        }
-      );
-
-      if (response.ok) {
-        setTokenValid(true);
-      } else {
-        setTokenValid(false);
-      }
-    } catch (error) {
-      console.error('Token validation failed:', error);
-      setTokenValid(false);
-    }
-  };
-
   const validatePassword = () => {
+    setError(null);
+
     if (password.length < 8) {
-      toast.error('비밀번호는 최소 8자 이상이어야 합니다');
+      setError('비밀번호는 최소 8자 이상이어야 합니다');
       return false;
     }
 
     const strength = Object.values(passwordStrength).filter(Boolean).length;
     if (strength < 3) {
-      toast.error('비밀번호가 너무 약합니다');
+      setError('비밀번호가 너무 약합니다');
       return false;
     }
 
     if (password !== confirmPassword) {
-      toast.error('비밀번호가 일치하지 않습니다');
+      setError('비밀번호가 일치하지 않습니다');
       return false;
     }
 
@@ -100,6 +106,7 @@ function ResetPasswordPageContent() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError(null);
 
     if (!validatePassword()) {
       return;
@@ -126,7 +133,7 @@ function ResetPasswordPageContent() {
 
       if (response.ok) {
         setIsSuccess(true);
-        toast.success('비밀번호가 변경되었습니다');
+        // Toast removed as per request
         
         // 3초 후 로그인 페이지로 이동
         setTimeout(() => {
@@ -134,18 +141,18 @@ function ResetPasswordPageContent() {
         }, 3000);
       } else {
         if (data.message?.includes('expired')) {
-          toast.error('링크가 만료되었습니다. 다시 요청해주세요.');
+          setError('링크가 만료되었습니다. 다시 요청해주세요.');
           setTokenValid(false);
         } else if (data.message?.includes('invalid')) {
-          toast.error('유효하지 않은 링크입니다.');
+          setError('유효하지 않은 링크입니다.');
           setTokenValid(false);
         } else {
-          toast.error(data.message || '비밀번호 변경에 실패했습니다');
+          setError(data.message || '비밀번호 변경에 실패했습니다');
         }
       }
     } catch (error) {
       console.error('Password reset failed:', error);
-      toast.error('오류가 발생했습니다. 다시 시도해주세요.');
+      setError('오류가 발생했습니다. 다시 시도해주세요.');
     } finally {
       setIsSubmitting(false);
     }
@@ -306,6 +313,14 @@ function ResetPasswordPageContent() {
                 </div>
               </div>
             </div>
+
+            {/* Error Message Inline */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm flex items-start gap-2 mb-4">
+                <AlertCircle className="h-5 w-5 flex-shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
 
             <button
               type="submit"

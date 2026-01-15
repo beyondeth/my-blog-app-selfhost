@@ -3,16 +3,29 @@
 import React from 'react';
 import Link from 'next/link';
 import { FiCalendar, FiEye } from 'react-icons/fi';
+import { Sparkles } from 'lucide-react';
 import { Post } from '@/types';
 import SidebarSection from './SidebarSection';
 
 interface RecentPostsSectionProps {
   posts: Post[];
+  className?: string;
 }
 
-const RecentPostsSection = React.memo(function RecentPostsSection({ posts }: RecentPostsSectionProps) {
+const RecentPostsSection = React.memo(function RecentPostsSection({
+  posts,
+  className,
+}: RecentPostsSectionProps) {
   return (
-    <SidebarSection title="최근 포스트">
+    <SidebarSection
+      className={className}
+      title={
+        <div className="flex items-center gap-2">
+          <Sparkles className="w-4 h-4 text-gray-700 dark:text-gray-300" />
+          <span>최근 포스트</span>
+        </div>
+      }
+    >
       <div className="space-y-3 sm:space-y-3">
         {posts.map((post) => (
           <div key={post.id} className="pb-3 sm:pb-3 border-b border-gray-100 dark:border-gray-700 last:border-b-0">

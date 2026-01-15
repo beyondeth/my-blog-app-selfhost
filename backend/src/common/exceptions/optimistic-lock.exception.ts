@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { ConflictException } from "@nestjs/common";
 
 /**
  * 낙관적 잠금 충돌 예외
@@ -62,11 +62,11 @@ export class OptimisticLockException extends ConflictException {
       expectedVersion,
       actualVersion,
       retryable: true, // 클라이언트가 재시도 가능함을 명시
-      code: 'OPTIMISTIC_LOCK_ERROR',
+      code: "OPTIMISTIC_LOCK_ERROR",
     });
 
     // 에러 이름 설정 (디버깅 시 유용)
-    this.name = 'OptimisticLockException';
+    this.name = "OptimisticLockException";
   }
 
   /**

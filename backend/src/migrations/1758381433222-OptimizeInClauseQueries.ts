@@ -1,6 +1,8 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class OptimizeInClauseQueries1758381433222 implements MigrationInterface {
+export class OptimizeInClauseQueries1758381433222
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // IN 절 쿼리 최적화를 위한 인덱스 생성
     // ID와 isPublished를 함께 인덱싱하여 IN 절과 WHERE 절을 동시에 최적화
@@ -42,6 +44,8 @@ export class OptimizeInClauseQueries1758381433222 implements MigrationInterface 
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_id_published"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_blogs_id_public"`);
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_blog_published"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_author_published"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_posts_author_published"`,
+    );
   }
 }

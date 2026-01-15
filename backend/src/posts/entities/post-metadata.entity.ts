@@ -8,9 +8,9 @@ import {
   JoinColumn,
   BeforeInsert,
   Index,
-} from 'typeorm';
-import { v7 as uuidv7 } from 'uuid';
-import { Post } from './post.entity';
+} from "typeorm";
+import { v7 as uuidv7 } from "uuid";
+import { Post } from "./post.entity";
 
 /**
  * PostMetadata 엔티티
@@ -33,17 +33,17 @@ import { Post } from './post.entity';
  * - processingCompletedAt: 백그라운드 작업 완료 시간
  * - indexedAt: 검색 인덱스 생성 시간
  */
-@Entity('post_metadata')
-@Index(['postId'], { unique: true }) // 1:1 관계 보장
-@Index(['category']) // 카테고리별 필터링 최적화
-@Index(['isEditorPick', 'editorPickedAt']) // 에디터픽 조회 최적화
-@Index(['indexedAt']) // 검색 인덱싱 배치 작업용
+@Entity("post_metadata")
+@Index(["postId"], { unique: true }) // 1:1 관계 보장
+@Index(["category"]) // 카테고리별 필터링 최적화
+@Index(["isEditorPick", "editorPickedAt"]) // 에디터픽 조회 최적화
+@Index(["indexedAt"]) // 검색 인덱싱 배치 작업용
 export class PostMetadata {
   /**
    * 기본 키 (UUID v7)
    * - 시간순 정렬로 메타데이터 생성 순서 파악 용이
    */
-  @PrimaryColumn('uuid')
+  @PrimaryColumn("uuid")
   id: string;
 
   /**
@@ -51,11 +51,11 @@ export class PostMetadata {
    * - onDelete: 'CASCADE' → Post 삭제 시 PostMetadata도 자동 삭제
    * - nullable: false → Post 없이 PostMetadata 존재 불가
    */
-  @OneToOne(() => Post, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'postId' })
+  @OneToOne(() => Post, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "postId" })
   post: Post;
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: "uuid", nullable: false })
   postId: string;
 
   /**
@@ -65,7 +65,7 @@ export class PostMetadata {
    * - SNS 공유 시 미리보기
    * - null: 자동 생성 안 됨
    */
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   excerpt: string;
 
   /**
@@ -75,7 +75,7 @@ export class PostMetadata {
    * - 최대 10개까지 권장
    * - 예: ["TypeScript", "NestJS", "PostgreSQL"]
    */
-  @Column('jsonb', { default: [] })
+  @Column("jsonb", { default: [] })
   tags: string[];
 
   /**
@@ -89,7 +89,7 @@ export class PostMetadata {
    * - 데이터: Database, AI/ML, Data Engineering
    * - 기타: Essay, Review, Tutorial
    */
-  @Column({ default: '기타' })
+  @Column({ default: "기타" })
   category: string;
 
   /**
@@ -98,7 +98,7 @@ export class PostMetadata {
    * - 'markdown': 마크다운 에디터
    * - 향후 확장: 'video', 'podcast' 등
    */
-  @Column({ type: 'varchar', default: 'html', nullable: true })
+  @Column({ type: "varchar", default: "html", nullable: true })
   content_type: string;
 
   /**
@@ -107,7 +107,7 @@ export class PostMetadata {
    * - 캐시 무효화 기준
    * - null: 렌더링 안 됨 (draft 상태)
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   content_rendered_at: Date;
 
   /**
@@ -116,7 +116,7 @@ export class PostMetadata {
    * - 최신 포스트 정렬 기준
    * - null: 미발행 (draft)
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   publishedAt: Date;
 
   /**
@@ -134,7 +134,7 @@ export class PostMetadata {
    * - 관리자 로그 (누가 언제 선정했는지)
    * - null: 에디터픽 아님
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   editorPickedAt: Date;
 
   /**
@@ -144,7 +144,7 @@ export class PostMetadata {
    * - 썸네일 생성 실패 등
    * - 관리자 대시보드에서 확인
    */
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   processingError: string;
 
   /**
@@ -153,7 +153,7 @@ export class PostMetadata {
    * - 모니터링: 처리 시간 추적
    * - null: 처리 중 또는 실패
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   processingCompletedAt: Date;
 
   /**
@@ -161,7 +161,7 @@ export class PostMetadata {
    * - 읽기 시간 계산용
    * - 콘텐츠 길이 통계
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   wordCount: number;
 
   /**
@@ -169,21 +169,21 @@ export class PostMetadata {
    * - 평균 200단어/분 기준
    * - 목록 표시용
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   readingTimeMinutes: number;
 
   /**
    * 마지막 편집 시간
    * - 편집 이력 추적
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   lastEditedAt: Date;
 
   /**
    * 편집 횟수
    * - 포스트 수정 횟수
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   editCount: number;
 
   /**
@@ -197,7 +197,7 @@ export class PostMetadata {
    * - 또는 배치 작업으로 주기적 재인덱싱
    */
   @Column({
-    type: 'tsvector',
+    type: "tsvector",
     nullable: true,
     select: false,
   })
@@ -209,13 +209,13 @@ export class PostMetadata {
    * - 배치 작업: indexedAt이 null인 포스트만 인덱싱
    * - null: 미인덱싱 상태
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   indexedAt: Date;
 
-  @CreateDateColumn({ name: 'createdAt' })
+  @CreateDateColumn({ name: "createdAt" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updatedAt' })
+  @UpdateDateColumn({ name: "updatedAt" })
   updatedAt: Date;
 
   /**

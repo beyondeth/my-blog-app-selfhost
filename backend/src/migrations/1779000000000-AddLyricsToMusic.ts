@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 음악 테이블에 가사 컬럼 추가
@@ -7,7 +7,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   JSONB 형태: [{ time: number(ms), text: string }, ...]
  */
 export class AddLyricsToMusic1779000000000 implements MigrationInterface {
-  name = 'AddLyricsToMusic1779000000000';
+  name = "AddLyricsToMusic1779000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 일반 가사 컬럼 추가 (긴 텍스트이므로 TEXT 타입)

@@ -1,15 +1,23 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { Interval, SchedulerRegistry } from '@nestjs/schedule';
-import { ChatQueueService } from './chat-queue.service';
-import { MessageRepository } from '../repositories/message.repository';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  OnModuleDestroy,
+} from "@nestjs/common";
+import { Interval, SchedulerRegistry } from "@nestjs/schedule";
+import { ChatQueueService } from "./chat-queue.service";
+import { MessageRepository } from "../repositories/message.repository";
 import {
   BatchResult,
   QueuedMessage,
   QueueMetrics,
-} from '../interfaces/message-queue.interface';
-import { BatchConfig, DEFAULT_BATCH_CONFIG } from '../interfaces/batch-config.interface';
-import { ChatMetricsService } from '../../metrics/chat-metrics.service';
-import { RedisMonitoringService } from '../../redis/redis-monitoring.service';
+} from "../interfaces/message-queue.interface";
+import {
+  BatchConfig,
+  DEFAULT_BATCH_CONFIG,
+} from "../interfaces/batch-config.interface";
+import { ChatMetricsService } from "../../metrics/chat-metrics.service";
+import { RedisMonitoringService } from "../../redis/redis-monitoring.service";
 
 @Injectable()
 export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
@@ -32,7 +40,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit() {
-    this.logger.log('ChatBatchService initialized');
+    this.logger.log("ChatBatchService initialized");
 
     // Check and update Redis connection status
     await this.updateRedisConnectionStatus();
@@ -45,7 +53,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy() {
-    this.logger.log('ChatBatchService shutting down');
+    this.logger.log("ChatBatchService shutting down");
 
     // Stop interval
     if (this.intervalHandle) {
@@ -68,7 +76,9 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
       await this.processBatch();
     }, this.config.batchInterval);
 
-    this.logger.log(`Batch processing started with ${this.config.batchInterval}ms interval`);
+    this.logger.log(
+      `Batch processing started with ${this.config.batchInterval}ms interval`,
+    );
   }
 
   /**
@@ -79,10 +89,15 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
       const metrics = await this.queueService.getMetrics();
 
       // Prometheus 메트릭 업데이트
-      this.metricsService.updateQueueMetrics(metrics.queueSize, metrics.dlqSize);
+      this.metricsService.updateQueueMetrics(
+        metrics.queueSize,
+        metrics.dlqSize,
+      );
 
       if (metrics.queueSize > 0) {
-        this.logger.log(`Found ${metrics.queueSize} pending messages from previous session`);
+        this.logger.log(
+          `Found ${metrics.queueSize} pending messages from previous session`,
+        );
         await this.processBatch();
       }
 
@@ -91,7 +106,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
         await this.recoverDeadLetterQueue();
       }
     } catch (error) {
-      this.logger.error('Failed to process initial queue:', error);
+      this.logger.error("Failed to process initial queue:", error);
     }
   }
 
@@ -101,13 +116,13 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
   async processBatch(): Promise<BatchResult> {
     // Prevent concurrent processing
     if (this.isProcessing) {
-      this.logger.debug('Batch processing already in progress, skipping');
+      this.logger.debug("Batch processing already in progress, skipping");
       return {
         success: false,
         processedCount: 0,
         failedCount: 0,
         processingTime: 0,
-        error: 'Processing already in progress',
+        error: "Processing already in progress",
       };
     }
 
@@ -117,7 +132,9 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
 
     try {
       // Get messages from queue
-      const messages = await this.queueService.dequeueMessages(this.config.batchSize);
+      const messages = await this.queueService.dequeueMessages(
+        this.config.batchSize,
+      );
 
       if (messages.length === 0) {
         const processingTime = Date.now() - startTime;
@@ -133,7 +150,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
       this.logger.debug(`Processing batch of ${messages.length} messages`);
 
       // 메시지 지연 시간 계산 및 기록
-      messages.forEach(msg => {
+      messages.forEach((msg) => {
         if (msg.queuedAt) {
           const latency = Date.now() - new Date(msg.queuedAt).getTime();
           this.metricsService.recordMessageLatency(latency);
@@ -160,11 +177,16 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
         this.consecutiveFailures = 0;
         this.metricsService.updateConsecutiveFailures(0);
 
-        this.logger.log(`Successfully processed ${messages.length} messages in ${processingTime}ms`);
+        this.logger.log(
+          `Successfully processed ${messages.length} messages in ${processingTime}ms`,
+        );
 
         // 큐 메트릭 업데이트
         const metrics = await this.queueService.getMetrics();
-        this.metricsService.updateQueueMetrics(metrics.queueSize, metrics.dlqSize);
+        this.metricsService.updateQueueMetrics(
+          metrics.queueSize,
+          metrics.dlqSize,
+        );
 
         return {
           success: true,
@@ -173,7 +195,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
           processingTime,
         };
       } catch (dbError) {
-        this.logger.error('Failed to save messages to database:', dbError);
+        this.logger.error("Failed to save messages to database:", dbError);
 
         // Move failed messages to DLQ if enabled
         if (this.config.dlqEnabled) {
@@ -196,7 +218,9 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
 
         // Check if we should pause processing
         if (this.consecutiveFailures >= this.MAX_CONSECUTIVE_FAILURES) {
-          this.logger.error(`Reached ${this.MAX_CONSECUTIVE_FAILURES} consecutive failures, pausing batch processing`);
+          this.logger.error(
+            `Reached ${this.MAX_CONSECUTIVE_FAILURES} consecutive failures, pausing batch processing`,
+          );
           clearInterval(this.intervalHandle);
         }
 
@@ -212,7 +236,10 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
 
         // 큐 메트릭 업데이트
         const metrics = await this.queueService.getMetrics();
-        this.metricsService.updateQueueMetrics(metrics.queueSize, metrics.dlqSize);
+        this.metricsService.updateQueueMetrics(
+          metrics.queueSize,
+          metrics.dlqSize,
+        );
 
         return {
           success: false,
@@ -224,7 +251,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
         };
       }
     } catch (error) {
-      this.logger.error('Unexpected error in batch processing:', error);
+      this.logger.error("Unexpected error in batch processing:", error);
 
       const processingTime = Date.now() - startTime;
       this.metricsService.endBatchProcessing(processingTime, 0, 0, 0);
@@ -254,11 +281,12 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
    */
   async recoverDeadLetterQueue(limit: number = 10): Promise<number> {
     try {
-      const messages = await this.queueService.recoverFromDeadLetterQueue(limit);
+      const messages =
+        await this.queueService.recoverFromDeadLetterQueue(limit);
       this.logger.log(`Recovered ${messages.length} messages from DLQ`);
       return messages.length;
     } catch (error) {
-      this.logger.error('Failed to recover DLQ messages:', error);
+      this.logger.error("Failed to recover DLQ messages:", error);
       return 0;
     }
   }
@@ -302,7 +330,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
     this.consecutiveFailures = 0;
     this.startBatchProcessing();
 
-    this.logger.log('Batch processing resumed');
+    this.logger.log("Batch processing resumed");
   }
 
   /**
@@ -319,7 +347,7 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
       this.startBatchProcessing();
     }
 
-    this.logger.log('Batch configuration updated:', this.config);
+    this.logger.log("Batch configuration updated:", this.config);
   }
 
   /**
@@ -333,14 +361,14 @@ export class ChatBatchService implements OnModuleInit, OnModuleDestroy {
       // Only log when connection status changes
       if (this.lastRedisConnectionStatus !== isConnected) {
         if (isConnected) {
-          this.logger.log('Redis connection restored');
+          this.logger.log("Redis connection restored");
         } else {
-          this.logger.warn('Redis connection lost');
+          this.logger.warn("Redis connection lost");
         }
         this.lastRedisConnectionStatus = isConnected;
       }
     } catch (error) {
-      this.logger.error('Failed to check Redis connection status:', error);
+      this.logger.error("Failed to check Redis connection status:", error);
       this.metricsService.updateRedisConnectionStatus(false);
       this.lastRedisConnectionStatus = false;
     }

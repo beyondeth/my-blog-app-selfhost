@@ -1,6 +1,15 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsDate, IsNumber } from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+  IsIn,
+  IsDate,
+  IsNumber,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * Cursor Pagination용 포스트 조회 DTO
@@ -27,15 +36,15 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
  */
 export class GetPostsCursorDto {
   @ApiPropertyOptional({
-    description: 'Cursor (Base64 인코딩된 문자열, 첫 페이지는 생략)',
-    example: 'MjAyNS0wMS0yMFQxMjowMDowMC4wMDBafGFiYzEyMw==',
+    description: "Cursor (Base64 인코딩된 문자열, 첫 페이지는 생략)",
+    example: "MjAyNS0wMS0yMFQxMjowMDowMC4wMDBafGFiYzEyMw==",
   })
   @IsOptional()
   @IsString()
   cursor?: string;
 
   @ApiPropertyOptional({
-    description: '페이지당 항목 수 (기본: 20, 최대: 50)',
+    description: "페이지당 항목 수 (기본: 20, 최대: 50)",
     minimum: 1,
     maximum: 50,
     default: 20,
@@ -48,39 +57,59 @@ export class GetPostsCursorDto {
   limit?: number = 20;
 
   @ApiPropertyOptional({
-    description: '정렬 방식 (recent: 최신순, popular: 인기순, trending: 트렌딩)',
-    enum: ['recent', 'popular', 'trending'],
-    default: 'recent',
+    description:
+      "정렬 방식 (recent: 최신순, popular: 인기순, trending: 트렌딩)",
+    enum: ["recent", "popular", "trending"],
+    default: "recent",
   })
   @IsOptional()
-  @IsIn(['recent', 'popular', 'trending'])
-  sort?: 'recent' | 'popular' | 'trending' = 'recent';
+  @IsIn(["recent", "popular", "trending"])
+  sort?: "recent" | "popular" | "trending" = "recent";
 
   // 호환성을 위한 필드들
   @IsOptional()
-  @IsIn(['ASC', 'DESC'])
-  sortOrder?: 'ASC' | 'DESC' = 'DESC';
+  @IsIn(["ASC", "DESC"])
+  sortOrder?: "ASC" | "DESC" = "DESC";
 
   @IsOptional()
-  @IsIn(['recent', 'popular', 'trending', 'editorPicks', 'published', 'views', 'likes', 'comments', 'title'])
-  sortBy?: 'recent' | 'popular' | 'trending' | 'editorPicks' | 'published' | 'views' | 'likes' | 'comments' | 'title' = 'recent';
+  @IsIn([
+    "recent",
+    "popular",
+    "trending",
+    "editorPicks",
+    "published",
+    "views",
+    "likes",
+    "comments",
+    "title",
+  ])
+  sortBy?:
+    | "recent"
+    | "popular"
+    | "trending"
+    | "editorPicks"
+    | "published"
+    | "views"
+    | "likes"
+    | "comments"
+    | "title" = "recent";
 
   @ApiPropertyOptional({
-    description: '태그 필터',
-    example: 'javascript',
+    description: "태그 필터",
+    example: "javascript",
   })
   @IsOptional()
   @IsString()
   tag?: string;
 
   @ApiPropertyOptional({
-    description: '시작일',
+    description: "시작일",
   })
   @IsOptional()
   dateFrom?: Date;
 
   @ApiPropertyOptional({
-    description: '종료일',
+    description: "종료일",
   })
   @IsOptional()
   dateTo?: Date;
@@ -90,32 +119,32 @@ export class GetPostsCursorDto {
   cursorRank?: number;
 
   @ApiPropertyOptional({
-    description: '카테고리 필터 (예: JavaScript, JavaScript/React)',
-    example: 'JavaScript/React',
+    description: "카테고리 필터 (예: JavaScript, JavaScript/React)",
+    example: "JavaScript/React",
   })
   @IsOptional()
   @IsString()
   category?: string;
 
   @ApiPropertyOptional({
-    description: '블로그 슬러그 (특정 블로그의 포스트만 조회)',
-    example: 'john-blog',
+    description: "블로그 슬러그 (특정 블로그의 포스트만 조회)",
+    example: "john-blog",
   })
   @IsOptional()
   @IsString()
   blogSlug?: string;
 
   @ApiPropertyOptional({
-    description: '블로그 ID (특정 블로그의 포스트만 조회)',
-    example: '019a77ab-d4c1-7313-bd30-3485ae91e7af',
+    description: "블로그 ID (특정 블로그의 포스트만 조회)",
+    example: "019a77ab-d4c1-7313-bd30-3485ae91e7af",
   })
   @IsOptional()
   @IsString()
   blogId?: string;
 
   @ApiPropertyOptional({
-    description: '검색 키워드 (제목, 내용, 태그 검색)',
-    example: 'React Hooks',
+    description: "검색 키워드 (제목, 내용, 태그 검색)",
+    example: "React Hooks",
   })
   @IsOptional()
   @IsString()

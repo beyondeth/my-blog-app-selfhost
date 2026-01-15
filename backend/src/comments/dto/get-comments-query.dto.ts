@@ -1,6 +1,14 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsISO8601 } from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsOptional,
+  IsString,
+  IsInt,
+  Min,
+  Max,
+  IsIn,
+  IsISO8601,
+} from "class-validator";
+import { Type } from "class-transformer";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * 댓글 페이지네이션 조회 DTO
@@ -21,15 +29,15 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
  */
 export class GetCommentsDto {
   @ApiPropertyOptional({
-    description: 'Base64 인코딩된 커서 (다음 페이지 요청 시 사용)',
-    example: 'eyJjcmVhdGVkQXQiOiIyMDI1LTEwLTIwVDEyOjAwOjAwWiIsImlkIjoidXVpZCJ9',
+    description: "Base64 인코딩된 커서 (다음 페이지 요청 시 사용)",
+    example: "eyJjcmVhdGVkQXQiOiIyMDI1LTEwLTIwVDEyOjAwOjAwWiIsImlkIjoidXVpZCJ9",
   })
   @IsOptional()
   @IsString()
   cursor?: string;
 
   @ApiPropertyOptional({
-    description: '페이지당 댓글 개수',
+    description: "페이지당 댓글 개수",
     minimum: 1,
     maximum: 50,
     default: 20,
@@ -42,17 +50,17 @@ export class GetCommentsDto {
   limit?: number = 20;
 
   @ApiPropertyOptional({
-    description: '정렬 방식',
-    enum: ['recent', 'popular'],
-    default: 'recent',
+    description: "정렬 방식",
+    enum: ["recent", "popular"],
+    default: "recent",
   })
   @IsOptional()
-  @IsIn(['recent', 'popular'])
-  sort?: 'recent' | 'popular' = 'recent';
+  @IsIn(["recent", "popular"])
+  sort?: "recent" | "popular" = "recent";
 
   @ApiPropertyOptional({
-    description: '스냅샷 타임스탬프 (인기순 정렬 시 중복/누락 방지용)',
-    example: '2025-10-20T12:00:00.000Z',
+    description: "스냅샷 타임스탬프 (인기순 정렬 시 중복/누락 방지용)",
+    example: "2025-10-20T12:00:00.000Z",
   })
   @IsOptional()
   @IsISO8601()

@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * MCP API Key 테이블 생성
@@ -10,7 +10,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - 사용자당 1개 제한
  */
 export class CreateMcpApiKeyTable1760697657000 implements MigrationInterface {
-  name = 'CreateMcpApiKeyTable1760697657000';
+  name = "CreateMcpApiKeyTable1760697657000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 테이블이 이미 존재하는지 체크

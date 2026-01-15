@@ -15,14 +15,25 @@ interface MainContentProps {
 export default function MainContent({ children }: MainContentProps) {
   const pathname = usePathname();
 
-  // Admin, 인증 페이지에서는 여백 제거
+  // Admin, 인증, 커스텀 레이아웃 페이지에서는 여백 제거
   const isAdminPage = pathname?.startsWith('/admin');
   const authPaths = ['/login', '/register', '/consent', '/forgot-password', '/reset-password'];
   const isAuthPage = authPaths.includes(pathname || '');
-  const shouldRemoveMargin = isAdminPage || isAuthPage;
+  const layoutlessPaths = [
+    '/mock-home-shell',
+    '/mock-home-shell-ko',
+    '/mock-home-shell-ink',
+    '/mock-home-shell-harbor',
+    '/mock-home-shell-harbor-white',
+  ];
+  const isLayoutlessPage = layoutlessPaths.includes(pathname || '');
+  const shouldRemoveMargin = isAdminPage || isAuthPage || isLayoutlessPage;
+  const baseMarginClass = shouldRemoveMargin
+    ? ''
+    : 'lg:ml-32 pb-20 lg:pb-0';
 
   return (
-    <div className={`flex-1 ${shouldRemoveMargin ? '' : 'lg:ml-32 pb-20 lg:pb-0'}`}>
+    <div className={`flex-1 ${baseMarginClass}`}>
       {children}
     </div>
   );

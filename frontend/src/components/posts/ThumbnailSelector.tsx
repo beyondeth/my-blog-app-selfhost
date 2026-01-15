@@ -125,6 +125,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
             {selectedThumbnailUrl && (
               <div className="relative">
                 <div className="aspect-video bg-gray-100 rounded-lg overflow-hidden">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={selectedThumbnailUrl}
                     alt="선택된 썸네일"
@@ -167,6 +168,7 @@ export const ThumbnailSelector: React.FC<ThumbnailSelectorProps> = ({
                       )}
                       onClick={() => handleImageSelect(image)}
                     >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={image.fileUrl}
                         alt={image.originalName}

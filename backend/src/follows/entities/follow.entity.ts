@@ -1,41 +1,41 @@
-import { 
-  Entity, 
-  PrimaryGeneratedColumn, 
-  Column, 
-  CreateDateColumn, 
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  CreateDateColumn,
   ManyToOne,
   JoinColumn,
   Index,
-  Unique
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+  Unique,
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('follows')
-@Unique(['followerId', 'followingId'])
-@Index(['followerId'])
-@Index(['followingId'])
+@Entity("follows")
+@Unique(["followerId", "followingId"])
+@Index(["followerId"])
+@Index(["followingId"])
 export class Follow {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: 'uuid', name: 'follower_id' })
+  @Column({ type: "uuid", name: "follower_id" })
   followerId: string;
 
-  @Column({ type: 'uuid', name: 'following_id' })
+  @Column({ type: "uuid", name: "following_id" })
   followingId: string;
 
-  @ManyToOne(() => User, user => user.following, { 
-    onDelete: 'CASCADE',
-    eager: false 
+  @ManyToOne(() => User, (user) => user.following, {
+    onDelete: "CASCADE",
+    eager: false,
   })
-  @JoinColumn({ name: 'follower_id' })
+  @JoinColumn({ name: "follower_id" })
   follower: User;
 
-  @ManyToOne(() => User, user => user.followers, { 
-    onDelete: 'CASCADE',
-    eager: false 
+  @ManyToOne(() => User, (user) => user.followers, {
+    onDelete: "CASCADE",
+    eager: false,
   })
-  @JoinColumn({ name: 'following_id' })
+  @JoinColumn({ name: "following_id" })
   following: User;
 
   @CreateDateColumn()

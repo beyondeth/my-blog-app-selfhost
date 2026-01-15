@@ -71,28 +71,38 @@ function HeaderComponent() {
     setSearchQuery(query);
   }, []);
 
+  const pathSegments = pathname?.split('/').filter(Boolean) ?? [];
+  const isBlogPage = pathname &&
+    !pathname.startsWith('/p/') &&
+    !pathname.startsWith('/settings/') &&
+    !pathname.startsWith('/new-story') &&
+    !pathname.startsWith('/login') &&
+    !pathname.startsWith('/register') &&
+    !pathname.startsWith('/dm') &&
+    !pathname.startsWith('/pricing') &&
+    pathname !== '/' &&
+    pathSegments.length === 1;
+  const isCommunityPage = pathSegments[0] === 'c' && pathSegments.length === 2;
+  const communitySlugFromPath = isCommunityPage ? pathSegments[1] : null;
+
   // Handle search submit
   const handleSearch = useCallback((e: React.FormEvent) => {
     e.preventDefault();
 
-    // 블로그 페이지인지 확인 (pathname이 /[blogSlug] 형태)
-    // 홈('/'), 포스트 상세('/p/...'), 설정('/settings/...') 등은 제외
-    const isBlogPage = pathname &&
-      !pathname.startsWith('/p/') &&
-      !pathname.startsWith('/settings/') &&
-      !pathname.startsWith('/new-story') &&
-      !pathname.startsWith('/login') &&
-      !pathname.startsWith('/register') &&
-      !pathname.startsWith('/dm') &&
-      !pathname.startsWith('/pricing') &&
-      pathname !== '/' &&
-      pathname.split('/').length === 2; // /[blogSlug] 형태만
+    const trimmedQuery = searchQuery.trim();
 
-    if (isBlogPage) {
+    if (isCommunityPage && communitySlugFromPath) {
+      const params = new URLSearchParams();
+      if (trimmedQuery) {
+        params.set('search', trimmedQuery);
+      }
+      const queryString = params.toString();
+      router.push(queryString ? `${pathname}?${queryString}` : pathname);
+    } else if (isBlogPage) {
       // 블로그 페이지: blogSlug 유지하면서 검색
       const params = new URLSearchParams();
-      if (searchQuery.trim()) {
-        params.set('search', searchQuery.trim());
+      if (trimmedQuery) {
+        params.set('search', trimmedQuery);
       }
       params.set('page', '1');
 
@@ -100,7 +110,7 @@ function HeaderComponent() {
     } else {
       // 홈 페이지 또는 기타 페이지: 홈으로 이동하면서 검색
       const newParams = {
-        search: searchQuery.trim() || undefined,
+        search: trimmedQuery || undefined,
         page: 1,
       };
 
@@ -110,7 +120,7 @@ function HeaderComponent() {
 
     // Blur the search input after submission
     searchInputRef.current?.blur();
-  }, [searchQuery, router, pathname]);
+  }, [searchQuery, router, pathname, isBlogPage, isCommunityPage, communitySlugFromPath]);
 
   // Handle search input change
   const handleSearchInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -127,7 +137,7 @@ function HeaderComponent() {
   }
 
   return (
-    <header className="border-b border-border sticky top-0 z-50 bg-background">
+    <header className="border-b border-border fixed top-0 left-0 right-0 z-50 bg-white dark:bg-[#0E141B]">
       {/* SearchParamsSync: useSearchParams를 사용하는 컴포넌트 (Suspense 필요)
           Header 전체가 아닌 이 작은 컴포넌트만 Suspense 경계 영향을 받음
           음악 플레이어 등 다른 요소는 영향받지 않음 */}
@@ -142,16 +152,15 @@ function HeaderComponent() {
             {/* Hamburger Menu Button */}
             <button
               onClick={toggleSidebar}
-              className="hidden lg:flex items-center justify-center w-10 h-10 rounded-full bg-gradient-to-br from-purple-500 via-pink-500 to-orange-400 hover:from-blue-500 hover:via-purple-500 hover:to-pink-500 hover:scale-110 hover:rotate-90 hover:shadow-[0_0_20px_rgba(168,85,247,0.6)] transition-all duration-300 ease-in-out group relative overflow-hidden"
+              className="hidden lg:flex items-center justify-center w-10 h-10 rounded-full border border-[#D9E0EA] bg-white text-[#1B2430] transition-colors hover:bg-[#F7F9FC] dark:border-[#2A3645] dark:bg-[#0E141B] dark:text-[#E6EDF3] dark:hover:bg-[#1A232E]"
               aria-label="사이드바 토글"
             >
-              <div className="absolute inset-0 bg-gradient-to-br from-transparent via-white/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
               <Image
                 src="/assets/left-sidebar/menu.svg"
                 alt="Menu"
                 width={24}
                 height={24}
-                className="invert brightness-0 transition-transform duration-300 group-hover:rotate-180 relative z-10"
+                className="opacity-80 transition-transform duration-200 group-hover:scale-105 dark:invert"
               />
             </button>
 
@@ -211,7 +220,7 @@ function HeaderComponent() {
             <div className="flex items-center space-x-4">
               {/* 음악 플레이어 버튼 - 자체 상태 관리 (Header 리렌더링과 분리) */}
               {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
-              <MusicPlayerButton />
+              {/* <MusicPlayerButton /> */}
 
               <ThemeSwitch />
 
@@ -259,7 +268,7 @@ function HeaderComponent() {
           <div className="md:hidden absolute right-2 xs:right-3 sm:right-4 flex items-center space-x-1 xs:space-x-2">
             {/* 음악 플레이어 버튼 (모바일) - 자체 상태 관리 */}
             {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
-            <MusicPlayerButton />
+            {/* <MusicPlayerButton /> */}
 
             {/* Theme Switch - Always visible */}
             <ThemeSwitch />

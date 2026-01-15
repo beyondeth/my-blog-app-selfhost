@@ -1,11 +1,11 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { PaymentService } from './payment.service';
-import { PaymentWebhookController } from './payment-webhook.controller';
-import { PaymentHistory } from '../subscription/entities/payment-history.entity';
-import { User } from '../users/entities/user.entity';
-import { SharedSubscriptionModule } from '../shared/shared-subscription.module';
-import { SubscriptionModule } from '../subscription/subscription.module';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { PaymentService } from "./payment.service";
+import { PaymentWebhookController } from "./payment-webhook.controller";
+import { PaymentHistory } from "../subscription/entities/payment-history.entity";
+import { User } from "../users/entities/user.entity";
+import { SharedSubscriptionModule } from "../shared/shared-subscription.module";
+import { SubscriptionModule } from "../subscription/subscription.module";
 
 /**
  * 결제 모듈

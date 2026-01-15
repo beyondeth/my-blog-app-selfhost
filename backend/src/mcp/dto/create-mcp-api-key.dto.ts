@@ -1,4 +1,4 @@
-import { IsString, IsUUID, IsNotEmpty, MaxLength } from 'class-validator';
+import { IsString, IsUUID, IsNotEmpty, MaxLength } from "class-validator";
 
 /**
  * API Key 생성 DTO

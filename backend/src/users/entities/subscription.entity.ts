@@ -8,10 +8,13 @@ import {
   JoinColumn,
   BeforeInsert,
   Index,
-} from 'typeorm';
-import { v7 as uuidv7 } from 'uuid';
-import { User } from './user.entity';
-import { SubscriptionTier, SubscriptionStatus } from '../../common/enums/subscription.enum';
+} from "typeorm";
+import { v7 as uuidv7 } from "uuid";
+import { User } from "./user.entity";
+import {
+  SubscriptionTier,
+  SubscriptionStatus,
+} from "../../common/enums/subscription.enum";
 
 /**
  * UserSubscription 엔티티 (Phase 1-2-3 리팩토링)
@@ -36,17 +39,17 @@ import { SubscriptionTier, SubscriptionStatus } from '../../common/enums/subscri
  * - subscription 모듈과 통합 가능
  * - 구독 이력 추적 (별도 subscription_history 테이블로 확장 가능)
  */
-@Entity('user_subscriptions')
-@Index(['userId'], { unique: true }) // 1:1 관계 보장
-@Index(['subscriptionStatus']) // 구독 상태별 조회 최적화
-@Index(['subscriptionEndDate']) // 만료 예정 구독 조회 최적화
+@Entity("user_subscriptions")
+@Index(["userId"], { unique: true }) // 1:1 관계 보장
+@Index(["subscriptionStatus"]) // 구독 상태별 조회 최적화
+@Index(["subscriptionEndDate"]) // 만료 예정 구독 조회 최적화
 export class Subscription {
   /**
    * 기본 키 (UUID v7)
    * - 시간순 정렬로 구독 순서 파악 용이
    * - B-tree 인덱스 성능 최적화
    */
-  @PrimaryColumn('uuid')
+  @PrimaryColumn("uuid")
   id: string;
 
   /**
@@ -54,11 +57,11 @@ export class Subscription {
    * - onDelete: 'CASCADE' → User 삭제 시 Subscription도 자동 삭제
    * - nullable: false → User 없이 Subscription 존재 불가
    */
-  @OneToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @OneToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: "uuid", nullable: false })
   userId: string;
 
   /**
@@ -70,7 +73,7 @@ export class Subscription {
    * 기본값: FREE
    */
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: SubscriptionTier,
     default: SubscriptionTier.FREE,
   })
@@ -87,7 +90,7 @@ export class Subscription {
    * nullable: 무료 사용자는 null
    */
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: SubscriptionStatus,
     nullable: true,
   })
@@ -98,7 +101,7 @@ export class Subscription {
    * - 유료 구독 시작 시점
    * - 무료 사용자는 null
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   subscriptionStartDate: Date;
 
   /**
@@ -107,7 +110,7 @@ export class Subscription {
    * - 자동 갱신 시 매달 업데이트
    * - cancelAtPeriodEnd=true일 경우 이 날짜에 만료
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   subscriptionEndDate: Date;
 
   /**
@@ -115,7 +118,7 @@ export class Subscription {
    * - 신규 가입 시 14일 무료 체험 제공
    * - 체험 종료 후 자동으로 유료 전환 또는 FREE로 다운그레이드
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   trialEndDate: Date;
 
   /**
@@ -170,10 +173,10 @@ export class Subscription {
   @Column({ default: false })
   cancelAtPeriodEnd: boolean;
 
-  @CreateDateColumn({ name: 'createdAt' })
+  @CreateDateColumn({ name: "createdAt" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updatedAt' })
+  @UpdateDateColumn({ name: "updatedAt" })
   updatedAt: Date;
 
   /**
@@ -233,7 +236,7 @@ export class Subscription {
   isExpiringSoon(): boolean {
     if (!this.subscriptionEndDate) return false;
     const daysUntilExpiry = Math.ceil(
-      (this.subscriptionEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (this.subscriptionEndDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
     );
     return daysUntilExpiry <= 7 && daysUntilExpiry > 0;
   }

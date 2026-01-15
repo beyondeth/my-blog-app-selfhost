@@ -1,7 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class FixUserDeletionLogsDeletedAt1771000000000 implements MigrationInterface {
-  name = 'FixUserDeletionLogsDeletedAt1771000000000';
+export class FixUserDeletionLogsDeletedAt1771000000000
+  implements MigrationInterface
+{
+  name = "FixUserDeletionLogsDeletedAt1771000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // user_deletion_logs 테이블의 deletedAt 컬럼을 nullable로 변경

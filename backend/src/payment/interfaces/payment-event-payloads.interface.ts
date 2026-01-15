@@ -1,4 +1,8 @@
-import { SubscriptionTier, BillingCycle, PaymentStatus } from '../../common/enums/subscription.enum';
+import {
+  SubscriptionTier,
+  BillingCycle,
+  PaymentStatus,
+} from "../../common/enums/subscription.enum";
 
 /**
  * 결제 이벤트 페이로드 타입 정의
@@ -70,7 +74,7 @@ export interface RefundPayload {
   refundId: string;
   amount: number;
   reason: string;
-  status: 'pending' | 'success' | 'failed';
+  status: "pending" | "success" | "failed";
   timestamp: Date;
 }
 

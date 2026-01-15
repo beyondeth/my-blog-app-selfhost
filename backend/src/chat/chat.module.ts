@@ -1,36 +1,39 @@
-import { Module, forwardRef } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bullmq';
-import { ScheduleModule } from '@nestjs/schedule';
+import { Module, forwardRef } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { BullModule } from "@nestjs/bullmq";
+import { ScheduleModule } from "@nestjs/schedule";
 
 // Controllers & Gateways
-import { ChatController } from './controllers/chat.controller';
-import { ChatGateway } from './gateways/chat.gateway';
+import { ChatController } from "./controllers/chat.controller";
+import { ChatGateway } from "./gateways/chat.gateway";
 
 // Services
-import { ChatService } from './services/chat.service';
-import { ChatQueueService } from './services/chat-queue.service';
-import { ChatBatchService } from './services/chat-batch.service';
+import { ChatService } from "./services/chat.service";
+import { ChatQueueService } from "./services/chat-queue.service";
+import { ChatBatchService } from "./services/chat-batch.service";
 
 // Repositories
-import { MessageRepository } from './repositories/message.repository';
-import { ConversationRepository } from './repositories/conversation.repository';
+import { MessageRepository } from "./repositories/message.repository";
+import { ConversationRepository } from "./repositories/conversation.repository";
 
 // Workers
-import { MessageBatchWorker, CHAT_QUEUE_NAME } from './workers/message-batch.worker';
+import {
+  MessageBatchWorker,
+  CHAT_QUEUE_NAME,
+} from "./workers/message-batch.worker";
 
 // Entities
-import { Conversation } from './entities/conversation.entity';
-import { Message } from './entities/message.entity';
-import { UserBlock } from './entities/user-block.entity';
-import { User } from '../users/entities/user.entity';
+import { Conversation } from "./entities/conversation.entity";
+import { Message } from "./entities/message.entity";
+import { UserBlock } from "./entities/user-block.entity";
+import { User } from "../users/entities/user.entity";
 
 // External Modules
-import { UsersModule } from '../users/users.module';
-import { FilesModule } from '../files/files.module';
-import { CacheModule } from '../cache/cache.module';
-import { RedisModule } from '../redis/redis.module';
-import { MetricsModule } from '../metrics/metrics.module';
+import { UsersModule } from "../users/users.module";
+import { FilesModule } from "../files/files.module";
+import { CacheModule } from "../cache/cache.module";
+import { RedisModule } from "../redis/redis.module";
+import { MetricsModule } from "../metrics/metrics.module";
 
 @Module({
   imports: [
@@ -42,7 +45,7 @@ import { MetricsModule } from '../metrics/metrics.module';
         removeOnFail: false,
         attempts: 3,
         backoff: {
-          type: 'exponential',
+          type: "exponential",
           delay: 1000,
         },
       },

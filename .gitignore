@@ -131,4 +131,6 @@ backend/cors-config.json
 # Docker volume data (로컬 프로덕션 테스트용)
 # postgres, redis, victoriametrics, grafana 데이터 저장 폴더
 /data/ 
+# Documentation
+docs/
 .env

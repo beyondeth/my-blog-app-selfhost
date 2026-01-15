@@ -1,5 +1,5 @@
-import { createParamDecorator, ExecutionContext } from '@nestjs/common';
-import { User } from '../../users/entities/user.entity';
+import { createParamDecorator, ExecutionContext } from "@nestjs/common";
+import { User } from "../../users/entities/user.entity";
 
 export const CurrentUser = createParamDecorator(
   (data: keyof User | undefined, ctx: ExecutionContext): User | any => {
@@ -12,4 +12,4 @@ export const CurrentUser = createParamDecorator(
 
     return data ? user[data] : user;
   },
-); 
+);

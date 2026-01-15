@@ -30,49 +30,49 @@ export enum CacheInvalidationEvents {
    * @payload PostCreatedEvent
    * @무효화_대상 홈 피드 첫 페이지, 블로그 피드 첫 페이지
    */
-  POST_CREATED = 'post.created',
+  POST_CREATED = "post.created",
 
   /**
    * 포스트 업데이트 시 발생
    * @payload PostUpdatedEvent
    * @무효화_대상 포스트 개별 캐시, 홈 피드, 블로그 피드
    */
-  POST_UPDATED = 'post.updated',
+  POST_UPDATED = "post.updated",
 
   /**
    * 포스트 삭제 시 발생
    * @payload PostDeletedEvent
    * @무효화_대상 모든 페이지, 인기 포스트, 에디터스 픽
    */
-  POST_DELETED = 'post.deleted',
+  POST_DELETED = "post.deleted",
 
   /**
    * 포스트 발행 시 발생 (초안 → 발행)
    * @payload PostPublishedEvent
    * @무효화_대상 홈 피드, 블로그 피드, 카테고리 피드
    */
-  POST_PUBLISHED = 'post.published',
+  POST_PUBLISHED = "post.published",
 
   /**
    * 에디터스 픽 토글 시 발생
    * @payload EditorPickToggledEvent
    * @무효화_대상 에디터스 픽 전체
    */
-  POST_EDITOR_PICK_TOGGLED = 'post.editorPick.toggled',
+  POST_EDITOR_PICK_TOGGLED = "post.editorPick.toggled",
 
   /**
    * 인기도 업데이트 시 발생 (조회수, 좋아요, 댓글 수 변경)
    * @payload PopularityUpdatedEvent
    * @무효화_대상 인기 포스트 전체, 포스트 개별 캐시
    */
-  POST_POPULARITY_UPDATED = 'post.popularity.updated',
+  POST_POPULARITY_UPDATED = "post.popularity.updated",
 
   /**
    * 포스트 썸네일 업데이트 시 발생
    * @payload PostThumbnailUpdatedEvent
    * @무효화_대상 홈 피드, 관련 블로그 피드
    */
-  POST_THUMBNAIL_UPDATED = 'post.thumbnail.updated',
+  POST_THUMBNAIL_UPDATED = "post.thumbnail.updated",
 
   // ===================================================
   // Comment 관련 이벤트
@@ -82,21 +82,21 @@ export enum CacheInvalidationEvents {
    * @payload CommentCreatedEvent
    * @무효화_대상 댓글 페이지네이션, 포스트 상세, 인기 포스트
    */
-  COMMENT_CREATED = 'comment.created',
+  COMMENT_CREATED = "comment.created",
 
   /**
    * 댓글 수정 시 발생
    * @payload CommentUpdatedEvent
    * @무효화_대상 댓글 개별 캐시
    */
-  COMMENT_UPDATED = 'comment.updated',
+  COMMENT_UPDATED = "comment.updated",
 
   /**
    * 댓글 삭제 시 발생
    * @payload CommentDeletedEvent
    * @무효화_대상 댓글 트리 전체, 포스트 상세, 인기 포스트
    */
-  COMMENT_DELETED = 'comment.deleted',
+  COMMENT_DELETED = "comment.deleted",
 
   // ===================================================
   // Blog 관련 이벤트
@@ -106,21 +106,21 @@ export enum CacheInvalidationEvents {
    * @payload BlogCreatedEvent
    * @무효화_대상 공개 블로그 목록
    */
-  BLOG_CREATED = 'blog.created',
+  BLOG_CREATED = "blog.created",
 
   /**
    * 블로그 업데이트 시 발생
    * @payload BlogUpdatedEvent
    * @무효화_대상 블로그 정보, 블로그 피드, 홈 피드 (isPublic 변경 시)
    */
-  BLOG_UPDATED = 'blog.updated',
+  BLOG_UPDATED = "blog.updated",
 
   /**
    * 블로그 설정 변경 시 발생 (allowComments, isPublic 등)
    * @payload BlogSettingsChangedEvent
    * @무효화_대상 블로그 정보, 관련 피드
    */
-  BLOG_SETTINGS_CHANGED = 'blog.settings.changed',
+  BLOG_SETTINGS_CHANGED = "blog.settings.changed",
 
   // ===================================================
   // User 관련 이벤트
@@ -130,14 +130,14 @@ export enum CacheInvalidationEvents {
    * @payload UserProfileUpdatedEvent
    * @무효화_대상 사용자 프로필, 블로그 정보, 포스트 목록 (author 정보)
    */
-  USER_PROFILE_UPDATED = 'user.profile.updated',
+  USER_PROFILE_UPDATED = "user.profile.updated",
 
   /**
    * 사용자 아바타 업데이트 시 발생
    * @payload UserAvatarUpdatedEvent
    * @무효화_대상 사용자 프로필, 모든 관련 포스트/댓글
    */
-  USER_AVATAR_UPDATED = 'user.avatar.updated',
+  USER_AVATAR_UPDATED = "user.avatar.updated",
 
   // ===================================================
   // Tag 관련 이벤트
@@ -147,7 +147,7 @@ export enum CacheInvalidationEvents {
    * @payload TagPopularityChangedEvent
    * @무효화_대상 인기 태그 목록
    */
-  TAG_POPULARITY_CHANGED = 'tag.popularity.changed',
+  TAG_POPULARITY_CHANGED = "tag.popularity.changed",
 }
 
 // ===================================================

@@ -243,6 +243,7 @@ export const adminTranslations = {
     warnUser: '사용자 경고',
     suspendUser: '사용자 정지',
     banUser: '사용자 차단',
+    restoreUser: '사용자 정지 해제',
     noAction: '조치 없음',
     
     // Status Descriptions

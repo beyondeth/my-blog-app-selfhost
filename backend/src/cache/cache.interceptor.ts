@@ -4,15 +4,15 @@ import {
   ExecutionContext,
   CallHandler,
   Logger,
-} from '@nestjs/common';
-import { Observable, of } from 'rxjs';
-import { tap } from 'rxjs/operators';
-import { CacheService } from './cache.service';
+} from "@nestjs/common";
+import { Observable, of } from "rxjs";
+import { tap } from "rxjs/operators";
+import { CacheService } from "./cache.service";
 
 /**
  * 자동 캐싱 인터셉터
  * GET 요청에 대해 자동으로 캐싱을 적용
- * 
+ *
  * 사용법:
  * @UseInterceptors(CacheInterceptor)
  * @CacheTTL(300) // 선택적 TTL 설정
@@ -30,7 +30,7 @@ export class CacheInterceptor implements NestInterceptor {
     const request = context.switchToHttp().getRequest();
 
     // GET 요청만 캐싱
-    if (request.method !== 'GET') {
+    if (request.method !== "GET") {
       return next.handle();
     }
 
@@ -38,7 +38,7 @@ export class CacheInterceptor implements NestInterceptor {
     const cacheKey = this.generateCacheKey(request);
 
     // 내 블로그인 경우 캐시 사용 안 함
-    if (cacheKey.startsWith('no-cache:')) {
+    if (cacheKey.startsWith("no-cache:")) {
       this.logger.debug(`BYPASS cache for my-blog: ${request.url}`);
       return next.handle();
     }
@@ -58,7 +58,9 @@ export class CacheInterceptor implements NestInterceptor {
         // 성공 응답만 캐싱
         if (response && !response.error) {
           await this.cacheService.set(cacheKey, response, ttl);
-          this.logger.debug(`Cached response for ${request.url} (TTL: ${ttl}s)`);
+          this.logger.debug(
+            `Cached response for ${request.url} (TTL: ${ttl}s)`,
+          );
         }
       }),
     );
@@ -77,8 +79,8 @@ export class CacheInterceptor implements NestInterceptor {
     if (query && Object.keys(query).length > 0) {
       const queryString = Object.keys(query)
         .sort()
-        .map(k => `${k}=${query[k]}`)
-        .join('&');
+        .map((k) => `${k}=${query[k]}`)
+        .join("&");
       key += `:${queryString}`;
     }
 
@@ -103,15 +105,15 @@ export class CacheInterceptor implements NestInterceptor {
   private getTTL(context: ExecutionContext): number {
     const handler = context.getHandler();
     const controller = context.getClass();
-    
+
     // 핸들러 레벨 TTL
-    const handlerTTL = Reflect.getMetadata('cache:ttl', handler);
+    const handlerTTL = Reflect.getMetadata("cache:ttl", handler);
     if (handlerTTL) return handlerTTL;
-    
+
     // 컨트롤러 레벨 TTL
-    const controllerTTL = Reflect.getMetadata('cache:ttl', controller);
+    const controllerTTL = Reflect.getMetadata("cache:ttl", controller);
     if (controllerTTL) return controllerTTL;
-    
+
     // 기본 TTL (5분)
     return 300;
   }
@@ -126,7 +128,7 @@ export class CacheInterceptor implements NestInterceptor {
       /\/api\/v1\/blogs\/my-blog/,
     ];
 
-    return userSpecificPatterns.some(pattern => pattern.test(url));
+    return userSpecificPatterns.some((pattern) => pattern.test(url));
   }
 
   /**
@@ -139,7 +141,7 @@ export class CacheInterceptor implements NestInterceptor {
     if (!user || !blogSlug) return false;
 
     // blogSlug에서 @ 제거
-    const cleanSlug = blogSlug.replace('@', '');
+    const cleanSlug = blogSlug.replace("@", "");
 
     // 사용자 username과 blogSlug가 같으면 내 블로그로 간주
     return user.username === cleanSlug;

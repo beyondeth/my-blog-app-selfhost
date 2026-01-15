@@ -1,11 +1,11 @@
-import { Processor, WorkerHost } from '@nestjs/bullmq';
-import { Job } from 'bullmq';
-import { Injectable, Logger } from '@nestjs/common';
-import { MessageRepository } from '../repositories/message.repository';
-import { ChatQueueService } from '../services/chat-queue.service';
-import { QueuedMessage } from '../interfaces/message-queue.interface';
+import { Processor, WorkerHost } from "@nestjs/bullmq";
+import { Job } from "bullmq";
+import { Injectable, Logger } from "@nestjs/common";
+import { MessageRepository } from "../repositories/message.repository";
+import { ChatQueueService } from "../services/chat-queue.service";
+import { QueuedMessage } from "../interfaces/message-queue.interface";
 
-export const CHAT_QUEUE_NAME = 'chat-messages';
+export const CHAT_QUEUE_NAME = "chat-messages";
 
 export interface MessageJobData {
   messages: QueuedMessage[];
@@ -28,16 +28,16 @@ export class MessageBatchWorker extends WorkerHost {
   async process(job: Job<MessageJobData>): Promise<any> {
     const { messages, timestamp, retryCount = 0 } = job.data;
 
-    this.logger.debug(`Processing job ${job.id} with ${messages.length} messages`);
+    this.logger.debug(
+      `Processing job ${job.id} with ${messages.length} messages`,
+    );
 
     try {
       // Save messages to database in batch
       const savedMessages = await this.messageRepository.saveBatch(messages);
 
       // Clear processed messages from Redis cache
-      await this.queueService.clearProcessedMessages(
-        messages.map((m) => m.id),
-      );
+      await this.queueService.clearProcessedMessages(messages.map((m) => m.id));
 
       // Update metrics
       const processingTime = Date.now() - timestamp;
@@ -75,14 +75,19 @@ export class MessageBatchWorker extends WorkerHost {
    * Handle job failure
    */
   async onFailed(job: Job<MessageJobData>, error: Error) {
-    this.logger.error(`Job ${job.id} failed after ${job.attemptsMade} attempts:`, error);
+    this.logger.error(
+      `Job ${job.id} failed after ${job.attemptsMade} attempts:`,
+      error,
+    );
 
     // Update retry count in job data
     job.data.retryCount = (job.data.retryCount || 0) + 1;
 
     // Alert if too many failures
     if (job.attemptsMade >= 3) {
-      this.logger.error(`Job ${job.id} failed permanently, messages moved to DLQ`);
+      this.logger.error(
+        `Job ${job.id} failed permanently, messages moved to DLQ`,
+      );
       // Here you could send alerts, emails, etc.
     }
   }

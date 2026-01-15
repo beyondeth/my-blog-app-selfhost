@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { FiTrash2, FiCalendar, FiActivity, FiShield } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
+import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 
 /**
  * 연결된 OAuth 토큰 타입 정의
@@ -38,7 +39,7 @@ export default function ConnectedAppsPage() {
   /**
    * 연결된 앱 목록 조회
    */
-  const fetchConnectedApps = async () => {
+  const fetchConnectedApps = useCallback(async () => {
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/oauth/tokens`,
@@ -58,11 +59,11 @@ export default function ConnectedAppsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     fetchConnectedApps();
-  }, []);
+  }, [fetchConnectedApps]);
 
   /**
    * 앱 연결 해제 (토큰 취소)
@@ -218,7 +219,7 @@ export default function ConnectedAppsPage() {
 
                 <button
                   onClick={() => revokeAccess(app.id, app.clientName)}
-                  className="flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+                  className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md ${DESTRUCTIVE_ACTION_CLASS}`}
                 >
                   <FiTrash2 className="h-4 w-4" />
                   권한 취소

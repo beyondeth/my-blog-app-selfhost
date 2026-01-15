@@ -11,16 +11,18 @@ import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import CommentSectionPaginated from '@/components/comments/CommentSectionPaginated';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { usePost, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
+import { usePost, useDeletePost } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import LikeButton from '@/components/ui/LikeButton';
+import { VoteButton } from '@/components/ui/VoteButton';
+import { useVote } from '@/hooks/useVote';
 import { useToggleBookmark } from '@/hooks/useBookmarks';
 import { useToggleEditorPick } from '@/hooks/useEditorPicks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { mixpanel } from '@/lib/mixpanel';
+import RelatedPostsSection from '@/components/post/RelatedPostsSection';
 
 /**
  * 댓글 섹션 Lazy Loading 컴포넌트
@@ -111,11 +113,14 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   // Fetch post details - 항상 최신 데이터 가져오기
   const { data: post, error, isError, refetch } = usePost(postSlug, {
     initialData: initialPost,
+    refetchOnMount: 'always',
   });
   const deletePostMutation = useDeletePost();
-  // 좋아요 토글 뮤테이션 (postId를 mutate 파라미터로 전달)
-  const likeMutation = useTogglePostLike(() => {
-    alert('로그인이 필요합니다.\n로그인 후 좋아요를 누를 수 있습니다.');
+  // 투표 뮤테이션 (업보트/다운보트)
+  const { mutate: vote } = useVote({
+    onRequireLogin: () => {
+      alert('로그인이 필요합니다.\n로그인 후 투표할 수 있습니다.');
+    },
   });
 
   // 북마크 기능 추가 - post.id 사용
@@ -126,7 +131,10 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
   // Editor's Pick 토글 mutation (Admin 전용)
   // React Query가 자동으로 캐시를 업데이트하므로 수동 refetch 제거 (무한 렌더링 방지)
-  const editorPickMutation = useToggleEditorPick(post?.id || '');
+  const editorPickMutation = useToggleEditorPick(post?.id || '', () => {
+    // 상세 데이터 강제 새로고침하여 버튼 상태 즉시 반영
+    refetch();
+  });
 
 
   const handleEdit = useCallback(() => {
@@ -168,10 +176,17 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
     }
   }, [deletePostMutation.isPending, isDeleting]);
 
-  const handleLike = useCallback(() => {
-    if (!post || !user) return; // 로그인하지 않은 경우 실행 안 함
-    likeMutation.mutate(post.id);
-  }, [post, user, likeMutation]);
+  /**
+   * 투표 핸들러 (업보트/다운보트)
+   * useVote 훅이 캐시 업데이트를 자동으로 처리
+   */
+  const handleVote = useCallback(
+    (voteType: 'upvote' | 'downvote') => {
+      if (!post?.id) return;
+      vote({ postId: post.id, voteType });
+    },
+    [post?.id, vote]
+  );
 
   const handleShare = useCallback(async () => {
     if (navigator.share && post) {
@@ -270,7 +285,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
         slug: post.slug || 'unknown',
       });
     }
-  }, [post?.id]);  // post.id가 변경될 때만 실행
+  }, [post?.id, post?.slug]);  // post.id가 변경될 때만 실행
 
   if (isError) {
     // 에러 타입 구분
@@ -462,10 +477,14 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
           onEdit={handleEdit}
           onDelete={handleDelete}
           LikeButtonComponent={
-            <LikeButton
-              liked={post.liked || false}
-              likeCount={post.likeCount || 0}
-              onClick={handleLike}
+            <VoteButton
+              upvoteCount={post.upvoteCount || 0}
+              downvoteCount={post.downvoteCount || 0}
+              userVote={post.userVote || null}
+              onVote={handleVote}
+              layout="horizontal"
+              compact={true}
+              displayMode="separated"
             />
           }
           onShare={handleShare}
@@ -486,7 +505,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-          <div className="mt-16 pt-8 border-t border-gray-100 dark:border-gray-700">
+          <div className="mt-16 pt-8 border-t border-gray-400 dark:border-gray-500">
             <div className="flex flex-wrap gap-2">
               {(() => {
                 // AI 태그를 맨 앞으로 정렬
@@ -521,11 +540,13 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
         {/* 댓글 섹션 - 블로그가 댓글을 허용하는 경우에만 표시 (Lazy Loading) */}
         {post.blog?.allowComments === true && post.id && (
-          <CommentSectionLazy
-            postId={String(post.id)}
-            postAuthorId={post.author?.id?.toString()}
-            totalCommentCount={post.commentCount}
-          />
+          <div className="mt-16 pt-8">
+            <CommentSectionLazy
+              postId={String(post.id)}
+              postAuthorId={post.author?.id?.toString()}
+              totalCommentCount={post.commentCount}
+            />
+          </div>
         )}
       </article>
 
@@ -535,6 +556,15 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
         onConfirm={handleConfirmDelete}
         isLoading={deletePostMutation.isPending || isDeleting}
       />
+
+      {/* Relate Posts Section - 배치 위치: 컴포넌트 최하단, Footer 직전 */}
+      {post.id && post.blog && (
+        <RelatedPostsSection
+          postId={post.id}
+          blogSlug={blogSlug}
+          authorName={post.author?.username || post.blog.name}
+        />
+      )}
     </>
   );
 }

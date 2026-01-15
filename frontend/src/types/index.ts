@@ -15,12 +15,45 @@ export const AuthProvider = {
 
 export type AuthProviderType = typeof AuthProvider[keyof typeof AuthProvider];
 
+export interface SocialLink {
+  platform: string;
+  url: string;
+}
+
+/**
+ * 투표 타입
+ */
+export const VoteTypeEnum = {
+  UPVOTE: 'upvote',
+  DOWNVOTE: 'downvote',
+} as const;
+
+export type VoteType = typeof VoteTypeEnum[keyof typeof VoteTypeEnum] | null;
+
+/**
+ * 투표 응답 인터페이스
+ */
+export interface VoteResponse {
+  readonly action: 'added' | 'removed' | 'changed';
+  readonly userVote: VoteType;
+  readonly upvoteCount: number;
+  readonly downvoteCount: number;
+  readonly score: number;
+  /** @deprecated liked 대신 userVote 사용 */
+  readonly liked?: boolean;
+  /** @deprecated likeCount 대신 upvoteCount 사용 */
+  readonly likeCount?: number;
+}
+
 export interface User {
   readonly id: string;
   readonly email: string;
   readonly username: string;
+  readonly name?: string;
   readonly profileImage?: string;
   readonly bio?: string;
+  readonly jobTitle?: string;
+  readonly socialLinks?: SocialLink[];
   readonly role: UserRoleType;
   readonly authProvider: AuthProviderType;            // 최초 가입 방법 (변경 안됨)
   readonly lastLoginProvider?: AuthProviderType;      // 현재 로그인 방법 (계정 삭제 UX용)
@@ -60,6 +93,8 @@ export interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  authStatus: 'loading' | 'authenticated' | 'unauthenticated' | 'error';
+  isUnauthorized: boolean;
   isAdmin: boolean;
   login: (credentials: LoginForm) => Promise<void>;
   register: (userData: RegisterForm) => Promise<void>;
@@ -86,6 +121,38 @@ export interface Blog {
   readonly postCount?: number;
   readonly isPublic?: boolean;
   readonly allowComments?: boolean;
+
+  // =====================================
+  // 브랜딩 필드 (개인 블로그 커스터마이징)
+  // =====================================
+
+  /** 블로그 로고 URL (권장: 200x60px) */
+  readonly logoUrl?: string;
+  /** 로고 표시 방식 */
+  readonly logoImageFit?: 'cover' | 'contain';
+  /** 블로그 아이콘 URL - 파비콘, 목록 썸네일 (권장: 64x64px) */
+  readonly iconUrl?: string;
+  /** 아이콘 표시 방식 */
+  readonly iconImageFit?: 'cover' | 'contain';
+  /** 아이콘 배치 */
+  readonly iconPlacement?: 'inline' | 'badge';
+  /** 아이콘 영역 텍스트 표시 여부 */
+  readonly iconTextEnabled?: boolean;
+  /** 아이콘 라벨 텍스트 */
+  readonly iconLabel?: string | null;
+  /** 라벨 활성화 여부 */
+  readonly iconLabelEnabled?: boolean;
+  /** 아이콘 서브 타이틀 */
+  readonly iconSubtitle?: string | null;
+  /** 서브 타이틀 활성화 여부 */
+  readonly iconSubtitleEnabled?: boolean;
+  /** 커버 이미지 URL - 블로그 헤더 배경 (권장: 1200x400px) */
+  readonly coverImageUrl?: string;
+  /** 커버 이미지 표시 방식 */
+  readonly coverImageFit?: 'cover' | 'contain';
+  /** 브랜드 색상 (HEX: #RRGGBB) */
+  readonly brandColor?: string | null;
+
   // 팔로우 정보 (백엔드에서 동적으로 추가)
   readonly followInfo?: {
     followersCount: number;
@@ -100,22 +167,36 @@ export interface Post {
   title: string;
   slug: string;
   content: string;
+  content_markdown?: string;
+  content_type?: 'html' | 'markdown';
   excerpt?: string;  // 포스트 요약 (목록 표시용)
   thumbnail?: string;
+  images?: string[];
   thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   isPublished: boolean;
   status?: string;  // 포스트 상태 ('published', 'draft', 'deleted')
   isDeleted?: boolean;  // 소프트 삭제 여부
   viewCount: number;
+  /** @deprecated upvoteCount 사용 권장 */
   likeCount: number;
+  /** 업보트 수 */
+  upvoteCount: number;
+  /** 다운보트 수 */
+  downvoteCount: number;
+  /** 순투표 점수 (upvoteCount - downvoteCount) */
+  score: number;
   commentCount: number;
+  /** @deprecated userVote 사용 권장 */
   liked: boolean;
+  /** 사용자의 투표 상태 (upvote/downvote/null) */
+  userVote?: VoteType;
   bookmarked?: boolean;  // 북마크 여부
   tags?: string[];
   category: string;  // 카테고리 (필수)
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
+  version?: number;
   author: User;
   blog?: Blog;
   blogId?: string;
@@ -125,6 +206,7 @@ export interface Post {
   qualityScore?: number | null;
   isEditorPick?: boolean;  // Editor's Pick 여부
   editorPickedAt?: string;  // Editor's Pick 선정 시간
+  editorPickExcerpt?: string; // Editor's Pick 전용 요약
 }
 
 // 댓글 관련 타입
@@ -190,11 +272,14 @@ export interface RegisterForm {
 export interface PostForm {
   title: string;
   content: string;
+  content_markdown?: string;
+  content_type?: 'html' | 'markdown';
   thumbnail?: string;
   thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   tags?: string[];
   category: string;  // 카테고리 (필수)
   attachedFileIds?: string[];
+  version?: number;
 }
 
 export interface CommentForm {

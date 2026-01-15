@@ -1,5 +1,5 @@
-import { Injectable } from '@nestjs/common';
-import { JSDOM } from 'jsdom';
+import { Injectable } from "@nestjs/common";
+import { JSDOM } from "jsdom";
 
 /**
  * 이미지 처리 서비스
@@ -17,69 +17,69 @@ export class ImageProcessorService {
    * @returns 처리된 HTML 문자열
    */
   processImages(html: string, baseUrl?: string): string {
-    if (!html) return '';
+    if (!html) return "";
 
     try {
       const dom = new JSDOM(html);
       const document = dom.window.document;
 
       // 모든 img 태그 찾기
-      const images = document.querySelectorAll('img');
+      const images = document.querySelectorAll("img");
 
       images.forEach((img) => {
         // 이미지 URL 정규화
-        const src = img.getAttribute('src');
+        const src = img.getAttribute("src");
         if (src) {
           const normalizedSrc = this.normalizeImageUrl(src, baseUrl);
-          img.setAttribute('src', normalizedSrc);
+          img.setAttribute("src", normalizedSrc);
         }
 
         // 지연 로딩 추가
-        if (!img.hasAttribute('loading')) {
-          img.setAttribute('loading', 'lazy');
+        if (!img.hasAttribute("loading")) {
+          img.setAttribute("loading", "lazy");
         }
 
         // 디코딩 최적화
-        if (!img.hasAttribute('decoding')) {
-          img.setAttribute('decoding', 'async');
+        if (!img.hasAttribute("decoding")) {
+          img.setAttribute("decoding", "async");
         }
 
         // 클릭 가능 마커 추가 (프론트엔드에서 모달 오픈용)
-        img.setAttribute('data-clickable', 'true');
+        img.setAttribute("data-clickable", "true");
 
         // alt 텍스트가 없으면 빈 문자열이라도 추가 (접근성)
-        if (!img.hasAttribute('alt')) {
-          img.setAttribute('alt', '');
+        if (!img.hasAttribute("alt")) {
+          img.setAttribute("alt", "");
         }
 
         // 원본 크기 정보 보존 (있는 경우)
-        const width = img.getAttribute('width');
-        const height = img.getAttribute('height');
-        if (width) img.setAttribute('data-original-width', width);
-        if (height) img.setAttribute('data-original-height', height);
+        const width = img.getAttribute("width");
+        const height = img.getAttribute("height");
+        if (width) img.setAttribute("data-original-width", width);
+        if (height) img.setAttribute("data-original-height", height);
       });
 
       // figure > img 구조 처리
-      const figures = document.querySelectorAll('figure');
+      const figures = document.querySelectorAll("figure");
       figures.forEach((figure) => {
-        const img = figure.querySelector('img');
-        const figcaption = figure.querySelector('figcaption');
+        const img = figure.querySelector("img");
+        const figcaption = figure.querySelector("figcaption");
 
         if (img) {
           // figure에 이미지 관련 클래스 추가
-          figure.classList.add('image-container');
+          figure.classList.add("image-container");
 
           // 캡션이 있으면 이미지의 title 속성으로도 추가
           if (figcaption) {
-            const captionText = figcaption.textContent || '';
-            img.setAttribute('title', captionText);
+            const captionText = figcaption.textContent || "";
+            img.setAttribute("title", captionText);
           }
         }
       });
 
       return document.body.innerHTML;
     } catch (error) {
-      console.error('Error processing images:', error);
+      console.error("Error processing images:", error);
       return html;
     }
   }
@@ -92,15 +92,19 @@ export class ImageProcessorService {
    * @returns 정규화된 URL
    */
   private normalizeImageUrl(url: string, baseUrl?: string): string {
-    if (!url) return '';
+    if (!url) return "";
 
     // 이미 절대 URL인 경우
-    if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    if (
+      url.startsWith("http://") ||
+      url.startsWith("https://") ||
+      url.startsWith("data:")
+    ) {
       return url;
     }
 
     // 프로토콜 상대 URL
-    if (url.startsWith('//')) {
+    if (url.startsWith("//")) {
       return `https:${url}`;
     }
 
@@ -117,16 +121,15 @@ export class ImageProcessorService {
     }
 
     // 로컬 이미지 경로인 경우 (예: /uploads/...)
-    if (url.startsWith('/')) {
+    if (url.startsWith("/")) {
       // API URL을 기본으로 사용
-      const apiUrl = process.env.API_URL || 'http://localhost:3000';
+      const apiUrl = process.env.API_URL || "http://localhost:3000";
       return `${apiUrl}${url}`;
     }
 
     return url;
   }
 
-  
   /**
    * HTML에서 모든 이미지 URL을 추출합니다.
    *
@@ -142,15 +145,15 @@ export class ImageProcessorService {
       const dom = new JSDOM(html);
       const document = dom.window.document;
 
-      const images = document.querySelectorAll('img');
+      const images = document.querySelectorAll("img");
       images.forEach((img) => {
-        const src = img.getAttribute('src');
+        const src = img.getAttribute("src");
         if (src) {
           urls.push(src);
         }
       });
     } catch (error) {
-      console.error('Error extracting image URLs:', error);
+      console.error("Error extracting image URLs:", error);
     }
 
     return urls;
@@ -179,12 +182,12 @@ export class ImageProcessorService {
       const dom = new JSDOM(html);
       const document = dom.window.document;
 
-      const images = document.querySelectorAll('img');
+      const images = document.querySelectorAll("img");
       stats.total = images.length;
 
       images.forEach((img) => {
         // 이미지 형식 추출
-        const src = img.getAttribute('src');
+        const src = img.getAttribute("src");
         if (src) {
           const format = this.extractImageFormat(src);
           if (format) {
@@ -194,10 +197,12 @@ export class ImageProcessorService {
       });
 
       // 캡션이 있는 이미지 수 계산
-      const figuresWithCaption = document.querySelectorAll('figure:has(figcaption)');
+      const figuresWithCaption = document.querySelectorAll(
+        "figure:has(figcaption)",
+      );
       stats.withCaption = figuresWithCaption.length;
     } catch (error) {
-      console.error('Error calculating image stats:', error);
+      console.error("Error calculating image stats:", error);
     }
 
     return stats;
@@ -213,7 +218,7 @@ export class ImageProcessorService {
     if (!url) return null;
 
     // Data URL인 경우
-    if (url.startsWith('data:image/')) {
+    if (url.startsWith("data:image/")) {
       const match = url.match(/data:image\/([^;]+)/);
       return match ? match[1] : null;
     }
@@ -230,31 +235,37 @@ export class ImageProcessorService {
    * @returns picture 요소로 변환된 HTML
    */
   convertToPictureElements(html: string): string {
-    if (!html) return '';
+    if (!html) return "";
 
     try {
       const dom = new JSDOM(html);
       const document = dom.window.document;
 
-      const images = document.querySelectorAll('img:not(picture img)');
+      const images = document.querySelectorAll("img:not(picture img)");
 
       images.forEach((img) => {
-        const src = img.getAttribute('src');
+        const src = img.getAttribute("src");
         if (!src) return;
 
         // picture 요소 생성
-        const picture = document.createElement('picture');
+        const picture = document.createElement("picture");
 
         // WebP source 추가
-        const sourceWebP = document.createElement('source');
-        sourceWebP.setAttribute('srcset', src.replace(/\.(jpg|jpeg|png)$/i, '.webp'));
-        sourceWebP.setAttribute('type', 'image/webp');
+        const sourceWebP = document.createElement("source");
+        sourceWebP.setAttribute(
+          "srcset",
+          src.replace(/\.(jpg|jpeg|png)$/i, ".webp"),
+        );
+        sourceWebP.setAttribute("type", "image/webp");
         picture.appendChild(sourceWebP);
 
         // AVIF source 추가 (더 나은 압축)
-        const sourceAVIF = document.createElement('source');
-        sourceAVIF.setAttribute('srcset', src.replace(/\.(jpg|jpeg|png)$/i, '.avif'));
-        sourceAVIF.setAttribute('type', 'image/avif');
+        const sourceAVIF = document.createElement("source");
+        sourceAVIF.setAttribute(
+          "srcset",
+          src.replace(/\.(jpg|jpeg|png)$/i, ".avif"),
+        );
+        sourceAVIF.setAttribute("type", "image/avif");
         picture.insertBefore(sourceAVIF, sourceWebP);
 
         // 원본 img를 picture 안으로 이동
@@ -267,7 +278,7 @@ export class ImageProcessorService {
 
       return document.body.innerHTML;
     } catch (error) {
-      console.error('Error converting to picture elements:', error);
+      console.error("Error converting to picture elements:", error);
       return html;
     }
   }

@@ -1,5 +1,5 @@
-import { Module, Global } from '@nestjs/common';
-import { EventEmitterModule } from '@nestjs/event-emitter';
+import { Module, Global } from "@nestjs/common";
+import { EventEmitterModule } from "@nestjs/event-emitter";
 
 /**
  * 결제 이벤트 모듈
@@ -11,8 +11,8 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
   imports: [
     EventEmitterModule.forRoot({
       // 이벤트 설정
-      wildcard: true,  // 와일드카드 지원 (payment.* 같은 패턴 사용 가능)
-      delimiter: '.',  // 네임스페이스 구분자
+      wildcard: true, // 와일드카드 지원 (payment.* 같은 패턴 사용 가능)
+      delimiter: ".", // 네임스페이스 구분자
       newListener: false, // 새 리스너 추가 시 이벤트 발생 비활성화
       removeListener: false, // 리스너 제거 시 이벤트 발생 비활성화
       maxListeners: 10, // 리스너 최대 개수 (메모리 누수 방지)

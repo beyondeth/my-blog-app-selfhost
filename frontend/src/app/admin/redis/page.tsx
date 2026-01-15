@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   Database,
   Activity,
@@ -94,7 +94,7 @@ export default function RedisMonitoringPage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       setRefreshing(true);
 
@@ -123,13 +123,13 @@ export default function RedisMonitoringPage() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, [API_URL]);
 
   useEffect(() => {
     fetchData();
     const interval = setInterval(fetchData, 5000); // Refresh every 5 seconds
     return () => clearInterval(interval);
-  }, []);
+  }, [fetchData]);
 
   const formatUptime = (seconds: number) => {
     const days = Math.floor(seconds / 86400);

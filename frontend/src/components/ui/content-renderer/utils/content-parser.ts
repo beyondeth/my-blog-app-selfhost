@@ -11,11 +11,14 @@
 
 import { ContentPart } from '../types';
 
+const MAX_AUTO_LINK_CARDS = 5;
+
 // 상수 정의 - 매직 넘버 제거
 const PLACEHOLDER_TYPES = {
   MERMAID: 'MERMAID',
   CODE: 'CODE',
   YOUTUBE: 'YOUTUBE',
+  VIDEO: 'VIDEO',
 } as const;
 
 const DEFAULT_LANGUAGE = 'plaintext';
@@ -52,6 +55,7 @@ function createParsingPipeline(html: string) {
     mermaid: [],
     code: [],
     youtube: [],
+    video: [],
   };
 
   return {
@@ -69,8 +73,8 @@ function createParsingPipeline(html: string) {
 }
 
 /**
- * 특수 콘텐츠(Mermaid, Code, YouTube) 추출
- * 순서가 중요: Mermaid → Code → YouTube
+ * 특수 콘텐츠(Mermaid, Code, YouTube, Video) 추출
+ * 순서가 중요: Mermaid → Code → YouTube → Video
  */
 function extractSpecialContent(html: string, blocks: ExtractedBlocks): string {
   let processedHtml = html;
@@ -89,6 +93,11 @@ function extractSpecialContent(html: string, blocks: ExtractedBlocks): string {
   const youtubeResult = extractYouTubeEmbeds(processedHtml);
   processedHtml = youtubeResult.processedHtml;
   blocks.youtube = youtubeResult.embeds;
+
+  // 비디오 임베드 추출 (업로드된 비디오)
+  const videoResult = extractVideoEmbeds(processedHtml);
+  processedHtml = videoResult.processedHtml;
+  blocks.video = videoResult.embeds;
 
   return processedHtml;
 }
@@ -113,6 +122,7 @@ interface ExtractedBlocks {
   mermaid: Array<{ placeholder: string; part: ContentPart }>;
   code: Array<{ placeholder: string; part: ContentPart }>;
   youtube: Array<{ placeholder: string; part: ContentPart }>;
+  video: Array<{ placeholder: string; part: ContentPart }>;
 }
 
 /**
@@ -432,6 +442,117 @@ function isValidVideoId(videoId: string): boolean {
 }
 
 /**
+ * 비디오 임베드를 추출합니다 (업로드된 비디오).
+ * 책임: VideoEmbed extension으로 생성된 비디오 식별 및 추출
+ *
+ * 2단계 접근법:
+ * 1단계: figure 태그만 매칭 (data-video-embed 속성 위치 무관)
+ * 2단계: 개별 속성 추출 (순서 무관)
+ *
+ * 이유: mergeAttributes()가 HTML 속성 순서를 보장하지 않음
+ */
+function extractVideoEmbeds(html: string): {
+  processedHtml: string;
+  embeds: Array<{ placeholder: string; part: ContentPart }>;
+} {
+  const embeds: Array<{ placeholder: string; part: ContentPart }> = [];
+  let processedHtml = html;
+  let index = 0;
+
+  // 1단계: figure 태그만 매칭 (data-video-embed 속성이 어디에 있든 매칭)
+  const figurePattern = /<figure[^>]*data-video-embed[^>]*>[\s\S]*?<\/figure>/gi;
+
+  let match;
+  figurePattern.lastIndex = 0;
+
+  while ((match = figurePattern.exec(html)) !== null) {
+    const figureHtml = match[0];
+
+    // 2단계: 개별 속성 추출 (순서 무관)
+    const videoIdMatch = figureHtml.match(/data-video-id="([^"]*)"/);
+    const statusMatch = figureHtml.match(/data-status="([^"]*)"/);
+    // video 태그에서 src 추출 (속성 순서 무관)
+    const srcMatch = figureHtml.match(/<video[^>]*\bsrc="([^"]*)"/);
+    // figure 태그 자체에서도 src 추출 시도 (mergeAttributes로 인해 figure에도 src가 있을 수 있음)
+    const figureSrcMatch = figureHtml.match(/<figure[^>]*\bsrc="([^"]*)"/);
+    const captionMatch = figureHtml.match(/<figcaption>([^<]*)<\/figcaption>/);
+
+    // 필수 속성 체크: videoId만 필수 (src는 없을 수 있음 - 비디오 처리 완료 전 저장된 경우)
+    if (!videoIdMatch) {
+      continue;
+    }
+
+    // status가 failed면 스킵
+    if (statusMatch && statusMatch[1] === 'failed') {
+      continue;
+    }
+
+    const videoId = videoIdMatch[1];
+    // src는 video 태그 또는 figure 태그에서 추출 (없으면 빈 문자열 - VideoRenderer에서 API 호출)
+    const src = srcMatch?.[1] || figureSrcMatch?.[1] || '';
+    const caption = captionMatch ? captionMatch[1] : '';
+
+    // 중복 체크
+    if (embeds.some(e => e.part.type === 'video' && (e.part as any).videoId === videoId)) {
+      continue;
+    }
+
+    const placeholder = `<!--${PLACEHOLDER_TYPES.VIDEO}_PLACEHOLDER_${videoId}_${index++}-->`;
+
+    embeds.push({
+      placeholder,
+      part: {
+        type: 'video',
+        videoId,
+        src: src || undefined, // 빈 문자열이면 undefined로 전달 (VideoRenderer에서 API 호출)
+        caption,
+      } as ContentPart,
+    });
+
+    processedHtml = processedHtml.replace(match[0], placeholder);
+  }
+
+  // 단순 video 태그 추출 (기존 콘텐츠 호환성) - 동일하게 2단계 접근법
+  const simplePattern = /<video[^>]*data-video-id[^>]*>[^<]*<\/video>/gi;
+  simplePattern.lastIndex = 0;
+
+  while ((match = simplePattern.exec(html)) !== null) {
+    const videoHtml = match[0];
+
+    // 개별 속성 추출 (순서 무관)
+    const srcMatch = videoHtml.match(/src="([^"]*)"/);
+    const videoIdMatch = videoHtml.match(/data-video-id="([^"]*)"/);
+
+    // videoId만 필수 (src는 없을 수 있음)
+    if (!videoIdMatch) continue;
+
+    const src = srcMatch?.[1] || '';
+    const videoId = videoIdMatch[1];
+
+    // 중복 체크
+    if (embeds.some(e => e.part.type === 'video' && (e.part as any).videoId === videoId)) {
+      continue;
+    }
+
+    const placeholder = `<!--${PLACEHOLDER_TYPES.VIDEO}_PLACEHOLDER_${videoId}_${index++}-->`;
+
+    embeds.push({
+      placeholder,
+      part: {
+        type: 'video',
+        videoId,
+        src: src || undefined,
+        caption: '',
+      } as ContentPart,
+    });
+
+    processedHtml = processedHtml.replace(match[0], placeholder);
+  }
+
+  return { processedHtml, embeds };
+}
+
+/**
  * HTML을 파트로 분할합니다.
  * 책임: placeholder 기준으로 HTML을 세그먼트로 분할
  */
@@ -508,9 +629,13 @@ function assembleContentParts(
 
   // placeholder 맵 생성 (빠른 검색을 위해)
   const placeholderMap = createPlaceholderMap(extractedBlocks);
+  const linkCardState: LinkCardState = {
+    count: 0,
+    limit: MAX_AUTO_LINK_CARDS,
+  };
 
   for (const part of htmlParts) {
-    const assembled = assembleSinglePart(part, placeholderMap);
+    const assembled = assembleSinglePart(part, placeholderMap, linkCardState);
     if (assembled) {
       result.push(assembled);
     }
@@ -533,6 +658,7 @@ function createPlaceholderMap(
     ...blocks.mermaid,
     ...blocks.code,
     ...blocks.youtube,
+    ...blocks.video,
   ];
 
   for (const block of allBlocks) {
@@ -542,13 +668,19 @@ function createPlaceholderMap(
   return map;
 }
 
+interface LinkCardState {
+  count: number;
+  limit: number;
+}
+
 /**
  * 단일 파트 조립
  * 책임: 하나의 파트를 ContentPart로 변환
  */
 function assembleSinglePart(
   part: { placeholder?: string; content: string },
-  placeholderMap: Map<string, ContentPart>
+  placeholderMap: Map<string, ContentPart>,
+  linkCardState?: LinkCardState
 ): ContentPart | null {
   // placeholder가 있는 경우
   if (part.placeholder) {
@@ -572,10 +704,139 @@ function assembleSinglePart(
 
   // 일반 HTML 콘텐츠
   if (part.content) {
+    if (linkCardState && linkCardState.count < linkCardState.limit) {
+      const linkCardPart = tryCreateLinkCardPart(part.content);
+      if (linkCardPart) {
+        linkCardState.count += 1;
+        return linkCardPart;
+      }
+    }
+
     return { type: 'html', content: part.content };
   }
 
   return null;
+}
+
+/**
+ * 단일 URL 단락을 LinkCard 파트로 변환
+ */
+function tryCreateLinkCardPart(content: string): ContentPart | null {
+  const trimmed = content.trim();
+  if (!trimmed) return null;
+
+  const paragraphMatch = trimmed.match(/^<p(?:\s+[^>]*)?>([\s\S]+)<\/p>$/i);
+  if (!paragraphMatch) {
+    return null;
+  }
+
+  const innerHtml = paragraphMatch[1]?.trim() ?? '';
+  if (!innerHtml) {
+    return null;
+  }
+
+  const normalizedInner = collapseWhitespace(
+    innerHtml
+      .replace(/<br\s*\/?>/gi, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .trim(),
+  );
+
+  if (!normalizedInner) {
+    return null;
+  }
+
+  // 앵커 단락 처리
+  const anchorMatch = normalizedInner.match(
+    /^<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]+)<\/a>$/i,
+  );
+  if (anchorMatch && anchorMatch[1]) {
+    const href = decodeHtmlEntities(anchorMatch[1]).trim();
+    const anchorTextRaw = anchorMatch[2]?.trim() ?? '';
+    if (!href || !anchorTextRaw) {
+      return null;
+    }
+
+    // 앵커 내부에 추가 태그가 있다면 카드로 변환하지 않음
+    if (/<[^>]+>/.test(anchorTextRaw)) {
+      return null;
+    }
+
+    const anchorText = collapseWhitespace(
+      decodeHtmlEntities(anchorTextRaw).trim(),
+    );
+
+    if (!isPlainHttpUrl(anchorText)) {
+      return null;
+    }
+
+    const normalizedHref = normalizeLinkCardUrl(href);
+    const normalizedText = normalizeLinkCardUrl(anchorText);
+    if (!normalizedHref || !normalizedText) {
+      return null;
+    }
+
+    if (!areUrlsEquivalent(normalizedHref, normalizedText)) {
+      return null;
+    }
+
+    return {
+      type: 'link-card',
+      url: normalizedHref,
+      label: anchorText,
+    };
+  }
+
+  // 순수 텍스트 단락 처리
+  if (/<[^>]+>/.test(normalizedInner)) {
+    return null;
+  }
+
+  const plainText = collapseWhitespace(
+    decodeHtmlEntities(normalizedInner).trim(),
+  );
+  if (!isPlainHttpUrl(plainText)) {
+    return null;
+  }
+
+  const normalizedUrl = normalizeLinkCardUrl(plainText);
+  if (!normalizedUrl) {
+    return null;
+  }
+
+  return {
+    type: 'link-card',
+    url: normalizedUrl,
+    label: plainText,
+  };
+}
+
+function collapseWhitespace(value: string): string {
+  return value.replace(/\s+/g, ' ').trim();
+}
+
+function isPlainHttpUrl(value: string): boolean {
+  return /^https?:\/\/[^\s<]+$/i.test(value);
+}
+
+function normalizeLinkCardUrl(value: string): string | null {
+  try {
+    const parsed = new URL(value);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      return null;
+    }
+
+    // fragment는 미리 제거 (텍스트와 href 비교 안전성)
+    parsed.hash = '';
+    return parsed.toString();
+  } catch {
+    return null;
+  }
+}
+
+function areUrlsEquivalent(a: string, b: string): boolean {
+  const normalize = (url: string) => url.replace(/\/$/, '');
+  return normalize(a) === normalize(b);
 }
 
 /**

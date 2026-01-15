@@ -69,7 +69,7 @@ const faqs = [
  */
 export default function SupportPage() {
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background dark:bg-[#0E141B]">
       {/* 왼쪽 사이드바(80px) 고려한 중앙 정렬 컨테이너 */}
       <div className="mx-auto max-w-6xl px-4 py-12 lg:ml-32">
         {/* 헤더 */}

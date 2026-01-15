@@ -10,12 +10,16 @@ import { useAuthDebug } from '@/hooks/useAuthDebug';
  * - UI를 렌더링하지 않고 디버그 기능만 활성화
  * - 개발 환경에서만 동작
  */
+function DebugContent() {
+  useAuthDebug();
+  return null;
+}
+
 export function Debug() {
   // 개발 환경에서만 인증 상태 디버깅 활성화
-  if (process.env.NODE_ENV === 'development') {
-    useAuthDebug();
+  if (process.env.NODE_ENV !== 'development') {
+    return null;
   }
 
-  // UI를 렌더링하지 않음
-  return null;
+  return <DebugContent />;
 }

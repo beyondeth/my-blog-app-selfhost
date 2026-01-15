@@ -20,6 +20,9 @@ import {
   Key,
   UserX,
   Music,
+  ShieldAlert,
+  Trophy,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -40,11 +43,15 @@ const navigation: NavigationItem[] = [
   { name: t.navigation.users, href: '/admin/users', icon: Users },
   { name: '삭제된 사용자', href: '/admin/users/deleted', icon: UserX, adminOnly: true },
   { name: t.navigation.posts, href: '/admin/posts', icon: FileText },
+  { name: '에디터 픽', href: '/admin/editor-picks', icon: Star, adminOnly: true },
   { name: '이미지 관리', href: '/admin/images', icon: Image },
   { name: '음악 관리', href: '/admin/music', icon: Music, adminOnly: true },
   { name: 'MCP 대시보드', href: '/admin/mcp', icon: Key, adminOnly: true, badge: 'New' },
+  { name: '평판 시스템', href: '/admin/reputation', icon: Trophy, adminOnly: true },
   { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
   { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true },
+  { name: '커뮤니티 복구', href: '/admin/communities', icon: ShieldAlert, adminOnly: true },
+  { name: '유저 모더레이션', href: '/admin/moderation/logs', icon: Flag, adminOnly: true },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: t.navigation.settings, href: '/admin/settings', icon: Settings },
@@ -184,6 +191,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
         <div className="border-t border-gray-200 dark:border-[#2A2A2A] p-4">
           <div className="flex items-center">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               className="h-8 w-8 rounded-full"
               src={user.profileImage || `https://ui-avatars.com/api/?name=${user.username}`}

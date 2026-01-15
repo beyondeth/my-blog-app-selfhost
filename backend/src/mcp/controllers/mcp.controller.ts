@@ -11,17 +11,17 @@ import {
   HttpStatus,
   Query,
   ParseIntPipe,
-} from '@nestjs/common';
-import { McpApiKeyService } from '../services/mcp-api-key.service';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { RolesGuard } from '../../auth/guards/roles.guard';
-import { Roles } from '../../auth/decorators/roles.decorator';
-import { Role } from '../../common/enums/role.enum';
-import { Public } from '../../common/decorators/public.decorator';
-import { CreateMcpApiKeyDto } from '../dto/create-mcp-api-key.dto';
-import { ValidateMcpApiKeyDto } from '../dto/validate-mcp-api-key.dto';
-import { UsageService } from '../../usage/usage.service';
-import { ResourceType } from '../../common/enums/subscription.enum';
+} from "@nestjs/common";
+import { McpApiKeyService } from "../services/mcp-api-key.service";
+import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { RolesGuard } from "../../auth/guards/roles.guard";
+import { Roles } from "../../auth/decorators/roles.decorator";
+import { Role } from "../../common/enums/role.enum";
+import { Public } from "../../common/decorators/public.decorator";
+import { CreateMcpApiKeyDto } from "../dto/create-mcp-api-key.dto";
+import { ValidateMcpApiKeyDto } from "../dto/validate-mcp-api-key.dto";
+import { UsageService } from "../../usage/usage.service";
+import { ResourceType } from "../../common/enums/subscription.enum";
 
 /**
  * MCP API Key 관리 컨트롤러
@@ -32,7 +32,7 @@ import { ResourceType } from '../../common/enums/subscription.enum';
  * - DELETE /api/v1/mcp/keys/:id: API Key 삭제
  * - POST /api/v1/mcp/validate-key: API Key 검증 (MCP Proxy → Backend)
  */
-@Controller('mcp')
+@Controller("mcp")
 export class McpController {
   constructor(
     private readonly mcpApiKeyService: McpApiKeyService,
@@ -50,7 +50,7 @@ export class McpController {
    * - 사용자당 1개 제한 (기존 키 자동 삭제)
    * - 생성된 API Key는 1회만 표시됨 (재조회 불가)
    */
-  @Post('keys')
+  @Post("keys")
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.CREATED)
   async createKey(@Request() req: any, @Body() dto: CreateMcpApiKeyDto) {
@@ -63,7 +63,8 @@ export class McpController {
     );
 
     return {
-      message: 'API Key created successfully. Save this key - it will not be shown again.',
+      message:
+        "API Key created successfully. Save this key - it will not be shown again.",
       data: result,
     };
   }
@@ -74,7 +75,7 @@ export class McpController {
    * @param req JWT 인증된 요청
    * @returns API Key 목록 (secret 제외, hint만 표시)
    */
-  @Get('keys')
+  @Get("keys")
   @UseGuards(JwtAuthGuard)
   async listKeys(@Request() req: any) {
     const userId = req.user.id;
@@ -107,10 +108,10 @@ export class McpController {
    * @param req JWT 인증된 요청
    * @param id API Key ID
    */
-  @Delete('keys/:id')
+  @Delete("keys/:id")
   @UseGuards(JwtAuthGuard)
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteKey(@Request() req: any, @Param('id') id: string) {
+  async deleteKey(@Request() req: any, @Param("id") id: string) {
     const userId = req.user.id;
 
     await this.mcpApiKeyService.delete(id, userId);
@@ -132,7 +133,7 @@ export class McpController {
    * - 이 엔드포인트는 JWT 인증 없음 (API Key 자체가 인증)
    * - Rate Limiting 필요 (향후 추가)
    */
-  @Post('validate-key')
+  @Post("validate-key")
   @Public()
   @HttpCode(HttpStatus.OK)
   async validateKey(@Body() dto: ValidateMcpApiKeyDto) {
@@ -167,10 +168,10 @@ export class McpController {
    * - create_post 성공 시 MCP Proxy가 호출
    * - VPC Internal Network에서만 접근 가능
    */
-  @Post('keys/:id/increment-posts')
+  @Post("keys/:id/increment-posts")
   @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
-  async incrementPosts(@Param('id') id: string) {
+  async incrementPosts(@Param("id") id: string) {
     await this.mcpApiKeyService.incrementPostsCreated(id);
     return;
   }
@@ -184,7 +185,7 @@ export class McpController {
    *
    * @returns 전체 시스템의 MCP 사용량 통계
    */
-  @Get('admin/stats/total')
+  @Get("admin/stats/total")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async getTotalStats() {
@@ -202,12 +203,12 @@ export class McpController {
    * @param month 월 (1-12)
    * @returns 특정 월의 MCP 사용량 통계
    */
-  @Get('admin/stats/monthly/:year/:month')
+  @Get("admin/stats/monthly/:year/:month")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
   async getMonthlyStats(
-    @Param('year', ParseIntPipe) year: number,
-    @Param('month', ParseIntPipe) month: number,
+    @Param("year", ParseIntPipe) year: number,
+    @Param("month", ParseIntPipe) month: number,
   ) {
     const stats = await this.mcpApiKeyService.getMonthlyStats(year, month);
     return {
@@ -222,10 +223,10 @@ export class McpController {
    * @param limit 조회할 사용자 수 (기본: 20)
    * @returns 사용량 순위별 사용자 통계
    */
-  @Get('admin/stats/users')
+  @Get("admin/stats/users")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async getUserStats(@Query('limit') limit?: number) {
+  async getUserStats(@Query("limit") limit?: number) {
     const stats = await this.mcpApiKeyService.getUserStats(limit || 20);
     return {
       success: true,
@@ -239,10 +240,10 @@ export class McpController {
    * @param hours 조회할 시간 범위 (기본: 24시간)
    * @returns 시간별 MCP 사용량
    */
-  @Get('admin/stats/hourly')
+  @Get("admin/stats/hourly")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async getHourlyStats(@Query('hours') hours?: number) {
+  async getHourlyStats(@Query("hours") hours?: number) {
     const stats = await this.mcpApiKeyService.getHourlyStats(hours || 24);
     return {
       success: true,
@@ -256,10 +257,10 @@ export class McpController {
    * @param limit 조회할 로그 수 (기본: 50)
    * @returns 최근 MCP 포스트 생성 이력
    */
-  @Get('admin/logs')
+  @Get("admin/logs")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
-  async getRecentLogs(@Query('limit') limit?: number) {
+  async getRecentLogs(@Query("limit") limit?: number) {
     // 모든 사용자의 MCP_POST 사용 이력 조회
     const logs = await this.usageService.getUsageHistory(
       null, // 모든 사용자
@@ -287,44 +288,50 @@ export class McpController {
    * - /mcp 페이지에서 스타일 목록 표시
    * - 각 스타일의 메타데이터 + 짧은 설명
    */
-  @Get('writing-styles')
+  @Get("writing-styles")
   @Public()
   @HttpCode(HttpStatus.OK)
   async getWritingStyles() {
     try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
+      const fs = await import("fs/promises");
+      const path = await import("path");
 
       // writing-styles 디렉토리 경로
       // Docker 환경: /mcp-proxy-server/writing-styles
       // 로컬 개발: ./mcp-proxy-server/writing-styles
-      const fs_sync = await import('fs');
-      let styleDir = '/mcp-proxy-server/writing-styles';
+      const fs_sync = await import("fs");
+      let styleDir = "/mcp-proxy-server/writing-styles";
 
       // 로컬 환경에서는 다른 경로 시도
       if (!fs_sync.existsSync(styleDir)) {
-        styleDir = path.resolve(process.cwd(), 'mcp-proxy-server/writing-styles');
+        styleDir = path.resolve(
+          process.cwd(),
+          "mcp-proxy-server/writing-styles",
+        );
       }
 
       if (!fs_sync.existsSync(styleDir)) {
-        styleDir = path.resolve(process.cwd(), '../mcp-proxy-server/writing-styles');
+        styleDir = path.resolve(
+          process.cwd(),
+          "../mcp-proxy-server/writing-styles",
+        );
       }
 
-      const styles = ['default', 'novel', 'comedy', 'podcast', 'tutorial'];
+      const styles = ["default", "novel", "comedy", "podcast", "tutorial", "vibe"];
       const styleData = [];
 
       for (const styleName of styles) {
         try {
           const filePath = path.join(styleDir, `${styleName}.md`);
-          const content = await fs.readFile(filePath, 'utf-8');
+          const content = await fs.readFile(filePath, "utf-8");
 
           // YAML Front Matter 파싱
           const match = content.match(/^---\n([\s\S]*?)\n---/);
-          const metadata = this.parseYaml(match ? match[1] : '');
+          const metadata = this.parseYaml(match ? match[1] : "");
 
           // 짧은 미리보기 추출 (처음 500자)
           const preview = content
-            .replace(/^---[\s\S]*?---/, '') // Front matter 제거
+            .replace(/^---[\s\S]*?---/, "") // Front matter 제거
             .trim()
             .substring(0, 500);
 
@@ -334,47 +341,57 @@ export class McpController {
             content: preview,
           });
         } catch (error) {
-          console.warn(`[MCP] Failed to load style: ${styleName}. Returning fallback metadata.`);
+          console.warn(
+            `[MCP] Failed to load style: ${styleName}. Returning fallback metadata.`,
+          );
           // 스타일 로드 실패해도 계속 진행 (fallback)
           const styleMetadata: Record<string, any> = {
             default: {
-              style_name: 'Professional Technical Blog',
-              language: 'korean',
+              style_name: "Professional Technical Blog",
+              language: "korean",
               min_length: 2000,
-              target_length: '3000-5000',
+              target_length: "3000-5000",
               code_block_ratio: 0.2,
               ai_tag_required: true,
             },
             novel: {
-              style_name: 'Fiction Writer\'s Narrative Style',
-              language: 'korean',
+              style_name: "Fiction Writer's Narrative Style",
+              language: "korean",
               min_length: 2500,
-              target_length: '4000-6000',
+              target_length: "4000-6000",
               code_block_ratio: 0.05,
               ai_tag_required: true,
             },
             comedy: {
-              style_name: 'Tech Comedy Blog Style',
-              language: 'korean',
+              style_name: "Tech Comedy Blog Style",
+              language: "korean",
               min_length: 2000,
-              target_length: '3000-4500',
+              target_length: "3000-4500",
               code_block_ratio: 0.15,
               ai_tag_required: true,
             },
             podcast: {
-              style_name: 'Tech Podcast Script Style',
-              language: 'korean',
+              style_name: "Tech Podcast Script Style",
+              language: "korean",
               min_length: 2500,
-              target_length: '3500-5000',
+              target_length: "3500-5000",
               code_block_ratio: 0.05,
               ai_tag_required: true,
             },
             tutorial: {
-              style_name: 'Step-by-Step Tutorial Style',
-              language: 'korean',
+              style_name: "Step-by-Step Tutorial Style",
+              language: "korean",
               min_length: 3000,
-              target_length: '4000-7000',
+              target_length: "4000-7000",
               code_block_ratio: 0.35,
+              ai_tag_required: true,
+            },
+            vibe: {
+              style_name: "Developer Learning Guide Style",
+              language: "korean",
+              min_length: 2500,
+              target_length: "3500-5500",
+              code_block_ratio: 0.15,
               ai_tag_required: true,
             },
           };
@@ -382,14 +399,16 @@ export class McpController {
           styleData.push({
             name: styleName,
             metadata: styleMetadata[styleName] || {
-              style_name: styleName.charAt(0).toUpperCase() + styleName.slice(1),
-              language: 'korean',
+              style_name:
+                styleName.charAt(0).toUpperCase() + styleName.slice(1),
+              language: "korean",
               min_length: 2000,
-              target_length: '3000-5000',
+              target_length: "3000-5000",
               code_block_ratio: 0.2,
               ai_tag_required: true,
             },
-            content: '💡 전체 가이드를 보려면 "전체 가이드 보기" 버튼을 클릭하세요.',
+            content:
+              '💡 전체 가이드를 보려면 "전체 가이드 보기" 버튼을 클릭하세요.',
           });
         }
       }
@@ -399,10 +418,10 @@ export class McpController {
         data: styleData,
       };
     } catch (error) {
-      console.error('Failed to fetch writing styles:', error);
+      console.error("Failed to fetch writing styles:", error);
       return {
         success: false,
-        error: 'Failed to fetch writing styles',
+        error: "Failed to fetch writing styles",
         data: [],
       };
     }
@@ -418,34 +437,40 @@ export class McpController {
    * - /mcp 페이지에서 "전체 가이드 보기" 클릭 시
    * - 스타일 가이드 다운로드 시
    */
-  @Get('writing-styles/:style')
+  @Get("writing-styles/:style")
   @Public()
   @HttpCode(HttpStatus.OK)
-  async getWritingStyleGuide(@Param('style') style: string) {
+  async getWritingStyleGuide(@Param("style") style: string) {
     try {
-      const fs = await import('fs/promises');
-      const path = await import('path');
+      const fs = await import("fs/promises");
+      const path = await import("path");
 
       // 스타일 이름 검증
-      const validStyles = ['default', 'novel', 'comedy', 'podcast', 'tutorial'];
+      const validStyles = ["default", "novel", "comedy", "podcast", "tutorial", "vibe"];
       if (!validStyles.includes(style)) {
         return {
           success: false,
-          error: `Invalid style: ${style}. Valid styles: ${validStyles.join(', ')}`,
+          error: `Invalid style: ${style}. Valid styles: ${validStyles.join(", ")}`,
           data: null,
         };
       }
 
-      const fs_sync = await import('fs');
-      let styleDir = '/mcp-proxy-server/writing-styles';
+      const fs_sync = await import("fs");
+      let styleDir = "/mcp-proxy-server/writing-styles";
 
       // 로컬 환경에서는 다른 경로 시도
       if (!fs_sync.existsSync(styleDir)) {
-        styleDir = path.resolve(process.cwd(), 'mcp-proxy-server/writing-styles');
+        styleDir = path.resolve(
+          process.cwd(),
+          "mcp-proxy-server/writing-styles",
+        );
       }
 
       if (!fs_sync.existsSync(styleDir)) {
-        styleDir = path.resolve(process.cwd(), '../mcp-proxy-server/writing-styles');
+        styleDir = path.resolve(
+          process.cwd(),
+          "../mcp-proxy-server/writing-styles",
+        );
       }
 
       const filePath = path.join(styleDir, `${style}.md`);
@@ -461,14 +486,14 @@ export class McpController {
         };
       }
 
-      const content = await fs.readFile(filePath, 'utf-8');
+      const content = await fs.readFile(filePath, "utf-8");
 
       // YAML Front Matter 파싱
       const match = content.match(/^---\n([\s\S]*?)\n---/);
-      const metadata = this.parseYaml(match ? match[1] : '');
+      const metadata = this.parseYaml(match ? match[1] : "");
 
       // Front Matter 제거한 본문만 반환
-      const body = content.replace(/^---[\s\S]*?---\n?/, '');
+      const body = content.replace(/^---[\s\S]*?---\n?/, "");
 
       return {
         success: true,
@@ -482,7 +507,7 @@ export class McpController {
       console.error(`Failed to fetch writing style: ${style}`, error);
       return {
         success: false,
-        error: 'Failed to fetch writing style',
+        error: "Failed to fetch writing style",
         data: null,
       };
     }
@@ -495,11 +520,11 @@ export class McpController {
   private parseYaml(yamlString: string): any {
     const result: any = {};
 
-    const lines = yamlString.trim().split('\n');
+    const lines = yamlString.trim().split("\n");
     for (const line of lines) {
-      const [key, ...valueParts] = line.split(':');
+      const [key, ...valueParts] = line.split(":");
       if (key && valueParts.length > 0) {
-        let value = valueParts.join(':').trim();
+        let value = valueParts.join(":").trim();
 
         // 큰따옴표 제거
         if (value.startsWith('"') && value.endsWith('"')) {
@@ -512,9 +537,9 @@ export class McpController {
         }
 
         // 타입 변환
-        if (value === 'true') {
+        if (value === "true") {
           result[key.trim()] = true;
-        } else if (value === 'false') {
+        } else if (value === "false") {
           result[key.trim()] = false;
         } else if (!isNaN(Number(value))) {
           result[key.trim()] = Number(value);

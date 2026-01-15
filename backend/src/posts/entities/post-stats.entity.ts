@@ -8,9 +8,9 @@ import {
   BeforeInsert,
   Index,
   VersionColumn,
-} from 'typeorm';
-import { v7 as uuidv7 } from 'uuid';
-import { Post } from './post.entity';
+} from "typeorm";
+import { v7 as uuidv7 } from "uuid";
+import { Post } from "./post.entity";
 
 /**
  * PostStats 엔티티
@@ -31,18 +31,18 @@ import { Post } from './post.entity';
  * - 여러 사용자가 동시에 좋아요/조회 시 데이터 정합성 보장
  * - VersionColumn으로 Lost Update 방지
  */
-@Entity('post_stats')
-@Index(['postId'], { unique: true }) // 1:1 관계 보장
-@Index(['viewCount']) // 인기 포스트 조회 최적화
-@Index(['likeCount']) // 좋아요 많은 포스트 조회 최적화
-@Index(['qualityScore']) // 품질 기반 추천 최적화
+@Entity("post_stats")
+@Index(["postId"], { unique: true }) // 1:1 관계 보장
+@Index(["viewCount"]) // 인기 포스트 조회 최적화
+@Index(["likeCount"]) // 좋아요 많은 포스트 조회 최적화
+@Index(["qualityScore"]) // 품질 기반 추천 최적화
 export class PostStats {
   /**
    * 기본 키 (UUID v7)
    * - 시간순 정렬로 통계 생성 순서 파악 용이
    * - B-tree 인덱스 성능 최적화
    */
-  @PrimaryColumn('uuid')
+  @PrimaryColumn("uuid")
   id: string;
 
   /**
@@ -50,11 +50,11 @@ export class PostStats {
    * - onDelete: 'CASCADE' → Post 삭제 시 PostStats도 자동 삭제
    * - nullable: false → Post 없이 PostStats 존재 불가
    */
-  @OneToOne(() => Post, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'postId' })
+  @OneToOne(() => Post, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "postId" })
   post: Post;
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: "uuid", nullable: false })
   postId: string;
 
   /**
@@ -63,17 +63,33 @@ export class PostStats {
    * - 배치 업데이트: Redis에 임시 저장 후 1분마다 DB 동기화
    * - 기본값: 0
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   viewCount: number;
 
   /**
-   * 좋아요 수
+   * 좋아요 수 (레거시)
+   * @deprecated upvoteCount로 대체됨. 하위 호환성을 위해 유지.
+   */
+  @Column({ type: "int", default: 0 })
+  likeCount: number;
+
+  /**
+   * 업보트 수
    * - post_likes 조인 테이블로 관리 (중복 방지)
-   * - 좋아요 추가/삭제 시 트랜잭션으로 카운트 업데이트
+   * - 투표 추가/삭제 시 트랜잭션으로 카운트 업데이트
    * - 기본값: 0
    */
-  @Column({ type: 'int', default: 0 })
-  likeCount: number;
+  @Column({ type: "int", default: 0 })
+  upvoteCount: number;
+
+  /**
+   * 다운보트 수
+   * - post_likes 조인 테이블로 관리 (중복 방지)
+   * - 투표 추가/삭제 시 트랜잭션으로 카운트 업데이트
+   * - 기본값: 0
+   */
+  @Column({ type: "int", default: 0 })
+  downvoteCount: number;
 
   /**
    * 댓글 수
@@ -82,7 +98,7 @@ export class PostStats {
    * - isDeleted=true인 댓글은 제외
    * - 기본값: 0
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   commentCount: number;
 
   /**
@@ -98,7 +114,7 @@ export class PostStats {
    * - 링크 품질 (404 링크 없는지)
    * - 사용자 반응 (좋아요, 댓글, 북마크 비율)
    */
-  @Column({ type: 'int', nullable: true, default: null })
+  @Column({ type: "int", nullable: true, default: null })
   qualityScore: number;
 
   /**
@@ -120,7 +136,7 @@ export class PostStats {
    * - 통계 캐시 무효화에 사용
    * - 업데이트 빈도 모니터링
    */
-  @UpdateDateColumn({ name: 'updatedAt' })
+  @UpdateDateColumn({ name: "updatedAt" })
   updatedAt: Date;
 
   /**
@@ -143,21 +159,68 @@ export class PostStats {
   }
 
   /**
-   * 좋아요 수 증가
-   * - 좋아요 추가 시 호출
-   * - 트랜잭션 내에서 실행 필수
+   * 좋아요 수 증가 (레거시)
+   * @deprecated incrementUpvoteCount 사용 권장
    */
   incrementLikeCount(): void {
     this.likeCount += 1;
+    this.upvoteCount += 1;
   }
 
   /**
-   * 좋아요 수 감소
-   * - 좋아요 취소 시 호출
-   * - 0 미만으로 내려가지 않도록 보호
+   * 좋아요 수 감소 (레거시)
+   * @deprecated decrementUpvoteCount 사용 권장
    */
   decrementLikeCount(): void {
     this.likeCount = Math.max(0, this.likeCount - 1);
+    this.upvoteCount = Math.max(0, this.upvoteCount - 1);
+  }
+
+  /**
+   * 업보트 수 증가
+   * - 업보트 추가 시 호출
+   * - 트랜잭션 내에서 실행 필수
+   */
+  incrementUpvoteCount(): void {
+    this.upvoteCount += 1;
+    this.likeCount += 1; // 하위 호환성
+  }
+
+  /**
+   * 업보트 수 감소
+   * - 업보트 취소 시 호출
+   * - 0 미만으로 내려가지 않도록 보호
+   */
+  decrementUpvoteCount(): void {
+    this.upvoteCount = Math.max(0, this.upvoteCount - 1);
+    this.likeCount = Math.max(0, this.likeCount - 1); // 하위 호환성
+  }
+
+  /**
+   * 다운보트 수 증가
+   * - 다운보트 추가 시 호출
+   * - 트랜잭션 내에서 실행 필수
+   */
+  incrementDownvoteCount(): void {
+    this.downvoteCount += 1;
+  }
+
+  /**
+   * 다운보트 수 감소
+   * - 다운보트 취소 시 호출
+   * - 0 미만으로 내려가지 않도록 보호
+   */
+  decrementDownvoteCount(): void {
+    this.downvoteCount = Math.max(0, this.downvoteCount - 1);
+  }
+
+  /**
+   * 투표 점수 계산
+   * - 업보트 - 다운보트
+   * - Reddit 스타일 스코어
+   */
+  get score(): number {
+    return this.upvoteCount - this.downvoteCount;
   }
 
   /**
@@ -190,29 +253,32 @@ export class PostStats {
   /**
    * 참여도 점수 계산 (Engagement Score)
    * - 추천 알고리즘에 활용
-   * - 가중치: 좋아요(3) > 댓글(2) > 조회(1)
+   * - 가중치: 업보트(3) > 댓글(2) > 조회(1) > 다운보트(-1)
    */
   calculateEngagementScore(): number {
-    const likeWeight = 3;
+    const upvoteWeight = 3;
+    const downvoteWeight = -1;
     const commentWeight = 2;
     const viewWeight = 1;
 
     const rawScore =
-      this.likeCount * likeWeight +
+      this.upvoteCount * upvoteWeight +
+      this.downvoteCount * downvoteWeight +
       this.commentCount * commentWeight +
       this.viewCount * viewWeight;
 
     // 로그 스케일로 정규화 (매우 큰 값 방지)
-    return Math.log10(rawScore + 1) * 100;
+    // 음수 방지를 위해 최소값 0 보장
+    return Math.log10(Math.max(rawScore, 0) + 1) * 100;
   }
 
   /**
    * 인기 포스트 여부
-   * - 조회수 1000 이상 또는 좋아요 50 이상
+   * - 조회수 1000 이상 또는 순투표(score) 50 이상
    * - 홈 피드 추천에 사용
    */
   isPopular(): boolean {
-    return this.viewCount >= 1000 || this.likeCount >= 50;
+    return this.viewCount >= 1000 || this.score >= 50;
   }
 
   /**
@@ -223,7 +289,7 @@ export class PostStats {
   isTrending(): boolean {
     // TODO: 시간별 조회수 증가율 계산 필요
     // 현재는 단순 기준으로 판단
-    return this.viewCount >= 500 && this.likeCount >= 20;
+    return this.viewCount >= 500 && this.score >= 20;
   }
 
   /**
@@ -233,7 +299,10 @@ export class PostStats {
     return {
       id: this.id,
       viewCount: this.viewCount,
-      likeCount: this.likeCount,
+      likeCount: this.likeCount, // 하위 호환성
+      upvoteCount: this.upvoteCount,
+      downvoteCount: this.downvoteCount,
+      score: this.score,
       commentCount: this.commentCount,
       qualityScore: this.qualityScore,
       engagementScore: this.calculateEngagementScore(),

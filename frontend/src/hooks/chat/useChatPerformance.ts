@@ -38,6 +38,30 @@ export function useChatPerformance(): UseChatPerformanceReturn {
   const metricsRef = useRef<PerformanceMetrics[]>([]);
   const maxMetricsSize = 100; // Keep last 100 metrics
 
+  // Report slow operations (could send to analytics)
+  const reportSlowOperation = useCallback((metrics: PerformanceMetrics) => {
+    // In production, this would send to analytics service
+    if (typeof window !== 'undefined' && (window as any).analytics) {
+      (window as any).analytics.track('slow_operation', {
+        operation: metrics.operation,
+        duration: metrics.duration,
+        memoryDelta: metrics.memoryDelta,
+        timestamp: metrics.timestamp
+      });
+    }
+
+    // Log to console in development
+    if (process.env.NODE_ENV === 'development') {
+      console.group(`🐌 Slow Operation Detected: ${metrics.operation}`);
+      console.log('Duration:', `${metrics.duration.toFixed(2)}ms`);
+      if (metrics.memoryDelta) {
+        console.log('Memory Delta:', `${(metrics.memoryDelta / 1024 / 1024).toFixed(2)}MB`);
+      }
+      console.log('Timestamp:', metrics.timestamp);
+      console.groupEnd();
+    }
+  }, []);
+
   // Measure performance of an async operation
   const measurePerformance = useCallback(async <T,>(
     operation: string,
@@ -110,7 +134,7 @@ export function useChatPerformance(): UseChatPerformanceReturn {
 
       throw error;
     }
-  }, []);
+  }, [reportSlowOperation]);
 
   // Get all collected metrics
   const getMetrics = useCallback((): PerformanceMetrics[] => {
@@ -141,30 +165,6 @@ export function useChatPerformance(): UseChatPerformanceReturn {
     });
 
     return averages;
-  }, []);
-
-  // Report slow operations (could send to analytics)
-  const reportSlowOperation = useCallback((metrics: PerformanceMetrics) => {
-    // In production, this would send to analytics service
-    if (typeof window !== 'undefined' && (window as any).analytics) {
-      (window as any).analytics.track('slow_operation', {
-        operation: metrics.operation,
-        duration: metrics.duration,
-        memoryDelta: metrics.memoryDelta,
-        timestamp: metrics.timestamp
-      });
-    }
-
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.group(`🐌 Slow Operation Detected: ${metrics.operation}`);
-      console.log('Duration:', `${metrics.duration.toFixed(2)}ms`);
-      if (metrics.memoryDelta) {
-        console.log('Memory Delta:', `${(metrics.memoryDelta / 1024 / 1024).toFixed(2)}MB`);
-      }
-      console.log('Timestamp:', metrics.timestamp);
-      console.groupEnd();
-    }
   }, []);
 
   return {

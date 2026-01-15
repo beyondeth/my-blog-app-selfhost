@@ -60,7 +60,7 @@ export interface BlogPostInteractionEvent {
   blogId: string;
   postId: string;
   userId: string;
-  type: 'view' | 'like' | 'unlike';
+  type: "view" | "like" | "unlike";
   timestamp: Date;
 }
 
@@ -70,6 +70,6 @@ export interface BlogPostInteractionEvent {
 export interface BlogStatsUpdateEvent {
   blogId: string;
   userId: string;
-  updateType: 'post_count' | 'category_stats' | 'activity' | 'all';
+  updateType: "post_count" | "category_stats" | "activity" | "all";
   metadata?: Record<string, any>;
 }

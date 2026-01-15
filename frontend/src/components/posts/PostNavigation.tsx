@@ -22,9 +22,9 @@ export default function PostNavigation({
           {/* 왼쪽: Back 버튼 */}
           <button
             onClick={onBack}
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors text-xs font-medium"
+            className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white dark:border-white/25 transition-colors text-xs font-semibold shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm"
           >
-            <FiArrowLeft className="mr-2 w-4 h-4" />
+            <FiArrowLeft className="w-4 h-4 mr-2" />
             Back
           </button>
           

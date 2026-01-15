@@ -1,45 +1,63 @@
-import { Injectable, NotFoundException, ForbiddenException, Logger, BadRequestException, ConflictException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, In, SelectQueryBuilder, MoreThan } from 'typeorm';
-import { OptimisticLockException } from '../common/exceptions/optimistic-lock.exception';
-import { Post } from './entities/post.entity';
-import { PostStats } from './entities/post-stats.entity';
-import { PostMetadata } from './entities/post-metadata.entity';
-import { User } from '../users/entities/user.entity';
-import { File } from '../files/entities/file.entity';
-import { FileContext, FileContextType, FilePurpose } from '../files/entities/file-context.entity';
-import { Blog } from '../blogs/entities/blog.entity';
-import { Role } from '../common/enums/role.enum';
-import { CreatePostDto } from './dto/create-post.dto';
-import { UpdatePostDto } from './dto/update-post.dto';
-import { SetThumbnailDto } from './dto/set-thumbnail.dto';
-import { GetPostsCursorDto } from './dto/get-posts-cursor.dto';
-import { CursorPaginatedPostsDto } from './dto/cursor-paginated-posts.dto';
-import { FilesService } from '../files/files.service';
-import { CdnService } from '../files/services/cdn.service';
-import { extractImageUrlsFromContent, extractS3KeyFromUrl, generateSlug } from './utils/post.utils';
-import { MarkdownRendererService } from '../common/services/markdown-renderer.service';
-import { ContentProcessingService } from '../content-processing/services/content-processing.service';
-import { PostResponseDto } from './dto/post-response.dto';
-import { CacheService, CacheKeys, CacheTTL } from '../cache/cache.service';
-import { CacheMetricsService } from '../metrics/cache-metrics.service';
-import { BookmarksService } from '../bookmarks/bookmarks.service';
-import { LikeService } from './services/like.service';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue } from 'bullmq';
-import { POST_PROCESSING_QUEUE, PostProcessingJobData } from './queues/post-processing.queue';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { RedisLockService } from '../redis/redis-lock.service';
-import { CacheInvalidationEvents } from '../common/events/cache.events';
-import { PostMapperService } from './services/post-mapper.service';
-import { PostCacheService } from './services/post-cache.service';
-import { PostFileService } from './services/post-file.service';
-import { PostContentService } from './services/post-content.service';
-import { PostReadService } from './services/post-read.service';
-import { PostInteractionService } from './services/post-interaction.service';
-import { PostCreationService } from './services/post-creation.service';
-import { ThumbnailService } from './services/thumbnail.service';
-import { CloudflareService } from '../cloudflare/cloudflare.service';
+import {
+  Injectable,
+  NotFoundException,
+  ForbiddenException,
+  Logger,
+  BadRequestException,
+  ConflictException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Like, In, SelectQueryBuilder, MoreThan } from "typeorm";
+import { OptimisticLockException } from "../common/exceptions/optimistic-lock.exception";
+import { Post } from "./entities/post.entity";
+import { PostStats } from "./entities/post-stats.entity";
+import { PostMetadata } from "./entities/post-metadata.entity";
+import { User } from "../users/entities/user.entity";
+import { File } from "../files/entities/file.entity";
+import {
+  FileContext,
+  FileContextType,
+  FilePurpose,
+} from "../files/entities/file-context.entity";
+import { Blog } from "../blogs/entities/blog.entity";
+import { Role } from "../common/enums/role.enum";
+import { CreatePostDto } from "./dto/create-post.dto";
+import { UpdatePostDto } from "./dto/update-post.dto";
+import { SetThumbnailDto } from "./dto/set-thumbnail.dto";
+import { GetPostsCursorDto } from "./dto/get-posts-cursor.dto";
+import { CursorPaginatedPostsDto } from "./dto/cursor-paginated-posts.dto";
+import { FilesService } from "../files/files.service";
+import { CdnService } from "../files/services/cdn.service";
+import {
+  extractImageUrlsFromContent,
+  extractS3KeyFromUrl,
+  generateSlug,
+} from "./utils/post.utils";
+import { MarkdownRendererService } from "../common/services/markdown-renderer.service";
+import { ContentProcessingService } from "../content-processing/services/content-processing.service";
+import { PostResponseDto } from "./dto/post-response.dto";
+import { CacheService, CacheKeys, CacheTTL } from "../cache/cache.service";
+import { CacheMetricsService } from "../metrics/cache-metrics.service";
+import { BookmarksService } from "../bookmarks/bookmarks.service";
+import { LikeService } from "./services/like.service";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
+import {
+  POST_PROCESSING_QUEUE,
+  PostProcessingJobData,
+} from "./queues/post-processing.queue";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { RedisLockService } from "../redis/redis-lock.service";
+import { CacheInvalidationEvents } from "../common/events/cache.events";
+import { PostMapperService } from "./services/post-mapper.service";
+import { PostCacheService } from "./services/post-cache.service";
+import { PostFileService } from "./services/post-file.service";
+import { PostContentService } from "./services/post-content.service";
+import { PostReadService } from "./services/post-read.service";
+import { PostInteractionService } from "./services/post-interaction.service";
+import { PostCreationService } from "./services/post-creation.service";
+import { ThumbnailService } from "./services/thumbnail.service";
+import { CloudflareService } from "../cloudflare/cloudflare.service";
 
 /**
  * PostsService - Facade Pattern
@@ -98,10 +116,20 @@ export class PostsService {
   /**
    * 새 포스트 생성
    */
-  async create(createPostDto: CreatePostDto, user: User, files?: File[]): Promise<PostResponseDto> {
+  async create(
+    createPostDto: CreatePostDto,
+    user: User,
+    files?: File[],
+    ip?: string,
+  ): Promise<PostResponseDto> {
     this.logger.log(`Creating post for user: ${user.id}`);
 
-    const post = await this.postCreationService.create(createPostDto, user, files);
+    const post = await this.postCreationService.create(
+      createPostDto,
+      user,
+      files,
+      ip,
+    );
 
     // 생성된 포스트를 DTO로 변환
     return await this.postMapperService.toPostDto(post, {
@@ -113,7 +141,10 @@ export class PostsService {
   /**
    * 빠른 포스트 생성 (MCP용)
    */
-  async createFast(createPostDto: CreatePostDto, user: User): Promise<PostResponseDto> {
+  async createFast(
+    createPostDto: CreatePostDto,
+    user: User,
+  ): Promise<PostResponseDto> {
     this.logger.log(`Fast creating post for user: ${user.id}`);
 
     // 기본적으로 create와 동일하지만, 최적화된 경로 사용
@@ -123,14 +154,27 @@ export class PostsService {
   /**
    * 포스트 수정
    */
-  async update(id: string, updatePostDto: UpdatePostDto, user: User, files?: File[]): Promise<PostResponseDto> {
+  async update(
+    id: string,
+    updatePostDto: UpdatePostDto,
+    user: User,
+    files?: File[],
+  ): Promise<PostResponseDto> {
     this.logger.log(`[POSTS_SERVICE] Updating post: ${id} by user: ${user.id}`);
-    this.logger.debug(`[POSTS_SERVICE] Update DTO keys: ${Object.keys(updatePostDto)}`);
 
-    const post = await this.postCreationService.update(id, updatePostDto, user, files);
+    const post = await this.postCreationService.update(
+      id,
+      updatePostDto,
+      user,
+      files,
+    );
 
-    this.logger.log(`[POSTS_SERVICE] Post updated, calling PostMapperService.toPostDto`);
-    this.logger.debug(`[POSTS_SERVICE] Post has ${post.attachedFiles?.length || 0} attached files`);
+    this.logger.log(
+      `[POSTS_SERVICE] Post updated, calling PostMapperService.toPostDto`,
+    );
+    this.logger.debug(
+      `[POSTS_SERVICE] Post has ${post.attachedFiles?.length || 0} attached files`,
+    );
 
     // 수정된 포스트를 DTO로 변환
     const result = await this.postMapperService.toPostDto(post, {
@@ -195,15 +239,43 @@ export class PostsService {
   /**
    * 초안 저장
    */
-  async saveDraft(createPostDto: CreatePostDto, author: User): Promise<PostResponseDto> {
+  async saveDraft(
+    createPostDto: CreatePostDto,
+    author: User,
+  ): Promise<PostResponseDto> {
     this.logger.log(`Saving draft for user: ${author.id}`);
 
-    const post = await this.postCreationService.saveDraft(createPostDto, author);
+    const post = await this.postCreationService.saveDraft(
+      createPostDto,
+      author,
+    );
 
     return await this.postMapperService.toPostDto(post, {
       user: author,
       blog: post.blog,
     });
+  }
+
+  /**
+   * 사용자의 초안 목록 조회
+   */
+  async findDrafts(userId: string): Promise<PostResponseDto[]> {
+    this.logger.log(`Finding drafts for user: ${userId}`);
+
+    const drafts = await this.postsRepository.find({
+      where: {
+        authorId: userId,
+        status: "draft",
+        isDeleted: false,
+      },
+      relations: ["blog", "author", "stats"],
+      order: { updatedAt: "DESC" },
+    });
+
+    // DTO로 변환
+    return await Promise.all(
+      drafts.map((post) => this.postMapperService.toPostDto(post)),
+    );
   }
 
   // ========== Read Operations (PostReadService로 위임) ==========
@@ -219,26 +291,75 @@ export class PostsService {
   /**
    * 커서 기반 포스트 목록 조회
    */
-  async getPostsCursor(query: GetPostsCursorDto, user?: User): Promise<CursorPaginatedPostsDto> {
-    this.logger.debug(`Getting posts cursor with query: ${JSON.stringify(query)}`);
+  async getPostsCursor(
+    query: GetPostsCursorDto,
+    user?: User,
+  ): Promise<CursorPaginatedPostsDto> {
+    this.logger.debug(
+      `Getting posts cursor with query: ${JSON.stringify(query)}`,
+    );
+
+    // DTO의 sort 값을 PostReadService가 이해하는 sortBy 값으로 매핑
+    // (PostReadService.getPostsCursor는 sortBy 필드를 기준으로 정렬 로직을 수행함)
+    if (query.sort && !query.sortBy) {
+      switch (query.sort) {
+        case "recent":
+          query.sortBy = "published";
+          break;
+        case "popular":
+          // 인기순 -> 좋아요순 (PostStats 조인)
+          query.sortBy = "likes";
+          break;
+        case "trending":
+          // 트렌딩 -> 조회수순 (PostStats 조인)
+          // 참고: FeedService의 Trending은 복합 로직이지만, PostsService는 단순 조회수 정렬로 매핑
+          query.sortBy = "views";
+          break;
+      }
+    }
+
     return await this.postReadService.getPostsCursor(query, user);
   }
 
   /**
    * 기간별 인기 포스트 조회
    */
-  async findPopularPosts(period: 'daily' | 'weekly' | 'monthly' | 'all' = 'weekly', limit: number = 10): Promise<PostResponseDto[]> {
-    this.logger.debug(`Finding popular posts by period: ${period}, limit: ${limit}`);
+  async findPopularPosts(
+    period: "daily" | "weekly" | "monthly" | "all" = "weekly",
+    limit: number = 10,
+  ): Promise<PostResponseDto[]> {
+    this.logger.debug(
+      `Finding popular posts by period: ${period}, limit: ${limit}`,
+    );
 
     // 인기 포스트 조회 (Materialized View 사용)
     const posts = await this.postReadService.findPopularPosts(period, limit);
 
-      // Post 엔티티를 DTO로 병렬 변환 (성능 최적화)
+    // Post 엔티티를 DTO로 병렬 변환 (성능 최적화)
     const dtos = await Promise.all(
-      posts.map(post => this.postMapperService.toPostDto(post))
+      posts.map((post) => this.postMapperService.toPostDto(post)),
     );
 
     return dtos;
+  }
+
+  /**
+   * 연관 포스트 조회
+   */
+  async getRelatedPosts(
+    postId: string,
+    limit: number = 6,
+  ): Promise<PostResponseDto[]> {
+    this.logger.debug(
+      `Getting related posts for post: ${postId}, limit: ${limit}`,
+    );
+
+    const posts = await this.postReadService.getRelatedPosts(postId, limit);
+
+    // DTO 변환 (병렬 처리)
+    return await Promise.all(
+      posts.map((post) => this.postMapperService.toPostDto(post)),
+    );
   }
 
   /**
@@ -251,7 +372,35 @@ export class PostsService {
 
     // PostResponseDto로 변환
     const dtos = await Promise.all(
-      posts.map(post => this.postMapperService.toPostDto(post))
+      posts.map(async (post) => {
+        const dto = await this.postMapperService.toPostDto(post);
+        dto.editorPickExcerpt = this.postContentService.extractExcerpt(
+          post.content || post.content_markdown || post.excerpt || "",
+          500,
+        );
+        return dto;
+      }),
+    );
+
+    return dtos;
+  }
+
+  /**
+   * Editor's Pick 포스트 조회 (관리자용)
+   */
+  async findEditorPicksAdmin(limit: number = 10): Promise<PostResponseDto[]> {
+    this.logger.debug(`Getting Editor's Pick posts (admin), limit: ${limit}`);
+
+    const posts = await this.postReadService.getEditorPicksAdmin(limit);
+    const dtos = await Promise.all(
+      posts.map(async (post) => {
+        const dto = await this.postMapperService.toPostDto(post);
+        dto.editorPickExcerpt = this.postContentService.extractExcerpt(
+          post.content || post.content_markdown || post.excerpt || "",
+          500,
+        );
+        return dto;
+      }),
     );
 
     return dtos;
@@ -268,7 +417,9 @@ export class PostsService {
   /**
    * 인기 태그 조회
    */
-  async getPopularTags(limit: number = 20): Promise<{ tag: string; count: number }[]> {
+  async getPopularTags(
+    limit: number = 20,
+  ): Promise<{ tag: string; count: number }[]> {
     this.logger.debug(`Getting popular tags, limit: ${limit}`);
     return await this.postReadService.getPopularTags(limit);
   }
@@ -278,7 +429,10 @@ export class PostsService {
   /**
    * 좋아요 토글
    */
-  async toggleLike(postId: string, user: User): Promise<{ liked: boolean; likeCount: number }> {
+  async toggleLike(
+    postId: string,
+    user: User,
+  ): Promise<{ liked: boolean; likeCount: number }> {
     this.logger.debug(`Toggling like for post: ${postId} by user: ${user.id}`);
 
     // LikeService를 사용하여 좋아요 토글 실행
@@ -296,11 +450,17 @@ export class PostsService {
   /**
    * 북마크 토글
    */
-  async toggleBookmark(postId: string, user: User): Promise<{ bookmarked: boolean }> {
-    this.logger.debug(`Toggling bookmark for post: ${postId} by user: ${user.id}`);
+  async toggleBookmark(
+    postId: string,
+    user: User,
+  ): Promise<{ bookmarked: boolean }> {
+    this.logger.debug(
+      `Toggling bookmark for post: ${postId} by user: ${user.id}`,
+    );
 
     // 현재 북마크 상태 확인
-    const currentlyBookmarked = await this.postInteractionService.getUserBookmarkStatus(postId, user.id);
+    const currentlyBookmarked =
+      await this.postInteractionService.getUserBookmarkStatus(postId, user.id);
 
     if (currentlyBookmarked) {
       // 북마크 삭제
@@ -316,7 +476,10 @@ export class PostsService {
   /**
    * 포스트 상호작용 정보 조회
    */
-  async getPostInteractions(postId: string, user?: User): Promise<{
+  async getPostInteractions(
+    postId: string,
+    user?: User,
+  ): Promise<{
     viewCount: number;
     likeCount: number;
     commentCount: number;
@@ -334,7 +497,11 @@ export class PostsService {
 
     if (user) {
       result.liked = await this.likeService.isLiked(postId, user.id);
-      result.bookmarked = await this.postInteractionService.getUserBookmarkStatus(postId, user.id);
+      result.bookmarked =
+        await this.postInteractionService.getUserBookmarkStatus(
+          postId,
+          user.id,
+        );
     }
 
     return result;
@@ -345,15 +512,23 @@ export class PostsService {
   /**
    * 썸네일 설정
    */
-  async setThumbnail(postId: string, userIdOrThumbnail: string | User, thumbnailFileId?: string | SetThumbnailDto): Promise<{ success: boolean; thumbnailUrl?: string }> {
+  async setThumbnail(
+    postId: string,
+    userIdOrThumbnail: string | User,
+    thumbnailFileId?: string | SetThumbnailDto,
+  ): Promise<{ success: boolean; thumbnailUrl?: string }> {
     this.logger.debug(`Setting thumbnail for post: ${postId}`);
 
     // 오버로드 처리: 첫 번째 파라미터가 string이면 userId, User 객체이면 user
     let fileId: string;
-    if (typeof userIdOrThumbnail === 'string') {
+    if (typeof userIdOrThumbnail === "string") {
       // 구래 방식: setThumbnail(postId, userId, thumbnailFileId)
       fileId = thumbnailFileId as string;
-      await this.thumbnailService.setThumbnail(postId, fileId, userIdOrThumbnail);
+      await this.thumbnailService.setThumbnail(
+        postId,
+        fileId,
+        userIdOrThumbnail,
+      );
     } else {
       // 새 방식: setThumbnail(postId, user, setThumbnailDto)
       const user = userIdOrThumbnail as User;
@@ -365,19 +540,22 @@ export class PostsService {
     // File 엔티티에서 직접 URL 조회
     const thumbnailFile = await this.filesRepository.findOne({
       where: { id: fileId },
-      select: ['fileUrl']
+      select: ["fileUrl"],
     });
 
     return {
       success: true,
-      thumbnailUrl: thumbnailFile?.fileUrl || null
+      thumbnailUrl: thumbnailFile?.fileUrl || null,
     };
   }
 
   /**
    * 포스트 썸네일 제거
    */
-  async removeThumbnail(postId: string, user: User): Promise<{ success: boolean }> {
+  async removeThumbnail(
+    postId: string,
+    user: User,
+  ): Promise<{ success: boolean }> {
     this.logger.debug(`Removing thumbnail for post: ${postId}`);
 
     await this.thumbnailService.removeThumbnail(postId, user.id);
@@ -387,11 +565,17 @@ export class PostsService {
   /**
    * 포스트에서 사용 가능한 썸네일 후보 이미지들 조회
    */
-  async getThumbnailCandidates(postId: string, userId: string): Promise<File[]> {
+  async getThumbnailCandidates(
+    postId: string,
+    userId: string,
+  ): Promise<File[]> {
     return await this.thumbnailService.getThumbnailCandidates(postId, userId);
   }
 
-  async removeThumbnailOld(postId: string, user: User): Promise<{ success: boolean }> {
+  async removeThumbnailOld(
+    postId: string,
+    user: User,
+  ): Promise<{ success: boolean }> {
     this.logger.debug(`Removing thumbnail for post: ${postId}`);
 
     const post = await this.postsRepository.findOne({
@@ -399,7 +583,7 @@ export class PostsService {
     });
 
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없거나 권한이 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없거나 권한이 없습니다.");
     }
 
     await this.postsRepository.update(postId, {
@@ -422,7 +606,10 @@ export class PostsService {
   /**
    * 포스트 내용 재렌더링
    */
-  async rerenderContent(postId: string, user: User): Promise<{
+  async rerenderContent(
+    postId: string,
+    user: User,
+  ): Promise<{
     html: string;
     thumbnail: string | null;
   }> {
@@ -448,7 +635,8 @@ export class PostsService {
     });
 
     const excerpt = this.postContentService.extractExcerpt(content);
-    const { readingTimeMinutes } = this.postContentService.calculateReadingTime(content);
+    const { readingTimeMinutes } =
+      this.postContentService.calculateReadingTime(content);
     const thumbnail = this.postContentService.extractThumbnail(result.html);
 
     return {
@@ -474,7 +662,9 @@ export class PostsService {
     isPublished?: boolean,
     isForCache?: boolean,
   ): Promise<any> {
-    this.logger.debug(`Finding all posts with pagination: page=${page}, limit=${limit}`);
+    this.logger.debug(
+      `Finding all posts with pagination: page=${page}, limit=${limit}`,
+    );
 
     const query: GetPostsCursorDto = {
       limit,
@@ -493,7 +683,11 @@ export class PostsService {
   /**
    * 카테고리별 포스트 조회
    */
-  async getPostsByCategory(category: string, page: number = 1, limit: number = 10): Promise<any> {
+  async getPostsByCategory(
+    category: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<any> {
     this.logger.debug(`Getting posts by category: ${category}`);
 
     const query: GetPostsCursorDto = {
@@ -532,7 +726,7 @@ export class PostsService {
 
     // slug가 없는 포스트 조회
     const postsWithoutSlug = await this.postsRepository.find({
-      where: { slug: '', isDeleted: false },
+      where: { slug: "", isDeleted: false },
     });
 
     for (const post of postsWithoutSlug) {
@@ -551,7 +745,7 @@ export class PostsService {
 
     const posts = await this.postsRepository.find({
       where: { isDeleted: false },
-      relations: ['attachedFiles'],
+      relations: ["attachedFiles"],
     });
 
     await this.postFileService.relinkContentFiles(posts);
@@ -562,15 +756,27 @@ export class PostsService {
   /**
    * Editor's Pick 토글
    */
-  async toggleEditorPick(postId: string, user: User): Promise<{ success: boolean; isEditorPick: boolean }> {
+  async toggleEditorPick(
+    postId: string,
+    user: User,
+  ): Promise<{ success: boolean; isEditorPick: boolean }> {
     this.logger.log(`Toggling editor pick for post: ${postId}`);
 
-    const post = await this.postsRepository.findOne({ where: { id: postId } });
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+      relations: ["metadata"],
+    });
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
-    const newIsEditorPick = !post.isEditorPick;
+    // metadata.isEditorPick가 단일 데이터 소스이므로 이를 기준으로 토글
+    const currentIsEditorPick =
+      post.metadata?.isEditorPick ??
+      post.isEditorPick ?? // 과거 데이터 호환용
+      false;
+    const newIsEditorPick = !currentIsEditorPick;
+
     await this.setEditorPick(postId, newIsEditorPick, user);
 
     return { success: true, isEditorPick: newIsEditorPick };
@@ -590,35 +796,37 @@ export class PostsService {
 
     // 블로그의 카테고리별 포스트 개수 집계
     const result = await this.postsRepository
-      .createQueryBuilder('post')
-      .select('post.category', 'category')
-      .addSelect('COUNT(post.id)', 'count')
-      .where('post.blogId = :blogId', { blogId: blog.id })
-      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
-      .andWhere('post.category IS NOT NULL')
-      .andWhere('post.category != \'\'')
-      .groupBy('post.category')
-      .orderBy('count', 'DESC')
+      .createQueryBuilder("post")
+      .select("post.category", "category")
+      .addSelect("COUNT(post.id)", "count")
+      .where("post.blogId = :blogId", { blogId: blog.id })
+      .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
+      .andWhere("post.category IS NOT NULL")
+      .andWhere("post.category != ''")
+      .groupBy("post.category")
+      .orderBy("count", "DESC")
       .getRawMany();
 
-    return result.map(row => row.category);
+    return result.map((row) => row.category);
   }
 
   /**
    * 사이트맵용 모든 발행된 포스트 조회
    */
-  async getAllPublishedPostsForSitemap(): Promise<Array<{ slug: string; blogSlug: string; updatedAt: Date }>> {
+  async getAllPublishedPostsForSitemap(): Promise<
+    Array<{ slug: string; blogSlug: string; updatedAt: Date }>
+  > {
     this.logger.debug(`Getting all published posts for sitemap`);
 
     const posts = await this.postsRepository.find({
       where: { isPublished: true, isDeleted: false },
-      relations: ['blog'],
-      select: ['id', 'slug', 'updatedAt', 'blog'],
-      order: { updatedAt: 'DESC' },
+      relations: ["blog"],
+      select: ["id", "slug", "updatedAt", "blog"],
+      order: { updatedAt: "DESC" },
     });
 
     // 필요한 형식으로 변환
-    return posts.map(post => ({
+    return posts.map((post) => ({
       slug: post.slug,
       blogSlug: post.blog.slug,
       updatedAt: post.updatedAt,
@@ -631,9 +839,14 @@ export class PostsService {
   async findOne(id: string, user?: User): Promise<PostResponseDto> {
     this.logger.debug(`Finding post by id: ${id}`);
 
-    const post = await this.postReadService.findById(id, ['author', 'blog', 'stats', 'metadata']);
+    const post = await this.postReadService.findById(id, [
+      "author",
+      "blog",
+      "stats",
+      "metadata",
+    ], user);
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
     return await this.postMapperService.toPostDto(post, { user });
@@ -645,7 +858,7 @@ export class PostsService {
   async incrementCommentCount(postId: string): Promise<void> {
     this.logger.debug(`Incrementing comment count for post: ${postId}`);
     // PostStats 테이블의 commentCount 증가
-    await this.postStatsRepository.increment({ postId }, 'commentCount', 1);
+    await this.postStatsRepository.increment({ postId }, "commentCount", 1);
 
     // 캐시 무효화
     await this.postCacheService.deletePostCache(postId);
@@ -661,9 +874,9 @@ export class PostsService {
       .createQueryBuilder()
       .update(PostStats)
       .set({
-        commentCount: () => `GREATEST(0, "commentCount" - 1)`
+        commentCount: () => `GREATEST(0, "commentCount" - 1)`,
       })
-      .where('postId = :postId', { postId })
+      .where("postId = :postId", { postId })
       .execute();
 
     // 캐시 무효화
@@ -675,26 +888,35 @@ export class PostsService {
   /**
    * @deprecated Use PostMapperService.toPostDto instead
    */
-  async toPostDto(post: Post, options?: {
-    liked?: boolean;
-    bookmarked?: boolean;
-    user?: User;
-    blog?: Blog;
-  }): Promise<PostResponseDto> {
+  async toPostDto(
+    post: Post,
+    options?: {
+      liked?: boolean;
+      bookmarked?: boolean;
+      user?: User;
+      blog?: Blog;
+    },
+  ): Promise<PostResponseDto> {
     return await this.postMapperService.toPostDto(post, options);
   }
 
   /**
    * @deprecated Use PostCacheService.invalidateRelatedCache instead
    */
-  private async invalidateRelatedCache(blogSlug: string, blogId?: string): Promise<void> {
+  private async invalidateRelatedCache(
+    blogSlug: string,
+    blogId?: string,
+  ): Promise<void> {
     return await this.postCacheService.invalidateRelatedCache(blogSlug, blogId);
   }
 
   /**
    * @deprecated Use PostFileService.validatePostTotalSize instead
    */
-  private async validatePostTotalSize(postId: string, userId: string): Promise<void> {
+  private async validatePostTotalSize(
+    postId: string,
+    userId: string,
+  ): Promise<void> {
     // Find files attached to post
     const files = await this.postFileService.getAttachedFiles(postId, userId);
     return await this.postFileService.validatePostTotalSize(files, postId);
@@ -707,7 +929,7 @@ export class PostsService {
    */
   async permanentDelete(id: string, user: User): Promise<void> {
     if (user.role !== Role.ADMIN) {
-      throw new ForbiddenException('관리자만 영구 삭제할 수 있습니다.');
+      throw new ForbiddenException("관리자만 영구 삭제할 수 있습니다.");
     }
 
     this.logger.log(`Permanently deleting post: ${id} by admin: ${user.id}`);
@@ -717,18 +939,26 @@ export class PostsService {
   /**
    * Editor's Pick 설정 (관리자용)
    */
-  async setEditorPick(postId: string, isEditorPick: boolean, user: User): Promise<void> {
+  async setEditorPick(
+    postId: string,
+    isEditorPick: boolean,
+    user: User,
+  ): Promise<void> {
     if (user.role !== Role.ADMIN) {
-      throw new ForbiddenException('관리자만 Editor\'s Pick을 설정할 수 있습니다.');
+      throw new ForbiddenException(
+        "관리자만 Editor's Pick을 설정할 수 있습니다.",
+      );
     }
 
     const post = await this.postsRepository.findOne({ where: { id: postId } });
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
     // PostMetadata 엔티티 업데이트 (주 데이터 소스)
-    let metadata = await this.postMetadataRepository.findOne({ where: { postId } });
+    let metadata = await this.postMetadataRepository.findOne({
+      where: { postId },
+    });
     if (!metadata) {
       // PostMetadata가 없으면 새로 생성
       metadata = this.postMetadataRepository.create({
@@ -752,7 +982,7 @@ export class PostsService {
       // 현재 Editor's Pick 목록 조회 (최신순)
       const currentPicks = await this.postMetadataRepository.find({
         where: { isEditorPick: true },
-        order: { editorPickedAt: 'DESC' }
+        order: { editorPickedAt: "DESC" },
       });
 
       // 5개 초과 시 가장 오래된 pick 제거
@@ -760,7 +990,9 @@ export class PostsService {
         const oldestPick = currentPicks[currentPicks.length - 1];
         oldestPick.removeEditorPick();
         await this.postMetadataRepository.save(oldestPick);
-        this.logger.log(`Removed oldest Editor's Pick: ${oldestPick.postId} (limit exceeded)`);
+        this.logger.log(
+          `Removed oldest Editor's Pick: ${oldestPick.postId} (limit exceeded)`,
+        );
       }
     }
 
@@ -774,14 +1006,65 @@ export class PostsService {
     });
 
     // 기존 캐시 무효화
-    this.eventEmitter.emit('cache.posts.invalidate', {
+    this.eventEmitter.emit("cache.posts.invalidate", {
       postId,
       blogId: post.blogId,
       isPublished: post.isPublished,
     });
 
-  
     this.logger.log(`Set Editor's Pick for post: ${postId} to ${isEditorPick}`);
+  }
+
+  /**
+   * Editor's Pick 순서 업데이트 (관리자용)
+   */
+  async updateEditorPicksOrder(
+    orderedIds: string[],
+    user: User,
+  ): Promise<void> {
+    if (user.role !== Role.ADMIN) {
+      throw new ForbiddenException(
+        "관리자만 Editor's Pick 순서를 변경할 수 있습니다.",
+      );
+    }
+
+    const uniqueIds = Array.from(new Set(orderedIds));
+    if (uniqueIds.length === 0 || uniqueIds.length > 5) {
+      throw new BadRequestException(
+        "Editor's Pick 순서는 1~5개 범위로 설정해야 합니다.",
+      );
+    }
+
+    const metadataList = await this.postMetadataRepository.find({
+      where: { postId: In(uniqueIds), isEditorPick: true },
+    });
+
+    if (metadataList.length !== uniqueIds.length) {
+      throw new BadRequestException(
+        "Editor's Pick 상태가 아닌 포스트가 포함되어 있습니다.",
+      );
+    }
+
+    const metadataMap = new Map(
+      metadataList.map((metadata) => [metadata.postId, metadata]),
+    );
+    const baseTime = Date.now();
+
+    const updatedMetadata = uniqueIds.map((postId, index) => {
+      const metadata = metadataMap.get(postId);
+      if (!metadata) {
+        throw new NotFoundException("포스트 메타데이터를 찾을 수 없습니다.");
+      }
+      metadata.editorPickedAt = new Date(baseTime - index * 1000);
+      return metadata;
+    });
+
+    await this.postMetadataRepository.save(updatedMetadata);
+    await this.postCacheService.invalidateEditorPicksCache();
+
+    this.logger.log(
+      `Updated Editor's Pick order for ${uniqueIds.length} posts`,
+    );
   }
 
   // ========== Utility Methods ==========
@@ -790,14 +1073,19 @@ export class PostsService {
    * 포스트 존재 여부 확인
    */
   async exists(id: string): Promise<boolean> {
-    const count = await this.postsRepository.count({ where: { id, isDeleted: false } });
+    const count = await this.postsRepository.count({
+      where: { id, isDeleted: false },
+    });
     return count > 0;
   }
 
   /**
    * 포스트 접근 권한 확인
    */
-  async checkAccessPermission(postId: string, user: User): Promise<{
+  async checkAccessPermission(
+    postId: string,
+    user: User,
+  ): Promise<{
     canRead: boolean;
     canWrite: boolean;
     canDelete: boolean;
@@ -806,7 +1094,7 @@ export class PostsService {
   }> {
     const post = await this.postsRepository.findOne({
       where: { id: postId, isDeleted: false },
-      relations: ['blog', 'author'],
+      relations: ["blog", "author"],
     });
 
     if (!post) {
@@ -846,29 +1134,40 @@ export class PostsService {
     totalLikes: number;
     totalComments: number;
   }> {
-    const query = this.postStatsRepository.createQueryBuilder('stats')
-      .leftJoin('stats.post', 'post')
-      .where('post.isDeleted = :isDeleted', { isDeleted: false });
+    const query = this.postStatsRepository
+      .createQueryBuilder("stats")
+      .leftJoin("stats.post", "post")
+      .where("post.isDeleted = :isDeleted", { isDeleted: false });
 
     if (options?.startDate) {
-      query.andWhere('post.createdAt >= :startDate', { startDate: options.startDate });
+      query.andWhere("post.createdAt >= :startDate", {
+        startDate: options.startDate,
+      });
     }
 
     if (options?.endDate) {
-      query.andWhere('post.createdAt <= :endDate', { endDate: options.endDate });
+      query.andWhere("post.createdAt <= :endDate", {
+        endDate: options.endDate,
+      });
     }
 
     if (options?.blogId) {
-      query.andWhere('post.blogId = :blogId', { blogId: options.blogId });
+      query.andWhere("post.blogId = :blogId", { blogId: options.blogId });
     }
 
     const result = await query
-      .select('COUNT(DISTINCT post.id)', 'totalPosts')
-      .addSelect('COUNT(CASE WHEN post.isPublished = true THEN 1 END)', 'publishedPosts')
-      .addSelect('COUNT(CASE WHEN post.isPublished = false THEN 1 END)', 'draftPosts')
-      .addSelect('SUM(stats.viewCount)', 'totalViews')
-      .addSelect('SUM(stats.likeCount)', 'totalLikes')
-      .addSelect('SUM(stats.commentCount)', 'totalComments')
+      .select("COUNT(DISTINCT post.id)", "totalPosts")
+      .addSelect(
+        "COUNT(CASE WHEN post.isPublished = true THEN 1 END)",
+        "publishedPosts",
+      )
+      .addSelect(
+        "COUNT(CASE WHEN post.isPublished = false THEN 1 END)",
+        "draftPosts",
+      )
+      .addSelect("SUM(stats.viewCount)", "totalViews")
+      .addSelect("SUM(stats.likeCount)", "totalLikes")
+      .addSelect("SUM(stats.commentCount)", "totalComments")
       .getRawOne();
 
     return {

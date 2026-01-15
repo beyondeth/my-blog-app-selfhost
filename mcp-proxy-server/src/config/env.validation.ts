@@ -115,6 +115,11 @@ const envSchema = z.object({
     .regex(/^\d+$/, 'API_KEY_CACHE_TTL must be a number')
     .default('300') // 5분
     .transform(Number),
+
+  // Backend 통신용 공유 시크릿 (선택적)
+  MCP_SHARED_SECRET: z.string()
+    .min(16, 'MCP_SHARED_SECRET must be at least 16 characters')
+    .optional(),
 });
 
 // 환경 변수 타입 정의
@@ -160,6 +165,12 @@ export function validateEnv(): EnvConfig {
       } else {
         console.log('  ✅ MCP Base URL HTTPS 사용 중');
       }
+    }
+
+    if (!env.MCP_SHARED_SECRET) {
+      console.warn('  ⚠️ MCP_SHARED_SECRET is not set. Internal MCP requests will rely solely on network isolation.');
+    } else {
+      console.log('  🔐 MCP shared secret configured');
     }
 
     return env;

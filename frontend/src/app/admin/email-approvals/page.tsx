@@ -7,7 +7,7 @@
  * - 승인/거부 처리 기능
  */
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
 import {
@@ -61,7 +61,7 @@ export default function EmailApprovalsPage() {
   }, [user, router]);
 
   // 이메일 승인 목록 조회
-  const fetchApprovals = async () => {
+  const fetchApprovals = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams({
@@ -91,13 +91,13 @@ export default function EmailApprovalsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, statusFilter, typeFilter]);
 
   useEffect(() => {
     if (user?.role === 'admin') {
       fetchApprovals();
     }
-  }, [user, page, statusFilter, typeFilter]);
+  }, [user, fetchApprovals]);
 
   // 이메일 미리보기
   const handlePreview = async (approval: EmailApproval) => {

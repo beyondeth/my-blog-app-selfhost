@@ -171,10 +171,18 @@ async function validateApiKey(apiKey: string): Promise<{
     // 3. 캐시 미스 - Backend 검증 (85-165ms)
     metricsService.recordCacheMiss();
 
+    const headers: Record<string, string> = {};
+    if (config.MCP_SHARED_SECRET) {
+      headers['X-Internal-Secret'] = config.MCP_SHARED_SECRET;
+    }
+
     const response = await axios.post(
       `${config.BACKEND_BASE_URL}/api/v1/mcp/validate-key`,
       { apiKey },
-      { timeout: 5000 }
+      {
+        timeout: 5000,
+        headers,
+      }
     );
 
     const duration = Date.now() - startTime;
@@ -236,6 +244,7 @@ async function createMcpServer(userData: {
       MCP_BASE_URL: config.MCP_BASE_URL,
       BACKEND_BASE_URL: config.BACKEND_BASE_URL,
       BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
+      MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
     },
   });
 

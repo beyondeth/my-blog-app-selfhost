@@ -1,6 +1,6 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { MarkdownRendererService } from '../../common/services/markdown-renderer.service';
-import { ContentProcessingService } from '../../content-processing/services/content-processing.service';
+import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import { MarkdownRendererService } from "../../common/services/markdown-renderer.service";
+import { ContentProcessingService } from "../../content-processing/services/content-processing.service";
 
 /**
  * 포스트 콘텐츠 처리 서비스
@@ -27,12 +27,15 @@ export class PostContentService {
    * @param options 처리 옵션
    * @returns 처리된 콘텐츠 정보
    */
-  async processContent(content: string, options?: {
-    preserveMermaid?: boolean;
-    sanitize?: boolean;
-    processCode?: boolean;
-    processImages?: boolean;
-  }): Promise<{
+  async processContent(
+    content: string,
+    options?: {
+      preserveMermaid?: boolean;
+      sanitize?: boolean;
+      processCode?: boolean;
+      processImages?: boolean;
+    },
+  ): Promise<{
     html: string;
     markdown?: string;
     isMarkdown: boolean;
@@ -53,12 +56,15 @@ export class PostContentService {
     }
 
     // 백엔드에서 콘텐츠 처리 파이프라인 적용
-    const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-      sanitize: options?.sanitize ?? true,
-      processCode: options?.processCode ?? true,
-      processImages: options?.processImages ?? true,
-      preserveMermaid: options?.preserveMermaid ?? true,
-    });
+    const processed = await this.contentProcessing.processMarkdownHtml(
+      htmlContent,
+      {
+        sanitize: options?.sanitize ?? true,
+        processCode: options?.processCode ?? true,
+        processImages: options?.processImages ?? true,
+        preserveMermaid: options?.preserveMermaid ?? true,
+      },
+    );
 
     return {
       html: processed.html,
@@ -108,7 +114,7 @@ export class PostContentService {
       /^>\s+/m, // 인용문
     ];
 
-    return markdownPatterns.some(pattern => pattern.test(content));
+    return markdownPatterns.some((pattern) => pattern.test(content));
   }
 
   /**
@@ -138,31 +144,41 @@ export class PostContentService {
    * @param markdownContent 마크다운 콘텐츠
    * @returns 처리된 HTML 콘텐츠
    */
-  async rerenderMarkdown(postId: string, markdownContent: string): Promise<{
+  async rerenderMarkdown(
+    postId: string,
+    markdownContent: string,
+  ): Promise<{
     html: string;
     thumbnail: string | null;
   }> {
     if (!markdownContent) {
-      throw new NotFoundException('Post with markdown content not found');
+      throw new NotFoundException("Post with markdown content not found");
     }
 
-    this.logger.log(`[Rerender] Starting markdown rerender for post: ${postId}`);
+    this.logger.log(
+      `[Rerender] Starting markdown rerender for post: ${postId}`,
+    );
 
     // 마크다운을 HTML로 변환
     const htmlContent = this.markdownRenderer.convertToHtml(markdownContent);
 
     // 콘텐츠 처리 파이프라인 적용
-    const processed = await this.contentProcessing.processMarkdownHtml(htmlContent, {
-      sanitize: true,
-      processCode: true,
-      processImages: true,
-      preserveMermaid: true,
-    });
+    const processed = await this.contentProcessing.processMarkdownHtml(
+      htmlContent,
+      {
+        sanitize: true,
+        processCode: true,
+        processImages: true,
+        preserveMermaid: true,
+      },
+    );
 
     // 썸네일 추출
     const thumbnail = this.extractThumbnail(processed.html);
 
-    this.logger.log(`[Rerender] Completed markdown rerender for post: ${postId}, thumbnail: ${thumbnail}`);
+    this.logger.log(
+      `[Rerender] Completed markdown rerender for post: ${postId}, thumbnail: ${thumbnail}`,
+    );
 
     return {
       html: processed.html,
@@ -181,22 +197,22 @@ export class PostContentService {
     if (!url) return null;
 
     // 빠른 실패: YouTube 썸네일은 YouTube CDN 활용
-    if (url.indexOf('youtube.com') !== -1 || url.indexOf('ytimg.com') !== -1) {
+    if (url.indexOf("youtube.com") !== -1 || url.indexOf("ytimg.com") !== -1) {
       return url;
     }
 
     // CDN URL이 이미 있으면 그대로 반환
-    if (url.indexOf('cdn.codebase.blog') !== -1) {
+    if (url.indexOf("cdn.codebase.blog") !== -1) {
       return url;
     }
 
     // 외부 HTTP/HTTPS URL은 그대로 반환
-    if (url.startsWith('http://') || url.startsWith('https://')) {
+    if (url.startsWith("http://") || url.startsWith("https://")) {
       return url;
     }
 
     // S3 키 (uploads/, v2/ 등)는 원본 URL 반환 (CDN 일시적으로 비활성화)
-    if (url.startsWith('uploads/') || url.startsWith('v2/')) {
+    if (url.startsWith("uploads/") || url.startsWith("v2/")) {
       return url;
     }
 
@@ -211,18 +227,29 @@ export class PostContentService {
    * @returns 요약문
    */
   extractExcerpt(content: string, maxLength: number = 150): string {
-    if (!content) return '';
+    if (!content) return "";
 
     // 마크다운 이미지 문법 제거 (![alt text](url) 형식)
     // 이미지 파일명이 excerpt에 노출되지 않도록 처리
     const contentWithoutImages = content
-      .replace(/!\[([^\]]*)\]\([^)]+\)/g, '') // 마크다운 이미지 완전 제거
-      .replace(/!\[[^\]]*\]/g, ''); // 이미지 참조 형식도 제거
+      .replace(/!\[([^\]]*)\]\([^)]+\)/g, "") // 마크다운 이미지 완전 제거
+      .replace(/!\[[^\]]*\]/g, ""); // 이미지 참조 형식도 제거
+
+    // 마크다운 문법 제거 (본문은 유지, excerpt만 텍스트화)
+    const withoutMarkdown = contentWithoutImages
+      .replace(/`{1,3}[^`]*`{1,3}/g, "") // 인라인/블록 코드
+      .replace(/!\[[^\]]*]\([^)]*\)/g, "") // 이미지
+      .replace(/\[[^\]]*]\([^)]*\)/g, "$1") // 링크 텍스트만
+      .replace(/[*_~]{1,3}/g, "") // 강조/취소선
+      .replace(/^\s{0,3}#{1,6}\s+/gm, "") // 헤딩
+      .replace(/^\s{0,3}>\s?/gm, "") // 인용
+      .replace(/^\s{0,3}[-*+]\s+/gm, "") // 불릿 리스트
+      .replace(/^\s{0,3}\d+\.\s+/gm, ""); // 번호 리스트
 
     // HTML 태그 제거
-    const textContent = contentWithoutImages
-      .replace(/<[^>]*>/g, '')
-      .replace(/\s+/g, ' ')
+    const textContent = withoutMarkdown
+      .replace(/<[^>]*>/g, "")
+      .replace(/\s+/g, " ")
       .trim();
 
     // 길이 제한
@@ -232,13 +259,13 @@ export class PostContentService {
 
     // 단어 중간에서 잘리지 않도록 처리
     const truncated = textContent.substring(0, maxLength);
-    const lastSpaceIndex = truncated.lastIndexOf(' ');
+    const lastSpaceIndex = truncated.lastIndexOf(" ");
 
     if (lastSpaceIndex > maxLength * 0.8) {
-      return truncated.substring(0, lastSpaceIndex) + '...';
+      return truncated.substring(0, lastSpaceIndex) + "...";
     }
 
-    return truncated + '...';
+    return truncated + "...";
   }
 
   /**
@@ -257,13 +284,15 @@ export class PostContentService {
 
     // HTML 태그 제거 및 공백 정리
     const textContent = content
-      .replace(/<[^>]*>/g, '')
-      .replace(/\s+/g, ' ')
+      .replace(/<[^>]*>/g, "")
+      .replace(/\s+/g, " ")
       .trim();
 
     // 단어 수 계산 (영어: 공백 기준, 한글: 문자 기준)
-    const englishWords = textContent.split(/\s+/).filter(word => /[a-zA-Z]/.test(word)).length;
-    const koreanChars = textContent.replace(/[a-zA-Z\s]/g, '').length;
+    const englishWords = textContent
+      .split(/\s+/)
+      .filter((word) => /[a-zA-Z]/.test(word)).length;
+    const koreanChars = textContent.replace(/[a-zA-Z\s]/g, "").length;
     const koreanWords = Math.ceil(koreanChars / 2); // 한글은 2글자를 1단어로 간주
 
     const totalWords = englishWords + koreanWords;

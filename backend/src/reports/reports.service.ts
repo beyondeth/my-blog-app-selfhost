@@ -4,29 +4,46 @@ import {
   BadRequestException,
   ForbiddenException,
   ConflictException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, FindOptionsWhere, Between, In } from 'typeorm';
-import { Report } from './entities/report.entity';
-import { CreateReportDto } from './dto/create-report.dto';
-import { UpdateReportDto } from './dto/update-report.dto';
-import { ReportType, ReportStatus, ReportAction, ReportReason } from './enums/report.enum';
-import { Post } from '../posts/entities/post.entity';
-import { Comment } from '../comments/entities/comment.entity';
-import { User } from '../users/entities/user.entity';
-import { Role } from '../common/enums/role.enum';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, FindOptionsWhere, Between, In } from "typeorm";
+import { Report } from "./entities/report.entity";
+import {
+  ReportActionLog,
+  ReportActionLogStatus,
+} from "./entities/report-action.entity";
+import { CreateReportDto } from "./dto/create-report.dto";
+import { UpdateReportDto } from "./dto/update-report.dto";
+import {
+  ReportType,
+  ReportStatus,
+  ReportAction,
+  ReportReason,
+} from "./enums/report.enum";
+import { Post } from "../posts/entities/post.entity";
+import { Comment } from "../comments/entities/comment.entity";
+import { User } from "../users/entities/user.entity";
+import { Role } from "../common/enums/role.enum";
+import { CommunityService } from "../communities/services/community.service";
+import { CommunityMembershipService } from "../communities/services/community-membership.service";
+import { CommunityRecoveryService } from "../communities/services/community-recovery.service";
 
 @Injectable()
 export class ReportsService {
   constructor(
     @InjectRepository(Report)
     private reportRepository: Repository<Report>,
+    @InjectRepository(ReportActionLog)
+    private reportActionRepository: Repository<ReportActionLog>,
     @InjectRepository(Post)
     private postRepository: Repository<Post>,
     @InjectRepository(Comment)
     private commentRepository: Repository<Comment>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    private readonly communityService: CommunityService,
+    private readonly communityMembershipService: CommunityMembershipService,
+    private readonly communityRecoveryService: CommunityRecoveryService,
   ) {}
 
   /**
@@ -47,16 +64,21 @@ export class ReportsService {
     // Calculate priority based on reason
     const priority = this.calculatePriority(createReportDto.reason);
 
+    const metadata = {
+      ...(createReportDto.metadata ?? {}),
+      reportedAt: new Date().toISOString(),
+      browserInfo: userAgent ? this.parseBrowserInfo(userAgent) : null,
+    };
+
     const report = this.reportRepository.create({
       ...createReportDto,
+      communityId: createReportDto.communityId ?? null,
+      reportedModeratorId: createReportDto.reportedModeratorId ?? null,
       reportedById: userId,
       priority,
       ipAddress,
       userAgent,
-      metadata: {
-        reportedAt: new Date().toISOString(),
-        browserInfo: userAgent ? this.parseBrowserInfo(userAgent) : null,
-      },
+      metadata,
     });
 
     const savedReport = await this.reportRepository.save(report);
@@ -77,23 +99,41 @@ export class ReportsService {
     status?: ReportStatus,
     type?: ReportType,
     page = 1,
-    limit = parseInt(process.env.DEFAULT_PAGE_LIMIT || '20'),
+    limit = parseInt(process.env.DEFAULT_PAGE_LIMIT || "20"),
   ) {
     const where: FindOptionsWhere<Report> = {};
-    
+
     if (status) where.status = status;
     if (type) where.type = type;
 
     const [reports, total] = await this.reportRepository.findAndCount({
       where,
-      relations: ['reportedBy', 'reviewedBy'],
+      relations: ["reportedBy", "reviewedBy"],
       order: {
-        priority: 'DESC',
-        createdAt: 'DESC',
+        priority: "DESC",
+        createdAt: "DESC",
       },
       skip: (page - 1) * limit,
       take: limit,
     });
+
+    const reportIds = reports.map((report) => report.id);
+    const actionLogs = reportIds.length
+      ? await this.reportActionRepository.find({
+          where: { reportId: In(reportIds) },
+          order: { createdAt: "DESC" },
+        })
+      : [];
+
+    const actionLogMap = actionLogs.reduce<Map<string, ReportActionLog[]>>(
+      (acc, log) => {
+        const arr = acc.get(log.reportId) ?? [];
+        arr.push(log);
+        acc.set(log.reportId, arr);
+        return acc;
+      },
+      new Map(),
+    );
 
     // Load target details for each report
     const reportsWithTargets = await Promise.all(
@@ -109,6 +149,7 @@ export class ReportsService {
           result.targetUser = target;
         }
         result.target = target; // Keep for backward compatibility
+        result.actionLogs = actionLogMap.get(report.id) ?? [];
         return result;
       }),
     );
@@ -128,22 +169,26 @@ export class ReportsService {
   async findOne(id: string, userId?: string, userRole?: Role) {
     const report = await this.reportRepository.findOne({
       where: { id },
-      relations: ['reportedBy', 'reviewedBy'],
+      relations: ["reportedBy", "reviewedBy"],
     });
 
     if (!report) {
-      throw new NotFoundException('Report not found');
+      throw new NotFoundException("Report not found");
     }
 
     // Check access permission
     if (userId && userRole !== Role.ADMIN && userRole !== Role.MODERATOR) {
       if (report.reportedById !== userId) {
-        throw new ForbiddenException('You can only view your own reports');
+        throw new ForbiddenException("You can only view your own reports");
       }
     }
 
     const target = await this.loadTargetDetails(report);
-    return { ...report, target };
+    const actionLogs = await this.reportActionRepository.find({
+      where: { reportId: report.id },
+      order: { createdAt: "DESC" },
+    });
+    return { ...report, target, actionLogs };
   }
 
   /**
@@ -157,19 +202,29 @@ export class ReportsService {
     const report = await this.reportRepository.findOne({ where: { id } });
 
     if (!report) {
-      throw new NotFoundException('Report not found');
+      throw new NotFoundException("Report not found");
     }
 
+    const { actionPayload, ...rest } = updateReportDto;
+
     // Update report
-    Object.assign(report, updateReportDto);
+    Object.assign(report, rest);
+    if (actionPayload !== undefined) {
+      report.actionPayload = actionPayload;
+    }
     report.reviewedById = reviewerId;
     report.reviewedAt = new Date();
 
     const updatedReport = await this.reportRepository.save(report);
 
     // Execute action if specified
-    if (updateReportDto.actionTaken && updateReportDto.actionTaken !== ReportAction.NO_ACTION) {
-      await this.executeAction(report, updateReportDto.actionTaken);
+    if (rest.actionTaken && rest.actionTaken !== ReportAction.NO_ACTION) {
+      await this.executeAction(
+        report,
+        rest.actionTaken,
+        reviewerId,
+        actionPayload || report.actionPayload,
+      );
     }
 
     return updatedReport;
@@ -181,7 +236,7 @@ export class ReportsService {
   async findByUser(userId: string, page = 1, limit = 20) {
     const [reports, total] = await this.reportRepository.findAndCount({
       where: { reportedById: userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -200,7 +255,7 @@ export class ReportsService {
    */
   async getStatistics(startDate?: Date, endDate?: Date) {
     const where: FindOptionsWhere<Report> = {};
-    
+
     if (startDate && endDate) {
       where.createdAt = Between(startDate, endDate);
     }
@@ -215,19 +270,23 @@ export class ReportsService {
       frequentlyReportedContent,
     ] = await Promise.all([
       this.reportRepository.count({ where }),
-      this.reportRepository.count({ where: { ...where, status: ReportStatus.PENDING } }),
-      this.reportRepository.count({ where: { ...where, status: ReportStatus.RESOLVED } }),
+      this.reportRepository.count({
+        where: { ...where, status: ReportStatus.PENDING },
+      }),
+      this.reportRepository.count({
+        where: { ...where, status: ReportStatus.RESOLVED },
+      }),
       this.getReportsByType(where),
       this.getReportsByReason(where),
       this.getTopReporters(where),
       this.getFrequentlyReportedContent(where),
     ]);
 
-    const escalatedReports = await this.reportRepository.count({ 
-      where: { ...where, status: ReportStatus.ESCALATED } 
+    const escalatedReports = await this.reportRepository.count({
+      where: { ...where, status: ReportStatus.ESCALATED },
     });
-    const dismissedReports = await this.reportRepository.count({ 
-      where: { ...where, status: ReportStatus.DISMISSED } 
+    const dismissedReports = await this.reportRepository.count({
+      where: { ...where, status: ReportStatus.DISMISSED },
     });
 
     return {
@@ -256,9 +315,9 @@ export class ReportsService {
     reviewerId: string,
   ) {
     const reports = await this.reportRepository.findByIds(reportIds);
-    
+
     if (reports.length !== reportIds.length) {
-      throw new NotFoundException('Some reports not found');
+      throw new NotFoundException("Some reports not found");
     }
 
     const updatedReports = await Promise.all(
@@ -278,7 +337,9 @@ export class ReportsService {
         exists = await this.postRepository.exist({ where: { id: targetId } });
         break;
       case ReportType.COMMENT:
-        exists = await this.commentRepository.exist({ where: { id: targetId } });
+        exists = await this.commentRepository.exist({
+          where: { id: targetId },
+        });
         break;
       case ReportType.USER:
         exists = await this.userRepository.exist({ where: { id: targetId } });
@@ -342,20 +403,80 @@ export class ReportsService {
     }
   }
 
-  private async executeAction(report: Report, action: ReportAction) {
-    switch (action) {
-      case ReportAction.CONTENT_REMOVED:
-        await this.removeContent(report.type, report.targetId);
-        break;
-      case ReportAction.USER_SUSPENDED:
-        await this.suspendUser(report);
-        break;
-      case ReportAction.USER_BANNED:
-        await this.banUser(report);
-        break;
-      case ReportAction.WARNING_ISSUED:
-        // TODO: Implement warning system
-        break;
+  private async executeAction(
+    report: Report,
+    action: ReportAction,
+    executorId: string,
+    payload?: Record<string, any> | null,
+  ) {
+    const log = this.reportActionRepository.create({
+      reportId: report.id,
+      action,
+      executorId,
+      payload: payload ?? null,
+      status: ReportActionLogStatus.PENDING,
+    });
+    await this.reportActionRepository.save(log);
+
+    try {
+      let result: Record<string, any> | undefined;
+      switch (action) {
+        case ReportAction.CONTENT_REMOVED:
+          result = await this.removeContent(report.type, report.targetId);
+          break;
+        case ReportAction.USER_SUSPENDED:
+          result = await this.suspendUser(report, payload);
+          break;
+        case ReportAction.USER_BANNED:
+          result = await this.banUser(report, payload);
+          break;
+        case ReportAction.USER_RESTORED:
+          result = await this.restoreUser(report, payload);
+          break;
+        case ReportAction.COMMUNITY_LOCKED:
+          result = await this.lockCommunityByReport(
+            report,
+            executorId,
+            payload,
+          );
+          break;
+        case ReportAction.COMMUNITY_UNLOCKED:
+          result = await this.unlockCommunityByReport(
+            report,
+            executorId,
+            payload,
+          );
+          break;
+        case ReportAction.SNAPSHOT_CAPTURED:
+          result = await this.captureSnapshotForReport(
+            report,
+            executorId,
+            payload,
+          );
+          break;
+        case ReportAction.MODERATOR_REMOVED:
+          result = await this.removeModeratorForReport(
+            report,
+            executorId,
+            payload,
+          );
+          break;
+        case ReportAction.WARNING_ISSUED:
+        case ReportAction.NO_ACTION:
+        default:
+          result = undefined;
+          break;
+      }
+
+      log.status = ReportActionLogStatus.SUCCESS;
+      log.result = result ?? null;
+      await this.reportActionRepository.save(log);
+    } catch (error) {
+      log.status = ReportActionLogStatus.FAILED;
+      log.errorMessage =
+        error instanceof Error ? error.message : "Unknown error";
+      await this.reportActionRepository.save(log);
+      throw error;
     }
   }
 
@@ -367,59 +488,204 @@ export class ReportsService {
       case ReportType.COMMENT:
         await this.commentRepository.update(targetId, { isDeleted: true });
         break;
+      case ReportType.USER:
+        await this.userRepository.update(targetId, { isActive: false });
+        break;
     }
+
+    return { type, targetId };
   }
 
-  private async suspendUser(report: Report) {
-    let userId: string;
+  private async suspendUser(
+    report: Report,
+    payload?: Record<string, any> | null,
+  ) {
+    const userId = await this.resolveReportedUserId(report);
 
-    if (report.type === ReportType.USER) {
-      userId = report.targetId;
-    } else {
-      // Get user ID from content
-      const content = await this.getContentOwner(report.type, report.targetId);
-      userId = content?.authorId;
+    if (!userId) {
+      throw new BadRequestException("대상 사용자를 찾을 수 없습니다.");
     }
 
-    if (userId) {
-      await this.userRepository.update(userId, { isActive: false });
-      // TODO: Add suspension end date
-    }
+    const durationInput = payload?.durationDays ?? payload?.duration ?? 7;
+    const durationDays = Math.max(1, parseInt(String(durationInput), 10) || 7);
+    const reason =
+      payload?.reason || report.description || `Report ${report.id} suspension`;
+
+    const now = new Date();
+    const suspensionUntil = new Date(
+      now.getTime() + durationDays * 24 * 60 * 60 * 1000,
+    );
+
+    await this.userRepository.update(userId, {
+      isActive: false,
+      suspensionUntil,
+      suspensionReason: reason,
+      isBanned: false,
+      banReason: null,
+      bannedAt: null,
+    });
+
+    return { userId, suspensionUntil, reason };
   }
 
-  private async banUser(report: Report) {
-    let userId: string;
+  private async banUser(report: Report, payload?: Record<string, any> | null) {
+    const userId = await this.resolveReportedUserId(report);
 
-    if (report.type === ReportType.USER) {
-      userId = report.targetId;
-    } else {
-      const content = await this.getContentOwner(report.type, report.targetId);
-      userId = content?.authorId;
+    if (!userId) {
+      throw new BadRequestException("대상 사용자를 찾을 수 없습니다.");
     }
 
-    if (userId) {
-      await this.userRepository.update(userId, { 
-        isActive: false,
-        // TODO: Add permanent ban flag
-      });
+    const reason =
+      payload?.reason || report.description || `Report ${report.id} ban`;
+
+    const bannedAt = new Date();
+
+    await this.userRepository.update(userId, {
+      isActive: false,
+      isBanned: true,
+      banReason: reason,
+      bannedAt,
+      suspensionUntil: null,
+      suspensionReason: null,
+    });
+
+    return { userId, reason, bannedAt };
+  }
+
+  private async restoreUser(
+    report: Report,
+    payload?: Record<string, any> | null,
+  ) {
+    const userId = await this.resolveReportedUserId(report);
+
+    if (!userId) {
+      throw new BadRequestException("대상 사용자를 찾을 수 없습니다.");
     }
+
+    const reason =
+      payload?.reason ||
+      report.description ||
+      `Report ${report.id} restoration`;
+
+    await this.userRepository.update(userId, {
+      isActive: true,
+      isBanned: false,
+      banReason: null,
+      bannedAt: null,
+      suspensionUntil: null,
+      suspensionReason: null,
+    });
+
+    return { userId, reason };
+  }
+
+  private resolveCommunityId(
+    report: Report,
+    payload?: Record<string, any> | null,
+  ): string {
+    const communityId = report.communityId || payload?.communityId;
+    if (!communityId) {
+      throw new BadRequestException(
+        "Community context is required for this action",
+      );
+    }
+    return communityId;
+  }
+
+  private async lockCommunityByReport(
+    report: Report,
+    executorId: string,
+    payload?: Record<string, any> | null,
+  ) {
+    const communityId = this.resolveCommunityId(report, payload);
+    const reason = payload?.reason || `Report ${report.id} triggered lock`;
+    await this.communityService.lockCommunity(communityId, executorId, reason);
+    return { communityId, reason };
+  }
+
+  private async unlockCommunityByReport(
+    report: Report,
+    executorId: string,
+    payload?: Record<string, any> | null,
+  ) {
+    const communityId = this.resolveCommunityId(report, payload);
+    const reason = payload?.reason || `Report ${report.id} unlock`;
+    await this.communityService.unlockCommunity(
+      communityId,
+      executorId,
+      reason,
+    );
+    return { communityId, reason };
+  }
+
+  private async captureSnapshotForReport(
+    report: Report,
+    executorId: string,
+    payload?: Record<string, any> | null,
+  ) {
+    const communityId = this.resolveCommunityId(report, payload);
+    const reason = payload?.reason || `Report ${report.id} snapshot`;
+    const metadata = payload?.metadata || undefined;
+    const snapshot = await this.communityRecoveryService.captureSnapshot(
+      communityId,
+      executorId,
+      reason,
+      metadata,
+    );
+    return { communityId, snapshotId: snapshot.id };
+  }
+
+  private async removeModeratorForReport(
+    report: Report,
+    executorId: string,
+    payload?: Record<string, any> | null,
+  ) {
+    const communityId = this.resolveCommunityId(report, payload);
+    const moderatorUserId =
+      report.reportedModeratorId || payload?.moderatorUserId || report.targetId;
+
+    if (!moderatorUserId) {
+      throw new BadRequestException(
+        "Moderator user ID is required to remove a moderator",
+      );
+    }
+
+    const reason = payload?.reason || `Report ${report.id} moderator removal`;
+
+    await this.communityMembershipService.forceRemoveModerator(
+      communityId,
+      moderatorUserId,
+      executorId,
+      reason,
+    );
+
+    return { communityId, moderatorUserId };
   }
 
   private async getContentOwner(type: ReportType, targetId: string) {
     switch (type) {
       case ReportType.POST:
-        return await this.postRepository.findOne({ 
+        return await this.postRepository.findOne({
           where: { id: targetId },
-          select: ['authorId'],
+          select: ["authorId"],
         });
       case ReportType.COMMENT:
-        return await this.commentRepository.findOne({ 
+        return await this.commentRepository.findOne({
           where: { id: targetId },
-          select: ['authorId'],
+          select: ["authorId"],
         });
       default:
         return null;
     }
+  }
+
+  private async resolveReportedUserId(report: Report): Promise<string | null> {
+    if (report.type === ReportType.USER) {
+      return report.targetId;
+    }
+
+    const content = await this.getContentOwner(report.type, report.targetId);
+    return content?.authorId ?? null;
   }
 
   private async loadTargetDetails(report: Report) {
@@ -427,17 +693,17 @@ export class ReportsService {
       case ReportType.POST:
         return await this.postRepository.findOne({
           where: { id: report.targetId },
-          relations: ['author'],
+          relations: ["author"],
         });
       case ReportType.COMMENT:
         return await this.commentRepository.findOne({
           where: { id: report.targetId },
-          relations: ['author', 'post'],
+          relations: ["author", "post"],
         });
       case ReportType.USER:
         return await this.userRepository.findOne({
           where: { id: report.targetId },
-          select: ['id', 'username', 'email', 'createdAt'],
+          select: ["id", "username", "email", "createdAt"],
         });
       default:
         return null;
@@ -460,16 +726,16 @@ export class ReportsService {
       }
     }
 
-    return { browser: 'Unknown', version: null };
+    return { browser: "Unknown", version: null };
   }
 
   private async getReportsByType(where: FindOptionsWhere<Report>) {
     const result = await this.reportRepository
-      .createQueryBuilder('report')
-      .select('report.type', 'type')
-      .addSelect('COUNT(*)', 'count')
+      .createQueryBuilder("report")
+      .select("report.type", "type")
+      .addSelect("COUNT(*)", "count")
       .where(where)
-      .groupBy('report.type')
+      .groupBy("report.type")
       .getRawMany();
 
     return result.reduce((acc, item) => {
@@ -480,11 +746,11 @@ export class ReportsService {
 
   private async getReportsByReason(where: FindOptionsWhere<Report>) {
     const result = await this.reportRepository
-      .createQueryBuilder('report')
-      .select('report.reason', 'reason')
-      .addSelect('COUNT(*)', 'count')
+      .createQueryBuilder("report")
+      .select("report.reason", "reason")
+      .addSelect("COUNT(*)", "count")
       .where(where)
-      .groupBy('report.reason')
+      .groupBy("report.reason")
       .getRawMany();
 
     return result.reduce((acc, item) => {
@@ -495,12 +761,12 @@ export class ReportsService {
 
   private async getTopReporters(where: FindOptionsWhere<Report>) {
     const result = await this.reportRepository
-      .createQueryBuilder('report')
-      .select('report.reportedById', 'userId')
-      .addSelect('COUNT(*)', 'count')
+      .createQueryBuilder("report")
+      .select("report.reportedById", "userId")
+      .addSelect("COUNT(*)", "count")
       .where(where)
-      .groupBy('report.reportedById')
-      .orderBy('COUNT(*)', 'DESC')
+      .groupBy("report.reportedById")
+      .orderBy("COUNT(*)", "DESC")
       .limit(10)
       .getRawMany();
 
@@ -509,13 +775,13 @@ export class ReportsService {
 
   private async getFrequentlyReportedContent(where: FindOptionsWhere<Report>) {
     const result = await this.reportRepository
-      .createQueryBuilder('report')
-      .select('report.targetId', 'targetId')
-      .addSelect('report.type', 'type')
-      .addSelect('COUNT(*)', 'count')
+      .createQueryBuilder("report")
+      .select("report.targetId", "targetId")
+      .addSelect("report.type", "type")
+      .addSelect("COUNT(*)", "count")
       .where(where)
-      .groupBy('report.targetId, report.type')
-      .orderBy('COUNT(*)', 'DESC')
+      .groupBy("report.targetId, report.type")
+      .orderBy("COUNT(*)", "DESC")
       .limit(10)
       .getRawMany();
 
@@ -524,10 +790,13 @@ export class ReportsService {
 
   private async getAverageResolutionTime(where: FindOptionsWhere<Report>) {
     const result = await this.reportRepository
-      .createQueryBuilder('report')
-      .select('AVG(EXTRACT(EPOCH FROM (report.reviewedAt - report.createdAt)))', 'avg')
+      .createQueryBuilder("report")
+      .select(
+        "AVG(EXTRACT(EPOCH FROM (report.reviewedAt - report.createdAt)))",
+        "avg",
+      )
       .where({ ...where, status: ReportStatus.RESOLVED })
-      .andWhere('report.reviewedAt IS NOT NULL')
+      .andWhere("report.reviewedAt IS NOT NULL")
       .getRawOne();
 
     return result?.avg ? Math.round(result.avg / 3600) : null; // Convert to hours

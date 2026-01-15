@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { PostResponseDto } from './post-response.dto';
+import { ApiProperty } from "@nestjs/swagger";
+import { PostResponseDto } from "./post-response.dto";
 
 /**
  * Cursor Pagination 응답 DTO
@@ -28,39 +28,39 @@ import { PostResponseDto } from './post-response.dto';
  */
 export class CursorPaginatedPostsDto {
   @ApiProperty({
-    description: '포스트 목록',
+    description: "포스트 목록",
     type: [PostResponseDto],
   })
   posts: PostResponseDto[];
 
   @ApiProperty({
-    description: '다음 페이지 커서 (Base64 인코딩, null이면 마지막 페이지)',
-    example: 'MjAyNS0wMS0yMFQxMjowMDowMC4wMDBafGFiYzEyMw==',
+    description: "다음 페이지 커서 (Base64 인코딩, null이면 마지막 페이지)",
+    example: "MjAyNS0wMS0yMFQxMjowMDowMC4wMDBafGFiYzEyMw==",
     nullable: true,
   })
   nextCursor: string | null;
 
   @ApiProperty({
-    description: '다음 페이지 존재 여부',
+    description: "다음 페이지 존재 여부",
     example: true,
   })
   hasMore: boolean;
 
   @ApiProperty({
-    description: '현재 페이지 아이템 수',
+    description: "현재 페이지 아이템 수",
     example: 20,
   })
   count: number;
 
   @ApiProperty({
-    description: '다음 페이지 커서 랭크 (검색 결과용)',
+    description: "다음 페이지 커서 랭크 (검색 결과용)",
     example: 123.45,
     required: false,
   })
   nextCursorRank?: number;
 
   @ApiProperty({
-    description: '다음 페이지 존재 여부 (hasMore와 동일)',
+    description: "다음 페이지 존재 여부 (hasMore와 동일)",
     example: true,
     required: false,
   })

@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * audit_logs.performedById를 nullable로 변경하고 ON DELETE SET NULL 추가
@@ -11,7 +11,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * 1. performedById 컬럼을 nullable로 변경
  * 2. 외래 키 제약 조건을 ON DELETE SET NULL로 변경
  */
-export class UpdateAuditLogsPerformedByIdNullable1761466000000 implements MigrationInterface {
+export class UpdateAuditLogsPerformedByIdNullable1761466000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. 기존 외래 키 제약 조건 이름 찾기
     const foreignKeys = await queryRunner.query(`

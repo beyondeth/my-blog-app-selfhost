@@ -7,9 +7,9 @@ import {
   JoinColumn,
   BeforeInsert,
   Index,
-} from 'typeorm';
-import { v7 as uuidv7 } from 'uuid';
-import { Blog } from './blog.entity';
+} from "typeorm";
+import { v7 as uuidv7 } from "uuid";
+import { Blog } from "./blog.entity";
 
 /**
  * OldAlias 엔티티
@@ -38,16 +38,16 @@ import { Blog } from './blog.entity';
  * - blogId에 index (블로그별 이력 조회)
  * - changedAt에 index (오래된 이력 정리용)
  */
-@Entity('old_aliases')
-@Index(['oldAlias'], { unique: true }) // 이전 alias는 고유해야 함
-@Index(['blogId']) // 블로그별 이력 조회
-@Index(['changedAt']) // 오래된 이력 배치 정리용
+@Entity("old_aliases")
+@Index(["oldAlias"], { unique: true }) // 이전 alias는 고유해야 함
+@Index(["blogId"]) // 블로그별 이력 조회
+@Index(["changedAt"]) // 오래된 이력 배치 정리용
 export class OldAlias {
   /**
    * 기본 키 (UUID v7)
    * - 시간순 정렬로 alias 변경 이력 추적 용이
    */
-  @PrimaryColumn('uuid')
+  @PrimaryColumn("uuid")
   id: string;
 
   /**
@@ -55,11 +55,11 @@ export class OldAlias {
    * - 하나의 블로그는 여러 이전 alias를 가질 수 있음
    * - onDelete: 'CASCADE' → Blog 삭제 시 이력도 삭제
    */
-  @ManyToOne(() => Blog, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'blogId' })
+  @ManyToOne(() => Blog, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "blogId" })
   blog: Blog;
 
-  @Column({ type: 'uuid', nullable: false })
+  @Column({ type: "uuid", nullable: false })
   blogId: string;
 
   /**
@@ -82,7 +82,7 @@ export class OldAlias {
    * - 오래된 이력 정리 기준 (예: 2년 이상 된 이력 삭제)
    * - 감사 로그 (누가 언제 변경했는지)
    */
-  @Column({ type: 'timestamp' })
+  @Column({ type: "timestamp" })
   changedAt: Date;
 
   /**
@@ -90,7 +90,7 @@ export class OldAlias {
    * - 다중 alias 변경 시 리다이렉트 체인 관리
    * - 예: oldAlias='luticek', redirectTo='luticek3'
    */
-  @Column({ name: 'redirectto', length: 100, nullable: true })
+  @Column({ name: "redirectto", length: 100, nullable: true })
   redirectTo: string;
 
   /**

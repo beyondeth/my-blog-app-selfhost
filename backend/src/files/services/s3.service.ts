@@ -1,15 +1,20 @@
-import { Injectable, Logger, BadRequestException, InternalServerErrorException } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import { 
-  S3Client, 
-  PutObjectCommand, 
+import {
+  Injectable,
+  Logger,
+  BadRequestException,
+  InternalServerErrorException,
+} from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import {
+  S3Client,
+  PutObjectCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
   ListObjectsV2Command,
-  CopyObjectCommand 
-} from '@aws-sdk/client-s3';
-import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
+  CopyObjectCommand,
+} from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 export interface PresignedUrlResponse {
   uploadUrl: string;
@@ -22,25 +27,35 @@ export class S3Service {
   private readonly logger = new Logger(S3Service.name);
   private readonly s3Client: S3Client;
   private readonly bucket: string;
-  private readonly storageProvider: 'aws' | 'oci'; // AWS S3 또는 Oracle Object Storage
+  private readonly storageProvider: "aws" | "oci"; // AWS S3 또는 Oracle Object Storage
   private readonly ociNamespace?: string; // OCI Object Storage Namespace
   private readonly region: string;
 
   constructor(private configService: ConfigService) {
     // 환경변수 직접 읽기 (ConfigService 네임스페이스가 없을 경우 대비)
-    const accessKeyId = this.configService.get('AWS_S3_ACCESS_KEY_ID') || this.configService.get('s3.accessKeyId');
-    const secretAccessKey = this.configService.get('AWS_S3_SECRET_ACCESS_KEY') || this.configService.get('s3.secretAccessKey');
-    const bucket = this.configService.get('AWS_S3_BUCKET') || this.configService.get('s3.bucket');
-    const region = this.configService.get('AWS_REGION') || this.configService.get('s3.region');
+    const accessKeyId =
+      this.configService.get("AWS_S3_ACCESS_KEY_ID") ||
+      this.configService.get("s3.accessKeyId");
+    const secretAccessKey =
+      this.configService.get("AWS_S3_SECRET_ACCESS_KEY") ||
+      this.configService.get("s3.secretAccessKey");
+    const bucket =
+      this.configService.get("AWS_S3_BUCKET") ||
+      this.configService.get("s3.bucket");
+    const region =
+      this.configService.get("AWS_REGION") ||
+      this.configService.get("s3.region");
 
     if (!accessKeyId || !secretAccessKey || !bucket) {
-      throw new Error('S3 configuration is incomplete. Required: AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY, AWS_S3_BUCKET');
+      throw new Error(
+        "S3 configuration is incomplete. Required: AWS_S3_ACCESS_KEY_ID, AWS_S3_SECRET_ACCESS_KEY, AWS_S3_BUCKET",
+      );
     }
 
     this.bucket = bucket;
-    this.region = region || 'us-east-1';
-    this.storageProvider = this.configService.get('STORAGE_PROVIDER', 'aws'); // 기본값: AWS
-    this.ociNamespace = this.configService.get('OCI_NAMESPACE'); // OCI 전용
+    this.region = region || "us-east-1";
+    this.storageProvider = this.configService.get("STORAGE_PROVIDER", "aws"); // 기본값: AWS
+    this.ociNamespace = this.configService.get("OCI_NAMESPACE"); // OCI 전용
 
     // S3 호환 클라이언트 생성 (AWS S3 또는 OCI Object Storage)
     const clientConfig: any = {
@@ -52,9 +67,11 @@ export class S3Service {
     };
 
     // OCI Object Storage 사용 시 엔드포인트 설정
-    if (this.storageProvider === 'oci') {
+    if (this.storageProvider === "oci") {
       if (!this.ociNamespace) {
-        throw new Error('OCI_NAMESPACE is required when using Oracle Object Storage');
+        throw new Error(
+          "OCI_NAMESPACE is required when using Oracle Object Storage",
+        );
       }
       // OCI S3 호환 엔드포인트 (Path-style URL 사용)
       // 형식: https://{namespace}.compat.objectstorage.{region}.oraclecloud.com
@@ -83,22 +100,29 @@ export class S3Service {
     s3Key: string, // UUID 기반 S3 키를 직접 받음
     mimeType: string,
     fileSize: number,
-    fileType: string = 'general'
+    fileType: string = "general",
   ): Promise<PresignedUrlResponse> {
     try {
       // MIME 타입 검증
       this.validateMimeType(mimeType, fileType);
-      
+
       // 스마트 WebP 변환 규칙 적용 (이미지 업로드의 경우)
       // - 100KB 이상 JPG/PNG는 WebP로 변환 권장
       // - 로고/아이콘류 PNG, SVG, ICO는 원본 형식 유지
       // - 현재는 클라이언트에서 WebP 변환 후 업로드
-      if (fileType === 'image') {
+      if (fileType === "image") {
         // WebP, PNG, SVG, GIF는 허용 (선택적 변환)
-        const allowedFormats = ['image/webp', 'image/png', 'image/svg+xml', 'image/gif'];
+        const allowedFormats = [
+          "image/webp",
+          "image/png",
+          "image/svg+xml",
+          "image/gif",
+        ];
         if (!allowedFormats.includes(mimeType)) {
           // JPG는 클라이언트에서 WebP로 변환 후 업로드 권장
-          this.logger.warn(`Non-optimized format uploaded: ${mimeType}. Consider converting to WebP for better performance.`);
+          this.logger.warn(
+            `Non-optimized format uploaded: ${mimeType}. Consider converting to WebP for better performance.`,
+          );
         }
       }
 
@@ -110,8 +134,8 @@ export class S3Service {
         ContentLength: fileSize,
         // 메타데이터 추가
         Metadata: {
-          'file-type': fileType,
-          'upload-date': new Date().toISOString(),
+          "file-type": fileType,
+          "upload-date": new Date().toISOString(),
         },
       });
 
@@ -119,7 +143,7 @@ export class S3Service {
       const expiresIn = 15 * 60; // 15분
       const uploadUrl = await getSignedUrl(this.s3Client, putObjectCommand, {
         expiresIn,
-        signableHeaders: new Set(['content-type']),
+        signableHeaders: new Set(["content-type"]),
       });
 
       this.logger.log(`Presigned URL generated for S3 key: ${s3Key}`);
@@ -130,8 +154,11 @@ export class S3Service {
         expiresIn,
       };
     } catch (error) {
-      this.logger.error(`Failed to generate presigned URL: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to generate upload URL');
+      this.logger.error(
+        `Failed to generate presigned URL: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to generate upload URL");
     }
   }
 
@@ -152,7 +179,7 @@ export class S3Service {
       const response = await this.s3Client.send(getObjectCommand);
 
       if (!response.Body) {
-        throw new Error('Empty response body from S3');
+        throw new Error("Empty response body from S3");
       }
 
       return {
@@ -161,8 +188,11 @@ export class S3Service {
         contentLength: response.ContentLength,
       };
     } catch (error) {
-      this.logger.error(`Failed to get object stream: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to get file from storage');
+      this.logger.error(
+        `Failed to get object stream: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to get file from storage");
     }
   }
 
@@ -183,8 +213,11 @@ export class S3Service {
       this.logger.log(`Download URL generated for file: ${fileKey}`);
       return url;
     } catch (error) {
-      this.logger.error(`Failed to generate download URL: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to generate download URL');
+      this.logger.error(
+        `Failed to generate download URL: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to generate download URL");
     }
   }
 
@@ -202,12 +235,18 @@ export class S3Service {
       this.logger.log(`File exists: ${fileKey}`);
       return true;
     } catch (error) {
-      if (error.name === 'NotFound' || error.$metadata?.httpStatusCode === 404) {
+      if (
+        error.name === "NotFound" ||
+        error.$metadata?.httpStatusCode === 404
+      ) {
         this.logger.log(`File does not exist: ${fileKey}`);
         return false;
       }
-      this.logger.error(`Failed to check file existence: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to check file existence');
+      this.logger.error(
+        `Failed to check file existence: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to check file existence");
     }
   }
 
@@ -225,14 +264,19 @@ export class S3Service {
       this.logger.log(`File deleted from S3: ${fileKey}`);
     } catch (error) {
       this.logger.error(`Failed to delete file: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to delete file');
+      throw new InternalServerErrorException("Failed to delete file");
     }
   }
 
   /**
    * 버퍼를 S3에 직접 업로드 (외부 이미지 다운로드용)
    */
-  async uploadBuffer(fileKey: string, buffer: Buffer, contentType: string, metadata?: Record<string, string>): Promise<void> {
+  async uploadBuffer(
+    fileKey: string,
+    buffer: Buffer,
+    contentType: string,
+    metadata?: Record<string, string>,
+  ): Promise<void> {
     try {
       const putObjectCommand = new PutObjectCommand({
         Bucket: this.bucket,
@@ -244,9 +288,14 @@ export class S3Service {
       });
 
       await this.s3Client.send(putObjectCommand);
-      this.logger.log(`Buffer uploaded to S3: ${fileKey} (${buffer.length} bytes)`);
+      this.logger.log(
+        `Buffer uploaded to S3: ${fileKey} (${buffer.length} bytes)`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to upload buffer to S3: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to upload buffer to S3: ${error.message}`,
+        error.stack,
+      );
       throw error;
     }
   }
@@ -254,7 +303,10 @@ export class S3Service {
   /**
    * Upload file to Object Storage (AWS S3 또는 OCI)
    */
-  async uploadFile(file: Express.Multer.File | null, s3Key: string): Promise<{ location?: string }> {
+  async uploadFile(
+    file: Express.Multer.File | null,
+    s3Key: string,
+  ): Promise<{ location?: string }> {
     if (!file) {
       // Mock upload for tests
       return { location: this.generatePublicUrl(s3Key) };
@@ -270,14 +322,16 @@ export class S3Service {
       });
 
       await this.s3Client.send(putObjectCommand);
-      this.logger.log(`File uploaded: ${s3Key} (${this.storageProvider.toUpperCase()})`);
+      this.logger.log(
+        `File uploaded: ${s3Key} (${this.storageProvider.toUpperCase()})`,
+      );
 
       return {
         location: this.generatePublicUrl(s3Key),
       };
     } catch (error) {
       this.logger.error(`Failed to upload file: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to upload file');
+      throw new InternalServerErrorException("Failed to upload file");
     }
   }
 
@@ -288,7 +342,7 @@ export class S3Service {
    * @returns Public URL
    */
   private generatePublicUrl(fileKey: string): string {
-    if (this.storageProvider === 'oci') {
+    if (this.storageProvider === "oci") {
       // OCI Object Storage URL 형식
       return `https://${this.ociNamespace}.compat.objectstorage.${this.region}.oraclecloud.com/${this.bucket}/${fileKey}`;
     } else {
@@ -300,7 +354,10 @@ export class S3Service {
   /**
    * Copy file (alias for copyObject for tests)
    */
-  async copyFile(sourceKey: string, destinationKey: string): Promise<{ success: boolean; sourceKey: string; destKey: string }> {
+  async copyFile(
+    sourceKey: string,
+    destinationKey: string,
+  ): Promise<{ success: boolean; sourceKey: string; destKey: string }> {
     await this.copyObject(sourceKey, destinationKey);
     return {
       success: true,
@@ -321,10 +378,15 @@ export class S3Service {
       });
 
       await this.s3Client.send(copyCommand);
-      this.logger.log(`Copied S3 object from ${sourceKey} to ${destinationKey}`);
+      this.logger.log(
+        `Copied S3 object from ${sourceKey} to ${destinationKey}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to copy S3 object: ${error.message}`, error.stack);
-      throw new InternalServerErrorException('Failed to copy file');
+      this.logger.error(
+        `Failed to copy S3 object: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to copy file");
     }
   }
 
@@ -344,12 +406,12 @@ export class S3Service {
       });
 
       const response = await this.s3Client.send(headCommand);
-      
+
       return {
         contentType: response.ContentType,
         contentLength: response.ContentLength,
         lastModified: response.LastModified,
-        originalName: response.Metadata?.['original-name'],
+        originalName: response.Metadata?.["original-name"],
       };
     } catch (error) {
       this.logger.warn(`Failed to get object metadata: ${error.message}`);
@@ -381,36 +443,31 @@ export class S3Service {
   private validateMimeType(mimeType: string, fileType: string): void {
     const allowedMimeTypes = {
       image: [
-        'image/jpeg',
-        'image/jpg', 
-        'image/png',
-        'image/gif',
-        'image/webp',
-        'image/svg+xml'
+        "image/jpeg",
+        "image/jpg",
+        "image/png",
+        "image/gif",
+        "image/webp",
+        "image/svg+xml",
       ],
       document: [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'text/plain'
+        "application/pdf",
+        "application/msword",
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/vnd.ms-excel",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "text/plain",
       ],
-      video: [
-        'video/mp4',
-        'video/mpeg',
-        'video/quicktime',
-        'video/x-msvideo'
-      ],
-      general: [] // 모든 타입 허용
+      video: ["video/mp4", "video/mpeg", "video/quicktime", "video/x-msvideo"],
+      general: [], // 모든 타입 허용
     };
 
-    if (fileType !== 'general' && allowedMimeTypes[fileType]) {
+    if (fileType !== "general" && allowedMimeTypes[fileType]) {
       if (!allowedMimeTypes[fileType].includes(mimeType)) {
         throw new BadRequestException(
-          `Invalid MIME type ${mimeType} for file type ${fileType}`
+          `Invalid MIME type ${mimeType} for file type ${fileType}`,
         );
       }
     }
   }
-} 
+}

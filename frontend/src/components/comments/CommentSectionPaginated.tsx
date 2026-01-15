@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import { FiMessageCircle, FiTrendingUp, FiClock, FiMenu, FiChevronDown, FiCheck } from 'react-icons/fi';
+import { AlertTriangle } from 'lucide-react';
 import {
   useParentCommentsPaginated,
   useCreateCommentPaginated,
@@ -11,11 +13,18 @@ import CommentForm from './CommentForm';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import CommentItemPaginated from './CommentItemPaginated';
+import type { CommentContext } from '@/lib/api/endpoints/comments';
+import type { Community } from '@/types/community';
 
 interface CommentSectionPaginatedProps {
   postId: string;
   postAuthorId?: string;
   totalCommentCount?: number; // Total comment count from parent (includes all replies)
+  context?: CommentContext;
+  isCommunityLocked?: boolean;
+  lockedAt?: string | null;
+  lockedBy?: Community['lockedBy'];
+  communitySlug?: string;
 }
 
 type SortType = 'recent' | 'popular';
@@ -34,7 +43,16 @@ type SortType = 'recent' | 'popular';
  * - 첫 페이지만 Redis 캐싱 (TTL 10초)
  * - 정렬 변경 시 전체 리셋
  */
-export default function CommentSectionPaginated({ postId, postAuthorId, totalCommentCount }: CommentSectionPaginatedProps) {
+export default function CommentSectionPaginated({
+  postId,
+  postAuthorId,
+  totalCommentCount,
+  context,
+  isCommunityLocked = false,
+  lockedAt,
+  lockedBy,
+  communitySlug,
+}: CommentSectionPaginatedProps) {
   const [sortType, setSortType] = useState<SortType>('popular');
   const [snapshotTimestamp, setSnapshotTimestamp] = useState<string | undefined>();
   const [showSortDropdown, setShowSortDropdown] = useState(false);
@@ -56,10 +74,10 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
     sort: sortType,
     limit: 20,
     snapshotTimestamp,
-  });
+  }, context);
 
   // 댓글 작성 mutation
-  const createCommentMutation = useCreateCommentPaginated(postId, sortType === 'recent' ? 'newest' : sortType);
+  const createCommentMutation = useCreateCommentPaginated(postId, sortType === 'recent' ? 'newest' : sortType, context);
   const [isSubmittingComment, setIsSubmittingComment] = useState(false);
 
   // 스냅샷 타임스탬프 저장 (인기순 정렬 시)
@@ -116,6 +134,9 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
 
   // 댓글 작성 핸들러
   const handleCreateComment = async (content: string) => {
+    if (isCommunityLocked) {
+      return;
+    }
     setIsSubmittingComment(true);
     try {
       await createCommentMutation.mutateAsync({
@@ -143,7 +164,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
   }
 
   return (
-    <section className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
+    <section className="mt-16 pt-8">
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">
@@ -157,7 +178,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
         <div className="relative" ref={dropdownRef}>
           <button
             onClick={() => setShowSortDropdown(!showSortDropdown)}
-            className="inline-flex items-center px-4 py-2 text-[13px] font-medium rounded-full bg-gray-50 text-gray-600 hover:bg-gray-100 dark:bg-gray-800 dark:text-gray-400 dark:hover:bg-gray-700 transition-colors"
+            className="inline-flex items-center px-4 py-2 text-[13px] font-semibold rounded-full bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700 transition-colors"
           >
             <FiMenu className="w-4 h-4 mr-2" />
             정렬 기준
@@ -192,15 +213,41 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
         </div>
       </div>
 
-      {/* 댓글 작성 폼 */}
+      {/* 댓글 작성 폼 / 잠금 안내 */}
       <div className="mb-8">
-        <CommentForm
-          postId={postId}
-          onSubmit={handleCreateComment}
-          isLoading={isSubmittingComment}
-          placeholder="댓글을 작성해주세요..."
-          maxLength={1000}
-        />
+        {isCommunityLocked ? (
+          <div className="rounded-xl border border-amber-200 bg-amber-50/80 dark:border-amber-800 dark:bg-amber-950/40 p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              <div className="space-y-1 text-sm text-amber-900 dark:text-amber-100">
+                <p className="font-semibold">댓글 작성이 일시적으로 제한되었습니다.</p>
+                <p className="text-amber-900/80 dark:text-amber-100/80">
+                  커뮤니티가 잠금 상태일 때는 새 댓글을 작성할 수 없습니다. 운영팀이 복구를 진행하는 동안 잠시 기다려 주세요.
+                </p>
+                <div className="text-xs text-amber-900/70 dark:text-amber-100/70">
+                  {lockedAt && <span className="mr-2">잠금 일시 {new Date(lockedAt).toLocaleString('ko-KR')}</span>}
+                  {lockedBy?.username && <span>담당자 {lockedBy.username}</span>}
+                </div>
+                {communitySlug && (
+                  <Link
+                    href={`/c/${communitySlug}/report-moderator`}
+                    className="inline-flex text-xs font-semibold text-amber-800 hover:text-amber-900"
+                  >
+                    운영진 신고 / 복구 요청 하기 →
+                  </Link>
+                )}
+              </div>
+            </div>
+          </div>
+        ) : (
+          <CommentForm
+            postId={postId}
+            onSubmit={handleCreateComment}
+            isLoading={isSubmittingComment}
+            placeholder="댓글을 작성해주세요..."
+            maxLength={1000}
+          />
+        )}
       </div>
 
       {/* 댓글 목록 */}
@@ -216,6 +263,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
               comment={comment}
               postId={postId}
               postAuthorId={postAuthorId}
+              context={context}
             />
           ))}
 
@@ -227,7 +275,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
               ) : (
                 <button
                   onClick={() => fetchNextPage()}
-                  className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                  className="text-sm text-gray-700 dark:text-gray-300 font-medium hover:text-black dark:hover:text-white"
                 >
                   더 보기
                 </button>
@@ -236,7 +284,7 @@ export default function CommentSectionPaginated({ postId, postAuthorId, totalCom
           )}
 
           {!isLoading && flatComments.length === 0 && (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+            <div className="text-center py-8 text-sm text-gray-600 dark:text-gray-400">
               아직 댓글이 없습니다. 첫 댓글을 작성해보세요!
             </div>
           )}

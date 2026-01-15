@@ -9,12 +9,14 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * 3. Drops the viewCount column from posts table
  * 4. Updates related indexes if needed
  */
-export class RemoveViewCountFromPosts1775000000000 implements MigrationInterface {
-    name = 'RemoveViewCountFromPosts1775000000000'
+export class RemoveViewCountFromPosts1775000000000
+  implements MigrationInterface
+{
+  name = "RemoveViewCountFromPosts1775000000000";
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // 1. Create PostStats records for posts that don't have them
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // 1. Create PostStats records for posts that don't have them
+    await queryRunner.query(`
             INSERT INTO post_stats ("postId", "viewCount", "likeCount", "commentCount", "qualityScore", "createdAt", "updatedAt")
             SELECT
                 p.id,
@@ -29,8 +31,8 @@ export class RemoveViewCountFromPosts1775000000000 implements MigrationInterface
             WHERE ps."postId" IS NULL
         `);
 
-        // 2. Update post_stats with the maximum view count from both tables
-        await queryRunner.query(`
+    // 2. Update post_stats with the maximum view count from both tables
+    await queryRunner.query(`
             UPDATE post_stats
             SET
                 "viewCount" = GREATEST(
@@ -45,12 +47,12 @@ export class RemoveViewCountFromPosts1775000000000 implements MigrationInterface
             )
         `);
 
-        // 3. Update materialized view to use post_stats instead of posts.viewCount
-        await queryRunner.query(`
+    // 3. Update materialized view to use post_stats instead of posts.viewCount
+    await queryRunner.query(`
             DROP MATERIALIZED VIEW IF EXISTS mv_popular_posts
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE MATERIALIZED VIEW mv_popular_posts AS
             SELECT p.id,
                 p.title,
@@ -71,53 +73,53 @@ export class RemoveViewCountFromPosts1775000000000 implements MigrationInterface
             ORDER BY (ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2) DESC, p."publishedAt" DESC
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE UNIQUE INDEX idx_mv_popular_posts_id ON mv_popular_posts (id)
         `);
 
-        // 4. Drop the viewCount column from posts table
-        await queryRunner.query(`
+    // 4. Drop the viewCount column from posts table
+    await queryRunner.query(`
             ALTER TABLE posts
             DROP COLUMN IF EXISTS "viewCount"
         `);
 
-        // 4. Also drop likeCount and commentCount if they exist (as they're also in post_stats)
-        const hasLikeCount = await queryRunner.query(`
+    // 4. Also drop likeCount and commentCount if they exist (as they're also in post_stats)
+    const hasLikeCount = await queryRunner.query(`
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'posts'
             AND column_name = 'likeCount'
         `);
 
-        if (hasLikeCount.length > 0) {
-            await queryRunner.query(`
+    if (hasLikeCount.length > 0) {
+      await queryRunner.query(`
                 ALTER TABLE posts
                 DROP COLUMN IF EXISTS "likeCount"
             `);
-        }
+    }
 
-        const hasCommentCount = await queryRunner.query(`
+    const hasCommentCount = await queryRunner.query(`
             SELECT column_name
             FROM information_schema.columns
             WHERE table_name = 'posts'
             AND column_name = 'commentCount'
         `);
 
-        if (hasCommentCount.length > 0) {
-            await queryRunner.query(`
+    if (hasCommentCount.length > 0) {
+      await queryRunner.query(`
                 ALTER TABLE posts
                 DROP COLUMN IF EXISTS "commentCount"
             `);
-        }
     }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // Rollback: Recreate original materialized view
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // Rollback: Recreate original materialized view
+    await queryRunner.query(`
             DROP MATERIALIZED VIEW IF EXISTS mv_popular_posts
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE MATERIALIZED VIEW mv_popular_posts AS
             SELECT id,
                 title,
@@ -137,18 +139,18 @@ export class RemoveViewCountFromPosts1775000000000 implements MigrationInterface
             ORDER BY ("viewCount" + "likeCount" * 3 + "commentCount" * 2) DESC, "publishedAt" DESC
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE UNIQUE INDEX idx_mv_popular_posts_id ON mv_popular_posts (id)
         `);
 
-        // Add viewCount back to posts table
-        await queryRunner.query(`
+    // Add viewCount back to posts table
+    await queryRunner.query(`
             ALTER TABLE posts
             ADD COLUMN "viewCount" integer DEFAULT 0 NOT NULL
         `);
 
-        // Copy viewCount data back from post_stats
-        await queryRunner.query(`
+    // Copy viewCount data back from post_stats
+    await queryRunner.query(`
             UPDATE posts
             SET "viewCount" = COALESCE(
                 (SELECT "viewCount" FROM post_stats WHERE "postId" = posts.id),
@@ -156,19 +158,19 @@ export class RemoveViewCountFromPosts1775000000000 implements MigrationInterface
             )
         `);
 
-        // Add likeCount and commentCount back if they were dropped
-        await queryRunner.query(`
+    // Add likeCount and commentCount back if they were dropped
+    await queryRunner.query(`
             ALTER TABLE posts
             ADD COLUMN IF NOT EXISTS "likeCount" integer DEFAULT 0 NOT NULL
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             ALTER TABLE posts
             ADD COLUMN IF NOT EXISTS "commentCount" integer DEFAULT 0 NOT NULL
         `);
 
-        // Copy likeCount and commentCount data back
-        await queryRunner.query(`
+    // Copy likeCount and commentCount data back
+    await queryRunner.query(`
             UPDATE posts
             SET "likeCount" = COALESCE(
                 (SELECT "likeCount" FROM post_stats WHERE "postId" = posts.id),
@@ -176,12 +178,12 @@ export class RemoveViewCountFromPosts1775000000000 implements MigrationInterface
             )
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             UPDATE posts
             SET "commentCount" = COALESCE(
                 (SELECT "commentCount" FROM post_stats WHERE "postId" = posts.id),
                 0
             )
         `);
-    }
+  }
 }

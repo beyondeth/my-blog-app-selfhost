@@ -12,6 +12,7 @@ interface InfiniteScrollTriggerProps {
   onLoadMore: () => void;
   error?: Error | null;
   onRetry?: () => void;
+  tone?: 'default' | 'harbor';
 }
 
 const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
@@ -22,7 +23,14 @@ const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
   onLoadMore,
   error,
   onRetry,
+  tone = 'default',
 }: InfiniteScrollTriggerProps) {
+  const isHarbor = tone === 'harbor';
+  const mutedTextClass = isHarbor ? 'text-[#7B8794] dark:text-[#A9B4C2]' : 'text-gray-500';
+  const subtleTextClass = isHarbor ? 'text-[#9AA4B2] dark:text-[#728093]' : 'text-gray-400';
+  const retryButtonClass = isHarbor
+    ? 'bg-[#264653] text-[#F9FBFD] hover:bg-[#2F5B6B] dark:bg-[#6CC3B2] dark:text-[#0E141B] dark:hover:bg-[#7DD1C0]'
+    : 'bg-black text-white hover:bg-gray-800';
   const { targetRef } = useInfiniteScroll({
     threshold: 0.5,          // 50% 보이면 트리거
     rootMargin: '100px',     // 100px 전에 미리 로드
@@ -45,7 +53,7 @@ const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
   // 모든 포스트를 로드했을 때
   if (!hasNextPage && currentPostsCount > 0) {
     return (
-      <div className="text-center py-8 text-gray-500 text-sm">
+      <div className={`text-center py-8 ${mutedTextClass} text-sm`}>
         <div className="inline-flex items-center gap-2">
           <svg 
             className="w-4 h-4" 
@@ -89,12 +97,12 @@ const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
         {onRetry && (
           <button
             onClick={onRetry}
-            className="px-4 py-2 text-sm bg-black text-white rounded hover:bg-gray-800 transition-colors"
+            className={`px-4 py-2 text-sm rounded transition-colors ${retryButtonClass}`}
           >
             다시 시도
           </button>
         )}
-        <p className="text-xs text-gray-500 mt-2">3초 후 자동으로 재시도합니다...</p>
+        <p className={`text-xs ${mutedTextClass} mt-2`}>3초 후 자동으로 재시도합니다...</p>
       </div>
     );
   }
@@ -103,8 +111,8 @@ const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
   if (isFetchingNextPage) {
     return (
       <div className="py-4">
-        <PostSkeletonWithShimmer count={3} />
-        <div className="text-center py-4 text-gray-500 text-sm">
+        <PostSkeletonWithShimmer count={3} tone={tone} />
+        <div className={`text-center py-4 ${mutedTextClass} text-sm`}>
           더 많은 포스트를 불러오는 중...
         </div>
       </div>
@@ -114,32 +122,17 @@ const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
   // 무한 스크롤 트리거 (보이지 않는 센티널 요소)
   if (hasNextPage) {
     return (
-      <>
-        {/* 센티널 요소 - 이 요소가 뷰포트에 들어오면 다음 페이지 로드 */}
-        <div 
-          ref={targetRef}
-          className="h-10 flex items-center justify-center"
-          aria-hidden="true"
-        >
-          {/* 디버깅용 - 개발 모드에서만 보이도록 */}
-          {process.env.NODE_ENV === 'development' && (
-            <span className="text-xs text-gray-400">
-              [스크롤 트리거 영역]
-            </span>
-          )}
-        </div>
-        
-        {/* 사용자가 빠르게 스크롤할 때를 대비한 수동 로드 옵션 */}
-        <div className="text-center py-4">
-          <button
-            onClick={onLoadMore}
-            disabled={isFetchingNextPage}
-            className="px-4 py-2 text-xs text-gray-500 hover:text-gray-700 transition-colors disabled:opacity-50"
-          >
-            수동으로 더 불러오기
-          </button>
-        </div>
-      </>
+      <div 
+        ref={targetRef}
+        className="h-10 flex items-center justify-center"
+        aria-hidden="true"
+      >
+        {process.env.NODE_ENV === 'development' && (
+          <span className={`text-xs ${subtleTextClass}`}>
+            [스크롤 트리거 영역]
+          </span>
+        )}
+      </div>
     );
   }
 

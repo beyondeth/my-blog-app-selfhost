@@ -44,6 +44,9 @@ export function useUploadFile() {
 
       // 이미지 파일이고 WebP가 아니면 변환
       if (validFileType === FileType.IMAGE && file.type !== 'image/webp') {
+        if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
+          throw new Error('SVG 이미지는 업로드할 수 없습니다.');
+        }
         try {
           console.log('[useUploadFile] Converting image to WebP:', {
             originalName: file.name,

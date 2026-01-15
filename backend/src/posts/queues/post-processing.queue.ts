@@ -13,18 +13,22 @@
  * - Shared Redis ← Queue 데이터 저장 (분산 인스턴스 간 공유)
  */
 
-import { Queue, QueueOptions } from 'bullmq';
-import Redis from 'ioredis';
+import { Queue, QueueOptions } from "bullmq";
+import Redis from "ioredis";
 
 /**
  * Job 데이터 타입 정의
+ *
+ * 주요 Job 타입:
+ * - process-post: 포스트 발행 처리 (userId, blogId, title, content 필수)
+ * - cleanup-deleted-post: 삭제된 포스트 정리 (postId, blogId, content 필수)
  */
 export interface PostProcessingJobData {
   postId: string; // 처리할 포스트 ID
-  userId: string; // 작성자 ID (권한 확인용)
+  userId?: string; // 작성자 ID (권한 확인용, cleanup에서는 불필요)
   blogId: string; // 블로그 ID
-  title: string; // 제목
-  content: string; // 원본 Markdown 컨텐츠
+  title?: string; // 제목 (cleanup에서는 불필요)
+  content?: string; // 원본 Markdown 컨텐츠 또는 HTML (cleanup에서는 HTML)
   tags?: string[]; // 태그 목록
   category?: string; // 카테고리
 }
@@ -35,7 +39,7 @@ export interface PostProcessingJobData {
 export interface PostProcessingResult {
   success: boolean;
   postId: string;
-  status: 'published' | 'failed';
+  status: "published" | "failed";
   error?: string;
   processingTime: number; // 처리 시간 (ms)
 }
@@ -43,14 +47,14 @@ export interface PostProcessingResult {
 /**
  * Queue 이름 상수
  */
-export const POST_PROCESSING_QUEUE = 'post-processing';
+export const POST_PROCESSING_QUEUE = "post-processing";
 
 /**
  * Redis 연결 옵션
  * 환경변수에서 읽어오며, 분산 배포를 위해 공유 Redis 사용
  */
 export const getRedisConnection = (): Redis => {
-  const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+  const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
 
   return new Redis(redisUrl, {
     maxRetriesPerRequest: 3, // 최대 재시도 횟수
@@ -71,7 +75,7 @@ export const queueOptions: QueueOptions = {
   defaultJobOptions: {
     attempts: 3, // 실패 시 최대 3번 재시도
     backoff: {
-      type: 'exponential',
+      type: "exponential",
       delay: 2000, // 첫 재시도: 2초, 두 번째: 4초, 세 번째: 8초
     },
     removeOnComplete: {

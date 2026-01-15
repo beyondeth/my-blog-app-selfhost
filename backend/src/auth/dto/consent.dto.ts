@@ -1,5 +1,5 @@
-import { IsBoolean, IsOptional, ValidateIf } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsBoolean, IsOptional, ValidateIf } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 /**
  * OAuth 로그인 후 약관 동의 DTO
@@ -7,7 +7,7 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class ConsentDto {
   @ApiProperty({
-    description: '만 14세 이상 확인 (필수)',
+    description: "만 14세 이상 확인 (필수)",
     example: true,
   })
   @IsBoolean()
@@ -15,7 +15,7 @@ export class ConsentDto {
   isOver14: boolean;
 
   @ApiProperty({
-    description: '이용약관 동의 (필수)',
+    description: "이용약관 동의 (필수)",
     example: true,
   })
   @IsBoolean()
@@ -23,7 +23,7 @@ export class ConsentDto {
   termsAccepted: boolean;
 
   @ApiProperty({
-    description: '개인정보 처리방침 동의 (필수)',
+    description: "개인정보 처리방침 동의 (필수)",
     example: true,
   })
   @IsBoolean()
@@ -31,7 +31,7 @@ export class ConsentDto {
   privacyAccepted: boolean;
 
   @ApiProperty({
-    description: '마케팅 정보 수신 동의 (선택)',
+    description: "마케팅 정보 수신 동의 (선택)",
     example: false,
     required: false,
   })
@@ -40,7 +40,7 @@ export class ConsentDto {
   marketingOptIn?: boolean;
 
   @ApiProperty({
-    description: '뉴스레터 수신 동의 (선택)',
+    description: "뉴스레터 수신 동의 (선택)",
     example: false,
     required: false,
   })

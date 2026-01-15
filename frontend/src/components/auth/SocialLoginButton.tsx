@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { useRouter } from 'next/navigation';
+import { isSafeRedirectUrl } from '@/lib/utils/sanitize';
 
 export type OAuthProvider = 'google'  | 'github';
 
@@ -34,10 +34,48 @@ const providerConfig = {
   },
 };
 
+const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
+
 export function SocialLoginButton({ provider, className = '', disabled = false }: SocialLoginButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
-  const router = useRouter();
   const config = providerConfig[provider];
+
+  const sanitizeRedirect = (target?: string | null) => {
+    if (typeof window === 'undefined' || !target) {
+      return '/';
+    }
+
+    const trimmed = target.trim();
+    if (!trimmed) {
+      return '/';
+    }
+
+    if (AUTH_REDIRECT_BLOCKLIST.some(path => trimmed === path || trimmed.startsWith(`${path}?`))) {
+      return '/';
+    }
+
+    try {
+      if (!isSafeRedirectUrl(trimmed)) {
+        return '/';
+      }
+    } catch {
+      return '/';
+    }
+
+    if (trimmed.startsWith('http')) {
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.origin !== window.location.origin) {
+          return '/';
+        }
+        return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/';
+      } catch {
+        return '/';
+      }
+    }
+
+    return trimmed;
+  };
 
   const handleLogin = () => {
     if (isLoading || disabled) return;
@@ -46,11 +84,13 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
       setIsLoading(true);
 
       // 현재 페이지 저장 (로그인 후 돌아올 페이지)
-      const returnUrl = window.location.pathname;
-      sessionStorage.setItem('redirectAfterLogin', returnUrl);
+      const urlParams = new URLSearchParams(window.location.search);
+      const redirectParam = urlParams.get('redirect') || urlParams.get('returnUrl');
+      const fallbackPath = window.location.pathname || '/';
+      const safeRedirect = sanitizeRedirect(redirectParam || fallbackPath || '/');
+      sessionStorage.setItem('redirectAfterLogin', safeRedirect);
 
       // MCP OAuth 파라미터가 있으면 sessionStorage에 저장 (소셜 로그인 후 처리용)
-      const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get('mcp_oauth') === 'true') {
         const mcpOAuthData = {
           state: urlParams.get('state'),

@@ -1,7 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class RemoveRecursiveSearchTrigger1778000000000 implements MigrationInterface {
-  name = 'RemoveRecursiveSearchTrigger1778000000000';
+export class RemoveRecursiveSearchTrigger1778000000000
+  implements MigrationInterface
+{
+  name = "RemoveRecursiveSearchTrigger1778000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 재귀 호출을 유발하는 검색 벡터 트리거 제거
@@ -13,7 +15,9 @@ export class RemoveRecursiveSearchTrigger1778000000000 implements MigrationInter
       DROP FUNCTION IF EXISTS update_post_search_vector()
     `);
 
-    console.log('Removed recursive search trigger and function to prevent stack overflow errors');
+    console.log(
+      "Removed recursive search trigger and function to prevent stack overflow errors",
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {

@@ -3,8 +3,8 @@
  * @description 전체 시스템 메트릭 관리 서비스
  */
 
-import { Injectable } from '@nestjs/common';
-import { Registry, collectDefaultMetrics } from 'prom-client';
+import { Injectable } from "@nestjs/common";
+import { Registry, collectDefaultMetrics } from "prom-client";
 
 @Injectable()
 export class MetricsService {
@@ -17,7 +17,7 @@ export class MetricsService {
     // 기본 메트릭 수집 (CPU, 메모리, GC 등)
     collectDefaultMetrics({
       register: this.registry,
-      prefix: 'nodejs_app_',
+      prefix: "nodejs_app_",
       gcDurationBuckets: [0.001, 0.01, 0.1, 1, 2, 5],
     });
   }

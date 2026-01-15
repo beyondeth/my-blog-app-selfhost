@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 약관 동의 관련 필드 추가
@@ -10,7 +10,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - marketingOptInAt: 마케팅 동의 시각
  * - newsletterOptIn: 뉴스레터 수신 동의
  */
-export class AddTermsAcceptanceFields1761100000000 implements MigrationInterface {
+export class AddTermsAcceptanceFields1761100000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // termsAcceptedAt 컬럼 추가 (기존 유저는 현재 시각으로 설정)
     await queryRunner.query(`
