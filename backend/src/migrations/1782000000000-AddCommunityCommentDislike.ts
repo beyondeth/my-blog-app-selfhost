@@ -23,21 +23,25 @@ export class AddCommunityCommentDislike1782000000000
     // =====================================================
     await queryRunner.query(`
       ALTER TABLE "community_comments"
-      ADD COLUMN "dislikeCount" INTEGER DEFAULT 0
+      ADD COLUMN IF NOT EXISTS "dislikeCount" INTEGER DEFAULT 0
     `);
 
     // =====================================================
     // 2. community_comment_like_type_enum 생성
     // =====================================================
     await queryRunner.query(`
-      CREATE TYPE "community_comment_like_type_enum" AS ENUM ('like', 'dislike')
+      DO $$ BEGIN
+        CREATE TYPE "community_comment_like_type_enum" AS ENUM ('like', 'dislike');
+      EXCEPTION
+        WHEN duplicate_object THEN null;
+      END $$;
     `);
 
     // =====================================================
     // 3. community_comment_likes 테이블 생성
     // =====================================================
     await queryRunner.query(`
-      CREATE TABLE "community_comment_likes" (
+      CREATE TABLE IF NOT EXISTS "community_comment_likes" (
         "id" UUID PRIMARY KEY DEFAULT gen_random_uuid(),
         "commentId" UUID NOT NULL,
         "userId" UUID NOT NULL,
@@ -53,10 +57,10 @@ export class AddCommunityCommentDislike1782000000000
 
     // community_comment_likes 인덱스
     await queryRunner.query(`
-      CREATE INDEX "idx_community_comment_likes_user" ON "community_comment_likes"("userId")
+      CREATE INDEX IF NOT EXISTS "idx_community_comment_likes_user" ON "community_comment_likes"("userId")
     `);
     await queryRunner.query(`
-      CREATE INDEX "idx_community_comment_likes_comment" ON "community_comment_likes"("commentId")
+      CREATE INDEX IF NOT EXISTS "idx_community_comment_likes_comment" ON "community_comment_likes"("commentId")
     `);
   }
 
