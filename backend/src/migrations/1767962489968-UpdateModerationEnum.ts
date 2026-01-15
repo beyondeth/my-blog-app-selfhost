@@ -4,6 +4,27 @@ export class UpdateModerationEnum1767962489968 implements MigrationInterface {
     name = 'UpdateModerationEnum1767962489968'
 
     public async up(queryRunner: QueryRunner): Promise<void> {
+        const typeExistsResult = await queryRunner.query(`
+            SELECT 1
+            FROM pg_type
+            WHERE typname = 'moderation_action_enum'
+        `);
+        if (typeExistsResult.length === 0) {
+            await queryRunner.query(`
+                DO $$ BEGIN
+                    CREATE TYPE moderation_action_enum AS ENUM (
+                        'WARN',
+                        'MUTE',
+                        'KICK',
+                        'BAN_ACCOUNT',
+                        'BLOCK_IP'
+                    );
+                EXCEPTION
+                    WHEN duplicate_object THEN null;
+                END $$;
+            `);
+        }
+
         const checkValue = async (value: string) => {
              const result = await queryRunner.query(`
                 SELECT 1 FROM pg_type t 
