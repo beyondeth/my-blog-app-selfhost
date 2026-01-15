@@ -1,5 +1,11 @@
-import { IsEnum, IsString, IsOptional, MaxLength } from 'class-validator';
-import { ReportStatus, ReportAction } from '../enums/report.enum';
+import {
+  IsEnum,
+  IsString,
+  IsOptional,
+  MaxLength,
+  IsObject,
+} from "class-validator";
+import { ReportStatus, ReportAction } from "../enums/report.enum";
 
 export class UpdateReportDto {
   @IsEnum(ReportStatus)
@@ -14,4 +20,8 @@ export class UpdateReportDto {
   @IsOptional()
   @MaxLength(2000)
   moderatorNotes?: string;
+
+  @IsOptional()
+  @IsObject()
+  actionPayload?: Record<string, any>;
 }

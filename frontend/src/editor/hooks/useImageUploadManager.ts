@@ -216,7 +216,7 @@ export function useImageUploadManager({
       }
     }, 300);
 
-  }, [onImagesChange, acquireSyncLock, editor, selectedThumbnailId, onThumbnailSelect]);  // images 의존성 제거 (ref 사용)
+  }, [onImagesChange, acquireSyncLock, selectedThumbnailId, onThumbnailSelect]);  // images 의존성 제거 (ref 사용)
   
   // Handle newly uploaded images (insert to editor)
   const handleImagesUploaded = useCallback((newlyUploaded: UploadedImageInfo[]) => {

@@ -2,15 +2,15 @@
  * Chat Batch Service Unit Tests
  */
 
-import { Test, TestingModule } from '@nestjs/testing';
-import { ChatBatchService } from './chat-batch.service';
-import { ChatQueueService } from './chat-queue.service';
-import { MessageRepository } from '../repositories/message.repository';
-import { ConversationRepository } from '../repositories/conversation.repository';
-import { SchedulerRegistry } from '@nestjs/schedule';
-import { Logger } from '@nestjs/common';
+import { Test, TestingModule } from "@nestjs/testing";
+import { ChatBatchService } from "./chat-batch.service";
+import { ChatQueueService } from "./chat-queue.service";
+import { MessageRepository } from "../repositories/message.repository";
+import { ConversationRepository } from "../repositories/conversation.repository";
+import { SchedulerRegistry } from "@nestjs/schedule";
+import { Logger } from "@nestjs/common";
 
-describe('ChatBatchService', () => {
+describe("ChatBatchService", () => {
   let service: ChatBatchService;
   let queueService: jest.Mocked<ChatQueueService>;
   let messageRepository: jest.Mocked<MessageRepository>;
@@ -54,39 +54,47 @@ describe('ChatBatchService', () => {
     }).compile();
 
     service = module.get<ChatBatchService>(ChatBatchService);
-    queueService = module.get(ChatQueueService) as jest.Mocked<ChatQueueService>;
-    messageRepository = module.get(MessageRepository) as jest.Mocked<MessageRepository>;
-    conversationRepository = module.get(ConversationRepository) as jest.Mocked<ConversationRepository>;
-    schedulerRegistry = module.get(SchedulerRegistry) as jest.Mocked<SchedulerRegistry>;
+    queueService = module.get(
+      ChatQueueService,
+    ) as jest.Mocked<ChatQueueService>;
+    messageRepository = module.get(
+      MessageRepository,
+    ) as jest.Mocked<MessageRepository>;
+    conversationRepository = module.get(
+      ConversationRepository,
+    ) as jest.Mocked<ConversationRepository>;
+    schedulerRegistry = module.get(
+      SchedulerRegistry,
+    ) as jest.Mocked<SchedulerRegistry>;
   });
 
-  describe('processBatch', () => {
-    it('should process messages successfully', async () => {
+  describe("processBatch", () => {
+    it("should process messages successfully", async () => {
       // Arrange
       const mockMessages = [
         {
-          id: 'msg1',
-          conversationId: 'conv1',
-          senderId: 'user1',
-          content: 'Hello',
-          tempId: 'temp1',
+          id: "msg1",
+          conversationId: "conv1",
+          senderId: "user1",
+          content: "Hello",
+          tempId: "temp1",
           createdAt: new Date(),
           queuedAt: new Date(),
           retryCount: 0,
         },
         {
-          id: 'msg2',
-          conversationId: 'conv1',
-          senderId: 'user2',
-          content: 'Hi there',
-          tempId: 'temp2',
+          id: "msg2",
+          conversationId: "conv1",
+          senderId: "user2",
+          content: "Hi there",
+          tempId: "temp2",
           createdAt: new Date(),
           queuedAt: new Date(),
           retryCount: 0,
         },
       ];
 
-      const savedMessages = mockMessages.map(m => ({
+      const savedMessages = mockMessages.map((m) => ({
         ...m,
         // Note: isRead removed - using lastReadAt on conversations instead
         isDeleted: false,
@@ -109,7 +117,7 @@ describe('ChatBatchService', () => {
       expect(queueService.updateMetrics).toHaveBeenCalled();
     });
 
-    it('should handle empty queue', async () => {
+    it("should handle empty queue", async () => {
       // Arrange
       queueService.dequeueMessages.mockResolvedValue([]);
 
@@ -123,14 +131,14 @@ describe('ChatBatchService', () => {
       expect(messageRepository.saveBatch).not.toHaveBeenCalled();
     });
 
-    it('should handle batch save failure', async () => {
+    it("should handle batch save failure", async () => {
       // Arrange
       const mockMessages = [
         {
-          id: 'msg1',
-          conversationId: 'conv1',
-          senderId: 'user1',
-          content: 'Hello',
+          id: "msg1",
+          conversationId: "conv1",
+          senderId: "user1",
+          content: "Hello",
           createdAt: new Date(),
           queuedAt: new Date(),
           retryCount: 0,
@@ -138,7 +146,9 @@ describe('ChatBatchService', () => {
       ];
 
       queueService.dequeueMessages.mockResolvedValue(mockMessages);
-      messageRepository.saveBatch.mockRejectedValue(new Error('Database error'));
+      messageRepository.saveBatch.mockRejectedValue(
+        new Error("Database error"),
+      );
 
       // Act
       const result = await service.processBatch();
@@ -147,35 +157,37 @@ describe('ChatBatchService', () => {
       expect(result.success).toBe(false);
       expect(result.processedCount).toBe(0);
       expect(result.failedCount).toBe(1);
-      expect(queueService.moveToDeadLetterQueue).toHaveBeenCalledWith(mockMessages);
+      expect(queueService.moveToDeadLetterQueue).toHaveBeenCalledWith(
+        mockMessages,
+      );
     });
 
-    it('should group messages by conversation', async () => {
+    it("should group messages by conversation", async () => {
       // Arrange
       const mockMessages = [
         {
-          id: 'msg1',
-          conversationId: 'conv1',
-          senderId: 'user1',
-          content: 'Message 1',
+          id: "msg1",
+          conversationId: "conv1",
+          senderId: "user1",
+          content: "Message 1",
           createdAt: new Date(),
           queuedAt: new Date(),
           retryCount: 0,
         },
         {
-          id: 'msg2',
-          conversationId: 'conv2',
-          senderId: 'user2',
-          content: 'Message 2',
+          id: "msg2",
+          conversationId: "conv2",
+          senderId: "user2",
+          content: "Message 2",
           createdAt: new Date(),
           queuedAt: new Date(),
           retryCount: 0,
         },
         {
-          id: 'msg3',
-          conversationId: 'conv1',
-          senderId: 'user1',
-          content: 'Message 3',
+          id: "msg3",
+          conversationId: "conv1",
+          senderId: "user1",
+          content: "Message 3",
           createdAt: new Date(),
           queuedAt: new Date(),
           retryCount: 0,
@@ -189,16 +201,24 @@ describe('ChatBatchService', () => {
       await service.processBatch();
 
       // Assert
-      expect(conversationRepository.updateLastMessageAt).toHaveBeenCalledTimes(2);
-      expect(conversationRepository.updateLastMessageAt).toHaveBeenCalledWith('conv1', expect.any(Object));
-      expect(conversationRepository.updateLastMessageAt).toHaveBeenCalledWith('conv2', expect.any(Object));
+      expect(conversationRepository.updateLastMessageAt).toHaveBeenCalledTimes(
+        2,
+      );
+      expect(conversationRepository.updateLastMessageAt).toHaveBeenCalledWith(
+        "conv1",
+        expect.any(Object),
+      );
+      expect(conversationRepository.updateLastMessageAt).toHaveBeenCalledWith(
+        "conv2",
+        expect.any(Object),
+      );
     });
   });
 
-  describe('processImmediate', () => {
-    it('should bypass timer and process immediately', async () => {
+  describe("processImmediate", () => {
+    it("should bypass timer and process immediately", async () => {
       // Arrange
-      const processBatchSpy = jest.spyOn(service, 'processBatch');
+      const processBatchSpy = jest.spyOn(service, "processBatch");
       processBatchSpy.mockResolvedValue({
         success: true,
         processedCount: 5,
@@ -216,15 +236,15 @@ describe('ChatBatchService', () => {
     });
   });
 
-  describe('recoverDeadLetterQueue', () => {
-    it('should recover messages from DLQ', async () => {
+  describe("recoverDeadLetterQueue", () => {
+    it("should recover messages from DLQ", async () => {
       // Arrange
       const deadMessages = [
         {
-          id: 'dead1',
-          conversationId: 'conv1',
-          senderId: 'user1',
-          content: 'Failed message',
+          id: "dead1",
+          conversationId: "conv1",
+          senderId: "user1",
+          content: "Failed message",
           createdAt: new Date(),
           queuedAt: new Date(),
           retryCount: 1,
@@ -241,8 +261,8 @@ describe('ChatBatchService', () => {
     });
   });
 
-  describe('getQueueMetrics', () => {
-    it('should return queue metrics', async () => {
+  describe("getQueueMetrics", () => {
+    it("should return queue metrics", async () => {
       // Arrange
       const mockMetrics = {
         queueSize: 10,
@@ -263,8 +283,8 @@ describe('ChatBatchService', () => {
     });
   });
 
-  describe('checkHealth', () => {
-    it('should return healthy status', async () => {
+  describe("checkHealth", () => {
+    it("should return healthy status", async () => {
       // Arrange
       const mockMetrics = {
         queueSize: 50,
@@ -285,7 +305,7 @@ describe('ChatBatchService', () => {
       expect(result.dlqSize).toBe(1);
     });
 
-    it('should return degraded status for high queue size', async () => {
+    it("should return degraded status for high queue size", async () => {
       // Arrange
       const mockMetrics = {
         queueSize: 600,
@@ -304,7 +324,7 @@ describe('ChatBatchService', () => {
       expect(result.healthy).toBe(true);
     });
 
-    it('should return unhealthy status for critical metrics', async () => {
+    it("should return unhealthy status for critical metrics", async () => {
       // Arrange
       const mockMetrics = {
         queueSize: 1500,
@@ -324,24 +344,26 @@ describe('ChatBatchService', () => {
     });
   });
 
-  describe('interval processing', () => {
-    it('should register interval on module init', () => {
+  describe("interval processing", () => {
+    it("should register interval on module init", () => {
       // Act
       service.onModuleInit();
 
       // Assert
       expect(schedulerRegistry.addInterval).toHaveBeenCalledWith(
-        'chat-batch-processing',
+        "chat-batch-processing",
         expect.any(Object),
       );
     });
 
-    it('should clear interval on module destroy', () => {
+    it("should clear interval on module destroy", () => {
       // Act
       service.onModuleDestroy();
 
       // Assert
-      expect(schedulerRegistry.deleteInterval).toHaveBeenCalledWith('chat-batch-processing');
+      expect(schedulerRegistry.deleteInterval).toHaveBeenCalledWith(
+        "chat-batch-processing",
+      );
     });
   });
 });

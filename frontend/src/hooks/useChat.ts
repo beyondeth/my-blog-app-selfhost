@@ -310,7 +310,7 @@ export function useChat(conversationId?: string) {
       socket.off('all-messages-read');
       socket.off('conversation-list-refresh');
     };
-  }, [socket, conversationId, user?.id, markAsRead]);
+  }, [socket, conversationId, user?.id, markAsRead, fetchConversations]);
 
   // Fetch initial data
   useEffect(() => {

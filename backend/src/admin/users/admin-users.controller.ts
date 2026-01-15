@@ -15,20 +15,24 @@ import {
   ParseEnumPipe,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { AdminUsersService, UserFilters, UpdateUserDto } from './admin-users.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { Role } from '../../common/enums/role.enum';
-import { DataRetentionService } from '../../users/services/data-retention.service';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { EmailApproval } from '../../email/entities/email-approval.entity';
-import { AuditService } from '../../audit/audit.service';
-import { AuditAction } from '../../audit/entities/audit-log.entity';
+} from "@nestjs/common";
+import {
+  AdminUsersService,
+  UserFilters,
+  UpdateUserDto,
+} from "./admin-users.service";
+import { JwtAuthGuard } from "../../common/guards/jwt-auth.guard";
+import { RolesGuard } from "../../common/guards/roles.guard";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { Role } from "../../common/enums/role.enum";
+import { DataRetentionService } from "../../users/services/data-retention.service";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { EmailApproval } from "../../email/entities/email-approval.entity";
+import { AuditService } from "../../audit/audit.service";
+import { AuditAction } from "../../audit/entities/audit-log.entity";
 
-@Controller('admin/users')
+@Controller("admin/users")
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Roles(Role.ADMIN)
 export class AdminUsersController {
@@ -45,33 +49,46 @@ export class AdminUsersController {
    */
   @Get()
   async findAll(
-    @Query('role') role?: Role,
-    @Query('isActive') isActive?: string,
-    @Query('isEmailVerified') isEmailVerified?: string,
-    @Query('search') search?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
-    @Query('sortBy', new DefaultValuePipe('createdAt')) sortBy?: string,
-    @Query('sortOrder', new DefaultValuePipe('DESC')) sortOrder?: 'ASC' | 'DESC',
+    @Query("role") role?: Role,
+    @Query("isActive") isActive?: string,
+    @Query("isEmailVerified") isEmailVerified?: string,
+    @Query("search") search?: string,
+    @Query("startDate") startDate?: string,
+    @Query("endDate") endDate?: string,
+    @Query("page", new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query("limit", new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+    @Query("sortBy", new DefaultValuePipe("createdAt")) sortBy?: string,
+    @Query("sortOrder", new DefaultValuePipe("DESC"))
+    sortOrder?: "ASC" | "DESC",
   ) {
     const filters: UserFilters = {
       role,
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
-      isEmailVerified: isEmailVerified === 'true' ? true : isEmailVerified === 'false' ? false : undefined,
+      isActive:
+        isActive === "true" ? true : isActive === "false" ? false : undefined,
+      isEmailVerified:
+        isEmailVerified === "true"
+          ? true
+          : isEmailVerified === "false"
+            ? false
+            : undefined,
       search,
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,
     };
 
-    return await this.adminUsersService.findAll(filters, page, limit, sortBy, sortOrder);
+    return await this.adminUsersService.findAll(
+      filters,
+      page,
+      limit,
+      sortBy,
+      sortOrder,
+    );
   }
 
   /**
    * Get user statistics
    */
-  @Get('statistics')
+  @Get("statistics")
   async getStatistics() {
     return await this.adminUsersService.getUserStatistics();
   }
@@ -79,9 +96,9 @@ export class AdminUsersController {
   /**
    * Export users data
    */
-  @Get('export')
+  @Get("export")
   async exportUsers(
-    @Query('format', new DefaultValuePipe('json')) format: 'json' | 'csv',
+    @Query("format", new DefaultValuePipe("json")) format: "json" | "csv",
   ) {
     return await this.adminUsersService.exportUsers(format);
   }
@@ -95,13 +112,14 @@ export class AdminUsersController {
    * - NestJS는 라우트를 위에서 아래로 매칭
    * - 'deleted'가 UUID로 파싱되는 것을 방지
    */
-  @Get('deleted')
+  @Get("deleted")
   async getDeletedUsers(
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
-    @Query('sortBy', new DefaultValuePipe('deletedAt')) sortBy?: string,
-    @Query('sortOrder', new DefaultValuePipe('DESC')) sortOrder?: 'ASC' | 'DESC',
-    @Query('search') search?: string,
+    @Query("page", new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query("limit", new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+    @Query("sortBy", new DefaultValuePipe("deletedAt")) sortBy?: string,
+    @Query("sortOrder", new DefaultValuePipe("DESC"))
+    sortOrder?: "ASC" | "DESC",
+    @Query("search") search?: string,
   ) {
     return await this.adminUsersService.findDeletedUsers(
       page,
@@ -117,26 +135,26 @@ export class AdminUsersController {
    * - 관리자 승인 대기 중인 이메일 목록 조회
    * - 상태별, 타입별 필터링 지원
    */
-  @Get('email-approvals')
+  @Get("email-approvals")
   async getEmailApprovals(
-    @Query('status') status?: string,
-    @Query('type') type?: string,
-    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page?: number,
-    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit?: number,
+    @Query("status") status?: string,
+    @Query("type") type?: string,
+    @Query("page", new DefaultValuePipe(1), ParseIntPipe) page?: number,
+    @Query("limit", new DefaultValuePipe(20), ParseIntPipe) limit?: number,
   ) {
     // 쿼리 빌더 생성
     const queryBuilder = this.emailApprovalRepository
-      .createQueryBuilder('approval')
-      .orderBy('approval.createdAt', 'DESC');
+      .createQueryBuilder("approval")
+      .orderBy("approval.createdAt", "DESC");
 
     // 상태별 필터링 (PENDING_APPROVAL, APPROVED, REJECTED)
     if (status) {
-      queryBuilder.andWhere('approval.status = :status', { status });
+      queryBuilder.andWhere("approval.status = :status", { status });
     }
 
     // 타입별 필터링 (DATA_RETENTION_NOTICE, ACCOUNT_DELETION_NOTICE, DORMANT_ACCOUNT_NOTICE)
     if (type) {
-      queryBuilder.andWhere('approval.type = :type', { type });
+      queryBuilder.andWhere("approval.type = :type", { type });
     }
 
     // 페이지네이션
@@ -162,15 +180,15 @@ export class AdminUsersController {
    * - 관리자가 이메일 발송 전 내용 확인
    * - 제목, 본문, 대상 사용자 수, 타입 등 정보 표시
    */
-  @Get('email-approvals/:id/preview')
-  async previewEmail(@Param('id', ParseUUIDPipe) id: string) {
+  @Get("email-approvals/:id/preview")
+  async previewEmail(@Param("id", ParseUUIDPipe) id: string) {
     // EmailApproval 레코드 조회
     const approval = await this.emailApprovalRepository.findOne({
       where: { id },
     });
 
     if (!approval) {
-      throw new NotFoundException('Email approval record not found');
+      throw new NotFoundException("Email approval record not found");
     }
 
     return {
@@ -196,15 +214,16 @@ export class AdminUsersController {
    * Task 25: 삭제 실패 목록 조회
    * Note: UserDeletionQueue 시스템이 제거되어 더 이상 사용되지 않음
    */
-  @Get('deletion-failures')
+  @Get("deletion-failures")
   async getDeletionFailures() {
     return {
       dlqSize: 0,
       totalFailed: 0,
       queueSize: 0,
       processingCount: 0,
-      note: 'UserDeletionQueue system has been removed. User deletion is now handled automatically by DataRetentionService (daily at midnight).',
-      migrationNote: '180일 후 자동 삭제는 DataRetentionService.deleteExpiredData()가 담당합니다.',
+      note: "UserDeletionQueue system has been removed. User deletion is now handled automatically by DataRetentionService (daily at midnight).",
+      migrationNote:
+        "180일 후 자동 삭제는 DataRetentionService.deleteExpiredData()가 담당합니다.",
     };
   }
 
@@ -229,16 +248,16 @@ export class AdminUsersController {
    * - NestJS는 라우트를 위에서 아래로 매칭
    * - 'legal/user-data/:id'가 ':id'로 매칭되는 것을 방지
    */
-  @Get('legal/user-data/:id')
+  @Get("legal/user-data/:id")
   async getLegalUserData(
-    @Param('id', ParseUUIDPipe) userId: string,
+    @Param("id", ParseUUIDPipe) userId: string,
     @Request() req,
   ) {
     // 1. 삭제된 사용자의 감사 로그 조회
     const auditLogs = await this.auditService.findAll(
       {
         action: AuditAction.USER_DELETED,
-        entityType: 'user',
+        entityType: "user",
         entityId: userId,
       },
       1,
@@ -248,7 +267,7 @@ export class AdminUsersController {
     if (!auditLogs.data || auditLogs.data.length === 0) {
       throw new NotFoundException(
         `User ${userId}에 대한 삭제 이력이 없습니다. ` +
-        `삭제되지 않은 사용자이거나, 감사 로그가 없는 경우입니다.`,
+          `삭제되지 않은 사용자이거나, 감사 로그가 없는 경우입니다.`,
       );
     }
 
@@ -275,11 +294,11 @@ export class AdminUsersController {
     await this.auditService.log(
       {
         action: AuditAction.ADMIN_ACCESS_DENIED, // 재사용 (적절한 action이 없어서)
-        entityType: 'legal_inquiry',
+        entityType: "legal_inquiry",
         entityId: userId,
         metadata: {
-          inquiryType: 'deleted_user_data',
-          reason: '법적 요구에 따른 삭제된 사용자 원본 데이터 조회',
+          inquiryType: "deleted_user_data",
+          reason: "법적 요구에 따른 삭제된 사용자 원본 데이터 조회",
           deletedAt: latestDeletionLog.newData?.deletedAt,
           scheduledDeletionAt: latestDeletionLog.newData?.scheduledDeletionAt,
           postsCount: deletedPosts.length,
@@ -289,14 +308,14 @@ export class AdminUsersController {
       {
         userId: req.user.id,
         ipAddress: req.ip || req.connection.remoteAddress,
-        userAgent: req.headers['user-agent'],
+        userAgent: req.headers["user-agent"],
       },
     );
 
     // 6. 응답 반환
     return {
       userId,
-      status: 'deleted',
+      status: "deleted",
       deletedAt: latestDeletionLog.createdAt,
       scheduledDeletionAt: latestDeletionLog.newData?.scheduledDeletionAt,
       originalData: {
@@ -321,7 +340,7 @@ export class AdminUsersController {
         subscriptionStatus: originalData.subscriptionStatus,
       },
       // 삭제된 포스트 목록 (법적 조회용)
-      deletedPosts: deletedPosts.map(post => ({
+      deletedPosts: deletedPosts.map((post) => ({
         id: post.id,
         title: post.title,
         slug: post.slug,
@@ -335,7 +354,7 @@ export class AdminUsersController {
         publishedAt: post.publishedAt,
       })),
       // 삭제된 댓글 목록 (법적 조회용)
-      deletedComments: deletedComments.map(comment => ({
+      deletedComments: deletedComments.map((comment) => ({
         id: comment.id,
         content: comment.content,
         postId: comment.postId,
@@ -343,8 +362,8 @@ export class AdminUsersController {
         createdAt: comment.createdAt,
       })),
       legalNotice: {
-        warning: '이 데이터는 법적 요구가 있을 때만 사용되어야 합니다',
-        purpose: '형사 수사, 민사 소송, 금융감독 등',
+        warning: "이 데이터는 법적 요구가 있을 때만 사용되어야 합니다",
+        purpose: "형사 수사, 민사 소송, 금융감독 등",
         retention: `${latestDeletionLog.metadata?.retentionDays || 180}일 후 완전 삭제 예정`,
         inquiredBy: req.user.email,
         inquiredAt: new Date().toISOString(),
@@ -360,21 +379,21 @@ export class AdminUsersController {
    * IMPORTANT: 동적 파라미터 라우트는 특정 경로 라우트 뒤에 정의
    * - 'deleted', 'email-approvals', 'deletion-failures', 'legal/user-data/:id' 등 특정 경로가 먼저 매칭되도록
    */
-  @Get(':id')
-  async findOne(@Param('id', ParseUUIDPipe) id: string) {
+  @Get(":id")
+  async findOne(@Param("id", ParseUUIDPipe) id: string) {
     return await this.adminUsersService.findOne(id);
   }
 
   /**
    * Task 23: 이메일 발송 승인
    */
-  @Post('email-approvals/:id/approve')
-  async approveEmail(@Param('id', ParseUUIDPipe) id: string) {
+  @Post("email-approvals/:id/approve")
+  async approveEmail(@Param("id", ParseUUIDPipe) id: string) {
     await this.dataRetentionService.approveEmailSending(id);
 
     return {
       success: true,
-      message: 'Email sending approved successfully',
+      message: "Email sending approved successfully",
       approvalId: id,
     };
   }
@@ -382,16 +401,16 @@ export class AdminUsersController {
   /**
    * Task 23: 이메일 발송 거부
    */
-  @Post('email-approvals/:id/reject')
+  @Post("email-approvals/:id/reject")
   async rejectEmail(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body('reason') reason: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body("reason") reason: string,
   ) {
     await this.dataRetentionService.rejectEmailSending(id, reason);
 
     return {
       success: true,
-      message: 'Email sending rejected',
+      message: "Email sending rejected",
       approvalId: id,
     };
   }
@@ -400,66 +419,77 @@ export class AdminUsersController {
    * Task 25: 삭제 실패 작업 재시도
    * Note: UserDeletionQueue 시스템이 제거되어 더 이상 사용되지 않음
    */
-  @Post('deletion-failures/retry')
+  @Post("deletion-failures/retry")
   async retryDeletionFailures(
-    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit?: number,
+    @Query("limit", new DefaultValuePipe(10), ParseIntPipe) limit?: number,
   ) {
     return {
       success: false,
-      message: 'UserDeletionQueue system has been removed',
+      message: "UserDeletionQueue system has been removed",
       recoveredCount: 0,
       jobs: [],
-      note: 'User deletion is now handled automatically by DataRetentionService. Check logs for any issues.',
+      note: "User deletion is now handled automatically by DataRetentionService. Check logs for any issues.",
     };
   }
 
   /**
    * Update user
    */
-  @Patch(':id')
+  @Patch(":id")
   async update(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Body() updateDto: UpdateUserDto,
     @Request() req,
   ) {
     const context = {
       ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers["user-agent"],
     };
 
-    return await this.adminUsersService.update(id, updateDto, req.user.id, context);
+    return await this.adminUsersService.update(
+      id,
+      updateDto,
+      req.user.id,
+      context,
+    );
   }
 
   /**
    * Suspend user
    */
-  @Post(':id/suspend')
+  @Post(":id/suspend")
   async suspend(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body('duration', ParseIntPipe) duration: number,
-    @Body('reason') reason: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body("duration", ParseIntPipe) duration: number,
+    @Body("reason") reason: string,
     @Request() req,
   ) {
     const context = {
       ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers["user-agent"],
     };
 
-    return await this.adminUsersService.suspend(id, duration, reason, req.user.id, context);
+    return await this.adminUsersService.suspend(
+      id,
+      duration,
+      reason,
+      req.user.id,
+      context,
+    );
   }
 
   /**
    * Ban user
    */
-  @Post(':id/ban')
+  @Post(":id/ban")
   async ban(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body('reason') reason: string,
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body("reason") reason: string,
     @Request() req,
   ) {
     const context = {
       ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers["user-agent"],
     };
 
     return await this.adminUsersService.ban(id, reason, req.user.id, context);
@@ -468,14 +498,11 @@ export class AdminUsersController {
   /**
    * Activate user
    */
-  @Post(':id/activate')
-  async activate(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Request() req,
-  ) {
+  @Post(":id/activate")
+  async activate(@Param("id", ParseUUIDPipe) id: string, @Request() req) {
     const context = {
       ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers["user-agent"],
     };
 
     return await this.adminUsersService.activate(id, req.user.id, context);
@@ -484,14 +511,11 @@ export class AdminUsersController {
   /**
    * Delete user
    */
-  @Delete(':id')
-  async delete(
-    @Param('id', ParseUUIDPipe) id: string,
-    @Request() req,
-  ) {
+  @Delete(":id")
+  async delete(@Param("id", ParseUUIDPipe) id: string, @Request() req) {
     const context = {
       ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers["user-agent"],
     };
 
     return await this.adminUsersService.delete(id, req.user.id, context);
@@ -503,14 +527,14 @@ export class AdminUsersController {
    * - CASCADE로 관련 데이터 모두 삭제
    * - 복구 불가능 (주의!)
    */
-  @Delete(':id/permanent')
+  @Delete(":id/permanent")
   async permanentDelete(
-    @Param('id', ParseUUIDPipe) id: string,
+    @Param("id", ParseUUIDPipe) id: string,
     @Request() req,
   ) {
     const context = {
       ipAddress: req.ip || req.connection.remoteAddress,
-      userAgent: req.headers['user-agent'],
+      userAgent: req.headers["user-agent"],
     };
 
     return await this.adminUsersService.permanentDeleteUser(

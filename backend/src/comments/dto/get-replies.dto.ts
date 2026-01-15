@@ -1,6 +1,6 @@
-import { IsOptional, IsString, IsInt, Min, Max } from 'class-validator';
-import { Type } from 'class-transformer';
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IsOptional, IsString, IsInt, Min, Max } from "class-validator";
+import { Type } from "class-transformer";
+import { ApiPropertyOptional } from "@nestjs/swagger";
 
 /**
  * 답글 페이지네이션 조회 DTO
@@ -16,15 +16,15 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
  */
 export class GetRepliesDto {
   @ApiPropertyOptional({
-    description: 'Base64 인코딩된 커서',
-    example: 'eyJjcmVhdGVkQXQiOiIyMDI1LTEwLTIwVDEyOjAwOjAwWiIsImlkIjoidXVpZCJ9',
+    description: "Base64 인코딩된 커서",
+    example: "eyJjcmVhdGVkQXQiOiIyMDI1LTEwLTIwVDEyOjAwOjAwWiIsImlkIjoidXVpZCJ9",
   })
   @IsOptional()
   @IsString()
   cursor?: string;
 
   @ApiPropertyOptional({
-    description: '페이지당 답글 개수',
+    description: "페이지당 답글 개수",
     minimum: 1,
     maximum: 50,
     default: 10,

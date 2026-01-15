@@ -1,30 +1,28 @@
-import { Injectable } from '@nestjs/common';
-import { marked } from 'marked';
+import { Injectable } from "@nestjs/common";
+import { marked } from "marked";
 
 @Injectable()
 export class MarkdownRendererService {
   constructor() {
-    // marked 기본 설정
-    marked.setOptions({
-      // 표준 옵션들
-      gfm: true,           // GitHub Flavored Markdown 지원
-      breaks: false,       // 줄바꿈 자동 변환 비활성화 (코드 블록 파싱 방해 방지)
-      pedantic: false,     // 표준 마크다운 호환성
+    marked.use({
+      gfm: true,
+      breaks: false,
+      pedantic: false,
     });
 
     // 커스텀 렌더러 설정 - 최소한의 처리만
     const renderer = new marked.Renderer();
 
     // 코드 블록: language 클래스만 추가 (highlight.js를 위해)
-    renderer.code = function({ text, lang }) {
-      const language = lang || '';
+    renderer.code = function ({ text, lang }) {
+      const language = lang || "";
       const escapedCode = text
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;');
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
 
       // Mermaid 블록은 명시적으로 처리 (프론트엔드 렌더링용)
-      if (language === 'mermaid') {
+      if (language === "mermaid") {
         return `<pre><code class="language-mermaid">${escapedCode}</code></pre>`;
       }
 
@@ -38,17 +36,22 @@ export class MarkdownRendererService {
     };
 
     // 링크: 외부 링크에 target="_blank" 추가
-    renderer.link = function({ href, title, tokens }) {
-      const text = this.parser?.parseInline(tokens) || '';
-      const isExternal = href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//');
-      const targetAttr = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
-      const titleAttr = title ? ` title="${title}"` : '';
+    renderer.link = function ({ href, title, tokens }) {
+      const text = this.parser?.parseInline(tokens) || "";
+      const isExternal =
+        href.startsWith("http://") ||
+        href.startsWith("https://") ||
+        href.startsWith("//");
+      const targetAttr = isExternal
+        ? ' target="_blank" rel="noopener noreferrer"'
+        : "";
+      const titleAttr = title ? ` title="${title}"` : "";
       return `<a href="${href}"${titleAttr}${targetAttr}>${text}</a>`;
     };
 
     marked.use({ renderer });
   }
-  
+
   convertToHtml(text: string): string {
     /**
      * 표준 marked 라이브러리를 사용한 마크다운 → HTML 변환
@@ -56,23 +59,37 @@ export class MarkdownRendererService {
      */
 
     // 개발 환경에서 Mermaid 블록 입력 확인 (디버깅용)
-    if (process.env.NODE_ENV === 'development' && text.includes('```mermaid')) {
+    if (process.env.NODE_ENV === "development" && text.includes("```mermaid")) {
       const mermaidMatches = text.match(/```mermaid[\s\S]*?```/g);
       if (mermaidMatches) {
-        console.log('[Markdown Renderer] Mermaid blocks detected:', mermaidMatches.length);
-        console.log('[Markdown Renderer] First block preview:', mermaidMatches[0].substring(0, 100) + '...');
+        console.log(
+          "[Markdown Renderer] Mermaid blocks detected:",
+          mermaidMatches.length,
+        );
+        console.log(
+          "[Markdown Renderer] First block preview:",
+          mermaidMatches[0].substring(0, 100) + "...",
+        );
       }
     }
 
     const html = marked.parse(text) as string;
 
     // 개발 환경에서 변환 결과 확인 (디버깅용)
-    if (process.env.NODE_ENV === 'development' && text.includes('```mermaid')) {
-      const hasLanguageMermaid = html.includes('language-mermaid');
-      console.log('[Markdown Renderer] Output contains language-mermaid:', hasLanguageMermaid);
+    if (process.env.NODE_ENV === "development" && text.includes("```mermaid")) {
+      const hasLanguageMermaid = html.includes("language-mermaid");
+      console.log(
+        "[Markdown Renderer] Output contains language-mermaid:",
+        hasLanguageMermaid,
+      );
       if (!hasLanguageMermaid) {
-        console.warn('[Markdown Renderer] WARNING: Mermaid blocks not properly converted!');
-        console.log('[Markdown Renderer] Output preview:', html.substring(0, 300));
+        console.warn(
+          "[Markdown Renderer] WARNING: Mermaid blocks not properly converted!",
+        );
+        console.log(
+          "[Markdown Renderer] Output preview:",
+          html.substring(0, 300),
+        );
       }
     }
 
@@ -85,35 +102,37 @@ export class MarkdownRendererService {
      * YAML front matter 처리는 유지 (포스트 메타데이터 필요)
      */
     const metadata = {
-      title: 'Untitled',
-      category: 'general',
-      tags: []
+      title: "Untitled",
+      category: "general",
+      tags: [],
     };
     let body = content;
 
     // Front matter 처리 (--- 로 감싸진 YAML)
-    if (content.startsWith('---')) {
-      const parts = content.split('---', 3);
+    if (content.startsWith("---")) {
+      const parts = content.split("---", 3);
       if (parts.length >= 3) {
         const frontMatter = parts[1].trim();
         body = parts[2].trim();
-        
+
         // 간단한 YAML 파싱
-        const lines = frontMatter.split('\n');
+        const lines = frontMatter.split("\n");
         for (const line of lines) {
-          const colonIndex = line.indexOf(':');
+          const colonIndex = line.indexOf(":");
           if (colonIndex > 0) {
             const key = line.substring(0, colonIndex).trim();
             let value = line.substring(colonIndex + 1).trim();
-            
+
             // 따옴표 제거
-            if ((value.startsWith('"') && value.endsWith('"')) || 
-                (value.startsWith("'") && value.endsWith("'"))) {
+            if (
+              (value.startsWith('"') && value.endsWith('"')) ||
+              (value.startsWith("'") && value.endsWith("'"))
+            ) {
               value = value.slice(1, -1);
             }
-            
+
             // 배열 처리 (간단한 JSON 파싱)
-            if (value.startsWith('[') && value.endsWith(']')) {
+            if (value.startsWith("[") && value.endsWith("]")) {
               try {
                 metadata[key] = JSON.parse(value);
               } catch {
@@ -128,7 +147,7 @@ export class MarkdownRendererService {
     }
 
     // 첫 번째 h1에서 제목 추출 (front matter가 없는 경우)
-    if (metadata.title === 'Untitled') {
+    if (metadata.title === "Untitled") {
       const h1Match = body.match(/^#\s+(.+)$/m);
       if (h1Match) {
         metadata.title = h1Match[1].trim();

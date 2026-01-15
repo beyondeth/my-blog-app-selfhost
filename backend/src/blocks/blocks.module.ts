@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { BlocksController } from './blocks.controller';
-import { BlocksService } from './blocks.service';
-import { Block } from './entities/block.entity';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { BlocksController } from "./blocks.controller";
+import { BlocksService } from "./blocks.service";
+import { Block } from "./entities/block.entity";
 
 /**
  * 사용자 차단 모듈

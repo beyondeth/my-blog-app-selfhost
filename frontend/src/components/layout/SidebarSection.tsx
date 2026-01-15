@@ -14,9 +14,9 @@ const SidebarSection = React.memo(function SidebarSection({
   className = ""
 }: SidebarSectionProps) {
   return (
-    <div className={`rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow duration-300 bg-card dark:bg-[rgb(38,38,38)] ${className}`}>
+    <div className={`rounded-3xl border border-[#D9E0EA] p-5 shadow-sm hover:shadow-md transition-shadow duration-300 bg-white dark:border-[#4B5563] dark:bg-[#262626] ${className}`}>
       {title && (
-        <h3 className="text-lg font-semibold text-foreground mb-5">
+        <h3 className="text-lg font-semibold text-[#1B2430] dark:text-[#E6EDF3] mb-5">
           {title}
         </h3>
       )}

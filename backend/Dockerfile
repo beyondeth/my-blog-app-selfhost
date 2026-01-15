@@ -101,8 +101,11 @@ ENV MSGPACKR_NO_EXTRACT=1
 ENV SKIP_NODE_GYP_BUILD=1
 ENV npm_config_build_from_source=false
 
-# 보안 강화: 비-루트 사용자 생성 (Debian 방식)
-RUN groupadd -g 1001 nodejs && \
+# FFmpeg 설치 (비디오 압축용) + 보안 강화: 비-루트 사용자 생성
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ffmpeg && \
+    rm -rf /var/lib/apt/lists/* && \
+    groupadd -g 1001 nodejs && \
     useradd -r -u 1001 -g nodejs -m nestjs
 
 # pnpm 및 PM2 전역 설치 (마이그레이션 실행 및 클러스터 모드 지원)

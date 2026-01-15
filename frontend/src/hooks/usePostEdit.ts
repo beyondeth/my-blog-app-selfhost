@@ -94,7 +94,7 @@ export function usePostEdit({ slugOrId }: UsePostEditOptions) {
       queryClient.invalidateQueries({ queryKey: ['posts'] });
       // 상세 페이지로 이동
       router.push(`/posts/${updatedPost.slug || updatedPost.id}`);
-    }, [queryClient, router, slugOrId]),
+    }, [queryClient, router]),
     onError: useCallback((error: any) => {
       debugLog('❌ [POST EDIT] Update failed:', error);
       

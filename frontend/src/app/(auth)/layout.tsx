@@ -1,5 +1,8 @@
 'use client';
 
+// 동적 렌더링 강제 - prerendering 시 useContext 오류 방지
+export const dynamic = 'force-dynamic';
+
 import { useEffect } from 'react';
 import { usePathname } from 'next/navigation';
 

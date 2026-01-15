@@ -191,7 +191,7 @@ Codebase.blog는 다음과 같은 콘텐츠와 행위를 엄격히 금지합니�
 
 저작권이 침해된 경우:
 
-1. **DMCA 신고 양식 작성**: copyright@codebase.blog으로 다음 정보 제출
+1. **DMCA 신고 양식 작성**: support@codebase.blog으로 다음 정보 제출
    - 저작권자 정보 (이름, 연락처)
    - 침해된 저작물 설명
    - 침해 콘텐츠 URL
@@ -204,7 +204,7 @@ Codebase.blog는 다음과 같은 콘텐츠와 행위를 엄격히 금지합니�
 
 콘텐츠가 삭제된 게시자는 다음과 같이 이의를 제기할 수 있습니다:
 
-1. **Counter-Notice 제출**: copyright@codebase.blog으로 이의 제기
+1. **Counter-Notice 제출**: support@codebase.blog으로 이의 제기
 2. **증빙 자료 제공**: 저작권 소유 증명 또는 공정 이용 근거
 3. **재검토**: 운영팀 및 법률 자문 검토
 

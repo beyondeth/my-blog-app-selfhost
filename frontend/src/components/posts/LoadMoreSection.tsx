@@ -8,6 +8,8 @@ interface LoadMoreSectionProps {
   totalPosts: number;
   allPostsCount: number;
   onLoadMore: () => void;
+  accentColor?: string;
+  accentSoftColor?: string;
 }
 
 const LoadMoreSection = React.memo(function LoadMoreSection({
@@ -16,6 +18,8 @@ const LoadMoreSection = React.memo(function LoadMoreSection({
   totalPosts,
   allPostsCount,
   onLoadMore,
+  accentColor,
+  accentSoftColor,
 }: LoadMoreSectionProps) {
   if (hasNextPage) {
     return (
@@ -23,7 +27,12 @@ const LoadMoreSection = React.memo(function LoadMoreSection({
         <button
           onClick={onLoadMore}
           disabled={isFetchingNextPage}
-          className="px-6 py-2 text-sm border border-gray-300 text-gray-700 hover:border-gray-400 hover:bg-gray-50 transition-colors disabled:opacity-50"
+          className="px-6 py-2 text-sm border rounded-full transition-colors disabled:opacity-50 text-gray-800 dark:text-gray-100 border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+          style={{
+            borderColor: accentColor || undefined,
+            color: accentColor || undefined,
+            backgroundColor: accentSoftColor || 'transparent',
+          }}
         >
           {isFetchingNextPage ? '로딩 중...' : '더 많은 포스트 보기'}
         </button>

@@ -1,4 +1,4 @@
-import { BillingCycle } from '../../common/enums/subscription.enum';
+import { BillingCycle } from "../../common/enums/subscription.enum";
 
 /**
  * 결제 세션 생성 옵션
@@ -100,7 +100,10 @@ export interface PaymentProvider {
   /**
    * 고객 업데이트
    */
-  updateCustomer(customerId: string, updates: Partial<CreateCustomerOptions>): Promise<void>;
+  updateCustomer(
+    customerId: string,
+    updates: Partial<CreateCustomerOptions>,
+  ): Promise<void>;
 
   /**
    * 고객 삭제
@@ -110,12 +113,16 @@ export interface PaymentProvider {
   /**
    * 결제 세션 생성
    */
-  createCheckoutSession(options: CreateCheckoutSessionOptions): Promise<CheckoutSessionResponse>;
+  createCheckoutSession(
+    options: CreateCheckoutSessionOptions,
+  ): Promise<CheckoutSessionResponse>;
 
   /**
    * 구독 생성
    */
-  createSubscription(options: CreateSubscriptionOptions): Promise<SubscriptionResponse>;
+  createSubscription(
+    options: CreateSubscriptionOptions,
+  ): Promise<SubscriptionResponse>;
 
   /**
    * 구독 조회
@@ -125,12 +132,18 @@ export interface PaymentProvider {
   /**
    * 구독 업데이트
    */
-  updateSubscription(subscriptionId: string, updates: any): Promise<SubscriptionResponse>;
+  updateSubscription(
+    subscriptionId: string,
+    updates: any,
+  ): Promise<SubscriptionResponse>;
 
   /**
    * 구독 취소
    */
-  cancelSubscription(subscriptionId: string, immediately?: boolean): Promise<void>;
+  cancelSubscription(
+    subscriptionId: string,
+    immediately?: boolean,
+  ): Promise<void>;
 
   /**
    * 구독 재개
@@ -145,7 +158,10 @@ export interface PaymentProvider {
   /**
    * 기본 결제 수단 설정
    */
-  setDefaultPaymentMethod(customerId: string, paymentMethodId: string): Promise<void>;
+  setDefaultPaymentMethod(
+    customerId: string,
+    paymentMethodId: string,
+  ): Promise<void>;
 
   /**
    * 결제 수단 삭제

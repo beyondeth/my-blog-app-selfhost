@@ -1,10 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { CacheService, CacheKeys, CacheTTL } from '../../cache/cache.service';
-import { CacheMetricsService } from '../../metrics/cache-metrics.service';
-import { PostResponseDto } from '../dto/post-response.dto';
-import { CacheInvalidationEvents, EditorPickToggledEvent, PostThumbnailUpdatedEvent } from '../../common/events/cache.events';
-import { CloudflareService } from '../../cloudflare/cloudflare.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { CacheService, CacheKeys, CacheTTL } from "../../cache/cache.service";
+import { CacheMetricsService } from "../../metrics/cache-metrics.service";
+import { PostResponseDto } from "../dto/post-response.dto";
+import {
+  CacheInvalidationEvents,
+  EditorPickToggledEvent,
+  PostThumbnailUpdatedEvent,
+} from "../../common/events/cache.events";
+import { CloudflareService } from "../../cloudflare/cloudflare.service";
 
 /**
  * 포스트 관련 캐시 관리 서비스
@@ -67,7 +71,10 @@ export class PostCacheService {
    * @param limit 가져올 개수
    * @returns 캐시된 인기 포스트 또는 null
    */
-  async getPopularPostsCache(period: 'daily' | 'weekly' | 'monthly', limit: number): Promise<any> {
+  async getPopularPostsCache(
+    period: "daily" | "weekly" | "monthly",
+    limit: number,
+  ): Promise<any> {
     const cacheKey = CacheKeys.FEED_POPULAR(period, limit);
     const cached = await this.cacheService.get(cacheKey);
 
@@ -88,10 +95,10 @@ export class PostCacheService {
    * @param ttl 캐시 만료 시간
    */
   async setPopularPostsCache(
-    period: 'daily' | 'weekly' | 'monthly',
+    period: "daily" | "weekly" | "monthly",
     limit: number,
     data: any,
-    ttl?: number
+    ttl?: number,
   ): Promise<void> {
     const cacheKey = CacheKeys.FEED_POPULAR(period, limit);
     await this.cacheService.set(cacheKey, data, ttl);
@@ -108,7 +115,7 @@ export class PostCacheService {
   async invalidateRelatedCache(
     blogSlug: string,
     blogId?: string,
-    postId?: string
+    postId?: string,
   ): Promise<void> {
     try {
       // 1. 홈 피드 캐시 삭제 (처음 1페이지만)
@@ -123,7 +130,7 @@ export class PostCacheService {
       }
 
       // 3. 패턴 기반 대규모 삭제 (모든 관련 캐시)
-      await this.cacheService.deletePattern('feed:home:page:*');
+      await this.cacheService.deletePattern("feed:home:page:*");
 
       if (blogId) {
         await this.cacheService.deletePattern(`feed:blog:${blogId}:page:*`);
@@ -133,8 +140,8 @@ export class PostCacheService {
       }
 
       // 포스트 관련 패턴
-      await this.cacheService.deletePattern('post:*');
-      await this.cacheService.deletePattern('feed:popular:*');
+      await this.cacheService.deletePattern("post:*");
+      await this.cacheService.deletePattern("feed:popular:*");
 
       // 4. 인기 게시물 캐시 삭제
       await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
@@ -144,9 +151,14 @@ export class PostCacheService {
         await this.cacheService.del(CacheKeys.POST_CORE(postId));
       }
 
-      this.logger.log(`✅ [Post Cache] Invalidated all cache for blog: ${blogSlug}${postId ? ` (post: ${postId})` : ''}`);
+      this.logger.log(
+        `✅ [Post Cache] Invalidated all cache for blog: ${blogSlug}${postId ? ` (post: ${postId})` : ""}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to invalidate cache: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to invalidate cache: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -160,7 +172,7 @@ export class PostCacheService {
   async invalidatePostUpdateCache(
     postId: string,
     blogSlug: string,
-    blogId: string
+    blogId: string,
   ): Promise<void> {
     try {
       // 1. 특정 포스트 캐시 삭제
@@ -171,7 +183,45 @@ export class PostCacheService {
 
       this.logger.log(`✅ [Post Update] Invalidated cache for post: ${postId}`);
     } catch (error) {
-      this.logger.error(`Failed to invalidate post update cache: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to invalidate post update cache: ${error.message}`,
+        error.stack,
+      );
+    }
+  }
+
+  /**
+   * Editor's Pick 피드 캐시 즉시 무효화
+   *
+   * @param postId 관련 포스트 ID (로그용)
+   */
+  async invalidateEditorPicksCache(postId?: string): Promise<void> {
+    try {
+      this.logger.log(
+        `🌐 [CDN Cache] Purging Cloudflare cache for Editor's Picks...`,
+      );
+
+      await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
+      await this.cacheService.deletePattern("feed:editor-picks:*");
+      const cloudflareSuccess = await this.cloudflareService.purgeEditorPicksCache();
+      if (cloudflareSuccess) {
+        this.logger.log(
+          `✅ [CDN Cache] Successfully purged Cloudflare cache for Editor's Picks`,
+        );
+      } else {
+        this.logger.warn(
+          `⚠️ [CDN Cache] Failed to purge Cloudflare cache for Editor's Picks`,
+        );
+      }
+
+      this.logger.log(
+        `✅ [Editor's Pick Cache] Invalidated editor picks${postId ? ` (post: ${postId})` : ""}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to invalidate editor picks cache: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -185,7 +235,7 @@ export class PostCacheService {
   async invalidatePostDeleteCache(
     postId: string,
     blogSlug: string,
-    blogId: string
+    blogId: string,
   ): Promise<void> {
     try {
       // 포스트 삭제 시 더 적극적인 캐시 삭제
@@ -194,9 +244,14 @@ export class PostCacheService {
       // 추가적으로 좋아요/뷰카운트 관련 캐시도 삭제
       await this.cacheService.deletePattern(`post:${postId}:*`);
 
-      this.logger.log(`✅ [Post Delete] Invalidated all cache for deleted post: ${postId}`);
+      this.logger.log(
+        `✅ [Post Delete] Invalidated all cache for deleted post: ${postId}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to invalidate post delete cache: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to invalidate post delete cache: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -210,7 +265,7 @@ export class PostCacheService {
   async handleCountUpdate(
     postId: string,
     incrementCount?: { view?: number; like?: number; comment?: number },
-    decrementCount?: { view?: number; like?: number; comment?: number }
+    decrementCount?: { view?: number; like?: number; comment?: number },
   ): Promise<void> {
     try {
       // 실시간 카운트는 캐시하지 않고, 포스트 전체 캐시만 삭제
@@ -218,9 +273,14 @@ export class PostCacheService {
       const cacheKey = CacheKeys.POST_CORE(postId);
       await this.cacheService.del(cacheKey);
 
-      this.logger.debug(`✅ [Count Update] Invalidated cache for post: ${postId}`);
+      this.logger.debug(
+        `✅ [Count Update] Invalidated cache for post: ${postId}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to handle count update cache: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to handle count update cache: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -263,18 +323,21 @@ export class PostCacheService {
    */
   generateCacheKey(type: string, ...params: any[]): string {
     switch (type) {
-      case 'post':
+      case "post":
         return CacheKeys.POST_CORE(params[0]);
-      case 'feed_home':
+      case "feed_home":
         return CacheKeys.FEED_HOME(params[0]);
-      case 'feed_blog':
+      case "feed_blog":
         return CacheKeys.FEED_BLOG(params[0], params[1]);
-      case 'feed_popular':
-        return CacheKeys.FEED_POPULAR(params[0] as 'daily' | 'weekly' | 'monthly', params[1]);
-      case 'feed_editor_picks':
+      case "feed_popular":
+        return CacheKeys.FEED_POPULAR(
+          params[0] as "daily" | "weekly" | "monthly",
+          params[1],
+        );
+      case "feed_editor_picks":
         return CacheKeys.FEED_EDITOR_PICKS();
       default:
-        return `${type}:${params.join(':')}`;
+        return `${type}:${params.join(":")}`;
     }
   }
 
@@ -302,7 +365,7 @@ export class PostCacheService {
    * @param keys 삭제할 캐시 키 배열
    */
   async deleteMultiple(keys: string[]): Promise<void> {
-    await Promise.all(keys.map(key => this.cacheService.del(key)));
+    await Promise.all(keys.map((key) => this.cacheService.del(key)));
   }
 
   // ========== 이벤트 리스너 ==========
@@ -312,13 +375,16 @@ export class PostCacheService {
    * Editor's Pick 상태 변경 시 관련 캐시 즉시 무효화
    */
   @OnEvent(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, { async: true })
-  async handleEditorPickToggled(payload: EditorPickToggledEvent): Promise<void> {
-    this.logger.log(`🎯 [Editor's Pick Cache] Handling toggle event for post: ${payload.postId}, isPicked: ${payload.isPicked}`);
+  async handleEditorPickToggled(
+    payload: EditorPickToggledEvent,
+  ): Promise<void> {
+    this.logger.log(
+      `🎯 [Editor's Pick Cache] Handling toggle event for post: ${payload.postId}, isPicked: ${payload.isPicked}`,
+    );
 
     try {
       // 1. Editor's Pick 피드 캐시 전체 삭제 (모든 limit 변형 포함) - 필수
-      await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
-      await this.cacheService.deletePattern('feed:editor-picks:*');
+      await this.invalidateEditorPicksCache(payload.postId);
 
       // 특정 limit 값들도 삭제 (컨트롤러가 limit 파라미터로 키를 생성)
       for (let limit = 1; limit <= 10; limit++) {
@@ -328,25 +394,21 @@ export class PostCacheService {
       // 2. 특정 포스트 캐시 삭제 (Editor's Pick 배지 정보 업데이트용) - 필수
       await this.cacheService.del(CacheKeys.POST_CORE(payload.postId));
 
-      // 3. Cloudflare CDN 캐시 무효화 - 필수
-      this.logger.log(`🌐 [CDN Cache] Purging Cloudflare cache for Editor's Picks...`);
-      const cloudflareSuccess = await this.cloudflareService.purgeEditorPicksCache();
-      if (cloudflareSuccess) {
-        this.logger.log(`✅ [CDN Cache] Successfully purged Cloudflare cache for Editor's Picks`);
-      } else {
-        this.logger.warn(`⚠️ [CDN Cache] Failed to purge Cloudflare cache for Editor's Picks`);
-      }
-
       // 홈 피드 및 인기 포스트 캐시는 Editor's Pick과 독립적이므로 삭제하지 않음
       // - 홈 피드: 최신순 정렬 only (Editor's Pick 영향 없음)
       // - 인기 포스트: 조회수/좋아요/댓글 기반 (Editor's Pick 미포함)
 
       // Prometheus 메트릭 기록
-      this.cacheMetricsService.recordCacheInvalidation('editor_picks', 'event');
+      this.cacheMetricsService.recordCacheInvalidation("editor_picks", "event");
 
-      this.logger.log(`✅ [Editor's Pick Cache] Invalidated essential caches for post: ${payload.postId}`);
+      this.logger.log(
+        `✅ [Editor's Pick Cache] Invalidated essential caches for post: ${payload.postId}`,
+      );
     } catch (error) {
-      this.logger.error(`Failed to invalidate Editor's Pick cache: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to invalidate Editor's Pick cache: ${error.message}`,
+        error.stack,
+      );
     }
   }
 
@@ -355,9 +417,13 @@ export class PostCacheService {
    * 썸네일 변경 시 홈 피드와 관련 캐시만 집중적으로 무효화
    */
   @OnEvent(CacheInvalidationEvents.POST_THUMBNAIL_UPDATED, { async: true })
-  async handlePostThumbnailUpdated(payload: PostThumbnailUpdatedEvent): Promise<void> {
+  async handlePostThumbnailUpdated(
+    payload: PostThumbnailUpdatedEvent,
+  ): Promise<void> {
     // 🎯 [THUMBNAIL_TRACK] STEP_7_EVENT_RECEIVED
-    this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_7_EVENT_RECEIVED: Cache service received thumbnail update event');
+    this.logger.log(
+      "🎯 [THUMBNAIL_TRACK] STEP_7_EVENT_RECEIVED: Cache service received thumbnail update event",
+    );
     this.logger.debug(`  - Post ID: ${payload.postId}`);
     this.logger.debug(`  - Blog Slug: ${payload.blogSlug}`);
     this.logger.debug(`  - Old ImageId: ${payload.oldThumbnailImageId}`);
@@ -366,7 +432,9 @@ export class PostCacheService {
 
     try {
       // 🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_START
-      this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_START: Starting cache invalidation');
+      this.logger.log(
+        "🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_START: Starting cache invalidation",
+      );
 
       // 1. 홈 피드 캐시 삭제 (썸네일이 표시되는 핵심 위치)
       // - 처음 3페이지만 삭제하여 성능 최적화
@@ -376,7 +444,9 @@ export class PostCacheService {
         homeFeedKeys.push(key);
         await this.cacheService.del(key);
       }
-      this.logger.debug(`  - Deleted home feed keys: ${homeFeedKeys.join(', ')}`);
+      this.logger.debug(
+        `  - Deleted home feed keys: ${homeFeedKeys.join(", ")}`,
+      );
 
       // 2. 블로그 피드 캐시 삭제 (해당 블로그의 피드)
       const blogFeedKeys = [];
@@ -386,10 +456,14 @@ export class PostCacheService {
           blogFeedKeys.push(key);
           await this.cacheService.del(key);
         }
-        this.logger.debug(`  - Deleted blog feed keys: ${blogFeedKeys.join(', ')}`);
+        this.logger.debug(
+          `  - Deleted blog feed keys: ${blogFeedKeys.join(", ")}`,
+        );
 
         // 블로그 ID와 slug가 다른 경우를 대비한 패턴 삭제
-        await this.cacheService.deletePattern(`feed:blog:${payload.blogSlug}:page:*`);
+        await this.cacheService.deletePattern(
+          `feed:blog:${payload.blogSlug}:page:*`,
+        );
       }
 
       // 3. 특정 포스트 캐시 삭제 (썸네일 URL 업데이트용)
@@ -399,21 +473,33 @@ export class PostCacheService {
 
       // 4. 패턴 기반 추가 삭제 (안전장치)
       // - 홈 피드 전체 패턴 삭제
-      await this.cacheService.deletePattern('feed:home:page:*');
+      await this.cacheService.deletePattern("feed:home:page:*");
 
       // - 관련 블로그 피드 패턴 삭제
       if (payload.blogSlug) {
-        await this.cacheService.deletePattern(`feed:blog:${payload.blogSlug}:page:*`);
+        await this.cacheService.deletePattern(
+          `feed:blog:${payload.blogSlug}:page:*`,
+        );
       }
 
       // Prometheus 메트릭 기록
-      this.cacheMetricsService.recordCacheInvalidation('thumbnail_update', 'event');
+      this.cacheMetricsService.recordCacheInvalidation(
+        "thumbnail_update",
+        "event",
+      );
 
       // 🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_COMPLETE
-      this.logger.log('🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_COMPLETE: All caches invalidated successfully');
-      this.logger.log(`✅ [Thumbnail Cache] Successfully invalidated caches for thumbnail update on post: ${payload.postId}`);
+      this.logger.log(
+        "🎯 [THUMBNAIL_TRACK] STEP_8_CACHE_INVALIDATION_COMPLETE: All caches invalidated successfully",
+      );
+      this.logger.log(
+        `✅ [Thumbnail Cache] Successfully invalidated caches for thumbnail update on post: ${payload.postId}`,
+      );
     } catch (error) {
-      this.logger.error(`🎯 [THUMBNAIL_TRACK] STEP_8_ERROR: Cache invalidation failed: ${error.message}`, error.stack);
+      this.logger.error(
+        `🎯 [THUMBNAIL_TRACK] STEP_8_ERROR: Cache invalidation failed: ${error.message}`,
+        error.stack,
+      );
     }
   }
 }

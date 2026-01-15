@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AddFullTextSearch1759400000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -63,19 +63,25 @@ export class AddFullTextSearch1759400000000 implements MigrationInterface {
       WHERE "isPublished" = true;
     `);
 
-    console.log('✅ Full-text search infrastructure created successfully');
-    console.log('   - Added search_vector column');
-    console.log('   - Created auto-update trigger');
-    console.log('   - Added GIN index for fast searching');
-    console.log('   - Updated existing posts');
+    console.log("✅ Full-text search infrastructure created successfully");
+    console.log("   - Added search_vector column");
+    console.log("   - Created auto-update trigger");
+    console.log("   - Added GIN index for fast searching");
+    console.log("   - Updated existing posts");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 롤백 시 생성한 모든 요소 제거
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_published_search`);
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_search_vector`);
-    await queryRunner.query(`DROP TRIGGER IF EXISTS post_search_vector_update ON "posts"`);
-    await queryRunner.query(`DROP FUNCTION IF EXISTS update_post_search_vector()`);
-    await queryRunner.query(`ALTER TABLE "posts" DROP COLUMN IF EXISTS "search_vector"`);
+    await queryRunner.query(
+      `DROP TRIGGER IF EXISTS post_search_vector_update ON "posts"`,
+    );
+    await queryRunner.query(
+      `DROP FUNCTION IF EXISTS update_post_search_vector()`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "posts" DROP COLUMN IF EXISTS "search_vector"`,
+    );
   }
 }

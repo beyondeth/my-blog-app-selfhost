@@ -1,7 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class RenameTagListToTagsColumn1761000000000 implements MigrationInterface {
-  name = 'RenameTagListToTagsColumn1761000000000';
+export class RenameTagListToTagsColumn1761000000000
+  implements MigrationInterface
+{
+  name = "RenameTagListToTagsColumn1761000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. 사전 검증: tagList 컬럼이 존재하는지 확인
@@ -14,11 +16,13 @@ export class RenameTagListToTagsColumn1761000000000 implements MigrationInterfac
     `);
 
     if (!tableExists[0].exists) {
-      throw new Error('tagList column does not exist in posts table. Migration may have already been applied.');
+      throw new Error(
+        "tagList column does not exist in posts table. Migration may have already been applied.",
+      );
     }
 
     // 2. 데이터 백업 (안전장치)
-    console.log('[Migration] Creating backup of tagList data...');
+    console.log("[Migration] Creating backup of tagList data...");
     await queryRunner.query(`
       CREATE TEMP TABLE temp_taglist_backup AS
       SELECT id, "tagList" FROM "posts"
@@ -34,11 +38,13 @@ export class RenameTagListToTagsColumn1761000000000 implements MigrationInterfac
     `);
 
     if (columnInfo.length > 0) {
-      console.log(`[Migration] Current tagList column type: ${columnInfo[0].data_type}`);
+      console.log(
+        `[Migration] Current tagList column type: ${columnInfo[0].data_type}`,
+      );
     }
 
     // 4. 컬럼 이름 변경 (트랜잭션 내에서 실행)
-    console.log('[Migration] Renaming tagList column to tags...');
+    console.log("[Migration] Renaming tagList column to tags...");
     await queryRunner.query(`
       ALTER TABLE "posts"
       RENAME COLUMN "tagList" TO "tags"
@@ -54,7 +60,9 @@ export class RenameTagListToTagsColumn1761000000000 implements MigrationInterfac
     `);
 
     if (!verifyRename[0].exists) {
-      throw new Error('Failed to rename column. tags column does not exist after migration.');
+      throw new Error(
+        "Failed to rename column. tags column does not exist after migration.",
+      );
     }
 
     // 6. 데이터 무결성 검증
@@ -68,7 +76,7 @@ export class RenameTagListToTagsColumn1761000000000 implements MigrationInterfac
     // 7. 임시 백업 테이블 삭제
     await queryRunner.query(`DROP TABLE IF EXISTS temp_taglist_backup`);
 
-    console.log('[Migration] Successfully renamed tagList to tags column');
+    console.log("[Migration] Successfully renamed tagList to tags column");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -82,11 +90,13 @@ export class RenameTagListToTagsColumn1761000000000 implements MigrationInterfac
     `);
 
     if (!tableExists[0].exists) {
-      throw new Error('tags column does not exist in posts table. Rollback may have already been applied.');
+      throw new Error(
+        "tags column does not exist in posts table. Rollback may have already been applied.",
+      );
     }
 
     // 2. 데이터 백업
-    console.log('[Rollback] Creating backup of tags data...');
+    console.log("[Rollback] Creating backup of tags data...");
     await queryRunner.query(`
       CREATE TEMP TABLE temp_tags_backup AS
       SELECT id, "tags" FROM "posts"
@@ -94,7 +104,7 @@ export class RenameTagListToTagsColumn1761000000000 implements MigrationInterfac
     `);
 
     // 3. 컬럼 이름 롤백
-    console.log('[Rollback] Renaming tags column back to tagList...');
+    console.log("[Rollback] Renaming tags column back to tagList...");
     await queryRunner.query(`
       ALTER TABLE "posts"
       RENAME COLUMN "tags" TO "tagList"
@@ -110,12 +120,14 @@ export class RenameTagListToTagsColumn1761000000000 implements MigrationInterfac
     `);
 
     if (!verifyRollback[0].exists) {
-      throw new Error('Failed to rollback column. tagList column does not exist after rollback.');
+      throw new Error(
+        "Failed to rollback column. tagList column does not exist after rollback.",
+      );
     }
 
     // 5. 임시 백업 테이블 삭제
     await queryRunner.query(`DROP TABLE IF EXISTS temp_tags_backup`);
 
-    console.log('[Rollback] Successfully rolled back tags to tagList column');
+    console.log("[Rollback] Successfully rolled back tags to tagList column");
   }
 }

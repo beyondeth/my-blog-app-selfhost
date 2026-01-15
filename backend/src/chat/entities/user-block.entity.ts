@@ -6,35 +6,35 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('user_blocks')
-@Index(['blockerId', 'blockedId'], { unique: true })
-@Index(['blockerId'])
-@Index(['blockedId'])
+@Entity("user_blocks")
+@Index(["blockerId", "blockedId"], { unique: true })
+@Index(["blockerId"])
+@Index(["blockedId"])
 export class UserBlock {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   blockerId: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   blockedId: string;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   reason: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
   // Relations
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'blockerId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "blockerId" })
   blocker: User;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'blockedId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "blockedId" })
   blockedUser: User;
 }

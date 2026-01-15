@@ -4,8 +4,8 @@
 @import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
 
 /* TipTap Simple Editor 스타일 */
-@import '../styles/_variables.scss';
-@import '../styles/_keyframe-animations.scss';
+@import '../styles/_variables.css';
+@import '../styles/_keyframe-animations.css';
 @import '../styles/elevated-editor.css';
 
 /* Sonner 토스트 겹침 방지 */
@@ -319,6 +319,8 @@ mark.search-highlight {
   width: auto !important;
   height: auto !important;
 }
+
+/* Link card layout guardrails */
 
 /* 드롭다운/모달 열릴 때 스크롤바로 인한 레이아웃 밀림 방지 */
 html {
@@ -745,4 +747,93 @@ textarea {
   50% {
     height: 80%;
   }
+}
+
+/* Link card layout guardrails */
+.link-card {
+  max-width: 640px;
+}
+
+.link-card-thumb {
+  width: 5rem;
+  height: 5rem;
+  border-radius: 1.25rem;
+  overflow: hidden;
+}
+
+.link-card-thumb img {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  position: static !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+}
+
+
+/* Fix: Protect LinkCard images from prose styles */
+/* 1. Favicon */
+.prose .link-card .flex-1 img {
+  width: 14px !important;
+  height: 14px !important;
+  min-width: 14px !important;
+  margin: 0 !important;
+  display: inline-block !important;
+  box-shadow: none !important;
+}
+
+/* 2. Thumbnail (next/image with fill) */
+.prose .link-card .link-card-thumb img {
+  position: absolute !important;
+  width: 100% !important;
+  height: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  box-shadow: none !important;
+  display: block !important;
+}
+
+/* 3. Remove default external link icon from markdown.css */
+body .prose a.link-card::after,
+.prose a.link-card::after {
+  content: none !important;
+  display: none !important;
+  width: 0 !important;
+  margin: 0 !important;
+}
+
+/* 4. Fix Link Card border (override markdown.css styles) */
+body .prose a.link-card {
+  border: 1px solid #e5e7eb !important; /* gray-200 */
+  text-decoration: none !important;
+  background-color: white !important;
+}
+
+body .prose a.link-card:hover {
+  border-color: #d1d5db !important; /* gray-300 */
+  background-color: white !important;
+}
+
+.dark body .prose a.link-card {
+  border-color: #374151 !important; /* gray-700 */
+  background-color: #111827 !important; /* gray-900 (card bg) */
+}
+
+.dark body .prose a.link-card:hover {
+  border-color: #4b5563 !important; /* gray-600 */
+  background-color: #111827 !important;
+}
+
+/* Widget Panel Dark Mode Color Tokens */
+.dark {
+  --widget-panel-bg: #181C14;
+  --widget-section-bg: #3C3D37;
+  --widget-section-border: #3C3D37;
+  --widget-button-bg: #181C14;
+  --widget-button-border: #55584f;
+  --widget-text-primary: #ffffff;
+  --widget-text-secondary: #a1a1aa;
+  --widget-accent: #4d68ff;
+  --widget-accent-hover: #3c52c7;
+  --widget-danger: #ef4444;
 }

@@ -4,8 +4,10 @@ export interface User {
   id: string;
   username: string;
   email: string;
+  name?: string;
   displayName: string;
   bio?: string;
+  jobTitle?: string;
   profileImage?: string;
   blog?: Blog;
   createdAt: string;
@@ -23,6 +25,19 @@ export interface Blog {
   posts?: Post[];
   createdAt: string;
   updatedAt: string;
+  logoUrl?: string;
+  logoImageFit?: 'cover' | 'contain';
+  iconUrl?: string;
+  iconImageFit?: 'cover' | 'contain';
+  iconPlacement?: 'inline' | 'badge';
+  iconTextEnabled?: boolean;
+  iconLabel?: string | null;
+  iconLabelEnabled?: boolean;
+  iconSubtitle?: string | null;
+  iconSubtitleEnabled?: boolean;
+  coverImageUrl?: string;
+  coverImageFit?: 'cover' | 'contain';
+  brandColor?: string | null;
 }
 
 export interface Post {
@@ -30,6 +45,8 @@ export interface Post {
   title: string;
   slug: string;
   content: string;
+  content_markdown?: string;
+  content_type?: 'html' | 'markdown';
   excerpt?: string;
   published: boolean;
   viewCount: number;
@@ -38,6 +55,7 @@ export interface Post {
   comments?: Comment[];
   createdAt: string;
   updatedAt: string;
+  version?: number;
 }
 
 export interface Comment {

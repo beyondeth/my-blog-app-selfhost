@@ -1,6 +1,12 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import "./globals.css";
+import '@/editor/styles/editor.css';  // 전역 로드 - 포스트 페이지 CSS preload 경고 해결
 import LayoutClient from './layout-client';
+import { SocketProvider } from '@/providers/SocketProvider';
+
+// 동적 렌더링 강제 - prerendering 시 useContext 오류 방지
+export const dynamic = 'force-dynamic';
 
 // metadataBase를 환경 변수에서 동적으로 설정
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
@@ -76,6 +82,7 @@ export default function RootLayout({
           as="style"
           crossOrigin=""
         />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           rel="stylesheet"
           href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable.min.css"
@@ -91,39 +98,20 @@ export default function RootLayout({
           href="https://fonts.gstatic.com"
           crossOrigin=""
         />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />
         {/* GeistMono Font */}
+        {/* eslint-disable-next-line @next/next/no-css-tags */}
         <link
           rel="stylesheet"
           href="/fonts/geistmono.css"
         />
-        {/* FOUC 방지 스크립트 - 테마 깜빡임 방지 */}
-        <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  // localStorage에서 테마 가져오기
-                  const theme = localStorage.getItem('theme');
-
-                  if (theme === 'dark' || theme === 'light') {
-                    // 저장된 테마 적용
-                    document.documentElement.classList.add(theme);
-                  } else {
-                    // 시스템 테마 감지
-                    const systemTheme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-                    document.documentElement.classList.add(systemTheme);
-                  }
-                } catch (e) {
-                  // localStorage 접근 실패 시 라이트 모드로 폴백
-                  document.documentElement.classList.add('light');
-                }
-              })();
-            `,
-          }}
+        <Script
+          src="/scripts/theme-init.js"
+          strategy="beforeInteractive"
         />
       </head>
       <body
@@ -133,7 +121,11 @@ export default function RootLayout({
         }}
         suppressHydrationWarning={true}
       >
-        <LayoutClient>{children}</LayoutClient>
+        <LayoutClient>
+          <SocketProvider>
+            {children}
+          </SocketProvider>
+        </LayoutClient>
       </body>
     </html>
   );

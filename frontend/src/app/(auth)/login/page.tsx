@@ -5,11 +5,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
-import { toast } from 'sonner';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
-import { safeDecodeMessage, getSafeQueryParam, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
+import { safeDecodeMessage, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
+
+const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
 
 /**
  * 로그인 페이지 메인 컴포넌트
@@ -24,6 +25,7 @@ function LoginPageContent() {
   const [showPassword, setShowPassword] = useState(false);
   const [loginAttempts, setLoginAttempts] = useState(0);
   const MAX_LOGIN_ATTEMPTS = 5;
+  const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -35,10 +37,16 @@ function LoginPageContent() {
     password: ''
   });
 
-  // 삭제된 계정 에러 상태
   const [accountDeletedError, setAccountDeletedError] = useState<{
     message: string;
     remainingDays: number;
+  } | null>(null);
+
+  // 정지된 계정 에러 상태
+  const [accountSuspendedError, setAccountSuspendedError] = useState<{
+    message: string;
+    suspensionUntil: string;
+    reason: string;
   } | null>(null);
 
   // MCP OAuth 파라미터 (Claude 커스텀 커넥터 연결용)
@@ -47,6 +55,74 @@ function LoginPageContent() {
   const mcpCallbackUrl = searchParams.get('callback_url');
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
+
+  const normalizeRedirectTarget = (target?: string | null) => {
+    if (typeof window === 'undefined' || !target) {
+      return '/';
+    }
+
+    const trimmed = target.trim();
+    if (!trimmed) {
+      return '/';
+    }
+
+    if (AUTH_REDIRECT_BLOCKLIST.some(path => trimmed === path || trimmed.startsWith(`${path}?`))) {
+      return '/';
+    }
+
+    try {
+      if (!isSafeRedirectUrl(trimmed)) {
+        return '/';
+      }
+    } catch (error) {
+      console.warn('Invalid redirect target detected:', error);
+      return '/';
+    }
+
+    if (trimmed.startsWith('http')) {
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.origin !== window.location.origin) {
+          return '/';
+        }
+        return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/';
+      } catch {
+        return '/';
+      }
+    }
+
+    return trimmed;
+  };
+
+  const getRedirectTargetFromParams = () => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const params = [searchParams.get('returnUrl'), searchParams.get('redirect')];
+
+    for (const value of params) {
+      if (!value) continue;
+      try {
+        if (isSafeRedirectUrl(value)) {
+          return value;
+        }
+      } catch (error) {
+        console.warn('Failed to parse redirect query param:', error);
+      }
+    }
+
+    return null;
+  };
+
+  const resolveRedirectTarget = () => {
+    const paramTarget = getRedirectTargetFromParams();
+    const sessionTarget = typeof window !== 'undefined'
+      ? sessionStorage.getItem('redirectAfterLogin')
+      : null;
+
+    return normalizeRedirectTarget(paramTarget || sessionTarget || '/');
+  };
 
   // OAuth 콜백 에러 및 리다이렉트 처리
   useEffect(() => {
@@ -63,23 +139,34 @@ function LoginPageContent() {
       window.history.replaceState({}, '', url.toString());
     }
 
-    if (error && message) {
+
+    if (error) {
       // URL 파라미터에서 메시지 안전하게 디코딩
-      const decodedMessage = safeDecodeMessage(message);
+      const decodedMessage = message ? safeDecodeMessage(message) : '';
 
       if (error === 'account_deleted') {
         setAccountDeletedError({
-          message: decodedMessage,
+          message: decodedMessage || '계정이 삭제되었습니다.',
           remainingDays: 0
         });
-      } else {
-        toast.error(decodedMessage || '로그인에 실패했습니다.');
+      } else if (error === 'account_suspended') {
+        const until = searchParams.get('until') || '';
+        const reason = searchParams.get('reason') || '';
+        setAccountSuspendedError({
+          message: decodedMessage || '계정이 정지되었습니다.',
+          suspensionUntil: until,
+          reason: reason ? safeDecodeMessage(reason) : '운영 정책 위반',
+        });
+      } else if (message) {
+        setLoginErrorMessage(decodedMessage || '로그인에 실패했습니다.');
       }
 
       // URL에서 에러 파라미터 제거
       const url = new URL(window.location.href);
       url.searchParams.delete('error');
       url.searchParams.delete('message');
+      url.searchParams.delete('reason');
+      url.searchParams.delete('until');
       window.history.replaceState({}, '', url.toString());
     }
   }, [searchParams]);
@@ -103,6 +190,10 @@ function LoginPageContent() {
     if (validationErrors[name as keyof typeof validationErrors]) {
       setValidationErrors(prev => ({ ...prev, [name]: '' }));
     }
+
+    if (loginErrorMessage) {
+      setLoginErrorMessage(null);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -115,7 +206,7 @@ function LoginPageContent() {
 
     // Check for too many failed attempts
     if (loginAttempts >= MAX_LOGIN_ATTEMPTS) {
-      toast.error('로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.');
+      setLoginErrorMessage('로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.');
       return;
     }
 
@@ -137,10 +228,15 @@ function LoginPageContent() {
 
     if (errors.email || errors.password) {
       setValidationErrors(errors);
+      const firstError = errors.email || errors.password;
+      if (firstError) {
+        setLoginErrorMessage(firstError);
+      }
       return;
     }
 
     setIsSubmitting(true);
+    setLoginErrorMessage(null);
 
     try {
       // returnUrl 파라미터 확인 (OAuth 콜백 대기 중인 경우)
@@ -180,7 +276,7 @@ function LoginPageContent() {
           }
         } catch (mcpError) {
           console.error('MCP OAuth error:', mcpError);
-          toast.error('MCP 연결에 실패했습니다. 다시 시도해주세요.');
+          setLoginErrorMessage('MCP 연결에 실패했습니다. 다시 시도해주세요.');
           // MCP OAuth 실패 시 일반 로그인 흐름으로 계속 진행
         }
       }
@@ -192,9 +288,11 @@ function LoginPageContent() {
       }
 
       // 일반적인 경우 기존 로직 사용
-      const redirectTo = returnUrl || sessionStorage.getItem('redirectAfterLogin') || '/';
-      sessionStorage.removeItem('redirectAfterLogin');
-      router.push(redirectTo);
+      const redirectTarget = resolveRedirectTarget();
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('redirectAfterLogin');
+      }
+      router.push(redirectTarget);
     } catch (error: any) {
       console.error('Login failed:', error);
 
@@ -203,6 +301,19 @@ function LoginPageContent() {
         setAccountDeletedError({
           message: error.response?.message || error.message || '계정이 삭제되었습니다.',
           remainingDays: error.response?.remainingDays || error.remainingDays || 0,
+        });
+        setFormData(prev => ({ ...prev, password: '' }));
+        setIsSubmitting(false);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 정지된 계정 에러 체크
+      if (error.response?.code === 'ACCOUNT_SUSPENDED' || error.code === 'ACCOUNT_SUSPENDED') {
+        setAccountSuspendedError({
+          message: error.response?.message || error.message || '계정이 정지되었습니다.',
+          suspensionUntil: error.response?.suspensionUntil || error.suspensionUntil,
+          reason: error.response?.reason || error.reason || '운영 정책 위반',
         });
         setFormData(prev => ({ ...prev, password: '' }));
         setIsSubmitting(false);
@@ -217,14 +328,8 @@ function LoginPageContent() {
       setFormData(prev => ({ ...prev, password: '' }));
 
       const errorMessage = error.message || '이메일 또는 비밀번호가 일치하지 않습니다';
-
-      // 시도 횟수 표시 메시지
-      const displayMessage = newAttempts < MAX_LOGIN_ATTEMPTS
-        ? `${errorMessage} (${newAttempts}/${MAX_LOGIN_ATTEMPTS} 시도)`
-        : errorMessage;
-
-      toast.error(displayMessage);
-      setValidationErrors(prev => ({ ...prev, password: displayMessage }));
+      setValidationErrors(prev => ({ ...prev, password: '' }));
+      setLoginErrorMessage(errorMessage);
 
       // 에러 발생 시에만 버튼 활성화 (성공 시에는 리다이렉트 전까지 비활성화 유지)
       setIsSubmitting(false);
@@ -323,6 +428,28 @@ function LoginPageContent() {
               </div>
             )}
 
+            {/* 정지된 계정 경고 */}
+            {accountSuspendedError && (
+              <div className="mb-3 sm:mb-6 p-4 sm:p-5 rounded-lg bg-orange-50 dark:bg-orange-900/20 border-2 border-orange-300 dark:border-orange-700 w-full shake">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-800 flex items-center justify-center">
+                    <AlertCircle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm sm:text-base font-semibold text-orange-900 dark:text-orange-200 mb-1">
+                      계정 이용이 정지되었습니다
+                    </h3>
+                    <p className="text-xs sm:text-sm text-orange-800 dark:text-orange-300 mb-2 font-medium">
+                      {accountSuspendedError.message}
+                    </p>
+                    <div className="text-xs text-orange-800 dark:text-orange-300 bg-orange-100 dark:bg-orange-900/40 p-2 rounded">
+                      <p><span className="font-bold">사유:</span> {accountSuspendedError.reason}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* 에러 메시지들 */}
             {loginAttempts >= MAX_LOGIN_ATTEMPTS && (
               <div className="mb-3 sm:mb-6 p-3 sm:p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 shake w-full">
@@ -335,16 +462,7 @@ function LoginPageContent() {
               </div>
             )}
 
-            {loginAttempts > 2 && loginAttempts < MAX_LOGIN_ATTEMPTS && (
-              <div className="mb-3 sm:mb-6 p-3 sm:p-4 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 w-full">
-                <div className="flex items-start gap-2 sm:gap-3">
-                  <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-amber-600 dark:text-amber-400 mt-0.5" />
-                  <div className="text-xs sm:text-sm text-amber-800 dark:text-amber-300">
-                    {MAX_LOGIN_ATTEMPTS - loginAttempts}회 시도 가능합니다.
-                  </div>
-                </div>
-              </div>
-            )}
+
 
             {/* 섹션 1: OAuth 로그인 */}
             <div className="w-full">
@@ -372,8 +490,8 @@ function LoginPageContent() {
                   onChange={handleChange}
                   placeholder="vangogh@example.com"
                   className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
-                    validationErrors.email ? 'border-red-500 dark:border-red-400' : ''
-                  } ${validationErrors.email ? 'shake' : ''}`}
+                    validationErrors.email || loginErrorMessage ? 'border-red-500 dark:border-red-400' : ''
+                  } ${(validationErrors.email || loginErrorMessage) ? 'shake' : ''}`}
                   disabled={isSubmitting}
                 />
                 {validationErrors.email && (
@@ -404,9 +522,9 @@ function LoginPageContent() {
                     value={formData.password}
                     onChange={handleChange}
                     placeholder="••••••••"
-                    className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
-                      validationErrors.password ? 'border-red-500 dark:border-red-400' : ''
-                    } ${validationErrors.password ? 'shake' : ''}`}
+                  className={`w-full px-4 sm:px-6 py-2.5 sm:py-3 pr-10 sm:pr-12 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
+                      validationErrors.password || loginErrorMessage ? 'border-red-500 dark:border-red-400' : ''
+                    } ${(validationErrors.password || loginErrorMessage) ? 'shake' : ''}`}
                     disabled={isSubmitting}
                   />
                   <button
@@ -427,6 +545,15 @@ function LoginPageContent() {
                   </p>
                 )}
               </div>
+
+              {loginErrorMessage && loginAttempts < MAX_LOGIN_ATTEMPTS && (
+                <p className="text-xs sm:text-sm text-center text-red-600 dark:text-red-300 font-semibold">
+                  {loginErrorMessage}{' '}
+                  <span className="font-normal">
+                    ({loginAttempts}/{MAX_LOGIN_ATTEMPTS} 시도)
+                  </span>
+                </p>
+              )}
 
               {/* 로그인 버튼 */}
               <button

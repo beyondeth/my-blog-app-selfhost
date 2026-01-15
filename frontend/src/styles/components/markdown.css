@@ -279,7 +279,7 @@
   margin-top: var(--space-2xl);
   margin-bottom: var(--space-2xl);
   border: 0;
-  border-top: 2px solid rgb(var(--color-gray-200));
+  border-top: 1px solid rgb(var(--color-gray-500));
 }
 
 /* ===================================================================
@@ -401,6 +401,41 @@
 
 .prose tbody tr:hover {
   background: rgb(var(--color-gray-50));
+}
+
+.dark .prose table {
+  box-shadow: none;
+  background: rgba(15, 18, 24, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.dark .prose thead {
+  background: rgba(30, 41, 59, 0.8);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.35);
+}
+
+.dark .prose th {
+  color: rgb(226, 232, 240);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.dark .prose tbody tr {
+  background: rgba(15, 18, 24, 0.65);
+}
+
+.dark .prose td {
+  color: rgba(241, 245, 249, 0.95);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+  background-color: transparent;
+}
+
+.dark .prose tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dark .prose tbody tr:hover,
+.dark .prose tbody tr:focus-within {
+  background: inherit;
 }
 
 /* 반응형 */
@@ -571,6 +606,12 @@
   color: rgb(var(--color-gray-200));
 }
 
+.dark .prose code.inline-code {
+  background: transparent;
+  color: #e6edf3;
+  border: 1px solid #e6edf3;
+}
+
 .dark .prose blockquote {
   background: rgb(var(--color-gray-100));
   border-left-color: rgb(var(--color-gray-500));
@@ -578,15 +619,15 @@
 }
 
 .dark .prose thead {
-  background: rgb(var(--color-gray-800));
+  background: rgba(30, 41, 59, 0.8);
 }
 
 .dark .prose th {
-  color: rgb(var(--color-gray-200));
+  color: rgb(226, 232, 240);
 }
 
 .dark .prose tbody tr:hover {
-  background: rgb(var(--color-gray-800));
+  background: inherit;
 }
 
 /* ===================================================================

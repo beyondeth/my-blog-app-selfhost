@@ -1,59 +1,80 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThanOrEqual, MoreThanOrEqual } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { UsageTracking } from './entities/usage-tracking.entity';
-import { UsersService } from '../users/users.service';
-import { ResourceType, SubscriptionTier } from '../common/enums/subscription.enum';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { Subscription } from '../subscription/entities/subscription.entity';
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThanOrEqual, MoreThanOrEqual } from "typeorm";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { UsageTracking } from "./entities/usage-tracking.entity";
+import { UsersService } from "../users/users.service";
+import {
+  ResourceType,
+  SubscriptionTier,
+} from "../common/enums/subscription.enum";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { Subscription } from "../subscription/entities/subscription.entity";
+import { Blog } from "../blogs/entities/blog.entity";
+import { UnifiedRedisService } from "../redis/unified-redis.service";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import Redis from "ioredis";
 
 // 플랜별 제한 설정
 const PLAN_LIMITS = {
   [SubscriptionTier.FREE]: {
-    [ResourceType.POST]: -1,              // 일반 포스트 무제한
-    [ResourceType.MCP_POST]: 30,          // MCP 자동포스팅 월 30개
-    [ResourceType.BLOG]: 1,               // 블로그 1개
-    [ResourceType.STORAGE]: 100,          // 100MB (사용 안 함)
-    [ResourceType.VIEWS]: 1000,           // 월 1000 뷰 (사용 안 함)
-    [ResourceType.API_CALLS]: 100,        // 월 100회 API 호출 (사용 안 함)
+    [ResourceType.POST]: -1, // 일반 포스트 무제한
+    [ResourceType.MCP_POST]: 30, // MCP 자동포스팅 월 30개
+    [ResourceType.BLOG]: 1, // 블로그 1개
+    [ResourceType.STORAGE]: 100, // 100MB (사용 안 함)
+    [ResourceType.VIEWS]: 1000, // 월 1000 뷰 (사용 안 함)
+    [ResourceType.API_CALLS]: 100, // 월 100회 API 호출 (사용 안 함)
   },
   [SubscriptionTier.STARTER]: {
-    [ResourceType.POST]: -1,              // 일반 포스트 무제한
-    [ResourceType.MCP_POST]: 200,         // MCP 자동포스팅 월 200개
-    [ResourceType.BLOG]: 1,               // 블로그 1개
-    [ResourceType.STORAGE]: 1000,         // 1GB (사용 안 함)
-    [ResourceType.VIEWS]: 10000,          // 월 10000 뷰 (사용 안 함)
-    [ResourceType.API_CALLS]: 1000,       // 월 1000회 API 호출 (사용 안 함)
+    [ResourceType.POST]: -1, // 일반 포스트 무제한
+    [ResourceType.MCP_POST]: 200, // MCP 자동포스팅 월 200개
+    [ResourceType.BLOG]: 1, // 블로그 1개
+    [ResourceType.STORAGE]: 1000, // 1GB (사용 안 함)
+    [ResourceType.VIEWS]: 10000, // 월 10000 뷰 (사용 안 함)
+    [ResourceType.API_CALLS]: 1000, // 월 1000회 API 호출 (사용 안 함)
   },
   [SubscriptionTier.PRO]: {
-    [ResourceType.POST]: -1,              // 일반 포스트 무제한
-    [ResourceType.MCP_POST]: 400,         // MCP 자동포스팅 월 400개
-    [ResourceType.BLOG]: 1,               // 블로그 1개
-    [ResourceType.STORAGE]: 10000,        // 10GB (사용 안 함)
-    [ResourceType.VIEWS]: -1,             // 무제한 (사용 안 함)
-    [ResourceType.API_CALLS]: -1,         // 무제한 (사용 안 함)
+    [ResourceType.POST]: -1, // 일반 포스트 무제한
+    [ResourceType.MCP_POST]: 400, // MCP 자동포스팅 월 400개
+    [ResourceType.BLOG]: 1, // 블로그 1개
+    [ResourceType.STORAGE]: 10000, // 10GB (사용 안 함)
+    [ResourceType.VIEWS]: -1, // 무제한 (사용 안 함)
+    [ResourceType.API_CALLS]: -1, // 무제한 (사용 안 함)
   },
 };
 
 @Injectable()
 export class UsageService {
+  private readonly logger = new Logger(UsageService.name);
   // 현재 사용자의 구독 정보를 캐시
-  private userSubscriptionCache = new Map<string, { tier: SubscriptionTier; timestamp: number }>();
+  private userSubscriptionCache = new Map<
+    string,
+    { tier: SubscriptionTier; timestamp: number }
+  >();
   private readonly CACHE_TTL = 60000; // 1분 캐시
+  private readonly SUBSCRIPTION_CACHE_NAMESPACE = "usage";
+  private readonly SUBSCRIPTION_CACHE_PREFIX = "subscription-tier";
+  private readonly SUBSCRIPTION_CACHE_TTL = 300; // 5분 TTL (Redis)
 
   constructor(
     @InjectRepository(UsageTracking)
     private usageTrackingRepository: Repository<UsageTracking>,
     @InjectRepository(Subscription)
     private subscriptionRepository: Repository<Subscription>,
+    @InjectRepository(Blog)
+    private blogRepository: Repository<Blog>,
     private usersService: UsersService,
     private eventEmitter: EventEmitter2,
+    private readonly unifiedRedisService: UnifiedRedisService,
+    @InjectRedis() private readonly redis: Redis,
   ) {
     // 구독 정보 변경 이벤트 리스닝
-    this.eventEmitter.on('subscription.updated', (data: { userId: string; tier: SubscriptionTier }) => {
-      this.userSubscriptionCache.set(data.userId, { tier: data.tier, timestamp: Date.now() });
-    });
+    this.eventEmitter.on(
+      "subscription.updated",
+      (data: { userId: string; tier: SubscriptionTier }) => {
+        void this.handleSubscriptionUpdate(data.userId, data.tier);
+      },
+    );
   }
 
   /**
@@ -63,31 +84,30 @@ export class UsageService {
     userId: string | null,
     resourceType?: ResourceType,
     startDate?: Date,
-    endDate?: Date
+    endDate?: Date,
   ) {
-    const query = this.usageTrackingRepository.createQueryBuilder('usage')
-      .leftJoinAndSelect('usage.user', 'user');
+    const query = this.usageTrackingRepository
+      .createQueryBuilder("usage")
+      .leftJoinAndSelect("usage.user", "user");
 
     // userId가 null이면 모든 사용자 조회
     if (userId) {
-      query.where('usage.userId = :userId', { userId });
+      query.where("usage.userId = :userId", { userId });
     }
 
     if (resourceType) {
-      query.andWhere('usage.resourceType = :resourceType', { resourceType });
+      query.andWhere("usage.resourceType = :resourceType", { resourceType });
     }
 
     if (startDate) {
-      query.andWhere('usage.lastUsedAt >= :startDate', { startDate });
+      query.andWhere("usage.lastUsedAt >= :startDate", { startDate });
     }
 
     if (endDate) {
-      query.andWhere('usage.lastUsedAt <= :endDate', { endDate });
+      query.andWhere("usage.lastUsedAt <= :endDate", { endDate });
     }
 
-    return await query
-      .orderBy('usage.lastUsedAt', 'DESC')
-      .getMany();
+    return await query.orderBy("usage.lastUsedAt", "DESC").getMany();
   }
 
   /**
@@ -104,16 +124,20 @@ export class UsageService {
     const limit = limits[resourceType];
 
     // 현재 월의 사용량 조회 또는 생성
-    const usage = await this.getOrCreateMonthlyUsage(userId, resourceType, limit);
+    const usage = await this.getOrCreateMonthlyUsage(
+      userId,
+      resourceType,
+      limit,
+    );
 
     // 사용 가능 여부 확인
     if (!usage.canUse(amount)) {
       const remainingUsage = usage.getRemainingUsage();
       throw new BadRequestException(
         `${this.getResourceDisplayName(resourceType)} 제한에 도달했습니다. ` +
-        `현재 사용량: ${usage.count}/${limit}, ` +
-        `남은 사용량: ${remainingUsage}. ` +
-        `더 많은 사용량이 필요하시면 ${this.getUpgradeRecommendation(tier)} 플랜으로 업그레이드하세요.`
+          `현재 사용량: ${usage.count}/${limit}, ` +
+          `남은 사용량: ${remainingUsage}. ` +
+          `더 많은 사용량이 필요하시면 ${this.getUpgradeRecommendation(tier)} 플랜으로 업그레이드하세요.`,
       );
     }
 
@@ -133,13 +157,18 @@ export class UsageService {
    * MCP 자동포스팅 월간 제한 체크
    * 월간 제한만 체크 (일간 제한 없음)
    */
-  async checkMcpPostLimit(userId: string): Promise<{ canPost: boolean; reason?: string }> {
+  async checkMcpPostLimit(
+    userId: string,
+  ): Promise<{ canPost: boolean; reason?: string }> {
     const tier = await this.getUserSubscriptionTier(userId);
     const limits = PLAN_LIMITS[tier];
 
     // 월간 제한 체크
     const monthlyLimit = limits[ResourceType.MCP_POST];
-    const monthlyUsage = await this.getCurrentMonthUsage(userId, ResourceType.MCP_POST);
+    const monthlyUsage = await this.getCurrentMonthUsage(
+      userId,
+      ResourceType.MCP_POST,
+    );
 
     if (monthlyLimit !== -1) {
       const monthlyCount = monthlyUsage?.count || 0;
@@ -202,6 +231,15 @@ export class UsageService {
     // 무제한인 경우
     if (limit === -1) return true;
 
+    if (resourceType === ResourceType.VIEWS) {
+      const blogId = await this.getUserBlogId(userId);
+      if (!blogId) {
+        return true;
+      }
+      const uniqueViews = await this.getMonthlyUniqueViewCountForBlog(blogId);
+      return uniqueViews + amount <= limit;
+    }
+
     const usage = await this.getCurrentMonthUsage(userId, resourceType);
     if (!usage) return true; // 사용 이력이 없으면 사용 가능
 
@@ -211,7 +249,10 @@ export class UsageService {
   /**
    * 블로그 수 제한 확인
    */
-  async checkBlogLimit(userId: string, currentBlogCount: number): Promise<boolean> {
+  async checkBlogLimit(
+    userId: string,
+    currentBlogCount: number,
+  ): Promise<boolean> {
     // 사용자의 구독 티어 확인
     const tier = await this.getUserSubscriptionTier(userId);
     const limits = PLAN_LIMITS[tier];
@@ -267,14 +308,26 @@ export class UsageService {
       percentages: {},
     };
 
+    const blogId = await this.getUserBlogId(userId);
+    const uniqueViewsThisMonth = blogId
+      ? await this.getMonthlyUniqueViewCountForBlog(blogId)
+      : 0;
+
     // 각 리소스별 통계 생성 (mcpPostsPerDay 제외)
     for (const [resourceType, limit] of Object.entries(limits)) {
       // mcpPostsPerDay는 일일 제한이므로 월간 통계에서 제외
-      if (resourceType === 'mcpPostsPerDay' || typeof limit !== 'number') continue;
+      if (resourceType === "mcpPostsPerDay" || typeof limit !== "number")
+        continue;
 
-      const usage = currentUsages.find(u => u.resourceType === resourceType as ResourceType);
-      const currentCount = usage?.count || 0;
-      const percentage = limit === -1 ? 0 : Math.round((currentCount / limit) * 100);
+      const usage = currentUsages.find(
+        (u) => u.resourceType === (resourceType as ResourceType),
+      );
+      let currentCount = usage?.count || 0;
+      if (resourceType === ResourceType.VIEWS) {
+        currentCount = uniqueViewsThisMonth;
+      }
+      const percentage =
+        limit === -1 ? 0 : Math.round((currentCount / limit) * 100);
 
       stats.limits[resourceType] = limit;
       stats.usage[resourceType] = currentCount;
@@ -285,7 +338,9 @@ export class UsageService {
     const blogCount = await this.usersService.getUserBlogCount(userId);
     stats.limits[ResourceType.BLOG] = limits[ResourceType.BLOG];
     stats.usage[ResourceType.BLOG] = blogCount;
-    stats.percentages[ResourceType.BLOG] = Math.round((blogCount / limits[ResourceType.BLOG]) * 100);
+    stats.percentages[ResourceType.BLOG] = Math.round(
+      (blogCount / limits[ResourceType.BLOG]) * 100,
+    );
 
     return stats;
   }
@@ -295,7 +350,7 @@ export class UsageService {
    */
   @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async resetMonthlyUsage(): Promise<void> {
-    console.log('[UsageService] 월별 사용량 초기화 시작');
+    console.log("[UsageService] 월별 사용량 초기화 시작");
 
     const lastMonth = new Date();
     lastMonth.setMonth(lastMonth.getMonth() - 1);
@@ -308,10 +363,12 @@ export class UsageService {
       },
     });
 
-    console.log(`[UsageService] ${lastMonthUsages.length}개의 지난달 사용량 기록 보존`);
+    console.log(
+      `[UsageService] ${lastMonthUsages.length}개의 지난달 사용량 기록 보존`,
+    );
 
     // 새로운 월 시작 - 자동으로 새 기록이 생성됨
-    console.log('[UsageService] 월별 사용량 초기화 완료');
+    console.log("[UsageService] 월별 사용량 초기화 완료");
   }
 
   /**
@@ -319,7 +376,7 @@ export class UsageService {
    */
   @Cron(CronExpression.EVERY_DAY_AT_NOON)
   async checkUsageWarnings(): Promise<void> {
-    console.log('[UsageService] 사용량 경고 체크 시작');
+    console.log("[UsageService] 사용량 경고 체크 시작");
 
     const currentPeriod = this.getCurrentPeriod();
 
@@ -337,7 +394,7 @@ export class UsageService {
       }
     }
 
-    console.log('[UsageService] 사용량 경고 체크 완료');
+    console.log("[UsageService] 사용량 경고 체크 완료");
   }
 
   // Helper Methods
@@ -346,26 +403,94 @@ export class UsageService {
    * 사용자의 구독 티어 조회
    * Subscription 테이블에서 직접 조회하여 항상 최신 tier 반환
    */
-  private async getUserSubscriptionTier(userId: string): Promise<SubscriptionTier> {
+  private async getUserSubscriptionTier(
+    userId: string,
+  ): Promise<SubscriptionTier> {
     // 캐시 확인
     const cached = this.userSubscriptionCache.get(userId);
-    if (cached && (Date.now() - cached.timestamp) < this.CACHE_TTL) {
+    if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
       return cached.tier;
+    }
+
+    // Redis 캐시 확인 (서버 간 일관성 확보)
+    const redisCached = await this.getSubscriptionTierFromRedis(userId);
+    if (redisCached) {
+      this.setLocalSubscriptionCache(userId, redisCached);
+      return redisCached;
     }
 
     // Subscription 테이블에서 직접 조회 (User 테이블 대신)
     // 이렇게 하면 구독 변경 시 즉시 반영됨
     const subscription = await this.subscriptionRepository.findOne({
       where: { userId },
-      order: { createdAt: 'DESC' },  // 최신 구독 정보 조회
+      order: { createdAt: "DESC" }, // 최신 구독 정보 조회
     });
 
     const tier = subscription?.tier || SubscriptionTier.FREE;
 
     // 캐시 업데이트
-    this.userSubscriptionCache.set(userId, { tier, timestamp: Date.now() });
+    this.setLocalSubscriptionCache(userId, tier);
+    await this.setSubscriptionTierToRedis(userId, tier);
 
     return tier;
+  }
+
+  private buildSubscriptionCacheKey(userId: string): string {
+    return `${this.SUBSCRIPTION_CACHE_PREFIX}:${userId}`;
+  }
+
+  private setLocalSubscriptionCache(userId: string, tier: SubscriptionTier) {
+    this.userSubscriptionCache.set(userId, {
+      tier,
+      timestamp: Date.now(),
+    });
+  }
+
+  private async getSubscriptionTierFromRedis(
+    userId: string,
+  ): Promise<SubscriptionTier | null> {
+    try {
+      const cached = await this.unifiedRedisService.getCache<{
+        tier: SubscriptionTier;
+      }>(
+        this.SUBSCRIPTION_CACHE_NAMESPACE,
+        this.buildSubscriptionCacheKey(userId),
+      );
+      return cached?.tier ?? null;
+    } catch (error) {
+      this.logger.warn(
+        `Redis에서 구독 티어 캐시 조회 실패 (userId=${userId})`,
+        error as Error,
+      );
+      return null;
+    }
+  }
+
+  private async setSubscriptionTierToRedis(
+    userId: string,
+    tier: SubscriptionTier,
+  ): Promise<void> {
+    try {
+      await this.unifiedRedisService.setCache(
+        this.SUBSCRIPTION_CACHE_NAMESPACE,
+        this.buildSubscriptionCacheKey(userId),
+        { tier },
+        this.SUBSCRIPTION_CACHE_TTL,
+      );
+    } catch (error) {
+      this.logger.warn(
+        `Redis에 구독 티어 캐시 저장 실패 (userId=${userId})`,
+        error as Error,
+      );
+    }
+  }
+
+  private async handleSubscriptionUpdate(
+    userId: string,
+    tier: SubscriptionTier,
+  ): Promise<void> {
+    this.setLocalSubscriptionCache(userId, tier);
+    await this.setSubscriptionTierToRedis(userId, tier);
   }
 
   /**
@@ -404,6 +529,36 @@ export class UsageService {
     return usage;
   }
 
+  private async getUserBlogId(userId: string): Promise<string | null> {
+    const blog = await this.blogRepository.findOne({
+      where: { userId },
+      select: ["id"],
+    });
+    return blog?.id ?? null;
+  }
+
+  private async getMonthlyUniqueViewCountForBlog(
+    blogId: string,
+  ): Promise<number> {
+    const key = this.buildBlogUniqueViewKey(blogId, this.getCurrentPeriod());
+    try {
+      const count = await this.redis.pfcount(key);
+      return typeof count === "number" ? count : 0;
+    } catch (error) {
+      this.logger.warn(
+        `Failed to read unique view count (blogId=${blogId})`,
+        error as Error,
+      );
+      return 0;
+    }
+  }
+
+  private buildBlogUniqueViewKey(blogId: string, period: Date): string {
+    const year = period.getFullYear();
+    const month = (period.getMonth() + 1).toString().padStart(2, "0");
+    return `blog:uniqueViews:${blogId}:${year}${month}`;
+  }
+
   /**
    * 현재 기간 (월) 가져오기
    */
@@ -424,13 +579,13 @@ export class UsageService {
    */
   private getResourceDisplayName(resourceType: ResourceType): string {
     const names = {
-      [ResourceType.POST]: '일반 포스트',
-      [ResourceType.MCP_POST]: 'MCP 자동포스팅',
-      [ResourceType.BLOG]: '블로그',
-      [ResourceType.STORAGE]: '저장공간',
-      [ResourceType.VIEWS]: '조회수',
-      [ResourceType.API_CALLS]: 'API 호출',
-      [ResourceType.AI_CREDITS]: 'AI 크레딧',
+      [ResourceType.POST]: "일반 포스트",
+      [ResourceType.MCP_POST]: "MCP 자동포스팅",
+      [ResourceType.BLOG]: "블로그",
+      [ResourceType.STORAGE]: "저장공간",
+      [ResourceType.VIEWS]: "조회수",
+      [ResourceType.API_CALLS]: "API 호출",
+      [ResourceType.AI_CREDITS]: "AI 크레딧",
     };
     return names[resourceType] || resourceType;
   }
@@ -440,11 +595,11 @@ export class UsageService {
    */
   private getUpgradeRecommendation(currentTier: SubscriptionTier): string {
     if (currentTier === SubscriptionTier.FREE) {
-      return 'Starter 또는 Pro';
+      return "Starter 또는 Pro";
     } else if (currentTier === SubscriptionTier.STARTER) {
-      return 'Pro';
+      return "Pro";
     }
-    return 'Enterprise (문의)';
+    return "Enterprise (문의)";
   }
 
   /**
@@ -458,7 +613,7 @@ export class UsageService {
     // 여기에 이메일 또는 알림 발송 로직 구현
     console.log(
       `[UsageService] 사용량 경고 발송: User ${userId}, ` +
-      `${this.getResourceDisplayName(resourceType)} ${usage.getUsagePercentage()}% 사용`
+        `${this.getResourceDisplayName(resourceType)} ${usage.getUsagePercentage()}% 사용`,
     );
 
     usage.warningsSent++;

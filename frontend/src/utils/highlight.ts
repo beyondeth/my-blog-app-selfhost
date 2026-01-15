@@ -13,11 +13,14 @@ export function highlightSearchTerms(
   text: string | null | undefined,
   searchQuery: string | null | undefined
 ): string {
-  if (!text || !searchQuery) {
-    return text || '';
+  if (!text) {
+    return '';
   }
 
-  // 검색어를 개별 단어로 분리
+  if (!searchQuery) {
+    return escapeHtml(text);
+  }
+
   const searchTerms = searchQuery
     .trim()
     .split(/\s+/)
@@ -25,14 +28,24 @@ export function highlightSearchTerms(
     .map(term => escapeRegExp(term));
 
   if (searchTerms.length === 0) {
-    return text;
+    return escapeHtml(text);
   }
 
-  // 모든 검색어를 OR 연산으로 결합
   const regex = new RegExp(`(${searchTerms.join('|')})`, 'gi');
 
-  // 매칭된 부분을 mark 태그로 감싸기 (CSS로 스타일 정의: globals.css)
-  return text.replace(regex, '<mark class="search-highlight">$1</mark>');
+  let result = '';
+  let lastIndex = 0;
+
+  text.replace(regex, (match, _group, offset) => {
+    result += escapeHtml(text.slice(lastIndex, offset));
+    result += `<mark class="search-highlight">${escapeHtml(match)}</mark>`;
+    lastIndex = offset + match.length;
+    return match;
+  });
+
+  result += escapeHtml(text.slice(lastIndex));
+
+  return result;
 }
 
 /**
@@ -40,6 +53,15 @@ export function highlightSearchTerms(
  */
 function escapeRegExp(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 /**

@@ -1,13 +1,18 @@
-import { Injectable, ConflictException, NotFoundException, UnauthorizedException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import * as bcrypt from 'bcrypt';
-import { McpApiKey } from '../entities/mcp-api-key.entity';
-import { customAlphabet } from 'nanoid';
-import { UsageTracking } from '../../usage/entities/usage-tracking.entity';
-import { ResourceType } from '../../common/enums/subscription.enum';
-import { CacheService } from '../../cache/cache.service';
-import { format } from 'date-fns';
+import {
+  Injectable,
+  ConflictException,
+  NotFoundException,
+  UnauthorizedException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import * as bcrypt from "bcrypt";
+import { McpApiKey } from "../entities/mcp-api-key.entity";
+import { customAlphabet } from "nanoid";
+import { UsageTracking } from "../../usage/entities/usage-tracking.entity";
+import { ResourceType } from "../../common/enums/subscription.enum";
+import { CacheService } from "../../cache/cache.service";
+import { format } from "date-fns";
 
 /**
  * MCP API Key 서비스
@@ -20,12 +25,15 @@ import { format } from 'date-fns';
 @Injectable()
 export class McpApiKeyService {
   // 8자 hint 생성용 (소문자 + 숫자)
-  private readonly hintGenerator = customAlphabet('abcdefghijklmnopqrstuvwxyz0123456789', 8);
+  private readonly hintGenerator = customAlphabet(
+    "abcdefghijklmnopqrstuvwxyz0123456789",
+    8,
+  );
 
   // 32자 secret 생성용 (영숫자)
   private readonly secretGenerator = customAlphabet(
-    'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789',
-    32
+    "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789",
+    32,
   );
 
   constructor(
@@ -62,13 +70,15 @@ export class McpApiKeyService {
 
     while (attempts < 3) {
       keyHint = this.hintGenerator();
-      const existing = await this.mcpApiKeyRepository.findOne({ where: { keyHint } });
+      const existing = await this.mcpApiKeyRepository.findOne({
+        where: { keyHint },
+      });
 
       if (!existing) break;
 
       attempts++;
       if (attempts === 3) {
-        throw new ConflictException('Failed to generate unique API key hint');
+        throw new ConflictException("Failed to generate unique API key hint");
       }
     }
 
@@ -125,14 +135,15 @@ export class McpApiKeyService {
    */
   async validateKey(apiKey: string): Promise<McpApiKey> {
     // 1. 키 형식 검증 (blog_sk_{hint}_{secret})
-    if (!apiKey.startsWith('blog_sk_')) {
-      throw new UnauthorizedException('Invalid API key format');
+    if (!apiKey.startsWith("blog_sk_")) {
+      throw new UnauthorizedException("Invalid API key format");
     }
 
     // 2. hint 추출
-    const parts = apiKey.split('_');
-    if (parts.length !== 4) { // ['blog', 'sk', hint, secret]
-      throw new UnauthorizedException('Invalid API key format');
+    const parts = apiKey.split("_");
+    if (parts.length !== 4) {
+      // ['blog', 'sk', hint, secret]
+      throw new UnauthorizedException("Invalid API key format");
     }
 
     const keyHint = parts[2];
@@ -140,32 +151,32 @@ export class McpApiKeyService {
     // 3. hint로 O(1) 조회
     const mcpApiKey = await this.mcpApiKeyRepository.findOne({
       where: { keyHint },
-      relations: ['user', 'blog'],
+      relations: ["user", "blog"],
     });
 
     if (!mcpApiKey) {
-      throw new UnauthorizedException('Invalid API key');
+      throw new UnauthorizedException("Invalid API key");
     }
 
     // 4. bcrypt 비교 (전체 키)
     const isValid = await bcrypt.compare(apiKey, mcpApiKey.keyHash);
     if (!isValid) {
-      throw new UnauthorizedException('Invalid API key');
+      throw new UnauthorizedException("Invalid API key");
     }
 
     // 5. 활성 상태 확인
     if (!mcpApiKey.isActive) {
-      throw new UnauthorizedException('API key is inactive');
+      throw new UnauthorizedException("API key is inactive");
     }
 
     // 6. 만료 확인
     if (mcpApiKey.expiresAt < new Date()) {
-      throw new UnauthorizedException('API key has expired');
+      throw new UnauthorizedException("API key has expired");
     }
 
     // 7. 마지막 사용 시간 업데이트 (비동기, 응답 블로킹 안 함)
     this.updateLastUsed(mcpApiKey.id).catch((err) => {
-      console.error('Failed to update lastUsedAt:', err);
+      console.error("Failed to update lastUsedAt:", err);
     });
 
     return mcpApiKey;
@@ -180,7 +191,7 @@ export class McpApiKeyService {
       {
         lastUsedAt: new Date(),
         requestCount: () => '"requestCount" + 1',
-      }
+      },
     );
   }
 
@@ -193,8 +204,8 @@ export class McpApiKeyService {
   async findByUser(userId: string): Promise<McpApiKey[]> {
     return this.mcpApiKeyRepository.find({
       where: { userId },
-      relations: ['blog'],
-      order: { createdAt: 'DESC' },
+      relations: ["blog"],
+      order: { createdAt: "DESC" },
     });
   }
 
@@ -210,12 +221,12 @@ export class McpApiKeyService {
     });
 
     if (!mcpApiKey) {
-      throw new NotFoundException('API key not found');
+      throw new NotFoundException("API key not found");
     }
 
     // 소유권 확인
     if (mcpApiKey.userId !== userId) {
-      throw new UnauthorizedException('Not authorized to delete this API key');
+      throw new UnauthorizedException("Not authorized to delete this API key");
     }
 
     // MCP Proxy 캐시 무효화 (mcp:apikey:valid:{keyHint})
@@ -233,7 +244,7 @@ export class McpApiKeyService {
   async incrementPostsCreated(keyId: string): Promise<void> {
     await this.mcpApiKeyRepository.update(
       { id: keyId },
-      { postsCreated: () => '"postsCreated" + 1' }
+      { postsCreated: () => '"postsCreated" + 1' },
     );
   }
 
@@ -252,28 +263,29 @@ export class McpApiKeyService {
 
     // 2. 총 요청 수 (모든 키의 requestCount 합계)
     const totalRequestsResult = await this.mcpApiKeyRepository
-      .createQueryBuilder('key')
-      .select('SUM(key.requestCount)', 'total')
+      .createQueryBuilder("key")
+      .select("SUM(key.requestCount)", "total")
       .getRawOne();
 
     // 3. 총 포스트 수 (usage_tracking에서 MCP_POST 합계)
     const totalPostsResult = await this.usageTrackingRepository
-      .createQueryBuilder('usage')
-      .select('SUM(usage.count)', 'total')
-      .where('usage.resourceType = :type', { type: ResourceType.MCP_POST })
+      .createQueryBuilder("usage")
+      .select("SUM(usage.count)", "total")
+      .where("usage.resourceType = :type", { type: ResourceType.MCP_POST })
       .getRawOne();
 
     // 4. 활성 사용자 수 (MCP_POST usage가 있는 사용자)
     const activeUsers = await this.usageTrackingRepository
-      .createQueryBuilder('usage')
-      .select('COUNT(DISTINCT usage.userId)', 'count')
-      .where('usage.resourceType = :type', { type: ResourceType.MCP_POST })
+      .createQueryBuilder("usage")
+      .select("COUNT(DISTINCT usage.userId)", "count")
+      .where("usage.resourceType = :type", { type: ResourceType.MCP_POST })
       .getRawOne();
 
     // 5. 평균 사용량
-    const avgPostsPerUser = activeUsers.count > 0
-      ? Math.round(totalPostsResult.total / activeUsers.count)
-      : 0;
+    const avgPostsPerUser =
+      activeUsers.count > 0
+        ? Math.round(totalPostsResult.total / activeUsers.count)
+        : 0;
 
     return {
       activeKeys,
@@ -296,7 +308,7 @@ export class McpApiKeyService {
         resourceType: ResourceType.MCP_POST,
         period,
       },
-      relations: ['user'],
+      relations: ["user"],
     });
 
     const totalPosts = usages.reduce((sum, u) => sum + u.count, 0);
@@ -304,23 +316,26 @@ export class McpApiKeyService {
     const avgPerUser = totalUsers > 0 ? Math.round(totalPosts / totalUsers) : 0;
 
     // 플랜별 사용량 (usages의 user.tier 기반)
-    const usagesByPlan = usages.reduce((acc, usage) => {
-      const tier = (usage.user as any)?.tier || 'FREE';
-      acc[tier] = (acc[tier] || 0) + usage.count;
-      return acc;
-    }, {} as Record<string, number>);
+    const usagesByPlan = usages.reduce(
+      (acc, usage) => {
+        const tier = (usage.user as any)?.tier || "FREE";
+        acc[tier] = (acc[tier] || 0) + usage.count;
+        return acc;
+      },
+      {} as Record<string, number>,
+    );
 
     // 일별 사용량 (lastUsedAt 기반 그룹핑)
     const dailyUsage = usages.reduce((acc, usage) => {
       if (usage.lastUsedAt) {
-        const day = format(usage.lastUsedAt, 'yyyy-MM-dd');
+        const day = format(usage.lastUsedAt, "yyyy-MM-dd");
         acc[day] = (acc[day] || 0) + usage.count;
       }
       return acc;
     }, {});
 
     return {
-      period: `${year}-${String(month).padStart(2, '0')}`,
+      period: `${year}-${String(month).padStart(2, "0")}`,
       totalPosts,
       totalUsers,
       avgPerUser,
@@ -338,19 +353,19 @@ export class McpApiKeyService {
     currentPeriod.setDate(1);
 
     const topUsers = await this.usageTrackingRepository
-      .createQueryBuilder('usage')
-      .leftJoinAndSelect('usage.user', 'user')
-      .where('usage.resourceType = :type', { type: ResourceType.MCP_POST })
-      .andWhere('usage.period = :period', { period: currentPeriod })
-      .orderBy('usage.count', 'DESC')
+      .createQueryBuilder("usage")
+      .leftJoinAndSelect("usage.user", "user")
+      .where("usage.resourceType = :type", { type: ResourceType.MCP_POST })
+      .andWhere("usage.period = :period", { period: currentPeriod })
+      .orderBy("usage.count", "DESC")
       .limit(limit)
       .getMany();
 
-    return topUsers.map(usage => ({
+    return topUsers.map((usage) => ({
       userId: usage.userId,
-      username: usage.user?.username || 'Unknown',
-      email: usage.user?.email || 'N/A',
-      tier: (usage.user as any)?.tier || 'FREE',
+      username: usage.user?.username || "Unknown",
+      email: usage.user?.email || "N/A",
+      tier: (usage.user as any)?.tier || "FREE",
       postsCreated: usage.count,
       limit: usage.limit,
       percentage: usage.getUsagePercentage(),
@@ -367,12 +382,12 @@ export class McpApiKeyService {
     for (let i = 0; i < hours; i++) {
       const date = new Date();
       date.setHours(date.getHours() - i);
-      const hourKey = `mcp:hourly:${format(date, 'yyyy-MM-dd-HH')}`;
+      const hourKey = `mcp:hourly:${format(date, "yyyy-MM-dd-HH")}`;
 
       const count = await this.cacheService.get(hourKey);
 
       stats.push({
-        hour: format(date, 'yyyy-MM-dd HH:00'),
+        hour: format(date, "yyyy-MM-dd HH:00"),
         count: count ? parseInt(String(count)) : 0,
       });
     }
@@ -384,7 +399,7 @@ export class McpApiKeyService {
    * 시간별 카운터 증가 (MCP 요청마다 호출)
    */
   async incrementHourlyCounter() {
-    const hourKey = `mcp:hourly:${format(new Date(), 'yyyy-MM-dd-HH')}`;
+    const hourKey = `mcp:hourly:${format(new Date(), "yyyy-MM-dd-HH")}`;
 
     // Redis에 시간별 카운터 증가
     await this.cacheService.increment(hourKey);

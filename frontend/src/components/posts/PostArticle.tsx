@@ -3,14 +3,43 @@
 import React from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Post } from '@/types';
+import { useAuth } from '@/providers/AuthProviderV2';
+import { Post, VoteType } from '@/types';
+import type { CommunityFlair, CommunityRoleType } from '@/types/community';
 import { Avatar } from '@/components/ui/avatar';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import QualityScoreBadge from '@/components/ui/QualityScoreBadge';
-import { FiHeart, FiMessageCircle, FiEye, FiTarget, FiTag, FiAlertCircle } from 'react-icons/fi';
+import { Badge } from '@/components/ui/badge';
+import { useRouter } from 'next/navigation';
+import ModerationModal from '../admin/ModerationModal';
+import VoteButton from '@/components/ui/VoteButton';
+import FlairBadge from '@/components/community/FlairBadge';
+import MemberRoleBadge from '@/components/community/MemberRoleBadge';
+import PostSourceMeta from '@/components/posts/PostSourceMeta';
+import {
+  FiMessageCircle,
+  FiEye,
+  FiTarget,
+  FiTag,
+  FiAlertCircle,
+  FiPlay,
+  FiBookmark,
+  FiLock,
+  FiAlertTriangle,
+} from 'react-icons/fi';
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
-import { shouldDisableOptimization } from '@/utils/imageUtils';
+import { extractImageKey, normalizeImageUrl, shouldDisableOptimization } from '@/utils/imageUtils';
+import { determineFeedLayout, extractYouTubeVideoId, FeedLayoutType, hasVideoEmbed, extractFirstVideoId } from '@/utils/feedLayoutUtils';
+import VideoRenderer from '@/components/ui/content-renderer/components/VideoRenderer';
+import PostImageCarousel from '@/components/posts/PostImageCarousel';
+import PostImageLightbox from '@/components/posts/PostImageLightbox';
+import BlurredImage from '@/components/ui/BlurredImage';
+import type { FeedCommunityContext } from '@/utils/feed/unifiedFeedAdapter';
+
+interface CommunityContextMeta extends FeedCommunityContext {
+  shouldBlurMedia?: boolean;
+}
 
 interface PostArticleProps {
   post: Post;
@@ -19,12 +48,21 @@ interface PostArticleProps {
   userId?: string;
   onEdit: (slug: string) => void;
   onDelete: (id: string) => void;
-  onLike?: (postId: string) => void; // 좋아요 토글 핸들러
+  /** @deprecated onVote 사용 권장 */
+  onLike?: (postId: string) => void;
+  /** 투표 핸들러 (upvote/downvote) */
+  onVote?: (postId: string, voteType: 'upvote' | 'downvote') => void;
   isDeleting?: boolean;
-  likePending?: boolean; // 좋아요 처리 중 상태
-  searchQuery?: string; // 검색어 하이라이팅을 위한 prop
-  priority?: boolean; // LCP 최적화: 프로필 이미지 우선 로드 (상위 3개 포스트)
-  isHomeFeed?: boolean; // 홈 피드 여부 (썸네일 스타일 적용용)
+  /** @deprecated votePending 사용 권장 */
+  likePending?: boolean;
+  votePending?: boolean;
+  searchQuery?: string;
+  priority?: boolean;
+  isHomeFeed?: boolean;
+  showAuthorPrefix?: boolean;
+  showCommunityHeader?: boolean;
+  postUrlOverride?: string;
+  communityContext?: CommunityContextMeta;
 }
 
 // HTML 태그를 제거하고 순수 텍스트만 반환하는 로컬 함수
@@ -55,66 +93,291 @@ const PostArticle = React.memo(function PostArticle({
   onEdit,
   onDelete,
   onLike,
+  onVote,
   isDeleting = false,
   likePending = false,
+  votePending = false,
   searchQuery,
-  priority = false, // 기본값: lazy loading
-  isHomeFeed = false,}: PostArticleProps) {
-  // 화면 크기에 따른 썸네일 크기 계산
-  const [thumbnailSize, setThumbnailSize] = React.useState({ width: 120, height: 113 });
-  const [isDesktop, setIsDesktop] = React.useState(false);
+  priority = false,
+  isHomeFeed = false,
+  showAuthorPrefix = true,
+  showCommunityHeader = true,
+  postUrlOverride,
+  communityContext,
+}: PostArticleProps) {
+  // 투표 핸들러 (새 API 우선, 구버전 호환)
+  const handleVote = React.useCallback((voteType: 'upvote' | 'downvote') => {
+    if (onVote) {
+      onVote(post.id, voteType);
+    } else if (onLike && voteType === 'upvote') {
+      // 레거시: upvote만 onLike로 처리
+      onLike(post.id);
+    }
+  }, [post.id, onVote, onLike]);
 
-  React.useEffect(() => {
-    const handleResize = () => {
-      const width = window.innerWidth;
-      if (width >= 421) {
-        // 데스크톱 (421px 이상)
-        setThumbnailSize({ width: 210, height: 197 });
-        setIsDesktop(true);
-      } else if (width >= 375 && width <= 420) {
-        // 모바일 중간 (375px-420px)
-        setThumbnailSize({ width: 140, height: 132 });
-        setIsDesktop(false);
-      } else {
-        // 작은 모바일 (~374px)
-        setThumbnailSize({ width: 120, height: 113 });
-        setIsDesktop(false);
+  const isPending = votePending || likePending;
+  const homeTextPrimary = 'text-[#1B2430] dark:text-[#E6EDF3]';
+  const homeTextSecondary = 'text-[#425466] dark:text-[#C7D2E0]';
+  const homeTextMuted = 'text-[#7B8794] dark:text-[#A9B4C2]';
+  const homeTextSubtle = 'text-[#9AA4B2] dark:text-[#728093]';
+  const metaRowClass = isHomeFeed ? homeTextSecondary : 'text-gray-600 dark:text-gray-200';
+  const metaMutedClass = isHomeFeed ? homeTextMuted : 'text-gray-500 dark:text-gray-400';
+  const metaMutedStrongClass = isHomeFeed ? homeTextMuted : 'text-gray-500 dark:text-gray-600';
+  const metaFaintClass = isHomeFeed ? homeTextSubtle : 'text-gray-400 dark:text-gray-500';
+  const editButtonClass = isHomeFeed
+    ? `text-xs ${homeTextSecondary} hover:text-[#9B6B2E] dark:hover:text-[#F6D36A] whitespace-nowrap`
+    : 'text-xs text-gray-700 dark:text-gray-200 hover:text-amber-700 dark:hover:text-amber-400 whitespace-nowrap';
+  const deleteButtonClass = isHomeFeed
+    ? `text-xs ${homeTextSecondary} hover:text-[#B13B35] dark:hover:text-[#F49A8A] disabled:opacity-50 whitespace-nowrap`
+    : 'text-xs text-gray-700 dark:text-gray-200 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 whitespace-nowrap';
+  const editorPickClass = isHomeFeed
+    ? `flex items-center gap-1 ${homeTextSecondary} whitespace-nowrap`
+    : 'flex items-center gap-1 text-gray-700 dark:text-gray-300 whitespace-nowrap';
+  const titleTextClass = isHomeFeed ? homeTextPrimary : 'text-foreground';
+  const bodyTextClass = isHomeFeed ? 'text-[#3F4A59] dark:text-[#E1E8F0]' : 'text-foreground';
+  const voteTone = isHomeFeed ? 'harbor' : 'default';
+  const articleBaseClass = isHomeFeed
+    ? 'rounded-3xl border border-[#D9E0EA] bg-white hover:bg-[#F7F9FC] transition-colors dark:border-[#4B5563] dark:bg-[#131A22] dark:hover:bg-[#1A232E] p-5 sm:p-6 shadow-sm'
+    : 'border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 first:pt-0';
+  const articleClassName = isHomeFeed ? `${articleBaseClass} max-w-[780px] mx-auto` : articleBaseClass;
+  const defaultPostUrl = post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#';
+  const postUrl = postUrlOverride ?? defaultPostUrl;
+  const showCommunityContext = Boolean(communityContext);
+  const shouldBlurMedia = communityContext?.shouldBlurMedia ?? false;
+  const blurReason: 'nsfw' | 'spoiler' = communityContext?.isSpoiler ? 'spoiler' : 'nsfw';
+  const displayCategory = !showCommunityContext ? post.category : '';
+  const communityFlair = communityContext?.flair;
+  const hasCommunityBadges =
+    !!communityContext &&
+    (communityContext.isPinned ||
+      communityContext.isLocked ||
+      communityContext.isNsfw ||
+      communityContext.isSpoiler);
+  const communityBadgeSection = hasCommunityBadges ? (
+    <div className="flex flex-wrap items-center gap-2 mb-3">
+      {communityContext?.isPinned && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
+          <FiBookmark className="w-3 h-3" />
+          고정됨
+        </span>
+      )}
+      {communityContext?.isLocked && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
+          <FiLock className="w-3 h-3" />
+          댓글 잠금
+        </span>
+      )}
+      {communityContext?.isNsfw && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">
+          NSFW
+        </span>
+      )}
+      {communityContext?.isSpoiler && (
+        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+          <FiAlertTriangle className="w-3 h-3" />
+          스포일러
+        </span>
+      )}
+    </div>
+  ) : null;
+  const shouldShowCommunityHeader = Boolean(communityContext) && showCommunityHeader;
+  const sourceMetaVariant = isHomeFeed
+      ? 'home'
+      : 'default';
+  const headerCommunityContext = shouldShowCommunityHeader ? communityContext : undefined;
+  const shouldShowAuthorPrefix = showAuthorPrefix && !(communityContext && !showCommunityHeader);
+  const timestamp = post.publishedAt || post.createdAt;
+  const relativeTime = React.useMemo(
+    () => (timestamp ? formatRelativeTime(timestamp) : ''),
+    [timestamp],
+  );
+  const showFooterTimestamp = !isHomeFeed && Boolean(relativeTime && timestamp);
+  const renderSourceMeta = (infoClassName: string, categoryClassName: string) => (
+    <PostSourceMeta
+      post={post}
+      communityContext={headerCommunityContext}
+      infoClassName={infoClassName}
+      categoryClassName={categoryClassName}
+      displayCategory={!showCommunityContext ? displayCategory : undefined}
+      priority={priority}
+      variant={sourceMetaVariant}
+      showAuthorPrefix={shouldShowAuthorPrefix}
+      timestamp={timestamp}
+      relativeTime={relativeTime}
+    />
+  );
+  const renderFlairBadge = (className?: string) =>
+    communityFlair ? <FlairBadge flair={communityFlair} size="xs" className={className} /> : null;
+
+  // 레이아웃 타입 결정 (공통 유틸리티 사용)
+  const layoutType = React.useMemo((): FeedLayoutType => {
+    return determineFeedLayout({
+      thumbnail: post.thumbnail,
+      excerpt: post.excerpt,
+      content: post.content,
+    });
+  }, [post.thumbnail, post.excerpt, post.content]);
+  const isImageFocused = layoutType === 'image-focused';
+
+  // YouTube 비디오 ID (비디오 중심 레이아웃일 때만 추출)
+  const youtubeVideoId = React.useMemo(() => {
+    if (layoutType !== 'video-focused' || !post.thumbnail) return null;
+    return extractYouTubeVideoId(post.thumbnail);
+  }, [layoutType, post.thumbnail]);
+
+  // 업로드된 비디오 포함 여부
+  const hasVideo = React.useMemo(() => {
+    return hasVideoEmbed(post.content);
+  }, [post.content]);
+
+  // 비디오 ID 추출 (인라인 재생용 - VideoRenderer에서 API 호출)
+  const videoId = React.useMemo(() => {
+    if (!hasVideo) return null;
+    return extractFirstVideoId(post.content);
+  }, [hasVideo, post.content]);
+
+  // 비디오 재생 상태 (클릭 시 인라인 재생)
+  const [isVideoPlaying, setIsVideoPlaying] = React.useState(false);
+  const [isModerationModalOpen, setIsModerationModalOpen] = React.useState(false);
+  const { user } = useAuth();
+  const router = useRouter();
+  const isVideoPost = hasVideo && !!videoId;
+  const imageSources = React.useMemo(() => {
+    const orderedImages = Array.isArray(post.images)
+      ? post.images.filter((url): url is string => Boolean(url && url.trim()))
+      : [];
+    const prioritized = post.thumbnail
+      ? [post.thumbnail, ...orderedImages]
+      : orderedImages;
+    const normalized = prioritized
+      .map((url) => normalizeImageUrl(url))
+      .filter((url): url is string => Boolean(url && url.trim()));
+    const unique: string[] = [];
+    const seen = new Set<string>();
+    normalized.forEach((url) => {
+      const key = extractImageKey(url) ?? url;
+      if (!seen.has(key)) {
+        seen.add(key);
+        unique.push(url);
       }
-    };
-
-    // 초기 설정
-    handleResize();
-
-    // 리사이즈 이벤트 리스너
-    window.addEventListener('resize', handleResize);
-
-    // 클린업
-    return () => window.removeEventListener('resize', handleResize);
+    });
+    return unique;
+  }, [post.images, post.thumbnail]);
+  const hasImages = imageSources.length > 0;
+  const [lightboxOpen, setLightboxOpen] = React.useState(false);
+  const [lightboxIndex, setLightboxIndex] = React.useState(0);
+  const handleOpenLightbox = React.useCallback((index: number) => {
+    setLightboxIndex(index);
+    setLightboxOpen(true);
   }, []);
+  const mediaWrapperClass = isHomeFeed
+    ? 'relative w-full max-w-[780px] mx-auto overflow-hidden rounded-xl bg-[#EEF3F8] dark:bg-[#1A232E]'
+    : 'relative w-full overflow-hidden rounded-xl bg-[#EEF3F8] dark:bg-[#1A232E]';
+  const renderThumbnailImage = React.useCallback(() => {
+    const source = imageSources[0] || post.thumbnail;
+    if (!source) {
+      return null;
+    }
+    const disableOptimization = shouldDisableOptimization(source);
+
+    if (isHomeFeed) {
+      return (
+        <div className="relative aspect-[700/540]">
+          {shouldBlurMedia ? (
+            <BlurredImage
+              src={source}
+              alt={post.title}
+              isBlurred
+              blurReason={blurReason}
+              fill
+              sizes="(max-width: 1024px) 90vw, 700px"
+              className="object-contain bg-black/5"
+              priority={priority}
+              unoptimized={disableOptimization}
+            />
+          ) : (
+            <Image
+              src={source}
+              alt={post.title}
+              fill
+              sizes="(max-width: 1024px) 90vw, 700px"
+              className="object-contain bg-black/5"
+              priority={priority}
+              unoptimized={disableOptimization}
+            />
+          )}
+        </div>
+      );
+    }
+
+    if (shouldBlurMedia) {
+      return (
+        <BlurredImage
+          src={source}
+          alt={post.title}
+          isBlurred
+          blurReason={blurReason}
+          width={0}
+          height={0}
+          sizes="100vw"
+          style={{ width: '100%', height: 'auto', display: 'block' }}
+          className="object-cover max-h-[540px]"
+          priority={priority}
+          unoptimized={disableOptimization}
+        />
+      );
+    }
+
+    return (
+      <Image
+        src={source}
+        alt={post.title}
+        width={0}
+        height={0}
+        sizes="100vw"
+        style={{ width: '100%', height: 'auto', display: 'block' }}
+        className="object-cover max-h-[540px]"
+        priority={priority}
+        unoptimized={disableOptimization}
+      />
+    );
+  }, [imageSources, isHomeFeed, post.thumbnail, post.title, priority, shouldBlurMedia, blurReason]);
+
   // 삭제된 포스트 상태 확인
   const isDeleted = post.isDeleted || post.status === 'deleted';
 
   // 삭제된 포스트는 간단한 상태 UI만 표시
   if (isDeleted) {
     return (
-      <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-8 first:pt-0">
-        <div className="bg-gray-50 dark:bg-gray-900/50 rounded-lg border-l-4 border-red-400 p-4">
-          <div className="flex items-center gap-3 text-gray-500 dark:text-gray-400 mb-2">
-            <FiAlertCircle className="w-5 h-5 text-red-400" />
-            <span className="font-medium">삭제된 게시물</span>
-          </div>
-          <p className="text-sm text-gray-400 dark:text-gray-500">
-            이 포스트는 작성자에 의해 삭제되었습니다
-          </p>
-          {post.title && (
-            <div className="mt-3">
-              <p className="text-xs text-gray-500 dark:text-gray-600 line-clamp-1">
-                제목: {post.title}
-              </p>
+      <>
+        <article className={articleClassName}>
+          <div className="bg-[#EEF3F8] dark:bg-[#1A232E] rounded-lg border-l-4 border-red-400 p-4">
+            <div className={`flex items-center gap-3 ${metaMutedClass} mb-2`}>
+              <FiAlertCircle className="w-5 h-5 text-red-400" />
+              <span className="font-medium">삭제된 게시물</span>
             </div>
-          )}
-        </div>
-      </article>
+            <p className={`text-sm ${metaFaintClass}`}>
+              이 포스트는 작성자에 의해 삭제되었습니다
+            </p>
+            {post.title && (
+              <div className="mt-3">
+                <p className={`text-xs ${metaMutedStrongClass} line-clamp-1`}>
+                  제목: {post.title}
+                </p>
+              </div>
+            )}
+          </div>
+        </article>
+        {hasImages && (
+          <PostImageLightbox
+            images={imageSources}
+            open={lightboxOpen}
+            startIndex={lightboxIndex}
+            onClose={() => setLightboxOpen(false)}
+            postUrl={postUrl}
+          />
+        )}
+      </>
     );
   }
 
@@ -135,117 +398,32 @@ const PostArticle = React.memo(function PostArticle({
       : cleanContent || '';
   }
   
-  // YouTube 썸네일인지 확인하고 비디오 ID 추출 (개선된 감지 로직)
-  let isYouTubeThumbnail = false;
-  let youtubeVideoId = null;
-  
-  // thumbnail URL에서 YouTube 패턴 확인
-  if (post.thumbnail) {
-    
-    // YouTube 썸네일 URL 패턴들 (우선순위 순서)
-    const youtubePatterns = [
-      // 1. 표준 YouTube 썸네일 URL 패턴
-      /(?:https?:\/\/)?img\.youtube\.com\/vi\/([a-zA-Z0-9_-]{11})\/(?:maxresdefault|hqdefault|mqdefault|sddefault|default)\.jpg/,
-      /(?:https?:\/\/)?i\.ytimg\.com\/vi\/([a-zA-Z0-9_-]{11})\/(?:maxresdefault|hqdefault|mqdefault|sddefault|default)\.jpg/,
-      
-      // 2. 짧은 형식
-      /(?:https?:\/\/)?(?:img\.)?youtube\.com\/vi\/([a-zA-Z0-9_-]{11})/,
-      /(?:https?:\/\/)?(?:www\.)?ytimg\.com\/vi\/([a-zA-Z0-9_-]{11})/,
-      
-      // 3. webp 형식 포함
-      /(?:https?:\/\/)?i\d*\.ytimg\.com\/vi(?:_webp)?\/([a-zA-Z0-9_-]{11})/,
-      
-      // 4. 다양한 품질 지정자
-      /\/vi\/([a-zA-Z0-9_-]{11})\/(?:maxresdefault|hqdefault|mqdefault|sddefault|default|0|1|2|3)/
-    ];
-    
-    // 각 패턴으로 테스트
-    for (const pattern of youtubePatterns) {
-      const match = post.thumbnail.match(pattern);
-      if (match && match[1]) {
-        isYouTubeThumbnail = true;
-        youtubeVideoId = match[1];
-        break;
-      }
-    }
-    
-    // 패턴 매칭 실패 시 도메인 체크 + 11자리 ID 추출
-    if (!isYouTubeThumbnail) {
-      const isYouTubeDomain = post.thumbnail.includes('youtube.com') || 
-                              post.thumbnail.includes('ytimg.com') ||
-                              post.thumbnail.includes('youtu.be');
-      
-      if (isYouTubeDomain) {
-        // YouTube 비디오 ID는 정확히 11자리
-        const idMatch = post.thumbnail.match(/([a-zA-Z0-9_-]{11})/);
-        if (idMatch) {
-          isYouTubeThumbnail = true;
-          youtubeVideoId = idMatch[1];
-        }
-      }
-    }
-  }
   
   // YouTube 비디오인 경우 Reddit 스타일 레이아웃
   if (youtubeVideoId) {
     return (
-      <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-8 first:pt-0">
+      <>
+      <article className={articleClassName}>
         <div className="flex flex-col">
-          {/* Header - Author Info와 제목 */}
-          <div className="mb-4">
-            {/* Author Info - 날짜 제거 */}
-            {post.author && (
-              <>
-                <div className="flex items-center gap-2 mb-4">
-                  <UserLinkWithTooltip
-                    userId={post.author.id}
-                    username={post.author.username}
-                    blogSlug={post.blog?.slug}
-                  >
-                    <div className="flex items-center gap-2">
-                      <Avatar
-                        src={post.author.profileImage}
-                        alt={post.author.username}
-                        fallback={post.author.username}
-                        size="sm"
-                        priority={priority}
-                      />
-                      <span className="text-[15px] text-gray-700 dark:text-gray-300 font-medium">
-                        {post.author.username}
-                      </span>
-                    </div>
-                  </UserLinkWithTooltip>
-                </div>
-                {/* 카테고리 표시 - 작성자 정보 아래 독립된 줄 */}
-                {post.category && (
-                  <div className="mb-2">
-                    <span className="text-[13px] text-gray-600 dark:text-gray-400 inline-flex items-center gap-1">
-                      <FiTag className="w-4 h-4" />
-                      <span>{post.category}</span>
-                    </span>
-                  </div>
-                )}
-              </>
-            )}
+          {renderSourceMeta('mb-4', 'mb-2')}
+          {communityBadgeSection}
+          <h2 className={`text-lg sm:text-xl font-bold ${titleTextClass} leading-tight mb-1`}>
+            <Link
+              href={postUrl}
+              className="hover:text-primary transition-colors"
+            >
+              {searchQuery ? (
+                <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
+              ) : (
+                post.title
+              )}
+            </Link>
+          </h2>
+          {renderFlairBadge('mb-4')}
 
-            {/* 제목 - YouTube 포스트는 더 큰 제목 */}
-            <h2 className="text-xl sm:text-2xl font-bold text-foreground leading-tight mb-1">
-              <Link
-                href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
-                className="hover:text-primary transition-colors"
-              >
-                {searchQuery ? (
-                  <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
-                ) : (
-                  post.title
-                )}
-              </Link>
-            </h2>
-          </div>
-          
           {/* YouTube 비디오 플레이어 - 반응형 */}
           <div className="w-full mb-7 max-w-full">
-            <div className="w-full max-w-[685px] mx-auto">
+            <div className="w-full max-w-[780px] mx-auto">
               <div className="relative w-full" style={{ paddingBottom: '78.8%' }}>
                 <iframe
                   src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
@@ -262,47 +440,40 @@ const PostArticle = React.memo(function PostArticle({
           {/* 하단 고정 영역 - 메타 정보와 버튼을 한 줄에 배치 */}
           <div className="flex items-center justify-between flex-wrap gap-2">
             {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-gray-400 gap-3 sm:gap-5">
-              <span className="whitespace-nowrap flex-shrink-0">
-                {formatRelativeTime(post.publishedAt || post.createdAt)}
-              </span>
-              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+            <div className={`flex flex-wrap items-center text-[13px] ${metaRowClass} gap-3 sm:gap-5`}>
+              <span className="flex items-center gap-1 whitespace-nowrap">
                 <FiEye className="w-5 h-5" />
                 <span>{post.viewCount || 0}</span>
               </span>
-              <button
-                onClick={() => onLike?.(post.id)}
-                disabled={!onLike || likePending}
-                className={`flex items-center gap-1 whitespace-nowrap mr-3 transition-colors ${
-                  onLike && !likePending
-                    ? post.liked
-                      ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
-                      : 'hover:text-red-600 dark:hover:text-red-400 cursor-pointer'
-                    : 'cursor-default'
-                } ${likePending ? 'opacity-50 cursor-wait' : ''}`}
-                title={!onLike ? undefined : post.liked ? '좋아요 취소' : '좋아요'}
-              >
-                <FiHeart className={`w-5 h-5 ${post.liked ? 'fill-current' : ''}`} />
-                <span>{post.likeCount || 0}</span>
-              </button>
-              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+              {/* 투표 버튼 (Upvote/Downvote) */}
+              <VoteButton
+                upvoteCount={post.upvoteCount ?? post.likeCount ?? 0}
+                downvoteCount={post.downvoteCount ?? 0}
+                userVote={post.userVote ?? (post.liked ? 'upvote' : null)}
+                onVote={handleVote}
+                disabled={isPending || (!onVote && !onLike)}
+                compact
+                displayMode="separated"
+                tone={voteTone}
+              />
+              <span className="flex items-center gap-1 whitespace-nowrap">
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{post.commentCount || 0}</span>
               </span>
 
-              {/* 수정/삭제 버튼 - 댓글 카운트 오른쪽에 배치 */}
+              {/* 수정/삭제 버튼 */}
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
                   <button
                     onClick={() => onEdit(post.id)}
-                    className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap mr-3"
+                    className={editButtonClass}
                   >
                     수정
                   </button>
                   <button
                     onClick={() => onDelete(post.id)}
                     disabled={isDeleting}
-                    className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap mr-3"
+                    className={deleteButtonClass}
                   >
                     {isDeleting ? '삭제중...' : '삭제'}
                   </button>
@@ -310,7 +481,7 @@ const PostArticle = React.memo(function PostArticle({
               )}
 
               {post.isEditorPick && (
-                <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <span className={editorPickClass}>
                   <FiTarget className="w-5 h-5" />
                   <span className="text-[11px]">Pick</span>
                 </span>
@@ -326,56 +497,32 @@ const PostArticle = React.memo(function PostArticle({
           </div>
         </div>
       </article>
+      {hasImages && (
+        <PostImageLightbox
+          images={imageSources}
+          open={lightboxOpen}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+          postUrl={postUrl}
+        />
+      )}
+      </>
     );
   }
 
-  // 일반 포스트 레이아웃 (기존 코드)
-  return (
-    <article className="border-b border-gray-200 dark:border-gray-800 py-6 sm:py-4 first:pt-0">
-      <div className={`flex ${post.thumbnail ? (isDesktop ? 'flex-row gap-6 sm:gap-12' : 'flex-col') : 'flex-col'}`}>
-        {/* Content */}
-        <div className="flex-1 min-w-0 flex flex-col">
-          {/* Author Info - 제목 위에 배치 */}
-          {post.author && (
-            <>
-              <div className="flex items-center gap-2 mb-4">
-                <UserLinkWithTooltip
-                  userId={post.author.id}
-                  username={post.author.username}
-                  blogSlug={post.blog?.slug}
-                >
-                  <div className="flex items-center gap-2">
-                    {/* Profile Image - 공통 Avatar 사용 (캐릭터 이미지 지원) */}
-                    <Avatar
-                      src={post.author.profileImage}
-                      alt={post.author.username}
-                      fallback={post.author.username}
-                      size="sm"
-                      priority={priority}
-                    />
-                    {/* Author Name */}
-                    <span className="text-[15px] text-gray-700 dark:text-gray-300 font-medium">
-                      {post.author.username}
-                    </span>
-                  </div>
-                </UserLinkWithTooltip>
-              </div>
-              {/* 카테고리 표시 - 작성자 정보 아래 독립된 줄 */}
-              {post.category && (
-                <div className="mb-3">
-                  <span className="text-[13px] text-gray-600 dark:text-gray-400 inline-flex items-center gap-1">
-                    <FiTag className="w-4 h-4" />
-                    <span>{post.category}</span>
-                  </span>
-                </div>
-              )}
-            </>
-          )}
+  if (layoutType === 'image-focused' && post.thumbnail) {
+    return (
+      <>
+      <article className={articleClassName}>
+        <div className="flex flex-col">
+          {renderSourceMeta('mb-3', 'mb-2')}
+          {communityBadgeSection}
 
-          <h2 className="text-lg sm:text-xl font-bold text-foreground mb-2 sm:mb-3 leading-tight line-clamp-2 break-words">
+          {/* 제목 - 이미지 중심 레이아웃은 큰 제목 */}
+          <h2 className={`text-lg sm:text-xl font-bold ${titleTextClass} leading-tight mb-2`}>
             <Link
-              href={post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#'}
-              className="hover:text-primary transition-colors block"
+              href={postUrl}
+              className="hover:text-primary transition-colors"
             >
               {searchQuery ? (
                 <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
@@ -384,71 +531,95 @@ const PostArticle = React.memo(function PostArticle({
               )}
             </Link>
           </h2>
+          {renderFlairBadge('mb-4')}
 
-          {displayContent && (
-            <p
-              className="text-[15px] text-foreground leading-relaxed line-clamp-3 break-words mb-7"
-              dangerouslySetInnerHTML={{ __html: displayContent }}
-            />
-          )}
-          {!displayContent && (
-            <p className="text-[15px] text-gray-400 italic leading-relaxed line-clamp-3 break-words mb-7">
-              내용 미리보기가 없습니다.
-            </p>
+          {/* 대형 이미지 혹은 인라인 비디오 */}
+          {isVideoPost && isVideoPlaying ? (
+            <div className={`mb-4 relative w-full overflow-hidden rounded-xl ${isHomeFeed ? 'max-w-[780px] mx-auto' : ''}`}>
+              <VideoRenderer
+                videoId={videoId!}
+                fullWidth
+                autoPlay
+              />
+            </div>
+          ) : isVideoPost ? (
+            <button
+              onClick={() => setIsVideoPlaying(true)}
+              className={`block mb-4 w-full focus:outline-none ${isHomeFeed ? 'flex justify-center' : ''}`}
+            >
+              <div className={mediaWrapperClass}>
+                {renderThumbnailImage()}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/50 rounded-full p-4">
+                    <FiPlay className="w-10 h-10 text-white fill-white" />
+                  </div>
+                </div>
+              </div>
+            </button>
+          ) : (
+            hasImages && (
+              <div className="mb-4">
+                <PostImageCarousel
+                  images={imageSources}
+                  onImageClick={handleOpenLightbox}
+                  isHomeFeed={isHomeFeed}
+                  shouldBlur={shouldBlurMedia}
+                  blurReason={blurReason}
+                />
+              </div>
+            )
           )}
 
-          {/* 하단 고정 영역 - 메타 정보와 버튼을 한 줄에 배치 */}
+          {/* 메타 정보 (투표, 댓글 등) */}
           <div className="flex items-center justify-between flex-wrap gap-2">
-            {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
-            <div className="flex flex-wrap items-center text-[13px] text-gray-500 dark:text-gray-400 gap-3 sm:gap-5">
-              <span className="whitespace-nowrap flex-shrink-0">
-                {formatRelativeTime(post.publishedAt || post.createdAt)}
-              </span>
-              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+            <div className={`flex flex-wrap items-center text-[13px] ${metaRowClass} gap-3 sm:gap-5`}>
+              <span className="flex items-center gap-1 whitespace-nowrap">
                 <FiEye className="w-5 h-5" />
                 <span>{post.viewCount || 0}</span>
               </span>
-              <button
-                onClick={() => onLike?.(post.id)}
-                disabled={!onLike || likePending}
-                className={`flex items-center gap-1 whitespace-nowrap mr-3 transition-colors ${
-                  onLike && !likePending
-                    ? post.liked
-                      ? 'text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300'
-                      : 'hover:text-red-600 dark:hover:text-red-400 cursor-pointer'
-                    : 'cursor-default'
-                } ${likePending ? 'opacity-50 cursor-wait' : ''}`}
-                title={!onLike ? undefined : post.liked ? '좋아요 취소' : '좋아요'}
-              >
-                <FiHeart className={`w-5 h-5 ${post.liked ? 'fill-current' : ''}`} />
-                <span>{post.likeCount || 0}</span>
-              </button>
-              <span className="flex items-center gap-1 whitespace-nowrap mr-3">
+              <VoteButton
+                upvoteCount={post.upvoteCount ?? post.likeCount ?? 0}
+                downvoteCount={post.downvoteCount ?? 0}
+                userVote={post.userVote ?? (post.liked ? 'upvote' : null)}
+                onVote={handleVote}
+                disabled={isPending || (!onVote && !onLike)}
+                compact
+                displayMode="separated"
+                tone={voteTone}
+              />
+              <span className="flex items-center gap-1 whitespace-nowrap">
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{post.commentCount || 0}</span>
               </span>
-
-              {/* 수정/삭제 버튼 - 댓글 카운트 오른쪽에 배치 */}
+              {/* 수정/삭제 버튼 (관리자/작성자) */}
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
                   <button
                     onClick={() => onEdit(post.id)}
-                    className="text-xs text-gray-600 hover:text-amber-800 whitespace-nowrap mr-3"
+                    className={editButtonClass}
                   >
                     수정
                   </button>
                   <button
                     onClick={() => onDelete(post.id)}
                     disabled={isDeleting}
-                    className="text-xs text-gray-600 hover:text-red-600 disabled:opacity-50 whitespace-nowrap mr-3"
+                    className={deleteButtonClass}
                   >
                     {isDeleting ? '삭제중...' : '삭제'}
                   </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setIsModerationModalOpen(true)}
+                      className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
+                    >
+                      <FiAlertTriangle className="w-3 h-3" />
+                      제재
+                    </button>
+                  )}
                 </>
               )}
-
               {post.isEditorPick && (
-                <span className="flex items-center gap-1 text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                <span className={editorPickClass}>
                   <FiTarget className="w-5 h-5" />
                   <span className="text-[11px]">Pick</span>
                 </span>
@@ -463,47 +634,341 @@ const PostArticle = React.memo(function PostArticle({
             </div>
           </div>
         </div>
+      </article>
+      {hasImages && (
+        <PostImageLightbox
+          images={imageSources}
+          open={lightboxOpen}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+          postUrl={postUrl}
+        />
+      )}
+      {isAdmin && (
+        <ModerationModal
+          isOpen={isModerationModalOpen}
+          onClose={() => setIsModerationModalOpen(false)}
+          targetType="post"
+          targetId={post.id}
+        />
+      )}
+      </>
+    );
+  }
 
-        {/* Thumbnail - 동적 크기 조절 */}
-        {post.thumbnail && (
-          <>
-            {/* 모바일 레이아웃 - 썸네일을 콘텐츠 아래로 */}
-            <div
-              className={`flex-shrink-0 mt-4 mx-auto ${isDesktop ? 'hidden' : 'block'}`}
-              style={{ width: thumbnailSize.width, height: thumbnailSize.height }}
+
+  if (layoutType === 'image-focused' && post.thumbnail) {
+    return (
+      <>
+      <article className={articleClassName}>
+        <div className="flex flex-col">
+          {renderSourceMeta('mb-3', 'mb-2')}
+          {communityBadgeSection}
+
+          {/* 제목 - 이미지 중심 레이아웃은 큰 제목 */}
+          <h2 className={`text-lg sm:text-xl font-bold ${titleTextClass} leading-tight mb-2`}>
+            <Link
+              href={postUrl}
+              className="hover:text-primary transition-colors"
             >
-              <Image
-                src={post.thumbnail}
-                alt={post.title}
-                width={thumbnailSize.width}
-                height={thumbnailSize.height}
-                className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
-                sizes={`${thumbnailSize.width}px`}
-                priority={priority}
-                unoptimized={shouldDisableOptimization(post.thumbnail)}
+              {searchQuery ? (
+                <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
+              ) : (
+                post.title
+              )}
+            </Link>
+          </h2>
+          {renderFlairBadge('mb-4')}
+
+          {/* 대형 이미지 혹은 인라인 비디오 */}
+          {isVideoPost && isVideoPlaying ? (
+            <div className={`mb-4 relative w-full overflow-hidden rounded-xl ${isHomeFeed ? 'max-w-[780px] mx-auto' : ''}`}>
+              <VideoRenderer
+                videoId={videoId!}
+                fullWidth
+                autoPlay
               />
             </div>
-
-            {/* 데스크톱 레이아웃 - 썸네일을 오른쪽에 */}
-            <div
-              className={`flex-shrink-0 ${isDesktop ? 'flex mt-0 self-center ml-6 mr-0' : 'hidden'}`}
-              style={{ width: thumbnailSize.width, height: thumbnailSize.height }}
+          ) : isVideoPost ? (
+            <button
+              onClick={() => setIsVideoPlaying(true)}
+              className={`block mb-4 w-full focus:outline-none ${isHomeFeed ? 'flex justify-center' : ''}`}
             >
-              <Image
-                src={post.thumbnail}
-                alt={post.title}
-                width={thumbnailSize.width}
-                height={thumbnailSize.height}
-                className={`w-full h-full object-contain${isHomeFeed ? " rounded" : ""}`}
-                sizes={`${thumbnailSize.width}px`}
-                priority={priority}
-                unoptimized={shouldDisableOptimization(post.thumbnail)}
+              <div className={mediaWrapperClass}>
+                {renderThumbnailImage()}
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="bg-black/50 rounded-full p-4">
+                    <FiPlay className="w-10 h-10 text-white fill-white" />
+                  </div>
+                </div>
+              </div>
+            </button>
+          ) : (
+            hasImages && (
+              <div className="mb-4">
+                <PostImageCarousel
+                  images={imageSources}
+                  onImageClick={handleOpenLightbox}
+                  isHomeFeed={isHomeFeed}
+                  shouldBlur={shouldBlurMedia}
+                  blurReason={blurReason}
+                />
+              </div>
+            )
+          )}
+
+          {/* 메타 정보 (투표, 댓글 등) */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className={`flex flex-wrap items-center text-[13px] ${metaRowClass} gap-3 sm:gap-5`}>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiEye className="w-5 h-5" />
+                <span>{post.viewCount || 0}</span>
+              </span>
+              <VoteButton
+                upvoteCount={post.upvoteCount ?? post.likeCount ?? 0}
+                downvoteCount={post.downvoteCount ?? 0}
+                userVote={post.userVote ?? (post.liked ? 'upvote' : null)}
+                onVote={handleVote}
+                disabled={isPending || (!onVote && !onLike)}
+                compact
+                displayMode="separated"
+                tone={voteTone}
+              />
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiMessageCircle className="w-5 h-5" />
+                <span>{post.commentCount || 0}</span>
+              </span>
+              {/* 수정/삭제 버튼 (관리자/작성자) */}
+              {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
+                <>
+                  <button
+                    onClick={() => onEdit(post.id)}
+                    className={editButtonClass}
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={() => onDelete(post.id)}
+                    disabled={isDeleting}
+                    className={deleteButtonClass}
+                  >
+                    {isDeleting ? '삭제중...' : '삭제'}
+                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setIsModerationModalOpen(true)}
+                      className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
+                    >
+                      <FiAlertTriangle className="w-3 h-3" />
+                      제재
+                    </button>
+                  )}
+                </>
+              )}
+              {post.isEditorPick && (
+                <span className={editorPickClass}>
+                  <FiTarget className="w-5 h-5" />
+                  <span className="text-[11px]">Pick</span>
+                </span>
+              )}
+              {isAdmin && post.qualityScore != null && (
+                <QualityScoreBadge
+                  score={post.qualityScore}
+                  aiType={post.tags?.find(tag => tag.startsWith('ai:'))?.replace('ai:', '') || 'unknown'}
+                  className="inline-block"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      </article>
+      {hasImages && (
+        <PostImageLightbox
+          images={imageSources}
+          open={lightboxOpen}
+          startIndex={lightboxIndex}
+          onClose={() => setLightboxOpen(false)}
+          postUrl={postUrl}
+        />
+      )}
+
+      <ModerationModal 
+        isOpen={isModerationModalOpen}
+        onClose={() => setIsModerationModalOpen(false)}
+        targetType="post"
+        targetId={post.id}
+      />
+      </>
+    );
+  }
+
+  // 텍스트 중심 레이아웃 (기존 로직) - 썸네일이 없는 경우
+  return (
+    <>
+    <article className={articleClassName}>
+      <div className="flex flex-col">
+        {/* Content */}
+        <div className="flex-1 min-w-0 flex flex-col">
+          {renderSourceMeta('mb-4', 'mb-3')}
+          {communityBadgeSection}
+
+          <h2 className={`text-lg sm:text-xl font-bold ${titleTextClass} mb-2 sm:mb-3 leading-tight line-clamp-2 break-words`}>
+            <Link
+              href={postUrl}
+              className="hover:text-primary transition-colors block"
+            >
+              {searchQuery ? (
+                <span dangerouslySetInnerHTML={createHighlightedHTML(post.title, searchQuery)} />
+              ) : (
+                post.title
+              )}
+            </Link>
+          </h2>
+
+          {/* 비디오 포함 시 인라인 재생 (썸네일 없는 경우) - 이미지와 동일한 크기 */}
+          {hasVideo && !post.thumbnail && videoId && (
+            <>
+              {renderFlairBadge('mb-4')}
+              <div className="mb-4">
+                {isVideoPlaying ? (
+                  // 비디오 플레이어 (VideoRenderer - API에서 URL 동적 조회)
+                  <div className="relative w-full overflow-hidden rounded-xl">
+                    <VideoRenderer
+                      videoId={videoId}
+                      fullWidth
+                      autoPlay
+                    />
+                  </div>
+                ) : (
+                  // 플레이 버튼 (클릭 시 재생) - 이미지 레이아웃과 동일한 스타일
+                  <button
+                    onClick={() => setIsVideoPlaying(true)}
+                    className="relative w-full aspect-video bg-[#EEF3F8] dark:bg-[#1A232E] rounded-xl overflow-hidden flex items-center justify-center cursor-pointer hover:bg-[#DCE3EC] dark:hover:bg-[#223040] transition-colors"
+                  >
+                    <div className="bg-black/50 rounded-full p-4">
+                      <FiPlay className="w-10 h-10 text-white fill-white" />
+                    </div>
+                    <span className={`absolute bottom-3 left-4 text-sm ${metaMutedClass}`}>
+                      비디오 포함
+                    </span>
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+
+          {displayContent && (
+            <p
+              className={`text-[15px] ${bodyTextClass} leading-relaxed line-clamp-3 break-words mb-7`}
+              dangerouslySetInnerHTML={{ __html: displayContent }}
+            />
+          )}
+          {!displayContent && !hasVideo && (
+            <p className={`text-[15px] ${metaFaintClass} italic leading-relaxed line-clamp-3 break-words mb-7`}>
+              내용 미리보기가 없습니다.
+            </p>
+          )}
+          {!isImageFocused && !hasVideo && renderFlairBadge('mb-4')}
+
+          {hasImages && (
+            <div className="mb-4">
+              <PostImageCarousel
+                images={imageSources}
+                onImageClick={handleOpenLightbox}
+                isHomeFeed={isHomeFeed}
+                shouldBlur={shouldBlurMedia}
+                blurReason={blurReason}
               />
             </div>
-          </>
-        )}
+          )}
+
+          {/* 하단 고정 영역 - 메타 정보와 버튼을 한 줄에 배치 */}
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            {/* 메타 정보 (날짜,조회,좋아요,댓글) */}
+            <div className={`flex flex-wrap items-center text-[13px] ${metaRowClass} gap-3 sm:gap-5`}>
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiEye className="w-5 h-5" />
+                <span>{post.viewCount || 0}</span>
+              </span>
+              {/* 투표 버튼 (Upvote/Downvote) */}
+              <VoteButton
+                upvoteCount={post.upvoteCount ?? post.likeCount ?? 0}
+                downvoteCount={post.downvoteCount ?? 0}
+                userVote={post.userVote ?? (post.liked ? 'upvote' : null)}
+                onVote={handleVote}
+                disabled={isPending || (!onVote && !onLike)}
+                compact
+                displayMode="separated"
+                tone={voteTone}
+              />
+              <span className="flex items-center gap-1 whitespace-nowrap">
+                <FiMessageCircle className="w-5 h-5" />
+                <span>{post.commentCount || 0}</span>
+              </span>
+
+              {/* 수정/삭제 버튼 */}
+              {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
+                <>
+                  <button
+                    onClick={() => onEdit(post.id)}
+                    className={editButtonClass}
+                  >
+                    수정
+                  </button>
+                  <button
+                    onClick={() => onDelete(post.id)}
+                    disabled={isDeleting}
+                    className={deleteButtonClass}
+                  >
+                    {isDeleting ? '삭제중...' : '삭제'}
+                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setIsModerationModalOpen(true)}
+                      className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
+                    >
+                      <FiAlertTriangle className="w-3 h-3" />
+                      제재
+                    </button>
+                  )}
+                </>
+              )}
+
+              {post.isEditorPick && (
+                <span className={editorPickClass}>
+                  <FiTarget className="w-5 h-5" />
+                  <span className="text-[11px]">Pick</span>
+                </span>
+              )}
+              {isAdmin && post.qualityScore != null && (
+                <QualityScoreBadge
+                  score={post.qualityScore}
+                  aiType={post.tags?.find(tag => tag.startsWith('ai:'))?.replace('ai:', '') || 'unknown'}
+                  className="inline-block"
+                />
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     </article>
+    {hasImages && (
+      <PostImageLightbox
+        images={imageSources}
+        open={lightboxOpen}
+        startIndex={lightboxIndex}
+        onClose={() => setLightboxOpen(false)}
+        postUrl={postUrl}
+      />
+    )}
+    
+    <ModerationModal 
+      isOpen={isModerationModalOpen}
+      onClose={() => setIsModerationModalOpen(false)}
+      targetType="post"
+      targetId={post.id}
+    />
+    </>
   );
 });
 

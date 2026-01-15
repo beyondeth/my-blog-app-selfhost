@@ -10,6 +10,7 @@ import type {
   PostForm,
   PaginatedResponse
 } from '../types';
+import type { VoteType, VoteResponse } from '@/types';
 
 /**
  * 커서 페이지네이션 응답 타입
@@ -146,9 +147,23 @@ export class PostsAPI {
    * @param id - 포스트 ID
    * @returns 좋아요 상태 (queued: Redis 큐에 들어갔는지 여부, likeCount: 현재 좋아요 수)
    * @description 좋아요/좋아요 취소 토글 (Redis 큐 시스템 사용)
+   * @deprecated vote 메서드 사용 권장
    */
   async toggleLike(id: string): Promise<{ liked: boolean; queued?: boolean; likeCount?: number }> {
     return this.client.post<{ liked: boolean; queued?: boolean; likeCount?: number }>(`/posts/${id}/like`);
+  }
+
+  /**
+   * 포스트 투표 (Upvote/Downvote)
+   * @param id - 포스트 ID
+   * @param voteType - 투표 타입 ('upvote' | 'downvote')
+   * @returns 투표 결과 (action, userVote, upvoteCount, downvoteCount, score)
+   * @description Reddit 스타일 투표 시스템
+   * - 같은 투표 다시 클릭: 취소
+   * - 다른 투표 클릭: 변경
+   */
+  async vote(id: string, voteType: NonNullable<VoteType>): Promise<VoteResponse> {
+    return this.client.post<VoteResponse>(`/posts/${id}/vote`, { type: voteType });
   }
 
   /**

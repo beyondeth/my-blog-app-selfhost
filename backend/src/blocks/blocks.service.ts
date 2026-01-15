@@ -3,11 +3,11 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Block } from './entities/block.entity';
-import { CreateBlockDto } from './dto/create-block.dto';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { Block } from "./entities/block.entity";
+import { CreateBlockDto } from "./dto/create-block.dto";
 
 /**
  * 사용자 차단 서비스
@@ -34,7 +34,7 @@ export class BlocksService {
 
     // 자기 자신을 차단할 수 없음
     if (blockerId === blockedId) {
-      throw new BadRequestException('자기 자신을 차단할 수 없습니다.');
+      throw new BadRequestException("자기 자신을 차단할 수 없습니다.");
     }
 
     // 이미 차단한 사용자인지 확인
@@ -43,7 +43,7 @@ export class BlocksService {
     });
 
     if (existingBlock) {
-      throw new ConflictException('이미 차단한 사용자입니다.');
+      throw new ConflictException("이미 차단한 사용자입니다.");
     }
 
     // 차단 생성
@@ -67,7 +67,7 @@ export class BlocksService {
     });
 
     if (!block) {
-      throw new NotFoundException('차단 정보를 찾을 수 없습니다.');
+      throw new NotFoundException("차단 정보를 찾을 수 없습니다.");
     }
 
     await this.blockRepository.remove(block);
@@ -87,8 +87,8 @@ export class BlocksService {
   ): Promise<{ data: Block[]; total: number; page: number; limit: number }> {
     const [data, total] = await this.blockRepository.findAndCount({
       where: { blockerId },
-      relations: ['blocked'], // 차단당한 사용자 정보 포함
-      order: { createdAt: 'DESC' },
+      relations: ["blocked"], // 차단당한 사용자 정보 포함
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -144,7 +144,7 @@ export class BlocksService {
   async getBlockedUserIds(blockerId: string): Promise<string[]> {
     const blocks = await this.blockRepository.find({
       where: { blockerId },
-      select: ['blockedId'],
+      select: ["blockedId"],
     });
 
     return blocks.map((block) => block.blockedId);

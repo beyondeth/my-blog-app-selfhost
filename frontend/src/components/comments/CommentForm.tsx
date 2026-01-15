@@ -207,7 +207,7 @@ export default function CommentForm({
               placeholder={isLoading ? '작성 중입니다...' : placeholder}
               disabled={isLoading}
               rows={1}
-              className={`w-full resize-none border-0 border-b-2 bg-transparent px-0 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-500 focus:outline-none transition-all duration-200 ${
+              className={`w-full resize-none border-0 border-b-2 bg-transparent px-0 py-2 text-sm text-gray-900 dark:text-gray-100 placeholder-gray-600 dark:placeholder-gray-400 focus:outline-none transition-all duration-200 ${
                 isFocused
                   ? 'border-gray-900 dark:border-gray-100'
                   : 'border-gray-300 dark:border-gray-700'

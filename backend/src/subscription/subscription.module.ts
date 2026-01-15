@@ -1,16 +1,16 @@
-import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScheduleModule } from '@nestjs/schedule';
-import { EventEmitterModule } from '@nestjs/event-emitter';
-import { SubscriptionService } from './subscription.service';
+import { Module } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { ScheduleModule } from "@nestjs/schedule";
+import { EventEmitterModule } from "@nestjs/event-emitter";
+import { SubscriptionService } from "./subscription.service";
 // import { SubscriptionController } from './subscription.controller';
-import { SubscriptionBasicController } from './subscription-basic.controller';
-import { Subscription } from './entities/subscription.entity';
-import { SubscriptionPlan } from './entities/subscription-plan.entity';
-import { PaymentHistory } from './entities/payment-history.entity';
-import { User } from '../users/entities/user.entity';
-import { SubscriptionGuard } from './guards/subscription.guard';
-import { SubscriptionPlanSeeder } from './seeders/subscription-plan.seeder';
+import { SubscriptionBasicController } from "./subscription-basic.controller";
+import { Subscription } from "./entities/subscription.entity";
+import { SubscriptionPlan } from "./entities/subscription-plan.entity";
+import { PaymentHistory } from "./entities/payment-history.entity";
+import { User } from "../users/entities/user.entity";
+import { SubscriptionGuard } from "./guards/subscription.guard";
+import { SubscriptionPlanSeeder } from "./seeders/subscription-plan.seeder";
 
 /**
  * 구독 모듈
@@ -34,14 +34,7 @@ import { SubscriptionPlanSeeder } from './seeders/subscription-plan.seeder';
     // SubscriptionController는 SharedSubscriptionModule로 이동됨
   ],
   controllers: [SubscriptionBasicController], // SubscriptionController 제거
-  providers: [
-    SubscriptionService,
-    SubscriptionGuard,
-    SubscriptionPlanSeeder,
-  ],
-  exports: [
-    SubscriptionService,
-    SubscriptionGuard,
-  ],
+  providers: [SubscriptionService, SubscriptionGuard, SubscriptionPlanSeeder],
+  exports: [SubscriptionService, SubscriptionGuard],
 })
 export class SubscriptionModule {}

@@ -1,0 +1,166 @@
+'use client';
+
+import React from 'react';
+import Link from 'next/link';
+import { usePathname, useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { Settings, Users, Shield, ShieldAlert, LayoutPanelLeft, ArrowLeft, BarChart3 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { useCommunity } from '@/hooks/community';
+import { useAuth } from '@/providers/AuthProviderV2';
+import { isModeratorOrAbove, isAdminOrAbove } from '@/types/community';
+import { SETTINGS_PAGE_WRAPPER } from '@/app/settings/theme';
+
+interface CommunityAdminLayoutProps {
+  slug: string;
+  children: React.ReactNode;
+}
+
+/**
+ * 커뮤니티 관리 페이지 공통 레이아웃
+ * 좌측 사이드바 네비게이션 + 우측 컨텐츠 영역
+ */
+export default function CommunityAdminLayout({
+  slug,
+  children,
+}: CommunityAdminLayoutProps) {
+  const pathname = usePathname();
+  const router = useRouter();
+  const { user } = useAuth();
+
+  // 커뮤니티 정보 및 사용자 권한 조회
+  const { data: community, isLoading } = useCommunity(slug);
+
+  const userRole = community?.userMembership?.role;
+  const canManage = isModeratorOrAbove(userRole);
+  const canManageMembers = isAdminOrAbove(userRole);
+
+  // 메뉴 항목 정의
+  const menuItems = [
+    {
+      href: `/c/${slug}/settings`,
+      label: '기본 설정',
+      icon: Settings,
+      show: canManage,
+    },
+    {
+      href: `/c/${slug}/members`,
+      label: '멤버 관리',
+      icon: Users,
+      show: canManageMembers, // ADMIN 이상만
+    },
+    {
+      href: `/c/${slug}/settings/mod-tools`,
+      label: '안전 / 잠금',
+      icon: ShieldAlert,
+      show: canManage,
+    },
+    {
+      href: `/c/${slug}/settings/widgets`,
+      label: '커뮤니티 위젯',
+      icon: LayoutPanelLeft,
+      show: canManage,
+    },
+    {
+      href: `/c/${slug}/settings/analytics`,
+      label: '분석',
+      icon: BarChart3,
+      show: canManage,
+    },
+  ];
+
+  // 현재 활성 메뉴 확인
+  const isActive = (href: string) => pathname === href;
+
+  // 로딩 상태
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#181818]">
+        <div className="max-w-6xl mx-auto px-4 py-8">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 w-48 bg-gray-200 dark:bg-white/10 rounded" />
+            <div className="h-64 bg-gray-200 dark:bg-white/10 rounded-xl" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 권한 없음
+  if (!canManage) {
+    return (
+      <div className="min-h-screen bg-white dark:bg-[#181818] flex items-center justify-center">
+        <div className="text-center">
+          <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
+            권한이 없습니다
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mb-6">
+            커뮤니티 관리는 매니저 이상의 권한이 필요합니다.
+          </p>
+          <Button onClick={() => router.push(`/c/${slug}`)}>
+            커뮤니티로 돌아가기
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={SETTINGS_PAGE_WRAPPER}>
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+        <div className="flex items-center gap-3">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => router.push(`/c/${slug}`)}
+            className="h-10 w-10 rounded-full border border-gray-200 dark:border-white/10"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span className="sr-only">커뮤니티로 돌아가기</span>
+          </Button>
+          <div className="space-y-1">
+            <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-50">커뮤니티 설정</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-300">c/{slug}을 관리하세요</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <div className="flex w-full items-center overflow-x-auto rounded-3xl border border-gray-100 bg-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-gray-800 dark:border-gray-700">
+            <div className="flex">
+              {menuItems
+                .filter((item) => item.show)
+                .map((item) => {
+                  const Icon = item.icon;
+                  const active = isActive(item.href);
+
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      className={`flex items-center gap-2 px-4 py-3 text-sm font-bold transition-colors border-b-2 ${
+                        active
+                          ? 'text-gray-900 dark:text-gray-50 border-[#5850ec] dark:border-[#818cf8]'
+                          : 'text-gray-600 dark:text-gray-200 border-transparent hover:text-gray-900 dark:hover:text-white'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+            </div>
+            <button
+              onClick={() => router.push(`/c/${slug}`)}
+              className="ml-auto flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#1f2330] transition-colors"
+            >
+              커뮤니티로 이동
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-6">{children}</div>
+      </div>
+    </div>
+  );
+}

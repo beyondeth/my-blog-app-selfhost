@@ -7,9 +7,18 @@ import SidebarSection from './SidebarSection';
 interface TagsSectionProps {
   tags: string[];
   onTagClick?: (tag: string) => void;
+  accentColor?: string;
+  accentSoftColor?: string;
+  className?: string;
 }
 
-const TagsSection = React.memo(function TagsSection({ tags, onTagClick }: TagsSectionProps) {
+const TagsSection = React.memo(function TagsSection({
+  tags,
+  onTagClick,
+  accentColor,
+  accentSoftColor,
+  className,
+}: TagsSectionProps) {
   const handleTagClick = (tag: string) => {
     if (onTagClick) {
       onTagClick(tag);
@@ -26,6 +35,7 @@ const TagsSection = React.memo(function TagsSection({ tags, onTagClick }: TagsSe
 
   return (
     <SidebarSection
+      className={className}
       title={
         <div className="flex items-center gap-2">
           <FiHash className="w-4 h-4 text-gray-700 dark:text-gray-300" />
@@ -47,6 +57,11 @@ const TagsSection = React.memo(function TagsSection({ tags, onTagClick }: TagsSe
                 }
               }}
               className="px-3 py-2 sm:px-2 sm:py-1 text-[15px] sm:text-[13px] cursor-pointer rounded-lg transition-colors min-h-[44px] sm:min-h-auto flex items-center border bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-black/30 dark:text-gray-300 dark:hover:bg-black/40 dark:hover:text-gray-200 border-gray-200 dark:border-gray-700"
+              style={{
+                borderColor: accentColor ? `${accentColor}33` : undefined,
+                color: accentColor || undefined,
+                backgroundColor: accentSoftColor || undefined,
+              }}
               role="button"
               tabIndex={0}
               aria-label={`${tag} 태그`}

@@ -414,11 +414,14 @@ function TrackItem({ track, index, isActive, isPlaying, onPlay }: TrackItemProps
       {/* 커버 이미지 + 트랙 번호/재생 애니메이션 */}
       <div className="relative w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-gray-100 dark:bg-gray-800">
         {track.coverUrl ? (
-          <img
-            src={track.coverUrl}
-            alt=""
-            className="w-full h-full object-cover"
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={track.coverUrl}
+              alt=""
+              className="w-full h-full object-cover"
+            />
+          </>
         ) : (
           <div className="w-full h-full flex items-center justify-center">
             <svg
@@ -724,11 +727,14 @@ function MusicPlayerDropdownInner() {
               {/* 앨범 커버 */}
               <div className="w-16 h-16 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100 dark:bg-gray-800">
                 {currentTrack.coverUrl ? (
-                  <img
-                    src={currentTrack.coverUrl}
-                    alt={`${currentTrack.title} 앨범 커버`}
-                    className="w-full h-full object-cover"
-                  />
+                  <>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={currentTrack.coverUrl}
+                      alt={`${currentTrack.title} 앨범 커버`}
+                      className="w-full h-full object-cover"
+                    />
+                  </>
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
                     <svg

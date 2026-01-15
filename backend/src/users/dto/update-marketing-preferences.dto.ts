@@ -1,5 +1,5 @@
-import { IsBoolean, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsBoolean, IsOptional } from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 /**
  * 마케팅 정보 수신 설정 업데이트 DTO
@@ -7,7 +7,7 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class UpdateMarketingPreferencesDto {
   @ApiProperty({
-    description: '마케팅 정보 수신 동의',
+    description: "마케팅 정보 수신 동의",
     example: true,
     required: false,
   })
@@ -16,7 +16,7 @@ export class UpdateMarketingPreferencesDto {
   marketingOptIn?: boolean;
 
   @ApiProperty({
-    description: '뉴스레터 수신 동의',
+    description: "뉴스레터 수신 동의",
     example: true,
     required: false,
   })

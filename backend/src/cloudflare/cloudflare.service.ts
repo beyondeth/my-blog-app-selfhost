@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger } from "@nestjs/common";
 
 interface CloudflarePurgeResponse {
   success: boolean;
@@ -32,7 +32,9 @@ export class CloudflareService {
     this.isEnabled = !!(this.zoneId && this.apiToken);
 
     if (!this.isEnabled) {
-      this.logger.warn('Cloudflare credentials not configured. Cache purge will be disabled.');
+      this.logger.warn(
+        "Cloudflare credentials not configured. Cache purge will be disabled.",
+      );
     }
   }
 
@@ -44,7 +46,7 @@ export class CloudflareService {
    */
   async purgeByUrl(urls: string[]): Promise<boolean> {
     if (!this.isEnabled) {
-      this.logger.debug('Cloudflare purge skipped (not configured)');
+      this.logger.debug("Cloudflare purge skipped (not configured)");
       return true; // 실패가 아니라 skip으로 처리
     }
 
@@ -52,28 +54,30 @@ export class CloudflareService {
       const response = await fetch(
         `https://api.cloudflare.com/client/v4/zones/${this.zoneId}/purge_cache`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiToken}`,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             files: urls,
           }),
-        }
+        },
       );
 
       const data: CloudflarePurgeResponse = await response.json();
 
       if (data.success) {
-        this.logger.log(`✅ Successfully purged ${urls.length} URLs from Cloudflare cache`);
+        this.logger.log(
+          `✅ Successfully purged ${urls.length} URLs from Cloudflare cache`,
+        );
         return true;
       } else {
         this.logger.error(`❌ Failed to purge Cloudflare cache:`, data.errors);
         return false;
       }
     } catch (error) {
-      this.logger.error('❌ Error purging Cloudflare cache:', error);
+      this.logger.error("❌ Error purging Cloudflare cache:", error);
       return false;
     }
   }
@@ -85,40 +89,47 @@ export class CloudflareService {
    */
   async purgeEditorPicksCache(): Promise<boolean> {
     if (!this.isEnabled) {
-      this.logger.debug('Cloudflare Editor Picks purge skipped (not configured)');
+      this.logger.debug(
+        "Cloudflare Editor Picks purge skipped (not configured)",
+      );
       return true;
     }
 
     try {
       // Editor's Pick 엔드포인트의 캐시 제거
-      const frontendUrl = process.env.FRONTEND_URL || 'https://localhost:3001';
+      const frontendUrl = process.env.FRONTEND_URL || "https://localhost:3001";
       const editorPicksUrl = `${frontendUrl}/api/v1/posts/editor-picks*`;
 
       const response = await fetch(
         `https://api.cloudflare.com/client/v4/zones/${this.zoneId}/purge_cache`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiToken}`,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             files: [editorPicksUrl],
           }),
-        }
+        },
       );
 
       const data: CloudflarePurgeResponse = await response.json();
 
       if (data.success) {
-        this.logger.log(`✅ Successfully purged Editor's Pick cache: ${editorPicksUrl}`);
+        this.logger.log(
+          `✅ Successfully purged Editor's Pick cache: ${editorPicksUrl}`,
+        );
         return true;
       } else {
-        this.logger.error(`❌ Failed to purge Editor's Pick cache:`, data.errors);
+        this.logger.error(
+          `❌ Failed to purge Editor's Pick cache:`,
+          data.errors,
+        );
         return false;
       }
     } catch (error) {
-      this.logger.error('❌ Error purging Editor\'s Pick cache:', error);
+      this.logger.error("❌ Error purging Editor's Pick cache:", error);
       return false;
     }
   }
@@ -130,7 +141,7 @@ export class CloudflareService {
    */
   async purgeAll(): Promise<boolean> {
     if (!this.isEnabled) {
-      this.logger.debug('Cloudflare purge all skipped (not configured)');
+      this.logger.debug("Cloudflare purge all skipped (not configured)");
       return true;
     }
 
@@ -138,15 +149,15 @@ export class CloudflareService {
       const response = await fetch(
         `https://api.cloudflare.com/client/v4/zones/${this.zoneId}/purge_cache`,
         {
-          method: 'POST',
+          method: "POST",
           headers: {
-            'Authorization': `Bearer ${this.apiToken}`,
-            'Content-Type': 'application/json',
+            Authorization: `Bearer ${this.apiToken}`,
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             purge_everything: true,
           }),
-        }
+        },
       );
 
       const data: CloudflarePurgeResponse = await response.json();
@@ -155,11 +166,14 @@ export class CloudflareService {
         this.logger.log(`✅ Successfully purged all Cloudflare cache`);
         return true;
       } else {
-        this.logger.error(`❌ Failed to purge all Cloudflare cache:`, data.errors);
+        this.logger.error(
+          `❌ Failed to purge all Cloudflare cache:`,
+          data.errors,
+        );
         return false;
       }
     } catch (error) {
-      this.logger.error('❌ Error purging all Cloudflare cache:', error);
+      this.logger.error("❌ Error purging all Cloudflare cache:", error);
       return false;
     }
   }

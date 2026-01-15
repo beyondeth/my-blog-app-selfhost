@@ -21,6 +21,8 @@ import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { apiClient } from '@/lib/api';
+import type { CommentContext } from '@/lib/api/endpoints/comments';
+import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 
 // 답글 아이템 컴포넌트
 interface ReplyItemProps {
@@ -36,6 +38,7 @@ interface ReplyItemProps {
   parentCommentId: string;
   replyingToId: string | null;
   setReplyingToId: (id: string | null) => void;
+  context?: CommentContext;
 }
 
 function ReplyItem({
@@ -51,6 +54,7 @@ function ReplyItem({
   parentCommentId,
   replyingToId,
   setReplyingToId,
+  context,
 }: ReplyItemProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
@@ -113,7 +117,7 @@ function ReplyItem({
                           }
                           setShowDropdown(false);
                         }}
-                        className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        className={`flex items-center w-full px-3 py-2 text-sm transition-colors ${DESTRUCTIVE_ACTION_CLASS} dark:hover:bg-red-900/20`}
                       >
                         <FiTrash2 className="w-4 h-4 mr-2" />
                         삭제
@@ -144,7 +148,7 @@ function ReplyItem({
               initialValue={reply.content}
               onSubmit={async (content) => {
                 try {
-                  await apiClient.updateComment(reply.id, content);
+                  await apiClient.updateComment(reply.id, content, context);
                   setIsEditing(false);
                   refetchReplies();
                 } catch (error) {
@@ -249,6 +253,7 @@ interface CommentItemPaginatedProps {
   postAuthorId?: string;
   level?: number; // 0 = parent, 1+ = reply
   rootParentId?: string; // 최상위 부모 댓글 ID (플랫 구조용)
+  context?: CommentContext;
 }
 
 /**
@@ -265,6 +270,7 @@ export default function CommentItemPaginated({
   postAuthorId,
   level = 0,
   rootParentId,
+  context,
 }: CommentItemPaginatedProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -297,16 +303,16 @@ export default function CommentItemPaginated({
   } = useRepliesPaginated(
     comment.id,
     { limit: 20 },
-    { enabled: showReplies && level === 0 }, // 부모 댓글만 답글 로드
+    { enabled: showReplies && level === 0, context }, // 부모 댓글만 답글 로드
   );
 
   // 좋아요/싫어요 mutations
-  const likeMutation = useToggleCommentLikePaginated(postId);
-  const dislikeMutation = useToggleCommentDislikePaginated(postId);
-  const deleteMutation = useDeleteCommentPaginated(postId);
+  const likeMutation = useToggleCommentLikePaginated(postId, context);
+  const dislikeMutation = useToggleCommentDislikePaginated(postId, context);
+  const deleteMutation = useDeleteCommentPaginated(postId, context);
   // 항상 최상위 부모 댓글 ID를 사용
   const parentIdForMutation = level === 0 ? comment.id : (rootParentId || comment.parentCommentId);
-  const createReplyMutation = useCreateCommentPaginated(postId);
+  const createReplyMutation = useCreateCommentPaginated(postId, undefined, context);
   const [isSubmittingReply, setIsSubmittingReply] = useState(false);
 
   // useInfiniteQuery는 { pages: [...] } 구조를 반환
@@ -393,7 +399,7 @@ export default function CommentItemPaginated({
 
   const handleEdit = async (content: string) => {
     try {
-      await apiClient.updateComment(comment.id, content);
+      await apiClient.updateComment(comment.id, content, context);
       setIsEditing(false);
       // TODO: 캐시 업데이트 (현재는 페이지 새로고침이 필요할 수 있음)
     } catch (error) {
@@ -505,7 +511,7 @@ export default function CommentItemPaginated({
                           <button
                             onClick={handleDeleteClick}
                             disabled={deleteMutation.isPending}
-                            className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                            className={`flex items-center w-full px-3 py-2 text-sm transition-colors disabled:opacity-50 ${DESTRUCTIVE_ACTION_CLASS} dark:hover:bg-red-900/20`}
                           >
                             <FiTrash2 className="mr-2 w-3 h-3" />
                             삭제
@@ -653,6 +659,7 @@ export default function CommentItemPaginated({
                   parentCommentId={comment.id}
                   replyingToId={replyingToId}
                   setReplyingToId={setReplyingToId}
+                  context={context}
                 />
               ))}
 

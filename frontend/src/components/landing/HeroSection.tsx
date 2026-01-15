@@ -9,14 +9,20 @@ import { useState, useEffect } from 'react';
  * 미니멀한 디자인으로 핵심 메시지 전달:
  * "대화를 블로그로, 인사이트를 자산으로"
  */
+// 타이핑 애니메이션 시퀀스
+const typingSequence = [
+  "매일 AI와 대화하시나요?",
+  "그 대화, 사라지게 두시나요?",
+];
+
+/**
+ * Hero Section - 타이핑 애니메이션 + 데모 영상 CTA
+ *
+ * 미니멀한 디자인으로 핵심 메시지 전달:
+ * "대화를 블로그로, 인사이트를 자산으로"
+ */
 export default function HeroSection() {
   const [typingStep, setTypingStep] = useState(0);
-
-  // 타이핑 애니메이션 시퀀스
-  const typingSequence = [
-    "매일 AI와 대화하시나요?",
-    "그 대화, 사라지게 두시나요?",
-  ];
 
   useEffect(() => {
     // 1초마다 타이핑 단계 진행

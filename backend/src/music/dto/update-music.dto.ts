@@ -1,5 +1,11 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsString, IsBoolean, IsNumber, IsOptional, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
+import {
+  IsString,
+  IsBoolean,
+  IsNumber,
+  IsOptional,
+  Min,
+} from "class-validator";
 
 /**
  * 음악 정보 수정 DTO
@@ -7,23 +13,23 @@ import { IsString, IsBoolean, IsNumber, IsOptional, Min } from 'class-validator'
  */
 export class UpdateMusicDto {
   @ApiPropertyOptional({
-    description: '표시용 제목 (ID3 태그 대신 사용)',
-    example: 'My Custom Title',
+    description: "표시용 제목 (ID3 태그 대신 사용)",
+    example: "My Custom Title",
   })
   @IsOptional()
   @IsString()
   displayTitle?: string;
 
   @ApiPropertyOptional({
-    description: '표시용 아티스트 (ID3 태그 대신 사용)',
-    example: 'Custom Artist',
+    description: "표시용 아티스트 (ID3 태그 대신 사용)",
+    example: "Custom Artist",
   })
   @IsOptional()
   @IsString()
   displayArtist?: string;
 
   @ApiPropertyOptional({
-    description: '활성화 상태',
+    description: "활성화 상태",
     example: true,
   })
   @IsOptional()
@@ -31,7 +37,7 @@ export class UpdateMusicDto {
   isActive?: boolean;
 
   @ApiPropertyOptional({
-    description: '재생 순서',
+    description: "재생 순서",
     example: 1,
   })
   @IsOptional()
@@ -40,8 +46,9 @@ export class UpdateMusicDto {
   order?: number;
 
   @ApiPropertyOptional({
-    description: '표시용 장르 (관리자 지정, 기본: Lo-Fi, Chill, Electronic, Ambient 또는 커스텀)',
-    example: 'Lo-Fi',
+    description:
+      "표시용 장르 (관리자 지정, 기본: Lo-Fi, Chill, Electronic, Ambient 또는 커스텀)",
+    example: "Lo-Fi",
   })
   @IsOptional()
   @IsString()

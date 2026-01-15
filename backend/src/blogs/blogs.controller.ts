@@ -1,20 +1,35 @@
-import { Controller, Get, Post, Put, Patch, Body, Param, UseGuards, Request, UnauthorizedException, Logger, UseInterceptors, ClassSerializerInterceptor } from '@nestjs/common';
-import { BlogsService } from './blogs.service';
-import { CreateBlogDto } from './dto/create-blog.dto';
-import { UpdateBlogDto } from './dto/update-blog.dto';
-import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
-import { Public } from '../common/decorators/public.decorator';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { User } from '../users/entities/user.entity';
-import { OptionalJwtAuthGuard } from '../common/guards/optional-jwt-auth.guard';
-import { BlogStatsService } from '../common/services/blog-stats.service';
-import { BlogResolverService } from '../common/services/blog-resolver.service';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { plainToInstance } from 'class-transformer';
-import { BlogResponseDto } from './dto/blog-response.dto';
+import {
+  Controller,
+  Get,
+  Post,
+  Put,
+  Patch,
+  Body,
+  Param,
+  UseGuards,
+  Request,
+  UnauthorizedException,
+  Logger,
+  UseInterceptors,
+  ClassSerializerInterceptor,
+  Query,
+} from "@nestjs/common";
+import { BlogsService } from "./blogs.service";
+import { CreateBlogDto } from "./dto/create-blog.dto";
+import { UpdateBlogDto } from "./dto/update-blog.dto";
+import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { Public } from "../common/decorators/public.decorator";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { User } from "../users/entities/user.entity";
+import { OptionalJwtAuthGuard } from "../common/guards/optional-jwt-auth.guard";
+import { BlogStatsService } from "../common/services/blog-stats.service";
+import { BlogResolverService } from "../common/services/blog-resolver.service";
+import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
+import { plainToInstance } from "class-transformer";
+import { BlogResponseDto } from "./dto/blog-response.dto";
 
-@ApiTags('blogs')
-@Controller('blogs')
+@ApiTags("blogs")
+@Controller("blogs")
 export class BlogsController {
   private readonly logger = new Logger(BlogsController.name);
 
@@ -25,27 +40,36 @@ export class BlogsController {
   ) {}
 
   @Post()
-  async create(@Body() createBlogDto: CreateBlogDto, @CurrentUser() user: User) {
+  async create(
+    @Body() createBlogDto: CreateBlogDto,
+    @CurrentUser() user: User,
+  ) {
     return await this.blogsService.create(createBlogDto, user);
   }
 
-  @Get('check-slug/:slug')
+  @Get("check-slug/:slug")
   @Public()
-  async checkSlug(@Param('slug') slug: string) {
+  async checkSlug(@Param("slug") slug: string) {
     const available = await this.blogsService.checkSlugAvailability(slug);
     return { available };
   }
 
-  @Get('my-blogs')
+  @Get("my-blogs")
   @UseGuards(JwtAuthGuard)
   async getMyBlogs(@CurrentUser() user: User) {
-    console.log(`[BlogsController] getMyBlogs - Request from user: ${user.email} (ID: ${user.id.substring(0, 8)}...)`);
+    console.log(
+      `[BlogsController] getMyBlogs - Request from user: ${user.email} (ID: ${user.id.substring(0, 8)}...)`,
+    );
     const blog = await this.blogsService.findBlogByUserId(user.id);
     if (!blog) {
-      console.log(`[BlogsController] getMyBlogs - No blog found for user: ${user.email}`);
+      console.log(
+        `[BlogsController] getMyBlogs - No blog found for user: ${user.email}`,
+      );
       return null;
     }
-    console.log(`[BlogsController] getMyBlogs - Returning blog: ${blog.slug} for user: ${user.email}`);
+    console.log(
+      `[BlogsController] getMyBlogs - Returning blog: ${blog.slug} for user: ${user.email}`,
+    );
     return blog;
   }
 
@@ -65,12 +89,12 @@ export class BlogsController {
    * GET /blogs/slug/oldname - 301 리다이렉트 정보 반환
    * GET /blogs/slug/luticek - slug로 폴백
    */
-  @Get('slug/:slug')
+  @Get("slug/:slug")
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @UseInterceptors(ClassSerializerInterceptor)
-  @ApiOperation({ summary: '블로그 조회 (alias/slug 통합)' })
-  async findOneBySlug(@Param('slug') slug: string, @CurrentUser() user?: User) {
+  @ApiOperation({ summary: "블로그 조회 (alias/slug 통합)" })
+  async findOneBySlug(@Param("slug") slug: string, @CurrentUser() user?: User) {
     // findOneByIdentifier()를 사용하여 alias > old_alias > slug 순서로 조회
     const blog = await this.blogsService.findOneByIdentifier(slug, user);
 
@@ -81,10 +105,10 @@ export class BlogsController {
     });
   }
 
-  @Get(':id')
+  @Get(":id")
   @Public()
   @UseInterceptors(ClassSerializerInterceptor)
-  async findOne(@Param('id') id: string) {
+  async findOne(@Param("id") id: string) {
     const blog = await this.blogsService.findOne(id);
 
     // DTO 변환: owner 필드의 민감정보 자동 제외
@@ -94,16 +118,16 @@ export class BlogsController {
     });
   }
 
-  @Put(':id')
+  @Put(":id")
   async update(
-    @Param('id') id: string,
+    @Param("id") id: string,
     @Body() updateBlogDto: UpdateBlogDto,
-    @CurrentUser() user: User
+    @CurrentUser() user: User,
   ) {
     // 블로그 소유자 확인
     const blog = await this.blogsService.findOne(id);
     if (blog.userId !== user.id) {
-      throw new UnauthorizedException('블로그를 수정할 권한이 없습니다.');
+      throw new UnauthorizedException("블로그를 수정할 권한이 없습니다.");
     }
     return await this.blogsService.update(id, updateBlogDto);
   }
@@ -118,24 +142,23 @@ export class BlogsController {
    * @param slug - 블로그 슬러그
    * @returns 카테고리별 포스트 개수 (내림차순)
    */
-  @Get('slug/:slug/categories')
+  @Get("slug/:slug/categories")
   @Public()
-  @ApiOperation({ summary: '블로그의 카테고리별 포스트 개수 조회' })
+  @ApiOperation({ summary: "블로그의 카테고리별 포스트 개수 조회" })
   @ApiResponse({
     status: 200,
-    description: '카테고리별 포스트 개수 (내림차순)',
-    schema: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          category: { type: 'string', example: 'JavaScript' },
-          count: { type: 'number', example: 12 },
-        },
-      },
-    },
+    description: "카테고리별 포스트 개수 (커서 페이지네이션)",
   })
-  async getBlogCategories(@Param('slug') slug: string): Promise<Array<{ category: string; count: number }>> {
+  async getBlogCategories(
+    @Param("slug") slug: string,
+    @Query("limit") limitQuery?: string,
+    @Query("cursor") cursor?: string,
+  ): Promise<{
+    items: Array<{ category: string; count: number }>;
+    total: number;
+    hasMore: boolean;
+    nextCursor: string | null;
+  }> {
     // BlogResolverService를 사용하여 식별자 우선순위(alias > old_alias > slug) 적용
     this.logger.debug(`📡 [CATEGORIES API] Looking up blog with slug: ${slug}`);
     const blog = await this.blogResolverService.resolveBlogByIdentifier(slug);
@@ -143,14 +166,39 @@ export class BlogsController {
     if (!blog) {
       // 블로그를 찾지 못하면 빈 배열 반환
       this.logger.warn(`📡 [CATEGORIES API] Blog not found for slug: ${slug}`);
-      return [];
+      return {
+        items: [],
+        total: 0,
+        hasMore: false,
+        nextCursor: null,
+      };
     }
 
-    this.logger.debug(`📡 [CATEGORIES API] Found blog: ${blog.id} (${blog.slug}, alias: ${blog.alias})`);
+    this.logger.debug(
+      `📡 [CATEGORIES API] Found blog: ${blog.id} (${blog.slug}, alias: ${blog.alias})`,
+    );
     // blogId로 카테고리 조회 (안정적인 blogId 기반)
-    const result = await this.blogStatsService.getBlogCategoriesWithCountById(blog.id);
-    this.logger.debug(`📡 [CATEGORIES API] Categories result:`, result);
-    return result;
+    const result = await this.blogStatsService.getBlogCategoriesWithCountById(
+      blog.id,
+    );
+
+    const limit = this.parseLimit(limitQuery);
+    const { items, hasMore, nextCursor } = this.paginateCategoryResults(
+      result,
+      limit,
+      cursor,
+    );
+
+    this.logger.debug(
+      `📡 [CATEGORIES API] Paginated categories: ${items.length}/${result.length} (hasMore=${hasMore})`,
+    );
+
+    return {
+      items,
+      total: result.length,
+      hasMore,
+      nextCursor,
+    };
   }
 
   /**
@@ -166,24 +214,30 @@ export class BlogsController {
    *
    * @returns 공개 블로그의 slug와 updatedAt 배열
    */
-  @Get('sitemap/all')
+  @Get("sitemap/all")
   @Public()
-  @ApiOperation({ summary: 'Sitemap용 모든 공개 블로그 조회' })
+  @ApiOperation({ summary: "Sitemap용 모든 공개 블로그 조회" })
   @ApiResponse({
     status: 200,
-    description: '공개 블로그 목록 (slug, updatedAt)',
+    description: "공개 블로그 목록 (slug, updatedAt)",
     schema: {
-      type: 'array',
+      type: "array",
       items: {
-        type: 'object',
+        type: "object",
         properties: {
-          slug: { type: 'string', example: 'john-blog' },
-          updatedAt: { type: 'string', format: 'date-time', example: '2025-01-20T12:00:00.000Z' },
+          slug: { type: "string", example: "john-blog" },
+          updatedAt: {
+            type: "string",
+            format: "date-time",
+            example: "2025-01-20T12:00:00.000Z",
+          },
         },
       },
     },
   })
-  async getAllBlogsForSitemap(): Promise<Array<{ slug: string; updatedAt: Date }>> {
+  async getAllBlogsForSitemap(): Promise<
+    Array<{ slug: string; updatedAt: Date }>
+  > {
     return this.blogsService.getAllPublicBlogsForSitemap();
   }
 
@@ -210,24 +264,24 @@ export class BlogsController {
    * GET /blogs/check-alias/park → { available: true }
    * GET /blogs/check-alias/admin → ConflictException (예약어)
    */
-  @Get('check-alias/:alias')
+  @Get("check-alias/:alias")
   @Public()
-  @ApiOperation({ summary: 'Alias 사용 가능 여부 확인' })
+  @ApiOperation({ summary: "Alias 사용 가능 여부 확인" })
   @ApiResponse({
     status: 200,
-    description: 'Alias 사용 가능',
+    description: "Alias 사용 가능",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        available: { type: 'boolean', example: true },
+        available: { type: "boolean", example: true },
       },
     },
   })
   @ApiResponse({
     status: 409,
-    description: 'Alias 사용 불가 (중복, 예약어, 형식 오류)',
+    description: "Alias 사용 불가 (중복, 예약어, 형식 오류)",
   })
-  async checkAlias(@Param('alias') alias: string) {
+  async checkAlias(@Param("alias") alias: string) {
     const available = await this.blogsService.checkAliasAvailability(alias);
     return { available };
   }
@@ -253,35 +307,112 @@ export class BlogsController {
    * Body: { "alias": "newname" }
    * Response: { id, slug, alias: "newname", ... }
    */
-  @Patch('my-blog/alias')
+  @Patch("my-blog/alias")
   @UseGuards(JwtAuthGuard)
-  @ApiOperation({ summary: '내 블로그 Alias 변경' })
+  @ApiOperation({ summary: "내 블로그 Alias 변경" })
   @ApiResponse({
     status: 200,
-    description: 'Alias 변경 성공',
+    description: "Alias 변경 성공",
   })
   @ApiResponse({
     status: 403,
-    description: '권한 없음 (본인 블로그가 아님)',
+    description: "권한 없음 (본인 블로그가 아님)",
   })
   @ApiResponse({
     status: 409,
-    description: 'Alias 사용 불가 (중복, 예약어 등)',
+    description: "Alias 사용 불가 (중복, 예약어 등)",
   })
   async updateMyBlogAlias(
-    @Body('alias') alias: string,
+    @Body("alias") alias: string,
     @CurrentUser() user: User,
   ) {
     // 사용자의 블로그 ID 조회
     const blogs = await this.blogsService.findByUserId(user.id);
 
     if (!blogs || blogs.length === 0) {
-      throw new UnauthorizedException('블로그가 없습니다.');
+      throw new UnauthorizedException("블로그가 없습니다.");
     }
 
     const blog = blogs[0]; // 한 사용자당 하나의 블로그
 
     // Alias 업데이트
     return await this.blogsService.updateAlias(blog.id, alias, user.id);
+  }
+
+  private parseLimit(limitQuery?: string): number {
+    const defaultLimit = 20;
+    if (!limitQuery) return defaultLimit;
+
+    const parsed = Number(limitQuery);
+    if (!Number.isFinite(parsed) || parsed <= 0) {
+      return defaultLimit;
+    }
+
+    return Math.min(Math.floor(parsed), 100);
+  }
+
+  private paginateCategoryResults(
+    categories: Array<{ category: string; count: number }>,
+    limit: number,
+    cursor?: string,
+  ): {
+    items: Array<{ category: string; count: number }>;
+    hasMore: boolean;
+    nextCursor: string | null;
+  } {
+    let startIndex = 0;
+
+    if (cursor) {
+      const decoded = this.decodeCategoryCursor(cursor);
+      if (decoded) {
+        const cursorIndex = categories.findIndex(
+          (item) =>
+            item.category === decoded.category && item.count === decoded.count,
+        );
+        if (cursorIndex >= 0) {
+          startIndex = cursorIndex + 1;
+        }
+      }
+    }
+
+    const items = categories.slice(startIndex, startIndex + limit);
+    const hasMore = startIndex + items.length < categories.length;
+    const nextCursor =
+      hasMore && items.length > 0
+        ? this.encodeCategoryCursor(items[items.length - 1])
+        : null;
+
+    return { items, hasMore, nextCursor };
+  }
+
+  private encodeCategoryCursor(item: {
+    category: string;
+    count: number;
+  }): string {
+    const payload = JSON.stringify({
+      category: item.category ?? "",
+      count: item.count ?? 0,
+    });
+    return Buffer.from(payload).toString("base64");
+  }
+
+  private decodeCategoryCursor(
+    cursor: string,
+  ): { category: string; count: number } | null {
+    try {
+      const decoded = Buffer.from(cursor, "base64").toString();
+      const payload = JSON.parse(decoded);
+      if (
+        typeof payload === "object" &&
+        payload !== null &&
+        typeof payload.category === "string" &&
+        typeof payload.count === "number"
+      ) {
+        return payload;
+      }
+      return null;
+    } catch {
+      return null;
+    }
   }
 }

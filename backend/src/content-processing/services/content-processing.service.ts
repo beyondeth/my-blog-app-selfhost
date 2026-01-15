@@ -1,7 +1,7 @@
-import { Injectable } from '@nestjs/common';
-import { HtmlSanitizerService } from './html-sanitizer.service';
-import { CodeHighlightService } from './code-highlight.service';
-import { ImageProcessorService } from './image-processor.service';
+import { Injectable } from "@nestjs/common";
+import { HtmlSanitizerService } from "./html-sanitizer.service";
+import { CodeHighlightService } from "./code-highlight.service";
+import { ImageProcessorService } from "./image-processor.service";
 
 /**
  * 콘텐츠 처리 파이프라인 옵션
@@ -140,7 +140,7 @@ export class ContentProcessingService {
 
     // 빈 콘텐츠는 그대로 반환
     if (!html) {
-      return { html: '', metadata: {} };
+      return { html: "", metadata: {} };
     }
 
     // 텍스트만 추출하는 경우
@@ -156,7 +156,7 @@ export class ContentProcessingService {
     }
 
     let processedHtml = html;
-    const metadata: ProcessedContent['metadata'] = {};
+    const metadata: ProcessedContent["metadata"] = {};
 
     // 1단계: HTML 살균 (XSS 방지)
     if (sanitize) {
@@ -256,13 +256,13 @@ export class ContentProcessingService {
 
     // 단어 경계에서 자르기
     const truncated = text.substring(0, maxLength);
-    const lastSpace = truncated.lastIndexOf(' ');
+    const lastSpace = truncated.lastIndexOf(" ");
 
     if (lastSpace > maxLength * 0.8) {
-      return truncated.substring(0, lastSpace) + '...';
+      return truncated.substring(0, lastSpace) + "...";
     }
 
-    return truncated + '...';
+    return truncated + "...";
   }
 
   /**
@@ -272,7 +272,7 @@ export class ContentProcessingService {
    * @returns 크기가 표준화된 HTML
    */
   private standardizeYouTubeSize(html: string): string {
-    if (!html) return '';
+    if (!html) return "";
 
     // YouTube 컨테이너와 iframe 크기 조정
     return html.replace(
@@ -309,17 +309,17 @@ export class ContentProcessingService {
     const warnings: string[] = [];
 
     if (!html) {
-      warnings.push('콘텐츠가 비어있습니다.');
+      warnings.push("콘텐츠가 비어있습니다.");
       return { isValid: true, errors, warnings };
     }
 
     // 위험한 태그 검사
     if (/<script/i.test(html)) {
-      errors.push('스크립트 태그가 포함되어 있습니다.');
+      errors.push("스크립트 태그가 포함되어 있습니다.");
     }
 
     if (/<style/i.test(html) && !/<style[^>]*scoped/i.test(html)) {
-      warnings.push('전역 스타일 태그가 포함되어 있습니다.');
+      warnings.push("전역 스타일 태그가 포함되어 있습니다.");
     }
 
     // iframe 검사 (YouTube 외)
@@ -336,7 +336,6 @@ export class ContentProcessingService {
       });
     }
 
-    
     return {
       isValid: errors.length === 0,
       errors,
@@ -357,10 +356,10 @@ export class ContentProcessingService {
       const urlObj = new URL(url);
       const hostname = urlObj.hostname.toLowerCase();
       return (
-        hostname === 'www.youtube.com' ||
-        hostname === 'youtube.com' ||
-        hostname === 'youtu.be' ||
-        hostname === 'www.youtube-nocookie.com'
+        hostname === "www.youtube.com" ||
+        hostname === "youtube.com" ||
+        hostname === "youtu.be" ||
+        hostname === "www.youtube-nocookie.com"
       );
     } catch {
       return false;

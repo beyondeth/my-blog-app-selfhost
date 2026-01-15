@@ -5,52 +5,55 @@ import {
   CreateDateColumn,
   ManyToOne,
   JoinColumn,
-  Index
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { Subscription } from './subscription.entity';
-import { PaymentStatus, PaymentProvider } from '../../common/enums/subscription.enum';
+  Index,
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
+import { Subscription } from "./subscription.entity";
+import {
+  PaymentStatus,
+  PaymentProvider,
+} from "../../common/enums/subscription.enum";
 
-@Entity('payment_history')
-@Index(['userId'])
-@Index(['subscriptionId'])
-@Index(['status'])
-@Index(['createdAt'])
+@Entity("payment_history")
+@Index(["userId"])
+@Index(["subscriptionId"])
+@Index(["status"])
+@Index(["createdAt"])
 export class PaymentHistory {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   userId: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: "uuid", nullable: true })
   subscriptionId: string;
 
-  @ManyToOne(() => Subscription, { onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'subscriptionId' })
+  @ManyToOne(() => Subscription, { onDelete: "SET NULL" })
+  @JoinColumn({ name: "subscriptionId" })
   subscription: Subscription;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: "decimal", precision: 10, scale: 2 })
   amount: number;
 
-  @Column({ length: 3, default: 'USD' })
+  @Column({ length: 3, default: "USD" })
   currency: string;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: PaymentStatus,
-    default: PaymentStatus.PENDING
+    default: PaymentStatus.PENDING,
   })
   status: PaymentStatus;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: PaymentProvider,
-    nullable: true
+    nullable: true,
   })
   paymentProvider: PaymentProvider;
 
@@ -66,19 +69,19 @@ export class PaymentHistory {
   @Column({ nullable: true })
   paymentMethodId: string; // 결제 수단 ID
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   paymentMethod: string; // 'card', 'bank_transfer', 'paypal' 등
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   description: string; // 결제 설명
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   invoiceUrl: string; // 인보이스 URL
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   receiptUrl: string; // 영수증 URL
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   failureReason: string; // 실패 사유
 
   @Column({ nullable: true })
@@ -87,14 +90,14 @@ export class PaymentHistory {
   @Column({ nullable: true })
   refundedAt: Date; // 환불 일시
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  @Column({ type: "decimal", precision: 10, scale: 2, nullable: true })
   refundedAmount: number; // 환불 금액
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   refundReason: string; // 환불 사유
 
   // 메타데이터 (Provider별 추가 정보)
-  @Column('jsonb', { nullable: true })
+  @Column("jsonb", { nullable: true })
   metadata: Record<string, any>;
 
   @CreateDateColumn()

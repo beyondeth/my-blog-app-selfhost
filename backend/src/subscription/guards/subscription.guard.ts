@@ -3,11 +3,11 @@ import {
   CanActivate,
   ExecutionContext,
   ForbiddenException,
-} from '@nestjs/common';
-import { Reflector } from '@nestjs/core';
-import { SubscriptionService } from '../subscription.service';
-import { SubscriptionTier } from '../../common/enums/subscription.enum';
-import { REQUIRED_TIER_KEY } from '../decorators/requires-tier.decorator';
+} from "@nestjs/common";
+import { Reflector } from "@nestjs/core";
+import { SubscriptionService } from "../subscription.service";
+import { SubscriptionTier } from "../../common/enums/subscription.enum";
+import { REQUIRED_TIER_KEY } from "../decorators/requires-tier.decorator";
 
 @Injectable()
 export class SubscriptionGuard implements CanActivate {
@@ -32,22 +32,24 @@ export class SubscriptionGuard implements CanActivate {
     const user = request.user;
 
     if (!user) {
-      throw new ForbiddenException('인증이 필요합니다');
+      throw new ForbiddenException("인증이 필요합니다");
     }
 
     // 사용자의 현재 구독 정보 확인
-    const subscription = await this.subscriptionService.getUserSubscription(user.id);
+    const subscription = await this.subscriptionService.getUserSubscription(
+      user.id,
+    );
 
     // 구독이 활성 상태인지 확인
     if (!subscription.isActive()) {
-      throw new ForbiddenException('활성 구독이 필요합니다');
+      throw new ForbiddenException("활성 구독이 필요합니다");
     }
 
     // 티어 레벨 확인
     if (!this.hasSufficientTier(subscription.tier, requiredTier)) {
       throw new ForbiddenException(
         `이 기능을 사용하려면 ${this.getTierDisplayName(requiredTier)} 이상의 플랜이 필요합니다. ` +
-        `현재 플랜: ${this.getTierDisplayName(subscription.tier)}`
+          `현재 플랜: ${this.getTierDisplayName(subscription.tier)}`,
       );
     }
 
@@ -75,9 +77,9 @@ export class SubscriptionGuard implements CanActivate {
    */
   private getTierDisplayName(tier: SubscriptionTier): string {
     const names = {
-      [SubscriptionTier.FREE]: 'Free',
-      [SubscriptionTier.STARTER]: 'Starter',
-      [SubscriptionTier.PRO]: 'Pro',
+      [SubscriptionTier.FREE]: "Free",
+      [SubscriptionTier.STARTER]: "Starter",
+      [SubscriptionTier.PRO]: "Pro",
     };
     return names[tier] || tier;
   }

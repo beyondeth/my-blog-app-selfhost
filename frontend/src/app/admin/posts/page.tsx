@@ -71,9 +71,11 @@ interface Post {
   };
   isPublished: boolean;
   publishedAt?: string;
-  viewCount: number;
-  likeCount: number;
-  commentCount: number;
+  stats?: {
+    viewCount?: number;
+    likeCount?: number;
+    commentCount?: number;
+  };
   category?: string;
   tags?: string[];
   createdAt: string;
@@ -260,7 +262,9 @@ export default function PostsManagement() {
               <div>
                 <p className="text-sm text-gray-600">{t.posts.totalViews}</p>
                 <p className="text-2xl font-semibold">
-                  {allPosts.reduce((acc: number, p: Post) => acc + p.viewCount, 0).toLocaleString()}
+                  {allPosts
+                    .reduce((acc: number, p: Post) => acc + (p as any).stats?.viewCount || 0, 0)
+                    .toLocaleString()}
                 </p>
               </div>
               <Eye className="h-8 w-8 text-blue-500" />
@@ -424,20 +428,20 @@ export default function PostsManagement() {
                       {post.category || <span className="text-gray-400">—</span>}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-3 text-xs text-gray-600">
-                        <span className="flex items-center">
-                          <Eye className="h-3 w-3 mr-1" />
-                          {post.viewCount}
-                        </span>
-                        <span className="flex items-center">
-                          <Heart className="h-3 w-3 mr-1" />
-                          {post.likeCount}
-                        </span>
-                        <span className="flex items-center">
-                          <MessageSquare className="h-3 w-3 mr-1" />
-                          {post.commentCount}
-                        </span>
-                      </div>
+                    <div className="flex items-center gap-3 text-xs text-gray-600">
+                      <span className="flex items-center">
+                        <Eye className="h-3 w-3 mr-1" />
+                        {(post as any).stats?.viewCount ?? 0}
+                      </span>
+                      <span className="flex items-center">
+                        <Heart className="h-3 w-3 mr-1" />
+                        {(post as any).stats?.likeCount ?? 0}
+                      </span>
+                      <span className="flex items-center">
+                        <MessageSquare className="h-3 w-3 mr-1" />
+                        {(post as any).stats?.commentCount ?? 0}
+                      </span>
+                    </div>
                     </TableCell>
                     <TableCell>
                       {post.publishedAt

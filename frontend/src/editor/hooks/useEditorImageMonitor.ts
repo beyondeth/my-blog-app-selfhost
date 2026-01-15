@@ -248,7 +248,7 @@ export function useEditorImageMonitor({
       }
     };
     // Remove extractImageIds from dependencies to prevent re-runs
-  }, [editor, isEnabled, scheduleCheck]);
+  }, [editor, isEnabled, scheduleCheck, extractImageIds]);
 
   return {
     acquireSyncLock,

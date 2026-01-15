@@ -12,14 +12,18 @@ interface TrackedFile {
  * 포스트 이미지 용량 추적 Hook
  * 포스트당 최대 30MB 제한 관리
  */
+const MAX_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
+
+/**
+ * 포스트 이미지 용량 추적 Hook
+ * 포스트당 최대 30MB 제한 관리
+ */
 export function usePostImageTracker() {
   const [trackedFiles, setTrackedFiles] = useState<TrackedFile[]>([]);
   const [totalSize, setTotalSize] = useState(0);
   const isCleaningUpRef = useRef(false);
   const cleanedUpFilesRef = useRef(new Set<string>());
-  
-  const MAX_TOTAL_SIZE = 30 * 1024 * 1024; // 30MB
-  const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB per file
 
   // 총 크기 재계산
   useEffect(() => {

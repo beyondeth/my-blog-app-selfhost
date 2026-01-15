@@ -6,6 +6,12 @@
 import type { ApiClient } from '../client';
 import type { Comment, CommentForm } from '../types';
 
+export type CommentContext =
+  | { type: 'blog' }
+  | { type: 'community'; communitySlug: string; postId: string };
+
+const DEFAULT_CONTEXT: CommentContext = { type: 'blog' };
+
 /**
  * 댓글 좋아요/싫어요 응답
  */
@@ -52,6 +58,14 @@ export interface GetRepliesParams {
 export class CommentsAPI {
   constructor(private client: ApiClient) {}
 
+  private resolveContext(context?: CommentContext): CommentContext {
+    return context ?? DEFAULT_CONTEXT;
+  }
+
+  private buildCommunityBasePath(context: Extract<CommentContext, { type: 'community' }>): string {
+    return `/community/${context.communitySlug}/posts/${context.postId}/comments`;
+  }
+
   /**
    * 포스트의 댓글 목록 조회
    * @param postId - 포스트 ID
@@ -68,7 +82,13 @@ export class CommentsAPI {
    * @returns 생성된 댓글
    * @description 로그인한 사용자만 작성 가능
    */
-  async createComment(data: CommentForm): Promise<Comment> {
+  async createComment(data: CommentForm, context?: CommentContext): Promise<Comment> {
+    const ctx = this.resolveContext(context);
+    if (ctx.type === 'community') {
+      const base = this.buildCommunityBasePath(ctx);
+      const response = await this.client.post<{ success: boolean; data: Comment }>(base, data);
+      return response.data;
+    }
     return this.client.post<Comment>('/comments', data);
   }
 
@@ -79,7 +99,13 @@ export class CommentsAPI {
    * @returns 수정된 댓글
    * @description 본인의 댓글만 수정 가능
    */
-  async updateComment(id: string, content: string): Promise<Comment> {
+  async updateComment(id: string, content: string, context?: CommentContext): Promise<Comment> {
+    const ctx = this.resolveContext(context);
+    if (ctx.type === 'community') {
+      const base = this.buildCommunityBasePath(ctx);
+      const response = await this.client.put<{ success: boolean; data: Comment }>(`${base}/${id}`, { content });
+      return response.data;
+    }
     return this.client.put<Comment>(`/comments/${id}`, { content });
   }
 
@@ -88,7 +114,13 @@ export class CommentsAPI {
    * @param id - 삭제할 댓글 ID
    * @description 본인의 댓글만 삭제 가능
    */
-  async deleteComment(id: string): Promise<void> {
+  async deleteComment(id: string, context?: CommentContext): Promise<void> {
+    const ctx = this.resolveContext(context);
+    if (ctx.type === 'community') {
+      const base = this.buildCommunityBasePath(ctx);
+      await this.client.delete(`${base}/${id}`);
+      return;
+    }
     await this.client.delete(`/comments/${id}`);
   }
 
@@ -98,7 +130,13 @@ export class CommentsAPI {
    * @returns 좋아요 상태 및 카운트
    * @description 좋아요와 싫어요는 상호 배타적
    */
-  async toggleCommentLike(id: string): Promise<CommentReactionResponse> {
+  async toggleCommentLike(id: string, context?: CommentContext): Promise<CommentReactionResponse> {
+    const ctx = this.resolveContext(context);
+    if (ctx.type === 'community') {
+      const base = this.buildCommunityBasePath(ctx);
+      const response = await this.client.post<{ success: boolean; data: CommentReactionResponse }>(`${base}/${id}/like`);
+      return response.data;
+    }
     return this.client.post<CommentReactionResponse>(`/comments/${id}/like`);
   }
 
@@ -108,7 +146,13 @@ export class CommentsAPI {
    * @returns 싫어요 상태 및 카운트
    * @description 좋아요와 싫어요는 상호 배타적
    */
-  async toggleCommentDislike(id: string): Promise<CommentReactionResponse> {
+  async toggleCommentDislike(id: string, context?: CommentContext): Promise<CommentReactionResponse> {
+    const ctx = this.resolveContext(context);
+    if (ctx.type === 'community') {
+      const base = this.buildCommunityBasePath(ctx);
+      const response = await this.client.post<{ success: boolean; data: CommentReactionResponse }>(`${base}/${id}/dislike`);
+      return response.data;
+    }
     return this.client.post<CommentReactionResponse>(`/comments/${id}/dislike`);
   }
 
@@ -126,7 +170,9 @@ export class CommentsAPI {
   async getCommentsPaginated(
     postId: string,
     params?: GetCommentsParams,
+    context?: CommentContext,
   ): Promise<PaginatedCommentsResponse> {
+    const ctx = this.resolveContext(context);
     const queryParams = new URLSearchParams();
     if (params?.cursor) queryParams.append('cursor', params.cursor);
     if (params?.limit) queryParams.append('limit', params.limit.toString());
@@ -134,6 +180,13 @@ export class CommentsAPI {
     if (params?.snapshotTimestamp) queryParams.append('snapshotTimestamp', params.snapshotTimestamp);
 
     const queryString = queryParams.toString();
+    if (ctx.type === 'community') {
+      const base = this.buildCommunityBasePath(ctx);
+      const url = `${base}/paginated${queryString ? `?${queryString}` : ''}`;
+      const response = await this.client.get<{ success: boolean; data: PaginatedCommentsResponse }>(url);
+      return response.data;
+    }
+
     const url = `/comments/post/${postId}/paginated${queryString ? `?${queryString}` : ''}`;
 
     return this.client.get<PaginatedCommentsResponse>(url);
@@ -149,12 +202,21 @@ export class CommentsAPI {
   async getRepliesPaginated(
     commentId: string,
     params?: GetRepliesParams,
+    context?: CommentContext,
   ): Promise<PaginatedCommentsResponse> {
+    const ctx = this.resolveContext(context);
     const queryParams = new URLSearchParams();
     if (params?.cursor) queryParams.append('cursor', params.cursor);
     if (params?.limit) queryParams.append('limit', params.limit.toString());
 
     const queryString = queryParams.toString();
+    if (ctx.type === 'community') {
+      const base = this.buildCommunityBasePath(ctx);
+      const url = `${base}/${commentId}/replies${queryString ? `?${queryString}` : ''}`;
+      const response = await this.client.get<{ success: boolean; data: PaginatedCommentsResponse }>(url);
+      return response.data;
+    }
+
     const url = `/comments/${commentId}/replies${queryString ? `?${queryString}` : ''}`;
 
     return this.client.get<PaginatedCommentsResponse>(url);

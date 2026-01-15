@@ -9,18 +9,15 @@ import {
   UseGuards,
   ParseIntPipe,
   ForbiddenException,
-  Sse,
-  MessageEvent,
-} from '@nestjs/common';
-import { Observable, interval, map, merge } from 'rxjs';
-import { ChatService } from '../services/chat.service';
-import { ChatBatchService } from '../services/chat-batch.service';
-import { CreateMessageDto } from '../dto/create-message.dto';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '../../users/entities/user.entity';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
+} from "@nestjs/common";
+import { ChatService } from "../services/chat.service";
+import { ChatBatchService } from "../services/chat-batch.service";
+import { CreateMessageDto } from "../dto/create-message.dto";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { User } from "../../users/entities/user.entity";
+import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 
-@Controller('chat')
+@Controller("chat")
 @UseGuards(JwtAuthGuard)
 export class ChatController {
   constructor(
@@ -28,146 +25,133 @@ export class ChatController {
     private readonly batchService: ChatBatchService,
   ) {}
 
-  @Get('conversations')
+  @Get("conversations")
   async getConversations(@CurrentUser() user: User) {
     return this.chatService.getConversations(user.id);
   }
 
-  @Get('conversation/by-id/:conversationId')
+  @Get("conversation/by-id/:conversationId")
   async getConversationById(
-    @Param('conversationId') conversationId: string,
+    @Param("conversationId") conversationId: string,
     @CurrentUser() user: User,
   ) {
     return this.chatService.getConversationForUser(conversationId, user.id);
   }
 
-  @Get('conversation/:userId')
+  @Get("conversation/:userId")
   async getOrCreateConversation(
-    @Param('userId') userId: string,
+    @Param("userId") userId: string,
     @CurrentUser() currentUser: User,
   ) {
-    console.log('[Chat] getOrCreateConversation:', {
+    console.log("[Chat] getOrCreateConversation:", {
       currentUserId: currentUser?.id,
       targetUserId: userId,
-      currentUserEmail: currentUser?.email
+      currentUserEmail: currentUser?.email,
     });
     return this.chatService.getOrCreateConversation(currentUser.id, userId);
   }
 
-  @Get('messages/:conversationId')
+  @Get("messages/:conversationId")
   async getMessages(
-    @Param('conversationId') conversationId: string,
-    @Query('page', ParseIntPipe) page = 1,
+    @Param("conversationId") conversationId: string,
+    @Query("page", ParseIntPipe) page = 1,
     @CurrentUser() user: User,
   ) {
     return this.chatService.getMessages(conversationId, user.id, page);
   }
 
-  @Post('message')
-  async sendMessage(
-    @Body() dto: CreateMessageDto,
-    @CurrentUser() user: User,
-  ) {
+  @Post("message")
+  async sendMessage(@Body() dto: CreateMessageDto, @CurrentUser() user: User) {
     return this.chatService.sendMessage(user.id, dto);
   }
 
-  @Post('message/:messageId/read')
+  @Post("message/:messageId/read")
   async markAsRead(
-    @Param('messageId') messageId: string,
+    @Param("messageId") messageId: string,
     @CurrentUser() user: User,
   ) {
     await this.chatService.markAsRead(messageId, user.id);
     return { success: true };
   }
 
-  @Post('conversation/:conversationId/mark-all-read')
+  @Post("conversation/:conversationId/mark-all-read")
   async markAllAsRead(
-    @Param('conversationId') conversationId: string,
+    @Param("conversationId") conversationId: string,
     @CurrentUser() user: User,
   ) {
     await this.chatService.markAllMessagesAsRead(conversationId, user.id);
     return { success: true };
   }
 
-  @Delete('message/:messageId')
+  @Delete("message/:messageId")
   async deleteMessage(
-    @Param('messageId') messageId: string,
+    @Param("messageId") messageId: string,
     @CurrentUser() user: User,
   ) {
     await this.chatService.deleteMessage(messageId, user.id);
     return { success: true };
   }
 
-  @Post('block/:userId')
+  @Post("block/:userId")
   async blockUser(
-    @Param('userId') userId: string,
+    @Param("userId") userId: string,
     @CurrentUser() currentUser: User,
   ) {
     await this.chatService.blockUser(currentUser.id, userId);
     return { success: true };
   }
 
-  @Delete('unblock/:userId')
+  @Delete("unblock/:userId")
   async unblockUser(
-    @Param('userId') userId: string,
+    @Param("userId") userId: string,
     @CurrentUser() currentUser: User,
   ) {
     await this.chatService.unblockUser(currentUser.id, userId);
     return { success: true };
   }
 
-  @Get('blocked-users')
+  @Get("blocked-users")
   async getBlockedUsers(@CurrentUser() user: User) {
     return this.chatService.getBlockedUsers(user.id);
   }
 
-  @Delete('conversation/:conversationId')
+  @Delete("conversation/:conversationId")
   async deleteConversation(
-    @Param('conversationId') conversationId: string,
+    @Param("conversationId") conversationId: string,
     @CurrentUser() user: User,
   ) {
     await this.chatService.deleteConversation(user.id, conversationId);
     return { success: true };
   }
 
-  @Get('unread-count')
+  @Get("unread-count")
   async getUnreadCount(@CurrentUser() user: User) {
     const count = await this.chatService.getUnreadCount(user.id);
     return { count };
   }
 
-  @Sse('notifications')
-  notifications(@CurrentUser() user: User): Observable<MessageEvent> {
-    // Create notification stream for the user
-    const notifications$ = this.chatService.getUserNotificationStream(user.id);
 
-    // Keep-alive ping every 30 seconds
-    const keepAlive$ = interval(30000).pipe(
-      map(() => ({ data: ':ping' } as MessageEvent))
-    );
-
-    // Merge notification stream with keep-alive
-    return merge(notifications$, keepAlive$);
-  }
 
   // Monitoring endpoints
-  @Get('queue/metrics')
+  @Get("queue/metrics")
   async getQueueMetrics() {
     return this.batchService.getQueueMetrics();
   }
 
-  @Get('queue/health')
+  @Get("queue/health")
   async getQueueHealth() {
     return this.batchService.checkHealth();
   }
 
-  @Post('queue/recover-dlq')
-  async recoverDeadLetterQueue(@Query('limit', ParseIntPipe) limit: number = 10) {
+  @Post("queue/recover-dlq")
+  async recoverDeadLetterQueue(
+    @Query("limit", ParseIntPipe) limit: number = 10,
+  ) {
     const recovered = await this.batchService.recoverDeadLetterQueue(limit);
     return { recovered };
   }
 
-  @Post('queue/process-immediate')
+  @Post("queue/process-immediate")
   async processImmediate() {
     return this.batchService.processImmediate();
   }

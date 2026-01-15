@@ -1,4 +1,4 @@
-import { IsUUID, IsString, IsOptional, MaxLength } from 'class-validator';
+import { IsUUID, IsString, IsOptional, MaxLength } from "class-validator";
 
 /**
  * 사용자 차단 생성 DTO

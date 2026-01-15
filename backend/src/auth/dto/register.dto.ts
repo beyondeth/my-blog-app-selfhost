@@ -1,53 +1,65 @@
-import { IsEmail, IsString, MinLength, MaxLength, Matches, IsOptional, IsBoolean, ValidateIf } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  MaxLength,
+  Matches,
+  IsOptional,
+  IsBoolean,
+  ValidateIf,
+} from "class-validator";
+import { ApiProperty } from "@nestjs/swagger";
 
 export class RegisterDto {
   @ApiProperty({
-    description: 'User email address',
-    example: 'user@example.com',
+    description: "User email address",
+    example: "user@example.com",
   })
-  @IsEmail({}, { message: '올바른 이메일 주소를 입력해주세요' })
+  @IsEmail({}, { message: "올바른 이메일 주소를 입력해주세요" })
   email: string;
 
   @ApiProperty({
-    description: 'Username',
+    description: "Username",
     minLength: 3,
-    maxLength: 20,
-    example: 'john_doe',
+    maxLength: 30,
+    example: "john_doe",
   })
   @IsString()
-  @MinLength(3, { message: '사용자명은 최소 3자 이상이어야 합니다' })
-  @MaxLength(20, { message: '사용자명은 20자를 초과할 수 없습니다' })
+  @MinLength(3, { message: "사용자명은 최소 3자 이상이어야 합니다" })
+  @MaxLength(30, { message: "사용자명은 30자를 초과할 수 없습니다" })
   @Matches(/^[a-zA-Z0-9가-힣ㄱ-ㅎㅏ-ㅣ_\s]+$/, {
-    message: '사용자명은 한글, 영문자, 숫자, 언더스코어(_), 공백만 사용할 수 있습니다',
+    message:
+      "사용자명은 한글, 영문자, 숫자, 언더스코어(_), 공백만 사용할 수 있습니다",
   })
   username: string;
 
   @ApiProperty({
-    description: 'User password',
+    description: "User password",
     minLength: 8,
-    example: 'StrongPassword123!',
+    example: "StrongPassword123!",
   })
   @IsString()
-  @MinLength(8, { message: '비밀번호는 최소 8자 이상이어야 합니다' })
+  @MinLength(8, { message: "비밀번호는 최소 8자 이상이어야 합니다" })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message: '비밀번호는 최소 하나의 소문자, 하나의 대문자, 그리고 하나의 숫자를 포함해야 합니다',
+    message:
+      "비밀번호는 최소 하나의 소문자, 하나의 대문자, 그리고 하나의 숫자를 포함해야 합니다",
   })
   @Matches(/^[^"'\\<>`\s]*$/, {
-    message: '비밀번호에 사용할 수 없는 문자가 포함되어 있습니다: " \' \\ < > ` 공백',
+    message:
+      "비밀번호에 사용할 수 없는 문자가 포함되어 있습니다: \" ' \\ < > ` 공백",
   })
   password: string;
 
   @ApiProperty({
-    description: 'Email verification session token (필수)',
-    example: 'abc123def456...',
+    description: "Email verification session token (필수)",
+    example: "abc123def456...",
     required: true,
   })
   @IsString()
   emailVerificationToken: string;
 
   @ApiProperty({
-    description: '만 14세 이상 확인',
+    description: "만 14세 이상 확인",
     example: true,
     required: true,
   })
@@ -56,7 +68,7 @@ export class RegisterDto {
   isOver14: boolean;
 
   @ApiProperty({
-    description: '이용약관 동의',
+    description: "이용약관 동의",
     example: true,
     required: true,
   })
@@ -65,7 +77,7 @@ export class RegisterDto {
   termsAccepted: boolean;
 
   @ApiProperty({
-    description: '개인정보 처리방침 동의',
+    description: "개인정보 처리방침 동의",
     example: true,
     required: true,
   })
@@ -74,7 +86,7 @@ export class RegisterDto {
   privacyAccepted: boolean;
 
   @ApiProperty({
-    description: '마케팅 정보 수신 동의 (선택)',
+    description: "마케팅 정보 수신 동의 (선택)",
     example: false,
     required: false,
   })
@@ -83,11 +95,11 @@ export class RegisterDto {
   marketingOptIn?: boolean;
 
   @ApiProperty({
-    description: '뉴스레터 수신 동의 (선택)',
+    description: "뉴스레터 수신 동의 (선택)",
     example: false,
     required: false,
   })
   @IsBoolean()
   @IsOptional()
   newsletterOptIn?: boolean;
-} 
+}

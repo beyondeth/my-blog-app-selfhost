@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 플랫 구조를 위한 repliesCount 재계산
@@ -7,7 +7,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - 최상위 부모 댓글만 실제 하위 댓글 수를 가짐
  * - 재귀적으로 모든 하위 댓글 카운트
  */
-export class RecalculateRepliesCount1761000000000 implements MigrationInterface {
+export class RecalculateRepliesCount1761000000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 모든 댓글의 repliesCount를 0으로 초기화
     await queryRunner.query(`

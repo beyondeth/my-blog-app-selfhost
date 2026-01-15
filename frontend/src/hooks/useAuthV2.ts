@@ -8,8 +8,6 @@ import {
   useRegister,
   useLogout,
   useRefreshUser,
-  useIsAuthenticated,
-  useIsAdmin,
 } from '@/lib/profile-queries';
 import type { LoginForm, RegisterForm, AuthContextType } from '@/types';
 
@@ -28,8 +26,19 @@ export function useAuthV2(): AuthContextType {
   const registerMutation = useRegister();
   const logoutMutation = useLogout();
   const refreshMutation = useRefreshUser();
-  const isAuthenticated = useIsAuthenticated();
-  const isAdmin = useIsAdmin();
+  const isUnauthorized = userError?.message === 'Unauthorized';
+  const normalizedUser = isUnauthorized ? null : user || null;
+  const isAuthenticated = !!normalizedUser;
+  const isAdmin = normalizedUser?.role?.toLowerCase() === 'admin';
+  const authStatus = userLoading
+    ? 'loading'
+    : isAuthenticated
+      ? 'authenticated'
+      : isUnauthorized
+        ? 'unauthenticated'
+        : userError
+          ? 'error'
+          : 'unauthenticated';
 
   // 에러 상태 통합
   const error = userError?.message ||
@@ -106,9 +115,11 @@ export function useAuthV2(): AuthContextType {
   // → Context consumer 불필요한 리렌더링 방지
   return useMemo(
     () => ({
-      user: user || null,
+      user: normalizedUser,
       isLoading,
       isAuthenticated,
+      authStatus,
+      isUnauthorized,
       isAdmin,
       login,
       register,
@@ -119,9 +130,11 @@ export function useAuthV2(): AuthContextType {
       error: error as string | null,
     }),
     [
-      user,
+      normalizedUser,
       isLoading,
       isAuthenticated,
+      authStatus,
+      isUnauthorized,
       isAdmin,
       login,
       register,

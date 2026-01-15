@@ -1,149 +1,109 @@
 "use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import Image from 'next/image';
-import { FiBarChart2, FiEye, FiHeart, FiMessageCircle } from 'react-icons/fi';
-import SidebarSection from './SidebarSection';
-import { usePopularPosts } from '@/hooks/usePopularPosts';
+import React, { useMemo, useState } from "react";
+import Link from "next/link";
+import Image from "next/image";
+import { FiBarChart2 } from "react-icons/fi";
+import { usePopularPosts } from "@/hooks/usePopularPosts";
+import SidebarSection from "./SidebarSection";
+
+const AuthorAvatar = ({
+  src,
+  label,
+}: {
+  src?: string | null;
+  label?: string | null;
+}) => {
+  if (src) {
+    return (
+      <Image
+        src={src}
+        alt={label ?? "작성자"}
+        width={32}
+        height={32}
+        className="h-8 w-8 rounded-full object-cover"
+      />
+    );
+  }
+
+  return (
+    <div className="h-8 w-8 rounded-full bg-[#D8E6EA] text-[#264653] flex items-center justify-center text-xs font-semibold dark:bg-[#1D3A36] dark:text-[#B9E6DC]">
+      {label?.charAt(0).toUpperCase() ?? "U"}
+    </div>
+  );
+};
 
 const PopularPostsSection = React.memo(function PopularPostsSection() {
   const [period, setPeriod] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const { data, isLoading, error } = usePopularPosts(period);
-  
-  const posts = data?.posts || [];
+  const posts = useMemo(() => data?.posts ?? [], [data?.posts]);
 
   return (
-    <SidebarSection 
+    <SidebarSection
       title={
-        <div className="flex items-center justify-between w-full">
-          <div className="flex items-center gap-2">
-            <FiBarChart2 className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-            <span>인기 포스트</span>
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <FiBarChart2 className="w-4 h-4 text-[#264653] dark:text-[#6CC3B2]" />
+            <span>인기 블로그 포스트</span>
           </div>
-          <div className="flex gap-1">
-            <button
-              onClick={() => setPeriod('daily')}
-              className={`px-2 py-0.5 text-[13px] rounded transition-colors ${
-                period === 'daily'
-                  ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
-              }`}
-              aria-label="일일 인기 포스트"
-            >
-              일일
-            </button>
-            <button
-              onClick={() => setPeriod('weekly')}
-              className={`px-2 py-0.5 text-[13px] rounded transition-colors ${
-                period === 'weekly'
-                  ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
-              }`}
-              aria-label="주간 인기 포스트"
-            >
-              주간
-            </button>
-            <button
-              onClick={() => setPeriod('monthly')}
-              className={`px-2 py-0.5 text-[13px] rounded transition-colors ${
-                period === 'monthly'
-                  ? 'bg-black text-white dark:bg-gray-700 dark:text-white'
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200 dark:bg-black dark:text-gray-400 dark:hover:bg-gray-900'
-              }`}
-              aria-label="월간 인기 포스트"
-            >
-              월간
-            </button>
+          <div className="flex gap-2">
+            {['daily', 'weekly', 'monthly'].map((value) => (
+              <button
+                key={value}
+                onClick={() => setPeriod(value as 'daily' | 'weekly' | 'monthly')}
+                className={`px-2.5 py-1 text-xs rounded-full border transition ${
+                  period === value
+                    ? 'bg-[#264653] text-[#F9FBFD] border-[#264653] dark:bg-[#6CC3B2] dark:text-[#0E141B] dark:border-[#6CC3B2]'
+                    : 'text-[#4B5563] border-[#D9E0EA] hover:text-[#1B2430] hover:bg-[#EEF3F8] dark:text-[#C7D1DD] dark:border-[#2A3645] dark:hover:text-[#E6EDF3] dark:hover:bg-[#1A232E]'
+                }`}
+              >
+                {value === 'daily' ? '일일' : value === 'weekly' ? '주간' : '월간'}
+              </button>
+            ))}
           </div>
         </div>
       }
     >
       {isLoading ? (
-        <div className="space-y-3">
+        <div className="-mx-5 divide-y divide-[#E5E7EB] dark:divide-[#2A3645]">
           {[...Array(5)].map((_, index) => (
-            <div key={index} className="animate-pulse">
-              <div className="flex gap-3">
-                <div className="w-6 h-6 bg-gray-200 rounded"></div>
-                <div className="flex-1 space-y-2">
-                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
-                  <div className="h-3 bg-gray-100 rounded w-1/2"></div>
-                </div>
+            <div
+              key={index}
+              className="flex gap-3 py-3 px-5 first:pt-0 last:pb-0"
+            >
+              <div className="w-8 h-8 bg-[#DCE3EC] dark:bg-[#223040] rounded-full animate-pulse"></div>
+              <div className="flex-1 space-y-2">
+                <div className="h-3 bg-[#DCE3EC] dark:bg-[#223040] rounded w-1/3"></div>
+                <div className="h-4 bg-[#DCE3EC] dark:bg-[#223040] rounded w-3/4"></div>
               </div>
             </div>
           ))}
         </div>
       ) : error ? (
-        <div className="text-center py-4 text-gray-500">
+        <div className="text-center py-4 text-[#4B5563] dark:text-[#C7D1DD]">
           <p className="text-sm">인기 포스트를 불러올 수 없습니다.</p>
         </div>
       ) : posts.length === 0 ? (
-        <div className="text-center py-4 text-gray-500">
+        <div className="text-center py-4 text-[#4B5563] dark:text-[#C7D1DD]">
           <p className="text-sm">아직 인기 포스트가 없습니다.</p>
         </div>
       ) : (
-        <div className="space-y-3">
+        <div className="-mx-5 divide-y divide-[#E5E7EB] dark:divide-[#4B5563]">
           {posts.map((post: any, index: number) => (
-            <div key={post.id} className="flex gap-3 pb-3 border-b border-gray-100 dark:border-gray-800 last:border-b-0">
-              <span className="text-lg font-bold text-gray-300 w-6 text-center">
-                {index + 1}
-              </span>
-              <div className="flex-1 min-w-0">
-                {post.thumbnail && (
-                  <div className="mb-2">
-                    <div className="block sm:hidden" style={{ width: '100px', height: '94px' }}>
-                      <Image
-                        src={post.thumbnail}
-                        alt={post.title}
-                        width={100}
-                        height={94}
-                        className="w-full h-full rounded-lg object-contain"
-                        sizes="100px"
-                        priority={index < 3}
-                      />
-                    </div>
-                    <div className="hidden sm:block" style={{ width: '210px', height: '197px' }}>
-                      <Image
-                        src={post.thumbnail}
-                        alt={post.title}
-                        width={210}
-                        height={197}
-                        className="w-full h-full rounded-lg object-contain"
-                        sizes="210px"
-                        priority={index < 3}
-                      />
-                    </div>
-                  </div>
-                )}
-                <Link
-                  href={`/${post.blog.slug}/${post.slug || post.id}`}
-                  className="block hover:text-gray-600 transition-colors"
-                >
-                  <h4 className="text-[15px] font-medium line-clamp-2 break-words">
-                    {post.title}
-                  </h4>
-                </Link>
-                <div className="flex items-center gap-3 text-[13px] text-gray-500 dark:text-[#cccccc] mt-2">
-                  <div className="flex items-center gap-1">
-                    <FiEye className="w-3 h-3" />
-                    <span>{post.viewCount || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <FiHeart className="w-3 h-3" />
-                    <span>{post.likeCount || 0}</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <FiMessageCircle className="w-3 h-3" />
-                    <span>{post.commentCount || 0}</span>
-                  </div>
-                </div>
-                {post.author && (
-                  <p className="text-xs text-gray-400 mt-1">
-                    {post.author.username || post.author.email}
-                  </p>
-                )}
+            <Link
+              key={post.id}
+              href={`/${post.blog?.slug}/${post.slug || post.id}`}
+              className="flex items-center gap-3 py-3 px-5 first:pt-0 last:pb-0 transition-colors hover:bg-[#F9FAFB] dark:hover:bg-[#1A232E]"
+            >
+              <AuthorAvatar
+                src={post.author?.profileImage ?? post.author?.profile?.profileImage ?? undefined}
+                label={post.author?.username ?? post.author?.email ?? ""}
+              />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">{post.author?.username ?? "알 수 없음"}</p>
+                <p className="text-sm font-medium text-[#1B2430] dark:text-[#E6EDF3] line-clamp-2">{post.title}</p>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
       )}

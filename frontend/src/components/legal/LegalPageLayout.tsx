@@ -89,7 +89,7 @@ export default function LegalPageLayout({ title, documentType }: LegalPageLayout
   }, [documentType]);
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background dark:bg-[#0E141B]">
       {/* 왼쪽 사이드바(80px) 고려한 중앙 정렬 컨테이너 */}
       <div className="mx-auto max-w-4xl px-4 py-12 lg:ml-32">
         {/* 인증 페이지에서 온 경우 뒤로가기 버튼 표시 */}

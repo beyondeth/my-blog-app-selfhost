@@ -1,5 +1,6 @@
-import { Exclude, Expose } from 'class-transformer';
-import { Role } from '../../common/enums/role.enum';
+import { Exclude, Expose, Type } from "class-transformer";
+import { Role } from "../../common/enums/role.enum";
+import { SocialLinkResponseDto } from "./social-link-response.dto";
 
 /**
  * User 응답 DTO
@@ -28,6 +29,13 @@ export class UserResponseDto {
 
   @Expose()
   bio?: string;
+
+  @Expose()
+  jobTitle?: string;
+
+  @Expose()
+  @Type(() => SocialLinkResponseDto)
+  socialLinks?: SocialLinkResponseDto[];
 
   // 민감한 정보는 명시적으로 제외
   @Exclude()

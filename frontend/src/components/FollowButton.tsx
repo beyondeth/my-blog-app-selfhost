@@ -6,7 +6,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { FollowInfo } from '@/types/api';
-import { Loader2, UserPlus, UserMinus, UserCheck } from 'lucide-react';
+import { Loader2, UserPlus, UserMinus, UserCheck, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { queryKeys } from '@/lib/queries/keys';
 
@@ -16,6 +16,7 @@ interface FollowButtonProps {
   className?: string;
   showFollowerCount?: boolean;
   variant?: 'default' | 'minimal' | 'icon-only';
+  suppressSuccessToast?: boolean;
 }
 
 // API 함수들
@@ -91,11 +92,14 @@ export default function FollowButton({
   className,
   showFollowerCount = false,
   variant = 'default',
+  suppressSuccessToast = false,
 }: FollowButtonProps) {
   const { user } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [isHovered, setIsHovered] = useState(false);
+  const [showSuccessIcon, setShowSuccessIcon] = useState(false);
+  const [lastAction, setLastAction] = useState<'FOLLOWED' | 'UNFOLLOWED' | null>(null);
 
   // 팔로우 정보 조회
   const { data: followInfo, isLoading: isLoadingFollowInfo } = useQuery({
@@ -174,12 +178,17 @@ export default function FollowButton({
       }
     },
     onSuccess: (result) => {
-      // 성공 토스트
-      if (result === 'FOLLOWED') {
-        toast.success('팔로우했습니다.');
-      } else if (result === 'UNFOLLOWED') {
-        toast.success('언팔로우했습니다.');
+      // Show checkmark icon temporarily on both follow and unfollow
+      if (result === 'FOLLOWED' || result === 'UNFOLLOWED') {
+        setLastAction(result as 'FOLLOWED' | 'UNFOLLOWED');
+        setShowSuccessIcon(true);
+        setTimeout(() => {
+          setShowSuccessIcon(false);
+          setLastAction(null);
+        }, 2000);
       }
+      
+      // Success toasts removed as per user request to use in-button visual feedback instead
       
       // 관련 캐시 무효화
       queryClient.invalidateQueries({
@@ -209,7 +218,7 @@ export default function FollowButton({
   const buttonConfig = useMemo(() => {
     if (isPending) {
       return {
-        text: 'Loading...',
+        text: '로딩 중...',
         icon: Loader2,
         className: 'bg-white text-gray-400 border border-gray-300 cursor-not-allowed',
         iconClassName: 'animate-spin',
@@ -217,24 +226,35 @@ export default function FollowButton({
       };
     }
 
+    // 언팔로우 성공 시 피드백
+    if (showSuccessIcon && lastAction === 'UNFOLLOWED') {
+      return {
+        text: '언팔로우',
+        icon: Check,
+        className: 'bg-white text-gray-900 border border-gray-900 transition-all duration-200',
+        iconClassName: '',
+        disabled: true,
+      };
+    }
+
     if (isFollowing) {
       return {
-        text: 'Following',
-        icon: null,
+        text: '팔로잉',
+        icon: Check,
         className: 'bg-white text-gray-900 border border-gray-900 transition-all duration-200',
         iconClassName: '',
         disabled: false,
       };
     } else {
       return {
-        text: 'Follow',
+        text: '팔로우',
         icon: null,
         className: 'bg-white text-gray-900 border border-gray-900 transition-all duration-200',
         iconClassName: '',
         disabled: false,
       };
     }
-  }, [isPending, isFollowing]);
+  }, [isPending, isFollowing, showSuccessIcon, lastAction]);
 
   // 자신의 프로필에서는 버튼을 표시하지 않음
   if (user?.id === userId) {
@@ -260,7 +280,7 @@ export default function FollowButton({
         disabled={buttonConfig.disabled}
         className={cn(
           'group relative w-10 h-10 rounded-full flex items-center justify-center',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+          'focus:outline-none',
           'disabled:opacity-50 disabled:pointer-events-none',
           isPending
             ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed'
@@ -292,8 +312,8 @@ export default function FollowButton({
         onClick={handleClick}
         disabled={buttonConfig.disabled}
         className={cn(
-          'inline-flex items-center justify-center text-sm font-normal px-5 py-1.5 rounded-full',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1',
+          'inline-flex items-center justify-center text-sm font-normal px-4 py-1.5 rounded-full min-w-[82px]',
+          'focus:outline-none',
           'disabled:opacity-50 disabled:pointer-events-none',
           'bg-transparent text-gray-700 hover:bg-gray-100 dark:bg-black/30 dark:text-[#9CA3AF] dark:hover:bg-black/40 border border-gray-200 dark:border-gray-700',
           'transition-all duration-200',
@@ -301,12 +321,15 @@ export default function FollowButton({
         )}
       >
         {isPending ? (
-          <>
-            <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" />
-            <span>Loading...</span>
-          </>
+          <div className="flex items-center">
+            <Loader2 className="w-3.5 h-3.5 animate-spin mr-1.5" />
+            <span>로딩 중...</span>
+          </div>
         ) : (
-          <span>{buttonConfig.text}</span>
+          <div className="flex items-center gap-1.5">
+            {showSuccessIcon && <Check className="w-3.5 h-3.5" />}
+            <span>{buttonConfig.text}</span>
+          </div>
         )}
       </button>
     );
@@ -321,19 +344,22 @@ export default function FollowButton({
         className={cn(
           'relative font-normal rounded-full px-6 text-sm',
           'min-w-[110px] h-10 inline-flex items-center justify-center',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
+          'focus:outline-none',
           'disabled:opacity-60 disabled:pointer-events-none',
           buttonConfig.className
         )}
-        aria-label={isPending ? 'Loading...' : isFollowing ? 'Following' : 'Follow'}
+        aria-label={isPending ? '로딩 중...' : isFollowing ? '팔로잉' : '팔로우'}
       >
         {isPending ? (
           <>
             <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            <span>Loading...</span>
+            <span>로딩 중...</span>
           </>
         ) : (
-          <span>{buttonConfig.text}</span>
+          <div className="flex items-center gap-1.5">
+            {(isFollowing || showSuccessIcon) && <Check className="h-4 w-4" />}
+            <span>{buttonConfig.text}</span>
+          </div>
         )}
       </button>
       
@@ -344,7 +370,7 @@ export default function FollowButton({
             {followInfo.followersCount.toLocaleString()}
           </span>
           <span className="text-xs text-gray-500">
-            Followers
+            팔로워
           </span>
         </div>
       )}

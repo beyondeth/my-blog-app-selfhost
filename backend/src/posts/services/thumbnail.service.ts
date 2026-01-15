@@ -1,9 +1,17 @@
-import { Injectable, Logger, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, EntityManager } from 'typeorm';
-import { Post } from '../entities/post.entity';
-import { File } from '../../files/entities/file.entity';
-import { FilePurpose, FileContextType } from '../../files/entities/file-context.entity';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, EntityManager } from "typeorm";
+import { Post } from "../entities/post.entity";
+import { File } from "../../files/entities/file.entity";
+import {
+  FilePurpose,
+  FileContextType,
+} from "../../files/entities/file-context.entity";
 
 /**
  * 썸네일 관리 전용 서비스
@@ -37,73 +45,86 @@ export class ThumbnailService {
     postId: string,
     fileId: string,
     userId: string,
-    manager?: EntityManager
+    manager?: EntityManager,
   ): Promise<Post> {
-    const postRepository = manager ? manager.getRepository(Post) : this.postsRepository;
-    const fileRepository = manager ? manager.getRepository(File) : this.filesRepository;
+    const postRepository = manager
+      ? manager.getRepository(Post)
+      : this.postsRepository;
+    const fileRepository = manager
+      ? manager.getRepository(File)
+      : this.filesRepository;
 
-    this.logger.log(`[SET_THUMBNAIL] Setting thumbnail for post: ${postId}, file: ${fileId}`);
+    this.logger.log(
+      `[SET_THUMBNAIL] Setting thumbnail for post: ${postId}, file: ${fileId}`,
+    );
 
     // 1. 포스트 조회 및 권한 확인
     const post = await postRepository.findOne({
       where: { id: postId },
-      relations: ['blog']
+      relations: ["blog"],
     });
 
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
     // 권한 확인: 작성자 또는 블로그 소유자만 가능
     if (post.authorId !== userId && post.blog?.userId !== userId) {
-      throw new ForbiddenException('썸네일을 수정할 권한이 없습니다.');
+      throw new ForbiddenException("썸네일을 수정할 권한이 없습니다.");
     }
 
     // 2. 파일 조회 및 소유권 확인
     const file = await fileRepository.findOne({
-      where: { id: fileId, userId }
+      where: { id: fileId, userId },
     });
 
     if (!file) {
-      throw new NotFoundException('파일을 찾을 수 없거나 접근 권한이 없습니다.');
+      throw new NotFoundException(
+        "파일을 찾을 수 없거나 접근 권한이 없습니다.",
+      );
     }
 
     // 3. 이미지 파일인지 확인
-    if (!file.fileType || file.fileType !== 'image') {
-      throw new NotFoundException('이미지 파일만 썸네일로 지정할 수 있습니다.');
+    if (!file.fileType || file.fileType !== "image") {
+      throw new NotFoundException("이미지 파일만 썸네일로 지정할 수 있습니다.");
     }
 
     // 4. 파일이 포스트에 연결되어 있는지 확인
-    const isFileAttachedToPost = await postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.attachedFiles', 'file')
-      .where('post.id = :postId', { postId })
-      .andWhere('file.id = :fileId', { fileId })
-      .getCount() > 0;
+    const isFileAttachedToPost =
+      (await postRepository
+        .createQueryBuilder("post")
+        .leftJoin("post.attachedFiles", "file")
+        .where("post.id = :postId", { postId })
+        .andWhere("file.id = :fileId", { fileId })
+        .getCount()) > 0;
 
     if (!isFileAttachedToPost) {
       // 포스트에 파일이 연결되어 있지 않다면 연결
       await postRepository
         .createQueryBuilder()
-        .relation(Post, 'attachedFiles')
+        .relation(Post, "attachedFiles")
         .of(postId)
         .add(fileId);
 
-      this.logger.log(`[SET_THUMBNAIL] Attached file ${fileId} to post ${postId}`);
+      this.logger.log(
+        `[SET_THUMBNAIL] Attached file ${fileId} to post ${postId}`,
+      );
     }
 
     // 5. 썸네일 업데이트
     await postRepository.update(postId, {
       thumbnailImageId: fileId,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
-    this.logger.log(`[SET_THUMBNAIL] Successfully set thumbnail: postId=${postId}, fileId=${fileId}`);
+    this.logger.log(
+      `[SET_THUMBNAIL] Successfully set thumbnail: postId=${postId}, fileId=${fileId}`,
+    );
 
     // 6. 업데이트된 포스트 반환
     const updatedPost = await postRepository.findOne({
       where: { id: postId },
-      relations: ['thumbnailImage']
+      relations: ["thumbnailImage"],
     });
 
     return updatedPost!;
@@ -120,18 +141,21 @@ export class ThumbnailService {
   async autoSetThumbnailForNewPost(
     postId: string,
     userId: string,
-    manager: EntityManager
+    manager: EntityManager,
   ): Promise<string | null> {
-    this.logger.debug(`[AUTO_SET_THUMBNAIL] Auto-setting thumbnail for new post: ${postId}`);
+    this.logger.debug(
+      `[AUTO_SET_THUMBNAIL] Auto-setting thumbnail for new post: ${postId}`,
+    );
 
     // 포스트에 연결된 이미지 파일들 조회
-    const imageFiles = await manager.getRepository(File)
-      .createQueryBuilder('file')
-      .innerJoin('file.posts', 'post')
-      .where('post.id = :postId', { postId })
-      .andWhere('file.fileType = :fileType', { fileType: 'image' })
-      .andWhere('file.userId = :userId', { userId })
-      .orderBy('file.createdAt', 'ASC')  // 첫 번째 이미지를 썸네일로
+    const imageFiles = await manager
+      .getRepository(File)
+      .createQueryBuilder("file")
+      .innerJoin("file.posts", "post")
+      .where("post.id = :postId", { postId })
+      .andWhere("file.fileType = :fileType", { fileType: "image" })
+      .andWhere("file.userId = :userId", { userId })
+      .orderBy("file.createdAt", "ASC") // 첫 번째 이미지를 썸네일로
       .limit(1)
       .getMany();
 
@@ -139,18 +163,23 @@ export class ThumbnailService {
       const thumbnailFile = imageFiles[0];
 
       // 포스트 업데이트
-      await manager.getRepository(Post)
+      await manager
+        .getRepository(Post)
         .createQueryBuilder()
         .update(Post)
         .set({ thumbnailImageId: thumbnailFile.id })
-        .where('id = :postId', { postId })
+        .where("id = :postId", { postId })
         .execute();
 
-      this.logger.log(`[AUTO_SET_THUMBNAIL] Auto-selected thumbnail: ${thumbnailFile.id} for post: ${postId}`);
+      this.logger.log(
+        `[AUTO_SET_THUMBNAIL] Auto-selected thumbnail: ${thumbnailFile.id} for post: ${postId}`,
+      );
       return thumbnailFile.id;
     }
 
-    this.logger.debug(`[AUTO_SET_THUMBNAIL] No image files found for post: ${postId}`);
+    this.logger.debug(
+      `[AUTO_SET_THUMBNAIL] No image files found for post: ${postId}`,
+    );
     return null;
   }
 
@@ -163,35 +192,39 @@ export class ThumbnailService {
    */
   async getThumbnailCandidates(
     postId: string,
-    userId: string
+    userId: string,
   ): Promise<File[]> {
-    this.logger.debug(`[GET_THUMBNAIL_CANDIDATES] Getting candidates for post: ${postId}`);
+    this.logger.debug(
+      `[GET_THUMBNAIL_CANDIDATES] Getting candidates for post: ${postId}`,
+    );
 
     // 포스트 조회
     const post = await this.postsRepository.findOne({
       where: { id: postId },
-      relations: ['blog']
+      relations: ["blog"],
     });
 
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
     // 권한 확인
     if (post.authorId !== userId && post.blog?.userId !== userId) {
-      throw new ForbiddenException('접근 권한이 없습니다.');
+      throw new ForbiddenException("접근 권한이 없습니다.");
     }
 
     // 포스트에 연결된 이미지 파일들 조회
     const imageFiles = await this.filesRepository
-      .createQueryBuilder('file')
-      .innerJoin('file.posts', 'post')
-      .where('post.id = :postId', { postId })
-      .andWhere('file.fileType = :fileType', { fileType: 'image' })
-      .orderBy('file.createdAt', 'ASC')
+      .createQueryBuilder("file")
+      .innerJoin("file.posts", "post")
+      .where("post.id = :postId", { postId })
+      .andWhere("file.fileType = :fileType", { fileType: "image" })
+      .orderBy("file.createdAt", "ASC")
       .getMany();
 
-    this.logger.debug(`[GET_THUMBNAIL_CANDIDATES] Found ${imageFiles.length} image candidates`);
+    this.logger.debug(
+      `[GET_THUMBNAIL_CANDIDATES] Found ${imageFiles.length} image candidates`,
+    );
     return imageFiles;
   }
 
@@ -205,31 +238,35 @@ export class ThumbnailService {
   async removeThumbnail(
     postId: string,
     userId: string,
-    manager?: EntityManager
+    manager?: EntityManager,
   ): Promise<void> {
-    const postRepository = manager ? manager.getRepository(Post) : this.postsRepository;
+    const postRepository = manager
+      ? manager.getRepository(Post)
+      : this.postsRepository;
 
     // 포스트 조회 및 권한 확인
     const post = await postRepository.findOne({
       where: { id: postId },
-      relations: ['blog']
+      relations: ["blog"],
     });
 
     if (!post) {
-      throw new NotFoundException('포스트를 찾을 수 없습니다.');
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
     if (post.authorId !== userId && post.blog?.userId !== userId) {
-      throw new ForbiddenException('썸네일을 제거할 권한이 없습니다.');
+      throw new ForbiddenException("썸네일을 제거할 권한이 없습니다.");
     }
 
     // 썸네일 제거
     await postRepository.update(postId, {
       thumbnailImageId: null,
-      updatedAt: new Date()
+      updatedAt: new Date(),
     });
 
-    this.logger.log(`[REMOVE_THUMBNAIL] Removed thumbnail from post: ${postId}`);
+    this.logger.log(
+      `[REMOVE_THUMBNAIL] Removed thumbnail from post: ${postId}`,
+    );
   }
 
   /**
@@ -243,24 +280,28 @@ export class ThumbnailService {
     try {
       // 파일이 존재하는지
       const file = await this.filesRepository.findOne({
-        where: { id: fileId }
+        where: { id: fileId },
       });
 
-      if (!file || file.fileType !== 'image') {
+      if (!file || file.fileType !== "image") {
         return false;
       }
 
       // 파일이 포스트에 연결되어 있는지
-      const isAttached = await this.postsRepository
-        .createQueryBuilder('post')
-        .leftJoin('post.attachedFiles', 'file')
-        .where('post.id = :postId', { postId })
-        .andWhere('file.id = :fileId', { fileId })
-        .getCount() > 0;
+      const isAttached =
+        (await this.postsRepository
+          .createQueryBuilder("post")
+          .leftJoin("post.attachedFiles", "file")
+          .where("post.id = :postId", { postId })
+          .andWhere("file.id = :fileId", { fileId })
+          .getCount()) > 0;
 
       return isAttached;
     } catch (error) {
-      this.logger.error(`[VALIDATE_THUMBNAIL] Error validating thumbnail:`, error);
+      this.logger.error(
+        `[VALIDATE_THUMBNAIL] Error validating thumbnail:`,
+        error,
+      );
       return false;
     }
   }

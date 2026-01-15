@@ -7,9 +7,9 @@ import {
   UpdateDateColumn,
   JoinColumn,
   Index,
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { Blog } from '../../blogs/entities/blog.entity';
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
+import { Blog } from "../../blogs/entities/blog.entity";
 
 /**
  * MCP API Key 엔티티
@@ -24,10 +24,10 @@ import { Blog } from '../../blogs/entities/blog.entity';
  * - 90일 자동 만료
  * - 사용자 기반 Rate Limiting (200req/h)
  */
-@Entity('mcp_api_keys')
-@Index(['userId', 'isActive']) // 사용자별 활성 키 조회 최적화
+@Entity("mcp_api_keys")
+@Index(["userId", "isActive"]) // 사용자별 활성 키 조회 최적화
 export class McpApiKey {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   /**
@@ -59,21 +59,21 @@ export class McpApiKey {
   /**
    * 소유자 (User)
    */
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   userId: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
   /**
    * 연결된 블로그
    */
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   blogId: string;
 
-  @ManyToOne(() => Blog, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'blogId' })
+  @ManyToOne(() => Blog, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "blogId" })
   blog: Blog;
 
   /**
@@ -86,31 +86,31 @@ export class McpApiKey {
    * 마지막 사용 시간
    * Rate Limiting에 사용
    */
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: "timestamptz", nullable: true })
   lastUsedAt: Date | null;
 
   /**
    * 총 요청 수 (통계)
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   requestCount: number;
 
   /**
    * 생성된 포스트 수 (통계)
    */
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: "int", default: 0 })
   postsCreated: number;
 
   /**
    * 만료 시간 (90일 후)
    * 생성 시 자동 설정
    */
-  @Column({ type: 'timestamptz' })
+  @Column({ type: "timestamptz" })
   expiresAt: Date;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: "timestamptz" })
   updatedAt: Date;
 }

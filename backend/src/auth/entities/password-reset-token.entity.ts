@@ -6,12 +6,12 @@ import {
   CreateDateColumn,
   JoinColumn,
   Index,
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('password_reset_tokens')
-@Index(['token'], { unique: true })
-@Index(['expiresAt'])
+@Entity("password_reset_tokens")
+@Index(["token"], { unique: true })
+@Index(["expiresAt"])
 export class PasswordResetToken {
   @PrimaryGeneratedColumn()
   id: number;
@@ -19,14 +19,14 @@ export class PasswordResetToken {
   @Column({ unique: true })
   token: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   userId: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: 'timestamptz' })
+  @Column({ type: "timestamptz" })
   expiresAt: Date;
 
   @Column({ default: false })
@@ -41,6 +41,6 @@ export class PasswordResetToken {
   @Column({ nullable: true })
   userAgent: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: "timestamptz" })
   createdAt: Date;
 }

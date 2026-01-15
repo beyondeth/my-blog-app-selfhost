@@ -9,28 +9,28 @@ export class DateUtils {
    * 지정된 날짜에 시간을 더합니다
    */
   static addHours(date: Date, hours: number): Date {
-    return new Date(date.getTime() + (hours * 60 * 60 * 1000));
+    return new Date(date.getTime() + hours * 60 * 60 * 1000);
   }
 
   /**
    * 지정된 날짜에 일수를 더합니다
    */
   static addDays(date: Date, days: number): Date {
-    return new Date(date.getTime() + (days * 24 * 60 * 60 * 1000));
+    return new Date(date.getTime() + days * 24 * 60 * 60 * 1000);
   }
 
   /**
    * 지정된 날짜에 분을 더합니다
    */
   static addMinutes(date: Date, minutes: number): Date {
-    return new Date(date.getTime() + (minutes * 60 * 1000));
+    return new Date(date.getTime() + minutes * 60 * 1000);
   }
 
   /**
    * 지정된 날짜에 초를 더합니다
    */
   static addSeconds(date: Date, seconds: number): Date {
-    return new Date(date.getTime() + (seconds * 1000));
+    return new Date(date.getTime() + seconds * 1000);
   }
 
   /**
@@ -44,28 +44,28 @@ export class DateUtils {
    * 지정된 날짜에서 시간을 뺍니다
    */
   static subtractHours(date: Date, hours: number): Date {
-    return new Date(date.getTime() - (hours * 60 * 60 * 1000));
+    return new Date(date.getTime() - hours * 60 * 60 * 1000);
   }
 
   /**
    * 지정된 날짜에서 일수를 뺍니다
    */
   static subtractDays(date: Date, days: number): Date {
-    return new Date(date.getTime() - (days * 24 * 60 * 60 * 1000));
+    return new Date(date.getTime() - days * 24 * 60 * 60 * 1000);
   }
 
   /**
    * 지정된 날짜에서 분을 뺍니다
    */
   static subtractMinutes(date: Date, minutes: number): Date {
-    return new Date(date.getTime() - (minutes * 60 * 1000));
+    return new Date(date.getTime() - minutes * 60 * 1000);
   }
 
   /**
    * 지정된 날짜에서 초를 뺍니다
    */
   static subtractSeconds(date: Date, seconds: number): Date {
-    return new Date(date.getTime() - (seconds * 1000));
+    return new Date(date.getTime() - seconds * 1000);
   }
 
   /**
@@ -121,6 +121,6 @@ export class DateUtils {
    * 초 단위 시간을 Date 객체로 변환 (현재 시간 기준)
    */
   static fromSecondsToDate(seconds: number): Date {
-    return new Date(Date.now() + (seconds * 1000));
+    return new Date(Date.now() + seconds * 1000);
   }
 }

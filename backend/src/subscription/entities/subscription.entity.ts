@@ -7,85 +7,85 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
-  BeforeInsert
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { SubscriptionPlan } from './subscription-plan.entity';
+  BeforeInsert,
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
+import { SubscriptionPlan } from "./subscription-plan.entity";
 import {
   SubscriptionTier,
   SubscriptionStatus,
   BillingCycle,
-  PaymentProvider
-} from '../../common/enums/subscription.enum';
+  PaymentProvider,
+} from "../../common/enums/subscription.enum";
 
-@Entity('subscriptions')
-@Index(['userId'])
-@Index(['status'])
-@Index(['tier'])
-@Index(['nextBillingDate'])
+@Entity("subscriptions")
+@Index(["userId"])
+@Index(["status"])
+@Index(["tier"])
+@Index(["nextBillingDate"])
 export class Subscription {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   userId: string;
 
   // 법적 보관 의무: 전자상거래법 5년 보관 (결제 기록)
   // 사용자 삭제 시 CASCADE 아닌 SET NULL로 변경하여 법적 보관 기간 준수
-  @ManyToOne(() => User, { onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { onDelete: "SET NULL" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @Column({ type: 'uuid', nullable: true })
+  @Column({ type: "uuid", nullable: true })
   planId: string;
 
   @ManyToOne(() => SubscriptionPlan, { eager: true })
-  @JoinColumn({ name: 'planId' })
+  @JoinColumn({ name: "planId" })
   plan: SubscriptionPlan;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: SubscriptionTier,
-    default: SubscriptionTier.FREE
+    default: SubscriptionTier.FREE,
   })
   tier: SubscriptionTier;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: SubscriptionStatus,
-    default: SubscriptionStatus.ACTIVE
+    default: SubscriptionStatus.ACTIVE,
   })
   status: SubscriptionStatus;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: BillingCycle,
-    nullable: true
+    nullable: true,
   })
   billingCycle: BillingCycle;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   startDate: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   endDate: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   trialEndDate: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   nextBillingDate: Date;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   canceledAt: Date;
 
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   cancelReason: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   price: number;
 
-  @Column({ length: 3, default: 'USD' })
+  @Column({ length: 3, default: "USD" })
   currency: string;
 
   @Column({ default: true })
@@ -93,9 +93,9 @@ export class Subscription {
 
   // Payment Provider 관련 필드
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: PaymentProvider,
-    nullable: true
+    nullable: true,
   })
   paymentProvider: PaymentProvider;
 
@@ -121,14 +121,14 @@ export class Subscription {
   @Column({ nullable: true })
   discountCode: string;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 0 })
+  @Column({ type: "decimal", precision: 5, scale: 2, default: 0 })
   discountPercentage: number;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   discountEndDate: Date;
 
   // 메타데이터
-  @Column('jsonb', { nullable: true })
+  @Column("jsonb", { nullable: true })
   metadata: Record<string, any>;
 
   @CreateDateColumn()
@@ -152,24 +152,31 @@ export class Subscription {
    * 구독이 활성 상태인지 확인
    */
   isActive(): boolean {
-    return this.status === SubscriptionStatus.ACTIVE &&
-           (!this.endDate || this.endDate > new Date());
+    return (
+      this.status === SubscriptionStatus.ACTIVE &&
+      (!this.endDate || this.endDate > new Date())
+    );
   }
 
   /**
    * 구독이 체험 기간인지 확인
    */
   isInTrial(): boolean {
-    return this.status === SubscriptionStatus.TRIAL &&
-           this.trialEndDate &&
-           this.trialEndDate > new Date();
+    return (
+      this.status === SubscriptionStatus.TRIAL &&
+      this.trialEndDate &&
+      this.trialEndDate > new Date()
+    );
   }
 
   /**
    * 구독 취소 가능 여부
    */
   canCancel(): boolean {
-    return this.status === SubscriptionStatus.ACTIVE || this.status === SubscriptionStatus.TRIAL;
+    return (
+      this.status === SubscriptionStatus.ACTIVE ||
+      this.status === SubscriptionStatus.TRIAL
+    );
   }
 
   /**

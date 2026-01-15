@@ -1,6 +1,6 @@
-declare module 'cache-manager-redis-store' {
-  import { StoreConfig } from 'cache-manager';
-  
+declare module "cache-manager-redis-store" {
+  import { StoreConfig } from "cache-manager";
+
   interface RedisStoreOptions {
     host?: string;
     port?: number;

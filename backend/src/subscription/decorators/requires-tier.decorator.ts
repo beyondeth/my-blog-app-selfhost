@@ -1,7 +1,7 @@
-import { SetMetadata } from '@nestjs/common';
-import { SubscriptionTier } from '../../common/enums/subscription.enum';
+import { SetMetadata } from "@nestjs/common";
+import { SubscriptionTier } from "../../common/enums/subscription.enum";
 
-export const REQUIRED_TIER_KEY = 'requiredTier';
+export const REQUIRED_TIER_KEY = "requiredTier";
 
 /**
  * 특정 구독 티어 이상이 필요한 엔드포인트를 표시하는 데코레이터

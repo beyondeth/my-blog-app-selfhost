@@ -3,14 +3,14 @@ import {
   Logger,
   NotFoundException,
   BadRequestException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import { v4 as uuidv4 } from 'uuid';
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import { v4 as uuidv4 } from "uuid";
 
-import { Music } from '../entities/music.entity';
-import { MusicMetadataService } from './music-metadata.service';
+import { Music } from "../entities/music.entity";
+import { MusicMetadataService } from "./music-metadata.service";
 import {
   CreateMusicUploadUrlDto,
   MusicUploadCompleteDto,
@@ -19,13 +19,10 @@ import {
   PlaylistTrackDto,
   AdminMusicDto,
   MusicUploadUrlResponseDto,
-} from '../dto';
-import { CacheService } from '../../cache/cache.service';
-import { S3Service } from '../../files/services/s3.service';
-import {
-  MUSIC_CACHE_KEYS,
-  MUSIC_CACHE_TTL,
-} from '../constants';
+} from "../dto";
+import { CacheService } from "../../cache/cache.service";
+import { S3Service } from "../../files/services/s3.service";
+import { MUSIC_CACHE_KEYS, MUSIC_CACHE_TTL } from "../constants";
 
 /**
  * 음악 서비스
@@ -45,8 +42,8 @@ export class MusicService {
     private readonly s3Service: S3Service,
   ) {
     // CDN_DOMAIN에서 CDN 베이스 URL 구성 (CdnService와 동일한 패턴)
-    const cdnDomain = this.configService.get('CDN_DOMAIN', '');
-    this.cdnBaseUrl = cdnDomain ? `https://${cdnDomain}` : '';
+    const cdnDomain = this.configService.get("CDN_DOMAIN", "");
+    this.cdnBaseUrl = cdnDomain ? `https://${cdnDomain}` : "";
   }
 
   // ============================================
@@ -83,7 +80,7 @@ export class MusicService {
     // DB 조회
     const musics = await this.musicRepository.find({
       where: whereCondition,
-      order: { order: 'ASC', createdAt: 'DESC' },
+      order: { order: "ASC", createdAt: "DESC" },
     });
 
     // DTO 변환
@@ -108,17 +105,17 @@ export class MusicService {
       MUSIC_CACHE_KEYS.GENRES_LIST,
     );
     if (cached) {
-      this.logger.debug('Genres list served from cache');
+      this.logger.debug("Genres list served from cache");
       return cached;
     }
 
     // DB에서 실제 사용 중인 장르만 조회 (관리자 지정 displayGenre, 활성화된 음악만)
     // 기본 장르 없음 - 관리자가 직접 지정한 장르만 표시
     const result = await this.musicRepository
-      .createQueryBuilder('music')
-      .select('DISTINCT music.display_genre', 'genre')
-      .where('music.is_active = :isActive', { isActive: true })
-      .andWhere('music.display_genre IS NOT NULL')
+      .createQueryBuilder("music")
+      .select("DISTINCT music.display_genre", "genre")
+      .where("music.is_active = :isActive", { isActive: true })
+      .andWhere("music.display_genre IS NOT NULL")
       .andWhere("music.display_genre != ''")
       .getRawMany();
 
@@ -146,25 +143,25 @@ export class MusicService {
   ): Promise<MusicUploadUrlResponseDto> {
     // MIME 타입 검증
     const allowedMimeTypes = [
-      'audio/mpeg',
-      'audio/mp3',
-      'audio/wav',
-      'audio/ogg',
-      'audio/flac',
-      'audio/m4a',
-      'audio/aac',
+      "audio/mpeg",
+      "audio/mp3",
+      "audio/wav",
+      "audio/ogg",
+      "audio/flac",
+      "audio/m4a",
+      "audio/aac",
     ];
 
     if (!allowedMimeTypes.includes(dto.mimeType)) {
       throw new BadRequestException(
-        `지원하지 않는 파일 형식입니다. 지원 형식: ${allowedMimeTypes.join(', ')}`,
+        `지원하지 않는 파일 형식입니다. 지원 형식: ${allowedMimeTypes.join(", ")}`,
       );
     }
 
     // S3 키 생성
     const now = new Date();
     const year = now.getFullYear();
-    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, "0");
     const ext = this.getExtensionFromMimeType(dto.mimeType);
     const fileKey = `uploads/music/${year}/${month}/${uuidv4()}${ext}`;
 
@@ -173,7 +170,7 @@ export class MusicService {
       fileKey,
       dto.mimeType,
       dto.fileSize,
-      'audio', // fileType
+      "audio", // fileType
     );
 
     return {
@@ -196,8 +193,8 @@ export class MusicService {
 
     // 현재 최대 순서 조회
     const maxOrder = await this.musicRepository
-      .createQueryBuilder('music')
-      .select('MAX(music.order)', 'max')
+      .createQueryBuilder("music")
+      .select("MAX(music.order)", "max")
       .getRawOne();
 
     const nextOrder = (maxOrder?.max ?? -1) + 1;
@@ -238,7 +235,7 @@ export class MusicService {
    */
   async findAll(): Promise<AdminMusicDto[]> {
     const musics = await this.musicRepository.find({
-      order: { order: 'ASC', createdAt: 'DESC' },
+      order: { order: "ASC", createdAt: "DESC" },
     });
 
     return musics.map((music) =>
@@ -253,7 +250,7 @@ export class MusicService {
     const music = await this.musicRepository.findOne({ where: { id } });
 
     if (!music) {
-      throw new NotFoundException('음악을 찾을 수 없습니다.');
+      throw new NotFoundException("음악을 찾을 수 없습니다.");
     }
 
     return AdminMusicDto.fromEntity(music, this.cdnBaseUrl);
@@ -266,7 +263,7 @@ export class MusicService {
     const music = await this.musicRepository.findOne({ where: { id } });
 
     if (!music) {
-      throw new NotFoundException('음악을 찾을 수 없습니다.');
+      throw new NotFoundException("음악을 찾을 수 없습니다.");
     }
 
     // 변경 사항 적용
@@ -318,7 +315,7 @@ export class MusicService {
     const music = await this.musicRepository.findOne({ where: { id } });
 
     if (!music) {
-      throw new NotFoundException('음악을 찾을 수 없습니다.');
+      throw new NotFoundException("음악을 찾을 수 없습니다.");
     }
 
     // S3에서 파일 삭제
@@ -348,7 +345,7 @@ export class MusicService {
     const music = await this.musicRepository.findOne({ where: { id } });
 
     if (!music) {
-      throw new NotFoundException('음악을 찾을 수 없습니다.');
+      throw new NotFoundException("음악을 찾을 수 없습니다.");
     }
 
     music.isActive = !music.isActive;
@@ -378,19 +375,21 @@ export class MusicService {
     // DB에서 현재 사용 중인 모든 장르 조회하여 해당 캐시 삭제
     // displayGenre 기준으로 조회 (관리자 지정 장르)
     const result = await this.musicRepository
-      .createQueryBuilder('music')
-      .select('DISTINCT music.display_genre', 'genre')
-      .where('music.display_genre IS NOT NULL')
+      .createQueryBuilder("music")
+      .select("DISTINCT music.display_genre", "genre")
+      .where("music.display_genre IS NOT NULL")
       .andWhere("music.display_genre != ''")
       .getRawMany();
 
     for (const row of result) {
       if (row.genre) {
-        await this.cacheService.del(MUSIC_CACHE_KEYS.PLAYLIST_BY_GENRE(row.genre));
+        await this.cacheService.del(
+          MUSIC_CACHE_KEYS.PLAYLIST_BY_GENRE(row.genre),
+        );
       }
     }
 
-    this.logger.debug('All playlist caches invalidated');
+    this.logger.debug("All playlist caches invalidated");
   }
 
   /**
@@ -405,15 +404,15 @@ export class MusicService {
    */
   private getExtensionFromMimeType(mimeType: string): string {
     const mimeToExt: Record<string, string> = {
-      'audio/mpeg': '.mp3',
-      'audio/mp3': '.mp3',
-      'audio/wav': '.wav',
-      'audio/ogg': '.ogg',
-      'audio/flac': '.flac',
-      'audio/m4a': '.m4a',
-      'audio/aac': '.aac',
+      "audio/mpeg": ".mp3",
+      "audio/mp3": ".mp3",
+      "audio/wav": ".wav",
+      "audio/ogg": ".ogg",
+      "audio/flac": ".flac",
+      "audio/m4a": ".m4a",
+      "audio/aac": ".aac",
     };
 
-    return mimeToExt[mimeType] || '.mp3';
+    return mimeToExt[mimeType] || ".mp3";
   }
 }

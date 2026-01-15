@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { FiCheck, FiX, FiLoader } from 'react-icons/fi';
+import { DESTRUCTIVE_SURFACE_CLASS } from '@/constants/accessibility';
 
 /**
  * 캐릭터 선택 컴포넌트
@@ -122,7 +123,7 @@ export default function CharacterSelector({
           {/* 컨텐츠 */}
           <div className="px-6 py-4">
             {error && (
-              <div className="mb-4 px-4 py-2 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm rounded-md">
+              <div className={`mb-4 px-4 py-2 text-sm rounded-md ${DESTRUCTIVE_SURFACE_CLASS}`}>
                 {error}
               </div>
             )}

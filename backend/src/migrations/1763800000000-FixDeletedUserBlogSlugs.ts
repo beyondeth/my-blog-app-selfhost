@@ -1,7 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class FixDeletedUserBlogSlugs1763800000000 implements MigrationInterface {
-  name = 'FixDeletedUserBlogSlugs1763800000000';
+export class FixDeletedUserBlogSlugs1763800000000
+  implements MigrationInterface
+{
+  name = "FixDeletedUserBlogSlugs1763800000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 삭제된 사용자들의 블로그 slug를 'deleted-{original-slug}-{user-id-timestamp}' 형식으로 변경
@@ -21,11 +23,13 @@ export class FixDeletedUserBlogSlugs1763800000000 implements MigrationInterface 
       WHERE b.slug LIKE 'deleted-%'
     `);
 
-    console.log(`[Migration] Updated ${result[0].count} deleted user blog slugs`);
+    console.log(
+      `[Migration] Updated ${result[0].count} deleted user blog slugs`,
+    );
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 롤백은 복잡하므로 수동 처리 필요
-    console.warn('[Migration] Rollback requires manual intervention');
+    console.warn("[Migration] Rollback requires manual intervention");
   }
 }

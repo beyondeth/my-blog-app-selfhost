@@ -1,9 +1,9 @@
-import { Injectable, ExecutionContext } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { ConfigService } from '@nestjs/config';
+import { Injectable, ExecutionContext } from "@nestjs/common";
+import { AuthGuard } from "@nestjs/passport";
+import { ConfigService } from "@nestjs/config";
 
 @Injectable()
-export class GoogleAuthGuard extends AuthGuard('google') {
+export class GoogleAuthGuard extends AuthGuard("google") {
   constructor(private configService: ConfigService) {
     super();
   }
@@ -17,17 +17,26 @@ export class GoogleAuthGuard extends AuthGuard('google') {
 
     if (err || !user) {
       // 에러 코드 및 메시지 추출
-      const errorCode = err?.response?.code || 'oauth_error';
-      const errorMessage = encodeURIComponent(err?.response?.message || err?.message || '로그인 실패');
+      const errorCode = err?.response?.code || "auth_failed";
+      // 메시지 인코딩 강화 
+      const errorMessage = encodeURIComponent(
+        err?.response?.message || err?.message || "로그인 실패",
+      );
       const remainingDays = err?.response?.remainingDays || 0;
-      const frontendUrl = this.configService.get('FRONTEND_URL') || 'http://localhost:3001';
+      const reason = encodeURIComponent(err?.response?.reason || "");
+      const suspensionUntil = encodeURIComponent(
+        err?.response?.suspensionUntil || "",
+      );
 
-      // 프론트엔드 콜백 페이지로 에러 정보와 함께 리다이렉트
+      const frontendUrl =
+        this.configService.get("FRONTEND_URL") || "http://localhost:3001";
+
+      // 프론트엔드 콜백 페이지로 상세 에러 정보와 함께 리다이렉트
       return response.redirect(
-        `${frontendUrl}/auth/callback?error=${errorCode}&message=${errorMessage}&remainingDays=${remainingDays}`
+        `${frontendUrl}/auth/callback?error=${errorCode}&message=${errorMessage}&remainingDays=${remainingDays}&reason=${reason}&until=${suspensionUntil}`,
       );
     }
 
     return user;
   }
-} 
+}

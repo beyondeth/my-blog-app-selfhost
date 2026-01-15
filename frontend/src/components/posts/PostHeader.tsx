@@ -34,14 +34,14 @@ export default function PostHeader({
 }: PostHeaderProps) {
   return (
     <header className="mb-8">
-      {/* Back Button - 컨테이너 경계를 넘어서 왼쪽에 배치 */}
+      {/* Back Button */}
       {onBack && (
-        <div className="mb-6 -ml-8">
+        <div className="mb-6">
           <button
             onClick={onBack}
-            className="inline-flex items-center text-gray-600 hover:text-gray-900 transition-colors text-xs font-medium"
+            className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white dark:border-white/25 transition-colors text-xs font-semibold shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm"
           >
-            <FiArrowLeft className="mr-2 w-4 h-4" />
+            <FiArrowLeft className="w-4 h-4 mr-2" />
             Back
           </button>
         </div>
@@ -63,7 +63,7 @@ export default function PostHeader({
       </h1>
 
       {/* Meta Information with Like/Share and Action Buttons */}
-      <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-gray-500 mb-8 pb-4 border-b border-gray-100">
+      <div className="flex flex-wrap items-center justify-between gap-4 text-xs text-gray-600 dark:text-gray-300 mb-8 pb-4 border-b border-gray-400 dark:border-gray-500">
         {/* Left: Meta Information with Like/Share */}
         <div className="flex flex-wrap items-center gap-6">
           <div className="flex items-center">

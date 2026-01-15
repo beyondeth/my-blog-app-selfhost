@@ -3,7 +3,7 @@
  * Provides mock implementations for TypeORM repositories
  */
 
-import { SelectQueryBuilder } from 'typeorm';
+import { SelectQueryBuilder } from "typeorm";
 
 export class MockRepository<T> {
   private data: T[] = [];
@@ -16,23 +16,23 @@ export class MockRepository<T> {
 
   find = jest.fn().mockImplementation((options?: any) => {
     if (!options) return Promise.resolve(this.data);
-    
+
     // Simple where clause simulation
     if (options.where) {
-      const filtered = this.data.filter(item => {
+      const filtered = this.data.filter((item) => {
         return Object.entries(options.where).every(([key, value]) => {
           return (item as any)[key] === value;
         });
       });
       return Promise.resolve(filtered);
     }
-    
+
     return Promise.resolve(this.data);
   });
 
   findOne = jest.fn().mockImplementation((options: any) => {
     if (options.where) {
-      const found = this.data.find(item => {
+      const found = this.data.find((item) => {
         return Object.entries(options.where).every(([key, value]) => {
           return (item as any)[key] === value;
         });
@@ -44,7 +44,7 @@ export class MockRepository<T> {
 
   save = jest.fn().mockImplementation((entity: T | T[]) => {
     if (Array.isArray(entity)) {
-      entity.forEach(e => this.addOrUpdate(e));
+      entity.forEach((e) => this.addOrUpdate(e));
       return Promise.resolve(entity);
     }
     this.addOrUpdate(entity);
@@ -52,8 +52,8 @@ export class MockRepository<T> {
   });
 
   update = jest.fn().mockImplementation((criteria: any, updates: any) => {
-    const items = this.data.filter(item => {
-      if (typeof criteria === 'object') {
+    const items = this.data.filter((item) => {
+      if (typeof criteria === "object") {
         return Object.entries(criteria).every(([key, value]) => {
           return (item as any)[key] === value;
         });
@@ -61,7 +61,7 @@ export class MockRepository<T> {
       return (item as any).id === criteria;
     });
 
-    items.forEach(item => {
+    items.forEach((item) => {
       Object.assign(item, updates);
     });
 
@@ -70,7 +70,7 @@ export class MockRepository<T> {
 
   remove = jest.fn().mockImplementation((entity: T | T[]) => {
     if (Array.isArray(entity)) {
-      entity.forEach(e => this.removeItem(e));
+      entity.forEach((e) => this.removeItem(e));
       return Promise.resolve(entity);
     }
     this.removeItem(entity);
@@ -79,15 +79,15 @@ export class MockRepository<T> {
 
   delete = jest.fn().mockImplementation((criteria: any) => {
     const initialLength = this.data.length;
-    this.data = this.data.filter(item => {
-      if (typeof criteria === 'object') {
+    this.data = this.data.filter((item) => {
+      if (typeof criteria === "object") {
         return !Object.entries(criteria).every(([key, value]) => {
           return (item as any)[key] === value;
         });
       }
       return (item as any).id !== criteria;
     });
-    
+
     return Promise.resolve({ affected: initialLength - this.data.length });
   });
 
@@ -96,12 +96,12 @@ export class MockRepository<T> {
       return Promise.resolve(this.data.length);
     }
 
-    const filtered = this.data.filter(item => {
+    const filtered = this.data.filter((item) => {
       return Object.entries(options.where).every(([key, value]) => {
         return (item as any)[key] === value;
       });
     });
-    
+
     return Promise.resolve(filtered.length);
   });
 
@@ -111,10 +111,10 @@ export class MockRepository<T> {
 
   // Helper methods
   private addOrUpdate(entity: T) {
-    const index = this.data.findIndex(item => 
-      (item as any).id === (entity as any).id
+    const index = this.data.findIndex(
+      (item) => (item as any).id === (entity as any).id,
     );
-    
+
     if (index >= 0) {
       this.data[index] = entity;
     } else {
@@ -123,10 +123,10 @@ export class MockRepository<T> {
   }
 
   private removeItem(entity: T) {
-    const index = this.data.findIndex(item => 
-      (item as any).id === (entity as any).id
+    const index = this.data.findIndex(
+      (item) => (item as any).id === (entity as any).id,
     );
-    
+
     if (index >= 0) {
       this.data.splice(index, 1);
     }
@@ -163,7 +163,7 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   private selectFields: string[] = [];
   private limitValue?: number;
   private orderByField?: string;
-  private orderByDirection?: 'ASC' | 'DESC';
+  private orderByDirection?: "ASC" | "DESC";
   public alias?: string;
 
   constructor(data: T[], alias?: string) {
@@ -191,12 +191,12 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   });
 
   andWhere = jest.fn().mockImplementation((condition: string, params?: any) => {
-    this.whereConditions.push({ condition, params, operator: 'AND' });
+    this.whereConditions.push({ condition, params, operator: "AND" });
     return this;
   });
 
   orWhere = jest.fn().mockImplementation((condition: string, params?: any) => {
-    this.whereConditions.push({ condition, params, operator: 'OR' });
+    this.whereConditions.push({ condition, params, operator: "OR" });
     return this;
   });
 
@@ -205,11 +205,13 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   innerJoin = jest.fn().mockImplementation(() => this);
   innerJoinAndSelect = jest.fn().mockImplementation(() => this);
 
-  orderBy = jest.fn().mockImplementation((field: string, direction?: 'ASC' | 'DESC') => {
-    this.orderByField = field;
-    this.orderByDirection = direction || 'ASC';
-    return this;
-  });
+  orderBy = jest
+    .fn()
+    .mockImplementation((field: string, direction?: "ASC" | "DESC") => {
+      this.orderByField = field;
+      this.orderByDirection = direction || "ASC";
+      return this;
+    });
 
   limit = jest.fn().mockImplementation((limit: number) => {
     this.limitValue = limit;
@@ -228,11 +230,11 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
 
   getMany = jest.fn().mockImplementation(() => {
     let result = [...this.data];
-    
+
     // Apply simple filtering based on where conditions
     if (this.whereConditions.length > 0) {
       // Simplified filtering logic
-      result = result.filter(item => {
+      result = result.filter((item) => {
         // Mock implementation - in real tests, you'd implement proper filtering
         return true;
       });
@@ -247,11 +249,11 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   });
 
   getOne = jest.fn().mockImplementation(() => {
-    return this.getMany().then(results => results[0] || null);
+    return this.getMany().then((results) => results[0] || null);
   });
 
   getCount = jest.fn().mockImplementation(() => {
-    return this.getMany().then(results => results.length);
+    return this.getMany().then((results) => results.length);
   });
 
   getRawMany = jest.fn().mockImplementation(() => {
@@ -263,7 +265,9 @@ export class MockQueryBuilder<T> implements Partial<SelectQueryBuilder<T>> {
   });
 
   getManyAndCount = jest.fn().mockImplementation(() => {
-    return this.getMany().then(results => [results, results.length] as [T[], number]);
+    return this.getMany().then(
+      (results) => [results, results.length] as [T[], number],
+    );
   });
 
   // Test utilities

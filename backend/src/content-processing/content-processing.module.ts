@@ -1,8 +1,8 @@
-import { Module } from '@nestjs/common';
-import { ContentProcessingService } from './services/content-processing.service';
-import { HtmlSanitizerService } from './services/html-sanitizer.service';
-import { CodeHighlightService } from './services/code-highlight.service';
-import { ImageProcessorService } from './services/image-processor.service';
+import { Module } from "@nestjs/common";
+import { ContentProcessingService } from "./services/content-processing.service";
+import { HtmlSanitizerService } from "./services/html-sanitizer.service";
+import { CodeHighlightService } from "./services/code-highlight.service";
+import { ImageProcessorService } from "./services/image-processor.service";
 
 /**
  * Content Processing 모듈
@@ -20,9 +20,6 @@ import { ImageProcessorService } from './services/image-processor.service';
     CodeHighlightService,
     ImageProcessorService,
   ],
-  exports: [
-    ContentProcessingService,
-    HtmlSanitizerService,
-  ],
+  exports: [ContentProcessingService, HtmlSanitizerService],
 })
 export class ContentProcessingModule {}

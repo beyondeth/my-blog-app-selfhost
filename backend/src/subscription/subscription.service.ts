@@ -1,24 +1,29 @@
-import { Injectable, BadRequestException, NotFoundException, ForbiddenException } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { OnEvent, EventEmitter2 } from '@nestjs/event-emitter';
-import { Subscription } from './entities/subscription.entity';
-import { SubscriptionPlan } from './entities/subscription-plan.entity';
-import { PaymentHistory } from './entities/payment-history.entity';
-import { User } from '../users/entities/user.entity';
+import {
+  Injectable,
+  BadRequestException,
+  NotFoundException,
+  ForbiddenException,
+} from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { OnEvent, EventEmitter2 } from "@nestjs/event-emitter";
+import { Subscription } from "./entities/subscription.entity";
+import { SubscriptionPlan } from "./entities/subscription-plan.entity";
+import { PaymentHistory } from "./entities/payment-history.entity";
+import { User } from "../users/entities/user.entity";
 import {
   SubscriptionTier,
   SubscriptionStatus,
   BillingCycle,
   PaymentStatus,
-} from '../common/enums/subscription.enum';
-import { PaymentEvents } from '../payment/enums/payment-events.enum';
+} from "../common/enums/subscription.enum";
+import { PaymentEvents } from "../payment/enums/payment-events.enum";
 import {
   PaymentSuccessPayload,
   PaymentFailedPayload,
   RefundPayload,
   SubscriptionCancelledPayload,
-} from '../payment/interfaces/payment-event-payloads.interface';
+} from "../payment/interfaces/payment-event-payloads.interface";
 
 @Injectable()
 export class SubscriptionService {
@@ -40,14 +45,17 @@ export class SubscriptionService {
    */
   async getAvailablePlans(): Promise<SubscriptionPlan[]> {
     return await this.subscriptionPlanRepository.find({
-      order: { name: 'ASC' },
+      order: { name: "ASC" },
     });
   }
 
   /**
    * 다운그레이드 가능 여부 확인
    */
-  async canDowngrade(userId: string, targetTier: SubscriptionTier): Promise<boolean> {
+  async canDowngrade(
+    userId: string,
+    targetTier: SubscriptionTier,
+  ): Promise<boolean> {
     const currentSubscription = await this.getUserSubscription(userId);
 
     // Free 플랜으로는 항상 다운그레이드 가능
@@ -71,7 +79,7 @@ export class SubscriptionService {
   async simulateUpgrade(
     userId: string,
     targetTier: SubscriptionTier,
-    billingCycle: BillingCycle
+    billingCycle: BillingCycle,
   ) {
     const currentSubscription = await this.getUserSubscription(userId);
     const targetPlan = await this.subscriptionPlanRepository.findOne({
@@ -79,14 +87,14 @@ export class SubscriptionService {
     });
 
     if (!targetPlan) {
-      throw new NotFoundException('Target plan not found');
+      throw new NotFoundException("Target plan not found");
     }
 
     // 비례 배분 계산 등
     const proratedAmount = this.calculateProratedAmount(
       currentSubscription,
       targetPlan,
-      billingCycle
+      billingCycle,
     );
 
     return {
@@ -104,7 +112,7 @@ export class SubscriptionService {
   private calculateProratedAmount(
     currentSubscription: Subscription,
     targetPlan: SubscriptionPlan,
-    billingCycle: BillingCycle
+    billingCycle: BillingCycle,
   ): number {
     // 간단한 구현 - 실제로는 더 복잡한 로직 필요
     if (billingCycle === BillingCycle.MONTHLY) {
@@ -114,15 +122,14 @@ export class SubscriptionService {
     }
   }
 
-
   /**
    * 사용자의 현재 구독 정보 조회
    */
   async getUserSubscription(userId: string): Promise<Subscription> {
     const subscription = await this.subscriptionRepository.findOne({
       where: { userId },
-      relations: ['plan'],
-      order: { createdAt: 'DESC' },
+      relations: ["plan"],
+      order: { createdAt: "DESC" },
     });
 
     if (!subscription) {
@@ -142,7 +149,7 @@ export class SubscriptionService {
     });
 
     if (!freePlan) {
-      throw new NotFoundException('Free 플랜을 찾을 수 없습니다');
+      throw new NotFoundException("Free 플랜을 찾을 수 없습니다");
     }
 
     const subscription = this.subscriptionRepository.create({
@@ -169,18 +176,22 @@ export class SubscriptionService {
   /**
    * 결제 세션 생성 (Checkout)
    */
-  async createCheckoutSession(userId: string, planId: string, billingCycle: BillingCycle) {
+  async createCheckoutSession(
+    userId: string,
+    planId: string,
+    billingCycle: BillingCycle,
+  ) {
     const user = await this.userRepository.findOne({ where: { id: userId } });
     const plan = await this.subscriptionPlanRepository.findOne({
       where: { id: planId },
     });
 
     if (!plan) {
-      throw new NotFoundException('플랜을 찾을 수 없습니다');
+      throw new NotFoundException("플랜을 찾을 수 없습니다");
     }
 
     if (!plan.isActive) {
-      throw new BadRequestException('선택한 플랜은 현재 이용할 수 없습니다');
+      throw new BadRequestException("선택한 플랜은 현재 이용할 수 없습니다");
     }
 
     // 다운그레이드 체크 - Mock 환경에서는 모든 플랜 변경 허용
@@ -194,9 +205,10 @@ export class SubscriptionService {
     // }
 
     // 가격 계산
-    const price = billingCycle === BillingCycle.YEARLY
-      ? plan.pricing.yearly
-      : plan.pricing.monthly;
+    const price =
+      billingCycle === BillingCycle.YEARLY
+        ? plan.pricing.yearly
+        : plan.pricing.monthly;
 
     // 결제 세션 생성 (Payment Provider 통해)
     // Mock 체크아웃 세션 생성 - 실제로는 결제 페이지로 이동
@@ -245,14 +257,14 @@ export class SubscriptionService {
       });
 
       if (!newPlan) {
-        throw new NotFoundException('플랜을 찾을 수 없습니다');
+        throw new NotFoundException("플랜을 찾을 수 없습니다");
       }
 
       const currentSubscription = await this.getUserSubscription(userId);
 
       // 업그레이드 가능 여부 확인
       if (!this.isUpgrade(currentSubscription.tier, newPlan.tier)) {
-        throw new BadRequestException('업그레이드가 아닙니다');
+        throw new BadRequestException("업그레이드가 아닙니다");
       }
 
       // 새 구독 생성
@@ -263,9 +275,10 @@ export class SubscriptionService {
         tier: newPlan.tier,
         status: SubscriptionStatus.ACTIVE,
         billingCycle,
-        price: billingCycle === BillingCycle.YEARLY
-          ? newPlan.pricing.yearly
-          : newPlan.pricing.monthly,
+        price:
+          billingCycle === BillingCycle.YEARLY
+            ? newPlan.pricing.yearly
+            : newPlan.pricing.monthly,
         currency: newPlan.pricing.currency,
         startDate: new Date(),
         nextBillingDate: this.calculateNextBillingDate(billingCycle),
@@ -298,11 +311,14 @@ export class SubscriptionService {
   /**
    * 구독 취소
    */
-  async cancelSubscription(userId: string, reason?: string): Promise<Subscription> {
+  async cancelSubscription(
+    userId: string,
+    reason?: string,
+  ): Promise<Subscription> {
     const subscription = await this.getUserSubscription(userId);
 
     if (!subscription.canCancel()) {
-      throw new BadRequestException('이 구독은 취소할 수 없습니다');
+      throw new BadRequestException("이 구독은 취소할 수 없습니다");
     }
 
     // 결제 시스템에서 구독 취소
@@ -341,7 +357,7 @@ export class SubscriptionService {
     // 기존 구독 확인
     let subscription = await this.subscriptionRepository.findOne({
       where: { userId },
-      relations: ['plan'],
+      relations: ["plan"],
     });
 
     // 새로운 플랜 가져오기
@@ -350,7 +366,7 @@ export class SubscriptionService {
     if (subscription) {
       // 기존 구독 업데이트
       subscription.planId = newPlan.id;
-      subscription.plan = newPlan;  // plan 관계도 업데이트
+      subscription.plan = newPlan; // plan 관계도 업데이트
       subscription.tier = tier;
       subscription.billingCycle = billingCycle;
       subscription.status = SubscriptionStatus.ACTIVE;
@@ -365,7 +381,7 @@ export class SubscriptionService {
         billingDate.setFullYear(billingDate.getFullYear() + 1);
       }
       subscription.endDate = billingDate;
-      subscription.nextBillingDate = billingDate;  // 다음 결제일 추가
+      subscription.nextBillingDate = billingDate; // 다음 결제일 추가
 
       subscription.canceledAt = null;
       subscription.cancelReason = null;
@@ -381,14 +397,14 @@ export class SubscriptionService {
       subscription = this.subscriptionRepository.create({
         userId,
         planId: newPlan.id,
-        plan: newPlan,  // plan 관계도 설정
+        plan: newPlan, // plan 관계도 설정
         tier,
         billingCycle,
         status: SubscriptionStatus.ACTIVE,
         autoRenew: true,
         startDate: new Date(),
         endDate: billingDate,
-        nextBillingDate: billingDate,  // 다음 결제일 추가
+        nextBillingDate: billingDate, // 다음 결제일 추가
       });
     }
 
@@ -397,34 +413,35 @@ export class SubscriptionService {
     // User 엔티티 업데이트
     // userId가 유효한지 확인
     if (!userId) {
-      throw new BadRequestException('유효하지 않은 사용자 ID입니다');
+      throw new BadRequestException("유효하지 않은 사용자 ID입니다");
     }
 
     await this.userRepository.update(
-      { id: userId },  // where 조건을 명시적으로 지정
+      { id: userId }, // where 조건을 명시적으로 지정
       {
         subscriptionTier: tier,
         subscriptionStatus: SubscriptionStatus.ACTIVE,
-      }
+      },
     );
 
     // 결제 이력 추가
     const paymentHistory = this.paymentHistoryRepository.create({
-      user: { id: userId } as User,  // userId 대신 user 관계 설정
-      subscription: { id: subscription.id } as Subscription,  // subscriptionId 대신 subscription 관계
-      amount: billingCycle === BillingCycle.MONTHLY
-        ? newPlan.getMonthlyPrice()  // 메서드 호출
-        : newPlan.getYearlyPrice(),   // 메서드 호출
-      currency: 'KRW',
+      user: { id: userId } as User, // userId 대신 user 관계 설정
+      subscription: { id: subscription.id } as Subscription, // subscriptionId 대신 subscription 관계
+      amount:
+        billingCycle === BillingCycle.MONTHLY
+          ? newPlan.getMonthlyPrice() // 메서드 호출
+          : newPlan.getYearlyPrice(), // 메서드 호출
+      currency: "KRW",
       status: PaymentStatus.SUCCEEDED,
-      provider: 'mock',
+      provider: "mock",
       providerId: `mock_${Date.now()}`,
-      createdAt: new Date(),  // paidAt 대신 createdAt 사용
+      createdAt: new Date(), // paidAt 대신 createdAt 사용
     });
     await this.paymentHistoryRepository.save(paymentHistory);
 
     // 구독 변경 이벤트 발생 (UsageService 캐시 무효화)
-    this.eventEmitter.emit('subscription.updated', {
+    this.eventEmitter.emit("subscription.updated", {
       userId,
       tier,
     });
@@ -439,11 +456,13 @@ export class SubscriptionService {
     const subscription = await this.getUserSubscription(userId);
 
     if (subscription.status !== SubscriptionStatus.CANCELED) {
-      throw new BadRequestException('취소된 구독만 재개할 수 있습니다');
+      throw new BadRequestException("취소된 구독만 재개할 수 있습니다");
     }
 
     if (subscription.endDate && subscription.endDate < new Date()) {
-      throw new BadRequestException('만료된 구독은 재개할 수 없습니다. 새로 구독해주세요.');
+      throw new BadRequestException(
+        "만료된 구독은 재개할 수 없습니다. 새로 구독해주세요.",
+      );
     }
 
     // 결제 시스템에서 구독 재개
@@ -472,10 +491,13 @@ export class SubscriptionService {
   /**
    * 결제 이력 조회
    */
-  async getPaymentHistory(userId: string, limit = 10): Promise<PaymentHistory[]> {
+  async getPaymentHistory(
+    userId: string,
+    limit = 10,
+  ): Promise<PaymentHistory[]> {
     return this.paymentHistoryRepository.find({
       where: { userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
       take: limit,
     });
   }
@@ -486,7 +508,7 @@ export class SubscriptionService {
   async getAllPlans(): Promise<SubscriptionPlan[]> {
     return this.subscriptionPlanRepository.find({
       where: { isActive: true },
-      order: { sortOrder: 'ASC' },
+      order: { sortOrder: "ASC" },
     });
   }
 
@@ -510,16 +532,16 @@ export class SubscriptionService {
    */
   async handleWebhook(event: any): Promise<void> {
     switch (event.type) {
-      case 'checkout.session.completed':
+      case "checkout.session.completed":
         await this.handleCheckoutCompleted(event.data);
         break;
-      case 'customer.subscription.updated':
+      case "customer.subscription.updated":
         await this.handleSubscriptionUpdated(event.data);
         break;
-      case 'customer.subscription.deleted':
+      case "customer.subscription.deleted":
         await this.handleSubscriptionDeleted(event.data);
         break;
-      case 'invoice.payment_failed':
+      case "invoice.payment_failed":
         await this.handlePaymentFailed(event.data);
         break;
     }
@@ -562,7 +584,7 @@ export class SubscriptionService {
       amount: data.amount_total / 100, // cents to dollars
       currency: data.currency,
       status: PaymentStatus.SUCCEEDED,
-      paymentProvider: 'stripe',
+      paymentProvider: "stripe",
       transactionId: data.payment_intent,
     });
   }
@@ -575,10 +597,12 @@ export class SubscriptionService {
     // 구독 삭제 처리
   }
 
-
   // Helper methods
 
-  private isUpgrade(current: SubscriptionTier, target: SubscriptionTier): boolean {
+  private isUpgrade(
+    current: SubscriptionTier,
+    target: SubscriptionTier,
+  ): boolean {
     const tierOrder = {
       [SubscriptionTier.FREE]: 0,
       [SubscriptionTier.STARTER]: 1,
@@ -587,7 +611,10 @@ export class SubscriptionService {
     return tierOrder[target] > tierOrder[current];
   }
 
-  private isDowngrade(current: SubscriptionTier, target: SubscriptionTier): boolean {
+  private isDowngrade(
+    current: SubscriptionTier,
+    target: SubscriptionTier,
+  ): boolean {
     const tierOrder = {
       [SubscriptionTier.FREE]: 0,
       [SubscriptionTier.STARTER]: 1,
@@ -612,13 +639,17 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.PAYMENT_SUCCESS)
   async handlePaymentSuccess(payload: PaymentSuccessPayload) {
-    console.log(`[SubscriptionService] Payment success event received for user ${payload.userId}`);
+    console.log(
+      `[SubscriptionService] Payment success event received for user ${payload.userId}`,
+    );
 
     const { userId, metadata } = payload;
     const { tier, billingCycle, paymentIntentId, subscriptionId } = metadata;
 
     if (!tier || !billingCycle) {
-      console.warn('[SubscriptionService] Payment success event missing tier or billing cycle');
+      console.warn(
+        "[SubscriptionService] Payment success event missing tier or billing cycle",
+      );
       return;
     }
 
@@ -651,7 +682,10 @@ export class SubscriptionService {
       tier,
       status: SubscriptionStatus.ACTIVE,
       billingCycle,
-      price: billingCycle === BillingCycle.YEARLY ? plan.pricing.yearly : plan.pricing.monthly,
+      price:
+        billingCycle === BillingCycle.YEARLY
+          ? plan.pricing.yearly
+          : plan.pricing.monthly,
       currency: plan.pricing.currency,
       startDate: new Date(),
       nextBillingDate: this.calculateNextBillingDate(billingCycle),
@@ -675,11 +709,16 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.REFUND_SUCCESS)
   async handleRefundSuccess(payload: RefundPayload) {
-    console.log(`[SubscriptionService] Refund success event received for user ${payload.userId}`);
+    console.log(
+      `[SubscriptionService] Refund success event received for user ${payload.userId}`,
+    );
 
     // 전액 환불인 경우 구독 취소
-    if (payload.status === 'success') {
-      await this.cancelSubscription(payload.userId.toString(), 'Full refund received');
+    if (payload.status === "success") {
+      await this.cancelSubscription(
+        payload.userId.toString(),
+        "Full refund received",
+      );
     }
   }
 
@@ -689,11 +728,13 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.SUBSCRIPTION_CANCELLED)
   async handleSubscriptionCancelled(payload: SubscriptionCancelledPayload) {
-    console.log(`[SubscriptionService] Subscription cancelled event received for user ${payload.userId}`);
+    console.log(
+      `[SubscriptionService] Subscription cancelled event received for user ${payload.userId}`,
+    );
 
     await this.cancelSubscription(
       payload.userId.toString(),
-      payload.reason || 'Subscription cancelled by payment provider'
+      payload.reason || "Subscription cancelled by payment provider",
     );
   }
 
@@ -703,7 +744,9 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.PAYMENT_FAILED)
   async handlePaymentFailed(payload: PaymentFailedPayload) {
-    console.log(`[SubscriptionService] Payment failed for user ${payload.userId}: ${payload.reason}`);
+    console.log(
+      `[SubscriptionService] Payment failed for user ${payload.userId}: ${payload.reason}`,
+    );
 
     // 여기서 사용자에게 알림을 보내거나 추가 처리를 할 수 있습니다
     // 예: 이메일 알림, 재시도 스케줄링 등

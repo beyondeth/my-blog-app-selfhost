@@ -85,7 +85,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
     return (
       <TooltipProvider delayDuration={300}>
         <Tooltip>
-          <div className="mt-12 p-6 bg-gray-50 dark:bg-[rgb(38,38,38)] rounded-lg">
+          <div className="mt-12 rounded-2xl border border-gray-400 bg-white p-6 shadow-sm dark:border-gray-500 dark:bg-[rgb(32,32,32)]">
             <TooltipTrigger asChild>
               <div className="flex items-start space-x-4 cursor-pointer">
                 <Avatar
@@ -109,7 +109,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
           <TooltipContent
             side="top"
             align="start"
-            className="bg-white border border-gray-200 shadow-2xl p-0 animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 rounded-2xl backdrop-blur-sm"
+            className="bg-white dark:bg-card border border-gray-200 dark:border-gray-700 shadow-2xl p-0 animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 rounded-2xl backdrop-blur-sm z-[10002]"
             sideOffset={8}
           >
             <UserProfileCard user={userData} followInfo={followInfo} />
@@ -121,7 +121,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
 
   // 데이터가 없는 경우 또는 삭제된 사용자의 경우 기존 디자인 그대로 표시 (호버 기능 없음)
   return (
-    <div className="mt-12 p-6 bg-gray-50 dark:bg-[rgb(38,38,38)] rounded-lg">
+    <div className="mt-12 rounded-2xl border border-gray-400 bg-white p-6 shadow-sm dark:border-gray-500 dark:bg-[rgb(32,32,32)]">
       <div className="flex items-start space-x-4">
         <Avatar
           src={isDeletedUser ? null : displayProfileImage}

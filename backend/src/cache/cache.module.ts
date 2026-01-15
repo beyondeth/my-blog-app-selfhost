@@ -1,15 +1,15 @@
-import { Module, Global, forwardRef } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { CacheService } from './cache.service';
-import { CacheInterceptor } from './cache.interceptor';
-import { CacheController } from './cache.controller';
-import { CacheWarmingService } from './cache-warming.service';
-import { CacheInvalidationListener } from './cache-invalidation.listener';
-import { RedisModule } from '../redis/redis.module';
-import { MetricsModule } from '../metrics/metrics.module';
-import { BlogsModule } from '../blogs/blogs.module';
-import { Post } from '../posts/entities/post.entity';
-import { User } from '../users/entities/user.entity';
+import { Module, Global, forwardRef } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { CacheService } from "./cache.service";
+import { CacheInterceptor } from "./cache.interceptor";
+import { CacheController } from "./cache.controller";
+import { CacheWarmingService } from "./cache-warming.service";
+import { CacheInvalidationListener } from "./cache-invalidation.listener";
+import { RedisModule } from "../redis/redis.module";
+import { MetricsModule } from "../metrics/metrics.module";
+import { BlogsModule } from "../blogs/blogs.module";
+import { Post } from "../posts/entities/post.entity";
+import { User } from "../users/entities/user.entity";
 
 @Global()
 @Module({

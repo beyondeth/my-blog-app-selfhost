@@ -1,5 +1,12 @@
-import { IsEnum, IsString, IsUUID, IsOptional, MaxLength } from 'class-validator';
-import { ReportType, ReportReason } from '../enums/report.enum';
+import {
+  IsEnum,
+  IsString,
+  IsUUID,
+  IsOptional,
+  MaxLength,
+  IsObject,
+} from "class-validator";
+import { ReportType, ReportReason } from "../enums/report.enum";
 
 export class CreateReportDto {
   @IsEnum(ReportType)
@@ -15,4 +22,16 @@ export class CreateReportDto {
 
   @IsUUID()
   targetId: string;
+
+  @IsUUID()
+  @IsOptional()
+  communityId?: string;
+
+  @IsUUID()
+  @IsOptional()
+  reportedModeratorId?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, any>;
 }

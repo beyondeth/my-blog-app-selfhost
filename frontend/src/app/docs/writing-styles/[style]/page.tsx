@@ -3,6 +3,12 @@
 import { useRouter, useParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { ArrowLeft, Copy, Check } from 'lucide-react';
+import {
+  SETTINGS_CARD_CLASS,
+  SETTINGS_PAGE_WRAPPER,
+  SETTINGS_PRIMARY_BUTTON_CLASS,
+  SETTINGS_SUBTLE_BUTTON_CLASS,
+} from '@/app/settings/theme';
 
 /**
  * Writing Style 상세 페이지
@@ -106,10 +112,10 @@ export default function WritingStyleDetailPage() {
   // 로딩 상태
   if (loading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-white mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-300">문서를 불러오는 중...</p>
+      <div className={`${SETTINGS_PAGE_WRAPPER} flex items-center justify-center py-20`}>
+        <div className="text-center space-y-3">
+          <div className="animate-spin rounded-full h-10 w-10 border-2 border-gray-300 border-t-gray-900 dark:border-[#2F3440] dark:border-t-white mx-auto" />
+          <p className="text-sm text-gray-600 dark:text-gray-300">문서를 불러오는 중...</p>
         </div>
       </div>
     );
@@ -118,16 +124,11 @@ export default function WritingStyleDetailPage() {
   // 에러 상태
   if (error) {
     return (
-      <div className="min-h-screen bg-white dark:bg-gray-950 flex items-center justify-center">
-        <div className="text-center max-w-md px-6">
-          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white mb-3">
-            오류 발생
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">{error}</p>
-          <button
-            onClick={() => router.push('/docs/writing-styles')}
-            className="px-5 py-2.5 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors"
-          >
+      <div className={`${SETTINGS_PAGE_WRAPPER} flex items-center justify-center py-20`}>
+        <div className={`${SETTINGS_CARD_CLASS} max-w-md w-full p-6 text-center space-y-4`}>
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">오류 발생</h2>
+          <p className="text-gray-600 dark:text-gray-400">{error}</p>
+          <button onClick={() => router.push('/docs/writing-styles')} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
             목록으로 돌아가기
           </button>
         </div>
@@ -136,136 +137,125 @@ export default function WritingStyleDetailPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950">
-      {/* 중앙 정렬 컨테이너 */}
-      <div className="mx-auto max-w-5xl px-6 py-8">
-        {/* 뒤로가기 버튼 */}
+    <div className={`${SETTINGS_PAGE_WRAPPER} pb-16`}>
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10 space-y-6">
         <button
           onClick={() => router.push('/docs/writing-styles')}
-          className="mb-6 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+          className="inline-flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white"
         >
           <ArrowLeft className="w-4 h-4" />
           목록으로 돌아가기
         </button>
 
-        {/* 제목 섹션 */}
-        <div className="mb-8 pb-6 border-b border-gray-200 dark:border-gray-800">
-          <div className="flex items-start justify-between gap-4 mb-3">
-            <h1 className="text-3xl font-semibold text-gray-900 dark:text-white">
-              {STYLE_NAMES[style] || style}
-            </h1>
-            {/* 복사 버튼 */}
-            <button
-              onClick={handleCopy}
-              className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 rounded hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors text-sm font-medium"
-            >
+        <section className={`${SETTINGS_CARD_CLASS} p-6 sm:p-8 space-y-4`}>
+          <div className="flex flex-col gap-3">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-500">Writing Style</p>
+              <h1 className="text-3xl font-semibold text-gray-900 dark:text-white mt-1">{STYLE_NAMES[style] || style}</h1>
+            </div>
+            <p className="text-gray-600 dark:text-gray-400">
+              MCP 자동포스팅에서{' '}
+              <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-[#1F2229] rounded text-sm font-mono">--{style}</code> 플래그를 사용할 때 참고하세요.
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <button onClick={handleCopy} className={`${SETTINGS_PRIMARY_BUTTON_CLASS} flex items-center gap-2`}>
               {copied ? (
                 <>
                   <Check className="w-4 h-4" />
-                  <span className="hidden sm:inline">복사됨</span>
+                  복사됨
                 </>
               ) : (
                 <>
                   <Copy className="w-4 h-4" />
-                  <span className="hidden sm:inline">전체 복사</span>
+                  전체 복사
                 </>
               )}
             </button>
+            <button
+              onClick={() => router.push('/docs/writing-styles')}
+              className={`${SETTINGS_SUBTLE_BUTTON_CLASS} flex items-center gap-2`}
+            >
+              <ArrowLeft className="w-4 h-4" />
+              다른 스타일 살펴보기
+            </button>
           </div>
-          <p className="text-gray-600 dark:text-gray-400">
-            이 가이드는 MCP 자동포스팅 서비스에서{' '}
-            <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded text-sm font-mono">
-              --{style}
-            </code>{' '}
-            플래그를 사용할 때 참고할 수 있는 템플릿입니다.
-          </p>
-        </div>
+        </section>
 
-        {/* YAML Frontmatter 정보 */}
         {frontmatter && (
-          <div className="mb-8 p-5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-4">
-              스타일 설정 (YAML Frontmatter)
-            </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+          <section className={`${SETTINGS_CARD_CLASS} p-6 sm:p-8 space-y-4`}>
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">스타일 설정 (YAML frontmatter)</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
               {frontmatter.style_name && (
                 <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">스타일 이름:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">{frontmatter.style_name}</span>
+                  <p className="text-gray-500 dark:text-gray-400">스타일 이름</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{frontmatter.style_name}</p>
                 </div>
               )}
               {frontmatter.language && (
                 <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">언어:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">{frontmatter.language}</span>
+                  <p className="text-gray-500 dark:text-gray-400">언어</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{frontmatter.language}</p>
                 </div>
               )}
               {frontmatter.min_length && (
                 <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">최소 길이:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">{frontmatter.min_length}자</span>
+                  <p className="text-gray-500 dark:text-gray-400">최소 길이</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{frontmatter.min_length}자</p>
                 </div>
               )}
               {frontmatter.target_length && (
                 <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">목표 길이:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">{frontmatter.target_length}자</span>
+                  <p className="text-gray-500 dark:text-gray-400">목표 길이</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">{frontmatter.target_length}자</p>
                 </div>
               )}
               {frontmatter.code_block_ratio && (
                 <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">코드 블록 비율:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">
+                  <p className="text-gray-500 dark:text-gray-400">코드 블록 비율</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
                     {(parseFloat(frontmatter.code_block_ratio) * 100).toFixed(0)}%
-                  </span>
+                  </p>
                 </div>
               )}
               {frontmatter.ai_tag_required && (
                 <div>
-                  <span className="font-medium text-gray-700 dark:text-gray-300">AI 태그 필수:</span>
-                  <span className="ml-2 text-gray-600 dark:text-gray-400">
+                  <p className="text-gray-500 dark:text-gray-400">AI 태그 필수</p>
+                  <p className="font-medium text-gray-900 dark:text-gray-100">
                     {frontmatter.ai_tag_required === 'true' ? '예' : '아니오'}
-                  </span>
+                  </p>
                 </div>
               )}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* 원본 마크다운 표시 */}
-        <div className="mb-8">
-          <div className="mb-4">
-            <h2 className="text-xl font-medium text-gray-900 dark:text-white mb-2">
-              원본 마크다운
-            </h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              아래 내용을 복사하여 로컬에 <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 rounded font-mono text-xs">.md</code> 파일로 저장하고, 원하는 대로 수정해서 사용하세요.
+        <section className={`${SETTINGS_CARD_CLASS} p-6 sm:p-8 space-y-4`}>
+          <div>
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">원본 마크다운</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              아래 내용을 복사해 로컬 <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-[#1F2229] rounded font-mono text-xs">.md</code> 파일로 저장한 뒤 자유롭게
+              수정하세요.
             </p>
           </div>
-
-          <div className="relative">
-            <pre className="bg-gray-900 dark:bg-black text-gray-100 p-6 rounded text-xs sm:text-sm overflow-x-auto font-mono leading-relaxed border border-gray-700 max-h-[600px] overflow-y-auto">
+          <div className="rounded-2xl border border-gray-200 dark:border-[#2F3440] overflow-hidden">
+            <pre className="bg-gray-950 text-gray-100 p-6 text-xs sm:text-sm overflow-x-auto font-mono leading-relaxed max-h-[600px]">
               <code>{rawMarkdown}</code>
             </pre>
           </div>
-
-          <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded">
+          <div className="rounded-2xl border border-gray-100 dark:border-[#2F3440] bg-gray-50 dark:bg-[#1F2229] p-4">
             <p className="text-sm text-gray-700 dark:text-gray-300 leading-relaxed">
-              <strong>사용 팁:</strong> 위 템플릿을 참고하여 커스터마이징한 후,{' '}
-              <code className="px-1.5 py-0.5 bg-gray-200 dark:bg-gray-800 rounded text-xs">
-                "이 스타일 가이드 + 위 내용을 참고해서 자동포스팅해줘"
-              </code>{' '}
-              라고 LLM에게 요청하면 훨씬 더 정교한 결과를 얻을 수 있습니다.
+              <span className="font-semibold text-gray-900 dark:text-white">사용 팁:</span> 위 템플릿을 커스터마이징한 뒤{' '}
+              <code className="px-1.5 py-0.5 bg-gray-100 dark:bg-[#1F2229] rounded text-xs font-mono">
+                이 스타일 가이드 + 위 내용을 참고해서 자동포스팅해줘
+              </code>
+              라고 요청하면 훨씬 더 정교한 결과를 얻을 수 있습니다.
             </p>
           </div>
-        </div>
+        </section>
 
-        {/* 하단 네비게이션 */}
-        <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => router.push('/docs/writing-styles')}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:underline"
-          >
+        <div className="flex justify-start">
+          <button onClick={() => router.push('/docs/writing-styles')} className={`${SETTINGS_SUBTLE_BUTTON_CLASS} flex items-center gap-2`}>
             <ArrowLeft className="w-4 h-4" />
             모든 스타일 보기
           </button>

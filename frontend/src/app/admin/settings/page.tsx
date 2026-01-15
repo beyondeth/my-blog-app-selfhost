@@ -1,5 +1,11 @@
 'use client';
 
+/**
+ * 동적 렌더링 강제 - 정적 사이트 생성(SSG) 비활성화
+ * Admin 페이지는 인증이 필요하므로 빌드 시 prerender하면 안 됨
+ */
+export const dynamic = 'force-dynamic';
+
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';

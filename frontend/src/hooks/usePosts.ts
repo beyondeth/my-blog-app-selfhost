@@ -1,5 +1,5 @@
 import React from 'react';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { postsAPI } from '@/lib/api';
 import { Post } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -8,6 +8,8 @@ import { mixpanel } from '@/lib/mixpanel';
 import { useRouter } from 'next/navigation'; // useRouter 훅 추가
 import { getPostUrl } from '@/lib/utils/blogUrl';
 import type { GetPostsCursorParams } from '@/lib/api/endpoints/posts';
+import { feedQueryKeys } from '@/hooks/feed/useUnifiedFeed';
+import type { UnifiedFeedResponse } from '@/services/api/feed.service';
 
 // Query 키 팩토리 패턴 (표준화)
 export const postQueryKeys = {
@@ -83,21 +85,25 @@ export function useInfinitePosts(options: {
 }
 
 // 단일 포스트 조회 훅 (상세)
+interface UsePostOptions {
+  initialData?: any; // Post 타입으로 나중에 변경 가능
+  enabled?: boolean;
+  refetchOnMount?: boolean | 'always';
+}
+
 export function usePost(
   slugOrId: string,
-  options?: {
-    initialData?: any; // Post 타입으로 나중에 변경 가능
-    enabled?: boolean;
-  }
+  options?: UsePostOptions,
 ) {
+  const refetchOnMountOption = options?.refetchOnMount ?? (!options?.initialData ? 'always' : false);
+
   return useQuery({
     queryKey: postQueryKeys.detail(slugOrId),
     queryFn: () => postsAPI.getPostBySlug(slugOrId),
     enabled: options?.enabled ?? !!slugOrId,
     ...commonQueryOptions,
     initialData: options?.initialData,
-    // initialData가 있으면 mount 시 refetch 안함
-    refetchOnMount: !options?.initialData ? 'always' : false,
+    refetchOnMount: refetchOnMountOption,
     // 항상 즉시 stale 처리하여 캐시 무효화가 바로 반영되도록 함
     staleTime: 0,
   });
@@ -169,8 +175,8 @@ export function useCreatePost() {
         }
       );
 
-      // 3. 생성된 포스트의 상세 페이지로 이동
-      if (newPost.blog) {
+      // 3. 생성된 포스트의 상세 페이지로 이동 (단, 초안이 아닌 경우에만)
+      if (newPost.blog && newPost.status !== 'draft') {
         const postUrl = getPostUrl(newPost.blog, { slug: newPost.slug, id: newPost.id });
         router.push(postUrl);
       }
@@ -274,6 +280,7 @@ export function useDeletePost() {
 
       // 1. 진행 중인 리페치 취소 (Race condition 방지)
       await queryClient.cancelQueries({ queryKey: postQueryKeys.lists() });
+      await queryClient.cancelQueries({ queryKey: feedQueryKeys.all });
 
       // 2. 삭제 전에 포스트 정보 백업 (롤백용)
       // 2-1. detail 캐시에서 찾기 (UUID로)
@@ -310,6 +317,7 @@ export function useDeletePost() {
 
       // 3. 이전 데이터 전체 백업 (롤백용)
       const previousLists = queryClient.getQueriesData({ queryKey: postQueryKeys.lists() });
+      const previousFeed = queryClient.getQueriesData({ queryKey: feedQueryKeys.all });
 
       // 4. 🚀 낙관적 업데이트: 모든 list 캐시에서 즉시 제거 (홈, 블로그, 검색 등 모든 목록)
       // useUpdatePost, useTogglePostLike와 동일한 패턴 사용
@@ -340,7 +348,22 @@ export function useDeletePost() {
       // 5. 상세 캐시도 즉시 제거
       queryClient.removeQueries({ queryKey: postQueryKeys.detail(deletedId) });
 
-      return { previousPost, blogSlug, previousLists };
+      // 6. 통합 피드에서도 제거
+      queryClient.setQueriesData(
+        { queryKey: feedQueryKeys.all },
+        (oldData: InfiniteData<UnifiedFeedResponse> | undefined) => {
+          if (!oldData?.pages) return oldData;
+
+          const updatedPages = oldData.pages.map(page => ({
+            ...page,
+            items: page.items.filter(item => item.id !== deletedId),
+          }));
+
+          return { ...oldData, pages: updatedPages };
+        }
+      );
+
+      return { previousPost, blogSlug, previousLists, previousFeed };
     },
     retry: 0,  // 삭제는 재시도 안 함 (이미 삭제된 포스트 재요청 방지)
   });
@@ -349,11 +372,16 @@ export function useDeletePost() {
   React.useEffect(() => {
     if (mutation.isError && mutation.error && mutation.variables) {
       const variables = mutation.variables;
-      const context = mutation.context as { previousPost?: Post; blogSlug?: string; previousLists?: Array<[any, any]> };
+      const context = mutation.context as { previousPost?: Post; blogSlug?: string; previousLists?: Array<[any, any]>; previousFeed?: Array<[any, any]> };
 
       // 롤백: 이전 데이터로 복구
       if (context?.previousLists) {
         context.previousLists.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      if (context?.previousFeed) {
+        context.previousFeed.forEach(([queryKey, data]) => {
           queryClient.setQueryData(queryKey, data);
         });
       }
@@ -377,6 +405,11 @@ export function useDeletePost() {
       // 모든 list 캐시를 stale로 마킹 (홈, 블로그, 검색 등)
       queryClient.invalidateQueries({
         queryKey: postQueryKeys.lists(),
+        refetchType: 'none'
+      });
+
+      queryClient.invalidateQueries({
+        queryKey: feedQueryKeys.all,
         refetchType: 'none'
       });
     }
@@ -403,10 +436,12 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
     onMutate: async (postId: string) => {
       // 1. 진행 중인 리페치 취소 (모든 관련 쿼리)
       await queryClient.cancelQueries({ queryKey: postQueryKeys.all });
+      await queryClient.cancelQueries({ queryKey: feedQueryKeys.all });
 
       // 2. 이전 데이터 백업 (롤백용)
       const previousLists = queryClient.getQueriesData({ queryKey: postQueryKeys.lists() });
       const previousDetails = queryClient.getQueriesData({ queryKey: postQueryKeys.details() });
+      const previousFeed = queryClient.getQueriesData({ queryKey: feedQueryKeys.all });
 
       // 3. 낙관적 업데이트: 모든 목록 캐시 업데이트 (홈, 내블로그, 검색 등)
       queryClient.setQueriesData(
@@ -452,7 +487,39 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
         }
       );
 
-      return { previousLists, previousDetails };
+      // 5. 통합 피드 캐시 업데이트
+      queryClient.setQueriesData(
+        { queryKey: feedQueryKeys.all },
+        (oldData: InfiniteData<UnifiedFeedResponse> | undefined) => {
+          if (!oldData?.pages) return oldData;
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map(page => ({
+              ...page,
+              items: page.items.map(item => {
+                if (item.id !== postId) return item;
+
+                const liked = !(item.userVote === 'upvote');
+                let likeCount = item.upvoteCount ?? item.likeCount ?? 0;
+                likeCount += liked ? 1 : -1;
+                if (likeCount < 0) likeCount = 0;
+
+                return {
+                  ...item,
+                  liked: liked || undefined,
+                  likeCount,
+                  upvoteCount: likeCount,
+                  userVote: liked ? 'upvote' : null,
+                  score: likeCount - (item.downvoteCount ?? 0),
+                };
+              }),
+            })),
+          };
+        }
+      );
+
+      return { previousLists, previousDetails, previousFeed };
     },
     retry: 1,
   });
@@ -460,7 +527,7 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
   // 에러 처리
   React.useEffect(() => {
     if (mutation.isError && mutation.error && mutation.variables) {
-      const context = mutation.context as { previousLists?: Array<[any, any]>; previousDetails?: Array<[any, any]> };
+      const context = mutation.context as { previousLists?: Array<[any, any]>; previousDetails?: Array<[any, any]>; previousFeed?: Array<[any, any]> };
 
       // 롤백: 이전 데이터로 복구
       if (context?.previousLists) {
@@ -470,6 +537,11 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
       }
       if (context?.previousDetails) {
         context.previousDetails.forEach(([queryKey, data]) => {
+          queryClient.setQueryData(queryKey, data);
+        });
+      }
+      if (context?.previousFeed) {
+        context.previousFeed.forEach(([queryKey, data]) => {
           queryClient.setQueryData(queryKey, data);
         });
       }
@@ -492,6 +564,7 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
 
       // queued가 아닌 경우에만 서버 응답으로 최종 확정 (모든 캐시 업데이트)
       const { liked, likeCount } = response;
+      const normalizedLikeCount = typeof likeCount === 'number' ? likeCount : 0;
 
       // 목록 캐시 최종 업데이트
       queryClient.setQueriesData(
@@ -507,7 +580,7 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
               return {
                 ...page,
                 posts: page.posts.map((post: any) =>
-                  post.id === postId ? { ...post, liked, likeCount } : post
+                  post.id === postId ? { ...post, liked, likeCount: normalizedLikeCount } : post
                 )
               };
             })
@@ -520,7 +593,33 @@ export function useTogglePostLike(onRequireLogin?: () => void) {
         { queryKey: postQueryKeys.details() },
         (oldData: any) => {
           if (!oldData || oldData.id !== postId) return oldData;
-          return { ...oldData, liked, likeCount };
+          return { ...oldData, liked, likeCount: normalizedLikeCount };
+        }
+      );
+      // 통합 피드 캐시 최종 업데이트
+      queryClient.setQueriesData(
+        { queryKey: feedQueryKeys.all },
+        (oldData: InfiniteData<UnifiedFeedResponse> | undefined) => {
+          if (!oldData?.pages) return oldData;
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map(page => ({
+              ...page,
+              items: page.items.map(item =>
+                item.id === postId
+                  ? {
+                      ...item,
+                      liked: liked || undefined,
+                      likeCount: normalizedLikeCount,
+                      upvoteCount: normalizedLikeCount,
+                      userVote: liked ? 'upvote' : null,
+                      score: normalizedLikeCount - (item.downvoteCount ?? 0),
+                    }
+                  : item
+              ),
+            })),
+          };
         }
       );
     }
@@ -722,3 +821,32 @@ export const useInvalidateBlogPosts = () => {
     });
   }, [queryClient]);
 }; 
+
+/**
+ * 사용자의 초안 목록 조회 훅
+ * 
+ * @description
+ * 로그인한 사용자의 임시저장된 초안 목록을 가져옵니다.
+ * /drafts 페이지에서 사용됩니다.
+ * 
+ * @returns 초안 포스트 목록 (최근 수정순)
+ */
+export function useDrafts() {
+  return useQuery({
+    queryKey: ['drafts'],
+    queryFn: async (): Promise<Post[]> => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/posts/drafts`,
+        {
+          credentials: 'include',
+        }
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch drafts');
+      }
+      return response.json();
+    },
+    staleTime: 1 * 60 * 1000, // 1분간 캐시
+    gcTime: 5 * 60 * 1000, // 5분간 가비지 컬렉션 방지
+  });
+}

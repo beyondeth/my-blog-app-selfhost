@@ -1,22 +1,22 @@
-import { Module, Global } from '@nestjs/common';
-import { RedisModule as NestRedisModule } from '@nestjs-modules/ioredis';
-import { ConfigService } from '@nestjs/config';
-import { RedisLockService } from './redis-lock.service';
-import { RedisMonitoringService } from './redis-monitoring.service';
-import { RedisController } from './redis.controller';
-import { UnifiedRedisService } from './unified-redis.service';
+import { Module, Global } from "@nestjs/common";
+import { RedisModule as NestRedisModule } from "@nestjs-modules/ioredis";
+import { ConfigService } from "@nestjs/config";
+import { RedisLockService } from "./redis-lock.service";
+import { RedisMonitoringService } from "./redis-monitoring.service";
+import { RedisController } from "./redis.controller";
+import { UnifiedRedisService } from "./unified-redis.service";
 
 @Global()
 @Module({
   imports: [
     NestRedisModule.forRootAsync({
       useFactory: (configService: ConfigService) => ({
-        type: 'single',
-        url: configService.get('REDIS_URL') || 'redis://localhost:6379',
+        type: "single",
+        url: configService.get("REDIS_URL") || "redis://localhost:6379",
         options: {
           maxRetriesPerRequest: null, // BullMQ requires this to be null
           enableReadyCheck: true,
-          showFriendlyErrorStack: process.env.NODE_ENV === 'development',
+          showFriendlyErrorStack: process.env.NODE_ENV === "development",
           retryStrategy: (times: number) => {
             // 재연결 전략
             if (times > 3) {
@@ -25,8 +25,9 @@ import { UnifiedRedisService } from './unified-redis.service';
             return Math.min(times * 50, 2000); // 지수 백오프
           },
           // 메모리 최적화 설정
-          maxmemory: configService.get('REDIS_MAX_MEMORY') || '2gb',
-          maxmemoryPolicy: configService.get('REDIS_MAX_MEMORY_POLICY') || 'allkeys-lru',
+          maxmemory: configService.get("REDIS_MAX_MEMORY") || "2gb",
+          maxmemoryPolicy:
+            configService.get("REDIS_MAX_MEMORY_POLICY") || "allkeys-lru",
           // 커넥션 풀링
           connectTimeout: 30000, // 10초에서 30초로 증가
           commandTimeout: 30000, // 15초에서 30초로 증가 (cascade 삭제 대응)
@@ -39,6 +40,11 @@ import { UnifiedRedisService } from './unified-redis.service';
   ],
   controllers: [RedisController],
   providers: [RedisLockService, RedisMonitoringService, UnifiedRedisService],
-  exports: [NestRedisModule, RedisLockService, RedisMonitoringService, UnifiedRedisService],
+  exports: [
+    NestRedisModule,
+    RedisLockService,
+    RedisMonitoringService,
+    UnifiedRedisService,
+  ],
 })
 export class RedisModule {}

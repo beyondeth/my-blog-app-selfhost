@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between, FindOptionsWhere } from 'typeorm';
-import { AuditLog, AuditAction } from './entities/audit-log.entity';
-import { DateUtils } from '../common/utils/date.utils';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Between, FindOptionsWhere } from "typeorm";
+import { AuditLog, AuditAction } from "./entities/audit-log.entity";
+import { DateUtils } from "../common/utils/date.utils";
 
 export interface AuditContext {
   userId: string;
@@ -30,10 +30,7 @@ export class AuditService {
   /**
    * Create an audit log entry
    */
-  async log(
-    entry: AuditLogEntry,
-    context: AuditContext,
-  ): Promise<AuditLog> {
+  async log(entry: AuditLogEntry, context: AuditContext): Promise<AuditLog> {
     const auditLog = this.auditLogRepository.create({
       ...entry,
       performedById: context.userId,
@@ -57,7 +54,7 @@ export class AuditService {
     return await this.log(
       {
         action,
-        entityType: 'user',
+        entityType: "user",
         entityId: userId,
         previousData: changes.previous,
         newData: changes.new,
@@ -78,7 +75,7 @@ export class AuditService {
     return await this.log(
       {
         action,
-        entityType: 'post',
+        entityType: "post",
         entityId: postId,
         previousData: changes.previous,
         newData: changes.new,
@@ -99,7 +96,7 @@ export class AuditService {
     return await this.log(
       {
         action,
-        entityType: 'report',
+        entityType: "report",
         entityId: reportId,
         previousData: changes.previous,
         newData: changes.new,
@@ -119,7 +116,7 @@ export class AuditService {
     return await this.log(
       {
         action,
-        entityType: 'admin',
+        entityType: "admin",
         metadata,
       },
       context,
@@ -147,15 +144,15 @@ export class AuditService {
     if (filters.entityType) where.entityType = filters.entityType;
     if (filters.entityId) where.entityId = filters.entityId;
     if (filters.performedById) where.performedById = filters.performedById;
-    
+
     if (filters.startDate && filters.endDate) {
       where.createdAt = Between(filters.startDate, filters.endDate);
     }
 
     const [logs, total] = await this.auditLogRepository.findAndCount({
       where,
-      relations: ['performedBy'],
-      order: { createdAt: 'DESC' },
+      relations: ["performedBy"],
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -180,8 +177,8 @@ export class AuditService {
   ) {
     const [logs, total] = await this.auditLogRepository.findAndCount({
       where: { entityType, entityId },
-      relations: ['performedBy'],
-      order: { createdAt: 'DESC' },
+      relations: ["performedBy"],
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -198,14 +195,10 @@ export class AuditService {
   /**
    * Get audit logs by user
    */
-  async findByUser(
-    userId: string,
-    page = 1,
-    limit = 50,
-  ) {
+  async findByUser(userId: string, page = 1, limit = 50) {
     const [logs, total] = await this.auditLogRepository.findAndCount({
       where: { performedById: userId },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
       skip: (page - 1) * limit,
       take: limit,
     });
@@ -224,8 +217,8 @@ export class AuditService {
    */
   async getRecentAdminActivity(limit = 20) {
     const logs = await this.auditLogRepository.find({
-      relations: ['performedBy'],
-      order: { createdAt: 'DESC' },
+      relations: ["performedBy"],
+      order: { createdAt: "DESC" },
       take: limit,
     });
 
@@ -237,22 +230,18 @@ export class AuditService {
    */
   async getStatistics(startDate?: Date, endDate?: Date) {
     const where: FindOptionsWhere<AuditLog> = {};
-    
+
     if (startDate && endDate) {
       where.createdAt = Between(startDate, endDate);
     }
 
-    const [
-      totalLogs,
-      logsByAction,
-      logsByEntityType,
-      topUsers,
-    ] = await Promise.all([
-      this.auditLogRepository.count({ where }),
-      this.getLogsByAction(where),
-      this.getLogsByEntityType(where),
-      this.getTopUsers(where),
-    ]);
+    const [totalLogs, logsByAction, logsByEntityType, topUsers] =
+      await Promise.all([
+        this.auditLogRepository.count({ where }),
+        this.getLogsByAction(where),
+        this.getLogsByEntityType(where),
+        this.getTopUsers(where),
+      ]);
 
     return {
       totalLogs,
@@ -272,7 +261,7 @@ export class AuditService {
     const result = await this.auditLogRepository
       .createQueryBuilder()
       .delete()
-      .where('createdAt < :cutoffDate', { cutoffDate })
+      .where("createdAt < :cutoffDate", { cutoffDate })
       .execute();
 
     return { deletedCount: result.affected };
@@ -282,11 +271,11 @@ export class AuditService {
 
   private async getLogsByAction(where: FindOptionsWhere<AuditLog>) {
     const result = await this.auditLogRepository
-      .createQueryBuilder('log')
-      .select('log.action', 'action')
-      .addSelect('COUNT(*)', 'count')
+      .createQueryBuilder("log")
+      .select("log.action", "action")
+      .addSelect("COUNT(*)", "count")
       .where(where)
-      .groupBy('log.action')
+      .groupBy("log.action")
       .getRawMany();
 
     return result.reduce((acc, item) => {
@@ -297,11 +286,11 @@ export class AuditService {
 
   private async getLogsByEntityType(where: FindOptionsWhere<AuditLog>) {
     const result = await this.auditLogRepository
-      .createQueryBuilder('log')
-      .select('log.entityType', 'entityType')
-      .addSelect('COUNT(*)', 'count')
+      .createQueryBuilder("log")
+      .select("log.entityType", "entityType")
+      .addSelect("COUNT(*)", "count")
       .where(where)
-      .groupBy('log.entityType')
+      .groupBy("log.entityType")
       .getRawMany();
 
     return result.reduce((acc, item) => {
@@ -312,12 +301,12 @@ export class AuditService {
 
   private async getTopUsers(where: FindOptionsWhere<AuditLog>) {
     const result = await this.auditLogRepository
-      .createQueryBuilder('log')
-      .select('log.performedById', 'userId')
-      .addSelect('COUNT(*)', 'count')
+      .createQueryBuilder("log")
+      .select("log.performedById", "userId")
+      .addSelect("COUNT(*)", "count")
       .where(where)
-      .groupBy('log.performedById')
-      .orderBy('COUNT(*)', 'DESC')
+      .groupBy("log.performedById")
+      .orderBy("COUNT(*)", "DESC")
       .limit(10)
       .getRawMany();
 

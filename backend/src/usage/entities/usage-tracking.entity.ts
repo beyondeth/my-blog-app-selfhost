@@ -7,65 +7,65 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
-  Unique
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { ResourceType } from '../../common/enums/subscription.enum';
+  Unique,
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
+import { ResourceType } from "../../common/enums/subscription.enum";
 
-@Entity('usage_tracking')
-@Unique(['userId', 'resourceType', 'period']) // 사용자-리소스-기간별 유니크
-@Index(['userId'])
-@Index(['period'])
-@Index(['resourceType'])
+@Entity("usage_tracking")
+@Unique(["userId", "resourceType", "period"]) // 사용자-리소스-기간별 유니크
+@Index(["userId"])
+@Index(["period"])
+@Index(["resourceType"])
 export class UsageTracking {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: 'uuid' })
+  @Column({ type: "uuid" })
   userId: string;
 
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
   @Column({
-    type: 'enum',
-    enum: ResourceType
+    type: "enum",
+    enum: ResourceType,
   })
   resourceType: ResourceType;
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: "integer", default: 0 })
   count: number; // 현재 사용량
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: "integer", default: 0 })
   limit: number; // 제한 수량 (-1 = 무제한)
 
-  @Column({ type: 'date' })
+  @Column({ type: "date" })
   period: Date; // YYYY-MM-01 형식으로 저장 (월 단위)
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   lastUsedAt: Date; // 마지막 사용 시간
 
   // 추가 통계 필드
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: "integer", default: 0 })
   peakUsage: number; // 해당 기간 최대 사용량
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   peakUsageAt: Date; // 최대 사용량 발생 시간
 
-  @Column({ type: 'integer', default: 0 })
+  @Column({ type: "integer", default: 0 })
   warningsSent: number; // 제한 경고 발송 횟수
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   lastWarningAt: Date; // 마지막 경고 발송 시간
 
   @Column({ default: false })
   limitReached: boolean; // 제한 도달 여부
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   limitReachedAt: Date; // 제한 도달 시간
 
-  @Column('jsonb', { nullable: true })
+  @Column("jsonb", { nullable: true })
   metadata: Record<string, any>; // 추가 메타데이터
 
   @CreateDateColumn()
@@ -129,7 +129,7 @@ export class UsageTracking {
    */
   canUse(amount: number = 1): boolean {
     if (this.limit === -1) return true; // 무제한
-    return (this.count + amount) <= this.limit;
+    return this.count + amount <= this.limit;
   }
 
   /**
@@ -159,7 +159,7 @@ export class UsageTracking {
    */
   getPeriodString(): string {
     const year = this.period.getFullYear();
-    const month = String(this.period.getMonth() + 1).padStart(2, '0');
+    const month = String(this.period.getMonth() + 1).padStart(2, "0");
     return `${year}-${month}`;
   }
 }

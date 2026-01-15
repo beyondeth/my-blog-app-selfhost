@@ -13,62 +13,78 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * - dataRetentionNotifiedAt: 개인정보 보유기간 만료 알림 발송일
  * - dataRetentionYears: 개인정보 보유기간 (년)
  */
-export class AddMissingAccountSettingsColumns1760200000000 implements MigrationInterface {
-    name = 'AddMissingAccountSettingsColumns1760200000000'
+export class AddMissingAccountSettingsColumns1760200000000
+  implements MigrationInterface
+{
+  name = "AddMissingAccountSettingsColumns1760200000000";
 
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // 1. refreshTokenExpiresAt 컬럼 추가
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // 1. refreshTokenExpiresAt 컬럼 추가
+    await queryRunner.query(`
             ALTER TABLE "account_settings"
             ADD COLUMN "refreshTokenExpiresAt" TIMESTAMP
         `);
 
-        // 2. primaryIdentityId 컬럼 추가 (Multi-Identity Architecture)
-        await queryRunner.query(`
+    // 2. primaryIdentityId 컬럼 추가 (Multi-Identity Architecture)
+    await queryRunner.query(`
             ALTER TABLE "account_settings"
             ADD COLUMN "primaryIdentityId" uuid
         `);
 
-        // 3. scheduledDeletionAt 컬럼 추가 (GDPR 준수)
-        await queryRunner.query(`
+    // 3. scheduledDeletionAt 컬럼 추가 (GDPR 준수)
+    await queryRunner.query(`
             ALTER TABLE "account_settings"
             ADD COLUMN "scheduledDeletionAt" TIMESTAMP
         `);
 
-        // 4. dataRetentionNotifiedAt 컬럼 추가
-        await queryRunner.query(`
+    // 4. dataRetentionNotifiedAt 컬럼 추가
+    await queryRunner.query(`
             ALTER TABLE "account_settings"
             ADD COLUMN "dataRetentionNotifiedAt" TIMESTAMP
         `);
 
-        // 5. dataRetentionYears 컬럼 추가 (기본값 3년)
-        await queryRunner.query(`
+    // 5. dataRetentionYears 컬럼 추가 (기본값 3년)
+    await queryRunner.query(`
             ALTER TABLE "account_settings"
             ADD COLUMN "dataRetentionYears" integer NOT NULL DEFAULT 3
         `);
 
-        // 6. 인덱스 추가 (성능 최적화)
-        await queryRunner.query(`
+    // 6. 인덱스 추가 (성능 최적화)
+    await queryRunner.query(`
             CREATE INDEX "IDX_account_settings_scheduledDeletionAt"
             ON "account_settings" ("scheduledDeletionAt")
         `);
 
-        await queryRunner.query(`
+    await queryRunner.query(`
             CREATE INDEX "IDX_account_settings_primaryIdentityId"
             ON "account_settings" ("primaryIdentityId")
         `);
-    }
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // 인덱스 제거
-        await queryRunner.query(`DROP INDEX "public"."IDX_account_settings_primaryIdentityId"`);
-        await queryRunner.query(`DROP INDEX "public"."IDX_account_settings_scheduledDeletionAt"`);
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // 인덱스 제거
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_account_settings_primaryIdentityId"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX "public"."IDX_account_settings_scheduledDeletionAt"`,
+    );
 
-        // 컬럼 제거 (역순)
-        await queryRunner.query(`ALTER TABLE "account_settings" DROP COLUMN "dataRetentionYears"`);
-        await queryRunner.query(`ALTER TABLE "account_settings" DROP COLUMN "dataRetentionNotifiedAt"`);
-        await queryRunner.query(`ALTER TABLE "account_settings" DROP COLUMN "scheduledDeletionAt"`);
-        await queryRunner.query(`ALTER TABLE "account_settings" DROP COLUMN "primaryIdentityId"`);
-        await queryRunner.query(`ALTER TABLE "account_settings" DROP COLUMN "refreshTokenExpiresAt"`);
-    }
+    // 컬럼 제거 (역순)
+    await queryRunner.query(
+      `ALTER TABLE "account_settings" DROP COLUMN "dataRetentionYears"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "account_settings" DROP COLUMN "dataRetentionNotifiedAt"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "account_settings" DROP COLUMN "scheduledDeletionAt"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "account_settings" DROP COLUMN "primaryIdentityId"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "account_settings" DROP COLUMN "refreshTokenExpiresAt"`,
+    );
+  }
 }

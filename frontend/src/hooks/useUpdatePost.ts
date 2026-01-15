@@ -82,8 +82,18 @@ export function useUpdatePost() {
         queryClient.invalidateQueries({ queryKey: ['posts', 'list', { blogSlug: updatedPost.blog.slug }] });
       }
 
-      // 6. 상세 페이지로 이동 (새 URL 구조)
-      if (updatedPost.blog?.slug) {
+      // 6. Editor's Pick인 경우 즉시 홈 피드 반영
+      if (updatedPost.isEditorPick) {
+        queryClient.invalidateQueries({ queryKey: ['editorPicks'] });
+        queryClient.refetchQueries({ queryKey: ['editorPicks'], type: 'active' });
+      }
+
+      // 7. 상태에 따른 리다이렉트
+      if (!updatedPost.isPublished) {
+        // 초안 상태이면 초안 목록으로 이동
+        router.push('/drafts');
+      } else if (updatedPost.blog?.slug) {
+        // 발행 상태이면 상세 페이지로 이동 (새 URL 구조)
         router.push(`/${updatedPost.blog.slug}/${updatedPost.slug || updatedPost.id}`);
       } else {
         // blog 없으면 홈으로 (발생 안 함)

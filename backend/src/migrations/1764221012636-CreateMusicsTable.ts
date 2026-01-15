@@ -1,11 +1,11 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 음악 테이블 생성 마이그레이션
  * BGM 플레이어 기능을 위한 음악 파일 메타데이터 저장
  */
 export class CreateMusicsTable1764221012636 implements MigrationInterface {
-  name = 'CreateMusicsTable1764221012636';
+  name = "CreateMusicsTable1764221012636";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // musics 테이블 생성

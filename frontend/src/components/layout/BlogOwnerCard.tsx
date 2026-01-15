@@ -1,23 +1,31 @@
 "use client";
 
 import React from 'react';
-import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { FiUsers } from 'react-icons/fi';
 import UserAvatar from '@/components/ui/UserAvatar';
 import FollowButton from '@/components/FollowButton';
-import { DMButton } from '@/components/dm/DMButton';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { queryKeys } from '@/lib/queries/keys';
+import { cn } from '@/lib/utils';
+import { SocialIcon } from '@/components/ui/SocialIcon';
+import { FiEdit, FiLink } from 'react-icons/fi';
+import { LevelBadge } from '@/components/ui/LevelBadge';
+import type { SocialLink } from '@/types';
 
 interface BlogOwnerCardProps {
   name?: string;
   username?: string;
+  jobTitle?: string;
   description?: string;
   profileImage?: string | null;
   userId?: string;
   isOwner?: boolean;
   followInfo?: FollowInfo; // 외부에서 전달받을 팔로우 정보
+  brandImage?: string | null;
+  brandColor?: string | null;
+  socialLinks?: SocialLink[];
+  className?: string;
 }
 
 interface FollowInfo {
@@ -29,24 +37,33 @@ interface FollowInfo {
 const BlogOwnerCard = React.memo(function BlogOwnerCard({
   name = "개발자",
   username,
+  jobTitle,
   description,
   profileImage,
   userId,
   isOwner = false,
-  followInfo: externalFollowInfo // 외부에서 전달받은 팔로우 정보
+  followInfo: externalFollowInfo, // 외부에서 전달받은 팔로우 정보
+  brandImage,
+  brandColor,
+  socialLinks,
+  className,
 }: BlogOwnerCardProps) {
-  const router = useRouter();
   const { isAuthenticated, user } = useAuth();
   
+  const followInfoQueryKey = userId
+    ? queryKeys.users.followInfo(userId)
+    : (['users', 'follow-info', 'anonymous'] as const);
+
   // 팔로우 정보 조회
   const {
     data: followInfo,
     isLoading: isLoadingFollowInfo,
-    error: followInfoError,
-    isError: isFollowInfoError
   } = useQuery<FollowInfo>({
-    queryKey: queryKeys.users.followInfo(userId!),
+    queryKey: followInfoQueryKey,
     queryFn: async () => {
+      if (!userId) {
+        throw new Error('사용자 정보를 찾을 수 없습니다.');
+      }
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${userId}/follow-info`,
         {
@@ -78,9 +95,14 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
 
   // 외부에서 전달받은 팔로우 정보와 내부에서 조회한 정보 통합
   const finalFollowInfo = externalFollowInfo || followInfo;
+  const shouldShowActions =
+    Boolean(userId) && !isOwner && isAuthenticated && user && user.id !== userId;
 
-  // isOwner일 경우 AuthProvider의 최신 user.profileImage를 우선 사용
-  const displayProfileImage = isOwner ? (user?.profileImage || profileImage) : profileImage;
+  // isOwner일 경우 AuthProvider의 최신 user.profileImage를 우선 사용하고,
+  // 없으면 브랜드 이미지라도 사용해서 비어있는 상태를 방지
+  const displayProfileImage = isOwner
+    ? user?.profileImage || profileImage || brandImage || undefined
+    : profileImage || brandImage || undefined;
 
   // 팔로워 수 포맷팅 (예: 17.4K)
   const formatFollowerCount = (count: number) => {
@@ -95,73 +117,139 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
     return count.toString();
   };
 
+  const bannerBackgroundStyle: React.CSSProperties = brandImage
+    ? {
+        backgroundImage: `url(${brandImage})`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }
+    : {};
+
+  const followerCount = finalFollowInfo?.followersCount ?? 0;
+  const followingCount = finalFollowInfo?.followingCount ?? 0;
+  const visibleSocialLinks = (socialLinks ?? [])
+    .filter((link) => Boolean(link?.platform && link?.url))
+    .reverse();
+
   return (
-    <div className="bg-white dark:bg-[rgb(38,38,38)] rounded-xl border border-border p-5 shadow-sm hover:shadow-md transition-shadow duration-300">
-      <div className="space-y-4">
-        {/* Profile Image - Left aligned */}
-        <div className="flex justify-start">
-          <UserAvatar
-            profileImage={displayProfileImage}
-            username={name}
-            size="xl"
-            className="w-20 h-20"
-          />
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-3xl border border-border/70 dark:border-gray-700 bg-white dark:bg-[#262626] shadow-sm transition-all",
+        className
+      )}
+    >
+      <div
+        className={cn(
+          "h-48 w-full relative group/banner",
+          !brandImage && "bg-gray-100 dark:bg-gray-800"
+        )}
+        style={bannerBackgroundStyle}
+        aria-label="블로그 브랜드 배경"
+      >
+        {/* Visibility Gradient for Icons/Text on Image */}
+        {brandImage && (
+          <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent pointer-events-none" />
+        )}
+        
+        <div className="absolute left-6 -bottom-9 z-10">
+          <div className="relative z-10">
+            <UserAvatar
+              profileImage={displayProfileImage}
+              username={name}
+              size="xl"
+              className="w-24 h-24 border-4 border-white dark:border-[#262626] shadow-xl bg-white"
+            />
+            {isOwner && (
+              <Link
+                href="/settings"
+                prefetch={false}
+                className="absolute -bottom-1 -right-2 h-7 w-7 rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm flex items-center justify-center hover:bg-gray-50 dark:bg-[#1F2230] dark:text-white dark:border-gray-600 z-10 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-gray-500"
+                aria-label="프로필 편집"
+              >
+                <FiEdit className="w-3 h-3" />
+              </Link>
+            )}
+          </div>
         </div>
 
-        {/* Name */}
-        <h2 className="text-xl font-semibold text-foreground">
-          {name}
-        </h2>
+        {visibleSocialLinks.length > 0 && (
+          <div className="absolute right-6 bottom-2.5 flex items-center gap-1 z-20 pointer-events-auto">
+            {visibleSocialLinks.map((link) => {
+              const platformKey = link.platform.toLowerCase();
+              
+              return (
+                <a
+                  key={`${platformKey}-${link.url}`}
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label={`${link.platform} 링크`}
+                  className={cn(
+                    "flex h-5 w-5 items-center justify-center transition-all hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 pointer-events-auto",
+                    brandImage 
+                      ? "text-white/80 hover:text-white focus-visible:ring-white/50" 
+                      : "text-black/40 hover:text-black dark:text-white/40 dark:hover:text-white focus-visible:ring-gray-400"
+                  )}
+                >
+                  <SocialIcon 
+                    platform={platformKey} 
+                    className={cn(
+                      "h-[16px] w-[16px]",
+                      brandImage ? "drop-shadow-[0_1px_2px_rgba(0,0,0,0.6)]" : "drop-shadow-sm"
+                    )} 
+                  />
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-        {/* Followers Count */}
-        {(finalFollowInfo || isFollowInfoError) && (
-          <div className="flex items-center gap-1.5 text-sm">
-            <FiUsers className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-            {isLoadingFollowInfo && !externalFollowInfo ? (
-              <div className="w-8 h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
-            ) : (
-              <>
-                <span className="font-medium text-gray-900 dark:text-gray-100">
-                  {finalFollowInfo ? formatFollowerCount(finalFollowInfo.followersCount) : '0'}
-                </span>
-                <span className="text-gray-500 dark:text-gray-400">팔로워</span>
-              </>
-            )}
+      <div className="px-6 pt-10 pb-6 relative flex flex-col">
+        {shouldShowActions && userId && (
+          <div className="absolute top-4 right-6">
+            <FollowButton
+              userId={userId}
+              initialState={finalFollowInfo}
+              className="rounded-full px-4 py-1 text-[13px] font-medium shadow-md bg-black text-white hover:bg-black/90 dark:bg-white dark:text-black dark:hover:bg-gray-200 transition-all"
+              variant="minimal"
+              suppressSuccessToast={true}
+            />
           </div>
         )}
 
-        {/* Bio/Description */}
+        <div className="mt-6 space-y-1">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white flex items-center gap-2">
+            {name}
+            <LevelBadge userId={userId} />
+          </h2>
+          {jobTitle && (
+            <p className="text-sm text-gray-600 dark:text-gray-300">{jobTitle}</p>
+          )}
+        </div>
+
         {description && (
-          <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed whitespace-pre-wrap break-words">
+          <p className="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed line-clamp-4 whitespace-pre-line break-words">
             {description}
           </p>
         )}
 
-        {/* Follow/Following Button and DM Button */}
-        {userId && !isOwner && isAuthenticated && user && user.id !== userId && (
-          <div className="flex gap-2 w-full">
-            <FollowButton
-              userId={userId}
-              initialState={finalFollowInfo}
-              variant="minimal"
-              className="flex-1"
-            />
-            <DMButton
-              userId={userId}
-              username={username}
-            />
-          </div>
-        )}
-
-        {/* Edit Profile for Owner */}
-        {isOwner && (
-          <button
-            onClick={() => router.push('/settings')}
-            className="w-full px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-full hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors"
-          >
-            프로필 편집
-          </button>
-        )}
+        <div className="mt-4 flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+          {isLoadingFollowInfo && !externalFollowInfo ? (
+            <div className="h-5 w-24 rounded bg-gray-200 dark:bg-gray-700 animate-pulse" />
+          ) : (
+            <>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-gray-900 dark:text-white">{formatFollowerCount(followerCount)}</span>
+                <span>팔로워</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <span className="font-semibold text-gray-900 dark:text-white">{formatFollowerCount(followingCount)}</span>
+                <span>팔로잉</span>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

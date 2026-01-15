@@ -1,7 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronRight, FiUser, FiMoreVertical, FiFlag, FiCheckCircle } from 'react-icons/fi';
+import ModerationModal from '../admin/ModerationModal';
+import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronRight, FiUser, FiMoreVertical, FiFlag, FiCheckCircle, FiShield } from 'react-icons/fi';
+
+
 import type { Comment } from '@/types';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Button } from '@/components/ui/button';
@@ -13,6 +16,7 @@ import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { formatRelativeTime } from '@/utils/timeFormat';
+import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 
 interface CommentItemProps {
   comment: Comment;
@@ -40,6 +44,7 @@ export default function CommentItem({
   const [isExpanded, setIsExpanded] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isModerationModalOpen, setIsModerationModalOpen] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
 
   // Check if this comment is from post author
@@ -262,7 +267,7 @@ export default function CommentItem({
                           <button
                             onClick={handleDeleteClick}
                             disabled={isLoading}
-                            className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                            className={`flex items-center w-full px-3 py-2 text-sm transition-colors disabled:opacity-50 ${DESTRUCTIVE_ACTION_CLASS} dark:hover:bg-red-900/20`}
                           >
                             <FiTrash2 className="mr-2 w-3 h-3" />
                             삭제
@@ -279,6 +284,18 @@ export default function CommentItem({
                           <FiFlag className="mr-2 w-3 h-3" />
                           신고
                         </button>
+                        {isAdmin && (
+                          <button
+                            onClick={() => {
+                              setIsModerationModalOpen(true);
+                              setShowDropdown(false);
+                            }}
+                            className="flex items-center w-full px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                          >
+                            <FiShield className="mr-2 w-3 h-3" />
+                            관리자 제재
+                          </button>
+                        )}
                       </>
                     )}
                   </div>
@@ -465,6 +482,14 @@ export default function CommentItem({
         confirmText="삭제"
         cancelText="취소"
         isLoading={isLoading}
+      />
+
+      {/* Moderation Modal */}
+      <ModerationModal
+        isOpen={isModerationModalOpen}
+        onClose={() => setIsModerationModalOpen(false)}
+        targetType="comment"
+        targetId={comment.id}
       />
     </div>
   );

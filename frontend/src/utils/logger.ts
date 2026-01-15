@@ -82,8 +82,19 @@ function sanitizeData(data: any): any {
     return data.map(item => sanitizeData(item));
   }
 
+  if (typeof data === 'function') {
+    return `[Function${data.name ? `:${data.name}` : ''}]`;
+  }
+
   // 객체는 깊이 제한하여 재귀 방지
   if (typeof data === 'object') {
+    if (data instanceof Error) {
+      return {
+        name: data.name,
+        message: data.message,
+        stack: data.stack,
+      };
+    }
     const sanitized: any = {};
     let keyCount = 0;
 
@@ -104,7 +115,11 @@ function sanitizeData(data: any): any {
         // 헤더와 설정은 최소 정보만
         sanitized[key] = '[HEADERS_HIDDEN]';
       } else {
-        sanitized[key] = sanitizeData(data[key]);
+        try {
+          sanitized[key] = sanitizeData((data as any)[key]);
+        } catch (error) {
+          sanitized[key] = `[UNREADABLE:${error instanceof Error ? error.message : 'unknown'}]`;
+        }
       }
     }
 
@@ -164,21 +179,57 @@ class SecureLogger {
       }
     } else if (IS_DEVELOPMENT) {
       // 개발 환경: 상세 로깅 (민감 정보는 제거된 상태)
-      // 민감한 데이터 제거 (개발 환경에서만)
-      const sanitizedArgs = args.map(arg => sanitizeData(arg));
+      // 민감한 데이터 제거 (개발 환경에서만) - 안전하게 처리
+      const sanitizedArgs = args.map(arg => {
+        try {
+          return sanitizeData(arg);
+        } catch (error) {
+          return `[UNSERIALIZABLE_ARG:${error instanceof Error ? error.message : 'unknown'}]`;
+        }
+      });
+
+      const prepareArgs = sanitizedArgs.map((arg) => {
+        if (arg === null || arg === undefined) {
+          return arg;
+        }
+        if (typeof arg === 'object') {
+          try {
+            return JSON.parse(JSON.stringify(arg));
+          } catch {
+            try {
+              return String(arg);
+            } catch {
+              return '[UNSERIALIZABLE_ARG]';
+            }
+          }
+        }
+        return arg;
+      });
+
+      const logWithFallback = (logFn: (...args: any[]) => void) => {
+        try {
+          logFn(`${prefix} ${message}`, ...prepareArgs);
+        } catch (error) {
+          const fallbackMsg =
+            error instanceof Error
+              ? `[LOGGER_ERROR:${error.message}]`
+              : '[LOGGER_ERROR:unknown]';
+          logFn(`${prefix} ${message} ${fallbackMsg}`);
+        }
+      };
 
       switch (level) {
         case 'error':
-          safeConsole.error(`${prefix} ${message}`, ...sanitizedArgs);
+          logWithFallback(safeConsole.error);
           break;
         case 'warn':
-          safeConsole.warn(`${prefix} ${message}`, ...sanitizedArgs);
+          logWithFallback(safeConsole.warn);
           break;
         case 'info':
-          safeConsole.info(`${prefix} ${message}`, ...sanitizedArgs);
+          logWithFallback(safeConsole.info);
           break;
         case 'debug':
-          safeConsole.log(`${prefix} ${message}`, ...sanitizedArgs);
+          logWithFallback(safeConsole.log);
           break;
       }
     }

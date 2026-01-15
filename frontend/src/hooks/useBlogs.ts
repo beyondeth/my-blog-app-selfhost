@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery, InfiniteData } from '@tanstack/react-query';
 import { getBlogBySlug, getMyBlogs, createBlog, updateBlog, deleteBlog, checkAlias, updateAlias } from '@/lib/api';
 import { toast } from 'sonner';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -98,33 +98,63 @@ export function useDeleteBlog() {
  * @param blogSlug - 블로그 슬러그
  * @returns 카테고리별 포스트 개수 (내림차순)
  */
+export interface BlogCategoriesPage {
+  items: Array<{ category: string; count: number }>;
+  total: number;
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
+const BLOG_CATEGORIES_PAGE_SIZE = 20;
+
+async function fetchBlogCategoriesPage(blogSlug: string, cursor?: string): Promise<BlogCategoriesPage> {
+  const params = new URLSearchParams();
+  params.set('limit', BLOG_CATEGORIES_PAGE_SIZE.toString());
+  if (cursor) {
+    params.set('cursor', cursor);
+  }
+
+  const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}/categories?${params.toString()}`;
+  console.log('📡 [CATEGORIES API] Fetching from:', url);
+
+  const response = await fetch(url, {
+    credentials: 'include',
+  });
+
+  console.log('📡 [CATEGORIES API] Response status:', response.status);
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error('📡 [CATEGORIES API] Error response:', errorText);
+    throw new Error(`Failed to fetch blog categories: ${response.status}`);
+  }
+
+  const data = await response.json();
+  console.log('📡 [CATEGORIES API] Response data:', data);
+
+  return data;
+}
+
 export function useBlogCategories(blogSlug: string) {
   // 캐시 키 정규화 - @ 제거
   const normalizedSlug = blogSlug.replace('@', '');
 
-  return useQuery({
+  return useInfiniteQuery<
+    BlogCategoriesPage,
+    Error,
+    InfiniteData<BlogCategoriesPage, string | undefined>,
+    string[],
+    string | undefined
+  >({
     queryKey: ['blog-categories', normalizedSlug],
-    queryFn: async (): Promise<Array<{ category: string; count: number }>> => {
-      const url = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/slug/${blogSlug}/categories`;
-      console.log('📡 [CATEGORIES API] Fetching from:', url);
-
-      const response = await fetch(url, {
-        credentials: 'include',
-      });
-
-      console.log('📡 [CATEGORIES API] Response status:', response.status);
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('📡 [CATEGORIES API] Error response:', errorText);
-        throw new Error(`Failed to fetch blog categories: ${response.status}`);
+    queryFn: ({ pageParam }) => fetchBlogCategoriesPage(blogSlug, pageParam),
+    getNextPageParam: (lastPage) => {
+      if (lastPage?.hasMore && lastPage.nextCursor) {
+        return lastPage.nextCursor;
       }
-
-      const data = await response.json();
-      console.log('📡 [CATEGORIES API] Response data:', data);
-
-      return data;
+      return undefined;
     },
+    initialPageParam: undefined,
     enabled: !!blogSlug,
     staleTime: 5 * 60 * 1000, // 5분간 캐시
     gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지

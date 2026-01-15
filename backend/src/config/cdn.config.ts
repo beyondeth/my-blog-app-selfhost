@@ -1,9 +1,9 @@
-import { registerAs } from '@nestjs/config';
+import { registerAs } from "@nestjs/config";
 
-export default registerAs('cdn', () => ({
+export default registerAs("cdn", () => ({
   // CDN 설정 (Cloudflare)
-  enabled: process.env.CDN_ENABLED === 'true',
-  domain: process.env.CDN_DOMAIN || '',
+  enabled: process.env.CDN_ENABLED === "true",
+  domain: process.env.CDN_DOMAIN || "",
 
   // 캐싱 설정
   cache: {

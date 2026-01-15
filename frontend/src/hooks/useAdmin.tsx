@@ -91,6 +91,22 @@ interface AdminReport {
   createdAt: string;
   reviewedAt?: string;
   target?: any; // Post, Comment, or User entity
+  communityId?: string;
+  reportedModeratorId?: string;
+  metadata?: Record<string, any>;
+  actionPayload?: Record<string, any>;
+  actionLogs?: AdminReportActionLog[];
+}
+
+interface AdminReportActionLog {
+  id: string;
+  action: string;
+  status: 'pending' | 'success' | 'failed';
+  executorId: string;
+  payload?: Record<string, any> | null;
+  result?: Record<string, any> | null;
+  errorMessage?: string | null;
+  createdAt: string;
 }
 
 interface AuditLog {
@@ -245,9 +261,14 @@ export function useAdminPosts(page = 1, limit = 20, filters?: any) {
   return useQuery({
     queryKey: ['admin', 'posts', page, limit, JSON.stringify(filters || {})],
     queryFn: async () => {
-      const response = await fetchWithAuth(`${API_URL}/posts?${params}`);
-      // Return the response as-is since the backend already provides the correct structure
-      return response;
+      const response = await fetchWithAuth(`${API_URL}/admin/posts?${params}`);
+      return {
+        posts: Array.isArray(response?.posts) ? response.posts : response?.data || [],
+        total: response?.total ?? 0,
+        totalPages: response?.totalPages ?? 1,
+        page: response?.page ?? page,
+        limit: response?.limit ?? limit,
+      };
     },
     staleTime: 30000, // 30초간 fresh 유지 (30초 내 재방문 시 API 호출 안함)
     gcTime: 5 * 60 * 1000, // 5분간 캐시 보관
@@ -320,12 +341,24 @@ export function useAdminReports(page = 1, limit = 20, status?: string, type?: st
     queryKey: ['admin', 'reports', page, limit, status, type],
     queryFn: async () => {
       const response = await fetchWithAuth(`${API_URL}/reports?${params}`);
-      // Transform the response to match the expected format
+      // API 응답이 { success: true, data: { data: [], total, ... } } 형식일 수도 있으므로 정규화
+      const wrapped = Array.isArray(response?.data?.data)
+        ? response.data
+        : response?.data && Array.isArray(response.data)
+        ? { data: response.data, total: response.total, totalPages: response.totalPages, page: response.page }
+        : response;
+
+      const reportsArray = Array.isArray(wrapped?.data)
+        ? wrapped.data
+        : Array.isArray(response?.reports)
+        ? response.reports
+        : [];
+
       return {
-        reports: response.reports || response.data || [],
-        total: response.total || 0,
-        totalPages: response.totalPages || 1,
-        page: response.page || page,
+        reports: reportsArray,
+        total: wrapped?.total ?? response.total ?? 0,
+        totalPages: wrapped?.totalPages ?? response.totalPages ?? 1,
+        page: wrapped?.page ?? response.page ?? page,
       };
     },
   });
@@ -339,16 +372,18 @@ export function useUpdateReport() {
       reportId, 
       status, 
       actionTaken, 
-      moderatorNotes 
+      moderatorNotes,
+      actionPayload,
     }: { 
       reportId: string; 
       status: string; 
       actionTaken?: string;
       moderatorNotes?: string;
+      actionPayload?: Record<string, any>;
     }) =>
       fetchWithAuth(`${API_URL}/reports/${reportId}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status, actionTaken, moderatorNotes }),
+        body: JSON.stringify({ status, actionTaken, moderatorNotes, actionPayload }),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] });

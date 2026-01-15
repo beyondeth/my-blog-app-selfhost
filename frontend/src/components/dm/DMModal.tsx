@@ -6,7 +6,6 @@ import { X, Maximize2, Minimize2, MessageCircle } from 'lucide-react';
 import { useDMStore } from '@/stores/dmStore';
 import DMLayout from './DMLayout/DMLayout';
 import { useWindowSize } from '@/hooks/useWindowSize';
-import { useSocket } from '@/hooks/useSocket';
 import { useDMNotifications } from '@/hooks/useDMNotifications';
 
 interface DMModalProps {
@@ -48,7 +47,7 @@ const DMModal: React.FC<DMModalProps> = ({
    *
    * 이 방식으로 완벽한 리소스 정리 보장
    */
-  const socket = useSocket(isOpen);
+
   const { isSSEConnected } = useDMNotifications(isOpen);
 
   // ESC key handler removed - modal should not close on ESC

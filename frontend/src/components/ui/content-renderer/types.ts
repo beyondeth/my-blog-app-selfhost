@@ -11,7 +11,9 @@ export type ContentPart =
   | { type: 'html'; content: string }
   | { type: 'mermaid'; content: string; id: string }
   | { type: 'code'; content: string; language: string; id: string }
-  | { type: 'youtube'; videoId: string; title?: string };
+  | { type: 'youtube'; videoId: string; title?: string }
+  | { type: 'video'; videoId: string; src?: string; caption?: string }
+  | { type: 'link-card'; url: string; label?: string };
 
 /**
  * 콘텐츠 처리 옵션

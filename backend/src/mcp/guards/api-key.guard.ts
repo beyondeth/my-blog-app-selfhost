@@ -1,7 +1,14 @@
-import { Injectable, CanActivate, ExecutionContext, UnauthorizedException, Logger } from '@nestjs/common';
-import { McpApiKeyService } from '../services/mcp-api-key.service';
-import { UsersService } from '../../users/users.service';
-import { BlogsService } from '../../blogs/blogs.service';
+import {
+  Injectable,
+  CanActivate,
+  ExecutionContext,
+  UnauthorizedException,
+  Logger,
+} from "@nestjs/common";
+import { McpApiKeyService } from "../services/mcp-api-key.service";
+import { UsersService } from "../../users/users.service";
+import { BlogsService } from "../../blogs/blogs.service";
+import { ConfigService } from "@nestjs/config";
 
 /**
  * API Key / OAuth 인증 가드
@@ -24,34 +31,42 @@ import { BlogsService } from '../../blogs/blogs.service';
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
   private readonly logger = new Logger(ApiKeyGuard.name);
+  private readonly sharedSecret?: string;
 
   constructor(
     private readonly mcpApiKeyService: McpApiKeyService,
     private readonly usersService: UsersService,
     private readonly blogsService: BlogsService,
-  ) {}
+    private readonly configService: ConfigService,
+  ) {
+    this.sharedSecret = this.configService.get<string>("MCP_SHARED_SECRET");
+  }
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest();
 
+    this.validateSharedSecret(request);
+
     // 1. X-API-Key 헤더 확인 (기존 API Key 인증)
-    const apiKey = request.headers['x-api-key'];
+    const apiKey = request.headers["x-api-key"];
 
     if (apiKey) {
       return this.validateApiKey(request, apiKey);
     }
 
     // 2. OAuth 헤더 확인 (MCP Proxy OAuth 모드)
-    const oauthUserId = request.headers['x-oauth-user-id'];
-    const oauthBlogId = request.headers['x-oauth-blog-id'];
+    const oauthUserId = request.headers["x-oauth-user-id"];
+    const oauthBlogId = request.headers["x-oauth-blog-id"];
 
     if (oauthUserId && oauthBlogId) {
       return this.validateOAuthHeaders(request, oauthUserId, oauthBlogId);
     }
 
     // 인증 헤더 없음
-    this.logger.warn('Missing authentication headers (X-API-Key or X-OAuth-*)');
-    throw new UnauthorizedException('Authentication required: API Key or OAuth headers');
+    this.logger.warn("Missing authentication headers (X-API-Key or X-OAuth-*)");
+    throw new UnauthorizedException(
+      "Authentication required: API Key or OAuth headers",
+    );
   }
 
   /**
@@ -62,8 +77,8 @@ export class ApiKeyGuard implements CanActivate {
       const mcpApiKey = await this.mcpApiKeyService.validateKey(apiKey);
 
       // 시간별 카운터 증가 (비동기, 블로킹 없음)
-      this.mcpApiKeyService.incrementHourlyCounter().catch(err => {
-        this.logger.error('Failed to increment hourly counter:', err);
+      this.mcpApiKeyService.incrementHourlyCounter().catch((err) => {
+        this.logger.error("Failed to increment hourly counter:", err);
       });
 
       // request에 인증 정보 첨부
@@ -81,14 +96,16 @@ export class ApiKeyGuard implements CanActivate {
           name: mcpApiKey.blog.name,
           slug: mcpApiKey.blog.alias || mcpApiKey.blog.slug,
         },
-        authMode: 'api_key',
+        authMode: "api_key",
       };
 
-      this.logger.debug(`✅ API Key validated: user=${mcpApiKey.userId.substring(0, 8)}`);
+      this.logger.debug(
+        `✅ API Key validated: user=${mcpApiKey.userId.substring(0, 8)}`,
+      );
       return true;
     } catch (error: any) {
       this.logger.warn(`❌ API Key validation failed: ${error.message}`);
-      throw new UnauthorizedException('Invalid or expired API Key');
+      throw new UnauthorizedException("Invalid or expired API Key");
     }
   }
 
@@ -109,20 +126,22 @@ export class ApiKeyGuard implements CanActivate {
       const user = await this.usersService.findOne(userId);
       if (!user) {
         this.logger.warn(`❌ OAuth user not found: ${userId.substring(0, 8)}`);
-        throw new UnauthorizedException('OAuth user not found');
+        throw new UnauthorizedException("OAuth user not found");
       }
 
       // 블로그 정보 조회
       const blog = await this.blogsService.findOne(blogId);
       if (!blog) {
         this.logger.warn(`❌ OAuth blog not found: ${blogId.substring(0, 8)}`);
-        throw new UnauthorizedException('OAuth blog not found');
+        throw new UnauthorizedException("OAuth blog not found");
       }
 
       // 블로그 소유권 확인
       if (blog.userId !== userId) {
-        this.logger.warn(`❌ Blog ownership mismatch: user=${userId.substring(0, 8)}, blog.userId=${blog.userId.substring(0, 8)}`);
-        throw new UnauthorizedException('Blog ownership mismatch');
+        this.logger.warn(
+          `❌ Blog ownership mismatch: user=${userId.substring(0, 8)}, blog.userId=${blog.userId.substring(0, 8)}`,
+        );
+        throw new UnauthorizedException("Blog ownership mismatch");
       }
 
       // request에 인증 정보 첨부 (API Key 모드와 동일한 형식)
@@ -140,17 +159,34 @@ export class ApiKeyGuard implements CanActivate {
           name: blog.name,
           slug: blog.alias || blog.slug,
         },
-        authMode: 'oauth',
+        authMode: "oauth",
       };
 
-      this.logger.debug(`✅ OAuth validated: user=${userId.substring(0, 8)}, blog=${blog.alias || blog.slug}`);
+      this.logger.debug(
+        `✅ OAuth validated: user=${userId.substring(0, 8)}, blog=${blog.alias || blog.slug}`,
+      );
       return true;
     } catch (error: any) {
       if (error instanceof UnauthorizedException) {
         throw error;
       }
       this.logger.warn(`❌ OAuth validation failed: ${error.message}`);
-      throw new UnauthorizedException('OAuth validation failed');
+      throw new UnauthorizedException("OAuth validation failed");
+    }
+  }
+
+  private validateSharedSecret(request: any): void {
+    if (!this.sharedSecret) {
+      return;
+    }
+
+    const providedSecret =
+      request.headers["x-internal-secret"] ||
+      request.headers["X-Internal-Secret"];
+
+    if (!providedSecret || providedSecret !== this.sharedSecret) {
+      this.logger.warn("Missing or invalid internal MCP secret");
+      throw new UnauthorizedException("Invalid internal signature");
     }
   }
 }

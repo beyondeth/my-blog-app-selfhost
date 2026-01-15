@@ -504,6 +504,7 @@ export default function AdminImagesPage() {
           onClick={() => setPreviewUrl(null)}
         >
           <div className="max-w-4xl max-h-[90vh] relative">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={previewUrl}
               alt="Preview"

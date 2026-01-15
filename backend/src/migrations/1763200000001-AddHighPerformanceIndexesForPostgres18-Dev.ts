@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * PostgreSQL 18 고성능 인덱스 추가 마이그레이션 (개발 환경용)
@@ -6,8 +6,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * 기본적인 성능 최적화 인덱스만 추가
  */
 export class AddHighPerformanceIndexesForPostgres18Dev1763200000001
-  implements MigrationInterface {
-  name = 'AddHighPerformanceIndexesForPostgres18Dev1763200000001';
+  implements MigrationInterface
+{
+  name = "AddHighPerformanceIndexesForPostgres18Dev1763200000001";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // ===== 1. 포스트 관련 핵심 인덱스 =====
@@ -125,13 +126,23 @@ export class AddHighPerformanceIndexesForPostgres18Dev1763200000001
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 인덱스 및 뷰 제거 (역순으로 제거)
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_mv_popular_posts_score_published";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_mv_popular_posts_score_published";`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_mv_popular_posts_id";`);
-    await queryRunner.query(`DROP MATERIALIZED VIEW IF EXISTS "mv_popular_posts";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_comments_post_created";`);
+    await queryRunner.query(
+      `DROP MATERIALIZED VIEW IF EXISTS "mv_popular_posts";`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_comments_post_created";`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_search_fts";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_author_published";`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_blog_published_count";`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_posts_author_published";`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_posts_blog_published_count";`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_bookmarks_user_post";`);
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_tags_gin";`);
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_posts_home_feed";`);

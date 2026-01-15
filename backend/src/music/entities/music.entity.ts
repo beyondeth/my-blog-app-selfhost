@@ -7,8 +7,8 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
-} from 'typeorm';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
 
 /**
  * 동기화된 가사 라인 타입
@@ -25,27 +25,27 @@ export interface SyncedLyricLine {
  * 사이트 전체 BGM으로 사용되는 음악 파일 관리
  * 관리자만 업로드 가능
  */
-@Entity('musics')
-@Index(['isActive', 'order'])
-@Index(['uploadedById'])
+@Entity("musics")
+@Index(["isActive", "order"])
+@Index(["uploadedById"])
 export class Music {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   // 파일 정보
-  @Column({ name: 'original_name' })
+  @Column({ name: "original_name" })
   originalName: string;
 
-  @Column({ name: 'file_key' })
+  @Column({ name: "file_key" })
   fileKey: string;
 
-  @Column({ name: 'file_size' })
+  @Column({ name: "file_size" })
   fileSize: number;
 
-  @Column({ name: 'mime_type' })
+  @Column({ name: "mime_type" })
   mimeType: string;
 
-  @Column({ name: 'duration', type: 'float', nullable: true })
+  @Column({ name: "duration", type: "float", nullable: true })
   duration: number; // 재생 시간 (초)
 
   // ID3 메타데이터 (자동 추출)
@@ -58,54 +58,54 @@ export class Music {
   @Column({ nullable: true })
   album: string;
 
-  @Column({ type: 'integer', nullable: true })
+  @Column({ type: "integer", nullable: true })
   year: number;
 
   @Column({ nullable: true })
   genre: string;
 
-  @Column({ name: 'track_number', nullable: true })
+  @Column({ name: "track_number", nullable: true })
   trackNumber: string;
 
-  @Column({ name: 'cover_image_key', nullable: true })
+  @Column({ name: "cover_image_key", nullable: true })
   coverImageKey: string; // 앨범 커버 S3 키
 
   // 가사 데이터
-  @Column({ type: 'text', nullable: true })
+  @Column({ type: "text", nullable: true })
   lyrics: string; // 일반 텍스트 가사 (USLT)
 
-  @Column({ name: 'synced_lyrics', type: 'jsonb', nullable: true })
+  @Column({ name: "synced_lyrics", type: "jsonb", nullable: true })
   syncedLyrics: SyncedLyricLine[]; // 동기화된 가사 [{time: ms, text: string}]
 
   // 관리자 수정용 표시 필드
-  @Column({ name: 'display_title', nullable: true })
+  @Column({ name: "display_title", nullable: true })
   displayTitle: string;
 
-  @Column({ name: 'display_artist', nullable: true })
+  @Column({ name: "display_artist", nullable: true })
   displayArtist: string;
 
-  @Column({ name: 'display_genre', nullable: true })
+  @Column({ name: "display_genre", nullable: true })
   displayGenre: string;
 
   // 재생 관리
-  @Column({ name: 'is_active', default: true })
+  @Column({ name: "is_active", default: true })
   isActive: boolean;
 
-  @Column({ name: 'play_order', type: 'integer', default: 0 })
+  @Column({ name: "play_order", type: "integer", default: 0 })
   order: number;
 
   // 업로드 정보
-  @Column({ name: 'uploaded_by_id', type: 'uuid' })
+  @Column({ name: "uploaded_by_id", type: "uuid" })
   uploadedById: string;
 
-  @ManyToOne(() => User, { onDelete: 'SET NULL' })
-  @JoinColumn({ name: 'uploaded_by_id' })
+  @ManyToOne(() => User, { onDelete: "SET NULL" })
+  @JoinColumn({ name: "uploaded_by_id" })
   uploadedBy: User;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
-  @UpdateDateColumn({ name: 'updated_at' })
+  @UpdateDateColumn({ name: "updated_at" })
   updatedAt: Date;
 
   /**
@@ -120,7 +120,7 @@ export class Music {
    * 표시용 아티스트 반환
    */
   getDisplayArtist(): string {
-    return this.displayArtist || this.artist || 'Unknown Artist';
+    return this.displayArtist || this.artist || "Unknown Artist";
   }
 
   /**

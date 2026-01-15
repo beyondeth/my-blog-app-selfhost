@@ -1,12 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Not, Like } from 'typeorm';
-import { File } from '../entities/file.entity';
-import { FileContext, FileContextType, FilePurpose } from '../entities/file-context.entity';
-import { S3Service } from './s3.service';
-import { ContextualFileService } from './contextual-file.service';
-import { v4 as uuidv4 } from 'uuid';
-import * as path from 'path';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, Not, Like } from "typeorm";
+import { File } from "../entities/file.entity";
+import {
+  FileContext,
+  FileContextType,
+  FilePurpose,
+} from "../entities/file-context.entity";
+import { S3Service } from "./s3.service";
+import { ContextualFileService } from "./contextual-file.service";
+import { v4 as uuidv4 } from "uuid";
+import * as path from "path";
 
 export interface MigrationProgress {
   total: number;
@@ -65,7 +69,7 @@ export class FileMigrationService {
     try {
       // 1. 기존 파일 분석
       const analysis = await this.analyzeExistingFiles();
-      this.logger.log('File analysis completed:', analysis);
+      this.logger.log("File analysis completed:", analysis);
 
       // 2. 배치 단위로 마이그레이션
       const batchSize = 100;
@@ -90,7 +94,7 @@ export class FileMigrationService {
             });
             this.logger.error(`Failed to migrate file ${file.id}:`, error);
           }
-          
+
           this.migrationProgress.processed++;
           this.updateProgress();
         }
@@ -105,7 +109,7 @@ export class FileMigrationService {
         errors,
       };
     } catch (error) {
-      this.logger.error('Migration failed:', error);
+      this.logger.error("Migration failed:", error);
       throw error;
     }
   }
@@ -116,17 +120,17 @@ export class FileMigrationService {
   async analyzeExistingFiles() {
     const total = await this.fileRepository.count();
     const v1Files = await this.fileRepository.count({
-      where: { fileKey: Not(Like('v2/%')) },
+      where: { fileKey: Not(Like("v2/%")) },
     });
     const v2Files = await this.fileRepository.count({
-      where: { fileKey: Like('v2/%') },
+      where: { fileKey: Like("v2/%") },
     });
 
     const fileTypes = await this.fileRepository
-      .createQueryBuilder('file')
-      .select('file.fileType', 'type')
-      .addSelect('COUNT(*)', 'count')
-      .groupBy('file.fileType')
+      .createQueryBuilder("file")
+      .select("file.fileType", "type")
+      .addSelect("COUNT(*)", "count")
+      .groupBy("file.fileType")
       .getRawMany();
 
     this.migrationProgress.total = v1Files;
@@ -146,11 +150,11 @@ export class FileMigrationService {
   private async getNextBatch(batchSize: number): Promise<File[]> {
     return this.fileRepository.find({
       where: {
-        fileKey: Not(Like('v2/%')),
+        fileKey: Not(Like("v2/%")),
         contextId: null, // 아직 마이그레이션되지 않은 파일
       },
       take: batchSize,
-      relations: ['user'],
+      relations: ["user"],
     });
   }
 
@@ -162,7 +166,7 @@ export class FileMigrationService {
     const { contextType, purpose } = await this.inferFilePurpose(file);
 
     // 2. FileContext 생성 또는 조회
-    let context = await this.findOrCreateContext(
+    const context = await this.findOrCreateContext(
       contextType,
       this.getContextId(file, contextType),
       file.userId,
@@ -178,7 +182,9 @@ export class FileMigrationService {
       this.logger.log(`Copied S3 object: ${file.fileKey} → ${newS3Key}`);
     } catch (error) {
       // S3 복사 실패 시 스킵
-      this.logger.warn(`S3 copy failed for ${file.fileKey}, using existing key`);
+      this.logger.warn(
+        `S3 copy failed for ${file.fileKey}, using existing key`,
+      );
       this.migrationProgress.skipped++;
       return;
     }
@@ -187,8 +193,8 @@ export class FileMigrationService {
     file.fileKey = newS3Key;
     file.contextId = context.id;
     file.s3Bucket = process.env.AWS_S3_BUCKET;
-    file.s3Region = process.env.AWS_REGION || 'us-east-1';
-    
+    file.s3Region = process.env.AWS_REGION || "us-east-1";
+
     await this.fileRepository.save(file);
 
     // 6. Context 통계 업데이트
@@ -211,7 +217,7 @@ export class FileMigrationService {
     const fileName = file.fileName.toLowerCase();
 
     // 프로필 이미지 패턴
-    if (fileKey.includes('profile') || fileKey.includes('avatar')) {
+    if (fileKey.includes("profile") || fileKey.includes("avatar")) {
       return {
         contextType: FileContextType.PROFILE,
         purpose: FilePurpose.AVATAR,
@@ -219,7 +225,7 @@ export class FileMigrationService {
     }
 
     // 블로그 썸네일 패턴
-    if (fileKey.includes('blog') && fileKey.includes('thumb')) {
+    if (fileKey.includes("blog") && fileKey.includes("thumb")) {
       return {
         contextType: FileContextType.BLOG,
         purpose: FilePurpose.THUMBNAIL,
@@ -227,7 +233,7 @@ export class FileMigrationService {
     }
 
     // 포스트 관련 파일
-    if (fileKey.includes('post') || fileKey.includes('content')) {
+    if (fileKey.includes("post") || fileKey.includes("content")) {
       return {
         contextType: FileContextType.POST,
         purpose: FilePurpose.CONTENT,
@@ -235,7 +241,7 @@ export class FileMigrationService {
     }
 
     // 이미지 파일은 대부분 콘텐츠
-    if (file.fileType === 'image') {
+    if (file.fileType === "image") {
       return {
         contextType: FileContextType.POST,
         purpose: FilePurpose.CONTENT,
@@ -305,21 +311,21 @@ export class FileMigrationService {
    * 새로운 S3 키 생성
    */
   private generateNewS3Key(file: File, context: FileContext): string {
-    const timestamp = new Date().toISOString().split('T')[0].replace(/-/g, '');
-    const uuid = uuidv4().split('-')[0];
+    const timestamp = new Date().toISOString().split("T")[0].replace(/-/g, "");
+    const uuid = uuidv4().split("-")[0];
     const ext = path.extname(file.fileName);
     const fileName = `${timestamp}_${uuid}_${context.purpose}${ext}`;
 
     switch (context.contextType) {
       case FileContextType.PROFILE:
         return `v2/users/${context.ownerId}/profile/${context.purpose}/${fileName}`;
-      
+
       case FileContextType.POST:
-        return `v2/users/${context.ownerId}/content/posts/${context.contextId || 'misc'}/${fileName}`;
-      
+        return `v2/users/${context.ownerId}/content/posts/${context.contextId || "misc"}/${fileName}`;
+
       case FileContextType.BLOG:
         return `v2/blogs/${context.contextId}/branding/${context.purpose}/${fileName}`;
-      
+
       default:
         return `v2/system/misc/${fileName}`;
     }
@@ -341,11 +347,14 @@ export class FileMigrationService {
     this.migrationProgress.percentage = Math.round(
       (this.migrationProgress.processed / this.migrationProgress.total) * 100,
     );
-    
+
     if (this.migrationProgress.processed % 10 === 0) {
-      this.logger.log(`Migration progress: ${this.migrationProgress.percentage}%`, {
-        ...this.migrationProgress,
-      });
+      this.logger.log(
+        `Migration progress: ${this.migrationProgress.percentage}%`,
+        {
+          ...this.migrationProgress,
+        },
+      );
     }
   }
 
@@ -362,7 +371,7 @@ export class FileMigrationService {
   async migrateToV2(options: MigrationOptions): Promise<MigrationResult> {
     const startTime = new Date();
     const errors: Array<{ fileId: string; error: string }> = [];
-    
+
     // Reset progress
     this.migrationProgress = {
       total: 0,
@@ -376,7 +385,7 @@ export class FileMigrationService {
     try {
       // Get v1 files count
       const v1Count = await this.fileRepository.count({
-        where: { fileKey: Not(Like('v2/%')) },
+        where: { fileKey: Not(Like("v2/%")) },
       });
       this.migrationProgress.total = v1Count;
 
@@ -395,10 +404,10 @@ export class FileMigrationService {
       let offset = 0;
       while (offset < v1Count) {
         const batch = await this.fileRepository.find({
-          where: { fileKey: Not(Like('v2/%')) },
+          where: { fileKey: Not(Like("v2/%")) },
           take: options.batchSize,
           skip: offset,
-          relations: ['posts'],
+          relations: ["posts"],
         });
 
         if (batch.length === 0) break;
@@ -440,13 +449,13 @@ export class FileMigrationService {
         success: true,
       };
     } catch (error) {
-      this.logger.error('Migration failed:', error);
+      this.logger.error("Migration failed:", error);
       return {
         startTime,
         endTime: new Date(),
         duration: new Date().getTime() - startTime.getTime(),
         progress: this.migrationProgress,
-        errors: [...errors, { fileId: 'system', error: error.message }],
+        errors: [...errors, { fileId: "system", error: error.message }],
         success: false,
       };
     }
@@ -462,9 +471,9 @@ export class FileMigrationService {
 
     // Infer context from file relationships or path
     const { contextType, purpose } = await this.inferFilePurpose(file);
-    
+
     let contextId = null;
-    
+
     // Check if file is attached to a post
     if (file.posts && (await file.posts).length > 0) {
       const posts = await file.posts;
@@ -488,7 +497,7 @@ export class FileMigrationService {
 
     // Copy file in S3
     await this.s3Service.copyFile(file.fileKey, newS3Key);
-    
+
     // Delete old file
     await this.s3Service.deleteFile(file.fileKey);
 
@@ -496,7 +505,7 @@ export class FileMigrationService {
     file.fileKey = newS3Key;
     file.fileUrl = newS3Key;
     file.contextId = context.id;
-    
+
     await this.fileRepository.save(file);
 
     return file;
@@ -506,11 +515,11 @@ export class FileMigrationService {
    * 롤백 기능
    */
   async rollbackMigration(): Promise<void> {
-    this.logger.warn('Starting migration rollback...');
-    
+    this.logger.warn("Starting migration rollback...");
+
     // v2 파일들을 찾아서 원래 위치로 복원
     const v2Files = await this.fileRepository.find({
-      where: { fileKey: Like('v2/%') },
+      where: { fileKey: Like("v2/%") },
     });
 
     for (const file of v2Files) {

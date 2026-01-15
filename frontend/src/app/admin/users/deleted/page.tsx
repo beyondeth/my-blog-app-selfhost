@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,6 +38,7 @@ import {
   Search,
   X,
 } from 'lucide-react';
+import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { toast } from 'sonner';
@@ -103,7 +104,7 @@ export default function DeletedUsersPage() {
   };
 
   // 삭제된 사용자 목록 조회
-  const fetchDeletedUsers = async () => {
+  const fetchDeletedUsers = useCallback(async () => {
     try {
       setLoading(true);
       const response = await apiClient.admin.getDeletedUsers({
@@ -123,7 +124,7 @@ export default function DeletedUsersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, limit, sortOrder, searchQuery]);
 
   // 검색 처리
   const handleSearch = () => {
@@ -140,7 +141,7 @@ export default function DeletedUsersPage() {
 
   useEffect(() => {
     fetchDeletedUsers();
-  }, [page, sortOrder, searchQuery]);
+  }, [fetchDeletedUsers]);
 
   // 즉시 영구 삭제
   const handlePermanentDelete = async (user: DeletedUser) => {
@@ -334,7 +335,7 @@ export default function DeletedUsersPage() {
                             onClick={() =>
                               setDeleteDialog({ open: true, user })
                             }
-                            className="text-red-600 hover:bg-red-50"
+                            className={DESTRUCTIVE_ACTION_CLASS}
                           >
                             <Trash2 className="w-4 h-4 mr-1" />
                             영구 삭제

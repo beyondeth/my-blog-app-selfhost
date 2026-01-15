@@ -1,28 +1,36 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, Unique } from 'typeorm';
-import { User } from '../../users/entities/user.entity';
-import { Comment } from './comment.entity';
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  CreateDateColumn,
+  Unique,
+} from "typeorm";
+import { User } from "../../users/entities/user.entity";
+import { Comment } from "./comment.entity";
 
 export const LikeType = {
-  LIKE: 'like',
-  DISLIKE: 'dislike'
+  LIKE: "like",
+  DISLIKE: "dislike",
 } as const;
 
-export type LikeType = typeof LikeType[keyof typeof LikeType];
+export type LikeType = (typeof LikeType)[keyof typeof LikeType];
 
-@Entity('comment_likes')
-@Unique(['userId', 'commentId'])
+@Entity("comment_likes")
+@Unique(["userId", "commentId"])
 export class CommentLike {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: 'uuid', name: 'userId' })
+  @Column({ type: "uuid", name: "userId" })
   userId: string;
 
-  @Column({ type: 'uuid', name: 'commentId' })
+  @Column({ type: "uuid", name: "commentId" })
   commentId: string;
 
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: LikeType,
   })
   type: LikeType;
@@ -30,11 +38,13 @@ export class CommentLike {
   @CreateDateColumn()
   createdAt: Date;
 
-  @ManyToOne(() => User, user => user.commentLikes, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'userId' })
+  @ManyToOne(() => User, (user) => user.commentLikes, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "userId" })
   user: User;
 
-  @ManyToOne(() => Comment, comment => comment.commentLikes, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'commentId' })
+  @ManyToOne(() => Comment, (comment) => comment.commentLikes, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn({ name: "commentId" })
   comment: Comment;
 }

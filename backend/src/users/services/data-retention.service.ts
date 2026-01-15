@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull } from 'typeorm';
-import { User } from '../entities/user.entity';
-import { EmailApproval } from '../../email/entities/email-approval.entity';
-import { Post } from '../../posts/entities/post.entity';
-import { Comment } from '../../comments/entities/comment.entity';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan, IsNull } from "typeorm";
+import { User } from "../entities/user.entity";
+import { EmailApproval } from "../../email/entities/email-approval.entity";
+import { Post } from "../../posts/entities/post.entity";
+import { Comment } from "../../comments/entities/comment.entity";
 
 /**
  * 개인정보 보유기간 관리 서비스
@@ -34,12 +34,12 @@ export class DataRetentionService {
    * - 마지막 활동일 기준 1년 이상 비활성 사용자
    * - 보유기간 만료 30일 전 사용자에게 알림
    */
-  @Cron('0 9 * * *', {
-    name: 'check-retention-expiry',
-    timeZone: 'Asia/Seoul',
+  @Cron("0 9 * * *", {
+    name: "check-retention-expiry",
+    timeZone: "Asia/Seoul",
   })
   async checkRetentionExpiry(): Promise<void> {
-    this.logger.log('Starting retention expiry check...');
+    this.logger.log("Starting retention expiry check...");
 
     try {
       // 1. 보유기간 만료 30일 전 대상자 조회
@@ -47,23 +47,23 @@ export class DataRetentionService {
       thirtyDaysFromNow.setDate(thirtyDaysFromNow.getDate() + 30);
 
       const usersNearingExpiry = await this.userRepository
-        .createQueryBuilder('user')
-        .where('user.isDeleted = :isDeleted', { isDeleted: false })
-        .andWhere('user.isActive = :isActive', { isActive: true })
-        .andWhere('user.lastLoginAt < :oneYearAgo', {
+        .createQueryBuilder("user")
+        .where("user.isDeleted = :isDeleted", { isDeleted: false })
+        .andWhere("user.isActive = :isActive", { isActive: true })
+        .andWhere("user.lastLoginAt < :oneYearAgo", {
           oneYearAgo: new Date(Date.now() - 365 * 24 * 60 * 60 * 1000),
         })
         .andWhere(
-          '(user.dataRetentionNotifiedAt IS NULL OR user.dataRetentionNotifiedAt < :thirtyDaysAgo)',
+          "(user.dataRetentionNotifiedAt IS NULL OR user.dataRetentionNotifiedAt < :thirtyDaysAgo)",
           {
             thirtyDaysAgo: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
           },
         )
-        .select(['user.id', 'user.email', 'user.username', 'user.lastLoginAt'])
+        .select(["user.id", "user.email", "user.username", "user.lastLoginAt"])
         .getMany();
 
       if (usersNearingExpiry.length === 0) {
-        this.logger.log('No users nearing retention expiry');
+        this.logger.log("No users nearing retention expiry");
         return;
       }
 
@@ -73,13 +73,13 @@ export class DataRetentionService {
 
       // 2. 관리자 승인 대기 레코드 생성
       await this.createEmailApprovalRecord(
-        'DATA_RETENTION_NOTICE',
+        "DATA_RETENTION_NOTICE",
         usersNearingExpiry,
       );
 
-      this.logger.log('Retention expiry check completed');
+      this.logger.log("Retention expiry check completed");
     } catch (error) {
-      this.logger.error('Failed to check retention expiry:', error);
+      this.logger.error("Failed to check retention expiry:", error);
     }
   }
 
@@ -98,7 +98,7 @@ export class DataRetentionService {
     const existingApproval = await this.emailApprovalRepository.findOne({
       where: {
         type,
-        status: 'PENDING_APPROVAL',
+        status: "PENDING_APPROVAL",
       },
     });
 
@@ -123,7 +123,7 @@ export class DataRetentionService {
       content: this.getEmailContent(type),
       targetCount: users.length,
       targetUserIds: userIds,
-      status: 'PENDING_APPROVAL',
+      status: "PENDING_APPROVAL",
       createdAt: new Date(),
     });
 
@@ -138,20 +138,19 @@ export class DataRetentionService {
    */
   private getEmailSubject(type: string): string {
     const subjects = {
-      DATA_RETENTION_NOTICE:
-        '[중요] 개인정보 보유기간 만료 예정 안내',
-      ACCOUNT_DELETION_NOTICE: '[안내] 계정 삭제 완료 안내',
-      DORMANT_ACCOUNT_NOTICE: '[안내] 휴면 계정 전환 안내',
+      DATA_RETENTION_NOTICE: "[중요] 개인정보 보유기간 만료 예정 안내",
+      ACCOUNT_DELETION_NOTICE: "[안내] 계정 삭제 완료 안내",
+      DORMANT_ACCOUNT_NOTICE: "[안내] 휴면 계정 전환 안내",
     };
 
-    return subjects[type] || '안내 메일';
+    return subjects[type] || "안내 메일";
   }
 
   /**
    * 이메일 내용 생성
    */
   private getEmailContent(type: string): string {
-    if (type === 'DATA_RETENTION_NOTICE') {
+    if (type === "DATA_RETENTION_NOTICE") {
       return `
 안녕하세요, DevLog입니다.
 
@@ -176,7 +175,7 @@ DevLog 드림
       `;
     }
 
-    return '안내 메일 내용';
+    return "안내 메일 내용";
   }
 
   /**
@@ -185,12 +184,12 @@ DevLog 드림
    * - 개인정보: 3년 경과 (scheduledDeletionAt 기준)
    * - 결제 기록: 5년 경과 (scheduledDeletionAt 기준)
    */
-  @Cron('0 0 * * *', {
-    name: 'delete-expired-data',
-    timeZone: 'Asia/Seoul',
+  @Cron("0 0 * * *", {
+    name: "delete-expired-data",
+    timeZone: "Asia/Seoul",
   })
   async deleteExpiredData(): Promise<void> {
-    this.logger.log('Starting expired data deletion...');
+    this.logger.log("Starting expired data deletion...");
 
     try {
       const now = new Date();
@@ -214,13 +213,13 @@ DevLog 드림
       // 2. 사용자 완전 삭제 (scheduledDeletionAt 도래)
       // accountSettings 테이블과 조인하여 scheduledDeletionAt 조회
       const usersToDelete = await this.userRepository
-        .createQueryBuilder('user')
-        .leftJoinAndSelect('user.accountSettings', 'settings')
-        .where('user.isDeleted = :isDeleted', { isDeleted: true })
-        .andWhere('settings.scheduledDeletionAt < :now', { now })
-        .andWhere('settings.scheduledDeletionAt IS NOT NULL')
-        .select(['user.id', 'user.email'])
-        .addSelect(['settings.scheduledDeletionAt'])
+        .createQueryBuilder("user")
+        .leftJoinAndSelect("user.accountSettings", "settings")
+        .where("user.isDeleted = :isDeleted", { isDeleted: true })
+        .andWhere("settings.scheduledDeletionAt < :now", { now })
+        .andWhere("settings.scheduledDeletionAt IS NOT NULL")
+        .select(["user.id", "user.email"])
+        .addSelect(["settings.scheduledDeletionAt"])
         .getMany();
 
       if (usersToDelete.length > 0) {
@@ -236,28 +235,23 @@ DevLog 드림
               `Permanently deleted user ${user.id} (scheduled at ${user.accountSettings?.scheduledDeletionAt})`,
             );
           } catch (error) {
-            this.logger.error(
-              `Failed to delete user ${user.id}:`,
-              error,
-            );
+            this.logger.error(`Failed to delete user ${user.id}:`, error);
           }
         }
       } else {
-        this.logger.log('No users scheduled for permanent deletion');
+        this.logger.log("No users scheduled for permanent deletion");
       }
 
       // 3. Soft delete된 Posts 완전 삭제 (180일 경과)
       const oneHundredEightyDaysAgo = new Date(now);
-      oneHundredEightyDaysAgo.setDate(
-        oneHundredEightyDaysAgo.getDate() - 180,
-      );
+      oneHundredEightyDaysAgo.setDate(oneHundredEightyDaysAgo.getDate() - 180);
 
       const deletedPostsResult = await this.postRepository
         .createQueryBuilder()
         .delete()
-        .where('isDeleted = :isDeleted', { isDeleted: true })
-        .andWhere('deletedAt IS NOT NULL')
-        .andWhere('deletedAt < :oneHundredEightyDaysAgo', {
+        .where("isDeleted = :isDeleted", { isDeleted: true })
+        .andWhere("deletedAt IS NOT NULL")
+        .andWhere("deletedAt < :oneHundredEightyDaysAgo", {
           oneHundredEightyDaysAgo,
         })
         .execute();
@@ -271,9 +265,9 @@ DevLog 드림
       const deletedCommentsResult = await this.commentRepository
         .createQueryBuilder()
         .delete()
-        .where('isDeleted = :isDeleted', { isDeleted: true })
-        .andWhere('deletedAt IS NOT NULL')
-        .andWhere('deletedAt < :oneHundredEightyDaysAgo', {
+        .where("isDeleted = :isDeleted", { isDeleted: true })
+        .andWhere("deletedAt IS NOT NULL")
+        .andWhere("deletedAt < :oneHundredEightyDaysAgo", {
           oneHundredEightyDaysAgo,
         })
         .execute();
@@ -283,9 +277,9 @@ DevLog 드림
         `Deleted ${deletedCommentsCount} soft-deleted comments (180+ days old)`,
       );
 
-      this.logger.log('Expired data deletion completed');
+      this.logger.log("Expired data deletion completed");
     } catch (error) {
-      this.logger.error('Failed to delete expired data:', error);
+      this.logger.error("Failed to delete expired data:", error);
     }
   }
 
@@ -298,15 +292,15 @@ DevLog 드림
     });
 
     if (!approval) {
-      throw new Error('Approval record not found');
+      throw new Error("Approval record not found");
     }
 
-    if (approval.status !== 'PENDING_APPROVAL') {
-      throw new Error('Approval already processed');
+    if (approval.status !== "PENDING_APPROVAL") {
+      throw new Error("Approval already processed");
     }
 
     // 상태 변경 (실제 이메일 발송은 별도 서비스에서 처리)
-    approval.status = 'APPROVED';
+    approval.status = "APPROVED";
     approval.approvedAt = new Date();
 
     await this.emailApprovalRepository.save(approval);
@@ -319,23 +313,20 @@ DevLog 드림
   /**
    * 관리자용: 이메일 발송 거부 처리
    */
-  async rejectEmailSending(
-    approvalId: string,
-    reason: string,
-  ): Promise<void> {
+  async rejectEmailSending(approvalId: string, reason: string): Promise<void> {
     const approval = await this.emailApprovalRepository.findOne({
       where: { id: approvalId },
     });
 
     if (!approval) {
-      throw new Error('Approval record not found');
+      throw new Error("Approval record not found");
     }
 
-    if (approval.status !== 'PENDING_APPROVAL') {
-      throw new Error('Approval already processed');
+    if (approval.status !== "PENDING_APPROVAL") {
+      throw new Error("Approval already processed");
     }
 
-    approval.status = 'REJECTED';
+    approval.status = "REJECTED";
     approval.rejectedAt = new Date();
     approval.rejectionReason = reason;
 

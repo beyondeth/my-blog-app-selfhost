@@ -1,7 +1,7 @@
-import { PartialType } from '@nestjs/swagger';
-import { CreatePostDto } from './create-post.dto';
-import { IsString, IsOptional, IsNumber, IsBoolean } from 'class-validator';
-import { Type } from 'class-transformer';
+import { PartialType } from "@nestjs/swagger";
+import { CreatePostDto } from "./create-post.dto";
+import { IsString, IsOptional, IsNumber, IsBoolean } from "class-validator";
+import { Type } from "class-transformer";
 
 export class UpdatePostDto extends PartialType(CreatePostDto) {
   // 상속받은 필수 필드들을 옵셔널로 명시적으로 지정

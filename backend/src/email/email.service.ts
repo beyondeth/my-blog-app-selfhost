@@ -1,13 +1,23 @@
-import { Injectable, BadRequestException, UnauthorizedException, ConflictException, Logger } from '@nestjs/common';
-import { MailerService } from '@nestjs-modules/mailer';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ConfigService } from '@nestjs/config';
-import { EmailVerification } from './entities/email-verification.entity';
-import { User } from '../users/entities/user.entity';
-import * as crypto from 'crypto';
-import { getAWSStyleEmailTemplate, getAWSStylePasswordResetTemplate, getModernAccountLinkTemplate } from './email-templates';
-import { DateUtils } from '../common/utils/date.utils';
+import {
+  Injectable,
+  BadRequestException,
+  UnauthorizedException,
+  ConflictException,
+  Logger,
+} from "@nestjs/common";
+import { MailerService } from "@nestjs-modules/mailer";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ConfigService } from "@nestjs/config";
+import { EmailVerification } from "./entities/email-verification.entity";
+import { User } from "../users/entities/user.entity";
+import * as crypto from "crypto";
+import {
+  getAWSStyleEmailTemplate,
+  getAWSStylePasswordResetTemplate,
+  getModernAccountLinkTemplate,
+} from "./email-templates";
+import { DateUtils } from "../common/utils/date.utils";
 
 @Injectable()
 export class EmailService {
@@ -26,8 +36,8 @@ export class EmailService {
    * 6자리 숫자 인증 코드 생성
    */
   generateVerificationCode(): string {
-    const min = parseInt(process.env.EMAIL_CODE_MIN || '100000');
-    const max = parseInt(process.env.EMAIL_CODE_MAX || '999999');
+    const min = parseInt(process.env.EMAIL_CODE_MIN || "100000");
+    const max = parseInt(process.env.EMAIL_CODE_MAX || "999999");
     return Math.floor(min + Math.random() * (max - min + 1)).toString();
   }
 
@@ -35,7 +45,7 @@ export class EmailService {
    * 세션 토큰 생성
    */
   generateSessionToken(): string {
-    return crypto.randomBytes(32).toString('hex');
+    return crypto.randomBytes(32).toString("hex");
   }
 
   /**
@@ -43,18 +53,21 @@ export class EmailService {
    * @param email - 인증할 이메일 주소
    * @param isSignup - 회원가입 용도인지 여부 (기본값: true)
    */
-  async sendVerificationCode(email: string, isSignup: boolean = true): Promise<void> {
+  async sendVerificationCode(
+    email: string,
+    isSignup: boolean = true,
+  ): Promise<void> {
     // 회원가입 용도일 때만 기존 회원 체크
     if (isSignup) {
-      const existingUser = await this.userRepository.findOne({ 
-        where: { email } 
+      const existingUser = await this.userRepository.findOne({
+        where: { email },
       });
-      
+
       if (existingUser) {
         // 보안을 위해 구체적인 이유를 명확히 알려줌
         // 사용자 경험 개선을 위해 친절한 안내 제공
         throw new ConflictException(
-          '이미 등록된 이메일입니다. 로그인 페이지에서 로그인해주세요.'
+          "이미 등록된 이메일입니다. 로그인 페이지에서 로그인해주세요.",
         );
       }
     }
@@ -67,7 +80,10 @@ export class EmailService {
 
     // 새 인증 코드 생성
     const code = this.generateVerificationCode();
-    const expiresIn = this.configService.get('EMAIL_VERIFICATION_EXPIRES_IN', 5);
+    const expiresIn = this.configService.get(
+      "EMAIL_VERIFICATION_EXPIRES_IN",
+      5,
+    );
     // DateUtils를 사용한 만료 시간 계산 (5분 후)
     const expiresAt = DateUtils.fromNowAddMinutes(expiresIn);
 
@@ -86,25 +102,35 @@ export class EmailService {
   /**
    * 인증 코드 검증
    */
-  async verifyCode(email: string, code: string): Promise<{ verified: boolean; sessionToken?: string }> {
+  async verifyCode(
+    email: string,
+    code: string,
+  ): Promise<{ verified: boolean; sessionToken?: string }> {
     const verification = await this.verificationRepository.findOne({
       where: { email, code, isVerified: false },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
 
     if (!verification) {
-      throw new UnauthorizedException('유효하지 않은 인증 코드입니다.');
+      throw new UnauthorizedException("유효하지 않은 인증 코드입니다.");
     }
 
     // 만료 체크
     if (new Date() > verification.expiresAt) {
-      throw new BadRequestException('인증 코드가 만료되었습니다. 재발급해주세요.');
+      throw new BadRequestException(
+        "인증 코드가 만료되었습니다. 재발급해주세요.",
+      );
     }
 
     // 시도 횟수 체크
-    const maxAttempts = this.configService.get('EMAIL_VERIFICATION_MAX_ATTEMPTS', 3);
+    const maxAttempts = this.configService.get(
+      "EMAIL_VERIFICATION_MAX_ATTEMPTS",
+      3,
+    );
     if (verification.attemptCount >= maxAttempts) {
-      throw new BadRequestException('최대 시도 횟수를 초과했습니다. 재발급해주세요.');
+      throw new BadRequestException(
+        "최대 시도 횟수를 초과했습니다. 재발급해주세요.",
+      );
     }
 
     // 시도 횟수 증가
@@ -113,7 +139,9 @@ export class EmailService {
     // 코드가 일치하는지 확인
     if (verification.code !== code) {
       await this.verificationRepository.save(verification);
-      throw new UnauthorizedException(`잘못된 인증 코드입니다. (${verification.attemptCount}/${maxAttempts}회 시도)`);
+      throw new UnauthorizedException(
+        `잘못된 인증 코드입니다. (${verification.attemptCount}/${maxAttempts}회 시도)`,
+      );
     }
 
     // 인증 성공
@@ -140,14 +168,17 @@ export class EmailService {
   /**
    * 세션 토큰으로 이메일 인증 상태 확인
    */
-  async checkVerificationStatus(email: string, sessionToken: string): Promise<boolean> {
+  async checkVerificationStatus(
+    email: string,
+    sessionToken: string,
+  ): Promise<boolean> {
     const verification = await this.verificationRepository.findOne({
-      where: { 
-        email, 
-        sessionToken, 
-        isVerified: true 
+      where: {
+        email,
+        sessionToken,
+        isVerified: true,
       },
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
 
     return !!verification;
@@ -161,7 +192,7 @@ export class EmailService {
 
     try {
       // 개발 환경에서만 상세 로그 출력
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         this.logger.debug(`이메일 발송 시도: ${email}`, {
           email,
           code: `${code.substring(0, 2)}****`,
@@ -171,13 +202,13 @@ export class EmailService {
 
       const result = await this.mailerService.sendMail({
         to: email,
-        subject: '[codebase.blog] 이메일 인증 코드',
+        subject: "[codebase.blog] 이메일 인증 코드",
         html,
-        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
+        replyTo: "noreply@codebase.blog", // 회신 주소를 noreply로 설정
       });
 
       // 성공 로그
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         this.logger.debug(`이메일 발송 성공: ${email}`, {
           messageId: result.messageId,
           response: result.response,
@@ -185,7 +216,7 @@ export class EmailService {
       }
     } catch (error) {
       // 상세 에러 로깅
-      this.logger.error('이메일 발송 실패:', {
+      this.logger.error("이메일 발송 실패:", {
         email,
         error: error.message,
         code: error.code,
@@ -196,12 +227,18 @@ export class EmailService {
       });
 
       // 사용자에게는 일반적인 에러 메시지 제공
-      if (error.code === 'EAUTH') {
-        throw new BadRequestException('이메일 인증에 실패했습니다. 관리자에게 문의해주세요.');
-      } else if (error.code === 'ECONNECTION') {
-        throw new BadRequestException('이메일 서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      if (error.code === "EAUTH") {
+        throw new BadRequestException(
+          "이메일 인증에 실패했습니다. 관리자에게 문의해주세요.",
+        );
+      } else if (error.code === "ECONNECTION") {
+        throw new BadRequestException(
+          "이메일 서버 연결에 실패했습니다. 잠시 후 다시 시도해주세요.",
+        );
       } else {
-        throw new BadRequestException('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+        throw new BadRequestException(
+          "이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.",
+        );
       }
     }
   }
@@ -212,7 +249,7 @@ export class EmailService {
   private async invalidateExistingCodes(email: string): Promise<void> {
     await this.verificationRepository.update(
       { email, isVerified: false },
-      { expiresAt: new Date() }
+      { expiresAt: new Date() },
     );
   }
 
@@ -230,9 +267,14 @@ export class EmailService {
       },
     });
 
-    const limitPerMinute = this.configService.get('EMAIL_RATE_LIMIT_PER_MINUTE', 1);
+    const limitPerMinute = this.configService.get(
+      "EMAIL_RATE_LIMIT_PER_MINUTE",
+      1,
+    );
     if (recentAttempts >= limitPerMinute) {
-      throw new BadRequestException('너무 많은 요청입니다. 1분 후 다시 시도해주세요.');
+      throw new BadRequestException(
+        "너무 많은 요청입니다. 1분 후 다시 시도해주세요.",
+      );
     }
 
     // 일일 제한 체크 - 오늘 시작 시간 (00:00:00)
@@ -246,9 +288,11 @@ export class EmailService {
       },
     });
 
-    const limitPerDay = this.configService.get('EMAIL_RATE_LIMIT_PER_DAY', 5);
+    const limitPerDay = this.configService.get("EMAIL_RATE_LIMIT_PER_DAY", 5);
     if (todayAttempts >= limitPerDay) {
-      throw new BadRequestException('일일 발송 한도를 초과했습니다. 내일 다시 시도해주세요.');
+      throw new BadRequestException(
+        "일일 발송 한도를 초과했습니다. 내일 다시 시도해주세요.",
+      );
     }
   }
 
@@ -261,12 +305,12 @@ export class EmailService {
     try {
       await this.mailerService.sendMail({
         to: email,
-        subject: '[codebase.blog] 계정 삭제 완료',
+        subject: "[codebase.blog] 계정 삭제 완료",
         html,
-        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
+        replyTo: "noreply@codebase.blog", // 회신 주소를 noreply로 설정
       });
     } catch (error) {
-      console.error('Account deletion email sending error:', error);
+      console.error("Account deletion email sending error:", error);
       // 이메일 발송 실패는 무시하고 계속 진행
     }
   }
@@ -274,18 +318,22 @@ export class EmailService {
   /**
    * 계정 연결 알림 이메일 발송
    */
-  async sendAccountLinkNotification(email: string, provider: string, linkedEmail: string): Promise<void> {
+  async sendAccountLinkNotification(
+    email: string,
+    provider: string,
+    linkedEmail: string,
+  ): Promise<void> {
     const html = getModernAccountLinkTemplate(provider, linkedEmail);
 
     try {
       await this.mailerService.sendMail({
         to: email,
-        subject: '[codebase.blog] 새로운 로그인 방법이 추가되었습니다',
+        subject: "[codebase.blog] 새로운 로그인 방법이 추가되었습니다",
         html,
-        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
+        replyTo: "noreply@codebase.blog", // 회신 주소를 noreply로 설정
       });
     } catch (error) {
-      console.error('Account link email sending error:', error);
+      console.error("Account link email sending error:", error);
       // 이메일 발송 실패는 무시하고 계속 진행
     }
   }
@@ -604,19 +652,25 @@ export class EmailService {
   /**
    * 비밀번호 재설정 이메일 발송
    */
-  async sendPasswordResetEmail(email: string, username: string, resetUrl: string): Promise<void> {
+  async sendPasswordResetEmail(
+    email: string,
+    username: string,
+    resetUrl: string,
+  ): Promise<void> {
     const html = getAWSStylePasswordResetTemplate(username, resetUrl);
 
     try {
       await this.mailerService.sendMail({
         to: email,
-        subject: '[codebase.blog] 비밀번호 재설정',
+        subject: "[codebase.blog] 비밀번호 재설정",
         html,
-        replyTo: 'noreply@codebase.blog', // 회신 주소를 noreply로 설정
+        replyTo: "noreply@codebase.blog", // 회신 주소를 noreply로 설정
       });
     } catch (error) {
-      console.error('Password reset email sending error:', error);
-      throw new BadRequestException('이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      console.error("Password reset email sending error:", error);
+      throw new BadRequestException(
+        "이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.",
+      );
     }
   }
 
@@ -733,7 +787,7 @@ export class EmailService {
             <div class="content">
               <h1 class="title">비밀번호 재설정</h1>
               <p class="text">
-                안녕하세요, ${username || '사용자'}님<br><br>
+                안녕하세요, ${username || "사용자"}님<br><br>
                 비밀번호 재설정을 요청하셨습니다.
                 아래 버튼을 클릭하여 새로운 비밀번호를 설정해주세요.
               </p>
@@ -766,5 +820,4 @@ export class EmailService {
       </html>
     `;
   }
-
 }

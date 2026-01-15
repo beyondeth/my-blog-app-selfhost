@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useRouter } from 'next/navigation';
 import {
@@ -45,17 +45,8 @@ export default function McpAdminDashboard() {
     }
   }, [user, loading, router]);
 
-  // 데이터 로딩 (최초 1회만)
-  useEffect(() => {
-    if (user?.role === 'admin') {
-      loadAllData();
-    }
-  }, [user]);
-
-  const loadAllData = async () => {
-    const isInitialLoad = loading;
-
-    if (!isInitialLoad) {
+  const loadAllData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
       setRefreshing(true);
     }
 
@@ -96,11 +87,18 @@ export default function McpAdminDashboard() {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  // 데이터 로딩 (최초 1회만)
+  useEffect(() => {
+    if (user?.role === 'admin') {
+      loadAllData(false);
+    }
+  }, [user, loadAllData]);
 
   // 수동 새로고침
   const handleRefresh = () => {
-    loadAllData();
+    loadAllData(true);
   };
 
   if (loading) {

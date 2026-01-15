@@ -9,35 +9,35 @@ import {
   Index,
   BeforeInsert,
   BeforeUpdate,
-} from 'typeorm';
-import { Exclude } from 'class-transformer';
-import * as bcrypt from 'bcryptjs';
-import { v7 as uuidv7 } from 'uuid';
-import { Post } from '../../posts/entities/post.entity';
-import { Comment } from '../../comments/entities/comment.entity';
-import { CommentLike } from '../../comments/entities/comment-like.entity';
-import { PostLike } from '../../posts/entities/post-like.entity';
-import { Role } from '../../common/enums/role.enum';
-import { Follow } from '../../follows/entities/follow.entity';
-import { Notification } from '../../notifications/entities/notification.entity';
-import { Blog } from '../../blogs/entities/blog.entity';
-import { UserIdentity } from './user-identity.entity';
-import { Profile } from './profile.entity';
-import { Subscription } from './subscription.entity';
-import { AccountSettings } from './account-settings.entity';
+} from "typeorm";
+import { Exclude } from "class-transformer";
+import * as bcrypt from "bcryptjs";
+import { v7 as uuidv7 } from "uuid";
+import { Post } from "../../posts/entities/post.entity";
+import { Comment } from "../../comments/entities/comment.entity";
+import { CommentLike } from "../../comments/entities/comment-like.entity";
+import { PostLike } from "../../posts/entities/post-like.entity";
+import { Role } from "../../common/enums/role.enum";
+import { Follow } from "../../follows/entities/follow.entity";
+import { Notification } from "../../notifications/entities/notification.entity";
+import { Blog } from "../../blogs/entities/blog.entity";
+import { UserIdentity } from "./user-identity.entity";
+import { Profile } from "./profile.entity";
+import { Subscription } from "./subscription.entity";
+import { AccountSettings } from "./account-settings.entity";
 
 /**
  * AuthProvider 상수
  * - 지원하는 인증 제공자 목록
  */
 export const AuthProvider = {
-  LOCAL: 'local',
-  GOOGLE: 'google',
-  KAKAO: 'kakao',
-  GITHUB: 'github',
+  LOCAL: "local",
+  GOOGLE: "google",
+  KAKAO: "kakao",
+  GITHUB: "github",
 } as const;
 
-export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
+export type AuthProvider = (typeof AuthProvider)[keyof typeof AuthProvider];
 
 /**
  * User 엔티티 (슬림화 버전)
@@ -58,11 +58,11 @@ export type AuthProvider = typeof AuthProvider[keyof typeof AuthProvider];
  * - 확장성 향상 (각 테이블 독립적 확장)
  * - 쿼리 성능 향상 (필요한 데이터만 조회)
  */
-@Entity('users')
-@Index(['email'])
-@Index(['username'])
-@Index(['role'])
-@Index(['authProvider'])
+@Entity("users")
+@Index(["email"])
+@Index(["username"])
+@Index(["role"])
+@Index(["authProvider"])
 export class User {
   /**
    * 기본 키
@@ -70,7 +70,7 @@ export class User {
    * - K-정렬 가능: 시간 순서대로 정렬 시 데이터베이스 성능 향상
    * - @Exclude: API 응답에서 제외 (보안상 사용자 UUID 노출 방지)
    */
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   @Exclude({ toPlainOnly: true })
   id: string;
 
@@ -112,7 +112,7 @@ export class User {
    * - 변경 가능
    * - nullable: 소셜 로그인 시 자동 생성
    */
-  @Column({ nullable: true, length: 100 })
+  @Column({ nullable: true, length: 30 })
   username: string;
 
   /**
@@ -123,7 +123,7 @@ export class User {
    * - @Exclude: API 응답에서 제외 (권한 정보 보호)
    */
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: Role,
     default: Role.USER,
   })
@@ -139,7 +139,7 @@ export class User {
    * - @Exclude: API 응답에서 제외 (인증 방법 보호)
    */
   @Column({
-    type: 'enum',
+    type: "enum",
     enum: AuthProvider,
     default: AuthProvider.LOCAL,
   })
@@ -179,6 +179,45 @@ export class User {
   isActive: boolean;
 
   /**
+   * 일시 정지 만료 시각
+   * - null: 정지 없음
+   * - 현재 시각 이전일 경우 자동 복구 대상
+   */
+  @Column({ name: "suspension_until", type: "timestamp", nullable: true })
+  @Exclude({ toPlainOnly: true })
+  suspensionUntil?: Date | null;
+
+  /**
+   * 일시 정지 사유
+   * - 관리자/신고 처리 시 입력
+   */
+  @Column({ name: "suspension_reason", type: "text", nullable: true })
+  @Exclude({ toPlainOnly: true })
+  suspensionReason?: string | null;
+
+  /**
+   * 영구 차단 여부
+   * - true: 로그인/토큰 발급 차단
+   */
+  @Column({ name: "is_banned", type: "boolean", default: false })
+  @Exclude({ toPlainOnly: true })
+  isBanned: boolean;
+
+  /**
+   * 영구 차단 사유
+   */
+  @Column({ name: "ban_reason", type: "text", nullable: true })
+  @Exclude({ toPlainOnly: true })
+  banReason?: string | null;
+
+  /**
+   * 영구 차단 일시
+   */
+  @Column({ name: "banned_at", type: "timestamp", nullable: true })
+  @Exclude({ toPlainOnly: true })
+  bannedAt?: Date | null;
+
+  /**
    * 마지막 로그인 시각
    * - 미사용 계정 감지 (3년 미접속 시 개인정보 파기 안내)
    * - 보안: 비정상적인 로그인 시간대 감지
@@ -199,7 +238,7 @@ export class User {
    * - 계정 삭제 요청 시점
    * - 30일 유예 기간 후 완전 삭제 (GDPR 준수)
    */
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: "timestamp", nullable: true })
   deletedAt: Date;
 
   /**
@@ -209,6 +248,31 @@ export class User {
    */
   @Column({ default: false })
   isDeleted: boolean;
+
+  /**
+   * 팔로워 수 (캐싱)
+   * - 실시간 COUNT 쿼리 대신 캐싱된 값 사용
+   * - follow/unfollow 시 트랜잭션 내에서 업데이트
+   */
+  @Column({ name: "follower_count", type: "int", default: 0 })
+  followerCount: number;
+
+  /**
+   * 팔로잉 수 (캐싱)
+   * - 실시간 COUNT 쿼리 대신 캐싱된 값 사용
+   * - follow/unfollow 시 트랜잭션 내에서 업데이트
+   */
+  @Column({ name: "following_count", type: "int", default: 0 })
+  followingCount: number;
+
+  /**
+   * 현재 일시 정지 상태인지 여부
+   */
+  isSuspended(): boolean {
+    return !!(
+      this.suspensionUntil && this.suspensionUntil.getTime() > Date.now()
+    );
+  }
 
   // =====================================
   // 관계 (Relationships)
@@ -329,6 +393,8 @@ export class User {
   name?: string;
   profileImage?: string;
   bio?: string;
+  jobTitle?: string;
+  socialLinks?: Array<{ platform: string; url: string }>;
   lastLoginProvider?: string;
   accountVerifiedAt?: Date;
 
@@ -339,7 +405,9 @@ export class User {
   subscriptionEndDate?: Date;
 
   // From account_settings
+  @Exclude({ toPlainOnly: true })
   refreshToken?: string;
+  @Exclude({ toPlainOnly: true })
   refreshTokenExpiresAt?: Date;
   marketingOptIn?: boolean;
   newsletterOptIn?: boolean;
@@ -349,8 +417,11 @@ export class User {
   primaryIdentityId?: string;
 
   // Payment fields (for subscription module compatibility)
+  @Exclude({ toPlainOnly: true })
   paymentCustomerId?: string;
+  @Exclude({ toPlainOnly: true })
   paymentSubscriptionId?: string;
+  @Exclude({ toPlainOnly: true })
   stripeCustomerId?: string; // Stripe 전용 (호환성)
 
   // =====================================
@@ -403,8 +474,10 @@ export class User {
       name: this.profile?.name || null,
       profileImage: this.profileImage || this.profile?.profileImage || null,
       bio: this.profile?.bio || null,
+      jobTitle: this.profile?.jobTitle || null,
+      socialLinks: this.profile?.socialLinks || [],
       lastLoginProvider: this.profile?.lastLoginProvider || null,
-      accountSecurityLevel: this.profile?.accountSecurityLevel || 'basic',
+      accountSecurityLevel: this.profile?.accountSecurityLevel || "basic",
 
       // Subscription 데이터 (join 시에만 포함)
       subscriptionTier: this.subscription?.subscriptionTier || null,
@@ -418,11 +491,13 @@ export class User {
       newsletterOptIn: this.accountSettings?.newsletterOptIn || false,
 
       // Blog 데이터
-      blog: this.blog ? {
-        id: this.blog.id,
-        slug: this.blog.slug,
-        alias: this.blog.alias,
-      } : null,
+      blog: this.blog
+        ? {
+            id: this.blog.id,
+            slug: this.blog.slug,
+            alias: this.blog.alias,
+          }
+        : null,
       blogSlug: this.blog?.slug || null,
     };
   }
@@ -460,10 +535,23 @@ export class User {
   /**
    * toJSON 오버라이드
    * - JSON.stringify() 시 자동 호출
-   * - password, refreshToken 제외
+   * - password, refreshToken, email 등 민감 정보 필터링
+   * - NOTE: 본인 프로필 조회 시에는 컨트롤러에서 email을 명시적으로 추가
    */
   toJSON() {
-    const { password, ...result } = this;
+    const {
+      password,
+      email, // 공개 프로필에서 이메일 숨김
+      refreshToken,
+      refreshTokenExpiresAt,
+      paymentCustomerId,
+      paymentSubscriptionId,
+      stripeCustomerId,
+      providerId,
+      suspensionReason,
+      banReason,
+      ...result
+    } = this;
     return result;
   }
 }

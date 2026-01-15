@@ -13,30 +13,46 @@ import {
   Res,
   Req,
   Options,
-} from '@nestjs/common';
+} from "@nestjs/common";
 import {
   ApiTags,
   ApiOperation,
   ApiResponse,
   ApiBearerAuth,
   ApiQuery,
-} from '@nestjs/swagger';
-import { FilesService } from './files.service';
-import { S3Service } from './services/s3.service';
-import { CreateUploadUrlDto } from './dto/create-upload-url.dto';
-import { UploadCompleteDto } from './dto/upload-complete.dto';
-import { CreateBatchUploadUrlDto, BatchUploadCompleteDto } from './dto/batch-upload.dto';
-import { UpdateImageOrderDto } from './dto/update-image-order.dto';
-import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
-import { UrlSanitizerUtil } from '../common/utils/url-sanitizer.util';
-import { CurrentUser } from '../common/decorators/current-user.decorator';
-import { Public } from '../common/decorators/public.decorator';
-import { Response, Request } from 'express';
-import { Logger } from '@nestjs/common';
-import { PaginationHelper } from '../common/dto/pagination.dto';
+} from "@nestjs/swagger";
+import { FilesService } from "./files.service";
+import { S3Service } from "./services/s3.service";
+import { R2Service } from "./services/r2.service";
+import { CreateUploadUrlDto } from "./dto/create-upload-url.dto";
+import { UploadCompleteDto } from "./dto/upload-complete.dto";
+import {
+  CreateBatchUploadUrlDto,
+  BatchUploadCompleteDto,
+} from "./dto/batch-upload.dto";
+import { UpdateImageOrderDto } from "./dto/update-image-order.dto";
+import { CreateVideoUploadUrlDto } from "./dto/create-video-upload-url.dto";
+import { VideoUploadCompleteDto } from "./dto/video-upload-complete.dto";
+import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
+import { Video, VideoStatus } from "./entities/video.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue } from "bullmq";
+import {
+  VIDEO_PROCESSING_QUEUE,
+  VideoProcessingJobData,
+} from "./queues/video-processing.queue";
+import { v4 as uuidv4 } from "uuid";
+import { UrlSanitizerUtil } from "../common/utils/url-sanitizer.util";
+import { CurrentUser } from "../common/decorators/current-user.decorator";
+import { Public } from "../common/decorators/public.decorator";
+import { Response, Request } from "express";
+import { Logger } from "@nestjs/common";
+import { PaginationHelper } from "../common/dto/pagination.dto";
 
-@ApiTags('Files')
-@Controller('files')
+@ApiTags("Files")
+@Controller("files")
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class FilesController {
@@ -45,202 +61,550 @@ export class FilesController {
   constructor(
     private readonly filesService: FilesService,
     private readonly s3Service: S3Service,
+    private readonly r2Service: R2Service,
+    @InjectRepository(Video)
+    private readonly videoRepository: Repository<Video>,
+    @InjectQueue(VIDEO_PROCESSING_QUEUE)
+    private readonly videoProcessingQueue: Queue<VideoProcessingJobData>,
   ) {}
 
-  @Post('upload-url')
-  @ApiOperation({ summary: '파일 업로드용 Presigned URL 생성' })
-  @ApiResponse({ 
-    status: 201, 
-    description: 'Presigned URL 생성 성공',
+  @Post("upload-url")
+  @ApiOperation({ summary: "파일 업로드용 Presigned URL 생성" })
+  @ApiResponse({
+    status: 201,
+    description: "Presigned URL 생성 성공",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        uploadUrl: { type: 'string', description: '파일 업로드용 URL' },
-        fileKey: { type: 'string', description: 'S3 파일 키' },
-        expiresIn: { type: 'number', description: '만료 시간(초)' },
-        tempId: { type: 'string', description: '임시 ID' },
+        uploadUrl: { type: "string", description: "파일 업로드용 URL" },
+        fileKey: { type: "string", description: "S3 파일 키" },
+        expiresIn: { type: "number", description: "만료 시간(초)" },
+        tempId: { type: "string", description: "임시 ID" },
       },
     },
   })
-  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @ApiResponse({ status: 400, description: "잘못된 요청" })
   async createUploadUrl(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() createUploadUrlDto: CreateUploadUrlDto,
   ) {
     return this.filesService.createUploadUrl(userId as any, createUploadUrlDto);
   }
 
-  @Post('upload-complete')
-  @ApiOperation({ summary: '파일 업로드 완료 처리' })
-  @ApiResponse({ status: 201, description: '파일 업로드 완료' })
-  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @Post("upload-complete")
+  @ApiOperation({ summary: "파일 업로드 완료 처리" })
+  @ApiResponse({ status: 201, description: "파일 업로드 완료" })
+  @ApiResponse({ status: 400, description: "잘못된 요청" })
   async uploadComplete(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() uploadCompleteDto: UploadCompleteDto,
   ) {
     return this.filesService.uploadComplete(userId as any, uploadCompleteDto);
   }
 
-  @Post('batch-upload-url')
-  @ApiOperation({ summary: '배치 파일 업로드용 Presigned URL 생성 (최대 5개)' })
-  @ApiResponse({ 
-    status: 201, 
-    description: '배치 Presigned URL 생성 성공',
+  @Post("batch-upload-url")
+  @ApiOperation({ summary: "배치 파일 업로드용 Presigned URL 생성 (최대 5개)" })
+  @ApiResponse({
+    status: 201,
+    description: "배치 Presigned URL 생성 성공",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
         uploads: {
-          type: 'array',
+          type: "array",
           items: {
-            type: 'object',
+            type: "object",
             properties: {
-              uploadUrl: { type: 'string', description: '파일 업로드용 URL' },
-              fileKey: { type: 'string', description: 'S3 파일 키' },
-              expiresIn: { type: 'number', description: '만료 시간(초)' },
-              tempId: { type: 'string', description: '임시 ID' },
-              fileName: { type: 'string', description: '원본 파일명' },
+              uploadUrl: { type: "string", description: "파일 업로드용 URL" },
+              fileKey: { type: "string", description: "S3 파일 키" },
+              expiresIn: { type: "number", description: "만료 시간(초)" },
+              tempId: { type: "string", description: "임시 ID" },
+              fileName: { type: "string", description: "원본 파일명" },
             },
           },
         },
-        batchId: { type: 'string', description: '배치 ID' },
+        batchId: { type: "string", description: "배치 ID" },
       },
     },
   })
-  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @ApiResponse({ status: 400, description: "잘못된 요청" })
   async createBatchUploadUrl(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() createBatchUploadUrlDto: CreateBatchUploadUrlDto,
   ) {
-    return this.filesService.createBatchUploadUrl(userId as any, createBatchUploadUrlDto);
+    return this.filesService.createBatchUploadUrl(
+      userId as any,
+      createBatchUploadUrlDto,
+    );
   }
 
-  @Post('batch-upload-complete')
-  @ApiOperation({ summary: '배치 파일 업로드 완료 처리' })
-  @ApiResponse({ status: 201, description: '배치 파일 업로드 완료' })
-  @ApiResponse({ status: 400, description: '잘못된 요청' })
+  @Post("batch-upload-complete")
+  @ApiOperation({ summary: "배치 파일 업로드 완료 처리" })
+  @ApiResponse({ status: 201, description: "배치 파일 업로드 완료" })
+  @ApiResponse({ status: 400, description: "잘못된 요청" })
   async batchUploadComplete(
-    @CurrentUser('id') userId: string,
+    @CurrentUser("id") userId: string,
     @Body() batchUploadCompleteDto: BatchUploadCompleteDto,
   ) {
-    return this.filesService.batchUploadComplete(userId as any, batchUploadCompleteDto);
+    return this.filesService.batchUploadComplete(
+      userId as any,
+      batchUploadCompleteDto,
+    );
+  }
+
+  // ===== 비디오 업로드 엔드포인트 =====
+
+  @Post("video/upload-url")
+  @ApiOperation({ summary: "비디오 업로드용 Presigned URL 생성 (R2)" })
+  @ApiResponse({
+    status: 201,
+    description: "Presigned URL 생성 성공",
+    schema: {
+      type: "object",
+      properties: {
+        uploadUrl: { type: "string", description: "R2 업로드용 URL" },
+        fileKey: { type: "string", description: "R2 파일 키" },
+        videoId: { type: "string", description: "비디오 ID (UUID)" },
+        expiresIn: { type: "number", description: "만료 시간(초)" },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: "잘못된 요청 또는 R2 미설정" })
+  async createVideoUploadUrl(
+    @CurrentUser("id") userId: string,
+    @Body() dto: CreateVideoUploadUrlDto,
+  ) {
+    // R2 설정 확인
+    if (!this.r2Service.isEnabled()) {
+      this.logger.warn("비디오 업로드 시도: R2가 설정되지 않음");
+      return {
+        success: false,
+        error: "비디오 업로드 기능이 활성화되지 않았습니다.",
+      };
+    }
+
+    // 비디오 ID 생성 (UUID)
+    const videoId = uuidv4();
+
+    // Presigned URL 생성
+    const presignedResult = await this.r2Service.generatePresignedUploadUrl(
+      videoId,
+      dto.mimeType,
+      dto.fileSize,
+      true, // isRaw = true (원본)
+    );
+
+    // Video 엔티티 생성 (uploading 상태)
+    // expiresAt: 24시간 후로 설정 (임시 파일)
+    // 포스트 저장 시 null로 변경되어 영구 보관됨
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    const video = this.videoRepository.create({
+      id: videoId,
+      userId,
+      originalName: dto.fileName,
+      mimeType: dto.mimeType,
+      sizeRaw: dto.fileSize,
+      storageKeyRaw: presignedResult.fileKey,
+      status: VideoStatus.UPLOADING,
+      expiresAt, // 24시간 후 자동 삭제 예정 (포스트 저장 시 null로 변경)
+    });
+
+    await this.videoRepository.save(video);
+
+    this.logger.log(`📹 비디오 업로드 URL 생성: ${videoId} (${dto.fileName})`);
+
+    return {
+      uploadUrl: presignedResult.uploadUrl,
+      fileKey: presignedResult.fileKey,
+      videoId,
+      expiresIn: presignedResult.expiresIn,
+    };
+  }
+
+  @Post("video/upload-complete")
+  @ApiOperation({ summary: "비디오 업로드 완료 알림 (BullMQ Job 생성)" })
+  @ApiResponse({
+    status: 201,
+    description: "업로드 완료, 처리 Job 생성됨",
+    schema: {
+      type: "object",
+      properties: {
+        success: { type: "boolean" },
+        videoId: { type: "string" },
+        status: { type: "string", enum: ["processing"] },
+        message: { type: "string" },
+      },
+    },
+  })
+  @ApiResponse({ status: 400, description: "잘못된 요청" })
+  @ApiResponse({ status: 404, description: "비디오를 찾을 수 없음" })
+  async videoUploadComplete(
+    @CurrentUser("id") userId: string,
+    @Body() dto: VideoUploadCompleteDto,
+  ) {
+    // 비디오 조회
+    const video = await this.videoRepository.findOne({
+      where: {
+        storageKeyRaw: dto.fileKey,
+        userId,
+        status: VideoStatus.UPLOADING,
+      },
+    });
+
+    if (!video) {
+      this.logger.warn(
+        `비디오 업로드 완료 실패: 비디오를 찾을 수 없음 (${dto.fileKey})`,
+      );
+      return {
+        success: false,
+        error: "비디오를 찾을 수 없거나 이미 처리 중입니다.",
+      };
+    }
+
+    // 파일 크기 업데이트 (실제 업로드된 크기)
+    video.sizeRaw = dto.fileSize;
+    video.originalName = dto.fileName;
+    video.status = VideoStatus.PROCESSING;
+    await this.videoRepository.save(video);
+
+    // 압축본 R2 경로 생성
+    const outputKey = `videos/processed/${video.id}.mp4`;
+
+    // BullMQ Job 추가
+    const job = await this.videoProcessingQueue.add(
+      "compress-video",
+      {
+        videoId: video.id,
+        userId,
+        originalKey: video.storageKeyRaw,
+        outputKey,
+        originalName: dto.fileName,
+      } as VideoProcessingJobData,
+      {
+        jobId: `video-${video.id}`,
+        priority: 1,
+      },
+    );
+
+    this.logger.log(`📹 비디오 처리 Job 생성: ${video.id} (Job ID: ${job.id})`);
+
+    return {
+      success: true,
+      videoId: video.id,
+      status: "processing",
+      message: "비디오 압축 처리가 시작되었습니다.",
+    };
+  }
+
+  @Get("video/:id/status")
+  @ApiOperation({ summary: "비디오 처리 상태 조회" })
+  @ApiResponse({
+    status: 200,
+    description: "비디오 상태 조회 성공",
+    schema: {
+      type: "object",
+      properties: {
+        videoId: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["uploading", "processing", "ready", "failed"],
+        },
+        url: {
+          type: "string",
+          description: "재생 가능한 URL (ready 상태일 때만)",
+        },
+        duration: { type: "number", description: "비디오 길이 (초)" },
+        resolution: { type: "number", description: "해상도" },
+        sizeOriginal: { type: "number", description: "원본 크기 (bytes)" },
+        sizeProcessed: { type: "number", description: "압축 크기 (bytes)" },
+        error: {
+          type: "string",
+          description: "에러 메시지 (failed 상태일 때만)",
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: "비디오를 찾을 수 없음" })
+  async getVideoStatus(
+    @Param("id") videoId: string,
+    @CurrentUser("id") userId: string,
+  ) {
+    const sanitizedVideoId = UrlSanitizerUtil.sanitizePathParam(videoId);
+
+    const video = await this.videoRepository.findOne({
+      where: { id: sanitizedVideoId, userId },
+    });
+
+    if (!video) {
+      return {
+        success: false,
+        error: "비디오를 찾을 수 없습니다.",
+      };
+    }
+
+    // 상태별 응답 구성
+    const response: any = {
+      videoId: video.id,
+      status: video.status,
+      duration: video.duration,
+      resolution: video.resolution,
+      sizeOriginal: video.sizeRaw,
+      sizeProcessed: video.sizeProcessed,
+    };
+
+    // ready 상태일 때 URL 생성
+    if (video.status === VideoStatus.READY && video.storageKeyProcessed) {
+      // Public URL 또는 Presigned URL
+      const publicUrl = this.r2Service.getPublicUrl(video.storageKeyProcessed);
+      if (publicUrl) {
+        response.url = publicUrl;
+      } else {
+        // Public URL이 없으면 Presigned URL 생성 (1시간 유효)
+        response.url = await this.r2Service.generatePresignedDownloadUrl(
+          video.storageKeyProcessed,
+          3600,
+        );
+      }
+    }
+
+    // failed 상태일 때 에러 메시지
+    if (video.status === VideoStatus.FAILED && video.errorMessage) {
+      response.error = video.errorMessage;
+    }
+
+    return response;
+  }
+
+  /**
+   * 공개 비디오 URL 조회
+   *
+   * 인증 없이 비디오 URL을 조회합니다.
+   * 포스트 상세페이지에서 비디오를 렌더링할 때 사용됩니다.
+   * (포스트 저장 시 비디오 처리가 완료되지 않아 src가 없는 경우 대응)
+   */
+  @Public()
+  @Get("video/:id/public-url")
+  @ApiOperation({ summary: "비디오 공개 URL 조회 (인증 불필요)" })
+  @ApiResponse({
+    status: 200,
+    description: "비디오 URL 조회 성공",
+    schema: {
+      type: "object",
+      properties: {
+        videoId: { type: "string" },
+        status: {
+          type: "string",
+          enum: ["uploading", "processing", "ready", "failed"],
+        },
+        url: {
+          type: "string",
+          nullable: true,
+          description: "재생 가능한 URL (ready 상태일 때만)",
+        },
+        thumbnailUrl: {
+          type: "string",
+          nullable: true,
+          description: "썸네일 URL (ready 상태일 때만)",
+        },
+        duration: {
+          type: "number",
+          nullable: true,
+          description: "비디오 길이 (초)",
+        },
+      },
+    },
+  })
+  @ApiResponse({ status: 404, description: "비디오를 찾을 수 없음" })
+  async getVideoPublicUrl(@Param("id") videoId: string) {
+    const sanitizedVideoId = UrlSanitizerUtil.sanitizePathParam(videoId);
+
+    const video = await this.videoRepository.findOne({
+      where: { id: sanitizedVideoId },
+    });
+
+    if (!video) {
+      return {
+        videoId: sanitizedVideoId,
+        status: "not_found",
+        url: null,
+      };
+    }
+
+    // ready 상태일 때 URL 반환
+    if (video.status === VideoStatus.READY && video.storageKeyProcessed) {
+      const publicUrl = this.r2Service.getPublicUrl(video.storageKeyProcessed);
+      // 썸네일 URL 생성
+      const thumbnailUrl = video.thumbnailKey
+        ? this.r2Service.getPublicUrl(video.thumbnailKey)
+        : null;
+
+      return {
+        videoId: video.id,
+        status: video.status,
+        url:
+          publicUrl ||
+          (await this.r2Service.generatePresignedDownloadUrl(
+            video.storageKeyProcessed,
+            3600,
+          )),
+        thumbnailUrl,
+        duration: video.duration,
+      };
+    }
+
+    // ready가 아닌 경우 상태만 반환
+    return {
+      videoId: video.id,
+      status: video.status,
+      url: null,
+      thumbnailUrl: null,
+      duration: null,
+    };
   }
 
   @Get()
-  @ApiOperation({ summary: '사용자 파일 목록 조회' })
-  @ApiQuery({ name: 'fileType', required: false, description: '파일 타입 필터' })
-  @ApiQuery({ name: 'page', required: false, description: '페이지 번호', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, description: '페이지 크기', example: 20 })
-  @ApiResponse({ status: 200, description: '파일 목록 조회 성공' })
+  @ApiOperation({ summary: "사용자 파일 목록 조회" })
+  @ApiQuery({
+    name: "fileType",
+    required: false,
+    description: "파일 타입 필터",
+  })
+  @ApiQuery({
+    name: "page",
+    required: false,
+    description: "페이지 번호",
+    example: 1,
+  })
+  @ApiQuery({
+    name: "limit",
+    required: false,
+    description: "페이지 크기",
+    example: 20,
+  })
+  @ApiResponse({ status: 200, description: "파일 목록 조회 성공" })
   async getUserFiles(
-    @CurrentUser('id') userId: string,
-    @Query('fileType') fileType?: string,
-    @Query('page', new ParseIntPipe({ optional: true })) page = 1,
-    @Query('limit', new ParseIntPipe({ optional: true })) limit = 20,
+    @CurrentUser("id") userId: string,
+    @Query("fileType") fileType?: string,
+    @Query("page", new ParseIntPipe({ optional: true })) page = 1,
+    @Query("limit", new ParseIntPipe({ optional: true })) limit = 20,
   ) {
     // 안전한 limit 값 처리
     const safeLimit = Math.min(Math.max(limit, 1), 20); // 최대 20개
     const safePage = Math.max(page, 1);
-    
-    return this.filesService.getUserFiles(userId as any, fileType, safePage, safeLimit);
+
+    return this.filesService.getUserFiles(
+      userId as any,
+      fileType,
+      safePage,
+      safeLimit,
+    );
   }
 
-  @Get('stats')
-  @ApiOperation({ summary: '파일 통계 조회' })
-  @ApiResponse({ status: 200, description: '파일 통계 조회 성공' })
-  async getFileStats(@CurrentUser('id') userId: string) {
+  @Get("stats")
+  @ApiOperation({ summary: "파일 통계 조회" })
+  @ApiResponse({ status: 200, description: "파일 통계 조회 성공" })
+  async getFileStats(@CurrentUser("id") userId: string) {
     return this.filesService.getFileStats(userId as any);
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: '파일 정보 조회' })
-  @ApiResponse({ status: 200, description: '파일 정보 조회 성공' })
-  @ApiResponse({ status: 404, description: '파일을 찾을 수 없음' })
+  @Get(":id")
+  @ApiOperation({ summary: "파일 정보 조회" })
+  @ApiResponse({ status: 200, description: "파일 정보 조회 성공" })
+  @ApiResponse({ status: 404, description: "파일을 찾을 수 없음" })
   async getFile(
-    @Param('id') fileId: string,
-    @CurrentUser('id') userId: string,
+    @Param("id") fileId: string,
+    @CurrentUser("id") userId: string,
   ) {
     // 파일 ID 안전하게 정제 (UUID 형식 검증)
     const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
     return this.filesService.getFileById(sanitizedFileId as any, userId as any);
   }
 
-  @Get(':id/download-url')
-  @ApiOperation({ summary: '파일 다운로드 URL 생성' })
+  @Get(":id/download-url")
+  @ApiOperation({ summary: "파일 다운로드 URL 생성" })
   @ApiResponse({
     status: 200,
-    description: '다운로드 URL 생성 성공',
+    description: "다운로드 URL 생성 성공",
     schema: {
-      type: 'object',
+      type: "object",
       properties: {
-        downloadUrl: { type: 'string', description: '파일 다운로드 URL' },
+        downloadUrl: { type: "string", description: "파일 다운로드 URL" },
       },
     },
   })
-  @ApiResponse({ status: 404, description: '파일을 찾을 수 없음' })
+  @ApiResponse({ status: 404, description: "파일을 찾을 수 없음" })
   async getDownloadUrl(
-    @Param('id') fileId: string,
-    @CurrentUser('id') userId: string,
+    @Param("id") fileId: string,
+    @CurrentUser("id") userId: string,
   ) {
     // 파일 ID 안전하게 정제
     const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
-    const downloadUrl = await this.filesService.getDownloadUrl(sanitizedFileId as any, userId as any);
+    const downloadUrl = await this.filesService.getDownloadUrl(
+      sanitizedFileId as any,
+      userId as any,
+    );
     return { downloadUrl };
   }
 
-  @Get(':id/download')
+  @Get(":id/download")
   @Public()
-  @ApiOperation({ summary: '파일 다운로드 (Public)' })
-  @ApiResponse({ status: 302, description: 'S3 파일로 리다이렉트' })
-  @ApiResponse({ status: 404, description: '파일을 찾을 수 없음' })
-  async downloadFile(
-    @Param('id') fileId: string,
-    @Res() res: Response,
-  ) {
+  @ApiOperation({ summary: "파일 다운로드 (Public)" })
+  @ApiResponse({ status: 302, description: "S3 파일로 리다이렉트" })
+  @ApiResponse({ status: 404, description: "파일을 찾을 수 없음" })
+  async downloadFile(@Param("id") fileId: string, @Res() res: Response) {
     try {
       // 파일 ID 안전하게 정제
       const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
-      const downloadUrl = await this.filesService.getPublicDownloadUrl(sanitizedFileId as any);
+      const downloadUrl = await this.filesService.getPublicDownloadUrl(
+        sanitizedFileId as any,
+      );
       return res.redirect(downloadUrl);
     } catch (error) {
-      return res.status(404).json({ message: 'File not found' });
+      return res.status(404).json({ message: "File not found" });
     }
   }
 
-  @Options('proxy/*')
+  @Options("proxy/*")
   @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   async proxyImageOptions(@Res() res: Response) {
     // OPTIONS 요청에 명시적 CORS 헤더 설정
     res.set({
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-      'Cross-Origin-Resource-Policy': 'cross-origin',
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type, Authorization",
+      "Cross-Origin-Resource-Policy": "cross-origin",
     });
     return res.send();
   }
 
-  @Get('proxy/*')
+  @Get("proxy/*")
   @Public()
   @ApiOperation({
-    summary: '이미지 프록시 - S3 파일로 리다이렉트 (UUID 기반) - DEPRECATED',
-    description: '⚠️ 이 엔드포인트는 곧 제거될 예정입니다. 직접 CDN URL을 사용하세요 (https://cdn.codebase.blog/...)'
+    summary: "이미지 프록시 - S3 파일로 리다이렉트 (UUID 기반) - DEPRECATED",
+    description:
+      "⚠️ 이 엔드포인트는 곧 제거될 예정입니다. 직접 CDN URL을 사용하세요 (https://cdn.codebase.blog/...)",
   })
   @ApiResponse({
     status: 302,
-    description: 'S3 파일로 리다이렉트',
+    description: "S3 파일로 리다이렉트",
   })
   @ApiResponse({
     status: 404,
-    description: '파일을 찾을 수 없음',
+    description: "파일을 찾을 수 없음",
   })
-  async proxyImage(@Param('0') fileKey: string, @Res() res: Response, @Req() req: Request) {
+  async proxyImage(
+    @Param("0") fileKey: string,
+    @Res() res: Response,
+    @Req() req: Request,
+  ) {
     // ⚠️ DEPRECATION WARNING: 프록시 엔드포인트 사용 로그 추적
-    const referer = req.headers.referer || 'unknown';
-    const userAgent = req.headers['user-agent'] || 'unknown';
+    const referer = req.headers.referer || "unknown";
+    const userAgent = req.headers["user-agent"] || "unknown";
     this.logger.warn(
       `🚨 [DEPRECATED] Proxy endpoint accessed. File: ${fileKey}, ` +
-      `Referer: ${referer}, UA: ${userAgent.substring(0, 100)}`
+        `Referer: ${referer}, UA: ${userAgent.substring(0, 100)}`,
     );
 
     try {
@@ -251,109 +615,131 @@ export class FilesController {
       this.logger.log(`🔄 [PROXY] After sanitization: ${processedFileKey}`);
 
       // 쿼리 파라미터 제거 (presigned URL 파라미터가 있을 수 있음)
-      if (processedFileKey.includes('?')) {
-        processedFileKey = processedFileKey.split('?')[0];
-        this.logger.log(`🧹 [PROXY] Cleaned fileKey (removed query params): ${processedFileKey}`);
+      if (processedFileKey.includes("?")) {
+        processedFileKey = processedFileKey.split("?")[0];
+        this.logger.log(
+          `🧹 [PROXY] Cleaned fileKey (removed query params): ${processedFileKey}`,
+        );
       }
-      
+
       // v2/ 또는 uploads/ 접두사 확인
-      if (!processedFileKey.startsWith('uploads/') && !processedFileKey.startsWith('v2/')) {
+      if (
+        !processedFileKey.startsWith("uploads/") &&
+        !processedFileKey.startsWith("v2/")
+      ) {
         processedFileKey = `uploads/${processedFileKey}`;
-        this.logger.log(`📁 [PROXY] Added uploads/ prefix: ${processedFileKey}`);
+        this.logger.log(
+          `📁 [PROXY] Added uploads/ prefix: ${processedFileKey}`,
+        );
       }
-      
-      this.logger.log(`📁 [PROXY] Final processed fileKey: ${processedFileKey}`);
-      
+
+      this.logger.log(
+        `📁 [PROXY] Final processed fileKey: ${processedFileKey}`,
+      );
+
       // S3에서 파일 존재 여부 확인 (선택사항 - 성능을 위해 생략 가능)
       // const exists = await this.s3Service.checkFileExists(processedFileKey);
       // if (!exists) {
       //   throw new Error('File not found in S3');
       // }
-      
-      const presignedUrl = await this.s3Service.generatePresignedDownloadUrl(processedFileKey);
-      
-      this.logger.log(`🔗 [PROXY] Generated presigned URL: ${presignedUrl.substring(0, 100)}...`);
-      
+
+      const presignedUrl =
+        await this.s3Service.generatePresignedDownloadUrl(processedFileKey);
+
+      this.logger.log(
+        `🔗 [PROXY] Generated presigned URL: ${presignedUrl.substring(0, 100)}...`,
+      );
+
       // S3에서 이미지를 직접 스트리밍
       this.logger.log(`📡 [PROXY] Fetching image from S3...`);
-      
+
       const s3Response = await fetch(presignedUrl);
-      
+
       if (!s3Response.ok) {
-        this.logger.error(`❌ [PROXY] S3 fetch failed: ${s3Response.status} ${s3Response.statusText}`);
+        this.logger.error(
+          `❌ [PROXY] S3 fetch failed: ${s3Response.status} ${s3Response.statusText}`,
+        );
         throw new Error(`S3 fetch failed: ${s3Response.status}`);
       }
-      
+
       // S3 응답 헤더에서 Content-Type 가져오기
-      const contentType = s3Response.headers.get('content-type') || 'image/*';
-      const contentLength = s3Response.headers.get('content-length');
-      
+      const contentType = s3Response.headers.get("content-type") || "image/*";
+      const contentLength = s3Response.headers.get("content-length");
+
       // 용도별 차등 Cache-Control 헤더 설정 (Cloudflare 최적화)
       const cacheControl = this.getCacheControlHeader(processedFileKey);
 
       // 캐시 및 컨텐츠 헤더 설정 (명시적 CORS 헤더 추가)
       res.set({
-        'Cache-Control': cacheControl,
-        'Content-Type': contentType,
-        'ETag': `"${processedFileKey}"`,
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-        'Cross-Origin-Resource-Policy': 'cross-origin',
+        "Cache-Control": cacheControl,
+        "Content-Type": contentType,
+        ETag: `"${processedFileKey}"`,
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
+        "Cross-Origin-Resource-Policy": "cross-origin",
       });
-      
+
       if (contentLength) {
-        res.set('Content-Length', contentLength);
+        res.set("Content-Length", contentLength);
       }
-      
-      this.logger.log(`✅ [PROXY] Streaming image (${contentType}, ${contentLength || 'unknown'} bytes)`);
-      
+
+      this.logger.log(
+        `✅ [PROXY] Streaming image (${contentType}, ${contentLength || "unknown"} bytes)`,
+      );
+
       // 이미지 스트리밍
       const imageBuffer = await s3Response.arrayBuffer();
       res.send(Buffer.from(imageBuffer));
-      
     } catch (error) {
-      this.logger.error(`❌ [PROXY] Error for file key: ${fileKey}`, error.message);
-      
+      this.logger.error(
+        `❌ [PROXY] Error for file key: ${fileKey}`,
+        error.message,
+      );
+
       // 에러 응답 헤더 설정 (명시적 CORS 헤더 추가)
       res.set({
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type, Authorization",
       });
-      
-      return res.status(404).json({ 
+
+      return res.status(404).json({
         statusCode: 404,
-        message: 'File not found or access denied',
-        error: 'Not Found',
-        fileKey: fileKey
+        message: "File not found or access denied",
+        error: "Not Found",
+        fileKey: fileKey,
       });
     }
   }
 
-  @Post(':id/update-order')
-  @ApiOperation({ summary: '이미지 순서 업데이트' })
-  @ApiResponse({ status: 200, description: '이미지 순서 업데이트 성공' })
-  @ApiResponse({ status: 404, description: '파일을 찾을 수 없음' })
+  @Post(":id/update-order")
+  @ApiOperation({ summary: "이미지 순서 업데이트" })
+  @ApiResponse({ status: 200, description: "이미지 순서 업데이트 성공" })
+  @ApiResponse({ status: 404, description: "파일을 찾을 수 없음" })
   async updateImageOrder(
-    @Param('id') postId: string,
-    @CurrentUser('id') userId: string,
+    @Param("id") postId: string,
+    @CurrentUser("id") userId: string,
     @Body() updateImageOrderDto: UpdateImageOrderDto,
   ) {
     // 포스트 ID 안전하게 정제
     const sanitizedPostId = UrlSanitizerUtil.sanitizePathParam(postId);
-    return this.filesService.updateImageOrder(sanitizedPostId, userId, updateImageOrderDto);
+    return this.filesService.updateImageOrder(
+      sanitizedPostId,
+      userId,
+      updateImageOrderDto,
+    );
   }
 
-  @Delete(':id')
+  @Delete(":id")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: '파일 삭제' })
-  @ApiResponse({ status: 204, description: '파일 삭제 성공' })
-  @ApiResponse({ status: 404, description: '파일을 찾을 수 없음' })
+  @ApiOperation({ summary: "파일 삭제" })
+  @ApiResponse({ status: 204, description: "파일 삭제 성공" })
+  @ApiResponse({ status: 404, description: "파일을 찾을 수 없음" })
   async deleteFile(
-    @Param('id') fileId: string,
-    @CurrentUser('id') userId: string,
+    @Param("id") fileId: string,
+    @CurrentUser("id") userId: string,
   ) {
     // 파일 ID 안전하게 정제
     const sanitizedFileId = UrlSanitizerUtil.sanitizePathParam(fileId);
@@ -375,31 +761,38 @@ export class FilesController {
    */
   private getCacheControlHeader(fileKey: string): string {
     // 프로필 이미지: 1년 (변경 시 CDN 캐시 무횡화로 관리)
-    if (fileKey.includes('/profile/avatar/') || fileKey.includes('/profile/cover/')) {
-      return 'public, max-age=31536000, s-maxage=31536000, immutable';
+    if (
+      fileKey.includes("/profile/avatar/") ||
+      fileKey.includes("/profile/cover/")
+    ) {
+      return "public, max-age=31536000, s-maxage=31536000, immutable";
     }
 
     // 블로그 브랜딩: 1년 (거의 변경 없음)
-    if (fileKey.includes('/branding/logo/') ||
-        fileKey.includes('/branding/banner/') ||
-        fileKey.includes('/branding/favicon/')) {
-      return 'public, max-age=31536000, s-maxage=31536000, immutable';
+    if (
+      fileKey.includes("/branding/logo/") ||
+      fileKey.includes("/branding/banner/") ||
+      fileKey.includes("/branding/favicon/")
+    ) {
+      return "public, max-age=31536000, s-maxage=31536000, immutable";
     }
 
     // 포스트 이미지: 30일 (안정성 우선, 변경 시 캐시 무효화)
-    if (fileKey.includes('/posts/') || fileKey.includes('/content/')) {
-      return 'public, max-age=2592000, s-maxage=2592000, immutable';
+    if (fileKey.includes("/posts/") || fileKey.includes("/content/")) {
+      return "public, max-age=2592000, s-maxage=2592000, immutable";
     }
 
     // v2/ 경로의 프로필 이미지도 1년으로 처리
-    if (fileKey.startsWith('v2/') &&
-        (fileKey.includes('profile') || fileKey.includes('avatar'))) {
-      return 'public, max-age=31536000, s-maxage=31536000, immutable';
+    if (
+      fileKey.startsWith("v2/") &&
+      (fileKey.includes("profile") || fileKey.includes("avatar"))
+    ) {
+      return "public, max-age=31536000, s-maxage=31536000, immutable";
     }
 
     // 기타 파일: 7일 (합리적인 타협)
-    return 'public, max-age=604800, s-maxage=604800, immutable';
+    return "public, max-age=604800, s-maxage=604800, immutable";
   }
 
   // test/s3-connection, test/s3-files, test/db-files 등 테스트/디버깅 엔드포인트 삭제 또는 주석 처리
-} 
+}

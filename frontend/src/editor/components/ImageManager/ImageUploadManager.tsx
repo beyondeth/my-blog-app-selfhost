@@ -117,19 +117,22 @@ function SortableImageItem({ image, isSelected, onRemove, onSelect }: SortableIm
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
           </div>
         ) : (
-          <img
-            src={image.preview || image.url || `/api/v1/files/${image.id}/download`}
-            alt={image.name}
-            className="w-full h-full object-cover select-none"
-            onError={(e) => {
-              const target = e.target as HTMLImageElement;
-              console.error('Image load error:', target.src);
-              // Fallback to file download endpoint
-              if (!target.src.includes('/download')) {
-                target.src = `/api/v1/files/${image.id}/download`;
-              }
-            }}
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={image.preview || image.url || `/api/v1/files/${image.id}/download`}
+              alt={image.name}
+              className="w-full h-full object-cover select-none"
+              onError={(e) => {
+                const target = e.target as HTMLImageElement;
+                console.error('Image load error:', target.src);
+                // Fallback to file download endpoint
+                if (!target.src.includes('/download')) {
+                  target.src = `/api/v1/files/${image.id}/download`;
+                }
+              }}
+            />
+          </>
         )}
       </div>
 
@@ -265,44 +268,7 @@ export default function ImageUploadManager({
         // Don't call onImagesChange here - it will be called by handleImageReorder
       }
     }
-  }, [images, onImagesChange, onImagesReordered, controlledImages]);
-
-  // Handle file selection
-  const handleFileSelect = useCallback((files: FileList | null) => {
-    if (!files) return;
-
-    const fileArray = Array.from(files);
-    const remainingSlots = maxImages - images.length;
-    
-    if (fileArray.length > remainingSlots) {
-      toast.error(`최대 ${maxImages}개의 이미지만 업로드할 수 있습니다.`);
-      return;
-    }
-
-    // Calculate total size after adding new files
-    const newFilesSize = fileArray.reduce((sum, file) => sum + file.size, 0);
-    const totalSizeAfterUpload = totalSize + newFilesSize;
-    
-    // Check total size limit
-    if (totalSizeAfterUpload > MAX_TOTAL_SIZE) {
-      const remainingSize = MAX_TOTAL_SIZE - totalSize;
-      const remainingSizeMB = (remainingSize / 1024 / 1024).toFixed(1);
-      toast.error(`총 용량 30MB 초과! 남은 용량: ${remainingSizeMB}MB`);
-      return;
-    }
-
-    // Validate individual files
-    for (const file of fileArray) {
-      const validation = validateImageFile(file);
-      if (!validation.valid) {
-        toast.error(`${file.name}: ${validation.error}`);
-        return;
-      }
-    }
-
-    // Start batch upload
-    uploadFiles(fileArray);
-  }, [images, maxImages, totalSize]);
+  }, [images, onImagesReordered]);
 
   // Upload multiple files
   const uploadFiles = useCallback(async (files: File[]) => {
@@ -407,7 +373,44 @@ export default function ImageUploadManager({
     } finally {
       setUploadingCount(0);
     }
-  }, [images, uploadMutation, onImagesChange, onImagesUploaded, selectedThumbnailId, onThumbnailSelect]);
+  }, [images, uploadMutation, onImagesChange, onImagesUploaded, selectedThumbnailId, onThumbnailSelect, setImages]);
+
+  // Handle file selection
+  const handleFileSelect = useCallback((files: FileList | null) => {
+    if (!files) return;
+
+    const fileArray = Array.from(files);
+    const remainingSlots = maxImages - images.length;
+    
+    if (fileArray.length > remainingSlots) {
+      toast.error(`최대 ${maxImages}개의 이미지만 업로드할 수 있습니다.`);
+      return;
+    }
+
+    // Calculate total size after adding new files
+    const newFilesSize = fileArray.reduce((sum, file) => sum + file.size, 0);
+    const totalSizeAfterUpload = totalSize + newFilesSize;
+    
+    // Check total size limit
+    if (totalSizeAfterUpload > MAX_TOTAL_SIZE) {
+      const remainingSize = MAX_TOTAL_SIZE - totalSize;
+      const remainingSizeMB = (remainingSize / 1024 / 1024).toFixed(1);
+      toast.error(`총 용량 30MB 초과! 남은 용량: ${remainingSizeMB}MB`);
+      return;
+    }
+
+    // Validate individual files
+    for (const file of fileArray) {
+      const validation = validateImageFile(file);
+      if (!validation.valid) {
+        toast.error(`${file.name}: ${validation.error}`);
+        return;
+      }
+    }
+
+    // Start batch upload
+    uploadFiles(fileArray);
+  }, [images, maxImages, totalSize, uploadFiles]);
 
   // Handle remove image
   const handleRemoveImage = useCallback((imageId: string) => {
@@ -425,7 +428,7 @@ export default function ImageUploadManager({
     if (selectedThumbnailId === imageId) {
       onThumbnailSelect?.('');
     }
-  }, [onThumbnailSelect, selectedThumbnailId]);
+  }, [onThumbnailSelect, selectedThumbnailId, setImages]);
 
   // Handle thumbnail selection
   const handleSelectThumbnail = useCallback((imageId: string) => {

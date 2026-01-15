@@ -57,6 +57,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
   // 썸네일 상태
   const imageId = node.attrs['data-image-id'] || '';
   const [isThumbnail, setIsThumbnail] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   // 디버깅: 이미지 속성 출력
   console.log('🎯 [MEDIUM_IMAGE_NODE] Rendered with attrs:', {
@@ -158,6 +159,26 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
     setIsThumbnail(isCurrentThumbnail);
   }, [editor, imageId]);
 
+  const ensureNodeSelected = useCallback(() => {
+    if (!editor) return;
+    const pos = getPos?.();
+    if (typeof pos === 'number') {
+      editor.commands.setNodeSelection(pos);
+    }
+  }, [editor, getPos]);
+
+  const handleImageClick = useCallback((event: React.MouseEvent<HTMLImageElement>) => {
+    event.stopPropagation();
+    ensureNodeSelected();
+  }, [ensureNodeSelected]);
+
+  const handleWrapperKeyDown = useCallback((event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault();
+      ensureNodeSelected();
+    }
+  }, [ensureNodeSelected]);
+
   // 썸네일 토글 핸들러
   const handleThumbnailToggle = useCallback(() => {
     console.log('🎯 [THUMBNAIL_TOGGLE] Thumbnail button clicked!', {
@@ -205,22 +226,28 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
     }
   }, [editor, imageId, isThumbnail]);
 
+  const showToolbar = (selected || isHovered) && isImageLoaded;
+
   return (
     <NodeViewWrapper
       ref={wrapperRef}
       className={cn(
         'medium-image-wrapper',
         'relative my-4 mx-auto',
-        selected && 'medium-image-selected'
+        (selected || isHovered) && 'medium-image-selected'
       )}
       contentEditable={false}
       draggable={true}
       data-drag-handle
       as="figure"
       data-medium-image=""
+      tabIndex={0}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      onKeyDown={handleWrapperKeyDown}
     >
-      {/* 이미지 툴바 (선택 시 표시) - 이미지 위에 위치 */}
-      {selected && isImageLoaded && (
+      {/* 이미지 툴바 (선택/호버 시 표시) */}
+      {showToolbar && (
         <ImageToolbar
           currentSize={node.attrs.size}
           availableSizes={availableSizes}
@@ -237,6 +264,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
           'relative w-full flex justify-center'
         )}
       >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           ref={imgRef}
           src={normalizeImageUrl(node.attrs.src)}
@@ -248,6 +276,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
             selected && 'ring-4 ring-emerald-500'
           )}
           onLoad={handleImageLoad}
+          onClick={handleImageClick}
           draggable={false}
         />
       </div>

@@ -27,7 +27,11 @@ export default function EditPostPage() {
   const queryClient = useQueryClient();
   // Next.js 16: useParams()의 반환값이 undefined일 수 있음
   const postIdOrSlug = Array.isArray(postId) ? postId[0] : (postId || '');
-  const { data: post, isLoading, error } = usePost(postIdOrSlug);
+  
+  // 초안 편집은 인증이 필수이므로, 사용자 정보가 로드된 후에만 요청을 보냅니다.
+  const { data: post, isLoading, error } = usePost(postIdOrSlug, { 
+    enabled: !!user && !!postIdOrSlug 
+  });
   const updatePost = useUpdatePost();
 
   // 프론트엔드 권한 체크
@@ -49,7 +53,7 @@ export default function EditPostPage() {
   }, [isLoading, post, user, isAdmin, router, postIdOrSlug]);
 
   if (isLoading) return <LoadingSpinner message="게시글을 불러오는 중..." />;
-  if (error || !post) return <ErrorMessage message="게시글을 불러올 수 없습니다." showBackButton={true} />;
+  if (error || !post) return <ErrorMessage message={`게시글을 불러올 수 없습니다. (${error?.message || 'Unknown error'})`} showBackButton={true} />;
 
   // Blog 정보 추출 (post.blog에서)
   const blogInfo = post.blog ? {
@@ -59,9 +63,13 @@ export default function EditPostPage() {
 
   return (
     <EditPostForm
-      initialData={post}
+      initialData={{
+        ...post,
+        // 데이터 정합성 보정: status가 'draft'이면 isPublished를 false로 간주
+        isPublished: post.status === 'draft' ? false : post.isPublished
+      }}
       isLoading={updatePost.isPending}
-      onSubmit={(formData) => {
+      onSubmit={(formData, isPublished) => {
         // thumbnailImageId 유효성 검사 및 처리
         const validFormData = {
           ...formData,
@@ -69,6 +77,8 @@ export default function EditPostPage() {
           ...(formData.thumbnailImageId && formData.thumbnailImageId.trim() !== '' && {
             thumbnailImageId: validateUUID(formData.thumbnailImageId)
           }),
+          // 발행 상태 업데이트 (명시적으로 전달된 경우 사용, 아니면 기존 상태 유지)
+          isPublished: isPublished ?? post.isPublished ?? true,
         };
 
         // 디버그 로그

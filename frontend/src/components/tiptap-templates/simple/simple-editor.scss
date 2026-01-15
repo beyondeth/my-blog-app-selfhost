@@ -9,6 +9,14 @@ body {
   }
 }
 
+:root {
+  --tt-bg-color: rgb(var(--background));
+}
+
+.dark {
+  --tt-bg-color: rgb(var(--background));
+}
+
 body {
   font-family: "Inter", sans-serif;
   color: var(--tt-theme-text);
@@ -87,10 +95,23 @@ body,
   flex: 1;
   padding: 2.5rem 4rem 3rem;
   /* min-height 제거 - 부모가 높이 제어 */
+  background: linear-gradient(180deg, #ffffff 0%, #f9fbff 100%);
+  color: rgb(var(--card-foreground));
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: var(--shadow-md);
+  transition: background-color 0.3s ease, border-color 0.3s ease,
+    color 0.3s ease, box-shadow 0.3s ease;
 }
 
 @media screen and (max-width: 480px) {
   .simple-editor-content .tiptap.ProseMirror.simple-editor {
     padding: 2rem 2rem 2rem;
   }
+}
+
+.dark .simple-editor-content .tiptap.ProseMirror.simple-editor {
+  background: linear-gradient(180deg, #1f1f23 0%, #121318 100%);
+  color: rgb(var(--foreground));
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.45);
 }

@@ -143,7 +143,22 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       console.warn('[Sitemap] Posts API failed, proceeding without post entries');
     }
 
-    // 3. 블로그 sitemap 엔트리 생성
+    // 3. 커뮤니티 포스트 조회 (Reddit 스타일 URL)
+    let communityPosts: Array<{ slug: string; communitySlug: string; updatedAt: string }> = [];
+    const communityPostsResponse = await fetchWithTimeout(`${apiUrl}/community/sitemap/all`, 5000);
+
+    if (communityPostsResponse?.ok) {
+      try {
+        communityPosts = await communityPostsResponse.json();
+        console.log(`[Sitemap] Fetched ${communityPosts.length} community posts`);
+      } catch (error) {
+        console.error('[Sitemap] Failed to parse community posts JSON:', error);
+      }
+    } else {
+      console.warn('[Sitemap] Community posts API failed, proceeding without community entries');
+    }
+
+    // 4. 블로그 sitemap 엔트리 생성
     const blogEntries: MetadataRoute.Sitemap = blogs.map((blog) => ({
       url: `${baseUrl}/${blog.slug}`,
       lastModified: new Date(blog.updatedAt),
@@ -151,7 +166,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.8,
     }));
 
-    // 4. 포스트 sitemap 엔트리 생성
+    // 5. 블로그 포스트 sitemap 엔트리 생성
     const postEntries: MetadataRoute.Sitemap = posts.map((post) => ({
       url: `${baseUrl}/${post.blogSlug}/${post.slug}`,
       lastModified: new Date(post.updatedAt),
@@ -159,9 +174,17 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       priority: 0.7,
     }));
 
-    // 5. 모든 엔트리 병합 및 반환
-    const allEntries = [...staticEntries, ...blogEntries, ...postEntries];
-    console.log(`[Sitemap] Generated ${allEntries.length} total entries (${staticEntries.length} static, ${blogEntries.length} blogs, ${postEntries.length} posts)`);
+    // 6. 커뮤니티 포스트 sitemap 엔트리 생성 (Reddit 스타일 URL)
+    const communityPostEntries: MetadataRoute.Sitemap = communityPosts.map((post) => ({
+      url: `${baseUrl}/c/${post.communitySlug}/comments/${post.slug}`,
+      lastModified: new Date(post.updatedAt),
+      changeFrequency: 'weekly',
+      priority: 0.6,
+    }));
+
+    // 7. 모든 엔트리 병합 및 반환
+    const allEntries = [...staticEntries, ...blogEntries, ...postEntries, ...communityPostEntries];
+    console.log(`[Sitemap] Generated ${allEntries.length} total entries (${staticEntries.length} static, ${blogEntries.length} blogs, ${postEntries.length} posts, ${communityPostEntries.length} community posts)`);
 
     return allEntries;
   } catch (error) {

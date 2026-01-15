@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 댓글 페이지네이션 최적화 인덱스 추가
@@ -24,7 +24,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * - 기존 (전체 로드): 1,000~1,500ms
  * - 개선 (페이징): 150~250ms (85% 개선)
  */
-export class AddCommentPaginationIndexes1760800000000 implements MigrationInterface {
+export class AddCommentPaginationIndexes1760800000000
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. 최신순 정렬용 복합 인덱스 (부모 댓글)
     // postId별로 삭제되지 않은 부모 댓글만 최신순으로 빠르게 조회
@@ -66,10 +68,18 @@ export class AddCommentPaginationIndexes1760800000000 implements MigrationInterf
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_comments_recent_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_comments_popular_parent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_comments_replies_recent"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_comments_replies_popular"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_comments_recent_parent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_comments_popular_parent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_comments_replies_recent"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_comments_replies_popular"`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS "idx_comments_count"`);
   }
 }

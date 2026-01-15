@@ -1,22 +1,23 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, IsNull } from 'typeorm';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { File } from '../entities/file.entity';
-import { FileContext, FileContextType } from '../entities/file-context.entity';
-import { S3Service } from './s3.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan, IsNull } from "typeorm";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { File } from "../entities/file.entity";
+import { FileContext, FileContextType } from "../entities/file-context.entity";
+import { S3Service } from "./s3.service";
 
 export const FileLifecycleEvent = {
-  UPLOADED: 'uploaded',
-  OPTIMIZED: 'optimized',
-  ATTACHED: 'attached',
-  DETACHED: 'detached',
-  ARCHIVED: 'archived',
-  DELETED: 'deleted',
-  EXPIRED: 'expired'
+  UPLOADED: "uploaded",
+  OPTIMIZED: "optimized",
+  ATTACHED: "attached",
+  DETACHED: "detached",
+  ARCHIVED: "archived",
+  DELETED: "deleted",
+  EXPIRED: "expired",
 } as const;
 
-export type FileLifecycleEvent = typeof FileLifecycleEvent[keyof typeof FileLifecycleEvent];
+export type FileLifecycleEvent =
+  (typeof FileLifecycleEvent)[keyof typeof FileLifecycleEvent];
 
 export interface CleanupResult {
   orphanedFiles: number;
@@ -44,10 +45,10 @@ export class FileLifecycleService {
   /**
    * 매일 새벽 2시: 자동 정리 시스템
    */
-  @Cron('0 2 * * *')
+  @Cron("0 2 * * *")
   async performDailyCleanup(): Promise<CleanupResult> {
-    this.logger.log('Starting daily cleanup...');
-    
+    this.logger.log("Starting daily cleanup...");
+
     const result: CleanupResult = {
       orphanedFiles: 0,
       expiredFiles: 0,
@@ -59,19 +60,19 @@ export class FileLifecycleService {
     try {
       // 1. 만료된 임시 파일 삭제
       result.expiredFiles = await this.deleteExpiredTemporaryFiles();
-      
+
       // 2. 고아 파일 처리
       result.orphanedFiles = await this.cleanupOrphanedFiles();
-      
+
       // 3. 오래된 파일 아카이브
       result.archivedFiles = await this.archiveOldFiles();
-      
+
       // 4. 삭제 예약된 파일 처리
       result.deletedFiles = await this.processScheduledDeletions();
-      
-      this.logger.log('Daily cleanup completed:', result);
+
+      this.logger.log("Daily cleanup completed:", result);
     } catch (error) {
-      this.logger.error('Daily cleanup failed:', error);
+      this.logger.error("Daily cleanup failed:", error);
       result.errors.push(error.message);
     }
 
@@ -107,12 +108,12 @@ export class FileLifecycleService {
   async cleanupOrphanedFiles(): Promise<number> {
     // 24시간 이상 컨텍스트가 없는 파일 중 아직 처리되지 않은 파일만
     const orphanedFiles = await this.fileRepository
-      .createQueryBuilder('file')
-      .where('file.contextId IS NULL')
-      .andWhere('file.createdAt < :date', {
+      .createQueryBuilder("file")
+      .where("file.contextId IS NULL")
+      .andWhere("file.createdAt < :date", {
         date: new Date(Date.now() - 24 * 60 * 60 * 1000),
       })
-      .andWhere('file.expiresAt IS NULL') // 이미 처리된 파일은 제외
+      .andWhere("file.expiresAt IS NULL") // 이미 처리된 파일은 제외
       .getMany();
 
     let cleaned = 0;
@@ -146,9 +147,9 @@ export class FileLifecycleService {
     sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
     const oldFiles = await this.fileRepository
-      .createQueryBuilder('file')
-      .where('file.createdAt < :date', { date: sixMonthsAgo })
-      .andWhere('file.isOptimized = false')
+      .createQueryBuilder("file")
+      .where("file.createdAt < :date", { date: sixMonthsAgo })
+      .andWhere("file.isOptimized = false")
       .limit(100) // 배치 처리
       .getMany();
 
@@ -171,7 +172,7 @@ export class FileLifecycleService {
   async archiveFile(file: File): Promise<void> {
     // S3 스토리지 클래스 변경
     await this.s3Service.transitionToArchive(file.fileKey);
-    
+
     // DB 상태 업데이트
     file.metadata = {
       ...file.metadata,
@@ -179,9 +180,9 @@ export class FileLifecycleService {
       optimizedAt: new Date().toISOString(),
     };
     file.isOptimized = true; // 아카이브됨 표시
-    
+
     await this.fileRepository.save(file);
-    
+
     this.recordLifecycleEvent(file.id, FileLifecycleEvent.ARCHIVED);
     this.logger.log(`File ${file.id} archived to Glacier`);
   }
@@ -216,7 +217,7 @@ export class FileLifecycleService {
     try {
       // S3에서 삭제
       await this.s3Service.deleteFile(file.fileKey);
-      
+
       // 썸네일이 있다면 함께 삭제
       if (file.metadata?.thumbnails) {
         for (const thumbnail of file.metadata.thumbnails) {
@@ -227,15 +228,15 @@ export class FileLifecycleService {
           }
         }
       }
-      
+
       // DB에서 삭제
       await this.fileRepository.remove(file);
-      
+
       // 컨텍스트 통계 업데이트
       if (file.contextId) {
         await this.updateContextStats(file.contextId);
       }
-      
+
       this.recordLifecycleEvent(file.id, FileLifecycleEvent.DELETED);
       this.logger.log(`File ${file.id} permanently deleted`);
     } catch (error) {
@@ -261,7 +262,7 @@ export class FileLifecycleService {
     const context = await this.contextRepository.findOne({
       where: { id: contextId },
     });
-    
+
     if (context) {
       context.version++;
       await this.contextRepository.save(context);
@@ -269,7 +270,7 @@ export class FileLifecycleService {
 
     // 새 파일은 ContextualFileService를 통해 업로드
     this.logger.log(`Created new version for context ${contextId}`);
-    
+
     return null; // 실제 업로드는 ContextualFileService에서 처리
   }
 
@@ -296,7 +297,7 @@ export class FileLifecycleService {
     for (const file of files) {
       file.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       await this.fileRepository.save(file);
-      
+
       this.recordLifecycleEvent(file.id, FileLifecycleEvent.DETACHED);
     }
 
@@ -304,7 +305,9 @@ export class FileLifecycleService {
     context.isActive = false;
     await this.contextRepository.save(context);
 
-    this.logger.log(`Scheduled deletion for ${files.length} files from post ${postId}`);
+    this.logger.log(
+      `Scheduled deletion for ${files.length} files from post ${postId}`,
+    );
   }
 
   /**
@@ -320,7 +323,7 @@ export class FileLifecycleService {
     for (const file of files) {
       file.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
       await this.fileRepository.save(file);
-      
+
       this.recordLifecycleEvent(file.id, FileLifecycleEvent.DETACHED);
     }
 
@@ -330,7 +333,9 @@ export class FileLifecycleService {
       { isActive: false },
     );
 
-    this.logger.log(`Scheduled deletion for ${files.length} files from user ${userId}`);
+    this.logger.log(
+      `Scheduled deletion for ${files.length} files from user ${userId}`,
+    );
   }
 
   /**
@@ -338,23 +343,26 @@ export class FileLifecycleService {
    */
   private async updateContextStats(contextId: string): Promise<void> {
     const stats = await this.fileRepository
-      .createQueryBuilder('file')
-      .select('COUNT(*)', 'count')
-      .addSelect('SUM(file.fileSize)', 'totalSize')
-      .where('file.contextId = :contextId', { contextId })
-      .andWhere('file.expiresAt IS NULL')
+      .createQueryBuilder("file")
+      .select("COUNT(*)", "count")
+      .addSelect("SUM(file.fileSize)", "totalSize")
+      .where("file.contextId = :contextId", { contextId })
+      .andWhere("file.expiresAt IS NULL")
       .getRawOne();
 
     await this.contextRepository.update(contextId, {
       fileCount: parseInt(stats.count),
-      totalSize: parseInt(stats.totalSize || '0'),
+      totalSize: parseInt(stats.totalSize || "0"),
     });
   }
 
   /**
    * 라이프사이클 이벤트 기록
    */
-  private recordLifecycleEvent(fileId: string, event: FileLifecycleEvent): void {
+  private recordLifecycleEvent(
+    fileId: string,
+    event: FileLifecycleEvent,
+  ): void {
     // TODO: 이벤트 로깅 시스템 구현
     this.logger.log(`Lifecycle event: ${event} for file ${fileId}`);
   }
@@ -363,7 +371,7 @@ export class FileLifecycleService {
    * 수동 정리 트리거
    */
   async triggerManualCleanup(): Promise<CleanupResult> {
-    this.logger.log('Manual cleanup triggered');
+    this.logger.log("Manual cleanup triggered");
     return this.performDailyCleanup();
   }
 }

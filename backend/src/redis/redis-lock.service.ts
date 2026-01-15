@@ -1,15 +1,13 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import { Redis } from 'ioredis';
-import { v4 as uuidv4 } from 'uuid';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import { Redis } from "ioredis";
+import { v4 as uuidv4 } from "uuid";
 
 @Injectable()
 export class RedisLockService {
   private readonly logger = new Logger(RedisLockService.name);
 
-  constructor(
-    @InjectRedis() private readonly redis: Redis,
-  ) {}
+  constructor(@InjectRedis() private readonly redis: Redis) {}
 
   /**
    * 분산 락 획득
@@ -29,12 +27,12 @@ export class RedisLockService {
       const result = await this.redis.set(
         key,
         lockId,
-        'PX', // milliseconds
+        "PX", // milliseconds
         ttl,
-        'NX', // only if not exists
+        "NX", // only if not exists
       );
 
-      if (result === 'OK') {
+      if (result === "OK") {
         this.logger.debug(`Lock acquired: ${key} with lockId: ${lockId}`);
         return lockId;
       }
@@ -66,14 +64,16 @@ export class RedisLockService {
     `;
 
     try {
-      const result = await this.redis.eval(script, 1, key, lockId) as number;
+      const result = (await this.redis.eval(script, 1, key, lockId)) as number;
 
       if (result === 1) {
         this.logger.debug(`Lock released: ${key}`);
         return true;
       }
 
-      this.logger.warn(`Failed to release lock: ${key} - lock ID mismatch or not found`);
+      this.logger.warn(
+        `Failed to release lock: ${key} - lock ID mismatch or not found`,
+      );
       return false;
     } catch (error) {
       this.logger.error(`Error releasing lock for ${key}:`, error);
@@ -105,14 +105,22 @@ export class RedisLockService {
     `;
 
     try {
-      const result = await this.redis.eval(script, 1, key, lockId, ttl) as number;
+      const result = (await this.redis.eval(
+        script,
+        1,
+        key,
+        lockId,
+        ttl,
+      )) as number;
 
       if (result === 1) {
         this.logger.debug(`Lock extended: ${key} for ${ttl}ms`);
         return true;
       }
 
-      this.logger.warn(`Failed to extend lock: ${key} - lock ID mismatch or not found`);
+      this.logger.warn(
+        `Failed to extend lock: ${key} - lock ID mismatch or not found`,
+      );
       return false;
     } catch (error) {
       this.logger.error(`Error extending lock for ${key}:`, error);
@@ -151,12 +159,17 @@ export class RedisLockService {
       ttl?: number;
       retryTimes?: number;
       retryDelay?: number;
-    } = {}
+    } = {},
   ): Promise<T> {
     const { ttl = 5000, retryTimes = 3, retryDelay = 100 } = options;
 
     // 락 획득
-    const lockId = await this.waitForLock(resource, ttl, retryTimes, retryDelay);
+    const lockId = await this.waitForLock(
+      resource,
+      ttl,
+      retryTimes,
+      retryDelay,
+    );
 
     if (!lockId) {
       throw new Error(`Failed to acquire lock for resource: ${resource}`);
@@ -195,11 +208,13 @@ export class RedisLockService {
 
       // 마지막 시도가 아니면 대기
       if (i < retryTimes - 1) {
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        await new Promise((resolve) => setTimeout(resolve, retryDelay));
       }
     }
 
-    this.logger.warn(`Failed to acquire lock after ${retryTimes} attempts: ${resource}`);
+    this.logger.warn(
+      `Failed to acquire lock after ${retryTimes} attempts: ${resource}`,
+    );
     return null;
   }
 
@@ -253,10 +268,10 @@ export class RedisLockService {
     try {
       if (ttl) {
         const result = await this.redis.setex(key, ttl, value);
-        return result === 'OK';
+        return result === "OK";
       } else {
         const result = await this.redis.set(key, value);
-        return result === 'OK';
+        return result === "OK";
       }
     } catch (error) {
       this.logger.error(`Failed to set key ${key}: ${error.message}`);

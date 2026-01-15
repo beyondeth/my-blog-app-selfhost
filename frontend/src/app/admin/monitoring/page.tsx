@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Shield, AlertTriangle, Clock, CheckCircle, XCircle, RefreshCw, Filter, X } from 'lucide-react';
 
 interface SuspiciousRequest {
@@ -45,7 +45,7 @@ export default function MonitoringPage() {
 
   const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
-  const fetchMonitoringData = async () => {
+  const fetchMonitoringData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -105,11 +105,11 @@ export default function MonitoringPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedSeverity, showUnresolvedOnly, API_URL]);
 
   useEffect(() => {
     fetchMonitoringData();
-  }, [selectedSeverity, showUnresolvedOnly]);
+  }, [fetchMonitoringData]);
 
   const handleReview = (request: SuspiciousRequest) => {
     setReviewingRequest(request);

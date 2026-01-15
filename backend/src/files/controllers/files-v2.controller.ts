@@ -12,20 +12,26 @@ import {
   HttpCode,
   HttpStatus,
   ParseUUIDPipe,
-} from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiConsumes } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../auth/guards/jwt-auth.guard';
-import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { User } from '../../users/entities/user.entity';
-import { Profile } from '../../users/entities/profile.entity';
-import { Express } from 'express';
-import 'multer';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { ContextualFileService } from '../services/contextual-file.service';
-import { FileContextType, FilePurpose } from '../entities/file-context.entity';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+} from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiConsumes,
+} from "@nestjs/swagger";
+import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
+import { CurrentUser } from "../../common/decorators/current-user.decorator";
+import { User } from "../../users/entities/user.entity";
+import { Profile } from "../../users/entities/profile.entity";
+import { Express } from "express";
+import "multer";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { ContextualFileService } from "../services/contextual-file.service";
+import { FileContextType, FilePurpose } from "../entities/file-context.entity";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 
 export class CreateUploadUrlDto {
   contextType: FileContextType;
@@ -40,8 +46,8 @@ export class CompleteUploadDto {
   fileId: string;
 }
 
-@ApiTags('Files V2')
-@Controller('files/v2')
+@ApiTags("Files V2")
+@Controller("files/v2")
 @UseGuards(JwtAuthGuard)
 @ApiBearerAuth()
 export class FilesV2Controller {
@@ -55,11 +61,11 @@ export class FilesV2Controller {
   /**
    * 프로필 이미지 업로드
    */
-  @Post('profile/avatar')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload profile avatar' })
-  @ApiResponse({ status: 201, description: 'Avatar uploaded successfully' })
+  @Post("profile/avatar")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload profile avatar" })
+  @ApiResponse({ status: 201, description: "Avatar uploaded successfully" })
   async uploadAvatar(
     @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
@@ -67,13 +73,15 @@ export class FilesV2Controller {
     const result = await this.contextualFileService.uploadProfileImage(
       user.id,
       file,
-      'avatar',
+      "avatar",
     );
 
     // Phase 1-2-3: Profile 테이블에 이미지 URL 업데이트
     // s3Key를 그대로 저장 (예: v2/users/xxx/profile/avatar/xxx.png)
     // 프론트엔드에서 /api/v1/files/{s3Key} 형태로 접근
-    const existingProfile = await this.profileRepository.findOne({ where: { userId: user.id } });
+    const existingProfile = await this.profileRepository.findOne({
+      where: { userId: user.id },
+    });
     const oldProfileImage = existingProfile?.profileImage || null;
 
     await this.profileRepository.update(
@@ -82,7 +90,7 @@ export class FilesV2Controller {
     );
 
     // 프로필 이미지 업데이트 이벤트 발생 (캐시 무효화용)
-    this.eventEmitter.emit('user.avatar.updated', {
+    this.eventEmitter.emit("user.avatar.updated", {
       userId: user.id,
       username: user.username,
       oldProfileImage,
@@ -95,11 +103,14 @@ export class FilesV2Controller {
   /**
    * 프로필 커버 이미지 업로드
    */
-  @Post('profile/cover')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload profile cover image' })
-  @ApiResponse({ status: 201, description: 'Cover image uploaded successfully' })
+  @Post("profile/cover")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload profile cover image" })
+  @ApiResponse({
+    status: 201,
+    description: "Cover image uploaded successfully",
+  })
   async uploadCover(
     @CurrentUser() user: User,
     @UploadedFile() file: Express.Multer.File,
@@ -107,79 +118,78 @@ export class FilesV2Controller {
     return this.contextualFileService.uploadProfileImage(
       user.id,
       file,
-      'cover',
+      "cover",
     );
   }
 
   /**
    * 포스트 이미지 업로드
    */
-  @Post('posts/:postId/images')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload post image' })
-  @ApiResponse({ status: 201, description: 'Post image uploaded successfully' })
+  @Post("posts/:postId/images")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload post image" })
+  @ApiResponse({ status: 201, description: "Post image uploaded successfully" })
   async uploadPostImage(
     @CurrentUser() user: User,
-    @Param('postId', ParseUUIDPipe) postId: string,
+    @Param("postId", ParseUUIDPipe) postId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    return this.contextualFileService.uploadPostImage(
-      user.id,
-      postId,
-      file,
-    );
+    return this.contextualFileService.uploadPostImage(user.id, postId, file);
   }
 
   /**
    * 블로그 로고 업로드
    */
-  @Post('blogs/:blogId/logo')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload blog logo' })
-  @ApiResponse({ status: 201, description: 'Blog logo uploaded successfully' })
+  @Post("blogs/:blogId/logo")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload blog logo" })
+  @ApiResponse({ status: 201, description: "Blog logo uploaded successfully" })
   async uploadBlogLogo(
     @CurrentUser() user: User,
-    @Param('blogId', ParseUUIDPipe) blogId: string,
+    @Param("blogId", ParseUUIDPipe) blogId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.contextualFileService.uploadBlogAsset(
       user.id,
       blogId,
       file,
-      'logo',
+      "logo",
     );
   }
 
   /**
    * 블로그 배너 업로드
    */
-  @Post('blogs/:blogId/banner')
-  @UseInterceptors(FileInterceptor('file'))
-  @ApiConsumes('multipart/form-data')
-  @ApiOperation({ summary: 'Upload blog banner' })
-  @ApiResponse({ status: 201, description: 'Blog banner uploaded successfully' })
+  @Post("blogs/:blogId/banner")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload blog banner" })
+  @ApiResponse({
+    status: 201,
+    description: "Blog banner uploaded successfully",
+  })
   async uploadBlogBanner(
     @CurrentUser() user: User,
-    @Param('blogId', ParseUUIDPipe) blogId: string,
+    @Param("blogId", ParseUUIDPipe) blogId: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     return this.contextualFileService.uploadBlogAsset(
       user.id,
       blogId,
       file,
-      'banner',
+      "banner",
     );
   }
 
   /**
    * 업로드 URL 생성 (브라우저 직접 업로드용)
    */
-  @Post('upload-url')
+  @Post("upload-url")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Generate presigned upload URL' })
-  @ApiResponse({ status: 200, description: 'Upload URL generated' })
+  @ApiOperation({ summary: "Generate presigned upload URL" })
+  @ApiResponse({ status: 200, description: "Upload URL generated" })
   async generateUploadUrl(
     @CurrentUser() user: User,
     @Body() dto: CreateUploadUrlDto,
@@ -201,46 +211,40 @@ export class FilesV2Controller {
   /**
    * 업로드 완료 처리
    */
-  @Post('upload-complete')
+  @Post("upload-complete")
   @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Complete file upload' })
-  @ApiResponse({ status: 200, description: 'Upload completed' })
+  @ApiOperation({ summary: "Complete file upload" })
+  @ApiResponse({ status: 200, description: "Upload completed" })
   async completeUpload(
     @CurrentUser() user: User,
     @Body() dto: CompleteUploadDto,
   ) {
-    return this.contextualFileService.completeUpload(
-      dto.fileId,
-      user.id,
-    );
+    return this.contextualFileService.completeUpload(dto.fileId, user.id);
   }
 
   /**
    * 컨텍스트별 파일 조회
    */
-  @Get('context/:contextType/:contextId')
-  @ApiOperation({ summary: 'Get files by context' })
-  @ApiResponse({ status: 200, description: 'Files retrieved' })
+  @Get("context/:contextType/:contextId")
+  @ApiOperation({ summary: "Get files by context" })
+  @ApiResponse({ status: 200, description: "Files retrieved" })
   async getFilesByContext(
-    @Param('contextType') contextType: FileContextType,
-    @Param('contextId', ParseUUIDPipe) contextId: string,
+    @Param("contextType") contextType: FileContextType,
+    @Param("contextId", ParseUUIDPipe) contextId: string,
   ) {
-    return this.contextualFileService.getFilesByContext(
-      contextType,
-      contextId,
-    );
+    return this.contextualFileService.getFilesByContext(contextType, contextId);
   }
 
   /**
    * 파일 삭제
    */
-  @Delete(':fileId')
+  @Delete(":fileId")
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Delete file' })
-  @ApiResponse({ status: 204, description: 'File deleted' })
+  @ApiOperation({ summary: "Delete file" })
+  @ApiResponse({ status: 204, description: "File deleted" })
   async deleteFile(
     @CurrentUser() user: User,
-    @Param('fileId', ParseUUIDPipe) fileId: string,
+    @Param("fileId", ParseUUIDPipe) fileId: string,
   ) {
     await this.contextualFileService.deleteFile(fileId, user.id);
   }
@@ -248,32 +252,28 @@ export class FilesV2Controller {
   /**
    * 사용자 프로필 이미지 조회
    */
-  @Get('profile/:userId')
-  @ApiOperation({ summary: 'Get user profile images' })
-  @ApiResponse({ status: 200, description: 'Profile images retrieved' })
-  async getUserProfileImages(
-    @Param('userId', ParseUUIDPipe) userId: string,
-  ) {
+  @Get("profile/:userId")
+  @ApiOperation({ summary: "Get user profile images" })
+  @ApiResponse({ status: 200, description: "Profile images retrieved" })
+  async getUserProfileImages(@Param("userId", ParseUUIDPipe) userId: string) {
     const avatar = await this.contextualFileService.getFilesByContext(
       FileContextType.PROFILE,
       userId,
     );
-    
+
     return {
-      avatar: avatar.find(f => f.context?.purpose === FilePurpose.AVATAR),
-      cover: avatar.find(f => f.context?.purpose === FilePurpose.COVER),
+      avatar: avatar.find((f) => f.context?.purpose === FilePurpose.AVATAR),
+      cover: avatar.find((f) => f.context?.purpose === FilePurpose.COVER),
     };
   }
 
   /**
    * 포스트 이미지 목록 조회
    */
-  @Get('posts/:postId')
-  @ApiOperation({ summary: 'Get post images' })
-  @ApiResponse({ status: 200, description: 'Post images retrieved' })
-  async getPostImages(
-    @Param('postId', ParseUUIDPipe) postId: string,
-  ) {
+  @Get("posts/:postId")
+  @ApiOperation({ summary: "Get post images" })
+  @ApiResponse({ status: 200, description: "Post images retrieved" })
+  async getPostImages(@Param("postId", ParseUUIDPipe) postId: string) {
     return this.contextualFileService.getFilesByContext(
       FileContextType.POST,
       postId,
@@ -283,21 +283,19 @@ export class FilesV2Controller {
   /**
    * 블로그 브랜딩 이미지 조회
    */
-  @Get('blogs/:blogId')
-  @ApiOperation({ summary: 'Get blog branding images' })
-  @ApiResponse({ status: 200, description: 'Blog images retrieved' })
-  async getBlogImages(
-    @Param('blogId', ParseUUIDPipe) blogId: string,
-  ) {
+  @Get("blogs/:blogId")
+  @ApiOperation({ summary: "Get blog branding images" })
+  @ApiResponse({ status: 200, description: "Blog images retrieved" })
+  async getBlogImages(@Param("blogId", ParseUUIDPipe) blogId: string) {
     const images = await this.contextualFileService.getFilesByContext(
       FileContextType.BLOG,
       blogId,
     );
-    
+
     return {
-      logo: images.find(f => f.context?.purpose === FilePurpose.LOGO),
-      banner: images.find(f => f.context?.purpose === FilePurpose.BANNER),
-      favicon: images.find(f => f.context?.purpose === FilePurpose.FAVICON),
+      logo: images.find((f) => f.context?.purpose === FilePurpose.LOGO),
+      banner: images.find((f) => f.context?.purpose === FilePurpose.BANNER),
+      favicon: images.find((f) => f.context?.purpose === FilePurpose.FAVICON),
     };
   }
 }

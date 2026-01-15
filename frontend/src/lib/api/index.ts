@@ -8,6 +8,7 @@ import { ApiClient, createApiClient, defaultApiClient } from './client';
 import { AuthAPI, createAuthAPI } from './endpoints/auth';
 import { PostsAPI, createPostsAPI } from './endpoints/posts';
 import { CommentsAPI, createCommentsAPI } from './endpoints/comments';
+import type { CommentContext } from './endpoints/comments';
 import { BlogsAPI, createBlogsAPI } from './endpoints/blogs';
 import { FilesAPI, createFilesAPI } from './endpoints/files';
 import { UsersAPI, createUsersAPI } from './endpoints/users';
@@ -78,21 +79,27 @@ export class ExtendedApiClient extends ApiClient {
 
   // Comments API - 레거시 메서드
   async getComments(postId: string) { return this.comments.getComments(postId); }
-  async createComment(data: any) { return this.comments.createComment(data); }
-  async updateComment(id: string, content: string) {
-    return this.comments.updateComment(id, content);
+  async createComment(data: any, context?: CommentContext) {
+    return this.comments.createComment(data, context);
   }
-  async deleteComment(id: string) { return this.comments.deleteComment(id); }
-  async toggleCommentLike(id: string) { return this.comments.toggleCommentLike(id); }
-  async toggleCommentDislike(id: string) {
-    return this.comments.toggleCommentDislike(id);
+  async updateComment(id: string, content: string, context?: CommentContext) {
+    return this.comments.updateComment(id, content, context);
+  }
+  async deleteComment(id: string, context?: CommentContext) {
+    return this.comments.deleteComment(id, context);
+  }
+  async toggleCommentLike(id: string, context?: CommentContext) {
+    return this.comments.toggleCommentLike(id, context);
+  }
+  async toggleCommentDislike(id: string, context?: CommentContext) {
+    return this.comments.toggleCommentDislike(id, context);
   }
   // Comments API - 페이지네이션 메서드
-  async getCommentsPaginated(postId: string, params?: any) {
-    return this.comments.getCommentsPaginated(postId, params);
+  async getCommentsPaginated(postId: string, params?: any, context?: CommentContext) {
+    return this.comments.getCommentsPaginated(postId, params, context);
   }
-  async getRepliesPaginated(commentId: string, params?: any) {
-    return this.comments.getRepliesPaginated(commentId, params);
+  async getRepliesPaginated(commentId: string, params?: any, context?: CommentContext) {
+    return this.comments.getRepliesPaginated(commentId, params, context);
   }
 
   // Blogs API - 레거시 메서드
@@ -244,13 +251,16 @@ export const kakaoAuth = () => apiClient.kakaoAuth();
 // postsAPI 객체 (레거시 호환)
 export const postsAPI = {
   getPosts: (params?: any) => apiClient.getPosts(params),
-  getPostsCursor: (params?: any) => apiClient.posts.getPostsCursor(params), // 커서 페이지네이션 추가
+  getPostsCursor: (params?: any) => apiClient.posts.getPostsCursor(params),
   getPost: (id: string) => apiClient.getPost(id),
   getPostBySlug: (slug: string) => apiClient.getPostBySlug(slug),
   createPost: (data: any) => apiClient.createPost(data),
   updatePost: (id: string, data: any) => apiClient.updatePost(id, data),
   deletePost: (id: string) => apiClient.deletePost(id),
+  /** @deprecated vote 사용 권장 */
   toggleLike: (id: string) => apiClient.toggleLike(id),
+  /** 투표 (upvote/downvote) */
+  vote: (id: string, voteType: 'upvote' | 'downvote') => apiClient.posts.vote(id, voteType),
   batchUpdateLikes: (batch: Record<string, boolean>) => apiClient.batchUpdateLikes(batch),
 };
 

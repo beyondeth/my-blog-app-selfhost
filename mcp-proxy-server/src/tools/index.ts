@@ -25,7 +25,7 @@ import { MetricsService } from '../services/MetricsService.js';
 /**
  * 도구 컨텍스트 (API Key 또는 OAuth 인증 결과)
  */
-interface ToolContext {
+export interface ToolContext {
   userData: {
     keyId: string;
     userId: string;
@@ -40,6 +40,7 @@ interface ToolContext {
     MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
     BACKEND_PUBLIC_URL: string;
+    MCP_SHARED_SECRET?: string;
   };
 }
 
@@ -410,6 +411,10 @@ async function handleCreatePost(
       headers['X-OAuth-Blog-Id'] = context.userData.blogId;
     }
 
+    if (context.config.MCP_SHARED_SECRET) {
+      headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
+    }
+
     const response = await axios.post(
       `${context.config.BACKEND_BASE_URL}/api/v1/mcp/posts`,
       {
@@ -431,7 +436,11 @@ async function handleCreatePost(
     // MCP API Key의 postsCreated 카운트 증가 (비동기, 블로킹 안 함)
     // OAuth 모드에서는 API Key가 없으므로 건너뜀
     if (context.apiKey && !context.userData.keyId.startsWith('oauth:')) {
-      incrementPostsCreated(context.userData.keyId, context.config.BACKEND_BASE_URL).catch((err) => {
+      incrementPostsCreated(
+        context.userData.keyId,
+        context.config.BACKEND_BASE_URL,
+        context.config.MCP_SHARED_SECRET
+      ).catch((err) => {
         logger.warn({ error: err.message }, '⚠️ Failed to increment postsCreated');
       });
     }
@@ -482,11 +491,17 @@ ${post._meta ? `\n_Processing in background: ${post._meta.processingTime || 'ong
  */
 async function incrementPostsCreated(
   keyId: string,
-  backendUrl: string
+  backendUrl: string,
+  sharedSecret?: string
 ): Promise<void> {
+  const headers: Record<string, string> = {};
+  if (sharedSecret) {
+    headers['X-Internal-Secret'] = sharedSecret;
+  }
+
   await axios.post(
     `${backendUrl}/api/v1/mcp/keys/${keyId}/increment-posts`,
     {},
-    { timeout: 3000 }
+    { timeout: 3000, headers }
   );
 }

@@ -1,1 +1,1 @@
-export * from './genre.constants';
+export * from "./genre.constants";

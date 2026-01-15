@@ -1,7 +1,9 @@
 import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class OptimizeDeletedPostsIndex1770000000000 implements MigrationInterface {
-  name = 'OptimizeDeletedPostsIndex1770000000000';
+export class OptimizeDeletedPostsIndex1770000000000
+  implements MigrationInterface
+{
+  name = "OptimizeDeletedPostsIndex1770000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 기존 인덱스 확인 후 생성
@@ -17,7 +19,7 @@ export class OptimizeDeletedPostsIndex1770000000000 implements MigrationInterfac
         CREATE INDEX idx_posts_deleted_published_publishedat
         ON posts("isDeleted", "isPublished", "publishedAt" DESC);
       `);
-      console.log('✅ Created idx_posts_deleted_published_publishedat');
+      console.log("✅ Created idx_posts_deleted_published_publishedat");
     }
 
     // 홈 피드 조회 최적화를 위한 인덱스
@@ -33,7 +35,7 @@ export class OptimizeDeletedPostsIndex1770000000000 implements MigrationInterfac
         ON posts("isPublished", "status", "isDeleted", "publishedAt" DESC)
         WHERE "isPublished" = true AND status = 'published';
       `);
-      console.log('✅ Created idx_posts_home_feed');
+      console.log("✅ Created idx_posts_home_feed");
     }
 
     // 블로그별 포스트 조회 최적화 인덱스
@@ -49,15 +51,19 @@ export class OptimizeDeletedPostsIndex1770000000000 implements MigrationInterfac
         ON posts("blogId", "isDeleted", "publishedAt" DESC)
         WHERE "isDeleted" = false;
       `);
-      console.log('✅ Created idx_posts_blog_published_deleted');
+      console.log("✅ Created idx_posts_blog_published_deleted");
     }
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 생성된 인덱스 삭제
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_deleted_published_publishedat`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_posts_deleted_published_publishedat`,
+    );
     await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_home_feed`);
-    await queryRunner.query(`DROP INDEX IF EXISTS idx_posts_blog_published_deleted`);
-    console.log('✅ Dropped optimization indexes');
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS idx_posts_blog_published_deleted`,
+    );
+    console.log("✅ Dropped optimization indexes");
   }
 }

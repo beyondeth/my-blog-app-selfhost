@@ -192,6 +192,7 @@ export default function Modal({
             }}
           >
             {type === 'image' ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={content}
                 alt={alt}

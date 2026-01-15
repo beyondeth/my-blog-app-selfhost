@@ -1,4 +1,4 @@
-import { Role } from '../../common/enums/role.enum';
+import { Role } from "../../common/enums/role.enum";
 
 export interface AuthResponse {
   access_token: string;
@@ -21,4 +21,4 @@ export interface AuthResponse {
     isPublic: boolean;
     createdAt: Date;
   };
-} 
+}

@@ -3,7 +3,6 @@
 import { MessageCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useChat } from '@/hooks/useChat';
 import { useDMModal } from '@/hooks/useDMModal';
 import { useCreateConversationMutation } from '@/hooks/chat/useChatsQuery';
 import toast from 'react-hot-toast';
@@ -18,7 +17,6 @@ interface DMButtonProps {
 export function DMButton({ userId, username, size = 'default', mode }: DMButtonProps) {
   const router = useRouter();
   const { user } = useAuth();
-  const { getOrCreateConversation } = useChat();
   const { openModal, mode: defaultMode } = useDMModal();
   const createConversationMutation = useCreateConversationMutation();
 

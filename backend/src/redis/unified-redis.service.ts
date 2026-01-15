@@ -1,6 +1,6 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import Redis from "ioredis";
 
 /**
  * 통합 Redis 서비스
@@ -16,16 +16,14 @@ export class UnifiedRedisService {
   // 현재 처리 중인 키 추적 (순환 참조 방지)
   private readonly processingKeys = new Set<string>();
 
-  constructor(
-    @InjectRedis() private readonly redis: Redis,
-  ) {}
+  constructor(@InjectRedis() private readonly redis: Redis) {}
 
   /**
    * 캐시 키 생성 헬퍼
    * 네임스페이스를 명확하게 구분하여 충돌 방지
    */
   private buildKey(...parts: string[]): string {
-    return parts.filter(Boolean).join(':');
+    return parts.filter(Boolean).join(":");
   }
 
   /**
@@ -42,7 +40,7 @@ export class UnifiedRedisService {
 
     // 무한루프 방지: TTL 없는 키는 생성 금지
     if (!ttl || ttl <= 0) {
-      throw new Error('TTL은 반드시 양수여야 합니다');
+      throw new Error("TTL은 반드시 양수여야 합니다");
     }
 
     // 순환 참조 방지: 이미 처리 중인 키인지 확인
@@ -54,13 +52,9 @@ export class UnifiedRedisService {
     this.processingKeys.add(fullKey);
 
     try {
-      await this.redis.setex(
-        fullKey,
-        ttl,
-        JSON.stringify(value),
-      );
+      await this.redis.setex(fullKey, ttl, JSON.stringify(value));
       // 개발 환경에서만 디버그 로그 출력
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         this.logger.debug(`캐시 저장: ${fullKey}, TTL: ${ttl}초`);
       }
     } catch (error) {
@@ -97,7 +91,7 @@ export class UnifiedRedisService {
     try {
       await this.redis.del(fullKey);
       // 개발 환경에서만 디버그 로그 출력
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         this.logger.debug(`캐시 삭제: ${fullKey}`);
       }
     } catch (error) {
@@ -142,7 +136,11 @@ export class UnifiedRedisService {
   /**
    * TTL 갱신 (무한루프 방지)
    */
-  async refreshTTL(namespace: string, key: string, ttl: number): Promise<boolean> {
+  async refreshTTL(
+    namespace: string,
+    key: string,
+    ttl: number,
+  ): Promise<boolean> {
     const fullKey = this.buildKey(namespace, key);
 
     // TTL 유효성 검증
@@ -156,7 +154,7 @@ export class UnifiedRedisService {
       if (exists) {
         await this.redis.expire(fullKey, ttl);
         // 개발 환경에서만 디버그 로그 출력
-        if (process.env.NODE_ENV === 'development') {
+        if (process.env.NODE_ENV === "development") {
           this.logger.debug(`TTL 갱신: ${fullKey}, 새 TTL: ${ttl}초`);
         }
         return true;
@@ -176,7 +174,7 @@ export class UnifiedRedisService {
       const info = await this.redis.info(section);
       return this.parseRedisInfo(info);
     } catch (error) {
-      this.logger.error('Redis 정보 조회 실패', error);
+      this.logger.error("Redis 정보 조회 실패", error);
       return null;
     }
   }
@@ -186,19 +184,19 @@ export class UnifiedRedisService {
    */
   private parseRedisInfo(info: string): Record<string, any> {
     const result: Record<string, any> = {};
-    const lines = info.split('\r\n');
+    const lines = info.split("\r\n");
 
-    let currentSection = 'general';
+    let currentSection = "general";
 
     for (const line of lines) {
-      if (line.startsWith('#')) {
+      if (line.startsWith("#")) {
         // 섹션 헤더
         currentSection = line.substring(1).trim().toLowerCase();
         result[currentSection] = {};
-      } else if (line.includes(':')) {
+      } else if (line.includes(":")) {
         // key:value 형태
-        const [key, value] = line.split(':');
-        if (currentSection === 'general') {
+        const [key, value] = line.split(":");
+        if (currentSection === "general") {
           result[key] = value;
         } else {
           result[currentSection] = result[currentSection] || {};
@@ -214,17 +212,17 @@ export class UnifiedRedisService {
    * Redis 서버 정보 조회
    * - INFO 명령어를 통해 서버 상태 확인
    */
-  async getRedisInfo(section: string = 'default'): Promise<any> {
+  async getRedisInfo(section: string = "default"): Promise<any> {
     try {
       const info = await this.redis.info(section);
 
       // INFO 명령어 결과를 파싱
-      const lines = info.split('\r\n');
+      const lines = info.split("\r\n");
       const result: Record<string, any> = {};
 
       for (const line of lines) {
-        if (line && !line.startsWith('#')) {
-          const [key, value] = line.split(':');
+        if (line && !line.startsWith("#")) {
+          const [key, value] = line.split(":");
           if (key && value) {
             result[key] = value;
           }
@@ -246,30 +244,30 @@ export class UnifiedRedisService {
     memoryUsage: string;
     hitRate: number;
     patterns: Record<string, number>;
-    hits: number;  // Redis의 실제 히트 수
-    misses: number;  // Redis의 실제 미스 수
-    uptime?: number;  // Redis 서버 가동 시간 (초)
+    hits: number; // Redis의 실제 히트 수
+    misses: number; // Redis의 실제 미스 수
+    uptime?: number; // Redis 서버 가동 시간 (초)
   }> {
     try {
       const info = await this.getInfo();
 
       // 키 개수 조회
       const dbInfo = info.keyspace?.db0 || {};
-      const keysParts = dbInfo.split ? dbInfo.split(',') : [];
-      const totalKeys = keysParts[0]?.split('=')[1] || 0;
+      const keysParts = dbInfo.split ? dbInfo.split(",") : [];
+      const totalKeys = keysParts[0]?.split("=")[1] || 0;
 
       // 메모리 사용량
-      const memoryUsage = info.memory?.used_memory_human || 'N/A';
+      const memoryUsage = info.memory?.used_memory_human || "N/A";
 
       // 히트율 계산
       const stats = info.stats || {};
-      const hits = parseInt(stats.keyspace_hits || '0');
-      const misses = parseInt(stats.keyspace_misses || '0');
+      const hits = parseInt(stats.keyspace_hits || "0");
+      const misses = parseInt(stats.keyspace_misses || "0");
       const total = hits + misses;
-      const hitRate = total > 0 ? (hits / total) : 0;
+      const hitRate = total > 0 ? hits / total : 0;
 
       // 서버 가동 시간
-      const uptime = parseInt(info.server?.uptime_in_seconds || '0');
+      const uptime = parseInt(info.server?.uptime_in_seconds || "0");
 
       // 네임스페이스별 키 개수 조회
       const patterns = await this.getKeyPatternCounts();
@@ -279,15 +277,15 @@ export class UnifiedRedisService {
         memoryUsage,
         hitRate,
         patterns,
-        hits,  // Redis의 실제 히트 수 반환
-        misses,  // Redis의 실제 미스 수 반환
-        uptime,  // Redis 서버 가동 시간 (초)
+        hits, // Redis의 실제 히트 수 반환
+        misses, // Redis의 실제 미스 수 반환
+        uptime, // Redis 서버 가동 시간 (초)
       };
     } catch (error) {
-      this.logger.error('캐시 통계 조회 실패', error);
+      this.logger.error("캐시 통계 조회 실패", error);
       return {
         totalKeys: 0,
-        memoryUsage: 'N/A',
+        memoryUsage: "N/A",
         hitRate: 0,
         patterns: {},
         hits: 0,
@@ -302,14 +300,14 @@ export class UnifiedRedisService {
    */
   private async getKeyPatternCounts(): Promise<Record<string, number>> {
     const patterns = [
-      'cache:posts:*',
-      'cache:blogs:*',
-      'cache:users:*',
-      'chat:*',
-      'sessions:*',
-      'ratelimit:*',
-      'bull:*',
-      'temp:*',
+      "cache:posts:*",
+      "cache:blogs:*",
+      "cache:users:*",
+      "chat:*",
+      "sessions:*",
+      "ratelimit:*",
+      "bull:*",
+      "temp:*",
     ];
 
     const result: Record<string, number> = {};
@@ -329,7 +327,7 @@ export class UnifiedRedisService {
           }
         }
 
-        const namespace = pattern.split(':')[0];
+        const namespace = pattern.split(":")[0];
         result[namespace] = (result[namespace] || 0) + count;
       } catch (error) {
         this.logger.error(`패턴 카운트 실패: ${pattern}`, error);
@@ -398,7 +396,9 @@ export class UnifiedRedisService {
     try {
       // Redis는 multi-key 삭제 지원
       const result = await this.redis.del(...keys);
-      this.logger.debug(`Deleted ${result} keys out of ${keys.length} requested`);
+      this.logger.debug(
+        `Deleted ${result} keys out of ${keys.length} requested`,
+      );
       return result;
     } catch (error) {
       this.logger.error(`Failed to delete multiple keys`, error);
@@ -415,17 +415,25 @@ export class UnifiedRedisService {
     try {
       // SCAN을 사용하여 네임스페이스에 속한 모든 키 찾기
       const keys: string[] = [];
-      let cursor = '0';
+      let cursor = "0";
 
       do {
-        const result = await this.redis.scan(cursor, 'MATCH', `${namespace}*`, 'COUNT', 100);
+        const result = await this.redis.scan(
+          cursor,
+          "MATCH",
+          `${namespace}*`,
+          "COUNT",
+          100,
+        );
         cursor = result[0];
         keys.push(...result[1]);
-      } while (cursor !== '0');
+      } while (cursor !== "0");
 
       if (keys.length > 0) {
         const deletedCount = await this.deleteMany(keys);
-        this.logger.debug(`Deleted ${deletedCount} keys from namespace: ${namespace}`);
+        this.logger.debug(
+          `Deleted ${deletedCount} keys from namespace: ${namespace}`,
+        );
         return deletedCount;
       }
 
@@ -448,7 +456,7 @@ export class UnifiedRedisService {
     remaining: number;
     resetAt: Date;
   }> {
-    const fullKey = this.buildKey('ratelimit', key);
+    const fullKey = this.buildKey("ratelimit", key);
 
     try {
       const multi = this.redis.multi();
@@ -468,7 +476,7 @@ export class UnifiedRedisService {
       multi.expire(fullKey, windowSeconds);
 
       const results = await multi.exec();
-      const count = results?.[2]?.[1] as number || 0;
+      const count = (results?.[2]?.[1] as number) || 0;
 
       return {
         allowed: count <= limit,
@@ -494,7 +502,7 @@ export class UnifiedRedisService {
     ttlSeconds: number = 30,
     maxRetries: number = 3,
   ): Promise<boolean> {
-    const lockKey = this.buildKey('temp', 'locks', resource);
+    const lockKey = this.buildKey("temp", "locks", resource);
     const lockValue = `${Date.now()}-${Math.random()}`;
 
     for (let i = 0; i < maxRetries; i++) {
@@ -503,14 +511,14 @@ export class UnifiedRedisService {
         const result = await this.redis.set(
           lockKey,
           lockValue,
-          'EX',
+          "EX",
           ttlSeconds,
-          'NX',
+          "NX",
         );
 
-        if (result === 'OK') {
+        if (result === "OK") {
           // 개발 환경에서만 디버그 로그 출력
-          if (process.env.NODE_ENV === 'development') {
+          if (process.env.NODE_ENV === "development") {
             this.logger.debug(`락 획득 성공: ${resource}`);
           }
           return true;
@@ -518,7 +526,9 @@ export class UnifiedRedisService {
 
         // 재시도 전 대기 (exponential backoff)
         if (i < maxRetries - 1) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 100));
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, i) * 100),
+          );
         }
       } catch (error) {
         this.logger.error(`락 획득 실패: ${resource}`, error);
@@ -533,12 +543,12 @@ export class UnifiedRedisService {
    * 분산 락 해제
    */
   async releaseLock(resource: string): Promise<void> {
-    const lockKey = this.buildKey('temp', 'locks', resource);
+    const lockKey = this.buildKey("temp", "locks", resource);
 
     try {
       await this.redis.del(lockKey);
       // 개발 환경에서만 디버그 로그 출력
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         this.logger.debug(`락 해제: ${resource}`);
       }
     } catch (error) {
@@ -553,11 +563,11 @@ export class UnifiedRedisService {
   async resetStats(): Promise<boolean> {
     try {
       // CONFIG RESETSTAT 명령으로 Redis 통계 리셋
-      const result = await this.redis.config('RESETSTAT');
-      this.logger.log('Redis 통계가 리셋되었습니다');
+      const result = await this.redis.config("RESETSTAT");
+      this.logger.log("Redis 통계가 리셋되었습니다");
       return true;
     } catch (error) {
-      this.logger.error('Redis 통계 리셋 실패:', error);
+      this.logger.error("Redis 통계 리셋 실패:", error);
       return false;
     }
   }
@@ -568,19 +578,19 @@ export class UnifiedRedisService {
    */
   async getUptime(): Promise<number> {
     try {
-      const info = await this.redis.info('server');
-      const lines = info.split('\r\n');
+      const info = await this.redis.info("server");
+      const lines = info.split("\r\n");
 
       for (const line of lines) {
-        if (line.startsWith('uptime_in_seconds:')) {
-          const uptime = parseInt(line.split(':')[1]);
+        if (line.startsWith("uptime_in_seconds:")) {
+          const uptime = parseInt(line.split(":")[1]);
           return uptime;
         }
       }
 
       return 0;
     } catch (error) {
-      this.logger.error('Redis uptime 조회 실패:', error);
+      this.logger.error("Redis uptime 조회 실패:", error);
       return 0;
     }
   }
@@ -589,7 +599,11 @@ export class UnifiedRedisService {
    * Redis Set에 멤버 추가
    * 대화방 활성 사용자 추적에 사용
    */
-  async addToSet(namespace: string, key: string, member: string): Promise<void> {
+  async addToSet(
+    namespace: string,
+    key: string,
+    member: string,
+  ): Promise<void> {
     const fullKey = this.buildKey(namespace, key);
 
     try {
@@ -597,7 +611,7 @@ export class UnifiedRedisService {
       // TTL 설정 (대화방 활성 사용자는 1시간 유지)
       await this.redis.expire(fullKey, 3600);
 
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         this.logger.debug(`Set에 멤버 추가: ${fullKey} -> ${member}`);
       }
     } catch (error) {
@@ -610,13 +624,17 @@ export class UnifiedRedisService {
    * Redis Set에서 멤버 제거
    * 대화방에서 나간 사용자 제거에 사용
    */
-  async removeFromSet(namespace: string, key: string, member: string): Promise<void> {
+  async removeFromSet(
+    namespace: string,
+    key: string,
+    member: string,
+  ): Promise<void> {
     const fullKey = this.buildKey(namespace, key);
 
     try {
       await this.redis.srem(fullKey, member);
 
-      if (process.env.NODE_ENV === 'development') {
+      if (process.env.NODE_ENV === "development") {
         this.logger.debug(`Set에서 멤버 제거: ${fullKey} -> ${member}`);
       }
     } catch (error) {
@@ -645,7 +663,11 @@ export class UnifiedRedisService {
    * Redis Set에 특정 멤버가 있는지 확인
    * 사용자가 대화방에 있는지 빠른 확인에 사용
    */
-  async isSetMember(namespace: string, key: string, member: string): Promise<boolean> {
+  async isSetMember(
+    namespace: string,
+    key: string,
+    member: string,
+  ): Promise<boolean> {
     const fullKey = this.buildKey(namespace, key);
 
     try {

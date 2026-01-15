@@ -1,7 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import { Redis } from 'ioredis';
-import { Queue } from 'bullmq';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import { Redis, RedisOptions } from "ioredis";
+import { Queue } from "bullmq";
 
 export interface QueueStats {
   waiting: number;
@@ -55,12 +55,22 @@ export class RedisMonitoringService {
   private readonly logger = new Logger(RedisMonitoringService.name);
   private suspiciousQueue: Queue;
 
-  constructor(
-    @InjectRedis() private readonly redis: Redis,
-  ) {
-    this.suspiciousQueue = new Queue('suspicious-requests', {
-      connection: this.redis.duplicate(),
+  constructor(@InjectRedis() private readonly redis: Redis) {
+    this.suspiciousQueue = new Queue("suspicious-requests", {
+      connection: this.createBullConnection(),
     });
+  }
+
+  /**
+   * BullMQ 통계 조회용 Redis 커넥션
+   * commandTimeout을 제거해 queue API 호출이 타임아웃 되지 않도록 한다.
+   */
+  private createBullConnection(): Redis {
+    const overrides: RedisOptions = {
+      maxRetriesPerRequest: null,
+      commandTimeout: undefined,
+    };
+    return this.redis.duplicate(overrides);
   }
 
   /**
@@ -88,7 +98,7 @@ export class RedisMonitoringService {
         paused: isPaused ? 1 : 0,
       };
     } catch (error) {
-      this.logger.error('Failed to get queue stats:', error);
+      this.logger.error("Failed to get queue stats:", error);
       return {
         waiting: 0,
         active: 0,
@@ -106,31 +116,32 @@ export class RedisMonitoringService {
   async getRedisInfo(): Promise<RedisMemoryInfo> {
     try {
       const info = await this.redis.info();
-      const keys = await this.redis.keys('*');
+      const keys = await this.redis.keys("*");
 
       // Parse Redis INFO output
-      const infoLines = info.split('\r\n');
+      const infoLines = info.split("\r\n");
       const infoMap: Record<string, string> = {};
 
-      infoLines.forEach(line => {
-        if (line && !line.startsWith('#') && line.includes(':')) {
-          const [key, value] = line.split(':');
+      infoLines.forEach((line) => {
+        if (line && !line.startsWith("#") && line.includes(":")) {
+          const [key, value] = line.split(":");
           infoMap[key] = value;
         }
       });
 
       return {
-        usedMemory: infoMap['used_memory'] || '0',
-        usedMemoryHuman: infoMap['used_memory_human'] || '0B',
-        usedMemoryPeak: infoMap['used_memory_peak'] || '0',
-        usedMemoryPeakHuman: infoMap['used_memory_peak_human'] || '0B',
-        memoryFragmentation: parseFloat(infoMap['mem_fragmentation_ratio']) || 1,
-        connectedClients: parseInt(infoMap['connected_clients']) || 0,
+        usedMemory: infoMap["used_memory"] || "0",
+        usedMemoryHuman: infoMap["used_memory_human"] || "0B",
+        usedMemoryPeak: infoMap["used_memory_peak"] || "0",
+        usedMemoryPeakHuman: infoMap["used_memory_peak_human"] || "0B",
+        memoryFragmentation:
+          parseFloat(infoMap["mem_fragmentation_ratio"]) || 1,
+        connectedClients: parseInt(infoMap["connected_clients"]) || 0,
         totalKeys: keys.length,
-        uptime: parseInt(infoMap['uptime_in_seconds']) || 0,
+        uptime: parseInt(infoMap["uptime_in_seconds"]) || 0,
       };
     } catch (error) {
-      this.logger.error('Failed to get Redis info:', error);
+      this.logger.error("Failed to get Redis info:", error);
       throw error;
     }
   }
@@ -140,21 +151,21 @@ export class RedisMonitoringService {
    */
   async getKeyPatterns(): Promise<KeyPattern[]> {
     try {
-      const keys = await this.redis.keys('*');
+      const keys = await this.redis.keys("*");
       const patterns: Record<string, number> = {
-        'cache:': 0,
-        'bull:': 0,
-        'lock:': 0,
-        'mcp:': 0,
-        'other': 0,
+        "cache:": 0,
+        "bull:": 0,
+        "lock:": 0,
+        "mcp:": 0,
+        other: 0,
       };
 
-      keys.forEach(key => {
-        if (key.startsWith('cache:')) patterns['cache:']++;
-        else if (key.startsWith('bull:')) patterns['bull:']++;
-        else if (key.startsWith('lock:')) patterns['lock:']++;
-        else if (key.startsWith('mcp:')) patterns['mcp:']++;
-        else patterns['other']++;
+      keys.forEach((key) => {
+        if (key.startsWith("cache:")) patterns["cache:"]++;
+        else if (key.startsWith("bull:")) patterns["bull:"]++;
+        else if (key.startsWith("lock:")) patterns["lock:"]++;
+        else if (key.startsWith("mcp:")) patterns["mcp:"]++;
+        else patterns["other"]++;
       });
 
       const total = keys.length || 1;
@@ -165,7 +176,7 @@ export class RedisMonitoringService {
         percentage: Math.round((count / total) * 100),
       }));
     } catch (error) {
-      this.logger.error('Failed to get key patterns:', error);
+      this.logger.error("Failed to get key patterns:", error);
       return [];
     }
   }
@@ -175,13 +186,13 @@ export class RedisMonitoringService {
    */
   async getLockStatus(): Promise<Lock[]> {
     try {
-      const lockKeys = await this.redis.keys('lock:*');
+      const lockKeys = await this.redis.keys("lock:*");
       const locks: Lock[] = [];
 
       for (const key of lockKeys) {
         const ttl = await this.redis.ttl(key);
         locks.push({
-          resource: key.replace('lock:', ''),
+          resource: key.replace("lock:", ""),
           ttl,
           locked: ttl > 0,
         });
@@ -189,7 +200,7 @@ export class RedisMonitoringService {
 
       return locks;
     } catch (error) {
-      this.logger.error('Failed to get lock status:', error);
+      this.logger.error("Failed to get lock status:", error);
       return [];
     }
   }
@@ -200,15 +211,15 @@ export class RedisMonitoringService {
   async getRateLimitStatus(): Promise<RateLimitStatus> {
     try {
       // Get blocked IPs
-      const blockKeys = await this.redis.keys('mcp:block:*');
+      const blockKeys = await this.redis.keys("mcp:block:*");
       const blockedIPs = [];
 
       for (const key of blockKeys) {
         const value = await this.redis.get(key);
-        const parts = key.split(':');
+        const parts = key.split(":");
         const ip = parts[2];
         const apiKeyId = parts[3];
-        const blockedUntil = parseInt(value || '0');
+        const blockedUntil = parseInt(value || "0");
         const now = Math.floor(Date.now() / 1000);
 
         if (blockedUntil > now) {
@@ -222,12 +233,12 @@ export class RedisMonitoringService {
       }
 
       // Get API key usage
-      const rateKeys = await this.redis.keys('mcp:rate:*');
+      const rateKeys = await this.redis.keys("mcp:rate:*");
       const apiKeyUsageMap: Record<string, any> = {};
 
       for (const key of rateKeys) {
         const value = await this.redis.get(key);
-        const parts = key.split(':');
+        const parts = key.split(":");
         const ip = parts[2];
         const apiKeyId = parts[3];
         const period = parts[4]; // minute, hour, or day
@@ -243,10 +254,10 @@ export class RedisMonitoringService {
           };
         }
 
-        const count = parseInt(value || '0');
-        if (period === 'minute') apiKeyUsageMap[mapKey].minuteCount = count;
-        else if (period === 'hour') apiKeyUsageMap[mapKey].hourCount = count;
-        else if (period === 'day') apiKeyUsageMap[mapKey].dayCount = count;
+        const count = parseInt(value || "0");
+        if (period === "minute") apiKeyUsageMap[mapKey].minuteCount = count;
+        else if (period === "hour") apiKeyUsageMap[mapKey].hourCount = count;
+        else if (period === "day") apiKeyUsageMap[mapKey].dayCount = count;
       }
 
       return {
@@ -254,7 +265,7 @@ export class RedisMonitoringService {
         apiKeyUsage: Object.values(apiKeyUsageMap),
       };
     } catch (error) {
-      this.logger.error('Failed to get rate limit status:', error);
+      this.logger.error("Failed to get rate limit status:", error);
       return {
         blockedIPs: [],
         apiKeyUsage: [],
@@ -312,9 +323,9 @@ export class RedisMonitoringService {
   async isConnected(): Promise<boolean> {
     try {
       const result = await this.redis.ping();
-      return result === 'PONG';
+      return result === "PONG";
     } catch (error) {
-      this.logger.error('Redis connection check failed:', error);
+      this.logger.error("Redis connection check failed:", error);
       return false;
     }
   }
@@ -333,11 +344,11 @@ export class RedisMonitoringService {
       const latency = Date.now() - start;
 
       return {
-        connected: result === 'PONG',
+        connected: result === "PONG",
         latency,
       };
     } catch (error) {
-      this.logger.error('Failed to get connection status:', error);
+      this.logger.error("Failed to get connection status:", error);
       return {
         connected: false,
         latency: -1,

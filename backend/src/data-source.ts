@@ -1,8 +1,9 @@
-import { DataSource } from 'typeorm';
+import { DataSource } from "typeorm";
+import * as dotenv from "dotenv";
 
 // 프로덕션 환경이 아닐 때만 dotenv 로드 (프로덕션에서는 환경변수가 이미 설정됨)
-if (process.env.NODE_ENV !== 'production') {
-  require('dotenv').config();
+if (process.env.NODE_ENV !== "production") {
+  dotenv.config();
 }
 
 /**
@@ -13,31 +14,36 @@ export const createDataSourceOptions = (): any => {
   const dbUrl = process.env.DB_URL || process.env.DATABASE_URL;
 
   // 프로덕션 환경에서는 빌드된 경로 사용
-  const isProduction = process.env.NODE_ENV === 'production';
+  const isProduction = process.env.NODE_ENV === "production";
 
   const baseConfig = {
-    type: 'postgres',
+    type: "postgres",
     // 환경별 마이그레이션 경로 분리 (중복 방지)
     // - 개발: src/*.ts (TypeScript 직접 실행)
     // - 프로덕션: dist/*.js (빌드된 JavaScript 실행)
-    entities: isProduction ? ['dist/**/*.entity.js'] : ['src/**/*.entity.ts'],
-    migrations: isProduction ? ['dist/src/migrations/*.js'] : ['src/migrations/*.ts'],
+    entities: isProduction ? ["dist/**/*.entity.js"] : ["src/**/*.entity.ts"],
+    migrations: isProduction
+      ? ["dist/src/migrations/*.js"]
+      : ["src/migrations/*.ts"],
     synchronize: false,
-    logging: process.env.NODE_ENV === 'development',
+    logging: process.env.NODE_ENV === "development",
   };
 
   if (dbUrl) {
     // 로컬 데이터베이스인 경우 SSL 비활성화
-    const isLocal = dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1');
-    
+    const isLocal = dbUrl.includes("localhost") || dbUrl.includes("127.0.0.1");
+
     return {
       ...baseConfig,
       url: dbUrl,
       ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
       extra: {
         // Connection Pool 설정 (migrations에서도 동일하게 적용)
-        max: parseInt(process.env.DB_POOL_SIZE || '5', 10), // migration은 적은 연결로 충분
-        connectionTimeoutMillis: parseInt(process.env.DB_CONNECTION_TIMEOUT || '3000', 10),
+        max: parseInt(process.env.DB_POOL_SIZE || "5", 10), // migration은 적은 연결로 충분
+        connectionTimeoutMillis: parseInt(
+          process.env.DB_CONNECTION_TIMEOUT || "3000",
+          10,
+        ),
         ...(isLocal ? {} : { ssl: { rejectUnauthorized: false } }),
       },
     };
@@ -46,11 +52,11 @@ export const createDataSourceOptions = (): any => {
   // 개별 환경 변수 사용
   return {
     ...baseConfig,
-    host: process.env.DB_HOST || 'localhost',
-    port: parseInt(process.env.DB_PORT || '5432'),
-    username: process.env.DB_USERNAME || 'postgres',
-    password: process.env.DB_PASSWORD || 'postgres',
-    database: process.env.DB_DATABASE || 'blog-db',
+    host: process.env.DB_HOST || "localhost",
+    port: parseInt(process.env.DB_PORT || "5432"),
+    username: process.env.DB_USERNAME || "postgres",
+    password: process.env.DB_PASSWORD || "postgres",
+    database: process.env.DB_DATABASE || "blog-db",
   };
 };
 

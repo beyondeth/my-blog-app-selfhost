@@ -1,7 +1,8 @@
-import { Exclude, Expose, Type } from 'class-transformer';
-import { UserResponseDto } from '../../users/dto/user-response.dto';
-import { BlogResponseDto } from '../../blogs/dto/blog-response.dto';
-import { FileResponseDto } from '../../files/dto/file-response.dto';
+import { Exclude, Expose, Type } from "class-transformer";
+import { UserResponseDto } from "../../users/dto/user-response.dto";
+import { BlogResponseDto } from "../../blogs/dto/blog-response.dto";
+import { FileResponseDto } from "../../files/dto/file-response.dto";
+import { VoteType } from "../enums/vote-type.enum";
 
 /**
  * Post 응답 DTO
@@ -42,10 +43,10 @@ export class PostResponseDto {
   content_rendered_at: Date;
 
   @Expose()
-  thumbnail: string | null;  // thumbnailImageId에서 생성된 URL
+  thumbnail: string | null; // thumbnailImageId에서 생성된 URL
 
   @Expose()
-  thumbnailImageId: string | null;  // 썸네일 파일 ID
+  thumbnailImageId: string | null; // 썸네일 파일 ID
 
   @Expose()
   isPublished: boolean;
@@ -58,6 +59,15 @@ export class PostResponseDto {
 
   @Expose()
   likeCount: number;
+
+  @Expose()
+  upvoteCount: number;
+
+  @Expose()
+  downvoteCount: number;
+
+  @Expose()
+  score: number;
 
   @Expose()
   commentCount: number;
@@ -107,15 +117,24 @@ export class PostResponseDto {
   bookmarked?: boolean; // 사용자 북마크 상태
 
   @Expose()
+  userVote?: VoteType | null;
+
+  @Expose()
   isEditorPick?: boolean; // Editor's Pick 여부
 
   @Expose()
   editorPickedAt?: Date; // Editor's Pick 선정 시간
 
+  @Expose()
+  editorPickExcerpt?: string; // Editor's Pick 전용 요약
+
   // 첨부 파일 - 프론트엔드에서 필요하므로 노출
   @Expose()
   @Type(() => FileResponseDto)
   attachedFiles?: FileResponseDto[];
+
+  @Expose()
+  images?: string[];
 
   // ManyToMany 관계는 명시적으로 제외 (lazy loading 방지)
   @Exclude()

@@ -19,6 +19,7 @@ import { Selection } from "@tiptap/extensions"
 import { MediumStyleImage } from "@/editor/extensions/MediumStyleImage.extension"
 import { CustomYoutube } from "@/editor/extensions/CustomYoutube.extension"
 import { YoutubeAutoEmbed } from "@/editor/extensions/YoutubeAutoEmbed.extension"
+import { VideoEmbed } from "@/editor/extensions/VideoEmbed.extension"
 
 // --- Hooks ---
 import { useUploadFile } from "@/hooks/useFiles"
@@ -47,9 +48,11 @@ import "@/components/tiptap-node/paragraph-node/paragraph-node.scss"
 // --- Tiptap UI ---
 import { HeadingDropdownMenu } from "@/components/tiptap-ui/heading-dropdown-menu"
 import { ImageUploadButton } from "@/components/tiptap-ui/image-upload-button"
+import { VideoUploadButton } from "@/components/tiptap-ui/video-upload-button"
 import { ListDropdownMenu } from "@/components/tiptap-ui/list-dropdown-menu"
 import { BlockquoteButton } from "@/components/tiptap-ui/blockquote-button"
 import { CodeBlockButton } from "@/components/tiptap-ui/code-block-button"
+import { HorizontalRuleButton } from "@/components/tiptap-ui/horizontal-rule-button"
 import {
   ColorHighlightPopover,
   ColorHighlightPopoverContent,
@@ -109,6 +112,7 @@ const MainToolbarContent = ({
         />
         <BlockquoteButton />
         <CodeBlockButton />
+        <HorizontalRuleButton />
       </ToolbarGroup>
 
       <ToolbarSeparator />
@@ -117,7 +121,6 @@ const MainToolbarContent = ({
         <MarkButton type="bold" />
         <MarkButton type="italic" />
         <MarkButton type="strike" />
-        <MarkButton type="code" />
         <MarkButton type="underline" />
         {!isMobile ? (
           <ColorHighlightPopover />
@@ -146,7 +149,8 @@ const MainToolbarContent = ({
       <ToolbarSeparator />
 
       <ToolbarGroup>
-        <ImageUploadButton text="Add" />
+        <ImageUploadButton text="Image" />
+        <VideoUploadButton text="Video" />
       </ToolbarGroup>
 
       <Spacer />
@@ -267,9 +271,21 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   const uploadedImagesRef = useRef(uploadedImages);
   uploadedImagesRef.current = uploadedImages;
 
+  // 🐛 BUG FIX: 렌더링 중 부모 상태 업데이트 방지를 위해 useEffect로 분리
+  const isFirstRun = useRef(true);
+  useEffect(() => {
+    if (isFirstRun.current) {
+      isFirstRun.current = false;
+      return;
+    }
+    if (onFileIdsChange) {
+      const fileIds = uploadedImages.map(img => img.id);
+      onFileIdsChange(fileIds);
+    }
+  }, [uploadedImages, onFileIdsChange]);
+
   // S3 파일 업로드 mutation
   const uploadMutation = useUploadFile()
-
   // S3 이미지 업로드 핸들러
   const handleImageUpload = useCallback(async (
     file: File,
@@ -305,13 +321,6 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       if (fileId) {
         setUploadedImages(prev => {
           const newImages = [...prev, { id: fileId, url: finalUrl }];
-
-          // fileIds 목록을 부모에게 알림
-          if (onFileIdsChange) {
-            const fileIds = newImages.map(img => img.id);
-            onFileIdsChange(fileIds);
-          }
-
           return newImages;
         });
 
@@ -335,7 +344,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       toast.error(errorMessage)
       throw error
     }
-  }, [uploadMutation, onFileIdsChange, setUploadedImages, setUrlToIdMap])
+  }, [uploadMutation])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -387,6 +396,9 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       }),
       YoutubeAutoEmbed, // URL 자동 변환
 
+      // 비디오 업로드 (R2 + FFmpeg 압축)
+      VideoEmbed,
+
       Typography,
       Superscript,
       Subscript,
@@ -425,13 +437,6 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
               // uploadedImages 상태 업데이트
               setUploadedImages(prev => {
                 const newImages = [...prev, { id: fileId, url: finalUrl }];
-
-                // fileIds 목록을 부모에게 알림
-                if (onFileIdsChange) {
-                  const fileIds = newImages.map(img => img.id);
-                  onFileIdsChange(fileIds);
-                }
-
                 return newImages;
               });
 
@@ -567,40 +572,45 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
     return null
   }
 
+  const toolbarElement = (
+    <Toolbar
+      ref={toolbarRef}
+      style={{
+        ...(isMobile
+          ? {
+              bottom: `calc(100% - ${height - rect.y}px)`,
+            }
+          : {}),
+      }}
+    >
+      {mobileView === "main" ? (
+        <MainToolbarContent
+          onHighlighterClick={() => setMobileView("highlighter")}
+          onLinkClick={() => setMobileView("link")}
+          isMobile={isMobile}
+        />
+      ) : (
+        <MobileToolbarContent
+          type={mobileView === "highlighter" ? "highlighter" : "link"}
+          onBack={() => setMobileView("main")}
+        />
+      )}
+    </Toolbar>
+  )
+
+  const editorContentElement = isMounted ? (
+    <EditorContent
+      editor={editor}
+      role="presentation"
+      className="simple-editor-content"
+    />
+  ) : null
+
   return (
     <EditorContext.Provider value={{ editor }}>
       <div className="simple-editor-wrapper">
-        <Toolbar
-          ref={toolbarRef}
-          style={{
-            ...(isMobile
-              ? {
-                  bottom: `calc(100% - ${height - rect.y}px)`,
-                }
-              : {}),
-          }}
-        >
-          {mobileView === "main" ? (
-            <MainToolbarContent
-              onHighlighterClick={() => setMobileView("highlighter")}
-              onLinkClick={() => setMobileView("link")}
-              isMobile={isMobile}
-            />
-          ) : (
-            <MobileToolbarContent
-              type={mobileView === "highlighter" ? "highlighter" : "link"}
-              onBack={() => setMobileView("main")}
-            />
-          )}
-        </Toolbar>
-
-        {isMounted && (
-          <EditorContent
-            editor={editor}
-            role="presentation"
-            className="simple-editor-content"
-          />
-        )}
+        {toolbarElement}
+        {editorContentElement}
       </div>
     </EditorContext.Provider>
   )

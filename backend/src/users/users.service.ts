@@ -1,24 +1,36 @@
-import { Injectable, NotFoundException, BadRequestException, Logger } from '@nestjs/common';
-import { EventEmitter2 } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, DataSource } from 'typeorm';
-import { DateUtils } from '../common/utils/date.utils';
-import * as bcrypt from 'bcrypt';
-import { User, AuthProvider } from './entities/user.entity';
-import { Profile } from './entities/profile.entity';
-import { Subscription } from './entities/subscription.entity';
-import { AccountSettings } from './entities/account-settings.entity';
-import { Role } from '../common/enums/role.enum';
-import { SubscriptionTier, SubscriptionStatus } from '../common/enums/subscription.enum';
-import { CreateUserDto } from './dto/create-user.dto';
-import { UpdateUserDto } from './dto/update-user.dto';
-import { UnifiedRedisService } from '../redis/unified-redis.service';
-import { CdnService } from '../files/services/cdn.service';
-import { AuditService } from '../audit/audit.service';
-import { AuditAction } from '../audit/entities/audit-log.entity';
-import { Post } from '../posts/entities/post.entity';
-import { Comment } from '../comments/entities/comment.entity';
-import { UserProfileUpdatedEvent, CacheInvalidationEvents } from '../common/events/cache.events';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+  Logger,
+} from "@nestjs/common";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, DataSource } from "typeorm";
+import { DateUtils } from "../common/utils/date.utils";
+import * as bcrypt from "bcrypt";
+import { User, AuthProvider } from "./entities/user.entity";
+import { Profile } from "./entities/profile.entity";
+import { Subscription } from "./entities/subscription.entity";
+import { AccountSettings } from "./entities/account-settings.entity";
+import { Role } from "../common/enums/role.enum";
+import {
+  SubscriptionTier,
+  SubscriptionStatus,
+} from "../common/enums/subscription.enum";
+import { CreateUserDto } from "./dto/create-user.dto";
+import { UpdateUserDto } from "./dto/update-user.dto";
+import { UnifiedRedisService } from "../redis/unified-redis.service";
+import { CdnService } from "../files/services/cdn.service";
+import { AuditService } from "../audit/audit.service";
+import { AuditAction } from "../audit/entities/audit-log.entity";
+import { Post } from "../posts/entities/post.entity";
+import { Comment } from "../comments/entities/comment.entity";
+import {
+  UserProfileUpdatedEvent,
+  CacheInvalidationEvents,
+} from "../common/events/cache.events";
+import { UrlSanitizerUtil } from "../common/utils/url-sanitizer.util";
 
 @Injectable()
 export class UsersService {
@@ -51,7 +63,7 @@ export class UsersService {
     // 현재 사용자는 블로그를 1개만 가질 수 있음
     const user = await this.usersRepository.findOne({
       where: { id: userId },
-      relations: ['blog'],
+      relations: ["blog"],
     });
 
     return user?.blog ? 1 : 0;
@@ -87,7 +99,7 @@ export class UsersService {
           bio,
           accountVerifiedAt,
           lastLoginProvider: null, // 회원가입 시에는 null
-          accountSecurityLevel: 'basic',
+          accountSecurityLevel: "basic",
         }),
 
         // Subscription 생성 (cascade) - 기본값으로 FREE 티어
@@ -111,7 +123,9 @@ export class UsersService {
 
       const savedUser = await this.usersRepository.save(user);
 
-      this.logger.log(`User created with separated entities: ${savedUser.email}`);
+      this.logger.log(
+        `User created with separated entities: ${savedUser.email}`,
+      );
       return savedUser;
     } catch (error) {
       this.logger.error(`Failed to create user: ${error.message}`);
@@ -119,12 +133,27 @@ export class UsersService {
     }
   }
 
-  async findAll(page: number = 1, limit: number = 10): Promise<{ users: User[]; total: number }> {
+  async findAll(
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{ users: User[]; total: number }> {
     const [users, total] = await this.usersRepository.findAndCount({
-      select: ['id', 'email', 'username', 'role', 'createdAt', 'lastLoginAt', 'isActive'],
+      select: [
+        "id",
+        "email",
+        "username",
+        "role",
+        "createdAt",
+        "lastLoginAt",
+        "isActive",
+        "suspensionUntil",
+        "suspensionReason",
+        "isBanned",
+        "banReason",
+      ],
       skip: (page - 1) * limit,
       take: limit,
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
 
     return { users, total };
@@ -133,23 +162,28 @@ export class UsersService {
   async findOne(id: string): Promise<User> {
     const user = await this.usersRepository.findOne({
       where: { id },
-      relations: ['profile', 'subscription', 'accountSettings', 'blog'], // Phase 1: 분리된 테이블 조인 + blog 추가
+      relations: ["profile", "subscription", "accountSettings", "blog"], // Phase 1: 분리된 테이블 조인 + blog 추가
       select: [
-        'id',
-        'email',
-        'username',
-        'role',
-        'isEmailVerified',
-        'createdAt',
-        'lastLoginAt',
-        'isActive',
-        'authProvider',               // 최초 가입 방법
-        'providerId',
-      ]
+        "id",
+        "email",
+        "username",
+        "role",
+        "isEmailVerified",
+        "createdAt",
+        "lastLoginAt",
+        "isActive",
+        "authProvider", // 최초 가입 방법
+        "providerId",
+        "suspensionUntil",
+        "suspensionReason",
+        "isBanned",
+        "banReason",
+        "bannedAt",
+      ],
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     // Phase 1 리팩토링: 분리된 필드들을 User 객체에 flatten (Frontend 호환성)
@@ -158,6 +192,8 @@ export class UsersService {
       user.name = user.profile.name;
       user.profileImage = user.profile.profileImage;
       user.bio = user.profile.bio;
+      user.jobTitle = user.profile.jobTitle;
+      user.socialLinks = user.profile.socialLinks;
       user.lastLoginProvider = user.profile.lastLoginProvider;
     }
 
@@ -185,9 +221,14 @@ export class UsersService {
 
     // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
     if (user.profileImage) {
-      if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+      if (
+        user.profileImage.startsWith("v2/") ||
+        user.profileImage.startsWith("uploads/")
+      ) {
         // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
-        user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
+        user.profileImage = this.cdnService.generateCdnUrlFromKey(
+          user.profileImage,
+        );
         this.logger.debug(`Profile image CDN URL: ${user.profileImage}`);
       }
     }
@@ -199,19 +240,24 @@ export class UsersService {
     // Phase 1 리팩토링: 분리된 테이블 조인
     const user = await this.usersRepository.findOne({
       where: { email },
-      relations: ['blog', 'profile', 'subscription', 'accountSettings'],
+      relations: ["blog", "profile", "subscription", "accountSettings"],
       select: [
-        'id',
-        'email',
-        'password',
-        'username',
-        'role',
-        'authProvider',         // 최초 가입 방법
-        'isActive',
-        'isEmailVerified',
-        'isDeleted',
-        'deletedAt',
-      ]
+        "id",
+        "email",
+        "password",
+        "username",
+        "role",
+        "authProvider", // 최초 가입 방법
+        "isActive",
+        "isEmailVerified",
+        "isDeleted",
+        "deletedAt",
+        "suspensionUntil",
+        "suspensionReason",
+        "isBanned",
+        "banReason",
+        "bannedAt",
+      ],
     });
 
     if (!user) {
@@ -224,6 +270,8 @@ export class UsersService {
       user.name = user.profile.name;
       user.profileImage = user.profile.profileImage;
       user.bio = user.profile.bio;
+      user.jobTitle = user.profile.jobTitle;
+      user.socialLinks = user.profile.socialLinks;
       user.lastLoginProvider = user.profile.lastLoginProvider;
     }
 
@@ -251,10 +299,17 @@ export class UsersService {
 
     // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
     if (user.profileImage) {
-      if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+      if (
+        user.profileImage.startsWith("v2/") ||
+        user.profileImage.startsWith("uploads/")
+      ) {
         // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
-        user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-        this.logger.debug(`Profile image CDN URL (findByEmail): ${user.profileImage}`);
+        user.profileImage = this.cdnService.generateCdnUrlFromKey(
+          user.profileImage,
+        );
+        this.logger.debug(
+          `Profile image CDN URL (findByEmail): ${user.profileImage}`,
+        );
       }
     }
 
@@ -274,17 +329,12 @@ export class UsersService {
   async findByEmailIncludingDeleted(email: string): Promise<User | null> {
     // 1. 먼저 활성 계정 검색 (일반적인 케이스)
     const activeUser = await this.usersRepository
-      .createQueryBuilder('user')
-      .select([
-        'user.id',
-        'user.email',
-        'user.isDeleted',
-        'user.deletedAt',
-      ])
+      .createQueryBuilder("user")
+      .select(["user.id", "user.email", "user.isDeleted", "user.deletedAt"])
       // Phase 1-2-3: scheduledDeletionAt는 account_settings 테이블로 이동
-      .leftJoin('user.accountSettings', 'accountSettings')
-      .addSelect(['accountSettings.scheduledDeletionAt'])
-      .where('user.email = :email', { email })
+      .leftJoin("user.accountSettings", "accountSettings")
+      .addSelect(["accountSettings.scheduledDeletionAt"])
+      .where("user.email = :email", { email })
       .getOne();
 
     if (activeUser) {
@@ -295,11 +345,11 @@ export class UsersService {
     // 삭제된 계정은 email이 마스킹되어 있으므로 audit_logs에서 원본 이메일 추적
     const auditLog = await this.dataSource
       .createQueryBuilder()
-      .select('audit_log."entityId"', 'userId')  // entityId가 삭제된 사용자의 ID
-      .from('audit_logs', 'audit_log')
-      .where('audit_log.action = :action', { action: 'user_deleted' })  // snake_case
-      .andWhere(`audit_log."previousData"->>'email' = :email`, { email })  // PostgreSQL 대소문자 유지
-      .orderBy('audit_log."createdAt"', 'DESC') // 최신 삭제 기록
+      .select('audit_log."entityId"', "userId") // entityId가 삭제된 사용자의 ID
+      .from("audit_logs", "audit_log")
+      .where("audit_log.action = :action", { action: "user_deleted" }) // snake_case
+      .andWhere(`audit_log."previousData"->>'email' = :email`, { email }) // PostgreSQL 대소문자 유지
+      .orderBy('audit_log."createdAt"', "DESC") // 최신 삭제 기록
       .limit(1)
       .getRawOne();
 
@@ -309,18 +359,13 @@ export class UsersService {
 
     // 3. audit_logs에서 찾은 userId로 삭제된 사용자 조회
     const deletedUser = await this.usersRepository
-      .createQueryBuilder('user')
-      .select([
-        'user.id',
-        'user.email',
-        'user.isDeleted',
-        'user.deletedAt',
-      ])
+      .createQueryBuilder("user")
+      .select(["user.id", "user.email", "user.isDeleted", "user.deletedAt"])
       // Phase 1-2-3: scheduledDeletionAt는 account_settings 테이블로 이동
-      .leftJoin('user.accountSettings', 'accountSettings')
-      .addSelect(['accountSettings.scheduledDeletionAt'])
-      .where('user.id = :userId', { userId: auditLog.userId })
-      .andWhere('user.isDeleted = :isDeleted', { isDeleted: true })
+      .leftJoin("user.accountSettings", "accountSettings")
+      .addSelect(["accountSettings.scheduledDeletionAt"])
+      .where("user.id = :userId", { userId: auditLog.userId })
+      .andWhere("user.isDeleted = :isDeleted", { isDeleted: true })
       .getOne();
 
     return deletedUser;
@@ -329,42 +374,83 @@ export class UsersService {
   async findByUsername(username: string): Promise<User | null> {
     // Phase 1-2-3: bio, profileImage는 profiles 테이블로 이동
     const user = await this.usersRepository
-      .createQueryBuilder('user')
-      .select(['user.id', 'user.username', 'user.email', 'user.createdAt', 'user.isActive'])
-      .leftJoin('user.profile', 'profile')
-      .addSelect(['profile.bio', 'profile.profileImage'])
-      .where('user.username = :username', { username })
+      .createQueryBuilder("user")
+      .select([
+        "user.id",
+        "user.username",
+        "user.email",
+        "user.createdAt",
+        "user.isActive",
+      ])
+      .leftJoin("user.profile", "profile")
+      .addSelect([
+        "profile.bio",
+        "profile.profileImage",
+        "profile.jobTitle",
+        "profile.socialLinks",
+      ])
+      .where("user.username = :username", { username })
       .getOne();
 
     // Transform profile image to CDN URL for public access (v2/, uploads/ 모두 처리)
     if (user?.profile?.profileImage) {
-      if (user.profile.profileImage.startsWith('v2/') || user.profile.profileImage.startsWith('uploads/')) {
+      if (
+        user.profile.profileImage.startsWith("v2/") ||
+        user.profile.profileImage.startsWith("uploads/")
+      ) {
         // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
-        user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
-        this.logger.debug(`Profile image CDN URL (findByUsername): ${user.profile.profileImage}`);
+        user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(
+          user.profile.profileImage,
+        );
+        this.logger.debug(
+          `Profile image CDN URL (findByUsername): ${user.profile.profileImage}`,
+        );
       }
     }
 
     return user;
   }
 
-  async findByProviderId(providerId: string, provider: AuthProvider): Promise<User | null> {
+  async findByProviderId(
+    providerId: string,
+    provider: AuthProvider,
+  ): Promise<User | null> {
     // Phase 1-2-3: bio, profileImage는 profiles 테이블로 이동
     const user = await this.usersRepository
-      .createQueryBuilder('user')
-      .select(['user.id', 'user.email', 'user.username', 'user.role', 'user.isEmailVerified', 'user.authProvider', 'user.providerId'])
-      .leftJoin('user.profile', 'profile')
-      .addSelect(['profile.profileImage', 'profile.bio'])
-      .where('user.providerId = :providerId', { providerId })
-      .andWhere('user.authProvider = :provider', { provider })
+      .createQueryBuilder("user")
+      .select([
+        "user.id",
+        "user.email",
+        "user.username",
+        "user.role",
+        "user.isEmailVerified",
+        "user.authProvider",
+        "user.providerId",
+      ])
+      .leftJoin("user.profile", "profile")
+      .addSelect([
+        "profile.profileImage",
+        "profile.bio",
+        "profile.jobTitle",
+        "profile.socialLinks",
+      ])
+      .where("user.providerId = :providerId", { providerId })
+      .andWhere("user.authProvider = :provider", { provider })
       .getOne();
 
     // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
     if (user?.profile?.profileImage) {
-      if (user.profile.profileImage.startsWith('v2/') || user.profile.profileImage.startsWith('uploads/')) {
+      if (
+        user.profile.profileImage.startsWith("v2/") ||
+        user.profile.profileImage.startsWith("uploads/")
+      ) {
         // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
-        user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(user.profile.profileImage);
-        this.logger.debug(`Profile image CDN URL (findByProviderId): ${user.profile.profileImage}`);
+        user.profile.profileImage = this.cdnService.generateCdnUrlFromKey(
+          user.profile.profileImage,
+        );
+        this.logger.debug(
+          `Profile image CDN URL (findByProviderId): ${user.profile.profileImage}`,
+        );
       }
     }
 
@@ -379,6 +465,8 @@ export class UsersService {
       // Profile 테이블 필드
       profileImage,
       bio,
+      jobTitle,
+      socialLinks,
       accountVerifiedAt,
 
       // AccountSettings 테이블 필드
@@ -397,13 +485,17 @@ export class UsersService {
     let processedProfileImage = profileImage;
     if (profileImage && profileImage !== user.profile?.profileImage) {
       // 캐릭터 이미지는 정적 파일이므로 캐시 버스팅 불필요
-      if (!profileImage.startsWith('/character/')) {
+      if (!profileImage.startsWith("/character/")) {
         const timestamp = Date.now();
-        const cleanUrl = profileImage.split('?')[0];
+        const cleanUrl = profileImage.split("?")[0];
         processedProfileImage = `${cleanUrl}?v=${timestamp}`;
-        this.logger.log(`🔄 Profile image cache busting applied: ?v=${timestamp}`);
+        this.logger.log(
+          `🔄 Profile image cache busting applied: ?v=${timestamp}`,
+        );
       } else {
-        this.logger.log(`📸 Character image selected (no cache busting needed): ${profileImage}`);
+        this.logger.log(
+          `📸 Character image selected (no cache busting needed): ${profileImage}`,
+        );
       }
     }
 
@@ -412,11 +504,32 @@ export class UsersService {
       await this.usersRepository.update(id, userData);
     }
 
+    const normalizedSocialLinks =
+      socialLinks !== undefined
+        ? this.normalizeSocialLinks(socialLinks)
+        : undefined;
+    if (
+      normalizedSocialLinks !== undefined &&
+      process.env.NODE_ENV === "development"
+    ) {
+      this.logger.debug(
+        `[User Update] socialLinks payload: ${JSON.stringify(
+          normalizedSocialLinks,
+        )}`,
+      );
+    }
+
     // 2. Profile 테이블 업데이트 (필드가 있을 때만)
     const profileData: any = {};
-    if (processedProfileImage !== undefined) profileData.profileImage = processedProfileImage;
+    if (processedProfileImage !== undefined)
+      profileData.profileImage = processedProfileImage;
     if (bio !== undefined) profileData.bio = bio;
-    if (accountVerifiedAt !== undefined) profileData.accountVerifiedAt = accountVerifiedAt;
+    if (jobTitle !== undefined) profileData.jobTitle = jobTitle;
+    if (normalizedSocialLinks !== undefined) {
+      profileData.socialLinks = normalizedSocialLinks;
+    }
+    if (accountVerifiedAt !== undefined)
+      profileData.accountVerifiedAt = accountVerifiedAt;
 
     if (Object.keys(profileData).length > 0) {
       await this.profileRepository.update({ userId: id }, profileData);
@@ -424,11 +537,16 @@ export class UsersService {
 
     // 3. AccountSettings 테이블 업데이트 (필드가 있을 때만)
     const settingsData: any = {};
-    if (termsAcceptedAt !== undefined) settingsData.termsAcceptedAt = termsAcceptedAt;
-    if (privacyAcceptedAt !== undefined) settingsData.privacyAcceptedAt = privacyAcceptedAt;
-    if (marketingOptIn !== undefined) settingsData.marketingOptIn = marketingOptIn;
-    if (marketingOptInAt !== undefined) settingsData.marketingOptInAt = marketingOptInAt;
-    if (newsletterOptIn !== undefined) settingsData.newsletterOptIn = newsletterOptIn;
+    if (termsAcceptedAt !== undefined)
+      settingsData.termsAcceptedAt = termsAcceptedAt;
+    if (privacyAcceptedAt !== undefined)
+      settingsData.privacyAcceptedAt = privacyAcceptedAt;
+    if (marketingOptIn !== undefined)
+      settingsData.marketingOptIn = marketingOptIn;
+    if (marketingOptInAt !== undefined)
+      settingsData.marketingOptInAt = marketingOptInAt;
+    if (newsletterOptIn !== undefined)
+      settingsData.newsletterOptIn = newsletterOptIn;
 
     if (Object.keys(settingsData).length > 0) {
       await this.accountSettingsRepository.update({ userId: id }, settingsData);
@@ -450,35 +568,44 @@ export class UsersService {
     if (bio !== undefined && bio !== user.profile?.bio) {
       changes.bio = true;
     }
+    if (
+      normalizedSocialLinks !== undefined &&
+      JSON.stringify(normalizedSocialLinks ?? []) !==
+        JSON.stringify(user.profile?.socialLinks ?? [])
+    ) {
+      changes.socialLinks = true;
+    }
 
     if (Object.keys(changes).length > 0) {
       try {
         // 프로필 이미지 변경이 있으면 USER_AVATAR_UPDATED 이벤트도 발생
         if (changes.profileImage) {
-          this.eventEmitter.emit('user.avatar.updated', {
+          this.eventEmitter.emit("user.avatar.updated", {
             userId: id,
             username: user.username,
             oldProfileImage,
             newProfileImage: processedProfileImage,
           });
-          this.logger.debug(`👤 User avatar updated event emitted for user: ${id}`);
+          this.logger.debug(
+            `👤 User avatar updated event emitted for user: ${id}`,
+          );
         }
 
         // 일반 프로필 변경 이벤트 (bio 등 기타 변경용)
-        this.eventEmitter.emit(
-          CacheInvalidationEvents.USER_PROFILE_UPDATED,
-          {
-            userId: id,
-            username: user.username, // Add username from user object
-            changes
-          }
+        this.eventEmitter.emit(CacheInvalidationEvents.USER_PROFILE_UPDATED, {
+          userId: id,
+          username: user.username, // Add username from user object
+          changes,
+        });
+        this.logger.debug(
+          `👤 User profile updated event emitted for user: ${id}`,
+          changes,
         );
-        this.logger.debug(`👤 User profile updated event emitted for user: ${id}`, changes);
       } catch (error) {
         // 이벤트 발생 실패 시 로그만 남기고 진행 (캐시 무효화 실패가 사용자 업데이트를 막아서는 안 됨)
         this.logger.error(
           `Failed to emit user profile updated event for user: ${id}`,
-          error.stack
+          error.stack,
         );
         // 실패한 이벤트를 큐에 저장하여 나중에 재시도할 수 있음
         // 여기서는 간단히 실패 로그만 남김
@@ -487,6 +614,55 @@ export class UsersService {
 
     // 업데이트된 사용자 정보 반환
     return this.findOne(id);
+  }
+
+  private normalizeSocialLinks(
+    links: Array<{ platform: string; url: string }>,
+  ): Array<{ platform: string; url: string }> {
+    if (!Array.isArray(links)) {
+      return [];
+    }
+
+    const normalized: Array<{ platform: string; url: string }> = [];
+    const seenPlatforms = new Set<string>();
+
+    for (const link of links) {
+      if (!link) continue;
+
+      const rawPlatform =
+        typeof link.platform === "string" ? link.platform.trim() : "";
+      const rawUrl = typeof link.url === "string" ? link.url.trim() : "";
+
+      if (!rawPlatform || !rawUrl) continue;
+
+      const sanitizedPlatform = UrlSanitizerUtil.sanitizeUserInput(
+        rawPlatform.toLowerCase(),
+      );
+      const platform = sanitizedPlatform.replace(/[^a-z0-9._-]/g, "");
+      if (!platform || seenPlatforms.has(platform)) continue;
+
+      let normalizedUrl = rawUrl;
+      if (!/^https?:\/\//i.test(normalizedUrl)) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+
+      try {
+        const parsedUrl = new URL(normalizedUrl);
+        if (parsedUrl.protocol !== "https:") continue;
+        normalizedUrl = parsedUrl.toString();
+      } catch {
+        continue;
+      }
+
+      normalized.push({ platform, url: normalizedUrl });
+      seenPlatforms.add(platform);
+
+      if (normalized.length >= 10) {
+        break;
+      }
+    }
+
+    return normalized;
   }
 
   /**
@@ -504,14 +680,14 @@ export class UsersService {
   async updateLastLogin(id: string, provider?: string): Promise<void> {
     // 1. lastLoginAt은 users 테이블에 저장
     await this.usersRepository.update(id, {
-      lastLoginAt: new Date()
+      lastLoginAt: new Date(),
     });
 
     // 2. lastLoginProvider는 profiles 테이블에 저장
     if (provider) {
       await this.profileRepository.update(
         { userId: id },
-        { lastLoginProvider: provider }
+        { lastLoginProvider: provider },
       );
     }
   }
@@ -519,32 +695,80 @@ export class UsersService {
   async deactivate(id: string): Promise<void> {
     const user = await this.findOne(id);
     user.isActive = false;
+    user.suspensionUntil = null;
+    user.suspensionReason = null;
+    user.isBanned = false;
+    user.bannedAt = null;
+    user.banReason = null;
     await this.usersRepository.save(user);
-    
+
     this.logger.log(`User deactivated: ${user.email}`);
   }
 
   async activate(id: string): Promise<void> {
     const user = await this.findOne(id);
     user.isActive = true;
+    user.suspensionUntil = null;
+    user.suspensionReason = null;
+    user.isBanned = false;
+    user.bannedAt = null;
+    user.banReason = null;
     await this.usersRepository.save(user);
-    
+
     this.logger.log(`User activated: ${user.email}`);
   }
 
   async remove(id: string): Promise<void> {
     const user = await this.findOne(id);
     await this.usersRepository.remove(user);
-    
+
     this.logger.log(`User removed: ${user.email}`);
+  }
+
+  async banUser(id: string): Promise<void> {
+    const user = await this.findOne(id);
+    user.isBanned = true;
+    user.bannedAt = new Date();
+    user.isActive = false;
+    // banReason is handled by update usually, or we can set default
+    await this.usersRepository.save(user); // Use save to trigger listeners if any
+    this.logger.log(`User banned: ${user.email}`);
+  }
+
+  /**
+   * 사용자의 상태 필드를 자동 복구
+   * - 일시 정지 기간이 지났다면 해제
+   */
+  async refreshUserStatus(user: User | null): Promise<User | null> {
+    if (!user) {
+      return user;
+    }
+
+    if (user.suspensionUntil) {
+      const suspensionEnd = new Date(user.suspensionUntil);
+      if (suspensionEnd.getTime() <= Date.now()) {
+        await this.usersRepository.update(user.id, {
+          suspensionUntil: null,
+          suspensionReason: null,
+          isActive: !user.isDeleted && !user.isBanned ? true : user.isActive,
+        });
+        user.suspensionUntil = null;
+        user.suspensionReason = null;
+        if (!user.isDeleted && !user.isBanned) {
+          user.isActive = true;
+        }
+      }
+    }
+
+    return user;
   }
 
   async isAdmin(userId: string): Promise<boolean> {
     const user = await this.usersRepository.findOne({
       where: { id: userId },
-      select: ['role']
+      select: ["role"],
     });
-    
+
     return user?.role === Role.ADMIN;
   }
 
@@ -555,14 +779,18 @@ export class UsersService {
     recentUsers: number;
   }> {
     const totalUsers = await this.usersRepository.count();
-    const activeUsers = await this.usersRepository.count({ where: { isActive: true } });
-    const adminUsers = await this.usersRepository.count({ where: { role: Role.ADMIN } });
-    
+    const activeUsers = await this.usersRepository.count({
+      where: { isActive: true },
+    });
+    const adminUsers = await this.usersRepository.count({
+      where: { role: Role.ADMIN },
+    });
+
     // 최근 30일 가입자 - DateUtils를 사용한 일수 기반 계산
     const thirtyDaysAgo = DateUtils.fromNowSubtractDays(30);
-    
+
     const recentUsers = await this.usersRepository.count({
-      where: { createdAt: { $gte: thirtyDaysAgo } as any }
+      where: { createdAt: { $gte: thirtyDaysAgo } as any },
     });
 
     return {
@@ -573,16 +801,20 @@ export class UsersService {
     };
   }
 
-  async searchUsers(query: string, page: number = 1, limit: number = 10): Promise<{ users: User[]; total: number }> {
+  async searchUsers(
+    query: string,
+    page: number = 1,
+    limit: number = 10,
+  ): Promise<{ users: User[]; total: number }> {
     const [users, total] = await this.usersRepository.findAndCount({
       where: [
         { username: { $ilike: `%${query}%` } as any },
         { email: { $ilike: `%${query}%` } as any },
       ],
-      select: ['id', 'email', 'username', 'role', 'createdAt', 'isActive'],
+      select: ["id", "email", "username", "role", "createdAt", "isActive"],
       skip: (page - 1) * limit,
       take: limit,
-      order: { createdAt: 'DESC' },
+      order: { createdAt: "DESC" },
     });
 
     return { users, total };
@@ -593,20 +825,25 @@ export class UsersService {
     // Phase 1 리팩토링: 분리된 테이블 조인
     const user = await this.usersRepository.findOne({
       where: { id },
-      relations: ['blog', 'profile', 'subscription', 'accountSettings'],
+      relations: ["blog", "profile", "subscription", "accountSettings"],
       select: [
-        'id',
-        'email',
-        'username',
-        'role',
-        'authProvider',            // 최초 가입 방법 (계정 관리용)
-        'isEmailVerified',
-        'createdAt',
-        'lastLoginAt',
-        'isActive',
-        'isDeleted',               // 삭제 플래그 (JwtStrategy 로그인 차단용)
-        'deletedAt',
-      ]
+        "id",
+        "email",
+        "username",
+        "role",
+        "authProvider", // 최초 가입 방법 (계정 관리용)
+        "isEmailVerified",
+        "createdAt",
+        "lastLoginAt",
+        "isActive",
+        "isDeleted", // 삭제 플래그 (JwtStrategy 로그인 차단용)
+        "deletedAt",
+        "suspensionUntil",
+        "suspensionReason",
+        "isBanned",
+        "banReason",
+        "bannedAt",
+      ],
     });
 
     if (!user) {
@@ -619,6 +856,8 @@ export class UsersService {
       user.name = user.profile.name;
       user.profileImage = user.profile.profileImage;
       user.bio = user.profile.bio;
+      user.jobTitle = user.profile.jobTitle;
+      user.socialLinks = user.profile.socialLinks;
       user.lastLoginProvider = user.profile.lastLoginProvider;
     }
 
@@ -645,10 +884,17 @@ export class UsersService {
 
     // 프로필 이미지를 CDN URL로 변환 (v2/, uploads/ 모두 처리)
     if (user.profileImage) {
-      if (user.profileImage.startsWith('v2/') || user.profileImage.startsWith('uploads/')) {
+      if (
+        user.profileImage.startsWith("v2/") ||
+        user.profileImage.startsWith("uploads/")
+      ) {
         // CDN 서비스 활성화 - S3 키를 CDN URL로 변환
-        user.profileImage = this.cdnService.generateCdnUrlFromKey(user.profileImage);
-        this.logger.debug(`Profile image CDN URL (findById): ${user.profileImage}`);
+        user.profileImage = this.cdnService.generateCdnUrlFromKey(
+          user.profileImage,
+        );
+        this.logger.debug(
+          `Profile image CDN URL (findById): ${user.profileImage}`,
+        );
       }
     }
 
@@ -657,13 +903,17 @@ export class UsersService {
 
   // Refresh Token 업데이트
   // Phase 1 리팩토링: refreshToken은 account_settings 테이블에 저장
-  async updateRefreshToken(id: string, refreshToken: string, expiresAt: Date): Promise<void> {
+  async updateRefreshToken(
+    id: string,
+    refreshToken: string,
+    expiresAt: Date,
+  ): Promise<void> {
     await this.accountSettingsRepository.update(
       { userId: id },
       {
         refreshToken,
-        refreshTokenExpiresAt: expiresAt
-      }
+        refreshTokenExpiresAt: expiresAt,
+      },
     );
   }
 
@@ -674,16 +924,19 @@ export class UsersService {
       { userId: id },
       {
         refreshToken: null,
-        refreshTokenExpiresAt: null
-      }
+        refreshTokenExpiresAt: null,
+      },
     );
   }
 
   // 비밀번호 업데이트 (비밀번호 재설정)
-  async updatePassword(userId: number | string, newPassword: string): Promise<void> {
+  async updatePassword(
+    userId: number | string,
+    newPassword: string,
+  ): Promise<void> {
     const user = await this.findById(String(userId));
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     // 비밀번호 해싱
@@ -699,8 +952,8 @@ export class UsersService {
       { userId: String(userId) },
       {
         refreshToken: null,
-        refreshTokenExpiresAt: null
-      }
+        refreshTokenExpiresAt: null,
+      },
     );
   }
 
@@ -713,7 +966,7 @@ export class UsersService {
   async softDelete(userId: string): Promise<void> {
     const user = await this.findById(userId);
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     // 이미 삭제된 사용자인지 확인
@@ -749,7 +1002,7 @@ export class UsersService {
     await this.auditService.log(
       {
         action: AuditAction.USER_DELETED,
-        entityType: 'user',
+        entityType: "user",
         entityId: userId,
         previousData: {
           // 개인정보 (법적 조회용)
@@ -779,8 +1032,8 @@ export class UsersService {
         },
         metadata: {
           retentionDays,
-          reason: '사용자 계정 삭제 요청',
-          legalNote: '법적 요구 시 audit_logs.previousData에서 원본 조회 가능',
+          reason: "사용자 계정 삭제 요청",
+          legalNote: "법적 요구 시 audit_logs.previousData에서 원본 조회 가능",
         },
       },
       {
@@ -804,17 +1057,17 @@ export class UsersService {
       // 해당 사용자의 모든 포스트 soft delete
       this.postRepository.update(
         { authorId: userId, isDeleted: false },
-        { isDeleted: true }
+        { isDeleted: true },
       ),
       // 해당 사용자의 모든 댓글 soft delete
       this.commentRepository.update(
         { authorId: userId, isDeleted: false },
-        { isDeleted: true }
+        { isDeleted: true },
       ),
     ]);
 
     this.logger.log(
-      `Soft deleted ${postsUpdated.affected} posts and ${commentsUpdated.affected} comments for user ${userId}`
+      `Soft deleted ${postsUpdated.affected} posts and ${commentsUpdated.affected} comments for user ${userId}`,
     );
 
     // 즉시 개인정보 마스킹 및 삭제 플래그 설정
@@ -842,7 +1095,7 @@ export class UsersService {
       {
         profileImage: null,
         bio: null,
-      }
+      },
     );
 
     // account_settings 테이블에 scheduledDeletionAt 저장
@@ -853,13 +1106,13 @@ export class UsersService {
         // refreshToken 관련 필드도 여기서 정리
         refreshToken: null,
         refreshTokenExpiresAt: null,
-      }
+      },
     );
 
     this.logger.log(
       `User ${userId} soft deleted. Original data saved to audit_logs. ` +
-      `Soft deleted ${postsUpdated.affected} posts and ${commentsUpdated.affected} comments. ` +
-      `Scheduled for permanent deletion at ${scheduledDeletionAt.toISOString()} (180 days from now)`
+        `Soft deleted ${postsUpdated.affected} posts and ${commentsUpdated.affected} comments. ` +
+        `Scheduled for permanent deletion at ${scheduledDeletionAt.toISOString()} (180 days from now)`,
     );
 
     // TODO: BullMQ 큐에 백그라운드 삭제 작업 추가
@@ -875,7 +1128,7 @@ export class UsersService {
   async permanentDelete(userId: string): Promise<void> {
     const user = await this.findById(userId);
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException("User not found");
     }
 
     // DB에서 완전히 삭제 (CASCADE로 관련 데이터 자동 삭제)
@@ -894,25 +1147,139 @@ export class UsersService {
   ): Promise<User> {
     const user = await this.findOne(userId);
 
-    const updateData: any = {};
+    const updateData: Partial<AccountSettings> = {};
 
-    // 마케팅 정보 수신 동의 업데이트
     if (preferences.marketingOptIn !== undefined) {
       updateData.marketingOptIn = preferences.marketingOptIn;
-      updateData.marketingOptInAt = preferences.marketingOptIn ? new Date() : null;
+      updateData.marketingOptInAt = preferences.marketingOptIn
+        ? new Date()
+        : null;
     }
 
-    // 뉴스레터 수신 동의 업데이트
     if (preferences.newsletterOptIn !== undefined) {
       updateData.newsletterOptIn = preferences.newsletterOptIn;
     }
 
-    Object.assign(user, updateData);
-    const updatedUser = await this.usersRepository.save(user);
+    if (!user.accountSettings) {
+      const newSettings = this.accountSettingsRepository.create({
+        userId,
+        marketingOptIn: updateData.marketingOptIn ?? false,
+        marketingOptInAt: updateData.marketingOptInAt ?? null,
+        newsletterOptIn: updateData.newsletterOptIn ?? false,
+      });
+      user.accountSettings =
+        await this.accountSettingsRepository.save(newSettings);
+    } else if (Object.keys(updateData).length > 0) {
+      await this.accountSettingsRepository.update({ userId }, updateData);
+      Object.assign(user.accountSettings, updateData);
+    }
+
+    user.marketingOptIn = user.accountSettings.marketingOptIn;
+    user.newsletterOptIn = user.accountSettings.newsletterOptIn;
 
     this.logger.log(`Marketing preferences updated for user: ${userId}`);
 
-    return updatedUser;
+    return user;
   }
 
-} 
+  /**
+   * 성인 인증 (생년월일 기반)
+   *
+   * @description 사용자의 생년월일을 저장하고 18세 이상인 경우 성인 인증 처리
+   *
+   * @param userId 사용자 ID
+   * @param birthdate 생년월일 (YYYY-MM-DD 형식)
+   * @returns 인증 결과 (verified, verifiedAt, message)
+   *
+   * @throws BadRequestException 생년월일이 미래 날짜인 경우
+   * @throws NotFoundException 프로필이 존재하지 않는 경우
+   */
+  async verifyAdult(
+    userId: string,
+    birthdate: string,
+  ): Promise<{ verified: boolean; verifiedAt?: Date; message: string }> {
+    // 1. 프로필 조회
+    const profile = await this.profileRepository.findOne({
+      where: { userId },
+    });
+
+    if (!profile) {
+      throw new NotFoundException("프로필을 찾을 수 없습니다.");
+    }
+
+    // 2. 생년월일 파싱 및 유효성 검사
+    const birthdateDate = new Date(birthdate);
+    const today = new Date();
+
+    // 미래 날짜인지 확인
+    if (birthdateDate > today) {
+      throw new BadRequestException("생년월일은 미래 날짜일 수 없습니다.");
+    }
+
+    // 3. 나이 계산 (만 나이 기준)
+    let age = today.getFullYear() - birthdateDate.getFullYear();
+    const monthDiff = today.getMonth() - birthdateDate.getMonth();
+    const dayDiff = today.getDate() - birthdateDate.getDate();
+
+    // 생일이 아직 안 지났으면 나이에서 1을 뺌
+    if (monthDiff < 0 || (monthDiff === 0 && dayDiff < 0)) {
+      age -= 1;
+    }
+
+    // 4. 18세 이상인지 확인
+    const isAdult = age >= 18;
+
+    // 5. 프로필 업데이트
+    const now = new Date();
+    await this.profileRepository.update(
+      { userId },
+      {
+        birthdate: birthdateDate,
+        isAdultVerified: isAdult,
+        adultVerifiedAt: isAdult ? now : null,
+      },
+    );
+
+    this.logger.log(
+      `Adult verification for user ${userId}: age=${age}, verified=${isAdult}`,
+    );
+
+    // 6. 결과 반환
+    if (isAdult) {
+      return {
+        verified: true,
+        verifiedAt: now,
+        message: "성인 인증이 완료되었습니다.",
+      };
+    } else {
+      return {
+        verified: false,
+        message: `만 18세 미만은 성인 콘텐츠에 접근할 수 없습니다. (현재 나이: ${age}세)`,
+      };
+    }
+  }
+
+  /**
+   * 성인 인증 상태 조회
+   *
+   * @param userId 사용자 ID
+   * @returns 성인 인증 상태
+   */
+  async getAdultVerificationStatus(
+    userId: string,
+  ): Promise<{ isAdultVerified: boolean; verifiedAt?: Date }> {
+    const profile = await this.profileRepository.findOne({
+      where: { userId },
+      select: ["isAdultVerified", "adultVerifiedAt"],
+    });
+
+    if (!profile) {
+      return { isAdultVerified: false };
+    }
+
+    return {
+      isAdultVerified: profile.isAdultVerified || false,
+      verifiedAt: profile.adultVerifiedAt,
+    };
+  }
+}

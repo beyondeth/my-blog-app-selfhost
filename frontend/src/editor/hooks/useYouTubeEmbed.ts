@@ -128,6 +128,7 @@ export function useYouTubeEmbed({
         processedVideoIds.current.add(videoId);
       }
     }, 100); // 100ms debounce
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     enableImageManager, 
     setImages, 

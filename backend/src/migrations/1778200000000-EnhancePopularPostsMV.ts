@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * Materialized View 개선: author/blog 정보 포함
@@ -11,7 +11,9 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
 export class EnhancePopularPostsMV1778200000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 기존 Materialized View 삭제
-    await queryRunner.query(`DROP MATERIALIZED VIEW IF EXISTS mv_popular_posts;`);
+    await queryRunner.query(
+      `DROP MATERIALIZED VIEW IF EXISTS mv_popular_posts;`,
+    );
 
     // 개선된 Materialized View 생성 (최소 author/blog 정보만 포함)
     await queryRunner.query(`
@@ -67,7 +69,9 @@ export class EnhancePopularPostsMV1778200000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // Rollback: 기존 MV로 복원
-    await queryRunner.query(`DROP MATERIALIZED VIEW IF EXISTS mv_popular_posts;`);
+    await queryRunner.query(
+      `DROP MATERIALIZED VIEW IF EXISTS mv_popular_posts;`,
+    );
 
     await queryRunner.query(`
       CREATE MATERIALIZED VIEW mv_popular_posts AS

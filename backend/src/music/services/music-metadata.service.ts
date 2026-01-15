@@ -1,11 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
-import * as mm from 'music-metadata';
-import { Readable } from 'stream';
-import { v4 as uuidv4 } from 'uuid';
-import { S3Service } from '../../files/services/s3.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
+import * as mm from "music-metadata";
+import { Readable } from "stream";
+import { v4 as uuidv4 } from "uuid";
+import { S3Service } from "../../files/services/s3.service";
 
-import { SyncedLyricLine } from '../entities/music.entity';
+import { SyncedLyricLine } from "../entities/music.entity";
 
 /**
  * 추출된 음악 메타데이터 인터페이스
@@ -39,8 +39,8 @@ export class MusicMetadataService {
     private readonly s3Service: S3Service,
   ) {
     // CDN_DOMAIN에서 CDN 베이스 URL 구성 (CdnService와 동일한 패턴)
-    const cdnDomain = this.configService.get('CDN_DOMAIN', '');
-    this.cdnBaseUrl = cdnDomain ? `https://${cdnDomain}` : '';
+    const cdnDomain = this.configService.get("CDN_DOMAIN", "");
+    this.cdnBaseUrl = cdnDomain ? `https://${cdnDomain}` : "";
   }
 
   /**
@@ -61,7 +61,9 @@ export class MusicMetadataService {
         size: contentLength,
       });
 
-      this.logger.debug(`Metadata extracted: ${JSON.stringify(metadata.common)}`);
+      this.logger.debug(
+        `Metadata extracted: ${JSON.stringify(metadata.common)}`,
+      );
 
       // 앨범 커버 추출 및 S3 업로드
       let coverImageKey: string | undefined;
@@ -80,7 +82,8 @@ export class MusicMetadataService {
         // lyrics는 ILyricsTag[] 형태 - text 속성에서 실제 가사 추출
         const lyricsTag = metadata.common.lyrics[0];
         // ILyricsTag는 문자열이거나 { text: string } 객체일 수 있음
-        const rawLyrics = typeof lyricsTag === 'string' ? lyricsTag : lyricsTag.text;
+        const rawLyrics =
+          typeof lyricsTag === "string" ? lyricsTag : lyricsTag.text;
 
         if (rawLyrics) {
           this.logger.debug(`Found lyrics: ${rawLyrics.substring(0, 100)}...`);
@@ -90,8 +93,10 @@ export class MusicMetadataService {
             // LRC 포맷이면 파싱하여 동기화 가사로 변환
             syncedLyrics = this.parseLrcLyrics(rawLyrics);
             // 일반 가사도 텍스트만 추출하여 저장
-            lyrics = syncedLyrics.map((line) => line.text).join('\n');
-            this.logger.debug(`Parsed ${syncedLyrics.length} synced lyrics lines`);
+            lyrics = syncedLyrics.map((line) => line.text).join("\n");
+            this.logger.debug(
+              `Parsed ${syncedLyrics.length} synced lyrics lines`,
+            );
           } else {
             // 일반 텍스트 가사
             lyrics = rawLyrics;
@@ -112,7 +117,10 @@ export class MusicMetadataService {
         syncedLyrics,
       };
     } catch (error) {
-      this.logger.error(`Failed to extract metadata: ${error.message}`, error.stack);
+      this.logger.error(
+        `Failed to extract metadata: ${error.message}`,
+        error.stack,
+      );
       // 메타데이터 추출 실패 시 빈 객체 반환 (파일 자체는 유효)
       return {};
     }
@@ -127,7 +135,7 @@ export class MusicMetadataService {
   ): Promise<string | undefined> {
     try {
       // 지원하는 이미지 포맷만 저장
-      const supportedFormats = ['image/jpeg', 'image/png', 'image/webp'];
+      const supportedFormats = ["image/jpeg", "image/png", "image/webp"];
       if (!supportedFormats.includes(picture.format)) {
         this.logger.debug(`Unsupported cover format: ${picture.format}`);
         return undefined;
@@ -135,16 +143,16 @@ export class MusicMetadataService {
 
       // 확장자 결정
       const extMap: Record<string, string> = {
-        'image/jpeg': '.jpg',
-        'image/png': '.png',
-        'image/webp': '.webp',
+        "image/jpeg": ".jpg",
+        "image/png": ".png",
+        "image/webp": ".webp",
       };
-      const ext = extMap[picture.format] || '.jpg';
+      const ext = extMap[picture.format] || ".jpg";
 
       // 커버 이미지 S3 키 생성
       const now = new Date();
       const year = now.getFullYear();
-      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const month = String(now.getMonth() + 1).padStart(2, "0");
       const coverKey = `uploads/music/covers/${year}/${month}/${uuidv4()}${ext}`;
 
       // S3Service를 통해 업로드 (Uint8Array를 Buffer로 변환)
@@ -152,7 +160,7 @@ export class MusicMetadataService {
         coverKey,
         Buffer.from(picture.data),
         picture.format,
-        { 'cache-control': 'public, max-age=31536000' }, // 1년 캐싱 메타데이터
+        { "cache-control": "public, max-age=31536000" }, // 1년 캐싱 메타데이터
       );
       this.logger.debug(`Cover image saved: ${coverKey}`);
 
@@ -196,7 +204,7 @@ export class MusicMetadataService {
    * @returns 시간순 정렬된 동기화 가사 배열
    */
   private parseLrcLyrics(lyrics: string): SyncedLyricLine[] {
-    const lines = lyrics.split('\n');
+    const lines = lyrics.split("\n");
     const result: SyncedLyricLine[] = [];
 
     // LRC 타임스탬프 패턴: [mm:ss.xx] 또는 [mm:ss]

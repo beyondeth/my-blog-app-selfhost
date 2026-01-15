@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * Category 복합 인덱스 재생성 마이그레이션
@@ -36,9 +36,11 @@ export class RecreateCategoryCompositeIndex1761465096433
     // 통계 갱신으로 쿼리 플래너가 새 인덱스 활용
     await queryRunner.query(`ANALYZE posts`);
 
-    console.log('✅ Category 복합 인덱스 재생성 완료: idx_posts_category_published');
-    console.log('   - 구조: (category, isPublished, publishedAt DESC)');
-    console.log('   - 부분 인덱스: WHERE category IS NOT NULL');
+    console.log(
+      "✅ Category 복합 인덱스 재생성 완료: idx_posts_category_published",
+    );
+    console.log("   - 구조: (category, isPublished, publishedAt DESC)");
+    console.log("   - 부분 인덱스: WHERE category IS NOT NULL");
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
@@ -47,6 +49,6 @@ export class RecreateCategoryCompositeIndex1761465096433
       DROP INDEX IF EXISTS "idx_posts_category_published"
     `);
 
-    console.log('⬇️  Rollback: Category 복합 인덱스 제거 완료');
+    console.log("⬇️  Rollback: Category 복합 인덱스 제거 완료");
   }
 }

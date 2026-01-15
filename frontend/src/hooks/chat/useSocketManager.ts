@@ -7,6 +7,8 @@ import { useEffect, useCallback, useState } from 'react';
 import { useSocket } from '../useSocket';
 import { SOCKET_EVENTS } from '@/constants/chat';
 
+const IS_DEV = process.env.NODE_ENV === 'development';
+
 // 전역 접근을 위한 타입 선언
 declare global {
   interface Window {
@@ -47,22 +49,22 @@ export function useSocketManager(): UseSocketManagerReturn {
     if (!socket) return;
 
     const handleConnect = () => {
-      console.log('[SocketManager] Connected');
+      if (IS_DEV) console.log('[SocketManager] Connected');
       setConnectionStatus('connected');
     };
 
     const handleDisconnect = () => {
-      console.log('[SocketManager] Disconnected');
+      if (IS_DEV) console.log('[SocketManager] Disconnected');
       setConnectionStatus('disconnected');
     };
 
     const handleReconnect = () => {
-      console.log('[SocketManager] Reconnecting');
+      if (IS_DEV) console.log('[SocketManager] Reconnecting');
       setConnectionStatus('reconnecting');
     };
 
     const handleError = (error: any) => {
-      console.error('[SocketManager] Socket error:', error);
+      if (IS_DEV) console.error('[SocketManager] Socket error:', error);
     };
 
     socket.on(SOCKET_EVENTS.CONNECT, handleConnect);

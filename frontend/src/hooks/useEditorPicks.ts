@@ -5,21 +5,28 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 // Editor's Pick 포스트 타입 정의
-interface EditorPickPost {
+export interface EditorPickPost {
   id: string;
   title: string;
   slug: string;
   excerpt: string | null;
   thumbnail: string | null;
+  images?: string[];
+  thumbnailImageId?: string | null;
+  isPublished?: boolean;
+  editorPickExcerpt?: string | null;
   viewCount: number;
   likeCount: number;
   commentCount: number;
   createdAt: string;
   publishedAt: string;
+  isEditorPick?: boolean;
+  editorPickedAt?: string;
   author: {
     id: string;
     username: string;
-    email: string;
+    email?: string;
+    profileImage?: string;
   };
   blog: {
     id: string;
@@ -58,6 +65,33 @@ export function useEditorPicks(limit: number = 5) {
     gcTime: 5 * 60 * 1000,  // 5분 동안 캐시 유지
     refetchOnWindowFocus: true,  // 윈도우 포커스 시 자동 리프레시
     refetchOnReconnect: true,   // 재연결 시 자동 리프레시
+  });
+}
+
+/**
+ * Editor's Pick 목록 조회 Hook (관리자용 - 비공개 포함)
+ */
+export function useAdminEditorPicks(limit: number = 10) {
+  return useQuery<EditorPicksResponse>({
+    queryKey: ['adminEditorPicks', limit],
+    queryFn: async () => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/posts/editor-picks/admin?limit=${limit}`,
+        {
+          credentials: 'include',
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error('Editor\'s Pick 목록을 불러올 수 없습니다.');
+      }
+
+      return response.json();
+    },
+    staleTime: 30 * 1000,
+    gcTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: true,
+    refetchOnReconnect: true,
   });
 }
 
@@ -126,6 +160,7 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
       for (let limit = 1; limit <= 10; limit++) {
         queryClient.invalidateQueries({ queryKey: ['editorPicks', limit] });
       }
+      queryClient.invalidateQueries({ queryKey: ['adminEditorPicks'] });
 
       // 3. 홈페이지 피드 캐시 무효화 (즉시 반영)
       queryClient.invalidateQueries({ queryKey: ['posts', 'home'] });
@@ -198,4 +233,42 @@ export function useToggleEditorPick(postId: string, onSuccess?: () => void) {
   }, [mutation.isError, mutation.error, postId]);
 
   return mutation;
+}
+
+/**
+ * Editor's Pick 순서 변경 Hook (관리자용)
+ */
+export function useReorderEditorPicks(onSuccess?: () => void) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (orderedIds: string[]) => {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/posts/editor-picks/order`,
+        {
+          method: 'PATCH',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ orderedIds }),
+        }
+      );
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Editor\'s Pick 순서 변경에 실패했습니다.');
+      }
+
+      return response.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['editorPicks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminEditorPicks'] });
+
+      if (onSuccess) {
+        onSuccess();
+      }
+    },
+  });
 }

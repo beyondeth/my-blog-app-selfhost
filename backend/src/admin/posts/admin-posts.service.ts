@@ -1,13 +1,18 @@
+import { Injectable, NotFoundException } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
 import {
-  Injectable,
-  NotFoundException,
-} from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like, Between, FindOptionsWhere, In, Not, IsNull } from 'typeorm';
-import { Post } from '../../posts/entities/post.entity';
-import { Comment } from '../../comments/entities/comment.entity';
-import { AuditService } from '../../audit/audit.service';
-import { AuditAction } from '../../audit/entities/audit-log.entity';
+  Repository,
+  Like,
+  Between,
+  FindOptionsWhere,
+  In,
+  Not,
+  IsNull,
+} from "typeorm";
+import { Post } from "../../posts/entities/post.entity";
+import { Comment } from "../../comments/entities/comment.entity";
+import { AuditService } from "../../audit/audit.service";
+import { AuditAction } from "../../audit/entities/audit-log.entity";
 
 export interface PostFilters {
   isPublished?: boolean;
@@ -25,7 +30,7 @@ export interface UpdatePostStatusDto {
 
 export interface BulkActionDto {
   postIds: string[];
-  action: 'publish' | 'unpublish' | 'delete';
+  action: "publish" | "unpublish" | "delete";
 }
 
 @Injectable()
@@ -45,15 +50,16 @@ export class AdminPostsService {
     filters: PostFilters,
     page = 1,
     limit = 20,
-    sortBy = 'createdAt',
-    sortOrder: 'ASC' | 'DESC' = 'DESC',
+    sortBy = "createdAt",
+    sortOrder: "ASC" | "DESC" = "DESC",
   ) {
     const where: FindOptionsWhere<Post> = {};
 
-    if (filters.isPublished !== undefined) where.isPublished = filters.isPublished;
+    if (filters.isPublished !== undefined)
+      where.isPublished = filters.isPublished;
     if (filters.authorId) where.authorId = filters.authorId;
     if (filters.category) where.category = filters.category;
-    
+
     if (filters.search) {
       // Search in title and content
       where.title = Like(`%${filters.search}%`);
@@ -66,7 +72,7 @@ export class AdminPostsService {
 
     const [posts, total] = await this.postRepository.findAndCount({
       where,
-      relations: ['author', 'blog', 'stats'],
+      relations: ["author", "blog", "stats"],
       order: { [sortBy]: sortOrder },
       skip: (page - 1) * limit,
       take: limit,
@@ -105,17 +111,17 @@ export class AdminPostsService {
   async findOne(postId: string) {
     const post = await this.postRepository.findOne({
       where: { id: postId },
-      relations: ['author', 'blog', 'comments', 'stats'],
+      relations: ["author", "blog", "comments", "stats"],
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException("Post not found");
     }
 
     const recentComments = await this.commentRepository.find({
       where: { postId },
-      relations: ['author'],
-      order: { createdAt: 'DESC' },
+      relations: ["author"],
+      order: { createdAt: "DESC" },
       take: 10,
     });
 
@@ -144,7 +150,7 @@ export class AdminPostsService {
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException("Post not found");
     }
 
     const previousData = {
@@ -153,7 +159,7 @@ export class AdminPostsService {
 
     // Update post
     Object.assign(post, updateDto);
-    
+
     if (updateDto.isPublished !== undefined) {
       post.publishedAt = updateDto.isPublished ? new Date() : null;
     }
@@ -162,7 +168,9 @@ export class AdminPostsService {
 
     // Log the action
     await this.auditService.logPostAction(
-      updateDto.isPublished ? AuditAction.POST_PUBLISHED : AuditAction.POST_UNPUBLISHED,
+      updateDto.isPublished
+        ? AuditAction.POST_PUBLISHED
+        : AuditAction.POST_UNPUBLISHED,
       postId,
       { previous: previousData, new: updateDto },
       { userId: adminId, ...context },
@@ -184,7 +192,7 @@ export class AdminPostsService {
     });
 
     if (!post) {
-      throw new NotFoundException('Post not found');
+      throw new NotFoundException("Post not found");
     }
 
     // Soft delete by unpublishing
@@ -198,7 +206,7 @@ export class AdminPostsService {
       { userId: adminId, ...context },
     );
 
-    return { message: 'Post deleted successfully' };
+    return { message: "Post deleted successfully" };
   }
 
   /**
@@ -215,41 +223,38 @@ export class AdminPostsService {
     // findByIds 대신 단순 카운트 쿼리로 존재 여부만 확인
     // 관계(relations)를 로드하지 않아 성능 대폭 향상
     const postCount = await this.postRepository.count({
-      where: { id: In(postIds) }
+      where: { id: In(postIds) },
     });
 
     if (postCount !== postIds.length) {
-      throw new NotFoundException('Some posts not found');
+      throw new NotFoundException("Some posts not found");
     }
 
     let updateData: Partial<Post> = {};
     let auditAction: AuditAction;
 
     switch (action) {
-      case 'publish':
+      case "publish":
         updateData = { isPublished: true, publishedAt: new Date() };
         auditAction = AuditAction.POST_PUBLISHED;
         break;
-      case 'unpublish':
+      case "unpublish":
         updateData = { isPublished: false, publishedAt: null };
         auditAction = AuditAction.POST_UNPUBLISHED;
         break;
-      case 'delete':
+      case "delete":
         updateData = { isPublished: false };
         auditAction = AuditAction.POST_DELETED;
         break;
     }
 
-    await this.postRepository.update(
-      { id: In(postIds) },
-      updateData,
-    );
+    await this.postRepository.update({ id: In(postIds) }, updateData);
 
     // Log bulk action
     await this.auditService.log(
       {
         action: AuditAction.BULK_ACTION_PERFORMED,
-        entityType: 'post',
+        entityType: "post",
         metadata: {
           action,
           postIds,
@@ -271,17 +276,22 @@ export class AdminPostsService {
   async getPopularPosts(limit = 10) {
     const posts = await this.postRepository.find({
       where: { isPublished: true },
-      relations: ['author', 'stats'],
+      relations: ["author", "stats"],
       take: limit,
     });
 
     // PostStats를 기준으로 정렬
-    return posts
-      .sort((a, b) => {
-        const aScore = (a.stats?.viewCount || 0) + (a.stats?.likeCount || 0) + (a.stats?.commentCount || 0);
-        const bScore = (b.stats?.viewCount || 0) + (b.stats?.likeCount || 0) + (b.stats?.commentCount || 0);
-        return bScore - aScore;
-      });
+    return posts.sort((a, b) => {
+      const aScore =
+        (a.stats?.viewCount || 0) +
+        (a.stats?.likeCount || 0) +
+        (a.stats?.commentCount || 0);
+      const bScore =
+        (b.stats?.viewCount || 0) +
+        (b.stats?.likeCount || 0) +
+        (b.stats?.commentCount || 0);
+      return bScore - aScore;
+    });
   }
 
   /**
@@ -289,15 +299,15 @@ export class AdminPostsService {
    */
   async getPostsByCategory() {
     const result = await this.postRepository
-      .createQueryBuilder('post')
-      .select('post.category', 'category')
-      .addSelect('COUNT(*)', 'count')
-      .where('post.category IS NOT NULL')
-      .groupBy('post.category')
-      .orderBy('COUNT(*)', 'DESC')
+      .createQueryBuilder("post")
+      .select("post.category", "category")
+      .addSelect("COUNT(*)", "count")
+      .where("post.category IS NOT NULL")
+      .groupBy("post.category")
+      .orderBy("COUNT(*)", "DESC")
       .getRawMany();
 
-    return result.map(item => ({
+    return result.map((item) => ({
       category: item.category,
       count: parseInt(item.count),
     }));
@@ -308,15 +318,15 @@ export class AdminPostsService {
    */
   async getPostsByTag() {
     const posts = await this.postRepository.find({
-      select: ['tags'],
+      select: ["tags"],
       where: { tags: Not(IsNull()) },
     });
 
     const tagCount = new Map<string, number>();
 
-    posts.forEach(post => {
+    posts.forEach((post) => {
       if (post.tags && Array.isArray(post.tags)) {
-        post.tags.forEach(tag => {
+        post.tags.forEach((tag) => {
           tagCount.set(tag, (tagCount.get(tag) || 0) + 1);
         });
       }
@@ -369,15 +379,20 @@ export class AdminPostsService {
   async getPostsNeedingModeration() {
     // Posts with multiple reports or flagged content
     // This would integrate with the reports system
-    
+
     const flaggedPosts = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('reports', 'report', 'report.targetId = post.id AND report.type = :type', {
-        type: 'post',
-      })
-      .where('report.status = :status', { status: 'pending' })
-      .groupBy('post.id')
-      .having('COUNT(report.id) >= :threshold', { threshold: 3 })
+      .createQueryBuilder("post")
+      .leftJoin(
+        "reports",
+        "report",
+        "report.targetId = post.id AND report.type = :type",
+        {
+          type: "post",
+        },
+      )
+      .where("report.status = :status", { status: "pending" })
+      .groupBy("post.id")
+      .having("COUNT(report.id) >= :threshold", { threshold: 3 })
       .getMany();
 
     return flaggedPosts;
@@ -387,45 +402,45 @@ export class AdminPostsService {
 
   private async getAverageCommentsPerPost(): Promise<number> {
     const result = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.stats', 'stats')
-      .select('AVG(stats.commentCount)', 'avg')
+      .createQueryBuilder("post")
+      .leftJoin("post.stats", "stats")
+      .select("AVG(stats.commentCount)", "avg")
       .getRawOne();
 
-    return parseFloat(result?.avg || '0');
+    return parseFloat(result?.avg || "0");
   }
 
   private async getAverageViewsPerPost(): Promise<number> {
     const result = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.stats', 'stats')
-      .select('AVG(stats.viewCount)', 'avg')
+      .createQueryBuilder("post")
+      .leftJoin("post.stats", "stats")
+      .select("AVG(stats.viewCount)", "avg")
       .getRawOne();
 
-    return parseFloat(result?.avg || '0');
+    return parseFloat(result?.avg || "0");
   }
 
   private async getUniqueCategories(): Promise<number> {
     const result = await this.postRepository
-      .createQueryBuilder('post')
-      .select('COUNT(DISTINCT post.category)', 'count')
-      .where('post.category IS NOT NULL')
+      .createQueryBuilder("post")
+      .select("COUNT(DISTINCT post.category)", "count")
+      .where("post.category IS NOT NULL")
       .getRawOne();
 
-    return parseInt(result?.count || '0');
+    return parseInt(result?.count || "0");
   }
 
   private async getUniqueTags(): Promise<number> {
     const posts = await this.postRepository.find({
-      select: ['tags'],
+      select: ["tags"],
       where: { tags: Not(IsNull()) },
     });
 
     const uniqueTags = new Set<string>();
 
-    posts.forEach(post => {
+    posts.forEach((post) => {
       if (post.tags && Array.isArray(post.tags)) {
-        post.tags.forEach(tag => uniqueTags.add(tag));
+        post.tags.forEach((tag) => uniqueTags.add(tag));
       }
     });
 

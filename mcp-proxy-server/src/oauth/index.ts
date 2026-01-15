@@ -117,9 +117,17 @@ async function getUserInfo(userId: string): Promise<{
 } | null> {
   try {
     // Backend에서 사용자 정보 조회
+    const headers: Record<string, string> = {};
+    if (config.MCP_SHARED_SECRET) {
+      headers['X-Internal-Secret'] = config.MCP_SHARED_SECRET;
+    }
+
     const response = await axios.get(
       `${config.BACKEND_BASE_URL}/api/v1/users/${userId}/mcp-info`,
-      { timeout: 5000 }
+      {
+        timeout: 5000,
+        headers,
+      }
     );
 
     if (response.data) {
@@ -233,6 +241,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
           MCP_BASE_URL: config.MCP_BASE_URL,
           BACKEND_BASE_URL: config.BACKEND_BASE_URL,
           BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
+          MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
         },
       });
 

@@ -2,9 +2,13 @@
 
 import { useInfiniteQuery, useMutation, useQueryClient, InfiniteData } from '@tanstack/react-query';
 import { apiClient } from '@/lib/api';
+import type { CommentContext } from '@/lib/api/endpoints/comments';
 import type { Comment, User } from '@/types';
 import type { PaginatedCommentsResponse, GetCommentsParams, GetRepliesParams } from '@/lib/api/endpoints/comments';
 import { useAuth } from '@/providers/AuthProviderV2';
+
+const getContextCacheKey = (context?: CommentContext) =>
+  context?.type === 'community' ? `community:${context.communitySlug}:${context.postId}` : 'blog';
 
 /**
  * 부모 댓글 페이지네이션 훅 (무한 스크롤)
@@ -25,15 +29,16 @@ import { useAuth } from '@/providers/AuthProviderV2';
 export function useParentCommentsPaginated(
   postId: string,
   params?: Omit<GetCommentsParams, 'cursor'>,
+  context?: CommentContext,
 ) {
-  return useInfiniteQuery<PaginatedCommentsResponse, Error, InfiniteData<PaginatedCommentsResponse>, string[], string | null>({
-    queryKey: ['comments', 'paginated', postId, params?.sort || 'recent'],
+  return useInfiniteQuery<PaginatedCommentsResponse, Error, InfiniteData<PaginatedCommentsResponse>, (string | null)[], string | null>({
+    queryKey: ['comments', 'paginated', postId, params?.sort || 'recent', getContextCacheKey(context)],
     queryFn: async ({ pageParam }) => {
       const response = await apiClient.getCommentsPaginated(postId, {
         ...params,
         cursor: pageParam || undefined,
         // 스냅샷 타임스탬프는 첫 페이지 응답에서 받아서 이후 페이지에 전달
-      });
+      }, context);
 
       return response;
     },
@@ -64,15 +69,16 @@ export function useParentCommentsPaginated(
 export function useRepliesPaginated(
   parentCommentId: string,
   params?: Omit<GetRepliesParams, 'cursor'>,
-  options?: { enabled?: boolean },
+  options?: { enabled?: boolean; context?: CommentContext },
 ) {
-  return useInfiniteQuery<PaginatedCommentsResponse, Error, InfiniteData<PaginatedCommentsResponse>, string[], string | null>({
-    queryKey: ['comments', 'replies', parentCommentId],
+  const context = options?.context;
+  return useInfiniteQuery<PaginatedCommentsResponse, Error, InfiniteData<PaginatedCommentsResponse>, (string | null)[], string | null>({
+    queryKey: ['comments', 'replies', parentCommentId, getContextCacheKey(context)],
     queryFn: async ({ pageParam }) => {
       const response = await apiClient.getRepliesPaginated(parentCommentId, {
         ...params,
         cursor: pageParam || undefined,
-      });
+      }, context);
 
       return response;
     },
@@ -93,7 +99,11 @@ export function useRepliesPaginated(
  * - 페이지네이션 캐시 무효화
  * - 첫 페이지만 refetch (이후 페이지는 그대로)
  */
-export function useCreateCommentPaginated(postId: string, sort?: 'newest' | 'oldest' | 'popular') {
+export function useCreateCommentPaginated(
+  postId: string,
+  sort?: 'newest' | 'oldest' | 'popular',
+  context?: CommentContext,
+) {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
@@ -122,7 +132,7 @@ export function useCreateCommentPaginated(postId: string, sort?: 'newest' | 'old
     };
 
     // 2. 캐시 키 (sort와 일치시킴)
-    const cacheKey = ['comments', 'paginated', postId, sort || 'newest'];
+    const cacheKey = ['comments', 'paginated', postId, sort || 'newest', getContextCacheKey(context)];
 
     // 3. 현재 캐시 데이터 가져오기
     const previousData = queryClient.getQueryData<InfiniteData<PaginatedCommentsResponse>>(cacheKey);
@@ -180,7 +190,7 @@ export function useCreateCommentPaginated(postId: string, sort?: 'newest' | 'old
 
     try {
       // 5. 서버에 댓글 생성 요청
-      const response = await apiClient.createComment(data);
+      const response = await apiClient.createComment(data, context);
 
       // 6. 성공 후 실제 데이터로 교체
       queryClient.setQueryData(cacheKey, (old: InfiniteData<PaginatedCommentsResponse> | undefined) => {
@@ -248,18 +258,18 @@ export function useCreateCommentPaginated(postId: string, sort?: 'newest' | 'old
  * @description
  * - 페이지네이션 캐시 무효화
  */
-export function useDeleteCommentPaginated(postId: string) {
+export function useDeleteCommentPaginated(postId: string, context?: CommentContext) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => apiClient.deleteComment(id),
+    mutationFn: (id: string) => apiClient.deleteComment(id, context),
     onSuccess: () => {
       // 전체 댓글 캐시 무효화 (부모/답글 모두)
       queryClient.invalidateQueries({
-        queryKey: ['comments', 'paginated', postId],
+        queryKey: ['comments', 'paginated', postId, getContextCacheKey(context)],
       });
       queryClient.invalidateQueries({
-        queryKey: ['comments', 'replies'],
+        queryKey: ['comments', 'replies', getContextCacheKey(context)],
       });
     },
   });
@@ -271,19 +281,19 @@ export function useDeleteCommentPaginated(postId: string) {
  * @description
  * - 인기순 정렬 캐시 무효화
  */
-export function useToggleCommentLikePaginated(postId: string) {
+export function useToggleCommentLikePaginated(postId: string, context?: CommentContext) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (commentId: string) => apiClient.toggleCommentLike(commentId),
+    mutationFn: (commentId: string) => apiClient.toggleCommentLike(commentId, context),
     onSuccess: () => {
       // 부모 댓글 캐시 무효화 (인기순)
       queryClient.invalidateQueries({
-        queryKey: ['comments', 'paginated', postId, 'popular'],
+        queryKey: ['comments', 'paginated', postId, 'popular', getContextCacheKey(context)],
       });
       // 모든 답글 캐시도 무효화 (좋아요 상태 업데이트)
       queryClient.invalidateQueries({
-        queryKey: ['comments', 'replies'],
+        queryKey: ['comments', 'replies', getContextCacheKey(context)],
       });
     },
   });
@@ -295,19 +305,19 @@ export function useToggleCommentLikePaginated(postId: string) {
  * @description
  * - 인기순 정렬 캐시 무효화
  */
-export function useToggleCommentDislikePaginated(postId: string) {
+export function useToggleCommentDislikePaginated(postId: string, context?: CommentContext) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (commentId: string) => apiClient.toggleCommentDislike(commentId),
+    mutationFn: (commentId: string) => apiClient.toggleCommentDislike(commentId, context),
     onSuccess: () => {
       // 인기순 정렬 캐시 무효화
       queryClient.invalidateQueries({
-        queryKey: ['comments', 'paginated', postId, 'popular'],
+        queryKey: ['comments', 'paginated', postId, 'popular', getContextCacheKey(context)],
       });
       // 모든 답글 캐시도 무효화 (싫어요 상태 업데이트)
       queryClient.invalidateQueries({
-        queryKey: ['comments', 'replies'],
+        queryKey: ['comments', 'replies', getContextCacheKey(context)],
       });
     },
   });

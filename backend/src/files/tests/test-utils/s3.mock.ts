@@ -6,28 +6,30 @@
 export class MockS3Service {
   private files: Map<string, any> = new Map();
 
-  uploadFile = jest.fn().mockImplementation((file: Express.Multer.File, key: string) => {
-    this.files.set(key, {
-      buffer: file.buffer,
-      mimetype: file.mimetype,
-      size: file.size,
-      uploadedAt: new Date(),
-    });
+  uploadFile = jest
+    .fn()
+    .mockImplementation((file: Express.Multer.File, key: string) => {
+      this.files.set(key, {
+        buffer: file.buffer,
+        mimetype: file.mimetype,
+        size: file.size,
+        uploadedAt: new Date(),
+      });
 
-    return Promise.resolve({
-      fileKey: key,
-      fileUrl: `https://test-bucket.s3.amazonaws.com/${key}`,
-      bucket: 'test-bucket',
-      etag: '"abc123"',
+      return Promise.resolve({
+        fileKey: key,
+        fileUrl: `https://test-bucket.s3.amazonaws.com/${key}`,
+        bucket: "test-bucket",
+        etag: '"abc123"',
+      });
     });
-  });
 
   deleteFile = jest.fn().mockImplementation((key: string) => {
     const exists = this.files.has(key);
     if (!exists) {
-      return Promise.reject(new Error('File not found'));
+      return Promise.reject(new Error("File not found"));
     }
-    
+
     this.files.delete(key);
     return Promise.resolve({
       success: true,
@@ -35,49 +37,53 @@ export class MockS3Service {
     });
   });
 
-  copyFile = jest.fn().mockImplementation((sourceKey: string, destKey: string) => {
-    const file = this.files.get(sourceKey);
-    if (!file) {
-      return Promise.reject(new Error('Source file not found'));
-    }
+  copyFile = jest
+    .fn()
+    .mockImplementation((sourceKey: string, destKey: string) => {
+      const file = this.files.get(sourceKey);
+      if (!file) {
+        return Promise.reject(new Error("Source file not found"));
+      }
 
-    this.files.set(destKey, { ...file, copiedAt: new Date() });
-    return Promise.resolve({
-      success: true,
-      sourceKey,
-      destKey,
+      this.files.set(destKey, { ...file, copiedAt: new Date() });
+      return Promise.resolve({
+        success: true,
+        sourceKey,
+        destKey,
+      });
     });
-  });
 
-  moveFile = jest.fn().mockImplementation((sourceKey: string, destKey: string) => {
-    const file = this.files.get(sourceKey);
-    if (!file) {
-      return Promise.reject(new Error('Source file not found'));
-    }
+  moveFile = jest
+    .fn()
+    .mockImplementation((sourceKey: string, destKey: string) => {
+      const file = this.files.get(sourceKey);
+      if (!file) {
+        return Promise.reject(new Error("Source file not found"));
+      }
 
-    this.files.set(destKey, { ...file, movedAt: new Date() });
-    this.files.delete(sourceKey);
-    
-    return Promise.resolve({
-      success: true,
-      sourceKey,
-      destKey,
+      this.files.set(destKey, { ...file, movedAt: new Date() });
+      this.files.delete(sourceKey);
+
+      return Promise.resolve({
+        success: true,
+        sourceKey,
+        destKey,
+      });
     });
-  });
 
   getSignedUrl = jest.fn().mockImplementation((key: string, expires = 3600) => {
     if (!this.files.has(key)) {
-      return Promise.reject(new Error('File not found'));
+      return Promise.reject(new Error("File not found"));
     }
 
     return Promise.resolve(
-      `https://test-bucket.s3.amazonaws.com/${key}?X-Amz-Expires=${expires}&X-Amz-Signature=mock`
+      `https://test-bucket.s3.amazonaws.com/${key}?X-Amz-Expires=${expires}&X-Amz-Signature=mock`,
     );
   });
 
   listFiles = jest.fn().mockImplementation((prefix: string) => {
     const results: string[] = [];
-    
+
     for (const key of this.files.keys()) {
       if (key.startsWith(prefix)) {
         results.push(key);
@@ -90,38 +96,40 @@ export class MockS3Service {
   transitionToArchive = jest.fn().mockImplementation((key: string) => {
     const file = this.files.get(key);
     if (!file) {
-      return Promise.reject(new Error('File not found'));
+      return Promise.reject(new Error("File not found"));
     }
 
-    file.storageClass = 'GLACIER';
+    file.storageClass = "GLACIER";
     file.archivedAt = new Date();
-    
+
     return Promise.resolve({
       success: true,
       key,
-      storageClass: 'GLACIER',
+      storageClass: "GLACIER",
     });
   });
 
-  generatePresignedPost = jest.fn().mockImplementation((key: string, metadata?: any) => {
-    return Promise.resolve({
-      url: 'https://test-bucket.s3.amazonaws.com',
-      fields: {
-        key,
-        'Content-Type': metadata?.contentType || 'application/octet-stream',
-        'X-Amz-Algorithm': 'AWS4-HMAC-SHA256',
-        'X-Amz-Credential': 'mock-credential',
-        'X-Amz-Date': new Date().toISOString(),
-        'X-Amz-Signature': 'mock-signature',
-        Policy: 'mock-policy',
-      },
+  generatePresignedPost = jest
+    .fn()
+    .mockImplementation((key: string, metadata?: any) => {
+      return Promise.resolve({
+        url: "https://test-bucket.s3.amazonaws.com",
+        fields: {
+          key,
+          "Content-Type": metadata?.contentType || "application/octet-stream",
+          "X-Amz-Algorithm": "AWS4-HMAC-SHA256",
+          "X-Amz-Credential": "mock-credential",
+          "X-Amz-Date": new Date().toISOString(),
+          "X-Amz-Signature": "mock-signature",
+          Policy: "mock-policy",
+        },
+      });
     });
-  });
 
   headObject = jest.fn().mockImplementation((key: string) => {
     const file = this.files.get(key);
     if (!file) {
-      return Promise.reject(new Error('File not found'));
+      return Promise.reject(new Error("File not found"));
     }
 
     return Promise.resolve({
@@ -129,7 +137,7 @@ export class MockS3Service {
       ContentType: file.mimetype,
       LastModified: file.uploadedAt,
       ETag: '"abc123"',
-      StorageClass: file.storageClass || 'STANDARD',
+      StorageClass: file.storageClass || "STANDARD",
     });
   });
 
@@ -162,16 +170,16 @@ export class MockS3Service {
   // Simulate S3 errors
   simulateError(operation: string, error: Error) {
     switch (operation) {
-      case 'upload':
+      case "upload":
         this.uploadFile.mockRejectedValueOnce(error);
         break;
-      case 'delete':
+      case "delete":
         this.deleteFile.mockRejectedValueOnce(error);
         break;
-      case 'copy':
+      case "copy":
         this.copyFile.mockRejectedValueOnce(error);
         break;
-      case 'move':
+      case "move":
         this.moveFile.mockRejectedValueOnce(error);
         break;
       default:
@@ -181,8 +189,8 @@ export class MockS3Service {
 
   // Simulate network delays
   simulateDelay(ms: number) {
-    const delay = () => new Promise(resolve => setTimeout(resolve, ms));
-    
+    const delay = () => new Promise((resolve) => setTimeout(resolve, ms));
+
     const originalUpload = this.uploadFile;
     this.uploadFile = jest.fn().mockImplementation(async (...args) => {
       await delay();
@@ -198,45 +206,45 @@ export function createMockS3Client() {
   return {
     send: jest.fn().mockImplementation((command: any) => {
       const commandName = command.constructor.name;
-      
+
       switch (commandName) {
-        case 'PutObjectCommand':
+        case "PutObjectCommand":
           return Promise.resolve({
             ETag: '"abc123"',
-            VersionId: 'v1',
+            VersionId: "v1",
           });
-        
-        case 'DeleteObjectCommand':
+
+        case "DeleteObjectCommand":
           return Promise.resolve({
             DeleteMarker: false,
-            VersionId: 'v1',
+            VersionId: "v1",
           });
-        
-        case 'CopyObjectCommand':
+
+        case "CopyObjectCommand":
           return Promise.resolve({
             CopyObjectResult: {
               ETag: '"abc123"',
               LastModified: new Date(),
             },
           });
-        
-        case 'HeadObjectCommand':
+
+        case "HeadObjectCommand":
           return Promise.resolve({
             ContentLength: 1024,
-            ContentType: 'image/jpeg',
+            ContentType: "image/jpeg",
             LastModified: new Date(),
             ETag: '"abc123"',
           });
-        
-        case 'ListObjectsV2Command':
+
+        case "ListObjectsV2Command":
           return Promise.resolve({
             Contents: [
-              { Key: 'file1.jpg', Size: 1024 },
-              { Key: 'file2.jpg', Size: 2048 },
+              { Key: "file1.jpg", Size: 1024 },
+              { Key: "file2.jpg", Size: 2048 },
             ],
             IsTruncated: false,
           });
-        
+
         default:
           return Promise.resolve({});
       }

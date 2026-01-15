@@ -2,23 +2,35 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useRouter } from 'next/navigation';
 import { useQueryClient } from '@tanstack/react-query';
-import { FiCheck, FiX, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, FiLoader, FiBell } from 'react-icons/fi';
+import { FiCheck, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, FiLoader, FiBell } from 'react-icons/fi';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale/ko';
 import Image from 'next/image';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import CharacterSelector from '@/components/settings/CharacterSelector';
+import {
+  SETTINGS_CARD_CLASS,
+  SETTINGS_INPUT_CLASS,
+  SETTINGS_PRIMARY_BUTTON_CLASS,
+  SETTINGS_SUBTLE_BUTTON_CLASS,
+} from '@/app/settings/theme';
+import { cn } from '@/lib/utils';
+import { DESTRUCTIVE_SURFACE_CLASS } from '@/constants/accessibility';
+import { Switch } from '@/components/ui/switch';
+import { LevelBadge } from '@/components/ui/LevelBadge';
+
+const BIO_MAX_LENGTH = 500;
+type MarketingPreferenceKey = 'marketingOptIn' | 'newsletterOptIn';
+
+const SUMMARY_CARD_CLASS =
+  'rounded-[32px] border border-gray-100 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.05)] dark:bg-[#262626] dark:border-[#4B5563] dark:shadow-[0_20px_45px_rgba(0,0,0,0.45)]';
 
 export default function ProfileSettingsPage() {
   const { user, isLoading: authLoading, refreshUser, logout } = useAuth();
-  const router = useRouter();
   const queryClient = useQueryClient();
-  const [usernameLoading, setUsernameLoading] = useState(false);
-  const [bioLoading, setBioLoading] = useState(false);
-  const [usernameSuccess, setUsernameSuccess] = useState(false);
-  const [bioSuccess, setBioSuccess] = useState(false);
+  const [profileSaveLoading, setProfileSaveLoading] = useState(false);
+  const [profileSaveSuccess, setProfileSaveSuccess] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
   const [usernameError, setUsernameError] = useState('');
@@ -26,11 +38,13 @@ export default function ProfileSettingsPage() {
     username: '',
     email: '',
     bio: '',
+    jobTitle: '',
   });
   const [marketingPreferences, setMarketingPreferences] = useState({
     marketingOptIn: false,
     newsletterOptIn: false,
   });
+  const [marketingFeedback, setMarketingFeedback] = useState<Partial<Record<MarketingPreferenceKey, { type: 'success' | 'error'; message: string }>>>({});
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteConfirmText, setDeleteConfirmText] = useState(''); // Task 26: 계정 삭제 확인 텍스트
@@ -39,6 +53,7 @@ export default function ProfileSettingsPage() {
   const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [showCharacterSelector, setShowCharacterSelector] = useState(false);
+  const marketingFeedbackTimers = useRef<Partial<Record<MarketingPreferenceKey, NodeJS.Timeout>>>({});
 
   useEffect(() => {
     // user가 있고 실제 데이터(email)가 있을 때만 업데이트 (깜빡임 방지)
@@ -47,6 +62,7 @@ export default function ProfileSettingsPage() {
         username: user.username || '',
         email: user.email || '',
         bio: user.bio || '',
+        jobTitle: user.jobTitle || '',
       });
       setMarketingPreferences({
         marketingOptIn: user.marketingOptIn || false,
@@ -66,6 +82,41 @@ export default function ProfileSettingsPage() {
       setUsernameError('');
     };
   }, []);
+
+  useEffect(() => {
+    const timersRef = marketingFeedbackTimers.current;
+    return () => {
+      Object.values(timersRef).forEach((timer) => {
+        if (timer) {
+          clearTimeout(timer);
+        }
+      });
+    };
+    // timersRef intentionally captures current reference for cleanup
+  }, []);
+
+  const pushMarketingFeedback = (key: MarketingPreferenceKey, type: 'success' | 'error', message: string) => {
+    if (marketingFeedbackTimers.current[key]) {
+      clearTimeout(marketingFeedbackTimers.current[key]);
+    }
+
+    setMarketingFeedback((prev) => ({
+      ...prev,
+      [key]: { type, message },
+    }));
+
+    marketingFeedbackTimers.current[key] = setTimeout(() => {
+      setMarketingFeedback((prev) => {
+        if (!prev[key] || prev[key]?.message !== message) {
+          return prev;
+        }
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      marketingFeedbackTimers.current[key] = undefined;
+    }, 4000);
+  };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,7 +166,7 @@ export default function ProfileSettingsPage() {
       // 사용자 정보 새로고침 (백그라운드에서 진행)
       // refreshUser가 호출되면 useEffect가 실행되어 새로운 이미지가 자동으로 설정됨
       await refreshUser();
-      
+
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
@@ -171,9 +222,11 @@ export default function ProfileSettingsPage() {
    * 마케팅 정보 수신 설정 변경 핸들러
    * 토글 변경 시 즉시 API 호출하여 백엔드 업데이트
    */
-  const handleMarketingPreferenceChange = async (
-    preferences: { marketingOptIn?: boolean; newsletterOptIn?: boolean }
-  ) => {
+  const handleMarketingPreferenceChange = async (key: MarketingPreferenceKey, nextValue: boolean, label: string) => {
+    const payload = {
+      [key]: nextValue,
+    } as Partial<typeof marketingPreferences>;
+
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/marketing-preferences`,
@@ -183,48 +236,70 @@ export default function ProfileSettingsPage() {
             'Content-Type': 'application/json',
           },
           credentials: 'include',
-          body: JSON.stringify(preferences),
+          body: JSON.stringify(payload),
         }
       );
 
       if (!response.ok) {
         const error = await response.json();
-        // 마케팅 설정 에러는 상단에 표시하지 않고 콘솔에만 기록
         console.error('Marketing preference update failed:', error.message);
         throw new Error(error.message || '마케팅 정보 수신 설정 업데이트에 실패했습니다');
       }
 
-      // 사용자 정보 새로고침 (JWT 토큰에 반영)
       await refreshUser();
+      setMarketingPreferences((prev) => ({ ...prev, [key]: nextValue }));
+      pushMarketingFeedback(
+        key,
+        'success',
+        `${label}이(가) ${nextValue ? '활성화되었습니다.' : '비활성화되었습니다.'}`
+      );
     } catch (err: any) {
-      // 에러 발생 시 이전 상태로 되돌리기
       if (user) {
         setMarketingPreferences({
           marketingOptIn: user.marketingOptIn || false,
           newsletterOptIn: user.newsletterOptIn || false,
         });
       }
-      // 마케팅 설정 에러는 전역 에러 상태에 저장하지 않음 (다른 섹션에 영향 주지 않기 위해)
+      pushMarketingFeedback(key, 'error', `${label} 변경에 실패했습니다. 잠시 후 다시 시도하세요.`);
     }
   };
 
-  /**
-   * 닉네임 업데이트 핸들러
-   * 닉네임 필드의 저장 버튼 클릭 시 호출
-   */
-  const handleUsernameUpdate = async () => {
-    setUsernameLoading(true);
+  const handleProfileSave = async () => {
+    if (!user) return;
+
     setError('');
     setUsernameError('');
     setSuccess(false);
+    setProfileSaveSuccess(false);
 
-    // 클라이언트 측에서 기본 유효성 검사
     if (formData.username && formData.username.length < 2) {
       setUsernameError('닉네임은 최소 2자 이상 입력하세요');
-      setUsernameLoading(false);
       return;
     }
 
+    const normalizedJobTitle =
+      formData.jobTitle.trim().length > 0 ? formData.jobTitle.trim() : null;
+    const currentJobTitle = user.jobTitle || null;
+    const payload: Record<string, any> = {};
+
+    if (formData.username !== (user.username || '')) {
+      payload.username = formData.username;
+    }
+
+    if ((formData.bio || '') !== (user.bio || '')) {
+      payload.bio = formData.bio;
+    }
+
+    if (normalizedJobTitle !== currentJobTitle) {
+      payload.jobTitle = normalizedJobTitle;
+    }
+
+    if (Object.keys(payload).length === 0) {
+      return;
+    }
+
+    setProfileSaveLoading(true);
+
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/profile`, {
         method: 'PUT',
@@ -232,80 +307,40 @@ export default function ProfileSettingsPage() {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify({
-          username: formData.username,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
         const error = await response.json();
-        // 닉네임 관련 에러인 경우 별도로 표시
         if (error.message && error.message.includes('닉네임')) {
           setUsernameError(error.message);
         } else {
-          setError(error.message || '닉네임 업데이트에 실패했습니다');
+          setError(error.message || '프로필 업데이트에 실패했습니다');
         }
-        throw new Error(error.message || '닉네임 업데이트에 실패했습니다');
-      }
-
-      await refreshUser();
-      setUsernameLoading(false);
-      setUsernameSuccess(true);
-      setSuccess(true);
-      setUsernameError('');
-      setTimeout(() => {
-        setUsernameSuccess(false);
-        setSuccess(false);
-      }, 2000);
-    } catch (err: any) {
-      // 이미 setError나 setUsernameError가 위에서 처리됨
-      setUsernameLoading(false);
-    }
-  };
-
-  /**
-   * 소개(Bio) 업데이트 핸들러
-   * Bio 필드의 저장 버튼 클릭 시 호출
-   */
-  const handleBioUpdate = async () => {
-    setBioLoading(true);
-    setError('');
-    setUsernameError('');  // Bio 업데이트 시에도 닉네임 에러 초기화
-    setSuccess(false);
-
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/profile`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          bio: formData.bio,
-        }),
-      });
-
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.message || '소개 업데이트에 실패했습니다');
+        throw new Error(error.message || '프로필 업데이트에 실패했습니다');
       }
 
       await refreshUser();
 
-      // 블로그 관련 캐시 무효화
       queryClient.invalidateQueries({ queryKey: ['blog'] });
       queryClient.invalidateQueries({ queryKey: ['my-blogs'] });
 
-      setBioLoading(false);
-      setBioSuccess(true);
+      if (payload.jobTitle !== undefined) {
+        setFormData((prev) => ({ ...prev, jobTitle: normalizedJobTitle ?? '' }));
+      }
+
       setSuccess(true);
+      setProfileSaveSuccess(true);
       setTimeout(() => {
-        setBioSuccess(false);
         setSuccess(false);
+        setProfileSaveSuccess(false);
       }, 2000);
     } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다');
-      setBioLoading(false);
+      if (!usernameError) {
+        setError(err.message || '오류가 발생했습니다');
+      }
+    } finally {
+      setProfileSaveLoading(false);
     }
   };
 
@@ -339,65 +374,114 @@ export default function ProfileSettingsPage() {
     }
   };
 
+  const joinedAt =
+    user?.createdAt ? format(new Date(user.createdAt), 'yyyy년 M월 d일', { locale: ko }) : null;
+
+  const marketingOptions = [
+    {
+      key: 'marketingOptIn' as const,
+      title: '마케팅 정보 수신',
+      description: '새로운 기능과 이벤트 소식을 이메일로 받아보세요.',
+      icon: <FiBell className="h-4 w-4 text-gray-400" />,
+    },
+    {
+      key: 'newsletterOptIn' as const,
+      title: '뉴스레터 수신',
+      description: '주간 업데이트와 커뮤니티 주요 소식을 알려드립니다.',
+      icon: <FiMail className="h-4 w-4 text-gray-400" />,
+    },
+  ];
+
   // 로딩 중이거나 사용자 정보가 없을 때
-  if (authLoading || !user) {
+  if (authLoading) {
     return (
-      <div className="p-8 text-center">
-        {authLoading ? (
-          <div className="flex flex-col items-center gap-3">
+      <div className="space-y-6 pt-2">
+        <section className={`${SETTINGS_CARD_CLASS} p-6 text-center`}>
+          <div className="flex flex-col items-center gap-3 text-gray-600 dark:text-gray-300">
             <FiLoader className="w-8 h-8 animate-spin text-gray-400" />
-            <p className="text-gray-600 dark:text-gray-400">로딩 중...</p>
+            로딩 중...
           </div>
-        ) : (
-          <p className="text-gray-600 dark:text-gray-400">로그인이 필요합니다</p>
-        )}
+        </section>
       </div>
     );
   }
 
-  return (
-    <div className="p-4 sm:p-6 md:p-8">
-      <div className="mb-6 sm:mb-8">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">프로필 설정</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-          기본 프로필 정보를 관리하세요
-        </p>
+  if (!user) {
+    return (
+      <div className="space-y-6 pt-2">
+        <section className={`${SETTINGS_CARD_CLASS} p-6 text-center`}>
+          <p className="text-sm text-gray-600 dark:text-gray-300">로그인이 필요합니다.</p>
+        </section>
       </div>
+    );
+  }
 
-      <div className="space-y-6">
-        {/* Profile Image */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            프로필 이미지
-          </label>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-            <div className="relative w-20 h-20 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden flex-shrink-0">
-              {profileImageUrl ? (
-                <Image
-                  src={profileImageUrl}
-                  alt="Profile"
-                  fill
-                  sizes="80px"
-                  className="object-cover"
-                  priority
-                  unoptimized
-                  onError={(e) => {
-                    console.error('[Settings] Failed to load profile image:', profileImageUrl);
-                    setProfileImageUrl(null); // fallback to default avatar
-                  }}
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <FiUser className="w-10 h-10 text-gray-400" />
+  const originalUsername = user.username || '';
+  const originalBio = user.bio || '';
+  const originalJobTitle = user.jobTitle || '';
+  const isProfileDirty =
+    formData.username !== originalUsername ||
+    formData.bio !== originalBio ||
+    formData.jobTitle !== originalJobTitle;
+
+  return (
+    <>
+      <div className="space-y-6 pt-2">
+        {error && !error.includes('크기') && !error.includes('닉네임') && (
+          <div className={cn('p-3 text-sm rounded-xl', DESTRUCTIVE_SURFACE_CLASS)}>
+            {error}
+          </div>
+        )}
+
+        <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-6`}>
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="relative w-20 h-20 rounded-full border border-gray-200 dark:border-[#2F3440] bg-gray-50 dark:bg-[#1A1F2B] overflow-hidden flex-shrink-0 shadow-sm">
+                {profileImageUrl ? (
+                  <Image
+                    src={profileImageUrl}
+                    alt="Profile"
+                    fill
+                    sizes="80px"
+                    className="object-cover"
+                    priority
+                    unoptimized
+                    onError={() => setProfileImageUrl(null)}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <FiUser className="w-10 h-10 text-gray-400 dark:text-gray-500" />
+                  </div>
+                )}
+                {uploadingImage && (
+                  <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
+                    <FiLoader className="w-6 h-6 text-white animate-spin" />
+                  </div>
+                )}
+              </div>
+              <div className="space-y-1">
+                <p className="text-base font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
+                  {formData.username || '프로필'}
+                  <LevelBadge userId={user?.id} />
+                </p>
+                <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
+                  <FiMail className="h-4 w-4 text-gray-400" />
+                  <span>{formData.email}</span>
+                  {user.isEmailVerified && (
+                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-[#1f352a] dark:text-emerald-300">
+                      <FiCheck className="mr-1 h-3 w-3" /> 인증됨
+                    </span>
+                  )}
                 </div>
-              )}
-              {uploadingImage && (
-                <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center">
-                  <FiLoader className="w-6 h-6 text-white animate-spin" />
-                </div>
-              )}
+                {joinedAt && (
+                  <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300">
+                    <FiCalendar className="h-4 w-4 text-gray-400" />
+                    가입일 {joinedAt}
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="w-full sm:w-auto">
+            <div className="flex flex-wrap gap-2">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -405,286 +489,235 @@ export default function ProfileSettingsPage() {
                 onChange={handleImageUpload}
                 className="hidden"
               />
-              <div className="flex flex-col sm:flex-row gap-2 w-full">
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={uploadingImage}
-                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {uploadingImage ? '업로드 중...' : '이미지 변경'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowCharacterSelector(true)}
-                  disabled={uploadingImage}
-                  className="w-full sm:w-auto min-h-[44px] px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  캐릭터 선택
-                </button>
-              </div>
-              <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                JPG, PNG, GIF (최대 5MB) 또는 캐릭터 선택
-              </p>
-              {error && error.includes('크기') && (
-                <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  {error}
-                </p>
-              )}
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingImage}
+                className={SETTINGS_SUBTLE_BUTTON_CLASS}
+              >
+                {uploadingImage ? '업로드 중...' : '이미지 변경'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowCharacterSelector(true)}
+                disabled={uploadingImage}
+                className={SETTINGS_SUBTLE_BUTTON_CLASS}
+              >
+                캐릭터 선택
+              </button>
             </div>
           </div>
-        </div>
+          {error && error.includes('크기') && (
+            <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
+          )}
+        </section>
 
-        {/* Username */}
-        <div>
-          <label htmlFor="username" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            닉네임
-          </label>
-          <div className="flex flex-col sm:flex-row gap-2">
-            <input
-              type="text"
-              id="username"
-              value={formData.username}
+        <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-6`}>
+          <div className="grid gap-6 md:grid-cols-2">
+            <div className="space-y-2">
+              <label htmlFor="username" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
+                닉네임 <span className="text-gray-400 text-xs">(필수)</span>
+              </label>
+              <input
+                type="text"
+                id="username"
+                value={formData.username}
+                maxLength={30}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  setFormData({ ...formData, username: value });
+
+                  if (value && value.length < 2) {
+                    setUsernameError('닉네임은 최소 2자 이상 입력하세요');
+                  } else if (value && value.length > 30) {
+                    setUsernameError('닉네임은 최대 30자까지 입력할 수 있습니다');
+                  } else {
+                    setUsernameError('');
+                  }
+                }}
+                className={`${SETTINGS_INPUT_CLASS} ${
+                  usernameError
+                    ? 'border-red-300 dark:border-red-500 focus:ring-red-200 dark:focus:ring-red-500/40'
+                    : ''
+                }`}
+                placeholder="실명이 아닌 별명을 사용하세요"
+              />
+              {usernameError && (
+                <p className="text-xs text-red-500 dark:text-red-400">{usernameError}</p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
+                직업 <span className="text-gray-400 text-xs">(선택)</span>
+              </label>
+              <input
+                type="text"
+                id="jobTitle"
+                value={formData.jobTitle}
+                maxLength={30}
+                onChange={(e) => {
+                  const value = e.target.value;
+                  if (value.length <= 30) {
+                    setFormData((prev) => ({ ...prev, jobTitle: value }));
+                  }
+                }}
+                className={SETTINGS_INPUT_CLASS}
+                placeholder="예: 프론트엔드 엔지니어, 작가 등"
+              />
+            </div>
+          </div>
+          <div className="space-y-3">
+            <label htmlFor="bio" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
+              소개 <span className="text-gray-400 text-xs">(선택)</span>
+            </label>
+            <textarea
+              id="bio"
+              value={formData.bio}
               onChange={(e) => {
                 const value = e.target.value;
-                setFormData({ ...formData, username: value });
-
-                // 실시간 유효성 검사
-                if (value && value.length < 2) {
-                  setUsernameError('닉네임은 최소 2자 이상 입력하세요');
-                } else if (value && value.length > 20) {
-                  setUsernameError('닉네임은 최대 20자까지 입력할 수 있습니다');
-                } else {
-                  setUsernameError('');
+                if (value.length <= BIO_MAX_LENGTH) {
+                  setFormData((prev) => ({ ...prev, bio: value }));
                 }
               }}
-              className={`flex-1 px-3 py-2 min-h-[44px] border rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none transition-colors ${
-                usernameError
-                  ? 'border-red-300 dark:border-red-600 focus:border-red-400 dark:focus:border-red-500'
-                  : 'border-gray-300 dark:border-gray-600 focus:border-gray-400 dark:focus:border-gray-500'
-              }`}
-              placeholder="실명이 아닌 별명을 사용하세요"
+              maxLength={BIO_MAX_LENGTH}
+              rows={5}
+              className={`${SETTINGS_INPUT_CLASS} resize-none`}
+              placeholder="자신을 소개하거나 앞으로의 계획을 적어보세요"
             />
+            <div className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+              <span>{formData.bio.length}/{BIO_MAX_LENGTH}</span>
+              <span>닉네임·직업·소개는 공개 프로필에 표시됩니다</span>
+            </div>
+          </div>
+          <div className="border-t border-gray-100 dark:border-[#2F3440] pt-4 mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className={`text-xs font-medium ${profileSaveSuccess ? 'text-emerald-600 dark:text-emerald-300' : profileSaveLoading ? 'text-gray-500 dark:text-gray-300' : 'text-gray-500 dark:text-gray-300'}`}>
+              {profileSaveSuccess
+                ? '프로필이 저장되었습니다.'
+                : profileSaveLoading
+                ? '저장 중...'
+                : isProfileDirty
+                ? '변경 사항이 있습니다.'
+                : '최신 상태입니다.'}
+            </div>
             <button
               type="button"
-              onClick={handleUsernameUpdate}
-              disabled={usernameLoading || usernameSuccess || usernameError !== ''}
-              className="w-full sm:w-[60px] min-h-[44px] px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
+              onClick={handleProfileSave}
+              disabled={!isProfileDirty || profileSaveLoading || usernameError !== ''}
+              className={`${SETTINGS_PRIMARY_BUTTON_CLASS} w-full sm:w-auto`}
             >
-              {usernameLoading ? (
+              {profileSaveLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : usernameSuccess ? (
-                '완료'
+              ) : profileSaveSuccess ? (
+                '저장 완료'
               ) : (
-                '저장'
+                '변경 사항 저장'
               )}
             </button>
           </div>
-          {/* 닉네임 에러 메시지 */}
-          {usernameError && (
-            <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-              {usernameError}
-            </p>
-          )}
-        </div>
+        </section>
 
-        {/* Email */}
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            이메일
-          </label>
-          <div className="flex items-center">
-            <input
-              type="email"
-              id="email"
-              value={formData.email}
-              disabled
-              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400"
-            />
-            {user.isEmailVerified ? (
-              <span className="ml-3 inline-flex items-center text-sm text-green-600 dark:text-green-400">
-                <FiCheck className="mr-1" /> 인증됨
-              </span>
-            ) : (
-              <span className="ml-3 inline-flex items-center text-sm text-gray-500 dark:text-gray-400">
-                <FiX className="mr-1" /> 미인증
-              </span>
-            )}
-          </div>
-          <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            이메일은 보안상의 이유로 변경할 수 없습니다
-          </p>
-        </div>
-
-        {/* Bio */}
-        <div>
-          <label htmlFor="bio" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-            소개
-          </label>
-          <textarea
-            id="bio"
-            value={formData.bio}
-            onChange={(e) => {
-              if (e.target.value.length <= 1000) {
-                setFormData({ ...formData, bio: e.target.value });
-              }
-            }}
-            rows={4}
-            maxLength={1000}
-            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:border-gray-400 dark:focus:border-gray-500"
-            placeholder="자신을 소개해주세요..."
-          />
-          <div className="mt-1 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-1 text-xs text-gray-500 dark:text-gray-400">
-            <span>자신을 소개하는 글을 작성해주세요</span>
-            <span>{formData.bio.length}/1000</span>
-          </div>
-          <div className="mt-2">
-            <button
-              type="button"
-              onClick={handleBioUpdate}
-              disabled={bioLoading || bioSuccess}
-              className="w-full sm:w-[60px] min-h-[44px] sm:ml-auto px-4 py-2 bg-gray-800 dark:bg-gray-600 text-white font-medium rounded-md hover:bg-gray-700 dark:hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center"
-            >
-              {bioLoading ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : bioSuccess ? (
-                '완료'
-              ) : (
-                '저장'
-              )}
-            </button>
-          </div>
-        </div>
-
-        {/* Account Info */}
-        <div className="pt-6 border-t border-gray-200 dark:border-gray-700">
-          <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">계정 정보</h3>
-          <div className="space-y-3">
-            <div className="flex items-center text-sm">
-              <FiCalendar className="mr-2 text-gray-400 dark:text-gray-500" />
-              <span className="text-gray-600 dark:text-gray-400">가입일:</span>
-              <span className="ml-2 text-gray-900 dark:text-gray-100">
-                {user.createdAt
-                  ? format(new Date(user.createdAt), 'yyyy년 MM월 dd일', { locale: ko })
-                  : '정보 없음'}
-              </span>
+        <div className="grid gap-5 lg:grid-cols-2">
+          <div className={`${SUMMARY_CARD_CLASS} p-6 space-y-4`}>
+            <p className="text-base font-semibold text-gray-900 dark:text-gray-50">계정 정보</p>
+            <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+              <FiShield className="h-5 w-5 text-gray-400" />
+              <div>
+                <p className="font-medium">이메일/비밀번호 계정 사용 중</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-300">{formData.email}</p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+                <FiCheck className="h-5 w-5 text-emerald-500" />
+                <div>
+                  <p className="font-medium">인증 상태</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-300">
+                    {user.isEmailVerified ? '이메일 인증 완료' : '이메일 인증이 필요합니다'}
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
+                <FiBell className="h-5 w-5 text-gray-400" />
+                <div>
+                  <p className="font-medium">최근 로그인</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-300">
+                    {user.lastLoginProvider ? user.lastLoginProvider : 'local'} 계정
+                  </p>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center text-sm">
-              <FiShield className="mr-2 text-gray-400 dark:text-gray-500" />
-              <span className="text-gray-600 dark:text-gray-400">역할:</span>
-              <span className="ml-2 text-gray-900 dark:text-gray-100">{user.role === 'admin' ? '관리자' : '일반 사용자'}</span>
-            </div>
-            <div className="flex items-center text-sm">
-              <FiMail className="mr-2 text-gray-400 dark:text-gray-500" />
-              <span className="text-gray-600 dark:text-gray-400">인증 방법:</span>
-              <span className="ml-2 text-gray-900 dark:text-gray-100">{user.authProvider || 'Email'}</span>
-            </div>
-          </div>
 
-          {/* 마케팅 정보 수신 설정 */}
-          <div className="border-t border-gray-200 dark:border-gray-700 pt-6 sm:pt-8 mt-6">
-            <h3 className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-4">마케팅 정보 수신</h3>
+          <div className={`${SUMMARY_CARD_CLASS} p-6 space-y-5`}>
+            <p className="text-base font-semibold text-gray-900 dark:text-gray-50">마케팅 및 알림</p>
             <div className="space-y-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-start sm:items-center">
-                  <FiBell className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      마케팅 정보 수신
-                    </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      신규 기능, 이벤트, 프로모션 정보를 받아보세요
-                    </p>
+                {marketingOptions.map((option) => (
+                  <div
+                    key={option.key}
+                    className="rounded-2xl border border-gray-100 dark:border-[#2F3440] px-4 py-3 space-y-2"
+                  >
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-gray-700 dark:text-gray-200">
+                      <div className="flex items-start gap-3">
+                        <span className="text-gray-400 mt-0.5">{option.icon}</span>
+                        <div>
+                          <p className="font-medium">{option.title}</p>
+                          <p className="text-xs text-gray-500 dark:text-gray-300">{option.description}</p>
+                        </div>
+                      </div>
+                        <Switch
+                          checked={marketingPreferences[option.key]}
+                          onCheckedChange={(checked) =>
+                            handleMarketingPreferenceChange(option.key, checked, option.title)
+                          }
+                        />
+                    </div>
+                    {marketingFeedback[option.key] && (
+                      <p
+                        className={`text-xs font-medium ${
+                          marketingFeedback[option.key]?.type === 'success'
+                            ? 'text-emerald-600 dark:text-emerald-300'
+                            : 'text-red-500 dark:text-red-400'
+                        }`}
+                      >
+                        {marketingFeedback[option.key]?.message}
+                      </p>
+                    )}
                   </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-8 sm:ml-0">
-                  <input
-                    type="checkbox"
-                    checked={marketingPreferences.marketingOptIn}
-                    onChange={async (e) => {
-                      const newValue = e.target.checked;
-                      setMarketingPreferences({ ...marketingPreferences, marketingOptIn: newValue });
-                      await handleMarketingPreferenceChange({ marketingOptIn: newValue });
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white peer-checked:after:bg-gray-800 dark:peer-checked:after:bg-white after:border-gray-300 peer-checked:after:border-gray-800 dark:peer-checked:after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-100 dark:peer-checked:bg-blue-600"></div>
-                </label>
-              </div>
-
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-start sm:items-center">
-                  <FiMail className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-                  <div>
-                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      뉴스레터 수신
-                    </label>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                      주간/월간 뉴스레터와 추천 콘텐츠를 받아보세요
-                    </p>
-                  </div>
-                </div>
-                <label className="relative inline-flex items-center cursor-pointer flex-shrink-0 ml-8 sm:ml-0">
-                  <input
-                    type="checkbox"
-                    checked={marketingPreferences.newsletterOptIn}
-                    onChange={async (e) => {
-                      const newValue = e.target.checked;
-                      setMarketingPreferences({ ...marketingPreferences, newsletterOptIn: newValue });
-                      await handleMarketingPreferenceChange({ newsletterOptIn: newValue });
-                    }}
-                    className="sr-only peer"
-                  />
-                  <div className="w-11 h-6 bg-gray-200 dark:bg-gray-700 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white peer-checked:after:bg-gray-800 dark:peer-checked:after:bg-white after:border-gray-300 peer-checked:after:border-gray-800 dark:peer-checked:after:border-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-gray-100 dark:peer-checked:bg-blue-600"></div>
-                </label>
+                ))}
               </div>
             </div>
           </div>
-        </div>
 
-        {/* Error/Success Messages */}
-        {error && !error.includes('크기') && !error.includes('닉네임') && (
-          <div className="p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
-            {error}
+        <section className={`${SETTINGS_CARD_CLASS} p-6`}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <h4 className="text-base font-semibold text-gray-900 dark:text-gray-50">계정 삭제</h4>
+              <p className="text-sm text-gray-600 dark:text-gray-300">
+                계정을 삭제하면 모든 블로그 게시물, 댓글, 파일이 영구적으로 삭제되며 복구할 수 없습니다.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors bg-gray-900 hover:bg-gray-800 dark:bg-[#5f63f3] dark:hover:bg-[#7377ff]"
+            >
+              계정 삭제
+            </button>
           </div>
-        )}
-        {success && (
-          <div className="p-3 text-sm text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 rounded-md">
-            프로필이 성공적으로 업데이트되었습니다!
-          </div>
-        )}
+        </section>
       </div>
 
-      {/* 회원 탈퇴 섹션 */}
-      <div className="mt-8 sm:mt-12 pt-6 sm:pt-8 border-t border-gray-200 dark:border-gray-700">
-        <div className="bg-gray-50 dark:bg-[rgb(38,38,38)] border border-gray-200 dark:border-gray-700 rounded-lg p-4 sm:p-6">
-          <h4 className="text-base font-medium text-gray-900 dark:text-gray-100 mb-2">계정 삭제</h4>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            계정을 삭제하면 모든 블로그 게시물, 댓글, 파일이 영구적으로 삭제되며 복구할 수 없습니다.
-          </p>
-          <button
-            onClick={() => setShowDeleteModal(true)}
-            className="w-full sm:w-auto min-h-[44px] px-4 py-2 bg-black dark:bg-gray-700 text-white font-medium rounded-md hover:bg-gray-800 dark:hover:bg-gray-600 transition-colors"
-          >
-            계정 삭제
-          </button>
-        </div>
-      </div>
-
-      {/* 삭제 확인 모달 */}
       {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-8 max-w-md w-full mx-4">
+        <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 px-4">
+          <div className="w-full max-w-md bg-white dark:bg-[#1F2332] border border-gray-100 dark:border-[#2F3440] rounded-2xl p-8 shadow-2xl">
             <div className="flex items-center mb-4">
               <FiAlertTriangle className="text-red-600 dark:text-red-400 w-6 h-6 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">계정 삭제 확인</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">계정 삭제 확인</h3>
             </div>
 
-            <p className="text-gray-600 dark:text-gray-400 mb-6">
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
               정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 다음 항목들이 모두 삭제됩니다:
             </p>
 
-            <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-400 mb-6 space-y-1">
+            <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-300 mb-6 space-y-1">
               <li>모든 블로그 게시물</li>
               <li>모든 댓글</li>
               <li>업로드한 모든 파일</li>
@@ -692,9 +725,8 @@ export default function ProfileSettingsPage() {
               <li>프로필 정보</li>
             </ul>
 
-            {/* Task 26: 계정 삭제 확인 텍스트 입력 필드 */}
             <div className="mb-6">
-              <label htmlFor="deleteConfirmText" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              <label htmlFor="deleteConfirmText" className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">
                 확인을 위해 <strong className="text-red-600 dark:text-red-400">&quot;계정 삭제&quot;</strong>를 입력하세요
               </label>
               <input
@@ -702,17 +734,16 @@ export default function ProfileSettingsPage() {
                 id="deleteConfirmText"
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
+                className={`${SETTINGS_INPUT_CLASS} focus:ring-red-200 dark:focus:ring-red-400`}
                 placeholder="계정 삭제"
                 autoFocus
               />
             </div>
 
-            {/* 현재 로그인 방법이 로컬인 경우만 비밀번호 입력 */}
             {(user?.lastLoginProvider === 'local' ||
               (!user?.lastLoginProvider && user?.authProvider === 'local')) && (
               <div className="mb-6">
-                <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">
                   비밀번호 확인
                 </label>
                 <input
@@ -720,19 +751,18 @@ export default function ProfileSettingsPage() {
                   id="deletePassword"
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500 dark:focus:ring-red-400"
+                  className={`${SETTINGS_INPUT_CLASS} focus:ring-red-200 dark:focus:ring-red-400`}
                   placeholder="비밀번호를 입력하세요"
                 />
-                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                <p className="mt-1 text-xs text-gray-500 dark:text-gray-300">
                   로컬 계정으로 마지막 로그인하셨습니다. 보안을 위해 비밀번호를 확인합니다.
                 </p>
               </div>
             )}
 
-            {/* 소셜 로그인 사용자 안내 */}
             {user?.lastLoginProvider && user.lastLoginProvider !== 'local' && (
-              <div className="mb-6 p-3 bg-blue-50 dark:bg-blue-900/30 rounded-md">
-                <p className="text-sm text-blue-700 dark:text-blue-300">
+              <div className="mb-6 p-3 bg-blue-50 dark:bg-[#1B2C3F] border border-blue-100 dark:border-[#234668] rounded-xl">
+                <p className="text-sm text-blue-700 dark:text-blue-200">
                   {user.lastLoginProvider.charAt(0).toUpperCase() + user.lastLoginProvider.slice(1)} 계정으로 로그인하셨습니다.
                   비밀번호 입력 없이 계정을 삭제할 수 있습니다.
                 </p>
@@ -740,7 +770,7 @@ export default function ProfileSettingsPage() {
             )}
 
             {error && (
-              <div className="mb-4 p-3 text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 rounded-md">
+              <div className={cn('mb-4 p-3 text-sm rounded-xl', DESTRUCTIVE_SURFACE_CLASS)}>
                 {error}
               </div>
             )}
@@ -750,10 +780,10 @@ export default function ProfileSettingsPage() {
                 onClick={() => {
                   setShowDeleteModal(false);
                   setDeletePassword('');
-                  setDeleteConfirmText(''); // Task 27: 모달 닫을 때 확인 텍스트도 초기화
+                  setDeleteConfirmText('');
                   setError('');
                 }}
-                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                className="flex-1 px-4 py-2 bg-gray-200 dark:bg-[#2A2F3A] text-gray-800 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-[#353C49] transition-colors"
               >
                 취소
               </button>
@@ -761,13 +791,12 @@ export default function ProfileSettingsPage() {
                 onClick={handleDeleteAccount}
                 disabled={
                   deleteLoading ||
-                  deleteConfirmText !== '계정 삭제' || // "계정 삭제" 텍스트가 정확히 일치해야만 활성화
-                  // 로컬 로그인인 경우에만 비밀번호 필수
+                  deleteConfirmText !== '계정 삭제' ||
                   ((user?.lastLoginProvider === 'local' ||
                     (!user?.lastLoginProvider && user?.authProvider === 'local')) &&
                     !deletePassword)
                 }
-                className="flex-1 px-4 py-2 bg-red-600 dark:bg-red-700 text-white font-medium rounded-md hover:bg-red-700 dark:hover:bg-red-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="flex-1 px-4 py-2 rounded-lg font-semibold text-gray-900 dark:text-gray-50 bg-gray-100 dark:bg-[#2A2F3A] hover:bg-gray-200 dark:hover:bg-[#353C49] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {deleteLoading ? '삭제 중...' : '영구 삭제'}
               </button>
@@ -776,13 +805,12 @@ export default function ProfileSettingsPage() {
         </div>
       )}
 
-      {/* 캐릭터 선택 모달 */}
       <CharacterSelector
         isOpen={showCharacterSelector}
         onClose={() => setShowCharacterSelector(false)}
         currentProfileImage={profileImageUrl}
         onSelectCharacter={handleSelectCharacter}
       />
-    </div>
+    </>
   );
 }

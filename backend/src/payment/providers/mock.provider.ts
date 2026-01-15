@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import {
   PaymentProvider,
   CreateCustomerOptions,
@@ -8,8 +8,8 @@ import {
   SubscriptionResponse,
   PaymentMethod,
   WebhookEvent,
-} from '../interfaces/payment-provider.interface';
-import { v4 as uuidv4 } from 'uuid';
+} from "../interfaces/payment-provider.interface";
+import { v4 as uuidv4 } from "uuid";
 
 /**
  * 개발/테스트용 Mock Payment Provider
@@ -25,7 +25,7 @@ export class MockProvider implements PaymentProvider {
   };
 
   getName(): string {
-    return 'mock';
+    return "mock";
   }
 
   async createCustomer(options: CreateCustomerOptions): Promise<string> {
@@ -51,7 +51,10 @@ export class MockProvider implements PaymentProvider {
     return customer;
   }
 
-  async updateCustomer(customerId: string, updates: Partial<CreateCustomerOptions>): Promise<void> {
+  async updateCustomer(
+    customerId: string,
+    updates: Partial<CreateCustomerOptions>,
+  ): Promise<void> {
     const customer = await this.getCustomer(customerId);
     Object.assign(customer, updates);
     this.mockDatabase.customers.set(customerId, customer);
@@ -63,7 +66,9 @@ export class MockProvider implements PaymentProvider {
     console.log(`[MockProvider] Customer deleted: ${customerId}`);
   }
 
-  async createCheckoutSession(options: CreateCheckoutSessionOptions): Promise<CheckoutSessionResponse> {
+  async createCheckoutSession(
+    options: CreateCheckoutSessionOptions,
+  ): Promise<CheckoutSessionResponse> {
     const sessionId = `cs_mock_${uuidv4()}`;
     const customerId = options.customerId || `cus_mock_${uuidv4()}`;
 
@@ -71,25 +76,29 @@ export class MockProvider implements PaymentProvider {
     const checkoutUrl = `http://localhost:3001/mock-checkout?session=${sessionId}`;
 
     console.log(`[MockProvider] Checkout session created: ${sessionId}`);
-    console.log(`[MockProvider] Amount: ${options.priceAmount} ${options.currency}`);
+    console.log(
+      `[MockProvider] Amount: ${options.priceAmount} ${options.currency}`,
+    );
     console.log(`[MockProvider] Product: ${options.productName}`);
 
     return {
       id: sessionId,
       url: checkoutUrl,
-      status: 'open',
+      status: "open",
       customerId,
       subscriptionId: `sub_mock_${uuidv4()}`,
     };
   }
 
-  async createSubscription(options: CreateSubscriptionOptions): Promise<SubscriptionResponse> {
+  async createSubscription(
+    options: CreateSubscriptionOptions,
+  ): Promise<SubscriptionResponse> {
     const subscriptionId = `sub_mock_${uuidv4()}`;
 
     const subscription = {
       id: subscriptionId,
       customerId: options.customerId,
-      status: 'active',
+      status: "active",
       currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30일 후
       metadata: options.metadata,
       created: new Date(),
@@ -109,7 +118,10 @@ export class MockProvider implements PaymentProvider {
     return subscription;
   }
 
-  async updateSubscription(subscriptionId: string, updates: any): Promise<SubscriptionResponse> {
+  async updateSubscription(
+    subscriptionId: string,
+    updates: any,
+  ): Promise<SubscriptionResponse> {
     const subscription = await this.getSubscription(subscriptionId);
     Object.assign(subscription, updates);
     this.mockDatabase.subscriptions.set(subscriptionId, subscription);
@@ -117,14 +129,17 @@ export class MockProvider implements PaymentProvider {
     return subscription;
   }
 
-  async cancelSubscription(subscriptionId: string, immediately = false): Promise<void> {
+  async cancelSubscription(
+    subscriptionId: string,
+    immediately = false,
+  ): Promise<void> {
     const subscription = await this.getSubscription(subscriptionId);
 
     if (immediately) {
-      subscription.status = 'canceled';
+      subscription.status = "canceled";
       subscription.cancelAt = new Date();
     } else {
-      subscription.status = 'active';
+      subscription.status = "active";
       subscription.cancelAt = subscription.currentPeriodEnd;
     }
 
@@ -134,7 +149,7 @@ export class MockProvider implements PaymentProvider {
 
   async resumeSubscription(subscriptionId: string): Promise<void> {
     const subscription = await this.getSubscription(subscriptionId);
-    subscription.status = 'active';
+    subscription.status = "active";
     subscription.cancelAt = null;
     this.mockDatabase.subscriptions.set(subscriptionId, subscription);
     console.log(`[MockProvider] Subscription resumed: ${subscriptionId}`);
@@ -145,17 +160,22 @@ export class MockProvider implements PaymentProvider {
     return [
       {
         id: `pm_mock_${uuidv4()}`,
-        type: 'card',
-        last4: '4242',
-        brand: 'visa',
+        type: "card",
+        last4: "4242",
+        brand: "visa",
         expiryMonth: 12,
         expiryYear: 2025,
       },
     ];
   }
 
-  async setDefaultPaymentMethod(customerId: string, paymentMethodId: string): Promise<void> {
-    console.log(`[MockProvider] Default payment method set: ${paymentMethodId} for ${customerId}`);
+  async setDefaultPaymentMethod(
+    customerId: string,
+    paymentMethodId: string,
+  ): Promise<void> {
+    console.log(
+      `[MockProvider] Default payment method set: ${paymentMethodId} for ${customerId}`,
+    );
   }
 
   async deletePaymentMethod(paymentMethodId: string): Promise<void> {
@@ -170,8 +190,8 @@ export class MockProvider implements PaymentProvider {
         id: `inv_mock_${uuidv4()}`,
         customerId,
         amount: 900, // $9.00
-        currency: 'usd',
-        status: 'paid',
+        currency: "usd",
+        status: "paid",
         created: new Date(),
       },
     ];
@@ -179,12 +199,14 @@ export class MockProvider implements PaymentProvider {
 
   async createRefund(paymentIntentId: string, amount?: number): Promise<any> {
     const refundId = `re_mock_${uuidv4()}`;
-    console.log(`[MockProvider] Refund created: ${refundId} for ${paymentIntentId}`);
+    console.log(
+      `[MockProvider] Refund created: ${refundId} for ${paymentIntentId}`,
+    );
 
     return {
       id: refundId,
       amount: amount || 0,
-      status: 'succeeded',
+      status: "succeeded",
       created: new Date(),
     };
   }
@@ -197,7 +219,7 @@ export class MockProvider implements PaymentProvider {
   parseWebhookEvent(payload: any): WebhookEvent {
     return {
       id: `evt_mock_${uuidv4()}`,
-      type: payload.type || 'mock.event',
+      type: payload.type || "mock.event",
       data: payload.data || {},
       created: new Date(),
     };

@@ -22,10 +22,12 @@ import { OAuthErrorCodes } from './types.js';
 
 const router = Router();
 
-// 허용된 redirect URI 패턴 (Claude)
+// 허용된 redirect URI 패턴 (Claude, ChatGPT)
 const ALLOWED_REDIRECT_PATTERNS = [
   /^https:\/\/claude\.ai\//,                    // Claude 프로덕션
   /^https:\/\/.*\.claude\.ai\//,                // Claude 서브도메인
+  /^https:\/\/chatgpt\.com\//,                  // ChatGPT 프로덕션
+  /^https:\/\/.*\.chatgpt\.com\//,              // ChatGPT 서브도메인
   /^http:\/\/localhost(:\d+)?\//,               // 로컬 개발
   /^http:\/\/127\.0\.0\.1(:\d+)?\//,            // 로컬 개발
 ];

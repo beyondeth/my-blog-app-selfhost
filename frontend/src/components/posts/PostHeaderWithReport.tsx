@@ -80,12 +80,12 @@ export default function PostHeaderWithReport({
       <header className="mb-8">
         {/* Back Button */}
         {onBack && (
-          <div className="mb-6 -ml-8 overflow-visible">
+          <div className="mb-6">
             <button
               onClick={onBack}
-              className="inline-flex items-center text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100 transition-colors text-xs font-medium"
+              className="inline-flex items-center rounded-full border border-gray-200 px-4 py-1.5 text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white dark:border-white/25 transition-colors text-xs font-semibold shadow-sm bg-white/60 dark:bg-white/5 backdrop-blur-sm"
             >
-              <FiArrowLeft className="mr-2 w-4 h-4" />
+              <FiArrowLeft className="w-4 h-4 mr-2" />
               Back
             </button>
           </div>
@@ -94,7 +94,7 @@ export default function PostHeaderWithReport({
         {/* Category - 제목 위 독립된 줄 */}
         {post.category && (
           <div className="mb-3">
-            <span className="inline-flex items-center text-[13px] text-gray-600 dark:text-gray-400 gap-1">
+            <span className="inline-flex items-center text-[13px] text-gray-700 dark:text-gray-300 font-medium gap-1">
               <FiTag className="w-4 h-4" />
               <span>{post.category}</span>
             </span>
@@ -218,11 +218,11 @@ export default function PostHeaderWithReport({
         </div>
 
         {/* Meta Information with Like/Share and Action Buttons */}
-        <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-500 dark:text-gray-400 mb-8 pt-2 pb-2 border-t border-b border-gray-100 dark:border-gray-700">
+        <div className="flex flex-wrap items-center justify-between gap-4 text-sm text-gray-600 dark:text-gray-300 mb-8 pt-2 pb-2 border-t border-b border-gray-400 dark:border-gray-500">
           {/* Left: Meta Information with Like/Share */}
           <div className="flex flex-wrap items-center gap-6 pl-1">
             {/* 뷰 - 정보 표시만 */}
-            <div className="flex items-center space-x-1 text-xs text-gray-500 dark:text-gray-400">
+            <div className="flex items-center space-x-1 text-xs text-gray-600 dark:text-gray-300 font-medium">
               <FiEye className="w-5 h-5" />
               <span>{(post.viewCount || 0).toLocaleString()}</span>
             </div>
@@ -249,7 +249,7 @@ export default function PostHeaderWithReport({
               {/* 댓글 버튼 - 클릭 시 댓글 섹션으로 스크롤 */}
               <button
                 onClick={handleScrollToComments}
-                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                className="flex items-center space-x-1 px-2 py-1 rounded-full text-xs text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors font-medium"
                 title="댓글 보기"
               >
                 <FiMessageCircle className="w-5 h-5" />
@@ -264,7 +264,7 @@ export default function PostHeaderWithReport({
             {onShare && (
               <button
                 onClick={onShare}
-                className="flex items-center justify-center p-1 rounded-full text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
                 title="공유"
               >
                 <FiUpload className="w-5 h-5" />
@@ -275,7 +275,7 @@ export default function PostHeaderWithReport({
             {isAuthor && onCopy && (
               <button
                 onClick={onCopy}
-                className="flex items-center justify-center p-1 rounded-full text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200 transition-colors"
+                className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
                 title="포스트 내용 복사"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -294,7 +294,7 @@ export default function PostHeaderWithReport({
                     ? 'opacity-50 cursor-not-allowed'
                     : bookmarked
                     ? 'bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/40'
-                    : 'text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-700 dark:hover:text-gray-200'
+                    : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100'
                 }`}
                 title={bookmarkPending ? '처리 중...' : '북마크'}
               >
@@ -310,7 +310,7 @@ export default function PostHeaderWithReport({
                     if (!user) return; // 로그인하지 않은 경우 실행 안 함
                     setShowDropdown(!showDropdown);
                   }}
-                  className="p-1 text-gray-500 hover:text-gray-700 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-gray-700 rounded transition-colors"
+                  className="p-1 text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-300 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
                   title="더보기"
                 >
                   <FiMoreVertical className="w-4 h-4" />

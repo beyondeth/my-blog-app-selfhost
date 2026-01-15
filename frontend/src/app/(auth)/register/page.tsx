@@ -54,32 +54,12 @@ export default function RegisterPage() {
     allAccepted: false
   });
 
-  // 컴포넌트 마운트 시 상태 초기화
+  // 컴포넌트 마운트 시 전역 에러 초기화
   useEffect(() => {
-    // 전역 에러 상태 초기화
     clearError();
-
-    // 모든 상태를 초기값으로 리셋
-    setFormData({
-      username: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-    });
-    setShowPassword(false);
-    setShowConfirmPassword(false);
-    setError('');
-    setFieldErrors({
-      username: '',
-      email: '',
-      password: '',
-      confirmPassword: '',
-    });
-    setIsSubmitting(false);
-    setIsEmailVerified(false);
-    setEmailVerificationToken('');
-    setShakeField(null);
-  }, []); // 빈 의존성 배열 - 컴포넌트 마운트 시에만 실행
+    // clearError는 컨텍스트에서 재생성될 수 있으므로 최초 마운트에서만 실행
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // 비밀번호 강도 체크
   useEffect(() => {

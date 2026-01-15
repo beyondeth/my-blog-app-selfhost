@@ -1,8 +1,8 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { SubscriptionPlan } from '../entities/subscription-plan.entity';
-import { SubscriptionTier } from '../../common/enums/subscription.enum';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { SubscriptionPlan } from "../entities/subscription-plan.entity";
+import { SubscriptionTier } from "../../common/enums/subscription.enum";
 
 /**
  * 구독 플랜 시더
@@ -20,34 +20,34 @@ export class SubscriptionPlanSeeder {
    * 이미 존재하는 플랜은 업데이트, 없는 플랜은 새로 생성
    */
   async seed() {
-    console.log('🌱 Seeding subscription plans...');
+    console.log("🌱 Seeding subscription plans...");
 
     const plans = [
       // FREE 플랜
       {
         tier: SubscriptionTier.FREE,
-        name: 'Free',
-        displayName: '무료 플랜',
-        description: '개인 블로그를 시작하는 분들을 위한 무료 플랜',
+        name: "Free",
+        displayName: "무료 플랜",
+        description: "개인 블로그를 시작하는 분들을 위한 무료 플랜",
         pricing: {
           monthly: 0,
           yearly: 0,
-          currency: 'KRW',
+          currency: "KRW",
         },
         features: {
           maxMcpPostsPerMonth: 30,
           maxBlogCount: 1,
-          analytics: 'none' as const,
+          analytics: "none" as const,
           removeAds: false,
           exportData: false,
           scheduledPosts: false,
         },
         metadata: {
           highlights: [
-            'MCP 자동포스팅 월 30건',
-            '무제한 일반 포스트 작성',
-            '팔로우 기능',
-            '블로그 미공개 기능',
+            "MCP 자동포스팅 월 30건",
+            "무제한 일반 포스트 작성",
+            "팔로우 기능",
+            "블로그 미공개 기능",
           ],
         },
         isPopular: false,
@@ -58,30 +58,30 @@ export class SubscriptionPlanSeeder {
       // STARTER 플랜
       {
         tier: SubscriptionTier.STARTER,
-        name: 'Starter',
-        displayName: '스타터 플랜',
-        description: '개인 크리에이터와 소규모 팀을 위한 플랜',
+        name: "Starter",
+        displayName: "스타터 플랜",
+        description: "개인 크리에이터와 소규모 팀을 위한 플랜",
         pricing: {
           monthly: 990, // ₩990
           yearly: 9860, // ₩9,860 (연간 결제 시 17% 할인: 990 × 12 × 0.83)
-          currency: 'KRW',
+          currency: "KRW",
           discountPercentage: 17,
         },
         features: {
           maxMcpPostsPerMonth: 200,
           maxBlogCount: 1,
-          analytics: 'basic' as const,
+          analytics: "basic" as const,
           removeAds: true,
           exportData: true,
           scheduledPosts: false,
         },
         metadata: {
           highlights: [
-            'MCP 자동포스팅 월 200건',
-            '무제한 일반 포스트 작성',
-            '팔로우 기능',
-            '블로그 미공개 기능',
-            'DM 채팅 기능',
+            "MCP 자동포스팅 월 200건",
+            "무제한 일반 포스트 작성",
+            "팔로우 기능",
+            "블로그 미공개 기능",
+            "DM 채팅 기능",
           ],
         },
         isPopular: true,
@@ -92,30 +92,30 @@ export class SubscriptionPlanSeeder {
       // PRO 플랜
       {
         tier: SubscriptionTier.PRO,
-        name: 'Pro',
-        displayName: '프로 플랜',
-        description: '전문 블로거와 기업을 위한 프리미엄 플랜',
+        name: "Pro",
+        displayName: "프로 플랜",
+        description: "전문 블로거와 기업을 위한 프리미엄 플랜",
         pricing: {
           monthly: 1500, // ₩1,500
           yearly: 14940, // ₩14,940 (연간 결제 시 17% 할인: 1500 × 12 × 0.83)
-          currency: 'KRW',
+          currency: "KRW",
           discountPercentage: 17,
         },
         features: {
           maxMcpPostsPerMonth: 400,
           maxBlogCount: 1,
-          analytics: 'advanced' as const,
+          analytics: "advanced" as const,
           removeAds: true,
           exportData: true,
           scheduledPosts: true,
         },
         metadata: {
           highlights: [
-            'MCP 자동포스팅 월 400건',
-            '무제한 일반 포스트 작성',
-            '팔로우 기능',
-            '블로그 미공개 기능',
-            'DM 채팅 기능',
+            "MCP 자동포스팅 월 400건",
+            "무제한 일반 포스트 작성",
+            "팔로우 기능",
+            "블로그 미공개 기능",
+            "DM 채팅 기능",
           ],
         },
         isPopular: false,
@@ -145,7 +145,7 @@ export class SubscriptionPlanSeeder {
       }
     }
 
-    console.log('🎉 Subscription plans seeding completed!');
+    console.log("🎉 Subscription plans seeding completed!");
   }
 
   /**
@@ -153,8 +153,8 @@ export class SubscriptionPlanSeeder {
    * 테스트나 개발 환경에서 사용
    */
   async clear() {
-    console.log('🗑️ Clearing subscription plans...');
+    console.log("🗑️ Clearing subscription plans...");
     await this.subscriptionPlanRepository.delete({});
-    console.log('✅ Subscription plans cleared!');
+    console.log("✅ Subscription plans cleared!");
   }
 }

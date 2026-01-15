@@ -13,27 +13,25 @@ import { MigrationInterface, QueryRunner } from "typeorm";
  * - 예: 2025-10-17 21:07:34 → 2025-10-17 12:07:34
  */
 export class FixPublishedAtTimezone1760703551831 implements MigrationInterface {
-
-    public async up(queryRunner: QueryRunner): Promise<void> {
-        // publishedAt 값을 UTC로 변환 (9시간 빼기)
-        await queryRunner.query(`
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    // publishedAt 값을 UTC로 변환 (9시간 빼기)
+    await queryRunner.query(`
             UPDATE posts
             SET "publishedAt" = "publishedAt" - INTERVAL '9 hours'
             WHERE "publishedAt" IS NOT NULL;
         `);
 
-        console.log('✅ publishedAt timestamps converted from KST to UTC');
-    }
+    console.log("✅ publishedAt timestamps converted from KST to UTC");
+  }
 
-    public async down(queryRunner: QueryRunner): Promise<void> {
-        // 롤백: publishedAt 값을 다시 KST로 변환 (9시간 더하기)
-        await queryRunner.query(`
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    // 롤백: publishedAt 값을 다시 KST로 변환 (9시간 더하기)
+    await queryRunner.query(`
             UPDATE posts
             SET "publishedAt" = "publishedAt" + INTERVAL '9 hours'
             WHERE "publishedAt" IS NOT NULL;
         `);
 
-        console.log('✅ publishedAt timestamps reverted from UTC to KST');
-    }
-
+    console.log("✅ publishedAt timestamps reverted from UTC to KST");
+  }
 }
