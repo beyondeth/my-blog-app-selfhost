@@ -1,11 +1,13 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import { ChevronDown, BookOpen, Users, Check, Search } from 'lucide-react';
 import { useMyCommunities } from '@/hooks/community';
 import { cn } from '@/lib/utils';
 import type { Community } from '@/types/community';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 /**
  * 발행 대상 타입
@@ -67,6 +69,10 @@ export default function PublishTargetSelector({
   const [searchQuery, setSearchQuery] = useState('');
   const dropdownRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false);
+    setSearchQuery('');
+  }, []);
 
   // 내가 가입한 커뮤니티 목록 조회
   const { data: myCommunities = [], isLoading: isLoadingCommunities } = useMyCommunities();
@@ -82,16 +88,18 @@ export default function PublishTargetSelector({
 
   // 드롭다운 외부 클릭 시 닫기
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-        setSearchQuery('');
+        closeDropdown();
       }
     };
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+    const outsideEvent = getOutsideClickEvent();
+    document.addEventListener(outsideEvent, handleClickOutside);
+    return () => document.removeEventListener(outsideEvent, handleClickOutside);
+  }, [closeDropdown]);
+
+  useMobileOverlayReset(closeDropdown, isOpen);
 
   // 드롭다운 열릴 때 검색 입력란에 포커스
   useEffect(() => {

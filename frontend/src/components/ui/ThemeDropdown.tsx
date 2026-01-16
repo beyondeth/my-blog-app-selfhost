@@ -3,6 +3,8 @@
 import * as React from "react";
 import { Moon, Sun, Monitor } from "lucide-react";
 import { useTheme } from "next-themes";
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 /**
  * View Transition API를 사용한 부드러운 테마 전환
@@ -62,14 +64,21 @@ export function ThemeDropdown() {
 
   // 드롭다운 외부 클릭시 닫기
   React.useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
+    function handleClickOutside(event: Event) {
       if (isOpen && !(event.target as Element).closest('.theme-dropdown')) {
         setIsOpen(false);
       }
     }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    const outsideEvent = getOutsideClickEvent();
+    document.addEventListener(outsideEvent, handleClickOutside);
+    return () => document.removeEventListener(outsideEvent, handleClickOutside);
   }, [isOpen]);
+
+  const closeDropdown = React.useCallback(() => {
+    setIsOpen(false);
+  }, []);
+
+  useMobileOverlayReset(closeDropdown, isOpen);
 
   if (!mounted) {
     return (

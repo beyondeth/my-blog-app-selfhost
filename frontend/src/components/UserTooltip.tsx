@@ -8,6 +8,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from './ui/tooltip';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from './ui/popover';
 import { User, FollowInfo } from '@/types/api';
 
 interface UserTooltipProps extends PropsWithChildren {
@@ -18,12 +23,28 @@ interface UserTooltipProps extends PropsWithChildren {
     _count?: {
       followers: number;
       following: number;
+      posts?: number;
     };
   };
   followInfo?: FollowInfo;
+  isMobile?: boolean;
 }
 
-export default function UserTooltip({ children, user, followInfo }: UserTooltipProps) {
+export default function UserTooltip({ children, user, followInfo, isMobile }: UserTooltipProps) {
+  if (isMobile) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>{children}</PopoverTrigger>
+        <PopoverContent
+          className="bg-white dark:bg-card border border-gray-200 dark:border-gray-700 shadow-2xl p-0 rounded-2xl w-auto backdrop-blur-sm z-[10002]"
+          sideOffset={12}
+        >
+          <UserProfileCard user={user} followInfo={followInfo} />
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
   return (
     <TooltipProvider delayDuration={300}>
       <Tooltip>

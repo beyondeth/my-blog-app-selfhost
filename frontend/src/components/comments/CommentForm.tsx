@@ -1,10 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Avatar } from '@/components/ui/avatar';
 import { toast } from 'sonner';
 import { FiSmile, FiLoader } from 'react-icons/fi';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface CommentFormProps {
   postId: string;
@@ -74,22 +76,30 @@ export default function CommentForm({
     }
   }, [initialValue, autoFocus]);
 
+  const closeEmojiPicker = useCallback(() => {
+    setShowEmojiPicker(false);
+  }, []);
+
   // 이모지 피커 외부 클릭 감지
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
-        setShowEmojiPicker(false);
+        closeEmojiPicker();
       }
     };
 
     if (showEmojiPicker) {
-      document.addEventListener('mousedown', handleClickOutside);
+      const outsideEvent = getOutsideClickEvent();
+      document.addEventListener(outsideEvent, handleClickOutside);
+      return () => {
+        document.removeEventListener(outsideEvent, handleClickOutside);
+      };
     }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showEmojiPicker]);
+    return undefined;
+  }, [showEmojiPicker, closeEmojiPicker]);
+
+  useMobileOverlayReset(closeEmojiPicker, showEmojiPicker);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

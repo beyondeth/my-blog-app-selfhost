@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useState, useRef, useEffect } from 'react';
+import React, { memo, useState, useRef, useEffect, useCallback } from 'react';
 import ConfirmModal from '../ConfirmModal';
 import { Avatar } from '@/components/ui/avatar';
 import { User } from '../DMLayout/DMLayout.types';
@@ -12,6 +12,8 @@ import { useBlock } from '@/hooks/useBlock';
 import ReportDialog from '@/components/reports/ReportDialog';
 import BlockConfirmDialog from '@/components/blocks/BlockConfirmDialog';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface ChatHeaderProps {
   otherUser?: User | null;
@@ -28,6 +30,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
   // 액션 버튼 표시 상태
   const [showActions, setShowActions] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
+  const closeActions = useCallback(() => setShowActions(false), []);
 
   // 신고 기능
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
@@ -37,20 +40,24 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
 
   // 외부 클릭 감지 - 액션 버튼 숨기기
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
-        setShowActions(false);
+        closeActions();
       }
     };
 
     if (showActions) {
-      document.addEventListener('mousedown', handleClickOutside);
+      const outsideEvent = getOutsideClickEvent();
+      document.addEventListener(outsideEvent, handleClickOutside);
+      return () => {
+        document.removeEventListener(outsideEvent, handleClickOutside);
+      };
     }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showActions]);
+    return undefined;
+  }, [showActions, closeActions]);
+
+  useMobileOverlayReset(closeActions, showActions);
 
   const handleBackClick = () => {
     setActiveConversation(null);

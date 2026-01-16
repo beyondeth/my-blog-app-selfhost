@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ZoomIn, ZoomOut, RotateCw, RefreshCw } from 'lucide-react';
 import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'react-zoom-pan-pinch';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface ModalProps {
   type: 'image' | 'mermaid';
@@ -41,6 +42,13 @@ export default function Modal({
 }: ModalProps) {
   // react-zoom-pan-pinch ref
   const transformComponentRef = useRef<ReactZoomPanPinchRef>(null);
+  const handleOverlayReset = useCallback(() => {
+    if (isOpen) {
+      onClose();
+    }
+  }, [isOpen, onClose]);
+
+  useMobileOverlayReset(handleOverlayReset, isOpen);
 
   // ESC 키로 모달 닫기
   useEffect(() => {

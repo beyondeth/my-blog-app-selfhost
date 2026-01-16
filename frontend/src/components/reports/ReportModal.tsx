@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { ReportReason, reportReasonLabels } from '@/hooks/useReport';
 import { FiX, FiCheck, FiAlertTriangle } from 'react-icons/fi';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface ReportModalProps {
   isOpen: boolean;
@@ -34,6 +35,8 @@ export default function ReportModal({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  useMobileOverlayReset(onClose, isOpen);
 
   // 성공 시 1.5초 후 자동으로 모달 닫기
   useEffect(() => {

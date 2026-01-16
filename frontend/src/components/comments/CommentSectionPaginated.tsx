@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { FiMessageCircle, FiTrendingUp, FiClock, FiMenu, FiChevronDown, FiCheck } from 'react-icons/fi';
 import { AlertTriangle } from 'lucide-react';
@@ -15,6 +15,8 @@ import ErrorMessage from '@/components/ui/ErrorMessage';
 import CommentItemPaginated from './CommentItemPaginated';
 import type { CommentContext } from '@/lib/api/endpoints/comments';
 import type { Community } from '@/types/community';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface CommentSectionPaginatedProps {
   postId: string;
@@ -106,22 +108,30 @@ export default function CommentSectionPaginated({
     return () => observer.disconnect();
   }, [fetchNextPage, hasNextPage, isFetchingNextPage]);
 
+  const closeSortDropdown = useCallback(() => {
+    setShowSortDropdown(false);
+  }, []);
+
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowSortDropdown(false);
+        closeSortDropdown();
       }
     };
 
     if (showSortDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
+      const outsideEvent = getOutsideClickEvent();
+      document.addEventListener(outsideEvent, handleClickOutside);
+      return () => {
+        document.removeEventListener(outsideEvent, handleClickOutside);
+      };
     }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showSortDropdown]);
+    return undefined;
+  }, [showSortDropdown, closeSortDropdown]);
+
+  useMobileOverlayReset(closeSortDropdown, showSortDropdown);
 
   // 정렬 변경 핸들러
   const handleSortChange = (newSort: SortType) => {

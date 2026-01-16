@@ -16,6 +16,7 @@ import { initMixpanel } from '@/lib/mixpanel';
 import Script from 'next/script';
 import { Debug } from '@/components/debug/Debug';
 import { CacheClearButton } from '@/components/CacheClearButton';
+import { isMobileInteraction, MOBILE_RESET_EVENT } from '@/utils/interaction';
 
 interface LayoutClientProps {
   children: React.ReactNode;
@@ -99,6 +100,40 @@ export default function LayoutClient({ children }: LayoutClientProps) {
     setShouldHideLayout(prev => prev !== newShouldHide ? newShouldHide : prev);
     setIsLandingPage(prev => prev !== newIsLanding ? newIsLanding : prev);
   }, [pathname]);
+
+  useEffect(() => {
+    if (!isMobileInteraction()) {
+      return;
+    }
+
+    const resetOverlays = () => {
+      document.body.removeAttribute('data-scroll-locked');
+      document.body.style.overflow = '';
+      document.body.style.userSelect = '';
+      window.dispatchEvent(new Event(MOBILE_RESET_EVENT));
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') {
+        resetOverlays();
+        return;
+      }
+      resetOverlays();
+    };
+
+    const handlePageShow = () => resetOverlays();
+    const handlePageHide = () => resetOverlays();
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pageshow', handlePageShow);
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pageshow', handlePageShow);
+      window.removeEventListener('pagehide', handlePageHide);
+    };
+  }, []);
 
   return (
     <ThemeProvider

@@ -16,15 +16,15 @@ export function SocialLoginGroup({
   title
 }: SocialLoginGroupProps) {
   return (
-    <div className={`flex justify-center ${className}`}>
-      {/* Social login buttons - 가로 배치 */}
-      <div className="flex gap-2">
+    <div className={`flex w-full flex-col items-center ${className}`}>
+      {/* Social login buttons - 모바일: 세로, 데스크톱: 가로 */}
+      <div className="flex flex-col sm:flex-row gap-3 w-full">
         {providers.map((provider) => (
           <SocialLoginButton
             key={provider}
             provider={provider}
             disabled={disabled}
-            className="flex-1"
+            className="w-full flex-1 justify-center"
           />
         ))}
       </div>

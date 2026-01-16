@@ -114,7 +114,7 @@ export default function UserLinkWithTooltip({
   }
 
   return (
-    <UserTooltip user={userData} followInfo={followInfo}>
+    <UserTooltip user={userData} followInfo={followInfo} isMobile={isMobile}>
       {isMobile ? (
         // 모바일: 탭하면 툴팁(카드)이 열림. 링크 이동 안 함.
         <span className="inline-block cursor-pointer" role="button" tabIndex={0}>

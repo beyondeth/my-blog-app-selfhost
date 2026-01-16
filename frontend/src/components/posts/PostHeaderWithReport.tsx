@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget, FiPlus, FiMinus } from 'react-icons/fi';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
@@ -11,6 +11,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import RelativeTime from '@/components/ui/RelativeTime';
 import FollowButton from '@/components/FollowButton';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface PostHeaderWithReportProps {
   post: Post;
@@ -56,6 +57,9 @@ export default function PostHeaderWithReport({
   const [showDropdown, setShowDropdown] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
   const { user } = useAuth();
+  const closeDropdown = useCallback(() => setShowDropdown(false), []);
+
+  useMobileOverlayReset(closeDropdown, showDropdown);
 
   // Check if current user is the post author
   const isAuthor = user?.id === post.author?.id;

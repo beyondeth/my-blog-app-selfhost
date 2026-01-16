@@ -131,17 +131,18 @@ export default function ForgotPasswordPage() {
         <div className="blur-orb blur-orb-1 opacity-20 dark:opacity-10 fixed inset-0 -z-10" />
         <div className="blur-orb blur-orb-2 opacity-20 dark:opacity-10 fixed inset-0 -z-10" />
 
-        <div className="relative w-full max-w-lg mx-auto">
-          {/* 뒤로가기 버튼 */}
-          <button
-            onClick={() => router.back()}
-            className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
+        <div className="relative flex items-center justify-center min-h-screen px-2 sm:px-4 lg:px-8 py-4 sm:py-0">
+          <div className="w-full max-w-lg">
+            {/* 뒤로가기 버튼 */}
+            <button
+              onClick={() => router.back()}
+              className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
 
-          <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-blue-600">
                 <LogIn className="h-5 w-5" />
@@ -192,7 +193,8 @@ export default function ForgotPasswordPage() {
             </CardContent>
           </Card>
         </div>
-      </>
+      </div>
+    </>
     );
   }
 
@@ -207,17 +209,18 @@ export default function ForgotPasswordPage() {
         <div className="blur-orb blur-orb-1 opacity-20 dark:opacity-10 fixed inset-0 -z-10" />
         <div className="blur-orb blur-orb-2 opacity-20 dark:opacity-10 fixed inset-0 -z-10" />
 
-        <div className="relative w-full max-w-lg mx-auto">
-          {/* 뒤로가기 버튼 */}
-          <button
-            onClick={() => router.back()}
-            className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </button>
+        <div className="relative flex items-center justify-center min-h-screen px-2 sm:px-4 lg:px-8 py-4 sm:py-0">
+          <div className="w-full max-w-lg">
+            {/* 뒤로가기 버튼 */}
+            <button
+              onClick={() => router.back()}
+              className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              Back
+            </button>
 
-          <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+            <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Mail className="h-5 w-5" />
@@ -267,7 +270,8 @@ export default function ForgotPasswordPage() {
             </CardContent>
           </Card>
         </div>
-      </>
+      </div>
+    </>
     );
   }
 
@@ -280,17 +284,18 @@ export default function ForgotPasswordPage() {
       <div className="blur-orb blur-orb-1 opacity-20 dark:opacity-10 fixed inset-0 -z-10" />
       <div className="blur-orb blur-orb-2 opacity-20 dark:opacity-10 fixed inset-0 -z-10" />
 
-      <div className="relative w-full max-w-lg mx-auto">
-        {/* 뒤로가기 버튼 */}
-        <button
-          onClick={() => router.back()}
-          className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back
-        </button>
+      <div className="relative flex items-center justify-center min-h-screen px-2 sm:px-4 lg:px-8 py-4 sm:py-0">
+        <div className="w-full max-w-lg">
+          {/* 뒤로가기 버튼 */}
+          <button
+            onClick={() => router.back()}
+            className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </button>
 
-        <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
+          <Card className="border-0 shadow-xl bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
@@ -341,17 +346,16 @@ export default function ForgotPasswordPage() {
               </button>
             </form>
 
-            <div className="bg-blue-50 border border-blue-200 rounded p-3">
-              <p className="text-xs text-blue-800">
-                <strong>참고:</strong> 소셜 로그인(Google, Kakao, GitHub)으로 가입하신 경우
-                비밀번호 재설정이 필요하지 않습니다. 해당 서비스로 직접 로그인해주세요.
+            <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded p-3">
+              <p className="text-xs text-blue-800 dark:text-blue-300">
+                <strong>참고:</strong> 소셜 계정(Google, GitHub)은 비밀번호 재설정 없이 해당 서비스로 로그인해주세요.
               </p>
             </div>
 
-            <div className="text-center pt-3 border-t">
+            <div className="text-center pt-3 border-t dark:border-gray-800">
               <Link
                 href="/login"
-                className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"
+                className="text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 inline-flex items-center gap-1"
               >
                 <ArrowLeft className="h-3 w-3" />
                 로그인으로 돌아가기
@@ -360,6 +364,7 @@ export default function ForgotPasswordPage() {
           </CardContent>
         </Card>
       </div>
+    </div>
     </>
   );
 }

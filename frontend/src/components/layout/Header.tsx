@@ -177,7 +177,7 @@ function HeaderComponent() {
                   alt="Codebase Blog Logo"
                   width={36}
                   height={36}
-                  className="object-contain w-9 h-9 md:w-12 md:h-12"
+                  className="object-contain w-9 h-9 md:w-12 md:h-12 dark:invert"
                   priority
                 />
               </div>

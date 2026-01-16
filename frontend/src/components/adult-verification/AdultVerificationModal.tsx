@@ -6,6 +6,7 @@ import { AlertTriangle, Calendar, Shield, X, LogIn } from 'lucide-react';
 import { useVerifyAdult } from '@/hooks/adult-verification';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 /**
  * AdultVerificationModal Props
@@ -71,6 +72,7 @@ export default function AdultVerificationModal({
 
   // 성인 인증 훅
   const { verifyAdult, isPending } = useVerifyAdult();
+  useMobileOverlayReset(onClose, isOpen);
 
   // 유효성 검사
   const isValidDate = useCallback(() => {
