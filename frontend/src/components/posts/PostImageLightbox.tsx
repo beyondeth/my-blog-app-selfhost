@@ -72,7 +72,7 @@ export default function PostImageLightbox({
   return (
     <Dialog open={open} onOpenChange={(value) => !value && onClose()}>
       <DialogContent 
-        className="max-w-[95vw] max-h-[95vh] border-none bg-black/95 p-0 text-white shadow-2xl"
+        className="w-screen h-[100dvh] max-w-none rounded-none border-none bg-black p-0 text-white shadow-none sm:max-w-[95vw] sm:max-h-[95vh] sm:rounded-lg sm:shadow-2xl sm:bg-black/95"
         hideClose
       >
         <DialogTitle className="sr-only">이미지 미리보기</DialogTitle>
@@ -91,13 +91,13 @@ export default function PostImageLightbox({
           </div>
 
           <div className="relative flex-1 flex items-center justify-center">
-            <div className="relative w-full max-w-5xl">
-              <div className="relative w-full aspect-[16/10]">
+            <div className="relative w-full h-full sm:max-w-5xl sm:h-auto">
+              <div className="relative w-full h-full sm:aspect-[16/10]">
                 <Image
                   src={safeImages[currentIndex]}
                   alt={`게시물 이미지 ${currentIndex + 1}`}
                   fill
-                  sizes="90vw"
+                  sizes="100vw"
                   className="object-contain select-none"
                   priority
                 />

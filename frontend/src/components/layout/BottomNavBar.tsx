@@ -5,9 +5,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useCallback } from 'react';
 import { HomeIcon } from '@/components/icons/HomeIcon';
-import { WriteIcon } from '@/components/icons/WriteIcon';
 import { MyBlogIcon } from '@/components/icons/MyBlogIcon';
 import { BookmarkIcon } from '@/components/icons/BookmarkIcon';
+import { Plus, Users } from 'lucide-react';
 
 /**
  * 모바일 하단 네비게이션 바 컴포넌트
@@ -56,12 +56,12 @@ export default function BottomNavBar() {
   }
 
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg z-50">
-      <div className="flex justify-around items-center h-16 w-full">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg z-50 overflow-visible">
+      <div className="grid grid-cols-5 items-center h-16 w-full px-3 overflow-visible">
         {/* 홈 버튼 - 항상 표시 */}
         <Link
           href="/"
-          className={`flex flex-col items-center justify-center transition-colors min-w-0 flex-shrink-0 ${
+          className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
             pathname === '/'
               ? 'text-primary'
               : 'text-muted-foreground'
@@ -75,7 +75,7 @@ export default function BottomNavBar() {
         {user && user.blogSlug ? (
           <Link
             href={`/${user.blogSlug}`}
-            className={`flex flex-col items-center justify-center transition-colors min-w-0 flex-shrink-0 ${
+            className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
               pathname === `/${user.blogSlug}`
                 ? 'text-primary'
                 : 'text-muted-foreground'
@@ -87,7 +87,7 @@ export default function BottomNavBar() {
         ) : (
           <button
             onClick={(e) => handleAuthRequiredClick(e, '/login')}
-            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0 flex-shrink-0"
+            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0"
           >
             <MyBlogIcon size={16} />
             <span className="hidden xs:block text-xs mt-0.5">내블로그</span>
@@ -95,21 +95,35 @@ export default function BottomNavBar() {
         )}
 
         {/* 글쓰기 버튼 - 로그인 시에만 활성화 */}
-        <button
-          onClick={handleWriteClick}
-          className={`flex flex-col items-center justify-center transition-colors min-w-0 flex-shrink-0 ${
-            user ? 'text-muted-foreground' : 'text-muted-foreground opacity-50'
+        <div className="relative flex h-16 items-end justify-center">
+          <button
+            type="button"
+            onClick={handleWriteClick}
+            aria-label="글쓰기"
+            className="absolute -top-4 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <Plus size={24} strokeWidth={2.5} />
+          </button>
+        </div>
+
+        {/* 커뮤니티 버튼 - 항상 표시 */}
+        <Link
+          href="/c"
+          className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
+            pathname?.startsWith('/c')
+              ? 'text-primary'
+              : 'text-muted-foreground'
           }`}
         >
-          <WriteIcon size={16} />
-          <span className="hidden xs:block text-xs mt-0.5">글쓰기</span>
-        </button>
+          <Users size={20} strokeWidth={1.5} />
+          <span className="hidden xs:block text-xs mt-0.5">커뮤니티</span>
+        </Link>
 
         {/* 북마크 버튼 - 로그인 시에만 활성화 */}
         {user ? (
           <Link
             href="/bookmarks"
-            className={`flex flex-col items-center justify-center transition-colors min-w-0 flex-shrink-0 ${
+            className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
               pathname === '/bookmarks'
                 ? 'text-primary'
                 : 'text-muted-foreground'
@@ -121,7 +135,7 @@ export default function BottomNavBar() {
         ) : (
           <button
             onClick={(e) => handleAuthRequiredClick(e, '/login')}
-            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0 flex-shrink-0"
+            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0"
           >
             <BookmarkIcon size={16} />
             <span className="hidden xs:block text-xs mt-0.5">북마크</span>

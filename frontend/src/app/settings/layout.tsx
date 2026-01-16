@@ -104,7 +104,7 @@ function SettingsLayoutContent({
 
   return (
     <div className="min-h-screen bg-background dark:bg-[#0E141B]">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-6">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-10 md:py-10 space-y-6">
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -121,9 +121,9 @@ function SettingsLayoutContent({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex w-full items-center overflow-x-auto rounded-3xl border border-gray-100 bg-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-gray-800 dark:border-gray-700">
-            <div className="flex">
+        <div className="w-full overflow-hidden">
+          <div className="flex w-full items-center overflow-x-auto rounded-3xl border border-gray-100 bg-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-gray-800 dark:border-gray-700 no-scrollbar touch-pan-x">
+            <div className="flex min-w-full p-1">
               {settingsNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.href;
@@ -131,10 +131,10 @@ function SettingsLayoutContent({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-4 py-3 text-sm font-bold transition-colors border-b-2 ${
+                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 rounded-2xl ${
                       isActive
-                        ? 'text-gray-900 dark:text-gray-50 border-[#5850ec] dark:border-[#818cf8]'
-                        : 'text-gray-600 dark:text-gray-200 border-transparent hover:text-gray-900 dark:hover:text-white'
+                        ? 'bg-white text-gray-900 shadow-sm dark:bg-[#1f2330] dark:text-white'
+                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
@@ -142,14 +142,14 @@ function SettingsLayoutContent({
                   </Link>
                 );
               })}
+              <button
+                onClick={() => logout('/')}
+                className="ml-auto flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 hover:bg-white/50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5 transition-colors whitespace-nowrap flex-shrink-0 rounded-2xl"
+              >
+                <FiLogOut className="h-4 w-4" />
+                로그아웃
+              </button>
             </div>
-            <button
-              onClick={() => logout('/')}
-              className="ml-auto flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#1f2330] transition-colors"
-            >
-              <FiLogOut className="h-4 w-4" />
-              로그아웃
-            </button>
           </div>
         </div>
 
