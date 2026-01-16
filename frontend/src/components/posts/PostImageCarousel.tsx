@@ -49,7 +49,7 @@ const CarouselItem = ({
   };
 
   const wrapperClasses = cn(
-    'relative w-full overflow-hidden rounded-xl border transition-shadow duration-300 aspect-[700/540]',
+    'relative w-full overflow-hidden rounded-xl border transition-shadow duration-300',
     isHomeFeed
       ? 'bg-[#EEF3F8] dark:bg-[#1A232E] border-[#D9E0EA] dark:border-[#2A3645]'
       : 'bg-gray-100 dark:bg-gray-800',
@@ -73,7 +73,7 @@ const CarouselItem = ({
           </div>
         )}
         
-        <div className="relative w-full h-full z-10">
+        <div className="relative w-full z-10 aspect-[700/540]">
           {shouldBlur ? (
             <BlurredImage
               src={src}

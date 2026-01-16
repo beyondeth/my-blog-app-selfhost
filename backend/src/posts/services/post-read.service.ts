@@ -747,6 +747,7 @@ export class PostReadService {
         "metadata.editorPickedAt",
       ])
       .where("post.isPublished = :isPublished", { isPublished: true })
+      .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
       .andWhere("metadata.isEditorPick = :isEditorPick", { isEditorPick: true })
       .orderBy("metadata.editorPickedAt", "DESC")
       .addOrderBy("post.publishedAt", "DESC")
