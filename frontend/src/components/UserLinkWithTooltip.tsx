@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useEffect, useState } from 'react';
 import UserTooltip from './UserTooltip';
 import { queryKeys } from '@/lib/queries/keys';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -22,6 +22,16 @@ export default function UserLinkWithTooltip({
 }: UserLinkWithTooltipProps) {
   const { user } = useAuth();
   
+  // 모바일 감지 (터치 시 툴팁 표시, 클릭 이동 방지)
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640); // sm breakpoint
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
   // 사용자 데이터 조회 (로그인된 상태에서만)
   const { data: userData } = useQuery({
     queryKey: queryKeys.users.detail(userId),
@@ -88,8 +98,11 @@ export default function UserLinkWithTooltip({
 
   const blogLink = getBlogLink();
 
-  // 데이터가 아직 없다면 기본 링크만 표시
+  // 데이터가 아직 없다면 
   if (!userData) {
+    if (isMobile) {
+      return <span className="inline-block">{children}</span>;
+    }
     return (
       <Link
         href={blogLink}
@@ -102,12 +115,20 @@ export default function UserLinkWithTooltip({
 
   return (
     <UserTooltip user={userData} followInfo={followInfo}>
-      <Link
-        href={blogLink}
-        className="inline-block cursor-pointer"
-      >
-        {children}
-      </Link>
+      {isMobile ? (
+        // 모바일: 탭하면 툴팁(카드)이 열림. 링크 이동 안 함.
+        <span className="inline-block cursor-pointer" role="button" tabIndex={0}>
+          {children}
+        </span>
+      ) : (
+        // 데스크톱: 호버하면 툴팁 열림. 클릭하면 블로그로 이동.
+        <Link
+          href={blogLink}
+          className="inline-block cursor-pointer"
+        >
+          {children}
+        </Link>
+      )}
     </UserTooltip>
   );
 }

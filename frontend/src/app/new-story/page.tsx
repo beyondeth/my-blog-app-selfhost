@@ -1122,7 +1122,7 @@ export default function NewStoryPage() {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-3 py-6">
+    <div className="max-w-5xl mx-auto px-3 pt-20 pb-6 lg:py-6">
       {/* 발행 대상 선택 */}
       {blog && publishTarget && (
         <div className="mb-3 pt-8">

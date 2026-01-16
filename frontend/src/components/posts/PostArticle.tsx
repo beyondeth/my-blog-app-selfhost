@@ -137,9 +137,9 @@ const PostArticle = React.memo(function PostArticle({
   const bodyTextClass = isHomeFeed ? 'text-[#3F4A59] dark:text-[#E1E8F0]' : 'text-foreground';
   const voteTone = isHomeFeed ? 'harbor' : 'default';
   const articleBaseClass = isHomeFeed
-    ? 'rounded-3xl border border-[#D9E0EA] bg-white hover:bg-[#F7F9FC] transition-colors dark:border-[#4B5563] dark:bg-[#131A22] dark:hover:bg-[#1A232E] p-5 sm:p-6 shadow-sm'
+    ? 'border-b border-gray-100 bg-white dark:border-gray-800 dark:bg-[#0E141B] py-5 sm:rounded-3xl sm:border sm:border-[#D9E0EA] sm:hover:bg-[#F7F9FC] sm:transition-colors sm:dark:border-[#4B5563] sm:dark:bg-[#131A22] sm:dark:hover:bg-[#1A232E] sm:p-6 sm:shadow-sm'
     : 'border-b border-gray-200 dark:border-gray-800 py-4 sm:py-6 first:pt-0';
-  const articleClassName = isHomeFeed ? `${articleBaseClass} max-w-[780px] mx-auto` : articleBaseClass;
+  const articleClassName = isHomeFeed ? `${articleBaseClass} w-full sm:max-w-[780px] sm:mx-auto` : articleBaseClass;
   const defaultPostUrl = post.blog?.slug ? `/${post.blog.slug}/${post.slug || post.id}` : '#';
   const postUrl = postUrlOverride ?? defaultPostUrl;
   const showCommunityContext = Boolean(communityContext);
@@ -404,7 +404,7 @@ const PostArticle = React.memo(function PostArticle({
     return (
       <>
       <article className={articleClassName}>
-        <div className="flex flex-col">
+        <div className={`flex flex-col ${isHomeFeed ? 'px-4 sm:px-0' : ''}`}>
           {renderSourceMeta('mb-4', 'mb-2')}
           {communityBadgeSection}
           <h2 className={`text-lg sm:text-xl font-bold ${titleTextClass} leading-tight mb-1`}>
@@ -661,7 +661,7 @@ const PostArticle = React.memo(function PostArticle({
     return (
       <>
       <article className={articleClassName}>
-        <div className="flex flex-col">
+        <div className={`flex flex-col ${isHomeFeed ? 'px-4 sm:px-0' : ''}`}>
           {renderSourceMeta('mb-3', 'mb-2')}
           {communityBadgeSection}
 
@@ -808,7 +808,7 @@ const PostArticle = React.memo(function PostArticle({
     <article className={articleClassName}>
       <div className="flex flex-col">
         {/* Content */}
-        <div className="flex-1 min-w-0 flex flex-col">
+        <div className={`flex-1 min-w-0 flex flex-col ${isHomeFeed ? 'px-4 sm:px-0' : ''}`}>
           {renderSourceMeta('mb-4', 'mb-3')}
           {communityBadgeSection}
 

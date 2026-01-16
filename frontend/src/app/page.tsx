@@ -29,6 +29,7 @@ import SidebarFooter from '@/components/home/SidebarFooter';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useDeletePost } from '@/hooks/usePosts';
 import { feedQueryKeys } from '@/hooks/feed/useUnifiedFeed';
+import { EditorPickCard } from '@/components/home/EditorPickCard';
 
 // 사이드바 컴포넌트 lazy loading (초기 로딩 최적화)
 const PromoCarouselSection = lazy(() => import('@/components/layout/PromoCarouselSection'));
@@ -486,150 +487,71 @@ function HomePageContent() {
         <main className="flex-1 min-w-0 pt-0">
           <div className="space-y-6">
             <div className="max-w-[780px] mx-auto space-y-6">
+              {/* Mobile Editor's Picks (Swipeable with Peek) */}
+              <div className="block sm:hidden -mx-6">
+                {isEditorPicksLoading ? (
+                  <div className="px-6">
+                    <div className="h-[240px] animate-pulse rounded-2xl border border-[#D9E0EA] bg-white shadow-sm dark:border-[#4B5563] dark:bg-[#0E141B]" />
+                  </div>
+                ) : editorPickPosts.length > 0 ? (
+                  <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 px-6 pb-4 no-scrollbar">
+                    {editorPickPosts.map((post, index) => {
+                       const postImage = post?.thumbnail || post?.images?.[0] || null;
+                       const wrapperClass = postImage
+                        ? 'min-w-[280px] snap-start rounded-2xl border border-[#D9E0EA] bg-white shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#0E141B] h-[360px]'
+                        : 'min-w-[280px] snap-start rounded-2xl border border-[#D9E0EA] bg-[#F7F9FC] shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#131A22] h-[360px]';
+                        
+                       return (
+                        <div key={post.id} className={wrapperClass}>
+                          <EditorPickCard post={post} priority={index < 2} />
+                        </div>
+                       );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Desktop Editor's Picks (Slideshow) */}
               <div 
-                className={editorPickWrapperClass}
+                className={`hidden sm:block ${editorPickWrapperClass} h-[360px] rounded-2xl`}
                 onClick={() => router.push(editorPickHref)}
               >
-                {!activePickImage && (
-                  <span className="absolute left-6 top-6 inline-flex items-center rounded-full bg-[#C1121F] px-3.5 py-1 text-sm font-semibold uppercase tracking-[0.2em] text-white dark:bg-[#E11D48]">
-                    EDITOR&apos;S PICK
-                  </span>
-                )}
-                <div className={`${pickContentSpacingClass} space-y-3`}>
                   {isEditorPicksLoading ? (
-                    <div className="h-[240px] animate-pulse rounded-2xl border border-[#D9E0EA] bg-white shadow-sm dark:border-[#4B5563] dark:bg-[#0E141B]" />
+                    <div className="h-full w-full animate-pulse bg-gray-100 dark:bg-gray-800" />
                   ) : editorPickPosts.length === 0 ? (
-                    <div className="rounded-2xl border border-[#D9E0EA] bg-white p-6 text-sm text-[#4B5563] shadow-sm dark:border-[#4B5563] dark:bg-[#0E141B] dark:text-[#A9B4C2]">
-                      아직 선정된 Editor&apos;s Pick이 없습니다.
+                    <div className="p-6 text-sm text-[#4B5563] dark:text-[#A9B4C2]">
+                       아직 선정된 Editor&apos;s Pick이 없습니다.
                     </div>
                   ) : (
-                    <div className="space-y-3">
-                      <div className="relative h-[360px] w-full">
-                        {activePickImage ? (
-                          <>
-                            <div className="relative h-full w-full">
-                              <Image
-                                src={activePickImage}
-                                alt={activePick?.title || 'Editor pick'}
-                                fill
-                                sizes="(max-width: 640px) 100vw, 780px"
-                                className="object-cover"
-                                priority={activePickIndex === 0}
-                                unoptimized={shouldDisableOptimization(activePickImage)}
-                              />
-                              <div className="absolute inset-x-0 bottom-0 z-0 h-40 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
-                              <div className="absolute left-6 top-6 z-10 rounded-full bg-[#C1121F] px-3.5 py-1 text-sm font-semibold uppercase tracking-[0.2em] text-white dark:bg-[#E11D48]">
-                                EDITOR&apos;S PICK
-                              </div>
-                              <div className="absolute inset-x-0 bottom-16 z-10 px-6">
-                                <h3 className="text-xl font-semibold text-white sm:text-2xl">
-                                  {activePick?.title}
-                                </h3>
-                                <div className="mt-3 flex items-center gap-2 text-sm text-white/85">
-                                  <Avatar
-                                    src={activePickAuthorImage}
-                                    alt={activePickAuthorName}
-                                    size="xs"
-                                    className="ring-1 ring-white/60 bg-white/20"
+                    <>
+                       <EditorPickCard post={activePick} priority={true} />
+                       
+                       {/* Controls for Desktop */}
+                        <div className="absolute inset-x-0 bottom-4 z-10 grid grid-cols-[1fr_auto_1fr] items-center px-6 pointer-events-none">
+                            <div />
+                            {shouldShowPickIndicators && (
+                              <div className={`flex items-center gap-2 pointer-events-auto ${activePickImage ? 'bg-black/35 px-3 py-1 rounded-full' : ''}`}>
+                                {editorPickPosts.map((_, index) => (
+                                  <button
+                                    key={`editor-pick-dot-${index}`}
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActivePickIndex(index);
+                                    }}
+                                    className={`transition-all duration-300 rounded-full ${
+                                      activePickIndex === index
+                                        ? `w-5 h-2 ${activePickImage ? 'bg-white' : 'bg-[#264653] dark:bg-[#6CC3B2]'}`
+                                        : `w-2 h-2 ${activePickImage ? 'bg-white/50 hover:bg-white/70' : 'bg-[#D9E0EA] dark:bg-[#2A3645] hover:bg-[#C9D3E0] dark:hover:bg-[#223040]'}`
+                                    }`}
+                                    aria-label={`Editor's Pick ${index + 1}로 이동`}
                                   />
-                                  <span className="font-medium">{activePickAuthorName}</span>
-                                </div>
+                                ))}
                               </div>
-                              <div className="absolute inset-x-0 bottom-4 z-10 grid grid-cols-[1fr_auto_1fr] items-center px-6">
-                                <div />
-                                {shouldShowPickIndicators && (
-                                  <div className="flex items-center gap-2 rounded-full bg-black/35 px-3 py-1">
-                                    {editorPickPosts.map((_, index) => (
-                                      <button
-                                        key={`editor-pick-dot-${index}`}
-                                        type="button"
-                                        onClick={() => setActivePickIndex(index)}
-                                        className={`transition-all duration-300 rounded-full ${
-                                          activePickIndex === index
-                                            ? 'w-5 h-2 bg-white'
-                                            : 'w-2 h-2 bg-white/50 hover:bg-white/70'
-                                        }`}
-                                        aria-label={`Editor&apos;s Pick ${index + 1}로 이동`}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                                <div className="justify-self-end">
-                                    <Link
-                                    href={editorPickHref}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="rounded-full bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B1220] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F87171] dark:bg-[#0B0F14] dark:hover:bg-[#111827] dark:focus-visible:ring-[#F87171]"
-                                  >
-                                    바로 가기
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                          </>
-                        ) : (
-                          <div className="flex h-full flex-col pt-16 pb-4">
-                            <div className="space-y-3">
-                              <h3 className="text-2xl font-semibold tracking-[-0.01em] leading-tight sm:text-3xl">
-                                {activePick?.title}
-                              </h3>
-                              <p
-                                className="text-[15px] text-[#3F4A59] dark:text-[#E1E8F0] leading-relaxed"
-                                style={{
-                                  display: '-webkit-box',
-                                  WebkitLineClamp: 4,
-                                  WebkitBoxOrient: 'vertical',
-                                  overflow: 'hidden',
-                                }}
-                              >
-                                {activePick?.editorPickExcerpt || activePick?.excerpt || '요약이 없는 포스트입니다.'}
-                              </p>
-                            </div>
-                            <div className="mt-auto space-y-4">
-                              <div className="flex items-center gap-2 text-xs text-[#4B5563] dark:text-[#A9B4C2]">
-                                <Avatar
-                                  src={activePickAuthorImage}
-                                  alt={activePickAuthorName}
-                                  size="xs"
-                                  className="ring-1 ring-black/10 dark:ring-white/20"
-                                />
-                                <span className="font-medium">{activePickAuthorName}</span>
-                              </div>
-                              <div className="grid grid-cols-[1fr_auto_1fr] items-center">
-                                <div />
-                                {shouldShowPickIndicators && (
-                                  <div className="flex items-center gap-2">
-                                    {editorPickPosts.map((_, index) => (
-                                      <button
-                                        key={`editor-pick-dot-${index}`}
-                                        type="button"
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setActivePickIndex(index);
-                                        }}
-                                        className={`transition-all duration-300 rounded-full ${
-                                          activePickIndex === index
-                                            ? 'w-6 h-2 bg-[#264653] dark:bg-[#6CC3B2]'
-                                            : 'w-2 h-2 bg-[#D9E0EA] dark:bg-[#2A3645] hover:bg-[#C9D3E0] dark:hover:bg-[#223040]'
-                                        }`}
-                                        aria-label={`Editor&apos;s Pick ${index + 1}로 이동`}
-                                      />
-                                    ))}
-                                  </div>
-                                )}
-                                <div className="justify-self-end">
-                                  <Link
-                                    href={editorPickHref}
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="rounded-full border border-[#111827] px-4 py-2 text-sm font-semibold text-[#111827] transition-colors hover:bg-[#111827] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F87171] focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-[#E6EDF3] dark:text-[#E6EDF3] dark:hover:bg-[#E6EDF3] dark:hover:text-[#0E141B] dark:focus-visible:ring-[#F87171] dark:focus-visible:ring-offset-[#0E141B]"
-                                  >
-                                    바로 가기
-                                  </Link>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
+                            )}
+                            <div /> 
+                        </div>
+
                       {hasMultiplePicks && (
                         <>
                           <button
@@ -650,9 +572,8 @@ function HomePageContent() {
                           </button>
                         </>
                       )}
-                    </div>
+                    </>
                   )}
-                </div>
               </div>
 
 
