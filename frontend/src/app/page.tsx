@@ -494,12 +494,12 @@ function HomePageContent() {
                     <div className="h-[240px] animate-pulse rounded-2xl border border-[#D9E0EA] bg-white shadow-sm dark:border-[#4B5563] dark:bg-[#0E141B]" />
                   </div>
                 ) : editorPickPosts.length > 0 ? (
-                  <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 px-6 pb-4 no-scrollbar">
+                  <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 px-6 pb-4 no-scrollbar touch-pan-x">
                     {editorPickPosts.map((post, index) => {
                        const postImage = post?.thumbnail || post?.images?.[0] || null;
                        const wrapperClass = postImage
-                        ? 'min-w-[280px] snap-start rounded-2xl border border-[#D9E0EA] bg-white shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#0E141B] h-[360px]'
-                        : 'min-w-[280px] snap-start rounded-2xl border border-[#D9E0EA] bg-[#F7F9FC] shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#131A22] h-[360px]';
+                        ? 'min-w-[280px] snap-center flex-shrink-0 rounded-2xl border border-[#D9E0EA] bg-white shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#0E141B] h-[360px]'
+                        : 'min-w-[280px] snap-center flex-shrink-0 rounded-2xl border border-[#D9E0EA] bg-[#F7F9FC] shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#131A22] h-[360px]';
                         
                        return (
                         <div key={post.id} className={wrapperClass}>
