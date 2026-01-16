@@ -154,7 +154,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
             {!shouldHideLayout && (
               <>
                 <Header />
-                <div className="h-[72px]" />
+                <div className="h-[132px] md:h-[88px]" />
               </>
             )}
 

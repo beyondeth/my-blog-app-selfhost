@@ -6,8 +6,8 @@ import {
   BadRequestException,
   ConflictException,
 } from "@nestjs/common";
-import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, Like, In, SelectQueryBuilder, MoreThan } from "typeorm";
+import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
+import { Repository, Like, In, SelectQueryBuilder, MoreThan, DataSource } from "typeorm";
 import { OptimisticLockException } from "../common/exceptions/optimistic-lock.exception";
 import { Post } from "./entities/post.entity";
 import { PostStats } from "./entities/post-stats.entity";
@@ -76,6 +76,8 @@ export class PostsService {
   private readonly logger = new Logger(PostsService.name);
 
   constructor(
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
     @InjectRepository(PostStats)
@@ -950,69 +952,104 @@ export class PostsService {
       );
     }
 
-    const post = await this.postsRepository.findOne({ where: { id: postId } });
-    if (!post) {
-      throw new NotFoundException("포스트를 찾을 수 없습니다.");
-    }
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    // PostMetadata 엔티티 업데이트 (주 데이터 소스)
-    let metadata = await this.postMetadataRepository.findOne({
-      where: { postId },
-    });
-    if (!metadata) {
-      // PostMetadata가 없으면 새로 생성
-      metadata = this.postMetadataRepository.create({
-        postId,
-        isEditorPick,
-        editorPickedAt: isEditorPick ? new Date() : null,
+    try {
+      const post = await queryRunner.manager.findOne(Post, { where: { id: postId } });
+      if (!post) {
+        throw new NotFoundException("포스트를 찾을 수 없습니다.");
+      }
+
+      // 1. PostMetadata 엔티티 업데이트 (주 데이터 소스)
+      let metadata = await queryRunner.manager.findOne(PostMetadata, {
+        where: { postId },
       });
-      await this.postMetadataRepository.save(metadata);
-    } else {
-      // 기존 PostMetadata 업데이트
-      if (isEditorPick) {
-        metadata.setAsEditorPick();
+      
+      if (!metadata) {
+        // PostMetadata가 없으면 새로 생성
+        metadata = queryRunner.manager.create(PostMetadata, {
+          postId,
+          isEditorPick,
+          editorPickedAt: isEditorPick ? new Date() : null,
+        });
+        await queryRunner.manager.save(metadata);
       } else {
-        metadata.removeEditorPick();
+        // 기존 PostMetadata 업데이트
+        // Entity method won't work on plain object returned by queryRunner if not careful, 
+        // but TypeORM usually returns instances. Safer to update manually.
+        await queryRunner.manager.update(PostMetadata, { postId }, {
+             isEditorPick: isEditorPick,
+             editorPickedAt: isEditorPick ? new Date() : null,
+        });
+        
+        // Re-fetch for logic below if needed, or just proceed knowing the state
       }
-      await this.postMetadataRepository.save(metadata);
-    }
 
-    // FIFO: Editor's Pick 제한 (최대 5개)
-    if (isEditorPick) {
-      // 현재 Editor's Pick 목록 조회 (최신순)
-      const currentPicks = await this.postMetadataRepository.find({
-        where: { isEditorPick: true },
-        order: { editorPickedAt: "DESC" },
+      // 2. Post 엔티티 업데이트 (동기화 복구: Atomic Double-Write)
+      // "Post" 테이블은 읽기 전용 캐시(Denormalization) 역할을 하므로
+      // "PostMetadata"와 항상 동일한 상태를 유지해야 함.
+      await queryRunner.manager.update(
+        Post,
+        { id: postId },
+        {
+          isEditorPick: isEditorPick,
+          editorPickedAt: isEditorPick ? new Date() : null,
+        },
+      );
+
+      // 3. FIFO: Editor's Pick 제한 (최대 5개) logic adapted for Transaction
+      if (isEditorPick) {
+        // 현재 Editor's Pick 목록 조회 (최신순)
+        const currentPicks = await queryRunner.manager.find(PostMetadata, {
+          where: { isEditorPick: true },
+          order: { editorPickedAt: "DESC" },
+        });
+
+        // 5개 초과 시 가장 오래된 pick 제거
+        if (currentPicks.length > 5) { // If we just added one, and it was 5 before, now it is 6.
+           // Removing picks beyond 5
+           const picksToRemove = currentPicks.slice(5);
+           for (const pick of picksToRemove) {
+               await queryRunner.manager.update(PostMetadata, { postId: pick.postId }, {
+                   isEditorPick: false,
+                   editorPickedAt: null
+               });
+               // Also sync Post table for removal!
+               await queryRunner.manager.update(Post, { id: pick.postId }, {
+                   isEditorPick: false,
+                   editorPickedAt: null
+               });
+               this.logger.log(`Removed oldest Editor's Pick: ${pick.postId} (limit exceeded)`);
+           }
+        }
+      }
+
+      await queryRunner.commitTransaction();
+
+      // Editor's Pick 캐시 무효화 이벤트 발행 (After Commit)
+      this.eventEmitter.emit(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, {
+        postId,
+        isPicked: isEditorPick,
       });
 
-      // 5개 초과 시 가장 오래된 pick 제거
-      if (currentPicks.length >= 5) {
-        const oldestPick = currentPicks[currentPicks.length - 1];
-        oldestPick.removeEditorPick();
-        await this.postMetadataRepository.save(oldestPick);
-        this.logger.log(
-          `Removed oldest Editor's Pick: ${oldestPick.postId} (limit exceeded)`,
-        );
-      }
+      // 기존 캐시 무효화
+      this.eventEmitter.emit("cache.posts.invalidate", {
+        postId,
+        blogId: post.blogId,
+        isPublished: post.isPublished,
+      });
+
+      this.logger.log(`Set Editor's Pick for post: ${postId} to ${isEditorPick}`);
+
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`Failed to set editor pick for post ${postId}:`, error);
+      throw error;
+    } finally {
+      await queryRunner.release();
     }
-
-    // Post 테이블 업데이트 제거 - 트리거 재귀 호출 방지
-    // PostMetadata가 단일 데이터 소스이므로 posts 테이블 업데이트 불필요
-
-    // Editor's Pick 캐시 무효화 이벤트 발행
-    this.eventEmitter.emit(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, {
-      postId,
-      isPicked: isEditorPick,
-    });
-
-    // 기존 캐시 무효화
-    this.eventEmitter.emit("cache.posts.invalidate", {
-      postId,
-      blogId: post.blogId,
-      isPublished: post.isPublished,
-    });
-
-    this.logger.log(`Set Editor's Pick for post: ${postId} to ${isEditorPick}`);
   }
 
   /**
