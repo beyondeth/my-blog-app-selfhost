@@ -1,11 +1,12 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { FiMoreVertical, FiFlag, FiEdit2, FiTrash2 } from 'react-icons/fi';
 import { Avatar } from '@/components/ui/avatar';
 import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface Comment {
   id: string;
@@ -42,6 +43,9 @@ export default function CommentItemWithReport({
 }: CommentItemWithReportProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
+  const closeDropdown = useCallback(() => setShowDropdown(false), []);
+
+  useMobileOverlayReset(closeDropdown, showDropdown);
   
   const isAuthor = currentUserId === comment.author.id;
 

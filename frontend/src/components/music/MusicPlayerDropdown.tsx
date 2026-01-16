@@ -18,6 +18,8 @@ import { useMusicStore } from '@/stores/musicStore';
 import { formatTime } from '@/types/music';
 import type { Track, SyncedLyricLine } from '@/types/music';
 import { GenreTabs } from './GenreTab';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 // ============================================
 // 아이콘 컴포넌트들
@@ -646,22 +648,25 @@ function MusicPlayerDropdownInner() {
   React.useEffect(() => {
     if (!isOpen) return;
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         handleClose();
       }
     };
 
     // 약간의 지연을 두어 버튼 클릭과 충돌 방지
+    const outsideEvent = getOutsideClickEvent();
     const timeoutId = setTimeout(() => {
-      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener(outsideEvent, handleClickOutside);
     }, 0);
 
     return () => {
       clearTimeout(timeoutId);
-      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener(outsideEvent, handleClickOutside);
     };
   }, [isOpen, handleClose]);
+
+  useMobileOverlayReset(handleClose, isOpen);
 
   // ESC 키로 닫기
   React.useEffect(() => {

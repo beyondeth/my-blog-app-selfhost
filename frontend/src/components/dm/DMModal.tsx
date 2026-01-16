@@ -7,6 +7,8 @@ import { useDMStore } from '@/stores/dmStore';
 import DMLayout from './DMLayout/DMLayout';
 import { useWindowSize } from '@/hooks/useWindowSize';
 import { useDMNotifications } from '@/hooks/useDMNotifications';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface DMModalProps {
   isOpen: boolean;
@@ -38,6 +40,13 @@ const DMModal: React.FC<DMModalProps> = ({
   const [isDragging, setIsDragging] = React.useState(false);
   const [dragStart, setDragStart] = React.useState({ x: 0, y: 0 });
   const [skipTransition, setSkipTransition] = React.useState(false);
+  const handleOverlayReset = useCallback(() => {
+    if (isOpen) {
+      onClose();
+    }
+  }, [isOpen, onClose]);
+
+  useMobileOverlayReset(handleOverlayReset, isOpen);
 
   /**
    * 핵심: Socket & SSE 연결 (모달이 열렸을 때만)
@@ -53,7 +62,7 @@ const DMModal: React.FC<DMModalProps> = ({
   // ESC key handler removed - modal should not close on ESC
 
   // Handle outside click
-  const handleOutsideClick = useCallback((e: MouseEvent) => {
+  const handleOutsideClick = useCallback((e: Event) => {
     const target = e.target as HTMLElement;
 
     // Portal로 렌더링된 모달들(신고, 차단 등)을 클릭한 경우 무시
@@ -121,10 +130,11 @@ const DMModal: React.FC<DMModalProps> = ({
 
   // Add/remove event listeners
   useEffect(() => {
+    const outsideEvent = getOutsideClickEvent();
     if (isOpen) {
       // Small delay for animation
       setTimeout(() => setIsVisible(true), 10);
-      document.addEventListener('mousedown', handleOutsideClick);
+      document.addEventListener(outsideEvent, handleOutsideClick);
       // Prevent body scroll when modal is open
       document.body.style.overflow = 'hidden';
     } else {
@@ -133,7 +143,7 @@ const DMModal: React.FC<DMModalProps> = ({
     }
 
     return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener(outsideEvent, handleOutsideClick);
       document.body.style.overflow = '';
     };
   }, [isOpen, handleOutsideClick]);

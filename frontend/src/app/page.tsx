@@ -479,6 +479,33 @@ function HomePageContent() {
     );
   }
 
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
+  const minSwipeDistance = 50;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchEnd(null); 
+    setTouchStart(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    setTouchEnd(e.targetTouches[0].clientX);
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStart || !touchEnd) return;
+    const distance = touchStart - touchEnd;
+    const isLeftSwipe = distance > minSwipeDistance;
+    const isRightSwipe = distance < -minSwipeDistance;
+
+    if (isLeftSwipe) {
+      handlePickNext();
+    } else if (isRightSwipe) {
+      handlePickPrev();
+    }
+  };
+
   return (
     <div className="w-full bg-white text-[#1B2430] dark:bg-[#0E141B] dark:text-[#E6EDF3]">
       <div className="max-w-7xl mx-auto px-6 pb-16 pt-6">
@@ -488,33 +515,13 @@ function HomePageContent() {
           <div className="space-y-6">
             <div className="max-w-[780px] mx-auto space-y-6">
               {/* Mobile Editor's Picks (Swipeable with Peek) */}
-              <div className="block sm:hidden -mx-6">
-                {isEditorPicksLoading ? (
-                  <div className="px-6">
-                    <div className="h-[240px] animate-pulse rounded-2xl border border-[#D9E0EA] bg-white shadow-sm dark:border-[#4B5563] dark:bg-[#0E141B]" />
-                  </div>
-                ) : editorPickPosts.length > 0 ? (
-                  <div className="flex overflow-x-auto snap-x snap-mandatory gap-4 px-6 pb-4 no-scrollbar touch-pan-x">
-                    {editorPickPosts.map((post, index) => {
-                       const postImage = post?.thumbnail || post?.images?.[0] || null;
-                       const wrapperClass = postImage
-                        ? 'min-w-[280px] snap-center flex-shrink-0 rounded-2xl border border-[#D9E0EA] bg-white shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#0E141B] h-[360px]'
-                        : 'min-w-[280px] snap-center flex-shrink-0 rounded-2xl border border-[#D9E0EA] bg-[#F7F9FC] shadow-sm overflow-hidden dark:border-[#4B5563] dark:bg-[#131A22] h-[360px]';
-                        
-                       return (
-                        <div key={post.id} className={wrapperClass}>
-                          <EditorPickCard post={post} priority={index < 2} />
-                        </div>
-                       );
-                    })}
-                  </div>
-                ) : null}
-              </div>
-
-              {/* Desktop Editor's Picks (Slideshow) */}
+              {/* Unified Editor's Picks (Slideshow with Swipe) */}
               <div 
-                className={`hidden sm:block ${editorPickWrapperClass} h-[360px] rounded-2xl`}
+                className={`${editorPickWrapperClass} h-[360px] rounded-2xl relative touch-pan-y`}
                 onClick={() => router.push(editorPickHref)}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
               >
                   {isEditorPicksLoading ? (
                     <div className="h-full w-full animate-pulse bg-gray-100 dark:bg-gray-800" />
@@ -526,7 +533,7 @@ function HomePageContent() {
                     <>
                        <EditorPickCard post={activePick} priority={true} />
                        
-                       {/* Controls for Desktop */}
+                       {/* Controls */}
                         <div className="absolute inset-x-0 bottom-4 z-10 grid grid-cols-[1fr_auto_1fr] items-center px-6 pointer-events-none">
                             <div />
                             {shouldShowPickIndicators && (
@@ -556,16 +563,22 @@ function HomePageContent() {
                         <>
                           <button
                             type="button"
-                            onClick={handlePickPrev}
-                            className="absolute left-6 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePickPrev();
+                            }}
+                            className="hidden sm:block absolute left-6 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                             aria-label="이전 Editor's Pick"
                           >
                             <ChevronLeft className="h-5 w-5" />
                           </button>
                           <button
                             type="button"
-                            onClick={handlePickNext}
-                            className="absolute right-6 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePickNext();
+                            }}
+                            className="hidden sm:block absolute right-6 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
                             aria-label="다음 Editor's Pick"
                           >
                             <ChevronRight className="h-5 w-5" />

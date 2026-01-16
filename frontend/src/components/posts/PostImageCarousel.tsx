@@ -49,16 +49,16 @@ const CarouselItem = ({
   };
 
   const wrapperClasses = cn(
-    'relative w-full h-full overflow-hidden rounded-xl border transition-shadow duration-300',
+    'relative w-full overflow-hidden rounded-xl border transition-shadow duration-300 aspect-[700/540]',
     isHomeFeed
       ? 'bg-[#EEF3F8] dark:bg-[#1A232E] border-[#D9E0EA] dark:border-[#2A3645]'
       : 'bg-gray-100 dark:bg-gray-800',
   );
 
   return (
-    <div 
+    <div
       className={cn(
-        "flex-shrink-0 snap-center relative aspect-[700/540] first:pl-0 last:mr-4",
+        "flex-shrink-0 snap-center relative first:pl-0 last:mr-4",
         isSingle ? "w-full" : "w-[95%]"
       )}
       onClick={onClick}
@@ -66,10 +66,10 @@ const CarouselItem = ({
       <div className={wrapperClasses} style={wrapperStyle}>
         {isHomeFeed && backgroundStyle && (
           <div className="pointer-events-none absolute inset-0 z-0">
-            <div
-              className="absolute inset-0 bg-cover bg-center blur-xl scale-110 opacity-50 dark:opacity-40"
-              style={backgroundStyle}
-            />
+              <div
+                className="absolute inset-0 bg-cover bg-center blur-md md:blur-xl scale-110 opacity-50 dark:opacity-40"
+                style={backgroundStyle}
+              />
           </div>
         )}
         
@@ -238,7 +238,7 @@ export default function PostImageCarousel({
           {backgroundStyle && (
             <div className="pointer-events-none absolute inset-0 z-0">
               <div
-                className="absolute inset-0 bg-cover bg-center blur-3xl scale-110 opacity-70 dark:opacity-60 transition-opacity duration-300"
+                className="absolute inset-0 bg-cover bg-center blur-xl md:blur-3xl scale-110 opacity-70 dark:opacity-60 transition-opacity duration-300"
                 style={backgroundStyle}
               />
               <div className="absolute inset-0 bg-gradient-to-b from-white/40 via-white/5 to-black/30 dark:from-slate-900/30 dark:via-slate-900/10 dark:to-black/60" />

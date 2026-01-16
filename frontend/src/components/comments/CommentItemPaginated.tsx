@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { FiThumbsUp, FiThumbsDown, FiChevronRight, FiMoreVertical, FiEdit3, FiTrash2, FiFlag, FiCheckCircle, FiMessageCircle } from 'react-icons/fi';
 import { useQueryClient } from '@tanstack/react-query';
 import type { Comment } from '@/types';
@@ -23,6 +23,7 @@ import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { apiClient } from '@/lib/api';
 import type { CommentContext } from '@/lib/api/endpoints/comments';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 // 답글 아이템 컴포넌트
 interface ReplyItemProps {
@@ -59,6 +60,9 @@ function ReplyItem({
   const [showDropdown, setShowDropdown] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const isAuthor = user?.id === reply.author.id;
+  const closeDropdown = useCallback(() => setShowDropdown(false), []);
+
+  useMobileOverlayReset(closeDropdown, showDropdown);
 
   return (
     <div className="ml-8 py-2">
@@ -289,9 +293,11 @@ export default function CommentItemPaginated({
   const [isReplying, setIsReplying] = useState(false);
   const [showDropdown, setShowDropdown] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const closeDropdown = useCallback(() => setShowDropdown(false), []);
   // 각 답글에 대한 답글 폼 상태 관리
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
+  useMobileOverlayReset(closeDropdown, showDropdown);
 
   // 답글 페이지네이션 (lazy-load) - level 0만 직접 로드
   const {

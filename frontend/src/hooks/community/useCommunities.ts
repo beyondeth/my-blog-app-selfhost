@@ -47,7 +47,7 @@ export function useCommunities(options: Omit<GetCommunitiesQuery, 'cursor' | 'cu
   return useQuery<CursorPaginationResponse<Community>>({
     queryKey: communityQueryKeys.list({ limit, search, sortBy, includeNsfw, joinedOnly }),
     queryFn: () => communityService.getCommunities({ limit, search, sortBy, includeNsfw, joinedOnly }),
-    staleTime: 30 * 1000, // 30초
+    staleTime: 5 * 60 * 1000, // 5분
     gcTime: 5 * 60 * 1000, // 5분
   });
 }
@@ -92,7 +92,7 @@ export function useInfiniteCommunities(options: Omit<GetCommunitiesQuery, 'curso
       return undefined;
     },
     initialPageParam: {}, // 첫 요청은 커서 없이
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -145,7 +145,7 @@ export function useCommunity(slug: string, options?: { enabled?: boolean }) {
     queryKey: communityQueryKeys.detail(slug),
     queryFn: () => communityService.getCommunity(slug),
     enabled: options?.enabled !== false && !!slug,
-    staleTime: 30 * 1000,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

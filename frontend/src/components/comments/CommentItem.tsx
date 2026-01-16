@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import ModerationModal from '../admin/ModerationModal';
 import { FiEdit3, FiTrash2, FiMessageCircle, FiThumbsUp, FiThumbsDown, FiChevronRight, FiUser, FiMoreVertical, FiFlag, FiCheckCircle, FiShield } from 'react-icons/fi';
 
@@ -17,6 +17,7 @@ import ReportModal from '@/components/reports/ReportModal';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { formatRelativeTime } from '@/utils/timeFormat';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface CommentItemProps {
   comment: Comment;
@@ -46,6 +47,9 @@ export default function CommentItem({
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isModerationModalOpen, setIsModerationModalOpen] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
+  const closeDropdown = useCallback(() => setShowDropdown(false), []);
+
+  useMobileOverlayReset(closeDropdown, showDropdown);
 
   // Check if this comment is from post author
   const isPostAuthor = postAuthorId && comment.author.id === postAuthorId;

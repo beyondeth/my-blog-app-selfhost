@@ -44,10 +44,10 @@ export const postQueryKeys = {
 
 // 공통 쿼리 옵션
 const commonQueryOptions = {
-  gcTime: 5 * 60 * 1000, // 5분 (가비지 컬렉션 - 메모리 관리)
-  staleTime: 0, // 항상 최신 데이터 (캐시 일관성 보장)
-  refetchOnWindowFocus: true, // 탭 전환시 자동 갱신 (사용자가 탭으로 돌아올 때 최신 데이터 보장)
-  refetchOnMount: true, // 항상 마운트 시 refetch (최신 데이터 보장)
+  gcTime: 5 * 60 * 1000,
+  staleTime: 1 * 60 * 1000, // 1분간 캐시 유지 (탭 전환 시 깜빡임 방지)
+  refetchOnWindowFocus: false, // 탭 전환시 자동 갱신 비활성화
+  refetchOnMount: false, // 컴포넌트 마운트 시 불필요한 재요청 방지
   retry: 1,
 };
 

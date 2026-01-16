@@ -9,6 +9,7 @@ import { SOCKET_EVENTS } from '@/constants/chat';
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import MessageInput from './MessageInput';
+import { getOutsideClickEvent } from '@/utils/interaction';
 
 interface DMChatAreaProps {
   conversationId: string;
@@ -44,7 +45,7 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
 
   // 채팅창 외부 클릭 처리 - 대화방 나가기
   useEffect(() => {
-    const handleOutsideClick = (e: MouseEvent) => {
+    const handleOutsideClick = (e: Event) => {
       const target = e.target as HTMLElement;
 
       // Radix UI Portal 요소 무시 (Popover, Dialog 등)
@@ -64,12 +65,12 @@ const DMChatArea: React.FC<DMChatAreaProps> = ({ conversationId }) => {
       }
     };
 
-    // mousedown 이벤트 리스너 추가
-    document.addEventListener('mousedown', handleOutsideClick);
+    const outsideEvent = getOutsideClickEvent();
+    document.addEventListener(outsideEvent, handleOutsideClick);
 
     // 클린업
     return () => {
-      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener(outsideEvent, handleOutsideClick);
     };
   }, [conversationId, socket]);
 

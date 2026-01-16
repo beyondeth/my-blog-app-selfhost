@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
@@ -20,6 +20,8 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import { toast } from 'sonner';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 export default function BookmarksPage() {
   const router = useRouter();
@@ -28,6 +30,7 @@ export default function BookmarksPage() {
   const [sortBy, setSortBy] = useState<'recent' | 'popular' | 'oldest'>('recent');
   const [page, setPage] = useState(1);
   const [showDeleteMenu, setShowDeleteMenu] = useState<string | null>(null);
+  const closeDeleteMenu = useCallback(() => setShowDeleteMenu(null), []);
 
   // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
   // 인증 로딩 중에는 리다이렉트하지 않음
@@ -39,10 +42,13 @@ export default function BookmarksPage() {
 
   useEffect(() => {
     if (!showDeleteMenu) return;
-    const handleOutsideClick = () => setShowDeleteMenu(null);
-    document.addEventListener('click', handleOutsideClick);
-    return () => document.removeEventListener('click', handleOutsideClick);
-  }, [showDeleteMenu]);
+    const handleOutsideClick = () => closeDeleteMenu();
+    const outsideEvent = getOutsideClickEvent();
+    document.addEventListener(outsideEvent, handleOutsideClick);
+    return () => document.removeEventListener(outsideEvent, handleOutsideClick);
+  }, [showDeleteMenu, closeDeleteMenu]);
+
+  useMobileOverlayReset(closeDeleteMenu, Boolean(showDeleteMenu));
 
   // 북마크 목록 가져오기
   const { data, isLoading, error } = useBookmarks(page, 20);
@@ -117,7 +123,7 @@ export default function BookmarksPage() {
   }
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen pt-20">
       {/* 헤더 영역 - 검색, 필터, 정렬 통합 */}
       <div className="border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

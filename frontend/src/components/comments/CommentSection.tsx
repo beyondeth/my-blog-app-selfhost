@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { FiMessageCircle, FiTrendingUp, FiClock, FiMenu, FiChevronDown, FiCheck } from 'react-icons/fi';
 import { useComments, useCreateComment, useUpdateComment, useDeleteComment } from '@/hooks/useComments';
 import CommentForm from './CommentForm';
@@ -8,6 +8,8 @@ import CommentList from './CommentList';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import { CommentProvider, useCommentStore } from '@/contexts/CommentContext';
+import { getOutsideClickEvent } from '@/utils/interaction';
+import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface CommentSectionProps {
   postId: string;
@@ -32,22 +34,30 @@ function CommentSectionContent({ postId, postAuthorId, totalCommentCount }: Comm
     setRepliesExpanded(parentId, true);
   };
 
+  const closeSortDropdown = useCallback(() => {
+    setShowSortDropdown(false);
+  }, []);
+
   // 드롭다운 외부 클릭 감지
   useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: Event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setShowSortDropdown(false);
+        closeSortDropdown();
       }
     };
 
     if (showSortDropdown) {
-      document.addEventListener('mousedown', handleClickOutside);
+      const outsideEvent = getOutsideClickEvent();
+      document.addEventListener(outsideEvent, handleClickOutside);
+      return () => {
+        document.removeEventListener(outsideEvent, handleClickOutside);
+      };
     }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showSortDropdown]);
+    return undefined;
+  }, [showSortDropdown, closeSortDropdown]);
+
+  useMobileOverlayReset(closeSortDropdown, showSortDropdown);
   
   const createCommentMutation = useCreateComment(postId, handleReplyAdded);
   const updateCommentMutation = useUpdateComment(postId);
