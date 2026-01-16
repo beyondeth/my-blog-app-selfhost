@@ -572,8 +572,16 @@ export class PostCreationService {
           post.isEditorPick = updatePostDto.isEditorPick;
           if (updatePostDto.isEditorPick) {
             post.editorPickedAt = new Date();
+            if (post.metadata) {
+              post.metadata.setAsEditorPick();
+              await manager.save(post.metadata);
+            }
           } else {
             post.editorPickedAt = null;
+            if (post.metadata) {
+              post.metadata.removeEditorPick();
+              await manager.save(post.metadata);
+            }
           }
         }
 
@@ -695,10 +703,29 @@ export class PostCreationService {
           ],
         });
 
-        const isEditorPick =
-          finalPost?.metadata?.isEditorPick ?? finalPost?.isEditorPick ?? false;
-        if (isEditorPick) {
-          await this.postCacheService.invalidateEditorPicksCache(updatedPost.id);
+        // isEditorPick 변경 시 이벤트 발행 (관리자 업데이트)
+        if (
+          updatePostDto.isEditorPick !== undefined &&
+          user.role === Role.ADMIN
+        ) {
+          this.eventEmitter.emit(
+            CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED,
+            {
+              postId: updatedPost.id,
+              isPicked: updatePostDto.isEditorPick,
+            },
+          );
+        } else {
+          // 기존 로직 유지: 에디터 픽인 게시글이 수정된 경우 캐시 무효화
+          const isEditorPick =
+            finalPost?.metadata?.isEditorPick ??
+            finalPost?.isEditorPick ??
+            false;
+          if (isEditorPick) {
+            await this.postCacheService.invalidateEditorPicksCache(
+              updatedPost.id,
+            );
+          }
         }
 
         return finalPost || updatedPost;
