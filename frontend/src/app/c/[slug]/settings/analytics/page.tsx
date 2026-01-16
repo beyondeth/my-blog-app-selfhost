@@ -18,6 +18,7 @@ import { SETTINGS_CARD_CLASS } from '@/app/settings/theme';
 import { Button } from '@/components/ui/button';
 import CommunityAdminLayout from '@/components/community/CommunityAdminLayout';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 
 // ApexCharts SSR 방지
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
@@ -424,12 +425,13 @@ export default function CommunityAnalyticsPage({ params }: CommunityAnalyticsPag
                       <span className="text-lg font-bold text-gray-400 w-6 text-center">
                         {index + 1}
                       </span>
-                      <div className="w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
+                      <div className="relative w-8 h-8 rounded-full bg-gray-200 dark:bg-gray-700 overflow-hidden">
                         {contributor.profileImage ? (
-                          <img
+                          <Image
                             src={contributor.profileImage}
                             alt={contributor.username}
-                            className="w-full h-full object-cover"
+                            fill
+                            className="object-cover"
                           />
                         ) : (
                           <div className="w-full h-full flex items-center justify-center text-gray-500 dark:text-gray-300 text-sm font-medium">

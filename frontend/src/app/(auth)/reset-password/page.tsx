@@ -80,7 +80,7 @@ function ResetPasswordPageContent() {
     };
     setPasswordStrength(strength);
     if (error) setError(null); // Clear error on input change
-  }, [password]);
+  }, [password, error]);
 
   const validatePassword = () => {
     setError(null);

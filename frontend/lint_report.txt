@@ -1,0 +1,27 @@
+
+> frontend@0.1.0 lint /Users/sihyungpark/Desktop/code/my-blog-app/frontend
+> eslint .
+
+
+/Users/sihyungpark/Desktop/code/my-blog-app/frontend/src/app/(auth)/reset-password/page.tsx
+  83:6  warning  React Hook useEffect has a missing dependency: 'error'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/sihyungpark/Desktop/code/my-blog-app/frontend/src/app/admin/editor-picks/page.tsx
+  99:9  warning  The 'editorPickPosts' logical expression could make the dependencies of useMemo Hook (at line 127) change on every render. To fix this, wrap the initialization of 'editorPickPosts' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  99:9  warning  The 'editorPickPosts' logical expression could make the dependencies of useMemo Hook (at line 140) change on every render. To fix this, wrap the initialization of 'editorPickPosts' in its own useMemo() Hook  react-hooks/exhaustive-deps
+  99:9  warning  The 'editorPickPosts' logical expression could make the dependencies of useMemo Hook (at line 149) change on every render. To fix this, wrap the initialization of 'editorPickPosts' in its own useMemo() Hook  react-hooks/exhaustive-deps
+
+/Users/sihyungpark/Desktop/code/my-blog-app/frontend/src/app/admin/moderation/logs/page.tsx
+  65:6  warning  React Hook useEffect has a missing dependency: 'fetchLogs'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/sihyungpark/Desktop/code/my-blog-app/frontend/src/app/c/[slug]/settings/analytics/page.tsx
+  429:27  warning  Using `<img>` could result in slower LCP and higher bandwidth. Consider using `<Image />` from `next/image` to automatically optimize images. This may incur additional usage or cost from your provider. See: https://nextjs.org/docs/messages/no-img-element  @next/next/no-img-element
+
+/Users/sihyungpark/Desktop/code/my-blog-app/frontend/src/components/admin/ModerationModal.tsx
+  44:6  warning  React Hook useEffect has a missing dependency: 'fetchContext'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+/Users/sihyungpark/Desktop/code/my-blog-app/frontend/src/providers/SocketProvider.tsx
+  147:6  warning  React Hook useEffect has a missing dependency: 'socket'. Either include it or remove the dependency array  react-hooks/exhaustive-deps
+
+✖ 8 problems (0 errors, 8 warnings)
+
