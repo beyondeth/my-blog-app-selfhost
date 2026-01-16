@@ -61,8 +61,8 @@ export function useEditorPicks(limit: number = 5) {
 
       return response.json();
     },
-    staleTime: 30 * 1000,  // 30초 동안 fresh 상태 유지 (실시간성 확보)
-    gcTime: 5 * 60 * 1000,  // 5분 동안 캐시 유지
+    staleTime: 0,  // 항상 최신 데이터 확인 (캐시 정책 개선)
+    gcTime: 1 * 60 * 1000,  // 1분간 캐시 보관 (백그라운드 사용)
     refetchOnWindowFocus: true,  // 윈도우 포커스 시 자동 리프레시
     refetchOnReconnect: true,   // 재연결 시 자동 리프레시
   });
@@ -88,8 +88,8 @@ export function useAdminEditorPicks(limit: number = 10) {
 
       return response.json();
     },
-    staleTime: 30 * 1000,
-    gcTime: 5 * 60 * 1000,
+    staleTime: 0,  // 항상 최신 데이터 확인 (캐시 정책 개선)
+    gcTime: 1 * 60 * 1000,  // 1분간 캐시 보관
     refetchOnWindowFocus: true,
     refetchOnReconnect: true,
   });

@@ -412,6 +412,11 @@ export function useDeletePost() {
         queryKey: feedQueryKeys.all,
         refetchType: 'none'
       });
+
+      // ⬇️ 추가: Editor's Pick 캐시 무효화 (삭제된 포스트가 목록에서 즉시 제거)
+      queryClient.invalidateQueries({ queryKey: ['editorPicks'] });
+      queryClient.invalidateQueries({ queryKey: ['adminEditorPicks'] });
+      queryClient.invalidateQueries({ queryKey: ['posts', 'home'] });
     }
   }, [mutation.isSuccess, queryClient]);
 
