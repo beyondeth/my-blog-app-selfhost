@@ -481,7 +481,7 @@ function HomePageContent() {
 
   return (
     <div className="w-full bg-white text-[#1B2430] dark:bg-[#0E141B] dark:text-[#E6EDF3]">
-      <div className="max-w-7xl mx-auto px-6 pb-16 pt-16">
+      <div className="max-w-7xl mx-auto px-6 pb-16 pt-6">
         <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
         {/* Main Content Area */}
         <main className="flex-1 min-w-0 pt-0">
