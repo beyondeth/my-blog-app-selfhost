@@ -93,6 +93,8 @@ function HomePageContent() {
   const { data: editorPickData, isLoading: isEditorPicksLoading } = useEditorPicks(5);
   const editorPickPosts = editorPickData?.posts ?? [];
   const [activePickIndex, setActivePickIndex] = useState(0);
+  const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const activePick = editorPickPosts[activePickIndex];
   const activePickImage = activePick?.thumbnail || activePick?.images?.[0] || null;
   const activePickAuthor = activePick?.author;
@@ -114,11 +116,12 @@ function HomePageContent() {
     }
   }, [activePickIndex, editorPickPosts.length]);
 
+  const firstPickId = editorPickPosts[0]?.id;
   useEffect(() => {
     if (editorPickPosts.length > 0) {
       setActivePickIndex(0);
     }
-  }, [editorPickPosts[0]?.id]);
+  }, [firstPickId, editorPickPosts.length]);
 
   const handlePickPrev = useCallback((e?: React.MouseEvent) => {
     e?.stopPropagation();
@@ -479,8 +482,7 @@ function HomePageContent() {
     );
   }
 
-  const [touchStart, setTouchStart] = useState<number | null>(null);
-  const [touchEnd, setTouchEnd] = useState<number | null>(null);
+
 
   const minSwipeDistance = 50;
 

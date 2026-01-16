@@ -144,7 +144,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       // 하지만 isConnecting 상태는 초기화해야 함
       isConnecting.current = false;
     };
-  }, [authStatus, isAuthenticated, user]); // 인증 상태/사용자 변경 시 실행
+  }, [authStatus, isAuthenticated, user, socket]); // 인증 상태/사용자 변경 시 실행
 
   // 로그아웃 이벤트 리스너 (AuthEvents)
   useEffect(() => {

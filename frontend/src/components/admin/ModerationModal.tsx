@@ -1,8 +1,7 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { defaultApiClient as api } from '@/lib/api';
 import { toast } from 'react-hot-toast';
@@ -37,13 +36,7 @@ export default function ModerationModal({ isOpen, onClose, targetType, targetId 
   const [action, setAction] = useState<'BAN_USER' | 'BLOCK_IP' | 'WARN'>('WARN');
   const [suspendDuration, setSuspendDuration] = useState<string>('permanent'); // permanent, 1, 3, 7, 30, 90
 
-  useEffect(() => {
-    if (isOpen && targetId) {
-      fetchContext();
-    }
-  }, [isOpen, targetId]);
-
-  const fetchContext = async () => {
+  const fetchContext = useCallback(async () => {
     setIsLoading(true);
     try {
       const data = await api.get<ModerationContext>(`/moderation/context/${targetType}/${targetId}`);
@@ -54,7 +47,13 @@ export default function ModerationModal({ isOpen, onClose, targetType, targetId 
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [targetType, targetId]);
+
+  useEffect(() => {
+    if (isOpen && targetId) {
+      fetchContext();
+    }
+  }, [isOpen, targetId, fetchContext]);
 
   const handleSubmit = async () => {
     if (!reason.trim()) {
