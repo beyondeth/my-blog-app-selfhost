@@ -77,7 +77,11 @@ const HomeFeedPlaceholderCard = ({ hasImage = true }: { hasImage?: boolean }) =>
   </div>
 );
 
-export default function HomePageClient() {
+interface HomePageClientProps {
+  isMobile?: boolean;
+}
+
+export default function HomePageClient({ isMobile = false }: HomePageClientProps) {
   const { user, isAuthenticated, isAdmin } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -634,43 +638,45 @@ export default function HomePageClient() {
           </main>
 
           {/* Sidebar - sticky positioning */}
-          <aside className="hidden lg:block lg:sticky lg:top-28 lg:h-[calc(100vh-7rem)] lg:overflow-y-auto sidebar-scroll bg-white dark:bg-[#0E141B]">
-          <div className="space-y-4 sm:space-y-6">
-            {/* My Communities - 최상단 */}
-            {user && (
-              <Suspense fallback={<div className="h-72 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
-                <MyCommunitiesSection />
-              </Suspense>
-            )}
+          {!isMobile && (
+            <aside className="hidden lg:block lg:sticky lg:top-28 lg:h-[calc(100vh-7rem)] lg:overflow-y-auto sidebar-scroll bg-white dark:bg-[#0E141B]">
+            <div className="space-y-4 sm:space-y-6">
+              {/* My Communities - 최상단 */}
+              {user && (
+                <Suspense fallback={<div className="h-72 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
+                  <MyCommunitiesSection />
+                </Suspense>
+              )}
 
-            {/* Trending Community Posts */}
-            <Suspense fallback={<div className="h-64 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
-              <TrendingCommunityPostsSection />
-            </Suspense>
-
-            {/* Popular Blog Posts */}
-            <Suspense fallback={<div className="h-96 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
-              <PopularPostsSection />
-            </Suspense>
-
-            {/* Connections 섹션 - Lazy Loading */}
-            {user && (
+              {/* Trending Community Posts */}
               <Suspense fallback={<div className="h-64 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
-                <ConnectionsSection userId={user.id} />
+                <TrendingCommunityPostsSection />
               </Suspense>
-            )}
 
-            <SidebarCtaSection />
+              {/* Popular Blog Posts */}
+              <Suspense fallback={<div className="h-96 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
+                <PopularPostsSection />
+              </Suspense>
 
-            {/* Writing Styles (Promo) - 최하단 */}
-            <Suspense fallback={<div className="h-48 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
-              <PromoCarouselSection />
-            </Suspense>
+              {/* Connections 섹션 - Lazy Loading */}
+              {user && (
+                <Suspense fallback={<div className="h-64 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
+                  <ConnectionsSection userId={user.id} />
+                </Suspense>
+              )}
 
-            {/* 사이드바 푸터 */}
-            <SidebarFooter />
-          </div>
-          </aside>
+              <SidebarCtaSection />
+
+              {/* Writing Styles (Promo) - 최하단 */}
+              <Suspense fallback={<div className="h-48 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>
+                <PromoCarouselSection />
+              </Suspense>
+
+              {/* 사이드바 푸터 */}
+              <SidebarFooter />
+            </div>
+            </aside>
+          )}
         </div>
       </div>
 

@@ -21,32 +21,6 @@ import { Plus, Users } from 'lucide-react';
 export default function BottomNavBar() {
   const { user } = useAuth();
   const pathname = usePathname();
-  const router = useRouter();
-
-  // 글쓰기 버튼 클릭 핸들러
-  const handleWriteClick = useCallback((e: React.MouseEvent) => {
-    e.preventDefault();
-
-    if (!user) {
-      router.push('/login');
-      return;
-    }
-
-    if (user.blogSlug) {
-      router.push('/new-story');
-    } else {
-      console.error('User does not have a blog. This should not happen for new users.');
-      router.push('/');
-    }
-  }, [user, router]);
-
-  // 로그인 필요 페이지 클릭 핸들러
-  const handleAuthRequiredClick = useCallback((e: React.MouseEvent, href: string) => {
-    if (!user) {
-      e.preventDefault();
-      router.push('/login');
-    }
-  }, [user, router]);
 
   // Admin, 로그인, 회원가입 페이지에서는 바텀바를 숨김
   const isAdminPage = pathname?.startsWith('/admin');
@@ -55,8 +29,10 @@ export default function BottomNavBar() {
     return null;
   }
 
+  const writeHref = !user ? '/login' : (user.blogSlug ? '/new-story' : '/');
+
   return (
-    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg z-50 overflow-visible">
+    <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-background border-t border-border shadow-lg z-50 overflow-visible touch-manipulation">
       <div className="grid grid-cols-5 items-center h-16 w-full px-3 overflow-visible">
         {/* 홈 버튼 - 항상 표시 */}
         <Link
@@ -87,25 +63,26 @@ export default function BottomNavBar() {
             <span className="hidden xs:block text-xs mt-0.5">내블로그</span>
           </Link>
         ) : (
-          <button
-            onClick={(e) => handleAuthRequiredClick(e, '/login')}
-            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0"
+          <Link
+            href="/login"
+            prefetch={true}
+            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0 touch-manipulation"
           >
             <MyBlogIcon size={16} />
             <span className="hidden xs:block text-xs mt-0.5">내블로그</span>
-          </button>
+          </Link>
         )}
 
         {/* 글쓰기 버튼 - 로그인 시에만 활성화 */}
         <div className="relative flex h-16 items-end justify-center">
-          <button
-            type="button"
-            onClick={handleWriteClick}
+          <Link
+            href={writeHref}
             aria-label="글쓰기"
-            className="absolute -top-4 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            prefetch={true}
+            className="absolute -top-4 z-10 flex h-14 w-14 items-center justify-center rounded-full bg-foreground text-background shadow-lg transition-transform active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-background touch-manipulation"
           >
             <Plus size={24} strokeWidth={2.5} />
-          </button>
+          </Link>
         </div>
 
         {/* 커뮤니티 버튼 - 항상 표시 */}
@@ -137,13 +114,14 @@ export default function BottomNavBar() {
             <span className="hidden xs:block text-xs mt-0.5">북마크</span>
           </Link>
         ) : (
-          <button
-            onClick={(e) => handleAuthRequiredClick(e, '/login')}
-            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0"
+          <Link
+            href="/login"
+            prefetch={true}
+            className="flex flex-col items-center justify-center text-muted-foreground opacity-50 min-w-0 touch-manipulation"
           >
             <BookmarkIcon size={16} />
             <span className="hidden xs:block text-xs mt-0.5">북마크</span>
-          </button>
+          </Link>
         )}
       </div>
     </nav>
