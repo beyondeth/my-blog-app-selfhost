@@ -2,7 +2,10 @@ import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query
 import { getUnifiedFeed, getEditorPicks } from '@/services/api/feed.service';
 import HomePageClient from '@/components/home/HomePageClient';
 
-export default async function HomePage() {
+export const revalidate = 60; // ISR 60 seconds
+
+export default async function DesktopHomePage() {
+
   const queryClient = new QueryClient();
 
   // Prefetch Unified Feed (Client Component의 useUnifiedFeed 기본값과 일치시켜야 함)
@@ -20,7 +23,7 @@ export default async function HomePage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <HomePageClient />
+      <HomePageClient isMobile={false} />
     </HydrationBoundary>
   );
 }

@@ -4,6 +4,18 @@ import type { NextRequest } from 'next/server';
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // Mobile/Desktop Routing (Code Splitting) logic
+  if (pathname === '/') {
+    const userAgent = request.headers.get('user-agent') || '';
+    const isMobile = /mobile|android|iphone|ipad|ipod/i.test(userAgent);
+
+    if (isMobile) {
+      return NextResponse.rewrite(new URL('/mobile', request.url));
+    } else {
+      return NextResponse.rewrite(new URL('/desktop', request.url));
+    }
+  }
+
   // Protected routes logic
   const protectedRoutes = ['/bookmarks', '/new-story', '/settings'];
   const isProtectedRoute = protectedRoutes.some(route => pathname.startsWith(route));
@@ -38,8 +50,9 @@ export async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     /*
-     * Match protected routes and alias routes
+     * Match protected routes, alias routes, and root path
      */
+    '/',
     '/bookmarks/:path*',
     '/new-story/:path*',
     '/settings/:path*',
