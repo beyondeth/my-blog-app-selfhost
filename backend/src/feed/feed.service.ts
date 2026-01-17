@@ -376,19 +376,19 @@ export class FeedService {
           p.id,
           p.title,
           p.slug,
-          pm.excerpt,
+          p.excerpt,
           p.content as content_html,
-          pm.tags as tags,
+          p.tags as tags,
           f.file_url as thumbnail,
           'blog'::text as source_type,
           p."blogId" as source_id,
           NULL::uuid as community_id,
           p."authorId" as author_id,
-          COALESCE(ps."likeCount", 0) as like_count,
-          COALESCE(ps."upvoteCount", 0) as upvote_count,
-          COALESCE(ps."downvoteCount", 0) as downvote_count,
-          COALESCE(ps."commentCount", 0) as comment_count,
-          COALESCE(ps."viewCount", 0) as view_count,
+          COALESCE(p."like_count", 0) as like_count,
+          COALESCE(p."like_count", 0) as upvote_count,
+          0 as downvote_count,
+          COALESCE(p."comment_count", 0) as comment_count,
+          COALESCE(p."view_count", 0) as view_count,
           p."createdAt" as created_at,
           p."updatedAt" as updated_at,
           pl_user.type as user_vote,
@@ -411,8 +411,6 @@ export class FeedService {
           u.username,
           pr."profileImage"
         FROM posts p
-        LEFT JOIN post_metadata pm ON pm."postId" = p.id
-        LEFT JOIN post_stats ps ON ps."postId" = p.id
         LEFT JOIN post_likes pl_user ON pl_user."postId" = p.id AND pl_user."userId" = ${userParamPlaceholder}
         LEFT JOIN files f ON f.id = p."thumbnail_image_id"
         LEFT JOIN blogs b ON b.id = p."blogId"

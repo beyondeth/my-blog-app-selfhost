@@ -126,6 +126,7 @@ export interface GetUnifiedFeedParams {
  * 통합 피드 조회
  *
  * @param params 조회 파라미터
+ * @param init Fetch 옵션 (Server Component에서 쿠키 전달 시 사용)
  * @returns 피드 응답
  *
  * @example
@@ -133,6 +134,7 @@ export interface GetUnifiedFeedParams {
  */
 export async function getUnifiedFeed(
   params: GetUnifiedFeedParams = {},
+  init?: RequestInit,
 ): Promise<UnifiedFeedResponse> {
   const { cursor, limit = 20, filter = 'all', sort = 'recent', period } = params;
 
@@ -147,13 +149,38 @@ export async function getUnifiedFeed(
   const response = await fetch(`${API_URL}/feed?${queryParams.toString()}`, {
     method: 'GET',
     credentials: 'include',
+    ...init,
     headers: {
       'Content-Type': 'application/json',
+      ...init?.headers,
     },
   });
 
   if (!response.ok) {
     throw new Error(`피드 조회 실패: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+/**
+ * Editor's Pick 목록 조회
+ * @param limit 조회할 개수 (기본: 5)
+ */
+export async function getEditorPicks(limit: number = 5): Promise<{ posts: any[]; total: number }> {
+  const response = await fetch(
+    `${API_URL}/posts/editor-picks?limit=${limit}`,
+    {
+      method: 'GET',
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error('Editor\'s Pick 목록을 불러올 수 없습니다.');
   }
 
   return response.json();

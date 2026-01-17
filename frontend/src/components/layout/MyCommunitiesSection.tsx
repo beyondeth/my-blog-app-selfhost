@@ -4,13 +4,14 @@ import { useMemo, useState, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Users, ChevronDown, ChevronUp, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 
 import SidebarSection from './SidebarSection';
 import { useInfiniteCommunities } from '@/hooks/community/useCommunities';
-import { useCommunityRecentPosts } from '@/hooks/community/useCommunityRecentPosts';
+import { getRecentPostsBatch } from '@/services/api/community.service';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { cn } from '@/lib/utils';
-import type { Community } from '@/types/community';
+import type { Community, CommunityPost } from '@/types/community';
 
 const MAX_COMMUNITIES = 4;
 
@@ -21,18 +22,20 @@ interface CommunityRecentPostsProps {
   communitySlug: string;
   isExpanded: boolean;
   onToggle: () => void;
+  posts?: CommunityPost[];
+  isLoading: boolean;
 }
 
-const CommunityRecentPosts = ({ communitySlug, isExpanded, onToggle }: CommunityRecentPostsProps) => {
-  const { data: posts, isLoading, error } = useCommunityRecentPosts(communitySlug, {
-    enabled: isExpanded,
-    limit: 3,
-  });
-
+const CommunityRecentPosts = ({ communitySlug, isExpanded, onToggle, posts, isLoading }: CommunityRecentPostsProps) => {
   return (
     <div className="mt-1">
       <button
         type="button"
+        onMouseDown={(e) => {
+           // Click 이벤트 대신 onMouseDown을 사용하여 포커스 이동 방지 및 반응 속도 향상
+           // Link 내부에서 클릭 시 이벤트 전파 방지가 중요함
+           e.stopPropagation();
+        }}
         onClick={(e) => {
           e.preventDefault();
           e.stopPropagation();
@@ -56,8 +59,6 @@ const CommunityRecentPosts = ({ communitySlug, isExpanded, onToggle }: Community
               <Loader2 className="h-3 w-3 animate-spin text-[#3F4A59] dark:text-[#E1E8F0]" />
               <span className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">로딩 중...</span>
             </div>
-          ) : error ? (
-            <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">불러오기 실패</p>
           ) : !posts || posts.length === 0 ? (
             <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">최신글이 없습니다</p>
           ) : (
@@ -86,9 +87,11 @@ interface CommunityCardProps {
   isExpanded: boolean;
   onToggle: () => void;
   renderImage: (iconUrl?: string | null, fallbackText?: string, fit?: 'cover' | 'contain') => React.ReactNode;
+  recentPosts?: CommunityPost[];
+  isLoadingPosts: boolean;
 }
 
-const CommunityCard = ({ community, isExpanded, onToggle, renderImage }: CommunityCardProps) => {
+const CommunityCard = ({ community, isExpanded, onToggle, renderImage, recentPosts, isLoadingPosts }: CommunityCardProps) => {
   return (
     <div className="py-3 px-5 first:pt-0 last:pb-0">
       <Link
@@ -107,6 +110,8 @@ const CommunityCard = ({ community, isExpanded, onToggle, renderImage }: Communi
         communitySlug={community.slug}
         isExpanded={isExpanded}
         onToggle={onToggle}
+        posts={recentPosts}
+        isLoading={isLoadingPosts}
       />
     </div>
   );
@@ -132,6 +137,17 @@ const MyCommunitiesSection = () => {
     () => data?.pages.flatMap((page) => page.items).slice(0, MAX_COMMUNITIES) ?? [],
     [data?.pages]
   );
+
+  // 커뮤니티 ID 목록 추출
+  const communityIds = useMemo(() => communities.map(c => c.id), [communities]);
+
+  // Batch API 호출
+  const { data: batchPosts, isLoading: isBatchLoading } = useQuery({
+    queryKey: ['communities', 'batch-recent-posts', communityIds],
+    queryFn: () => getRecentPostsBatch(communityIds),
+    enabled: communityIds.length > 0,
+    staleTime: 5 * 60 * 1000, // 5분 캐시
+  });
 
   // 커뮤니티 로드 후 모든 커뮤니티를 펼친 상태로 초기화
   useMemo(() => {
@@ -231,6 +247,8 @@ const MyCommunitiesSection = () => {
               isExpanded={expandedCommunities.has(community.id)}
               onToggle={() => toggleExpanded(community.id)}
               renderImage={renderImage}
+              recentPosts={batchPosts ? batchPosts[community.id] : undefined}
+              isLoadingPosts={isBatchLoading}
             />
           ))}
 

@@ -799,6 +799,29 @@ export async function incrementPostView(
     console.warn('Failed to increment post view');
   }
 }
+// =====================================================
+// 배치 조회 (성능 최적화)
+// =====================================================
+
+/**
+ * 커뮤니티별 최신 게시글 일괄 조회 (Batch API)
+ */
+export async function getRecentPostsBatch(
+  communityIds: string[],
+): Promise<Record<string, CommunityPost[]>> {
+  if (!communityIds.length) {
+    return {};
+  }
+  
+  const ids = communityIds.join(',');
+  const response = await fetch(`${API_URL}/community/batch/recent-posts?ids=${ids}`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+
+  return handleResponse(response);
+}
 
 // =====================================================
 // 댓글 CRUD
