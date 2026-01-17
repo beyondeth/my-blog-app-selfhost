@@ -85,6 +85,9 @@ const DMModal: React.FC<DMModalProps> = ({
 
   // Toggle minimize - 애니메이션 완전 제거
   const toggleMinimize = () => {
+    if (isFullscreen) {
+      setIsFullscreen(false);
+    }
     setSkipTransition(true);
     setIsMinimized(!isMinimized);
     // 다음 프레임에서 skipTransition 리셋

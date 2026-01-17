@@ -61,6 +61,7 @@ export default function BottomNavBar() {
         {/* 홈 버튼 - 항상 표시 */}
         <Link
           href="/"
+          prefetch={true}
           className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
             pathname === '/'
               ? 'text-primary'
@@ -75,6 +76,7 @@ export default function BottomNavBar() {
         {user && user.blogSlug ? (
           <Link
             href={`/${user.blogSlug}`}
+            prefetch={true}
             className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
               pathname === `/${user.blogSlug}`
                 ? 'text-primary'
@@ -109,6 +111,7 @@ export default function BottomNavBar() {
         {/* 커뮤니티 버튼 - 항상 표시 */}
         <Link
           href="/c"
+          prefetch={true}
           className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
             pathname?.startsWith('/c')
               ? 'text-primary'
@@ -123,6 +126,7 @@ export default function BottomNavBar() {
         {user ? (
           <Link
             href="/bookmarks"
+            prefetch={true}
             className={`flex flex-col items-center justify-center transition-colors min-w-0 ${
               pathname === '/bookmarks'
                 ? 'text-primary'
