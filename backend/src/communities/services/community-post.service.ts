@@ -394,6 +394,78 @@ export class CommunityPostService {
   }
 
   /**
+   * 여러 커뮤니티의 최신 게시글 일괄 조회 (Batch API)
+   * N+1 문제 해결용: 각 커뮤니티별 최신 N개 게시글 반환
+   */
+  async getRecentPostsForCommunities(
+    communityIds: string[],
+    limitPerCommunity = 3,
+  ): Promise<Map<string, CommunityPost[]>> {
+    if (!communityIds.length) {
+      return new Map();
+    }
+
+    // ROW_NUMBER()를 사용하여 커뮤니티별 최신 N개 추출
+    // Relation 로딩 편의성을 위해 ID만 먼저 Raw Query로 가져오고, 그 ID로 find 하는 방식 사용
+    const rawResult = await this.postRepository.query(
+      `
+      WITH RankedPosts AS (
+        SELECT id, "communityId",
+               ROW_NUMBER() OVER (PARTITION BY "communityId" ORDER BY "createdAt" DESC) as rn
+        FROM community_posts
+        WHERE "communityId" = ANY($1)
+          AND status = 'published'
+          AND "deletedAt" IS NULL
+      )
+      SELECT id
+      FROM RankedPosts
+      WHERE rn <= $2
+      `,
+      [communityIds, limitPerCommunity],
+    );
+
+    const postIds = rawResult.map((row: any) => row.id);
+
+    if (postIds.length === 0) {
+      return new Map();
+    }
+
+    // ID로 실제 엔티티 조회 (Relation 포함)
+    const posts = await this.postRepository.find({
+      where: { id: In(postIds) },
+      relations: [
+        "author",
+        "author.profile",
+        "flair",
+        "thumbnailImage",
+        "community",
+      ],
+      order: { createdAt: "DESC" },
+    });
+
+    posts.forEach((post) => this.enrichPostMetadata(post));
+
+    // Map으로 그룹핑
+    const result = new Map<string, CommunityPost[]>();
+    posts.forEach((post) => {
+      const list = result.get(post.communityId) || [];
+      list.push(post);
+      result.set(post.communityId, list);
+    });
+
+    // 각 커뮤니티 리스트 내부 정렬 보장 (createdAt DESC)
+    for (const [, list] of result.entries()) {
+      list.sort((a, b) => {
+        const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
+        const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+        return timeB - timeA;
+      });
+    }
+
+    return result;
+  }
+
+  /**
    * 게시물 목록 조회
    */
   async findAll(
