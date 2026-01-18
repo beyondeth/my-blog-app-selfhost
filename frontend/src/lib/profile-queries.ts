@@ -9,7 +9,7 @@ import type { User, LoginForm, RegisterForm } from '@/types';
 import { authEvents, emitLogin, emitLogout, emitTokenRefreshed, emitAuthError } from './auth/events';
 import { mixpanel } from '@/lib/mixpanel';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+const API_URL = (typeof window === 'undefined' ? process.env.BACKEND_API_URL : process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:3000/api/v1';
 
 /**
  * 토큰 갱신 관리 상태

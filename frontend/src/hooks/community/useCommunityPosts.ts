@@ -57,7 +57,7 @@ export function useCommunityPosts(
     },
     initialPageParam: undefined as string | undefined,
     enabled: !!communitySlug,
-    staleTime: 30 * 1000,
+    staleTime: 3 * 60 * 1000, // 3분간 캐시 유지 (탭 전환 시 즉시 렌더링)
   });
 }
 
@@ -74,7 +74,7 @@ export function useCommunityPost(
     queryFn: () => communityService.getPost(communitySlug, postSlug),
     enabled: options?.enabled !== false && !!communitySlug && !!postSlug,
     initialData: options?.initialData,
-    staleTime: 30 * 1000,
+    staleTime: 3 * 60 * 1000, // 3분간 캐시 유지
   });
 }
 
