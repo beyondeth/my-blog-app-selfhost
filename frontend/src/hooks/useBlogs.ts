@@ -20,7 +20,7 @@ export function useBlogBySlug(slug: string) {
     enabled: !!slug,
     // 캐싱 최적화: 페이지 이동 시 불필요한 API 호출 방지
     // 블로그 정보 변경 시에는 invalidateQueries로 명시적 갱신
-    staleTime: 30 * 1000,            // 30초간 fresh 유지 (페이지 이동 시 리페치 방지)
+    staleTime: 10 * 60 * 1000,       // 10분간 fresh 유지 (탭 전환 시 캐시 사용)
     gcTime: 10 * 60 * 1000,          // 10분간 메모리 보관
     refetchOnMount: true,            // stale일 때만 마운트 시 재페칭
     refetchOnWindowFocus: false,     // 포커스 시 재요청 안함 (수동 갱신)
@@ -135,7 +135,7 @@ async function fetchBlogCategoriesPage(blogSlug: string, cursor?: string): Promi
   return data;
 }
 
-export function useBlogCategories(blogSlug: string) {
+export function useBlogCategories(blogSlug: string, options?: { enabled?: boolean }) {
   // 캐시 키 정규화 - @ 제거
   const normalizedSlug = blogSlug.replace('@', '');
 
@@ -155,7 +155,7 @@ export function useBlogCategories(blogSlug: string) {
       return undefined;
     },
     initialPageParam: undefined,
-    enabled: !!blogSlug,
+    enabled: options?.enabled !== false && !!blogSlug, // enabled 옵션 추가
     staleTime: 5 * 60 * 1000, // 5분간 캐시
     gcTime: 10 * 60 * 1000, // 10분간 가비지 컬렉션 방지
   });

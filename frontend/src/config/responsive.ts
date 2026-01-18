@@ -89,7 +89,7 @@ export const DEVICE_RESOLUTIONS = {
  */
 export const BREAKPOINTS = {
   xs: '360px',   // 가장 작은 모바일 (Android 중저가형)
-  sm: '375px',   // 표준 모바일 (iPhone X 이후)
+  sm: '428px',   // 큰 모바일 (iPhone Pro Max 이상) - 홈 피드 카드 스타일 시작점
   md: '768px',   // 태블릿 세로 모드
   lg: '1024px',  // 태블릿 가로 모드 / 소형 데스크톱
   xl: '1280px',  // 데스크톱
@@ -101,7 +101,7 @@ export const BREAKPOINTS = {
  */
 export const BREAKPOINT_VALUES = {
   xs: 360,
-  sm: 375,
+  sm: 428,
   md: 768,
   lg: 1024,
   xl: 1280,
@@ -112,8 +112,8 @@ export const BREAKPOINT_VALUES = {
  * 디바이스 타입 Enum
  */
 export enum DeviceType {
-  MOBILE_SMALL = 'mobile-small',      // < 375px (Android 중저가형)
-  MOBILE_MEDIUM = 'mobile-medium',    // 375px ~ 768px (대부분의 스마트폰)
+  MOBILE_SMALL = 'mobile-small',      // < 360px (매우 작은 모바일)
+  MOBILE_MEDIUM = 'mobile-medium',    // 360px ~ 428px (대부분의 스마트폰)
   MOBILE_LARGE = 'mobile-large',      // 428px ~ 768px (큰 스마트폰)
   TABLET_PORTRAIT = 'tablet-portrait',   // 768px ~ 1024px (태블릿 세로)
   TABLET_LANDSCAPE = 'tablet-landscape', // 1024px ~ 1280px (태블릿 가로)

@@ -6,6 +6,7 @@ import { useRouter, useSearchParams, useParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfiniteCursorPosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useBlogBySlug, useBlogCategories } from '@/hooks/useBlogs';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 import { toast } from 'sonner';
@@ -55,11 +56,13 @@ export default function BlogPage() {
   const router = useRouter();
   const params = useParams();
   const blogSlug = decodeURIComponent(params.blogSlug as string);
-  // console.log('📝 [BLOG PAGE COMPONENT RENDERED] blogSlug:', blogSlug);
 
   const isClient = useIsClient();
   const searchParams = useSearchParams();
   const { getCacheStatus } = useNavigationCache();
+  
+  // 모바일/데스크탑 감지 (사이드바는 lg 이상에서만 표시)
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
 
   // 블로그 정보 가져오기 (React Query 캐싱 사용)
   const {
@@ -102,7 +105,8 @@ export default function BlogPage() {
     }
   }, [blog, searchParams, router, isClient]);
 
-  // 블로그의 카테고리별 포스트 개수 가져오기
+  // 블로그의 카테고리별 포스트 개수 가져오기 (데스크탑에서만)
+  // 모바일에서는 사이드바가 숨겨져 있으므로 불필요한 API 호출 방지
   const {
     data: categoryPagesData,
     isLoading: categoriesLoading,
@@ -110,7 +114,7 @@ export default function BlogPage() {
     fetchNextPage: fetchNextCategories,
     hasNextPage: hasMoreCategories,
     isFetchingNextPage: isFetchingNextCategories,
-  } = useBlogCategories(blogSlug);
+  } = useBlogCategories(blogSlug, { enabled: isClient && isDesktop });
 
   const flattenedCategories = useMemo(() => {
     if (!categoryPagesData?.pages) return [];
@@ -286,6 +290,10 @@ export default function BlogPage() {
   const allPosts = useMemo(() => {
     if (!data?.pages) return [];
 
+    // 조기 종료: 빈 데이터에 대한 불필요한 Map 연산 제거
+    const firstPage = data.pages[0];
+    if (!firstPage?.posts || firstPage.posts.length === 0) return [];
+
     // 커서 페이지네이션은 각 페이지에 posts 배열이 있음
     const postsMap = new Map();
     data.pages.forEach((page: any) => {
@@ -319,13 +327,18 @@ export default function BlogPage() {
     });
   }, [hasNextPage, isFetchingNextPage, fetchNextPage, lastCursor]);
 
-  // 최근 포스트 (처음 5개)
+  // 최근 포스트 (처음 5개) - 데스크탑에서만 계산
   const recentPosts = useMemo(() => {
+    if (!isDesktop) return []; // 모바일에서는 계산 스킵
+    if (allPosts.length === 0) return []; // 조기 종료
     return allPosts.slice(0, 5);
-  }, [allPosts]);
+  }, [allPosts, isDesktop]);
 
-  // 실제 포스트에서 태그 추출 - 메모이제이션
+  // 실제 포스트에서 태그 추출 - 메모이제이션 (데스크탑에서만)
   const tags = useMemo(() => {
+    if (!isDesktop) return []; // 모바일에서는 계산 스킵
+    if (allPosts.length === 0) return []; // 조기 종료: 빈 배열 루프 제거
+
     const tagMap = new Map<string, number>();
 
     allPosts.forEach(post => {
@@ -344,7 +357,7 @@ export default function BlogPage() {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 20)
       .map(([tag]) => tag);
-  }, [allPosts]);
+  }, [allPosts, isDesktop]);
 
   const handleEditPost = useCallback((id: string) => {
     router.push(`/p/${id}/edit`);

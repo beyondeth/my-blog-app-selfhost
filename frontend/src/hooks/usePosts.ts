@@ -45,7 +45,7 @@ export const postQueryKeys = {
 // 공통 쿼리 옵션
 const commonQueryOptions = {
   gcTime: 5 * 60 * 1000,
-  staleTime: 1 * 60 * 1000, // 1분간 캐시 유지 (탭 전환 시 깜빡임 방지)
+  staleTime: 5 * 60 * 1000, // 5분간 캐시 유지 (탭 전환 시 즉시 렌더링)
   refetchOnWindowFocus: false, // 탭 전환시 자동 갱신 비활성화
   refetchOnMount: false, // 컴포넌트 마운트 시 불필요한 재요청 방지
   retry: 1,
