@@ -317,61 +317,46 @@ function fixErDiagramEntityQuotes(content: string): string {
  * 특수문자가 포함된 레이블을 따옴표로 감싸줍니다.
  */
 function fixNodeLabels(content: string): string {
-  // 특수문자 패턴 (Mermaid에서 문제를 일으킬 수 있는 문자들)
-  const specialCharsPattern = /[\/\{\}:\|<>]/;
+  // 특수문자 패턴 (이제 사용하지 않음 - 모든 레이블을 따옴표로 감쌈)
+  // const specialCharsPattern = /[\/\{\}:\|<>]/;
 
   // 노드 레이블 패턴 매칭
   // 형태: nodeId[label] 또는 nodeId(label) 등
-    const nodeLabelPatterns = [
-    // 0. 복합 형태 (우선 순위 높음) - 특수문자가 있을 때만 처리
+  const nodeLabelPatterns = [
+    // 0. 복합 형태 (우선 순위 높음) - 무조건 따옴표 처리
     // Database: nodeId[(label)]
     {
       pattern: /(\w+)\[\(([^"\)]+)\)\]/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}[("${label.trim()}")]`;
-        }
-        return match;
+        return `${nodeId}[("${label.trim()}")]`;
       }
     },
     // Subroutine: nodeId[[label]]
     {
       pattern: /(\w+)\[\[([^"\]]+)\]\]/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}[["${label.trim()}"]]`;
-        }
-        return match;
+        return `${nodeId}[["${label.trim()}"]]`;
       }
     },
     // Circle: nodeId((label))
     {
       pattern: /(\w+)\(\(([^"\)]+)\)\)/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}(("${label.trim()}")`;
-        }
-        return match;
+        return `${nodeId}(("${label.trim()}")`;
       }
     },
     // Stadium: nodeId([label])
     {
       pattern: /(\w+)\(\[([^"\]]+)\]\)/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}(["${label.trim()}"])`;
-        }
-        return match;
+        return `${nodeId}(["${label.trim()}"])`;
       }
     },
     // Asymmetric: nodeId>label]
     {
       pattern: /(\w+)>([^"\]]+)\]/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}>"${label.trim()}"]`;
-        }
-        return match;
+        return `${nodeId}>"${label.trim()}"]`;
       }
     },
     
@@ -381,10 +366,7 @@ function fixNodeLabels(content: string): string {
       pattern: /(\w+)\[(?![\[\(])([^\]"]+)\]/g,
       replacer: (match: string, nodeId: string, label: string) => {
         if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}["${label.trim()}"]`;
-        }
-        return match;
+        return `${nodeId}["${label.trim()}"]`;
       }
     },
     // 2. 소괄호 형태: nodeId(label)
@@ -393,10 +375,7 @@ function fixNodeLabels(content: string): string {
       pattern: /(\w+)\((?![\[\(])([^\)"]+)\)/g,
       replacer: (match: string, nodeId: string, label: string) => {
         if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}("${label.trim()}")`;
-        }
-        return match;
+        return `${nodeId}("${label.trim()}")`;
       }
     },
     // 3. 중괄호 형태: nodeId{label}
@@ -405,10 +384,7 @@ function fixNodeLabels(content: string): string {
       pattern: /(\w+)\{(?!\{)([^\}"]+)\}/g,
       replacer: (match: string, nodeId: string, label: string) => {
         if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
-        if (specialCharsPattern.test(label)) {
-          return `${nodeId}{"${label.trim()}"}`;
-        }
-        return match;
+        return `${nodeId}{"${label.trim()}"}`;
       }
     }
   ];
