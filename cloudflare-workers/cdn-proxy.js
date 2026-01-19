@@ -8,13 +8,26 @@
  * - Bucket은 Private 상태 유지
  * - Pre-Authenticated Request (PAR) URL 사용
  * - 원본 URL 외부 노출 차단
+ * - codebase.blog 도메인에서만 접근 허용 (핫링킹 차단)
  *
  * 주요 기능:
  * - Private Bucket 안전 접근
  * - 캐싱 최적화 (Cloudflare Edge)
- * - CORS 헤더 자동 설정
+ * - CORS 헤더 (모든 도메인 허용 for Public Images)
  * - 이미지/문서 파일별 차등 TTL
+ * - 보안 헤더 강화
+ * - Health Check 엔드포인트
  */
+
+/**
+ * 허용된 Origin 목록 (핫링킹 방지용 Referer 체크에 사용)
+ */
+const ALLOWED_ORIGINS = [
+  'https://codebase.blog',
+  'https://www.codebase.blog',
+  'http://localhost:3001',  // 개발 환경
+  'http://localhost:3000',  // 백엔드 개발
+];
 
 /**
  * 메인 요청 핸들러
@@ -27,10 +40,47 @@ export default {
     try {
       const url = new URL(request.url);
       const pathname = url.pathname;
+      // const origin = request.headers.get('Origin'); // Public Image는 Origin 체크 불필요
+      const referer = request.headers.get('Referer');
+
+      // Health check 엔드포인트
+      if (pathname === '/' || pathname === '/health') {
+        return new Response(JSON.stringify({
+          status: 'ok',
+          service: 'CDN Proxy Worker',
+          version: '2.1.0', // Updated version
+          timestamp: new Date().toISOString(),
+          allowed_origins: ALLOWED_ORIGINS,
+          security: {
+            cors: 'public (*)',
+            hotlinking: 'blocked',
+            referrer_policy: 'strict-origin-when-cross-origin',
+          },
+        }, null, 2), {
+          status: 200,
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': 'no-store',
+          },
+        });
+      }
 
       // OPTIONS 요청 처리 (CORS Preflight)
       if (request.method === 'OPTIONS') {
         return handleCORS();
+      }
+
+      // Referer 기반 접근 제어 (핫링킹 차단)
+      // Origin이 없으면 Referer로 판단 (직접 접근은 둘 다 없을 수 있음)
+      if (referer && !isAllowedReferer(referer)) {
+        console.warn(`[CDN Proxy] Blocked referer: ${referer} for ${pathname}`);
+        return new Response('Access denied: Hotlinking not allowed', {
+          status: 403,
+          headers: {
+            'Content-Type': 'text/plain',
+            'Cache-Control': 'no-store',
+          },
+        });
       }
 
       // Oracle OCI PAR URL 구성
@@ -38,19 +88,19 @@ export default {
       // 예: https://...objectstorage.../p/{token}/n/{namespace}/b/{bucket}/o
       const originUrl = `${env.ORIGIN_BASE_URL}${pathname}`;
 
-      console.log(`[CDN Proxy] Request: ${pathname}`);
+      // console.log(`[CDN Proxy] Request: ${pathname}`);
 
       // Oracle OCI로 요청 전달
       const ociResponse = await fetch(originUrl, {
         method: request.method,
         headers: {
-          'User-Agent': 'Cloudflare-Worker-Proxy/1.0',
+          'User-Agent': 'Cloudflare-Worker-Proxy/2.0',
         },
       });
 
       // 404 처리
       if (!ociResponse.ok) {
-        console.error(`[CDN Proxy] OCI error: ${ociResponse.status} for ${pathname}`);
+        // console.error(`[CDN Proxy] OCI error: ${ociResponse.status} for ${pathname}`);
         return new Response(`File not found: ${pathname}`, {
           status: 404,
           headers: {
@@ -69,11 +119,18 @@ export default {
         headers: {
           'Content-Type': contentType,
           'Cache-Control': cacheControl,
-          'Access-Control-Allow-Origin': '*',
+          // CORS: Public Images이므로 모든 Origin 허용
+          // Credentials(쿠키 등)가 필요한 경우 * 사용 불가하지만, 이미지 로딩은 보통 anonymous임
+          'Access-Control-Allow-Origin': '*', 
           'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+          // 'Access-Control-Allow-Credentials': 'true', // * 와 함께 사용 불가
+          
+          // 보안 헤더
           'Cross-Origin-Resource-Policy': 'cross-origin',
           'X-Content-Type-Options': 'nosniff',
+          'Referrer-Policy': 'strict-origin-when-cross-origin',
+          'X-Frame-Options': 'SAMEORIGIN',
         },
       });
 
@@ -82,23 +139,45 @@ export default {
       newResponse.headers.delete('x-amz-request-id');
       newResponse.headers.delete('opc-request-id');
 
-      console.log(`[CDN Proxy] Success: ${pathname} (${contentType})`);
-
       return newResponse;
 
     } catch (error) {
       console.error(`[CDN Proxy] Error:`, error.message);
 
-      return new Response(`Internal error: ${error.message}`, {
+      return new Response(JSON.stringify({
+        error: 'Internal server error',
+        message: error.message,
+        timestamp: new Date().toISOString(),
+      }, null, 2), {
         status: 500,
         headers: {
-          'Content-Type': 'text/plain',
+          'Content-Type': 'application/json',
           'Cache-Control': 'no-store',
         },
       });
     }
   },
 };
+
+/**
+ * Referer가 허용된 도메인인지 확인 (핫링킹 차단)
+ * @param {string} referer - 요청 Referer 헤더
+ * @returns {boolean} - 허용 여부
+ */
+function isAllowedReferer(referer) {
+  if (!referer) return true;  // Referer 없으면 허용 (직접 접근)
+
+  try {
+    const refererUrl = new URL(referer);
+    const refererOrigin = `${refererUrl.protocol}//${refererUrl.host}`;
+
+    // 허용된 Origin 목록에 있는지 확인
+    return ALLOWED_ORIGINS.includes(refererOrigin);
+  } catch (e) {
+    // Referer 파싱 실패 시 차단
+    return false;
+  }
+}
 
 /**
  * CORS Preflight 요청 처리
@@ -124,12 +203,22 @@ function handleCORS() {
  */
 function getCacheControl(path, contentType) {
   // 이미지 파일: 24시간 캐시 (자주 변경되지 않음)
-  if (contentType.startsWith('image/') || path.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i)) {
+  if (contentType.startsWith('image/') || path.match(/\.(jpg|jpeg|png|webp|gif|svg|ico)$/i)) {
     return 'public, max-age=86400, s-maxage=86400, immutable';
   }
 
   // 문서 파일: 1시간 캐시
   if (contentType.includes('pdf') || path.match(/\.(pdf|doc|docx)$/i)) {
+    return 'public, max-age=3600, s-maxage=3600';
+  }
+
+  // 폰트 파일: 1년 캐시 (거의 변경 안 됨)
+  if (contentType.includes('font') || path.match(/\.(woff|woff2|ttf|eot)$/i)) {
+    return 'public, max-age=31536000, s-maxage=31536000, immutable';
+  }
+
+  // CSS/JS 파일: 1시간 캐시
+  if (contentType.includes('javascript') || contentType.includes('css') || path.match(/\.(js|css)$/i)) {
     return 'public, max-age=3600, s-maxage=3600';
   }
 
