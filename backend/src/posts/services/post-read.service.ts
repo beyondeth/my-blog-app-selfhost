@@ -102,7 +102,7 @@ export class PostReadService {
     if (tags && tags.length > 0) {
       // tags 컬럼이 jsonb라고 가정 (Post 엔티티 확인됨)
       // post.tags ?| :tags -> tags 배열 중 하나라도 포함되면 true
-      conditions.push("post.tags \\?| :tags");
+      conditions.push("post.tags ?| :tags");
       params.tags = tags;
     }
 
