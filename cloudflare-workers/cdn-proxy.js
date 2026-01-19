@@ -48,12 +48,12 @@ export default {
         return new Response(JSON.stringify({
           status: 'ok',
           service: 'CDN Proxy Worker',
-          version: '2.2.0', // Updated version for Strict Hotlinking
+          version: '2.3.0', // Updated version: Reverted strict check
           timestamp: new Date().toISOString(),
           allowed_origins: ALLOWED_ORIGINS,
           security: {
             cors: 'public (*)',
-            hotlinking: 'strict (blocks missing referer)',
+            hotlinking: 'flexible (allows missing referer for tools/bots)',
             referrer_policy: 'strict-origin-when-cross-origin',
           },
         }, null, 2), {
@@ -71,7 +71,7 @@ export default {
       }
 
       // ----------------------------------------------------------------
-      // 🛡️ Hotlinking & Access Control (Strict Mode)
+      // 🛡️ Hotlinking & Access Control (Flexible Mode)
       // ----------------------------------------------------------------
       
       // 1. Origin 검증 (CORS 요청인 경우 가장 신뢰할 수 있음)
@@ -80,20 +80,22 @@ export default {
           // console.warn(`[CDN Proxy] Blocked origin: ${origin}`);
           return new Response('Access denied: Invalid origin', { status: 403 });
         }
-        // Origin이 허용되었으면 통과 (Referer가 없어도 됨 - 일부 브라우저/설정)
+        // Origin이 허용되었으면 통과
       } 
-      // 2. Referer 검증 (Origin이 없는 경우 - 일반 이미지 로딩 등)
-      else {
-        // P2 Badge: Enforce hotlinking block when Referer is missing
-        if (!referer) {
-           // console.warn(`[CDN Proxy] Blocked missing referer (Strict Mode)`);
-           return new Response('Access denied: Missing referer', { status: 403 });
-        }
-
+      // 2. Referer 검증 (Origin이 없는 경우)
+      else if (referer) {
+        // Referer가 '있는데' 허용되지 않은 도메인이면 차단 (핫링킹 방지)
         if (!isAllowedReferer(referer)) {
           // console.warn(`[CDN Proxy] Blocked referer: ${referer}`);
           return new Response('Access denied: Hotlinking not allowed', { status: 403 });
         }
+        // Referer가 허용된 도메인이면 통과
+      }
+      // 3. 둘 다 없는 경우 (Direct Access / Server-side Fetch / Next.js Image Optimization)
+      else {
+        // Next.js Image 서버 등이 요청할 때 Header가 없을 수 있으므로 허용해야 함
+        // P2 Badge 요구사항("Missing referer 차단")은 우리 서버까지 차단해버리므로 적용 불가 판단
+        // console.log(`[CDN Proxy] Allowed missing referer (Direct Access/Tools)`);
       }
 
       // ----------------------------------------------------------------
@@ -109,7 +111,7 @@ export default {
       const ociResponse = await fetch(originUrl, {
         method: request.method,
         headers: {
-          'User-Agent': 'Cloudflare-Worker-Proxy/2.2',
+          'User-Agent': 'Cloudflare-Worker-Proxy/2.3',
         },
       });
 
@@ -188,7 +190,7 @@ function isAllowedOrigin(origin) {
  * @returns {boolean} - 허용 여부
  */
 function isAllowedReferer(referer) {
-  if (!referer) return false; // Strict check
+  if (!referer) return false;
 
   try {
     const refererUrl = new URL(referer);
