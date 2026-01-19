@@ -40,7 +40,7 @@ export default {
     try {
       const url = new URL(request.url);
       const pathname = url.pathname;
-      // const origin = request.headers.get('Origin'); // Public Image는 Origin 체크 불필요
+      const origin = request.headers.get('Origin'); 
       const referer = request.headers.get('Referer');
 
       // Health check 엔드포인트
@@ -48,12 +48,12 @@ export default {
         return new Response(JSON.stringify({
           status: 'ok',
           service: 'CDN Proxy Worker',
-          version: '2.1.0', // Updated version
+          version: '2.2.0', // Updated version for Strict Hotlinking
           timestamp: new Date().toISOString(),
           allowed_origins: ALLOWED_ORIGINS,
           security: {
             cors: 'public (*)',
-            hotlinking: 'blocked',
+            hotlinking: 'strict (blocks missing referer)',
             referrer_policy: 'strict-origin-when-cross-origin',
           },
         }, null, 2), {
@@ -70,18 +70,33 @@ export default {
         return handleCORS();
       }
 
-      // Referer 기반 접근 제어 (핫링킹 차단)
-      // Origin이 없으면 Referer로 판단 (직접 접근은 둘 다 없을 수 있음)
-      if (referer && !isAllowedReferer(referer)) {
-        console.warn(`[CDN Proxy] Blocked referer: ${referer} for ${pathname}`);
-        return new Response('Access denied: Hotlinking not allowed', {
-          status: 403,
-          headers: {
-            'Content-Type': 'text/plain',
-            'Cache-Control': 'no-store',
-          },
-        });
+      // ----------------------------------------------------------------
+      // 🛡️ Hotlinking & Access Control (Strict Mode)
+      // ----------------------------------------------------------------
+      
+      // 1. Origin 검증 (CORS 요청인 경우 가장 신뢰할 수 있음)
+      if (origin) {
+        if (!isAllowedOrigin(origin)) {
+          // console.warn(`[CDN Proxy] Blocked origin: ${origin}`);
+          return new Response('Access denied: Invalid origin', { status: 403 });
+        }
+        // Origin이 허용되었으면 통과 (Referer가 없어도 됨 - 일부 브라우저/설정)
+      } 
+      // 2. Referer 검증 (Origin이 없는 경우 - 일반 이미지 로딩 등)
+      else {
+        // P2 Badge: Enforce hotlinking block when Referer is missing
+        if (!referer) {
+           // console.warn(`[CDN Proxy] Blocked missing referer (Strict Mode)`);
+           return new Response('Access denied: Missing referer', { status: 403 });
+        }
+
+        if (!isAllowedReferer(referer)) {
+          // console.warn(`[CDN Proxy] Blocked referer: ${referer}`);
+          return new Response('Access denied: Hotlinking not allowed', { status: 403 });
+        }
       }
+
+      // ----------------------------------------------------------------
 
       // Oracle OCI PAR URL 구성
       // env.ORIGIN_BASE_URL은 Cloudflare Workers 환경 변수에서 설정
@@ -94,7 +109,7 @@ export default {
       const ociResponse = await fetch(originUrl, {
         method: request.method,
         headers: {
-          'User-Agent': 'Cloudflare-Worker-Proxy/2.0',
+          'User-Agent': 'Cloudflare-Worker-Proxy/2.2',
         },
       });
 
@@ -120,11 +135,9 @@ export default {
           'Content-Type': contentType,
           'Cache-Control': cacheControl,
           // CORS: Public Images이므로 모든 Origin 허용
-          // Credentials(쿠키 등)가 필요한 경우 * 사용 불가하지만, 이미지 로딩은 보통 anonymous임
           'Access-Control-Allow-Origin': '*', 
           'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
           'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-          // 'Access-Control-Allow-Credentials': 'true', // * 와 함께 사용 불가
           
           // 보안 헤더
           'Cross-Origin-Resource-Policy': 'cross-origin',
@@ -160,12 +173,22 @@ export default {
 };
 
 /**
+ * Origin이 허용 목록에 있는지 확인
+ * @param {string} origin - 요청 Origin 헤더
+ * @returns {boolean} - 허용 여부
+ */
+function isAllowedOrigin(origin) {
+  if (!origin) return false;
+  return ALLOWED_ORIGINS.includes(origin);
+}
+
+/**
  * Referer가 허용된 도메인인지 확인 (핫링킹 차단)
  * @param {string} referer - 요청 Referer 헤더
  * @returns {boolean} - 허용 여부
  */
 function isAllowedReferer(referer) {
-  if (!referer) return true;  // Referer 없으면 허용 (직접 접근)
+  if (!referer) return false; // Strict check
 
   try {
     const refererUrl = new URL(referer);
