@@ -456,10 +456,13 @@ const PostArticle = React.memo(function PostArticle({
                 displayMode="separated"
                 tone={voteTone}
               />
-              <span className="flex items-center gap-1 whitespace-nowrap">
+              <Link
+                href={`${postUrl}#comments`}
+                className="flex items-center gap-1 whitespace-nowrap cursor-pointer hover:text-[#1B2430] dark:hover:text-[#E6EDF3] transition-colors"
+              >
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{post.commentCount || 0}</span>
-              </span>
+              </Link>
 
               {/* 수정/삭제 버튼 */}
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
@@ -587,10 +590,13 @@ const PostArticle = React.memo(function PostArticle({
                 displayMode="separated"
                 tone={voteTone}
               />
-              <span className="flex items-center gap-1 whitespace-nowrap">
+              <Link
+                href={`${postUrl}#comments`}
+                className="flex items-center gap-1 whitespace-nowrap cursor-pointer hover:text-[#1B2430] dark:hover:text-[#E6EDF3] transition-colors"
+              >
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{post.commentCount || 0}</span>
-              </span>
+              </Link>
               {/* 수정/삭제 버튼 (관리자/작성자) */}
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
@@ -734,10 +740,13 @@ const PostArticle = React.memo(function PostArticle({
                 displayMode="separated"
                 tone={voteTone}
               />
-              <span className="flex items-center gap-1 whitespace-nowrap">
+              <Link
+                href={`${postUrl}#comments`}
+                className="flex items-center gap-1 whitespace-nowrap cursor-pointer hover:text-[#1B2430] dark:hover:text-[#E6EDF3] transition-colors"
+              >
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{post.commentCount || 0}</span>
-              </span>
+              </Link>
               {/* 수정/삭제 버튼 (관리자/작성자) */}
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
@@ -901,10 +910,13 @@ const PostArticle = React.memo(function PostArticle({
                 displayMode="separated"
                 tone={voteTone}
               />
-              <span className="flex items-center gap-1 whitespace-nowrap">
+              <Link
+                href={`${postUrl}#comments`}
+                className="flex items-center gap-1 whitespace-nowrap cursor-pointer hover:text-[#1B2430] dark:hover:text-[#E6EDF3] transition-colors"
+              >
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{post.commentCount || 0}</span>
-              </span>
+              </Link>
 
               {/* 수정/삭제 버튼 */}
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (

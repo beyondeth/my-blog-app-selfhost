@@ -27,12 +27,24 @@ import RelatedPostsSection from '@/components/post/RelatedPostsSection';
 /**
  * 댓글 섹션 Lazy Loading 컴포넌트
  * Intersection Observer를 사용하여 스크롤 시에만 댓글 로드
+ * URL에 #comments 해시가 있으면 즉시 로드 및 스크롤
  */
 function CommentSectionLazy({ postId, postAuthorId, totalCommentCount }: { postId: string; postAuthorId?: string; totalCommentCount?: number }) {
   const [isVisible, setIsVisible] = useState(false);
   const commentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // URL에 #comments 해시가 있으면 즉시 로드
+    const hasCommentsHash = window.location.hash === '#comments';
+    if (hasCommentsHash) {
+      setIsVisible(true);
+      // 약간의 딜레이 후 스크롤 (렌더링 완료 대기)
+      setTimeout(() => {
+        commentRef.current?.scrollIntoView({ behavior: 'instant', block: 'start' });
+      }, 100);
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -58,7 +70,7 @@ function CommentSectionLazy({ postId, postAuthorId, totalCommentCount }: { postI
   }, []);
 
   return (
-    <div ref={commentRef} data-comment-section>
+    <div ref={commentRef} id="comments" data-comment-section>
       {isVisible ? (
         <CommentSectionPaginated postId={postId} postAuthorId={postAuthorId} totalCommentCount={totalCommentCount} />
       ) : (

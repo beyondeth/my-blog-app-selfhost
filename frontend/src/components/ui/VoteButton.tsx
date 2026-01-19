@@ -187,7 +187,7 @@ export const VoteButton = memo(function VoteButton({
   // 수평 레이아웃 (기본)
   return (
     <div
-      className={`inline-flex items-center gap-5 ${className}`}
+      className={`inline-flex items-center gap-1.5 ${className}`}
       role="group"
       aria-label="투표"
     >

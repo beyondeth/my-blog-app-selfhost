@@ -112,7 +112,7 @@ function CommentSectionContent({ postId, postAuthorId, totalCommentCount }: Comm
   }
 
   return (
-    <section className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
+    <section id="comments" className="mt-16 pt-8 border-t border-gray-200 dark:border-gray-700">
       {/* 댓글 헤더 */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-2">

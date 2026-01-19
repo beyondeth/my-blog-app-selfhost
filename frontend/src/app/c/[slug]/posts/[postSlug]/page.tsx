@@ -272,7 +272,7 @@ export default function PostDetailPage({ params }: PostDetailPageProps) {
             />
 
             {/* 댓글 섹션 - 블로그 스타일 (상단 border만) */}
-            <section className="mt-8 pt-8">
+            <section id="comments" className="mt-8 pt-8">
               <CommentSectionPaginated
                 postId={post.id}
                 postAuthorId={post.author?.id}
