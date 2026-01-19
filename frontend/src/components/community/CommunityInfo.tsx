@@ -1,14 +1,12 @@
 'use client';
 
 import React from 'react';
-import Link from 'next/link';
 import { cn } from '@/lib/utils';
 import { Users, FileText, Calendar, Globe, Lock, Shield } from 'lucide-react';
 import JoinButton from './JoinButton';
 import type { Community, JoinPolicyType } from '@/types/community';
 import { JoinPolicy } from '@/types/community';
 import CommunityLockBanner from './CommunityLockBanner';
-import { Button } from '@/components/ui/button';
 
 interface CommunityInfoProps {
   community: Community;
@@ -63,14 +61,6 @@ const CommunityInfo = React.memo(function CommunityInfo({
 
   const joinPolicyInfo = getJoinPolicyLabel(community.joinPolicy);
   const PolicyIcon = joinPolicyInfo.icon;
-  const iconFit = community.iconImageFit ?? 'contain';
-  const iconContainerClass = cn(
-    'flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center overflow-hidden border border-gray-200 dark:border-gray-700',
-    iconFit === 'cover'
-      ? 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600'
-      : 'bg-white dark:bg-gray-900 p-1'
-  );
-  const iconImageClass = iconFit === 'cover' ? 'object-cover' : 'object-contain';
 
   return (
     <div
@@ -79,46 +69,17 @@ const CommunityInfo = React.memo(function CommunityInfo({
         className
       )}
     >
-      {/* 헤더 */}
-      <div className="flex items-center gap-3 pb-4 border-b border-gray-200 dark:border-gray-700">
-        {/* 아이콘 */}
-        <div className={iconContainerClass}>
-          {community.iconUrl ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={community.iconUrl}
-                alt={community.name}
-                className={cn('w-full h-full', iconImageClass)}
-              />
-            </>
-          ) : (
-            <span className="text-xl font-bold text-gray-500 dark:text-[#C7D1DD]">
-              {community.name.charAt(0).toUpperCase()}
-            </span>
-          )}
-        </div>
-
-        {/* 이름 */}
-        <div className="flex-1 min-w-0">
-          <Link
-            href={`/c/${community.slug}`}
-            className="font-semibold text-gray-900 dark:text-gray-50 hover:text-blue-600 dark:hover:text-blue-400 transition-colors truncate block"
-          >
-            c/{community.slug}
-          </Link>
-          <p className="text-sm text-gray-700 dark:text-gray-100 truncate">
-            {community.name}
+      {/* 이름 및 설명 */}
+      <div className="pb-4">
+        <h2 className="text-base font-semibold text-gray-900 dark:text-gray-50 mb-2">
+          {community.name}
+        </h2>
+        {community.description && (
+          <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap break-words">
+            {community.description}
           </p>
-        </div>
+        )}
       </div>
-
-      {/* 설명 */}
-      {community.description && (
-        <p className="py-4 text-sm text-gray-800 dark:text-gray-200 line-clamp-3">
-          {community.description}
-        </p>
-      )}
 
       {/* 통계 */}
       <div className="space-y-3 py-4 border-t border-gray-200 dark:border-gray-700">
