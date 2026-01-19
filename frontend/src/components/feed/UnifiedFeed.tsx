@@ -1,15 +1,15 @@
 'use client';
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useUnifiedFeed } from '@/hooks/feed';
-import { FeedFilterType, FeedSortType, type UnifiedFeedItem as FeedItemType, type UnifiedFeedResponse } from '@/services/api/feed.service';
+import { FeedFilterType, FeedSortType, type UnifiedFeedItem as FeedItemType } from '@/services/api/feed.service';
 import UnifiedFeedItem from './UnifiedFeedItem';
 import FeedFilterTabs from './FeedFilterTabs';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
 import { useVote } from '@/hooks/useVote';
-import type { VoteResponse, VoteType } from '@/types';
+import type { VoteResponse } from '@/types';
 import { communityService } from '@/services/api/community.service';
 
 /**
@@ -58,8 +58,6 @@ export default function UnifiedFeed({
   // 필터 및 정렬 상태
   const [filter, setFilter] = useState<FeedFilterType>(initialFilter);
   const [sort, setSort] = useState<FeedSortType>(initialSort);
-  const queryClient = useQueryClient();
-  const feedQueryKey = useMemo(() => ['unified-feed', filter, sort, limit] as const, [filter, sort, limit]);
 
   const requireLogin = useCallback(() => {
     alert('로그인이 필요합니다.\n로그인 후 좋아요/안 좋아요를 사용할 수 있습니다.');
@@ -92,10 +90,10 @@ export default function UnifiedFeed({
   });
 
   // 모든 아이템 플랫화 (중복 제거)
-  const allItems = useMemo(() => {
+  const allItems = useMemo((): FeedItemType[] => {
     if (!data?.pages) return [];
 
-    const itemsMap = new Map();
+    const itemsMap = new Map<string, FeedItemType>();
     data.pages.forEach((page) => {
       page.items.forEach((item) => {
         if (item && item.id) {
@@ -124,68 +122,15 @@ export default function UnifiedFeed({
     setSort(newSort);
   }, []);
 
-  // 통합 피드 투표 핸들러 (낙관적 업데이트 포함)
+  // 통합 피드 투표 핸들러 (useVote 훅의 낙관적 업데이트에 위임)
   const handleVote = useCallback(
     (targetItem: FeedItemType, voteType: 'upvote' | 'downvote') => {
-      const previousData = queryClient.getQueryData<InfiniteData<UnifiedFeedResponse>>(feedQueryKey);
-
-      queryClient.setQueryData(
-        feedQueryKey,
-        (oldData: InfiniteData<UnifiedFeedResponse> | undefined) => {
-          if (!oldData?.pages) return oldData;
-
-          const updatedPages = oldData.pages.map((page) => ({
-            ...page,
-            items: page.items.map((item) => {
-              if (item.id !== targetItem.id) return item;
-
-              let upvoteCount = item.upvoteCount ?? item.likeCount ?? 0;
-              let downvoteCount = item.downvoteCount ?? 0;
-              let nextVote: VoteType = item.userVote ?? null;
-
-              if (nextVote === voteType) {
-                nextVote = null;
-                if (voteType === 'upvote') upvoteCount = Math.max(0, upvoteCount - 1);
-                else downvoteCount = Math.max(0, downvoteCount - 1);
-              } else if (nextVote === null) {
-                nextVote = voteType;
-                if (voteType === 'upvote') upvoteCount += 1;
-                else downvoteCount += 1;
-              } else {
-                nextVote = voteType;
-                if (voteType === 'upvote') {
-                  upvoteCount += 1;
-                  downvoteCount = Math.max(0, downvoteCount - 1);
-                } else {
-                  upvoteCount = Math.max(0, upvoteCount - 1);
-                  downvoteCount += 1;
-                }
-              }
-
-              return {
-                ...item,
-                userVote: nextVote,
-                upvoteCount,
-                downvoteCount,
-                score: upvoteCount - downvoteCount,
-                likeCount: upvoteCount,
-              };
-            }),
-          }));
-
-          return { ...oldData, pages: updatedPages };
-        }
-      );
-
       setPendingPostId(targetItem.id);
 
       let mutationPromise: Promise<VoteResponse>;
       if (targetItem.sourceType === 'community') {
         if (!targetItem.community?.slug) {
           setPendingPostId(null);
-          if (previousData) {
-            queryClient.setQueryData(feedQueryKey, previousData);
-          }
           return;
         }
         mutationPromise = voteCommunityPost({
@@ -197,18 +142,17 @@ export default function UnifiedFeed({
         mutationPromise = votePost({ postId: targetItem.id, voteType });
       }
 
-      mutationPromise.catch((error) => {
-        if (previousData) {
-          queryClient.setQueryData(feedQueryKey, previousData);
-        }
-        if (error instanceof Error) {
-          console.error('[UnifiedFeed] vote failed:', error.message);
-        }
-      }).finally(() => {
-        setPendingPostId((current) => (current === targetItem.id ? null : current));
-      });
+      mutationPromise
+        .catch((error) => {
+          if (error instanceof Error) {
+            console.error('[UnifiedFeed] vote failed:', error.message);
+          }
+        })
+        .finally(() => {
+          setPendingPostId((current) => (current === targetItem.id ? null : current));
+        });
     },
-    [feedQueryKey, queryClient, voteCommunityPost, votePost]
+    [voteCommunityPost, votePost]
   );
 
   // 에러 상태

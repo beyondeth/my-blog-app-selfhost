@@ -327,10 +327,14 @@ const UnifiedFeedItem = React.memo(function UnifiedFeedItem({
                 compact
                 displayMode="separated"
               />
-              <span className="flex items-center gap-1 whitespace-nowrap">
+              <Link
+                href={`${postUrl}#comments`}
+                className="flex items-center gap-1 whitespace-nowrap cursor-pointer hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <FiMessageCircle className="w-5 h-5" />
                 <span>{item.commentCount || 0}</span>
-              </span>
+              </Link>
 
               {/* 고정 포스트 표시 */}
               {item.isPinned && (

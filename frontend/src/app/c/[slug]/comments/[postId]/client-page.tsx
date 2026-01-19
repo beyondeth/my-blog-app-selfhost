@@ -258,7 +258,7 @@ export default function CommunityPostDetailClient({
           className="pb-0"
         />
 
-        <section className="mt-16 pt-8">
+        <section id="comments" className="mt-16 pt-8">
           <CommentSectionPaginated
             postId={post.id}
             postAuthorId={post.author?.id}

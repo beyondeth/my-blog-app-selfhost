@@ -108,9 +108,11 @@ export function useVote(options: UseVoteOptions = {}) {
 
     // 낙관적 업데이트: API 호출 전에 UI 먼저 업데이트
     onMutate: async ({ postId, voteType }) => {
-      // 1. 진행 중인 쿼리 취소
-      await queryClient.cancelQueries({ queryKey: postQueryKeys.all });
-      await queryClient.cancelQueries({ queryKey: feedQueryKeys.all });
+      // 1. 진행 중인 쿼리 취소 (병렬 실행)
+      await Promise.all([
+        queryClient.cancelQueries({ queryKey: postQueryKeys.all }),
+        queryClient.cancelQueries({ queryKey: feedQueryKeys.all }),
+      ]);
 
       // 2. 이전 데이터 백업 (롤백용)
       const previousLists = queryClient.getQueriesData({ queryKey: postQueryKeys.lists() });
