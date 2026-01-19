@@ -322,47 +322,91 @@ function fixNodeLabels(content: string): string {
 
   // 노드 레이블 패턴 매칭
   // 형태: nodeId[label] 또는 nodeId(label) 등
-  const nodeLabelPatterns = [
-    // 1. 대괄호 형태: nodeId[label]
+    const nodeLabelPatterns = [
+    // 0. 복합 형태 (우선 순위 높음) - 특수문자가 있을 때만 처리
+    // Database: nodeId[(label)]
     {
-      pattern: /(\w+)\[([^\]"]+)\]/g,
+      pattern: /(\w+)\[\(([^"\)]+)\)\]/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        // 이미 따옴표가 있으면 스킵
-        if (label.trim().startsWith('"') && label.trim().endsWith('"')) {
-          return match;
-        }
-        // 특수문자가 있으면 따옴표로 감싸기
         if (specialCharsPattern.test(label)) {
-          const cleanLabel = label.trim();
-          return `${nodeId}["${cleanLabel}"]`;
+          return `${nodeId}[("${label.trim()}")]`;
+        }
+        return match;
+      }
+    },
+    // Subroutine: nodeId[[label]]
+    {
+      pattern: /(\w+)\[\[([^"\]]+)\]\]/g,
+      replacer: (match: string, nodeId: string, label: string) => {
+        if (specialCharsPattern.test(label)) {
+          return `${nodeId}[["${label.trim()}"]]`;
+        }
+        return match;
+      }
+    },
+    // Circle: nodeId((label))
+    {
+      pattern: /(\w+)\(\(([^"\)]+)\)\)/g,
+      replacer: (match: string, nodeId: string, label: string) => {
+        if (specialCharsPattern.test(label)) {
+          return `${nodeId}(("${label.trim()}")`;
+        }
+        return match;
+      }
+    },
+    // Stadium: nodeId([label])
+    {
+      pattern: /(\w+)\(\[([^"\]]+)\]\)/g,
+      replacer: (match: string, nodeId: string, label: string) => {
+        if (specialCharsPattern.test(label)) {
+          return `${nodeId}(["${label.trim()}"])`;
+        }
+        return match;
+      }
+    },
+    // Asymmetric: nodeId>label]
+    {
+      pattern: /(\w+)>([^"\]]+)\]/g,
+      replacer: (match: string, nodeId: string, label: string) => {
+        if (specialCharsPattern.test(label)) {
+          return `${nodeId}>"${label.trim()}"]`;
+        }
+        return match;
+      }
+    },
+    
+    // 1. 대괄호 형태: nodeId[label]
+    // 주의: [( or [[ 같은 복합 형태와 매칭되지 않도록 lookahead 사용
+    {
+      pattern: /(\w+)\[(?![\[\(])([^\]"]+)\]/g,
+      replacer: (match: string, nodeId: string, label: string) => {
+        if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
+        if (specialCharsPattern.test(label)) {
+          return `${nodeId}["${label.trim()}"]`;
         }
         return match;
       }
     },
     // 2. 소괄호 형태: nodeId(label)
+    // 주의: (( or ([ 와 매칭되지 않도록 lookahead 사용
     {
-      pattern: /(\w+)\(([^\)"]+)\)/g,
+      pattern: /(\w+)\((?![\[\(])([^\)"]+)\)/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        if (label.trim().startsWith('"') && label.trim().endsWith('"')) {
-          return match;
-        }
+        if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
         if (specialCharsPattern.test(label)) {
-          const cleanLabel = label.trim();
-          return `${nodeId}("${cleanLabel}")`;
+          return `${nodeId}("${label.trim()}")`;
         }
         return match;
       }
     },
     // 3. 중괄호 형태: nodeId{label}
+    // 주의: {{ (Hexagon) 와 매칭되지 않도록 lookahead 사용
     {
-      pattern: /(\w+)\{([^\}"]+)\}/g,
+      pattern: /(\w+)\{(?!\{)([^\}"]+)\}/g,
       replacer: (match: string, nodeId: string, label: string) => {
-        if (label.trim().startsWith('"') && label.trim().endsWith('"')) {
-          return match;
-        }
+        if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
         if (specialCharsPattern.test(label)) {
-          const cleanLabel = label.trim();
-          return `${nodeId}{"${cleanLabel}"}`;
+          return `${nodeId}{"${label.trim()}"}`;
         }
         return match;
       }
