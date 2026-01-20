@@ -37,9 +37,8 @@ export const widgetTypeOptions: Array<{
   { type: 'images', label: '이미지', description: '최대 10장의 이미지' },
   { type: 'community_list', label: '추천 커뮤니티', description: '다른 커뮤니티 홍보' },
   { type: 'calendar', label: '캘린더', description: '이벤트 일정' },
-  { type: 'post_flairs', label: '플레어 하이라이트', description: '게시물 플레어 강조' },
+  { type: 'post_flairs', label: '말머리', description: '게시판의 말머리(토픽)를 필터링할 수 있는 위젯입니다.' },
   { type: 'community_rules', label: '커뮤니티 규칙', description: '규칙을 사이드바 위젯으로 표시' },
-  { type: 'post_flair_list', label: '플레어 목록', description: '전체 플레어 목록과 필터 제공' },
 ];
 
 interface WidgetEditorFormProps {
@@ -127,32 +126,16 @@ export default function WidgetEditorForm({
   return (
     <div className="space-y-4 text-gray-900 dark:text-gray-100">
       <div>
-        <Label className="text-xs uppercase tracking-wide text-gray-500 dark:text-white">제목</Label>
+        <div className="flex items-center justify-between mb-1">
+          <Label className="text-xs uppercase tracking-wide text-gray-500 dark:text-white">제목</Label>
+          <span className="text-xs text-gray-500">{(draft.title ?? '').length}/30</span>
+        </div>
         <Input
           className={cn(SETTINGS_INPUT_CLASS, 'mt-1')}
           value={draft.title ?? ''}
-          onChange={(event) => handleFieldChange('title', event.target.value)}
+          onChange={(event) => handleFieldChange('title', event.target.value.slice(0, 30))}
           placeholder="위젯 제목"
         />
-      </div>
-      <div>
-        <Label className="text-xs uppercase tracking-wide text-gray-500 dark:text-white">설명</Label>
-        <Textarea
-          className={cn(SETTINGS_INPUT_CLASS, 'mt-1 min-h-[120px]')}
-          value={draft.description ?? ''}
-          onChange={(event) => handleFieldChange('description', event.target.value)}
-          placeholder="위젯에 대한 설명"
-        />
-      </div>
-      <div className="flex items-center gap-3">
-        <Switch
-          id="widget-toggle"
-          checked={draft.isEnabled ?? widget.isEnabled}
-          onCheckedChange={(checked) => handleFieldChange('isEnabled', checked)}
-        />
-        <Label htmlFor="widget-toggle" className="text-sm text-gray-600 dark:text-gray-50">
-          위젯 활성화
-        </Label>
       </div>
 
       <WidgetTypeSpecificForm
@@ -170,7 +153,23 @@ export default function WidgetEditorForm({
         <p className="text-xs text-red-500">{formError}</p>
       )}
       
-      <div className="pt-2 flex justify-end">
+      <div className="pt-4 border-t border-gray-200 dark:border-gray-700 mt-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Switch
+              id="widget-toggle"
+              checked={draft.isEnabled ?? widget.isEnabled}
+              onCheckedChange={(checked) => handleFieldChange('isEnabled', checked)}
+            />
+            <div>
+              <Label htmlFor="widget-toggle" className="text-sm font-medium text-gray-900 dark:text-gray-50">
+                이 위젯을 사이드바에 표시
+              </Label>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                비활성화 시 설정은 유지되지만 사용자에게 보이지 않습니다
+              </p>
+            </div>
+          </div>
         <button
           type="button"
           onClick={handleSave}
@@ -190,6 +189,7 @@ export default function WidgetEditorForm({
           ) : null}
           {isSuccess ? '저장됨' : '저장'}
         </button>
+        </div>
       </div>
     </div>
   );
@@ -602,44 +602,134 @@ function WidgetTypeSpecificForm({
         </div>
       );
     case 'post_flairs': {
-      const availableFlairs = community.flairs || [];
+      const availableFlairs = (community.flairs || []).filter(flair => flair.type === 'post');
       const selectedFlairs = (draft.metadata?.flairIds as string[]) || [];
+      const showAll = Boolean(draft.metadata?.showAll ?? true); // Default to Show All
+
       return (
-        <div className="space-y-3">
-          <Label className="text-sm font-medium">강조할 플레어 선택</Label>
-          {availableFlairs.length === 0 ? (
-            <p className="text-xs text-gray-500 dark:text-white">등록된 플레어가 없습니다.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {availableFlairs.map((flair) => {
-                const isSelected = selectedFlairs.includes(flair.id);
-                return (
-                  <Button
-                    key={flair.id}
-                    variant={isSelected ? 'default' : 'outline'}
-                    size="sm"
-                    className={cn(
-                      'flex items-center gap-2 border',
-                      isSelected
-                        ? 'bg-[#4d68ff] text-white border-transparent hover:bg-[#3c52c7]'
-                        : 'text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-[#1f2538]',
-                    )}
-                    onClick={() => {
-                      const next = isSelected
-                        ? selectedFlairs.filter((id) => id !== flair.id)
-                        : [...selectedFlairs, flair.id];
-                      onChange('metadata', { ...(draft.metadata || {}), flairIds: next });
-                    }}
-                  >
-                    <span>{flair.name}</span>
-                    {isSelected && (
-                      <span className="text-xs font-semibold text-white">✓</span>
-                    )}
-                  </Button>
-                );
-              })}
+        <div className="space-y-4">
+          <div className="p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-gray-100 dark:border-gray-800">
+            <Label className="text-sm font-medium mb-3 block">표시 방식</Label>
+            <div className="flex gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  id="mode-all"
+                  name="flair-mode"
+                  checked={showAll}
+                  onChange={() => onChange('metadata', { ...(draft.metadata || {}), showAll: true, flairIds: [] })}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                />
+                <Label htmlFor="mode-all" className="text-sm cursor-pointer select-none">
+                  전체 말머리 (기본)
+                </Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <input
+                  type="radio"
+                  id="mode-select"
+                  name="flair-mode"
+                  checked={!showAll}
+                  onChange={() => onChange('metadata', { ...(draft.metadata || {}), showAll: false })}
+                  className="w-4 h-4 text-blue-600 focus:ring-blue-500 border-gray-300 dark:border-gray-600 dark:bg-gray-700"
+                />
+                <Label htmlFor="mode-select" className="text-sm cursor-pointer select-none">
+                  특정 말머리 강조
+                </Label>
+              </div>
+            </div>
+            
+            <p className="text-xs text-gray-500 mt-2 px-1">
+              {showAll 
+                ? "커뮤니티의 모든 말머리를 목록 형태로 표시합니다." 
+                : "선택한 말머리만 별도로 강조하여 표시합니다."}
+            </p>
+          </div>
+
+          {showAll && (
+            <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+              <div className="grid gap-4 md:grid-cols-2">
+                <div>
+                  <Label className="text-sm font-medium">최대 표시 개수</Label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2">
+                    이 개수까지 펼쳐 보이고, 나머지는 '더보기' 버튼으로 숨깁니다 (기본값: 10개)
+                  </p>
+                  <Input
+                    className={SETTINGS_INPUT_CLASS}
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={draft.metadata?.limit ?? 10}
+                    onChange={(event) =>
+                      onChange('metadata', {
+                        ...(draft.metadata || {}),
+                        limit: Number(event.target.value),
+                      })
+                    }
+                  />
+                </div>
+              </div>
             </div>
           )}
+
+          {!showAll && (
+            <div className="space-y-3 pl-1">
+              <Label className="text-sm font-medium">강조할 말머리 선택</Label>
+              {availableFlairs.length === 0 ? (
+                <div className="rounded-lg border border-yellow-200 dark:border-yellow-700 bg-yellow-50 dark:bg-yellow-900/20 p-3 space-y-2">
+                  <p className="text-sm text-yellow-800 dark:text-yellow-200 font-medium">
+                    말머리가 아직 생성되지 않았습니다
+                  </p>
+                  <p className="text-xs text-yellow-700 dark:text-yellow-300">
+                    커뮤니티 설정에서 말머리를 생성해주세요.
+                  </p>
+                  <a
+                    href={`/c/${community.slug}/settings/flairs`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-block text-xs text-blue-600 dark:text-blue-400 hover:underline"
+                  >
+                    말머리 관리 페이지로 이동 →
+                  </a>
+                </div>
+              ) : (
+                <div className="flex flex-wrap gap-2">
+                  {availableFlairs.map((flair) => {
+                    const isSelected = selectedFlairs.includes(flair.id);
+                    return (
+                      <Button
+                        key={flair.id}
+                        variant={isSelected ? 'default' : 'outline'}
+                        size="sm"
+                        className={cn(
+                          'flex items-center gap-2 border',
+                          isSelected
+                            ? 'bg-[#4d68ff] text-white border-transparent hover:bg-[#3c52c7]'
+                            : 'text-gray-700 dark:text-gray-200 border-gray-200 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-[#1f2538]',
+                        )}
+                        onClick={() => {
+                          const next = isSelected
+                            ? selectedFlairs.filter((id) => id !== flair.id)
+                            : [...selectedFlairs, flair.id];
+                          onChange('metadata', { ...(draft.metadata || {}), flairIds: next });
+                        }}
+                      >
+                        <span>{flair.name}</span>
+                        {isSelected && (
+                          <span className="text-xs font-semibold text-white">✓</span>
+                        )}
+                      </Button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+          
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Label className="text-sm font-medium mb-3 block">말머리 관리</Label>
+            <FlairsManagerPanel slug={community.slug} initialFlairs={community.flairs} embedded />
+          </div>
         </div>
       );
     }
@@ -648,75 +738,48 @@ function WidgetTypeSpecificForm({
         typeof draft.metadata?.limit === 'number'
           ? draft.metadata.limit
           : Number(draft.metadata?.limit) || 5;
+      
+      const showNumbering = draft.metadata?.showNumbering !== false;
+
       return (
         <div className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-2">
-            <div>
-              <Label className="text-sm font-medium">최대 표시 규칙 수</Label>
-              <Input
-                className={SETTINGS_INPUT_CLASS}
-                type="number"
-                min={1}
-                max={20}
-                value={limitValue}
-                onChange={(event) =>
-                  onChange('metadata', {
-                    ...(draft.metadata || {}),
-                    limit: Number(event.target.value),
-                  })
-                }
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={draft.metadata?.collapsed ?? false}
-                onCheckedChange={(checked) =>
-                  onChange('metadata', { ...(draft.metadata || {}), collapsed: checked })
-                }
-              />
-              <span className="text-sm text-gray-600 dark:text-gray-50">기본으로 접기</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={draft.metadata?.showNumbering ?? true}
-                onCheckedChange={(checked) =>
-                  onChange('metadata', { ...(draft.metadata || {}), showNumbering: checked })
-                }
-              />
-              <span className="text-sm text-gray-600 dark:text-gray-50">번호 표시</span>
+          <RulesManagerPanel 
+            slug={community.slug} 
+            embedded 
+            showNumbering={showNumbering}
+            onShowNumberingChange={(checked) => 
+              onChange('metadata', { ...(draft.metadata || {}), showNumbering: checked })
+            }
+          />
+          
+          <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
+            <Label className="text-sm font-medium mb-3 block">표시 옵션</Label>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div>
+                <Label className="text-sm font-medium">최대 표시 규칙 수</Label>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 mb-2">
+                  이 개수까지 펼쳐 보이고, 나머지는 '더보기' 버튼으로 숨깁니다
+                </p>
+                <Input
+                  className={SETTINGS_INPUT_CLASS}
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={limitValue}
+                  onChange={(event) =>
+                    onChange('metadata', {
+                      ...(draft.metadata || {}),
+                      limit: Number(event.target.value),
+                    })
+                  }
+                />
+              </div>
             </div>
           </div>
-          <RulesManagerPanel slug={community.slug} embedded />
         </div>
       );
     }
-    case 'post_flair_list': {
-      return (
-        <div className="space-y-4">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={draft.metadata?.showFilter !== false}
-                onCheckedChange={(checked) =>
-                  onChange('metadata', { ...(draft.metadata || {}), showFilter: checked })
-                }
-              />
-              <span className="text-sm text-gray-600 dark:text-gray-50">플레어 필터 버튼 제공</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Switch
-                checked={!!draft.metadata?.showCounts}
-                onCheckedChange={(checked) =>
-                  onChange('metadata', { ...(draft.metadata || {}), showCounts: checked })
-                }
-              />
-              <span className="text-sm text-gray-600 dark:text-gray-50">사용 빈도 표시</span>
-            </div>
-          </div>
-          <FlairsManagerPanel slug={community.slug} embedded />
-        </div>
-      );
-    }
+
     default:
       return null;
   }
@@ -818,7 +881,7 @@ export function buildInitialWidgetPayload(
       };
     case 'post_flairs':
       if (!community.flairs || community.flairs.length === 0) {
-        throw new Error('먼저 플레어를 생성한 뒤 위젯을 추가할 수 있습니다.');
+        throw new Error('먼저 말머리를 생성한 뒤 위젯을 추가할 수 있습니다.');
       }
       return {
         type,
@@ -835,14 +898,7 @@ export function buildInitialWidgetPayload(
           showNumbering: true,
         },
       };
-    case 'post_flair_list':
-      return {
-        type,
-        metadata: {
-          showFilter: true,
-          showCounts: false,
-        },
-      };
+
     default:
       return { type };
   }

@@ -44,8 +44,8 @@ export const UNDO_REDO_SHORTCUT_KEYS: Record<UndoRedoAction, string> = {
 }
 
 export const historyActionLabels: Record<UndoRedoAction, string> = {
-  undo: "Undo",
-  redo: "Redo",
+  undo: "실행 취소",
+  redo: "다시 실행",
 }
 
 export const historyIcons = {

@@ -123,10 +123,10 @@ export class CreateCommunityWidgetDto {
   @IsEnum(CommunitySidebarWidgetType)
   type: CommunitySidebarWidgetType;
 
-  @ApiPropertyOptional({ description: "위젯 제목", maxLength: 120 })
+  @ApiPropertyOptional({ description: "위젯 제목", maxLength: 30 })
   @IsOptional()
   @IsString()
-  @MaxLength(120)
+  @MaxLength(30)
   title?: string;
 
   @ApiPropertyOptional({ description: "위젯 설명", maxLength: 500 })

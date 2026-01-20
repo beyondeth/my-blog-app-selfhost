@@ -245,6 +245,61 @@ export class TitleService {
   }
 
   /**
+   * 배치 쿼리로 여러 사용자의 활성 타이틀을 한 번에 조회 (N+1 문제 해결)
+   *
+   * @param userIds 사용자 ID 배열
+   * @returns userId → TitleInfoDto[] Map
+   */
+  async getBatchUserTitles(
+    userIds: string[],
+  ): Promise<Map<string, TitleInfoDto[]>> {
+    const titlesMap = new Map<string, TitleInfoDto[]>();
+
+    if (userIds.length === 0) {
+      return titlesMap;
+    }
+
+    // 모든 사용자의 활성 타이틀을 한 번에 조회
+    const now = new Date();
+    const grants = await this.titleGrantRepository
+      .createQueryBuilder("grant")
+      .where("grant.userId IN (:...userIds)", { userIds })
+      .andWhere(
+        "(grant.expiresAt IS NULL OR grant.expiresAt > :now)",
+        { now },
+      )
+      .getMany();
+
+    // userId별로 그룹화
+    for (const grant of grants) {
+      const meta = TITLE_METADATA[grant.titleCode];
+      const titleInfo: TitleInfoDto = {
+        code: grant.titleCode,
+        displayName: meta.displayName,
+        description: meta.description,
+        icon: meta.icon,
+        grantedAt: grant.grantedAt,
+        expiresAt: grant.expiresAt,
+        isActive: grant.isActive(),
+      };
+
+      const existing = titlesMap.get(grant.userId) || [];
+      existing.push(titleInfo);
+      titlesMap.set(grant.userId, existing);
+    }
+
+    // 타이틀이 없는 사용자도 빈 배열로 초기화
+    for (const userId of userIds) {
+      if (!titlesMap.has(userId)) {
+        titlesMap.set(userId, []);
+      }
+    }
+
+    return titlesMap;
+  }
+
+  /**
+
    * 특정 타이틀의 활성 grant 조회
    *
    * @param userId 사용자 ID

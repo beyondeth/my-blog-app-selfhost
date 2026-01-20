@@ -42,7 +42,6 @@ export class CommunityWidgetService {
     CommunitySidebarWidgetType.COMMUNITY_LIST,
     CommunitySidebarWidgetType.CALENDAR,
     CommunitySidebarWidgetType.COMMUNITY_RULES,
-    CommunitySidebarWidgetType.POST_FLAIR_LIST,
   ];
 
   constructor(
@@ -228,8 +227,7 @@ export class CommunityWidgetService {
     }
 
     if (
-      widget.type === CommunitySidebarWidgetType.COMMUNITY_RULES ||
-      widget.type === CommunitySidebarWidgetType.POST_FLAIR_LIST
+      widget.type === CommunitySidebarWidgetType.COMMUNITY_RULES
     ) {
       throw new BadRequestException("이 위젯은 비활성화만 가능합니다");
     }
@@ -244,7 +242,7 @@ export class CommunityWidgetService {
   private async ensureFoundationWidgets(communityId: string): Promise<void> {
     const foundationTypes: CommunitySidebarWidgetType[] = [
       CommunitySidebarWidgetType.COMMUNITY_RULES,
-      CommunitySidebarWidgetType.POST_FLAIR_LIST,
+      CommunitySidebarWidgetType.POST_FLAIRS,
     ];
 
     const existing = await this.widgetRepository.find({
@@ -256,6 +254,7 @@ export class CommunityWidgetService {
     });
 
     const existingTypes = new Set(existing.map((item) => item.type));
+
     let nextOrderIndex = await this.getNextOrderIndex(communityId);
 
     if (!existingTypes.has(CommunitySidebarWidgetType.COMMUNITY_RULES)) {
@@ -274,7 +273,7 @@ export class CommunityWidgetService {
       });
     }
 
-    if (!existingTypes.has(CommunitySidebarWidgetType.POST_FLAIR_LIST)) {
+    if (!existingTypes.has(CommunitySidebarWidgetType.POST_FLAIRS)) {
       const flairCount = await this.communityRepository
         .createQueryBuilder("community")
         .leftJoin("community.flairs", "flair")
@@ -284,14 +283,15 @@ export class CommunityWidgetService {
 
       await this.widgetRepository.save({
         communityId,
-        type: CommunitySidebarWidgetType.POST_FLAIR_LIST,
-        title: "플레어",
+        type: CommunitySidebarWidgetType.POST_FLAIRS,
+        title: "말머리",
         description: null,
         isEnabled: flairCount > 0,
         orderIndex: nextOrderIndex++,
         metadata: {
-          showFilter: true,
-          showCounts: false,
+          showAll: true,
+          showFilterButton: true,
+          flairIds: [],
         },
       });
     }
@@ -500,8 +500,7 @@ export class CommunityWidgetService {
         return this.preparePostFlairWidget(metadata);
       case CommunitySidebarWidgetType.COMMUNITY_RULES:
         return this.prepareRulesWidget(metadata);
-      case CommunitySidebarWidgetType.POST_FLAIR_LIST:
-        return this.prepareFlairListWidget(metadata);
+
       default:
         throw new BadRequestException("지원하지 않는 위젯 타입입니다");
     }
@@ -525,27 +524,33 @@ export class CommunityWidgetService {
   }
 
   private preparePostFlairWidget(metadata?: Record<string, any>) {
-    const flairIds = metadata?.flairIds;
-    if (!Array.isArray(flairIds) || flairIds.length === 0) {
-      throw new BadRequestException("표시할 플레어를 최소 1개 이상 선택하세요");
-    }
-    if (flairIds.length > 10) {
-      throw new BadRequestException(
-        "플레어는 최대 10개까지 선택할 수 있습니다",
-      );
-    }
+    const showAll = Boolean(metadata?.showAll);
+    let normalized: string[] = [];
 
-    const normalized = flairIds
-      .map((id: unknown) => (typeof id === "string" ? id : null))
-      .filter((id): id is string => !!id);
+    if (!showAll) {
+      const flairIds = metadata?.flairIds;
+      if (!Array.isArray(flairIds) || flairIds.length === 0) {
+        throw new BadRequestException("표시할 말머리를 최소 1개 이상 선택하세요");
+      }
+      if (flairIds.length > 20) {
+        throw new BadRequestException(
+          "말머리는 최대 20개까지 선택할 수 있습니다",
+        );
+      }
 
-    if (normalized.length === 0) {
-      throw new BadRequestException("유효한 플레어 ID가 필요합니다");
+      normalized = flairIds
+        .map((id: unknown) => (typeof id === "string" ? id : null))
+        .filter((id): id is string => !!id);
+
+      if (normalized.length === 0) {
+        throw new BadRequestException("유효한 말머리 ID가 필요합니다");
+      }
     }
 
     return {
       metadata: {
         flairIds: normalized,
+        showAll,
         showFilterButton: metadata?.showFilterButton ?? true,
       },
       entries: [],
@@ -566,15 +571,6 @@ export class CommunityWidgetService {
     };
   }
 
-  private prepareFlairListWidget(metadata?: Record<string, any>) {
-    return {
-      metadata: {
-        showFilter: metadata?.showFilter !== false,
-        showCounts: Boolean(metadata?.showCounts),
-      },
-      entries: [],
-    };
-  }
 
   private prepareLinkWidget(
     type: CommunitySidebarWidgetType,

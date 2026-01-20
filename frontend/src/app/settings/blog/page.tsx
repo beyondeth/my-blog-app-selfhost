@@ -14,7 +14,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { Blog, SocialLink } from '@/types';
 import { Switch } from '@/components/ui/switch';
-import { SETTINGS_CARD_CLASS, SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS } from '@/app/settings/theme';
+import { SETTINGS_CARD_CLASS, SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECTION_TITLE_CLASS, SETTINGS_SECTION_DESCRIPTION_CLASS } from '@/app/settings/theme';
 import { DESTRUCTIVE_SURFACE_CLASS } from '@/constants/accessibility';
 
 export default function BlogSettingsPage() {
@@ -579,8 +579,14 @@ export default function BlogSettingsPage() {
         </section>
 
         {/* Blog Info */}
-        <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-4`}>
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">블로그 정보</h3>
+        <section className={`${SETTINGS_CARD_CLASS} p-6`}>
+          <div className="mb-6 space-y-1">
+            <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
+              <FiCalendar className="w-5 h-5" />
+              블로그 정보
+            </h3>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>블로그 생성일과 주소를 확인하세요.</p>
+          </div>
           <div className="space-y-3 text-sm">
             <div className="flex items-center">
               <FiCalendar className="mr-2 text-gray-400 dark:text-gray-500" />
@@ -625,10 +631,13 @@ export default function BlogSettingsPage() {
         </section>
 
         {/* Blog Alias Settings */}
-        <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-5`}>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">블로그 주소 설정</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-300 mt-1">
+        <section className={`${SETTINGS_CARD_CLASS} p-6`}>
+          <div className="mb-6 space-y-1">
+            <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
+              <FiLink className="w-5 h-5" />
+              블로그 주소 설정
+            </h3>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
               주소를 변경하면 이전 주소는 자동으로 리다이렉트되어 SEO가 보호됩니다.
             </p>
           </div>
@@ -719,10 +728,13 @@ export default function BlogSettingsPage() {
         </section>
 
         {/* Social Links */}
-        <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-5`}>
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">프로필 소셜 링크</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-300 mt-1">
+        <section className={`${SETTINGS_CARD_CLASS} p-6`}>
+          <div className="mb-6 space-y-1">
+            <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
+              <FiGlobe className="w-5 h-5" />
+              프로필 소셜 링크
+            </h3>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
               블로그 프로필 카드에 표시됩니다. 최대 3개까지 연결할 수 있습니다.
             </p>
           </div>

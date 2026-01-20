@@ -115,17 +115,18 @@ export class LeaderboardService {
       userIds.push(results[i]);
     }
 
-    // 사용자 정보 일괄 조회
-    const users = await this.getUserInfoBatch(userIds);
+    // 사용자 정보와 타이틀을 배치 조회 (N+1 → 2 쿼리로 최적화)
+    const [users, titlesMap] = await Promise.all([
+      this.getUserInfoBatch(userIds),
+      this.titleService.getBatchUserTitles(userIds),
+    ]);
 
     let rank = 1;
     for (let i = 0; i < results.length; i += 2) {
       const userId = results[i];
       const score = parseFloat(results[i + 1]);
       const userInfo = users.get(userId);
-
-      // 타이틀 조회
-      const titles = await this.titleService.getUserActiveTitles(userId);
+      const titles = titlesMap.get(userId) || [];
 
       entries.push({
         rank,
@@ -148,6 +149,7 @@ export class LeaderboardService {
       lastUpdatedAt: new Date(),
       totalParticipants,
     };
+
   }
 
   /**

@@ -284,6 +284,35 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
         </WidgetCard>
       );
     case 'post_flairs': {
+      const showAll = Boolean(widget.metadata?.showAll ?? false); // Legacy highlight widgets default to false
+
+      // Case 1: Show All (Unified List Mode)
+      // Case 1: Show All (Unified List Mode)
+      if (showAll) {
+        const flairs = community.flairs || [];
+        if (!flairs.length && widget.type === 'post_flairs' && !community.userMembership?.isMember) {
+           // If it's a "selection" widget but no flairs are created/selected, and user is visitor, hide it?
+           // Actually for now let's just show what we have.
+        }
+      
+        const limit = typeof widget.metadata?.limit === 'number' 
+          ? widget.metadata.limit 
+          : 10;
+
+        return (
+          <WidgetCard title={title} description={widget.description}>
+            <FlairsList
+              flairs={flairs}
+              onFlairClick={onFlairFilter}
+              selectedFlairId={selectedFlairId}
+              showHeader={false}
+              limit={limit}
+            />
+          </WidgetCard>
+        );
+      }
+
+      // Case 2: Highlight Mode (Specific Flairs)
       const flairIds = Array.isArray(widget.metadata?.flairIds)
         ? (widget.metadata?.flairIds as string[])
         : [];
@@ -331,42 +360,23 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
         typeof widget.metadata?.limit === 'number'
           ? widget.metadata.limit
           : Number(widget.metadata?.limit) || community.rules?.length || 3;
-      const rules = (community.rules || []).slice(0, limit || undefined);
+      const rules = community.rules || [];
       if (!rules.length) return null;
-      const collapsed = Boolean(widget.metadata?.collapsed);
+      // Default to collapsed unless explicitly set otherwise (though we removed the toggle, defaulting to collapsed enables the "See More" behavior)
       const showNumbering = widget.metadata?.showNumbering !== false;
       return (
         <WidgetCard title={title} description={widget.description}>
           <CommunityRulesList
             rules={rules}
-            maxCollapsed={Math.min(rules.length, limit || 3)}
-            defaultExpanded={!collapsed}
+            maxCollapsed={limit || 3}
+            defaultExpanded={false}
             showHeader={false}
             showNumbering={showNumbering}
           />
         </WidgetCard>
       );
     }
-    case 'post_flair_list': {
-      const flairs = community.flairs || [];
-      if (!flairs.length) return null;
-      const showFilter = widget.metadata?.showFilter !== false;
-      return (
-        <WidgetCard title={title} description={widget.description}>
-          <FlairsList
-            flairs={flairs}
-            onFlairClick={showFilter ? onFlairFilter ?? undefined : undefined}
-            selectedFlairId={showFilter ? selectedFlairId : undefined}
-            showHeader={false}
-          />
-          {!showFilter && (
-            <p className="mt-2 text-xs text-gray-500 dark:text-[#C7D1DD]">
-              운영진이 추천한 플레어입니다.
-            </p>
-          )}
-        </WidgetCard>
-      );
-    }
+
     default:
       return null;
   }

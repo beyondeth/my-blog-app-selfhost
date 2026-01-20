@@ -135,24 +135,24 @@ export class ReportsService {
       new Map(),
     );
 
-    // Load target details for each report
-    const reportsWithTargets = await Promise.all(
-      reports.map(async (report) => {
-        const target = await this.loadTargetDetails(report);
-        // Map target to specific fields based on type
-        const result: any = { ...report };
-        if (report.type === ReportType.POST && target) {
-          result.post = target;
-        } else if (report.type === ReportType.COMMENT && target) {
-          result.comment = target;
-        } else if (report.type === ReportType.USER && target) {
-          result.targetUser = target;
-        }
-        result.target = target; // Keep for backward compatibility
-        result.actionLogs = actionLogMap.get(report.id) ?? [];
-        return result;
-      }),
-    );
+    // 배치 쿼리로 타입별 타겟 상세 정보 조회 (N+1 → 4 쿼리로 최적화)
+    const targetMaps = await this.loadBatchTargetDetails(reports);
+
+    // 동기적 매핑 (비동기 루프 제거)
+    const reportsWithTargets = reports.map((report) => {
+      const target = targetMaps.get(`${report.type}:${report.targetId}`) || null;
+      const result: any = { ...report };
+      if (report.type === ReportType.POST && target) {
+        result.post = target;
+      } else if (report.type === ReportType.COMMENT && target) {
+        result.comment = target;
+      } else if (report.type === ReportType.USER && target) {
+        result.targetUser = target;
+      }
+      result.target = target; // Keep for backward compatibility
+      result.actionLogs = actionLogMap.get(report.id) ?? [];
+      return result;
+    });
 
     return {
       data: reportsWithTargets,
@@ -162,6 +162,7 @@ export class ReportsService {
       totalPages: Math.ceil(total / limit),
     };
   }
+
 
   /**
    * Get a single report
@@ -688,7 +689,68 @@ export class ReportsService {
     return content?.authorId ?? null;
   }
 
+  /**
+   * 배치 쿼리로 여러 신고의 타겟 상세 정보를 한 번에 조회 (N+1 문제 해결)
+   * 타입별로 그룹화하여 IN 쿼리로 조회
+   */
+  private async loadBatchTargetDetails(
+    reports: Report[],
+  ): Promise<Map<string, any>> {
+    const targetMap = new Map<string, any>();
+
+    // 타입별로 targetId 분류
+    const postIds: string[] = [];
+    const commentIds: string[] = [];
+    const userIds: string[] = [];
+
+    for (const report of reports) {
+      if (report.type === ReportType.POST) {
+        postIds.push(report.targetId);
+      } else if (report.type === ReportType.COMMENT) {
+        commentIds.push(report.targetId);
+      } else if (report.type === ReportType.USER) {
+        userIds.push(report.targetId);
+      }
+    }
+
+    // 병렬로 3개 배치 쿼리 실행
+    const [posts, comments, users] = await Promise.all([
+      postIds.length > 0
+        ? this.postRepository.find({
+            where: { id: In(postIds) },
+            relations: ["author"],
+          })
+        : [],
+      commentIds.length > 0
+        ? this.commentRepository.find({
+            where: { id: In(commentIds) },
+            relations: ["author", "post"],
+          })
+        : [],
+      userIds.length > 0
+        ? this.userRepository.find({
+            where: { id: In(userIds) },
+            select: ["id", "username", "email", "createdAt"],
+          })
+        : [],
+    ]);
+
+    // Map으로 변환 (key: "TYPE:targetId")
+    for (const post of posts) {
+      targetMap.set(`${ReportType.POST}:${post.id}`, post);
+    }
+    for (const comment of comments) {
+      targetMap.set(`${ReportType.COMMENT}:${comment.id}`, comment);
+    }
+    for (const user of users) {
+      targetMap.set(`${ReportType.USER}:${user.id}`, user);
+    }
+
+    return targetMap;
+  }
+
   private async loadTargetDetails(report: Report) {
+
     switch (report.type) {
       case ReportType.POST:
         return await this.postRepository.findOne({

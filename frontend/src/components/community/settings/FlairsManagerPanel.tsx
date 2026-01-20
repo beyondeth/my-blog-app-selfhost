@@ -39,18 +39,15 @@ const COLOR_PRESETS = [
 interface FlairsManagerPanelProps {
   slug: string;
   embedded?: boolean;
+  initialFlairs?: CommunityFlair[];
 }
 
-export default function FlairsManagerPanel({ slug, embedded = false }: FlairsManagerPanelProps) {
-  const [filter, setFilter] = useState<FlairTypeType | 'all'>('all');
+export default function FlairsManagerPanel({ slug, embedded = false, initialFlairs }: FlairsManagerPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingFlair, setEditingFlair] = useState<CommunityFlair | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CommunityFlair | null>(null);
 
-  const { data: flairs, isLoading } = useCommunityFlairs(
-    slug,
-    filter === 'all' ? undefined : filter,
-  );
+  const { data: flairs, isLoading } = useCommunityFlairs(slug, undefined, { initialData: initialFlairs });
   const createMutation = useCreateCommunityFlair(slug);
   const updateMutation = useUpdateCommunityFlair(slug);
   const deleteMutation = useDeleteCommunityFlair(slug);
@@ -137,41 +134,26 @@ export default function FlairsManagerPanel({ slug, embedded = false }: FlairsMan
       <header className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            게시물 플레어
+            게시물 말머리
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            게시물 분류 및 강조를 위한 플레어를 관리하세요.
+            게시물 분류 및 강조를 위한 말머리를 관리하세요.
           </p>
         </div>
         <Button size="sm" onClick={() => setIsCreating(true)} disabled={isCreating}>
           <Plus className="w-4 h-4 mr-1" />
-          플레어 추가
+          말머리 추가
         </Button>
       </header>
 
-      <div className="flex gap-2">
-        {(['all', FlairType.POST, FlairType.USER] as Array<FlairTypeType | 'all'>).map((option) => (
-          <button
-            key={option}
-            onClick={() => setFilter(option)}
-            className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium transition',
-              filter === option
-                ? 'border-blue-500 bg-blue-50 text-blue-600 dark:bg-blue-900/40'
-                : 'border-gray-200 text-gray-500 hover:border-gray-300',
-            )}
-          >
-            {option === 'all' ? '전체' : option === FlairType.POST ? '게시물' : '사용자'}
-          </button>
-        ))}
-      </div>
+
 
       {isCreating && (
         <div className="rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-3">
           <Input
             value={newFlair.name}
             onChange={(event) => setNewFlair((prev) => ({ ...prev, name: event.target.value }))}
-            placeholder="플레어 이름"
+            placeholder="말머리 이름"
           />
           <div className="flex flex-wrap gap-2">
             {COLOR_PRESETS.map((preset) => (
@@ -186,10 +168,10 @@ export default function FlairsManagerPanel({ slug, embedded = false }: FlairsMan
                   }))
                 }
                 className={cn(
-                  'w-6 h-6 rounded-full border-2',
+                  'w-6 h-6 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
                   newFlair.backgroundColor === preset.bg
-                    ? 'border-blue-500'
-                    : 'border-transparent',
+                    ? 'ring-2 ring-blue-600 dark:ring-blue-400 ring-offset-2 ring-offset-blue-50 dark:ring-offset-gray-900 scale-110'
+                    : 'hover:scale-110',
                 )}
                 style={{ backgroundColor: preset.bg }}
               />
@@ -218,7 +200,7 @@ export default function FlairsManagerPanel({ slug, embedded = false }: FlairsMan
       <div className="grid gap-3">
         {isLoading && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 text-sm text-gray-500">
-            플레어를 불러오는 중...
+            말머리를 불러오는 중...
           </div>
         )}
         {!isLoading &&
@@ -248,10 +230,10 @@ export default function FlairsManagerPanel({ slug, embedded = false }: FlairsMan
                             }))
                           }
                           className={cn(
-                            'w-6 h-6 rounded-full border-2',
+                            'w-6 h-6 rounded-full transition-all focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2',
                             editState.backgroundColor === preset.bg
-                              ? 'border-blue-500'
-                              : 'border-transparent',
+                              ? 'ring-2 ring-blue-600 dark:ring-blue-400 ring-offset-2 ring-offset-white dark:ring-offset-[#222222] scale-110'
+                              : 'hover:scale-110',
                           )}
                           style={{ backgroundColor: preset.bg }}
                         />
@@ -287,10 +269,9 @@ export default function FlairsManagerPanel({ slug, embedded = false }: FlairsMan
                       >
                         {flair.name}
                       </span>
-                      <span className="text-xs text-gray-500">
-                        {flair.type === FlairType.POST ? '게시물' : '사용자'}
-                        {flair.isModOnly && ' · 운영진 전용'}
-                      </span>
+                      {flair.isModOnly && (
+                        <span className="text-xs text-gray-500">운영진 전용</span>
+                      )}
                     </div>
                     <div className="flex gap-2">
                       <button
@@ -314,16 +295,16 @@ export default function FlairsManagerPanel({ slug, embedded = false }: FlairsMan
             );
           })}
         {!isLoading && filteredFlairs.length === 0 && (
-          <p className="text-sm text-gray-500">조건에 맞는 플레어가 없습니다.</p>
+          <p className="text-sm text-gray-500">조건에 맞는 말머리가 없습니다.</p>
         )}
       </div>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>플레어 삭제</AlertDialogTitle>
+            <AlertDialogTitle>말머리 삭제</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deleteTarget?.name}" 플레어를 삭제하시겠습니까?
+              "{deleteTarget?.name}" 말머리를 삭제하시겠습니까?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

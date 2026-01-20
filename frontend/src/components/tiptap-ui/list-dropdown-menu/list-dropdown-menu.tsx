@@ -92,7 +92,7 @@ export function ListDropdownMenu({
           disabled={!canToggle}
           data-disabled={!canToggle}
           aria-label="List options"
-          tooltip="List"
+          tooltip="목록"
           {...props}
         >
           <Icon className="tiptap-button-icon" />

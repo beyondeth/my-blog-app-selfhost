@@ -211,6 +211,6 @@ export function useVideoUploadButton(config?: UseVideoUploadConfig) {
     openFileDialog,
     handleFileSelect,
     fileInputRef,
-    label: "Add video",
+    label: "비디오 추가",
   }
 }

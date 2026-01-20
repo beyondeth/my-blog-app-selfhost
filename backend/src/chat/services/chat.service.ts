@@ -287,57 +287,59 @@ export class ChatService {
       ]),
     );
 
-    // 2. 각 대화방의 unreadCount 계산
-    // 아직 개별 쿼리지만 이전보다는 최적화됨 (lastMessage는 이미 배치로 처리)
-    const conversationsWithUnreadCount = await Promise.all(
-      conversations.map(async (conv) => {
-        // 현재 사용자의 lastReadAt 타임스탬프
-        const lastReadAt =
-          userId === conv.user1Id ? conv.user1LastReadAt : conv.user2LastReadAt;
+    // 2. 배치 쿼리로 모든 대화방의 unreadCount를 한 번에 조회 (N+1 → 2 쿼리로 최적화)
+    // Raw SQL로 복잡한 조건 처리 (user1/user2별 lastReadAt)
+    let unreadCountMap = new Map<string, number>();
 
-        // 상대방이 보낸 메시지 중 lastReadAt 이후 메시지 카운트
-        let unreadCount = 0;
-        if (!lastReadAt) {
-          // lastReadAt이 없으면 모든 상대방 메시지가 unread
-          unreadCount = await this.messageRepository
-            .createQueryBuilder("message")
-            .where("message.conversationId = :conversationId", {
-              conversationId: conv.id,
-            })
-            .andWhere("message.senderId != :userId", { userId })
-            .andWhere("message.isDeleted = false")
-            .getCount();
-        } else {
-          // lastReadAt 이후 메시지만 카운트
-          unreadCount = await this.messageRepository
-            .createQueryBuilder("message")
-            .where("message.conversationId = :conversationId", {
-              conversationId: conv.id,
-            })
-            .andWhere("message.senderId != :userId", { userId })
-            .andWhere("message.isDeleted = false")
-            .andWhere("message.createdAt > :lastReadAt", { lastReadAt })
-            .getCount();
-        }
+    if (conversationIds.length > 0) {
+      const unreadCountsRaw = await this.messageRepository.query(
+        `
+        SELECT 
+          m."conversationId",
+          COUNT(*) as "unreadCount"
+        FROM messages m
+        INNER JOIN conversations c ON c.id = m."conversationId"
+        WHERE m."conversationId" = ANY($1)
+          AND m."senderId" != $2
+          AND m."isDeleted" = false
+          AND (
+            (c."user1Id" = $2 AND (c."user1LastReadAt" IS NULL OR m."createdAt" > c."user1LastReadAt"))
+            OR
+            (c."user2Id" = $2 AND (c."user2LastReadAt" IS NULL OR m."createdAt" > c."user2LastReadAt"))
+          )
+        GROUP BY m."conversationId"
+        `,
+        [conversationIds, userId],
+      );
 
-        // 맵에서 미리 조회된 lastMessage 가져오기 (N+1 문제 해결)
-        const lastMessage = lastMessageMap.get(conv.id) || null;
+      unreadCountMap = new Map(
+        unreadCountsRaw.map((r: any) => [
+          r.conversationId,
+          parseInt(r.unreadCount, 10),
+        ]),
+      );
+    }
 
-        // formatAuthorData 패턴 적용 (PostsService와 동일)
-        if (conv.user1) {
-          this.formatAuthorData(conv.user1);
-        }
-        if (conv.user2) {
-          this.formatAuthorData(conv.user2);
-        }
+    // 동기적 매핑 (비동기 루프 제거)
+    const conversationsWithUnreadCount = conversations.map((conv) => {
+      const lastMessage = lastMessageMap.get(conv.id) || null;
+      const unreadCount = unreadCountMap.get(conv.id) || 0;
 
-        return {
-          ...conv,
-          unreadCount,
-          lastMessage,
-        };
-      }),
-    );
+      // formatAuthorData 패턴 적용 (PostsService와 동일)
+      if (conv.user1) {
+        this.formatAuthorData(conv.user1);
+      }
+      if (conv.user2) {
+        this.formatAuthorData(conv.user2);
+      }
+
+      return {
+        ...conv,
+        unreadCount,
+        lastMessage,
+      };
+    });
+
 
     /**
      * 대화 목록 캐싱 개선

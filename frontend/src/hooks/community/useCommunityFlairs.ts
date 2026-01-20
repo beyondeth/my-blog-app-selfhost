@@ -12,6 +12,11 @@ import type {
 /**
  * 플레어 관리 관련 Query Key 팩토리
  */
+import { communityQueryKeys } from './useCommunities';
+
+/**
+ * 플레어 관리 관련 Query Key 팩토리
+ */
 export const communityFlairQueryKeys = {
   all: ['community-flairs'] as const,
   list: (slug: string, type?: FlairTypeType) =>
@@ -21,12 +26,17 @@ export const communityFlairQueryKeys = {
 /**
  * 커뮤니티 플레어 목록 조회 훅
  */
-export function useCommunityFlairs(slug: string, type?: FlairTypeType) {
+export function useCommunityFlairs(
+  slug: string,
+  type?: FlairTypeType,
+  options?: { initialData?: CommunityFlair[] },
+) {
   return useQuery<CommunityFlair[]>({
     queryKey: communityFlairQueryKeys.list(slug, type),
     queryFn: () => communityService.getCommunityFlairs(slug, type),
     enabled: !!slug,
     staleTime: 5 * 60 * 1000, // 5분
+    initialData: options?.initialData,
   });
 }
 
@@ -43,6 +53,10 @@ export function useCreateCommunityFlair(slug: string) {
       // 플레어 목록 캐시 무효화
       queryClient.invalidateQueries({
         queryKey: communityFlairQueryKeys.all,
+      });
+      // 커뮤니티 상세 정보 캐시 무효화 (위젯 등에서 사용되는 flairs 목록 갱신)
+      queryClient.invalidateQueries({
+        queryKey: communityQueryKeys.detail(slug),
       });
     },
   });
@@ -62,6 +76,10 @@ export function useUpdateCommunityFlair(slug: string) {
       queryClient.invalidateQueries({
         queryKey: communityFlairQueryKeys.all,
       });
+      // 커뮤니티 상세 정보 캐시 무효화
+      queryClient.invalidateQueries({
+        queryKey: communityQueryKeys.detail(slug),
+      });
     },
   });
 }
@@ -79,6 +97,10 @@ export function useDeleteCommunityFlair(slug: string) {
       // 플레어 목록 캐시 무효화
       queryClient.invalidateQueries({
         queryKey: communityFlairQueryKeys.all,
+      });
+      // 커뮤니티 상세 정보 캐시 무효화
+      queryClient.invalidateQueries({
+        queryKey: communityQueryKeys.detail(slug),
       });
     },
   });

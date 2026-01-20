@@ -10,7 +10,7 @@ export const CommunitySidebarWidgetType = {
   POST_FLAIRS: "post_flairs",
   BOOKMARKS: "bookmarks",
   COMMUNITY_RULES: "community_rules",
-  POST_FLAIR_LIST: "post_flair_list",
+
 } as const;
 
 export type CommunitySidebarWidgetType =
