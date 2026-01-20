@@ -42,12 +42,13 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
   showNumbering = true,
 }: CommunityRulesListProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
-  const [expandedRules, setExpandedRules] = useState<Set<string>>(new Set());
+  const [expandedRules, setExpandedRules] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (defaultExpanded && rules?.length) {
-      setIsExpanded(true);
-      setExpandedRules(new Set(rules.map(rule => rule.id)));
+      const initial: Record<string, boolean> = {};
+      rules.forEach(r => { initial[r.id] = true; });
+      setExpandedRules(initial);
     }
   }, [defaultExpanded, rules]);
 
@@ -62,17 +63,11 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
   // 표시할 규칙
   const displayedRules = isExpanded ? sortedRules : sortedRules.slice(0, maxCollapsed);
 
-  // 규칙 상세 토글
-  const toggleRuleExpanded = (ruleId: string) => {
-    setExpandedRules((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(ruleId)) {
-        newSet.delete(ruleId);
-      } else {
-        newSet.add(ruleId);
-      }
-      return newSet;
-    });
+  const toggleRule = (ruleId: string) => {
+    setExpandedRules(prev => ({
+      ...prev,
+      [ruleId]: !prev[ruleId]
+    }));
   };
 
   return (
@@ -98,17 +93,20 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
       {/* 규칙 목록 */}
       <div className="divide-y divide-gray-100 dark:divide-gray-800">
         {displayedRules.map((rule, index) => {
-          const isRuleExpanded = expandedRules.has(rule.id);
+          const isRuleExpanded = !!expandedRules[rule.id];
 
           return (
             <div key={rule.id} className="px-3 py-3">
               <button
-                onClick={() => toggleRuleExpanded(rule.id)}
-                className="w-full text-left flex items-start gap-3 group"
+                onClick={() => toggleRule(rule.id)}
+                className={cn(
+                  "w-full text-left flex items-start gap-3 group rounded-md p-2 transition-colors",
+                  "hover:bg-gray-50 dark:hover:bg-white/5"
+                )}
               >
                 {/* 규칙 번호 */}
                 {showNumbering && (
-                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-[#C7D1DD] text-sm font-medium flex items-center justify-center">
+                  <span className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-[#C7D1DD] text-sm font-medium flex items-center justify-center mt-0.5">
                     {index + 1}
                   </span>
                 )}
@@ -119,10 +117,10 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
                     {rule.title}
                   </h4>
                 </div>
-
-                {/* 확장 아이콘 */}
-                {rule.description && (
-                  <span className="flex-shrink-0 text-gray-400 dark:text-[#C7D1DD]">
+                
+                 {/* 확장 아이콘 */}
+                 {rule.description && (
+                  <span className="flex-shrink-0 text-gray-400 dark:text-[#C7D1DD] mt-1">
                     {isRuleExpanded ? (
                       <ChevronUp className="w-4 h-4" />
                     ) : (
@@ -134,7 +132,7 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
 
               {/* 규칙 설명 (버튼 밖으로 분리하여 링크 클릭 가능하도록) */}
               {isRuleExpanded && rule.description && (
-                <div className={cn("mt-2 text-sm text-gray-600 dark:text-[#C7D1DD] whitespace-pre-wrap", showNumbering ? "ml-9" : "ml-0")}>
+                <div className={cn("mt-1 pr-2 text-sm text-gray-600 dark:text-[#C7D1DD] whitespace-pre-wrap", showNumbering ? "pl-11" : "pl-2")}>
                   <Linkify options={linkifyOptions}>
                     {rule.description}
                   </Linkify>

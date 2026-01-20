@@ -14,6 +14,8 @@ import type {
 import CommunityRulesList from '../CommunityRulesList';
 import FlairsList from '../FlairsList';
 import { resolveWidgetTitle } from './titleUtils';
+import { useCommunityRules } from '@/hooks/community/useCommunityRules';
+import { useCommunityFlairs } from '@/hooks/community/useCommunityFlairs';
 
 interface CommunityWidgetRendererProps {
   community: Community;
@@ -93,11 +95,24 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
   onFlairFilter,
   selectedFlairId,
 }) => {
+  // Always call hooks at the top level
+  // Only fetch rules if the widget type matches
+  const isRulesWidget = widget?.type === 'community_rules';
+  const { data: latestRules } = useCommunityRules(community.slug); // react-query hook handles caching
+  const { data: latestFlairs } = useCommunityFlairs(community.slug);
+
   if (!widget) return null;
 
   const title = resolveWidgetTitle(widget);
 
   switch (widget.type) {
+    // ... (case text ~ calendar unchanged)
+
+    // ~~~
+    // Need to skip to post_flairs case.
+    // I will split this into two simpler Replacements to avoid large context matching error.
+    // First, insert the hook call.
+
     case 'text': {
       const content = widget.metadata?.content as string | undefined;
       if (!content) return null;
@@ -287,12 +302,12 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
       const showAll = Boolean(widget.metadata?.showAll ?? false); // Legacy highlight widgets default to false
 
       // Case 1: Show All (Unified List Mode)
-      // Case 1: Show All (Unified List Mode)
       if (showAll) {
-        const flairs = community.flairs || [];
+        // Use latest fetched flairs first
+        const flairs = latestFlairs || community.flairs || [];
+        
         if (!flairs.length && widget.type === 'post_flairs' && !community.userMembership?.isMember) {
-           // If it's a "selection" widget but no flairs are created/selected, and user is visitor, hide it?
-           // Actually for now let's just show what we have.
+           // ...
         }
       
         const limit = typeof widget.metadata?.limit === 'number' 
@@ -316,8 +331,11 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
       const flairIds = Array.isArray(widget.metadata?.flairIds)
         ? (widget.metadata?.flairIds as string[])
         : [];
+      
+      const allFlairs = latestFlairs || community.flairs || [];
       const highlightedFlairs =
-        community.flairs?.filter((flair) => flairIds.includes(flair.id)) || [];
+        allFlairs.filter((flair) => flairIds.includes(flair.id)) || [];
+        
       if (!highlightedFlairs.length) return null;
       return (
         <WidgetCard title={title} description={widget.description}>
@@ -360,12 +378,15 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
         typeof widget.metadata?.limit === 'number'
           ? widget.metadata.limit
           : Number(widget.metadata?.limit) || community.rules?.length || 3;
-      const rules = community.rules || [];
+      
+      // Use latest fetched rules first, fallback to community.rules (SSR/Initial data)
+      const rules = latestRules || community.rules || [];
+      
       if (!rules.length) return null;
       // Default to collapsed unless explicitly set otherwise (though we removed the toggle, defaulting to collapsed enables the "See More" behavior)
       const showNumbering = widget.metadata?.showNumbering !== false;
       return (
-        <WidgetCard title={title} description={widget.description}>
+        <WidgetCard title={title} description={undefined}>
           <CommunityRulesList
             rules={rules}
             maxCollapsed={limit || 3}
