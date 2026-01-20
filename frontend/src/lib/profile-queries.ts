@@ -334,6 +334,10 @@ export const useLogin = () => {
       // 블로그 정보 무효화 (재조회 트리거)
       queryClient.invalidateQueries({ queryKey: ['blogs', 'my-blogs'] });
       queryClient.invalidateQueries({ queryKey: ['user-blog'] });
+      
+      // 커뮤니티 상세 캐시 무효화 (userMembership 갱신)
+      // 비로그인 상태에서 캐시된 멤버십 정보가 로그인 후에도 유지되는 문제 해결
+      queryClient.invalidateQueries({ queryKey: ['communities', 'detail'] });
 
       // Mixpanel: 로그인 이벤트 추적
       mixpanel.track('User Login', { method: 'email' });

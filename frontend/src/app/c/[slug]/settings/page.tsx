@@ -548,10 +548,10 @@ export default function CommunitySettingsPage({ params }: CommunitySettingsPageP
                     setFormData({ ...formData, description: e.target.value });
                   }
                 }}
-                rows={4}
+                rows={8}
                 maxLength={500}
                 placeholder="커뮤니티를 소개해주세요..."
-                className={`${SETTINGS_INPUT_CLASS} min-h-[120px]`}
+                className={`${SETTINGS_INPUT_CLASS} min-h-[240px]`}
               />
               <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-300">
                 <span>{formData.description.length}/500</span>
