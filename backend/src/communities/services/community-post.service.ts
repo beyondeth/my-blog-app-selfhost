@@ -21,6 +21,7 @@ import {
   isModeratorOrAbove,
 } from "../enums";
 import { VoteType } from "../../posts/enums/vote-type.enum";
+import { generateSlug } from "../../posts/utils/post.utils";
 import {
   CreateCommunityPostDto,
   UpdateCommunityPostDto,
@@ -154,6 +155,7 @@ export class CommunityPostService {
       communityId,
       authorId,
       title: dto.title,
+      slug: generateSlug(dto.title), // SEO 친화적 URL
       content: dto.content,
       content_markdown: dto.contentMarkdown,
       flairId: dto.flairId,

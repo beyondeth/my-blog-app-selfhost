@@ -23,7 +23,7 @@ import { File } from "../../files/entities/file.entity";
 import { Role } from "../../common/enums/role.enum";
 import { CreatePostDto } from "../dto/create-post.dto";
 import { UpdatePostDto } from "../dto/update-post.dto";
-// import { extractImageUrlsFromContent } from '../utils/post.utils'; // 사용하지 않음
+import { generateSlug } from "../utils/post.utils";
 import { PostContentService } from "./post-content.service";
 import { PostFileService } from "./post-file.service";
 import { PostCacheService } from "./post-cache.service";
@@ -247,7 +247,8 @@ export class PostCreationService {
       // 5. 포스트 엔티티 생성
       const post = manager.create(Post, {
         title: sanitizedTitle,
-        // slug는 @BeforeInsert 훅에서 자동 생성됨
+        // SEO 친화적 URL (YYYY-MM-DD-title-timestamp)
+        slug: generateSlug(sanitizedTitle),
         content: processedContent.html, // 처리된 HTML 콘텐츠 저장
         content_markdown: createPostDto.content_markdown, // 원본 마크다운 저장
         excerpt: this.postContentService.extractExcerpt(rawContent),
