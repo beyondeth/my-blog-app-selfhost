@@ -182,6 +182,13 @@ export default function BlogPage() {
     return !!(blog && user && String(blog.owner?.id) === String(user.id));
   }, [blog, user]);
 
+  const hasCategoryFilter = Boolean(currentParams.category);
+  const emptyStateMessage = hasCategoryFilter
+    ? "이 카테고리의 글이 삭제되어 더 이상 표시할 내용이 없습니다."
+    : isBlogOwner
+      ? "아직 작성된 글이 없습니다. 첫 번째 글을 작성해보세요."
+      : "아직 포스트가 없습니다.";
+
   // 브랜드 색상 관련 유틸
   const brandColor = useMemo(() => {
     if (blog?.brandColor && /^#[0-9A-Fa-f]{6}$/.test(blog.brandColor)) {
@@ -547,9 +554,7 @@ export default function BlogPage() {
                 ) : (
                   <div className="text-center py-12 text-gray-500">
                     <p className="text-sm sm:text-base">
-                      {isBlogOwner 
-                        ? "아직 작성된 글이 없습니다. 첫 번째 글을 작성해보세요." 
-                        : "아직 포스트가 없습니다."}
+                      {emptyStateMessage}
                     </p>
                   </div>
                 )}

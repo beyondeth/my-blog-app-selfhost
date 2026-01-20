@@ -417,6 +417,17 @@ export function useDeletePost() {
       queryClient.invalidateQueries({ queryKey: ['editorPicks'] });
       queryClient.invalidateQueries({ queryKey: ['adminEditorPicks'] });
       queryClient.invalidateQueries({ queryKey: ['posts', 'home'] });
+
+      const context = mutation.context as {
+        blogSlug?: string;
+      } | null;
+
+      if (context?.blogSlug) {
+        const normalizedBlogSlug = context.blogSlug.replace('@', '');
+        queryClient.invalidateQueries({
+          queryKey: ['blog-categories', normalizedBlogSlug],
+        });
+      }
     }
   }, [mutation.isSuccess, queryClient]);
 
