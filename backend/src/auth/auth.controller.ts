@@ -39,6 +39,21 @@ import { User } from "../users/entities/user.entity";
 
 @ApiTags("auth")
 @Controller("auth")
+// -----------------------------------------------------------------------------
+// 🔐 [보안 설계 정책]
+// -----------------------------------------------------------------------------
+// 1. SameSite: "none" 사용
+//    - 이유: OAuth 리다이렉트(Cross-Site Request) 지원을 위해 필수
+//    - 통일: 일반/소셜 로그인 및 로그아웃 시 쿠키 설정(삭제) 불일치 문제를 방지하기 위해
+//           모든 인증 쿠키 설정을 sameSite="none", secure=true(HTTPS)로 통일함.
+//
+// 2. CSRF 방어 정책
+//    - 본 서비스는 sameSite: "none" 쿠키를 사용하므로, CSRF 방어는
+//      main.ts의 CORS 기반 Origin Allowlist 검증으로 처리함.
+//    - 모든 상태 변경 요청은 브라우저 기반 fetch/XHR을 통해서만 허용되며,
+//      허용되지 않은 Origin의 요청은 CORS 단계에서 차단됨.
+//    - 단, origin이 null인 요청은 OAuth 콜백 등 의도된 경로에서만 제한적으로 허용됨.
+// -----------------------------------------------------------------------------
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
@@ -98,8 +113,8 @@ export class AuthController {
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie("access_token", authResponse.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // 프로덕션에서만 HTTPS 사용
-      sameSite: "lax", // lax: POST CSRF 차단 + 서버 사이드 리다이렉트 호환
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: "/",
     });
@@ -107,7 +122,7 @@ export class AuthController {
     res.cookie("refresh_token", authResponse.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // lax: POST CSRF 차단 + 서버 사이드 리다이렉트 호환
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: "/",
     });
@@ -137,8 +152,8 @@ export class AuthController {
     // HttpOnly 쿠키로 토큰들 설정
     res.cookie("access_token", authResponse.access_token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production", // 프로덕션에서만 HTTPS 사용
-      sameSite: "lax", // lax: POST CSRF 차단 + 서버 사이드 리다이렉트 호환
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: "/",
     });
@@ -146,7 +161,7 @@ export class AuthController {
     res.cookie("refresh_token", authResponse.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // lax: POST CSRF 차단 + 서버 사이드 리다이렉트 호환
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: "/",
     });
@@ -544,7 +559,7 @@ export class AuthController {
     res.cookie("access_token", authResponse.access_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // lax: POST CSRF 차단 + 서버 사이드 리다이렉트 호환
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 24 * 60 * 60 * 1000, // 1일 (JWT와 동일)
       path: "/",
     });
@@ -552,7 +567,7 @@ export class AuthController {
     res.cookie("refresh_token", authResponse.refresh_token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: "lax", // lax: POST CSRF 차단 + 서버 사이드 리다이렉트 호환
+      sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7일
       path: "/",
     });
