@@ -17,6 +17,7 @@ interface FlairsListProps {
   className?: string;
   showHeader?: boolean;
   headerTitle?: string;
+  limit?: number;
 }
 
 /**
@@ -29,7 +30,8 @@ const FlairsList = React.memo(function FlairsList({
   selectedFlairId,
   className,
   showHeader = true,
-  headerTitle = '플레어',
+  headerTitle = '말머리',
+  limit
 }: FlairsListProps) {
   // 게시물 플레어만 필터링하고 활성화된 것만 표시
   const postFlairs = flairs?.filter(
@@ -46,10 +48,19 @@ const FlairsList = React.memo(function FlairsList({
     (a, b) => a.displayOrder - b.displayOrder
   );
 
+  const [isExpanded, setIsExpanded] = React.useState(false);
+  const effectiveLimit = limit || Infinity;
+  const shouldTruncate = sortedFlairs.length > effectiveLimit;
+  const displayedFlairs = shouldTruncate && !isExpanded 
+    ? sortedFlairs.slice(0, effectiveLimit) 
+    : sortedFlairs;
+
   return (
     <div
       className={cn(
-        'bg-white dark:bg-[rgb(38,38,38)] rounded-xl border border-gray-200 dark:border-gray-700 p-5',
+        'bg-white dark:bg-[rgb(38,38,38)] rounded-xl border border-gray-200 dark:border-gray-700 pt-5 px-5',
+        // 하단 버튼이 있을 때는 pb-0 (버튼 자체 패딩 사용), 없을 때는 pb-5
+        shouldTruncate ? 'pb-0' : 'pb-5',
         className
       )}
     >
@@ -64,8 +75,8 @@ const FlairsList = React.memo(function FlairsList({
       )}
 
       {/* 플레어 목록 */}
-      <div className="flex flex-wrap gap-2">
-        {sortedFlairs.map((flair) => {
+      <div className={cn("flex flex-wrap gap-2", shouldTruncate ? "mb-5" : "")}>
+        {displayedFlairs.map((flair) => {
           const isSelected = selectedFlairId === flair.id;
 
           return (
@@ -85,14 +96,34 @@ const FlairsList = React.memo(function FlairsList({
         })}
       </div>
 
-      {/* 선택된 플레어 초기화 버튼 */}
-      {selectedFlairId && onFlairClick && (
+      {/* 선택된 플레어 초기화 버튼 (limit이 없을 때만 여기서 표시 - limit 있으면 전체 보기 상태에서만 표시하거나 위치 조정 필요) */}
+      {selectedFlairId && onFlairClick && !shouldTruncate && (
         <button
           onClick={() => onFlairClick('')}
-          className="mt-3 text-xs text-gray-500 hover:text-gray-700 dark:text-[#C7D1DD] dark:hover:text-[#E6EDF3] transition-colors"
+          className="mt-3 text-xs text-gray-500 hover:text-gray-700 dark:text-[#C7D1DD] dark:hover:text-[#E6EDF3] transition-colors block"
         >
           필터 초기화
         </button>
+      )}
+
+      {/* 더보기 버튼 */}
+      {shouldTruncate && (
+        <React.Fragment>
+          {selectedFlairId && onFlairClick && isExpanded && (
+             <button
+              onClick={() => onFlairClick('')}
+              className="mb-4 text-xs text-gray-500 hover:text-gray-700 dark:text-[#C7D1DD] dark:hover:text-[#E6EDF3] transition-colors block"
+            >
+              필터 초기화
+            </button>
+          )}
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="w-[calc(100%+2.5rem)] -mx-5 px-5 py-3 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-t border-gray-200 dark:border-gray-700 flex items-center justify-center rounded-b-xl"
+          >
+            {isExpanded ? '접기' : `모두 보기 (${sortedFlairs.length - effectiveLimit}개 더)`}
+          </button>
+        </React.Fragment>
       )}
     </div>
   );

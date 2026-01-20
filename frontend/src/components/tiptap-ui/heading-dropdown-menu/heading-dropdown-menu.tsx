@@ -92,7 +92,7 @@ export const HeadingDropdownMenu = forwardRef<
             data-disabled={!canToggle}
             aria-label="Format text as heading"
             aria-pressed={isActive}
-            tooltip="Heading"
+            tooltip="제목"
             {...buttonProps}
             ref={ref}
           >

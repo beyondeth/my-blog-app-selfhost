@@ -11,15 +11,15 @@ interface FlairBadgeProps {
 }
 
 /**
- * 커뮤니티 플레어 배지 컴포넌트
- * 게시물이나 사용자에 할당된 플레어를 표시
+ * 커뮤니티 말머리 배지 컴포넌트
+ * 게시물이나 사용자에 할당된 말머리를 표시
  */
 const FlairBadge = React.memo(function FlairBadge({
   flair,
   size = 'sm',
   className,
 }: FlairBadgeProps) {
-  // 플레어가 비활성화되어 있으면 렌더링하지 않음
+  // 말머리가 비활성화되어 있으면 렌더링하지 않음
   if (!flair.isEnabled) {
     return null;
   }

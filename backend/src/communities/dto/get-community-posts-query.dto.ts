@@ -45,7 +45,7 @@ export class GetCommunityPostsQueryDto extends CursorPaginationDto {
   })
   @IsOptional()
   @Transform(({ value }) => (value === "" ? undefined : value))
-  @IsUUID("4", { message: "플레어 ID는 유효한 UUID 형식이어야 합니다" })
+  @IsUUID("all", { message: "플레어 ID는 유효한 UUID 형식이어야 합니다" })
   flairId?: string;
 
   @ApiPropertyOptional({
@@ -63,7 +63,7 @@ export class GetCommunityPostsQueryDto extends CursorPaginationDto {
   })
   @IsOptional()
   @Transform(({ value }) => (value === "" ? undefined : value))
-  @IsUUID("4", { message: "작성자 ID는 유효한 UUID 형식이어야 합니다" })
+  @IsUUID("all", { message: "작성자 ID는 유효한 UUID 형식이어야 합니다" })
   authorId?: string;
 
   @ApiPropertyOptional({

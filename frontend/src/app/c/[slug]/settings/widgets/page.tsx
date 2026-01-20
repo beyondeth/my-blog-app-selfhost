@@ -412,7 +412,7 @@ function SortableWidgetRow({
         onCheckedChange={(next) => onToggle(next)}
         onClick={(event) => event.stopPropagation()}
       />
-      {!['community_rules', 'post_flair_list'].includes(widget.type) && (
+      {!['community_rules'].includes(widget.type) && (
         <button
           type="button"
           className="text-gray-400 hover:text-red-500"

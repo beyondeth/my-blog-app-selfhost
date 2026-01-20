@@ -107,13 +107,22 @@ export class AdminUsersService {
 
     const [users, total] = await query.getManyAndCount();
 
-    // Get additional stats for each user
-    const usersWithStats = await Promise.all(
-      users.map(async (user) => {
-        const stats = await this.getUserStats(user.id);
-        return { ...user, stats };
-      }),
-    );
+    // 배치 쿼리로 모든 사용자의 통계를 한 번에 조회 (N+1 → 4 쿼리로 최적화)
+    const userIds = users.map((user) => user.id);
+    const statsMap = await this.getBatchUserStats(userIds);
+
+    const usersWithStats = users.map((user) => ({
+      ...user,
+      stats: statsMap.get(user.id) || {
+        totalPosts: 0,
+        totalComments: 0,
+        totalLikes: 0,
+        accountAge: Math.floor(
+          (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+        ),
+        lastActivity: user.lastLoginAt,
+      },
+    }));
 
     return {
       data: usersWithStats,
@@ -123,6 +132,7 @@ export class AdminUsersService {
       totalPages: Math.ceil(total / limit),
     };
   }
+
 
   /**
    * Get detailed user information
@@ -485,7 +495,95 @@ export class AdminUsersService {
 
   // Private helper methods
 
+  /**
+   * 배치 쿼리로 여러 사용자의 통계를 한 번에 조회 (N+1 문제 해결)
+   * 기존 3N+1개 쿼리 → 4개 쿼리로 최적화
+   */
+  private async getBatchUserStats(
+    userIds: string[],
+  ): Promise<Map<string, UserStats>> {
+    const statsMap = new Map<string, UserStats>();
+
+    if (userIds.length === 0) {
+      return statsMap;
+    }
+
+    // 1. 모든 사용자 정보 조회 (accountAge, lastActivity 계산용)
+    const users = await this.userRepository
+      .createQueryBuilder("user")
+      .select(["user.id", "user.createdAt", "user.lastLoginAt"])
+      .where("user.id IN (:...userIds)", { userIds })
+      .getMany();
+
+    const userMap = new Map(users.map((u) => [u.id, u]));
+
+    // 2-4. 병렬로 3개 배치 쿼리 실행
+    const [postCounts, commentCounts, likeSums] = await Promise.all([
+      // 2. 포스트 수 배치 조회
+      this.postRepository
+        .createQueryBuilder("post")
+        .select("post.authorId", "authorId")
+        .addSelect("COUNT(*)", "count")
+        .where("post.authorId IN (:...userIds)", { userIds })
+        .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
+        .groupBy("post.authorId")
+        .getRawMany(),
+
+      // 3. 댓글 수 배치 조회
+      this.commentRepository
+        .createQueryBuilder("comment")
+        .select("comment.authorId", "authorId")
+        .addSelect("COUNT(*)", "count")
+        .where("comment.authorId IN (:...userIds)", { userIds })
+        .groupBy("comment.authorId")
+        .getRawMany(),
+
+      // 4. 좋아요 합계 배치 조회
+      this.postRepository
+        .createQueryBuilder("post")
+        .leftJoin("post.stats", "stats")
+        .select("post.authorId", "authorId")
+        .addSelect("COALESCE(SUM(stats.likeCount), 0)", "total")
+        .where("post.authorId IN (:...userIds)", { userIds })
+        .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
+        .groupBy("post.authorId")
+        .getRawMany(),
+    ]);
+
+    // Map으로 변환
+    const postCountMap = new Map<string, number>(
+      postCounts.map((r: any) => [r.authorId, parseInt(r.count, 10)]),
+    );
+    const commentCountMap = new Map<string, number>(
+      commentCounts.map((r: any) => [r.authorId, parseInt(r.count, 10)]),
+    );
+    const likeMap = new Map<string, number>(
+      likeSums.map((r: any) => [r.authorId, parseInt(r.total, 10) || 0]),
+    );
+
+    // 각 사용자별 통계 조합
+    for (const userId of userIds) {
+      const user = userMap.get(userId);
+      const accountAge = user
+        ? Math.floor(
+            (Date.now() - user.createdAt.getTime()) / (1000 * 60 * 60 * 24),
+          )
+        : 0;
+
+      statsMap.set(userId, {
+        totalPosts: postCountMap.get(userId) || 0,
+        totalComments: commentCountMap.get(userId) || 0,
+        totalLikes: likeMap.get(userId) || 0,
+        accountAge,
+        lastActivity: user?.lastLoginAt || null,
+      });
+    }
+
+    return statsMap;
+  }
+
   private async getUserStats(userId: string): Promise<UserStats> {
+
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });

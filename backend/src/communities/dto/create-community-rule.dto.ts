@@ -21,26 +21,26 @@ import { Transform } from "class-transformer";
  */
 export class CreateCommunityRuleDto {
   @ApiProperty({
-    description: "규칙 제목 (1-100자)",
+    description: "규칙 제목 (1-30자)",
     example: "스팸 금지",
     minLength: 1,
-    maxLength: 100,
+    maxLength: 30,
   })
   @IsString()
   @MinLength(1, { message: "규칙 제목은 최소 1자 이상이어야 합니다" })
-  @MaxLength(100, { message: "규칙 제목은 최대 100자까지 가능합니다" })
+  @MaxLength(30, { message: "규칙 제목은 최대 30자까지 가능합니다" })
   @Transform(({ value }) => value?.trim())
   title: string;
 
   @ApiProperty({
-    description: "규칙 설명 (1-1000자)",
+    description: "규칙 설명 (1-300자)",
     example: "광고, 스팸, 반복적인 홍보 게시물은 삭제됩니다.",
     minLength: 1,
-    maxLength: 1000,
+    maxLength: 300,
   })
   @IsString()
   @MinLength(1, { message: "규칙 설명은 최소 1자 이상이어야 합니다" })
-  @MaxLength(1000, { message: "규칙 설명은 최대 1000자까지 가능합니다" })
+  @MaxLength(300, { message: "규칙 설명은 최대 300자까지 가능합니다" })
   @Transform(({ value }) => value?.trim())
   description: string;
 

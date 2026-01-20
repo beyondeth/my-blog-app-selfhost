@@ -126,6 +126,7 @@ export default function CommunityDetailPage({ params }: CommunityDetailPageProps
   const searchQuery = searchParams.get('search')?.trim() || '';
 
   const [sortBy, setSortBy] = useState<CommunityPostSortByType>('newest');
+  const [selectedFlairId, setSelectedFlairId] = useState<string | null>(null);
 
   // NSFW 성인 인증 관련 상태
   const { isAdultVerified, isLoading: isAdultVerificationLoading } = useAdultVerificationStatus();
@@ -157,6 +158,7 @@ export default function CommunityDetailPage({ params }: CommunityDetailPageProps
     sortBy,
     limit: 20,
     search: searchQuery || undefined,
+    flairId: selectedFlairId || undefined,
   });
 
   // 투표 mutation
@@ -251,6 +253,11 @@ export default function CommunityDetailPage({ params }: CommunityDetailPageProps
     if (!post) return;
     voteMutation.mutate({ postId, postSlug: post.slug, voteType });
   }, [findPostById, isAuthenticated, router, voteMutation]);
+
+  // 플레어 필터 핸들러
+  const handleFlairFilter = useCallback((flairId: string | null) => {
+    setSelectedFlairId(flairId);
+  }, []);
 
   // NSFW 커뮤니티 접근 시 성인 인증 체크
   useEffect(() => {
@@ -576,6 +583,8 @@ export default function CommunityDetailPage({ params }: CommunityDetailPageProps
                 showJoinButton={isAuthenticated}
                 widgets={publicWidgets}
                 canEditWidgets={canEditWidgets}
+                onFlairFilter={handleFlairFilter}
+                selectedFlairId={selectedFlairId}
               />
             </div>
           </aside>

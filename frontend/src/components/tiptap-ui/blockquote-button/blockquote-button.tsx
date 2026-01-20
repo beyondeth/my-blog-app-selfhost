@@ -103,7 +103,7 @@ export const BlockquoteButton = forwardRef<
         data-disabled={!canToggle}
         aria-label={label}
         aria-pressed={isActive}
-        tooltip="Blockquote"
+        tooltip="인용문"
         onClick={handleClick}
         {...buttonProps}
         ref={ref}

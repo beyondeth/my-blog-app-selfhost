@@ -188,6 +188,9 @@ importers:
       html-react-parser:
         specifier: ^5.2.6
         version: 5.2.10(@types/react@18.3.27)(react@18.3.1)
+      linkify-react:
+        specifier: ^4.3.2
+        version: 4.3.2(linkifyjs@4.3.2)(react@18.3.1)
       linkifyjs:
         specifier: ^4.3.2
         version: 4.3.2
@@ -3296,6 +3299,12 @@ packages:
 
   linkify-it@5.0.0:
     resolution: {integrity: sha512-5aHCbzQRADcdP+ATqnDuhhJ/MRIqDkZX5pyjFHRRysS8vZ5AbqGEoFIb6pYHPZ+L/OC2Lc+xT8uHVVR5CAK/wQ==}
+
+  linkify-react@4.3.2:
+    resolution: {integrity: sha512-mi744h1hf+WDsr+paJgSBBgYNLMWNSHyM9V9LVUo03RidNGdw1VpI7Twnt+K3pEh3nIzB4xiiAgZxpd61ItKpQ==}
+    peerDependencies:
+      linkifyjs: ^4.0.0
+      react: '>= 15.0.0'
 
   linkifyjs@4.3.2:
     resolution: {integrity: sha512-NT1CJtq3hHIreOianA8aSXn6Cw0JzYOuDQbOrSPe7gqFnCpKP++MQe3ODgO3oh2GJFORkAAdqredOa60z63GbA==}
@@ -7696,6 +7705,11 @@ snapshots:
   linkify-it@5.0.0:
     dependencies:
       uc.micro: 2.1.0
+
+  linkify-react@4.3.2(linkifyjs@4.3.2)(react@18.3.1):
+    dependencies:
+      linkifyjs: 4.3.2
+      react: 18.3.1
 
   linkifyjs@4.3.2: {}
 

@@ -205,8 +205,7 @@ export type CommunitySidebarWidgetType =
   | 'calendar'
   | 'post_flairs'
   | 'bookmarks'
-  | 'community_rules'
-  | 'post_flair_list';
+  | 'community_rules';
 
 export type CommunitySidebarWidgetEntryType =
   | 'text'

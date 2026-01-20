@@ -59,10 +59,10 @@ export const textAlignIcons = {
 }
 
 export const textAlignLabels: Record<TextAlign, string> = {
-  left: "Align left",
-  center: "Align center",
-  right: "Align right",
-  justify: "Align justify",
+  left: "왼쪽 정렬",
+  center: "가운데 정렬",
+  right: "오른쪽 정렬",
+  justify: "양쪽 정렬",
 }
 
 /**

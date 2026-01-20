@@ -21,13 +21,31 @@ import {
 } from '@/components/ui/alert-dialog';
 import { cn } from '@/lib/utils';
 import { Plus, Edit, Trash2, GripVertical } from 'lucide-react';
+import Linkify from 'linkify-react';
+
+const TITLE_MAX_LENGTH = 30;
+const DESCRIPTION_MAX_LENGTH = 300;
 
 interface RulesManagerPanelProps {
   slug: string;
   embedded?: boolean;
+  showNumbering?: boolean;
+  onShowNumberingChange?: (show: boolean) => void;
 }
 
-export default function RulesManagerPanel({ slug, embedded = false }: RulesManagerPanelProps) {
+// linkify-react 옵션
+const linkifyOptions = {
+  className: 'text-blue-600 dark:text-blue-400 hover:underline',
+  target: '_blank',
+  rel: 'noopener noreferrer',
+};
+
+export default function RulesManagerPanel({ 
+  slug, 
+  embedded = false,
+  showNumbering,
+  onShowNumberingChange
+}: RulesManagerPanelProps) {
   const [isCreating, setIsCreating] = useState(false);
   const [editingRule, setEditingRule] = useState<CommunityRule | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<CommunityRule | null>(null);
@@ -100,28 +118,53 @@ export default function RulesManagerPanel({ slug, embedded = false }: RulesManag
             커뮤니티 운영 원칙을 추가하고 정렬하세요.
           </p>
         </div>
-        <Button size="sm" onClick={() => setIsCreating(true)} disabled={isCreating}>
-          <Plus className="w-4 h-4 mr-1" />
-          규칙 추가
-        </Button>
+        <div className="flex items-center gap-3">
+          {onShowNumberingChange && (
+            <div className="flex items-center gap-2 bg-gray-50 dark:bg-gray-800 px-3 py-1.5 rounded-lg border border-gray-100 dark:border-gray-700">
+              <span className="text-xs font-medium text-gray-600 dark:text-gray-300">번호 표시</span>
+              <input
+                type="checkbox"
+                checked={showNumbering}
+                onChange={(e) => onShowNumberingChange(e.target.checked)}
+                className="w-3.5 h-3.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+              />
+            </div>
+          )}
+          <Button size="sm" onClick={() => setIsCreating(true)} disabled={isCreating}>
+            <Plus className="w-4 h-4 mr-1" />
+            규칙 추가
+          </Button>
+        </div>
       </header>
 
       {isCreating && (
         <div className="rounded-xl border border-dashed border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-950/20 p-4 space-y-3">
-          <input
-            type="text"
-            value={newTitle}
-            onChange={(event) => setNewTitle(event.target.value)}
-            placeholder="규칙 제목"
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-          />
-          <textarea
-            value={newDescription}
-            onChange={(event) => setNewDescription(event.target.value)}
-            placeholder="설명 (선택)"
-            rows={3}
-            className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-          />
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">규칙 제목</label>
+              <span className="text-xs text-gray-500">{newTitle.length}/{TITLE_MAX_LENGTH}</span>
+            </div>
+            <input
+              type="text"
+              value={newTitle}
+              onChange={(event) => setNewTitle(event.target.value.slice(0, TITLE_MAX_LENGTH))}
+              placeholder="규칙 제목"
+              className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            />
+          </div>
+          <div>
+            <div className="flex items-center justify-between mb-1">
+              <label className="text-xs font-medium text-gray-700 dark:text-gray-300">설명 (선택)</label>
+              <span className="text-xs text-gray-500">{newDescription.length}/{DESCRIPTION_MAX_LENGTH}</span>
+            </div>
+            <textarea
+              value={newDescription}
+              onChange={(event) => setNewDescription(event.target.value.slice(0, DESCRIPTION_MAX_LENGTH))}
+              placeholder="설명 (선택) - 링크 포함 가능"
+              rows={3}
+              className="w-full max-w-2xl rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+            />
+          </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setIsCreating(false)}>
               취소
@@ -152,17 +195,29 @@ export default function RulesManagerPanel({ slug, embedded = false }: RulesManag
               >
                 {isEditing ? (
                   <div className="space-y-3">
-                    <input
-                      value={editTitle}
-                      onChange={(event) => setEditTitle(event.target.value)}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-                    />
-                    <textarea
-                      value={editDescription}
-                      onChange={(event) => setEditDescription(event.target.value)}
-                      rows={3}
-                      className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
-                    />
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">규칙 제목</label>
+                        <span className="text-xs text-gray-500">{editTitle.length}/{TITLE_MAX_LENGTH}</span>
+                      </div>
+                      <input
+                        value={editTitle}
+                        onChange={(event) => setEditTitle(event.target.value.slice(0, TITLE_MAX_LENGTH))}
+                        className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-xs font-medium text-gray-700 dark:text-gray-300">설명 (선택)</label>
+                        <span className="text-xs text-gray-500">{editDescription.length}/{DESCRIPTION_MAX_LENGTH}</span>
+                      </div>
+                      <textarea
+                        value={editDescription}
+                        onChange={(event) => setEditDescription(event.target.value.slice(0, DESCRIPTION_MAX_LENGTH))}
+                        rows={3}
+                        className="w-full max-w-2xl rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 px-3 py-2 text-sm"
+                      />
+                    </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={handleEditCancel}>
                         취소
@@ -175,13 +230,15 @@ export default function RulesManagerPanel({ slug, embedded = false }: RulesManag
                 ) : (
                   <div className="flex items-start gap-3">
                     <GripVertical className="w-4 h-4 mt-1 text-gray-400" />
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 max-w-2xl">
                       <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
                         {rule.title}
                       </h3>
                       {rule.description && (
                         <p className="mt-1 text-sm text-gray-500 dark:text-gray-400 whitespace-pre-line">
-                          {rule.description}
+                          <Linkify options={linkifyOptions}>
+                            {rule.description}
+                          </Linkify>
                         </p>
                       )}
                     </div>

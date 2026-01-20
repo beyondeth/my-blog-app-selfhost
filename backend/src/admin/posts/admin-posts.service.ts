@@ -78,23 +78,32 @@ export class AdminPostsService {
       take: limit,
     });
 
-    // Get additional stats for each post
-    const postsWithStats = await Promise.all(
-      posts.map(async (post) => {
-        const commentCount = await this.commentRepository.count({
-          where: { postId: post.id },
-        });
+    // 배치 쿼리로 모든 포스트의 댓글 수를 한 번에 조회 (N+1 → 2 쿼리로 최적화)
+    const postIds = posts.map((post) => post.id);
+    let commentCountMap = new Map<string, number>();
 
-        return {
-          ...post,
-          stats: {
-            viewCount: post.stats?.viewCount || 0,
-            likeCount: post.stats?.likeCount || 0,
-            commentCount,
-          },
-        };
-      }),
-    );
+    if (postIds.length > 0) {
+      const commentCounts = await this.commentRepository
+        .createQueryBuilder("comment")
+        .select("comment.postId", "postId")
+        .addSelect("COUNT(*)", "count")
+        .where("comment.postId IN (:...postIds)", { postIds })
+        .groupBy("comment.postId")
+        .getRawMany();
+
+      commentCountMap = new Map(
+        commentCounts.map((r: any) => [r.postId, parseInt(r.count, 10)]),
+      );
+    }
+
+    const postsWithStats = posts.map((post) => ({
+      ...post,
+      stats: {
+        viewCount: post.stats?.viewCount || 0,
+        likeCount: post.stats?.likeCount || 0,
+        commentCount: commentCountMap.get(post.id) || 0,
+      },
+    }));
 
     return {
       data: postsWithStats,
@@ -104,6 +113,7 @@ export class AdminPostsService {
       totalPages: Math.ceil(total / limit),
     };
   }
+
 
   /**
    * Get post details

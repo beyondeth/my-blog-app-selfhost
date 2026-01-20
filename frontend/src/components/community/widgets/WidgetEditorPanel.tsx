@@ -43,10 +43,28 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
   useEffect(() => {
     setLocalWidgets(widgets);
   }, [widgets]);
-  const sortedWidgets = useMemo(
-    () => [...localWidgets].sort((a, b) => a.orderIndex - b.orderIndex),
-    [localWidgets],
-  );
+  const sortedWidgets = useMemo(() => {
+    // Deduplicate by ID to prevent duplicate widgets from appearing
+    const uniqueMap = new Map<string, CommunitySidebarWidget>();
+    localWidgets.forEach((widget) => {
+      if (!uniqueMap.has(widget.id)) {
+        uniqueMap.set(widget.id, widget);
+      }
+    });
+    const result = Array.from(uniqueMap.values()).sort((a, b) => a.orderIndex - b.orderIndex);
+    
+    // Debug logging
+    if (localWidgets.length !== result.length) {
+      console.log('[Widget Editor] Duplicate widgets detected!');
+      console.log('Original count:', localWidgets.length);
+      console.log('After dedup:', result.length);
+      console.log('Duplicates:', localWidgets.filter((w, i, arr) => 
+        arr.findIndex(w2 => w2.id === w.id) !== i
+      ));
+    }
+    
+    return result;
+  }, [localWidgets]);
 
   const widget = useMemo(() => {
     if (!selectedWidget) return null;
@@ -194,7 +212,7 @@ export default function WidgetEditorPanel({ widgets }: WidgetEditorPanelProps) {
                   })}
                 </div>
                 <p className="text-xs text-gray-700 dark:text-white">
-                  플레어/규칙/북마크 등 일부 위젯은 커뮤니티당 1개만 존재합니다. 이미 존재한다면 목록에서 선택해 수정하세요.
+                  말머리/규칙/북마크 등 일부 위젯은 커뮤니티당 1개만 존재합니다. 이미 존재한다면 목록에서 선택해 수정하세요.
                 </p>
               </section>
 

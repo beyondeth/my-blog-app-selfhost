@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import type { CommunityRule } from '@/types/community';
+import Linkify from 'linkify-react';
 
 interface CommunityRulesListProps {
   rules: CommunityRule[];
@@ -19,6 +20,13 @@ interface CommunityRulesListProps {
   /** 번호 표시 여부 */
   showNumbering?: boolean;
 }
+
+// linkify-react 옵션
+const linkifyOptions = {
+  className: 'text-blue-600 dark:text-blue-400 hover:underline',
+  target: '_blank',
+  rel: 'noopener noreferrer',
+};
 
 /**
  * 커뮤니티 규칙 목록 컴포넌트
@@ -93,7 +101,7 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
           const isRuleExpanded = expandedRules.has(rule.id);
 
           return (
-            <div key={rule.id} className="px-5 py-3">
+            <div key={rule.id} className="px-3 py-3">
               <button
                 onClick={() => toggleRuleExpanded(rule.id)}
                 className="w-full text-left flex items-start gap-3 group"
@@ -110,13 +118,6 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
                   <h4 className="text-sm font-medium text-gray-900 dark:text-gray-100 group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                     {rule.title}
                   </h4>
-
-                  {/* 규칙 설명 (펼쳐진 경우만) */}
-                  {isRuleExpanded && rule.description && (
-                    <p className="mt-2 text-sm text-gray-600 dark:text-[#C7D1DD] whitespace-pre-wrap">
-                      {rule.description}
-                    </p>
-                  )}
                 </div>
 
                 {/* 확장 아이콘 */}
@@ -130,6 +131,15 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
                   </span>
                 )}
               </button>
+
+              {/* 규칙 설명 (버튼 밖으로 분리하여 링크 클릭 가능하도록) */}
+              {isRuleExpanded && rule.description && (
+                <div className={cn("mt-2 text-sm text-gray-600 dark:text-[#C7D1DD] whitespace-pre-wrap", showNumbering ? "ml-9" : "ml-0")}>
+                  <Linkify options={linkifyOptions}>
+                    {rule.description}
+                  </Linkify>
+                </div>
+              )}
             </div>
           );
         })}

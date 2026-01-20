@@ -1231,21 +1231,21 @@ export default function NewStoryPage() {
                 <div className="space-y-4">
                   {availableCommunityFlairs.length > 0 && (
                     <div className="space-y-2">
-                      <Label className="text-sm font-medium">플레어 (선택)</Label>
+                      <Label className="text-sm font-medium">말머리 (선택)</Label>
                       <Select
                         value={selectedFlairId || '__none__'}
                         onValueChange={(value) => setSelectedFlairId(value === '__none__' ? null : value)}
                         disabled={isMutationPending}
                       >
                         <SelectTrigger className="w-full">
-                          <SelectValue placeholder="플레어 선택">
+                          <SelectValue placeholder="말머리 선택">
                             {selectedCommunityFlair && (
                               <FlairBadge flair={selectedCommunityFlair} size="sm" />
                             )}
                           </SelectValue>
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="__none__">플레어 없음</SelectItem>
+                          <SelectItem value="__none__">말머리 없음</SelectItem>
                           {availableCommunityFlairs.map((flair) => (
                             <SelectItem key={flair.id} value={flair.id}>
                               <FlairBadge flair={flair} size="sm" />
