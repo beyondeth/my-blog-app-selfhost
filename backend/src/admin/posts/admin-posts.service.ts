@@ -114,7 +114,6 @@ export class AdminPostsService {
     };
   }
 
-
   /**
    * Get post details
    */

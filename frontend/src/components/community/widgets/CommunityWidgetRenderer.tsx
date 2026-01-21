@@ -16,6 +16,7 @@ import FlairsList from '../FlairsList';
 import { resolveWidgetTitle } from './titleUtils';
 import { useCommunityRules } from '@/hooks/community/useCommunityRules';
 import { useCommunityFlairs } from '@/hooks/community/useCommunityFlairs';
+import { BOOKMARK_BODY_PREVIEW_MAX } from './constants';
 
 interface CommunityWidgetRendererProps {
   community: Community;
@@ -62,30 +63,57 @@ const formatDate = (value: string | undefined, options?: Intl.DateTimeFormatOpti
   }
 };
 
+const normalizePreviewText = (value?: string | null) => {
+  if (!value) return '';
+  return value.replace(/\s+/g, ' ').trim();
+};
+
+const truncateText = (value: string, maxLength: number) => {
+  if (value.length <= maxLength) return value;
+  return `${value.slice(0, maxLength).trimEnd()}...`;
+};
+
 const renderLinkList = (items: CommunitySidebarWidgetEntry[], variant: 'link' | 'bookmark') => (
   <div className="space-y-2">
     {items
       .filter((item) => !!item.linkUrl)
-      .map((item) => (
-        <a
-          key={item.id}
-          href={item.linkUrl}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            'flex items-center justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm transition hover:bg-gray-50 dark:hover:bg-gray-800',
-            variant === 'bookmark' && 'bg-gray-50 dark:bg-gray-800/40',
-          )}
-        >
-          <div className="flex items-center gap-2 min-w-0">
-            {variant === 'bookmark' && <BookmarkIcon className="w-4 h-4 text-blue-500 flex-shrink-0" />}
-            <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
-              {item.label}
-            </span>
-          </div>
-          <ExternalLink className="w-4 h-4 text-gray-400 dark:text-[#C7D1DD] flex-shrink-0" />
-        </a>
-      ))}
+      .map((item) => {
+        const bodyText =
+          variant === 'bookmark'
+            ? truncateText(normalizePreviewText(item.body), BOOKMARK_BODY_PREVIEW_MAX)
+            : '';
+        const showBody = variant === 'bookmark' && !!bodyText;
+        return (
+          <a
+            key={item.id}
+            href={item.linkUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(
+              'flex justify-between rounded-lg border border-gray-200 dark:border-gray-700 px-3 py-2 text-sm transition hover:bg-gray-50 dark:hover:bg-gray-800',
+              showBody ? 'items-start' : 'items-center',
+              variant === 'bookmark' && 'bg-gray-50 dark:bg-gray-800/40',
+            )}
+          >
+            <div className="flex min-w-0 flex-1 items-start gap-2">
+              {variant === 'bookmark' && (
+                <BookmarkIcon className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
+              )}
+              <div className="min-w-0">
+                <span className="font-medium text-gray-900 dark:text-gray-100 truncate block">
+                  {item.label}
+                </span>
+                {showBody && (
+                  <p className="mt-1 text-xs text-gray-500 dark:text-[#C7D1DD]">
+                    {bodyText}
+                  </p>
+                )}
+              </div>
+            </div>
+            <ExternalLink className="w-4 h-4 text-gray-400 dark:text-[#C7D1DD] flex-shrink-0 mt-0.5" />
+          </a>
+        );
+      })}
   </div>
 );
 

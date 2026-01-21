@@ -203,7 +203,8 @@ export class PostCacheService {
 
       await this.cacheService.del(CacheKeys.FEED_EDITOR_PICKS());
       await this.cacheService.deletePattern("feed:editor-picks:*");
-      const cloudflareSuccess = await this.cloudflareService.purgeEditorPicksCache();
+      const cloudflareSuccess =
+        await this.cloudflareService.purgeEditorPicksCache();
       if (cloudflareSuccess) {
         this.logger.log(
           `✅ [CDN Cache] Successfully purged Cloudflare cache for Editor's Picks`,

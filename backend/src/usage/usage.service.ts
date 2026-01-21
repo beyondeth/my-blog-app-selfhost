@@ -66,6 +66,7 @@ export class UsageService {
     private usersService: UsersService,
     private eventEmitter: EventEmitter2,
     private readonly unifiedRedisService: UnifiedRedisService,
+    // Core Redis: unique view counters affect policy enforcement.
     @InjectRedis() private readonly redis: Redis,
   ) {
     // 구독 정보 변경 이벤트 리스닝

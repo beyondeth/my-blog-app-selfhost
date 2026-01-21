@@ -15,7 +15,6 @@ export enum CacheTTL {
   HOME_FEED = SHORT, // 홈 피드 (30초)
   MEDIUM = 120, // 2분 - 블로그/커뮤니티 정보 등 중간 가치 데이터
 
-
   // 콜드 데이터 (낮은 가치)
   LONG = 180, // 3분 - 기타 데이터
 
@@ -149,7 +148,8 @@ export class CacheService implements OnModuleInit {
   private cacheDeletes = 0;
 
   constructor(
-    @InjectRedis() private readonly redis: Redis,
+    // Cache Redis only: evictable keys (LRU allowed).
+    @InjectRedis("cache") private readonly redis: Redis,
     private readonly unifiedRedisService: UnifiedRedisService,
     private readonly cacheMetricsService: CacheMetricsService,
   ) {}

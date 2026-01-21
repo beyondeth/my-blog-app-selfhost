@@ -104,11 +104,22 @@ const envSchema = z.object({
         : `http://localhost:${process.env.MCP_PROXY_PORT || 3002}`
     ),
 
-  // Redis 설정 (API Key 캐싱용)
-  REDIS_HOST: z.string().default('my-blog-app-shared-redis'),
-  REDIS_PORT: z.string()
-    .regex(/^\d+$/, 'REDIS_PORT must be a number')
-    .default('6379')
+  // Redis 설정 (Core + Cache)
+  REDIS_CORE_HOST: z.string()
+    .default(process.env.REDIS_HOST || 'my-blog-app-redis-core'),
+  REDIS_CORE_PORT: z.string()
+    .regex(/^\d+$/, 'REDIS_CORE_PORT must be a number')
+    .default(process.env.REDIS_PORT || '6379')
+    .transform(Number),
+  REDIS_CACHE_HOST: z.string()
+    .default(
+      process.env.REDIS_CACHE_HOST ||
+        process.env.REDIS_HOST ||
+        'my-blog-app-redis-cache'
+    ),
+  REDIS_CACHE_PORT: z.string()
+    .regex(/^\d+$/, 'REDIS_CACHE_PORT must be a number')
+    .default(process.env.REDIS_PORT || '6379')
     .transform(Number),
   REDIS_PASSWORD: z.string().optional(),
   API_KEY_CACHE_TTL: z.string()

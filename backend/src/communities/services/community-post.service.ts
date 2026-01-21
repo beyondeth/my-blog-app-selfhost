@@ -275,8 +275,8 @@ export class CommunityPostService {
     switch (sortBy) {
       case CommunityPostSortBy.HOT:
         // Use generated column 'hotScore' if available, otherwise calculate fallback
-        if (typeof post.hotScore === 'number') {
-            return post.hotScore;
+        if (typeof post.hotScore === "number") {
+          return post.hotScore;
         }
         return (
           (post.upvoteCount ?? post.likeCount ?? 0) - (post.downvoteCount ?? 0)
@@ -458,8 +458,14 @@ export class CommunityPostService {
     // 각 커뮤니티 리스트 내부 정렬 보장 (createdAt DESC)
     for (const [, list] of result.entries()) {
       list.sort((a, b) => {
-        const timeA = a.createdAt instanceof Date ? a.createdAt.getTime() : new Date(a.createdAt).getTime();
-        const timeB = b.createdAt instanceof Date ? b.createdAt.getTime() : new Date(b.createdAt).getTime();
+        const timeA =
+          a.createdAt instanceof Date
+            ? a.createdAt.getTime()
+            : new Date(a.createdAt).getTime();
+        const timeB =
+          b.createdAt instanceof Date
+            ? b.createdAt.getTime()
+            : new Date(b.createdAt).getTime();
         return timeB - timeA;
       });
     }

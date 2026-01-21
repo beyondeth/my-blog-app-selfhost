@@ -4,7 +4,7 @@ import {
   Column,
   CreateDateColumn,
   Index,
-} from 'typeorm';
+} from "typeorm";
 
 /**
  * StatsSnapshot 엔티티
@@ -16,44 +16,44 @@ import {
  * - 성능: 복합 인덱스로 시계열 조회 최적화
  * - 확장성: targetType으로 블로그/커뮤니티 구분
  */
-@Entity('stats_snapshot')
-@Index('idx_stats_snapshot_target_period', [
-  'targetType',
-  'targetId',
-  'period',
-  'periodStart',
+@Entity("stats_snapshot")
+@Index("idx_stats_snapshot_target_period", [
+  "targetType",
+  "targetId",
+  "period",
+  "periodStart",
 ])
 @Index(
-  'idx_stats_snapshot_unique',
-  ['targetType', 'targetId', 'period', 'periodStart'],
+  "idx_stats_snapshot_unique",
+  ["targetType", "targetId", "period", "periodStart"],
   { unique: true },
 )
 export class StatsSnapshot {
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   /**
    * 대상 타입
    */
-  @Column({ name: 'target_type', type: 'varchar', length: 20 })
-  targetType: 'blog' | 'community';
+  @Column({ name: "target_type", type: "varchar", length: 20 })
+  targetType: "blog" | "community";
 
   /**
    * 대상 ID (블로그 또는 커뮤니티 UUID)
    */
-  @Column({ name: 'target_id', type: 'uuid' })
+  @Column({ name: "target_id", type: "uuid" })
   targetId: string;
 
   /**
    * 집계 기간
    */
-  @Column({ name: 'period', type: 'varchar', length: 20 })
-  period: 'daily' | 'weekly' | 'monthly';
+  @Column({ name: "period", type: "varchar", length: 20 })
+  period: "daily" | "weekly" | "monthly";
 
   /**
    * 기간 시작일
    */
-  @Column({ name: 'period_start', type: 'date' })
+  @Column({ name: "period_start", type: "date" })
   periodStart: Date;
 
   /**
@@ -62,10 +62,10 @@ export class StatsSnapshot {
    * 블로그 예시: { views: 100, likes: 20, comments: 5, newPosts: 3 }
    * 커뮤니티 예시: { views: 500, upvotes: 100, comments: 30, newMembers: 10 }
    */
-  @Column({ name: 'metrics', type: 'jsonb', default: {} })
+  @Column({ name: "metrics", type: "jsonb", default: {} })
   metrics: Record<string, number>;
 
-  @CreateDateColumn({ name: 'created_at' })
+  @CreateDateColumn({ name: "created_at" })
   createdAt: Date;
 
   /**

@@ -13,25 +13,25 @@ export const ReputationEvents = {
    * 평판 점수 기록됨
    * 새로운 Ledger 엔트리가 생성되었을 때 발행
    */
-  SCORE_RECORDED: 'reputation.score.recorded',
+  SCORE_RECORDED: "reputation.score.recorded",
 
   /**
    * 타이틀 부여됨
    * 사용자에게 새 타이틀이 부여되었을 때 발행
    */
-  TITLE_GRANTED: 'reputation.title.granted',
+  TITLE_GRANTED: "reputation.title.granted",
 
   /**
    * 타이틀 만료됨
    * 사용자의 타이틀이 만료되었을 때 발행
    */
-  TITLE_EXPIRED: 'reputation.title.expired',
+  TITLE_EXPIRED: "reputation.title.expired",
 
   /**
    * 리더보드 갱신됨
    * 리더보드가 새로 갱신되었을 때 발행
    */
-  LEADERBOARD_REFRESHED: 'reputation.leaderboard.refreshed',
+  LEADERBOARD_REFRESHED: "reputation.leaderboard.refreshed",
 };
 
 /**

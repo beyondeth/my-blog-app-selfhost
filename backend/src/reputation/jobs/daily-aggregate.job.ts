@@ -13,13 +13,16 @@
  * @see AggregatorService
  * @see TitleService
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
-import { AggregatorService } from '../services/aggregator.service';
-import { TitleService } from '../services/title.service';
-import { LedgerService } from '../services/ledger.service';
-import { ReputationQueueService, ReputationEventData } from '../queues/reputation-queue.service';
-import { REPUTATION_ACTION_SCORES } from '../enums/reputation-action.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron } from "@nestjs/schedule";
+import { AggregatorService } from "../services/aggregator.service";
+import { TitleService } from "../services/title.service";
+import { LedgerService } from "../services/ledger.service";
+import {
+  ReputationQueueService,
+  ReputationEventData,
+} from "../queues/reputation-queue.service";
+import { REPUTATION_ACTION_SCORES } from "../enums/reputation-action.enum";
 
 @Injectable()
 export class DailyAggregateJob {
@@ -40,12 +43,12 @@ export class DailyAggregateJob {
    * - 전체 사용자의 기간별 점수 집계
    * - 만료된 타이틀 정리
    */
-  @Cron('10 3 * * *', {
-    name: 'daily-reputation-aggregate',
-    timeZone: 'Asia/Seoul',
+  @Cron("10 3 * * *", {
+    name: "daily-reputation-aggregate",
+    timeZone: "Asia/Seoul",
   })
   async handleCron(): Promise<void> {
-    this.logger.log('===== 일일 평판 집계 시작 =====');
+    this.logger.log("===== 일일 평판 집계 시작 =====");
     const startTime = Date.now();
 
     try {
@@ -63,10 +66,7 @@ export class DailyAggregateJob {
       const elapsed = Date.now() - startTime;
       this.logger.log(`===== 일일 평판 집계 완료 (${elapsed}ms) =====`);
     } catch (error) {
-      this.logger.error(
-        `일일 집계 실패: ${error.message}`,
-        error.stack,
-      );
+      this.logger.error(`일일 집계 실패: ${error.message}`, error.stack);
     }
   }
 
@@ -77,9 +77,9 @@ export class DailyAggregateJob {
    */
   private async processQueueToLedger(): Promise<number> {
     const waitingJobs = await this.queueService.getWaitingJobs();
-    
+
     if (waitingJobs.length === 0) {
-      this.logger.debug('처리할 큐 이벤트가 없습니다.');
+      this.logger.debug("처리할 큐 이벤트가 없습니다.");
       return 0;
     }
 
@@ -91,7 +91,7 @@ export class DailyAggregateJob {
     for (const job of waitingJobs) {
       try {
         const data = job.data as ReputationEventData;
-        
+
         // 점수 계산 (SCORE_POLICY에서 가져오거나 data.score 사용)
         const score = data.score ?? REPUTATION_ACTION_SCORES[data.action] ?? 0;
 
@@ -107,12 +107,12 @@ export class DailyAggregateJob {
         });
 
         // Job 완료 처리
-        await job.moveToCompleted('processed', job.token || '', false);
+        await job.moveToCompleted("processed", job.token || "", false);
         processedCount++;
       } catch (error) {
         errors.push(`Job ${job.id}: ${error.message}`);
         // Job 실패 처리
-        await job.moveToFailed(error, job.token || '', false);
+        await job.moveToFailed(error, job.token || "", false);
       }
     }
 
@@ -129,8 +129,12 @@ export class DailyAggregateJob {
    * 관리자가 Admin API를 통해 수동으로 집계를 실행할 때 사용합니다.
    * 큐 처리 → 집계 → 타이틀 정리 순서로 실행합니다.
    */
-  async runManually(): Promise<{ success: boolean; elapsed: number; queueProcessed: number }> {
-    this.logger.log('수동 집계 실행 시작');
+  async runManually(): Promise<{
+    success: boolean;
+    elapsed: number;
+    queueProcessed: number;
+  }> {
+    this.logger.log("수동 집계 실행 시작");
     const startTime = Date.now();
 
     try {
@@ -151,4 +155,3 @@ export class DailyAggregateJob {
     }
   }
 }
-

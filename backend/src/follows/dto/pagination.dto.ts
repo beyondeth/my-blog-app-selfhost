@@ -40,7 +40,10 @@ export class CursorPaginationQueryDto {
   @IsOptional()
   limit?: number = 20;
 
-  @ApiProperty({ required: false, description: "커서 (마지막 아이템의 createdAt)" })
+  @ApiProperty({
+    required: false,
+    description: "커서 (마지막 아이템의 createdAt)",
+  })
   @IsString()
   @IsOptional()
   cursor?: string;

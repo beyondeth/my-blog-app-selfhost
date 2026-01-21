@@ -263,25 +263,21 @@ export class BlogStatsService {
    * @param slug 블로그 slug
    */
   async invalidateBlogStatsCache(blogId: string, slug?: string): Promise<void> {
-    const patterns = [
-      `blog:stats:*`,
-      `blog:stats:categories:${slug}`,
+    const keys = [
+      `blog:stats:categories:id:${blogId}`,
       `blog:stats:posts:${blogId}`,
-      `blog:stats:activity:${blogId}`,
-      `blog:stats:popular:${blogId}`,
+      `blog:stats:activity:${blogId}:30`,
+      `blog:stats:popular:${blogId}:5`,
     ];
+
+    if (slug) {
+      keys.push(`blog:stats:categories:${slug}`);
+    }
 
     // 간단히 Redis 패턴 삭제는 복잡하므로, 키들을 직접 관리
     // 실제 프로덕션에서는 Redis SCAN을 사용하거나 별도 캐시 관리 전략 필요
-    for (const pattern of patterns) {
-      if (pattern.includes("*")) {
-        // 패턴 매칭은 구현이 복잡하므로 로깅만
-        this.logger.warn(
-          `Cache invalidation pattern not implemented: ${pattern}`,
-        );
-      } else {
-        await this.cacheService.delete(pattern);
-      }
+    for (const key of keys) {
+      await this.cacheService.delete(key);
     }
 
     this.logger.debug(`Invalidated blog stats cache: ${blogId}, slug: ${slug}`);
@@ -294,7 +290,7 @@ export class BlogStatsService {
   async incrementPostCount(blogId: string): Promise<void> {
     // postCount 컬럼이 없으므로 캐시 무효화만 처리
     // 실제 포스트 수는 동적으로 계산됨
-    await this.invalidateBlogStatsCache("", blogId);
+    await this.invalidateBlogStatsCache(blogId);
 
     this.logger.debug(`Invalidated blog stats cache for blog: ${blogId}`);
   }
@@ -306,7 +302,7 @@ export class BlogStatsService {
   async decrementPostCount(blogId: string): Promise<void> {
     // postCount 컬럼이 없으므로 캐시 무효화만 처리
     // 실제 포스트 수는 동적으로 계산됨
-    await this.invalidateBlogStatsCache("", blogId);
+    await this.invalidateBlogStatsCache(blogId);
 
     this.logger.debug(`Invalidated blog stats cache for blog: ${blogId}`);
   }
@@ -442,9 +438,7 @@ export class BlogStatsService {
 
     // 참여율 계산
     const avgEngagementRate =
-      totalViews > 0
-        ? ((totalLikes + totalComments) / totalViews) * 100
-        : 0;
+      totalViews > 0 ? ((totalLikes + totalComments) / totalViews) * 100 : 0;
 
     // Upsert (ON CONFLICT DO UPDATE)
     await this.blogStatsRepository
@@ -660,42 +654,42 @@ export class BlogStatsService {
 
     // 해당 일자 게시물 수 (공개된 것만)
     const postsCount = await this.postRepository
-      .createQueryBuilder('post')
-      .where('post.blogId = :blogId', { blogId })
-      .andWhere('post.isDeleted = :isDeleted', { isDeleted: false })
-      .andWhere('post.isPublished = :isPublished', { isPublished: true })
-      .andWhere('post.createdAt >= :date', { date })
-      .andWhere('post.createdAt < :nextDate', { nextDate })
+      .createQueryBuilder("post")
+      .where("post.blogId = :blogId", { blogId })
+      .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
+      .andWhere("post.isPublished = :isPublished", { isPublished: true })
+      .andWhere("post.createdAt >= :date", { date })
+      .andWhere("post.createdAt < :nextDate", { nextDate })
       .getCount();
 
     // 해당 일자 게시물의 조회수 합계 (단순화: 생성일 기준)
     const { views } = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.stats', 'stats')
-      .where('post.blogId = :blogId', { blogId })
-      .andWhere('post.createdAt >= :date', { date })
-      .andWhere('post.createdAt < :nextDate', { nextDate })
-      .select('COALESCE(SUM(stats.viewCount), 0)', 'views')
+      .createQueryBuilder("post")
+      .leftJoin("post.stats", "stats")
+      .where("post.blogId = :blogId", { blogId })
+      .andWhere("post.createdAt >= :date", { date })
+      .andWhere("post.createdAt < :nextDate", { nextDate })
+      .select("COALESCE(SUM(stats.viewCount), 0)", "views")
       .getRawOne();
 
     // 해당 일자 게시물의 좋아요 합계 (단순화: 생성일 기준)
     const { likes } = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.stats', 'stats')
-      .where('post.blogId = :blogId', { blogId })
-      .andWhere('post.createdAt >= :date', { date })
-      .andWhere('post.createdAt < :nextDate', { nextDate })
-      .select('COALESCE(SUM(stats.likeCount), 0)', 'likes')
+      .createQueryBuilder("post")
+      .leftJoin("post.stats", "stats")
+      .where("post.blogId = :blogId", { blogId })
+      .andWhere("post.createdAt >= :date", { date })
+      .andWhere("post.createdAt < :nextDate", { nextDate })
+      .select("COALESCE(SUM(stats.likeCount), 0)", "likes")
       .getRawOne();
 
     // 해당 일자 게시물의 댓글 합계 (단순화: 생성일 기준)
     const { comments } = await this.postRepository
-      .createQueryBuilder('post')
-      .leftJoin('post.stats', 'stats')
-      .where('post.blogId = :blogId', { blogId })
-      .andWhere('post.createdAt >= :date', { date })
-      .andWhere('post.createdAt < :nextDate', { nextDate })
-      .select('COALESCE(SUM(stats.commentCount), 0)', 'comments')
+      .createQueryBuilder("post")
+      .leftJoin("post.stats", "stats")
+      .where("post.blogId = :blogId", { blogId })
+      .andWhere("post.createdAt >= :date", { date })
+      .andWhere("post.createdAt < :nextDate", { nextDate })
+      .select("COALESCE(SUM(stats.commentCount), 0)", "comments")
       .getRawOne();
 
     const metrics = {
@@ -709,9 +703,9 @@ export class BlogStatsService {
     // 스냅샷 저장 (기존 데이터 있으면 업데이트)
     const existing = await this.snapshotRepository.findOne({
       where: {
-        targetType: 'blog',
+        targetType: "blog",
         targetId: blogId,
-        period: 'daily',
+        period: "daily",
         periodStart: date,
       },
     });
@@ -721,15 +715,16 @@ export class BlogStatsService {
       await this.snapshotRepository.save(existing);
     } else {
       await this.snapshotRepository.save({
-        targetType: 'blog',
+        targetType: "blog",
         targetId: blogId,
-        period: 'daily',
+        period: "daily",
         periodStart: date,
         metrics,
       });
     }
 
-    this.logger.debug(`Saved daily snapshot for blog ${blogId} on ${date.toISOString().split('T')[0]}`);
+    this.logger.debug(
+      `Saved daily snapshot for blog ${blogId} on ${date.toISOString().split("T")[0]}`,
+    );
   }
 }
-

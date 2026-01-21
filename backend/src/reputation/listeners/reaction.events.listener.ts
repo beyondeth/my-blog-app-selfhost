@@ -15,18 +15,18 @@
  * @see PostInteractionEvents
  * @see ReputationQueueService
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
 import {
   PostInteractionEvents,
   LikeToggledEventPayload,
   BookmarkToggledEventPayload,
-} from '../../posts/events/post-interaction.events';
-import { Post } from '../../posts/entities/post.entity';
-import { ReputationQueueService } from '../queues/reputation-queue.service';
-import { ReputationAction } from '../enums/reputation-action.enum';
+} from "../../posts/events/post-interaction.events";
+import { Post } from "../../posts/entities/post.entity";
+import { ReputationQueueService } from "../queues/reputation-queue.service";
+import { ReputationAction } from "../enums/reputation-action.enum";
 
 @Injectable()
 export class ReactionEventsListener {
@@ -50,7 +50,9 @@ export class ReactionEventsListener {
   async handleLikeToggled(payload: LikeToggledEventPayload): Promise<void> {
     // 좋아요가 추가된 경우에만 처리
     if (!payload.liked) {
-      this.logger.debug(`좋아요 취소 - 점수 부여하지 않음: postId=${payload.postId}`);
+      this.logger.debug(
+        `좋아요 취소 - 점수 부여하지 않음: postId=${payload.postId}`,
+      );
       return;
     }
 
@@ -62,7 +64,7 @@ export class ReactionEventsListener {
       // 포스트 작성자 조회
       const post = await this.postRepository.findOne({
         where: { id: payload.postId },
-        select: ['id', 'authorId'],
+        select: ["id", "authorId"],
       });
 
       if (!post) {
@@ -81,7 +83,7 @@ export class ReactionEventsListener {
         action: ReputationAction.LIKE_RECEIVED,
         userId: post.authorId, // 포스트 작성자에게 점수 부여
         triggeredBy: payload.userId, // 좋아요를 누른 사용자
-        targetType: 'post',
+        targetType: "post",
         targetId: payload.postId,
         occurredAt: new Date(),
         metadata: {
@@ -115,7 +117,9 @@ export class ReactionEventsListener {
   ): Promise<void> {
     // 북마크가 추가된 경우에만 처리
     if (!payload.bookmarked) {
-      this.logger.debug(`북마크 취소 - 점수 부여하지 않음: postId=${payload.postId}`);
+      this.logger.debug(
+        `북마크 취소 - 점수 부여하지 않음: postId=${payload.postId}`,
+      );
       return;
     }
 
@@ -127,7 +131,7 @@ export class ReactionEventsListener {
       // 포스트 작성자 조회
       const post = await this.postRepository.findOne({
         where: { id: payload.postId },
-        select: ['id', 'authorId'],
+        select: ["id", "authorId"],
       });
 
       if (!post) {
@@ -146,7 +150,7 @@ export class ReactionEventsListener {
         action: ReputationAction.BOOKMARK_RECEIVED,
         userId: post.authorId, // 포스트 작성자에게 점수 부여
         triggeredBy: payload.userId, // 북마크한 사용자
-        targetType: 'post',
+        targetType: "post",
         targetId: payload.postId,
         occurredAt: new Date(),
         metadata: {
@@ -165,4 +169,3 @@ export class ReactionEventsListener {
     }
   }
 }
-

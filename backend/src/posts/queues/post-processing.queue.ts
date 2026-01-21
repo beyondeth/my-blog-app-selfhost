@@ -54,7 +54,11 @@ export const POST_PROCESSING_QUEUE = "post-processing";
  * 환경변수에서 읽어오며, 분산 배포를 위해 공유 Redis 사용
  */
 export const getRedisConnection = (): Redis => {
-  const redisUrl = process.env.REDIS_URL || "redis://localhost:6379";
+  // Core Redis only: queue jobs must not be evicted.
+  const redisUrl =
+    process.env.REDIS_CORE_URL ||
+    process.env.REDIS_URL ||
+    "redis://localhost:6379";
 
   return new Redis(redisUrl, {
     maxRetriesPerRequest: 3, // 최대 재시도 횟수

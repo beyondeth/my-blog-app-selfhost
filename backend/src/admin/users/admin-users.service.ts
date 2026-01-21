@@ -133,7 +133,6 @@ export class AdminUsersService {
     };
   }
 
-
   /**
    * Get detailed user information
    */
@@ -583,7 +582,6 @@ export class AdminUsersService {
   }
 
   private async getUserStats(userId: string): Promise<UserStats> {
-
     const user = await this.userRepository.findOne({
       where: { id: userId },
     });

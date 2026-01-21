@@ -27,27 +27,30 @@ import {
   ParseUUIDPipe,
   Logger,
   NotFoundException,
-} from '@nestjs/common';
-import { Roles } from '../../common/decorators/roles.decorator';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { LeaderboardService } from '../services/leaderboard.service';
-import { TitleService } from '../services/title.service';
-import { AggregatorService } from '../services/aggregator.service';
-import { LedgerService } from '../services/ledger.service';
-import { DailyAggregateJob } from '../jobs/daily-aggregate.job';
-import { WeeklyLeaderboardJob } from '../jobs/weekly-leaderboard.job';
-import { UsersService } from '../../users/users.service';
+} from "@nestjs/common";
+import { Roles } from "../../common/decorators/roles.decorator";
+import { RolesGuard } from "../../common/guards/roles.guard";
+import { LeaderboardService } from "../services/leaderboard.service";
+import { TitleService } from "../services/title.service";
+import { AggregatorService } from "../services/aggregator.service";
+import { LedgerService } from "../services/ledger.service";
+import { DailyAggregateJob } from "../jobs/daily-aggregate.job";
+import { WeeklyLeaderboardJob } from "../jobs/weekly-leaderboard.job";
+import { UsersService } from "../../users/users.service";
 import {
   LeaderboardResponseDto,
   LeaderboardEntryDto,
-} from '../dto/leaderboard-entry.dto';
-import { ReputationSummaryDto, TitleInfoDto } from '../dto/reputation-summary.dto';
-import { LeaderboardPeriod } from '../reputation.keys';
-import { ReputationPeriod } from '../enums/reputation-period.enum';
+} from "../dto/leaderboard-entry.dto";
+import {
+  ReputationSummaryDto,
+  TitleInfoDto,
+} from "../dto/reputation-summary.dto";
+import { LeaderboardPeriod } from "../reputation.keys";
+import { ReputationPeriod } from "../enums/reputation-period.enum";
 
-@Controller('admin/reputation')
+@Controller("admin/reputation")
 @UseGuards(RolesGuard)
-@Roles('admin')
+@Roles("admin")
 export class ReputationAdminController {
   private readonly logger = new Logger(ReputationAdminController.name);
 
@@ -68,21 +71,21 @@ export class ReputationAdminController {
    * @param limit 조회할 상위 N명 (기본값: 100)
    * @returns 리더보드 응답
    */
-  @Get('leaderboard')
+  @Get("leaderboard")
   async getLeaderboard(
-    @Query('period') period: LeaderboardPeriod = 'l7',
-    @Query('limit') limit: number = 100,
+    @Query("period") period: LeaderboardPeriod = "l7",
+    @Query("limit") limit: number = 100,
   ): Promise<LeaderboardResponseDto> {
     this.logger.log(`리더보드 조회: period=${period}, limit=${limit}`);
 
     // 유효한 기간만 허용
     const periodMap: Record<string, LeaderboardPeriod> = {
-      'l7': 'l7',
-      'l30': 'l30',
-      'l90': 'l90',
-      'all': 'all',
+      l7: "l7",
+      l30: "l30",
+      l90: "l90",
+      all: "all",
     };
-    const validPeriod: LeaderboardPeriod = periodMap[period] || 'l7';
+    const validPeriod: LeaderboardPeriod = periodMap[period] || "l7";
 
     return this.leaderboardService.getTopUsers(validPeriod, limit);
   }
@@ -95,15 +98,15 @@ export class ReputationAdminController {
    * @param period 기간 ('l7' | 'l30' | 'l90' | 'all', 기본값: 모두 갱신)
    * @returns 갱신 결과
    */
-  @Post('leaderboard/refresh')
+  @Post("leaderboard/refresh")
   async refreshLeaderboard(
-    @Query('period') period?: LeaderboardPeriod,
+    @Query("period") period?: LeaderboardPeriod,
   ): Promise<{ success: boolean; periods: string[]; message: string }> {
-    this.logger.log(`리더보드 수동 갱신 요청: period=${period || 'all'}`);
+    this.logger.log(`리더보드 수동 갱신 요청: period=${period || "all"}`);
 
     const periodsToRefresh: LeaderboardPeriod[] = period
       ? [period]
-      : ['l7', 'l30', 'l90', 'all'];
+      : ["l7", "l30", "l90", "all"];
 
     for (const p of periodsToRefresh) {
       await this.leaderboardService.refreshLeaderboard(p);
@@ -112,7 +115,7 @@ export class ReputationAdminController {
     return {
       success: true,
       periods: periodsToRefresh,
-      message: `${periodsToRefresh.join(', ')} 리더보드 갱신 완료`,
+      message: `${periodsToRefresh.join(", ")} 리더보드 갱신 완료`,
     };
   }
 
@@ -122,10 +125,15 @@ export class ReputationAdminController {
    * @param q 검색어 (사용자명 또는 이메일)
    * @returns 검색된 사용자 목록
    */
-  @Get('search')
-  async searchUsers(
-    @Query('q') query: string,
-  ): Promise<{ users: { id: string; username: string; email: string; profileImage?: string }[] }> {
+  @Get("search")
+  async searchUsers(@Query("q") query: string): Promise<{
+    users: {
+      id: string;
+      username: string;
+      email: string;
+      profileImage?: string;
+    }[];
+  }> {
     this.logger.log(`사용자 검색: query=${query}`);
 
     if (!query || query.length < 2) {
@@ -133,19 +141,21 @@ export class ReputationAdminController {
     }
 
     // 이메일 형식인지 확인
-    const isEmail = query.includes('@');
+    const isEmail = query.includes("@");
 
     if (isEmail) {
       // 이메일로 검색
       const user = await this.usersService.findByEmail(query);
       if (user) {
         return {
-          users: [{
-            id: user.id,
-            username: user.username,
-            email: user.email,
-            profileImage: user.profile?.profileImage || undefined,
-          }],
+          users: [
+            {
+              id: user.id,
+              username: user.username,
+              email: user.email,
+              profileImage: user.profile?.profileImage || undefined,
+            },
+          ],
         };
       }
       return { users: [] };
@@ -154,7 +164,7 @@ export class ReputationAdminController {
     // 사용자명으로 검색 (부분 매칭)
     const { users } = await this.usersService.searchUsers(query, 1, 10);
     return {
-      users: users.map(user => ({
+      users: users.map((user) => ({
         id: user.id,
         username: user.username,
         email: user.email,
@@ -169,28 +179,28 @@ export class ReputationAdminController {
    * @param userId 사용자 ID
    * @returns 사용자 평판 요약
    */
-  @Get('user/:userId')
+  @Get("user/:userId")
   async getUserReputation(
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
   ): Promise<ReputationSummaryDto> {
     this.logger.log(`사용자 평판 조회: userId=${userId}`);
 
     // 사용자 정보 조회
     const user = await this.usersService.findById(userId);
     if (!user) {
-      throw new NotFoundException('사용자를 찾을 수 없습니다.');
+      throw new NotFoundException("사용자를 찾을 수 없습니다.");
     }
 
     // 모든 기간의 점수 조회
     const periodToKey: Record<ReputationPeriod, LeaderboardPeriod> = {
-      [ReputationPeriod.L7]: 'l7',
-      [ReputationPeriod.L30]: 'l30',
-      [ReputationPeriod.L90]: 'l90',
-      [ReputationPeriod.ALL_TIME]: 'all',
+      [ReputationPeriod.L7]: "l7",
+      [ReputationPeriod.L30]: "l30",
+      [ReputationPeriod.L90]: "l90",
+      [ReputationPeriod.ALL_TIME]: "all",
     };
 
     const scores = await Promise.all(
-      Object.values(ReputationPeriod).map(async period => {
+      Object.values(ReputationPeriod).map(async (period) => {
         const total = await this.aggregatorService.getUserScore(userId, period);
         const leaderboardPeriod = periodToKey[period];
         const rank = await this.leaderboardService.getUserRank(
@@ -217,7 +227,7 @@ export class ReputationAdminController {
 
     // 총 획득 점수 (ALL_TIME)
     const allTimeScore = scores.find(
-      s => s.period === ReputationPeriod.ALL_TIME,
+      (s) => s.period === ReputationPeriod.ALL_TIME,
     );
 
     // 가입 일수 계산
@@ -242,10 +252,10 @@ export class ReputationAdminController {
    * @param limit 조회 개수 (기본 50, 최대 200)
    * @returns 최근 평판 원장 기록
    */
-  @Get('user/:userId/ledger')
+  @Get("user/:userId/ledger")
   async getUserLedger(
-    @Param('userId', ParseUUIDPipe) userId: string,
-    @Query('limit') limit = 50,
+    @Param("userId", ParseUUIDPipe) userId: string,
+    @Query("limit") limit = 50,
   ): Promise<{ entries: Array<Record<string, unknown>> }> {
     const safeLimit = Math.min(Math.max(Number(limit) || 50, 1), 200);
 
@@ -274,13 +284,13 @@ export class ReputationAdminController {
    *
    * @returns 타이틀 목록
    */
-  @Get('titles')
+  @Get("titles")
   async getAllTitles(): Promise<{ count: number; message: string }> {
-    this.logger.log('전체 타이틀 현황 조회');
+    this.logger.log("전체 타이틀 현황 조회");
     // TODO: 실제 구현 시 TitleGrant 전체 조회 필요
     return {
       count: 0,
-      message: '타이틀 현황 조회 기능 구현 예정',
+      message: "타이틀 현황 조회 기능 구현 예정",
     };
   }
 
@@ -291,9 +301,9 @@ export class ReputationAdminController {
    *
    * @returns 실행 결과
    */
-  @Post('aggregate')
+  @Post("aggregate")
   async runAggregate(): Promise<{ success: boolean; elapsed: number }> {
-    this.logger.log('수동 집계 실행 요청');
+    this.logger.log("수동 집계 실행 요청");
     return this.dailyAggregateJob.runManually();
   }
 }

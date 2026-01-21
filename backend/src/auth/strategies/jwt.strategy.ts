@@ -137,9 +137,11 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       const suspensionEnd = new Date(user.suspensionUntil);
       const remainingMs = suspensionEnd.getTime() - Date.now();
       const remainingDays = Math.ceil(remainingMs / (1000 * 60 * 60 * 24));
-      
-      this.logger.warn(`[JWT] User account is suspended until ${user.suspensionUntil}`);
-      
+
+      this.logger.warn(
+        `[JWT] User account is suspended until ${user.suspensionUntil}`,
+      );
+
       throw new ForbiddenException({
         statusCode: 403,
         message: `계정이 정지되었습니다. ${suspensionEnd.toLocaleString("ko-KR")}까지 로그인할 수 없습니다.`,

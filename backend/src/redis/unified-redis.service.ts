@@ -16,7 +16,8 @@ export class UnifiedRedisService {
   // 현재 처리 중인 키 추적 (순환 참조 방지)
   private readonly processingKeys = new Set<string>();
 
-  constructor(@InjectRedis() private readonly redis: Redis) {}
+  // Cache Redis only: evictable data (no sessions/locks/queues).
+  constructor(@InjectRedis("cache") private readonly redis: Redis) {}
 
   /**
    * 캐시 키 생성 헬퍼

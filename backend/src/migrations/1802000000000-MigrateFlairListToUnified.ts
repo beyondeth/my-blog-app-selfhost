@@ -1,11 +1,13 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
-export class MigrateFlairListToUnified1801000000001 implements MigrationInterface {
+export class MigrateFlairListToUnified1801000000001
+  implements MigrationInterface
+{
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. "post_flair_list" 타입의 위젯을 "post_flairs"로 변경합니다.
     // 2. 메타데이터를 통합된 형식(showAll: true)으로 업데이트합니다.
     // 3. 제목이 '플레어'인 경우 '말머리'로 변경합니다.
-    
+
     // 1. 충돌 방지: 'post_flair_list'가 있는 커뮤니티의 기존 'post_flairs'(하이라이트) 위젯을 삭제합니다.
     // (통합 시 '목록' 위젯을 '전체 보기' 모드의 통합 위젯으로 우선시하기 위함)
     await queryRunner.query(`

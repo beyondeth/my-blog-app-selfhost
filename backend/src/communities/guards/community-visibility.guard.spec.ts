@@ -20,8 +20,14 @@ describe("CommunityVisibilityGuard", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommunityVisibilityGuard,
-        { provide: getRepositoryToken(Community), useValue: mockCommunityRepository },
-        { provide: getRepositoryToken(CommunityMember), useValue: mockMemberRepository },
+        {
+          provide: getRepositoryToken(Community),
+          useValue: mockCommunityRepository,
+        },
+        {
+          provide: getRepositoryToken(CommunityMember),
+          useValue: mockMemberRepository,
+        },
       ],
     }).compile();
 
@@ -37,7 +43,7 @@ describe("CommunityVisibilityGuard", () => {
       switchToHttp: () => ({
         getRequest: () => request,
       }),
-    } as any);
+    }) as any;
 
   it("allows access to public community without login", async () => {
     mockCommunityRepository.findOne.mockResolvedValue({

@@ -52,9 +52,15 @@ export class AllExceptionsFilter implements ExceptionFilter {
         const responseObj = exceptionResponse as any;
         message = responseObj.message || exception.message;
         details = responseObj.details || null;
-        
+
         // 커스텀 에러 속성 추출 (code, reason, suspensionUntil 등)
-        const { statusCode, message: msg, error, details: det, ...rest } = responseObj;
+        const {
+          statusCode,
+          message: msg,
+          error,
+          details: det,
+          ...rest
+        } = responseObj;
         additionalProps = rest;
       } else {
         message = exception.message;
@@ -110,8 +116,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
     };
 
     // 🔍 디버그: 최종 응답 데이터 확인 (Suspension 관련)
-    if ((additionalProps as any)?.code === 'ACCOUNT_SUSPENDED') {
-       this.logger.debug(`[Filter] Sending Suspended Response: ${JSON.stringify(errorResponse)}`);
+    if ((additionalProps as any)?.code === "ACCOUNT_SUSPENDED") {
+      this.logger.debug(
+        `[Filter] Sending Suspended Response: ${JSON.stringify(errorResponse)}`,
+      );
     }
 
     // 헤더가 이미 전송되었는지 확인 (OAuth 콜백 등에서 중요)

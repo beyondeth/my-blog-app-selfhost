@@ -20,16 +20,12 @@
  *
  * @see app.module.ts
  */
-import { Module, forwardRef } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { BullModule } from '@nestjs/bullmq';
+import { Module, forwardRef } from "@nestjs/common";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { BullModule } from "@nestjs/bullmq";
 
 // Entities
-import {
-  ReputationLedger,
-  ReputationTotal,
-  TitleGrant,
-} from './entities';
+import { ReputationLedger, ReputationTotal, TitleGrant } from "./entities";
 
 // Services
 import {
@@ -37,7 +33,7 @@ import {
   AggregatorService,
   TitleService,
   LeaderboardService,
-} from './services';
+} from "./services";
 
 // Listeners
 import {
@@ -45,27 +41,30 @@ import {
   CommentEventsListener,
   ReactionEventsListener,
   EditorPickEventsListener,
-} from './listeners';
+} from "./listeners";
 
 // Jobs
-import { DailyAggregateJob, WeeklyLeaderboardJob } from './jobs';
+import { DailyAggregateJob, WeeklyLeaderboardJob } from "./jobs";
 
 // Queue
 import {
   REPUTATION_QUEUE,
   ReputationQueueService,
   ReputationQueueProcessor,
-} from './queues';
+} from "./queues";
 
 // Controllers
-import { ReputationAdminController, ReputationPublicController } from './controllers';
+import {
+  ReputationAdminController,
+  ReputationPublicController,
+} from "./controllers";
 
 // External modules
-import { PostsModule } from '../posts/posts.module';
-import { UsersModule } from '../users/users.module';
-import { RedisModule } from '../redis/redis.module';
-import { Post } from '../posts/entities/post.entity';
-import { User } from '../users/entities/user.entity';
+import { PostsModule } from "../posts/posts.module";
+import { UsersModule } from "../users/users.module";
+import { RedisModule } from "../redis/redis.module";
+import { Post } from "../posts/entities/post.entity";
+import { User } from "../users/entities/user.entity";
 
 @Module({
   imports: [
@@ -82,7 +81,7 @@ import { User } from '../users/entities/user.entity';
       name: REPUTATION_QUEUE,
       defaultJobOptions: {
         attempts: 3,
-        backoff: { type: 'exponential', delay: 2000 },
+        backoff: { type: "exponential", delay: 2000 },
         removeOnComplete: { age: 86400, count: 1000 },
         removeOnFail: { age: 604800, count: 5000 },
       },
@@ -92,10 +91,7 @@ import { User } from '../users/entities/user.entity';
     forwardRef(() => UsersModule),
     RedisModule,
   ],
-  controllers: [
-    ReputationAdminController,
-    ReputationPublicController,
-  ],
+  controllers: [ReputationAdminController, ReputationPublicController],
   providers: [
     // Services
     LedgerService,

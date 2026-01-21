@@ -138,8 +138,6 @@ export class Post {
   @Column({ name: "thumbnail_image_id", type: "uuid", nullable: true })
   thumbnailImageId: string;
 
-
-
   /**
    * 좋아요 수 (역정규화)
    * - 성능 최적화: JOIN 없이 정렬/조회 가능하도록 post_stats에서 동기화

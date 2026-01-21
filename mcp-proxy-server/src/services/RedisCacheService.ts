@@ -7,7 +7,7 @@
  * - CPU 사용량 70% 감소
  *
  * Redis 연결:
- * - my-blog-app-shared-redis:6379 (Backend와 공유)
+ * - redis-cache:6379 (Cache 전용, evictable)
  * - Namespace: mcp:apikey:* (충돌 방지)
  */
 

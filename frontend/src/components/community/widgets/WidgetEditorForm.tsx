@@ -24,7 +24,12 @@ import type {
 import RulesManagerPanel from '@/components/community/settings/RulesManagerPanel';
 import FlairsManagerPanel from '@/components/community/settings/FlairsManagerPanel';
 import { useCommunities } from '@/hooks/community';
-import { MAX_WIDGET_ITEMS } from './constants';
+import {
+  BOOKMARK_BODY_MAX,
+  BOOKMARK_BODY_PREVIEW_MAX,
+  BOOKMARK_LABEL_MAX,
+  MAX_WIDGET_ITEMS,
+} from './constants';
 
 export const widgetTypeOptions: Array<{
   type: CommunitySidebarWidgetType;
@@ -239,7 +244,8 @@ function WidgetTypeSpecificForm({
         </div>
       );
     case 'buttons':
-    case 'bookmarks':
+    case 'bookmarks': {
+      const isBookmark = widget.type === 'bookmarks';
       return (
         <div className="space-y-3">
           <div className="flex items-center justify-between">
@@ -261,20 +267,32 @@ function WidgetTypeSpecificForm({
             </Button>
           </div>
           <div className="space-y-3">
-            {items.map((item, index) => (
-              <div
-                key={index}
-                className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2"
-              >
-                <Label className="text-xs font-semibold text-gray-500 dark:text-white">
-                  표시될 라벨
-                </Label>
-                <Input
-                  className={SETTINGS_INPUT_CLASS}
-                  value={item.label ?? ''}
+            {items.map((item, index) => {
+              const labelValue = item.label ?? '';
+              const bodyValue = item.body ?? '';
+              return (
+                <div
+                  key={index}
+                  className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 space-y-2"
+                >
+                  <Label className="text-xs font-semibold text-gray-500 dark:text-white">
+                    표시될 라벨
+                  </Label>
+                  <Input
+                    className={SETTINGS_INPUT_CLASS}
+                  value={labelValue}
                   onChange={(event) => onItemChange(index, { ...item, label: event.target.value })}
-                  placeholder="버튼 라벨"
+                  placeholder={isBookmark ? `라벨 (최대 ${BOOKMARK_LABEL_MAX}자)` : '버튼 라벨'}
+                  maxLength={isBookmark ? BOOKMARK_LABEL_MAX : undefined}
                 />
+                {isBookmark && (
+                  <div className="flex items-center justify-between text-xs text-gray-500 dark:text-white">
+                    <span>최대 {BOOKMARK_LABEL_MAX}자</span>
+                    <span>
+                      {labelValue.length}/{BOOKMARK_LABEL_MAX}
+                    </span>
+                  </div>
+                )}
                 <Label className="text-xs font-semibold text-gray-500 dark:text-white">
                   클릭 시 이동할 주소
                 </Label>
@@ -305,18 +323,29 @@ function WidgetTypeSpecificForm({
                 </p>
                 <Textarea
                   className={cn(SETTINGS_INPUT_CLASS, 'min-h-[90px]')}
-                  value={item.body ?? ''}
+                  value={bodyValue}
                   onChange={(event) => onItemChange(index, { ...item, body: event.target.value })}
                   placeholder="사이드바에 표시할 짧은 소개 (선택)"
+                  maxLength={isBookmark ? BOOKMARK_BODY_MAX : undefined}
                 />
-                <Button variant="ghost" size="sm" className="text-red-500" onClick={() => onRemoveItem(index)}>
-                  삭제
-                </Button>
-              </div>
-            ))}
+                {isBookmark && (
+                  <p className="text-xs text-gray-500 dark:text-white">
+                    최대 {BOOKMARK_BODY_MAX}자 · 사이드바에는 최대 {BOOKMARK_BODY_PREVIEW_MAX}자만 표시
+                    <span className="ml-2">
+                      {bodyValue.length}/{BOOKMARK_BODY_MAX}
+                    </span>
+                  </p>
+                )}
+                  <Button variant="ghost" size="sm" className="text-red-500" onClick={() => onRemoveItem(index)}>
+                    삭제
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         </div>
       );
+    }
     case 'images':
       return (
         <div className="space-y-3">
@@ -472,7 +501,7 @@ function WidgetTypeSpecificForm({
                         slug: selected.slug,
                         iconUrl: selected.iconUrl,
                       },
-                      body: selected.description || item.body || '',
+                      body: item.body ?? '',
                     })
                   }
                 />
@@ -864,7 +893,6 @@ export function buildInitialWidgetPayload(
         items: [
           {
             targetCommunitySlug: community.slug,
-            body: community.description?.slice(0, 80),
           },
         ],
       };
@@ -1048,8 +1076,14 @@ function validateWidgetDraft(
         if (!item.label?.trim()) {
           return `${i + 1}번째 항목의 라벨을 입력하세요.`;
         }
+        if (type === 'bookmarks' && item.label.trim().length > BOOKMARK_LABEL_MAX) {
+          return `${i + 1}번째 라벨은 최대 ${BOOKMARK_LABEL_MAX}자까지 입력할 수 있습니다.`;
+        }
         if (!isLinkFieldValid(item.linkUrl)) {
           return `${i + 1}번째 항목의 링크는 https:// 로 시작하는 전체 주소여야 합니다.`;
+        }
+        if (type === 'bookmarks' && item.body?.trim() && item.body.trim().length > BOOKMARK_BODY_MAX) {
+          return `${i + 1}번째 소개는 최대 ${BOOKMARK_BODY_MAX}자까지 입력할 수 있습니다.`;
         }
       }
       break;

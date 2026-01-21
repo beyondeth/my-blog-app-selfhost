@@ -256,21 +256,30 @@ export class AuthController {
       if (!res.headersSent) {
         // Handle specific error codes
         const code = error.response?.code || error.code;
-        
-        if (code === "ACCOUNT_DELETED" || errorMessage.includes("계정이 삭제되었습니다")) {
-           return res.redirect(
+
+        if (
+          code === "ACCOUNT_DELETED" ||
+          errorMessage.includes("계정이 삭제되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
-        
-        if (code === "ACCOUNT_SUSPENDED" || errorMessage.includes("계정이 정지되었습니다")) {
-             return res.redirect(
+
+        if (
+          code === "ACCOUNT_SUSPENDED" ||
+          errorMessage.includes("계정이 정지되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
-        
-        if (code === "ACCOUNT_BANNED" || errorMessage.includes("계정이 영구 차단되었습니다")) {
-             return res.redirect(
+
+        if (
+          code === "ACCOUNT_BANNED" ||
+          errorMessage.includes("계정이 영구 차단되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }
@@ -338,20 +347,29 @@ export class AuthController {
         const code = error.response?.code || error.code;
 
         // Handle specific error codes
-        if (code === "ACCOUNT_DELETED" || errorMessage.includes("계정이 삭제되었습니다")) {
+        if (
+          code === "ACCOUNT_DELETED" ||
+          errorMessage.includes("계정이 삭제되었습니다")
+        ) {
           return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
 
-        if (code === "ACCOUNT_SUSPENDED" || errorMessage.includes("계정이 정지되었습니다")) {
-             return res.redirect(
+        if (
+          code === "ACCOUNT_SUSPENDED" ||
+          errorMessage.includes("계정이 정지되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
-        
-        if (code === "ACCOUNT_BANNED" || errorMessage.includes("계정이 영구 차단되었습니다")) {
-             return res.redirect(
+
+        if (
+          code === "ACCOUNT_BANNED" ||
+          errorMessage.includes("계정이 영구 차단되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }
@@ -425,21 +443,30 @@ export class AuthController {
       if (!res.headersSent) {
         // Handle specific error codes
         const code = error.response?.code || error.code;
-        
-        if (code === "ACCOUNT_DELETED" || errorMessage.includes("계정이 삭제되었습니다")) {
-           return res.redirect(
+
+        if (
+          code === "ACCOUNT_DELETED" ||
+          errorMessage.includes("계정이 삭제되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
-        
-        if (code === "ACCOUNT_SUSPENDED" || errorMessage.includes("계정이 정지되었습니다")) {
-             return res.redirect(
+
+        if (
+          code === "ACCOUNT_SUSPENDED" ||
+          errorMessage.includes("계정이 정지되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
-        
-        if (code === "ACCOUNT_BANNED" || errorMessage.includes("계정이 영구 차단되었습니다")) {
-             return res.redirect(
+
+        if (
+          code === "ACCOUNT_BANNED" ||
+          errorMessage.includes("계정이 영구 차단되었습니다")
+        ) {
+          return res.redirect(
             `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }

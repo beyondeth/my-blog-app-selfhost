@@ -20,33 +20,33 @@ import {
   Index,
   ManyToOne,
   JoinColumn,
-} from 'typeorm';
-import { ReputationAction } from '../enums/reputation-action.enum';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { ReputationAction } from "../enums/reputation-action.enum";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('reputation_ledger')
-@Index('idx_reputation_ledger_user_recorded', ['userId', 'recordedAt'])
-@Index('idx_reputation_ledger_action_recorded', ['actionType', 'recordedAt'])
+@Entity("reputation_ledger")
+@Index("idx_reputation_ledger_user_recorded", ["userId", "recordedAt"])
+@Index("idx_reputation_ledger_action_recorded", ["actionType", "recordedAt"])
 export class ReputationLedger {
   /**
    * 기본 키 (UUID v7)
    * 시간순 정렬이 가능한 UUID 사용
    */
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   /**
    * 점수를 받는 사용자 ID
    * 콘텐츠 작성자 또는 액션 수행자
    */
-  @Column({ type: 'uuid', name: 'user_id' })
+  @Column({ type: "uuid", name: "user_id" })
   userId: string;
 
   /**
    * 사용자 관계 (조회 최적화용)
    */
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "user_id" })
   user: User;
 
   /**
@@ -54,9 +54,9 @@ export class ReputationLedger {
    * 점수 변동의 원인이 되는 행동 종류
    */
   @Column({
-    type: 'varchar',
+    type: "varchar",
     length: 50,
-    name: 'action_type',
+    name: "action_type",
   })
   actionType: ReputationAction;
 
@@ -64,28 +64,28 @@ export class ReputationLedger {
    * 대상 타입
    * 액션이 발생한 대상의 종류 (예: 'post', 'comment')
    */
-  @Column({ type: 'varchar', length: 50, name: 'target_type', nullable: true })
+  @Column({ type: "varchar", length: 50, name: "target_type", nullable: true })
   targetType: string | null;
 
   /**
    * 대상 ID
    * 액션이 발생한 대상의 고유 식별자
    */
-  @Column({ type: 'uuid', name: 'target_id', nullable: true })
+  @Column({ type: "uuid", name: "target_id", nullable: true })
   targetId: string | null;
 
   /**
    * 점수 변화량
    * 양수: 점수 증가, 음수: 점수 감소
    */
-  @Column({ type: 'int' })
+  @Column({ type: "int" })
   delta: number;
 
   /**
    * 반응 수 (선택적)
    * 좋아요/북마크 등의 누적 반응 수 스냅샷
    */
-  @Column({ type: 'int', name: 'reaction_count', default: 0 })
+  @Column({ type: "int", name: "reaction_count", default: 0 })
   reactionCount: number;
 
   /**
@@ -93,13 +93,13 @@ export class ReputationLedger {
    * 추가적인 컨텍스트 정보 저장
    * 예: { sourceUserId: '...', postTitle: '...' }
    */
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   metadata: Record<string, any> | null;
 
   /**
    * 기록 시각
    * 레코드 생성 시점 (불변)
    */
-  @CreateDateColumn({ name: 'recorded_at' })
+  @CreateDateColumn({ name: "recorded_at" })
   recordedAt: Date;
 }

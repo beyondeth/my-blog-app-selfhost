@@ -428,12 +428,12 @@ export class CommunityStatsService {
     for (const community of communities) {
       try {
         await this.calculateAndSaveCommunityStats(community.id);
-        
+
         // 일별 스냅샷 생성 (어제 날짜 기준)
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         await this.saveDailySnapshot(community.id, yesterday);
-        
+
         successCount++;
       } catch (error) {
         this.logger.error(
@@ -456,42 +456,42 @@ export class CommunityStatsService {
    */
   async saveDailySnapshot(communityId: string, date: Date): Promise<void> {
     date.setHours(0, 0, 0, 0); // Start of day
-    
+
     const nextDate = new Date(date);
     nextDate.setDate(date.getDate() + 1);
 
     // 해당 일자 게시물 수
     const postsCount = await this.postRepository
-      .createQueryBuilder('post')
-      .where('post.communityId = :communityId', { communityId })
-      .andWhere('post.createdAt >= :date', { date })
-      .andWhere('post.createdAt < :nextDate', { nextDate })
+      .createQueryBuilder("post")
+      .where("post.communityId = :communityId", { communityId })
+      .andWhere("post.createdAt >= :date", { date })
+      .andWhere("post.createdAt < :nextDate", { nextDate })
       .getCount();
 
     // 해당 일자 신규 멤버 수
     const newMembersCount = await this.memberRepository
-      .createQueryBuilder('member')
-      .where('member.communityId = :communityId', { communityId })
-      .andWhere('member.joinedAt >= :date', { date })
-      .andWhere('member.joinedAt < :nextDate', { nextDate })
+      .createQueryBuilder("member")
+      .where("member.communityId = :communityId", { communityId })
+      .andWhere("member.joinedAt >= :date", { date })
+      .andWhere("member.joinedAt < :nextDate", { nextDate })
       .getCount();
-    
+
     // 해당 일자 게시물의 업보트 합계 (단순화: 생성일 기준)
     const { upvotes } = await this.postRepository
-      .createQueryBuilder('post')
-      .where('post.communityId = :communityId', { communityId })
-      .andWhere('post.createdAt >= :date', { date })
-      .andWhere('post.createdAt < :nextDate', { nextDate })
-      .select('COALESCE(SUM(post.upvoteCount), 0)', 'upvotes')
+      .createQueryBuilder("post")
+      .where("post.communityId = :communityId", { communityId })
+      .andWhere("post.createdAt >= :date", { date })
+      .andWhere("post.createdAt < :nextDate", { nextDate })
+      .select("COALESCE(SUM(post.upvoteCount), 0)", "upvotes")
       .getRawOne();
 
     // 해당 일자 게시물의 댓글 합계 (단순화: 생성일 기준)
     const { comments } = await this.postRepository
-      .createQueryBuilder('post')
-      .where('post.communityId = :communityId', { communityId })
-      .andWhere('post.createdAt >= :date', { date })
-      .andWhere('post.createdAt < :nextDate', { nextDate })
-      .select('COALESCE(SUM(post.commentCount), 0)', 'comments')
+      .createQueryBuilder("post")
+      .where("post.communityId = :communityId", { communityId })
+      .andWhere("post.createdAt >= :date", { date })
+      .andWhere("post.createdAt < :nextDate", { nextDate })
+      .select("COALESCE(SUM(post.commentCount), 0)", "comments")
       .getRawOne();
 
     const metrics = {
@@ -499,15 +499,15 @@ export class CommunityStatsService {
       members: newMembersCount,
       upvotes: parseInt(upvotes, 10),
       comments: parseInt(comments, 10),
-      views: 0, 
+      views: 0,
     };
 
     // 스냅샷 저장 (기존 데이터 있으면 업데이트)
     const existing = await this.snapshotRepository.findOne({
       where: {
-        targetType: 'community',
+        targetType: "community",
         targetId: communityId,
-        period: 'daily',
+        period: "daily",
         periodStart: date,
       },
     });
@@ -517,14 +517,16 @@ export class CommunityStatsService {
       await this.snapshotRepository.save(existing);
     } else {
       await this.snapshotRepository.save({
-        targetType: 'community',
+        targetType: "community",
         targetId: communityId,
-        period: 'daily',
+        period: "daily",
         periodStart: date,
         metrics,
       });
     }
 
-    this.logger.debug(`Saved daily snapshot for community ${communityId} on ${date.toISOString().split('T')[0]}`);
+    this.logger.debug(
+      `Saved daily snapshot for community ${communityId} on ${date.toISOString().split("T")[0]}`,
+    );
   }
 }

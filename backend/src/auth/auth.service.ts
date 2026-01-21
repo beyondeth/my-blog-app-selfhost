@@ -445,7 +445,7 @@ export class AuthService {
 
         // 🛑 비활성 계정 체크
         if (!existingUser.isActive && !existingUser.isDeleted) {
-           throw new UnauthorizedException({
+          throw new UnauthorizedException({
             statusCode: 401,
             message: "계정이 비활성화되어 있습니다. 관리자에게 문의해주세요.",
             error: "Unauthorized",
@@ -1014,7 +1014,8 @@ export class AuthService {
 
     // Check if new password matches the current password
     if (resetToken.user.password) {
-      const isSamePassword = await resetToken.user.validatePassword(newPassword);
+      const isSamePassword =
+        await resetToken.user.validatePassword(newPassword);
       if (isSamePassword) {
         throw new BadRequestException(
           "기존 비밀번호와 다른 비밀번호를 입력해주세요",

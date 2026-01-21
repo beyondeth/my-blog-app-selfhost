@@ -140,7 +140,8 @@ export class ReportsService {
 
     // 동기적 매핑 (비동기 루프 제거)
     const reportsWithTargets = reports.map((report) => {
-      const target = targetMaps.get(`${report.type}:${report.targetId}`) || null;
+      const target =
+        targetMaps.get(`${report.type}:${report.targetId}`) || null;
       const result: any = { ...report };
       if (report.type === ReportType.POST && target) {
         result.post = target;
@@ -162,7 +163,6 @@ export class ReportsService {
       totalPages: Math.ceil(total / limit),
     };
   }
-
 
   /**
    * Get a single report
@@ -750,7 +750,6 @@ export class ReportsService {
   }
 
   private async loadTargetDetails(report: Report) {
-
     switch (report.type) {
       case ReportType.POST:
         return await this.postRepository.findOne({

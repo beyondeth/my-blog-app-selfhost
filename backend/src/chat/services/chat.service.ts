@@ -30,7 +30,6 @@ export class ChatService {
   private readonly logger = new Logger(ChatService.name);
   private chatGateway: ChatGateway;
 
-
   constructor(
     @InjectRepository(Conversation)
     private conversationRepository: Repository<Conversation>,
@@ -339,7 +338,6 @@ export class ChatService {
         lastMessage,
       };
     });
-
 
     /**
      * 대화 목록 캐싱 개선
@@ -700,8 +698,6 @@ export class ChatService {
       });
     }
 
-
-
     return fullMessage;
   }
 
@@ -997,8 +993,6 @@ export class ChatService {
       );
     }
   }
-
-
 
   /**
    * Transform cached messages from Redis to Message format

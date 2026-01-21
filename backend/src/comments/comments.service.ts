@@ -100,7 +100,11 @@ export class CommentsService {
     return dto;
   }
 
-  async create(createCommentDto: any, user: User, ip?: string): Promise<CommentResponseDto> {
+  async create(
+    createCommentDto: any,
+    user: User,
+    ip?: string,
+  ): Promise<CommentResponseDto> {
     const { postId, parentCommentId, ...commentData } = createCommentDto;
 
     // 게시글 존재 확인 및 블로그 정보 가져오기

@@ -306,15 +306,12 @@ export class ExternalImageDownloadService {
           await new Promise((resolve) => setTimeout(resolve, delay));
         } else {
           // 모든 시도 실패
-          this.logger.error(
-            `All attempts failed for image: ${normalizedUrl}`,
-            {
-              error: errorMessage,
-              statusCode,
-              isGemini: isGeminiUrl,
-              attempts: attempt,
-            },
-          );
+          this.logger.error(`All attempts failed for image: ${normalizedUrl}`, {
+            error: errorMessage,
+            statusCode,
+            isGemini: isGeminiUrl,
+            attempts: attempt,
+          });
           return null;
         }
       }

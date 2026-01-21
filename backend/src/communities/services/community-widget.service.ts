@@ -226,9 +226,7 @@ export class CommunityWidgetService {
       throw new NotFoundException("위젯을 찾을 수 없습니다");
     }
 
-    if (
-      widget.type === CommunitySidebarWidgetType.COMMUNITY_RULES
-    ) {
+    if (widget.type === CommunitySidebarWidgetType.COMMUNITY_RULES) {
       throw new BadRequestException("이 위젯은 비활성화만 가능합니다");
     }
 
@@ -530,7 +528,9 @@ export class CommunityWidgetService {
     if (!showAll) {
       const flairIds = metadata?.flairIds;
       if (!Array.isArray(flairIds) || flairIds.length === 0) {
-        throw new BadRequestException("표시할 말머리를 최소 1개 이상 선택하세요");
+        throw new BadRequestException(
+          "표시할 말머리를 최소 1개 이상 선택하세요",
+        );
       }
       if (flairIds.length > 20) {
         throw new BadRequestException(
@@ -570,7 +570,6 @@ export class CommunityWidgetService {
       entries: [],
     };
   }
-
 
   private prepareLinkWidget(
     type: CommunitySidebarWidgetType,

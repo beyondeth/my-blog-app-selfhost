@@ -19,14 +19,17 @@ describe("FeedRankingService - Community Visibility Filters", () => {
   });
 
   it("adds community visibility filters to ranking query", async () => {
-    const service = new FeedRankingService(mockDataSource as any, mockRedis as any);
+    const service = new FeedRankingService(
+      mockDataSource as any,
+      mockRedis as any,
+    );
 
     await (service as any).fetchRankingRows(FeedSortType.HOT, 10);
 
     const query = mockDataSource.query.mock.calls[0][0] as string;
-    expect(query).toContain('INNER JOIN communities c');
+    expect(query).toContain("INNER JOIN communities c");
     expect(query).toContain('c."isPublic" = true');
     expect(query).toContain('c."isPostDiscoverable" = true');
-    expect(query).toContain('c."joinPolicy" <> \'private\'');
+    expect(query).toContain("c.\"joinPolicy\" <> 'private'");
   });
 });

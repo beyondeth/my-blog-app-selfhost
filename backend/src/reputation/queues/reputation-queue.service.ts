@@ -11,11 +11,11 @@
  * @see ReputationQueueProcessor
  * @see LedgerService
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectQueue } from '@nestjs/bullmq';
-import { Queue, Job } from 'bullmq';
-import { REPUTATION_QUEUE, ReputationJobName } from './reputation.queue';
-import { ReputationAction } from '../enums/reputation-action.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectQueue } from "@nestjs/bullmq";
+import { Queue, Job } from "bullmq";
+import { REPUTATION_QUEUE, ReputationJobName } from "./reputation.queue";
+import { ReputationAction } from "../enums/reputation-action.enum";
 
 /**
  * 평판 이벤트 데이터
@@ -54,9 +54,7 @@ export interface QueueStats {
 export class ReputationQueueService {
   private readonly logger = new Logger(ReputationQueueService.name);
 
-  constructor(
-    @InjectQueue(REPUTATION_QUEUE) private readonly queue: Queue,
-  ) {}
+  constructor(@InjectQueue(REPUTATION_QUEUE) private readonly queue: Queue) {}
 
   /**
    * 평판 이벤트를 큐에 추가
@@ -73,7 +71,7 @@ export class ReputationQueueService {
 
     return this.queue.add(ReputationJobName.REPUTATION_EVENT, data, {
       // 중복 방지: 같은 이벤트가 단시간 내 여러 번 들어오는 것 방지
-      jobId: `${data.action}:${data.userId}:${data.targetId || 'no-target'}:${Date.now()}`,
+      jobId: `${data.action}:${data.userId}:${data.targetId || "no-target"}:${Date.now()}`,
     });
   }
 
@@ -109,7 +107,7 @@ export class ReputationQueueService {
    * @returns 삭제된 Job 수
    */
   async drainQueue(): Promise<number> {
-    this.logger.warn('큐 비우기 실행');
+    this.logger.warn("큐 비우기 실행");
     const waiting = await this.queue.getWaiting();
     const count = waiting.length;
 

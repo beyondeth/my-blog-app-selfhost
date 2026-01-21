@@ -8,16 +8,10 @@
  *
  * @see AggregatorService
  */
-import {
-  Controller,
-  Get,
-  Param,
-  ParseUUIDPipe,
-  Logger,
-} from '@nestjs/common';
-import { AggregatorService } from '../services/aggregator.service';
-import { getUserLevel, UserLevel } from '../enums/title-code.enum';
-import { ReputationPeriod } from '../enums/reputation-period.enum';
+import { Controller, Get, Param, ParseUUIDPipe, Logger } from "@nestjs/common";
+import { AggregatorService } from "../services/aggregator.service";
+import { getUserLevel, UserLevel } from "../enums/title-code.enum";
+import { ReputationPeriod } from "../enums/reputation-period.enum";
 
 /**
  * 사용자 레벨 응답 DTO
@@ -29,13 +23,11 @@ interface UserLevelResponse {
   currentScore: number;
 }
 
-@Controller('reputation')
+@Controller("reputation")
 export class ReputationPublicController {
   private readonly logger = new Logger(ReputationPublicController.name);
 
-  constructor(
-    private readonly aggregatorService: AggregatorService,
-  ) {}
+  constructor(private readonly aggregatorService: AggregatorService) {}
 
   /**
    * 사용자 레벨 조회
@@ -46,9 +38,9 @@ export class ReputationPublicController {
    * @param userId 사용자 ID
    * @returns 레벨 정보 또는 null
    */
-  @Get('user/:userId/level')
+  @Get("user/:userId/level")
   async getUserLevel(
-    @Param('userId', ParseUUIDPipe) userId: string,
+    @Param("userId", ParseUUIDPipe) userId: string,
   ): Promise<UserLevelResponse | null> {
     this.logger.debug(`사용자 레벨 조회: userId=${userId}`);
 

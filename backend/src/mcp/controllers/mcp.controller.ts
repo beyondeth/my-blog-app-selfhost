@@ -317,7 +317,14 @@ export class McpController {
         );
       }
 
-      const styles = ["default", "novel", "comedy", "podcast", "tutorial", "vibe"];
+      const styles = [
+        "default",
+        "novel",
+        "comedy",
+        "podcast",
+        "tutorial",
+        "vibe",
+      ];
       const styleData = [];
 
       for (const styleName of styles) {
@@ -446,7 +453,14 @@ export class McpController {
       const path = await import("path");
 
       // 스타일 이름 검증
-      const validStyles = ["default", "novel", "comedy", "podcast", "tutorial", "vibe"];
+      const validStyles = [
+        "default",
+        "novel",
+        "comedy",
+        "podcast",
+        "tutorial",
+        "vibe",
+      ];
       if (!validStyles.includes(style)) {
         return {
           success: false,
