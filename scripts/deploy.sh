@@ -160,7 +160,8 @@ restart_services() {
 
     # Step 1: 데이터베이스 및 캐시 먼저 시작
     log "Step 1: 데이터베이스 및 캐시 서비스 시작..."
-    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d postgres redis pgbouncer
+    docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d \
+        postgres redis-core redis-cache pgbouncer
 
     # Step 2: 데이터베이스 초기화 대기 (시간 단축)
     log "Step 2: 데이터베이스 초기화 대기 (최대 30초)..."
@@ -175,7 +176,7 @@ restart_services() {
     # Step 3: 모든 애플리케이션 서비스 동시 시작 (병렬)
     log "Step 3: 모든 애플리케이션 서비스 동시 시작..."
     docker compose -f "$COMPOSE_FILE" --env-file "$ENV_FILE" up -d \
-        backend frontend mcp-proxy victoriametrics grafana redis-exporter
+        backend frontend mcp-proxy victoriametrics grafana redis-core-exporter redis-cache-exporter
 
     # Step 4: 백엔드 준비 대기 (마이그레이션용)
     log "Step 4: 백엔드 준비 대기 (최대 60초)..."
@@ -207,7 +208,10 @@ health_checks() {
     (check_health "postgres" 30 && echo "✓ PostgreSQL 준비 완료") &
     pids+=($!)
 
-    (check_health "redis" 20 && echo "✓ Redis 준비 완료") &
+    (check_health "redis-core" 20 && echo "✓ Redis Core 준비 완료") &
+    pids+=($!)
+
+    (check_health "redis-cache" 20 && echo "✓ Redis Cache 준비 완료") &
     pids+=($!)
 
     (check_health "pgbouncer" 20 && echo "✓ PgBouncer 준비 완료") &
