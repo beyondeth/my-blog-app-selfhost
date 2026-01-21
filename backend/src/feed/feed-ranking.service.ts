@@ -26,7 +26,8 @@ export class FeedRankingService {
 
   constructor(
     private readonly dataSource: DataSource,
-    @InjectRedis() private readonly redis: Redis,
+    // Cache Redis: ranking data is periodic and evictable.
+    @InjectRedis("cache") private readonly redis: Redis,
   ) {}
 
   @Cron(CronExpression.EVERY_MINUTE)

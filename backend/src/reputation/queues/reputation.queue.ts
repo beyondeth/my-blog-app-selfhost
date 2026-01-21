@@ -7,7 +7,7 @@
 /**
  * 평판 이벤트 처리 큐 이름
  */
-export const REPUTATION_QUEUE = 'reputation-events';
+export const REPUTATION_QUEUE = "reputation-events";
 
 /**
  * 큐 Job 이름
@@ -16,10 +16,10 @@ export enum ReputationJobName {
   /**
    * 평판 이벤트 처리
    */
-  REPUTATION_EVENT = 'reputation-event',
+  REPUTATION_EVENT = "reputation-event",
 
   /**
    * 배치 처리 (일괄 ledger INSERT)
    */
-  BATCH_PROCESS = 'batch-process',
+  BATCH_PROCESS = "batch-process",
 }

@@ -62,7 +62,7 @@ describe("FeedService - Community Visibility Filters", () => {
     const query = mockQueryRunner.query.mock.calls[0][0] as string;
     expect(query).toContain('c."isPublic" = true');
     expect(query).toContain('c."isPostDiscoverable" = true');
-    expect(query).toContain('c."joinPolicy" <> \'private\'');
+    expect(query).toContain("c.\"joinPolicy\" <> 'private'");
   });
 
   it("filters community posts by discoverability in ranked fetch", async () => {
@@ -71,6 +71,6 @@ describe("FeedService - Community Visibility Filters", () => {
     const query = mockDataSource.query.mock.calls[0][0] as string;
     expect(query).toContain('c."isPublic" = true');
     expect(query).toContain('c."isPostDiscoverable" = true');
-    expect(query).toContain('c."joinPolicy" <> \'private\'');
+    expect(query).toContain("c.\"joinPolicy\" <> 'private'");
   });
 });

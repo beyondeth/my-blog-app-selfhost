@@ -41,12 +41,30 @@ describe("CommunityService - Visibility Rules", () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CommunityService,
-        { provide: getRepositoryToken(Community), useValue: mockCommunityRepository },
-        { provide: getRepositoryToken(CommunityMember), useValue: mockMemberRepository },
-        { provide: getRepositoryToken(CommunityRule), useValue: mockRuleRepository },
-        { provide: getRepositoryToken(CommunityFlair), useValue: mockFlairRepository },
-        { provide: getRepositoryToken(CommunityModLog), useValue: mockModLogRepository },
-        { provide: getRepositoryToken(CommunityPost), useValue: mockPostRepository },
+        {
+          provide: getRepositoryToken(Community),
+          useValue: mockCommunityRepository,
+        },
+        {
+          provide: getRepositoryToken(CommunityMember),
+          useValue: mockMemberRepository,
+        },
+        {
+          provide: getRepositoryToken(CommunityRule),
+          useValue: mockRuleRepository,
+        },
+        {
+          provide: getRepositoryToken(CommunityFlair),
+          useValue: mockFlairRepository,
+        },
+        {
+          provide: getRepositoryToken(CommunityModLog),
+          useValue: mockModLogRepository,
+        },
+        {
+          provide: getRepositoryToken(CommunityPost),
+          useValue: mockPostRepository,
+        },
         { provide: DataSource, useValue: mockDataSource },
         { provide: CacheService, useValue: mockCacheService },
       ],
@@ -102,7 +120,9 @@ describe("CommunityService - Visibility Rules", () => {
       }),
     };
 
-    mockDataSource.transaction.mockImplementation(async (fn: any) => fn(mockManager));
+    mockDataSource.transaction.mockImplementation(async (fn: any) =>
+      fn(mockManager),
+    );
 
     await service.create("user-id", {
       name: "Private Community",
@@ -131,7 +151,9 @@ describe("CommunityService - Visibility Rules", () => {
     };
 
     mockCommunityRepository.findOne.mockResolvedValue(existingCommunity);
-    mockCommunityRepository.save.mockImplementation(async (payload: any) => payload);
+    mockCommunityRepository.save.mockImplementation(
+      async (payload: any) => payload,
+    );
 
     const updated = await service.update(
       existingCommunity.id,
@@ -141,7 +163,9 @@ describe("CommunityService - Visibility Rules", () => {
 
     expect(updated.isPublic).toBe(true);
     expect(updated.isPostDiscoverable).toBe(true);
-    expect(mockCacheService.deletePattern).toHaveBeenCalledWith("feed:unified:*");
+    expect(mockCacheService.deletePattern).toHaveBeenCalledWith(
+      "feed:unified:*",
+    );
   });
 
   it("forces visibility off when switching to private policy", async () => {
@@ -154,7 +178,9 @@ describe("CommunityService - Visibility Rules", () => {
     };
 
     mockCommunityRepository.findOne.mockResolvedValue(existingCommunity);
-    mockCommunityRepository.save.mockImplementation(async (payload: any) => payload);
+    mockCommunityRepository.save.mockImplementation(
+      async (payload: any) => payload,
+    );
 
     const updated = await service.update(
       existingCommunity.id,
@@ -173,7 +199,12 @@ describe("CommunityService - Visibility Rules", () => {
   describe("Community list/search queries", () => {
     it("filters out private communities for anonymous users", async () => {
       const qb = buildQueryBuilder([
-        { id: "community-id", name: "커뮤니티", createdAt: new Date(), memberCount: 1 },
+        {
+          id: "community-id",
+          name: "커뮤니티",
+          createdAt: new Date(),
+          memberCount: 1,
+        },
       ]);
       mockCommunityRepository.createQueryBuilder.mockReturnValue(qb);
 
@@ -186,7 +217,12 @@ describe("CommunityService - Visibility Rules", () => {
 
     it("allows joined communities even when private", async () => {
       const qb = buildQueryBuilder([
-        { id: "community-id", name: "커뮤니티", createdAt: new Date(), memberCount: 1 },
+        {
+          id: "community-id",
+          name: "커뮤니티",
+          createdAt: new Date(),
+          memberCount: 1,
+        },
       ]);
       mockCommunityRepository.createQueryBuilder.mockReturnValue(qb);
       mockMemberRepository.find.mockResolvedValue([]);
@@ -207,7 +243,12 @@ describe("CommunityService - Visibility Rules", () => {
 
     it("adds search filter for name/description", async () => {
       const qb = buildQueryBuilder([
-        { id: "community-id", name: "커뮤니티", createdAt: new Date(), memberCount: 1 },
+        {
+          id: "community-id",
+          name: "커뮤니티",
+          createdAt: new Date(),
+          memberCount: 1,
+        },
       ]);
       mockCommunityRepository.createQueryBuilder.mockReturnValue(qb);
 

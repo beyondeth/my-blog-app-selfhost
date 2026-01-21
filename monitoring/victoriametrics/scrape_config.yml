@@ -36,7 +36,7 @@ scrape_configs:
   # Redis 메트릭
   - job_name: 'redis'
     static_configs:
-      - targets: ['redis-exporter:9121']
+      - targets: ['redis-core-exporter:9121', 'redis-cache-exporter:9121']
     scrape_interval: 30s
 
     # Redis 과도한 메트릭 제거

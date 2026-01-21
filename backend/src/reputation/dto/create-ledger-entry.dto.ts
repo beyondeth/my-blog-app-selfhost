@@ -6,8 +6,8 @@
  *
  * @see LedgerService.record()
  */
-import { IsEnum, IsUUID, IsInt, IsOptional, IsObject } from 'class-validator';
-import { ReputationAction } from '../enums/reputation-action.enum';
+import { IsEnum, IsUUID, IsInt, IsOptional, IsObject } from "class-validator";
+import { ReputationAction } from "../enums/reputation-action.enum";
 
 export class CreateLedgerEntryDto {
   /**

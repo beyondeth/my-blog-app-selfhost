@@ -5,7 +5,7 @@
  *
  * @see ReputationAdminController.getUserReputation()
  */
-import { TitleCode } from '../enums/title-code.enum';
+import { TitleCode } from "../enums/title-code.enum";
 
 /**
  * 기간별 점수 정보

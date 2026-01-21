@@ -21,7 +21,8 @@ export class CommunityPostViewService {
   constructor(
     @InjectRepository(CommunityPost)
     private readonly communityPostRepository: Repository<CommunityPost>,
-    @InjectRedis() private readonly redis: Redis,
+    // Cache Redis: view buffers and rankings are evictable.
+    @InjectRedis("cache") private readonly redis: Redis,
   ) {}
 
   async bufferView(postId: string): Promise<void> {

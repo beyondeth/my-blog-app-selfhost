@@ -13,21 +13,21 @@
  * @see WeeklyLeaderboardJob
  * @see LeaderboardEntryDto
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ReputationTotal } from '../entities/reputation-total.entity';
-import { User } from '../../users/entities/user.entity';
-import { UnifiedRedisService } from '../../redis/unified-redis.service';
-import { repKeys, LeaderboardPeriod } from '../reputation.keys';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ReputationTotal } from "../entities/reputation-total.entity";
+import { User } from "../../users/entities/user.entity";
+import { UnifiedRedisService } from "../../redis/unified-redis.service";
+import { repKeys, LeaderboardPeriod } from "../reputation.keys";
 import {
   LeaderboardEntryDto,
   LeaderboardResponseDto,
-} from '../dto/leaderboard-entry.dto';
-import { ReputationPeriod } from '../enums/reputation-period.enum';
-import { TitleService } from './title.service';
-import { InjectRedis } from '@nestjs-modules/ioredis';
-import Redis from 'ioredis';
+} from "../dto/leaderboard-entry.dto";
+import { ReputationPeriod } from "../enums/reputation-period.enum";
+import { TitleService } from "./title.service";
+import { InjectRedis } from "@nestjs-modules/ioredis";
+import Redis from "ioredis";
 
 @Injectable()
 export class LeaderboardService {
@@ -38,7 +38,8 @@ export class LeaderboardService {
     private readonly totalRepository: Repository<ReputationTotal>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
-    @InjectRedis()
+    // Cache Redis: leaderboards are rebuilt on schedule.
+    @InjectRedis("cache")
     private readonly redis: Redis,
     private readonly redisService: UnifiedRedisService,
     private readonly titleService: TitleService,
@@ -58,17 +59,17 @@ export class LeaderboardService {
 
     // 기간 매핑
     const periodMap: Record<LeaderboardPeriod, ReputationPeriod> = {
-      'l7': ReputationPeriod.L7,
-      'l30': ReputationPeriod.L30,
-      'l90': ReputationPeriod.L90,
-      'all': ReputationPeriod.ALL_TIME,
+      l7: ReputationPeriod.L7,
+      l30: ReputationPeriod.L30,
+      l90: ReputationPeriod.L90,
+      all: ReputationPeriod.ALL_TIME,
     };
     const repPeriod = periodMap[period] || ReputationPeriod.L7;
 
     // 해당 기간의 모든 사용자 점수 조회
     const totals = await this.totalRepository.find({
       where: { period: repPeriod },
-      order: { decayedScore: 'DESC' },
+      order: { decayedScore: "DESC" },
     });
 
     // Redis Sorted Set 키
@@ -105,7 +106,7 @@ export class LeaderboardService {
     const key = repKeys.leaderboard(period);
 
     // Redis에서 상위 N명 조회 (점수와 함께)
-    const results = await this.redis.zrevrange(key, 0, limit - 1, 'WITHSCORES');
+    const results = await this.redis.zrevrange(key, 0, limit - 1, "WITHSCORES");
 
     // 결과 파싱: [userId1, score1, userId2, score2, ...]
     const entries: LeaderboardEntryDto[] = [];
@@ -131,10 +132,10 @@ export class LeaderboardService {
       entries.push({
         rank,
         userId,
-        username: userInfo?.username || 'Unknown',
+        username: userInfo?.username || "Unknown",
         avatarUrl: userInfo?.avatarUrl,
         score: Math.round(score * 100) / 100,
-        titles: titles.map(t => t.code),
+        titles: titles.map((t) => t.code),
       });
 
       rank++;
@@ -149,7 +150,6 @@ export class LeaderboardService {
       lastUpdatedAt: new Date(),
       totalParticipants,
     };
-
   }
 
   /**
@@ -210,10 +210,10 @@ export class LeaderboardService {
     totals: Array<{ period: ReputationPeriod; decayedScore: number }>,
   ): Promise<void> {
     const periodMap: Record<ReputationPeriod, LeaderboardPeriod> = {
-      [ReputationPeriod.L7]: 'l7',
-      [ReputationPeriod.L30]: 'l30',
-      [ReputationPeriod.L90]: 'l90',
-      [ReputationPeriod.ALL_TIME]: 'all',
+      [ReputationPeriod.L7]: "l7",
+      [ReputationPeriod.L30]: "l30",
+      [ReputationPeriod.L90]: "l90",
+      [ReputationPeriod.ALL_TIME]: "all",
     };
 
     const pipeline = this.redis.pipeline();
@@ -240,9 +240,9 @@ export class LeaderboardService {
     }
 
     const users = await this.userRepository
-      .createQueryBuilder('user')
-      .leftJoinAndSelect('user.profile', 'profile')
-      .where('user.id IN (:...userIds)', { userIds })
+      .createQueryBuilder("user")
+      .leftJoinAndSelect("user.profile", "profile")
+      .where("user.id IN (:...userIds)", { userIds })
       .getMany();
 
     const map = new Map<string, { username: string; avatarUrl?: string }>();

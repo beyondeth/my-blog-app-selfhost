@@ -34,7 +34,7 @@ export class MetricsController {
   async getMetrics(@Req() req: Request): Promise<string> {
     const clientIP = req.ip || req.connection.remoteAddress || "";
     console.log(`[MetricsController] Admin access granted for IP: ${clientIP}`);
-    
+
     return register.metrics();
   }
 }

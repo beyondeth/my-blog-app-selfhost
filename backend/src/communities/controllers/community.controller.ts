@@ -47,7 +47,11 @@ import { CurrentUser } from "../../common/decorators/current-user.decorator";
 import { User } from "../../users/entities/user.entity";
 import { Community } from "../entities/community.entity";
 import { CommunityRole, FlairType } from "../enums";
-import { CommunityService, CommunityMembershipService, CommunityPostService } from "../services";
+import {
+  CommunityService,
+  CommunityMembershipService,
+  CommunityPostService,
+} from "../services";
 import { ContextualFileService } from "../../files/services/contextual-file.service";
 import {
   CreateCommunityDto,
@@ -104,7 +108,10 @@ export class CommunityController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "커뮤니티 목록 조회 (커서 페이지네이션)" })
   @ApiResponse({ status: 200, description: "커뮤니티 목록 반환" })
-  async findAll(@Query() query: GetCommunitiesQueryDto, @Request() req: { user?: { id: string } }) {
+  async findAll(
+    @Query() query: GetCommunitiesQueryDto,
+    @Request() req: { user?: { id: string } },
+  ) {
     const userId = req.user?.id;
     const result = await this.communityService.findAll(query, userId);
 
@@ -123,15 +130,17 @@ export class CommunityController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "커뮤니티별 최신 게시글 일괄 조회 (Batch API)" })
   @ApiResponse({ status: 200, description: "커뮤니티별 최신 게시글 맵 반환" })
-  async getRecentPostsBatch(
-    @Query("ids") ids: string,
-  ) {
+  async getRecentPostsBatch(@Query("ids") ids: string) {
     if (!ids) {
       return { success: true, data: {} };
     }
 
-    const communityIds = ids.split(",").map((id) => id.trim()).filter((id) => id.length > 0);
-    const postMap = await this.postService.getRecentPostsForCommunities(communityIds);
+    const communityIds = ids
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id.length > 0);
+    const postMap =
+      await this.postService.getRecentPostsForCommunities(communityIds);
 
     // Map -> Object 변환 (JSON 응답용)
     const data: Record<string, any[]> = {};

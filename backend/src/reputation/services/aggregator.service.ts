@@ -17,12 +17,12 @@
  * @see DailyAggregateJob
  * @see ReputationTotal
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ReputationTotal } from '../entities/reputation-total.entity';
-import { ReputationLedger } from '../entities/reputation-ledger.entity';
-import { ReputationPeriod, PERIOD_DAYS } from '../enums/reputation-period.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ReputationTotal } from "../entities/reputation-total.entity";
+import { ReputationLedger } from "../entities/reputation-ledger.entity";
+import { ReputationPeriod, PERIOD_DAYS } from "../enums/reputation-period.enum";
 
 /**
  * 감쇠율 상수
@@ -47,7 +47,7 @@ export class AggregatorService {
    * Cron job에서 호출됩니다.
    */
   async aggregateAll(): Promise<void> {
-    this.logger.log('전체 집계 시작');
+    this.logger.log("전체 집계 시작");
     const startTime = Date.now();
 
     // 모든 기간에 대해 순차적으로 집계
@@ -69,23 +69,29 @@ export class AggregatorService {
    */
   async aggregateUser(
     userId: string,
-  ): Promise<Array<{ period: ReputationPeriod; score: number; decayedScore: number }>> {
+  ): Promise<
+    Array<{ period: ReputationPeriod; score: number; decayedScore: number }>
+  > {
     const now = new Date();
-    const results: Array<{ period: ReputationPeriod; score: number; decayedScore: number }> = [];
+    const results: Array<{
+      period: ReputationPeriod;
+      score: number;
+      decayedScore: number;
+    }> = [];
 
     for (const period of Object.values(ReputationPeriod)) {
       const days = PERIOD_DAYS[period];
-      const startDate = days === null ? new Date('2020-01-01') : new Date(now);
+      const startDate = days === null ? new Date("2020-01-01") : new Date(now);
       if (days !== null) {
         startDate.setDate(startDate.getDate() - days);
       }
 
       const ledgers = await this.ledgerRepository
-        .createQueryBuilder('ledger')
-        .select(['ledger.delta', 'ledger.recordedAt'])
-        .where('ledger.userId = :userId', { userId })
-        .andWhere('ledger.recordedAt >= :startDate', { startDate })
-        .andWhere('ledger.recordedAt <= :endDate', { endDate: now })
+        .createQueryBuilder("ledger")
+        .select(["ledger.delta", "ledger.recordedAt"])
+        .where("ledger.userId = :userId", { userId })
+        .andWhere("ledger.recordedAt >= :startDate", { startDate })
+        .andWhere("ledger.recordedAt <= :endDate", { endDate: now })
         .getMany();
 
       let score = 0;
@@ -129,7 +135,7 @@ export class AggregatorService {
     let startDate: Date;
     if (days === null) {
       // ALL_TIME: 매우 오래된 날짜부터
-      startDate = new Date('2020-01-01');
+      startDate = new Date("2020-01-01");
     } else {
       startDate = new Date(now);
       startDate.setDate(startDate.getDate() - days);
@@ -146,7 +152,6 @@ export class AggregatorService {
     if (userScores.length > 0) {
       await this.bulkUpsertTotals(userScores, period);
     }
-
 
     this.logger.log(
       `기간별 집계 완료: ${period}, 처리된 사용자 수: ${userScores.length}`,
@@ -168,10 +173,10 @@ export class AggregatorService {
   ): Promise<Array<{ userId: string; score: number; decayedScore: number }>> {
     // 해당 기간의 모든 ledger 조회
     const ledgers = await this.ledgerRepository
-      .createQueryBuilder('ledger')
-      .select(['ledger.userId', 'ledger.delta', 'ledger.recordedAt'])
-      .where('ledger.recordedAt >= :startDate', { startDate })
-      .andWhere('ledger.recordedAt <= :endDate', { endDate })
+      .createQueryBuilder("ledger")
+      .select(["ledger.userId", "ledger.delta", "ledger.recordedAt"])
+      .where("ledger.recordedAt >= :startDate", { startDate })
+      .andWhere("ledger.recordedAt <= :endDate", { endDate })
       .getMany();
 
     // 사용자별로 그룹핑하여 점수 계산
@@ -266,9 +271,12 @@ export class AggregatorService {
     await this.totalRepository
       .createQueryBuilder()
       .insert()
-      .into('reputation_total')
+      .into("reputation_total")
       .values(values)
-      .orUpdate(['score', 'decayed_score', 'last_computed_at'], ['user_id', 'period'])
+      .orUpdate(
+        ["score", "decayed_score", "last_computed_at"],
+        ["user_id", "period"],
+      )
       .execute();
   }
 
@@ -283,7 +291,6 @@ export class AggregatorService {
    * @param decayedScore 감쇠 적용 점수
    */
   private async upsertTotal(
-
     userId: string,
     period: ReputationPeriod,
     score: number,
@@ -337,7 +344,7 @@ export class AggregatorService {
   ): Promise<ReputationTotal[]> {
     return this.totalRepository.find({
       where: { period },
-      order: { decayedScore: 'DESC' },
+      order: { decayedScore: "DESC" },
       take: limit,
     });
   }

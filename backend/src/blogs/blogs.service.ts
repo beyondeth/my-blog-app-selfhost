@@ -1069,4 +1069,3 @@ export class BlogsService {
     return blog ? { id: blog.id, userId: blog.userId } : null;
   }
 }
-

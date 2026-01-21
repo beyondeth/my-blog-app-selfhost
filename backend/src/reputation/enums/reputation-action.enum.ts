@@ -12,14 +12,14 @@ export enum ReputationAction {
    * 사용자가 블로그 포스트를 작성하고 발행했을 때 부여
    * 기본 점수: +10
    */
-  POST_PUBLISHED = 'POST_PUBLISHED',
+  POST_PUBLISHED = "POST_PUBLISHED",
 
   /**
    * 댓글 작성
    * 사용자가 포스트에 댓글을 달았을 때 부여
    * 기본 점수: +3
    */
-  COMMENT_ADDED = 'COMMENT_ADDED',
+  COMMENT_ADDED = "COMMENT_ADDED",
 
   /**
    * 좋아요 수신
@@ -27,7 +27,7 @@ export enum ReputationAction {
    * 기본 점수: +2
    * 주의: 셀프 좋아요는 차단됨
    */
-  LIKE_RECEIVED = 'LIKE_RECEIVED',
+  LIKE_RECEIVED = "LIKE_RECEIVED",
 
   /**
    * 북마크 수신
@@ -35,21 +35,21 @@ export enum ReputationAction {
    * 기본 점수: +1
    * 주의: 셀프 북마크는 차단됨
    */
-  BOOKMARK_RECEIVED = 'BOOKMARK_RECEIVED',
+  BOOKMARK_RECEIVED = "BOOKMARK_RECEIVED",
 
   /**
    * 유효한 신고
    * 사용자가 제출한 신고가 관리자에 의해 유효함으로 처리되었을 때 부여
    * 기본 점수: +5
    */
-  REPORT_VALID = 'REPORT_VALID',
+  REPORT_VALID = "REPORT_VALID",
 
   /**
    * Editor's Pick 선정
    * 관리자가 포스트를 Editor's Pick으로 선정했을 때 부여
    * 기본 점수: +30
    */
-  EDITOR_PICKED = 'EDITOR_PICKED',
+  EDITOR_PICKED = "EDITOR_PICKED",
 }
 
 /**

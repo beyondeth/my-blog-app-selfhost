@@ -56,18 +56,36 @@ export function Avatar({
   const showFallback = !imageUrl || imageError;
 
   if (showFallback) {
-    // Always use default icon fallback for users without profile image
+    // fallback 문자열이 있으면 첫 글자 사용 (커뮤니티/사용자 이름)
+    const fallbackLetter = fallback?.charAt(0)?.toUpperCase();
+    
     return (
       <div
         className={cn(
           sizeClasses[size],
-          'rounded-full bg-gray-200 flex items-center justify-center',
-          onClick && 'cursor-pointer hover:bg-gray-300 transition-colors',
+          'rounded-full flex items-center justify-center',
+          fallbackLetter
+            ? 'bg-gradient-to-br from-gray-200 to-gray-300 dark:from-gray-700 dark:to-gray-600'
+            : 'bg-gray-200',
+          onClick && 'cursor-pointer hover:opacity-90 transition-opacity',
           className
         )}
         onClick={onClick}
       >
-        <FiUser className={cn(iconSizes[size], 'text-gray-400')} />
+        {fallbackLetter ? (
+          <span className={cn(
+            'font-bold text-gray-500 dark:text-gray-400',
+            size === 'xs' && 'text-xs',
+            size === 'sm' && 'text-sm',
+            size === 'md' && 'text-base',
+            size === 'lg' && 'text-lg',
+            size === 'xl' && 'text-xl',
+          )}>
+            {fallbackLetter}
+          </span>
+        ) : (
+          <FiUser className={cn(iconSizes[size], 'text-gray-400')} />
+        )}
       </div>
     );
   }

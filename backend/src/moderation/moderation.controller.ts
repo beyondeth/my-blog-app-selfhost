@@ -28,7 +28,8 @@ export class ModerationController {
   @ApiOperation({ summary: "유저 계정 정지" })
   async banUser(
     @CurrentUser() admin: User,
-    @Body() body: { userId: string; reason: string; memo?: string; evidence?: any },
+    @Body()
+    body: { userId: string; reason: string; memo?: string; evidence?: any },
   ) {
     return this.moderationService.banUser(
       admin.id,
@@ -43,7 +44,8 @@ export class ModerationController {
   @ApiOperation({ summary: "IP 차단" })
   async blockIp(
     @CurrentUser() admin: User,
-    @Body() body: { ip: string; reason: string; memo?: string; userId?: string },
+    @Body()
+    body: { ip: string; reason: string; memo?: string; userId?: string },
   ) {
     return this.moderationService.blockIp(
       admin.id,
@@ -56,10 +58,7 @@ export class ModerationController {
 
   @Post("unblock-ip")
   @ApiOperation({ summary: "IP 차단 해제" })
-  async unblockIp(
-    @CurrentUser() admin: User,
-    @Body() body: { ip: string },
-  ) {
+  async unblockIp(@CurrentUser() admin: User, @Body() body: { ip: string }) {
     return this.moderationService.unblockIp(admin.id, body.ip);
   }
 
@@ -67,7 +66,13 @@ export class ModerationController {
   @ApiOperation({ summary: "유저 계정 일시 정지" })
   async suspendUser(
     @CurrentUser() admin: User,
-    @Body() body: { userId: string; durationDays: number; reason: string; memo?: string },
+    @Body()
+    body: {
+      userId: string;
+      durationDays: number;
+      reason: string;
+      memo?: string;
+    },
   ) {
     return this.moderationService.suspendUser(
       admin.id,
@@ -103,7 +108,7 @@ export class ModerationController {
   @ApiOperation({ summary: "모더레이션 컨텍스트 조회 (IP 포함)" })
   async getContext(
     @CurrentUser() admin: User,
-    @Param("type") type: "post" | "comment", 
+    @Param("type") type: "post" | "comment",
     @Param("id") id: string,
   ) {
     return this.moderationService.getModerationContext(type, id, admin.id);

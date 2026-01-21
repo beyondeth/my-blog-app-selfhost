@@ -9,12 +9,12 @@
  * @see BlogEventEmitter
  * @see ReputationQueueService
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { BlogEvent } from '../../common/events/blog-events.enum';
-import { BlogPostEvent } from '../../common/events/dto/blog-event.dto';
-import { ReputationQueueService } from '../queues/reputation-queue.service';
-import { ReputationAction } from '../enums/reputation-action.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { BlogEvent } from "../../common/events/blog-events.enum";
+import { BlogPostEvent } from "../../common/events/dto/blog-event.dto";
+import { ReputationQueueService } from "../queues/reputation-queue.service";
+import { ReputationAction } from "../enums/reputation-action.enum";
 
 @Injectable()
 export class PostEventsListener {
@@ -40,7 +40,7 @@ export class PostEventsListener {
       await this.queueService.addReputationEvent({
         action: ReputationAction.POST_PUBLISHED,
         userId: payload.userId,
-        targetType: 'post',
+        targetType: "post",
         targetId: payload.postId,
         occurredAt: new Date(),
         metadata: {
@@ -60,4 +60,3 @@ export class PostEventsListener {
     }
   }
 }
-

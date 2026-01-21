@@ -137,18 +137,21 @@ describe("CommunityCommentService", () => {
         select: ["id", "communityId"],
       });
 
-      expect(mockManager.create).toHaveBeenCalledWith(CommunityComment, expect.objectContaining({
-        postId,
-        authorId,
-        content: dto.content,
-        communityId: communityId, // Critical assertion: communityId must be populated
-      }));
+      expect(mockManager.create).toHaveBeenCalledWith(
+        CommunityComment,
+        expect.objectContaining({
+          postId,
+          authorId,
+          content: dto.content,
+          communityId: communityId, // Critical assertion: communityId must be populated
+        }),
+      );
 
       expect(mockManager.increment).toHaveBeenCalledWith(
         CommunityPost,
         { id: postId },
         "commentCount",
-        1
+        1,
       );
     });
 
@@ -156,7 +159,7 @@ describe("CommunityCommentService", () => {
       mockPostRepository.findOne.mockResolvedValue(null);
 
       await expect(service.create(postId, dto, authorId)).rejects.toThrow(
-        NotFoundException
+        NotFoundException,
       );
     });
   });
@@ -183,7 +186,7 @@ describe("CommunityCommentService", () => {
         // relations: ["post"] should NOT be present
       });
       expect(mockCommentRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ content: dto.content })
+        expect.objectContaining({ content: dto.content }),
       );
     });
   });
@@ -201,7 +204,7 @@ describe("CommunityCommentService", () => {
       };
 
       mockCommentRepository.findOne.mockResolvedValue(mockComment);
-      
+
       const mockManager = {
         save: jest.fn(),
         update: jest.fn().mockReturnThis(),
@@ -218,7 +221,7 @@ describe("CommunityCommentService", () => {
       };
 
       mockDataSource.transaction.mockImplementation(async (cb) => {
-         return cb(mockManager);
+        return cb(mockManager);
       });
 
       await service.delete(commentId, userId);
@@ -227,7 +230,7 @@ describe("CommunityCommentService", () => {
         where: { id: commentId },
         // relations: ["post"] should NOT be present
       });
-      
+
       // Verify communityId access from comment object (not comment.post.communityId)
       // This is implicit if the code doesn't crash accessing property of undefined 'post'
     });

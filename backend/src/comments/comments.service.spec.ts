@@ -25,7 +25,7 @@ describe("CommentsService", () => {
   let commentsRepository: Repository<Comment>;
   let postsService: PostsService;
   let blogResolverService: BlogResolverService;
-  
+
   const mockComment = {
     id: "comment-uuid",
     author: { id: "user-uuid" },
@@ -127,7 +127,7 @@ describe("CommentsService", () => {
       mockPostsService.findOne.mockResolvedValue(mockPost);
       mockBlogResolverService.findBlogById.mockResolvedValue(mockBlog);
       mockCommentsRepository.create.mockImplementation((data) => data);
-      
+
       const savedComment = {
         id: "comment-uuid",
         createdAt: new Date(),
@@ -144,15 +144,19 @@ describe("CommentsService", () => {
       const result = await service.create(createCommentDto, mockUser);
 
       // Assert
-      expect(mockPostsService.findOne).toHaveBeenCalledWith(createCommentDto.postId);
+      expect(mockPostsService.findOne).toHaveBeenCalledWith(
+        createCommentDto.postId,
+      );
       expect(mockBlogResolverService.findBlogById).toHaveBeenCalledWith(blogId);
-      
-      expect(mockCommentsRepository.create).toHaveBeenCalledWith(expect.objectContaining({
-        content: createCommentDto.content,
-        post: { id: createCommentDto.postId },
-        blogId: blogId, // Critical assertion: blogId must be populated
-        author: mockUser,
-      }));
+
+      expect(mockCommentsRepository.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          content: createCommentDto.content,
+          post: { id: createCommentDto.postId },
+          blogId: blogId, // Critical assertion: blogId must be populated
+          author: mockUser,
+        }),
+      );
       expect(mockCommentsRepository.findOne).toHaveBeenCalledWith({
         where: { id: savedComment.id },
         relations: ["author", "author.profile"],
@@ -163,7 +167,7 @@ describe("CommentsService", () => {
       mockPostsService.findOne.mockResolvedValue(null);
 
       await expect(service.create(createCommentDto, mockUser)).rejects.toThrow(
-        NotFoundException
+        NotFoundException,
       );
     });
 
@@ -181,7 +185,7 @@ describe("CommentsService", () => {
       mockBlogResolverService.findBlogById.mockResolvedValue(mockBlog);
 
       await expect(service.create(createCommentDto, mockUser)).rejects.toThrow(
-        ForbiddenException
+        ForbiddenException,
       );
     });
   });
@@ -199,10 +203,10 @@ describe("CommentsService", () => {
         relations: ["author"],
       });
       expect(mockCommentsRepository.save).toHaveBeenCalledWith(
-        expect.objectContaining({ isDeleted: true })
+        expect.objectContaining({ isDeleted: true }),
       );
       expect(mockPostsService.decrementCommentCount).toHaveBeenCalledWith(
-        mockComment.postId
+        mockComment.postId,
       );
     });
 
@@ -213,7 +217,7 @@ describe("CommentsService", () => {
       mockCommentsRepository.findOne.mockResolvedValue(mockComment);
 
       await expect(service.remove(commentId, user)).rejects.toThrow(
-        ForbiddenException
+        ForbiddenException,
       );
     });
   });

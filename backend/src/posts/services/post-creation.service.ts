@@ -806,10 +806,13 @@ export class PostCreationService {
       });
 
       if (wasEditorPick) {
-        this.eventEmitter.emit(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, {
-          postId: id,
-          isPicked: false,
-        });
+        this.eventEmitter.emit(
+          CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED,
+          {
+            postId: id,
+            isPicked: false,
+          },
+        );
       }
 
       // 7. 비동기 정리 작업 (비디오 파일 R2 삭제 포함)

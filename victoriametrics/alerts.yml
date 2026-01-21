@@ -246,14 +246,14 @@ groups:
 
       # Redis 메모리 높음
       - alert: RedisHighMemory
-        expr: container_memory_usage_bytes{name=~".*redis.*"} > 4.3 * 1024 * 1024 * 1024
+        expr: container_memory_usage_bytes{name=~".*redis.*"} > 1.6 * 1024 * 1024 * 1024
         for: 5m
         labels:
           severity: warning
           component: redis
         annotations:
           summary: "Redis 메모리 사용량 높음"
-          description: "현재 사용량: {{ $value | humanize1024 }}B (제한: 4.5GB)"
+          description: "현재 사용량: {{ $value | humanize1024 }}B (제한: 2GB)"
 
       # Backend 메모리 높음 (PM2)
       - alert: BackendHighMemory

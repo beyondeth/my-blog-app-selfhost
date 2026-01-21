@@ -115,8 +115,12 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     // BullMQ configuration for Redis connection
     BullModule.forRoot({
       connection: {
-        host: process.env.REDIS_HOST || "localhost",
-        port: parseInt(process.env.REDIS_PORT || "6379"),
+        // Core Redis only: queue data must not be evicted.
+        host:
+          process.env.REDIS_CORE_HOST || process.env.REDIS_HOST || "localhost",
+        port: parseInt(
+          process.env.REDIS_CORE_PORT || process.env.REDIS_PORT || "6379",
+        ),
       },
     }),
 
@@ -188,8 +192,6 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
-    consumer
-      .apply(IpBlockMiddleware)
-      .forRoutes('*');
+    consumer.apply(IpBlockMiddleware).forRoutes("*");
   }
 }

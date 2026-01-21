@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class RemoveDuplicateWidgets1801000000000 implements MigrationInterface {
   public async up(queryRunner: QueryRunner): Promise<void> {
@@ -29,6 +29,8 @@ export class RemoveDuplicateWidgets1801000000000 implements MigrationInterface {
   }
 
   public async down(queryRunner: QueryRunner): Promise<void> {
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_community_widget_singleton"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_community_widget_singleton"`,
+    );
   }
 }

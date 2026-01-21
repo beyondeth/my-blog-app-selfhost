@@ -1,15 +1,15 @@
 /**
  * 평판 시스템 - AggregatorService 단위 테스트
  */
-import { Test, TestingModule } from '@nestjs/testing';
-import { getRepositoryToken } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { AggregatorService } from '../services/aggregator.service';
-import { ReputationLedger } from '../entities/reputation-ledger.entity';
-import { ReputationTotal } from '../entities/reputation-total.entity';
-import { ReputationPeriod, PERIOD_DAYS } from '../enums/reputation-period.enum';
+import { Test, TestingModule } from "@nestjs/testing";
+import { getRepositoryToken } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { AggregatorService } from "../services/aggregator.service";
+import { ReputationLedger } from "../entities/reputation-ledger.entity";
+import { ReputationTotal } from "../entities/reputation-total.entity";
+import { ReputationPeriod, PERIOD_DAYS } from "../enums/reputation-period.enum";
 
-describe('AggregatorService', () => {
+describe("AggregatorService", () => {
   let service: AggregatorService;
   let ledgerRepository: jest.Mocked<Repository<ReputationLedger>>;
   let totalRepository: jest.Mocked<Repository<ReputationTotal>>;
@@ -47,10 +47,10 @@ describe('AggregatorService', () => {
     jest.clearAllMocks();
   });
 
-  describe('getUserScore', () => {
-    const userId = 'user-123';
+  describe("getUserScore", () => {
+    const userId = "user-123";
 
-    it('사용자 점수가 정상적으로 조회되어야 함', async () => {
+    it("사용자 점수가 정상적으로 조회되어야 함", async () => {
       const mockTotal = {
         userId,
         period: ReputationPeriod.L7,
@@ -68,7 +68,7 @@ describe('AggregatorService', () => {
       });
     });
 
-    it('점수가 없는 사용자는 null을 반환해야 함', async () => {
+    it("점수가 없는 사용자는 null을 반환해야 함", async () => {
       mockTotalRepository.findOne.mockResolvedValue(null);
 
       const result = await service.getUserScore(userId, ReputationPeriod.L7);
@@ -77,11 +77,11 @@ describe('AggregatorService', () => {
     });
   });
 
-  describe('getTopUsersByPeriod', () => {
-    it('상위 사용자 목록을 반환해야 함', async () => {
+  describe("getTopUsersByPeriod", () => {
+    it("상위 사용자 목록을 반환해야 함", async () => {
       const mockUsers = [
-        { userId: 'user-1', period: ReputationPeriod.L7, decayedScore: 100 },
-        { userId: 'user-2', period: ReputationPeriod.L7, decayedScore: 80 },
+        { userId: "user-1", period: ReputationPeriod.L7, decayedScore: 100 },
+        { userId: "user-2", period: ReputationPeriod.L7, decayedScore: 80 },
       ];
 
       mockTotalRepository.find.mockResolvedValue(mockUsers);
@@ -91,14 +91,14 @@ describe('AggregatorService', () => {
       expect(result).toEqual(mockUsers);
       expect(mockTotalRepository.find).toHaveBeenCalledWith({
         where: { period: ReputationPeriod.L7 },
-        order: { decayedScore: 'DESC' },
+        order: { decayedScore: "DESC" },
         take: 10,
       });
     });
   });
 
-  describe('PERIOD_DAYS (exported constant)', () => {
-    it('각 기간에 올바른 일수가 매핑되어야 함', () => {
+  describe("PERIOD_DAYS (exported constant)", () => {
+    it("각 기간에 올바른 일수가 매핑되어야 함", () => {
       expect(PERIOD_DAYS[ReputationPeriod.L7]).toBe(7);
       expect(PERIOD_DAYS[ReputationPeriod.L30]).toBe(30);
       expect(PERIOD_DAYS[ReputationPeriod.L90]).toBe(90);

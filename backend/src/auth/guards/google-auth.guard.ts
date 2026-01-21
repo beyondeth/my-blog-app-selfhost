@@ -18,7 +18,7 @@ export class GoogleAuthGuard extends AuthGuard("google") {
     if (err || !user) {
       // 에러 코드 및 메시지 추출
       const errorCode = err?.response?.code || "auth_failed";
-      // 메시지 인코딩 강화 
+      // 메시지 인코딩 강화
       const errorMessage = encodeURIComponent(
         err?.response?.message || err?.message || "로그인 실패",
       );

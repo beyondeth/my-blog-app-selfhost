@@ -8,7 +8,12 @@ import {
   ForbiddenException,
   Logger,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth } from "@nestjs/swagger";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { User } from "../users/entities/user.entity";
@@ -119,9 +124,7 @@ export class BlogStatsController {
       this.logger.warn(
         `Unauthorized stats access attempt: user ${user.id} tried to access blog ${blog.id}`,
       );
-      throw new ForbiddenException(
-        "본인의 블로그 통계만 조회할 수 있습니다",
-      );
+      throw new ForbiddenException("본인의 블로그 통계만 조회할 수 있습니다");
     }
 
     return blog;

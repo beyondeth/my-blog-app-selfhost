@@ -9,11 +9,11 @@
  * @see PostInteractionEvents
  * @see ReputationQueueService
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { PostInteractionEvents } from '../../posts/events/post-interaction.events';
-import { ReputationQueueService } from '../queues/reputation-queue.service';
-import { ReputationAction } from '../enums/reputation-action.enum';
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { PostInteractionEvents } from "../../posts/events/post-interaction.events";
+import { ReputationQueueService } from "../queues/reputation-queue.service";
+import { ReputationAction } from "../enums/reputation-action.enum";
 
 /**
  * 댓글 추가 이벤트 페이로드
@@ -51,7 +51,7 @@ export class CommentEventsListener {
       await this.queueService.addReputationEvent({
         action: ReputationAction.COMMENT_ADDED,
         userId: payload.authorId,
-        targetType: 'comment',
+        targetType: "comment",
         targetId: payload.commentId,
         occurredAt: payload.timestamp,
         metadata: {
@@ -70,4 +70,3 @@ export class CommentEventsListener {
     }
   }
 }
-

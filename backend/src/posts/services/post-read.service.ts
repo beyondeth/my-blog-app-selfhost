@@ -86,8 +86,7 @@ export class PostReadService {
       .where("post.blogId = :blogId", { blogId })
       .andWhere("post.id != :postId", { postId }) // 현재 포스트 제외
       .andWhere("post.isPublished = true")
-      .andWhere("post.isDeleted = false")
-
+      .andWhere("post.isDeleted = false");
 
     // 카테고리 또는 태그 조건 (OR 로직)
     const conditions: string[] = [];
@@ -118,10 +117,10 @@ export class PostReadService {
     // 3. 인기 기반 조회 (조회수 높은 순)
     // 이미 뽑힌 relatedPosts 제외
     const excludedIds = [postId, ...relatedPosts.map((p) => p.id)];
-    
+
     // 부족한 개수만큼 인기글로 채움
     const remainingLimit = limit - relatedPosts.length;
-    
+
     let popularPosts: Post[] = [];
     if (remainingLimit > 0) {
       popularPosts = await this.postsRepository
@@ -138,7 +137,7 @@ export class PostReadService {
         // PostStats와 조인하여 viewCount 정렬 (Index 활용 확인 필요하지만 일단 기능 구현)
         // Note: Post 엔티티에 viewCount 컬럼(역정규화)이 있다면 그것을 쓰는게 빠름.
         // Post 엔티티에 viewCount가 있으므로 그것을 사용.
-        .orderBy("post.viewCount", "DESC") 
+        .orderBy("post.viewCount", "DESC")
         .take(remainingLimit)
         .getMany();
     }
@@ -215,7 +214,9 @@ export class PostReadService {
 
       // 작성자 본인 또는 블로그 소유자만 접근 가능
       if (!user) {
-        this.logger.warn(`[findById] Unauthorized access attempt to draft post ${id}`);
+        this.logger.warn(
+          `[findById] Unauthorized access attempt to draft post ${id}`,
+        );
         throw new UnauthorizedException("로그인이 필요합니다.");
       }
 
@@ -224,7 +225,9 @@ export class PostReadService {
         post.blog.userId !== user.id &&
         user.role !== Role.ADMIN
       ) {
-        this.logger.warn(`[findById] Forbidden access attempt by user ${user.id} to draft post ${id}`);
+        this.logger.warn(
+          `[findById] Forbidden access attempt by user ${user.id} to draft post ${id}`,
+        );
         throw new ForbiddenException("접근 권한이 없습니다.");
       }
     }

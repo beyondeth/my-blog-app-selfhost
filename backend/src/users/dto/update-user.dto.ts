@@ -1,6 +1,13 @@
 import { PartialType, ApiPropertyOptional } from "@nestjs/swagger";
 import { CreateUserDto } from "./create-user.dto";
-import { IsOptional, IsDate, IsString, IsBoolean, IsArray, ValidateNested } from "class-validator";
+import {
+  IsOptional,
+  IsDate,
+  IsString,
+  IsBoolean,
+  IsArray,
+  ValidateNested,
+} from "class-validator";
 import { Type } from "class-transformer";
 import { SocialLinkDto } from "./social-link.dto";
 

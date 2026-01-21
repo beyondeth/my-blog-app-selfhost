@@ -4,16 +4,22 @@
  * Editor's Pick 선정 이벤트를 구독하여 작성자에게 평판 점수를 부여합니다.
  * - 포스트당 1회만 부여 (LedgerService에서 중복 차단)
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { OnEvent } from '@nestjs/event-emitter';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { CacheInvalidationEvents, EditorPickToggledEvent } from '../../common/events/cache.events';
-import { Post } from '../../posts/entities/post.entity';
-import { ReputationAction, REPUTATION_ACTION_SCORES } from '../enums/reputation-action.enum';
-import { LedgerService } from '../services/ledger.service';
-import { AggregatorService } from '../services/aggregator.service';
-import { LeaderboardService } from '../services/leaderboard.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { OnEvent } from "@nestjs/event-emitter";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import {
+  CacheInvalidationEvents,
+  EditorPickToggledEvent,
+} from "../../common/events/cache.events";
+import { Post } from "../../posts/entities/post.entity";
+import {
+  ReputationAction,
+  REPUTATION_ACTION_SCORES,
+} from "../enums/reputation-action.enum";
+import { LedgerService } from "../services/ledger.service";
+import { AggregatorService } from "../services/aggregator.service";
+import { LeaderboardService } from "../services/leaderboard.service";
 
 @Injectable()
 export class EditorPickEventsListener {
@@ -28,7 +34,9 @@ export class EditorPickEventsListener {
   ) {}
 
   @OnEvent(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED)
-  async handleEditorPickToggled(payload: EditorPickToggledEvent): Promise<void> {
+  async handleEditorPickToggled(
+    payload: EditorPickToggledEvent,
+  ): Promise<void> {
     if (!payload.isPicked) {
       return;
     }
@@ -36,7 +44,7 @@ export class EditorPickEventsListener {
     try {
       const post = await this.postRepository.findOne({
         where: { id: payload.postId },
-        select: ['id', 'authorId', 'isDeleted'],
+        select: ["id", "authorId", "isDeleted"],
       });
 
       if (!post) {
@@ -45,14 +53,16 @@ export class EditorPickEventsListener {
       }
 
       if (post.isDeleted) {
-        this.logger.warn(`삭제된 포스트는 점수 부여하지 않음: postId=${payload.postId}`);
+        this.logger.warn(
+          `삭제된 포스트는 점수 부여하지 않음: postId=${payload.postId}`,
+        );
         return;
       }
 
       const recorded = await this.ledgerService.record({
         userId: post.authorId,
         actionType: ReputationAction.EDITOR_PICKED,
-        targetType: 'post',
+        targetType: "post",
         targetId: post.id,
         delta: REPUTATION_ACTION_SCORES[ReputationAction.EDITOR_PICKED],
         metadata: {

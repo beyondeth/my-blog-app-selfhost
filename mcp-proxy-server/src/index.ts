@@ -28,33 +28,37 @@ const port = config.MCP_PROXY_PORT;
 // Prometheus 메트릭 서비스 초기화 (먼저 생성)
 const metricsService = new MetricsService();
 
-// Redis 인스턴스 생성 (OAuth + 캐시 공유)
-const redis = new Redis({
-  host: config.REDIS_HOST,
-  port: config.REDIS_PORT,
+// Redis Core: OAuth/session storage (noeviction).
+const redisCore = new Redis({
+  host: config.REDIS_CORE_HOST,
+  port: config.REDIS_CORE_PORT,
   password: config.REDIS_PASSWORD,
   maxRetriesPerRequest: 3,
   retryStrategy: (times) => Math.min(times * 100, 3000),
 });
 
-// Redis 캐시 서비스 초기화 (메트릭 서비스 주입)
+// Redis Cache: API key caching (evictable).
 const redisCache = new RedisCacheService(
   {
-    host: config.REDIS_HOST,
-    port: config.REDIS_PORT,
+    host: config.REDIS_CACHE_HOST,
+    port: config.REDIS_CACHE_PORT,
     password: config.REDIS_PASSWORD,
     ttl: config.API_KEY_CACHE_TTL,
   },
   metricsService
 );
 
-// OAuth 라우터 초기화 (Redis 인스턴스 공유)
-const { wellKnownRouter, oauthRouter, mcpRemoteRouter } = createOAuthRouter(redis, metricsService);
+// OAuth 라우터 초기화 (Core Redis 사용)
+const { wellKnownRouter, oauthRouter, mcpRemoteRouter } = createOAuthRouter(
+  redisCore,
+  metricsService
+);
 
 // Redis 연결 상태 모니터링 (10초마다)
 setInterval(() => {
-  const isConnected = redisCache.getConnectionStatus();
-  metricsService.updateRedisConnection(isConnected);
+  const isCoreConnected = redisCore.status === 'ready';
+  const isCacheConnected = redisCache.getConnectionStatus();
+  metricsService.updateRedisConnection(isCoreConnected && isCacheConnected);
 }, 10000);
 
 // 미들웨어 (⚠️ MCP 경로는 제외 - StreamableHTTPServerTransport가 raw stream 필요)
@@ -531,7 +535,7 @@ const shutdown = async (signal: string) => {
 
   // Redis 연결 종료 (캐시 + OAuth 공유 인스턴스)
   await redisCache.disconnect();
-  await redis.quit();
+  await redisCore.quit();
 
   server.close(() => {
     logger.info('✅ Server closed');

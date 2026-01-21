@@ -1,9 +1,9 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 export class AddHomeFeedPerformanceIndexes1800000000000
   implements MigrationInterface
 {
-  name = 'AddHomeFeedPerformanceIndexes1800000000000';
+  name = "AddHomeFeedPerformanceIndexes1800000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // Posts table index for unified feed query optimization

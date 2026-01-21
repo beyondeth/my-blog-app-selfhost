@@ -31,14 +31,14 @@ import { CacheModule } from "../cache/cache.module";
     CacheModule,
   ],
   providers: [
-    BlogResolverService, 
+    BlogResolverService,
     MaterializedViewService,
     IpSecurityService,
     IpRetentionService,
     IpAuditService,
   ],
   exports: [
-    BlogResolverService, 
+    BlogResolverService,
     MaterializedViewService,
     IpSecurityService,
     IpRetentionService,

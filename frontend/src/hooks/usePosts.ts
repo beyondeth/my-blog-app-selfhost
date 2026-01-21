@@ -429,7 +429,7 @@ export function useDeletePost() {
         });
       }
     }
-  }, [mutation.isSuccess, queryClient]);
+  }, [mutation.isSuccess, mutation.context, queryClient]);
 
   return mutation;
 }

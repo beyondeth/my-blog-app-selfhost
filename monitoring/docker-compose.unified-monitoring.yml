@@ -95,18 +95,36 @@ services:
   # ============================================
   # Redis Exporter - Redis 메트릭 수집 (개발 환경)
   # ============================================
-  redis-exporter:
+  redis-core-exporter:
     image: oliver006/redis_exporter:v1.62.0-alpine
-    container_name: codebase-dev-monitoring-redis-exporter
+    container_name: codebase-dev-monitoring-redis-core-exporter
     command:
       # CPU 9% 문제 해결: 과도한 메트릭 제거
-      - '--redis.addr=my-blog-app-shared-redis:6379'
+      - '--redis.addr=codebase-dev-redis-core:6379'
       - '--include-system-metrics=false'  # 시스템 메트릭 제외
     ports:
       - "127.0.0.1:9121:9121"  # Bind to localhost only for security
     networks:
       - monitoring
-      - my-blog-app-network  # Redis와 같은 네트워크 추가
+      - codebase-dev-network  # Redis와 같은 네트워크 추가
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:9121/metrics"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis-cache-exporter:
+    image: oliver006/redis_exporter:v1.62.0-alpine
+    container_name: codebase-dev-monitoring-redis-cache-exporter
+    command:
+      - '--redis.addr=codebase-dev-redis-cache:6379'
+      - '--include-system-metrics=false'
+    ports:
+      - "127.0.0.1:9122:9121"
+    networks:
+      - monitoring
+      - codebase-dev-network
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "wget", "--spider", "--quiet", "http://localhost:9121/metrics"]
@@ -126,9 +144,9 @@ networks:
   monitoring:
     driver: bridge
     name: codebase-monitoring-network
-  my-blog-app-network:
+  codebase-dev-network:
     external: true
-    name: my-blog-app-network  # 기존 Redis 네트워크 이름
+    name: codebase-dev-network  # Redis 네트워크 이름 (docker-compose.dev.yml)
 
 volumes:
   victoriametrics_data:

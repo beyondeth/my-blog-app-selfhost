@@ -6,16 +6,36 @@
 
 services:
   # ============================================
-  # Redis (공유 캐시 및 큐)
+  # Redis Core (queues, sessions, locks)
   # ============================================
-  redis:
+  redis-core:
     image: redis:7.4-alpine
-    container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis-core
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_CORE_PORT_PUBLIC:-6379}:6379"
     volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes --maxmemory 6gb --maxmemory-policy noeviction
+      - redis_core_data:/data
+    command: redis-server --appendonly yes --maxmemory 3gb --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - codebase_network
+    restart: unless-stopped
+
+  # ============================================
+  # Redis Cache (evictable data)
+  # ============================================
+  redis-cache:
+    image: redis:7.4-alpine
+    container_name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis-cache
+    ports:
+      - "${REDIS_CACHE_PORT_PUBLIC:-6380}:6379"
+    volumes:
+      - redis_cache_data:/data
+    command: redis-server --appendonly yes --maxmemory 3gb --maxmemory-policy allkeys-lru
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -68,7 +88,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      redis:
+      redis-core:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
     networks:
       - codebase_network
@@ -94,7 +116,9 @@ services:
     depends_on:
       backend:
         condition: service_started
-      redis:
+      redis-core:
+        condition: service_healthy
+      redis-cache:
         condition: service_healthy
     networks:
       - codebase_network
@@ -104,8 +128,10 @@ services:
 volumes:
   postgres_data:
     name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-postgres-data
-  redis_data:
-    name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis-data
+  redis_core_data:
+    name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis-core-data
+  redis_cache_data:
+    name: ${COMPOSE_PROJECT_NAME:-codebase-dev}-redis-cache-data
 
 networks:
   codebase_network:

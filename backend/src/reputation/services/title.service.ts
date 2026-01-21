@@ -12,16 +12,16 @@
  * @see TitleGrant
  * @see TitleCode
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, LessThan, MoreThan, IsNull, Or } from 'typeorm';
-import { TitleGrant } from '../entities/title-grant.entity';
-import { ReputationTotal } from '../entities/reputation-total.entity';
-import { TitleCode, TITLE_METADATA } from '../enums/title-code.enum';
-import { ReputationPeriod } from '../enums/reputation-period.enum';
-import { UnifiedRedisService } from '../../redis/unified-redis.service';
-import { repKeys, repTTL } from '../reputation.keys';
-import { TitleInfoDto } from '../dto/reputation-summary.dto';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository, LessThan, MoreThan, IsNull, Or } from "typeorm";
+import { TitleGrant } from "../entities/title-grant.entity";
+import { ReputationTotal } from "../entities/reputation-total.entity";
+import { TitleCode, TITLE_METADATA } from "../enums/title-code.enum";
+import { ReputationPeriod } from "../enums/reputation-period.enum";
+import { UnifiedRedisService } from "../../redis/unified-redis.service";
+import { repKeys, repTTL } from "../reputation.keys";
+import { TitleInfoDto } from "../dto/reputation-summary.dto";
 
 /**
  * 타이틀 부여 조건 정의
@@ -168,7 +168,7 @@ export class TitleService {
       titleCode: condition.code,
       expiresAt,
       context: {
-        grantedBy: 'system',
+        grantedBy: "system",
         version: 1,
       },
     });
@@ -221,7 +221,7 @@ export class TitleService {
     });
 
     // DTO 변환
-    const titles: TitleInfoDto[] = grants.map(grant => {
+    const titles: TitleInfoDto[] = grants.map((grant) => {
       const meta = TITLE_METADATA[grant.titleCode];
       return {
         code: grant.titleCode,
@@ -264,10 +264,7 @@ export class TitleService {
     const grants = await this.titleGrantRepository
       .createQueryBuilder("grant")
       .where("grant.userId IN (:...userIds)", { userIds })
-      .andWhere(
-        "(grant.expiresAt IS NULL OR grant.expiresAt > :now)",
-        { now },
-      )
+      .andWhere("(grant.expiresAt IS NULL OR grant.expiresAt > :now)", { now })
       .getMany();
 
     // userId별로 그룹화

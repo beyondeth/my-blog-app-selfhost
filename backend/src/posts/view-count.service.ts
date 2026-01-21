@@ -24,7 +24,8 @@ export class ViewCountService {
     private postsRepository: Repository<Post>,
     @InjectRepository(PostStats)
     private postStatsRepository: Repository<PostStats>,
-    @InjectRedis()
+    // Cache Redis: view buffers can be evicted without breaking core flows.
+    @InjectRedis("cache")
     private readonly redis: Redis,
     private readonly eventEmitter: EventEmitter2,
   ) {}

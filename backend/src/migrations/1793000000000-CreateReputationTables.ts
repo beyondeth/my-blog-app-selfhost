@@ -1,4 +1,4 @@
-import { MigrationInterface, QueryRunner } from 'typeorm';
+import { MigrationInterface, QueryRunner } from "typeorm";
 
 /**
  * 평판 시스템 테이블 생성 마이그레이션
@@ -9,7 +9,7 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * 3. title_grant - 타이틀 부여 이력
  */
 export class CreateReputationTables1793000000000 implements MigrationInterface {
-  name = 'CreateReputationTables1793000000000';
+  name = "CreateReputationTables1793000000000";
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     // 1. reputation_ledger 테이블 생성
@@ -108,16 +108,32 @@ export class CreateReputationTables1793000000000 implements MigrationInterface {
 
   public async down(queryRunner: QueryRunner): Promise<void> {
     // 외래 키 제거
-    await queryRunner.query(`ALTER TABLE "title_grant" DROP CONSTRAINT "FK_title_grant_user"`);
-    await queryRunner.query(`ALTER TABLE "reputation_total" DROP CONSTRAINT "FK_reputation_total_user"`);
-    await queryRunner.query(`ALTER TABLE "reputation_ledger" DROP CONSTRAINT "FK_reputation_ledger_user"`);
+    await queryRunner.query(
+      `ALTER TABLE "title_grant" DROP CONSTRAINT "FK_title_grant_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "reputation_total" DROP CONSTRAINT "FK_reputation_total_user"`,
+    );
+    await queryRunner.query(
+      `ALTER TABLE "reputation_ledger" DROP CONSTRAINT "FK_reputation_ledger_user"`,
+    );
 
     // 인덱스 제거
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_title_grant_user_code_expires"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_title_grant_code_expires"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_reputation_total_period_score"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_reputation_ledger_action_recorded"`);
-    await queryRunner.query(`DROP INDEX IF EXISTS "idx_reputation_ledger_user_recorded"`);
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_title_grant_user_code_expires"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_title_grant_code_expires"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_reputation_total_period_score"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_reputation_ledger_action_recorded"`,
+    );
+    await queryRunner.query(
+      `DROP INDEX IF EXISTS "idx_reputation_ledger_user_recorded"`,
+    );
 
     // 테이블 제거
     await queryRunner.query(`DROP TABLE IF EXISTS "title_grant"`);

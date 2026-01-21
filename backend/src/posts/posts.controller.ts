@@ -131,7 +131,12 @@ export class PostsController {
     @CurrentUser() user: User,
     @Ip() ip: string,
   ) {
-    const newPost = await this.postsService.create(createPostDto, user, undefined, ip);
+    const newPost = await this.postsService.create(
+      createPostDto,
+      user,
+      undefined,
+      ip,
+    );
     // 캐시 무효화는 EventEmitter를 통한 이벤트 기반으로 처리됨
     return newPost;
   }
@@ -690,8 +695,6 @@ export class PostsController {
 
     return result;
   }
-
-
 
   @Patch(":id")
   @UseGuards(JwtAuthGuard, RolesGuard)

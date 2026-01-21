@@ -44,6 +44,7 @@ export class PostInteractionService {
     private readonly redisLockService: RedisLockService,
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
+    // Core Redis: unique views and user view markers affect policy/analytics.
     @InjectRedis() private readonly redis: Redis,
   ) {}
 

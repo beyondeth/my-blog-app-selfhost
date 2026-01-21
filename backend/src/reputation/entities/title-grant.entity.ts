@@ -20,31 +20,35 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
-} from 'typeorm';
-import { TitleCode } from '../enums/title-code.enum';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { TitleCode } from "../enums/title-code.enum";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('title_grant')
-@Index('idx_title_grant_code_expires', ['titleCode', 'expiresAt'])
-@Index('idx_title_grant_user_code_expires', ['userId', 'titleCode', 'expiresAt'])
+@Entity("title_grant")
+@Index("idx_title_grant_code_expires", ["titleCode", "expiresAt"])
+@Index("idx_title_grant_user_code_expires", [
+  "userId",
+  "titleCode",
+  "expiresAt",
+])
 export class TitleGrant {
   /**
    * 기본 키 (UUID)
    */
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   /**
    * 타이틀을 받는 사용자 ID
    */
-  @Column({ type: 'uuid', name: 'user_id' })
+  @Column({ type: "uuid", name: "user_id" })
   userId: string;
 
   /**
    * 사용자 관계
    */
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "user_id" })
   user: User;
 
   /**
@@ -52,9 +56,9 @@ export class TitleGrant {
    * 부여된 타이틀의 종류
    */
   @Column({
-    type: 'varchar',
+    type: "varchar",
     length: 50,
-    name: 'title_code',
+    name: "title_code",
   })
   titleCode: TitleCode;
 
@@ -62,7 +66,7 @@ export class TitleGrant {
    * 부여 시각
    * 타이틀이 처음 부여된 시점
    */
-  @CreateDateColumn({ name: 'granted_at' })
+  @CreateDateColumn({ name: "granted_at" })
   grantedAt: Date;
 
   /**
@@ -70,7 +74,7 @@ export class TitleGrant {
    * null이면 영구 타이틀
    * 이 시각 이후에는 타이틀이 비활성화됨
    */
-  @Column({ type: 'timestamp', name: 'expires_at', nullable: true })
+  @Column({ type: "timestamp", name: "expires_at", nullable: true })
   expiresAt: Date | null;
 
   /**
@@ -78,7 +82,7 @@ export class TitleGrant {
    * 타이틀 부여 시점의 관련 정보
    * 예: { score: 1500, rank: 5, percentile: 95 }
    */
-  @Column({ type: 'jsonb', nullable: true })
+  @Column({ type: "jsonb", nullable: true })
   context: Record<string, any> | null;
 
   /**

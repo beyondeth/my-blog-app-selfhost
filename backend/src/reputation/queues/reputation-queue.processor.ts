@@ -10,12 +10,12 @@
  * @see ReputationQueueService
  * @see LedgerService
  */
-import { Processor, WorkerHost, OnWorkerEvent } from '@nestjs/bullmq';
-import { Logger, Injectable } from '@nestjs/common';
-import { Job } from 'bullmq';
-import { REPUTATION_QUEUE, ReputationJobName } from './reputation.queue';
-import { ReputationEventData } from './reputation-queue.service';
-import { LedgerService } from '../services/ledger.service';
+import { Processor, WorkerHost, OnWorkerEvent } from "@nestjs/bullmq";
+import { Logger, Injectable } from "@nestjs/common";
+import { Job } from "bullmq";
+import { REPUTATION_QUEUE, ReputationJobName } from "./reputation.queue";
+import { ReputationEventData } from "./reputation-queue.service";
+import { LedgerService } from "../services/ledger.service";
 
 @Injectable()
 @Processor(REPUTATION_QUEUE, {
@@ -43,7 +43,7 @@ export class ReputationQueueProcessor extends WorkerHost {
 
     // 현재는 배치 모드라서 process에서 아무것도 안 함
     // 집계 Job에서 일괄 처리함
-    // 
+    //
     // 만약 실시간 처리가 필요하면 아래 주석 해제:
     // await this.ledgerService.record({
     //   userId,
@@ -55,12 +55,12 @@ export class ReputationQueueProcessor extends WorkerHost {
     // });
   }
 
-  @OnWorkerEvent('completed')
+  @OnWorkerEvent("completed")
   onCompleted(job: Job) {
     this.logger.debug(`Job 완료: ${job.id}`);
   }
 
-  @OnWorkerEvent('failed')
+  @OnWorkerEvent("failed")
   onFailed(job: Job, error: Error) {
     this.logger.error(`Job 실패: ${job.id}, error=${error.message}`);
   }

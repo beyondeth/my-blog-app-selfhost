@@ -38,22 +38,23 @@ const FlairsList = React.memo(function FlairsList({
     (flair) => flair.type === FlairType.POST && flair.isEnabled
   ) || [];
 
-  // 플레어가 없는 경우 표시하지 않음
-  if (postFlairs.length === 0) {
-    return null;
-  }
-
   // displayOrder로 정렬
   const sortedFlairs = [...postFlairs].sort(
     (a, b) => a.displayOrder - b.displayOrder
   );
 
+  // Hook은 항상 동일한 순서로 호출되어야 함 (early return 전에 선언)
   const [isExpanded, setIsExpanded] = React.useState(false);
   const effectiveLimit = limit || Infinity;
   const shouldTruncate = sortedFlairs.length > effectiveLimit;
   const displayedFlairs = shouldTruncate && !isExpanded 
     ? sortedFlairs.slice(0, effectiveLimit) 
     : sortedFlairs;
+
+  // 플레어가 없는 경우 표시하지 않음
+  if (postFlairs.length === 0) {
+    return null;
+  }
 
   return (
     <div

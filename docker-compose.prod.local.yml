@@ -53,9 +53,13 @@ services:
       - ./postgres/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
 
   # Redis 볼륨 오버라이드
-  redis:
+  redis-core:
     volumes: !override
-      - ./data/redis:/data
+      - ./data/redis-core:/data
+
+  redis-cache:
+    volumes: !override
+      - ./data/redis-cache:/data
 
   # VictoriaMetrics 볼륨 오버라이드
   victoriametrics:

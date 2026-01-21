@@ -14,7 +14,7 @@
 /**
  * 리더보드 기간 타입
  */
-export type LeaderboardPeriod = 'l7' | 'l30' | 'l90' | 'all';
+export type LeaderboardPeriod = "l7" | "l30" | "l90" | "all";
 
 /**
  * 평판 시스템 Redis 키 정의

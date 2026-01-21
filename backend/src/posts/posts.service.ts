@@ -7,7 +7,14 @@ import {
   ConflictException,
 } from "@nestjs/common";
 import { InjectRepository, InjectDataSource } from "@nestjs/typeorm";
-import { Repository, Like, In, SelectQueryBuilder, MoreThan, DataSource } from "typeorm";
+import {
+  Repository,
+  Like,
+  In,
+  SelectQueryBuilder,
+  MoreThan,
+  DataSource,
+} from "typeorm";
 import { OptimisticLockException } from "../common/exceptions/optimistic-lock.exception";
 import { Post } from "./entities/post.entity";
 import { PostStats } from "./entities/post-stats.entity";
@@ -841,12 +848,11 @@ export class PostsService {
   async findOne(id: string, user?: User): Promise<PostResponseDto> {
     this.logger.debug(`Finding post by id: ${id}`);
 
-    const post = await this.postReadService.findById(id, [
-      "author",
-      "blog",
-      "stats",
-      "metadata",
-    ], user);
+    const post = await this.postReadService.findById(
+      id,
+      ["author", "blog", "stats", "metadata"],
+      user,
+    );
     if (!post) {
       throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
@@ -957,7 +963,9 @@ export class PostsService {
     await queryRunner.startTransaction();
 
     try {
-      const post = await queryRunner.manager.findOne(Post, { where: { id: postId } });
+      const post = await queryRunner.manager.findOne(Post, {
+        where: { id: postId },
+      });
       if (!post) {
         throw new NotFoundException("포스트를 찾을 수 없습니다.");
       }
@@ -966,7 +974,7 @@ export class PostsService {
       let metadata = await queryRunner.manager.findOne(PostMetadata, {
         where: { postId },
       });
-      
+
       if (!metadata) {
         // PostMetadata가 없으면 새로 생성
         metadata = queryRunner.manager.create(PostMetadata, {
@@ -977,13 +985,17 @@ export class PostsService {
         await queryRunner.manager.save(metadata);
       } else {
         // 기존 PostMetadata 업데이트
-        // Entity method won't work on plain object returned by queryRunner if not careful, 
+        // Entity method won't work on plain object returned by queryRunner if not careful,
         // but TypeORM usually returns instances. Safer to update manually.
-        await queryRunner.manager.update(PostMetadata, { postId }, {
-             isEditorPick: isEditorPick,
-             editorPickedAt: isEditorPick ? new Date() : null,
-        });
-        
+        await queryRunner.manager.update(
+          PostMetadata,
+          { postId },
+          {
+            isEditorPick: isEditorPick,
+            editorPickedAt: isEditorPick ? new Date() : null,
+          },
+        );
+
         // Re-fetch for logic below if needed, or just proceed knowing the state
       }
 
@@ -1008,21 +1020,32 @@ export class PostsService {
         });
 
         // 5개 초과 시 가장 오래된 pick 제거
-        if (currentPicks.length > 5) { // If we just added one, and it was 5 before, now it is 6.
-           // Removing picks beyond 5
-           const picksToRemove = currentPicks.slice(5);
-           for (const pick of picksToRemove) {
-               await queryRunner.manager.update(PostMetadata, { postId: pick.postId }, {
-                   isEditorPick: false,
-                   editorPickedAt: null
-               });
-               // Also sync Post table for removal!
-               await queryRunner.manager.update(Post, { id: pick.postId }, {
-                   isEditorPick: false,
-                   editorPickedAt: null
-               });
-               this.logger.log(`Removed oldest Editor's Pick: ${pick.postId} (limit exceeded)`);
-           }
+        if (currentPicks.length > 5) {
+          // If we just added one, and it was 5 before, now it is 6.
+          // Removing picks beyond 5
+          const picksToRemove = currentPicks.slice(5);
+          for (const pick of picksToRemove) {
+            await queryRunner.manager.update(
+              PostMetadata,
+              { postId: pick.postId },
+              {
+                isEditorPick: false,
+                editorPickedAt: null,
+              },
+            );
+            // Also sync Post table for removal!
+            await queryRunner.manager.update(
+              Post,
+              { id: pick.postId },
+              {
+                isEditorPick: false,
+                editorPickedAt: null,
+              },
+            );
+            this.logger.log(
+              `Removed oldest Editor's Pick: ${pick.postId} (limit exceeded)`,
+            );
+          }
         }
       }
 
@@ -1041,8 +1064,9 @@ export class PostsService {
         isPublished: post.isPublished,
       });
 
-      this.logger.log(`Set Editor's Pick for post: ${postId} to ${isEditorPick}`);
-
+      this.logger.log(
+        `Set Editor's Pick for post: ${postId} to ${isEditorPick}`,
+      );
     } catch (error) {
       await queryRunner.rollbackTransaction();
       this.logger.error(`Failed to set editor pick for post ${postId}:`, error);

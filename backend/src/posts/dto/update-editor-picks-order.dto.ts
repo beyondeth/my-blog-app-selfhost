@@ -1,6 +1,7 @@
 import { ArrayMaxSize, ArrayMinSize, IsArray, Matches } from "class-validator";
 
-const uuidAnyVersionRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const uuidAnyVersionRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class UpdateEditorPicksOrderDto {
   @IsArray()

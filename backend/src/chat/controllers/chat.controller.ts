@@ -130,8 +130,6 @@ export class ChatController {
     return { count };
   }
 
-
-
   // Monitoring endpoints
   @Get("queue/metrics")
   async getQueueMetrics() {

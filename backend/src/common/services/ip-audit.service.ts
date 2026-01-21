@@ -1,9 +1,9 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { DataSource } from 'typeorm';
+import { Injectable, Logger } from "@nestjs/common";
+import { DataSource } from "typeorm";
 
 /**
  * IP 접근 감사 로그 서비스
- * 
+ *
  * 개인정보보호법 준수를 위한 IP 조회 이력 기록
  * - 누가, 언제, 어떤 IP를 조회했는지 기록
  * - 보관 기간: 1년
@@ -16,7 +16,7 @@ export class IpAuditService {
 
   /**
    * IP 조회 감사 로그 기록
-   * 
+   *
    * @param adminId 조회한 관리자 ID
    * @param targetType 대상 유형 (post, comment, user)
    * @param targetId 대상 ID
@@ -25,13 +25,14 @@ export class IpAuditService {
    */
   async logIpAccess(
     adminId: string,
-    targetType: 'post' | 'comment' | 'user' | 'ip',
+    targetType: "post" | "comment" | "user" | "ip",
     targetId: string,
-    action: 'view' | 'export' | 'block' | 'unblock',
+    action: "view" | "export" | "block" | "unblock",
     ipViewed?: string,
   ): Promise<void> {
     try {
-      await this.dataSource.query(`
+      await this.dataSource.query(
+        `
         INSERT INTO audit_logs (
           "performedById",
           action,
@@ -40,19 +41,21 @@ export class IpAuditService {
           metadata,
           "createdAt"
         ) VALUES ($1, $2, $3, $4, $5, NOW())
-      `, [
-        adminId,
-        `ip_${action}`,
-        targetType,
-        targetId,
-        JSON.stringify({
-          ipViewed: ipViewed || 'N/A',
-          timestamp: new Date().toISOString(),
-        }),
-      ]);
+      `,
+        [
+          adminId,
+          `ip_${action}`,
+          targetType,
+          targetId,
+          JSON.stringify({
+            ipViewed: ipViewed || "N/A",
+            timestamp: new Date().toISOString(),
+          }),
+        ],
+      );
 
       this.logger.log(
-        `📋 IP Audit: Admin ${adminId} performed ${action} on ${targetType}:${targetId}`
+        `📋 IP Audit: Admin ${adminId} performed ${action} on ${targetType}:${targetId}`,
       );
     } catch (error) {
       // 감사 로그 실패는 주요 기능을 중단시키지 않음
@@ -62,21 +65,30 @@ export class IpAuditService {
 
   /**
    * 감사 로그 조회 (관리자용)
-   * 
+   *
    * @param options 조회 옵션
    */
-  async getAuditLogs(options: {
-    adminId?: string;
-    targetType?: string;
-    startDate?: Date;
-    endDate?: Date;
-    limit?: number;
-    offset?: number;
-  } = {}): Promise<{
+  async getAuditLogs(
+    options: {
+      adminId?: string;
+      targetType?: string;
+      startDate?: Date;
+      endDate?: Date;
+      limit?: number;
+      offset?: number;
+    } = {},
+  ): Promise<{
     logs: any[];
     total: number;
   }> {
-    const { adminId, targetType, startDate, endDate, limit = 50, offset = 0 } = options;
+    const {
+      adminId,
+      targetType,
+      startDate,
+      endDate,
+      limit = 50,
+      offset = 0,
+    } = options;
 
     let whereClause = `WHERE action LIKE 'IP_%'`;
     const params: any[] = [];
@@ -102,11 +114,15 @@ export class IpAuditService {
       params.push(endDate);
     }
 
-    const countResult = await this.dataSource.query(`
+    const countResult = await this.dataSource.query(
+      `
       SELECT COUNT(*) as total FROM audit_logs ${whereClause}
-    `, params);
+    `,
+      params,
+    );
 
-    const logs = await this.dataSource.query(`
+    const logs = await this.dataSource.query(
+      `
       SELECT 
         al.*,
         u.username as admin_username
@@ -115,11 +131,13 @@ export class IpAuditService {
       ${whereClause}
       ORDER BY al."createdAt" DESC
       LIMIT $${paramIndex++} OFFSET $${paramIndex}
-    `, [...params, limit, offset]);
+    `,
+      [...params, limit, offset],
+    );
 
     return {
       logs,
-      total: parseInt(countResult[0]?.total || '0', 10),
+      total: parseInt(countResult[0]?.total || "0", 10),
     };
   }
 }

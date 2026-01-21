@@ -21,31 +21,31 @@ import {
   ManyToOne,
   JoinColumn,
   Index,
-} from 'typeorm';
-import { ReputationPeriod } from '../enums/reputation-period.enum';
-import { User } from '../../users/entities/user.entity';
+} from "typeorm";
+import { ReputationPeriod } from "../enums/reputation-period.enum";
+import { User } from "../../users/entities/user.entity";
 
-@Entity('reputation_total')
-@Unique('uq_reputation_total_user_period', ['userId', 'period'])
-@Index('idx_reputation_total_period_score', ['period', 'decayedScore'])
+@Entity("reputation_total")
+@Unique("uq_reputation_total_user_period", ["userId", "period"])
+@Index("idx_reputation_total_period_score", ["period", "decayedScore"])
 export class ReputationTotal {
   /**
    * 기본 키 (UUID)
    */
-  @PrimaryGeneratedColumn('uuid')
+  @PrimaryGeneratedColumn("uuid")
   id: string;
 
   /**
    * 사용자 ID
    */
-  @Column({ type: 'uuid', name: 'user_id' })
+  @Column({ type: "uuid", name: "user_id" })
   userId: string;
 
   /**
    * 사용자 관계
    */
-  @ManyToOne(() => User, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'user_id' })
+  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @JoinColumn({ name: "user_id" })
   user: User;
 
   /**
@@ -53,7 +53,7 @@ export class ReputationTotal {
    * L7: 최근 7일, L30: 최근 30일, L90: 최근 90일, ALL_TIME: 전체
    */
   @Column({
-    type: 'varchar',
+    type: "varchar",
     length: 20,
   })
   period: ReputationPeriod;
@@ -63,7 +63,7 @@ export class ReputationTotal {
    * 해당 기간 내 모든 delta의 단순 합계
    */
   @Column({
-    type: 'numeric',
+    type: "numeric",
     precision: 12,
     scale: 2,
     default: 0,
@@ -77,11 +77,11 @@ export class ReputationTotal {
    * 리더보드 정렬에 사용됨
    */
   @Column({
-    type: 'numeric',
+    type: "numeric",
     precision: 12,
     scale: 2,
     default: 0,
-    name: 'decayed_score',
+    name: "decayed_score",
   })
   decayedScore: number;
 
@@ -89,6 +89,6 @@ export class ReputationTotal {
    * 마지막 집계 시각
    * AggregatorService가 이 레코드를 갱신한 시점
    */
-  @UpdateDateColumn({ name: 'last_computed_at' })
+  @UpdateDateColumn({ name: "last_computed_at" })
   lastComputedAt: Date;
 }

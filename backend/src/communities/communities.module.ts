@@ -147,4 +147,3 @@ import { FilesModule } from "../files/files.module";
   ],
 })
 export class CommunitiesModule {}
-

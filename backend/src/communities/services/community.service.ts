@@ -146,7 +146,9 @@ export class CommunityService {
     });
 
     if (existingCount >= 5) {
-      throw new ForbiddenException("커뮤니티는 최대 5개까지만 생성할 수 있습니다.");
+      throw new ForbiddenException(
+        "커뮤니티는 최대 5개까지만 생성할 수 있습니다.",
+      );
     }
 
     // slug 중복 확인

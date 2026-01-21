@@ -13,17 +13,17 @@
  * @see CreateLedgerEntryDto
  * @see ReputationLedger
  */
-import { Injectable, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { ReputationLedger } from '../entities/reputation-ledger.entity';
-import { CreateLedgerEntryDto } from '../dto/create-ledger-entry.dto';
+import { Injectable, Logger } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { ReputationLedger } from "../entities/reputation-ledger.entity";
+import { CreateLedgerEntryDto } from "../dto/create-ledger-entry.dto";
 import {
   ReputationAction,
   REPUTATION_ACTION_SCORES,
-} from '../enums/reputation-action.enum';
-import { UnifiedRedisService } from '../../redis/unified-redis.service';
-import { repKeys, repTTL } from '../reputation.keys';
+} from "../enums/reputation-action.enum";
+import { UnifiedRedisService } from "../../redis/unified-redis.service";
+import { repKeys, repTTL } from "../reputation.keys";
 
 @Injectable()
 export class LedgerService {
@@ -61,7 +61,7 @@ export class LedgerService {
           targetId: dto.targetId,
           userId: dto.userId,
         },
-        select: ['id'],
+        select: ["id"],
       });
 
       if (existing) {
@@ -168,7 +168,7 @@ export class LedgerService {
     targetId: string,
   ): Promise<void> {
     const key = `${repKeys.userActivityCooldown(userId, action)}:${targetId}`;
-    await this.redisService.setWithExpiry(key, '1', repTTL.cooldown);
+    await this.redisService.setWithExpiry(key, "1", repTTL.cooldown);
   }
 
   /**
@@ -197,11 +197,11 @@ export class LedgerService {
     endDate: Date,
   ): Promise<number> {
     const result = await this.ledgerRepository
-      .createQueryBuilder('ledger')
-      .select('COALESCE(SUM(ledger.delta), 0)', 'total')
-      .where('ledger.userId = :userId', { userId })
-      .andWhere('ledger.recordedAt >= :startDate', { startDate })
-      .andWhere('ledger.recordedAt <= :endDate', { endDate })
+      .createQueryBuilder("ledger")
+      .select("COALESCE(SUM(ledger.delta), 0)", "total")
+      .where("ledger.userId = :userId", { userId })
+      .andWhere("ledger.recordedAt >= :startDate", { startDate })
+      .andWhere("ledger.recordedAt <= :endDate", { endDate })
       .getRawOne();
 
     return parseFloat(result?.total) || 0;
@@ -219,15 +219,15 @@ export class LedgerService {
     endDate: Date,
   ): Promise<Array<{ userId: string; total: number }>> {
     const results = await this.ledgerRepository
-      .createQueryBuilder('ledger')
-      .select('ledger.userId', 'userId')
-      .addSelect('COALESCE(SUM(ledger.delta), 0)', 'total')
-      .where('ledger.recordedAt >= :startDate', { startDate })
-      .andWhere('ledger.recordedAt <= :endDate', { endDate })
-      .groupBy('ledger.userId')
+      .createQueryBuilder("ledger")
+      .select("ledger.userId", "userId")
+      .addSelect("COALESCE(SUM(ledger.delta), 0)", "total")
+      .where("ledger.recordedAt >= :startDate", { startDate })
+      .andWhere("ledger.recordedAt <= :endDate", { endDate })
+      .groupBy("ledger.userId")
       .getRawMany();
 
-    return results.map(r => ({
+    return results.map((r) => ({
       userId: r.userId,
       total: parseFloat(r.total) || 0,
     }));
@@ -245,7 +245,7 @@ export class LedgerService {
   ): Promise<ReputationLedger[]> {
     return this.ledgerRepository.find({
       where: { userId },
-      order: { recordedAt: 'DESC' },
+      order: { recordedAt: "DESC" },
       take: limit,
     });
   }
