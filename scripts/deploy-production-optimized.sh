@@ -90,7 +90,7 @@ success "이미지 빌드 완료"
 # 5. 데이터베이스 및 캐시 시작
 log "Step 3: 데이터베이스 및 캐시 서비스 시작"
 docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d \
-    postgres redis pgbouncer
+    postgres redis-core redis-cache pgbouncer
 
 # 6. 데이터베이스 대기 (최대 30초)
 log "데이터베이스 초기화 대기..."
@@ -114,7 +114,7 @@ timeout 60 bash -c "
 # 8. Frontend 및 기타 서비스 시작
 log "Step 5: Frontend 및 모니터링 서비스 시작"
 docker compose -f docker-compose.prod.oracle.yml --env-file .env.production up -d \
-    frontend mcp-proxy victoriametrics grafana redis-exporter
+    frontend mcp-proxy victoriametrics grafana redis-core-exporter redis-cache-exporter
 
 # 9. 마이그레이션 실행 (Backend 준비 후)
 log "Step 6: 데이터베이스 마이그레이션"
