@@ -8,6 +8,7 @@ import { useCommunity } from '@/hooks/community';
 import {
   useCommunityMembers,
   useUpdateMemberRole,
+  useTransferOwnership,
   useBanMember,
   useUnbanMember,
   useCommunityBans,
@@ -88,6 +89,10 @@ export default function MembersPage({ params }: MembersPageProps) {
     userId: string;
     username: string;
   } | null>(null);
+  const [ownershipTarget, setOwnershipTarget] = useState<{
+    userId: string;
+    username: string;
+  } | null>(null);
   const [banReason, setBanReason] = useState('');
 
   // 커뮤니티 정보
@@ -115,6 +120,7 @@ export default function MembersPage({ params }: MembersPageProps) {
 
   // Mutations
   const updateRoleMutation = useUpdateMemberRole(slug);
+  const transferOwnershipMutation = useTransferOwnership(slug);
   const banMutation = useBanMember(slug);
   const unbanMutation = useUnbanMember(slug);
 
@@ -169,6 +175,21 @@ export default function MembersPage({ params }: MembersPageProps) {
     }
     setRoleChangeTarget(null);
   }, [roleChangeTarget, updateRoleMutation]);
+
+  // 소유권 이전 핸들러
+  const handleTransferOwnership = useCallback((userId: string, username: string) => {
+    setOwnershipTarget({ userId, username });
+  }, []);
+
+  const confirmTransferOwnership = useCallback(async () => {
+    if (!ownershipTarget) return;
+    try {
+      await transferOwnershipMutation.mutateAsync(ownershipTarget.userId);
+    } catch (error) {
+      // 에러 처리
+    }
+    setOwnershipTarget(null);
+  }, [ownershipTarget, transferOwnershipMutation]);
 
   // 차단 핸들러
   const handleBan = useCallback((userId: string, username: string) => {
@@ -444,6 +465,20 @@ export default function MembersPage({ params }: MembersPageProps) {
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
+                            {isUserOwner && member.role !== CommunityRole.OWNER && (
+                              <DropdownMenuItem
+                                onClick={() =>
+                                  handleTransferOwnership(
+                                    member.user!.id,
+                                    member.user!.username
+                                  )
+                                }
+                                className="text-orange-600 dark:text-orange-400"
+                              >
+                                <Crown className="w-4 h-4 mr-2 text-orange-500" />
+                                소유권 이전
+                              </DropdownMenuItem>
+                            )}
                             {/* 차단 */}
                             <DropdownMenuItem
                               onClick={() => handleBan(member.user!.id, member.user!.username)}
@@ -562,6 +597,26 @@ export default function MembersPage({ params }: MembersPageProps) {
             <AlertDialogCancel>취소</AlertDialogCancel>
             <AlertDialogAction onClick={confirmRoleChange}>
               변경
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 소유권 이전 다이얼로그 */}
+      <AlertDialog open={!!ownershipTarget} onOpenChange={() => setOwnershipTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>소유권 이전</AlertDialogTitle>
+            <AlertDialogDescription>
+              <strong>{ownershipTarget?.username}</strong>님에게 커뮤니티 소유권을 이전하시겠습니까?
+              <br />
+              이전 후에는 오너 권한을 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmTransferOwnership}>
+              이전
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
