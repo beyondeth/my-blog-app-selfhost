@@ -67,6 +67,10 @@ export default function BookmarksPage() {
   // 포스트 클릭 핸들러
   const handlePostClick = (post: any) => {
     // 포스트 상세 페이지로 이동
+    if (post.community?.slug && post.slug) {
+      router.push(`/c/${post.community.slug}/comments/${post.slug}`);
+      return;
+    }
     if (post.blog?.slug && (post.slug || post.id)) {
       router.push(`/${post.blog.slug}/${post.slug || post.id}`);
     }
@@ -222,10 +226,14 @@ export default function BookmarksPage() {
 
                         {/* 메타 정보 */}
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          {post.blog && (
+                          {(post.blog || post.community) && (
                             <div className="flex items-center">
                               <FiUser className="mr-1 w-3 h-3" />
-                              <span>{post.blog.name || post.author?.username}</span>
+                              <span>
+                                {post.community
+                                  ? `c/${post.community.slug}`
+                                  : post.blog?.name || post.author?.username}
+                              </span>
                             </div>
                           )}
 

@@ -53,6 +53,9 @@ interface CommunityPostContentProps {
   onTogglePinClick?: (isPinned: boolean) => void;
   /** 잠금/해제 클릭 핸들러 (MODERATOR+) */
   onToggleLockClick?: (isLocked: boolean) => void;
+  onBookmarkClick?: () => void;
+  onReportClick?: () => void;
+  isBookmarked?: boolean;
   /** 모더레이션 액션 로딩 상태 */
   isModerationPending?: boolean;
   className?: string;
@@ -74,6 +77,9 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
   onDeleteClick,
   onTogglePinClick,
   onToggleLockClick,
+  onBookmarkClick,
+  onReportClick,
+  isBookmarked = false,
   isModerationPending = false,
   className,
   variant = 'card',
@@ -279,9 +285,9 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                   <Share2 className="mr-2 h-4 w-4" />
                   링크 복사
                 </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Bookmark className="mr-2 h-4 w-4" />
-                  북마크
+                <DropdownMenuItem onClick={onBookmarkClick}>
+                  <Bookmark className={cn("mr-2 h-4 w-4", isBookmarked && "fill-current")} />
+                  {isBookmarked ? "북마크 해제" : "북마크"}
                 </DropdownMenuItem>
                 {canEdit && (
                   <>
@@ -340,14 +346,13 @@ const CommunityPostContent = React.memo(function CommunityPostContent({
                         </>
                       )}
                     </DropdownMenuItem>
-                    <DropdownMenuItem disabled={isModerationPending}>
-                      <AlertTriangle className="mr-2 h-4 w-4" />
-                      신고 보기
-                    </DropdownMenuItem>
                   </>
                 )}
                 <DropdownMenuSeparator />
-                <DropdownMenuItem className="text-red-600 dark:text-red-400">
+                <DropdownMenuItem 
+                  className="text-red-600 dark:text-red-400"
+                  onClick={onReportClick}
+                >
                   <Flag className="mr-2 h-4 w-4" />
                   신고
                 </DropdownMenuItem>

@@ -140,11 +140,15 @@ export function useMyCommunities(options?: { enabled?: boolean }) {
 /**
  * 단일 커뮤니티 조회 훅
  */
-export function useCommunity(slug: string, options?: { enabled?: boolean }) {
+export function useCommunity(
+  slug: string,
+  options?: { enabled?: boolean; initialData?: Community }
+) {
   return useQuery<Community>({
     queryKey: communityQueryKeys.detail(slug),
     queryFn: () => communityService.getCommunity(slug),
     enabled: options?.enabled !== false && !!slug,
+    initialData: options?.initialData,
     staleTime: 5 * 60 * 1000,
   });
 }

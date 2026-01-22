@@ -723,6 +723,9 @@ export class CommunityPostService {
       if (dto.contentMarkdown !== undefined)
         post.content_markdown = dto.contentMarkdown;
       if (dto.flairId !== undefined) post.flairId = dto.flairId;
+      if (dto.tags !== undefined) post.tags = dto.tags;
+      if (dto.isNsfw !== undefined) post.isNsfw = dto.isNsfw;
+      if (dto.isSpoiler !== undefined) post.isSpoiler = dto.isSpoiler;
       if (dto.thumbnailImageId !== undefined)
         post.thumbnailImageId = dto.thumbnailImageId;
     }
@@ -824,7 +827,22 @@ export class CommunityPostService {
       post.slug,
     );
 
-    return updated;
+    const refetched = await this.postRepository.findOne({
+      where: { id: updated.id },
+      relations: [
+        "author",
+        "author.profile",
+        "flair",
+        "thumbnailImage",
+        "community",
+      ],
+    });
+
+    if (!refetched) {
+      throw new NotFoundException("게시물을 찾을 수 없습니다.");
+    }
+
+    return refetched;
   }
 
   /**
@@ -1364,6 +1382,7 @@ export class CommunityPostService {
         PostCacheKeys.POST_BY_SLUG(communitySlug, postSlug),
       ),
       this.invalidatePostListCache(communityId),
+      this.cacheService.del(PostCacheKeys.PINNED_POSTS(communityId)),
     ]);
   }
 

@@ -1,8 +1,8 @@
 ---
 style_name: "Professional Technical Blog"
 language: "korean"
-min_length: 2000
-target_length: "3000-5000"
+min_length: 5000
+target_length: "5000-8000"
 code_block_ratio: 0.2
 ai_tag_required: true
 ---

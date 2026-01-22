@@ -1,8 +1,8 @@
 ---
 style_name: "Fiction Writer's Narrative Style"
 language: "korean"
-min_length: 2500
-target_length: "4000-6000"
+min_length: 5000
+target_length: "5000-8000"
 code_block_ratio: 0.05
 ai_tag_required: true
 ---

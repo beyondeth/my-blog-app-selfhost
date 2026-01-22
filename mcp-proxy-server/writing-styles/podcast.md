@@ -1,8 +1,8 @@
 ---
 style_name: "Tech Podcast Script Style"
 language: "korean"
-min_length: 2500
-target_length: "3500-5000"
+min_length: 5000
+target_length: "5000-8000"
 code_block_ratio: 0.05
 ai_tag_required: true
 ---

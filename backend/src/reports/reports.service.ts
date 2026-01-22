@@ -24,6 +24,8 @@ import { Post } from "../posts/entities/post.entity";
 import { Comment } from "../comments/entities/comment.entity";
 import { User } from "../users/entities/user.entity";
 import { Role } from "../common/enums/role.enum";
+import { CommunityPost, CommunityComment } from "../communities/entities";
+import { CommunityPostStatus } from "../communities/enums";
 import { CommunityService } from "../communities/services/community.service";
 import { CommunityMembershipService } from "../communities/services/community-membership.service";
 import { CommunityRecoveryService } from "../communities/services/community-recovery.service";
@@ -41,6 +43,10 @@ export class ReportsService {
     private commentRepository: Repository<Comment>,
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(CommunityPost)
+    private communityPostRepository: Repository<CommunityPost>,
+    @InjectRepository(CommunityComment)
+    private communityCommentRepository: Repository<CommunityComment>,
     private readonly communityService: CommunityService,
     private readonly communityMembershipService: CommunityMembershipService,
     private readonly communityRecoveryService: CommunityRecoveryService,
@@ -56,7 +62,11 @@ export class ReportsService {
     userAgent?: string,
   ): Promise<Report> {
     // Check if target exists based on type
-    await this.validateTarget(createReportDto.type, createReportDto.targetId);
+    const resolvedTarget = await this.resolveTargetInfo(
+      createReportDto.type,
+      createReportDto.targetId,
+      createReportDto.communityId,
+    );
 
     // 중복 신고 허용: 같은 사용자가 같은 대상을 여러 번 신고할 수 있음
     // 관리자 패널에서 모든 신고 기록을 확인 가능
@@ -72,7 +82,10 @@ export class ReportsService {
 
     const report = this.reportRepository.create({
       ...createReportDto,
-      communityId: createReportDto.communityId ?? null,
+      communityId:
+        resolvedTarget.source === "community"
+          ? createReportDto.communityId ?? resolvedTarget.communityId ?? null
+          : null,
       reportedModeratorId: createReportDto.reportedModeratorId ?? null,
       reportedById: userId,
       priority,
@@ -330,26 +343,64 @@ export class ReportsService {
 
   // Private helper methods
 
-  private async validateTarget(type: ReportType, targetId: string) {
-    let exists = false;
-
+  private async resolveTargetInfo(
+    type: ReportType,
+    targetId: string,
+    communityId?: string,
+  ): Promise<{ source: "blog" | "community"; communityId?: string | null }> {
     switch (type) {
-      case ReportType.POST:
-        exists = await this.postRepository.exist({ where: { id: targetId } });
-        break;
-      case ReportType.COMMENT:
-        exists = await this.commentRepository.exist({
+      case ReportType.POST: {
+        const postExists = await this.postRepository.exist({
           where: { id: targetId },
         });
+        if (postExists) {
+          return { source: "blog" };
+        }
+
+        const communityPost = await this.communityPostRepository.findOne({
+          where: communityId ? { id: targetId, communityId } : { id: targetId },
+          select: ["id", "communityId"],
+        });
+        if (communityPost) {
+          return { source: "community", communityId: communityPost.communityId };
+        }
         break;
-      case ReportType.USER:
-        exists = await this.userRepository.exist({ where: { id: targetId } });
+      }
+      case ReportType.COMMENT: {
+        const commentExists = await this.commentRepository.exist({
+          where: { id: targetId },
+        });
+        if (commentExists) {
+          return { source: "blog" };
+        }
+
+        const communityComment = await this.communityCommentRepository.findOne({
+          where: communityId ? { id: targetId, communityId } : { id: targetId },
+          select: ["id", "communityId"],
+        });
+        if (communityComment) {
+          return {
+            source: "community",
+            communityId: communityComment.communityId ?? null,
+          };
+        }
+        break;
+      }
+      case ReportType.USER: {
+        const userExists = await this.userRepository.exist({
+          where: { id: targetId },
+        });
+        if (userExists) {
+          return { source: "blog" };
+        }
+        break;
+      }
+      case ReportType.MESSAGE:
+      default:
         break;
     }
 
-    if (!exists) {
-      throw new NotFoundException(`${type} not found`);
-    }
+    throw new NotFoundException(`${type} not found`);
   }
 
   private calculatePriority(reason: ReportReason): number {
@@ -391,12 +442,30 @@ export class ReportsService {
 
   private async autoHideContent(type: ReportType, targetId: string) {
     switch (type) {
-      case ReportType.POST:
-        await this.postRepository.update(targetId, { isPublished: false });
+      case ReportType.POST: {
+        const result = await this.postRepository.update(targetId, {
+          isPublished: false,
+        });
+        if (!result.affected) {
+          await this.communityPostRepository.update(targetId, {
+            status: CommunityPostStatus.SPAM,
+            removedAt: new Date(),
+          });
+        }
         break;
-      case ReportType.COMMENT:
-        await this.commentRepository.update(targetId, { isDeleted: true });
+      }
+      case ReportType.COMMENT: {
+        const result = await this.commentRepository.update(targetId, {
+          isDeleted: true,
+        });
+        if (!result.affected) {
+          await this.communityCommentRepository.update(targetId, {
+            isDeleted: true,
+            removedAt: new Date(),
+          });
+        }
         break;
+      }
       case ReportType.USER:
         // For users, we might want to restrict their actions instead
         await this.userRepository.update(targetId, { isActive: false });
@@ -483,12 +552,30 @@ export class ReportsService {
 
   private async removeContent(type: ReportType, targetId: string) {
     switch (type) {
-      case ReportType.POST:
-        await this.postRepository.update(targetId, { isPublished: false });
+      case ReportType.POST: {
+        const result = await this.postRepository.update(targetId, {
+          isPublished: false,
+        });
+        if (!result.affected) {
+          await this.communityPostRepository.update(targetId, {
+            status: CommunityPostStatus.REMOVED,
+            removedAt: new Date(),
+          });
+        }
         break;
-      case ReportType.COMMENT:
-        await this.commentRepository.update(targetId, { isDeleted: true });
+      }
+      case ReportType.COMMENT: {
+        const result = await this.commentRepository.update(targetId, {
+          isDeleted: true,
+        });
+        if (!result.affected) {
+          await this.communityCommentRepository.update(targetId, {
+            isDeleted: true,
+            removedAt: new Date(),
+          });
+        }
         break;
+      }
       case ReportType.USER:
         await this.userRepository.update(targetId, { isActive: false });
         break;
@@ -665,16 +752,32 @@ export class ReportsService {
 
   private async getContentOwner(type: ReportType, targetId: string) {
     switch (type) {
-      case ReportType.POST:
-        return await this.postRepository.findOne({
+      case ReportType.POST: {
+        const post = await this.postRepository.findOne({
           where: { id: targetId },
           select: ["authorId"],
         });
-      case ReportType.COMMENT:
-        return await this.commentRepository.findOne({
+        if (post) {
+          return post;
+        }
+        return await this.communityPostRepository.findOne({
           where: { id: targetId },
           select: ["authorId"],
         });
+      }
+      case ReportType.COMMENT: {
+        const comment = await this.commentRepository.findOne({
+          where: { id: targetId },
+          select: ["authorId"],
+        });
+        if (comment) {
+          return comment;
+        }
+        return await this.communityCommentRepository.findOne({
+          where: { id: targetId },
+          select: ["authorId"],
+        });
+      }
       default:
         return null;
     }
@@ -713,18 +816,36 @@ export class ReportsService {
       }
     }
 
-    // 병렬로 3개 배치 쿼리 실행
-    const [posts, comments, users] = await Promise.all([
+    // 병렬로 5개 배치 쿼리 실행
+    const [
+      posts,
+      communityPosts,
+      comments,
+      communityComments,
+      users,
+    ] = await Promise.all([
       postIds.length > 0
         ? this.postRepository.find({
             where: { id: In(postIds) },
             relations: ["author"],
           })
         : [],
+      postIds.length > 0
+        ? this.communityPostRepository.find({
+            where: { id: In(postIds) },
+            relations: ["author", "community"],
+          })
+        : [],
       commentIds.length > 0
         ? this.commentRepository.find({
             where: { id: In(commentIds) },
             relations: ["author", "post"],
+          })
+        : [],
+      commentIds.length > 0
+        ? this.communityCommentRepository.find({
+            where: { id: In(commentIds) },
+            relations: ["author", "post", "community"],
           })
         : [],
       userIds.length > 0
@@ -739,8 +860,20 @@ export class ReportsService {
     for (const post of posts) {
       targetMap.set(`${ReportType.POST}:${post.id}`, post);
     }
+    for (const post of communityPosts) {
+      const key = `${ReportType.POST}:${post.id}`;
+      if (!targetMap.has(key)) {
+        targetMap.set(key, post);
+      }
+    }
     for (const comment of comments) {
       targetMap.set(`${ReportType.COMMENT}:${comment.id}`, comment);
+    }
+    for (const comment of communityComments) {
+      const key = `${ReportType.COMMENT}:${comment.id}`;
+      if (!targetMap.has(key)) {
+        targetMap.set(key, comment);
+      }
     }
     for (const user of users) {
       targetMap.set(`${ReportType.USER}:${user.id}`, user);
@@ -751,16 +884,32 @@ export class ReportsService {
 
   private async loadTargetDetails(report: Report) {
     switch (report.type) {
-      case ReportType.POST:
-        return await this.postRepository.findOne({
+      case ReportType.POST: {
+        const post = await this.postRepository.findOne({
           where: { id: report.targetId },
           relations: ["author"],
         });
-      case ReportType.COMMENT:
-        return await this.commentRepository.findOne({
+        if (post) {
+          return post;
+        }
+        return await this.communityPostRepository.findOne({
+          where: { id: report.targetId },
+          relations: ["author", "community"],
+        });
+      }
+      case ReportType.COMMENT: {
+        const comment = await this.commentRepository.findOne({
           where: { id: report.targetId },
           relations: ["author", "post"],
         });
+        if (comment) {
+          return comment;
+        }
+        return await this.communityCommentRepository.findOne({
+          where: { id: report.targetId },
+          relations: ["author", "post", "community"],
+        });
+      }
       case ReportType.USER:
         return await this.userRepository.findOne({
           where: { id: report.targetId },

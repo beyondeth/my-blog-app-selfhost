@@ -26,7 +26,24 @@ class BookmarkedPostBlogDto {
   name: string;
 }
 
+class BookmarkedPostCommunityDto {
+  @Expose()
+  id: string;
+
+  @Expose()
+  slug: string;
+
+  @Expose()
+  name: string;
+
+  @Expose()
+  iconUrl?: string;
+}
+
 export class BookmarkedPostDto {
+  @Expose()
+  sourceType: "blog" | "community";
+
   @Expose()
   id: string;
 
@@ -57,7 +74,11 @@ export class BookmarkedPostDto {
 
   @Expose()
   @Type(() => BookmarkedPostBlogDto)
-  blog: BookmarkedPostBlogDto;
+  blog?: BookmarkedPostBlogDto;
+
+  @Expose()
+  @Type(() => BookmarkedPostCommunityDto)
+  community?: BookmarkedPostCommunityDto;
 
   @Expose()
   publishedAt: Date;

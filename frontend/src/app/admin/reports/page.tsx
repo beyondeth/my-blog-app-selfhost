@@ -89,11 +89,27 @@ interface Report {
     id: string;
     title: string;
     authorId: string;
+    slug?: string;
+    communityId?: string;
+    community?: {
+      slug?: string;
+      name?: string;
+    };
+    communitySlug?: string;
   };
   comment?: {
     id: string;
     content: string;
     authorId: string;
+    post?: {
+      id?: string;
+      slug?: string;
+    };
+    communityId?: string;
+    community?: {
+      slug?: string;
+      name?: string;
+    };
   };
   targetUser?: {
     id: string;
@@ -371,6 +387,20 @@ export default function ReportsManagement() {
 
   const getTargetInfo = (report: Report) => {
     if (report.type === 'post' && report.post) {
+      const communitySlug =
+        report.post.community?.slug ||
+        report.post.communitySlug ||
+        report.metadata?.communitySlug;
+      if (communitySlug) {
+        const postSlug =
+          report.post.slug || report.metadata?.communityPostSlug || report.targetId;
+        return {
+          type: 'Post',
+          title: report.post.title,
+          link: `/c/${communitySlug}/comments/${postSlug}`,
+          icon: FileText,
+        };
+      }
       return { 
         type: 'Post', 
         title: report.post.title,
@@ -379,6 +409,17 @@ export default function ReportsManagement() {
       };
     }
     if (report.type === 'comment' && report.comment) {
+      const communitySlug =
+        report.comment.community?.slug || report.metadata?.communitySlug;
+      const postSlug = report.comment.post?.slug;
+      if (communitySlug && postSlug) {
+        return {
+          type: 'Comment',
+          title: report.comment.content.substring(0, 50) + '...',
+          link: `/c/${communitySlug}/comments/${postSlug}`,
+          icon: MessageSquare,
+        };
+      }
       return { 
         type: 'Comment', 
         title: report.comment.content.substring(0, 50) + '...',
@@ -569,6 +610,10 @@ export default function ReportsManagement() {
               ) : (
                 filteredReports.map((report: any) => {
                   const targetInfo = getTargetInfo(report);
+                  const reportCommunitySlug =
+                    report.metadata?.communitySlug ||
+                    report.post?.community?.slug ||
+                    report.comment?.community?.slug;
                   return (
                     <TableRow key={report.id}>
                       <TableCell>
@@ -583,12 +628,26 @@ export default function ReportsManagement() {
                         <TooltipProvider>
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <div className="max-w-xs cursor-help">
-                                <div className="flex items-center space-x-2">
-                                  <targetInfo.icon className="h-4 w-4 text-gray-400" />
-                                  <p className="font-medium truncate">{targetInfo.title}</p>
+                              {targetInfo.link ? (
+                                <a
+                                  href={targetInfo.link}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="max-w-xs cursor-pointer hover:underline"
+                                >
+                                  <div className="flex items-center space-x-2">
+                                    <targetInfo.icon className="h-4 w-4 text-gray-400" />
+                                    <p className="font-medium truncate">{targetInfo.title}</p>
+                                  </div>
+                                </a>
+                              ) : (
+                                <div className="max-w-xs cursor-help">
+                                  <div className="flex items-center space-x-2">
+                                    <targetInfo.icon className="h-4 w-4 text-gray-400" />
+                                    <p className="font-medium truncate">{targetInfo.title}</p>
+                                  </div>
                                 </div>
-                              </div>
+                              )}
                             </TooltipTrigger>
                             <TooltipContent>
                               <p className="text-sm">{targetInfo.type}: {targetInfo.title}</p>
@@ -603,9 +662,9 @@ export default function ReportsManagement() {
                         <Badge variant="outline">
                           {REASON_LABELS[report.reason] || report.reason}
                         </Badge>
-                        {report.metadata?.communitySlug && (
+                        {reportCommunitySlug && (
                           <p className="text-xs text-muted-foreground mt-1">
-                            c/{report.metadata.communitySlug}
+                            c/{reportCommunitySlug}
                           </p>
                         )}
                         {report.metadata?.reportedModeratorUsername && (

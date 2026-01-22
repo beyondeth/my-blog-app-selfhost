@@ -20,6 +20,8 @@ export interface CreateReportDto {
   reason: ReportReason;
   description?: string;
   targetId: string;
+  communityId?: string;
+  metadata?: Record<string, any>;
 }
 
 export interface Report {
@@ -41,6 +43,8 @@ export function useReport() {
     type: ReportType;
     targetId: string;
     targetTitle?: string;
+    communityId?: string;
+    metadata?: Record<string, any>;
   } | null>(null);
 
   const createReportMutation = useMutation({
@@ -84,8 +88,22 @@ export function useReport() {
     }
   }, [createReportMutation.isError, createReportMutation.error]);
 
-  const openReportModal = (type: ReportType, targetId: string, targetTitle?: string) => {
-    setReportTarget({ type, targetId, targetTitle });
+  const openReportModal = (
+    type: ReportType,
+    targetId: string,
+    targetTitle?: string,
+    options?: {
+      communityId?: string;
+      metadata?: Record<string, any>;
+    },
+  ) => {
+    setReportTarget({
+      type,
+      targetId,
+      targetTitle,
+      communityId: options?.communityId,
+      metadata: options?.metadata,
+    });
     setIsReportModalOpen(true);
   };
 
@@ -102,6 +120,8 @@ export function useReport() {
       targetId: reportTarget.targetId,
       reason,
       description,
+      communityId: reportTarget.communityId,
+      metadata: reportTarget.metadata,
     });
   };
 

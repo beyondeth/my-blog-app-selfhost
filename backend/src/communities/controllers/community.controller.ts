@@ -469,7 +469,9 @@ export class CommunityController {
 
     return {
       success: true,
-      data: rules.map((r) => r.toPublicJSON()),
+      data: rules.map((r) =>
+        typeof r.toPublicJSON === "function" ? r.toPublicJSON() : r,
+      ),
     };
   }
 
@@ -578,7 +580,9 @@ export class CommunityController {
 
     return {
       success: true,
-      data: flairs.map((f) => f.toPublicJSON()),
+      data: flairs.map((f) =>
+        typeof f.toPublicJSON === "function" ? f.toPublicJSON() : f,
+      ),
     };
   }
 

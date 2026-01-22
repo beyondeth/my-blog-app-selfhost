@@ -1,8 +1,8 @@
 ---
 style_name: "Step-by-Step Tutorial Style"
 language: "korean"
-min_length: 3000
-target_length: "4000-7000"
+min_length: 5000
+target_length: "5000-8000"
 code_block_ratio: 0.35
 ai_tag_required: true
 ---

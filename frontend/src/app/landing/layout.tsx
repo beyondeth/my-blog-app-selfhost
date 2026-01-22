@@ -24,7 +24,7 @@ export const metadata: Metadata = {
     siteName: 'Codebase',
     images: [
       {
-        url: `${siteUrl}/og-image.png`,
+        url: `${siteUrl}/og-image-v2.png`,
         width: 1200,
         height: 630,
         alt: 'Codebase MCP 자동 포스팅',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'MCP 자동 블로그 포스팅 - Codebase',
     description: '대화만으로 전문적인 기술 블로그를 자동으로 생성하고 발행하세요.',
-    images: [`${siteUrl}/og-image.png`],
+    images: [`${siteUrl}/og-image-v2.png`],
   },
 
   alternates: {

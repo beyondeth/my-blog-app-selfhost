@@ -7,11 +7,20 @@ import { ReportActionLog } from "./entities/report-action.entity";
 import { Post } from "../posts/entities/post.entity";
 import { Comment } from "../comments/entities/comment.entity";
 import { User } from "../users/entities/user.entity";
+import { CommunityPost, CommunityComment } from "../communities/entities";
 import { CommunitiesModule } from "../communities/communities.module";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Report, ReportActionLog, Post, Comment, User]),
+    TypeOrmModule.forFeature([
+      Report,
+      ReportActionLog,
+      Post,
+      Comment,
+      User,
+      CommunityPost,
+      CommunityComment,
+    ]),
     CommunitiesModule,
   ],
   controllers: [ReportsController],

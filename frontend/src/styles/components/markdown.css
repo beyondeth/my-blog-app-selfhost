@@ -664,3 +664,14 @@
 .dark .prose svg * {
   color: inherit !important;
 }
+
+/* Markdown preview should honor paragraph spacing inside editor preview */
+.markdown-content.prose p {
+  margin: var(--space-md) 0 !important;
+}
+
+.markdown-content.prose p:empty,
+.markdown-content.prose p br:only-child {
+  line-height: var(--space-md) !important;
+  height: var(--space-md) !important;
+}

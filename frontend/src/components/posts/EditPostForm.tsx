@@ -769,7 +769,7 @@ export default function EditPostForm({
                                   게시글과 동일한 스타일로 렌더링됩니다.
                                 </span>
                               </p>
-                              <div className="prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words">
+                              <div className="markdown-content prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words">
                                 <ReactMarkdown skipHtml>{previewContent}</ReactMarkdown>
                               </div>
                             </div>

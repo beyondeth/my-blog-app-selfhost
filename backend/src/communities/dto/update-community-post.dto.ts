@@ -9,6 +9,8 @@ import {
   IsNumber,
   Min,
   Max,
+  IsArray,
+  ArrayMaxSize,
 } from "class-validator";
 import { ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
@@ -65,6 +67,36 @@ export class UpdateCommunityPostDto {
   @Transform(({ value }) => (value === "" ? undefined : value))
   @IsUUID("all", { message: "플레어 ID는 유효한 UUID 형식이어야 합니다" })
   flairId?: string;
+
+  @ApiPropertyOptional({
+    description: "게시물 태그 목록 (최대 10개, 각 태그 최대 50자)",
+    example: ["nestjs", "redis", "caching"],
+    type: [String],
+  })
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(10, { message: "태그는 최대 10개까지 가능합니다" })
+  @IsString({ each: true })
+  @MaxLength(50, { each: true, message: "각 태그는 최대 50자까지 가능합니다" })
+  tags?: string[];
+
+  @ApiPropertyOptional({
+    description: "NSFW(성인/민감) 콘텐츠 여부",
+    default: false,
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isNsfw?: boolean;
+
+  @ApiPropertyOptional({
+    description: "스포일러 포함 여부",
+    default: false,
+    example: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isSpoiler?: boolean;
 
   @ApiPropertyOptional({
     description: "썸네일 이미지 파일 ID (UUID)",

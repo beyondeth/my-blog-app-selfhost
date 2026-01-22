@@ -1,8 +1,8 @@
 ---
 style_name: "Tech Comedy Blog Style"
 language: "korean"
-min_length: 2000
-target_length: "3000-4500"
+min_length: 5000
+target_length: "5000-8000"
 code_block_ratio: 0.15
 ai_tag_required: true
 ---
