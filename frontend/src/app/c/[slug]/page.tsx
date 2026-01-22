@@ -1,17 +1,56 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import { cache } from 'react';
 import CommunityDetailClient from './client-page';
 import type { Community } from '@/types/community';
 
-// 중복 API 호출 방지를 위한 React Cache 적용
-const getCommunity = cache(async (slug: string): Promise<Community | null> => {
+async function getAuthCookieHeader(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  const readCookieValue = (name: string): string | undefined => {
+    if (cookieStore && typeof (cookieStore as { get?: (key: string) => { value?: string } | undefined }).get === 'function') {
+      return (cookieStore as { get: (key: string) => { value?: string } | undefined })
+        .get(name)
+        ?.value;
+    }
+    if (cookieStore && typeof (cookieStore as { getAll?: () => Array<{ name: string; value: string }> }).getAll === 'function') {
+      const allCookies = (cookieStore as { getAll: () => Array<{ name: string; value: string }> }).getAll();
+      return allCookies.find((cookie) => cookie.name === name)?.value;
+    }
+    if (cookieStore && typeof (cookieStore as { toString?: () => string }).toString === 'function') {
+      const cookieString = (cookieStore as { toString: () => string }).toString();
+      return cookieString
+        .split(';')
+        .map((part) => part.trim())
+        .find((part) => part.startsWith(`${name}=`))
+        ?.slice(name.length + 1);
+    }
+    return undefined;
+  };
+  const accessToken = readCookieValue('access_token');
+
+  // 보안: access_token만 전달 (refresh_token은 클라이언트 → 백엔드 /auth/refresh 전용)
+  return accessToken ? `access_token=${accessToken}` : undefined;
+}
+
+
+async function fetchCommunity(
+  slug: string,
+  cookieHeader?: string,
+): Promise<Community | null> {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+    const hasCookie = Boolean(cookieHeader);
+    const fetchOptions: RequestInit & { next?: { revalidate: number } } = {};
+    if (hasCookie) {
+      fetchOptions.cache = 'no-store';
+      fetchOptions.headers = { cookie: cookieHeader! };
+    } else {
+      fetchOptions.next = { revalidate: 60 };
+    }
+
     // fetch URL: /community/:slug
-    const res = await fetch(`${apiUrl}/community/${slug}`, {
-      next: { revalidate: 60 }, // 1분 캐시 (ISR)
-    });
+    const res = await fetch(`${apiUrl}/community/${slug}`, fetchOptions);
 
     if (!res.ok) {
       if (res.status === 404) return null;
@@ -26,7 +65,12 @@ const getCommunity = cache(async (slug: string): Promise<Community | null> => {
     console.error('Failed to fetch community:', error);
     return null;
   }
-});
+}
+
+// 중복 API 호출 방지를 위한 React Cache 적용 (익명 조회 전용)
+const getCommunityPublic = cache(async (slug: string): Promise<Community | null> =>
+  fetchCommunity(slug)
+);
 
 interface PageProps {
   params: Promise<{ slug: string }>;
@@ -34,7 +78,10 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const community = await getCommunity(slug);
+  const cookieHeader = await getAuthCookieHeader();
+  const community = cookieHeader
+    ? await fetchCommunity(slug, cookieHeader)
+    : await getCommunityPublic(slug);
 
   if (!community) {
     return {
@@ -80,7 +127,10 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function CommunityPage({ params }: PageProps) {
   const { slug } = await params;
-  const community = await getCommunity(slug);
+  const cookieHeader = await getAuthCookieHeader();
+  const community = cookieHeader
+    ? await fetchCommunity(slug, cookieHeader)
+    : await getCommunityPublic(slug);
 
   if (!community) {
     notFound();

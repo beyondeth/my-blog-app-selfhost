@@ -1,43 +1,56 @@
 import { Metadata } from 'next';
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import CommunityPostDetailClient from './client-page';
 import type { CommunityPost } from '@/types/community';
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+
+/**
+ * 인증 쿠키 헤더 생성 (access_token만 전달)
+ */
+async function getAuthCookieHeader(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get?.('access_token')?.value;
+  return accessToken ? `access_token=${accessToken}` : undefined;
+}
 
 /**
  * 커뮤니티 게시물 데이터 가져오기 (서버 컴포넌트용)
  *
  * @description
- * - cache로 감싸서 동일한 렌더링 사이클 내 중복 호출 방지
- * - SEO 메타데이터와 페이지 렌더링에서 동시 사용
+ * - 인증된 요청: 비공개 커뮤니티 멤버/오너도 접근 가능
+ * - 비인증 요청: 공개 게시물만 조회 (캐시 사용)
  * - 403 에러(private 커뮤니티)는 undefined 반환 (클라이언트에서 재시도)
  */
-const getCommunityPost = cache(async (
+async function fetchCommunityPost(
   communitySlug: string,
-  postId: string
-): Promise<CommunityPost | null | undefined> => {
+  postId: string,
+  cookieHeader?: string,
+): Promise<CommunityPost | null | undefined> {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+    const hasCookie = Boolean(cookieHeader);
+    const fetchOptions: RequestInit & { next?: { revalidate: number } } = {
+      headers: { 'Content-Type': 'application/json' },
+    };
 
-    // 새로운 /comments/ 엔드포인트 사용 (Reddit 스타일)
+    if (hasCookie) {
+      fetchOptions.cache = 'no-store';
+      (fetchOptions.headers as Record<string, string>).cookie = cookieHeader!;
+    } else {
+      fetchOptions.next = { revalidate: 60 };
+    }
+
     const response = await fetch(
-      `${apiUrl}/community/${communitySlug}/comments/${postId}`,
-      {
-        next: { revalidate: 60 }, // 60초마다 재검증
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      `${API_URL}/community/${communitySlug}/comments/${postId}`,
+      fetchOptions
     );
 
     if (!response.ok) {
-      if (response.status === 404) {
-        return null;
-      }
+      if (response.status === 404) return null;
       // 403 (private 커뮤니티): undefined 반환 → 클라이언트에서 인증 포함 재시도
-      if (response.status === 403) {
-        return undefined;
-      }
+      if (response.status === 403) return undefined;
       throw new Error('Failed to fetch community post');
     }
 
@@ -47,7 +60,15 @@ const getCommunityPost = cache(async (
     console.error('Error fetching community post for metadata:', error);
     return null;
   }
-});
+}
+
+// 중복 API 호출 방지를 위한 React Cache 적용 (익명 조회 전용)
+const getCommunityPostPublic = cache(async (
+  communitySlug: string,
+  postId: string
+): Promise<CommunityPost | null | undefined> =>
+  fetchCommunityPost(communitySlug, postId)
+);
 
 /**
  * 동적 메타데이터 생성 (SEO)
@@ -61,7 +82,10 @@ export async function generateMetadata(
   { params }: { params: Promise<{ slug: string; postId: string }> }
 ): Promise<Metadata> {
   const { slug, postId } = await params;
-  const post = await getCommunityPost(slug, postId);
+  const cookieHeader = await getAuthCookieHeader();
+  const post = cookieHeader
+    ? await fetchCommunityPost(slug, postId, cookieHeader)
+    : await getCommunityPostPublic(slug, postId);
 
   if (!post) {
     return {
@@ -276,8 +300,11 @@ export default async function CommunityPostPage({
 }) {
   const { slug, postId } = await params;
 
-  // 게시물 데이터 가져오기
-  const post = await getCommunityPost(slug, postId);
+  // 게시물 데이터 가져오기 (인증된 사용자는 비공개 커뮤니티도 접근 가능)
+  const cookieHeader = await getAuthCookieHeader();
+  const post = cookieHeader
+    ? await fetchCommunityPost(slug, postId, cookieHeader)
+    : await getCommunityPostPublic(slug, postId);
 
   // 게시물이 없으면 404 (null = 진짜 없음)
   if (post === null) {

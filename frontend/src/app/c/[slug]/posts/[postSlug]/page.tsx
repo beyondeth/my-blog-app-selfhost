@@ -1,44 +1,68 @@
 import { Metadata } from 'next';
 import { cache } from 'react';
+import { cookies } from 'next/headers';
 import { notFound } from 'next/navigation';
 import PostDetailClient from './client-page';
 import type { CommunityPost } from '@/types/community';
 
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+
+/**
+ * 인증 쿠키 헤더 생성 (access_token만 전달)
+ */
+async function getAuthCookieHeader(): Promise<string | undefined> {
+  const cookieStore = await cookies();
+  const accessToken = cookieStore.get?.('access_token')?.value;
+  return accessToken ? `access_token=${accessToken}` : undefined;
+}
+
 /**
  * 커뮤니티 게시물 데이터 가져오기 (Server Component)
- * - cache로 감싸서 generateMetadata와 Page 컴포넌트 간 중복 호출 방지
+ * - 인증된 요청: 비공개 커뮤니티 멤버/오너도 접근 가능
+ * - 비인증 요청: 공개 게시물만 조회 (캐시 사용)
  */
-const getPost = cache(async (slug: string, postSlug: string): Promise<CommunityPost | null> => {
+async function fetchPost(
+  slug: string,
+  postSlug: string,
+  cookieHeader?: string,
+): Promise<CommunityPost | null> {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-    
-    // OptionalJwtAuthGuard가 적용된 엔드포인트 호출
-    // 쿠키를 전달하지 않아도 공개 게시물은 조회 가능해야 함
+    const hasCookie = Boolean(cookieHeader);
+    const fetchOptions: RequestInit & { next?: { revalidate: number } } = {
+      headers: { 'Content-Type': 'application/json' },
+    };
+
+    if (hasCookie) {
+      fetchOptions.cache = 'no-store';
+      (fetchOptions.headers as Record<string, string>).cookie = cookieHeader!;
+    } else {
+      fetchOptions.next = { revalidate: 60 };
+    }
+
     const response = await fetch(
-      `${apiUrl}/community/${slug}/posts/${postSlug}`,
-      {
-        next: { revalidate: 60 }, // 60초 캐싱 (ISR)
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      }
+      `${API_URL}/community/${slug}/posts/${postSlug}`,
+      fetchOptions
     );
 
     if (!response.ok) {
       if (response.status === 404) return null;
-      // 403 Forbidden (비공개 커뮤니티 등)일 경우에도 null 반환하여
-      // Client Component에서 Auth 처리하도록 유도할 수도 있으나,
-      // 여기서는 null 반환 -> 404 or Client Side fallback
+      // 403 (비공개 커뮤니티) → null 반환하여 클라이언트에서 처리
       return null;
     }
 
     const json = await response.json();
-    return json.data; // ResponseWrapper { success: true, data: ... }
+    return json.data;
   } catch (error) {
     console.error('Failed to fetch community post:', error);
     return null;
   }
-});
+}
+
+// 중복 API 호출 방지를 위한 React Cache 적용 (익명 조회 전용)
+const getPostPublic = cache(async (slug: string, postSlug: string): Promise<CommunityPost | null> =>
+  fetchPost(slug, postSlug)
+);
+
 
 /**
  * 동적 메타데이터 생성 (SEO)
@@ -47,7 +71,10 @@ export async function generateMetadata(
   { params }: { params: Promise<{ slug: string; postSlug: string }> }
 ): Promise<Metadata> {
   const { slug, postSlug } = await params;
-  const post = await getPost(slug, postSlug);
+  const cookieHeader = await getAuthCookieHeader();
+  const post = cookieHeader
+    ? await fetchPost(slug, postSlug, cookieHeader)
+    : await getPostPublic(slug, postSlug);
 
   if (!post) {
     return {
@@ -168,7 +195,10 @@ export default async function Page({
   params: Promise<{ slug: string; postSlug: string }>;
 }) {
   const { slug, postSlug } = await params;
-  const post = await getPost(slug, postSlug);
+  const cookieHeader = await getAuthCookieHeader();
+  const post = cookieHeader
+    ? await fetchPost(slug, postSlug, cookieHeader)
+    : await getPostPublic(slug, postSlug);
 
   // SEO를 위해 데이터가 있으면 JSON-LD 주입
   const structuredData = post ? generateStructuredData(post, slug, postSlug) : null;
