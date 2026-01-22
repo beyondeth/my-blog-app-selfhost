@@ -1436,7 +1436,7 @@ export default function NewStoryPage() {
                                   <span>실시간 미리보기</span>
                                   <span className="text-[11px] text-gray-400 dark:text-gray-500">이미지, 표, 코드까지 즉시 반영돼요.</span>
                                 </p>
-                                <div className="prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words overflow-y-auto flex-1">
+                                <div className="markdown-content prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words overflow-y-auto flex-1">
                                   <ReactMarkdown skipHtml>{previewContent}</ReactMarkdown>
                                 </div>
                               </div>

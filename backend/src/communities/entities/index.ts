@@ -17,3 +17,4 @@ export * from "./community-invite.entity";
 export * from "./community-recovery-snapshot.entity";
 export * from "./community-sidebar-widget.entity";
 export * from "./community-sidebar-widget-entry.entity";
+export * from "./community-bookmark.entity";

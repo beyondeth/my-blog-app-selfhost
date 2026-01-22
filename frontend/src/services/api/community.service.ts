@@ -1029,10 +1029,10 @@ export async function uploadCommunityImage(
  */
 export async function togglePostPin(
   communitySlug: string,
-  postSlug: string,
+  postId: string,
   isPinned: boolean,
 ): Promise<CommunityPost> {
-  return updateCommunityPost(communitySlug, postSlug, { isPinned });
+  return updateCommunityPost(communitySlug, postId, { isPinned });
 }
 
 /**
@@ -1040,11 +1040,11 @@ export async function togglePostPin(
  */
 export async function togglePostLock(
   communitySlug: string,
-  postSlug: string,
+  postId: string,
   isLocked: boolean,
 ): Promise<CommunityPost> {
   // update 엔드포인트를 통해 isLocked 필드 변경
-  return updateCommunityPost(communitySlug, postSlug, { isLocked });
+  return updateCommunityPost(communitySlug, postId, { isLocked });
 }
 
 /**

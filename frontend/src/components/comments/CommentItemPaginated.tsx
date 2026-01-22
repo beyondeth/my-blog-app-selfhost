@@ -258,6 +258,7 @@ interface CommentItemPaginatedProps {
   level?: number; // 0 = parent, 1+ = reply
   rootParentId?: string; // 최상위 부모 댓글 ID (플랫 구조용)
   context?: CommentContext;
+  communityId?: string;
 }
 
 /**
@@ -275,6 +276,7 @@ export default function CommentItemPaginated({
   level = 0,
   rootParentId,
   context,
+  communityId,
 }: CommentItemPaginatedProps) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -298,6 +300,13 @@ export default function CommentItemPaginated({
   const [replyingToId, setReplyingToId] = useState<string | null>(null);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
   useMobileOverlayReset(closeDropdown, showDropdown);
+  const communityReportMetadata =
+    context?.type === 'community'
+      ? {
+          communitySlug: context.communitySlug,
+          communityPostId: context.postId,
+        }
+      : undefined;
 
   // 답글 페이지네이션 (lazy-load) - level 0만 직접 로드
   const {
@@ -429,7 +438,10 @@ export default function CommentItemPaginated({
     const contentPreview = comment.content.length > 100
       ? comment.content.substring(0, 100) + '...'
       : comment.content;
-    openReportModal('comment', comment.id, contentPreview);
+    openReportModal('comment', comment.id, contentPreview, {
+      communityId,
+      metadata: communityReportMetadata,
+    });
     setShowDropdown(false);
   };
 
@@ -660,7 +672,11 @@ export default function CommentItemPaginated({
                   openReportModal={() => openReportModal(
                     'comment',
                     reply.id,
-                    reply.author.username || '익명'
+                    reply.author.username || '익명',
+                    {
+                      communityId,
+                      metadata: communityReportMetadata,
+                    },
                   )}
                   parentCommentId={comment.id}
                   replyingToId={replyingToId}

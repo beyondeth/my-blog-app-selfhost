@@ -14,6 +14,7 @@ import type {
 import type { VoteType } from '@/types';
 import { feedQueryKeys } from '@/hooks/feed/useUnifiedFeed';
 import type { UnifiedFeedResponse } from '@/services/api/feed.service';
+import { toast } from 'sonner';
 
 /**
  * 커뮤니티 게시물 관련 Query Key 팩토리
@@ -110,16 +111,19 @@ export function useCreateCommunityPost(communitySlug: string) {
 /**
  * 커뮤니티 게시물 수정 훅
  */
-export function useUpdateCommunityPost(communitySlug: string, postSlug: string) {
+/**
+ * 커뮤니티 게시물 수정 훅
+ */
+export function useUpdateCommunityPost(communitySlug: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: UpdateCommunityPostDto) =>
+    mutationFn: ({ postSlug, data }: { postSlug: string; data: UpdateCommunityPostDto }) =>
       communityService.updatePost(communitySlug, postSlug, data),
-    onSuccess: (updatedPost) => {
+    onSuccess: (updatedPost, variables) => {
       // 게시물 상세 캐시 업데이트
       queryClient.setQueryData(
-        communityPostQueryKeys.detail(communitySlug, postSlug),
+        communityPostQueryKeys.detail(communitySlug, variables.postSlug),
         updatedPost
       );
 
@@ -583,11 +587,11 @@ export function useTogglePostPin(communitySlug: string) {
   return useMutation<
     CommunityPost,
     Error,
-    { postSlug: string; isPinned: boolean },
+    { postId: string; postSlug: string; isPinned: boolean },
     ModerationContext
   >({
-    mutationFn: ({ postSlug, isPinned }) =>
-      communityService.togglePostPin(communitySlug, postSlug, isPinned),
+    mutationFn: ({ postId, isPinned }) =>
+      communityService.togglePostPin(communitySlug, postId, isPinned),
     onMutate: async ({ postSlug, isPinned }) => {
       // 진행 중인 쿼리 취소
       await queryClient.cancelQueries({
@@ -609,7 +613,9 @@ export function useTogglePostPin(communitySlug: string) {
 
       return { previousPost };
     },
-    onError: (_, { postSlug }, context) => {
+    onError: (error, { postSlug }, context) => {
+      toast.error(error.message || "작업을 처리하는 중 오류가 발생했습니다.");
+      
       // 롤백
       if (context?.previousPost) {
         queryClient.setQueryData(
@@ -618,7 +624,9 @@ export function useTogglePostPin(communitySlug: string) {
         );
       }
     },
-    onSuccess: (updatedPost, { postSlug }) => {
+    onSuccess: (updatedPost, { postSlug, isPinned }) => {
+      toast.success(isPinned ? "게시물이 고정되었습니다." : "게시물 고정이 해제되었습니다.");
+      
       // 상세 캐시 업데이트
       queryClient.setQueryData(
         communityPostQueryKeys.detail(communitySlug, postSlug),
@@ -641,11 +649,11 @@ export function useTogglePostLock(communitySlug: string) {
   return useMutation<
     CommunityPost,
     Error,
-    { postSlug: string; isLocked: boolean },
+    { postId: string; postSlug: string; isLocked: boolean },
     ModerationContext
   >({
-    mutationFn: ({ postSlug, isLocked }) =>
-      communityService.togglePostLock(communitySlug, postSlug, isLocked),
+    mutationFn: ({ postId, isLocked }) =>
+      communityService.togglePostLock(communitySlug, postId, isLocked),
     onMutate: async ({ postSlug, isLocked }) => {
       await queryClient.cancelQueries({
         queryKey: communityPostQueryKeys.detail(communitySlug, postSlug),

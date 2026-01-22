@@ -4,7 +4,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/providers/AuthProviderV2';
 
 // Get blog by slug
-export function useBlogBySlug(slug: string) {
+export function useBlogBySlug(slug: string, options?: { initialData?: any }) {
   const queryClient = useQueryClient();
   const { user } = useAuth(); // AuthProvider에서 사용자 정보 가져오기
 
@@ -18,6 +18,7 @@ export function useBlogBySlug(slug: string) {
       return blog;
     },
     enabled: !!slug,
+    initialData: options?.initialData,
     // 캐싱 최적화: 페이지 이동 시 불필요한 API 호출 방지
     // 블로그 정보 변경 시에는 invalidateQueries로 명시적 갱신
     staleTime: 10 * 60 * 1000,       // 10분간 fresh 유지 (탭 전환 시 캐시 사용)

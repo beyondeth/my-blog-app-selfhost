@@ -49,6 +49,11 @@ const WRITING_STYLES: StyleGuide[] = [
     description: '개발자 학습 가이드 스타일. 선임 개발자가 후임에게 조언하는 멘토링 톤으로 학습 방법론과 성장 마인드셋을 다룹니다.',
   },
   {
+    id: 'research',
+    name: 'Research',
+    description: '논문 분석 인사이트 스타일. 연구 결과를 검증 근거와 함께 요약하고 실무 적용 포인트를 제시합니다.',
+  },
+  {
     id: '_common',
     name: 'Common Rules',
     description: '모든 스타일에 공통으로 적용되는 기본 규칙과 가이드라인입니다.',
@@ -82,7 +87,7 @@ export default function WritingStylesPage() {
           </div>
 
           <div className="space-y-4">
-            {WRITING_STYLES.filter((style) => style.id !== '_common').slice(0, 6).map((style, index) => (
+            {WRITING_STYLES.filter((style) => style.id !== '_common').map((style, index) => (
               <div
                 key={style.id}
                 className={`rounded-2xl border border-gray-100 dark:border-[#2F3440] bg-gray-50 dark:bg-[#1F2229] p-4 ${

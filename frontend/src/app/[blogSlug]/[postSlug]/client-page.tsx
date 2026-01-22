@@ -195,9 +195,16 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   const handleVote = useCallback(
     (voteType: 'upvote' | 'downvote') => {
       if (!post?.id) return;
+      
+      // 비로그인 사용자 클릭 차단 (낙관적 업데이트 방지)
+      if (!user) {
+        alert('로그인이 필요합니다.\n로그인 후 투표할 수 있습니다.');
+        return;
+      }
+      
       vote({ postId: post.id, voteType });
     },
-    [post?.id, vote]
+    [post?.id, vote, user]
   );
 
   const handleShare = useCallback(async () => {
@@ -512,7 +519,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}
         <div className="blog-content">
-          <HtmlContentRenderer content={post.content} />
+          <HtmlContentRenderer content={post.content} className="markdown-content" />
         </div>
 
         {/* Tags */}

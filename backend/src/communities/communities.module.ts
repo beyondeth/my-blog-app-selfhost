@@ -19,6 +19,7 @@ import {
   CommunityRecoverySnapshot,
   CommunitySidebarWidget,
   CommunitySidebarWidgetEntry,
+  CommunityBookmark,
 } from "./entities";
 import { CommunityStats } from "./entities/community-stats.entity";
 import { StatsSnapshot } from "../common/entities/stats-snapshot.entity";
@@ -101,6 +102,7 @@ import { FilesModule } from "../files/files.module";
       CommunitySidebarWidgetEntry,
       CommunityStats,
       StatsSnapshot,
+      CommunityBookmark,
     ]),
     UsersModule,
     CacheModule,

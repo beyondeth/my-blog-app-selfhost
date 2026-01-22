@@ -164,7 +164,7 @@ export class CommunityPostController {
    * 게시물 수정
    */
   @Put(":postId")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CommunityMembershipGuard)
   @ApiBearerAuth()
   @ApiOperation({ summary: "게시물 수정" })
   @ApiParam({ name: "slug", description: "커뮤니티 slug" })
@@ -184,12 +184,7 @@ export class CommunityPostController {
     return {
       success: true,
       message: "게시물이 수정되었습니다.",
-      data: {
-        id: post.id,
-        slug: post.slug,
-        title: post.title,
-        status: post.status,
-      },
+      data: post,
     };
   }
 
@@ -197,7 +192,7 @@ export class CommunityPostController {
    * 게시물 삭제
    */
   @Delete(":postId")
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, CommunityMembershipGuard)
   @ApiBearerAuth()
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: "게시물 삭제" })

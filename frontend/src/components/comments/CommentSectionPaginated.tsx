@@ -27,6 +27,7 @@ interface CommentSectionPaginatedProps {
   lockedAt?: string | null;
   lockedBy?: Community['lockedBy'];
   communitySlug?: string;
+  communityId?: string;
 }
 
 type SortType = 'recent' | 'popular';
@@ -54,6 +55,7 @@ export default function CommentSectionPaginated({
   lockedAt,
   lockedBy,
   communitySlug,
+  communityId,
 }: CommentSectionPaginatedProps) {
   const [sortType, setSortType] = useState<SortType>('popular');
   const [snapshotTimestamp, setSnapshotTimestamp] = useState<string | undefined>();
@@ -274,6 +276,7 @@ export default function CommentSectionPaginated({
               postId={postId}
               postAuthorId={postAuthorId}
               context={context}
+              communityId={communityId}
             />
           ))}
 

@@ -48,6 +48,8 @@ interface PostArticleProps {
   userId?: string;
   onEdit: (slug: string) => void;
   onDelete: (id: string) => void;
+  onPin?: (postId: string, postSlug: string, isPinned: boolean) => void;
+
   /** @deprecated onVote 사용 권장 */
   onLike?: (postId: string) => void;
   /** 투표 핸들러 (upvote/downvote) */
@@ -92,6 +94,7 @@ const PostArticle = React.memo(function PostArticle({
   userId,
   onEdit,
   onDelete,
+  onPin,
   onLike,
   onVote,
   isDeleting = false,
@@ -464,7 +467,7 @@ const PostArticle = React.memo(function PostArticle({
                 <span>{post.commentCount || 0}</span>
               </Link>
 
-              {/* 수정/삭제 버튼 */}
+                  {/* 수정/삭제 버튼 */}
               {(isAdmin || (isAuthenticated && post.author?.id === userId)) && (
                 <>
                   <button
@@ -482,7 +485,29 @@ const PostArticle = React.memo(function PostArticle({
                   </button>
                 </>
               )}
-
+              {/* 관리자/모더레이터 전용 버튼 */}
+              {onPin && (
+                  <button
+                    onClick={() => onPin(post.id, post.slug || post.id, !communityContext?.isPinned)}
+                    className={`text-xs whitespace-nowrap flex items-center gap-1 ${
+                      communityContext?.isPinned 
+                        ? 'text-green-600 hover:text-green-700 dark:text-green-500 dark:hover:text-green-400' 
+                        : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                    }`}
+                  >
+                    <FiBookmark className={`w-3 h-3 ${communityContext?.isPinned ? 'fill-current' : ''}`} />
+                    {communityContext?.isPinned ? '고정 해제' : '상단 고정'}
+                  </button>
+              )}
+              {isAdmin && (
+                    <button
+                      onClick={() => setIsModerationModalOpen(true)}
+                      className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
+                    >
+                      <FiAlertTriangle className="w-3 h-3" />
+                      제재
+                    </button>
+                  )}
               {post.isEditorPick && (
                 <span className={editorPickClass}>
                   <FiTarget className="w-5 h-5" />

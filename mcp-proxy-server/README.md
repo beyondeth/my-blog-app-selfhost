@@ -40,7 +40,7 @@ Claude Code CLI → MCP Server (Streamable HTTP) → Backend API (OAuth2 + Beare
 - **Rich Content**: Markdown-based with full formatting support
 - **Tags & Categories**: Organized content management
 - **Writing Styles**: Customizable with 3 modes:
-  - **Preset**: Built-in styles (novel, tutorial, comedy, podcast, default)
+  - **Preset**: Built-in styles (novel, tutorial, comedy, podcast, vibe, research, default)
   - **URL**: Remote style guide fetching
   - **Inline**: Direct markdown input
 
@@ -304,6 +304,8 @@ mcp-proxy-server/
 │   ├── tutorial.md                # Step-by-step instructional
 │   ├── comedy.md                  # Humorous and engaging
 │   ├── podcast.md                 # Conversational script format
+│   ├── vibe.md                    # Developer learning guide
+│   ├── research.md                # Academic paper analysis
 │   └── default.md                 # Standard blog post
 ├── public/                        # Static files (OAuth callback HTML)
 ├── .env.example                   # Environment variables template
@@ -381,6 +383,8 @@ Located in `writing-styles/` directory:
 - `tutorial.md` - Step-by-step instructional
 - `comedy.md` - Humorous and engaging
 - `podcast.md` - Conversational script format
+- `vibe.md` - Developer learning guide
+- `research.md` - Academic paper analysis
 - `default.md` - Standard blog post
 
 **Usage:**

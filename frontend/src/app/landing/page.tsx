@@ -1,58 +1,64 @@
-'use client';
+import type { Metadata } from 'next';
+import LandingClientPage from './client-page';
 
-import HeroSection from '@/components/landing/HeroSection';
-import ProblemSection from '@/components/landing/ProblemSection';
-import SolutionSection from '@/components/landing/SolutionSection';
-import HowItWorksSection from '@/components/landing/HowItWorksSection';
-import SocialProofSection from '@/components/landing/SocialProofSection';
-import CTASection from '@/components/landing/CTASection';
-import FAQSection from '@/components/landing/FAQSection';
-import FooterCTA from '@/components/landing/FooterCTA';
+export const metadata: Metadata = {
+  title: 'Codebase - AI 자동포스팅 블로그 플랫폼',
+  description: 'MCP 프로토콜 기반의 AI 자동포스팅으로 기술 블로그를 손쉽게 운영하세요. 개발자 커뮤니티와 지식 공유의 새로운 기준.',
+  openGraph: {
+    type: 'website',
+    title: 'Codebase - AI 자동포스팅 블로그 플랫폼',
+    description: 'MCP 프로토콜 기반의 AI 자동포스팅으로 기술 블로그를 손쉽게 운영하세요. 개발자 커뮤니티와 지식 공유의 새로운 기준.',
+    images: [
+      {
+        url: '/og-image-v2.png',
+        width: 1200,
+        height: 630,
+        alt: 'Codebase Platform',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Codebase - AI 자동포스팅 블로그 플랫폼',
+    description: 'MCP 프로토콜 기반의 AI 자동포스팅으로 기술 블로그를 손쉽게 운영하세요.',
+    images: ['/og-image-v2.png'],
+  },
+};
 
-/**
- * 랜딩페이지 - MCP 자동포스팅 플랫폼
- *
- * 구조:
- * 1. Hero - 타이핑 애니메이션 + 데모 영상 CTA
- * 2. Problem - 사용자 공감 (3가지 문제점)
- * 3. Solution - 인터랙티브 데모 (대화 → 블로그)
- * 4. How It Works - 3단계 가이드
- * 5. Social Proof - 사용자 블로그 갤러리
- * 6. CTA - 주요 전환 섹션
- * 7. FAQ - 자주 묻는 질문
- * 8. Footer - 최종 CTA + 링크
- *
- * 디자인 원칙:
- * - 미니멀/감성적 톤앤매너
- * - 생산성 혁신 강조
- * - 데모 영상 시청을 주요 전환 목표로 설정
- */
 export default function LandingPage() {
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
+
+  const jsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    name: 'Codebase',
+    url: siteUrl,
+    description: 'AI 자동포스팅 전문 블로그 플랫폼',
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: {
+        '@type': 'EntryPoint',
+        urlTemplate: `${siteUrl}/search?q={search_term_string}`,
+      },
+      'query-input': 'required name=search_term_string',
+    },
+    publisher: {
+      '@type': 'Organization',
+      name: 'Codebase',
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteUrl}/logo.png`,
+      },
+    },
+  };
+
   return (
-    <div className="min-h-screen bg-white dark:bg-gray-950 overflow-x-hidden">
-      {/* Hero Section - First Impression */}
-      <HeroSection />
-
-      {/* Problem Section - 공감 유도 */}
-      <ProblemSection />
-
-      {/* Solution Section - 핵심 기능 시연 */}
-      <SolutionSection />
-
-      {/* How It Works - 사용 방법 */}
-      <HowItWorksSection />
-
-      {/* Social Proof - 신뢰 구축 */}
-      <SocialProofSection />
-
-      {/* CTA Section - 주요 전환 */}
-      <CTASection />
-
-      {/* FAQ Section - 의심 해소 */}
-      <FAQSection />
-
-      {/* Footer - 최종 CTA + 링크 */}
-      <FooterCTA />
-    </div>
+    <>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
+      />
+      <LandingClientPage />
+    </>
   );
 }
