@@ -41,6 +41,9 @@ importers:
       nodemon:
         specifier: ^3.1.10
         version: 3.1.10
+      p-limit:
+        specifier: ^7.2.0
+        version: 7.2.0
       pino:
         specifier: ^9.11.0
         version: 9.11.0
@@ -815,6 +818,10 @@ packages:
   once@1.4.0:
     resolution: {integrity: sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w==}
 
+  p-limit@7.2.0:
+    resolution: {integrity: sha512-ATHLtwoTNDloHRFFxFJdHnG6n2WUeFjaR8XQMFdKIv0xkXjrER8/iG9iu265jOM95zXHAfv9oTkqhrfbIzosrQ==}
+    engines: {node: '>=20'}
+
   parseurl@1.3.3:
     resolution: {integrity: sha512-CiyeOxFT/JZyN5m0z9PfXw4SCBJ6Sygz1Dpl0wqjlhDEGGBP1GnsUVEL0p63hoG1fcj3fHynXi9NYO4nWOL+qQ==}
     engines: {node: '>= 0.8'}
@@ -1082,6 +1089,10 @@ packages:
   yn@3.1.1:
     resolution: {integrity: sha512-Ux4ygGWsu2c7isFWe8Yu1YluJmqVhxqK2cLXNQA5AcC3QfbGNpM7fu0Y8b/z16pXLnFxZYvWhd3fhBY9DLmC6Q==}
     engines: {node: '>=6'}
+
+  yocto-queue@1.2.2:
+    resolution: {integrity: sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==}
+    engines: {node: '>=12.20'}
 
   zod-to-json-schema@3.24.6:
     resolution: {integrity: sha512-h/z3PKvcTcTetyjl1fkj79MHNEjm+HpD6NXheWjzOekY7kV+lwDYnHw+ivHkijnCSMz1yJaWBD9vu/Fcmk+vEg==}
@@ -1778,6 +1789,10 @@ snapshots:
     dependencies:
       wrappy: 1.0.2
 
+  p-limit@7.2.0:
+    dependencies:
+      yocto-queue: 1.2.2
+
   parseurl@1.3.3: {}
 
   path-key@3.1.1: {}
@@ -2061,6 +2076,8 @@ snapshots:
   wrappy@1.0.2: {}
 
   yn@3.1.1: {}
+
+  yocto-queue@1.2.2: {}
 
   zod-to-json-schema@3.24.6(zod@3.25.76):
     dependencies:
