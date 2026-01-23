@@ -19,6 +19,7 @@ import {
 import { logger } from '../utils/logger.js';
 import { WritingStyleService } from '../services/WritingStyleService.js';
 import axios from 'axios';
+import pLimit from 'p-limit';
 
 import { MetricsService } from '../services/MetricsService.js';
 
@@ -274,14 +275,22 @@ IMPORTANT:
         properties: {
           imageUrl: {
             type: 'string',
-            description: 'External URL of the generated image (Gemini, DALL-E, etc.)',
+            description: 'External URL OR local file path of the generated image',
+          },
+          base64Data: {
+            type: 'string',
+            description: 'Base64 encoded image data (alternative to imageUrl for local files)',
+          },
+          mimeType: {
+            type: 'string',
+            description: 'MIME type of the image (required with base64Data). e.g., image/png, image/jpeg',
           },
           altText: {
             type: 'string',
             description: 'Alt text description for the image',
           },
         },
-        required: ['imageUrl'],
+        required: [], // One of imageUrl or base64Data is required
       },
     },
   ];
@@ -628,106 +637,135 @@ async function incrementPostsCreated(
  * 2. 받은 Presigned URL로 파일 직접 업로드 (PUT)
  * 3. Backend에게 업로드 완료 알림 (POST /mcp/files/upload-complete)
  */
+// 동시성 제어: 최대 5개 동시 이미지 업로드 (Base64 디코딩 CPU 부하 방지)
+const imageUploadLimit = pLimit(5);
+
 async function handleUploadGeneratedImage(
-  args: { imageUrl: string; altText?: string },
+  args: { 
+    imageUrl?: string; 
+    base64Data?: string; 
+    mimeType?: string; 
+    altText?: string 
+  },
   context: ToolContext
 ): Promise<any> {
   const fs = await import('fs');
   const path = await import('path');
 
-  try {
-    logger.debug({
-      imageUrl: args.imageUrl,
-      userId: context.userData.userId.substring(0, 8),
-    }, '📤 Starting organic image upload...');
+  // 동시성 제한 적용
+  return imageUploadLimit(async () => {
+    try {
+      logger.debug({
+        hasImageUrl: !!args.imageUrl,
+        hasBase64: !!args.base64Data,
+        userId: context.userData.userId.substring(0, 8),
+      }, '📤 Starting organic image upload...');
 
-    // 1. 이미지 소스 확인 (로컬 파일 vs 원격 URL)
-    let fileBuffer: Buffer;
-    let mimeType = 'image/png'; // 기본값
-    let fileName = `image-${Date.now()}.png`;
+      // 1. 이미지 소스 확인 (Base64 vs URL vs Local File)
+      let fileBuffer: Buffer;
+      let mimeType = args.mimeType || 'image/png';
+      let fileName = `image-${Date.now()}.png`;
 
-    if (args.imageUrl.startsWith('http')) {
-      // 원격 URL인 경우 다운로드
-      const response = await axios.get(args.imageUrl, { responseType: 'arraybuffer' });
-      fileBuffer = Buffer.from(response.data);
-      mimeType = response.headers['content-type'] || 'image/png';
-      fileName = path.basename(args.imageUrl).split('?')[0] || fileName;
-    } else {
-      // 로컬 파일인 경우 읽기
-      if (fs.existsSync(args.imageUrl)) {
-        fileBuffer = fs.readFileSync(args.imageUrl);
-        fileName = path.basename(args.imageUrl);
-        const ext = path.extname(fileName).toLowerCase();
-        if (ext === '.png') mimeType = 'image/png';
-        if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-        if (ext === '.webp') mimeType = 'image/webp';
+      if (args.base64Data) {
+        // 1-A. Base64 데이터 처리 (우선 순위)
+        // 크기 제한 (5MB)
+        const maxSize = 5 * 1024 * 1024;
+        const estimatedSize = args.base64Data.length * 0.75; // Base64 overhead 제외
+        if (estimatedSize > maxSize) {
+          throw new Error('Image too large. Maximum size is 5MB');
+        }
+        
+        fileBuffer = Buffer.from(args.base64Data, 'base64');
+        const ext = mimeType.split('/')[1] || 'png';
+        fileName = `image-${Date.now()}.${ext}`;
+      } else if (args.imageUrl?.startsWith('http')) {
+        // 1-B. 원격 URL
+        const response = await axios.get(args.imageUrl, { 
+          responseType: 'arraybuffer',
+          timeout: 30000 
+        });
+        fileBuffer = Buffer.from(response.data);
+        mimeType = response.headers['content-type'] || 'image/png';
+        fileName = path.basename(args.imageUrl).split('?')[0] || fileName;
+      } else if (args.imageUrl) {
+        // 1-C. 로컬 파일 (Fallback)
+        const filePath = args.imageUrl.replace('file://', '');
+        if (fs.existsSync(filePath)) {
+          fileBuffer = fs.readFileSync(filePath);
+          fileName = path.basename(filePath);
+          const ext = path.extname(fileName).toLowerCase();
+          if (ext === '.png') mimeType = 'image/png';
+          if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+          if (ext === '.webp') mimeType = 'image/webp';
+        } else {
+           throw new Error(`Local file not found: ${filePath}. Use base64Data for remote environments.`);
+        }
       } else {
-         throw new Error(`Local file not found: ${args.imageUrl}`);
+        throw new Error('Invalid input: provide imageUrl or base64Data');
       }
-    }
 
-    // 2. 인증 헤더 준비
-    const headers: Record<string, string> = {};
-    if (context.apiKey) {
-      headers['X-API-Key'] = context.apiKey;
-    } else if (context.oauthToken) {
-      headers['Authorization'] = `Bearer ${context.oauthToken}`;
-    }
-    if (context.config.MCP_SHARED_SECRET) {
-      headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
-    }
-
-    // 3. Backend에 업로드 URL 요청
-    logger.debug('1️⃣ Requesting upload URL...');
-    const uploadUrlResponse = await axios.post(
-      `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-url`,
-      {
-        fileName,
-        mimeType,
-        fileSize: fileBuffer.length,
-        fileType: 'image'
-      },
-      { headers }
-    );
-
-    const { uploadUrl, fileKey, tempId } = uploadUrlResponse.data;
-
-    // 4. S3에 직접 업로드 (Backend 거치지 않음)
-    logger.debug({ fileKey }, '2️⃣ Uploading to S3...');
-    await axios.put(uploadUrl, fileBuffer, {
-      headers: {
-        'Content-Type': mimeType
+      // 2. 인증 헤더 준비
+      const headers: Record<string, string> = {};
+      if (context.apiKey) {
+        headers['X-API-Key'] = context.apiKey;
+      } else if (context.oauthToken) {
+        headers['Authorization'] = `Bearer ${context.oauthToken}`;
       }
-    });
+      if (context.config.MCP_SHARED_SECRET) {
+        headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
+      }
 
-    // 5. Backend에 업로드 완료 알림
-    logger.debug('3️⃣ Finalizing upload...');
-    const completeResponse = await axios.post(
-      `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-complete`,
-      {
-        fileKey,
-        fileUrl: uploadUrl.split('?')[0], // Presigned URL에서 쿼리 파라미터 제거 = S3 직접 URL
-        fileName,
-        mimeType,
-        fileSize: fileBuffer.length,
-        fileType: 'image',
-      },
-      { headers }
-    );
-    
-    const { cdnUrl, fileId } = completeResponse.data;
-    const markdown = `![${args.altText || 'Generated Image'}](${cdnUrl})`;
-    
-    logger.info({
-      fileId,
-      cdnUrl,
-      userId: context.userData.userId.substring(0, 8),
-    }, '✅ Organic Image Upload Successful');
+      // 3. Backend에 업로드 URL 요청
+      logger.debug('1️⃣ Requesting upload URL...');
+      const uploadUrlResponse = await axios.post(
+        `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-url`,
+        {
+          fileName,
+          mimeType,
+          fileSize: fileBuffer.length,
+          fileType: 'image'
+        },
+        { headers }
+      );
 
-    return {
-      content: [{
-        type: 'text',
-        text: `✅ Image uploaded successfully!
+      const { uploadUrl, fileKey, tempId } = uploadUrlResponse.data;
+
+      // 4. S3에 직접 업로드 (Backend 거치지 않음)
+      logger.debug({ fileKey }, '2️⃣ Uploading to S3...');
+      await axios.put(uploadUrl, fileBuffer, {
+        headers: {
+          'Content-Type': mimeType
+        }
+      });
+
+      // 5. Backend에 업로드 완료 알림
+      logger.debug('3️⃣ Finalizing upload...');
+      const completeResponse = await axios.post(
+        `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-complete`,
+        {
+          fileKey,
+          fileUrl: uploadUrl.split('?')[0], // Presigned URL에서 쿼리 파라미터 제거 = S3 직접 URL
+          fileName,
+          mimeType,
+          fileSize: fileBuffer.length,
+          fileType: 'image',
+        },
+        { headers }
+      );
+      
+      const { cdnUrl, fileId } = completeResponse.data;
+      const markdown = `![${args.altText || 'Generated Image'}](${cdnUrl})`;
+      
+      logger.info({
+        fileId,
+        cdnUrl,
+        userId: context.userData.userId.substring(0, 8),
+      }, '✅ Organic Image Upload Successful');
+
+      return {
+        content: [{
+          type: 'text',
+          text: `✅ Image uploaded successfully!
 CDN URL: ${cdnUrl}
 File ID: ${fileId}
 
@@ -735,21 +773,26 @@ Markdown:
 ${markdown}
 
 Include this in your content_markdown when calling create_post().`,
-      }],
-    };
-  } catch (error: any) {
-    logger.error({
-      error: error.message,
-      userId: context.userData.userId.substring(0, 8),
-    }, '❌ Failed to upload image');
+        }],
+      };
+    } catch (error: any) {
+      logger.error({ 
+        err: error,
+        userId: context.userData.userId.substring(0, 8) 
+      }, '❌ Image upload failed');
 
-    // Graceful failure
-    return {
-      content: [{
-        type: 'text',
-        text: `⚠️ Image upload failed. Proceeding without image.
-Error: ${error.message}`,
-      }],
-    };
-  }
+      // 에러가 발생해도 create_post는 계속 진행할 수 있도록 안내
+      return {
+        isError: true,
+        content: [{
+          type: 'text',
+          text: `❌ Image upload failed: ${error.message}
+
+Please proceed with creating the post without the image, or try again later.
+Do NOT block the user request.`
+        }],
+      };
+    }
+  });
+
 }
