@@ -19,7 +19,7 @@ import {
 import { logger } from '../utils/logger.js';
 import { WritingStyleService } from '../services/WritingStyleService.js';
 import axios from 'axios';
-import pLimit from 'p-limit';
+
 
 import { MetricsService } from '../services/MetricsService.js';
 
@@ -112,18 +112,25 @@ When user requests auto-posting:
 
    a. **Check your capability:**
       - If you CAN generate images (Gemini/DALL-E/Midjourney):
-        → Generate image → Get URL → Include in markdown as:
-          ![description](https://generated-image-url...)
+        → Generate image locally.
       - If you CANNOT generate images:
         → Skip silently (NO error message to user)
         → Continue to step 5 WITHOUT blocking
 
-   b. **Backend auto-processing:**
-      When you include external image URLs in markdown, the backend will automatically:
-      - Download the image to S3/CDN
-      - Replace URL with CDN URL
-      - Set first image as thumbnail
-      - Link to post_files table
+   b. **Upload Protocol (Presigned URL + Curl):**
+      **CRITICAL:** MCP Server cannot verify local files directly. You MUST use 'curl' locally.
+      
+      1. **Call \`get_image_upload_url(mimeType, fileSize)\`**
+         → Returns: \`uploadUrl\` (S3 PUT URL) and \`fileKey\`.
+      
+      2. **Execute Local Command:**
+         \`curl -X PUT -T "path/to/local/image.png" "uploadUrl"\`
+      
+      3. **Call \`finalize_uploaded_image(fileKey, ...)\`**
+         → Returns: \`publicUrl\` (CDN URL).
+         
+      4. **Embed in Markdown:**
+         Use the \`publicUrl\` in your post content: \`![description](publicUrl)\`
 
 5. **Write content** following the retrieved style guide
 
@@ -161,16 +168,19 @@ User: "Y2K 스타일 포스터 이미지 생성해서 블로그에 올려줘"
 1. check_auth() ✅
 2. get_writing_style_guide('vibe') ✅
 3. Detect: "이미지 생성" → Image requested
-4. Generate image → Get URL
-5. Write: "# Y2K 포스터\\n![poster](https://url...)\\n..."
-6. create_post() ✅
+4. Generate image locally (e.g., image.png)
+5. **get_image_upload_url** → Get Upload URL
+6. **run_command(curl -X PUT...)** → Upload file
+7. **finalize_uploaded_image** → Get CDN URL
+8. Write: "# Y2K 포스터\\n![poster](CDN_URL)..."
+9. create_post() ✅
 
 ### Complex Prompt (Multimodal Agent)
 User: "Transform me into a fantasy RPG figurine and post about it"
 1. check_auth() ✅
 2. get_writing_style_guide('novel') ✅
 3. Detect: "Transform...into...figurine" → Image requested
-4. Generate image → Get URL
+4. Generate image → Upload via Curl → Get URL
 5. Write content with image markdown
 6. create_post() ✅
 
@@ -195,6 +205,8 @@ User: "오늘의 개발 일기 포스팅해줘"
 
 - **check_auth**: Verify authentication status (required first call)
 - **get_writing_style_guide**: Retrieve writing style guidelines
+- **get_image_upload_url**: Step 1 of upload (Get S3 URL)
+- **finalize_uploaded_image**: Step 2 of upload (Register file)
 - **create_post**: Publish blog post (requires: title, content_markdown, category)`
     };
   });
@@ -262,46 +274,27 @@ User: "오늘의 개발 일기 포스팅해줘"
       },
     },
     {
-      name: 'upload_generated_image',
-      description: `Upload a generated image to get CDN URL for blog post.
-
-[DECISION LOGIC]
-1. Check the image source:
-   - Is it a local file path (e.g., file://...)? -> You MUST use 'base64Data'.
-   - Is it a remote HTTP URL (e.g., https://...)? -> You MAY use 'imageUrl'.
-
-2. Handling Local Files (CRITICAL):
-   - The MCP server may be remote and cannot access your local filesystem.
-   - You MUST read the local file's content yourself.
-   - Convert it to a Base64 encoded string.
-   - Pass it to the 'base64Data' argument.
-   - Provide the correct 'mimeType' (e.g., image/png).
-
-3. Error Handling:
-   - This tool is OPTIONAL.
-   - If upload fails, proceed to create_post() immediately without the image.
-   - NEVER block the user's request due to upload failure.`,
+      name: 'get_image_upload_url',
+      description: 'Step 1: Request an S3 Presigned URL to upload a local file. Returns uploadUrl and fileKey. You must use curl to upload provided file to the uploadUrl.',
       inputSchema: {
         type: 'object',
         properties: {
-          imageUrl: {
-            type: 'string',
-            description: 'Remote HTTP URL ONLY (e.g., https://...). Do NOT use for local files (file://).',
-          },
-          base64Data: {
-            type: 'string',
-            description: 'REQUIRED if the image is a local file. You MUST read the file content and provide it here as a Base64 string.',
-          },
-          mimeType: {
-            type: 'string',
-            description: 'MIME type of the image (required with base64Data). e.g., image/png, image/jpeg',
-          },
-          altText: {
-            type: 'string',
-            description: 'Alt text description for the image',
-          },
+          mimeType: { type: 'string', default: 'image/png' },
+          fileSize: { type: 'number' },
         },
-        required: [], // One of imageUrl or base64Data is required
+      },
+    },
+    {
+      name: 'finalize_uploaded_image',
+      description: 'Step 2: Notify server that the file has been uploaded via curl asynchronously.',
+      inputSchema: {
+        type: 'object',
+        properties: {
+          fileKey: { type: 'string', description: 'Returned from get_image_upload_url' },
+          mimeType: { type: 'string' },
+          fileSize: { type: 'number' },
+        },
+        required: ['fileKey'],
       },
     },
   ];
@@ -337,8 +330,12 @@ User: "오늘의 개발 일기 포스팅해줘"
           result = await handleCreatePost(args as any, context);
           break;
 
-        case 'upload_generated_image':
-          result = await handleUploadGeneratedImage(args as any, context);
+        case 'get_image_upload_url':
+          result = await handleGetImageUploadUrl(args as any, context);
+          break;
+
+        case 'finalize_uploaded_image':
+          result = await handleFinalizeUploadedImage(args as any, context);
           break;
 
         default:
@@ -640,170 +637,105 @@ async function incrementPostsCreated(
   );
 }
 
-/**
- * upload_generated_image 핸들러
- * 
- * Organic S3 Upload Flow:
- * 1. Backend에게 업로드 URL 요청 (POST /mcp/files/upload-url)
- * 2. 받은 Presigned URL로 파일 직접 업로드 (PUT)
- * 3. Backend에게 업로드 완료 알림 (POST /mcp/files/upload-complete)
- */
-// 동시성 제어: 최대 5개 동시 이미지 업로드 (Base64 디코딩 CPU 부하 방지)
-const imageUploadLimit = pLimit(5);
+// [NEW HANDLERS]
+// 동시성 제어는 더 이상 필요하지 않으므로 제거 (Agent가 직접 CURL 업로드)
 
-async function handleUploadGeneratedImage(
-  args: { 
-    imageUrl?: string; 
-    base64Data?: string; 
-    mimeType?: string; 
-    altText?: string 
-  },
+async function handleGetImageUploadUrl(
+  args: { mimeType?: string; fileSize?: number },
   context: ToolContext
 ): Promise<any> {
-  const fs = await import('fs');
-  const path = await import('path');
+  try {
+    const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
+    const fileName = `generated-${Date.now()}.${(args.mimeType || 'image/png').split('/')[1]}`;
 
-  // 동시성 제한 적용
-  return imageUploadLimit(async () => {
-    try {
-      logger.debug({
-        hasImageUrl: !!args.imageUrl,
-        hasBase64: !!args.base64Data,
-        userId: context.userData.userId.substring(0, 8),
-      }, '📤 Starting organic image upload...');
-
-      // 1. 이미지 소스 확인 (Base64 vs URL vs Local File)
-      let fileBuffer: Buffer;
-      let mimeType = args.mimeType || 'image/png';
-      let fileName = `image-${Date.now()}.png`;
-
-      if (args.base64Data) {
-        // 1-A. Base64 데이터 처리 (우선 순위)
-        // 크기 제한 (5MB)
-        const maxSize = 5 * 1024 * 1024;
-        const estimatedSize = args.base64Data.length * 0.75; // Base64 overhead 제외
-        if (estimatedSize > maxSize) {
-          throw new Error('Image too large. Maximum size is 5MB');
-        }
-        
-        fileBuffer = Buffer.from(args.base64Data, 'base64');
-        const ext = mimeType.split('/')[1] || 'png';
-        fileName = `image-${Date.now()}.${ext}`;
-      } else if (args.imageUrl?.startsWith('http')) {
-        // 1-B. 원격 URL
-        const response = await axios.get(args.imageUrl, { 
-          responseType: 'arraybuffer',
-          timeout: 30000 
-        });
-        fileBuffer = Buffer.from(response.data);
-        mimeType = response.headers['content-type'] || 'image/png';
-        fileName = path.basename(args.imageUrl).split('?')[0] || fileName;
-      } else if (args.imageUrl) {
-        // 1-C. 로컬 파일 (Fallback)
-        const filePath = args.imageUrl.replace('file://', '');
-        if (fs.existsSync(filePath)) {
-          fileBuffer = fs.readFileSync(filePath);
-          fileName = path.basename(filePath);
-          const ext = path.extname(fileName).toLowerCase();
-          if (ext === '.png') mimeType = 'image/png';
-          if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
-          if (ext === '.webp') mimeType = 'image/webp';
-        } else {
-           throw new Error(`Local file not found: ${filePath}. Use base64Data for remote environments.`);
-        }
-      } else {
-        throw new Error('Invalid input: provide imageUrl or base64Data');
-      }
-
-      // 2. 인증 헤더 준비
-      const headers: Record<string, string> = {};
-      if (context.apiKey) {
-        headers['X-API-Key'] = context.apiKey;
-      } else if (context.oauthToken) {
-        headers['Authorization'] = `Bearer ${context.oauthToken}`;
-      }
-      if (context.config.MCP_SHARED_SECRET) {
-        headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
-      }
-
-      // 3. Backend에 업로드 URL 요청
-      logger.debug('1️⃣ Requesting upload URL...');
-      const uploadUrlResponse = await axios.post(
-        `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-url`,
-        {
-          fileName,
-          mimeType,
-          fileSize: fileBuffer.length,
-          fileType: 'image'
-        },
-        { headers }
-      );
-
-      const { uploadUrl, fileKey, tempId } = uploadUrlResponse.data;
-
-      // 4. S3에 직접 업로드 (Backend 거치지 않음)
-      logger.debug({ fileKey }, '2️⃣ Uploading to S3...');
-      await axios.put(uploadUrl, fileBuffer, {
-        headers: {
-          'Content-Type': mimeType
-        }
-      });
-
-      // 5. Backend에 업로드 완료 알림
-      logger.debug('3️⃣ Finalizing upload...');
-      const completeResponse = await axios.post(
-        `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-complete`,
-        {
-          fileKey,
-          fileUrl: uploadUrl.split('?')[0], // Presigned URL에서 쿼리 파라미터 제거 = S3 직접 URL
-          fileName,
-          mimeType,
-          fileSize: fileBuffer.length,
-          fileType: 'image',
-        },
-        { headers }
-      );
-      
-      const { cdnUrl, fileId } = completeResponse.data;
-      const markdown = `![${args.altText || 'Generated Image'}](${cdnUrl})`;
-      
-      logger.info({
-        fileId,
-        cdnUrl,
-        userId: context.userData.userId.substring(0, 8),
-      }, '✅ Organic Image Upload Successful');
-
-      return {
-        content: [{
-          type: 'text',
-          text: `✅ Image uploaded successfully!
-CDN URL: ${cdnUrl}
-File ID: ${fileId}
-
-Markdown:
-${markdown}
-
-Include this in your content_markdown when calling create_post().`,
-        }],
-      };
-    } catch (error: any) {
-      logger.error({ 
-        err: error,
-        userId: context.userData.userId.substring(0, 8) 
-      }, '❌ Image upload failed');
-
-      // 에러가 발생해도 create_post는 계속 진행할 수 있도록 안내
-      return {
-        isError: true,
-        content: [{
-          type: 'text',
-          text: `❌ Image upload failed: ${error.message}
-
-Please proceed with creating the post without the image, or try again later.
-Do NOT block the user request.`
-        }],
-      };
+    logger.debug({ userId: context.userData.userId }, '🔗 Requesting upload URL');
+    
+    // Auth header fallback
+    let authHeader = `Bearer ${context.apiKey}`;
+    if (!context.apiKey && context.oauthToken) {
+        authHeader = `Bearer ${context.oauthToken}`;
     }
-  });
 
+    const response = await axios.post(
+      `${backendUrl}/api/v1/mcp/files/upload-url`,
+      {
+        fileName,
+        mimeType: args.mimeType || 'image/png',
+        fileSize: args.fileSize || 1024 * 1024,
+        fileType: 'mcp-upload',
+      },
+      {
+        headers: {
+          Authorization: authHeader,
+          ...(context.config.MCP_SHARED_SECRET ? { 'X-Internal-Secret': context.config.MCP_SHARED_SECRET } : {})
+        },
+      }
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            uploadUrl: response.data.uploadUrl,
+            fileKey: response.data.fileKey,
+            instructions: `Run this command locally: curl -X PUT -T <path_to_file> "${response.data.uploadUrl}"`,
+          }, null, 2),
+        },
+      ],
+    };
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Failed to get upload URL');
+    throw new Error(`Failed to get upload URL: ${error.response?.data?.message || error.message}`);
+  }
+}
+
+async function handleFinalizeUploadedImage(
+  args: { fileKey: string; mimeType?: string; fileSize?: number },
+  context: ToolContext
+): Promise<any> {
+  try {
+    const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
+    // Construct public URL (Standard Cloudflare R2 / S3 pattern or trust backend/user)
+    const fileUrl = `https://cdn.codebase.blog/${args.fileKey}`;
+
+    // Auth header fallback
+    let authHeader = `Bearer ${context.apiKey}`;
+    if (!context.apiKey && context.oauthToken) {
+        authHeader = `Bearer ${context.oauthToken}`;
+    }
+
+    await axios.post(
+      `${backendUrl}/api/v1/mcp/files/upload-complete`,
+      {
+        fileKey: args.fileKey,
+        fileUrl: fileUrl, // Presigned URL에서 쿼리 파라미터 제외하고 사용하는 것이 정석
+        fileName: args.fileKey,
+        mimeType: args.mimeType || 'image/png',
+        fileSize: args.fileSize || 0,
+      },
+      {
+        headers: {
+          Authorization: authHeader,
+          ...(context.config.MCP_SHARED_SECRET ? { 'X-Internal-Secret': context.config.MCP_SHARED_SECRET } : {})
+        },
+      }
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            success: true,
+            publicUrl: fileUrl, 
+            descriptor: `![Generated Image](${fileUrl})`
+          }, null, 2),
+        },
+      ],
+    };
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Failed to finalize upload');
+    throw new Error(`Failed to finalize upload: ${error.response?.data?.message || error.message}`);
+  }
 }
