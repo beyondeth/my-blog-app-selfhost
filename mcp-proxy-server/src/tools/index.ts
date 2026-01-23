@@ -651,9 +651,14 @@ async function handleGetImageUploadUrl(
     logger.debug({ userId: context.userData.userId }, '🔗 Requesting upload URL');
     
     // Auth header fallback
-    let authHeader = `Bearer ${context.apiKey}`;
-    if (!context.apiKey && context.oauthToken) {
-        authHeader = `Bearer ${context.oauthToken}`;
+    const headers: Record<string, string> = {
+      ...(context.config.MCP_SHARED_SECRET ? { 'X-Internal-Secret': context.config.MCP_SHARED_SECRET } : {})
+    };
+
+    if (context.apiKey) {
+      headers['X-API-Key'] = context.apiKey;
+    } else if (context.oauthToken) {
+      headers['Authorization'] = `Bearer ${context.oauthToken}`;
     }
 
     const response = await axios.post(
@@ -665,10 +670,7 @@ async function handleGetImageUploadUrl(
         fileType: 'mcp-upload',
       },
       {
-        headers: {
-          Authorization: authHeader,
-          ...(context.config.MCP_SHARED_SECRET ? { 'X-Internal-Secret': context.config.MCP_SHARED_SECRET } : {})
-        },
+        headers,
       }
     );
 
@@ -700,9 +702,14 @@ async function handleFinalizeUploadedImage(
     const fileUrl = `https://cdn.codebase.blog/${args.fileKey}`;
 
     // Auth header fallback
-    let authHeader = `Bearer ${context.apiKey}`;
-    if (!context.apiKey && context.oauthToken) {
-        authHeader = `Bearer ${context.oauthToken}`;
+    const headers: Record<string, string> = {
+      ...(context.config.MCP_SHARED_SECRET ? { 'X-Internal-Secret': context.config.MCP_SHARED_SECRET } : {})
+    };
+
+    if (context.apiKey) {
+      headers['X-API-Key'] = context.apiKey;
+    } else if (context.oauthToken) {
+      headers['Authorization'] = `Bearer ${context.oauthToken}`;
     }
 
     await axios.post(
@@ -715,10 +722,7 @@ async function handleFinalizeUploadedImage(
         fileSize: args.fileSize || 0,
       },
       {
-        headers: {
-          Authorization: authHeader,
-          ...(context.config.MCP_SHARED_SECRET ? { 'X-Internal-Secret': context.config.MCP_SHARED_SECRET } : {})
-        },
+        headers,
       }
     );
 
