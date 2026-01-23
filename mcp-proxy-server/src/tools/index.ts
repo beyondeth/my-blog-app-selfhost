@@ -71,12 +71,18 @@ export async function registerAllTools(
       },
       instructions: `# Codebase.blog Auto-posting MCP Server
 
+## ⚠️ CRITICAL RULE
+
+> **create_post() must ALWAYS execute regardless of image generation success.**
+> Never block or refuse posting due to image issues.
+
 ## Workflow
 
-When user requests auto-posting with style flags (e.g., "create post --default"):
+When user requests auto-posting:
 
-1. Call check_auth() to verify authentication
-2. Call get_writing_style_guide(style) with appropriate style parameter:
+1. **Call check_auth()** to verify authentication
+
+2. **Call get_writing_style_guide(style)** with appropriate style:
    - --novel → 'novel'
    - --tutorial → 'tutorial'
    - --comedy → 'comedy'
@@ -84,33 +90,111 @@ When user requests auto-posting with style flags (e.g., "create post --default")
    - --vibe → 'vibe'
    - --research → 'research'
    - --default or no flag → 'default'
-3. Write content following the retrieved style guide
-4. **Select a category** that best describes the post content (REQUIRED)
-5. Call create_post() to publish (must include title, content_markdown, and category)
+
+3. **[IMAGE DETECTION]** Analyze if user wants image generation:
+
+   **Direct Keywords:**
+   - 한국어: 이미지 생성, 그림 그려, 사진 만들어, 포스터, 일러스트, 이미지 첨부
+   - English: generate image, create image, make image, with image, attach image
+
+   **Complex Patterns (also trigger image generation):**
+   - "Transform [X] into [figurine/character/artwork]..."
+   - "Turn [me/this] into [action figure/character/art]..."
+   - "Create a [4K/HD/realistic] [photo/picture/portrait]..."
+   - "Convert [this] into [1980s/Y2K/retro style]..."
+   - "Design [a poster/artwork/illustration]..."
+   - Any request describing visual transformation
+
+4. **[IMAGE GENERATION - CONDITIONAL]**
+
+   IF image generation is requested:
+
+   a. **Check your capability:**
+      - If you CAN generate images (Gemini/DALL-E/Midjourney):
+        → Generate image → Get URL → Include in markdown as:
+          ![description](https://generated-image-url...)
+      - If you CANNOT generate images:
+        → Skip silently (NO error message to user)
+        → Continue to step 5 WITHOUT blocking
+
+   b. **Backend auto-processing:**
+      When you include external image URLs in markdown, the backend will automatically:
+      - Download the image to S3/CDN
+      - Replace URL with CDN URL
+      - Set first image as thumbnail
+      - Link to post_files table
+
+5. **Write content** following the retrieved style guide
+
+6. **Select a category** (REQUIRED)
+
+7. **Call create_post()** - THIS IS MANDATORY
+   - Execute even if image generation failed
+   - Execute even if you don't support image generation
+   - Never skip this step
+
+## Fallback Behavior Matrix
+
+| Scenario | Image Included? | create_post Executed? |
+|----------|-----------------|----------------------|
+| Image requested + Generated successfully | ✅ Yes | ✅ Yes |
+| Image requested + Generation failed | ❌ No | ✅ Yes |
+| Image requested + Agent doesn't support images | ❌ No | ✅ Yes |
+| No image requested | ❌ No | ✅ Yes |
 
 ## Available Styles
 
-**Priority:** Preset styles (default if no flag) → Custom markdown (if user provides)
-
-- **default**: Professional technical blog (formal, detailed analysis) - used when no flag specified
+- **default**: Professional technical blog (formal, detailed analysis)
 - **novel**: Narrative storytelling (vivid descriptions, emotional journey)
 - **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
 - **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
 - **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
 - **vibe**: Developer learning guide (friendly, conversational, concept-focused)
 - **research**: Academic paper analysis (claims, evidence, and practical insights)
-- **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
+- **custom**: Pass user-provided markdown to customMarkdown parameter
 
-## Important Requirements
+## Example Workflows
 
-- **Category is REQUIRED**: Every post must have exactly 1 category that describes its content
-- **Tags are optional**: Add up to 10 tags to help with post discoverability
+### With Image (Multimodal Agent)
+User: "Y2K 스타일 포스터 이미지 생성해서 블로그에 올려줘"
+1. check_auth() ✅
+2. get_writing_style_guide('vibe') ✅
+3. Detect: "이미지 생성" → Image requested
+4. Generate image → Get URL
+5. Write: "# Y2K 포스터\\n![poster](https://url...)\\n..."
+6. create_post() ✅
+
+### Complex Prompt (Multimodal Agent)
+User: "Transform me into a fantasy RPG figurine and post about it"
+1. check_auth() ✅
+2. get_writing_style_guide('novel') ✅
+3. Detect: "Transform...into...figurine" → Image requested
+4. Generate image → Get URL
+5. Write content with image markdown
+6. create_post() ✅
+
+### Non-Multimodal Agent
+User: "이미지 생성해서 포스팅해줘"
+1. check_auth() ✅
+2. get_writing_style_guide('default') ✅
+3. Detect image request ✅
+4. Cannot generate images → Skip silently (NO error shown)
+5. Write text-only content
+6. create_post() ✅ ← Still executes!
+
+### No Image Requested
+User: "오늘의 개발 일기 포스팅해줘"
+1. check_auth() ✅
+2. get_writing_style_guide('default') ✅
+3. No image keywords/patterns → Skip step 4
+5. Write content
+6. create_post() ✅
 
 ## Tools
 
 - **check_auth**: Verify authentication status (required first call)
 - **get_writing_style_guide**: Retrieve writing style guidelines
-- **create_post**: Publish blog post to codebase.blog (requires: title, content_markdown, category)`
+- **create_post**: Publish blog post (requires: title, content_markdown, category)`
     };
   });
 
@@ -176,6 +260,30 @@ When user requests auto-posting with style flags (e.g., "create post --default")
         required: ['title', 'content_markdown', 'category'],
       },
     },
+    {
+      name: 'upload_generated_image',
+      description: `Upload a generated image to get CDN URL for blog post.
+      
+IMPORTANT:
+- This tool is OPTIONAL
+- Only call if you successfully generated an image
+- If this tool fails, proceed to create_post() anyway
+- Never block posting due to image upload failure`,
+      inputSchema: {
+        type: 'object',
+        properties: {
+          imageUrl: {
+            type: 'string',
+            description: 'External URL of the generated image (Gemini, DALL-E, etc.)',
+          },
+          altText: {
+            type: 'string',
+            description: 'Alt text description for the image',
+          },
+        },
+        required: ['imageUrl'],
+      },
+    },
   ];
 
   // 도구 목록 핸들러
@@ -207,6 +315,10 @@ When user requests auto-posting with style flags (e.g., "create post --default")
 
         case 'create_post':
           result = await handleCreatePost(args as any, context);
+          break;
+
+        case 'upload_generated_image':
+          result = await handleUploadGeneratedImage(args as any, context);
           break;
 
         default:
@@ -506,4 +618,138 @@ async function incrementPostsCreated(
     {},
     { timeout: 3000, headers }
   );
+}
+
+/**
+ * upload_generated_image 핸들러
+ * 
+ * Organic S3 Upload Flow:
+ * 1. Backend에게 업로드 URL 요청 (POST /mcp/files/upload-url)
+ * 2. 받은 Presigned URL로 파일 직접 업로드 (PUT)
+ * 3. Backend에게 업로드 완료 알림 (POST /mcp/files/upload-complete)
+ */
+async function handleUploadGeneratedImage(
+  args: { imageUrl: string; altText?: string },
+  context: ToolContext
+): Promise<any> {
+  const fs = await import('fs');
+  const path = await import('path');
+
+  try {
+    logger.debug({
+      imageUrl: args.imageUrl,
+      userId: context.userData.userId.substring(0, 8),
+    }, '📤 Starting organic image upload...');
+
+    // 1. 이미지 소스 확인 (로컬 파일 vs 원격 URL)
+    let fileBuffer: Buffer;
+    let mimeType = 'image/png'; // 기본값
+    let fileName = `image-${Date.now()}.png`;
+
+    if (args.imageUrl.startsWith('http')) {
+      // 원격 URL인 경우 다운로드
+      const response = await axios.get(args.imageUrl, { responseType: 'arraybuffer' });
+      fileBuffer = Buffer.from(response.data);
+      mimeType = response.headers['content-type'] || 'image/png';
+      fileName = path.basename(args.imageUrl).split('?')[0] || fileName;
+    } else {
+      // 로컬 파일인 경우 읽기
+      if (fs.existsSync(args.imageUrl)) {
+        fileBuffer = fs.readFileSync(args.imageUrl);
+        fileName = path.basename(args.imageUrl);
+        const ext = path.extname(fileName).toLowerCase();
+        if (ext === '.png') mimeType = 'image/png';
+        if (ext === '.jpg' || ext === '.jpeg') mimeType = 'image/jpeg';
+        if (ext === '.webp') mimeType = 'image/webp';
+      } else {
+         throw new Error(`Local file not found: ${args.imageUrl}`);
+      }
+    }
+
+    // 2. 인증 헤더 준비
+    const headers: Record<string, string> = {};
+    if (context.apiKey) {
+      headers['X-API-Key'] = context.apiKey;
+    } else if (context.oauthToken) {
+      headers['Authorization'] = `Bearer ${context.oauthToken}`;
+    }
+    if (context.config.MCP_SHARED_SECRET) {
+      headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
+    }
+
+    // 3. Backend에 업로드 URL 요청
+    logger.debug('1️⃣ Requesting upload URL...');
+    const uploadUrlResponse = await axios.post(
+      `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-url`,
+      {
+        fileName,
+        mimeType,
+        fileSize: fileBuffer.length,
+        fileType: 'image'
+      },
+      { headers }
+    );
+
+    const { uploadUrl, fileKey, tempId } = uploadUrlResponse.data;
+
+    // 4. S3에 직접 업로드 (Backend 거치지 않음)
+    logger.debug({ fileKey }, '2️⃣ Uploading to S3...');
+    await axios.put(uploadUrl, fileBuffer, {
+      headers: {
+        'Content-Type': mimeType
+      }
+    });
+
+    // 5. Backend에 업로드 완료 알림
+    logger.debug('3️⃣ Finalizing upload...');
+    const completeResponse = await axios.post(
+      `${context.config.BACKEND_BASE_URL}/api/v1/mcp/files/upload-complete`,
+      {
+        fileKey,
+        fileUrl: uploadUrl.split('?')[0], // Presigned URL에서 쿼리 파라미터 제거 = S3 직접 URL
+        fileName,
+        mimeType,
+        fileSize: fileBuffer.length,
+        fileType: 'image',
+      },
+      { headers }
+    );
+    
+    const { cdnUrl, fileId } = completeResponse.data;
+    const markdown = `![${args.altText || 'Generated Image'}](${cdnUrl})`;
+    
+    logger.info({
+      fileId,
+      cdnUrl,
+      userId: context.userData.userId.substring(0, 8),
+    }, '✅ Organic Image Upload Successful');
+
+    return {
+      content: [{
+        type: 'text',
+        text: `✅ Image uploaded successfully!
+CDN URL: ${cdnUrl}
+File ID: ${fileId}
+
+Markdown:
+${markdown}
+
+Include this in your content_markdown when calling create_post().`,
+      }],
+    };
+  } catch (error: any) {
+    logger.error({
+      error: error.message,
+      userId: context.userData.userId.substring(0, 8),
+    }, '❌ Failed to upload image');
+
+    // Graceful failure
+    return {
+      content: [{
+        type: 'text',
+        text: `⚠️ Image upload failed. Proceeding without image.
+Error: ${error.message}`,
+      }],
+    };
+  }
 }

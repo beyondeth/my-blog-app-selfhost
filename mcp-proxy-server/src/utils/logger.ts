@@ -120,9 +120,10 @@ export const httpLogger = (req: any, res: any, next: any) => {
     req.id = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  // 폴링 엔드포인트는 debug 레벨로 로깅 (로그 verbosity 감소)
-  const isStatusEndpoint = req.url.includes('/status');
-  const logLevel = isStatusEndpoint ? 'debug' : 'info';
+  // 폴링/헬스체크 엔드포인트는 debug 레벨로 로깅 (로그 verbosity 감소)
+  const isPollingEndpoint = req.url.includes('/status') || 
+                            (req.method === 'GET' && req.url === '/mcp');
+  const logLevel = isPollingEndpoint ? 'debug' : 'info';
 
   // 요청 로깅
   logger[logLevel]({

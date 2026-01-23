@@ -305,9 +305,12 @@ export class FilesService {
     const { fileName, mimeType, fileSize, fileType } = createUploadUrlDto;
 
     try {
-      // 이미지 파일인 경우 WebP만 허용
-      if (fileType === "image" && mimeType !== "image/webp") {
-        throw new Error("이미지 업로드는 WebP 형식만 허용됩니다.");
+      // 이미지 파일인 경우 WebP, PNG, JPEG 허용 (MCP 업로드 호환)
+      if (fileType === "image") {
+        const allowedImageTypes = ["image/webp", "image/png", "image/jpeg", "image/jpg"];
+        if (!allowedImageTypes.includes(mimeType)) {
+          throw new Error("지원되지 않는 이미지 형식입니다. WebP, PNG, JPEG만 허용됩니다.");
+        }
       }
 
       // 문서 파일인 경우 기존 검증 로직 적용

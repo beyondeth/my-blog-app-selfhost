@@ -197,7 +197,11 @@ export class ExternalImageDownloadService {
    * @param userId 사용자 ID
    * @returns File 엔티티 또는 null (실패 시)
    */
-  private async downloadAndProcessImage(
+  /**
+   * 단일 이미지 다운로드 및 처리
+   * MCP 도구에서도 사용 (Public)
+   */
+  public async downloadAndProcessImage(
     imageUrl: string,
     userId: string,
   ): Promise<File | null> {
