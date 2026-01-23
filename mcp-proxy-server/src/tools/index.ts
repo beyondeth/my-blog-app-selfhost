@@ -264,12 +264,23 @@ User: "오늘의 개발 일기 포스팅해줘"
     {
       name: 'upload_generated_image',
       description: `Upload a generated image to get CDN URL for blog post.
-      
-IMPORTANT:
-- This tool is OPTIONAL
-- Only call if you successfully generated an image
-- If this tool fails, proceed to create_post() anyway
-- Never block posting due to image upload failure`,
+
+[DECISION LOGIC]
+1. Check the image source:
+   - Is it a local file path (e.g., file://...)? -> You MUST use 'base64Data'.
+   - Is it a remote HTTP URL (e.g., https://...)? -> You MAY use 'imageUrl'.
+
+2. Handling Local Files (CRITICAL):
+   - The MCP server may be remote and cannot access your local filesystem.
+   - You MUST read the local file's content yourself.
+   - Convert it to a Base64 encoded string.
+   - Pass it to the 'base64Data' argument.
+   - Provide the correct 'mimeType' (e.g., image/png).
+
+3. Error Handling:
+   - This tool is OPTIONAL.
+   - If upload fails, proceed to create_post() immediately without the image.
+   - NEVER block the user's request due to upload failure.`,
       inputSchema: {
         type: 'object',
         properties: {
@@ -279,7 +290,7 @@ IMPORTANT:
           },
           base64Data: {
             type: 'string',
-            description: 'Base64 encoded image data (alternative to imageUrl for local files)',
+            description: 'REQUIRED if the image is a local file (file://). You MUST read the file and provide the Base64 encoded string here. Do NOT use imageUrl for local files.',
           },
           mimeType: {
             type: 'string',
