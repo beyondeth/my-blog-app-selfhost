@@ -286,11 +286,11 @@ User: "오늘의 개발 일기 포스팅해줘"
         properties: {
           imageUrl: {
             type: 'string',
-            description: 'External URL OR local file path of the generated image',
+            description: 'Remote HTTP URL ONLY (e.g., https://...). Do NOT use for local files (file://).',
           },
           base64Data: {
             type: 'string',
-            description: 'REQUIRED if the image is a local file (file://). You MUST read the file and provide the Base64 encoded string here. Do NOT use imageUrl for local files.',
+            description: 'REQUIRED if the image is a local file. You MUST read the file content and provide it here as a Base64 string.',
           },
           mimeType: {
             type: 'string',
