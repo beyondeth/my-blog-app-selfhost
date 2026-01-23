@@ -681,7 +681,7 @@ async function handleGetImageUploadUrl(
           text: JSON.stringify({
             uploadUrl: response.data.uploadUrl,
             fileKey: response.data.fileKey,
-            instructions: `Run this command locally: curl -X PUT -T <path_to_file> "${response.data.uploadUrl}"`,
+            instructions: `Run this command locally: curl -X PUT -H "Content-Type: ${args.mimeType || 'image/png'}" -T <path_to_file> "${response.data.uploadUrl}"`,
           }, null, 2),
         },
       ],
