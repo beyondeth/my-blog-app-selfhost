@@ -10,6 +10,33 @@ export const getMcpJsonConfig = (apiKey: string) => `{
   }
 }`;
 
+
+export const getAntigravityConfig = (apiKey: string, includeComment: boolean = true) =>
+  includeComment
+    ? `// 설정 위치: Manage MCP Servers -> Configure
+{
+  "mcpServers": {
+    "codebase-blog-mcp": {
+      "serverUrl": "https://mcp.codebase.blog/mcp",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}",
+        "Accept": "application/json, text/event-stream"
+      }
+    }
+  }
+}`
+    : `{
+  "mcpServers": {
+    "codebase-blog-mcp": {
+      "serverUrl": "https://mcp.codebase.blog/mcp",
+      "headers": {
+        "Authorization": "Bearer ${apiKey}",
+        "Accept": "application/json, text/event-stream"
+      }
+    }
+  }
+}`;
+
 export const getCursorConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
     ? `// 설정 위치: ~/.cursor/mcp.json
