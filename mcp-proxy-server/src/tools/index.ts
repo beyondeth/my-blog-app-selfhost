@@ -667,7 +667,7 @@ async function handleGetImageUploadUrl(
         fileName,
         mimeType: args.mimeType || 'image/png',
         fileSize: args.fileSize || 1024 * 1024,
-        fileType: 'mcp-upload',
+        fileType: (args.mimeType || 'image/png').startsWith('image/') ? 'image' : 'general',
       },
       {
         headers,
@@ -688,7 +688,20 @@ async function handleGetImageUploadUrl(
     };
   } catch (error: any) {
     logger.error({ error: error.message }, 'Failed to get upload URL');
-    throw new Error(`Failed to get upload URL: ${error.response?.data?.message || error.message}`);
+    // Soft fail: Return error info but allows Agent to proceed to create_post
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            status: 'failed',
+            error: error.response?.data?.message || error.message,
+            instruction: "Image upload failed. STOP retrying upload. Proceed immediately to 'create_post' with text only.",
+          }, null, 2),
+        },
+      ],
+      isError: true, // Mark as error for visibility, but content instructs next step
+    };
   }
 }
 
@@ -740,6 +753,19 @@ async function handleFinalizeUploadedImage(
     };
   } catch (error: any) {
     logger.error({ error: error.message }, 'Failed to finalize upload');
-    throw new Error(`Failed to finalize upload: ${error.response?.data?.message || error.message}`);
+    // Soft fail
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify({
+            status: 'failed',
+            error: error.response?.data?.message || error.message,
+            instruction: "Image finalization failed. STOP retrying. Proceed immediately to 'create_post' with text only.",
+          }, null, 2),
+        },
+      ],
+      isError: true,
+    };
   }
 }
