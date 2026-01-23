@@ -26,6 +26,9 @@ import { User } from "../../users/entities/user.entity";
 import { ExternalImageDownloadService } from "../../files/services/external-image-download.service";
 import { Public } from "../../common/decorators/public.decorator";
 import { UsageService } from "../../usage/usage.service";
+import { FilesService } from "../../files/files.service";
+import { CreateUploadUrlDto } from "../../files/dto/create-upload-url.dto";
+import { UploadCompleteDto } from "../../files/dto/upload-complete.dto";
 
 /**
  * MCP Proxy 컨트롤러
@@ -49,6 +52,7 @@ export class McpProxyController {
     private readonly userRepository: Repository<User>,
     private readonly usageService: UsageService,
     private readonly externalImageDownloadService: ExternalImageDownloadService,
+    private readonly filesService: FilesService,
   ) {}
 
   /**
@@ -413,7 +417,103 @@ export class McpProxyController {
         throw error;
       }
 
-      throw new BadRequestException("포스트 생성 실패");
+      // 그 외 알 수 없는 에러
+      throw new BadRequestException(
+        `포스트 생성 실패: ${error.message || "Unknown error"}`,
+      );
+    }
+  }
+
+  /**
+   * MCP 파일 업로드용 URL 생성
+   * - FilesController.createUploadUrl과 동일하지만 API Key 인증 사용
+   */
+  @Post("files/upload-url")
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: "MCP 파일 업로드 URL 생성" })
+  async createUploadUrl(
+    @Req() req: any,
+    @Body() createUploadUrlDto: CreateUploadUrlDto,
+  ) {
+    const { userId } = req.apiKey;
+    return this.filesService.createUploadUrl(userId, createUploadUrlDto);
+  }
+
+  /**
+   * MCP 파일 업로드 완료 처리
+   * - FilesController.uploadComplete와 동일하지만 API Key 인증 사용
+   */
+  @Post("files/upload-complete")
+  @UseGuards(ApiKeyGuard)
+  @ApiOperation({ summary: "MCP 파일 업로드 완료 처리" })
+  async uploadComplete(
+    @Req() req: any,
+    @Body() uploadCompleteDto: UploadCompleteDto,
+  ) {
+    const { userId } = req.apiKey;
+    const result = await this.filesService.uploadComplete(
+      userId,
+      uploadCompleteDto,
+    );
+
+    // CDN URL이 없는 경우 fileUrl(S3 Key)을 사용해서 구성
+    // (FilesService.uploadComplete가 accessUrl을 반환하긴 함)
+    return {
+      success: true,
+      fileId: result.id,
+      // accessUrl이 있으면 쓰고, 없으면 cdn.codebase.blog 형식으로 직접 구성
+      cdnUrl:
+        (result as any).accessUrl ||
+        `https://cdn.codebase.blog/${result.fileKey}`,
+    };
+  }
+
+  /**
+   * MCP 도구를 통한 이미지 업로드 (외부 URL)
+   * Phase 1 방식 (URL 다운로드)
+   */
+  @Post("images/upload")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  async uploadImage(@Req() req: any, @Body() body: { imageUrl: string }) {
+    const { userId } = req.apiKey;
+
+    if (!body.imageUrl) {
+      throw new BadRequestException("Image URL is required");
+    }
+
+    try {
+      this.logger.log(
+        `[MCP Image Upload] Request received for URL: ${body.imageUrl}`,
+      );
+
+      const result =
+        await this.externalImageDownloadService.downloadAndProcessImage(
+          body.imageUrl,
+          userId,
+        );
+
+      if (!result) {
+        throw new BadRequestException("Failed to download image");
+      }
+
+      const cdnUrl = `https://cdn.codebase.blog/${result.fileKey}`;
+
+      this.logger.log(`[MCP Image Upload] Success: ${result.id} -> ${cdnUrl}`);
+
+      return {
+        success: true,
+        fileId: result.id,
+        cdnUrl,
+      };
+    } catch (error) {
+      this.logger.error(
+        `[MCP Image Upload] Error: ${error.message}`,
+        error.stack,
+      );
+      throw new BadRequestException(
+        `Image upload failed: ${error.message || "Unknown error"}`,
+      );
     }
   }
 }

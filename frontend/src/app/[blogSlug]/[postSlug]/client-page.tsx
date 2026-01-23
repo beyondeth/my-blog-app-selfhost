@@ -2,10 +2,7 @@
 
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { FiArrowLeft } from 'react-icons/fi';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
-import LoadingSpinner from '@/components/ui/LoadingSpinner';
-import ErrorMessage from '@/components/ui/ErrorMessage';
 import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';
 import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
@@ -14,7 +11,6 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { usePost, useDeletePost } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
 import { VoteButton } from '@/components/ui/VoteButton';
 import { useVote } from '@/hooks/useVote';
 import { useToggleBookmark } from '@/hooks/useBookmarks';
@@ -95,10 +91,35 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   const { user, isAdmin } = useAuth();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const queryClient = useQueryClient();
   const hasViewed = useRef(false);
 
   const blogSlug = params.blogSlug as string;
+
+  /**
+   * 스마트 뒤로가기 핸들러
+   * 외부 유입(검색, 공유링크 등)인 경우 '뒤로가기' 대신 '블로그 홈'으로 이동
+   * 내부 유입인 경우 정상적으로 router.back() 실행
+   * 네트워크 요청 없이 브라우저 메모리(referrer)만 확인하므로 부하 0
+   */
+  const handleSmartBack = useCallback(() => {
+    // 1. 내부 유입 확인: Referrer가 현재 도메인을 포함하는지 체크
+    // document.referrer는 브라우저가 이미 알고 있는 정보 (Zero Cost)
+    const currentHost = window.location.host;
+    const isInternal = document.referrer && document.referrer.includes(currentHost);
+
+    // 2. 히스토리 스택 확인 (보조 수단)
+    // 새 탭으로 열었거나 바로 접속한 경우 history.length는 보통 1 또는 2
+    const hasHistory = window.history.length > 1;
+
+    if (isInternal && hasHistory) {
+      router.back();
+    } else {
+      // 외부 유입이거나 히스토리가 없으면 블로그 홈으로 이동
+      router.push(`/${blogSlug}`);
+    }
+  }, [router, blogSlug]);
+
+
   const postSlug = params.postSlug as string;
 
   // 블로그 정보 가져오기 (alias 리다이렉트 확인용)
@@ -492,7 +513,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
         <PostHeaderWithReport
           post={post}
           canEdit={canEditDelete}
-          onBack={() => router.back()}
+          onBack={handleSmartBack}
           onEdit={handleEdit}
           onDelete={handleDelete}
           LikeButtonComponent={

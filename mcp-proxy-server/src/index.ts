@@ -82,6 +82,11 @@ if (config.NODE_ENV === 'development' || config.LOG_LEVEL === 'debug') {
   app.use(httpLogger);
 }
 
+// 정적 파일 서빙 (Local Image Generation -> URL 변환용)
+// generated 폴더의 이미지를 http://localhost:3002/generated/... 로 접근 가능하게 함
+import path from 'path';
+app.use('/generated', express.static(path.join(process.cwd(), 'public/generated')));
+
 // CORS 설정
 // MCP/OAuth 엔드포인트는 Bearer 토큰으로 보호되므로 모든 origin 허용
 // Claude 커스텀 커넥터 등 다양한 클라이언트 지원을 위해 필요

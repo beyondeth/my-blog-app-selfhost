@@ -18,6 +18,7 @@ import type { CreateMcpApiKeyResponse, McpApiKey } from '@/services/api/mcp.serv
 import { createMcpApiKey, deleteMcpApiKey } from '@/services/api/mcp.service';
 import {
   getClaudeCodeConfig,
+  getAntigravityConfig,
   getCodexConfig,
   getCodexEnvSnippet,
   getCodexWindowsEnvSnippet,
@@ -471,6 +472,36 @@ export default function ApiKeysPage() {
                 containerClassName="bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 overflow-hidden"
                 copyTitle="복사"
                 copyAriaLabel="Cursor 설정 복사"
+              />
+            )}
+          </div>
+
+          {/* Antigravity */}
+          <div className="border border-gray-200 dark:border-[#2F3440] rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('antigravity')}
+              className={`w-full flex items-center justify-between p-3 sm:p-4 min-h-[44px] transition ${
+                expandedEnv === 'antigravity'
+                  ? 'bg-gray-900 text-white dark:bg-[#6D79FF] dark:text-white'
+                  : 'bg-gray-50 dark:bg-[#1F2229] hover:bg-gray-100 dark:hover:bg-[#272C36] text-gray-900 dark:text-gray-100'
+              }`}
+            >
+              <div className="flex items-center gap-2 sm:gap-3">
+                {expandedEnv === 'antigravity' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'antigravity' ? 'text-white' : 'text-gray-600 dark:text-gray-300 dark:text-gray-300'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'antigravity' ? 'text-white' : 'text-gray-600 dark:text-gray-300 dark:text-gray-300'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'antigravity' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>Antigravity</span>
+              </div>
+            </button>
+            {expandedEnv === 'antigravity' && (
+              <CodeSnippetBlock
+                code={getAntigravityConfig(getCurrentApiKey())}
+                onCopy={() => copyToClipboard(getAntigravityConfig(getCurrentApiKey(), false))}
+                containerClassName="bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 overflow-hidden"
+                copyTitle="복사"
+                copyAriaLabel="Antigravity 설정 복사"
               />
             )}
           </div>
