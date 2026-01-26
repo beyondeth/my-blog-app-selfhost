@@ -1,2 +1,2 @@
 file appendonly.aof.4.base.rdb seq 4 type b
-file appendonly.aof.4.incr.aof seq 4 type i startoffset 759769
+file appendonly.aof.4.incr.aof seq 4 type i startoffset 759769 endoffset 799827

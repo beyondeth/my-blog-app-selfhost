@@ -226,7 +226,8 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
     }
   }, [editor, imageId, isThumbnail]);
 
-  const showToolbar = (selected || isHovered) && isImageLoaded;
+  // Option 1: 클릭(선택) 시에만 툴바 표시 (호버 시 레이아웃 점프 방지)
+  const showToolbar = selected && isImageLoaded;
 
   return (
     <NodeViewWrapper
@@ -234,7 +235,7 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       className={cn(
         'medium-image-wrapper',
         'relative my-4 mx-auto',
-        (selected || isHovered) && 'medium-image-selected'
+        selected && 'medium-image-selected'
       )}
       contentEditable={false}
       draggable={true}
@@ -242,8 +243,9 @@ export const MediumImageNode: React.FC<MediumImageNodeProps> = ({
       as="figure"
       data-medium-image=""
       tabIndex={0}
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
+      // 호버 이벤트 제거 - 레이아웃 점프 방지
+      // onMouseEnter={() => setIsHovered(true)}
+      // onMouseLeave={() => setIsHovered(false)}
       onKeyDown={handleWrapperKeyDown}
     >
       {/* 이미지 툴바 (선택/호버 시 표시) */}

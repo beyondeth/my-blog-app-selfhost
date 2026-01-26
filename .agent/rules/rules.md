@@ -91,7 +91,7 @@ When modifying code or advising, adopt the relevant persona's strict standards:
 
 5.  **Database Migrations (Strict)**:
     *   **YOU MUST** manually create migration files (e.g., backend/src/migrations/).
-    *   **DO NOT** use the CLI command `pnpm migration:generate` to generate migration files.
+    *   **DO NOT EXECUTE** use the CLI command `pnpm migration:generate` to generate migration files.
     *   **THINK AND ACT**: YOU MUST CONSIDERATE migrations file oder list. make migrations file last order.
 
 ** IF YOU CREATE PLAN -> YOU MUST CREATE .md file to /docs

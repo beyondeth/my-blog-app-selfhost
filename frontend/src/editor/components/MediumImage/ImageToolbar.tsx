@@ -99,7 +99,8 @@ export const ImageToolbar: React.FC<ImageToolbarProps> = ({
   onThumbnailToggle,
 }) => {
   return (
-    <div className="medium-image-toolbar-wrapper w-full flex justify-center mb-2">
+    // Option 2: absolute 포지션으로 이미지 위에 오버레이 (레이아웃 점프 방지)
+    <div className="medium-image-toolbar-wrapper absolute top-2 left-1/2 -translate-x-1/2 z-10 flex justify-center">
       {/* 흰색 배경의 툴바 */}
       <div
         className={cn(

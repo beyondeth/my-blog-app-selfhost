@@ -6,32 +6,82 @@ description: Run TypeORM database migrations.
 
 Manage database schema changes safely.
 
-## 1. Generate Migration
-After modifying an Entity file, generate a migration file.
+⚠️ IMPORTANT  
+This project DOES NOT use `migration:generate`.  
+Auto-generated migrations often produce thousands of unintended SQL lines and may cause schema corruption.
 
+All migrations MUST be written manually.
+
+---
+
+## 1. Create Migration (Manual)
+
+After modifying an Entity file, manually create a migration file.
+
+📁 Migration file location:
+backend/src/migrations
+
+
+### Steps
+1. Navigate to `backend/src/migrations`
+2. Check the latest migration file
+3. Create a new file with a newer timestamp and a meaningful name
+
+Example:
+backend/src/migrations/
+└── 1706009876543-AddUserPhone.ts
+
+
+❌ DO NOT USE:
 ```bash
-cd backend
-pnpm migration:generate src/migrations/DescriptionOfChange
-```
-*   **Note**: Replace `DescriptionOfChange` with a meaningful name (e.g., `AddUserPhone`).
+pnpm migration:generate
+2. Write & Review Migration
+Check: Open the manually created file in backend/src/migrations
 
-## 2. Review Migration
-*   **Check**: Open the generated file in `src/migrations/`.
-*   **Verify**: Ensure strict SQL changes match your intent. Look out for `DROP TABLE` or data loss risks.
+Verify:
 
-## 3. Run Migration
-Apply changes to the local database.
+SQL changes are minimal and intentional
 
-```bash
+No unintended schema-wide changes
+
+No DROP TABLE or data-loss operations unless explicitly required
+
+down() is the exact reverse of up()
+
+Basic template:
+
+import { MigrationInterface, QueryRunner } from "typeorm";
+
+export class AddUserPhone1706009876543 implements MigrationInterface {
+  name = "AddUserPhone1706009876543";
+
+  public async up(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+      ALTER TABLE "user"
+      ADD COLUMN "phone" varchar(20)
+    `);
+  }
+
+  public async down(queryRunner: QueryRunner): Promise<void> {
+    await queryRunner.query(`
+      ALTER TABLE "user"
+      DROP COLUMN "phone"
+    `);
+  }
+}
+3. Run Migration
+Apply migrations to the local database.
+
 pnpm migration:run
-```
+Before running:
 
-## 4. Revert (If needed)
-Undo the last applied migration.
+Ensure only ONE new migration file was added
 
-```bash
+Ensure it is based on the latest migration
+
+4. Revert (If needed)
+Undo the last applied migration only.
+
 pnpm migration:revert
-```
+⚠️ Revert always rolls back the MOST RECENT migration.
 
-## Troubleshooting
-*   **Sync**: If the DB is out of sync with migrations, you may need to drop the schema (development only) or carefully craft a manual migration.
