@@ -307,9 +307,16 @@ export class FilesService {
     try {
       // 이미지 파일인 경우 WebP, PNG, JPEG 허용 (MCP 업로드 호환)
       if (fileType === "image") {
-        const allowedImageTypes = ["image/webp", "image/png", "image/jpeg", "image/jpg"];
+        const allowedImageTypes = [
+          "image/webp",
+          "image/png",
+          "image/jpeg",
+          "image/jpg",
+        ];
         if (!allowedImageTypes.includes(mimeType)) {
-          throw new Error("지원되지 않는 이미지 형식입니다. WebP, PNG, JPEG만 허용됩니다.");
+          throw new Error(
+            "지원되지 않는 이미지 형식입니다. WebP, PNG, JPEG만 허용됩니다.",
+          );
         }
       }
 

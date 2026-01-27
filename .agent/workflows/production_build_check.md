@@ -27,11 +27,11 @@ Run the optimized production server.
 ```bash
 # Frontend (Terminal 1)
 cd frontend
-pnpm start
+pnpm dev
 
 # Backend (Terminal 2)
 cd backend
-pnpm start:prod
+pnpm start:dev
 ```
 
 ## 3. Verification

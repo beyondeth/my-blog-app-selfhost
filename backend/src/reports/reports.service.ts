@@ -84,7 +84,7 @@ export class ReportsService {
       ...createReportDto,
       communityId:
         resolvedTarget.source === "community"
-          ? createReportDto.communityId ?? resolvedTarget.communityId ?? null
+          ? (createReportDto.communityId ?? resolvedTarget.communityId ?? null)
           : null,
       reportedModeratorId: createReportDto.reportedModeratorId ?? null,
       reportedById: userId,
@@ -362,7 +362,10 @@ export class ReportsService {
           select: ["id", "communityId"],
         });
         if (communityPost) {
-          return { source: "community", communityId: communityPost.communityId };
+          return {
+            source: "community",
+            communityId: communityPost.communityId,
+          };
         }
         break;
       }
@@ -817,44 +820,39 @@ export class ReportsService {
     }
 
     // 병렬로 5개 배치 쿼리 실행
-    const [
-      posts,
-      communityPosts,
-      comments,
-      communityComments,
-      users,
-    ] = await Promise.all([
-      postIds.length > 0
-        ? this.postRepository.find({
-            where: { id: In(postIds) },
-            relations: ["author"],
-          })
-        : [],
-      postIds.length > 0
-        ? this.communityPostRepository.find({
-            where: { id: In(postIds) },
-            relations: ["author", "community"],
-          })
-        : [],
-      commentIds.length > 0
-        ? this.commentRepository.find({
-            where: { id: In(commentIds) },
-            relations: ["author", "post"],
-          })
-        : [],
-      commentIds.length > 0
-        ? this.communityCommentRepository.find({
-            where: { id: In(commentIds) },
-            relations: ["author", "post", "community"],
-          })
-        : [],
-      userIds.length > 0
-        ? this.userRepository.find({
-            where: { id: In(userIds) },
-            select: ["id", "username", "email", "createdAt"],
-          })
-        : [],
-    ]);
+    const [posts, communityPosts, comments, communityComments, users] =
+      await Promise.all([
+        postIds.length > 0
+          ? this.postRepository.find({
+              where: { id: In(postIds) },
+              relations: ["author"],
+            })
+          : [],
+        postIds.length > 0
+          ? this.communityPostRepository.find({
+              where: { id: In(postIds) },
+              relations: ["author", "community"],
+            })
+          : [],
+        commentIds.length > 0
+          ? this.commentRepository.find({
+              where: { id: In(commentIds) },
+              relations: ["author", "post"],
+            })
+          : [],
+        commentIds.length > 0
+          ? this.communityCommentRepository.find({
+              where: { id: In(commentIds) },
+              relations: ["author", "post", "community"],
+            })
+          : [],
+        userIds.length > 0
+          ? this.userRepository.find({
+              where: { id: In(userIds) },
+              select: ["id", "username", "email", "createdAt"],
+            })
+          : [],
+      ]);
 
     // Map으로 변환 (key: "TYPE:targetId")
     for (const post of posts) {
