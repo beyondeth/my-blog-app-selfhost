@@ -41,6 +41,9 @@ import PublishTargetSelector, { type PublishTarget } from '@/components/publish/
 import type { CommunityPost } from '@/types/community';
 import { useCommunity } from '@/hooks/community';
 import { useVideoUpload } from '@/hooks/video/useVideoUpload';
+import { serializeImageAttributes, type MarkdownImageInfo } from '@/types/image-metadata.types';
+import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
+import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
 
 // Define schema for community post editing
 const communityPostFormSchema = z.object({
@@ -64,7 +67,7 @@ const FALLBACK_USER_BLOG = {
   name: '내 블로그',
 };
 
-interface MarkdownImageInfo { id: string; url: string; name?: string }
+// MarkdownImageInfo 타입은 @/types/image-metadata.types에서 import
 interface MarkdownImageMeta { url: string; name?: string; }
 
 function isLikelyImageUrl(url: string): boolean {
@@ -110,7 +113,7 @@ export default function CommunityPostEditForm({
   const [isSpoiler, setIsSpoiler] = useState(initialData.isSpoiler ?? false);
   
   // Markdown handling state
-  const markdownTextareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const markdownEditorRef = useRef<HybridMarkdownEditorRef | null>(null);
   const markdownImageInputRef = useRef<HTMLInputElement | null>(null);
   const markdownVideoInputRef = useRef<HTMLInputElement | null>(null);
   const [markdownImages, setMarkdownImages] = useState<MarkdownImageInfo[]>([]);
@@ -371,9 +374,11 @@ export default function CommunityPostEditForm({
     isSubmittingRef.current = true;
     setIsLocalSubmitting(true);
 
+    const convertedHtml = isMarkdownMode ? convertMarkdownToHtml(data.content) : data.content;
+
     const formData = {
       title: data.title,
-      content: data.content,
+      content: convertedHtml,
       contentMarkdown: isMarkdownMode ? data.content : undefined,
       flairId: data.flairId,
       tags: data.tags,
@@ -402,29 +407,15 @@ export default function CommunityPostEditForm({
 
   // --- Markdown / Media Handling ---
   const insertMarkdownSnippet = useCallback((snippet: string) => {
-    const textarea = markdownTextareaRef.current;
-    const fallbackValue = form.getValues('content') || '';
-    const sanitizedSnippet = snippet.endsWith('\n') ? snippet : `${snippet}\n`;
-
-    if (!textarea) {
-      const needsNewline = fallbackValue && !fallbackValue.endsWith('\n');
-      const nextValue = `${fallbackValue}${needsNewline ? '\n' : ''}${sanitizedSnippet}`;
-      form.setValue('content', nextValue, { shouldDirty: true, shouldTouch: true });
+    if (markdownEditorRef.current) {
+      markdownEditorRef.current.insertText(snippet);
       autoConversionSkipRef.current = true;
       return;
     }
 
-    const { selectionStart = textarea.value.length, selectionEnd = textarea.value.length } = textarea;
-    const before = textarea.value.slice(0, selectionStart);
-    const after = textarea.value.slice(selectionEnd);
-    const needsNewlineBefore = before && !before.endsWith('\n');
-    const insertion = `${needsNewlineBefore ? '\n' : ''}${sanitizedSnippet}`;
-    const nextValue = `${before}${insertion}${after}`;
-
-    textarea.value = nextValue;
-    const cursor = before.length + insertion.length;
-    textarea.setSelectionRange(cursor, cursor);
-    textarea.focus();
+    const currentContent = form.getValues('content') || '';
+    const needsNewline = currentContent && !currentContent.endsWith('\n');
+    const nextValue = `${currentContent}${needsNewline ? '\n' : ''}${snippet.endsWith('\n') ? snippet : snippet + '\n'}`;
     form.setValue('content', nextValue, { shouldDirty: true, shouldTouch: true });
     autoConversionSkipRef.current = true;
   }, [form]);
@@ -435,7 +426,26 @@ export default function CommunityPostEditForm({
         toast.error('이미지 정보를 불러오지 못했습니다.');
         return;
       }
-      insertMarkdownSnippet(`![${image.name || 'image'}](${image.url})`);
+      
+      if (markdownEditorRef.current) {
+        markdownEditorRef.current.insertImageBlock({
+          url: image.url,
+          alt: image.name || 'image',
+          size: 'default',
+          caption: '',
+          fileId: image.id,
+        });
+        toast.success('이미지를 본문에 삽입했습니다.');
+        return;
+      }
+      
+      const attrs = serializeImageAttributes({
+        id: image.id,
+        size: 'default',
+        caption: '',
+      });
+      
+      insertMarkdownSnippet(`![${image.name || 'image'}](${image.url})${attrs}`);
       toast.success('이미지를 본문에 삽입했습니다.');
     },
     [insertMarkdownSnippet],
@@ -466,7 +476,18 @@ export default function CommunityPostEditForm({
 
       const { fileIds: nextFileIds } = appendFileId(fileId);
       syncMarkdownImages(nextFileIds);
-      insertMarkdownSnippet(`![${file.name || 'image'}](${imageUrl})`);
+      if (markdownEditorRef.current) {
+        markdownEditorRef.current.insertImageBlock({
+          url: imageUrl,
+          alt: file.name || 'image',
+          size: 'default',
+          caption: '',
+          fileId,
+        });
+        autoConversionSkipRef.current = true;
+      } else {
+        insertMarkdownSnippet(`![${file.name || 'image'}](${imageUrl})`);
+      }
 
       if (!form.getValues('thumbnailImageId')) {
         handleThumbnailChange(fileId);
@@ -852,29 +873,30 @@ export default function CommunityPostEditForm({
                                 업로드 시 아래 목록에서 썸네일을 고를 수 있어요.
                               </span>
                             </div>
-                            <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] lg:gap-6 lg:items-start">
-                              <div className="space-y-3">
-                                <Textarea
-                                  ref={markdownTextareaRef}
-                                  value={field.value}
-                                  onChange={(event) => field.onChange(event.target.value)}
-                                  placeholder="Markdown 문법으로 본문을 작성하세요..."
-                                  className="min-h-[260px] lg:min-h-[360px] resize-y"
+                            <div className="space-y-4">
+                              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+                                <HybridMarkdownEditor
+                                  ref={markdownEditorRef}
+                                  content={field.value}
+                                  onChange={(value) => field.onChange(value)}
+                                  className="min-h-[260px] lg:min-h-[360px]"
                                 />
+                              </div>
+                              <div className="space-y-1">
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
-                                  기본 Markdown 문법을 지원하며, 저장 시 서버에서 안전하게 HTML로 변환됩니다.
+                                  이미지는 시각적으로 편집할 수 있으며, 텍스트는 Markdown 문법을 따릅니다.
                                 </p>
                                 <p className="text-xs text-gray-500 dark:text-gray-400">
                                   이미지 링크를 붙여넣으면 자동으로 <code>![이미지]</code> 형식으로 바뀝니다.
                                 </p>
                               </div>
-                              <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900 mt-4 lg:mt-0 max-h-[520px] lg:max-h-[720px] overflow-hidden flex flex-col">
-                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between flex-shrink-0">
+                              <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900">
+                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
                                   <span>실시간 미리보기</span>
                                   <span className="text-[11px] text-gray-400 dark:text-gray-500">이미지, 표, 코드까지 즉시 반영돼요.</span>
                                 </p>
-                                <div className="markdown-content prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words overflow-y-auto flex-1">
-                                  <ReactMarkdown skipHtml>{previewContent}</ReactMarkdown>
+                                <div className="markdown-content prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words">
+                                  <div dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(previewContent) }} />
                                 </div>
                               </div>
                             </div>
@@ -894,49 +916,15 @@ export default function CommunityPostEditForm({
                               )}
                               {markdownImages.length > 0 ? (
                                 <div className="grid gap-4 sm:grid-cols-2">
-                                  {markdownImages.map((image) => {
-                                    const isActive = currentThumbnailFileId === image.id;
-                                    return (
-                                      <div
-                                        key={image.id}
-                                        className="flex items-center gap-3 rounded-lg border border-gray-100 dark:border-gray-800 p-2"
-                                      >
-                                        <div className="h-16 w-16 overflow-hidden rounded-md border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
-                                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                                          <img
-                                            src={image.url}
-                                            alt={image.name || '업로드한 이미지'}
-                                            className="h-full w-full object-cover"
-                                          />
-                                        </div>
-                                        <div className="flex-1 space-y-1">
-                                          <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                                            {image.name || '업로드한 이미지'}
-                                          </p>
-                                          <div className="flex flex-wrap gap-2">
-                                            <Button
-                                              type="button"
-                                              size="sm"
-                                              variant="outline"
-                                              className="gap-1.5"
-                                              onClick={() => handleInsertImageFromList(image)}
-                                            >
-                                              <FileText className="h-3.5 w-3.5" />
-                                              본문에 삽입
-                                            </Button>
-                                            <Button
-                                              type="button"
-                                              size="sm"
-                                              variant={isActive ? 'default' : 'secondary'}
-                                              onClick={() => setThumbnailByFileId(image.id)}
-                                            >
-                                              {isActive ? '썸네일 선택됨' : '썸네일로 지정'}
-                                            </Button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    );
-                                  })}
+                                  {markdownImages.map((image) => (
+                                    <MarkdownImageCard
+                                      key={image.id}
+                                      image={image}
+                                      isActiveThumbnail={currentThumbnailFileId === image.id}
+                                      onInsert={handleInsertImageFromList}
+                                      onSetThumbnail={setThumbnailByFileId}
+                                    />
+                                  ))}
                                 </div>
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">

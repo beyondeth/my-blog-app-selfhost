@@ -118,8 +118,7 @@ export class BookmarksService {
     }
 
     const result = await this.dataSource.transaction(async (manager) => {
-      const communityBookmarkRepo =
-        manager.getRepository(CommunityBookmark);
+      const communityBookmarkRepo = manager.getRepository(CommunityBookmark);
 
       const existingBookmark = await communityBookmarkRepo.findOne({
         where: { userId, postId },

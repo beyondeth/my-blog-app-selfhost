@@ -200,6 +200,7 @@ export class PostCreationService {
           processCode: true,
           processImages: true,
           preserveMermaid: true,
+          forceMarkdown: !!createPostDto.content_markdown,
         },
       );
 
@@ -486,6 +487,7 @@ export class PostCreationService {
               processCode: true,
               processImages: true,
               preserveMermaid: true,
+              forceMarkdown: hasMarkdownUpdate,
             },
           );
 

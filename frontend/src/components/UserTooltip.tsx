@@ -1,6 +1,6 @@
 "use client";
 
-import { PropsWithChildren } from 'react';
+import { PropsWithChildren, useEffect, useState } from 'react';
 import UserProfileCard from './ui/UserProfileCard';
 import {
   Tooltip,
@@ -31,6 +31,17 @@ interface UserTooltipProps extends PropsWithChildren {
 }
 
 export default function UserTooltip({ children, user, followInfo, isMobile }: UserTooltipProps) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // SSR/초기 하이드레이션에서는 툴팁/포퍼를 렌더링하지 않아 DOM 불일치 방지
+  if (!mounted) {
+    return <>{children}</>;
+  }
+
   if (isMobile) {
     return (
       <Popover>

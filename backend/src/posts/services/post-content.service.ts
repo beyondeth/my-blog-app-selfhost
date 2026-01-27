@@ -34,6 +34,7 @@ export class PostContentService {
       sanitize?: boolean;
       processCode?: boolean;
       processImages?: boolean;
+      forceMarkdown?: boolean;
     },
   ): Promise<{
     html: string;
@@ -41,7 +42,9 @@ export class PostContentService {
     isMarkdown: boolean;
   }> {
     // 마크다운 여부 확인
-    const isMarkdown = this.isMarkdownContent(content);
+    const isMarkdown = options?.forceMarkdown
+      ? true
+      : this.isMarkdownContent(content);
 
     let htmlContent: string;
     let markdownContent: string | undefined;

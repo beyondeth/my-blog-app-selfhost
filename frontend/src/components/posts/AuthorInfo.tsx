@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { useEffect, useState } from 'react';
 import { Avatar } from '@/components/ui/avatar';
 import UserProfileCard from '@/components/ui/UserProfileCard';
 import {
@@ -21,6 +22,11 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
   const { user } = useAuth();
   const isOwner = user?.id === author?.id;
   const displayProfileImage = isOwner ? user?.profileImage : author?.profileImage;
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // 사용자 데이터 조회
   const { data: userData } = useQuery({
@@ -81,7 +87,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
   const displayUsername = isDeletedUser ? '탈퇴한 사용자' : (author.username || 'Author');
 
   // 호버 툴팁에 사용할 사용자 데이터가 있는 경우에만 호버 기능 활성화
-  if (userData && !isDeletedUser) {
+  if (userData && !isDeletedUser && mounted) {
     return (
       <TooltipProvider delayDuration={300}>
         <Tooltip>
