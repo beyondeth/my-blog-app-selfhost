@@ -536,6 +536,13 @@ export class FeedService {
    */
   private mapToFeedItem(row: any): UnifiedFeedItemDto {
     const sourceType: FeedSourceType = row.source_type;
+    const contentHtml =
+      typeof row.content_html === "string" ? row.content_html : "";
+    const preferredYouTubeId =
+      this.extractPreferredYouTubeVideoIdFromContent(contentHtml);
+    const youtubeVideoId =
+      preferredYouTubeId ||
+      this.extractYouTubeVideoIdFromContent(contentHtml);
 
     const item: UnifiedFeedItemDto = {
       id: row.id,
@@ -543,6 +550,7 @@ export class FeedService {
       slug: row.slug,
       excerpt: row.excerpt || undefined,
       thumbnail: row.thumbnail || undefined,
+      youtubeVideoId: youtubeVideoId || undefined,
       sourceType,
       author: {
         id: row.user_id,
@@ -596,8 +604,6 @@ export class FeedService {
       }
     }
 
-    const contentHtml =
-      typeof row.content_html === "string" ? row.content_html : null;
     if (contentHtml) {
       if (!item.excerpt) {
         const excerpt = this.createExcerptFromHtml(contentHtml);
@@ -615,6 +621,12 @@ export class FeedService {
           }
         }
       }
+    }
+
+    if (preferredYouTubeId) {
+      item.thumbnail = this.buildYouTubeThumbnailUrl(preferredYouTubeId);
+    } else if (!item.thumbnail && youtubeVideoId) {
+      item.thumbnail = this.buildYouTubeThumbnailUrl(youtubeVideoId);
     }
 
     const userVote = row.user_vote ?? null;
@@ -652,6 +664,49 @@ export class FeedService {
     }
 
     return item;
+  }
+
+  private extractPreferredYouTubeVideoIdFromContent(
+    content: string,
+  ): string | null {
+    if (!content) return null;
+
+    const match = content.match(
+      /<div[^>]*data-youtube-video[^>]*data-thumbnail=["']true["'][^>]*>[\s\S]*?<\/div>/i,
+    );
+    if (!match) return null;
+
+    return this.extractYouTubeVideoIdFromContent(match[0]);
+  }
+
+  private extractYouTubeVideoIdFromContent(content: string): string | null {
+    if (!content) return null;
+
+    const iframeMatch = content.match(
+      /https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})/i,
+    );
+    if (iframeMatch?.[1]) {
+      return iframeMatch[1];
+    }
+
+    const originalUrlMatch = content.match(
+      /data-original-url=["']([^"']+)["']/i,
+    );
+    if (originalUrlMatch?.[1]) {
+      const urlMatch = originalUrlMatch[1].match(
+        /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
+      );
+      if (urlMatch?.[1]) return urlMatch[1];
+    }
+
+    const urlFallback = content.match(
+      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
+    );
+    return urlFallback?.[1] ?? null;
+  }
+
+  private buildYouTubeThumbnailUrl(videoId: string): string {
+    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
   }
 
   /**

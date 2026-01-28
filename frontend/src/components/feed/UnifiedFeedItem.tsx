@@ -11,11 +11,12 @@ import { FiHeart, FiMessageCircle, FiEye, FiAlertTriangle, FiLock } from 'react-
 import type { VoteType } from '@/types';
 import { formatRelativeTime } from '@/utils/timeFormat';
 import { extractImageKey, normalizeImageUrl, shouldDisableOptimization } from '@/utils/imageUtils';
-import { determineFeedLayout, FeedLayoutType } from '@/utils/feedLayoutUtils';
+import { determineFeedLayout, FeedLayoutType, extractYouTubeVideoId } from '@/utils/feedLayoutUtils';
 import { useAdultVerificationStatus } from '@/hooks/adult-verification/useAdultVerification';
 import { UnifiedFeedItem as FeedItemType } from '@/services/api/feed.service';
 import PostImageCarousel from '@/components/posts/PostImageCarousel';
 import PostImageLightbox from '@/components/posts/PostImageLightbox';
+import YouTubeEmbedPlayer from '@/components/ui/YouTubeEmbedPlayer';
 
 /**
  * UnifiedFeedItem 컴포넌트 Props
@@ -82,6 +83,7 @@ const getFeedLayoutType = (item: FeedItemType): FeedLayoutType => {
   return determineFeedLayout({
     thumbnail: item.thumbnail,
     excerpt: item.excerpt,
+    youtubeVideoId: item.youtubeVideoId,
   });
 };
 
@@ -123,6 +125,7 @@ const UnifiedFeedItem = React.memo(function UnifiedFeedItem({
   // 레이아웃 타입 결정 (공통 유틸리티 사용)
   const layoutType = React.useMemo(() => getFeedLayoutType(item), [item]);
   const useImageFocused = layoutType === 'image-focused';
+  const useVideoFocused = layoutType === 'video-focused';
   const relativeTime = React.useMemo(() => formatRelativeTime(item.createdAt), [item.createdAt]);
 
   // 포스트 상세 페이지 URL 생성
@@ -173,6 +176,11 @@ const UnifiedFeedItem = React.memo(function UnifiedFeedItem({
   const blurReason: 'nsfw' | 'spoiler' = showSpoilerWarning ? 'spoiler' : 'nsfw';
 
   const primaryImage = hasImages ? imageSources[0] : undefined;
+  const youtubeVideoId = React.useMemo(() => {
+    if (item.youtubeVideoId) return item.youtubeVideoId;
+    if (item.thumbnail) return extractYouTubeVideoId(item.thumbnail);
+    return null;
+  }, [item.thumbnail, item.youtubeVideoId]);
 
   return (
     <>
@@ -194,7 +202,7 @@ const UnifiedFeedItem = React.memo(function UnifiedFeedItem({
           - 이미지 중심 모드: 이미 위에 표시됨 → flex-col만 사용
           - 기본 모드: 모바일은 flex-col, 데스크톱은 flex-row */}
         <div className={`flex ${
-          useImageFocused
+          useImageFocused || useVideoFocused
             ? 'flex-col'
             : hasImages
               ? 'flex-col min-[421px]:flex-row min-[421px]:gap-12'
@@ -298,13 +306,27 @@ const UnifiedFeedItem = React.memo(function UnifiedFeedItem({
             </Link>
           </h2>
 
+          {useVideoFocused && youtubeVideoId && (
+            <div className="w-full mb-7 max-w-full">
+              <div className="w-full max-w-[780px] mx-auto">
+                <YouTubeEmbedPlayer
+                  videoId={youtubeVideoId}
+                  title={item.title}
+                  aspectRatio={0.788}
+                  className="relative w-full"
+                  iframeClassName="absolute inset-0 w-full h-full rounded-lg shadow-sm"
+                />
+              </div>
+            </div>
+          )}
+
           {/* 내용 미리보기 - 텍스트 중심 레이아웃에서만 표시 */}
-          {!useImageFocused && displayContent && (
+          {!useImageFocused && !useVideoFocused && displayContent && (
             <p className="text-[15px] text-foreground leading-relaxed line-clamp-3 break-words mb-7">
               {displayContent}
             </p>
           )}
-          {!useImageFocused && !displayContent && (
+          {!useImageFocused && !useVideoFocused && !displayContent && (
             <p className="text-[15px] text-gray-400 italic leading-relaxed line-clamp-3 break-words mb-7">
               내용 미리보기가 없습니다.
             </p>

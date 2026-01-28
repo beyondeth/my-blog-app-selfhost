@@ -1,6 +1,7 @@
 "use client";
 
 import React from 'react';
+import YouTubeEmbedPlayer from '@/components/ui/YouTubeEmbedPlayer';
 
 interface YouTubeRendererProps {
   /**
@@ -46,37 +47,14 @@ export default function YouTubeRenderer({
     return null;
   }
 
-  const embedUrl = `https://www.youtube.com/embed/${videoId}`;
-
   return (
-    <div
+    <YouTubeEmbedPlayer
+      videoId={videoId}
+      title={title}
+      width={width}
+      height={height}
       className={`youtube-wrapper ${className}`}
-      data-youtube-video
-      style={{
-        position: 'relative',
-        width: `${width}px`,
-        height: `${height}px`,
-        maxWidth: '100%',
-        margin: '0 auto',
-      }}
-    >
-      <iframe
-        src={embedUrl}
-        title={title || `YouTube video ${videoId}`}
-        width="100%"
-        height="100%"
-        frameBorder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowFullScreen
-        loading="lazy"
-        style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: '100%',
-        }}
-      />
-    </div>
+      iframeClassName="youtube-iframe"
+    />
   );
 }

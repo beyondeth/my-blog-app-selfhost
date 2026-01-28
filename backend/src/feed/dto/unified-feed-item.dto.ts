@@ -88,6 +88,9 @@ export class UnifiedFeedItemDto {
   @ApiPropertyOptional({ description: "썸네일 URL" })
   thumbnail?: string;
 
+  @ApiPropertyOptional({ description: "YouTube 비디오 ID (피드용)" })
+  youtubeVideoId?: string;
+
   @ApiProperty({
     description: "소스 타입 (blog 또는 community)",
     enum: ["blog", "community"],

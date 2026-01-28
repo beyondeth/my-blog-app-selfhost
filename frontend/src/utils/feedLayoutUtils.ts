@@ -16,6 +16,7 @@ export interface FeedLayoutInput {
   thumbnail?: string | null;
   excerpt?: string | null;
   content?: string | null;
+  youtubeVideoId?: string | null;
 }
 
 /**
@@ -55,6 +56,8 @@ export function extractYouTubeVideoId(url: string): string | null {
     /\/vi\/([a-zA-Z0-9_-]{11})/,
     // i3.ytimg.com/vi/{videoId}/... (CDN 변형)
     /(?:https?:\/\/)?i[0-9]\.ytimg\.com\/vi\/([a-zA-Z0-9_-]{11})/,
+    // youtube watch/shorts/short URL
+    /(?:https?:\/\/)?(?:www\.)?(?:youtube\.com\/watch\?v=|youtube\.com\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/,
   ];
 
   for (const pattern of patterns) {
@@ -77,6 +80,49 @@ export function extractYouTubeVideoId(url: string): string | null {
 }
 
 /**
+ * 콘텐츠에 YouTube 임베드가 포함되어 있는지 확인
+ */
+export function hasYouTubeEmbed(content: string | null | undefined): boolean {
+  if (!content) return false;
+
+  return (
+    /<div[^>]*data-youtube-video[^>]*>/i.test(content) ||
+    /<iframe[^>]*src="https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/[^"]+"/i.test(content)
+  );
+}
+
+/**
+ * HTML 콘텐츠에서 YouTube 비디오 ID 추출
+ */
+export function extractYouTubeVideoIdFromContent(
+  content: string | null | undefined,
+): string | null {
+  if (!content) return null;
+
+  const embedMatch = content.match(
+    /https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})/i,
+  );
+  if (embedMatch?.[1]) {
+    return embedMatch[1];
+  }
+
+  const originalUrlMatch = content.match(
+    /data-original-url=["']([^"']+)["']/i,
+  );
+  if (originalUrlMatch?.[1]) {
+    const urlMatch = originalUrlMatch[1].match(
+      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
+    );
+    if (urlMatch?.[1]) return urlMatch[1];
+  }
+
+  const urlFallback = content.match(
+    /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
+  );
+  return urlFallback?.[1] ?? null;
+}
+
+/**
  * 피드 레이아웃 타입 결정
  *
  * @description
@@ -89,15 +135,24 @@ export function extractYouTubeVideoId(url: string): string | null {
  * @returns 레이아웃 타입
  */
 export function determineFeedLayout(input: FeedLayoutInput): FeedLayoutType {
-  const { thumbnail } = input;
+  const { thumbnail, content, youtubeVideoId } = input;
 
   // 썸네일이 없으면 텍스트 중심 레이아웃
   if (!thumbnail) {
+    // 콘텐츠에 YouTube 임베드가 있으면 비디오 중심 레이아웃
+    if (youtubeVideoId || hasYouTubeEmbed(content)) {
+      return 'video-focused';
+    }
     return 'text-focused';
   }
 
   // YouTube 썸네일이면 비디오 중심 레이아웃
   if (isYouTubeThumbnail(thumbnail)) {
+    return 'video-focused';
+  }
+
+  // 썸네일이 일반 이미지더라도 본문에 YouTube가 있으면 비디오 레이아웃 우선
+  if (youtubeVideoId || hasYouTubeEmbed(content)) {
     return 'video-focused';
   }
 

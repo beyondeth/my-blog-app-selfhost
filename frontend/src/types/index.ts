@@ -171,6 +171,7 @@ export interface Post {
   content_type?: 'html' | 'markdown';
   excerpt?: string;  // 포스트 요약 (목록 표시용)
   thumbnail?: string;
+  youtubeVideoId?: string;
   images?: string[];
   thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   isPublished: boolean;

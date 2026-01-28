@@ -147,7 +147,7 @@ export class MarkdownRendererService {
       !html.includes("size=") &&
       !html.includes("caption=")
     ) {
-      return html;
+      return this.applyYouTubeEmbeds(html);
     }
 
     try {
@@ -250,14 +250,234 @@ export class MarkdownRendererService {
         attrNode.remove();
       });
 
+      this.applyYouTubeEmbedsToDocument(document, Node);
+
       return document.body.innerHTML;
     } catch (error) {
       console.warn(
         "[Markdown Renderer] Failed to apply image attributes:",
         error,
       );
+      return this.applyYouTubeEmbeds(html);
+    }
+  }
+
+  private applyYouTubeEmbeds(html: string): string {
+    if (!html) return html;
+    if (!this.containsYouTubeUrl(html)) return html;
+
+    try {
+      const dom = new JSDOM(html);
+      const document = dom.window.document;
+      const { Node } = dom.window;
+
+      this.applyYouTubeEmbedsToDocument(document, Node);
+
+      return document.body.innerHTML;
+    } catch (error) {
+      console.warn("[Markdown Renderer] Failed to apply YouTube embeds:", error);
       return html;
     }
+  }
+
+  private applyYouTubeEmbedsToDocument(
+    document: Document,
+    NodeRef: { TEXT_NODE: number; ELEMENT_NODE: number; COMMENT_NODE: number },
+  ) {
+    const preferredVideoId = this.extractYouTubeThumbnailMarker(
+      document,
+      NodeRef,
+    );
+    const candidates = Array.from(document.querySelectorAll("p"));
+
+    candidates.forEach((element) => {
+      const parentTag = element.parentElement?.tagName || "";
+      if (["LI", "BLOCKQUOTE", "PRE", "CODE"].includes(parentTag)) {
+        return;
+      }
+
+      const url = this.extractStandaloneUrl(element, NodeRef);
+      if (!url) return;
+
+      const videoId = this.extractYouTubeVideoId(url);
+      if (!videoId) return;
+
+      const embed = this.buildYouTubeEmbedElement(
+        document,
+        videoId,
+        url,
+        preferredVideoId === videoId,
+      );
+      element.replaceWith(embed);
+    });
+
+    if (preferredVideoId) {
+      const embeds = Array.from(
+        document.querySelectorAll("div[data-youtube-video]"),
+      );
+      for (const embed of embeds) {
+        const iframe = embed.querySelector("iframe");
+        const src = iframe?.getAttribute("src") || "";
+        if (src.includes(preferredVideoId)) {
+          embed.setAttribute("data-thumbnail", "true");
+          break;
+        }
+      }
+    }
+  }
+
+  private extractStandaloneUrl(
+    element: Element,
+    NodeRef: { TEXT_NODE: number; ELEMENT_NODE: number; COMMENT_NODE: number },
+  ): string | null {
+    const nonWhitespaceNodes = Array.from(element.childNodes).filter((node) => {
+      if (node.nodeType === NodeRef.TEXT_NODE) {
+        return (node.textContent || "").trim().length > 0;
+      }
+      return true;
+    });
+
+    if (nonWhitespaceNodes.length === 1) {
+      const node = nonWhitespaceNodes[0];
+      if (node.nodeType === NodeRef.TEXT_NODE) {
+        const text = (node.textContent || "").trim();
+        return text || null;
+      }
+
+      if (
+        node.nodeType === NodeRef.ELEMENT_NODE &&
+        (node as Element).tagName === "A"
+      ) {
+        const anchor = node as HTMLAnchorElement;
+        const href = anchor.getAttribute("href")?.trim();
+        return href || (anchor.textContent || "").trim() || null;
+      }
+    }
+
+    return null;
+  }
+
+  private buildYouTubeEmbedElement(
+    document: Document,
+    videoId: string,
+    originalUrl: string,
+    isPreferred: boolean,
+  ): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-youtube-video", "true");
+    wrapper.setAttribute("data-original-url", originalUrl);
+    if (isPreferred) {
+      wrapper.setAttribute("data-thumbnail", "true");
+    }
+    wrapper.setAttribute(
+      "style",
+      "position: relative; width: 685px; height: 540px; max-width: 100%; margin: 0 auto;",
+    );
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute(
+      "src",
+      `https://www.youtube.com/embed/${videoId}`,
+    );
+    iframe.setAttribute("width", "100%");
+    iframe.setAttribute("height", "100%");
+    iframe.setAttribute("frameborder", "0");
+    iframe.setAttribute("allowfullscreen", "true");
+    iframe.setAttribute(
+      "allow",
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+    );
+    iframe.setAttribute(
+      "style",
+      "position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;",
+    );
+
+    wrapper.appendChild(iframe);
+    return wrapper;
+  }
+
+  private extractYouTubeThumbnailMarker(
+    document: Document,
+    NodeRef: { COMMENT_NODE: number },
+  ): string | null {
+    const markers: string[] = [];
+    const walker = document.createTreeWalker(
+      document.body,
+      (document.defaultView as any)?.NodeFilter?.SHOW_COMMENT ?? 128,
+    );
+
+    let node = walker.nextNode() as Comment | null;
+    while (node) {
+      const content = (node.nodeValue || "").trim();
+      const match = content.match(/YT_THUMBNAIL:([a-zA-Z0-9_-]{11})/);
+      if (match?.[1]) {
+        markers.push(match[1]);
+        node.parentNode?.removeChild(node);
+      }
+      node = walker.nextNode() as Comment | null;
+    }
+
+    return markers[0] ?? null;
+  }
+
+  private containsYouTubeUrl(html: string): boolean {
+    return /youtube\.com\/(watch\?v=|shorts\/|embed\/)|youtu\.be\//i.test(html);
+  }
+
+  private extractYouTubeVideoId(url: string): string | null {
+    if (!url) return null;
+
+    const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
+
+    try {
+      const parsed = new URL(normalizedUrl);
+      const host = parsed.hostname.toLowerCase();
+
+      const isYouTubeHost =
+        host === "youtube.com" ||
+        host === "www.youtube.com" ||
+        host === "m.youtube.com" ||
+        host === "music.youtube.com" ||
+        host === "youtu.be" ||
+        host === "www.youtu.be" ||
+        host === "youtube-nocookie.com" ||
+        host === "www.youtube-nocookie.com";
+
+      if (!isYouTubeHost) return null;
+
+      if (host.includes("youtu.be")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[1]);
+      }
+
+      if (parsed.pathname.startsWith("/watch")) {
+        return this.normalizeYouTubeId(parsed.searchParams.get("v"));
+      }
+
+      if (parsed.pathname.startsWith("/shorts/")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[2]);
+      }
+
+      if (parsed.pathname.startsWith("/embed/")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[2]);
+      }
+
+      if (parsed.pathname.startsWith("/v/")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[2]);
+      }
+
+      return null;
+    } catch {
+      const fallbackMatch = url.match(
+        /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
+      );
+      return fallbackMatch?.[1] || null;
+    }
+  }
+
+  private normalizeYouTubeId(value: string | null | undefined): string | null {
+    if (!value) return null;
+    const match = value.match(/[a-zA-Z0-9_-]{11}/);
+    return match ? match[0] : null;
   }
 
   private parseImageAttributes(attrs: string): {

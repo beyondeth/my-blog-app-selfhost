@@ -25,6 +25,7 @@ import { validateUUID } from '@/lib/utils/uuid';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
 import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
+import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import { apiClient } from '@/lib/api';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import ReactMarkdown from 'react-markdown';
@@ -32,6 +33,13 @@ import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import { serializeImageAttributes, type MarkdownImageInfo } from '@/types/image-metadata.types';
 import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
 import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
+import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
+import {
+  appendYouTubeThumbnailMarker,
+  extractYouTubeIdsFromMarkdown,
+  extractYouTubeThumbnailMarker,
+  stripYouTubeThumbnailMarker,
+} from '@/utils/youtubeMarkdown';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -157,12 +165,17 @@ export default function EditPostForm({
     })();
   };
 
-  const initialEditorMode: EditorMode = initialData?.content_markdown ? 'markdown' : 'rich';
+  const rawMarkdownContent = initialData?.content_markdown ?? '';
+  const initialYouTubeThumbnailId = extractYouTubeThumbnailMarker(rawMarkdownContent);
+  const cleanedMarkdownContent = stripYouTubeThumbnailMarker(rawMarkdownContent);
+  const initialEditorMode: EditorMode = rawMarkdownContent ? 'markdown' : 'rich';
   const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode);
   const [isSwitchingEditorMode, setIsSwitchingEditorMode] = useState(false);
   const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingEditorMode, setPendingEditorMode] = useState<EditorMode | null>(null);
+  const [selectedYouTubeThumbnailId, setSelectedYouTubeThumbnailId] = useState<string | null>(initialYouTubeThumbnailId);
+  const [markdownYouTubeIds, setMarkdownYouTubeIds] = useState<string[]>([]);
   const markdownEditorRef = useRef<HybridMarkdownEditorRef | null>(null);
   const markdownImageInputRef = useRef<HTMLInputElement | null>(null);
   const [markdownImages, setMarkdownImages] = useState<MarkdownImageInfo[]>([]);
@@ -184,7 +197,7 @@ export default function EditPostForm({
     defaultValues: {
       title: initialData?.title || '',
       categories: [],  // useEffect에서 파싱하여 설정
-      content: initialData?.content_markdown ?? initialData?.content ?? '',
+      content: initialEditorMode === 'markdown' ? cleanedMarkdownContent : (initialData?.content ?? ''),
       tags: initialData?.tags || [],
       thumbnail: initialData?.thumbnail || '',
       thumbnailImageId: initialData?.thumbnailImageId || undefined, // 빈 문자열 대신 undefined 사용
@@ -317,6 +330,10 @@ export default function EditPostForm({
       timestamp: new Date().toISOString()
     });
 
+    if (thumbnailImageId) {
+      setSelectedYouTubeThumbnailId(null);
+    }
+
     const currentIds = form.getValues('attachedFileIds') || [];
     const nextIndex = thumbnailImageId ? currentIds.indexOf(thumbnailImageId) : -1;
     setThumbnailIndex(nextIndex);
@@ -336,6 +353,13 @@ export default function EditPostForm({
     }
     handleThumbnailChange(fileId);
   }, [form, handleThumbnailChange]);
+
+  const handleYouTubeThumbnailSelect = useCallback((videoId: string) => {
+    if (!videoId) return;
+    setSelectedYouTubeThumbnailId(videoId);
+    handleThumbnailChange(null);
+    toast.success('YouTube 영상을 썸네일로 지정했습니다.');
+  }, [handleThumbnailChange]);
 
   const executeEditorModeChange = useCallback((mode: EditorMode) => {
     setIsSwitchingEditorMode(true);
@@ -482,6 +506,20 @@ export default function EditPostForm({
   }, [editorMode, form, watchedContent]);
 
   useEffect(() => {
+    if (editorMode !== 'markdown') {
+      setMarkdownYouTubeIds([]);
+      return;
+    }
+
+    const ids = extractYouTubeIdsFromMarkdown(watchedContent || '');
+    setMarkdownYouTubeIds(ids);
+
+    if (selectedYouTubeThumbnailId && !ids.includes(selectedYouTubeThumbnailId)) {
+      setSelectedYouTubeThumbnailId(null);
+    }
+  }, [editorMode, watchedContent, selectedYouTubeThumbnailId]);
+
+  useEffect(() => {
     if (!watchedThumbnailImageId) {
       setThumbnailIndex(-1);
       return;
@@ -512,6 +550,7 @@ export default function EditPostForm({
 
     // 프론트엔드에서 안전하게 HTML로 변환 (백엔드 파싱 오류 방지)
     const convertedHtml = isMarkdownMode ? convertMarkdownToHtml(data.content) : data.content;
+    const hasPreferredYouTube = !isMarkdownMode && /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(convertedHtml);
 
     const formData: any = {
       ...data,
@@ -521,8 +560,13 @@ export default function EditPostForm({
     };
 
     if (isMarkdownMode) {
-      formData.content_markdown = data.content;
+      formData.content_markdown = appendYouTubeThumbnailMarker(
+        data.content,
+        selectedYouTubeThumbnailId,
+      );
       // content 필드는 HTML로 전송됨
+    } else if (hasPreferredYouTube) {
+      formData.thumbnailImageId = '';
     }
 
     // categories 필드 제거 (백엔드는 category 필드만 사용)
@@ -792,9 +836,11 @@ export default function EditPostForm({
                                     게시글과 동일한 스타일로 렌더링됩니다.
                                   </span>
                                 </p>
-                                <div className="markdown-content prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words">
-                                  <div dangerouslySetInnerHTML={{ __html: !isConfirmDialogOpen ? convertMarkdownToHtml(previewContent) : '' }} />
-                                </div>
+                              <HtmlContentRenderer
+                                content={!isConfirmDialogOpen ? convertMarkdownToHtml(previewContent) : ''}
+                                options={{ enableImageModal: false }}
+                                className="markdown-content prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words"
+                              />
                               </div>
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
@@ -803,7 +849,7 @@ export default function EditPostForm({
                                   업로드한 이미지
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  썸네일은 이 목록에서만 선택할 수 있습니다.
+                                  썸네일은 이미지 또는 YouTube에서 선택할 수 있습니다.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
@@ -817,7 +863,7 @@ export default function EditPostForm({
                                     <MarkdownImageCard
                                       key={image.id}
                                       image={image}
-                                      isActiveThumbnail={watchedThumbnailImageId === image.id}
+                                      isActiveThumbnail={!selectedYouTubeThumbnailId && watchedThumbnailImageId === image.id}
                                       onInsert={handleInsertImageFromList}
                                       onSetThumbnail={setThumbnailByFileId}
                                     />
@@ -826,6 +872,32 @@ export default function EditPostForm({
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                   아직 업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
+                                </p>
+                              )}
+                            </div>
+                            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                  본문 내 YouTube
+                                </p>
+                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  YouTube 링크가 있으면 여기서 썸네일로 선택할 수 있어요.
+                                </span>
+                              </div>
+                              {markdownYouTubeIds.length > 0 ? (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  {markdownYouTubeIds.map((videoId) => (
+                                    <MarkdownYouTubeCard
+                                      key={videoId}
+                                      videoId={videoId}
+                                      isActiveThumbnail={selectedYouTubeThumbnailId === videoId}
+                                      onSetThumbnail={handleYouTubeThumbnailSelect}
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  본문에 YouTube 링크를 추가하면 목록에 표시됩니다.
                                 </p>
                               )}
                             </div>

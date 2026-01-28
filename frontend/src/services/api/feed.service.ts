@@ -74,6 +74,7 @@ export interface UnifiedFeedItem {
   excerpt?: string;
   tags?: string[];
   thumbnail?: string;
+  youtubeVideoId?: string;
   images?: string[];
   sourceType: FeedSourceType;
   blog?: FeedBlog;

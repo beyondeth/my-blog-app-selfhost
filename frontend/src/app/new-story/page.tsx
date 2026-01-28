@@ -60,11 +60,19 @@ import { useUploadFile } from '@/hooks/useFiles';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useVideoUpload } from '@/hooks/video/useVideoUpload';
 import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
+import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import { apiClient } from '@/lib/api';
 import { serializeImageAttributes, type MarkdownImageInfo } from '@/types/image-metadata.types';
 import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
+import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
 import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
+import {
+  appendYouTubeThumbnailMarker,
+  extractYouTubeIdsFromMarkdown,
+  extractYouTubeThumbnailMarker,
+  stripYouTubeThumbnailMarker,
+} from '@/utils/youtubeMarkdown';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogSimpleEditor = dynamic(
@@ -118,6 +126,11 @@ function isLikelyImageUrl(url: string): boolean {
     return false;
   }
   return IMAGE_URL_PATTERN.test(normalized);
+}
+
+function hasPreferredYouTubeInHtml(html: string): boolean {
+  if (!html) return false;
+  return /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(html);
 }
 
 function convertInlineLinksToImages(markdown: string): string {
@@ -223,6 +236,8 @@ export default function NewStoryPage() {
 
   // 썸네일 인덱스 상태
   const [thumbnailIndex, setThumbnailIndex] = useState<number>(-1);
+  const [selectedYouTubeThumbnailId, setSelectedYouTubeThumbnailId] = useState<string | null>(null);
+  const [markdownYouTubeIds, setMarkdownYouTubeIds] = useState<string[]>([]);
   const [editorMode, setEditorMode] = useState<EditorMode>('rich');
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingEditorMode, setPendingEditorMode] = useState<EditorMode | null>(null);
@@ -360,6 +375,10 @@ export default function NewStoryPage() {
   const handleThumbnailChange = useCallback((index: number) => {
     console.log('🎯 [DEBUG] Thumbnail index changed:', { index, timestamp: new Date().toISOString() });
 
+    if (index >= 0) {
+      setSelectedYouTubeThumbnailId(null);
+    }
+
     // React Hook Form의 setValue를 사용하여 form state 업데이트
     form.setValue('thumbnailIndex', index, {
       shouldValidate: true,
@@ -420,6 +439,15 @@ export default function NewStoryPage() {
     }
     handleThumbnailChange(index);
   }, [form, handleThumbnailChange]);
+
+  const handleYouTubeThumbnailSelect = useCallback((videoId: string) => {
+    if (!videoId) {
+      return;
+    }
+    setSelectedYouTubeThumbnailId(videoId);
+    handleThumbnailChange(-1);
+    toast.success('YouTube 영상을 썸네일로 지정했습니다.');
+  }, [handleThumbnailChange]);
 
   const syncMarkdownImages = useCallback(
     (fileIdsOverride?: string[]) => {
@@ -538,6 +566,7 @@ export default function NewStoryPage() {
               typeof latestDraftRef.current.thumbnailIndex === 'number'
                 ? latestDraftRef.current.thumbnailIndex
                 : thumbnailIndex,
+            youtubeThumbnailId: selectedYouTubeThumbnailId ?? undefined,
           },
         };
 
@@ -558,7 +587,7 @@ export default function NewStoryPage() {
         draftSaveTimeoutRef.current = null;
       }, 1000);
     },
-    [activeDraftKey, editorMode, markdownImages, thumbnailIndex],
+    [activeDraftKey, editorMode, markdownImages, thumbnailIndex, selectedYouTubeThumbnailId],
   );
 
   const clearDraft = useCallback(() => {
@@ -589,12 +618,17 @@ export default function NewStoryPage() {
       }
 
       const restoredFileIds = parsed.data.fileIds ?? [];
+      const rawContent = parsed.data.content ?? '';
+      const restoredMarkerId =
+        extractYouTubeThumbnailMarker(rawContent) ??
+        (typeof parsed.data.youtubeThumbnailId === 'string' ? parsed.data.youtubeThumbnailId : null);
+      const cleanedContent = stripYouTubeThumbnailMarker(rawContent);
       form.reset({
         title: parsed.data.title ?? '',
         categories: Array.isArray(parsed.data.categories)
           ? parsed.data.categories.filter((cat: unknown): cat is string => typeof cat === 'string')
           : [],
-        content: parsed.data.content ?? '',
+        content: cleanedContent,
         tags: parsed.data.tags ?? [],
         fileIds: restoredFileIds,
         thumbnailIndex: typeof parsed.data.thumbnailIndex === 'number' ? parsed.data.thumbnailIndex : -1,
@@ -611,6 +645,7 @@ export default function NewStoryPage() {
       setThumbnailIndex(
         typeof parsed.data.thumbnailIndex === 'number' ? parsed.data.thumbnailIndex : -1,
       );
+      setSelectedYouTubeThumbnailId(restoredMarkerId);
       hasRestoredDraftRef.current = true;
       
       // 빈 초안이 아닌 경우에만 토스트 표시
@@ -623,7 +658,7 @@ export default function NewStoryPage() {
       latestDraftRef.current = {
         title: parsed.data.title ?? '',
         categories: parsed.data.categories ?? [],
-        content: parsed.data.content ?? '',
+        content: cleanedContent,
         tags: Array.isArray(parsed.data.tags)
           ? parsed.data.tags.filter((tag: unknown): tag is string => typeof tag === 'string')
           : [],
@@ -665,7 +700,7 @@ export default function NewStoryPage() {
 
   useEffect(() => {
     scheduleDraftSave();
-  }, [editorMode, markdownImages, scheduleDraftSave, thumbnailIndex]);
+  }, [editorMode, markdownImages, scheduleDraftSave, thumbnailIndex, selectedYouTubeThumbnailId]);
 
   useEffect(() => {
     if (editorMode !== 'markdown') {
@@ -688,6 +723,20 @@ export default function NewStoryPage() {
       form.setValue('content', converted, { shouldDirty: true, shouldTouch: true });
     }
   }, [editorMode, form, watchedContent]);
+
+  useEffect(() => {
+    if (editorMode !== 'markdown') {
+      setMarkdownYouTubeIds([]);
+      return;
+    }
+
+    const ids = extractYouTubeIdsFromMarkdown(watchedContent || '');
+    setMarkdownYouTubeIds(ids);
+
+    if (selectedYouTubeThumbnailId && !ids.includes(selectedYouTubeThumbnailId)) {
+      setSelectedYouTubeThumbnailId(null);
+    }
+  }, [editorMode, watchedContent, selectedYouTubeThumbnailId]);
 
   useEffect(() => {
     if (!Array.isArray(watchedFileIds)) {
@@ -996,16 +1045,22 @@ export default function NewStoryPage() {
         setCategoryError(null);
         const categoryString = categories.join('/');
 
+        const hasPreferredYouTube = !isMarkdownMode && hasPreferredYouTubeInHtml(data.content);
+
         const postData: any = {
           title: data.title,
           category: categoryString,
           tags: data.tags,
           attachedFileIds: data.fileIds,
-          ...(thumbnailImageId && { thumbnailImageId }),
+          ...(thumbnailImageId && !hasPreferredYouTube && { thumbnailImageId }),
         };
 
         if (isMarkdownMode) {
-          postData.content_markdown = data.content;
+          const contentWithYouTubeMarker = appendYouTubeThumbnailMarker(
+            data.content,
+            selectedYouTubeThumbnailId,
+          );
+          postData.content_markdown = contentWithYouTubeMarker;
           postData.content_type = 'markdown';
         } else {
           postData.content = data.content;
@@ -1034,20 +1089,26 @@ export default function NewStoryPage() {
       }
       // 커뮤니티에 포스트 발행
       else {
+        const hasPreferredYouTube = !isMarkdownMode && hasPreferredYouTubeInHtml(data.content);
+
         const communityPostData: any = {
           title: data.title,
           tags: data.tags,
-          ...(thumbnailImageId && { thumbnailImageId }),
+          ...(thumbnailImageId && !hasPreferredYouTube && { thumbnailImageId }),
           isPublished: true,
           ...(selectedFlairId && { flairId: selectedFlairId }),
           isNsfw,
           isSpoiler,
         };
         if (isMarkdownMode) {
+          const contentWithYouTubeMarker = appendYouTubeThumbnailMarker(
+            data.content,
+            selectedYouTubeThumbnailId,
+          );
           // Markdown 모드: content와 contentMarkdown 둘 다 설정
           // content는 필수 필드이므로 마크다운 원본을 그대로 저장
-          communityPostData.content = data.content;
-          communityPostData.contentMarkdown = data.content;
+          communityPostData.content = contentWithYouTubeMarker;
+          communityPostData.contentMarkdown = contentWithYouTubeMarker;
         } else {
           communityPostData.content = data.content;
         }
@@ -1469,9 +1530,11 @@ export default function NewStoryPage() {
                                   <span>실시간 미리보기</span>
                                   <span className="text-[11px] text-gray-400 dark:text-gray-500">이미지, 표, 코드까지 즉시 반영돼요.</span>
                                 </p>
-                                <div className="markdown-content prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words">
-                                  <div dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(previewContent) }} />
-                                </div>
+                                <HtmlContentRenderer
+                                  content={convertMarkdownToHtml(previewContent)}
+                                  options={{ enableImageModal: false }}
+                                  className="markdown-content prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words"
+                                />
                               </div>
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
@@ -1480,7 +1543,7 @@ export default function NewStoryPage() {
                                   업로드한 이미지
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  썸네일은 업로드한 이미지에서만 선택됩니다.
+                                  썸네일은 업로드한 이미지 또는 YouTube 영상에서 선택됩니다.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
@@ -1494,7 +1557,7 @@ export default function NewStoryPage() {
                                     <MarkdownImageCard
                                       key={image.id}
                                       image={image}
-                                      isActiveThumbnail={currentThumbnailFileId === image.id}
+                                      isActiveThumbnail={!selectedYouTubeThumbnailId && currentThumbnailFileId === image.id}
                                       onInsert={handleInsertImageFromList}
                                       onSetThumbnail={setThumbnailByFileId}
                                     />
@@ -1503,6 +1566,32 @@ export default function NewStoryPage() {
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                   업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
+                                </p>
+                              )}
+                            </div>
+                            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                  본문 내 YouTube
+                                </p>
+                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  YouTube 링크가 있으면 여기서 썸네일로 선택할 수 있어요.
+                                </span>
+                              </div>
+                              {markdownYouTubeIds.length > 0 ? (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  {markdownYouTubeIds.map((videoId) => (
+                                    <MarkdownYouTubeCard
+                                      key={videoId}
+                                      videoId={videoId}
+                                      isActiveThumbnail={selectedYouTubeThumbnailId === videoId}
+                                      onSetThumbnail={handleYouTubeThumbnailSelect}
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  본문에 YouTube 링크를 추가하면 목록에 표시됩니다.
                                 </p>
                               )}
                             </div>

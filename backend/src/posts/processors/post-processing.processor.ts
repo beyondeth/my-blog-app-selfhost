@@ -111,8 +111,14 @@ export class PostProcessingProcessor
         };
       }
 
-      // 2. Markdown → HTML 변환
-      const rawHtml = this.markdownRenderer.convertToHtml(content);
+      // 2. Markdown → HTML 변환 (콘텐츠 타입에 따라 분기)
+      const isMarkdown = post.content_type === "markdown";
+      const sourceMarkdown = isMarkdown
+        ? post.content_markdown || content || ""
+        : "";
+      const rawHtml = isMarkdown
+        ? this.markdownRenderer.convertToHtml(sourceMarkdown)
+        : post.content || content || "";
 
       // 3. Content 처리 (HTML sanitization, code highlighting, image processing)
       const { html: processedContent, metadata } =

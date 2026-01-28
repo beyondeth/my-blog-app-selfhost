@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import { useRouter } from 'next/navigation';
 import ModerationModal from '../admin/ModerationModal';
 import VoteButton from '@/components/ui/VoteButton';
+import YouTubeEmbedPlayer from '@/components/ui/YouTubeEmbedPlayer';
 import FlairBadge from '@/components/community/FlairBadge';
 import MemberRoleBadge from '@/components/community/MemberRoleBadge';
 import PostSourceMeta from '@/components/posts/PostSourceMeta';
@@ -30,7 +31,15 @@ import {
 import { createHighlightedHTML, highlightAndTruncate } from '@/utils/highlight';
 import { formatRelativeTime } from '@/utils/timeFormat';
 import { extractImageKey, normalizeImageUrl, shouldDisableOptimization } from '@/utils/imageUtils';
-import { determineFeedLayout, extractYouTubeVideoId, FeedLayoutType, hasVideoEmbed, extractFirstVideoId } from '@/utils/feedLayoutUtils';
+import {
+  determineFeedLayout,
+  extractYouTubeVideoId,
+  extractYouTubeVideoIdFromContent,
+  hasYouTubeEmbed,
+  FeedLayoutType,
+  hasVideoEmbed,
+  extractFirstVideoId,
+} from '@/utils/feedLayoutUtils';
 import VideoRenderer from '@/components/ui/content-renderer/components/VideoRenderer';
 import PostImageCarousel from '@/components/posts/PostImageCarousel';
 import PostImageLightbox from '@/components/posts/PostImageLightbox';
@@ -218,20 +227,29 @@ const PostArticle = React.memo(function PostArticle({
       thumbnail: post.thumbnail,
       excerpt: post.excerpt,
       content: post.content,
+      youtubeVideoId: post.youtubeVideoId,
     });
-  }, [post.thumbnail, post.excerpt, post.content]);
+  }, [post.thumbnail, post.excerpt, post.content, post.youtubeVideoId]);
   const isImageFocused = layoutType === 'image-focused';
 
   // YouTube 비디오 ID (비디오 중심 레이아웃일 때만 추출)
   const youtubeVideoId = React.useMemo(() => {
-    if (layoutType !== 'video-focused' || !post.thumbnail) return null;
-    return extractYouTubeVideoId(post.thumbnail);
-  }, [layoutType, post.thumbnail]);
+    if (layoutType !== 'video-focused') return null;
+    if (post.youtubeVideoId) return post.youtubeVideoId;
+    if (post.thumbnail) {
+      const id = extractYouTubeVideoId(post.thumbnail);
+      if (id) return id;
+    }
+    return extractYouTubeVideoIdFromContent(post.content);
+  }, [layoutType, post.thumbnail, post.content]);
 
   // 업로드된 비디오 포함 여부
   const hasVideo = React.useMemo(() => {
     return hasVideoEmbed(post.content);
   }, [post.content]);
+  const hasYouTube = React.useMemo(() => {
+    return Boolean(post.youtubeVideoId) || hasYouTubeEmbed(post.content);
+  }, [post.youtubeVideoId, post.content]);
 
   // 비디오 ID 추출 (인라인 재생용 - VideoRenderer에서 API 호출)
   const videoId = React.useMemo(() => {
@@ -427,16 +445,13 @@ const PostArticle = React.memo(function PostArticle({
           {/* YouTube 비디오 플레이어 - 반응형 */}
           <div className="w-full mb-7 max-w-full">
             <div className="w-full max-w-[780px] mx-auto">
-              <div className="relative w-full" style={{ paddingBottom: '78.8%' }}>
-                <iframe
-                  src={`https://www.youtube.com/embed/${youtubeVideoId}?rel=0&modestbranding=1`}
-                  title={post.title}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowFullScreen
-                  className="absolute inset-0 w-full h-full rounded-lg shadow-sm"
-                />
-              </div>
+              <YouTubeEmbedPlayer
+                videoId={youtubeVideoId}
+                title={post.title}
+                aspectRatio={0.788}
+                className="relative w-full"
+                iframeClassName="absolute inset-0 w-full h-full rounded-lg shadow-sm"
+              />
             </div>
           </div>
           
@@ -897,7 +912,7 @@ const PostArticle = React.memo(function PostArticle({
               dangerouslySetInnerHTML={{ __html: displayContent }}
             />
           )}
-          {!displayContent && !hasVideo && (
+          {!displayContent && !hasVideo && !hasYouTube && (
             <p className={`text-[15px] ${metaFaintClass} italic leading-relaxed line-clamp-3 break-words mb-7`}>
               내용 미리보기가 없습니다.
             </p>
