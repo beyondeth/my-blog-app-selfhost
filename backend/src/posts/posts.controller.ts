@@ -578,27 +578,6 @@ export class PostsController {
     return { success: true };
   }
 
-  @Get(":blogId/:slug")
-  @Public()
-  @UseGuards(OptionalJwtAuthGuard)
-  @ApiOperation({
-    summary: "블로그 ID와 슬러그로 게시글 조회 (프론트엔드 호환성)",
-  })
-  findByBlogIdAndSlug(
-    @Param("blogId", ParseUUIDPipe) blogId: string,
-    @Param("slug") slug: string,
-    @Request() req: any,
-  ) {
-    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
-    const user = req.user || null;
-
-    // URL 파라미터 안전하게 디코딩 및 정제
-    const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
-
-    // blogId는 validation 용도로만 사용하고, 실제로는 slug로 조회
-    return this.postsService.findBySlug(sanitizedSlug, user);
-  }
-
   @Get("view-stats")
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles(Role.ADMIN)
@@ -1056,6 +1035,27 @@ export class PostsController {
     Array<{ slug: string; blogSlug: string; updatedAt: Date }>
   > {
     return this.postsService.getAllPublishedPostsForSitemap();
+  }
+
+  @Get(":blogId/:slug")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({
+    summary: "블로그 ID와 슬러그로 게시글 조회 (프론트엔드 호환성)",
+  })
+  findByBlogIdAndSlug(
+    @Param("blogId", ParseUUIDPipe) blogId: string,
+    @Param("slug") slug: string,
+    @Request() req: any,
+  ) {
+    // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
+    const user = req.user || null;
+
+    // URL 파라미터 안전하게 디코딩 및 정제
+    const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
+
+    // blogId는 validation 용도로만 사용하고, 실제로는 slug로 조회
+    return this.postsService.findBySlug(sanitizedSlug, user);
   }
 
   // ⚠️ 주의: 이 라우트는 반드시 모든 정적 라우트 아래에 위치해야 합니다.
