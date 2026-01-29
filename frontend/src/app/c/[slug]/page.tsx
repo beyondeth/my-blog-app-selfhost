@@ -93,7 +93,9 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
   const communityUrl = `${siteUrl}/c/${slug}`;
-  const description = community.description || `${community.name} 커뮤니티입니다.`;
+  const description =
+    community.description ||
+    `AI 최신 트렌드와 바이브코딩 정보를 나누는 ${community.name} 커뮤니티입니다.`;
 
   // 대표 이미지 (아이콘이 없으면 기본 이미지)
   const imageUrl = community.iconUrl || `${siteUrl}/og-image-v2.png`;
@@ -142,7 +144,9 @@ export default async function CommunityPage({ params }: PageProps) {
     '@context': 'https://schema.org',
     '@type': 'CollectionPage',
     name: community.name,
-    description: community.description || `${community.name} 커뮤니티 메인`,
+    description:
+      community.description ||
+      `AI 최신 트렌드와 바이브코딩 정보를 나누는 ${community.name} 커뮤니티 메인`,
     url: `${siteUrl}/c/${slug}`,
     image: community.iconUrl || `${siteUrl}/og-image-v2.png`,
     mainEntity: {

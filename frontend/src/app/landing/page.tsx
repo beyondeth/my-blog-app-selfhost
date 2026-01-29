@@ -2,12 +2,12 @@ import type { Metadata } from 'next';
 import LandingClientPage from './client-page';
 
 export const metadata: Metadata = {
-  title: 'Codebase - AI 자동포스팅 블로그 플랫폼',
-  description: 'MCP 프로토콜 기반의 AI 자동포스팅으로 기술 블로그를 손쉽게 운영하세요. 개발자 커뮤니티와 지식 공유의 새로운 기준.',
+  title: 'Codebase - AI 트렌드 & 바이브코딩 커뮤니티',
+  description: 'LLM, 프롬프트, 에이전트, AI 도구의 최신 트렌드를 나누고 초보자도 쉽게 시작할 수 있는 바이브코딩 커뮤니티.',
   openGraph: {
     type: 'website',
-    title: 'Codebase - AI 자동포스팅 블로그 플랫폼',
-    description: 'MCP 프로토콜 기반의 AI 자동포스팅으로 기술 블로그를 손쉽게 운영하세요. 개발자 커뮤니티와 지식 공유의 새로운 기준.',
+    title: 'Codebase - AI 트렌드 & 바이브코딩 커뮤니티',
+    description: 'LLM, 프롬프트, 에이전트, AI 도구의 최신 트렌드를 나누고 초보자도 쉽게 시작할 수 있는 바이브코딩 커뮤니티.',
     images: [
       {
         url: '/og-image-v2.png',
@@ -19,8 +19,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Codebase - AI 자동포스팅 블로그 플랫폼',
-    description: 'MCP 프로토콜 기반의 AI 자동포스팅으로 기술 블로그를 손쉽게 운영하세요.',
+    title: 'Codebase - AI 트렌드 & 바이브코딩 커뮤니티',
+    description: 'LLM, 프롬프트, 에이전트, AI 도구의 최신 트렌드를 나누고 초보자도 쉽게 시작할 수 있는 바이브코딩 커뮤니티.',
     images: ['/og-image-v2.png'],
   },
 };
@@ -33,7 +33,7 @@ export default function LandingPage() {
     '@type': 'WebSite',
     name: 'Codebase',
     url: siteUrl,
-    description: 'AI 자동포스팅 전문 블로그 플랫폼',
+    description: 'AI 트렌드와 바이브코딩 정보를 나누는 커뮤니티 플랫폼',
     potentialAction: {
       '@type': 'SearchAction',
       target: {

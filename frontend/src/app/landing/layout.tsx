@@ -13,13 +13,13 @@ import { Metadata } from 'next';
 const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://www.codebase.blog';
 
 export const metadata: Metadata = {
-  title: 'MCP 자동 블로그 포스팅 - Codebase',
-  description: '개발자를 위한 AI 자동 블로그 포스팅 플랫폼. MCP와 Claude를 활용하여 대화만으로 전문적인 기술 블로그를 자동으로 생성하고 발행하세요. 생산성 혁신을 경험하세요.',
-  keywords: ['MCP', 'Claude', 'AI 블로그', '자동 포스팅', '개발 블로그 자동화', 'AI 글쓰기', 'Codebase'],
+  title: 'AI 트렌드 & 바이브코딩 커뮤니티 - Codebase',
+  description: 'LLM, 프롬프트, 에이전트, AI 도구의 최신 트렌드를 나누고 초보자도 쉽게 시작할 수 있는 바이브코딩 커뮤니티.',
+  keywords: ['AI 트렌드', '바이브코딩', 'LLM', '프롬프트', '에이전트', 'AI 도구', '커뮤니티', 'Codebase'],
 
   openGraph: {
-    title: 'MCP 자동 블로그 포스팅 - Codebase',
-    description: '대화만으로 전문적인 기술 블로그를 자동으로 생성하고 발행하세요. AI와 MCP가 만나는 생산성 혁신.',
+    title: 'AI 트렌드 & 바이브코딩 커뮤니티 - Codebase',
+    description: 'LLM, 프롬프트, 에이전트, AI 도구의 최신 트렌드를 나누고 초보자도 쉽게 시작할 수 있는 바이브코딩 커뮤니티.',
     url: `${siteUrl}/landing`,
     siteName: 'Codebase',
     images: [
@@ -36,8 +36,8 @@ export const metadata: Metadata = {
 
   twitter: {
     card: 'summary_large_image',
-    title: 'MCP 자동 블로그 포스팅 - Codebase',
-    description: '대화만으로 전문적인 기술 블로그를 자동으로 생성하고 발행하세요.',
+    title: 'AI 트렌드 & 바이브코딩 커뮤니티 - Codebase',
+    description: 'LLM, 프롬프트, 에이전트, AI 도구의 최신 트렌드를 나누고 초보자도 쉽게 시작할 수 있는 바이브코딩 커뮤니티.',
     images: [`${siteUrl}/og-image-v2.png`],
   },
 
