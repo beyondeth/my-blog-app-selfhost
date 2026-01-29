@@ -21,6 +21,7 @@ import { BlogSimpleEditor } from '@/editor';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
 import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
+import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import { apiClient } from '@/lib/api';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import { Save, ImageIcon, Film, Plus, FileText } from 'lucide-react';
@@ -44,6 +45,13 @@ import { useVideoUpload } from '@/hooks/video/useVideoUpload';
 import { serializeImageAttributes, type MarkdownImageInfo } from '@/types/image-metadata.types';
 import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
 import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
+import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
+import {
+  appendYouTubeThumbnailMarker,
+  extractYouTubeIdsFromMarkdown,
+  extractYouTubeThumbnailMarker,
+  stripYouTubeThumbnailMarker,
+} from '@/utils/youtubeMarkdown';
 
 // Define schema for community post editing
 const communityPostFormSchema = z.object({
@@ -103,12 +111,17 @@ export default function CommunityPostEditForm({
 }: CommunityPostEditFormProps) {
   const isSubmittingRef = useRef(false);
   // Infer initial mode: if content_markdown represents the source of truth, use markdown mode
-  const initialMode = initialData.content_markdown ? 'markdown' : 'rich';
+  const rawMarkdownContent = initialData.content_markdown ?? '';
+  const initialYouTubeThumbnailId = extractYouTubeThumbnailMarker(rawMarkdownContent);
+  const cleanedMarkdownContent = stripYouTubeThumbnailMarker(rawMarkdownContent);
+  const initialMode = rawMarkdownContent ? 'markdown' : 'rich';
   const [editorMode, setEditorMode] = useState<EditorMode>(initialMode);
   const [isSwitchingEditorMode, setIsSwitchingEditorMode] = useState(false);
   const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingEditorMode, setPendingEditorMode] = useState<EditorMode | null>(null);
+  const [selectedYouTubeThumbnailId, setSelectedYouTubeThumbnailId] = useState<string | null>(initialYouTubeThumbnailId);
+  const [markdownYouTubeIds, setMarkdownYouTubeIds] = useState<string[]>([]);
   const [isNsfw, setIsNsfw] = useState(initialData.isNsfw ?? false);
   const [isSpoiler, setIsSpoiler] = useState(initialData.isSpoiler ?? false);
   
@@ -171,7 +184,7 @@ export default function CommunityPostEditForm({
     resolver: zodResolver(communityPostFormSchema),
     defaultValues: {
       title: initialData.title || '',
-      content: initialMode === 'markdown' ? (initialData.content_markdown || '') : (initialData.content || ''),
+      content: initialMode === 'markdown' ? cleanedMarkdownContent : (initialData.content || ''),
       flairId: initialData.flairId || undefined,
       tags: initialData.tags || [],
       attachedFileIds: initialData.thumbnailImageId ? [initialData.thumbnailImageId] : [],
@@ -299,6 +312,9 @@ export default function CommunityPostEditForm({
   }, [form, handleFileIdsChange]);
 
   const handleThumbnailChange = useCallback((thumbnailImageId: string | null) => {
+    if (thumbnailImageId) {
+      setSelectedYouTubeThumbnailId(null);
+    }
     form.setValue('thumbnailImageId', thumbnailImageId || '', {
       shouldDirty: true,
       shouldTouch: true,
@@ -314,6 +330,13 @@ export default function CommunityPostEditForm({
     }
     handleThumbnailChange(fileId);
   }, [form, handleThumbnailChange]);
+
+  const handleYouTubeThumbnailSelect = useCallback((videoId: string) => {
+    if (!videoId) return;
+    setSelectedYouTubeThumbnailId(videoId);
+    handleThumbnailChange(null);
+    toast.success('YouTube 영상을 썸네일로 지정했습니다.');
+  }, [handleThumbnailChange]);
 
   const executeEditorModeChange = useCallback((mode: EditorMode) => {
     setIsSwitchingEditorMode(true);
@@ -375,14 +398,18 @@ export default function CommunityPostEditForm({
     setIsLocalSubmitting(true);
 
     const convertedHtml = isMarkdownMode ? convertMarkdownToHtml(data.content) : data.content;
+    const hasPreferredYouTube = !isMarkdownMode && /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(convertedHtml);
+    const contentWithYouTubeMarker = isMarkdownMode
+      ? appendYouTubeThumbnailMarker(data.content, selectedYouTubeThumbnailId)
+      : data.content;
 
     const formData = {
       title: data.title,
       content: convertedHtml,
-      contentMarkdown: isMarkdownMode ? data.content : undefined,
+      contentMarkdown: isMarkdownMode ? contentWithYouTubeMarker : undefined,
       flairId: data.flairId,
       tags: data.tags,
-      thumbnailImageId: data.thumbnailImageId || undefined,
+      thumbnailImageId: hasPreferredYouTube ? '' : data.thumbnailImageId || undefined,
       isNsfw,
       isSpoiler,
     };
@@ -560,6 +587,20 @@ export default function CommunityPostEditForm({
       form.setValue('content', converted, { shouldDirty: true, shouldTouch: true });
     }
   }, [editorMode, form, watchedContent]);
+
+  useEffect(() => {
+    if (editorMode !== 'markdown') {
+      setMarkdownYouTubeIds([]);
+      return;
+    }
+
+    const ids = extractYouTubeIdsFromMarkdown(watchedContent || '');
+    setMarkdownYouTubeIds(ids);
+
+    if (selectedYouTubeThumbnailId && !ids.includes(selectedYouTubeThumbnailId)) {
+      setSelectedYouTubeThumbnailId(null);
+    }
+  }, [editorMode, watchedContent, selectedYouTubeThumbnailId]);
 
   useEffect(() => {
     if (!Array.isArray(watchedFileIds)) {
@@ -895,9 +936,11 @@ export default function CommunityPostEditForm({
                                   <span>실시간 미리보기</span>
                                   <span className="text-[11px] text-gray-400 dark:text-gray-500">이미지, 표, 코드까지 즉시 반영돼요.</span>
                                 </p>
-                                <div className="markdown-content prose prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words">
-                                  <div dangerouslySetInnerHTML={{ __html: convertMarkdownToHtml(previewContent) }} />
-                                </div>
+                              <HtmlContentRenderer
+                                content={convertMarkdownToHtml(previewContent)}
+                                options={{ enableImageModal: false }}
+                                className="markdown-content prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words"
+                              />
                               </div>
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
@@ -906,7 +949,7 @@ export default function CommunityPostEditForm({
                                   업로드한 이미지
                                 </p>
                                 <span className="text-[11px] text-gray-500 dark:text-gray-400">
-                                  썸네일은 업로드한 이미지에서만 선택됩니다.
+                                  썸네일은 이미지 또는 YouTube에서 선택할 수 있습니다.
                                 </span>
                               </div>
                               {isResolvingFileMetadata && (
@@ -920,7 +963,7 @@ export default function CommunityPostEditForm({
                                     <MarkdownImageCard
                                       key={image.id}
                                       image={image}
-                                      isActiveThumbnail={currentThumbnailFileId === image.id}
+                                      isActiveThumbnail={!selectedYouTubeThumbnailId && currentThumbnailFileId === image.id}
                                       onInsert={handleInsertImageFromList}
                                       onSetThumbnail={setThumbnailByFileId}
                                     />
@@ -929,6 +972,32 @@ export default function CommunityPostEditForm({
                               ) : (
                                 <p className="text-sm text-gray-500 dark:text-gray-400">
                                   업로드한 이미지가 없습니다. 위의 버튼으로 이미지를 추가하면 여기에서 미리보고 썸네일을 지정할 수 있어요.
+                                </p>
+                              )}
+                            </div>
+                            <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
+                              <div className="flex items-center justify-between">
+                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400">
+                                  본문 내 YouTube
+                                </p>
+                                <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                  YouTube 링크가 있으면 여기서 썸네일로 선택할 수 있어요.
+                                </span>
+                              </div>
+                              {markdownYouTubeIds.length > 0 ? (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                  {markdownYouTubeIds.map((videoId) => (
+                                    <MarkdownYouTubeCard
+                                      key={videoId}
+                                      videoId={videoId}
+                                      isActiveThumbnail={selectedYouTubeThumbnailId === videoId}
+                                      onSetThumbnail={handleYouTubeThumbnailSelect}
+                                    />
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 dark:text-gray-400">
+                                  본문에 YouTube 링크를 추가하면 목록에 표시됩니다.
                                 </p>
                               )}
                             </div>

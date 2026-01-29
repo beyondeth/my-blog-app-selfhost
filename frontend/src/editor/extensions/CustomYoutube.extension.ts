@@ -4,8 +4,10 @@
  */
 
 import { Node, mergeAttributes, nodePasteRule, InputRule } from '@tiptap/core';
+import { ReactNodeViewRenderer } from '@tiptap/react';
 import { find } from 'linkifyjs';
 import { Plugin, PluginKey, Transaction } from 'prosemirror-state';
+import { YouTubeNode } from '../components/YouTube/YouTubeNode';
 
 export interface YoutubeOptions {
   addPasteHandler: boolean;
@@ -130,6 +132,14 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
       src: {
         default: null,
       },
+      isThumbnail: {
+        default: false,
+        parseHTML: element => element.getAttribute('data-thumbnail') === 'true',
+        renderHTML: attributes => {
+          if (!attributes.isThumbnail) return {};
+          return { 'data-thumbnail': 'true' };
+        },
+      },
       originalUrl: {
         default: null,
         // Store the original YouTube URL for later use
@@ -156,25 +166,33 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
       {
         tag: 'div[data-youtube-video]',
         getAttrs: (element) => {
-          const iframe = (element as HTMLElement).querySelector('iframe');
-          if (!iframe) return false;
-          
-          const src = iframe.getAttribute('src');
-          if (!src) return false;
-          
-          // Extract video ID from embed URL
-          const match = src.match(/embed\/([\w-]+)/);
-          if (!match) return false;
-          
-          // Try to get the original URL from data attribute
-          const originalUrl = (element as HTMLElement).getAttribute('data-original-url') 
-            || `https://www.youtube.com/watch?v=${match[1]}`;
-          
+          const htmlElement = element as HTMLElement;
+          const iframe = htmlElement.querySelector('iframe');
+          const iframeSrc = iframe?.getAttribute('src') || '';
+          const iframeMatch = iframeSrc.match(/embed\/([\w-]+)/);
+          const originalUrlAttr = htmlElement.getAttribute('data-original-url')?.trim() || '';
+
+          const resolvedUrl =
+            originalUrlAttr ||
+            iframeSrc ||
+            (htmlElement.textContent || '').trim();
+
+          const videoId =
+            iframeMatch?.[1] ||
+            getYoutubeVideoId(resolvedUrl) ||
+            getYoutubeVideoId(iframeSrc);
+
+          if (!videoId) return false;
+
+          const originalUrl =
+            originalUrlAttr || `https://www.youtube.com/watch?v=${videoId}`;
+
           return {
             src: originalUrl,
-            originalUrl: originalUrl, // Preserve original URL when parsing
-            width: iframe.getAttribute('width') || this.options.width,
-            height: iframe.getAttribute('height') || this.options.height,
+            originalUrl: originalUrl,
+            width: iframe?.getAttribute('width') || this.options.width,
+            height: iframe?.getAttribute('height') || this.options.height,
+            isThumbnail: htmlElement.getAttribute('data-thumbnail') === 'true',
           };
         },
       },
@@ -182,7 +200,7 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
-    const { src, width, height, originalUrl } = node.attrs;
+    const { src, width, height, originalUrl, isThumbnail } = node.attrs;
     
     if (!src) {
       return ['div', { 'data-youtube-video': true }, 'No YouTube URL provided'];
@@ -207,6 +225,10 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
     if (originalUrl) {
       divAttrs['data-original-url'] = originalUrl;
     }
+
+    if (isThumbnail) {
+      divAttrs['data-thumbnail'] = 'true';
+    }
     
     return [
       'div',
@@ -228,6 +250,10 @@ export const CustomYoutube = Node.create<YoutubeOptions>({
         },
       ],
     ];
+  },
+
+  addNodeView() {
+    return ReactNodeViewRenderer(YouTubeNode);
   },
 
   addCommands() {

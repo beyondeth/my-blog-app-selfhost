@@ -58,6 +58,8 @@ export class HtmlSanitizerService {
       "var",
       // 컨테이너
       "div",
+      // iframe (YouTube 전용, allowIframes 옵션으로 제어)
+      "iframe",
       // 구분선
       "hr",
       // 테이블
@@ -92,6 +94,11 @@ export class HtmlSanitizerService {
       // 이미지 최적화
       "loading",
       "decoding",
+      // iframe 관련 속성 (YouTube 전용)
+      "allow",
+      "allowfullscreen",
+      "frameborder",
+      "referrerpolicy",
     ],
     ALLOW_DATA_ATTR: true,
     KEEP_CONTENT: true,
@@ -137,6 +144,8 @@ export class HtmlSanitizerService {
       "samp",
       "var",
       "div",
+      // iframe (YouTube 전용, allowIframes 옵션으로 제어)
+      "iframe",
       "hr",
       "table",
       "thead",
@@ -155,11 +164,19 @@ export class HtmlSanitizerService {
       a: ["href", "target", "rel", "title"],
       img: ["src", "alt", "title", "width", "height", "loading", "decoding"],
       button: ["data-code"],
+      iframe: ["src", "width", "height", "allow", "allowfullscreen", "frameborder", "title", "loading", "referrerpolicy"],
     },
     allowedSchemes: ["http", "https"],
     allowedSchemesByTag: {
       img: ["http", "https", "data"],
     },
+    allowedIframeHostnames: [
+      "youtube.com",
+      "www.youtube.com",
+      "m.youtube.com",
+      "youtube-nocookie.com",
+      "www.youtube-nocookie.com",
+    ],
     allowCommentTag: true,
   };
 
@@ -205,10 +222,39 @@ export class HtmlSanitizerService {
       }
 
       // DOMPurify로 살균 (안전성 체크 추가)
-      const config = { ...this.domPurifyConfig };
+      const config = {
+        ...this.domPurifyConfig,
+        ALLOWED_TAGS: [...this.domPurifyConfig.ALLOWED_TAGS],
+        ALLOWED_ATTR: [...this.domPurifyConfig.ALLOWED_ATTR],
+      };
 
       if (!allowComments) {
         config.ALLOW_COMMENTS = false;
+      }
+
+      if (!allowIframes) {
+        config.ALLOWED_TAGS = config.ALLOWED_TAGS.filter((tag) => tag !== "iframe");
+      }
+
+      if (allowIframes) {
+        // YouTube iframe만 허용
+        const allowYouTubeIframes = (node: Element) => {
+          if (node.tagName !== "IFRAME") return;
+
+          const src = node.getAttribute("src") || "";
+          if (!this.isYouTubeIframeSrc(src)) {
+            node.parentNode?.removeChild(node);
+            return;
+          }
+
+          // 안전한 기본 속성 보강
+          node.setAttribute("loading", "lazy");
+          if (!node.getAttribute("referrerpolicy")) {
+            node.setAttribute("referrerpolicy", "no-referrer-when-downgrade");
+          }
+        };
+
+        DOMPurify.addHook("uponSanitizeElement", allowYouTubeIframes);
       }
 
       // DOMPurify가 정상적으로 초기화되었는지 확인
@@ -220,6 +266,9 @@ export class HtmlSanitizerService {
       }
 
       let sanitized = DOMPurify.sanitize(processedHtml, config);
+
+      // 등록한 hook 정리 (전역 오염 방지)
+      DOMPurify.removeAllHooks();
 
       // Mermaid 블록 복원
       if (preserveMermaid) {
@@ -264,6 +313,11 @@ export class HtmlSanitizerService {
 
     if (!allowComments) {
       config.allowCommentTag = false;
+    }
+
+    if (!allowIframes) {
+      config.allowedTags = config.allowedTags.filter((tag) => tag !== "iframe");
+      config.allowedIframeHostnames = [];
     }
 
     return sanitizeHtml(html, config);
@@ -362,5 +416,29 @@ export class HtmlSanitizerService {
     };
 
     return text.replace(/&[#\w]+;/g, (entity) => entities[entity] || entity);
+  }
+
+  /**
+   * YouTube iframe URL 여부 확인
+   *
+   * @param src iframe src
+   * @returns YouTube iframe 여부
+   */
+  private isYouTubeIframeSrc(src: string): boolean {
+    if (!src) return false;
+    try {
+      const url = new URL(src);
+      const host = url.hostname.toLowerCase();
+      const isYouTubeHost =
+        host === "youtube.com" ||
+        host === "www.youtube.com" ||
+        host === "m.youtube.com" ||
+        host === "youtube-nocookie.com" ||
+        host === "www.youtube-nocookie.com";
+
+      return isYouTubeHost && url.pathname.startsWith("/embed/");
+    } catch {
+      return false;
+    }
   }
 }

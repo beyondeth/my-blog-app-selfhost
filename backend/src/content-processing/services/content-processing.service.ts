@@ -1,4 +1,5 @@
 import { Injectable } from "@nestjs/common";
+import { JSDOM } from "jsdom";
 import { HtmlSanitizerService } from "./html-sanitizer.service";
 import { CodeHighlightService } from "./code-highlight.service";
 import { ImageProcessorService } from "./image-processor.service";
@@ -195,7 +196,8 @@ export class ContentProcessingService {
       metadata.imageUrls = this.imageProcessor.extractImageUrls(processedHtml);
     }
 
-    // 4단계: YouTube iframe 크기 표준화 (685x540)
+    // 4단계: YouTube 임베드 보강 + 크기 표준화 (685x540)
+    processedHtml = this.ensureYouTubeEmbeds(processedHtml);
     processedHtml = this.standardizeYouTubeSize(processedHtml);
 
     return {
@@ -292,6 +294,195 @@ export class ContentProcessingService {
         return updatedDiv + middle + updatedIframe;
       },
     );
+  }
+
+  /**
+   * YouTube 임베드를 보강합니다.
+   *
+   * - data-youtube-video 컨테이너에 iframe이 없으면 복구
+   * - 단독 YouTube 링크를 임베드로 변환
+   */
+  private ensureYouTubeEmbeds(html: string): string {
+    if (!html) return "";
+    if (!/youtube\.com|youtu\.be|data-youtube-video/i.test(html)) {
+      return html;
+    }
+
+    try {
+      const dom = new JSDOM(html);
+      const document = dom.window.document;
+      const { Node } = dom.window;
+
+      // 1) data-youtube-video 컨테이너 복구
+      const wrappers = Array.from(
+        document.querySelectorAll("div[data-youtube-video]"),
+      );
+
+      wrappers.forEach((wrapper) => {
+        const existingIframe = wrapper.querySelector("iframe");
+        const iframeSrc = existingIframe?.getAttribute("src") || "";
+        if (this.extractYouTubeVideoId(iframeSrc)) {
+          return;
+        }
+
+        const candidateUrl =
+          wrapper.getAttribute("data-original-url") ||
+          (wrapper.textContent || "").trim();
+        const videoId = this.extractYouTubeVideoId(candidateUrl);
+        if (!videoId) return;
+
+        wrapper.textContent = "";
+        const embed = this.buildYouTubeEmbedElement(
+          document,
+          videoId,
+          candidateUrl,
+        );
+        wrapper.replaceWith(embed);
+      });
+
+      // 2) 단독 YouTube 링크 처리
+      const paragraphs = Array.from(document.querySelectorAll("p"));
+      paragraphs.forEach((element) => {
+        const parentTag = element.parentElement?.tagName || "";
+        if (["LI", "BLOCKQUOTE", "PRE", "CODE"].includes(parentTag)) {
+          return;
+        }
+
+        const url = this.extractStandaloneUrl(element, Node);
+        if (!url) return;
+        const videoId = this.extractYouTubeVideoId(url);
+        if (!videoId) return;
+
+        const embed = this.buildYouTubeEmbedElement(document, videoId, url);
+        element.replaceWith(embed);
+      });
+
+      return document.body.innerHTML;
+    } catch (error) {
+      console.warn("[ContentProcessing] Failed to ensure YouTube embeds:", error);
+      return html;
+    }
+  }
+
+  private extractStandaloneUrl(
+    element: Element,
+    NodeRef: { TEXT_NODE: number; ELEMENT_NODE: number },
+  ): string | null {
+    const nonWhitespaceNodes = Array.from(element.childNodes).filter((node) => {
+      if (node.nodeType === NodeRef.TEXT_NODE) {
+        return (node.textContent || "").trim().length > 0;
+      }
+      return true;
+    });
+
+    if (nonWhitespaceNodes.length === 1) {
+      const node = nonWhitespaceNodes[0];
+      if (node.nodeType === NodeRef.TEXT_NODE) {
+        const text = (node.textContent || "").trim();
+        return text || null;
+      }
+
+      if (
+        node.nodeType === NodeRef.ELEMENT_NODE &&
+        (node as Element).tagName === "A"
+      ) {
+        const anchor = node as HTMLAnchorElement;
+        const href = anchor.getAttribute("href")?.trim();
+        return href || (anchor.textContent || "").trim() || null;
+      }
+    }
+
+    return null;
+  }
+
+  private buildYouTubeEmbedElement(
+    document: Document,
+    videoId: string,
+    originalUrl: string,
+  ): HTMLElement {
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-youtube-video", "true");
+    wrapper.setAttribute("data-original-url", originalUrl);
+    wrapper.setAttribute(
+      "style",
+      "position: relative; width: 685px; height: 540px; max-width: 100%; margin: 0 auto;",
+    );
+
+    const iframe = document.createElement("iframe");
+    iframe.setAttribute("src", `https://www.youtube.com/embed/${videoId}`);
+    iframe.setAttribute("width", "100%");
+    iframe.setAttribute("height", "100%");
+    iframe.setAttribute("frameborder", "0");
+    iframe.setAttribute("allowfullscreen", "true");
+    iframe.setAttribute(
+      "allow",
+      "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share",
+    );
+    iframe.setAttribute(
+      "style",
+      "position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;",
+    );
+
+    wrapper.appendChild(iframe);
+    return wrapper;
+  }
+
+  private extractYouTubeVideoId(url: string): string | null {
+    if (!url) return null;
+
+    const normalizedUrl = url.startsWith("http") ? url : `https://${url}`;
+
+    try {
+      const parsed = new URL(normalizedUrl);
+      const host = parsed.hostname.toLowerCase();
+
+      const isYouTubeHost =
+        host === "youtube.com" ||
+        host === "www.youtube.com" ||
+        host === "m.youtube.com" ||
+        host === "music.youtube.com" ||
+        host === "youtu.be" ||
+        host === "www.youtu.be" ||
+        host === "youtube-nocookie.com" ||
+        host === "www.youtube-nocookie.com";
+
+      if (!isYouTubeHost) return null;
+
+      if (host.includes("youtu.be")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[1]);
+      }
+
+      if (parsed.pathname.startsWith("/watch")) {
+        return this.normalizeYouTubeId(parsed.searchParams.get("v"));
+      }
+
+      if (parsed.pathname.startsWith("/shorts/")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[2]);
+      }
+
+      if (parsed.pathname.startsWith("/embed/")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[2]);
+      }
+
+      if (parsed.pathname.startsWith("/v/")) {
+        return this.normalizeYouTubeId(parsed.pathname.split("/")[2]);
+      }
+
+      return null;
+    } catch {
+      const fallbackMatch = url.match(
+        /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
+      );
+      return fallbackMatch?.[1] || null;
+    }
+  }
+
+  private normalizeYouTubeId(
+    value: string | null | undefined,
+  ): string | null {
+    if (!value) return null;
+    const match = value.match(/[a-zA-Z0-9_-]{11}/);
+    return match ? match[0] : null;
   }
 
   /**

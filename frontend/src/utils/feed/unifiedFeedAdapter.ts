@@ -42,6 +42,7 @@ export function adaptUnifiedFeedItem(item: UnifiedFeedItem): AdaptedFeedItem {
     content: item.excerpt ?? '',
     excerpt: item.excerpt,
     thumbnail: item.thumbnail ?? images[0],
+    youtubeVideoId: item.youtubeVideoId,
     images,
     thumbnailImageId: undefined,
     isPublished: true,

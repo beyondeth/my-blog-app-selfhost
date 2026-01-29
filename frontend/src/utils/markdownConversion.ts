@@ -230,6 +230,16 @@ export function convertMarkdownToHtml(markdown: string): string {
       continue;
     }
 
+    const youtubeUrl = extractYouTubeUrlFromLine(line.trim());
+    if (youtubeUrl) {
+      const videoId = extractYouTubeVideoId(youtubeUrl);
+      if (videoId) {
+        flushLists();
+        htmlLines.push(buildYouTubeEmbedHtml(videoId, youtubeUrl));
+        continue;
+      }
+    }
+
     flushLists();
     htmlLines.push(`<p>${transformInline(line)}</p>`);
   }
@@ -619,6 +629,86 @@ function transformInline(text: string): string {
   }
 
   return output;
+}
+
+function extractYouTubeUrlFromLine(line: string): string | null {
+  if (!line) return null;
+
+  const markdownLinkMatch = line.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+  if (markdownLinkMatch?.[2]) {
+    return markdownLinkMatch[2];
+  }
+
+  const urlMatch = line.match(
+    /^(https?:\/\/(?:www\.|m\.|music\.)?(?:youtube\.com\/(?:watch\?v=|shorts\/|embed\/)|youtu\.be\/)[^\s]+)$/i,
+  );
+  if (urlMatch?.[1]) {
+    return urlMatch[1];
+  }
+
+  return null;
+}
+
+function extractYouTubeVideoId(url: string): string | null {
+  try {
+    const normalized = url.startsWith('http') ? url : `https://${url}`;
+    const parsed = new URL(normalized);
+    const host = parsed.hostname.toLowerCase();
+
+    const isYouTubeHost =
+      host === 'youtube.com' ||
+      host === 'www.youtube.com' ||
+      host === 'm.youtube.com' ||
+      host === 'music.youtube.com' ||
+      host === 'youtu.be' ||
+      host === 'www.youtu.be' ||
+      host === 'youtube-nocookie.com' ||
+      host === 'www.youtube-nocookie.com';
+
+    if (!isYouTubeHost) return null;
+
+    if (host.includes('youtu.be')) {
+      return normalizeYouTubeId(parsed.pathname.split('/')[1]);
+    }
+
+    if (parsed.pathname.startsWith('/watch')) {
+      return normalizeYouTubeId(parsed.searchParams.get('v'));
+    }
+
+    if (parsed.pathname.startsWith('/shorts/')) {
+      return normalizeYouTubeId(parsed.pathname.split('/')[2]);
+    }
+
+    if (parsed.pathname.startsWith('/embed/')) {
+      return normalizeYouTubeId(parsed.pathname.split('/')[2]);
+    }
+
+    if (parsed.pathname.startsWith('/v/')) {
+      return normalizeYouTubeId(parsed.pathname.split('/')[2]);
+    }
+
+    return null;
+  } catch {
+    const match = url.match(
+      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
+    );
+    return match?.[1] ?? null;
+  }
+}
+
+function normalizeYouTubeId(value: string | null | undefined): string | null {
+  if (!value) return null;
+  const match = value.match(/[a-zA-Z0-9_-]{11}/);
+  return match ? match[0] : null;
+}
+
+function buildYouTubeEmbedHtml(videoId: string, originalUrl: string): string {
+  const safeUrl = escapeAttribute(originalUrl);
+  return [
+    `<div data-youtube-video="true" data-original-url="${safeUrl}" style="position: relative; width: 685px; height: 540px; max-width: 100%; margin: 0 auto;">`,
+    `<iframe src="https://www.youtube.com/embed/${videoId}" width="100%" height="100%" frameborder="0" allowfullscreen="true" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; border: none;"></iframe>`,
+    `</div>`,
+  ].join('');
 }
 
 function escapeHtml(input: string): string {
