@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useRef, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
+import React, { useState, useCallback, useRef, forwardRef, useImperativeHandle, useLayoutEffect, useEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { VisualMarkdownImageBlock } from '@/components/posts/VisualMarkdownImageBlock';
 import { parseMarkdownBlocks, serializeBlocks, MarkdownBlock } from '@/utils/markdownBlockParser';
@@ -23,6 +23,7 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
   ({ content, onChange, className, placeholder }, ref) => {
     const [blocks, setBlocks] = useState<MarkdownBlock[]>(() => parseMarkdownBlocks(content));
     const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+    const lastSerializedRef = useRef<string>(serializeBlocks(parseMarkdownBlocks(content)));
     
     // 외부에서 content가 변경되었을 때 (예: 초기 로드, 리셋 등)
     // 타이핑 중에는 이 효과가 발생하지 않도록 주의해야 함.
@@ -33,12 +34,23 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
     // 여기서는 간단히: 외부 content prop은 초기값 또는 전체 교체 시에만 유효하다고 가정.
     // (실제 타이핑은 onChange로 상위로 전파되지만 상위에서 다시 내려오는 prop은 무시하거나 debounce 처리됨을 기대)
     
-    // 이펙트 제거: 로컬 상태가 진실(Source of Truth)이라고 가정.
-    // 상위에서 content를 강제로 바꿀 때는 key를 변경하여 컴포넌트를 재생성하는 것이 안전함.
+    // content prop이 외부에서 갱신될 경우(초기 로드/리셋/드래프트 복원 등) 블록 동기화
+    useEffect(() => {
+      if (typeof content !== 'string') {
+        return;
+      }
+      if (content === lastSerializedRef.current) {
+        return;
+      }
+      const nextBlocks = parseMarkdownBlocks(content);
+      lastSerializedRef.current = content;
+      setBlocks(nextBlocks);
+    }, [content]);
 
     const updateBlocks = useCallback((newBlocks: MarkdownBlock[]) => {
       setBlocks(newBlocks);
       const serialized = serializeBlocks(newBlocks);
+      lastSerializedRef.current = serialized;
       onChange(serialized);
     }, [onChange]);
 
@@ -108,6 +120,7 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
       setBlocks(newBlocks); // 로컬 업데이트 즉시
       // 부모 전파는 약간 지연시키거나 바로 해도 됨. serialize 비용 확인.
       const serialized = serializeBlocks(newBlocks);
+      lastSerializedRef.current = serialized;
       onChange(serialized);
     };
 
