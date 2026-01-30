@@ -87,16 +87,16 @@ export default function Modal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm"
+      className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/95 dark:bg-gray-100/95 backdrop-blur-sm"
       onClick={onClose}
     >
       <div
-        className="relative max-w-[90vw] max-h-[90vh] bg-black/90 text-gray-100 rounded-lg shadow-2xl overflow-hidden border border-white/10"
+        className="relative max-w-[90vw] max-h-[90vh] bg-white dark:bg-gray-50 text-gray-900 dark:text-gray-800 rounded-lg shadow-2xl overflow-hidden border border-gray-200 dark:border-gray-300"
         onClick={(e) => e.stopPropagation()}
       >
         {/* 상단 툴바 */}
-        <div className="absolute top-0 left-0 right-0 bg-black/70 backdrop-blur-sm border-b border-white/10 p-4 flex items-center justify-between z-10">
-          <div className="text-sm text-gray-200">
+        <div className="absolute top-0 left-0 right-0 bg-white/90 dark:bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-300 p-4 flex items-center justify-between z-10">
+          <div className="text-sm text-gray-700 dark:text-gray-800">
             {type === 'mermaid' ? 'Mermaid 다이어그램' : '이미지'}
           </div>
 
@@ -104,21 +104,21 @@ export default function Modal({
           <div className="flex items-center gap-2">
             <button
               onClick={() => transformComponentRef.current?.zoomOut()}
-              className="p-2 rounded-lg text-gray-100 hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-200 transition-colors"
               title="축소"
             >
               <ZoomOut className="w-5 h-5" />
             </button>
             <button
               onClick={() => transformComponentRef.current?.zoomIn()}
-              className="p-2 rounded-lg text-gray-100 hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-200 transition-colors"
               title="확대"
             >
               <ZoomIn className="w-5 h-5" />
             </button>
             <button
               onClick={() => transformComponentRef.current?.resetTransform()}
-              className="p-2 rounded-lg text-gray-100 hover:bg-white/10 transition-colors"
+              className="p-2 rounded-lg text-gray-700 dark:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-200 transition-colors"
               title="초기화"
             >
               <RefreshCw className="w-5 h-5" />
@@ -127,7 +127,7 @@ export default function Modal({
 
           <button
             onClick={onClose}
-            className="p-2 rounded-lg text-gray-100 hover:bg-white/10 transition-colors"
+            className="p-2 rounded-lg text-gray-700 dark:text-gray-800 hover:bg-gray-100 dark:hover:bg-gray-200 transition-colors"
             title="닫기 (ESC)"
           >
             <X className="w-5 h-5" />
@@ -136,8 +136,8 @@ export default function Modal({
 
         {/* 제목 (선택적) */}
         {title && (
-          <div className="absolute top-[68px] left-0 right-0 bg-black/60 backdrop-blur-sm border-b border-white/10 px-4 py-2 z-10">
-            <p className="text-sm text-gray-200 text-center truncate">
+          <div className="absolute top-[68px] left-0 right-0 bg-white/80 dark:bg-gray-50/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-300 px-4 py-2 z-10">
+            <p className="text-sm text-gray-700 dark:text-gray-800 text-center truncate">
               {title}
             </p>
           </div>
@@ -226,7 +226,7 @@ export default function Modal({
         </TransformWrapper>
 
         {/* 안내 텍스트 */}
-        <div className="absolute bottom-4 left-4 text-xs text-gray-200 bg-black/70 px-2 py-1 rounded border border-white/10">
+        <div className="absolute bottom-4 left-4 text-xs text-gray-700 dark:text-gray-800 bg-white/80 dark:bg-gray-50/80 px-2 py-1 rounded border border-gray-200 dark:border-gray-300">
           드래그로 이동 • 스크롤로 확대/축소 • 더블클릭으로 리셋 • ESC로 닫기
         </div>
       </div>
