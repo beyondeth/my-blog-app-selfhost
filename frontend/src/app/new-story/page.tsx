@@ -1510,6 +1510,7 @@ export default function NewStoryPage() {
                             <div className="space-y-4">
                               <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
                                 <HybridMarkdownEditor
+                                  key={`markdown-${activeDraftKey ?? 'new-story'}`}
                                   ref={markdownEditorRef}
                                   content={field.value}
                                   onChange={(value) => field.onChange(value)}

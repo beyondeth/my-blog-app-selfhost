@@ -150,20 +150,42 @@
 
 /* Mermaid 콘텐츠 - 포스트용 */
 .mermaid-content {
-  display: flex;
-  justify-center: center;
-  align-items: center;
-  width: 100%;
+  display: inline-block;
+  width: max-content;
+  max-width: none;
+  margin: 0 auto;
 }
 
 .mermaid-content svg {
-  /* 스마트 스케일링: 최소 너비 설정으로 텍스트 가독성 보장 */
-  min-width: 600px;   /* 최소 600px 유지 → 텍스트 최소 12-14px */
+  /* 자연 크기 유지: 강제 축소 방지 */
   width: auto;
   height: auto;
-  max-width: none;    /* 제한 제거: 큰 다이어그램도 완전히 표시 */
+  max-width: none;
+  flex-shrink: 0;
   display: block;
   margin: 0 auto;
+}
+
+/* Mermaid HTML labels (foreignObject) - 다크 모드에서도 텍스트 가독성 보장 */
+.mermaid-wrapper .label,
+.mermaid-wrapper .label *,
+.mermaid-wrapper .nodeLabel,
+.mermaid-wrapper .nodeLabel *,
+.mermaid-wrapper .edgeLabel,
+.mermaid-wrapper .edgeLabel * {
+  color: #1f2937 !important;
+  fill: #1f2937 !important;
+}
+
+/* Mermaid foreignObject 텍스트가 prose 스타일을 상속하지 않도록 리셋 */
+.mermaid-wrapper p,
+.mermaid-wrapper span,
+.mermaid-wrapper .nodeLabel,
+.mermaid-wrapper .edgeLabel {
+  margin: 0 !important;
+  font-size: 16px !important;
+  line-height: 1.5 !important;
+  letter-spacing: normal !important;
 }
 
 /* 모달 내 Mermaid 스타일 - 포스트와 동일한 스타일 유지 */
@@ -215,19 +237,6 @@
     margin: 1rem auto;
     max-width: calc(100vw - 2rem);  /* 거의 전체 너비 사용 */
     overflow-x: auto;   /* 가로 스크롤 명시적 허용 */
-  }
-
-  .mermaid-content svg {
-    min-width: 500px;   /* 모바일에서도 최소 크기 유지 → 텍스트 10-12px */
-    max-width: 100%;
-  }
-}
-
-/* 데스크톱: 더 큰 최소 너비 */
-@media (min-width: 1280px) {
-  .mermaid-content svg {
-    min-width: 800px;   /* 데스크톱에서는 더 크게 */
-    max-width: 1400px;  /* 과도하게 큰 경우만 제한 */
   }
 }
 

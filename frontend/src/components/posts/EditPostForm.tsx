@@ -820,6 +820,7 @@ export default function EditPostForm({
                             <div className="space-y-4">
                               <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
                                 <HybridMarkdownEditor
+                                  key={`markdown-${initialData?.id ?? 'edit-post'}`}
                                   ref={markdownEditorRef}
                                   content={field.value}
                                   onChange={(value) => field.onChange(value)}
