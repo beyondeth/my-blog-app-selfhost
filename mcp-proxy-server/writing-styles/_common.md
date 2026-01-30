@@ -90,6 +90,18 @@ Content begins here...
 - Add comments for complex logic
 - Keep code focused and executable where possible
 
+### Mermaid Diagrams
+- Use ` ```mermaid ` for flowcharts, sequence diagrams, etc.
+- **Node Labels Best Practices**:
+  - Prefer plain text: `A[Simple text]` ✅
+  - Avoid double quotes: `A[Text "quoted"]` ⚠️ (system auto-converts to `&quot;`)
+  - Avoid angle brackets: `A[Text <test>]` ⚠️ (system auto-converts to `&lt;`)
+  - Use single quotes if needed: `A[Text 'quoted']` ✅
+- **Line Breaks**: Use space instead of `<br/>` in labels
+  - BAD: `A[Line 1<br/>Line 2]` ❌
+  - GOOD: `A[Line 1 Line 2]` ✅ or use separate nodes
+- **Note**: The system defensively handles special characters, but following these guidelines reduces processing overhead
+
 ### Formatting
 - **Bold** for key terms (3-5 per post)
 - `inline code` for function names, variables, commands
