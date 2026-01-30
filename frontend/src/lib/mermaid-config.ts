@@ -44,15 +44,24 @@ export async function initializeMermaid(): Promise<MermaidModule> {
     theme: 'default',
     themeVariables: {
       fontSize: '16px',  // 고정 글씨 크기
+      textColor: '#1f2937',
+      primaryTextColor: '#1f2937',
+      secondaryTextColor: '#1f2937',
+      tertiaryTextColor: '#1f2937',
+      lineColor: '#6b7280',
     },
     flowchart: {
       useMaxWidth: false,  // ✅ 변경: true → false (원본 크기 유지, 텍스트 가독성 향상)
-      htmlLabels: true,
+      htmlLabels: false,
       curve: 'basis'
     },
     sequence: {
       useMaxWidth: false,  // ✅ 추가: 시퀀스 다이어그램도 원본 크기 유지
     },
+    themeCSS: `
+      .label foreignObject { overflow: visible; }
+      .label span, .label p { margin: 0; line-height: 1.4; }
+    `,
     securityLevel: 'loose',
   });
 
@@ -224,12 +233,12 @@ function normalizePieChartData(content: string, options?: PieChartOptions): stri
 function sanitizeNodeLabels(content: string): string {
   // 패턴: nodeId[label], nodeId(label), nodeId{label} 등
   const patterns = [
-    // 대괄호: A[label]
-    { regex: /([\w]+)\[([^\]"]*)\]/g, bracket: ['[', ']'] as const },
+    // 대괄호: A[label] - [^\]]* 로 변경 (따옴표 포함 모든 문자 매칭)
+    { regex: /([\w]+)\[([^\]]*)\]/g, bracket: ['[', ']'] as const },
     // 소괄호: A(label)
-    { regex: /([\w]+)\(([^\)"]*)\)/g, bracket: ['(', ')'] as const },
+    { regex: /([\w]+)\(([^\)]*)\)/g, bracket: ['(', ')'] as const },
     // 중괄호: A{label}
-    { regex: /([\w]+)\{([^\}"]*)\}/g, bracket: ['{', '}'] as const },
+    { regex: /([\w]+)\{([^\}]*)\}/g, bracket: ['{', '}'] as const },
   ];
 
   let result = content;

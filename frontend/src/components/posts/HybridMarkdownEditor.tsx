@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useRef, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useCallback, useRef, forwardRef, useImperativeHandle, useLayoutEffect } from 'react';
 import { Textarea } from '@/components/ui/textarea';
 import { VisualMarkdownImageBlock } from '@/components/posts/VisualMarkdownImageBlock';
 import { parseMarkdownBlocks, serializeBlocks, MarkdownBlock } from '@/utils/markdownBlockParser';
@@ -22,6 +22,7 @@ export interface HybridMarkdownEditorRef {
 export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMarkdownEditorProps>(
   ({ content, onChange, className, placeholder }, ref) => {
     const [blocks, setBlocks] = useState<MarkdownBlock[]>(() => parseMarkdownBlocks(content));
+    const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
     
     // 외부에서 content가 변경되었을 때 (예: 초기 로드, 리셋 등)
     // 타이핑 중에는 이 효과가 발생하지 않도록 주의해야 함.
@@ -40,6 +41,22 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
       const serialized = serializeBlocks(newBlocks);
       onChange(serialized);
     }, [onChange]);
+
+    const syncTextareaHeight = useCallback((textarea: HTMLTextAreaElement) => {
+      textarea.style.height = 'auto';
+      textarea.style.height = `${textarea.scrollHeight}px`;
+    }, []);
+
+    useLayoutEffect(() => {
+      blocks.forEach((block) => {
+        if (block.type === 'text') {
+          const textarea = textareaRefs.current.get(block.id);
+          if (textarea) {
+            syncTextareaHeight(textarea);
+          }
+        }
+      });
+    }, [blocks, syncTextareaHeight]);
 
     useImperativeHandle(ref, () => ({
       insertImageBlock: (image) => {
@@ -96,8 +113,7 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
 
     const handleInput = (e: React.FormEvent<HTMLTextAreaElement>) => {
       const target = e.currentTarget;
-      target.style.height = 'auto';
-      target.style.height = `${target.scrollHeight}px`;
+      syncTextareaHeight(target);
     };
 
     const handleImageChange = (id: string, changes: { size?: ImageSize; caption?: string }) => {
@@ -160,7 +176,14 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
                 value={block.content}
                 onChange={(e) => handleTextChange(block.id, e.target.value)}
                 onInput={handleInput}
-                className="min-h-[2em] border-none shadow-none resize-none overflow-hidden focus-visible:ring-0 p-2 text-base leading-7 bg-transparent rounded-md"
+                ref={(node) => {
+                  if (node) {
+                    textareaRefs.current.set(block.id, node);
+                  } else {
+                    textareaRefs.current.delete(block.id);
+                  }
+                }}
+                className="border-none shadow-none resize-none overflow-hidden focus-visible:ring-0 p-2 text-base leading-7 bg-transparent rounded-md"
                 placeholder={blocks.length === 1 ? (placeholder || "당신의 이야기를 적어보세요...") : undefined}
                 // 자동 높이 조절을 위해 ref 사용 고려 가능
               />

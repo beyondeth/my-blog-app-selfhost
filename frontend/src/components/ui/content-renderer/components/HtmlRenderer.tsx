@@ -75,6 +75,36 @@ export default function HtmlRenderer({ content, onImageClick, className = '' }: 
       },
     );
 
+    // Mermaid SVG가 HTML에 직접 포함된 경우 wrapper로 감싸기
+    if (typeof window !== 'undefined' && processed.includes('<svg')) {
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(processed, 'text/html');
+        const mermaidSvgs = Array.from(
+          doc.querySelectorAll('svg.flowchart, svg[id^="mermaid_"]')
+        );
+
+        mermaidSvgs.forEach((svg) => {
+          if (svg.closest('.mermaid-wrapper')) {
+            return;
+          }
+          const wrapper = doc.createElement('div');
+          wrapper.className = 'mermaid-wrapper mermaid-raw';
+
+          const contentDiv = doc.createElement('div');
+          contentDiv.className = 'mermaid-content';
+
+          svg.replaceWith(wrapper);
+          contentDiv.appendChild(svg);
+          wrapper.appendChild(contentDiv);
+        });
+
+        processed = doc.body.innerHTML;
+      } catch (error) {
+        console.warn('[HtmlRenderer] Mermaid SVG wrapping failed:', error);
+      }
+    }
+
     // 백엔드에서 이미 HTML sanitization 처리됨
     // Hydration mismatch 방지를 위해 클라이언트 사이드 DOMPurify 제거
     return processed;

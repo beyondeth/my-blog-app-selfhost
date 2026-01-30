@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { renderMermaidDiagram, PieChartOptions } from '@/lib/mermaid-config';
 import { MermaidInfo } from '../types';
 
@@ -40,6 +40,41 @@ export default function MermaidRenderer({
   const [errorDetails, setErrorDetails] = useState<{ negativeValues?: boolean, suggestions?: string[] } | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [layoutOverride, setLayoutOverride] = useState<string | null>(null);
+  const [mermaidMetrics, setMermaidMetrics] = useState<{ width: number; height: number; ratio: number } | null>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    setLayoutOverride(null);
+  }, [content]);
+
+  const parseSvgMetrics = (svgMarkup: string) => {
+    const widthMatch = svgMarkup.match(/\bwidth="([\d.]+)"/i);
+    const heightMatch = svgMarkup.match(/\bheight="([\d.]+)"/i);
+    if (!widthMatch || !heightMatch) return null;
+    const width = parseFloat(widthMatch[1]);
+    const height = parseFloat(heightMatch[1]);
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+      return null;
+    }
+    return { width, height, ratio: height / width };
+  };
+
+  const getFlowDirection = (source: string) => {
+    const match = source.match(/(?:^|\n)\s*(flowchart|graph)\s+([A-Za-z]{1,2})\b/i);
+    if (!match) {
+      return null;
+    }
+    return match[2].toUpperCase();
+  };
+
+  const forceFlowchartLR = (source: string) => {
+    const match = source.match(/(?:^|\n)\s*(flowchart|graph)\s+([A-Za-z]{1,2})\b/i);
+    if (!match) {
+      return source;
+    }
+    return source.replace(match[0], match[0].replace(match[2], 'LR'));
+  };
 
   /**
    * Mermaid 다이어그램을 렌더링합니다.
@@ -52,8 +87,28 @@ export default function MermaidRenderer({
         setIsLoading(true);
         setError(null);
 
+        if (typeof document !== 'undefined' && document.fonts?.ready) {
+          await document.fonts.ready;
+        }
+
         // 전역 설정을 사용하여 렌더링
-        const renderedSvg = await renderMermaidDiagram(id, content, pieChartOptions);
+        const source = layoutOverride ?? content;
+        const renderedSvg = await renderMermaidDiagram(id, source, pieChartOptions);
+        const metrics = parseSvgMetrics(renderedSvg);
+        setMermaidMetrics(metrics);
+
+        // 세로로 지나치게 긴 다이어그램은 LR로 재시도
+        if (!layoutOverride && metrics && metrics.ratio > 3.0) {
+          const direction = getFlowDirection(content);
+          if (!direction || direction === 'TD' || direction === 'TB' || direction === 'BT') {
+            const rotatedContent = forceFlowchartLR(content);
+            if (rotatedContent !== content) {
+              setLayoutOverride(rotatedContent);
+              return;
+            }
+          }
+        }
+
         setSvg(renderedSvg);
       } catch (err) {
         console.error('Mermaid rendering error:', err);
@@ -79,7 +134,33 @@ export default function MermaidRenderer({
     };
 
     renderDiagram();
-  }, [id, content, pieChartOptions]); // theme 제거 - 전역 설정 사용
+  }, [id, content, pieChartOptions, layoutOverride]); // theme 제거 - 전역 설정 사용
+
+  useLayoutEffect(() => {
+    if (!mermaidMetrics || !containerRef.current) {
+      setScale(1);
+      return;
+    }
+
+    const node = containerRef.current;
+    const computed = window.getComputedStyle(node);
+    const paddingX =
+      parseFloat(computed.paddingLeft || '0') + parseFloat(computed.paddingRight || '0');
+    const availableWidth = node.clientWidth - paddingX;
+
+    if (!Number.isFinite(availableWidth) || availableWidth <= 0) {
+      setScale(1);
+      return;
+    }
+
+    if (mermaidMetrics.width <= availableWidth) {
+      setScale(1);
+      return;
+    }
+
+    const nextScale = Math.max(0.8, Math.min(1, availableWidth / mermaidMetrics.width));
+    setScale(nextScale);
+  }, [mermaidMetrics]);
 
   /**
    * 다이어그램 클릭 핸들러
@@ -185,12 +266,51 @@ export default function MermaidRenderer({
       className={`mermaid-wrapper ${className}`}
       ref={containerRef}
       data-mermaid-id={id}
+      data-mermaid-layout={
+        mermaidMetrics
+          ? mermaidMetrics.ratio > 3
+            ? 'tall'
+            : mermaidMetrics.width > 1200
+              ? 'wide'
+              : 'normal'
+          : 'unknown'
+      }
+      style={
+        mermaidMetrics
+          ? ({
+              ['--mermaid-width' as string]: `${mermaidMetrics.width}px`,
+              ['--mermaid-height' as string]: `${mermaidMetrics.height}px`,
+            } as React.CSSProperties)
+          : undefined
+      }
     >
       <div
         className="mermaid-content cursor-pointer hover:opacity-90 transition-opacity"
-        dangerouslySetInnerHTML={{ __html: svg }}
+        style={
+          mermaidMetrics
+            ? ({
+                width: `${mermaidMetrics.width * scale}px`,
+                height: `${mermaidMetrics.height * scale}px`,
+              } as React.CSSProperties)
+            : undefined
+        }
         onClick={handleClick}
-      />
+      >
+        <div
+          className="mermaid-canvas"
+          style={
+            mermaidMetrics
+              ? ({
+                  width: `${mermaidMetrics.width}px`,
+                  height: `${mermaidMetrics.height}px`,
+                  transform: `scale(${scale})`,
+                  transformOrigin: 'top left',
+                } as React.CSSProperties)
+              : undefined
+          }
+          dangerouslySetInnerHTML={{ __html: svg }}
+        />
+      </div>
     </div>
   );
 }
