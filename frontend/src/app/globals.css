@@ -157,8 +157,11 @@
 }
 
 .mermaid-content svg {
-  max-width: 100%;
+  /* 스마트 스케일링: 최소 너비 설정으로 텍스트 가독성 보장 */
+  min-width: 600px;   /* 최소 600px 유지 → 텍스트 최소 12-14px */
+  width: auto;
   height: auto;
+  max-width: none;    /* 제한 제거: 큰 다이어그램도 완전히 표시 */
   display: block;
   margin: 0 auto;
 }
@@ -211,10 +214,20 @@
     padding: 1rem;      /* 모바일에서 패딩 줄임 */
     margin: 1rem auto;
     max-width: calc(100vw - 2rem);  /* 거의 전체 너비 사용 */
+    overflow-x: auto;   /* 가로 스크롤 명시적 허용 */
   }
 
   .mermaid-content svg {
+    min-width: 500px;   /* 모바일에서도 최소 크기 유지 → 텍스트 10-12px */
     max-width: 100%;
+  }
+}
+
+/* 데스크톱: 더 큰 최소 너비 */
+@media (min-width: 1280px) {
+  .mermaid-content svg {
+    min-width: 800px;   /* 데스크톱에서는 더 크게 */
+    max-width: 1400px;  /* 과도하게 큰 경우만 제한 */
   }
 }
 

@@ -46,9 +46,12 @@ export async function initializeMermaid(): Promise<MermaidModule> {
       fontSize: '16px',  // 고정 글씨 크기
     },
     flowchart: {
-      useMaxWidth: true,
+      useMaxWidth: false,  // ✅ 변경: true → false (원본 크기 유지, 텍스트 가독성 향상)
       htmlLabels: true,
       curve: 'basis'
+    },
+    sequence: {
+      useMaxWidth: false,  // ✅ 추가: 시퀀스 다이어그램도 원본 크기 유지
     },
     securityLevel: 'loose',
   });
@@ -202,6 +205,61 @@ function normalizePieChartData(content: string, options?: PieChartOptions): stri
 }
 
 /**
+ * Mermaid 노드 레이블 내의 문제가 될 수 있는 특수문자를 HTML 엔티티로 치환합니다.
+ * 
+ * 방어적 파싱: AI 자동포스팅이나 사용자 수동 입력에서 특수문자가 들어올 수 있으므로
+ * 파싱 레벨에서 자동으로 처리하여 렌더링 에러를 방지합니다.
+ * 
+ * 처리 대상:
+ * - 큰따옴표(") → &quot;
+ * - 부등호(<, >) → &lt;, &gt;
+ * 
+ * 예:
+ * - G[AI에게 알림 "사용 불가"] → G[AI에게 알림 &quot;사용 불가&quot;]
+ * - B[텍스트 <test>] → B[텍스트 &lt;test&gt;]
+ * 
+ * @param content - Mermaid 다이어그램 코드
+ * @returns HTML 엔티티로 치환된 코드
+ */
+function sanitizeNodeLabels(content: string): string {
+  // 패턴: nodeId[label], nodeId(label), nodeId{label} 등
+  const patterns = [
+    // 대괄호: A[label]
+    { regex: /([\w]+)\[([^\]"]*)\]/g, bracket: ['[', ']'] as const },
+    // 소괄호: A(label)
+    { regex: /([\w]+)\(([^\)"]*)\)/g, bracket: ['(', ')'] as const },
+    // 중괄호: A{label}
+    { regex: /([\w]+)\{([^\}"]*)\}/g, bracket: ['{', '}'] as const },
+  ];
+
+  let result = content;
+
+  patterns.forEach(({ regex, bracket }) => {
+    result = result.replace(regex, (match, nodeId, label) => {
+      // 이미 따옴표로 감싸진 경우 건너뛰기 (이중 처리 방지)
+      if (label.trim().startsWith('"') && label.trim().endsWith('"')) {
+        return match;
+      }
+
+      // 문제 문자 확인: 큰따옴표, 부등호
+      if (/["<>]/.test(label)) {
+        // HTML 엔티티로 치환 (Mermaid htmlLabels: true로 자동 렌더링됨)
+        const safe = label
+          .replace(/"/g, '&quot;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;');
+        
+        return `${nodeId}${bracket[0]}${safe}${bracket[1]}`;
+      }
+
+      return match;
+    });
+  });
+
+  return result;
+}
+
+/**
  * Mermaid 콘텐츠를 정규화합니다.
  *
  * HTML 태그와 특수문자를 Mermaid가 이해할 수 있는 형식으로 변환합니다.
@@ -248,6 +306,11 @@ function normalizeMermaidContent(content: string, options?: PieChartOptions): st
   // 2. <br> 태그 제거 또는 공백으로 변환
   // Mermaid 노드 레이블 안에서 <br/>는 문제를 일으킬 수 있으므로 공백으로 변환
   normalized = normalized.replace(/<br\s*\/?>/gi, ' ');
+
+  // 2.5. 노드 레이블 내 문제 문자 HTML 엔티티로 치환 (방어적 파싱)
+  // AI 자동포스팅이나 사용자 수동 입력에서 특수문자가 들어올 수 있으므로 자동 처리
+  normalized = sanitizeNodeLabels(normalized);
+
 
   // 3. 노드 레이블의 특수문자 처리
   // 대괄호 안의 텍스트에 특수문자가 있으면 따옴표로 감싸기
