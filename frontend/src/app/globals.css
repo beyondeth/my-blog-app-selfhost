@@ -138,13 +138,14 @@
 
 /* Mermaid 다이어그램 스타일링 - 포스트용 */
 .mermaid-wrapper {
-  max-width: 768px;   /* 포스트와 동일한 max-w-3xl */
+  max-width: 1024px;  /* 확대: 768px → 1024px (큰 다이어그램 지원) */
   margin: 2rem auto;
   padding: 1.5rem;
-  background: #f9fafb;
+  background: #ffffff;  /* 순백색으로 변경 (대비 향상) */
   border: 1px solid #e5e7eb;
   border-radius: 0.75rem;
-  overflow: hidden;   /* 스크롤 없이 고정 */
+  overflow: auto;   /* 스크롤 허용 (큰 다이어그램 완전히 보기) */
+  min-height: 300px;  /* 최소 높이 설정 */
 }
 
 /* Mermaid 콘텐츠 - 포스트용 */
@@ -189,16 +190,59 @@
   margin: 0 auto;
 }
 
+/* 반응형 처리 - 화면 크기별 최적화 */
+@media (min-width: 1280px) {
+  /* 데스크톱: 더 넓게 표시 */
+  .mermaid-wrapper {
+    max-width: 1200px;
+  }
+}
+
+@media (max-width: 1024px) {
+  /* 태블릿: 기존 크기 유지 */
+  .mermaid-wrapper {
+    max-width: 768px;
+  }
+}
+
 /* 작은 화면에서 반응형 처리 */
 @media (max-width: 768px) {
   .mermaid-wrapper {
     padding: 1rem;      /* 모바일에서 패딩 줄임 */
     margin: 1rem auto;
+    max-width: calc(100vw - 2rem);  /* 거의 전체 너비 사용 */
   }
 
   .mermaid-content svg {
     max-width: 100%;
   }
+}
+
+/* Mermaid wrapper 스크롤바 스타일링 (부드러운 UX) */
+.mermaid-wrapper::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.mermaid-wrapper::-webkit-scrollbar-track {
+  background: #f1f5f9;  /* slate-100 */
+  border-radius: 4px;
+}
+
+.mermaid-wrapper::-webkit-scrollbar-thumb {
+  background: #cbd5e1;  /* slate-300 */
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.mermaid-wrapper::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;  /* slate-400 */
+}
+
+/* Firefox 스크롤바 */
+.mermaid-wrapper {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
 }
 
 .mermaid {
@@ -218,11 +262,11 @@
   height: auto;
 }
 
-/* 다크 모드 지원 (선택사항) */
+/* 다크 모드 지원 - 라이트/다크 모두 흰색 배경 유지 (Mermaid 최적화) */
 @media (prefers-color-scheme: dark) {
   .mermaid-wrapper {
-    background: #1f2937;
-    border-color: #374151;
+    background: #ffffff;  /* 변경: 어두운 배경 → 흰색 (일관성) */
+    border-color: #d1d5db;  /* 다크 모드에서는 더 밝은 테두리 */
   }
 }
 
@@ -310,6 +354,11 @@ mark.search-highlight {
   display: flex;
   align-items: center;
   justify-content: center;
+  
+  /* 추가: 명시적 흰색 배경 (모든 선과 텍스트 선명하게 보임) */
+  background: #ffffff;
+  padding: 2rem;
+  border-radius: 0.75rem;
 }
 
 /* 모달 내 Mermaid SVG - 가능한 크게 표시 */
