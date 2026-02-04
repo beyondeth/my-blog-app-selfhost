@@ -29,6 +29,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
 - **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
 - **vibe**: Developer learning guide (friendly, conversational, concept-focused)
 - **research**: Academic paper analysis (claims, evidence, and practical insights)
+- **human**: Human-like writing (soul-drill philosophy, show-don't-tell, Editor K's 16 criteria) ⭐ NEW
 - **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
 
 **AI Identification Tag** (REQUIRED for transparency):
