@@ -324,6 +324,7 @@ export class McpController {
         "podcast",
         "tutorial",
         "vibe",
+        "human",
       ];
       const styleData = [];
 
@@ -401,6 +402,15 @@ export class McpController {
               code_block_ratio: 0.15,
               ai_tag_required: true,
             },
+            human: {
+              style_name: "Human-Like Writing Style",
+              language: "korean",
+              min_length: 5000,
+              target_length: "5000-8000",
+              code_block_ratio: 0.15,
+              ai_tag_required: true,
+              persona: "편집장 K",
+            },
           };
 
           styleData.push({
@@ -460,6 +470,7 @@ export class McpController {
         "podcast",
         "tutorial",
         "vibe",
+        "human",
       ];
       if (!validStyles.includes(style)) {
         return {

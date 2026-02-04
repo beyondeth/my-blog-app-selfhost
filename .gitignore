@@ -35,6 +35,9 @@
 # Codex settings (개인 API 키 포함)
 .codex/
 
+# Local agent workspace
+.agent/
+
 # OS
 .DS_Store
 **/.DS_Store
@@ -133,4 +136,5 @@ backend/cors-config.json
 /data/ 
 # Documentation
 docs/
+backend/docs/
 .env
