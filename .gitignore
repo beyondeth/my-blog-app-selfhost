@@ -138,3 +138,6 @@ backend/cors-config.json
 docs/
 backend/docs/
 .env
+
+# OpenClaw Isolated Environment
+openclaw-lab/

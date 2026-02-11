@@ -35,7 +35,8 @@
     "migrate:files": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts",
     "migrate:files:dry": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --dry-run",
     "migrate:files:execute": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --execute",
-    "seed:subscription-plans": "ts-node -r tsconfig-paths/register src/commands/seed-subscription-plans.command.ts"
+    "seed:subscription-plans": "ts-node -r tsconfig-paths/register src/commands/seed-subscription-plans.command.ts",
+    "seed:plan": "ts-node -r tsconfig-paths/register scripts/seed_plan.ts"
   },
   "keywords": [],
   "packageManager": "pnpm@9.0.0",
@@ -61,6 +62,7 @@
     "@nestjs/throttler": "^5.2.0",
     "@nestjs/typeorm": "^10.0.0",
     "@nestjs/websockets": "^11.1.6",
+    "@supabase/supabase-js": "^2.94.1",
     "@types/bcrypt": "^6.0.0",
     "@types/dompurify": "^3.2.0",
     "@types/express-session": "^1.18.2",

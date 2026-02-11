@@ -21,5 +21,6 @@
     "paths": {
       "@/*": ["src/*"]
     }
-  }
+  },
+  "include": ["src/**/*", "scripts/**/*", "test/**/*"]
 } 
