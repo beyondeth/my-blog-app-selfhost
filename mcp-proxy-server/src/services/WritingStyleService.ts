@@ -39,7 +39,7 @@ export interface WritingStyle {
 }
 
 export class WritingStyleService {
-  private readonly PRESETS = ['novel', 'tutorial', 'comedy', 'podcast', 'default', 'vibe', 'research', 'human'];
+  private readonly PRESETS = ['novel', 'tutorial', 'comedy', 'podcast', 'default', 'vibe', 'research', 'human', 'autonomy'];
   private readonly STYLES_DIR = path.join(__dirname, '../../writing-styles');
   private styleCache: Map<string, WritingStyle> = new Map();  // 스타일 캐시
   private commonInstructionsCache: string | null = null;  // 공통 지침 캐시

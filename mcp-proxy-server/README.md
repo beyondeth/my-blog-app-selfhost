@@ -385,6 +385,7 @@ Located in `writing-styles/` directory:
 - `podcast.md` - Conversational script format
 - `vibe.md` - Developer learning guide
 - `research.md` - Academic paper analysis
+- `autonomy.md` - Autonomy systems insight (prompt/tool/policy/sandbox analysis)
 - `default.md` - Standard blog post
 
 **Usage:**

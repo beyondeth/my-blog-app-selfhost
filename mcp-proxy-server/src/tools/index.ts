@@ -517,12 +517,21 @@ async function handleCreatePost(
   context: ToolContext
 ): Promise<any> {
   try {
+    const aiDisclosure =
+      '본 콘텐츠는 사용자의 작업 및 대화 맥락을 기반으로 AI가 자동 생성하였습니다.';
+
     // 태그 10개 제한
     const tags = args.tags ? args.tags.slice(0, 10) : [];
 
+    // AI 고지 문구는 모든 글 하단에 통일적으로 추가
+    let contentMarkdown = args.content_markdown.trimEnd();
+    if (!contentMarkdown.includes(aiDisclosure)) {
+      contentMarkdown = `${contentMarkdown}\n\n---\n\n${aiDisclosure}`;
+    }
+
     logger.debug({
       title: args.title,
-      contentLength: args.content_markdown.length,
+      contentLength: contentMarkdown.length,
       tagCount: tags.length,
       userId: context.userData.userId.substring(0, 8),
       blogSlug: context.userData.blog.slug,
@@ -550,7 +559,7 @@ async function handleCreatePost(
       `${context.config.BACKEND_BASE_URL}/api/v1/mcp/posts`,
       {
         title: args.title,
-        content_markdown: args.content_markdown, // 원본 마크다운
+        content_markdown: contentMarkdown, // 하단 고지 포함 마크다운
         tags,
         category: args.category,
       },
