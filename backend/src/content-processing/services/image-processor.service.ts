@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { JSDOM } from "jsdom";
 
 /**
@@ -9,6 +9,8 @@ import { JSDOM } from "jsdom";
  */
 @Injectable()
 export class ImageProcessorService {
+  private readonly logger = new Logger(ImageProcessorService.name);
+
   /**
    * HTML 내의 이미지를 처리합니다.
    *
@@ -79,7 +81,7 @@ export class ImageProcessorService {
 
       return document.body.innerHTML;
     } catch (error) {
-      console.error("Error processing images:", error);
+      this.logger.error("Error processing images:", error);
       return html;
     }
   }
@@ -153,7 +155,7 @@ export class ImageProcessorService {
         }
       });
     } catch (error) {
-      console.error("Error extracting image URLs:", error);
+      this.logger.error("Error extracting image URLs:", error);
     }
 
     return urls;
@@ -202,7 +204,7 @@ export class ImageProcessorService {
       );
       stats.withCaption = figuresWithCaption.length;
     } catch (error) {
-      console.error("Error calculating image stats:", error);
+      this.logger.error("Error calculating image stats:", error);
     }
 
     return stats;
@@ -278,7 +280,7 @@ export class ImageProcessorService {
 
       return document.body.innerHTML;
     } catch (error) {
-      console.error("Error converting to picture elements:", error);
+      this.logger.error("Error converting to picture elements:", error);
       return html;
     }
   }

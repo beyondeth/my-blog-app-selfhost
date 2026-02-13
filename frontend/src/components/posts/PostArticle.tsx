@@ -241,7 +241,7 @@ const PostArticle = React.memo(function PostArticle({
       if (id) return id;
     }
     return extractYouTubeVideoIdFromContent(post.content);
-  }, [layoutType, post.thumbnail, post.content]);
+  }, [layoutType, post.youtubeVideoId, post.thumbnail, post.content]);
 
   // 업로드된 비디오 포함 여부
   const hasVideo = React.useMemo(() => {

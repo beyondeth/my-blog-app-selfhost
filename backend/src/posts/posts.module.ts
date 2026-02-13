@@ -51,6 +51,7 @@ import { LikeService } from "./services/like.service";
 import { VoteService } from "./services/vote.service";
 import { ThumbnailService } from "./services/thumbnail.service";
 import { CloudflareModule } from "../cloudflare/cloudflare.module";
+import { MobilePostsController } from "./mobile-posts.controller";
 
 @Module({
   imports: [
@@ -121,7 +122,7 @@ import { CloudflareModule } from "../cloudflare/cloudflare.module";
     BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
     ThumbnailService, // 썸네일 관리 서비스
   ],
-  controllers: [PostsController],
+  controllers: [PostsController, MobilePostsController],
   exports: [
     PostsService,
     ViewCountService,

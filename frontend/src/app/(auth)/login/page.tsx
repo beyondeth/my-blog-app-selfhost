@@ -19,7 +19,7 @@ const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/re
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login, refreshUser } = useAuth();
+  const { login } = useAuth();
   const { resolvedTheme } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -244,10 +244,6 @@ function LoginPageContent() {
 
       // 로그인 요청 - returnUrl을 보내지 않음 (프론트엔드에서만 처리)
       await login(formData);
-
-      // 로그인 직후 user 정보 새로고침하여 약관 동의 필드 최신화
-      // ConsentGuard 타이밍 이슈 방지 (회원가입과 동일한 처리)
-      await refreshUser();
 
       // MCP OAuth 로그인인 경우 (Claude 커스텀 커넥터 연결)
       if (isMcpOAuth && mcpState && mcpCallbackUrl) {

@@ -3,7 +3,11 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan, IsNull } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { File } from "../entities/file.entity";
-import { FileContext, FileContextType } from "../entities/file-context.entity";
+import {
+  FileContext,
+  FileContextType,
+  FilePurpose,
+} from "../entities/file-context.entity";
 import { S3Service } from "./s3.service";
 
 export const FileLifecycleEvent = {
@@ -104,16 +108,33 @@ export class FileLifecycleService {
 
   /**
    * 참조되지 않는 파일 찾기 및 정리
+   * - legacy orphan: contextId IS NULL
+   * - upload orphan: system/content context 이지만 post_files 연결이 없는 파일
    */
   async cleanupOrphanedFiles(): Promise<number> {
-    // 24시간 이상 컨텍스트가 없는 파일 중 아직 처리되지 않은 파일만
+    // 24시간 이상 경과 + 아직 삭제 예약이 되지 않은 파일
     const orphanedFiles = await this.fileRepository
       .createQueryBuilder("file")
-      .where("file.contextId IS NULL")
+      .leftJoin("file.context", "context")
+      .leftJoin("post_files", "pf", 'pf."fileId" = file.id')
+      .where(
+        `
+        file.contextId IS NULL
+        OR (
+          context.contextType = :systemType
+          AND context.purpose = :contentPurpose
+          AND pf."postId" IS NULL
+        )
+      `,
+        {
+          systemType: FileContextType.SYSTEM,
+          contentPurpose: FilePurpose.CONTENT,
+        },
+      )
       .andWhere("file.createdAt < :date", {
         date: new Date(Date.now() - 24 * 60 * 60 * 1000),
       })
-      .andWhere("file.expiresAt IS NULL") // 이미 처리된 파일은 제외
+      .andWhere("file.expiresAt IS NULL") // 이미 처리된 파일 제외
       .getMany();
 
     let cleaned = 0;

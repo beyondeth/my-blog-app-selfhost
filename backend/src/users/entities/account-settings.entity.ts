@@ -157,6 +157,21 @@ export class AccountSettings {
   @Column({ default: false })
   newsletterOptIn: boolean;
 
+  @Column({ length: 20, default: "SYSTEM" })
+  themePreference: string;
+
+  @Column({ default: true })
+  pushEnabled: boolean;
+
+  @Column({ default: true })
+  communityReplyEnabled: boolean;
+
+  @Column({ default: true })
+  profileVisible: boolean;
+
+  @Column({ default: true })
+  activityVisible: boolean;
+
   /**
    * 로그인 실패 횟수
    * - Brute Force 공격 방어

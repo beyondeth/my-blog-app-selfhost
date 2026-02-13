@@ -1,4 +1,4 @@
-import { Module } from "@nestjs/common";
+import { Module, Logger } from "@nestjs/common";
 import { MailerModule } from "@nestjs-modules/mailer";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
@@ -12,6 +12,8 @@ import { User } from "../users/entities/user.entity";
     MailerModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => {
+        const logger = new Logger(EmailModule.name);
+
         // 이메일 설정 유효성 검증
         const host =
           configService.get("SMTP_HOST") || configService.get("EMAIL_HOST");
@@ -29,7 +31,7 @@ import { User } from "../users/entities/user.entity";
 
         // 개발 환경에서 디버그 로그
         if (process.env.NODE_ENV === "development") {
-          console.log("Email Module Configuration:", {
+          logger.debug("Email Module Configuration:", {
             host,
             port,
             user: user ? `${user.substring(0, 3)}***` : "undefined",
@@ -42,7 +44,7 @@ import { User } from "../users/entities/user.entity";
           });
 
           // 환경 변수 직접 확인
-          console.log("Direct environment check:", {
+          logger.debug("Direct environment check:", {
             SMTP_HOST: process.env.SMTP_HOST,
             SMTP_USER: process.env.SMTP_USER,
             SMTP_USER_LENGTH: process.env.SMTP_USER
@@ -59,7 +61,7 @@ import { User } from "../users/entities/user.entity";
 
         // 필수 환경 변수 검증
         if (!host || !user || !pass) {
-          console.error("Missing required email configuration:", {
+          logger.error("Missing required email configuration:", {
             host: !!host,
             user: !!user,
             pass: !!pass,

@@ -289,12 +289,12 @@ export class PostsController {
       if (cached) {
         // 캐시 히트 로깅 (성능 모니터링용)
         const cacheType = actualBlogId ? "MY_BLOG" : "HOME_FEED";
-        console.log(`✅ [Cache HIT] ${cacheType} for ${cacheKey}`);
+        this.logger.debug(`✅ [Cache HIT] ${cacheType} for ${cacheKey}`);
         this.logger.log(`[Cache HIT] ${cacheType} - ${cacheKey}`);
         return cached;
       }
     } catch (error) {
-      console.error("Cache get error:", error);
+      this.logger.error("Cache get error:", error);
       this.logger.error(`Cache get error for ${cacheKey}:`, error);
     }
 
@@ -324,18 +324,20 @@ export class PostsController {
 
     // 캐시 미스 로깅
     const cacheType = actualBlogId ? "MY_BLOG" : "HOME_FEED";
-    console.log(`❌ [Cache MISS] ${cacheType} for ${cacheKey} - Querying DB`);
+    this.logger.debug(
+      `❌ [Cache MISS] ${cacheType} for ${cacheKey} - Querying DB`,
+    );
     this.logger.log(`[Cache MISS] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
 
     // 캐싱
     try {
       await this.cacheService.set(cacheKey, result, ttl);
-      console.log(
+      this.logger.debug(
         `📦 [Cache SET] ${cacheType} for ${cacheKey} with TTL ${ttl}s`,
       );
       this.logger.log(`[Cache SET] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
     } catch (error) {
-      console.error("Cache set error:", error);
+      this.logger.error("Cache set error:", error);
       this.logger.error(`Cache set error for ${cacheKey}:`, error);
     }
 

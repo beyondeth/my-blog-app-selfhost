@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -32,6 +33,8 @@ import { Public } from "../../common/decorators/public.decorator";
 @Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class AdminDebugController {
+  private readonly logger = new Logger(AdminDebugController.name);
+
   constructor(
     private readonly debugService: UserDeletionDebugService,
     private readonly deletionService: UserDeletionService,
@@ -41,17 +44,19 @@ export class AdminDebugController {
   @ApiOperation({ summary: "사용자 삭제 전 데이터 미리보기 (디버그용)" })
   async previewDeletion(@Param("userIdOrEmail") userIdOrEmail: string) {
     try {
-      console.log(`[DEBUG] Preview deletion request for: ${userIdOrEmail}`);
+      this.logger.debug(
+        `[DEBUG] Preview deletion request for: ${userIdOrEmail}`,
+      );
       const debugInfo =
         await this.debugService.collectPreDeletionData(userIdOrEmail);
-      console.log(`[DEBUG] Debug info collected successfully`);
+      this.logger.debug(`[DEBUG] Debug info collected successfully`);
       return {
         message: "삭제 예정 데이터 미리보기",
         warning: "이것은 시뮬레이션입니다. 실제로 삭제되지 않습니다.",
         data: debugInfo,
       };
     } catch (error) {
-      console.error(`[DEBUG] Error in previewDeletion:`, error);
+      this.logger.error(`[DEBUG] Error in previewDeletion:`, error);
       throw new NotFoundException(
         `사용자를 찾을 수 없습니다: ${userIdOrEmail} - ${error.message}`,
       );

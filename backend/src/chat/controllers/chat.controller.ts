@@ -9,6 +9,7 @@ import {
   UseGuards,
   ParseIntPipe,
   ForbiddenException,
+  Logger,
 } from "@nestjs/common";
 import { ChatService } from "../services/chat.service";
 import { ChatBatchService } from "../services/chat-batch.service";
@@ -20,6 +21,8 @@ import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
 @Controller("chat")
 @UseGuards(JwtAuthGuard)
 export class ChatController {
+  private readonly logger = new Logger(ChatController.name);
+
   constructor(
     private readonly chatService: ChatService,
     private readonly batchService: ChatBatchService,
@@ -43,7 +46,7 @@ export class ChatController {
     @Param("userId") userId: string,
     @CurrentUser() currentUser: User,
   ) {
-    console.log("[Chat] getOrCreateConversation:", {
+    this.logger.debug("[Chat] getOrCreateConversation:", {
       currentUserId: currentUser?.id,
       targetUserId: userId,
       currentUserEmail: currentUser?.email,

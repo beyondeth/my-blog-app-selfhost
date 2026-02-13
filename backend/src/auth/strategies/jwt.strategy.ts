@@ -10,6 +10,9 @@ import { UnifiedRedisService } from "../../redis/unified-redis.service";
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(JwtStrategy.name);
+  // UUID v1~v8 공통 허용 (v7 포함)
+  private readonly uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   constructor(
     private configService: ConfigService,
@@ -33,12 +36,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     // JWT payload has 'sub' field (standard claim)
-    const userId = payload.sub || payload.id;
+    const rawUserId = payload?.sub ?? payload?.id;
+    const userId = rawUserId == null ? "" : String(rawUserId);
     const tokenType = payload.tokenType;
 
     // 개발 환경 및 프로덕션에서 모두 로깅 (보안 마스킹 적용)
     this.logger.log(
-      `[JWT] Token validation - userId: ${userId ? userId.substring(0, 8) + "..." : "null"}, type: ${tokenType}`,
+      `[JWT] Token validation - userId: ${this.maskUserId(userId)}, type: ${tokenType}`,
     );
 
     // 개발 환경에서 더 상세한 디버그 로그 추가
@@ -46,9 +50,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       this.logger.debug(
         `[JWT] Starting validation for token type: ${tokenType}`,
       );
-      this.logger.debug(
-        `[JWT] User ID (masked): ${userId ? userId.substring(0, 8) + "..." : "null"}`,
-      );
+      this.logger.debug(`[JWT] User ID (masked): ${this.maskUserId(userId)}`);
     }
 
     const expectedIssuer = this.configService.get<string>(
@@ -62,6 +64,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!userId) {
       this.logger.error("[JWT] No userId found in JWT payload");
+      return null;
+    }
+
+    // 레거시/손상 토큰 방어: UUID 형식이 아니면 인증 실패 처리 (500 방지)
+    if (!this.uuidPattern.test(userId)) {
+      this.logger.warn(
+        `[JWT] Invalid userId format in token payload: ${this.maskUserId(userId)}`,
+      );
       return null;
     }
 
@@ -100,14 +110,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     );
     if (cachedUser) {
       this.logger.log(
-        `[JWT] Cache HIT for user: ${cachedUser.email} (ID: ${cachedUser.id.substring(0, 8)}...), cacheKey: ${cacheKey}`,
+        `[JWT] Cache HIT for user: ${cachedUser.email} (ID: ${this.maskUserId(cachedUser.id)}), cacheKey: ${cacheKey}`,
       );
       return cachedUser;
     }
 
     // 2. 캐시에 없으면 DB에서 조회
     this.logger.log(
-      `[JWT] Cache MISS for user ID: ${userId.substring(0, 8)}..., cacheKey: ${cacheKey}`,
+      `[JWT] Cache MISS for user ID: ${this.maskUserId(userId)}, cacheKey: ${cacheKey}`,
     );
     const user = await this.usersService.findById(userId);
 
@@ -182,5 +192,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
 
     return user;
+  }
+
+  private maskUserId(value: unknown): string {
+    if (value == null) {
+      return "null";
+    }
+    const raw = String(value);
+    if (raw.length <= 8) {
+      return raw;
+    }
+    return `${raw.substring(0, 8)}...`;
   }
 }

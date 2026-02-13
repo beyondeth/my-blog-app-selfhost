@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import {
   PaymentProvider,
   CreateCustomerOptions,
@@ -17,6 +17,7 @@ import { v4 as uuidv4 } from "uuid";
  */
 @Injectable()
 export class MockProvider implements PaymentProvider {
+  private readonly logger = new Logger(MockProvider.name);
   private mockDatabase = {
     customers: new Map<string, any>(),
     subscriptions: new Map<string, any>(),
@@ -39,7 +40,7 @@ export class MockProvider implements PaymentProvider {
       created: new Date(),
     });
 
-    console.log(`[MockProvider] Customer created: ${customerId}`);
+    this.logger.debug(`[MockProvider] Customer created: ${customerId}`);
     return customerId;
   }
 
@@ -58,12 +59,12 @@ export class MockProvider implements PaymentProvider {
     const customer = await this.getCustomer(customerId);
     Object.assign(customer, updates);
     this.mockDatabase.customers.set(customerId, customer);
-    console.log(`[MockProvider] Customer updated: ${customerId}`);
+    this.logger.debug(`[MockProvider] Customer updated: ${customerId}`);
   }
 
   async deleteCustomer(customerId: string): Promise<void> {
     this.mockDatabase.customers.delete(customerId);
-    console.log(`[MockProvider] Customer deleted: ${customerId}`);
+    this.logger.debug(`[MockProvider] Customer deleted: ${customerId}`);
   }
 
   async createCheckoutSession(
@@ -75,11 +76,11 @@ export class MockProvider implements PaymentProvider {
     // Mock checkout URL - 실제로는 결제 페이지로 이동
     const checkoutUrl = `http://localhost:3001/mock-checkout?session=${sessionId}`;
 
-    console.log(`[MockProvider] Checkout session created: ${sessionId}`);
-    console.log(
+    this.logger.debug(`[MockProvider] Checkout session created: ${sessionId}`);
+    this.logger.debug(
       `[MockProvider] Amount: ${options.priceAmount} ${options.currency}`,
     );
-    console.log(`[MockProvider] Product: ${options.productName}`);
+    this.logger.debug(`[MockProvider] Product: ${options.productName}`);
 
     return {
       id: sessionId,
@@ -105,7 +106,7 @@ export class MockProvider implements PaymentProvider {
     };
 
     this.mockDatabase.subscriptions.set(subscriptionId, subscription);
-    console.log(`[MockProvider] Subscription created: ${subscriptionId}`);
+    this.logger.debug(`[MockProvider] Subscription created: ${subscriptionId}`);
 
     return subscription;
   }
@@ -125,7 +126,7 @@ export class MockProvider implements PaymentProvider {
     const subscription = await this.getSubscription(subscriptionId);
     Object.assign(subscription, updates);
     this.mockDatabase.subscriptions.set(subscriptionId, subscription);
-    console.log(`[MockProvider] Subscription updated: ${subscriptionId}`);
+    this.logger.debug(`[MockProvider] Subscription updated: ${subscriptionId}`);
     return subscription;
   }
 
@@ -144,7 +145,9 @@ export class MockProvider implements PaymentProvider {
     }
 
     this.mockDatabase.subscriptions.set(subscriptionId, subscription);
-    console.log(`[MockProvider] Subscription canceled: ${subscriptionId}`);
+    this.logger.debug(
+      `[MockProvider] Subscription canceled: ${subscriptionId}`,
+    );
   }
 
   async resumeSubscription(subscriptionId: string): Promise<void> {
@@ -152,7 +155,7 @@ export class MockProvider implements PaymentProvider {
     subscription.status = "active";
     subscription.cancelAt = null;
     this.mockDatabase.subscriptions.set(subscriptionId, subscription);
-    console.log(`[MockProvider] Subscription resumed: ${subscriptionId}`);
+    this.logger.debug(`[MockProvider] Subscription resumed: ${subscriptionId}`);
   }
 
   async listPaymentMethods(customerId: string): Promise<PaymentMethod[]> {
@@ -173,14 +176,16 @@ export class MockProvider implements PaymentProvider {
     customerId: string,
     paymentMethodId: string,
   ): Promise<void> {
-    console.log(
+    this.logger.debug(
       `[MockProvider] Default payment method set: ${paymentMethodId} for ${customerId}`,
     );
   }
 
   async deletePaymentMethod(paymentMethodId: string): Promise<void> {
     this.mockDatabase.paymentMethods.delete(paymentMethodId);
-    console.log(`[MockProvider] Payment method deleted: ${paymentMethodId}`);
+    this.logger.debug(
+      `[MockProvider] Payment method deleted: ${paymentMethodId}`,
+    );
   }
 
   async listInvoices(customerId: string, limit = 10): Promise<any[]> {
@@ -199,7 +204,7 @@ export class MockProvider implements PaymentProvider {
 
   async createRefund(paymentIntentId: string, amount?: number): Promise<any> {
     const refundId = `re_mock_${uuidv4()}`;
-    console.log(
+    this.logger.debug(
       `[MockProvider] Refund created: ${refundId} for ${paymentIntentId}`,
     );
 

@@ -396,6 +396,83 @@ export class CommunityPostService {
   }
 
   /**
+   * 게시물 조회 (ID)
+   */
+  async findById(
+    communitySlug: string,
+    postId: string,
+    userId?: string,
+  ): Promise<
+    CommunityPost & { userLiked?: boolean; userVote?: VoteType | null }
+  > {
+    const community = await this.communityRepository.findOne({
+      where: { slug: communitySlug },
+      select: ["id"],
+    });
+
+    if (!community) {
+      throw new NotFoundException("커뮤니티를 찾을 수 없습니다");
+    }
+
+    const cacheKey = PostCacheKeys.POST_BY_ID(postId);
+    let post = await this.cacheService.get<CommunityPost>(cacheKey);
+
+    if (!post) {
+      post = await this.postRepository.findOne({
+        where: {
+          communityId: community.id,
+          id: postId,
+          status: In([
+            CommunityPostStatus.PUBLISHED,
+            CommunityPostStatus.DRAFT,
+          ]),
+        },
+        relations: [
+          "author",
+          "author.profile",
+          "flair",
+          "community",
+          "thumbnailImage",
+        ],
+      });
+
+      if (!post) {
+        throw new NotFoundException("게시물을 찾을 수 없습니다");
+      }
+
+      if (
+        post.status === CommunityPostStatus.DRAFT &&
+        post.authorId !== userId
+      ) {
+        throw new NotFoundException("게시물을 찾을 수 없습니다");
+      }
+
+      await this.cacheService.set(cacheKey, post, CacheTTL.MEDIUM);
+    }
+
+    if (post) {
+      this.enrichPostMetadata(post);
+    }
+
+    this.incrementViewCount(post.id).catch(() => {});
+
+    const result = post as CommunityPost & {
+      userLiked?: boolean;
+      userVote?: VoteType | null;
+    };
+
+    if (userId) {
+      const userVote = await this.getUserVote(post.id, userId);
+      result.userVote = userVote;
+      result.userLiked = userVote === VoteType.UPVOTE;
+    }
+
+    this.enrichPostMetadata(result);
+
+    return result;
+  }
+
+  /**
    * 여러 커뮤니티의 최신 게시글 일괄 조회 (Batch API)
    * N+1 문제 해결용: 각 커뮤니티별 최신 N개 게시글 반환
    */
@@ -825,6 +902,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      updated.id,
     );
 
     const refetched = await this.postRepository.findOne({
@@ -852,6 +930,7 @@ export class CommunityPostService {
     postId: string,
     userId: string,
     userRole?: CommunityRole,
+    isPlatformAdmin: boolean = false,
   ): Promise<void> {
     const post = await this.postRepository.findOne({
       where: { id: postId },
@@ -863,9 +942,10 @@ export class CommunityPostService {
     }
 
     const isAuthor = post.authorId === userId;
-    const isModerator = userRole && isModeratorOrAbove(userRole);
+    const isModerator = !!(userRole && isModeratorOrAbove(userRole));
+    const canModerate = isModerator || isPlatformAdmin;
 
-    if (!isAuthor && !isModerator) {
+    if (!isAuthor && !canModerate) {
       throw new ForbiddenException("게시물을 삭제할 권한이 없습니다");
     }
 
@@ -873,7 +953,7 @@ export class CommunityPostService {
     const wasPublished = post.status === CommunityPostStatus.PUBLISHED;
 
     // 모더레이터가 삭제하는 경우 로그 기록
-    if (isModerator && !isAuthor) {
+    if (canModerate && !isAuthor) {
       await this.modLogRepository.save({
         communityId: post.communityId,
         moderatorId: userId,
@@ -885,7 +965,7 @@ export class CommunityPostService {
     }
 
     // 삭제 주체에 따른 처리
-    if (isModerator && !isAuthor) {
+    if (canModerate && !isAuthor) {
       // 모더레이터 삭제: 소프트 삭제 (status: REMOVED)
       post.status = CommunityPostStatus.REMOVED;
       post.removedAt = new Date();
@@ -916,6 +996,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
   }
 
@@ -983,6 +1064,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
 
     this.logger.log(`게시물 스팸 표시: ${post.slug} by ${moderatorId}`);
@@ -1045,6 +1127,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
 
     this.logger.log(`게시물 승인: ${post.slug} by ${moderatorId}`);
@@ -1119,6 +1202,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
 
     this.logger.log(`게시물 삭제 (모더레이션): ${post.slug} by ${moderatorId}`);
@@ -1376,11 +1460,15 @@ export class CommunityPostService {
     communityId: string,
     communitySlug: string,
     postSlug: string,
+    postId?: string,
   ): Promise<void> {
+    const postIdCache = postId ? PostCacheKeys.POST_BY_ID(postId) : null;
+
     await Promise.all([
       this.cacheService.del(
         PostCacheKeys.POST_BY_SLUG(communitySlug, postSlug),
       ),
+      ...(postIdCache ? [this.cacheService.del(postIdCache)] : []),
       this.invalidatePostListCache(communityId),
       this.cacheService.del(PostCacheKeys.PINNED_POSTS(communityId)),
     ]);

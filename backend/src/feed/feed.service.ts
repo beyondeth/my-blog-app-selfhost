@@ -541,8 +541,7 @@ export class FeedService {
     const preferredYouTubeId =
       this.extractPreferredYouTubeVideoIdFromContent(contentHtml);
     const youtubeVideoId =
-      preferredYouTubeId ||
-      this.extractYouTubeVideoIdFromContent(contentHtml);
+      preferredYouTubeId || this.extractYouTubeVideoIdFromContent(contentHtml);
 
     const item: UnifiedFeedItemDto = {
       id: row.id,

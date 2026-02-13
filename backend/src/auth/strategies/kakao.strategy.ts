@@ -1,12 +1,14 @@
 import { PassportStrategy } from "@nestjs/passport";
 import { Strategy } from "passport-kakao";
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { AuthService } from "../auth.service";
 import { AuthProvider } from "../../users/entities/user.entity";
 
 @Injectable()
 export class KakaoStrategy extends PassportStrategy(Strategy, "kakao") {
+  private readonly logger = new Logger(KakaoStrategy.name);
+
   constructor(
     private configService: ConfigService,
     private authService: AuthService,
@@ -32,7 +34,7 @@ export class KakaoStrategy extends PassportStrategy(Strategy, "kakao") {
     profile: any,
   ): Promise<any> {
     // 카카오 프로필 전체 구조 확인
-    console.log("Kakao profile structure:", {
+    this.logger.debug("Kakao profile structure:", {
       id: profile.id,
       username: profile.username,
       displayName: profile.displayName,
@@ -43,14 +45,17 @@ export class KakaoStrategy extends PassportStrategy(Strategy, "kakao") {
 
     // Kakao는 이메일을 다른 방식으로 제공할 수 있음
     if (profile._json) {
-      console.log("Kakao _json details:", {
+      this.logger.debug("Kakao _json details:", {
         email: profile._json.email,
         kakao_account: profile._json.kakao_account,
       });
 
       // kakao_account 안에 이메일이 있을 수 있음
       if (profile._json.kakao_account) {
-        console.log("Kakao account details:", profile._json.kakao_account);
+        this.logger.debug(
+          "Kakao account details:",
+          profile._json.kakao_account,
+        );
 
         // 이메일을 kakao_account에서 가져와서 profile.emails에 추가
         if (profile._json.kakao_account.email) {

@@ -432,7 +432,7 @@ export class ChatQueueService {
       (sum, size) => sum + size,
       0,
     );
-    const healthy = totalSize < 1000 && dlqSize < 100;
+    const healthy = warnings.length === 0 && totalSize < 1000 && dlqSize < 100;
 
     return {
       healthy,

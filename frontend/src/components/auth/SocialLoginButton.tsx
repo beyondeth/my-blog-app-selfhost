@@ -102,8 +102,14 @@ export function SocialLoginButton({ provider, className = '', disabled = false }
       }
 
       // 백엔드 OAuth 엔드포인트로 직접 리디렉션
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-      const oauthUrl = `${backendUrl}/api/v1/auth/${provider}`;
+      const rawBackendUrl =
+        process.env.NEXT_PUBLIC_BACKEND_URL ||
+        process.env.NEXT_PUBLIC_API_URL ||
+        'http://localhost:3000';
+      const normalizedBackendUrl = rawBackendUrl
+        .replace(/\/api\/v1\/?$/, '')
+        .replace(/\/+$/, '');
+      const oauthUrl = `${normalizedBackendUrl}/api/v1/auth/${provider}`;
 
       // OAuth 페이지로 이동 - replace 사용으로 히스토리 관리 개선
       window.location.replace(oauthUrl);
