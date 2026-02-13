@@ -51,3 +51,33 @@ Accessible color palette with luminance/contrast values
 Typography guidelines (sizes, weights, spacing)
 Layout and spacing system definitions
 Accessibility compliance checklist
+
+## Multi-Platform Worktree Policy (Required)
+This repository must be operated with dedicated worktrees per platform to prevent branch switching collisions between terminals.
+
+### Required Worktree Layout
+- `/Users/sihyungpark/Desktop/code/my-blog-app-integ`: integration and merge only (`hotfix/auth-me-no-401`)
+- `/Users/sihyungpark/Desktop/code/my-blog-app-ios`: iOS implementation only (`feature/ios/*`)
+- `/Users/sihyungpark/Desktop/code/my-blog-app-aos`: Android implementation only (`feature/aos/*`)
+- `/Users/sihyungpark/Desktop/code/my-blog-app-web`: Web implementation only (`feature/web/*`)
+
+### Branch Ownership Rules
+- `feature/shared/*`: shared backend/contracts changes only (`backend/`, `mobile/contracts/`, shared docs)
+- `feature/ios/*`: `mobile/ios/**` only
+- `feature/aos/*`: `mobile/android/**` only
+- `feature/web/*`: web UI/application changes only
+
+### Merge Order
+- Merge `feature/shared/*` first.
+- Then merge platform branches (`feature/ios/*`, `feature/aos/*`, `feature/web/*`).
+- Integrate only in `hotfix/auth-me-no-401`.
+- Merge to `main` only after integration validation.
+
+### Operational Guardrails
+- Do not develop in the base repository path `/Users/sihyungpark/Desktop/code/my-blog-app`.
+- Use the integration worktree for merge/cherry-pick/push tasks only.
+- Keep temporary analysis artifacts (`output/`, `sdd-tool-analysis/`) out of tracked changes.
+- If a feature requires both shared and platform work, split commits by ownership branch.
+
+For full workflow and runbook details, see:
+- `docs/platform-coordination/worktree-branch-playbook.md`
