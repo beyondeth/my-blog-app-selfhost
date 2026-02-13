@@ -1,0 +1,18 @@
+version: "1.0"
+domains:
+  platform:
+    description: iOS platform layer and app shell
+    specs:
+      - platform/ios-architecture
+  auth:
+    description: Authentication and session handling
+    specs:
+      - auth/ios-auth
+  ui:
+    description: Mobile user experience and navigation
+    specs:
+      - ui/ios-feed-navigation
+  realtime:
+    description: Realtime and notifications
+    specs:
+      - realtime/ios-realtime
