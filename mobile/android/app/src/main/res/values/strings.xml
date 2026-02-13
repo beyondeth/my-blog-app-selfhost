@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MyBlog Android</string>
+    <string name="app_title">MyBlog Mobile</string>
+    <string name="app_subtitle">Settings API integration ready</string>
+    <string name="open_settings">Open Settings</string>
+    <string name="settings_title">Settings Screen</string>
+    <string name="settings_subtitle">Log in first, then load your API-backed settings.</string>
+    <string name="open_login">Open Login</string>
+    <string name="load_settings">Load Settings (API)</string>
+    <string name="settings_loading_idle">Tap to load settings from API.</string>
+    <string name="settings_loading_in_progress">Loading settings from %1$s ...</string>
+    <string name="settings_loading_error">Request failed: %1$s</string>
+    <string name="settings_login_success">Signed in as %1$s. Loading settings...</string>
+    <string name="login_title">Login</string>
+    <string name="login_subtitle">Use your backend account credentials.</string>
+    <string name="login_email_hint">Email</string>
+    <string name="login_password_hint">Password</string>
+    <string name="login_action">Sign In</string>
+    <string name="login_status_idle">Enter credentials and sign in.</string>
+    <string name="login_status_missing_fields">Email and password are required.</string>
+    <string name="login_status_loading">Signing in...</string>
+    <string name="login_status_success">Signed in as %1$s. Returning to settings...</string>
+    <string name="login_status_failed">Login failed: %1$s</string>
+</resources>

@@ -1,0 +1,340 @@
+--------- beginning of main
+02-14 01:11:09.961 D/SafetySourceDataValidat(  686): No cert check requested for package com.android.settings
+02-14 01:11:09.969 W/JobInfo ( 1375): Requested important-while-foreground flag for job162 is ignored and takes no effect
+02-14 01:11:09.982 W/JobInfo ( 1375): Requested important-while-foreground flag for job164 is ignored and takes no effect
+02-14 01:11:09.997 I/ssioncontroller( 1396): Background concurrent mark compact GC freed 4965KB AllocSpace bytes, 26(2936KB) LOS objects, 49% free, 4183KB/8367KB, paused 101us,1.008ms total 1.681s
+02-14 01:11:09.997 I/ActiveUnlockStatusUtils( 1159): authority not set
+02-14 01:11:10.077 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.078 W/HWUI    ( 1462): Image decoding logging dropped!
+--------- beginning of system
+02-14 01:11:10.087 I/BootReceiver(  686): fs_stat, partition:vdc found tree optimization:Inode 352931 extent tree (at level 1) could be shorter.  Optimize? yes
+02-14 01:11:10.087 I/BootReceiver(  686): fs_stat, partition:vdc found tree optimization:Inode 353727 extent tree (at level 1) could be shorter.  Optimize? yes
+02-14 01:11:10.087 I/BootReceiver(  686): fs_stat, partition:vdc found tree optimization:Inode 353729 extent tree (at level 1) could be shorter.  Optimize? yes
+02-14 01:11:10.094 I/BootReceiver(  686): fs_stat, partition:vdc found quota warning:[QUOTA WARNING] Usage inconsistent for ID 10145:actual (12587008, 467) != expected (12599296, 467)
+02-14 01:11:10.094 I/BootReceiver(  686): fs_stat, partition:vdc found quota warning:[QUOTA WARNING] Usage inconsistent for ID 10145:actual (11677696, 382) != expected (11689984, 382)
+02-14 01:11:10.094 I/BootReceiver(  686): fs_stat, partition:vdc found quota warning:[QUOTA WARNING] Usage inconsistent for ID 0:actual (5257756672, 12062) != expected (5257768960, 12062)
+02-14 01:11:10.094 I/BootReceiver(  686): fs_stat, partition:vdc fix ignored
+02-14 01:11:10.094 I/BootReceiver(  686): fs_stat, partition:vdc stat:0xb
+02-14 01:11:10.094 I/BootReceiver(  686): Copying /dev/fscklogs/log to DropBox (SYSTEM_FSCK)
+02-14 01:11:10.094 I/DropBoxManagerService(  686): add tag=SYSTEM_FSCK isTagEnabled=true flags=0x2
+02-14 01:11:10.103 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.122 W/putmethod.latin( 1375): Suspending all threads took: 77.881ms
+02-14 01:11:10.128 W/JobInfo ( 1375): Requested important-while-foreground flag for job173 is ignored and takes no effect
+02-14 01:11:10.128 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/ambientcontext session_name:ambientcontext
+02-14 01:11:10.128 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/pecanmessageevents session_name:pecanmessageevents
+02-14 01:11:10.133 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/search session_name:search
+02-14 01:11:10.134 I/AiAiNowPlaying( 1462): Initializing Now Playing SimpleStorage Module.
+02-14 01:11:10.134 I/AiAiNowPlaying( 1462): Registering Now Playing population: NOW_PLAYING_USAGE
+02-14 01:11:10.135 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/toastquery session_name:toastquery
+02-14 01:11:10.135 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/pecanconversationsessionevents session_name:pecanconversationsessionevents
+02-14 01:11:10.136 W/Looper  (  686): Slow dispatch took 165ms main app=system_server main=true group=FOREGROUND h=android.app.ActivityThread$H c=android.app.LoadedApk$ReceiverDispatcher$Args$$ExternalSyntheticLambda0@2389a0e m=0
+02-14 01:11:10.142 I/ActivityManager(  686): Force stopping com.myblog.android appid=10220 user=0: from pid 2063
+02-14 01:11:10.144 I/WindowManager(  686):   Force removing ActivityRecord{56080312 u0 com.myblog.android/.MainActivity t47}
+02-14 01:11:10.145 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/pecanconversationfragmentevents session_name:pecanconversationfragmentevents
+02-14 01:11:10.145 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/pecanconversationthreadevents session_name:pecanconversationthreadevents
+02-14 01:11:10.147 W/UsageStatsService(  686): Unexpected activity event reported! (com.myblog.android/com.myblog.android.MainActivity event : 23 instanceId : 63712503)
+02-14 01:11:10.149 I/FederatedTrainingScheduler( 1851): Cancelling training for population:aiai/playstore/pecansearchqueryevents session_name:pecansearchqueryevents
+02-14 01:11:10.151 D/SafetySourceDataValidat(  686): No cert check requested for package com.android.settings
+02-14 01:11:10.168 D/PrivateSpaceSafetySrc( 1159): Setting safety source data
+02-14 01:11:10.171 D/SafetySourceDataValidat(  686): No cert check requested for package com.android.settings
+02-14 01:11:10.183 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:10.191 E/ActivityManager(  686): Unable to freeze binder for 1989: -11
+02-14 01:11:10.277 W/Looper  (  686): Drained
+02-14 01:11:10.281 D/SafetySourceDataValidat(  686): No cert check requested for package com.android.settings
+02-14 01:11:10.301 D/RecentsView( 1098): onTaskRemoved: 47, not handling task stack changes
+02-14 01:11:10.304 D/RecentsView( 1098): onTaskRemoved: 47, not handling task stack changes
+02-14 01:11:10.331 D/WifiNl80211Manager(  686): Scan result ready event
+02-14 01:11:10.331 D/WifiNative(  686): Scan result ready event
+02-14 01:11:10.352 W/WindowManager(  686): Failed looking up window session=Session{cf3c6a0 942:u0a10187} callers=com.android.server.wm.WindowManagerService.windowForClientLocked:6410 com.android.server.wm.WindowManagerService.relayoutWindow:2379 com.android.server.wm.Session.relayout:283 
+02-14 01:11:10.356 W/WindowOnBackDispatcher(  942): sendCancelIfRunning: isInProgress=false callback=android.view.ViewRootImpl$$ExternalSyntheticLambda13@f42cf6c
+02-14 01:11:10.358 W/WindowManager(  686): Failed looking up window session=Session{cf3c6a0 942:u0a10187} callers=com.android.server.wm.WindowManagerService.removeClientToken:2135 com.android.server.wm.Session.remove:270 android.view.IWindowSession$Stub.onTransact:696 
+02-14 01:11:10.362 I/ActivityManager(  686): Killing 1989:com.myblog.android/u0a220 (adj 0): stop com.myblog.android due to from pid 2063
+02-14 01:11:10.362 W/WindowManager(  686): Failed looking up window session=Session{cf3c6a0 942:u0a10187} callers=com.android.server.wm.WindowManagerService.windowForClientLocked:6410 com.android.server.wm.Session.setOnBackInvokedCallbackInfo:1002 android.view.IWindowSession$Stub.onTransact:1156 
+02-14 01:11:10.362 I/WindowManager(  686): setOnBackInvokedCallback(): No window state for package:com.android.systemui
+02-14 01:11:10.399 I/SatelliteAppTracker( 1093): onPackageModified : com.android.stk
+02-14 01:11:10.410 W/IPCThreadState(  686): Sending oneway calls to frozen process.
+02-14 01:11:10.415 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/pecanmessageevents, session=pecanmessageevents]
+02-14 01:11:10.417 W/HWUI    ( 1462): Image decoding logging dropped!
+02-14 01:11:10.417 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/search, session=search]
+02-14 01:11:10.417 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/toastquery, session=toastquery]
+02-14 01:11:10.417 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.418 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.418 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.418 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.418 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.425 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.429 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/pecanconversationsessionevents, session=pecanconversationsessionevents]
+02-14 01:11:10.436 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.437 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.439 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.440 D/Telephony( 1093): isEmergencyPreferredAccount: Device does not require preference.
+02-14 01:11:10.446 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/pecanconversationfragmentevents, session=pecanconversationfragmentevents]
+02-14 01:11:10.446 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/pecanconversationthreadevents, session=pecanconversationthreadevents]
+02-14 01:11:10.446 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/pecansearchqueryevents, session=pecansearchqueryevents]
+02-14 01:11:10.446 I/TrainerGrpcBindableService( 1851): Cancelling training succeeded [population=aiai/playstore/ambientcontext, session=ambientcontext]
+02-14 01:11:10.450 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.451 W/BestClock(  686): java.time.DateTimeException: No network time available
+02-14 01:11:10.465 I/adbd    (  528): Remote process closed the socket (on MSG_PEEK)
+02-14 01:11:10.466 I/AttributionAndPermissionUtils(  600): checkPermission (forDataDelivery 0 startDataDelivery 0): Permission hard denied for client attribution [uid 10141, pid 1462, packageName "<unknown>"]
+02-14 01:11:10.467 I/Zygote  (  472): Process 1989 exited due to signal 9 (Killed)
+02-14 01:11:10.474 W/hbox:interactor( 1478): Suspending all threads took: 650.773ms
+02-14 01:11:10.481 I/aixz    ( 1478): Manufacturer not matched [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.481 I/aixz    ( 1478): Device not matched [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.511 D/SafetySourceDataValidat(  686): No cert check requested for package com.android.settings
+02-14 01:11:10.514 D/SafetySourceDataValidat(  686): No cert check requested for package com.android.settings
+02-14 01:11:10.517 W/Looper  (  942): Slow dispatch took 3067ms SysUiBg app=com.android.systemui main=false group=FOREGROUND h=android.os.Handler c=com.android.systemui.statusbar.connectivity.NetworkControllerImpl$$ExternalSyntheticLambda11@6dfbcae m=0
+02-14 01:11:10.521 I/ActivityThread( 1375): Removing dead content provider:android.content.ContentProviderProxy@32468d6
+02-14 01:11:10.522 I/ActivityThread( 1375): Removing dead content provider:android.content.ContentProviderProxy@32468d6
+02-14 01:11:10.523 D/ActivityThread( 1375): Too many transaction errors, throttling freezer binder callback.
+02-14 01:11:10.545 V/MediaProvider( 1449): onConfigure() for internal.db
+02-14 01:11:10.550 W/JobInfo ( 1375): Requested important-while-foreground flag for job176 is ignored and takes no effect
+02-14 01:11:10.551 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:10.552 E/TransitionController(  686): Set visible without transition ActivityRecord{112006842 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity t5} playing=false caller=com.android.server.wm.TaskFragment.resumeTopActivity:1629 
+02-14 01:11:10.561 D/ActivityManager(  686): created ANR temporary file:/data/anr/temp_anr_1468370275637660643.txt
+02-14 01:11:10.561 I/ActivityManager(  686): Collecting stacks for pid 1093 into temporary file temp_anr_1468370275637660643.txt
+02-14 01:11:10.564 D/VRI[NexusLauncherActivity]( 1098): visibilityChanged oldVisibility=false newVisibility=true
+02-14 01:11:10.582 I/Zygote  (  472): Process 1238 exited due to signal 9 (Killed)
+02-14 01:11:10.588 W/AnrMainProcessD(  686): type=1400 audit(0.0:8): avc:  denied  { read } for  name="transactions" dev="binder" ino=1048587 scontext=u:r:system_server:s0 tcontext=u:object_r:binderfs_logs_transactions:s0 tclass=file permissive=0
+02-14 01:11:10.591 E/system_server(  686): Could not open /dev/binderfs/binder_logs/transactions. Likely a permissions issue. errno: 2
+02-14 01:11:10.591 E/android.os.Debug(  686): Failed to get binder state info for pid: 1093 status: -2: No such file or directory
+02-14 01:11:10.605 W/JobInfo ( 1375): Requested important-while-foreground flag for job177 is ignored and takes no effect
+02-14 01:11:10.606 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:10.611 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:10.669 V/MediaProvider( 1449): onOpen() for internal.db
+02-14 01:11:10.670 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:10.675 I/MediaProvider( 1449): No database change across sequential open calls for internal.db.
+02-14 01:11:10.693 W/ogle.android.as( 1462): Suspending all threads took: 219.063ms
+02-14 01:11:10.699 I/AppsFilter(  686): interaction: PackageSetting{73e1c0d com.company.ordermarket/10219} -> PackageSetting{beebf5d com.myblog.android/10220} BLOCKED
+02-14 01:11:10.715 D/ViewRootImpl( 1098): Skipping stats log for color mode
+02-14 01:11:10.726 D/StatsLog( 1098): LAUNCHER_ONRESUME
+02-14 01:11:10.729 D/ConnectivityService(  686): releasing NetworkRequest [ REQUEST id=70, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED Uid: 10146 RequestorUid: 10146 RequestorPkg: com.google.android.gms UnderlyingNetworks: Null] ] (release request)
+02-14 01:11:10.732 D/NexusLauncherModelDelegate( 1098): notifySmartspaceEvent: SmartspaceTargetEvent{mSmartspaceTarget=null, mSmartspaceActionId='null', mEventType=6}
+02-14 01:11:10.741 D/ConditionProviders(  686): Removing active service ComponentInfo{com.google.android.gms/com.google.android.location.settings.DrivingConditionProvider}
+02-14 01:11:10.744 V/ConditionProviders(  686): 0 condition provider connection lost: ComponentInfo{com.google.android.gms/com.google.android.location.settings.DrivingConditionProvider}
+02-14 01:11:10.751 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.751 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.751 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.751 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.760 E/ashmem  ( 1907): Pinning is deprecated since Android Q. Please use trim or other methods.
+02-14 01:11:10.774 I/system_server(  686): libdebuggerd_client: started dumping process 1093
+02-14 01:11:10.775 I/tombstoned(  273): registered intercept for pid 1093 and type kDebuggerdJavaBacktrace
+02-14 01:11:10.776 I/libprocessgroup(  686): Removed cgroup /sys/fs/cgroup/apps/uid_10146/pid_1238
+02-14 01:11:10.776 D/WifiScoreReport(  686): startConnectedNetworkScorer(100, false)
+02-14 01:11:10.776 W/WifiScoreReport(  686): Cannot start external scoring netId=100 currentNetId=100 sessionId=1008
+02-14 01:11:10.777 I/libprocessgroup(  686): Removed cgroup /sys/fs/cgroup/apps/uid_10220/pid_1989
+02-14 01:11:10.810 D/CountryDetector(  686): The first listener is added
+02-14 01:11:10.814 I/ampb    ( 1478): (REDACTED) DelegationStatus: %s
+02-14 01:11:10.820 I/m.android.phone( 1093): Thread[2,tid=1097,WaitingInMainSignalCatcherLoop,Thread*=0xb400007e302efb20,peer=0x2000c50,"Signal Catcher"]: reacting to signal 3
+02-14 01:11:10.820 I/m.android.phone( 1093): 
+02-14 01:11:10.822 I/ContactsDatabaseHelper( 1878): updateUseStrictPhoneNumberComparison: US
+02-14 01:11:10.826 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.827 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.827 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.827 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.827 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.827 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.827 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.831 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.831 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.831 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.843 W/ActivityManager(  686): Slow operation: 742ms so far, now at finishAttachApplicationInner: after mServices.attachApplicationLocked
+02-14 01:11:10.843 W/ActivityManager(  686): Slow operation: 742ms so far, now at finishAttachApplicationInner: after dispatching broadcasts
+02-14 01:11:10.844 D/OomAdjuster(  686): Not killing cached processes
+02-14 01:11:10.844 W/ActivityManager(  686): Slow operation: 743ms so far, now at finishAttachApplicationInner: after updateOomAdjLocked
+02-14 01:11:10.885 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.897 D/LoaderTask( 1098): sanitizeData finished
+02-14 01:11:10.900 W/LoaderTask( 1098): LoaderTask cancelled
+02-14 01:11:10.900 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.906 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.906 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.906 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.906 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.906 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.907 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.907 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.907 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.908 W/JobInfo ( 1375): Requested important-while-foreground flag for job178 is ignored and takes no effect
+02-14 01:11:10.908 D/DesktopModeFlags( 1462): Toggle override initialized to: OVERRIDE_UNSET
+02-14 01:11:10.909 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.909 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.909 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.909 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.909 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.909 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.909 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.909 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.909 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.909 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.909 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.910 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.910 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:10.910 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:10.910 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:10.911 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:10.911 I/AiAiEcho( 1462): Predicting[0]:  [CONTEXT sampling_count=5 ]
+02-14 01:11:10.915 D/ConnectivityService(  686): [100 WIFI] EVENT_NETWORK_INFO_CHANGED, going from CONNECTING to CONNECTED
+02-14 01:11:10.982 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:10.986 D/WifiMemoryStoreImpl(  686): Set cluster G32f7a02fddfdb5bf for W96b7d04ba0aca39: SUCCESS
+02-14 01:11:10.995 I/GridSizeMigrationDBController( 1098): Migration is not needed. destDeviceState: DeviceGridState{mGridSizeString='4,5', mNumHotseat=4, mDeviceType=0, mDbFile=launcher_4_by_5.db}, srcDeviceState: DeviceGridState{mGridSizeString='4,5', mNumHotseat=4, mDeviceType=0, mDbFile=launcher_4_by_5.db}
+02-14 01:11:10.995 D/ModelDbController( 1098): isGridMigrationNecessary: no grid migration needed
+02-14 01:11:11.006 I/GridSizeMigrationDBController( 1098): Migration is not needed. destDeviceState: DeviceGridState{mGridSizeString='4,5', mNumHotseat=4, mDeviceType=0, mDbFile=launcher_4_by_5.db}, srcDeviceState: DeviceGridState{mGridSizeString='4,5', mNumHotseat=4, mDeviceType=0, mDbFile=launcher_4_by_5.db}
+02-14 01:11:11.007 D/LoaderTask( 1098): loadWorkspace: loading default favorites if necessary
+02-14 01:11:11.010 I/ImsExternalCallTracker( 1093): handleVideoCapabilitiesChanged : isVideoCapable = false
+02-14 01:11:11.010 D/ImsExternalCallTracker( 1093): refreshCallPullState
+02-14 01:11:11.010 I/Telephony( 1093): handleVideoCapabilitesChanged. Video capability - false
+02-14 01:11:11.017 I/AiAiEcho( 1462): EchoTargets: 
+02-14 01:11:11.017 I/AiAiEcho( 1462): Filtered by AiAi flag check: 
+02-14 01:11:11.017 I/AiAiEcho( 1462): [CONTEXT ratelimit_period="10 SECONDS" ]
+02-14 01:11:11.018 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:11.018 I/SP.AiAi ( 1462): Scheduling job with delay of 0s for {W:C:I:l, bg}, 5 candidates
+02-14 01:11:11.025 I/AiAiEcho( 1462): #remoteViewsTwiddler: feature disabled.
+02-14 01:11:11.034 D/WindowManagerShell(  942): setLauncherKeepClearAreaHeight: visible=true, height=527
+02-14 01:11:11.036 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:11.037 D/LoaderTask( 1098): loadWorkspace: Packages with active install/update sessions: [com.google.android.tzdata6]
+02-14 01:11:11.038 I/AiAiNowPlaying( 1462): Registering Now Playing population: NOW_PLAYING_USAGE_WEEKLY
+02-14 01:11:11.043 D/LoaderTask( 1098): No pinned shortcuts found for user UserHandle{0}
+02-14 01:11:11.057 D/WorkspaceItemProcessor( 1098): valid target true, marking restored: com.google.android.dialer, itemType=0, restoreFlag=0
+02-14 01:11:11.061 W/ContextImpl(  686): Calling a method in the system process without a qualified user: android.app.ContextImpl.sendStickyBroadcast:1698 com.android.server.wifi.ClientModeImpl.sendNetworkChangeBroadcast:3140 com.android.server.wifi.ClientModeImpl.lambda$sendNetworkChangeBroadcastWithCurrentState$14:3117 com.android.server.wifi.ClientModeImpl.$r8$lambda$mtuS9ulugUkTxNA_sDDnAioo66w:0 com.android.server.wifi.ClientModeImpl$$ExternalSyntheticLambda13.send:0 
+02-14 01:11:11.081 D/WorkspaceItemProcessor( 1098): valid target true, marking restored: com.google.android.apps.messaging, itemType=0, restoreFlag=0
+02-14 01:11:11.089 I/HWUI    (  942): Davey! duration=2244ms; Flags=0, FrameTimelineVsyncId=6930, IntendedVsync=38361968105, Vsync=39195301405, InputEventId=0, HandleInputStart=39205581601, AnimationStart=39205582935, PerformTraversalsStart=39205583185, DrawStart=40117254602, FrameDeadline=38378634771, FrameStartTime=39199492685, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=40117725394, SyncStart=40118707644, IssueDrawCommandsStart=40121154519, SwapBuffers=40529070310, FrameCompleted=40607717435, DequeueBufferDuration=7417, QueueBufferDuration=8422459, GpuCompleted=40607551977, SwapBuffersCompleted=40607717435, DisplayPresentTime=0, CommandSubmissionCompleted=40529070310, 
+02-14 01:11:11.090 D/WorkspaceItemProcessor( 1098): valid target true, marking restored: com.android.chrome, itemType=0, restoreFlag=0
+02-14 01:11:11.128 E/JobScheduler.JobStatus(  686): App com.google.android.inputmethod.latin became active but still in NEVER bucket
+02-14 01:11:11.130 D/ONSNetworkScanCtlr( 1093): init called
+02-14 01:11:11.150 W/ProcessCpuTracker(  686): Failed to stat(/proc/2057): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+02-14 01:11:11.150 W/ProcessCpuTracker(  686): Skipping unknown process pid 2057
+02-14 01:11:11.150 W/ProcessCpuTracker(  686): Failed to stat(/proc/2063): android.system.ErrnoException: stat failed: ENOENT (No such file or directory)
+02-14 01:11:11.150 W/ProcessCpuTracker(  686): Skipping unknown process pid 2063
+02-14 01:11:11.160 I/AiAiEcho( 1462): #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+02-14 01:11:11.157 D/WorkspaceItemProcessor( 1098): valid target true, marking restored: com.android.vending, itemType=0, restoreFlag=0
+02-14 01:11:11.162 I/AiAiEcho( 1462): #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+02-14 01:11:11.163 I/AiAiEcho( 1462): #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+02-14 01:11:11.166 I/AiAiEcho( 1462): #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+02-14 01:11:11.168 I/AiAiEcho( 1462): #postPredictionTargets: Sending updates to UISurface lockscreen with targets# 0 (types=[])
+02-14 01:11:11.172 D/WorkspaceItemProcessor( 1098): valid target true, marking restored: com.google.android.gm, itemType=0, restoreFlag=0
+02-14 01:11:11.186 I/AiAiEcho( 1462): [pnb-agg] Reload pnb aggregation on events deleted
+02-14 01:11:11.186 I/AiAiEcho( 1462): [pnb-agg] pnb aggregation disabled.
+02-14 01:11:11.192 D/WorkspaceItemProcessor( 1098): valid target true, marking restored: com.google.android.apps.photos, itemType=0, restoreFlag=0
+02-14 01:11:11.196 W/DnsManager(  686): updatePrivateDns(100, PrivateDnsConfig{opportunistic:/[], dohName=, dohIps=[], dohPath=, dohPort=-1})
+02-14 01:11:11.196 D/ConnectivityService(  686): Setting DNS servers for network 100 to [/10.0.2.3]
+02-14 01:11:11.196 D/DnsManager(  686): sendDnsConfigurationForNetwork(ResolverParamsParcel{netId: 100, sampleValiditySeconds: 1800, successThreshold: 25, minSamples: 8, maxSamples: 64, baseTimeoutMsec: 0, retryCount: 0, servers: [10.0.2.3], domains: [], tlsName: , tlsServers: [10.0.2.3], tlsFingerprints: [], caCertificate: , tlsConnectTimeoutMs: 0, resolverOptions: null, transportTypes: [1], meteredNetwork: false, dohParams: null, interfaceNames: [wlan0]})
+02-14 01:11:11.198 W/resolv  (  469): Validating DnsTlsServer {10.0.2.3/} with mark 0xf0064
+02-14 01:11:11.201 I/SP      ( 1375): GC for 'emoticon_content_description' (10) with ttl of 0 ms took 29 ms (0/29/0)
+02-14 01:11:11.201 I/AbstractSyncResultCallback( 1375): AbstractSyncResultCallback.onFailure():38 onFailure(): emoticon_content_description.sync cancelled; expected if new request supersedes pending one.
+02-14 01:11:11.202 D/WorkspaceItemProcessor( 1098): valid target true, marking restored: com.google.android.youtube, itemType=0, restoreFlag=0
+02-14 01:11:11.212 W/Looper  (  686): Slow dispatch took 1076ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=null m=68
+02-14 01:11:11.254 D/ContactsDatabaseHelper( 1878): WAL enabled for contacts2.db: true
+02-14 01:11:11.263 I/ActivityManager(  686): dumpStackTraces pids=null
+02-14 01:11:11.284 W/Looper  (  686): Slow delivery took 899ms android.ui app=system_server main=false group=TOP_APP h=com.android.server.am.ActivityManagerService$UiHandler c=com.android.server.am.UidObserverController$$ExternalSyntheticLambda0@e3ff6c9 m=0
+02-14 01:11:11.304 E/IPCThreadState(  686): Binder transaction failure. id: 45210, BR_*: 29189, error: -22 (Invalid argument)
+02-14 01:11:11.304 I/ActivityManager(  686): Process com.google.android.gms.persistent (pid 1238) early provider death
+02-14 01:11:11.306 W/Looper  (  686): Slow dispatch took 1763ms android.fg app=system_server main=false group=FOREGROUND h=com.android.server.DropBoxManagerService$DropBoxManagerBroadcastHandler c=null m=1
+02-14 01:11:11.315 I/ActivityManager(  686): Dumping to /data/anr/anr_2026-02-14-01-11-11-263
+02-14 01:11:11.356 D/ONSProfileSelector( 1093): ONSProfileSelector init complete
+02-14 01:11:11.469 I/Choreographer( 1098): Skipped 52 frames!  The application may be doing too much work on its main thread.
+02-14 01:11:11.496 I/HWUI    ( 1098): Davey! duration=886ms; Flags=1, FrameTimelineVsyncId=7619, IntendedVsync=40145301367, Vsync=40161968033, InputEventId=0, HandleInputStart=40162202185, AnimationStart=40162202644, PerformTraversalsStart=40162612435, DrawStart=40881299019, FrameDeadline=40161968033, FrameStartTime=40162197060, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=40881771936, SyncStart=40882820394, IssueDrawCommandsStart=40891591061, SwapBuffers=40931246394, FrameCompleted=41033164769, DequeueBufferDuration=11958, QueueBufferDuration=2404000, GpuCompleted=41033090394, SwapBuffersCompleted=41033164769, DisplayPresentTime=0, CommandSubmissionCompleted=40931246394, 
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): Phenotype bulk registration failed [CONTEXT service_id=231 ]
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): java.util.concurrent.ExecutionException: aylo: 20: The connection to Google Play services was lost due to service disconnection.
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at esyz.p(:com.google.android.gms@253031035@25.30.31 (260400-786424874):32)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at esyz.n(:com.google.android.gms@253031035@25.30.31 (260400-786424874):36)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at com.google.android.gms.common.config.PhenotypeRegistrationOperation.onHandleIntent(:com.google.android.gms@253031035@25.30.31 (260400-786424874):228)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at com.google.android.chimera.IntentOperation.onHandleIntent(:com.google.android.gms@253031035@25.30.31 (260400-786424874):2)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at auyx.onHandleIntent(:com.google.android.gms@253031035@25.30.31 (260400-786424874):8)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at wew.run(:com.google.android.gms@253031035@25.30.31 (260400-786424874):64)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at wev.run(:com.google.android.gms@253031035@25.30.31 (260400-786424874):132)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at gamk.run(:com.google.android.gms@253031035@25.30.31 (260400-786424874):21)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1156)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:651)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at java.lang.Thread.run(Thread.java:1119)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): Caused by: aylo: 20: The connection to Google Play services was lost due to service disconnection.
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at ayoi.a(:com.google.android.gms@253031035@25.30.31 (260400-786424874):105)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at aypp.h(:com.google.android.gms@253031035@25.30.31 (260400-786424874):59)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at aypp.onConnectionSuspended(:com.google.android.gms@253031035@25.30.31 (260400-786424874):15)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at azjm.b(:com.google.android.gms@253031035@25.30.31 (260400-786424874):3)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at azil.handleMessage(:com.google.android.gms@253031035@25.30.31 (260400-786424874):198)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at android.os.Handler.dispatchMessage(Handler.java:110)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at cjsl.mH(:com.google.android.gms@253031035@25.30.31 (260400-786424874):1)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at cjsl.dispatchMessage(:com.google.android.gms@253031035@25.30.31 (260400-786424874):144)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at android.os.Looper.loopOnce(Looper.java:248)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at android.os.Looper.loop(Looper.java:338)
+02-14 01:11:11.553 E/PhenotypeRegOp( 1427): 	at android.os.HandlerThread.run(HandlerThread.java:85)
+02-14 01:11:11.612 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentApiService in 1000ms for connection
+02-14 01:11:11.613 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.internal.server.HardwareArProviderService in 10993ms for connection
+02-14 01:11:11.614 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentIntentOperationService in 51720ms for start-requested
+02-14 01:11:11.614 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentBoundBrokerService in 20992ms for connection
+02-14 01:11:11.614 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.network.NetworkLocationService in 30991ms for connection
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.play.integrity.api.service.IntegrityApiPersistentService in 40991ms for start-requested
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.fused.FusedLocationService in 61719ms for connection
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.clearcut.debug.ClearcutDebugDumpService in 71719ms for start-requested
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.geotimezone.GeoTimeZoneService in 81719ms for connection
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.gcm.nts.SchedulerService in 91719ms for start-requested
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.internal.GoogleLocationManagerService in 101719ms for connection
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.auth.account.authenticator.GoogleAccountAuthenticatorService in 111719ms for connection
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.location.geocode.GeocodeService in 121719ms for connection
+02-14 01:11:11.615 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentInternalBoundBrokerService in 131719ms for connection
+02-14 01:11:11.667 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.wearable.service.WearableService in 141719ms for connection
+02-14 01:11:11.668 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/com.google.android.location.settings.DrivingConditionProvider in 151666ms for connection
+02-14 01:11:11.668 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.chimera.PersistentDirectBootAwareApiService in 161665ms for connection
+02-14 01:11:11.669 W/ActivityManager(  686): Scheduling restart of crashed service com.google.android.gms/.gcm.GcmService in 171665ms for start-requested
+02-14 01:11:11.673 W/Looper  (  686): Drained
+02-14 01:11:11.722 D/WifiMemoryStoreImpl(  686): Set cluster G32f7a02fddfdb5bf for W32f7a02fddfdb5bf: SUCCESS
+02-14 01:11:11.734 D/LoaderTask( 1098): loadWorkspace finished
+02-14 01:11:11.744 I/PhoneAccountHandleMigrationUtils_ContactsDatabaseHelper( 1878): updatePhoneAccountHandleMigrationPendingStatus false
+02-14 01:11:11.765 W/ActivityManager(  686): Slow operation: 4930ms so far, now at startProcess: asking zygote to start proc
+02-14 01:11:11.792 W/resolv  (  469): validateDnsTlsServer returned 1 for {10.0.2.3/}
+02-14 01:11:11.792 W/resolv  (  469): Validation success
+02-14 01:11:11.798 I/HWUI    ( 1098): Davey! duration=921ms; Flags=0, FrameTimelineVsyncId=7627, IntendedVsync=40161968033, Vsync=41028634665, InputEventId=0, HandleInputStart=41043867102, AnimationStart=41043868102, PerformTraversalsStart=41045481477, DrawStart=41045880811, FrameDeadline=41061967997, FrameStartTime=41041903144, FrameInterval=16666666, WorkloadTarget=16666666, SyncQueued=41046140644, SyncStart=41268718311, IssueDrawCommandsStart=41268850727, SwapBuffers=41281614977, FrameCompleted=41306073186, DequeueBufferDuration=51292, QueueBufferDuration=806417, GpuCompleted=41305931477, SwapBuffersCompleted=41306073186, DisplayPresentTime=0, CommandSubmissionCompleted=41281614977, 
+02-14 01:11:11.807 I/ImeTracker(  686): com.google.android.apps.nexuslauncher:389217eb: onRequestHide at ORIGIN_SERVER reason HIDE_SAME_WINDOW_FOCUSED_WITHOUT_EDITOR fromUser false
+02-14 01:11:11.874 D/PrivateSpaceBroadcastReceiver( 1159): Received Intent: android.intent.action.BOOT_COMPLETED
+02-14 01:11:11.882 D/MediaProvider( 1449): xattr set to 0899edc5-6d70-4d37-8651-84667a41048e for key:user.intdbsessionid0 on path: /data/user/0/com.google.android.providers.media.module/databases/internal.db.
+02-14 01:11:11.889 D/PrivateSpaceBroadcastReceiver( 1159): Setting component ComponentInfo{com.android.settings/com.android.settings.privatespace.PrivateSpaceAuthenticationActivity} state: 1
+02-14 01:11:11.891 D/MediaProvider( 1449): xattr set to 0899edc5-6d70-4d37-8651-84667a41048e for key:user.intdbsessionid0 on path: /data/media/0.
+02-14 01:11:11.891 I/MediaProvider( 1449): SessionId set to 0899edc5-6d70-4d37-8651-84667a41048e on paths /data/user/0/com.google.android.providers.media.module/databases/internal.db and /data/media/0.
+02-14 01:11:11.891 V/MediaProvider( 1449): onOpen() finished for internal.db
+02-14 01:11:11.893 W/ActivityManager(  686): pid 1375 com.google.android.inputmethod.latin sent binder code 21 with flags 2 to frozen apps and got error -32
+02-14 01:11:11.893 D/ActivityManager(  686): Too many transaction errors, throttling freezer binder callback.
+02-14 01:11:11.893 D/FileUtils(  686): Rounded bytes from 8324440064 to 16000000000
+02-14 01:11:11.895 D/ActivityManager(  686): sync unfroze 1611 com.google.android.googlequicksearchbox:search for 6
+02-14 01:11:11.895 W/ModernMediaScanner( 1449): Failed to visit /system/media: java.nio.file.NoSuchFileException: /system/media
+02-14 01:11:11.898 D/Zygote  (  472): Forked child process 2120
+02-14 01:11:11.920 V/ActivityManager(  686): Got obituary of 1989:com.myblog.android
+02-14 01:11:11.922 W/ServiceBindIntentUtils( 1375): Dynamic intent resolution failed: android.os.DeadObjectException
+02-14 01:11:11.922 W/ServiceBindIntentUtils( 1375): Dynamic lookup for intent failed for action: com.google.android.gms.auth.aang.events.services.START
+02-14 01:11:11.923 D/InsetsController( 1098): hide(ime(), fromIme=false)
+02-14 01:11:11.923 I/ImeTracker( 1098): com.google.android.apps.nexuslauncher:389217eb: onCancelled at PHASE_CLIENT_ALREADY_HIDDEN
+02-14 01:11:11.941 V/GrammaticalInflectionUtils(  686): AttributionSource: android.content.AttributionSource@56fe867b does not have READ_SYSTEM_GRAMMATICAL_GENDER permission.
+02-14 01:11:11.941 W/ActivityManager(  686): Slow operation: 5106ms so far, now at startProcess: returned from zygote!
+02-14 01:11:11.942 I/GoogleInputMethodService( 1375): GoogleInputMethodService.onFinishInput():2113 
+02-14 01:11:11.963 D/BackgroundInstallControlService(  686): Package event received: 0
+02-14 01:11:11.964 D/BackgroundInstallControlService(  686): Package event received: 0
+02-14 01:11:11.976 I/Module  ( 1375): DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():103 repeatCheckTimes = 0, locked = false
+02-14 01:11:11.977 W/NotificationCenter( 1375): NotificationCenter$NotificationQueue.notifyPendingNotificationsOnExecutor():877 Heavy notify work detected on UI thread: [mul->lxh, mul->kpu, mul->kpu, mul->kpu, mul->kpu, mul->kpu, mul->god, mul->glg, mul->mte, mul->kpu, mul->mtn, mul->kpu, mul->knd, mul->okf, mul->kpu, mul->kpu, mul->kpu, mul->krx, mul->kpu, mul->kpu, mul->hmz, mul->kpu, mul->oyp] takes 34ms
+02-14 01:11:11.997 I/MediaProvider( 1449): Scanned internal due to REASON_MOUNTED, found 0 items in 105ms, 0 inserts 0 updates 0 deletes
+02-14 01:11:11.999 D/ONS     ( 1093): service is enable state true
+02-14 01:11:12.019 I/.gms.persistent( 2120): Using CollectorTypeCMC GC.
+02-14 01:11:12.088 E/NetlinkEvent(  469): NetlinkEvent::FindParam(): Parameter 'INTERFACE' not found
+02-14 01:11:12.088 E/NetlinkEvent(  469): NetlinkEvent::FindParam(): Parameter 'STATE' not found
+02-14 01:11:12.088 E/NetlinkEvent(  469): NetlinkEvent::FindParam(): Parameter 'TIME_NS' not found
+02-14 01:11:12.088 E/NetlinkEvent(  469): NetlinkEvent::FindParam(): Parameter 'UID' not found
+02-14 01:11:12.110 I/GoogleInputMethodService( 1375): GoogleInputMethodService.onStartInput():1384 onStartInput(EditorInfo{EditorInfo{packageName=com.google.android.apps.nexuslauncher, inputType=0, inputTypeString=NULL, enableLearning=false, autoCorrection=false, autoComplete=false, imeOptions=0, privateImeOptions=null, actionName=UNSPECIFIED, actionLabel=null, initialSelStart=-1, initialSelEnd=-1, initialCapsMode=0, label=null, fieldId=0, fieldName=null, extras=null, hintText=null, hintLocales=[]}}, false)
+02-14 01:11:12.112 I/Module  ( 1375): DeviceLockedStatusModuleProvider$Module.updateDeviceLockedStatus():103 repeatCheckTimes = 1, locked = false
+02-14 01:11:12.113 E/.gms.persistent( 2120): Not starting debugger since process cannot load the jdwp agent.
+02-14 01:11:12.114 W/PackageConfigPersister(  686): App-specific configuration not found for packageName: com.google.android.apps.nexuslauncher and userId: 0
+02-14 01:11:12.168 I/eysz    ( 1611): (REDACTED) Scoped context discovery schemas: %s.
+02-14 01:11:12.209 D/nativeloader( 2120): Load libframework-connectivity-tiramisu-jni.so using APEX ns com_android_tethering for caller /apex/com.android.tethering/javalib/framework-connectivity-t.jar: ok
+02-14 01:11:12.300 D/NetworkMonitor/100( 1033): PROBE_DNS connectivitycheck.gstatic.com 411ms OK 142.250.199.3,2404:6800:4004:81a::2003
+02-14 01:11:12.309 D/NetworkMonitor/100( 1033): PROBE_DNS www.google.com 421ms OK 142.250.196.100,2404:6800:4004:821::2004
+02-14 01:11:12.474 I/ContactsDatabaseHelper( 1878): updateUseStrictPhoneNumberComparison: US
+02-14 01:11:12.475 D/ConnectivityService(  686): Switching to new default network for: uid/pid:1000/686 activeRequest: 1 callbackRequest: 1 [NetworkRequest [ REQUEST id=1, [ Capabilities: INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED RequestorUid: 1000 RequestorPkg: android UnderlyingNetworks: Null] ]] callback flags: 1 order: 2147483647 isUidTracked: false declaredMethods: NONE using NetworkAgentInfo{network{100}  handle{432902426637}  ni{WIFI CONNECTED extra: } created=2026-02-13T16:10:57.857Z Score(Policies : TRANSPORT_PRIMARY&IS_UNMETERED ; KeepConnected : 0)  created 28018  lp{{InterfaceName: wlan0 LinkAddresses: [ fe80::6644:c1e8:96c0:c4c8/64,fec0::426a:54e3:7262:e5c6/64,fec0::edb7:3a88:8c80:a698/64,10.0.2.16/24 ] DnsAddresses: [ /10.0.2.3 ] Domains: null MTU: 0 ServerAddress: /10.0.2.2 TcpBufferSizes: 524288,1048576,2097152,262144,524288,1048576 Routes: [ fe80::/64 -> :: wlan0 mtu 0,::/0 -> fe80::2 wlan0 mtu 0,fec0::/64 -> :: wlan0 mtu 0,10.0.2.0/24 -> 0.0.0.0 wlan0 mtu 0,0.0.0.0/0 -> 10.0.2.2 wlan0 mtu 0 ]}}  nc{[ Transports: WIFI Capabilities: NOT_METERED&INTERNET&NOT_RESTRICTED&TRUSTED&NOT_VPN&NOT_ROAMING&FOREGROUND&NOT_CONGESTED&NOT_SUSPENDED&NOT_VCN_MANAGED&NOT_BANDWIDTH_CONSTRAINED LinkUpBandwidth>=12000Kbps LinkDnBandwidth>=30000Kbps Specifier: <WifiNetworkAgentSpecifier [WifiConfiguration=, SSID="AndroidWifi", BSSID=00:13:10:85:fe:01, band=1, mMatchLocalOnlySpecifiers=false]> TransportInfo: <SSID: "AndroidWifi", BSSID: 00:13:10:85:fe:01, MAC: 02:15:b4:00:00:00, IP: /10.0.2.16, Security type: 0, Supplicant state: COMPLETED, Wi-Fi standard: legacy, RSSI: -50, Link speed: 1Mbps, Tx Link speed: 1Mbps, Max Supported Tx Link speed: 11Mbps, Rx Link speed: -1Mbps, Max Supported Rx Link speed: 11Mbps, Frequency: 2447MHz, Net ID: 0, Metered hint: false, score: 60, isUsable: true, CarrierMerged: false, SubscriptionId: -1, IsPrimary: 1, Trusted: true, Restricted: false, Ephemeral: false, OEM paid: false, OEM private: false, OSU AP: false, FQDN: <none>, Provider friendly name: <none>, Requesting package name: <none>"AndroidWifi"openMLO Information: , Is TID-To-Link negotiation supported by the AP: false, AP MLD Address: <none>, AP MLO Link Id: <none>, AP MLO Affiliated links: <none>, Vendor Data: <none>> SignalStrength: -50 OwnerUid: 10177 AdminUids: [10177] SSID: "AndroidWifi" UnderlyingNetworks: Null]}  factorySerialNumber=6}
+02-14 01:11:12.529 W/ProcessStats(  686): Tracking association SourceState{e6e9425 com.google.android.googlequicksearchbox:interactor/10149 BFgs #256} whose proc state 4 is better than process ProcessState{e6757bb com.google.android.googlequicksearchbox:search/10149 pkg=com.google.android.googlequicksearchbox} proc state 14 (0 skipped)
+02-14 01:11:12.531 W/ActivityManager(  686): Unable to start service Intent { act=com.google.android.gms.auth.aang.events.services.START xflg=0x4 pkg=com.google.android.gms } U=0: not found
+02-14 01:11:12.536 W/ActivityManager(  686): ProcessRecord{8cbbe6b 0:com.google.android.gms.persistent/u0a146} is attached to a previous process 1238
+02-14 01:11:12.550 W/ActivityManager(  686): Unbind failed: could not find connection for android.os.BinderProxy@dbf1bab
+02-14 01:11:12.552 W/ActivityManager(  686): Slow operation: 5718ms so far, now at startProcess: done updating battery stats
+02-14 01:11:12.554 W/GmsClient( 1375): unable to connect to service: com.google.android.gms.auth.aang.events.services.START on com.google.android.gms
+02-14 01:11:12.558 W/ActivityManager(  686): Slow operation: 5724ms so far, now at startProcess: building log message
+02-14 01:11:12.562 I/ActivityManager(  686): Start proc 2120:com.google.android.gms.persistent/u0a146 for content provider {com.google.android.gms/com.google.android.gms.phenotype.provider.ConfigurationProvider}
+02-14 01:11:12.563 W/ActivityManager(  686): Slow operation: 5728ms so far, now at startProcess: starting to update pids map
+02-14 01:11:12.563 I/ActivityManager(  686): ProcessObserver broadcast disabled
+02-14 01:11:12.563 W/ActivityManager(  686): Slow operation: 5728ms so far, now at startProcess: done updating pids map
+02-14 01:11:12.565 I/tombstoned(  273): received crash request for pid 1093
+02-14 01:11:12.565 I/tombstoned(  273): found intercept fd 512 for pid 1093 and type kDebuggerdJavaBacktrace
