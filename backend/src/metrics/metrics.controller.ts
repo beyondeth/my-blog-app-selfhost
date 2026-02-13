@@ -11,6 +11,7 @@ import {
   ForbiddenException,
   SetMetadata,
   UseGuards,
+  Logger,
 } from "@nestjs/common";
 import { Request } from "express";
 import { register } from "prom-client";
@@ -25,6 +26,8 @@ import { ApiBearerAuth } from "@nestjs/swagger";
 @Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class MetricsController {
+  private readonly logger = new Logger(MetricsController.name);
+
   /**
    * Prometheus 메트릭 엔드포인트
    * @description 오직 관리자만 접근 가능 (보안 강화)
@@ -33,7 +36,9 @@ export class MetricsController {
   @Get()
   async getMetrics(@Req() req: Request): Promise<string> {
     const clientIP = req.ip || req.connection.remoteAddress || "";
-    console.log(`[MetricsController] Admin access granted for IP: ${clientIP}`);
+    this.logger.log(
+      `[MetricsController] Admin access granted for IP: ${clientIP}`,
+    );
 
     return register.metrics();
   }

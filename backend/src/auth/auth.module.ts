@@ -5,6 +5,7 @@ import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthService } from "./auth.service";
 import { AuthController } from "./auth.controller";
+import { MobileAuthController } from "./mobile-auth.controller";
 import { UsersModule } from "../users/users.module";
 import { BlogsModule } from "../blogs/blogs.module";
 import { EmailModule } from "../email/email.module";
@@ -41,7 +42,7 @@ const providers: any[] = [
     }),
   ],
   providers,
-  controllers: [AuthController],
+  controllers: [AuthController, MobileAuthController],
   exports: [AuthService],
 })
 export class AuthModule {}

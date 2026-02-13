@@ -83,6 +83,11 @@ export class CommunityMembershipGuard implements CanActivate {
       request.community = community;
     }
 
+    // 플랫폼 관리자(admin)는 커뮤니티 멤버십 없이 접근 허용
+    if (String(user.role || "").toLowerCase() === "admin") {
+      return true;
+    }
+
     // 4. 차단 여부 확인 (우선)
     const activeBan = await this.banRepository.findOne({
       where: {

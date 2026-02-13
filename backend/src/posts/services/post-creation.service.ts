@@ -818,18 +818,25 @@ export class PostCreationService {
       }
 
       // 7. 비동기 정리 작업 (비디오 파일 R2 삭제 포함)
-      await this.postProcessingQueue.add(
-        "cleanup-deleted-post",
-        {
-          postId: id,
-          blogId: post.blogId,
-          content: post.content, // 비디오 ID 추출을 위해 content 포함
-        } as PostProcessingJobData,
-        {
-          delay: 60000, // 1분 후 실행
-          attempts: 3, // 3번 재시도 (R2 삭제 실패 대비)
-        },
-      );
+      // 큐 등록 실패가 삭제 트랜잭션 전체를 롤백시키지 않도록 best-effort 처리
+      try {
+        await this.postProcessingQueue.add(
+          "cleanup-deleted-post",
+          {
+            postId: id,
+            blogId: post.blogId,
+            content: post.content, // 비디오 ID 추출을 위해 content 포함
+          } as PostProcessingJobData,
+          {
+            delay: 60000, // 1분 후 실행
+            attempts: 3, // 3번 재시도 (R2 삭제 실패 대비)
+          },
+        );
+      } catch (queueError) {
+        this.logger.warn(
+          `삭제 후 정리 큐 등록 실패(postId=${id}) - 삭제는 유지: ${queueError?.message || queueError}`,
+        );
+      }
 
       this.logger.log(`Post deleted successfully: ${id}`);
     });

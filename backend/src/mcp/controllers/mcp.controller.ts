@@ -11,6 +11,7 @@ import {
   HttpStatus,
   Query,
   ParseIntPipe,
+  Logger,
 } from "@nestjs/common";
 import { McpApiKeyService } from "../services/mcp-api-key.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -34,6 +35,8 @@ import { ResourceType } from "../../common/enums/subscription.enum";
  */
 @Controller("mcp")
 export class McpController {
+  private readonly logger = new Logger(McpController.name);
+
   constructor(
     private readonly mcpApiKeyService: McpApiKeyService,
     private readonly usageService: UsageService,
@@ -349,7 +352,7 @@ export class McpController {
             content: preview,
           });
         } catch (error) {
-          console.warn(
+          this.logger.warn(
             `[MCP] Failed to load style: ${styleName}. Returning fallback metadata.`,
           );
           // 스타일 로드 실패해도 계속 진행 (fallback)
@@ -435,7 +438,7 @@ export class McpController {
         data: styleData,
       };
     } catch (error) {
-      console.error("Failed to fetch writing styles:", error);
+      this.logger.error("Failed to fetch writing styles:", error);
       return {
         success: false,
         error: "Failed to fetch writing styles",
@@ -529,7 +532,7 @@ export class McpController {
         },
       };
     } catch (error) {
-      console.error(`Failed to fetch writing style: ${style}`, error);
+      this.logger.error(`Failed to fetch writing style: ${style}`, error);
       return {
         success: false,
         error: "Failed to fetch writing style",

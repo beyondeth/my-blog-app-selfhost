@@ -3,6 +3,7 @@ import {
   BadRequestException,
   NotFoundException,
   ForbiddenException,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
@@ -27,6 +28,8 @@ import {
 
 @Injectable()
 export class SubscriptionService {
+  private readonly logger = new Logger(SubscriptionService.name);
+
   constructor(
     @InjectRepository(Subscription)
     private subscriptionRepository: Repository<Subscription>,
@@ -639,7 +642,7 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.PAYMENT_SUCCESS)
   async handlePaymentSuccess(payload: PaymentSuccessPayload) {
-    console.log(
+    this.logger.log(
       `[SubscriptionService] Payment success event received for user ${payload.userId}`,
     );
 
@@ -647,7 +650,7 @@ export class SubscriptionService {
     const { tier, billingCycle, paymentIntentId, subscriptionId } = metadata;
 
     if (!tier || !billingCycle) {
-      console.warn(
+      this.logger.warn(
         "[SubscriptionService] Payment success event missing tier or billing cycle",
       );
       return;
@@ -659,7 +662,9 @@ export class SubscriptionService {
     });
 
     if (!plan) {
-      console.error(`[SubscriptionService] Plan not found for tier: ${tier}`);
+      this.logger.error(
+        `[SubscriptionService] Plan not found for tier: ${tier}`,
+      );
       return;
     }
 
@@ -709,7 +714,7 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.REFUND_SUCCESS)
   async handleRefundSuccess(payload: RefundPayload) {
-    console.log(
+    this.logger.log(
       `[SubscriptionService] Refund success event received for user ${payload.userId}`,
     );
 
@@ -728,7 +733,7 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.SUBSCRIPTION_CANCELLED)
   async handleSubscriptionCancelled(payload: SubscriptionCancelledPayload) {
-    console.log(
+    this.logger.log(
       `[SubscriptionService] Subscription cancelled event received for user ${payload.userId}`,
     );
 
@@ -744,7 +749,7 @@ export class SubscriptionService {
    */
   @OnEvent(PaymentEvents.PAYMENT_FAILED)
   async handlePaymentFailed(payload: PaymentFailedPayload) {
-    console.log(
+    this.logger.log(
       `[SubscriptionService] Payment failed for user ${payload.userId}: ${payload.reason}`,
     );
 

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { SubscriptionPlan } from "../entities/subscription-plan.entity";
@@ -10,6 +10,8 @@ import { SubscriptionTier } from "../../common/enums/subscription.enum";
  */
 @Injectable()
 export class SubscriptionPlanSeeder {
+  private readonly logger = new Logger(SubscriptionPlanSeeder.name);
+
   constructor(
     @InjectRepository(SubscriptionPlan)
     private readonly subscriptionPlanRepository: Repository<SubscriptionPlan>,
@@ -20,7 +22,7 @@ export class SubscriptionPlanSeeder {
    * 이미 존재하는 플랜은 업데이트, 없는 플랜은 새로 생성
    */
   async seed() {
-    console.log("🌱 Seeding subscription plans...");
+    this.logger.log("🌱 Seeding subscription plans...");
 
     const plans = [
       // FREE 플랜
@@ -136,16 +138,16 @@ export class SubscriptionPlanSeeder {
         // 기존 플랜 업데이트
         Object.assign(plan, planData);
         await this.subscriptionPlanRepository.save(plan);
-        console.log(`✅ Updated plan: ${planData.displayName}`);
+        this.logger.log(`✅ Updated plan: ${planData.displayName}`);
       } else {
         // 새 플랜 생성
         plan = this.subscriptionPlanRepository.create(planData);
         await this.subscriptionPlanRepository.save(plan);
-        console.log(`✅ Created plan: ${planData.displayName}`);
+        this.logger.log(`✅ Created plan: ${planData.displayName}`);
       }
     }
 
-    console.log("🎉 Subscription plans seeding completed!");
+    this.logger.log("🎉 Subscription plans seeding completed!");
   }
 
   /**
@@ -153,8 +155,8 @@ export class SubscriptionPlanSeeder {
    * 테스트나 개발 환경에서 사용
    */
   async clear() {
-    console.log("🗑️ Clearing subscription plans...");
+    this.logger.log("🗑️ Clearing subscription plans...");
     await this.subscriptionPlanRepository.delete({});
-    console.log("✅ Subscription plans cleared!");
+    this.logger.log("✅ Subscription plans cleared!");
   }
 }

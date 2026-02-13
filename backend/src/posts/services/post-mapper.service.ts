@@ -268,8 +268,9 @@ export class PostMapperService {
     }
     // 3. 썸네일이 없으면 콘텐츠에서 추출 (thumbnailImageId가 유효하지 않은 경우도 포함)
     if (!dto.thumbnail && post.content) {
-      const preferredYouTubeId =
-        this.extractPreferredYouTubeVideoIdFromContent(post.content);
+      const preferredYouTubeId = this.extractPreferredYouTubeVideoIdFromContent(
+        post.content,
+      );
       if (preferredYouTubeId) {
         dto.thumbnail = this.buildYouTubeThumbnailUrl(preferredYouTubeId);
         if (process.env.NODE_ENV === "development") {
@@ -286,10 +287,10 @@ export class PostMapperService {
           if (extractedUrl) {
             this.logger.debug(
               `[POST_MAPPER] No thumbnail selected, using first image from content for post ${post.id}: ${extractedUrl.substring(0, 100)}...`,
-          );
-        } else {
-          this.logger.debug(
-            `[POST_MAPPER] No image found in content for post ${post.id}`,
+            );
+          } else {
+            this.logger.debug(
+              `[POST_MAPPER] No image found in content for post ${post.id}`,
             );
           }
         }
@@ -308,7 +309,9 @@ export class PostMapperService {
 
     // YouTube 임베드가 있는 경우 (이미지 썸네일이 없을 때만)
     if (!dto.thumbnail && post.content) {
-      const youtubeVideoId = this.extractYouTubeVideoIdFromContent(post.content);
+      const youtubeVideoId = this.extractYouTubeVideoIdFromContent(
+        post.content,
+      );
       if (youtubeVideoId) {
         dto.thumbnail = this.buildYouTubeThumbnailUrl(youtubeVideoId);
         if (process.env.NODE_ENV === "development") {
@@ -800,7 +803,9 @@ export class PostMapperService {
     }
 
     // 2) iframe src에서 직접 추출
-    const iframeMatch = content.match(/<iframe[^>]+src=["']([^"']+)["'][^>]*>/i);
+    const iframeMatch = content.match(
+      /<iframe[^>]+src=["']([^"']+)["'][^>]*>/i,
+    );
     if (iframeMatch?.[1]) {
       const iframeId = this.extractYouTubeVideoIdFromUrl(iframeMatch[1]);
       if (iframeId) return iframeId;
@@ -847,7 +852,9 @@ export class PostMapperService {
       if (id) return id;
     }
 
-    const iframeMatch = htmlBlock.match(/<iframe[^>]+src=["']([^"']+)["'][^>]*>/i);
+    const iframeMatch = htmlBlock.match(
+      /<iframe[^>]+src=["']([^"']+)["'][^>]*>/i,
+    );
     if (iframeMatch?.[1]) {
       const id = this.extractYouTubeVideoIdFromUrl(iframeMatch[1]);
       if (id) return id;

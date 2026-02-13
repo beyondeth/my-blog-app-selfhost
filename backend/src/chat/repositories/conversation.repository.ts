@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, Brackets } from "typeorm";
 import { Conversation } from "../entities/conversation.entity";
@@ -6,6 +6,8 @@ import { ConversationWithUnread } from "../dto/conversation-with-unread.dto";
 
 @Injectable()
 export class ConversationRepository {
+  private readonly logger = new Logger(ConversationRepository.name);
+
   /**
    * 반복되는 select 옵션을 상수화 (DRY 원칙)
    * - conversations 테이블의 모든 필드
@@ -264,7 +266,7 @@ export class ConversationRepository {
 
     // 업데이트된 행이 없으면 해당 대화가 없거나 사용자가 참여자가 아님
     if (result.affected === 0) {
-      console.warn(
+      this.logger.warn(
         `[대화] 대화 ${conversationId}에서 사용자 ${userId}를 찾을 수 없음`,
       );
     }
@@ -295,7 +297,7 @@ export class ConversationRepository {
       .execute();
 
     if (result.affected === 0) {
-      console.log(
+      this.logger.debug(
         `[대화] 대화 ${conversationId}에서 사용자 ${userId}의 deletedAt이 이미 null이거나 참여자가 아님`,
       );
     }

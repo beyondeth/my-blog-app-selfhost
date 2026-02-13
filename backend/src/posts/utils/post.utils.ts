@@ -1,4 +1,7 @@
 import * as crypto from "crypto";
+import { Logger } from "@nestjs/common";
+
+const logger = new Logger("PostUtils");
 
 /**
  * 8자리 16진수 short ID 생성
@@ -92,7 +95,7 @@ export function extractS3KeyFromUrl(url: string): string | null {
 
     return null;
   } catch (error) {
-    console.error("Error extracting S3 key from URL:", url, error);
+    logger.error("Error extracting S3 key from URL:", url, error);
     return null;
   }
 }

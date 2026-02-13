@@ -3,6 +3,7 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  Logger,
 } from "@nestjs/common";
 import * as crypto from "crypto";
 
@@ -14,6 +15,7 @@ import * as crypto from "crypto";
  */
 @Injectable()
 export class CsrfGuard implements CanActivate {
+  private readonly logger = new Logger(CsrfGuard.name);
   private readonly TOKEN_HEADER = "x-csrf-token";
 
   /**
@@ -89,7 +91,7 @@ export class CsrfGuard implements CanActivate {
 
       // Referer가 같은 호스트에서 온 것인지 확인
       if (refererUrl.host !== expectedHost) {
-        console.warn(
+        this.logger.warn(
           `CSRF: Referer 불일치 - Expected: ${expectedHost}, Got: ${refererUrl.host}`,
         );
         // 경고만 하고 통과시킴 (일부 브라우저는 Referer를 보내지 않을 수 있음)

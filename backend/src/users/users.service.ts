@@ -31,6 +31,22 @@ import {
   CacheInvalidationEvents,
 } from "../common/events/cache.events";
 import { UrlSanitizerUtil } from "../common/utils/url-sanitizer.util";
+import { ThemePreference } from "./dto/update-mobile-theme-preference.dto";
+import { UpdateMobileNotificationPreferencesDto } from "./dto/update-mobile-notification-preferences.dto";
+import { UpdateMobilePrivacyPreferencesDto } from "./dto/update-mobile-privacy-preferences.dto";
+
+export interface MobileSettingsSnapshot {
+  themePreference: ThemePreference;
+  notifications: {
+    pushEnabled: boolean;
+    marketingEnabled: boolean;
+    communityReplyEnabled: boolean;
+  };
+  privacy: {
+    profileVisible: boolean;
+    activityVisible: boolean;
+  };
+}
 
 @Injectable()
 export class UsersService {
@@ -1180,6 +1196,92 @@ export class UsersService {
     this.logger.log(`Marketing preferences updated for user: ${userId}`);
 
     return user;
+  }
+
+  async getMobileSettings(userId: string): Promise<MobileSettingsSnapshot> {
+    const settings = await this.ensureAccountSettings(userId);
+    return this.buildMobileSettingsSnapshot(settings);
+  }
+
+  async updateMobileThemePreference(
+    userId: string,
+    themePreference: ThemePreference,
+  ): Promise<MobileSettingsSnapshot> {
+    const settings = await this.ensureAccountSettings(userId);
+    settings.themePreference = themePreference;
+    await this.accountSettingsRepository.save(settings);
+    return this.buildMobileSettingsSnapshot(settings);
+  }
+
+  async updateMobileNotificationPreferences(
+    userId: string,
+    preferences: UpdateMobileNotificationPreferencesDto,
+  ): Promise<MobileSettingsSnapshot> {
+    const settings = await this.ensureAccountSettings(userId);
+    settings.pushEnabled = preferences.pushEnabled;
+    settings.marketingOptIn = preferences.marketingEnabled;
+    settings.marketingOptInAt = preferences.marketingEnabled
+      ? new Date()
+      : null;
+    settings.communityReplyEnabled = preferences.communityReplyEnabled;
+    await this.accountSettingsRepository.save(settings);
+    return this.buildMobileSettingsSnapshot(settings);
+  }
+
+  async updateMobilePrivacyPreferences(
+    userId: string,
+    preferences: UpdateMobilePrivacyPreferencesDto,
+  ): Promise<MobileSettingsSnapshot> {
+    const settings = await this.ensureAccountSettings(userId);
+    settings.profileVisible = preferences.profileVisible;
+    settings.activityVisible = preferences.activityVisible;
+    await this.accountSettingsRepository.save(settings);
+    return this.buildMobileSettingsSnapshot(settings);
+  }
+
+  private buildMobileSettingsSnapshot(
+    settings: AccountSettings,
+  ): MobileSettingsSnapshot {
+    const normalizedTheme =
+      settings.themePreference === ThemePreference.LIGHT ||
+      settings.themePreference === ThemePreference.DARK
+        ? settings.themePreference
+        : ThemePreference.SYSTEM;
+
+    return {
+      themePreference: normalizedTheme,
+      notifications: {
+        pushEnabled: settings.pushEnabled ?? true,
+        marketingEnabled: settings.marketingOptIn ?? false,
+        communityReplyEnabled: settings.communityReplyEnabled ?? true,
+      },
+      privacy: {
+        profileVisible: settings.profileVisible ?? true,
+        activityVisible: settings.activityVisible ?? true,
+      },
+    };
+  }
+
+  private async ensureAccountSettings(
+    userId: string,
+  ): Promise<AccountSettings> {
+    const user = await this.findOne(userId);
+    if (user.accountSettings) {
+      return user.accountSettings;
+    }
+
+    return this.accountSettingsRepository.save(
+      this.accountSettingsRepository.create({
+        userId,
+        marketingOptIn: false,
+        newsletterOptIn: false,
+        themePreference: ThemePreference.SYSTEM,
+        pushEnabled: true,
+        communityReplyEnabled: true,
+        profileVisible: true,
+        activityVisible: true,
+      }),
+    );
   }
 
   /**

@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   UnauthorizedException,
+  Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -24,6 +25,8 @@ import { format } from "date-fns";
  */
 @Injectable()
 export class McpApiKeyService {
+  private readonly logger = new Logger(McpApiKeyService.name);
+
   // 8자 hint 생성용 (소문자 + 숫자)
   private readonly hintGenerator = customAlphabet(
     "abcdefghijklmnopqrstuvwxyz0123456789",
@@ -176,7 +179,7 @@ export class McpApiKeyService {
 
     // 7. 마지막 사용 시간 업데이트 (비동기, 응답 블로킹 안 함)
     this.updateLastUsed(mcpApiKey.id).catch((err) => {
-      console.error("Failed to update lastUsedAt:", err);
+      this.logger.error("Failed to update lastUsedAt:", err);
     });
 
     return mcpApiKey;

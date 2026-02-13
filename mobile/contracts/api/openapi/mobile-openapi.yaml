@@ -1,0 +1,677 @@
+openapi: 3.0.3
+info:
+  title: my-blog-app Mobile API
+  version: "0.1.4"
+  description: >
+    Contract scaffold for native mobile clients.
+servers:
+  - url: /api/v1
+paths:
+  /mobile/auth/login:
+    post:
+      summary: Mobile login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - email
+                - password
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+                  format: password
+      responses:
+        "200":
+          description: Login success
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        example: "uuid"
+                      username:
+                        type: string
+                      email:
+                        type: string
+                      role:
+                        type: string
+                      profileImage:
+                        type: string
+                        nullable: true
+  /mobile/auth/refresh:
+    post:
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - refreshToken
+              properties:
+                refreshToken:
+                  type: string
+      responses:
+        "200":
+          description: Token refreshed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken:
+                    type: string
+                  refreshToken:
+                    type: string
+                  user:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+  /mobile/auth/me:
+    get:
+      summary: Get current user profile
+      responses:
+        "200":
+          description: User data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  username:
+                    type: string
+                  email:
+                    type: string
+                  role:
+                    type: string
+                  profileImage:
+                    type: string
+                    nullable: true
+                  blogSlug:
+                    type: string
+                    nullable: true
+                  socialLinks:
+                    type: array
+                    items:
+                      type: object
+                  marketingOptIn:
+                    type: boolean
+                  newsletterOptIn:
+                    type: boolean
+                  bio:
+                    type: string
+                    nullable: true
+                  createdAt:
+                    type: string
+                    format: date-time
+  /mobile/feed:
+    get:
+      summary: Get paginated unified feed for mobile
+      description: >
+        Backend web feed response wrapper (`/feed`) mapped for mobile client.
+        Supports cursor pagination using nextCursor.
+      parameters:
+        - name: cursor
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+            default: 20
+        - name: filter
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, blog, community]
+        - name: sort
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [recent, hot, top]
+        - name: period
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [all, daily, weekly, monthly]
+      responses:
+        "200":
+          description: Feed page
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        title:
+                          type: string
+                        slug:
+                          type: string
+                        sourceType:
+                          type: string
+                          enum: [blog, community]
+                        excerpt:
+                          type: string
+                        thumbnail:
+                          type: string
+                          nullable: true
+                        author:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            username:
+                              type: string
+                        likeCount:
+                          type: integer
+                        commentCount:
+                          type: integer
+                        viewCount:
+                          type: integer
+                        createdAt:
+                          type: string
+                          format: date-time
+                        updatedAt:
+                          type: string
+                          format: date-time
+                  nextCursor:
+                    type: string
+                    nullable: true
+                  hasMore:
+                    type: boolean
+                  count:
+                    type: integer
+  /mobile/settings:
+    get:
+      summary: Get mobile settings snapshot
+      responses:
+        "200":
+          description: Settings snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - themePreference
+                  - notifications
+                  - privacy
+                properties:
+                  themePreference:
+                    type: string
+                    enum: [SYSTEM, LIGHT, DARK]
+                  notifications:
+                    type: object
+                    required:
+                      - pushEnabled
+                      - marketingEnabled
+                      - communityReplyEnabled
+                    properties:
+                      pushEnabled:
+                        type: boolean
+                      marketingEnabled:
+                        type: boolean
+                      communityReplyEnabled:
+                        type: boolean
+                  privacy:
+                    type: object
+                    required:
+                      - profileVisible
+                      - activityVisible
+                    properties:
+                      profileVisible:
+                        type: boolean
+                      activityVisible:
+                        type: boolean
+  /mobile/settings/theme:
+    patch:
+      summary: Update theme preference
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - themePreference
+              properties:
+                themePreference:
+                  type: string
+                  enum: [SYSTEM, LIGHT, DARK]
+      responses:
+        "200":
+          description: Updated settings snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - themePreference
+                  - notifications
+                  - privacy
+                properties:
+                  themePreference:
+                    type: string
+                    enum: [SYSTEM, LIGHT, DARK]
+                  notifications:
+                    type: object
+                    required:
+                      - pushEnabled
+                      - marketingEnabled
+                      - communityReplyEnabled
+                    properties:
+                      pushEnabled:
+                        type: boolean
+                      marketingEnabled:
+                        type: boolean
+                      communityReplyEnabled:
+                        type: boolean
+                  privacy:
+                    type: object
+                    required:
+                      - profileVisible
+                      - activityVisible
+                    properties:
+                      profileVisible:
+                        type: boolean
+                      activityVisible:
+                        type: boolean
+  /mobile/settings/notifications:
+    patch:
+      summary: Update notification preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - pushEnabled
+                - marketingEnabled
+                - communityReplyEnabled
+              properties:
+                pushEnabled:
+                  type: boolean
+                marketingEnabled:
+                  type: boolean
+                communityReplyEnabled:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated settings snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - themePreference
+                  - notifications
+                  - privacy
+                properties:
+                  themePreference:
+                    type: string
+                    enum: [SYSTEM, LIGHT, DARK]
+                  notifications:
+                    type: object
+                    required:
+                      - pushEnabled
+                      - marketingEnabled
+                      - communityReplyEnabled
+                    properties:
+                      pushEnabled:
+                        type: boolean
+                      marketingEnabled:
+                        type: boolean
+                      communityReplyEnabled:
+                        type: boolean
+                  privacy:
+                    type: object
+                    required:
+                      - profileVisible
+                      - activityVisible
+                    properties:
+                      profileVisible:
+                        type: boolean
+                      activityVisible:
+                        type: boolean
+  /mobile/settings/privacy:
+    patch:
+      summary: Update privacy preferences
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - profileVisible
+                - activityVisible
+              properties:
+                profileVisible:
+                  type: boolean
+                activityVisible:
+                  type: boolean
+      responses:
+        "200":
+          description: Updated settings snapshot
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - themePreference
+                  - notifications
+                  - privacy
+                properties:
+                  themePreference:
+                    type: string
+                    enum: [SYSTEM, LIGHT, DARK]
+                  notifications:
+                    type: object
+                    required:
+                      - pushEnabled
+                      - marketingEnabled
+                      - communityReplyEnabled
+                    properties:
+                      pushEnabled:
+                        type: boolean
+                      marketingEnabled:
+                        type: boolean
+                      communityReplyEnabled:
+                        type: boolean
+                  privacy:
+                    type: object
+                    required:
+                      - profileVisible
+                      - activityVisible
+                    properties:
+                      profileVisible:
+                        type: boolean
+                      activityVisible:
+                        type: boolean
+  /mobile/posts/{id}:
+    get:
+      summary: Get post detail
+      description: >
+        Post detail endpoint for native clients. Current implementation reuses
+        existing PostResponseDto fields for consistency with web contract.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Post detail response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  slug:
+                    type: string
+                    nullable: true
+                  content:
+                    type: string
+                    nullable: true
+                  content_markdown:
+                    type: string
+                    nullable: true
+                  excerpt:
+                    type: string
+                    nullable: true
+                  isPublished:
+                    type: boolean
+                  likeCount:
+                    type: integer
+                  commentCount:
+                    type: integer
+                  viewCount:
+                    type: integer
+                  createdAt:
+                    type: string
+                    format: date-time
+                  author:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      username:
+                        type: string
+                      profileImage:
+                        type: string
+                        nullable: true
+                  blog:
+                    type: object
+                    nullable: true
+                    properties:
+                      id:
+                        type: string
+                      slug:
+                        type: string
+                      name:
+                        type: string
+  /mobile/posts:
+    post:
+      summary: Create post
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - title
+                - category
+              properties:
+                title:
+                  type: string
+                content:
+                  type: string
+                  nullable: true
+                content_markdown:
+                  type: string
+                  nullable: true
+                category:
+                  type: string
+                  example: general
+                isPublished:
+                  type: boolean
+                  default: true
+      responses:
+        "201":
+          description: Post created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  title:
+                    type: string
+                  slug:
+                    type: string
+                    nullable: true
+                  content:
+                    type: string
+                    nullable: true
+                  content_markdown:
+                    type: string
+                    nullable: true
+                  excerpt:
+                    type: string
+                    nullable: true
+                  isPublished:
+                    type: boolean
+                  likeCount:
+                    type: integer
+                  commentCount:
+                    type: integer
+                  viewCount:
+                    type: integer
+  /mobile/posts/{id}/vote:
+    post:
+      summary: Post vote (upvote / downvote)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - type
+              properties:
+                type:
+                  type: string
+                  enum: [upvote, downvote]
+      responses:
+        "200":
+          description: Vote result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  action:
+                    type: string
+                    enum: [added, removed, changed]
+                  userVote:
+                    type: string
+                    nullable: true
+                    enum: [upvote, downvote]
+                  upvoteCount:
+                    type: integer
+                  downvoteCount:
+                    type: integer
+                  score:
+                    type: integer
+                  liked:
+                    type: boolean
+                  likeCount:
+                    type: integer
+  /mobile/posts/{id}/view:
+    post:
+      summary: Increase post view count
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: View count queued
+  /mobile/posts/{postId}/comments:
+    get:
+      summary: Get comments for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Comment list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    content:
+                      type: string
+                    postId:
+                      type: string
+                    likesCount:
+                      type: integer
+                    dislikesCount:
+                      type: integer
+                    author:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        username:
+                          type: string
+                        profileImage:
+                          type: string
+                          nullable: true
+    post:
+      summary: Create comment for a post
+      parameters:
+        - name: postId
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - content
+              properties:
+                content:
+                  type: string
+                parentCommentId:
+                  type: string
+                  nullable: true
+      responses:
+        "200":
+          description: Comment created
+  /mobile/auth/logout:
+    post:
+      summary: Logout current user
+      responses:
+        "200":
+          description: Logout success

@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { JSDOM } from "jsdom";
 import { HtmlSanitizerService } from "./html-sanitizer.service";
 import { CodeHighlightService } from "./code-highlight.service";
@@ -110,6 +110,8 @@ export interface ProcessedContent {
  */
 @Injectable()
 export class ContentProcessingService {
+  private readonly logger = new Logger(ContentProcessingService.name);
+
   constructor(
     private readonly htmlSanitizer: HtmlSanitizerService,
     private readonly codeHighlight: CodeHighlightService,
@@ -359,7 +361,10 @@ export class ContentProcessingService {
 
       return document.body.innerHTML;
     } catch (error) {
-      console.warn("[ContentProcessing] Failed to ensure YouTube embeds:", error);
+      this.logger.warn(
+        "[ContentProcessing] Failed to ensure YouTube embeds:",
+        error,
+      );
       return html;
     }
   }
@@ -477,9 +482,7 @@ export class ContentProcessingService {
     }
   }
 
-  private normalizeYouTubeId(
-    value: string | null | undefined,
-  ): string | null {
+  private normalizeYouTubeId(value: string | null | undefined): string | null {
     if (!value) return null;
     const match = value.match(/[a-zA-Z0-9_-]{11}/);
     return match ? match[0] : null;

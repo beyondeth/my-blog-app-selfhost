@@ -70,9 +70,16 @@ export default function EditPostPage() {
       }}
       isLoading={updatePost.isPending}
       onSubmit={(formData, isPublished) => {
+        const normalizedCategories = Array.isArray(formData.categories)
+          ? formData.categories.map((value) => value.trim()).filter(Boolean)
+          : [];
+        const nextCategory = normalizedCategories.join('/');
+        const { categories, ...restFormData } = formData;
+
         // thumbnailImageId 유효성 검사 및 처리
         const validFormData = {
-          ...formData,
+          ...restFormData,
+          category: nextCategory,
           // thumbnailImageId가 있고 빈 문자열이 아니고 유효한 UUID인 경우에만 포함
           ...(formData.thumbnailImageId && formData.thumbnailImageId.trim() !== '' && {
             thumbnailImageId: validateUUID(formData.thumbnailImageId)
