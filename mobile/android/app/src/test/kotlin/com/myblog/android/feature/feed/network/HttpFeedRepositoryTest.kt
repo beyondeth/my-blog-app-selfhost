@@ -67,7 +67,7 @@ class HttpFeedRepositoryTest {
 
         val request = transport.requests.single()
         assertEquals("GET", request.method)
-        assertEquals("https://api.myblog.app/api/v1/mobile/feed?cursor=cursor+1", request.url)
+        assertEquals("https://api.myblog.app/api/v1/mobile/feed?sort=recent&cursor=cursor+1", request.url)
         assertEquals("Bearer access-1", request.headers["Authorization"])
     }
 

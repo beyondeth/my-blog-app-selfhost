@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/communityCardRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginTop="10dp"
+    android:background="@drawable/bg_quick_compose"
+    android:fontFamily="sans-serif"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:padding="12dp">
+
+    <ImageView
+        android:id="@+id/communityIconImage"
+        android:layout_width="58dp"
+        android:layout_height="58dp"
+        android:background="@drawable/myblog_avatar_placeholder"
+        android:scaleType="centerCrop" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/communityNameText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="@style/MyBlogTextTitleMedium"
+            android:textColor="@color/myblog_text_primary"
+            android:textSize="16sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/communitySlugText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="@style/MyBlogTextMeta"
+            android:textColor="@color/myblog_text_secondary"
+            android:textSize="14sp" />
+
+        <TextView
+            android:id="@+id/communityMemberCountText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            style="@style/MyBlogTextMeta"
+            android:textColor="@color/myblog_text_secondary"
+            android:textSize="13sp" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/communityJoinButton"
+        android:layout_width="84dp"
+        android:layout_height="42dp"
+        android:background="@drawable/bg_filter_chip_unselected"
+        android:fontFamily="sans-serif-medium"
+        android:gravity="center"
+        android:textColor="@color/myblog_text_primary"
+        android:textSize="14sp"
+        android:textStyle="bold" />
+</LinearLayout>

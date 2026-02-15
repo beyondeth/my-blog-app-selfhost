@@ -14,6 +14,8 @@ data class UserSession(
     val userId: String,
     val email: String,
     val displayName: String,
+    val username: String,
+    val profileImageUrl: String?,
 )
 
 sealed interface AuthState {

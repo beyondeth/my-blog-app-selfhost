@@ -33,10 +33,12 @@ data class MeResponseDto(
     val id: String,
     val username: String,
     val email: String,
+    val profileImage: String?,
 )
 
 data class AuthUserDto(
     val id: String,
     val username: String,
     val email: String,
+    val profileImage: String?,
 )

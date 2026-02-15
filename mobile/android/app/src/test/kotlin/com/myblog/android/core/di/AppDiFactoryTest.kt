@@ -77,7 +77,7 @@ class AppDiFactoryTest {
         assertEquals(false, success.data.hasMore)
 
         val request = transport.requests.single()
-        assertEquals("https://api.myblog.app/api/v1/mobile/feed", request.url)
+        assertEquals("https://api.myblog.app/api/v1/mobile/feed?sort=recent", request.url)
         assertEquals("Bearer access-token", request.headers["Authorization"])
     }
 

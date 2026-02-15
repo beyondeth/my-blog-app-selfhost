@@ -1,6 +1,7 @@
 package com.myblog.android.feature.feed
 
 import com.myblog.android.core.network.ApiResult
+import com.myblog.android.feature.feed.model.FeedSort
 import com.myblog.android.feature.feed.model.FeedItem
 import com.myblog.android.feature.feed.model.FeedPage
 import com.myblog.android.feature.feed.model.FeedState
@@ -69,18 +70,34 @@ private class FakeFeedRepository(
     private val refreshResult: ApiResult<FeedPage>,
     private val nextResult: ApiResult<FeedPage>,
 ) : FeedRepository {
-    override suspend fun getFeed(cursor: String?): ApiResult<FeedPage> = nextResult
+    override suspend fun getFeed(
+        cursor: String?,
+        sort: FeedSort,
+    ): ApiResult<FeedPage> = nextResult
 
-    override suspend fun refreshFeed(): ApiResult<FeedPage> = refreshResult
+    override suspend fun refreshFeed(sort: FeedSort): ApiResult<FeedPage> = refreshResult
 }
 
 private fun sampleItem(id: String): FeedItem {
     return FeedItem(
         postId = id,
+        slug = "slug-$id",
         title = "t$id",
         excerpt = "e$id",
         authorName = "a$id",
-        liked = false,
+        authorProfileImage = null,
+        sourceType = "blog",
+        communitySlug = null,
         likeCount = 0,
+        commentCount = 0,
+        viewCount = 0,
+        upvoteCount = 0,
+        downvoteCount = 0,
+        score = 0,
+        liked = false,
+        userVote = null,
+        thumbnail = null,
+        images = emptyList(),
+        createdAtEpochSeconds = 0L,
     )
 }

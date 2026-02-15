@@ -10,7 +10,8 @@ class MobileContractAuthRepository(
     private val authApi: AuthApi,
 ) : AuthRepository {
     override suspend fun login(request: LoginRequest): ApiResult<AuthTokens> {
-        return when (val result = authApi.login(LoginRequestDto(email = request.email, password = request.password))) {
+        val result = authApi.login(LoginRequestDto(email = request.email, password = request.password))
+        return when (result) {
             is ApiResult.Success -> ApiResult.Success(
                 AuthTokens(
                     accessToken = result.data.accessToken,
@@ -18,12 +19,13 @@ class MobileContractAuthRepository(
                 ),
             )
 
-            is ApiResult.Failure -> result
+            is ApiResult.Failure -> ApiResult.Failure(result.code, result.message)
         }
     }
 
     override suspend fun refresh(refreshToken: String): ApiResult<AuthTokens> {
-        return when (val result = authApi.refresh(RefreshRequestDto(refreshToken = refreshToken))) {
+        val result = authApi.refresh(RefreshRequestDto(refreshToken = refreshToken))
+        return when (result) {
             is ApiResult.Success -> ApiResult.Success(
                 AuthTokens(
                     accessToken = result.data.accessToken,
@@ -31,21 +33,24 @@ class MobileContractAuthRepository(
                 ),
             )
 
-            is ApiResult.Failure -> result
+            is ApiResult.Failure -> ApiResult.Failure(result.code, result.message)
         }
     }
 
     override suspend fun me(): ApiResult<UserSession> {
-        return when (val result = authApi.me()) {
+        val result = authApi.me()
+        return when (result) {
             is ApiResult.Success -> ApiResult.Success(
                 UserSession(
                     userId = result.data.id,
                     email = result.data.email,
                     displayName = result.data.username,
+                    username = result.data.username,
+                    profileImageUrl = result.data.profileImage,
                 ),
             )
 
-            is ApiResult.Failure -> result
+            is ApiResult.Failure -> ApiResult.Failure(result.code, result.message)
         }
     }
 

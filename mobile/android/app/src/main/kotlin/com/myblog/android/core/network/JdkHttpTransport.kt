@@ -21,6 +21,13 @@ class JdkHttpTransport(
                     }
                 }
 
+                request.bodyBytes?.let { bytes ->
+                    connection.doOutput = true
+                    connection.outputStream.use { stream ->
+                        stream.write(bytes)
+                    }
+                }
+
                 request.body?.let { body ->
                     connection.doOutput = true
                     connection.outputStream.bufferedWriter(Charsets.UTF_8).use { writer ->
@@ -34,9 +41,20 @@ class JdkHttpTransport(
                     ?.bufferedReader(Charsets.UTF_8)
                     ?.use { reader -> reader.readText() }
                     .orEmpty()
+                val responseHeaders = connection.headerFields
+                    .filterKeys { key ->
+                        key != null && key.isNotBlank()
+                    }
+                    .mapValues { entry ->
+                        entry.value.orEmpty()
+                    }
 
                 connection.disconnect()
-                HttpResponse(statusCode = statusCode, body = responseBody)
+                HttpResponse(
+                    statusCode = statusCode,
+                    body = responseBody,
+                    headers = responseHeaders,
+                )
             }.fold(
                 onSuccess = { ApiResult.Success(it) },
                 onFailure = { throwable ->
