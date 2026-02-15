@@ -112,6 +112,7 @@ actor APIClient {
         _ request: EndpointRequest,
         requiresAuthentication: Bool,
         retried: Bool = false,
+        fallbackRetried: Bool = false,
     ) async throws -> Data {
         IOSRunTrace.emit(
             "request.start",
@@ -177,6 +178,32 @@ actor APIClient {
                 target: parseServerTarget(responseData),
                 type: errorType,
             )
+
+            if !fallbackRetried,
+               httpResponse.statusCode == 404,
+               let fallbackPath = legacyFallbackPath(for: request.path) {
+                let fallbackRequest = EndpointRequest(
+                    path: fallbackPath,
+                    method: request.method,
+                    body: request.body,
+                    query: request.query,
+                )
+                IOSRunTrace.emit(
+                    "request.fallback",
+                    category: "network",
+                    fields: [
+                        "path": request.path,
+                        "fallbackPath": fallbackPath,
+                        "status": "\(httpResponse.statusCode)",
+                    ],
+                )
+                return try await execute(
+                    fallbackRequest,
+                    requiresAuthentication: requiresAuthentication,
+                    retried: retried,
+                    fallbackRetried: true,
+                )
+            }
 
             if !requiresAuthentication || retried {
                 IOSRunTrace.emit(
@@ -501,6 +528,24 @@ actor APIClient {
         body.append(fileData)
         body.append("\r\n--\(boundary)--\r\n")
         return MultipartPayload(boundary: boundary, body: body)
+    }
+
+    private func legacyFallbackPath(for path: String) -> String? {
+        let fallbackMappings: [String] = [
+            "/mobile/feed",
+            "/mobile/posts",
+            "/mobile/auth",
+            "/mobile/files",
+            "/mobile/community",
+            "/mobile/comments",
+            "/mobile/reports",
+            "/mobile/notifications",
+        ]
+
+        for mapping in fallbackMappings where path == mapping || path.hasPrefix("\(mapping)/") {
+            return "/" + path.dropFirst("/mobile/".count)
+        }
+        return nil
     }
 }
 

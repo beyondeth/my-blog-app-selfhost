@@ -7,7 +7,22 @@ import AppKit
 private typealias HomeHeaderPlatformImage = NSImage
 #endif
 
+enum FeedScrollDirection {
+    case up
+    case down
+}
+
+private struct FeedScrollOffsetPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
+    }
+}
+
 struct FeedView: View {
+    var onScrollDirectionChanged: ((FeedScrollDirection) -> Void)? = nil
+
     @StateObject private var vm = FeedViewModel()
     @EnvironmentObject private var appStore: AppStore
     @Environment(\.colorScheme) private var colorScheme
@@ -20,6 +35,11 @@ struct FeedView: View {
     @State private var deleteCandidate: FeedActionCandidate?
     @State private var feedbackAlert: FeedFeedbackAlert?
     @State private var repostedPostIDs: Set<String> = []
+    @State private var lastObservedScrollOffset: CGFloat = 0
+    @State private var hasObservedScrollOffset = false
+    @State private var lastEmittedDirection: FeedScrollDirection?
+    @State private var accumulatedScrollDelta: CGFloat = 0
+    @State private var lastDragTranslationY: CGFloat = 0
 
     private var filteredPosts: [FeedPost] {
         let base = vm.posts
@@ -40,11 +60,33 @@ struct FeedView: View {
         NavigationStack(path: $navigationPath) {
             ScrollView {
                 LazyVStack(spacing: 0) {
+                    GeometryReader { proxy in
+                        Color.clear
+                            .preference(
+                                key: FeedScrollOffsetPreferenceKey.self,
+                                value: proxy.frame(in: .named("feedScrollArea")).minY
+                            )
+                    }
+                    .frame(height: 0)
+
                     headerBar
                     filterBar
                     contentSection
                 }
             }
+            .coordinateSpace(name: "feedScrollArea")
+            .onPreferenceChange(FeedScrollOffsetPreferenceKey.self) { offset in
+                handleScrollOffset(offset)
+            }
+            .simultaneousGesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { value in
+                        handleDragTranslation(value.translation.height)
+                    }
+                    .onEnded { _ in
+                        lastDragTranslationY = 0
+                    }
+            )
             .background(backgroundColor)
             .navigationBarHidden(true)
             .refreshable {
@@ -319,9 +361,6 @@ struct FeedView: View {
                     onComment: {
                         openDetail(post: post, target: target)
                     },
-                    onView: {
-                        Task { await handleViewTap(post: post, target: target) }
-                    },
                     onRepost: {
                         handleRepostTap(post: post)
                     },
@@ -450,7 +489,6 @@ struct FeedView: View {
         onOpenDetail: @escaping () -> Void,
         onLike: @escaping () -> Void,
         onComment: @escaping () -> Void,
-        onView: @escaping () -> Void,
         onRepost: @escaping () -> Void,
         onEdit: @escaping () -> Void,
         onDelete: @escaping () -> Void,
@@ -608,7 +646,7 @@ struct FeedView: View {
                 .padding(.leading, feedImageLeadingInset)
             }
 
-            HStack(spacing: 18) {
+            HStack(spacing: 24) {
                 actionMetricButton(
                     icon: post.userVote == .upvote ? "heart.fill" : "heart",
                     value: post.likeCount ?? 0,
@@ -621,13 +659,6 @@ struct FeedView: View {
                     value: post.commentCount ?? 0,
                     tint: secondaryText,
                     action: onComment
-                )
-
-                actionMetricButton(
-                    icon: "eye",
-                    value: post.viewCount ?? 0,
-                    tint: secondaryText,
-                    action: onView
                 )
 
                 actionMetricButton(
@@ -669,13 +700,28 @@ struct FeedView: View {
         Button(action: action) {
             HStack(spacing: 6) {
                 Image(systemName: icon)
-                Text("\(value)")
+                Text(compactCount(value))
+                    .monospacedDigit()
             }
             .font(.subheadline.weight(.medium))
             .foregroundStyle(tint)
             .contentShape(Rectangle())
+            .frame(minWidth: 56, alignment: .leading)
         }
         .buttonStyle(.plain)
+    }
+
+    private func compactCount(_ value: Int) -> String {
+        let absValue = abs(value)
+        if absValue >= 1_000_000 {
+            let scaled = Double(value) / 1_000_000.0
+            return String(format: "%.1fM", scaled).replacingOccurrences(of: ".0M", with: "M")
+        }
+        if absValue >= 1_000 {
+            let scaled = Double(value) / 1_000.0
+            return String(format: "%.1fK", scaled).replacingOccurrences(of: ".0K", with: "K")
+        }
+        return "\(value)"
     }
 
     private func shortTimestamp(_ source: String?) -> String {
@@ -837,6 +883,47 @@ struct FeedView: View {
         navigationPath.append(target)
     }
 
+    private func handleScrollOffset(_ offset: CGFloat) {
+        if !hasObservedScrollOffset {
+            hasObservedScrollOffset = true
+            lastObservedScrollOffset = offset
+            return
+        }
+
+        let delta = offset - lastObservedScrollOffset
+        lastObservedScrollOffset = offset
+        guard abs(delta) > 0.05 else { return }
+
+        accumulatedScrollDelta += delta
+        let trigger: CGFloat = 10
+
+        if accumulatedScrollDelta <= -trigger {
+            emitScrollDirection(.down)
+            accumulatedScrollDelta = 0
+        } else if accumulatedScrollDelta >= trigger {
+            emitScrollDirection(.up)
+            accumulatedScrollDelta = 0
+        }
+    }
+
+    private func emitScrollDirection(_ direction: FeedScrollDirection) {
+        guard lastEmittedDirection != direction else { return }
+        lastEmittedDirection = direction
+        onScrollDirectionChanged?(direction)
+    }
+
+    private func handleDragTranslation(_ translationY: CGFloat) {
+        let delta = translationY - lastDragTranslationY
+        lastDragTranslationY = translationY
+        guard abs(delta) >= 1 else { return }
+
+        if delta < 0 {
+            emitScrollDirection(.down)
+        } else {
+            emitScrollDirection(.up)
+        }
+    }
+
     private func handleLikeTap(post: FeedPost, target: PostDetailTarget) async {
         do {
             await vm.prefetchDetail(for: target)
@@ -844,17 +931,6 @@ struct FeedView: View {
         } catch {
             feedbackAlert = FeedFeedbackAlert(
                 title: "좋아요 처리 실패",
-                message: error.localizedDescription
-            )
-        }
-    }
-
-    private func handleViewTap(post: FeedPost, target: PostDetailTarget) async {
-        do {
-            try await vm.incrementView(postId: post.id, target: target)
-        } catch {
-            feedbackAlert = FeedFeedbackAlert(
-                title: "조회 처리 실패",
                 message: error.localizedDescription
             )
         }

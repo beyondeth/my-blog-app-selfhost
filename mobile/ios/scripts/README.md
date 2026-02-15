@@ -21,7 +21,7 @@ cd /Users/sihyungpark/Desktop/code/my-blog-app/mobile/ios
 - `MOBILE_IOS_SIMULATOR_UDID`: 타깃 시뮬레이터 UDID
 - `MOBILE_BACKEND_URL`: 헬스체크 대상 백엔드 URL
 - `MOBILE_IOS_TEST_ACCESS_TOKEN`: fallback 검증 시 feed 접근용 Bearer 토큰
-- `MOBILE_IOS_FEED_LIMIT`: `/api/v1/mobile/feed?limit=` 값(최대 50)
+- `MOBILE_IOS_FEED_LIMIT`: `/api/v1/feed?limit=` 값(최대 50)
 - `MOBILE_IOS_COMMUNITY_FALLBACK_MAX_POSTS`: 검증할 feed 아이템 최대 개수
 - `MOBILE_IOS_COMMUNITY_FALLBACK_COMMENT_LIMIT`: 댓글 fallback 후보 API에서 limit 값
 - `MOBILE_IOS_SESSION_EXPIRY_MODES`: suite 실행 시 사용할 모드 목록 (공백 구분)

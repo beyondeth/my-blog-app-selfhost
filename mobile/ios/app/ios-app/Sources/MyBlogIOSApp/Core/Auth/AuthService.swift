@@ -58,7 +58,7 @@ actor AuthService {
             newPassword: newPassword,
         )
         let req = EndpointRequest(
-            path: "/auth/change-password",
+            path: "/mobile/auth/change-password",
             method: .post,
             body: try JSONEncoder().encode(body)
         )
@@ -79,6 +79,37 @@ struct MobileAuthResponse: Decodable {
     let accessToken: String
     let refreshToken: String
     let user: UserProfile
+
+    private enum CodingKeys: String, CodingKey {
+        case accessToken
+        case refreshToken
+        case access_token
+        case refresh_token
+        case user
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let access = (try? container.decode(String.self, forKey: .accessToken))
+            ?? (try? container.decode(String.self, forKey: .access_token))
+        let refresh = (try? container.decode(String.self, forKey: .refreshToken))
+            ?? (try? container.decode(String.self, forKey: .refresh_token))
+
+        guard
+            let accessToken = access, !accessToken.isEmpty,
+            let refreshToken = refresh, !refreshToken.isEmpty
+        else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .accessToken,
+                in: container,
+                debugDescription: "missing access token pair",
+            )
+        }
+
+        self.accessToken = accessToken
+        self.refreshToken = refreshToken
+        self.user = try container.decode(UserProfile.self, forKey: .user)
+    }
 }
 
 struct UserProfile: Decodable {
