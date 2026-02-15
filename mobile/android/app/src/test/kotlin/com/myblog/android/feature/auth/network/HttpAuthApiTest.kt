@@ -63,6 +63,55 @@ class HttpAuthApiTest {
     }
 
     @Test
+    fun loginParsesTokenFromHeadersAndNestedPayload() = runTest {
+        val transport = RecordingTransport(
+            result = ApiResult.Success(
+                HttpResponse(
+                    statusCode = 200,
+                    body = """
+                        {
+                          "data": {
+                            "user": {
+                              "id": "user-2",
+                              "username": "NestedUser",
+                              "email": "nested@myblog.app"
+                            },
+                            "tokens": {
+                              "not_used_access": "ignore"
+                            }
+                          }
+                        }
+                    """.trimIndent(),
+                    headers = mapOf(
+                        "Set-Cookie" to listOf(
+                            "access_token=nested-access; Path=/; HttpOnly",
+                            "refresh_token=nested-refresh; Path=/; HttpOnly",
+                        ),
+                    ),
+                ),
+            ),
+        )
+        val authApi = HttpAuthApi(
+            transport = transport,
+            baseUrl = "https://api.myblog.app",
+        )
+
+        val result = authApi.login(
+            LoginRequestDto(
+                email = "nested@myblog.app",
+                password = "password-2",
+            ),
+        )
+
+        val success = assertIs<ApiResult.Success<LoginResponseDto>>(result)
+        assertEquals("nested-access", success.data.accessToken)
+        assertEquals("nested-refresh", success.data.refreshToken)
+        assertEquals("user-2", success.data.user.id)
+        assertEquals("NestedUser", success.data.user.username)
+        assertEquals("nested@myblog.app", success.data.user.email)
+    }
+
+    @Test
     fun meAddsBearerHeaderFromTokenProvider() = runTest {
         val transport = RecordingTransport(
             result = ApiResult.Success(

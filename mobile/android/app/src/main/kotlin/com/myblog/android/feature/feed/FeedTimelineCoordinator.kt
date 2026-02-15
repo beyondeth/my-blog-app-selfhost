@@ -2,6 +2,7 @@ package com.myblog.android.feature.feed
 
 import com.myblog.android.core.network.ApiResult
 import com.myblog.android.feature.feed.model.FeedEvent
+import com.myblog.android.feature.feed.model.FeedSort
 import com.myblog.android.feature.feed.model.FeedPage
 import com.myblog.android.feature.feed.model.FeedState
 import com.myblog.android.feature.feed.model.FeedStateMachine
@@ -16,11 +17,12 @@ class FeedTimelineCoordinator(
     val state: StateFlow<FeedState> = mutableState.asStateFlow()
 
     private var currentPage: FeedPage? = null
+    private var currentSort: FeedSort = FeedSort.RECENT
 
     suspend fun refresh() {
         mutableState.value = FeedStateMachine.reduce(FeedEvent.StartLoading)
 
-        when (val result = feedRepository.refreshFeed()) {
+        when (val result = feedRepository.refreshFeed(currentSort)) {
             is ApiResult.Success -> {
                 currentPage = result.data
                 mutableState.value = FeedStateMachine.reduce(FeedEvent.LoadSucceeded(result.data))
@@ -38,7 +40,7 @@ class FeedTimelineCoordinator(
             return
         }
 
-        when (val result = feedRepository.getFeed(page.nextCursor)) {
+        when (val result = feedRepository.getFeed(page.nextCursor, currentSort)) {
             is ApiResult.Success -> {
                 val merged = PaginationPolicy.mergePages(page, result.data)
                 currentPage = merged
@@ -53,5 +55,12 @@ class FeedTimelineCoordinator(
 
     fun enterOffline(message: String) {
         mutableState.value = FeedStateMachine.reduce(FeedEvent.EnterOffline(message))
+    }
+
+    fun setSort(sort: FeedSort) {
+        if (currentSort == sort) {
+            return
+        }
+        currentSort = sort
     }
 }

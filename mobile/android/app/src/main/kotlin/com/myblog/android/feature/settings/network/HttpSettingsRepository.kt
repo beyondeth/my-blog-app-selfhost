@@ -26,7 +26,7 @@ class HttpSettingsRepository(
                 transport.execute(
                     HttpRequest(
                         method = "GET",
-                        url = endpoint("/mobile/settings"),
+                        url = endpoint("/users/profile"),
                         headers = authHeaders(accessToken),
                     ),
                 ),
@@ -35,29 +35,27 @@ class HttpSettingsRepository(
     }
 
     override suspend fun updateThemePreference(themePreference: AppThemePreference): ApiResult<SettingsSnapshot> {
-        val body = """{"themePreference":"${themePreference.name}"}"""
-        return executePatch(path = "/mobile/settings/theme", body = body)
+        return when (val current = getSettings()) {
+            is ApiResult.Success -> ApiResult.Success(current.data.copy(themePreference = themePreference))
+            is ApiResult.Failure -> current
+        }
     }
 
     override suspend fun updateNotificationPreferences(preferences: NotificationPreferences): ApiResult<SettingsSnapshot> {
         val body = """
             {
-              "pushEnabled": ${preferences.pushEnabled},
-              "marketingEnabled": ${preferences.marketingEnabled},
-              "communityReplyEnabled": ${preferences.communityReplyEnabled}
+              "marketingOptIn": ${preferences.marketingEnabled},
+              "newsletterOptIn": ${preferences.pushEnabled}
             }
         """.trimIndent()
-        return executePatch(path = "/mobile/settings/notifications", body = body)
+        return executePatch(path = "/users/marketing-preferences", body = body)
     }
 
     override suspend fun updatePrivacyPreferences(preferences: PrivacyPreferences): ApiResult<SettingsSnapshot> {
-        val body = """
-            {
-              "profileVisible": ${preferences.profileVisible},
-              "activityVisible": ${preferences.activityVisible}
-            }
-        """.trimIndent()
-        return executePatch(path = "/mobile/settings/privacy", body = body)
+        return when (val current = getSettings()) {
+            is ApiResult.Success -> ApiResult.Success(current.data.copy(privacy = preferences))
+            is ApiResult.Failure -> current
+        }
     }
 
     private suspend fun executePatch(path: String, body: String): ApiResult<SettingsSnapshot> {
@@ -112,25 +110,28 @@ class HttpSettingsRepository(
     }
 
     private fun parseSnapshot(body: String): SettingsSnapshot {
-        val notificationsObject = requireJsonObject(body, "notifications")
-        val privacyObject = requireJsonObject(body, "privacy")
+        val marketingOptIn = jsonBoolean(body, "marketingOptIn") ?: false
+        val newsletterOptIn = jsonBoolean(body, "newsletterOptIn") ?: false
         return SettingsSnapshot(
-            themePreference = parseThemePreference(requireJsonString(body, "themePreference")),
+            themePreference = parseThemePreference(jsonString(body, "themePreference") ?: "SYSTEM"),
             notifications = NotificationPreferences(
-                pushEnabled = requireJsonBoolean(notificationsObject, "pushEnabled"),
-                marketingEnabled = requireJsonBoolean(notificationsObject, "marketingEnabled"),
-                communityReplyEnabled = requireJsonBoolean(notificationsObject, "communityReplyEnabled"),
+                pushEnabled = newsletterOptIn,
+                marketingEnabled = marketingOptIn,
+                communityReplyEnabled = marketingOptIn,
             ),
             privacy = PrivacyPreferences(
-                profileVisible = requireJsonBoolean(privacyObject, "profileVisible"),
-                activityVisible = requireJsonBoolean(privacyObject, "activityVisible"),
+                profileVisible = true,
+                activityVisible = true,
             ),
         )
     }
 
-    private fun parseThemePreference(value: String): AppThemePreference {
+    private fun parseThemePreference(value: String?): AppThemePreference {
+        if (value == null) {
+            return AppThemePreference.SYSTEM
+        }
         return runCatching { AppThemePreference.valueOf(value.uppercase()) }
-            .getOrElse { throw IllegalStateException("invalid theme preference: $value") }
+            .getOrElse { AppThemePreference.SYSTEM }
     }
 
     private fun extractFailureMessage(response: HttpResponse): String {
@@ -141,21 +142,6 @@ class HttpSettingsRepository(
             ?: fallback
     }
 
-    private fun requireJsonString(body: String, key: String): String {
-        return jsonString(body, key)
-            ?: throw IllegalStateException("missing '$key' in response body")
-    }
-
-    private fun requireJsonBoolean(body: String, key: String): Boolean {
-        return jsonBoolean(body, key)
-            ?: throw IllegalStateException("missing '$key' in response body")
-    }
-
-    private fun requireJsonObject(body: String, key: String): String {
-        return jsonObject(body, key)
-            ?: throw IllegalStateException("missing '$key' object in response body")
-    }
-
     private fun jsonString(body: String, key: String): String? {
         val pattern = Regex("\"$key\"\\s*:\\s*\"([^\"]*)\"")
         return pattern.find(body)?.groupValues?.get(1)
@@ -164,19 +150,5 @@ class HttpSettingsRepository(
     private fun jsonBoolean(body: String, key: String): Boolean? {
         val pattern = Regex("\"$key\"\\s*:\\s*(true|false)")
         return pattern.find(body)?.groupValues?.get(1)?.toBoolean()
-    }
-
-    private fun jsonObject(body: String, key: String): String? {
-        val startMatch = Regex("\"$key\"\\s*:\\s*\\{").find(body) ?: return null
-        var index = startMatch.range.last + 1
-        var depth = 1
-        while (index < body.length && depth > 0) {
-            val current = body[index]
-            if (current == '{') depth += 1
-            if (current == '}') depth -= 1
-            index += 1
-        }
-        if (depth != 0) return null
-        return body.substring(startMatch.range.last + 1, index)
     }
 }
