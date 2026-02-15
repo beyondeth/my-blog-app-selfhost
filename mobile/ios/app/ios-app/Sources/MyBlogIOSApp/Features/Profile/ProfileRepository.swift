@@ -8,7 +8,7 @@ actor ProfileRepository {
     }
 
     func fetchMeProfile() async throws -> UserProfile {
-        let req = EndpointRequest(path: "/mobile/auth/me")
+        let req = EndpointRequest(path: "/auth/me")
         return try await apiClient.request(req, as: UserProfile.self)
     }
 

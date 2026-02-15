@@ -37,7 +37,7 @@ BACKEND_HEALTH_ENDPOINTS=(
   "${BACKEND_URL}/health"
   "${BACKEND_URL}/api/v1/health"
   "${BACKEND_URL}/api/v1"
-  "${BACKEND_URL}/api/v1/mobile/feed?limit=1"
+  "${BACKEND_URL}/api/v1/feed?limit=1"
   "${BACKEND_URL}"
 )
 
