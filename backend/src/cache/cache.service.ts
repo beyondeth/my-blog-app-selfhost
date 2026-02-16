@@ -12,7 +12,7 @@ export enum CacheTTL {
 
   // 온 데이터 (중간 가치)
   SHORT = 30, // 30초 - 실시간 데이터
-  HOME_FEED = SHORT, // 홈 피드 (30초)
+  HOME_FEED = 120, // 홈 피드 (2분, 워밍/재계산 부하 완화)
   MEDIUM = 120, // 2분 - 블로그/커뮤니티 정보 등 중간 가치 데이터
 
 

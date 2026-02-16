@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron } from '@nestjs/schedule';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { FeedService } from './feed.service';
@@ -20,6 +20,7 @@ import {
 @Injectable()
 export class FeedCacheWarmingService {
   private readonly logger = new Logger(FeedCacheWarmingService.name);
+  private warmingInProgress = false;
 
   // 홈 피드 워밍 대상 정렬
   private readonly feedSortsToWarm: FeedSortType[] = [
@@ -55,50 +56,54 @@ export class FeedCacheWarmingService {
   }
 
   /**
-   * 통합 워밍 작업 (30초 주기)
+   * 통합 워밍 작업 (1분 주기)
    *
-   * 홈 피드와 인기 커뮤니티 피드를 동시에 워밍합니다.
+   * 홈 피드와 인기 커뮤니티 피드를 워밍합니다.
    */
-  @Cron('*/30 * * * * *')
+  @Cron(CronExpression.EVERY_MINUTE)
   async warmAllFeeds(): Promise<void> {
-    const jobs: Promise<void>[] = [];
-
-    // 1. 홈 피드 워밍
-    if (process.env.DISABLE_FEED_WARMING !== 'true') {
-      jobs.push(this.warmUnifiedFeed());
+    if (this.warmingInProgress) {
+      this.logger.debug('Skip feed warming: previous cycle still running');
+      return;
     }
 
-    // 2. 커뮤니티 피드 워밍
-    if (process.env.DISABLE_COMMUNITY_FEED_WARMING !== 'true') {
-      jobs.push(this.warmCommunityFeeds());
-    }
+    this.warmingInProgress = true;
+    try {
+      // 1. 홈 피드 워밍
+      if (process.env.DISABLE_FEED_WARMING !== 'true') {
+        await this.warmUnifiedFeed();
+      }
 
-    await Promise.all(jobs);
+      // 2. 커뮤니티 피드 워밍
+      if (process.env.DISABLE_COMMUNITY_FEED_WARMING !== 'true') {
+        await this.warmCommunityFeeds();
+      }
+    } finally {
+      this.warmingInProgress = false;
+    }
   }
 
   /**
    * 홈 피드 워밍 로직
    */
   private async warmUnifiedFeed(): Promise<void> {
-    await Promise.all(
-      this.feedSortsToWarm.map(async (sort) => {
-        try {
-          await this.feedService.getUnifiedFeed(
-            {
-              filter: FeedFilterType.ALL,
-              sort,
-              limit: 20,
-            },
-            undefined, // No user context
-          );
-          this.logger.debug(`Warm unified feed cache for sort=${sort}`);
-        } catch (error) {
-          this.logger.warn(
-            `Unified feed warmup failed for sort=${sort}: ${error.message}`,
-          );
-        }
-      }),
-    );
+    for (const sort of this.feedSortsToWarm) {
+      try {
+        await this.feedService.getUnifiedFeed(
+          {
+            filter: FeedFilterType.ALL,
+            sort,
+            limit: 20,
+          },
+          undefined, // No user context
+        );
+        this.logger.debug(`Warm unified feed cache for sort=${sort}`);
+      } catch (error) {
+        this.logger.warn(
+          `Unified feed warmup failed for sort=${sort}: ${error.message}`,
+        );
+      }
+    }
   }
 
   /**
@@ -119,11 +124,9 @@ export class FeedCacheWarmingService {
 
     if (communities.length === 0) return;
 
-    await Promise.all(
-      communities.map((community) =>
-        this.warmForCommunity(community.id, community.slug),
-      ),
-    );
+    for (const community of communities) {
+      await this.warmForCommunity(community.id, community.slug);
+    }
   }
 
   /**

@@ -16,6 +16,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { logger, httpLogger } from './utils/logger.js';
 import { config } from './config/env.validation.js';
 import { registerAllTools } from './tools/index.js';
+import { getDiscoveryTools } from './tools/catalog.js';
 import { RedisCacheService } from './services/RedisCacheService.js';
 import { MetricsService } from './services/MetricsService.js';
 import { createOAuthRouter } from './oauth/index.js';
@@ -448,20 +449,7 @@ app.get('/mcp', (req, res) => {
       jsonrpc: '/mcp'
     },
     authentication: ['bearer'],
-    tools: [
-      {
-        name: 'check_auth',
-        description: 'Verify authentication status'
-      },
-      {
-        name: 'get_writing_style_guide',
-        description: 'Retrieve writing style guidelines'
-      },
-      {
-        name: 'create_post',
-        description: 'Create and publish blog posts to codebase.blog'
-      }
-    ]
+    tools: getDiscoveryTools(),
   });
 });
 

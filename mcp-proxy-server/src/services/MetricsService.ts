@@ -152,7 +152,7 @@ export class MetricsService {
    * 요청 처리 시간 기록
    *
    * @param durationMs 처리 시간 (밀리초)
-   * @param tool 도구명 (check_auth, get_writing_style_guide, create_post)
+   * @param tool 도구명 (check_auth, get_writing_style_guide, create_post, get_image_upload_url, finalize_uploaded_image)
    */
   recordRequestDuration(durationMs: number, tool?: string): void {
     this.requestDuration.observe(

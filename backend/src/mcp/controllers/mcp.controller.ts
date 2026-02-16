@@ -317,7 +317,16 @@ export class McpController {
         );
       }
 
-      const styles = ["default", "novel", "comedy", "podcast", "tutorial", "vibe"];
+      const styles = [
+        "default",
+        "novel",
+        "comedy",
+        "podcast",
+        "tutorial",
+        "vibe",
+        "research",
+        "human",
+      ];
       const styleData = [];
 
       for (const styleName of styles) {
@@ -394,6 +403,22 @@ export class McpController {
               code_block_ratio: 0.15,
               ai_tag_required: true,
             },
+            research: {
+              style_name: "Research Insight Analysis Style",
+              language: "korean",
+              min_length: 6000,
+              target_length: "6000-9000",
+              code_block_ratio: 0.1,
+              ai_tag_required: true,
+            },
+            human: {
+              style_name: "Human-Like Writing Style",
+              language: "korean",
+              min_length: 5000,
+              target_length: "5000-8000",
+              code_block_ratio: 0.15,
+              ai_tag_required: true,
+            },
           };
 
           styleData.push({
@@ -446,7 +471,16 @@ export class McpController {
       const path = await import("path");
 
       // 스타일 이름 검증
-      const validStyles = ["default", "novel", "comedy", "podcast", "tutorial", "vibe"];
+      const validStyles = [
+        "default",
+        "novel",
+        "comedy",
+        "podcast",
+        "tutorial",
+        "vibe",
+        "research",
+        "human",
+      ];
       if (!validStyles.includes(style)) {
         return {
           success: false,

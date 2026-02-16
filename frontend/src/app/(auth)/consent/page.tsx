@@ -156,7 +156,36 @@ export default function ConsentPage() {
       // 사용자 정보 즉시 새로고침 (캐시 무효화)
       await refreshUserMutation.mutateAsync();
 
-      // 즉시 메인 페이지로 이동
+      // MCP OAuth 진행 중이면 callback으로 자동 복귀
+      // - 신규 OAuth 사용자의 약관 동의 완료 이후에도 MCP 연결 흐름이 끊기지 않도록 보장
+      const mcpOAuthRaw = sessionStorage.getItem('mcpOAuth');
+      if (mcpOAuthRaw) {
+        try {
+          const { state, callback_url } = JSON.parse(mcpOAuthRaw);
+          if (state && callback_url) {
+            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+            const completeResponse = await fetch(`${apiUrl}/auth/oauth/mcp/complete`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ state, callback_url }),
+            });
+
+            if (completeResponse.ok) {
+              const completeData = await completeResponse.json();
+              if (completeData.success && completeData.redirect_url) {
+                sessionStorage.removeItem('mcpOAuth');
+                window.location.href = completeData.redirect_url;
+                return;
+              }
+            }
+          }
+        } catch (mcpError) {
+          console.error('MCP OAuth completion after consent failed:', mcpError);
+        }
+      }
+
+      // MCP OAuth가 없거나 완료 실패 시 일반 이동
       router.push('/');
     } catch (err: any) {
       setError(err.message || '약관 동의 처리 중 오류가 발생했습니다');

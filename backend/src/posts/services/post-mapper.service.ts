@@ -267,8 +267,11 @@ export class PostMapperService {
       }
     }
     // 3. 썸네일이 선택되지 않은 경우에만 첫 번째 이미지를 썸네일로 사용
-    else if (post.content) {
-      const extractedUrl = this.extractFirstImageFromContent(post.content);
+    else if (post.content || post.content_markdown) {
+      const extractedUrl = this.extractFirstImageFromContent(
+        post.content,
+        post.content_markdown,
+      );
       dto.thumbnail = extractedUrl;
       if (process.env.NODE_ENV === "development") {
         if (extractedUrl) {
@@ -364,6 +367,9 @@ export class PostMapperService {
     }
 
     dto.images = await this.resolvePostImageUrls(post);
+    if ((!dto.images || dto.images.length === 0) && (post.content || post.content_markdown)) {
+      dto.images = this.extractInlineImageUrls(post.content, post.content_markdown);
+    }
     if ((!dto.images || dto.images.length === 0) && dto.thumbnail) {
       dto.images = [dto.thumbnail];
     }
@@ -503,7 +509,12 @@ export class PostMapperService {
       .map((file) => this.getCdnUrlForFile(file))
       .filter((url): url is string => Boolean(url));
 
-    return Array.from(new Set(urls));
+    const uniqueFileUrls = Array.from(new Set(urls));
+    if (uniqueFileUrls.length > 0) {
+      return uniqueFileUrls;
+    }
+
+    return this.extractInlineImageUrls(post.content, post.content_markdown);
   }
 
   /**
@@ -734,27 +745,52 @@ export class PostMapperService {
    * @param content HTML 콘텐츠
    * @returns 첫 번째 이미지 URL 또는 null
    */
-  private extractFirstImageFromContent(content: string): string | null {
-    if (!content) {
-      return null;
-    }
+  private extractFirstImageFromContent(
+    ...contents: Array<string | undefined | null>
+  ): string | null {
+    const urls = this.extractInlineImageUrls(...contents);
+    return urls.length > 0 ? urls[0] : null;
+  }
 
-    // 정규식으로 img 태그의 src 속성 추출
-    // data: URL은 제외
-    const imgTagRegex = /<img[^>]+src\s*=\s*["']([^"']+)["'][^>]*>/gi;
-    const match = imgTagRegex.exec(content);
+  private extractInlineImageUrls(
+    ...contents: Array<string | undefined | null>
+  ): string[] {
+    const urls = new Set<string>();
+    for (const rawContent of contents) {
+      const content = rawContent?.trim();
+      if (!content) {
+        continue;
+      }
 
-    if (match && match[1]) {
-      // 이미지 URL을 찾았으면 반환
-      const imageUrl = match[1];
+      let match: RegExpExecArray | null;
+      const htmlRegex = /<img[^>]+src\s*=\s*["']([^"']+)["'][^>]*>/gi;
+      while ((match = htmlRegex.exec(content)) !== null) {
+        const url = match[1]?.trim();
+        if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
+          urls.add(url);
+        }
+      }
 
-      // data: URL이 아닌 실제 URL만 반환
-      if (!imageUrl.startsWith("data:")) {
-        return imageUrl;
+      const markdownRegex = /!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/gi;
+      while ((match = markdownRegex.exec(content)) !== null) {
+        const rawUrl = match[1]?.trim();
+        const url = rawUrl?.replace(/^<|>$/g, "");
+        if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
+          urls.add(url);
+        }
+      }
+
+      const plainImageUrlRegex =
+        /https?:\/\/[^\s)"']+\.(?:png|jpe?g|gif|webp|avif|svg)(?:\?[^\s)"']*)?/gi;
+      while ((match = plainImageUrlRegex.exec(content)) !== null) {
+        const url = match[0]?.trim();
+        if (url && !url.startsWith("javascript:")) {
+          urls.add(url);
+        }
       }
     }
 
-    return null;
+    return Array.from(urls);
   }
 
   /**

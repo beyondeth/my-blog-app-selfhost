@@ -11,7 +11,7 @@ import {
   Req,
   Query,
 } from "@nestjs/common";
-import { Response } from "express";
+import { Request as ExpressRequest, Response } from "express";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { ConfigService } from "@nestjs/config";
 import { Throttle } from "@nestjs/throttler";
@@ -37,7 +37,7 @@ import { UnifiedRedisService } from "../redis/unified-redis.service";
 import { User } from "../users/entities/user.entity";
 
 @ApiTags("auth")
-@Controller("auth")
+@Controller(["auth", "mobile/auth"])
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
 
@@ -91,7 +91,11 @@ export class AuthController {
   @ApiResponse({ status: 200, description: "로그인 성공" })
   @ApiResponse({ status: 401, description: "인증 실패" })
   @ApiResponse({ status: 429, description: "요청 횟수 초과" })
-  async login(@Body() loginDto: LoginDto, @Res() res: Response) {
+  async login(
+    @Body() loginDto: LoginDto,
+    @Req() req: ExpressRequest,
+    @Res() res: Response,
+  ) {
     const authResponse = await this.authService.login(loginDto);
 
     // HttpOnly 쿠키로 토큰들 설정
@@ -114,13 +118,21 @@ export class AuthController {
     // 웹 세션 생성 (MCP 세션과 동기화를 위해)
     await this.createWebSessionInRedis(authResponse.user.id);
 
+    // always include token payload for mobile clients
+    const isMobileRoute =
+      req.originalUrl?.includes("/mobile/auth/") ||
+      req.baseUrl?.includes("/mobile/auth");
+    const includeTokens = process.env.NODE_ENV !== "production" || isMobileRoute;
+
     // 항상 JSON 응답 반환 (프론트엔드에서 리다이렉트 처리)
     return res.json({
       user: authResponse.user,
       message: "로그인 성공",
-      ...(process.env.NODE_ENV !== "production" && {
+      ...(includeTokens && {
         access_token: authResponse.access_token,
         refresh_token: authResponse.refresh_token,
+        accessToken: authResponse.access_token,
+        refreshToken: authResponse.refresh_token,
       }),
     });
   }
@@ -530,8 +542,15 @@ export class AuthController {
   @ApiOperation({ summary: "토큰 갱신" })
   @ApiResponse({ status: 200, description: "토큰 갱신 성공" })
   @ApiResponse({ status: 401, description: "유효하지 않은 토큰" })
-  async refreshToken(@Request() req, @Res() res: Response) {
-    const refreshToken = req.cookies?.refresh_token;
+  async refreshToken(
+    @Req() req: ExpressRequest,
+    @Body() body: { refreshToken?: string; refresh_token?: string },
+    @Res() res: Response,
+  ) {
+    const refreshToken =
+      req.cookies?.refresh_token ||
+      body?.refreshToken ||
+      body?.refresh_token;
 
     if (!refreshToken) {
       return res.status(401).json({ message: "Refresh token not found" });
@@ -556,9 +575,20 @@ export class AuthController {
       path: "/",
     });
 
+    const isMobileRoute =
+      req.originalUrl?.includes("/mobile/auth/") ||
+      req.baseUrl?.includes("/mobile/auth");
+    const includeTokens = process.env.NODE_ENV !== "production" || isMobileRoute;
+
     return res.json({
       user: authResponse.user,
       message: "토큰이 갱신되었습니다.",
+      ...(includeTokens && {
+        access_token: authResponse.access_token,
+        refresh_token: authResponse.refresh_token,
+        accessToken: authResponse.access_token,
+        refreshToken: authResponse.refresh_token,
+      }),
     });
   }
 
@@ -1049,6 +1079,17 @@ export class AuthController {
       return res.status(400).json({
         error: "invalid_request",
         error_description: "Missing required parameters",
+      });
+    }
+
+    // MCP OAuth callback 발급 전 필수 약관 동의 여부 확인
+    // - 미동의 사용자는 /consent 완료 후 다시 complete를 호출해야 함
+    const latestUser = await this.usersService.findById(user.id);
+    if (!latestUser?.termsAcceptedAt || !latestUser?.privacyAcceptedAt) {
+      return res.status(403).json({
+        error: "consent_required",
+        code: "CONSENT_REQUIRED",
+        message: "필수 약관 동의가 필요합니다.",
       });
     }
 

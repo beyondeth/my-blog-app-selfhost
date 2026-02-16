@@ -22,6 +22,7 @@ import axios from 'axios';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/env.validation.js';
 import { registerAllTools } from '../tools/index.js';
+import { getDiscoveryTools } from '../tools/catalog.js';
 import { MetricsService } from '../services/MetricsService.js';
 
 import { OAuthStorage } from './storage.js';
@@ -307,20 +308,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         authorization_server: serverUrl,
         protected_resource: `${serverUrl}/.well-known/oauth-protected-resource`,
       },
-      tools: [
-        {
-          name: 'check_auth',
-          description: 'Verify authentication status',
-        },
-        {
-          name: 'get_writing_style_guide',
-          description: 'Retrieve writing style guidelines',
-        },
-        {
-          name: 'create_post',
-          description: 'Create and publish blog posts to codebase.blog',
-        },
-      ],
+      tools: getDiscoveryTools(),
     });
   });
 

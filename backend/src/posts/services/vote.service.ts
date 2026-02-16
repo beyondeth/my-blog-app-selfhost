@@ -142,11 +142,9 @@ export class VoteService {
             likeCount: upvoteCount,
           };
 
-          // 비동기로 캐시 무효화 (응답 지연 방지)
-          setImmediate(() => {
-            this.invalidateCache(postId).catch((err) => {
-              this.logger.warn("Cache invalidation failed:", err.message);
-            });
+          // 캐시 무효화 (디바이스 간 stale 최소화)
+          void this.invalidateCache(postId).catch((err) => {
+            this.logger.warn("Vote cache invalidation failed:", err.message);
           });
 
           // 이벤트 발행 (부가 기능 연동)
@@ -308,9 +306,20 @@ export class VoteService {
       // 포스트 캐시 삭제
       await this.cacheService.del(CacheKeys.POST_CORE(postId));
 
-      // 피드 관련 캐시 패턴 삭제
-      await this.cacheService.deletePattern("feed:home:*");
-      await this.cacheService.deletePattern("feed:popular:*");
+      // 피드 관련 캐시 패턴 무효화 (범위 축소 + Debounce로 부하 완화)
+      const patterns = [
+        "feed:unified:all:*:limit:20:cursor:first",
+        "feed:unified:blog:*:limit:20:cursor:first",
+        "feed:unified:community:*:limit:20:cursor:first",
+        "feed:home:*",
+        "feed:popular:*",
+      ];
+
+      await Promise.all(
+        patterns.map((pattern) =>
+          this.cacheService.invalidatePattern(pattern, { debounce: 250 }),
+        ),
+      );
     } catch (error) {
       this.logger.warn("Cache invalidation error:", error.message);
     }
