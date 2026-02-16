@@ -10,6 +10,24 @@
 **/.next/
 **/build/
 
+# Mobile platform build artifacts
+mobile/ios/**/DerivedData/
+mobile/ios/**/*.xcuserstate
+mobile/ios/**/*.xccheckout
+mobile/ios/**/*.xcscmblueprint
+mobile/ios/**/*.xcscheme
+mobile/ios/**/*.xcworkspace/xcuserdata/
+mobile/ios/**/Build/
+mobile/android/**/.gradle/
+mobile/android/**/build/
+mobile/android/**/local.properties
+mobile/android/**/*.iml
+mobile/android/**/.idea/
+mobile/android/**/*.apk
+mobile/android/**/*.aab
+*.ipa
+*.dSYM
+
 # Environment variables (실제 값 포함된 파일들)
 **/.env
 **/.env.local

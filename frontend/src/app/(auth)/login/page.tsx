@@ -19,7 +19,7 @@ const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/re
 function LoginPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { login } = useAuth();
+  const { login, refreshUser } = useAuth();
   const { resolvedTheme } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -55,6 +55,9 @@ function LoginPageContent() {
   const mcpCallbackUrl = searchParams.get('callback_url');
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
+  const registerHref = isMcpOAuth && mcpState && mcpCallbackUrl
+    ? `/register?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
+    : '/register';
 
   const normalizeRedirectTarget = (target?: string | null) => {
     if (typeof window === 'undefined' || !target) {
@@ -171,6 +174,23 @@ function LoginPageContent() {
     }
   }, [searchParams]);
 
+  // MCP OAuth 컨텍스트 보존
+  // - 사용자가 로그인 페이지에서 회원가입 페이지로 이동해도
+  //   OAuth 완료 state/callback을 잃지 않도록 sessionStorage에 즉시 저장합니다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!isMcpOAuth || !mcpState || !mcpCallbackUrl) return;
+
+    const mcpOAuthData = {
+      state: mcpState,
+      callback_url: mcpCallbackUrl,
+      client_name: mcpClientName,
+      scope: mcpScope,
+    };
+
+    sessionStorage.setItem('mcpOAuth', JSON.stringify(mcpOAuthData));
+  }, [isMcpOAuth, mcpState, mcpCallbackUrl, mcpClientName, mcpScope]);
+
   const validateEmail = (email: string) => {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     return emailRegex.test(email);
@@ -245,37 +265,9 @@ function LoginPageContent() {
       // 로그인 요청 - returnUrl을 보내지 않음 (프론트엔드에서만 처리)
       await login(formData);
 
-      // MCP OAuth 로그인인 경우 (Claude 커스텀 커넥터 연결)
-      if (isMcpOAuth && mcpState && mcpCallbackUrl) {
-        try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-          const response = await fetch(`${apiUrl}/auth/oauth/mcp/complete`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              state: mcpState,
-              callback_url: mcpCallbackUrl,
-            }),
-          });
-
-          if (!response.ok) {
-            throw new Error('MCP OAuth 완료 실패');
-          }
-
-          const data = await response.json();
-
-          if (data.success && data.redirect_url) {
-            // MCP Proxy callback으로 리다이렉트 (Claude로 돌아감)
-            window.location.href = data.redirect_url;
-            return;
-          }
-        } catch (mcpError) {
-          console.error('MCP OAuth error:', mcpError);
-          setLoginErrorMessage('MCP 연결에 실패했습니다. 다시 시도해주세요.');
-          // MCP OAuth 실패 시 일반 로그인 흐름으로 계속 진행
-        }
-      }
+      // 로그인 직후 user 정보 새로고침하여 약관 동의 필드 최신화
+      // ConsentGuard 타이밍 이슈 방지 (회원가입과 동일한 처리)
+      await refreshUser();
 
       // OAuth 콜백 URL인 경우 직접 리다이렉트 (localhost:7777/callback)
       if (returnUrl && returnUrl.includes('localhost:7777/callback')) {
@@ -577,7 +569,7 @@ function LoginPageContent() {
               <p className="text-center text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 계정이 없으신가요?{' '}
                 <Link
-                  href="/register"
+                  href={registerHref}
                   className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
                 >
                   회원가입

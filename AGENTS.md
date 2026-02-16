@@ -18,6 +18,63 @@ Follow the Conventional Commit vocabulary already in the log (`feat(backend): �
 ## Environment & Security Tips
 Copy `.env.production.example` into `.env.local` for each app, keep secrets out of Git, and record new configuration needs inside `ENV_SETUP.md` or `docs/`. Apply schema changes only through the TypeORM scripts (`pnpm --dir backend migration:run` / `migration:revert`) and sanitize any artifacts synced into `data/` or `postgres/` before sharing.
 
+## Multi-Platform Workflow (Worktree + Branch Discipline)
+- A **branch** is a code line in git history.
+- A **worktree** is a separate checkout folder tied to one branch for isolated work.
+- One platform team should work on one worktree/branch pair only.
+
+### Recommended mapping
+- `main` / `my-blog-app`: integration base branch (`hotfix/auth-me-no-401` currently used for pre-production baseline in this repo).
+- `mobile/ios` worktree: branch `feature/ios/<topic>` (`feature/ios/workspace` for coordination, then narrow topic branches if needed).
+- `mobile/android` worktree: branch `feature/aos/<topic>` (`feature/aos/workspace` for coordination, then narrow topic branches if needed).
+- Optional web worktree: branch `feature/web/<topic>`.
+
+### Mandatory guardrails
+1. Do not write iOS code on an Android branch and do not write Android code on iOS branch.
+2. Before each feature, create or check out a dedicated branch in that platform worktree:
+   - iOS: `git switch feature/ios/ui-sync-v1` (or new topic branch)
+   - Android: `git switch feature/aos/ui-sync-v1` (or new topic branch)
+3. Keep common mobile-contract/API fixes only on `hotfix/auth-me-no-401` or a clearly named shared branch, never directly inside platform feature branches.
+4. 병합은 플랫폼 시뮬/스테이징 실동작(로그인/피드/설정 등 1회 핵심 시나리오) 완료 후에만 진행.
+5. Merge order: 플랫폼 브랜치 -> 공유/핫픽스 브랜치(필요 시) -> `main`.
+6. Do not force-push platform branches unless explicitly coordinated.
+
+### Safe branch deletion policy
+- Do not delete a platform or shared branch until:
+  - 해당 브랜치가 공유 브랜치(`hotfix/auth-me-no-401` 또는 `main`)로 병합되었고
+  - `git log` 또는 PR로 변경사항이 통합됨이 확인된 경우.
+- 병합 완료 후 삭제:
+  - 로컬: `git branch -d feature/ios/xxx` / `git branch -d feature/aos/xxx`
+  - 원격: `git push origin --delete feature/ios/xxx`
+- 병합 전 삭제가 필요한 긴급 회수는 `git branch -D` + 문서/PR 로그에 삭제 사유 기록 필수.
+- 병합 직후 최소 24시간은 브랜치 백업 태그(선택) 유지 후 정리 권장.
+
+### Worktree command set (권장)
+- 상태 확인:
+  - `git worktree list`
+  - 각 워크트리에서: `git branch --show-current`
+- 이동:
+  - `git switch feature/ios/<topic>` (ios)
+  - `git switch feature/aos/<topic>` (android)
+- 통합:
+  - `git switch hotfix/auth-me-no-401`
+  - `git merge --no-ff feature/ios/<topic>` / `git merge --no-ff feature/aos/<topic>`
+  - 테스트/문서 확인 후 `main`으로 정식 병합
+
+### Useful commands
+- Check active worktrees:
+  - `git worktree list`
+- Create/attach worktree:
+  - `git worktree add /path/to/my-blog-app-ios feature/ios/workspace`
+  - `git worktree add /path/to/my-blog-app-aos feature/aos/workspace`
+- Verify branch in each worktree:
+  - `git status --short -b`
+- Quick conflict-free workflow:
+  - Implement in one worktree.
+  - Commit with Conventional Commit.
+  - Push only that platform branch.
+  - Cherry-pick or open PR to shared branch explicitly.
+
 ## Design Guidelines
 Design decisions related to layout, typography, color, and contrast must follow WCAG 3.0 accessibility standards, ensuring consistent readability and usability across the product.
 
@@ -51,33 +108,3 @@ Accessible color palette with luminance/contrast values
 Typography guidelines (sizes, weights, spacing)
 Layout and spacing system definitions
 Accessibility compliance checklist
-
-## Multi-Platform Worktree Policy (Required)
-This repository must be operated with dedicated worktrees per platform to prevent branch switching collisions between terminals.
-
-### Required Worktree Layout
-- `/Users/sihyungpark/Desktop/code/my-blog-app-integ`: integration and merge only (`hotfix/auth-me-no-401`)
-- `/Users/sihyungpark/Desktop/code/my-blog-app-ios`: iOS implementation only (`feature/ios/*`)
-- `/Users/sihyungpark/Desktop/code/my-blog-app-aos`: Android implementation only (`feature/aos/*`)
-- `/Users/sihyungpark/Desktop/code/my-blog-app-web`: Web implementation only (`feature/web/*`)
-
-### Branch Ownership Rules
-- `feature/shared/*`: shared backend/contracts changes only (`backend/`, `mobile/contracts/`, shared docs)
-- `feature/ios/*`: `mobile/ios/**` only
-- `feature/aos/*`: `mobile/android/**` only
-- `feature/web/*`: web UI/application changes only
-
-### Merge Order
-- Merge `feature/shared/*` first.
-- Then merge platform branches (`feature/ios/*`, `feature/aos/*`, `feature/web/*`).
-- Integrate only in `hotfix/auth-me-no-401`.
-- Merge to `main` only after integration validation.
-
-### Operational Guardrails
-- Do not develop in the base repository path `/Users/sihyungpark/Desktop/code/my-blog-app`.
-- Use the integration worktree for merge/cherry-pick/push tasks only.
-- Keep temporary analysis artifacts (`output/`, `sdd-tool-analysis/`) out of tracked changes.
-- If a feature requires both shared and platform work, split commits by ownership branch.
-
-For full workflow and runbook details, see:
-- `docs/platform-coordination/worktree-branch-playbook.md`

@@ -54,6 +54,8 @@ export class FeedService {
     dto: GetUnifiedFeedDto,
     userId?: string,
   ): Promise<UnifiedFeedResponseDto> {
+    const normalizedUserId = this.normalizeUserId(userId);
+
     const {
       cursor: cursorRaw,
       limit = 20,
@@ -74,7 +76,7 @@ export class FeedService {
     }
 
     // 캐시 키 (사용자 컨텍스트 없을 때만 캐싱)
-    const cacheKey = !userId
+    const cacheKey = !normalizedUserId
       ? CacheKeys.FEED_UNIFIED(filter, sort, {
           limit,
           cursor: cursorRaw ?? null,
@@ -103,7 +105,7 @@ export class FeedService {
         filter,
         sort,
         limit + 1,
-        userId,
+        normalizedUserId,
       );
       if (rankedItems.length > 0) {
         items = rankedItems;
@@ -117,7 +119,7 @@ export class FeedService {
         sort,
         limit + 1,
         cursorData,
-        userId,
+        normalizedUserId,
         period,
       );
     }
@@ -146,7 +148,7 @@ export class FeedService {
       count: items.length,
     };
 
-    // 첫 페이지 캐싱 (30초)
+    // 첫 페이지 캐싱 (HOME_FEED TTL)
     if (cacheKey) {
       await this.cacheService.set(cacheKey, response, CacheTTL.HOME_FEED);
     }
@@ -220,128 +222,194 @@ export class FeedService {
     communityIds: string[],
     userId?: string,
   ): Promise<any[]> {
-    const queryParts: string[] = [];
-    const params: any[] = [userId ?? null];
-    let paramIndex = 2;
-    const userPlaceholder = "$1";
+    const normalizedUserId = this.normalizeUserId(userId);
+    const [blogRows, communityRows] = await Promise.all([
+      blogIds.length > 0
+        ? this.fetchBlogFeedItemsByIds(blogIds, normalizedUserId)
+        : Promise.resolve([]),
+      communityIds.length > 0
+        ? this.fetchCommunityFeedItemsByIds(communityIds, normalizedUserId)
+        : Promise.resolve([]),
+    ]);
 
-    if (blogIds.length > 0) {
-      const blogPlaceholder = `$${paramIndex++}`;
-      params.push(blogIds);
-      queryParts.push(`
-        SELECT
-          p.id,
-          p.title,
-          p.slug,
-          pm.excerpt,
-          p.content as content_html,
-          pm.tags as tags,
-          f.file_url as thumbnail,
-          'blog'::text as source_type,
-          p."blogId" as source_id,
-          NULL::uuid as community_id,
-          p."authorId" as author_id,
-          COALESCE(ps."likeCount", 0) as like_count,
-          COALESCE(ps."upvoteCount", 0) as upvote_count,
-          COALESCE(ps."downvoteCount", 0) as downvote_count,
-          COALESCE(ps."commentCount", 0) as comment_count,
-          COALESCE(ps."viewCount", 0) as view_count,
-          p."createdAt" as created_at,
-          p."updatedAt" as updated_at,
-          pl_user.type as user_vote,
-          FALSE as is_nsfw,
-          FALSE as is_spoiler,
-          FALSE as is_pinned,
-          b.id as blog_id,
-          COALESCE(b.alias, b.slug) as blog_slug,
-          b.alias as blog_alias,
-          b.name as blog_name,
-          NULL::uuid as comm_id,
-          NULL::text as comm_slug,
-          NULL::text as comm_name,
-          NULL::text as comm_icon,
-          NULL::text as comm_icon_fit,
-          u.id as user_id,
-          u.username,
-          pr."profileImage"
-        FROM posts p
-        LEFT JOIN post_metadata pm ON pm."postId" = p.id
-        LEFT JOIN post_stats ps ON ps."postId" = p.id
-        LEFT JOIN post_likes pl_user
-          ON pl_user."postId" = p.id AND pl_user."userId" = ${userPlaceholder}
-        LEFT JOIN files f ON f.id = p."thumbnail_image_id"
-        LEFT JOIN blogs b ON b.id = p."blogId"
-        LEFT JOIN users u ON u.id = p."authorId"
-        LEFT JOIN profiles pr ON pr."userId" = u.id
-        WHERE p."isPublished" = true
-          AND p."isDeleted" = false
-          AND p.status = 'published'
-          AND p.id = ANY(${blogPlaceholder}::uuid[])
-      `);
-    }
+    return [...blogRows, ...communityRows];
+  }
 
-    if (communityIds.length > 0) {
-      const communityPlaceholder = `$${paramIndex++}`;
-      params.push(communityIds);
-      queryParts.push(`
-        SELECT
-          cp.id,
-          cp.title,
-          cp.slug,
-          LEFT(REGEXP_REPLACE(cp.content, '<[^>]*>', '', 'g'), 200) as excerpt,
-          cp.content as content_html,
-          cp.tags as tags,
-          f.file_url as thumbnail,
-          'community'::text as source_type,
-          NULL::uuid as source_id,
-          cp."communityId" as community_id,
-          cp."authorId" as author_id,
-          cp."likeCount" as like_count,
-          cp."upvoteCount" as upvote_count,
-          cp."downvoteCount" as downvote_count,
-          cp."commentCount" as comment_count,
-          cp."viewCount" as view_count,
-          cp."createdAt" as created_at,
-          cp."updatedAt" as updated_at,
-          cpl_user.type as user_vote,
-          cp."isNsfw" as is_nsfw,
-          cp."isSpoiler" as is_spoiler,
-          cp."isPinned" as is_pinned,
-          NULL::uuid as blog_id,
-          NULL::text as blog_slug,
-          NULL::text as blog_alias,
-          NULL::text as blog_name,
-          c.id as comm_id,
-          c.slug as comm_slug,
-          c.name as comm_name,
-          c."iconUrl" as comm_icon,
-          c."iconImageFit" as comm_icon_fit,
-          u.id as user_id,
-          u.username,
-          pr."profileImage"
-        FROM community_posts cp
-        LEFT JOIN files f ON f.id = cp."thumbnailImageId"
-        INNER JOIN communities c
-          ON c.id = cp."communityId"
-          AND c."isPublic" = true
-          AND c."isPostDiscoverable" = true
-          AND c."joinPolicy" <> 'private'
-          AND c."deletedAt" IS NULL
-        LEFT JOIN users u ON u.id = cp."authorId"
-        LEFT JOIN profiles pr ON pr."userId" = u.id
-        LEFT JOIN community_post_likes cpl_user
-          ON cpl_user."postId" = cp.id AND cpl_user."userId" = ${userPlaceholder}
-        WHERE cp.status = 'published'
-          AND cp."deletedAt" IS NULL
-          AND cp.id = ANY(${communityPlaceholder}::uuid[])
-      `);
-    }
-
-    if (!queryParts.length) {
+  private async fetchBlogFeedItemsByIds(
+    blogIds: string[],
+    userId?: string,
+  ): Promise<any[]> {
+    if (!blogIds.length) {
       return [];
     }
 
-    const query = queryParts.join(" UNION ALL ");
+    const includeUserVote = !!userId;
+    const query = `
+      WITH target_ids AS (
+        SELECT DISTINCT UNNEST($1::uuid[]) AS id
+      )
+      SELECT
+        p.id,
+        p.title,
+        p.slug,
+        COALESCE(pm.excerpt, LEFT(COALESCE(p.content_markdown, p.content), 200)) as excerpt,
+        CASE
+          WHEN f.file_url IS NULL THEN LEFT(COALESCE(p.content, p.content_markdown), 8000)
+          ELSE NULL::text
+        END as content_html,
+        pm.tags as tags,
+        f.file_url as thumbnail,
+        'blog'::text as source_type,
+        p."blogId" as source_id,
+        NULL::uuid as community_id,
+        p."authorId" as author_id,
+        COALESCE(ps."likeCount", 0) as like_count,
+        COALESCE(ps."upvoteCount", 0) as upvote_count,
+        COALESCE(ps."downvoteCount", 0) as downvote_count,
+        COALESCE(ps."commentCount", 0) as comment_count,
+        COALESCE(ps."viewCount", 0) as view_count,
+        p."createdAt" as created_at,
+        p."updatedAt" as updated_at,
+        ${includeUserVote ? "pl_user.user_vote" : "NULL::text"} as user_vote,
+        FALSE as is_nsfw,
+        FALSE as is_spoiler,
+        FALSE as is_pinned,
+        b.id as blog_id,
+        COALESCE(b.alias, b.slug) as blog_slug,
+        b.alias as blog_alias,
+        b.name as blog_name,
+        NULL::uuid as comm_id,
+        NULL::text as comm_slug,
+        NULL::text as comm_name,
+        NULL::text as comm_icon,
+        NULL::text as comm_icon_fit,
+        u.id as user_id,
+        u.username,
+        pr."profileImage"
+      FROM target_ids t
+      INNER JOIN posts p ON p.id = t.id
+      LEFT JOIN (
+        SELECT
+          meta."postId",
+          meta.excerpt,
+          meta.tags
+        FROM post_metadata meta
+        WHERE meta."postId" = ANY($1::uuid[])
+      ) pm ON pm."postId" = p.id
+      LEFT JOIN (
+        SELECT
+          stats."postId",
+          stats."likeCount",
+          stats."upvoteCount",
+          stats."downvoteCount",
+          stats."commentCount",
+          stats."viewCount"
+        FROM post_stats stats
+        WHERE stats."postId" = ANY($1::uuid[])
+      ) ps ON ps."postId" = p.id
+      ${
+        includeUserVote
+          ? `LEFT JOIN (
+              SELECT pl."postId", pl.type::text as user_vote
+              FROM post_likes pl
+              WHERE pl."userId" = $2
+                AND pl."postId" = ANY($1::uuid[])
+            ) pl_user ON pl_user."postId" = p.id`
+          : ""
+      }
+      LEFT JOIN files f ON f.id = p."thumbnail_image_id"
+      LEFT JOIN blogs b ON b.id = p."blogId"
+      LEFT JOIN users u ON u.id = p."authorId"
+      LEFT JOIN profiles pr ON pr."userId" = u.id
+      WHERE p."isPublished" = true
+        AND p."isDeleted" = false
+        AND p.status = 'published'
+    `;
+
+    const params = includeUserVote ? [blogIds, userId as string] : [blogIds];
+    return this.dataSource.query(query, params);
+  }
+
+  private async fetchCommunityFeedItemsByIds(
+    communityIds: string[],
+    userId?: string,
+  ): Promise<any[]> {
+    if (!communityIds.length) {
+      return [];
+    }
+
+    const includeUserVote = !!userId;
+    const query = `
+      WITH target_ids AS (
+        SELECT DISTINCT UNNEST($1::uuid[]) AS id
+      )
+      SELECT
+        cp.id,
+        cp.title,
+        cp.slug,
+        LEFT(COALESCE(cp.content_markdown, cp.content), 200) as excerpt,
+        CASE
+          WHEN f.file_url IS NULL THEN LEFT(COALESCE(cp.content, cp.content_markdown), 8000)
+          ELSE NULL::text
+        END as content_html,
+        cp.tags as tags,
+        f.file_url as thumbnail,
+        'community'::text as source_type,
+        NULL::uuid as source_id,
+        cp."communityId" as community_id,
+        cp."authorId" as author_id,
+        cp."likeCount" as like_count,
+        cp."upvoteCount" as upvote_count,
+        cp."downvoteCount" as downvote_count,
+        cp."commentCount" as comment_count,
+        cp."viewCount" as view_count,
+        cp."createdAt" as created_at,
+        cp."updatedAt" as updated_at,
+        ${includeUserVote ? "cpl_user.user_vote" : "NULL::text"} as user_vote,
+        cp."isNsfw" as is_nsfw,
+        cp."isSpoiler" as is_spoiler,
+        cp."isPinned" as is_pinned,
+        NULL::uuid as blog_id,
+        NULL::text as blog_slug,
+        NULL::text as blog_alias,
+        NULL::text as blog_name,
+        c.id as comm_id,
+        c.slug as comm_slug,
+        c.name as comm_name,
+        c."iconUrl" as comm_icon,
+        c."iconImageFit" as comm_icon_fit,
+        u.id as user_id,
+        u.username,
+        pr."profileImage"
+      FROM target_ids t
+      INNER JOIN community_posts cp
+        ON cp.id = t.id
+      LEFT JOIN files f ON f.id = cp."thumbnailImageId"
+      INNER JOIN communities c
+        ON c.id = cp."communityId"
+        AND c."isPublic" = true
+        AND c."isPostDiscoverable" = true
+        AND c."joinPolicy" <> 'private'
+        AND c."deletedAt" IS NULL
+      LEFT JOIN users u ON u.id = cp."authorId"
+      LEFT JOIN profiles pr ON pr."userId" = u.id
+      ${
+        includeUserVote
+          ? `LEFT JOIN (
+              SELECT cpl."postId", cpl.type::text as user_vote
+              FROM community_post_likes cpl
+              WHERE cpl."userId" = $2
+                AND cpl."postId" = ANY($1::uuid[])
+            ) cpl_user ON cpl_user."postId" = cp.id`
+          : ""
+      }
+      WHERE cp.status = 'published'
+        AND cp."deletedAt" IS NULL
+    `;
+
+    const params = includeUserVote
+      ? [communityIds, userId as string]
+      : [communityIds];
     return this.dataSource.query(query, params);
   }
 
@@ -358,11 +426,24 @@ export class FeedService {
     userId?: string,
     period: FeedPeriodType = FeedPeriodType.ALL,
   ): Promise<UnifiedFeedItemDto[]> {
+    const normalizedUserId = this.normalizeUserId(userId);
+
+    if (sort === FeedSortType.RECENT && filter === FeedFilterType.ALL) {
+      return this.executeRecentUnifiedQueryOptimized(
+        limit,
+        cursor,
+        normalizedUserId,
+        period,
+      );
+    }
+
     const queryRunner = this.dataSource.createQueryRunner();
 
     try {
-      const userParamIndex = cursor ? 4 : 2;
-      const userParamPlaceholder = `$${userParamIndex}`;
+      const includeUserVote = !!normalizedUserId;
+      const userParamPlaceholder = includeUserVote
+        ? `$${cursor ? 4 : 2}`
+        : null;
       const communityVisibilityWhere = `AND c."joinPolicy" <> 'private'`;
 
       // 기간 필터 조건 생성
@@ -376,22 +457,25 @@ export class FeedService {
           p.id,
           p.title,
           p.slug,
-          p.excerpt,
-          p.content as content_html,
-          p.tags as tags,
+          COALESCE(pm.excerpt, LEFT(COALESCE(p.content_markdown, p.content), 200)) as excerpt,
+          CASE
+            WHEN f.file_url IS NULL THEN LEFT(COALESCE(p.content, p.content_markdown), 8000)
+            ELSE NULL::text
+          END as content_html,
+          pm.tags as tags,
           f.file_url as thumbnail,
           'blog'::text as source_type,
           p."blogId" as source_id,
           NULL::uuid as community_id,
           p."authorId" as author_id,
-          COALESCE(p."like_count", 0) as like_count,
-          COALESCE(p."like_count", 0) as upvote_count,
-          0 as downvote_count,
-          COALESCE(p."comment_count", 0) as comment_count,
-          COALESCE(p."view_count", 0) as view_count,
+          COALESCE(ps."likeCount", 0) as like_count,
+          COALESCE(ps."upvoteCount", 0) as upvote_count,
+          COALESCE(ps."downvoteCount", 0) as downvote_count,
+          COALESCE(ps."commentCount", 0) as comment_count,
+          COALESCE(ps."viewCount", 0) as view_count,
           p."createdAt" as created_at,
           p."updatedAt" as updated_at,
-          pl_user.type as user_vote,
+          ${includeUserVote ? "pl_user.type" : "NULL::text"} as user_vote,
           FALSE as is_nsfw,
           FALSE as is_spoiler,
           FALSE as is_pinned,
@@ -411,7 +495,13 @@ export class FeedService {
           u.username,
           pr."profileImage"
         FROM posts p
-        LEFT JOIN post_likes pl_user ON pl_user."postId" = p.id AND pl_user."userId" = ${userParamPlaceholder}
+        LEFT JOIN post_metadata pm ON pm."postId" = p.id
+        LEFT JOIN post_stats ps ON ps."postId" = p.id
+        ${
+          includeUserVote && userParamPlaceholder
+            ? `LEFT JOIN post_likes pl_user ON pl_user."postId" = p.id AND pl_user."userId" = ${userParamPlaceholder}`
+            : ""
+        }
         LEFT JOIN files f ON f.id = p."thumbnail_image_id"
         LEFT JOIN blogs b ON b.id = p."blogId"
         LEFT JOIN users u ON u.id = p."authorId"
@@ -432,8 +522,11 @@ export class FeedService {
           cp.id,
           cp.title,
           cp.slug,
-          LEFT(REGEXP_REPLACE(cp.content, '<[^>]*>', '', 'g'), 200) as excerpt,
-          cp.content as content_html,
+          LEFT(COALESCE(cp.content_markdown, cp.content), 200) as excerpt,
+          CASE
+            WHEN f.file_url IS NULL THEN LEFT(COALESCE(cp.content, cp.content_markdown), 8000)
+            ELSE NULL::text
+          END as content_html,
           cp.tags as tags,
           f.file_url as thumbnail,
           'community'::text as source_type,
@@ -447,7 +540,7 @@ export class FeedService {
           cp."viewCount" as view_count,
           cp."createdAt" as created_at,
           cp."updatedAt" as updated_at,
-          cpl_user.type as user_vote,
+          ${includeUserVote ? "cpl_user.type" : "NULL::text"} as user_vote,
           cp."isNsfw" as is_nsfw,
           cp."isSpoiler" as is_spoiler,
           cp."isPinned" as is_pinned,
@@ -476,8 +569,12 @@ export class FeedService {
           AND c."deletedAt" IS NULL
         LEFT JOIN users u ON u.id = cp."authorId"
         LEFT JOIN profiles pr ON pr."userId" = u.id
-        LEFT JOIN community_post_likes cpl_user
-          ON cpl_user."postId" = cp.id AND cpl_user."userId" = ${userParamPlaceholder}
+        ${
+          includeUserVote && userParamPlaceholder
+            ? `LEFT JOIN community_post_likes cpl_user
+          ON cpl_user."postId" = cp.id AND cpl_user."userId" = ${userParamPlaceholder}`
+            : ""
+        }
         WHERE cp.status = 'published'
           AND cp."deletedAt" IS NULL
           ${communityVisibilityWhere}
@@ -518,8 +615,9 @@ export class FeedService {
       const params: any[] = cursor
         ? [cursor.createdAt, cursor.id, limit]
         : [limit];
-
-      params.push(userId ?? null);
+      if (includeUserVote) {
+        params.push(normalizedUserId as string);
+      }
 
       // 쿼리 실행
       const rawResults = await queryRunner.query(finalQuery, params);
@@ -531,17 +629,201 @@ export class FeedService {
     }
   }
 
+  private async executeRecentUnifiedQueryOptimized(
+    limit: number,
+    cursor: CursorData | null,
+    userId?: string,
+    period: FeedPeriodType = FeedPeriodType.ALL,
+  ): Promise<UnifiedFeedItemDto[]> {
+    const normalizedUserId = this.normalizeUserId(userId);
+    const includeUserVote = !!normalizedUserId;
+    const periodCondition = this.getPeriodCondition(period);
+    const candidateLimit = Math.max(limit * 2, 40);
+
+    const query = `
+      WITH blog_candidates AS (
+        SELECT
+          p.id,
+          p."createdAt" as created_at
+        FROM posts p
+        WHERE p."isPublished" = true
+          AND p."isDeleted" = false
+          AND p.status = 'published'
+          ${periodCondition ? `AND p."createdAt" >= ${periodCondition}` : ""}
+          AND ($1::timestamptz IS NULL OR (p."createdAt", p.id) < ($1::timestamptz, $2::uuid))
+        ORDER BY p."createdAt" DESC, p.id DESC
+        LIMIT $3
+      ),
+      community_candidates AS (
+        SELECT
+          cp.id,
+          cp."createdAt" as created_at
+        FROM community_posts cp
+        INNER JOIN communities c
+          ON c.id = cp."communityId"
+          AND c."isPublic" = true
+          AND c."isPostDiscoverable" = true
+          AND c."joinPolicy" <> 'private'
+          AND c."deletedAt" IS NULL
+        WHERE cp.status = 'published'
+          AND cp."deletedAt" IS NULL
+          ${periodCondition ? `AND cp."createdAt" >= ${periodCondition}` : ""}
+          AND ($1::timestamptz IS NULL OR (cp."createdAt", cp.id) < ($1::timestamptz, $2::uuid))
+        ORDER BY cp."createdAt" DESC, cp.id DESC
+        LIMIT $3
+      ),
+      unified_candidates AS (
+        SELECT id, created_at, 'blog'::text as source_type
+        FROM blog_candidates
+        UNION ALL
+        SELECT id, created_at, 'community'::text as source_type
+        FROM community_candidates
+      ),
+      limited_candidates AS (
+        SELECT *
+        FROM unified_candidates
+        ORDER BY created_at DESC, id DESC
+        LIMIT $4
+      )
+      SELECT * FROM (
+        SELECT
+          p.id,
+          p.title,
+          p.slug,
+          COALESCE(pm.excerpt, LEFT(COALESCE(p.content_markdown, p.content), 200)) as excerpt,
+          CASE
+            WHEN f.file_url IS NULL THEN LEFT(COALESCE(p.content, p.content_markdown), 8000)
+            ELSE NULL::text
+          END as content_html,
+          pm.tags as tags,
+          f.file_url as thumbnail,
+          'blog'::text as source_type,
+          p."blogId" as source_id,
+          NULL::uuid as community_id,
+          p."authorId" as author_id,
+          COALESCE(ps."likeCount", 0) as like_count,
+          COALESCE(ps."upvoteCount", 0) as upvote_count,
+          COALESCE(ps."downvoteCount", 0) as downvote_count,
+          COALESCE(ps."commentCount", 0) as comment_count,
+          COALESCE(ps."viewCount", 0) as view_count,
+          lc.created_at as created_at,
+          p."updatedAt" as updated_at,
+          ${includeUserVote ? "pl_user.type" : "NULL::text"} as user_vote,
+          FALSE as is_nsfw,
+          FALSE as is_spoiler,
+          FALSE as is_pinned,
+          b.id as blog_id,
+          COALESCE(b.alias, b.slug) as blog_slug,
+          b.alias as blog_alias,
+          b.name as blog_name,
+          NULL::uuid as comm_id,
+          NULL::text as comm_slug,
+          NULL::text as comm_name,
+          NULL::text as comm_icon,
+          NULL::text as comm_icon_fit,
+          u.id as user_id,
+          u.username,
+          pr."profileImage"
+        FROM limited_candidates lc
+        INNER JOIN posts p
+          ON p.id = lc.id
+          AND lc.source_type = 'blog'
+        LEFT JOIN post_metadata pm ON pm."postId" = p.id
+        LEFT JOIN post_stats ps ON ps."postId" = p.id
+        ${
+          includeUserVote
+            ? `LEFT JOIN post_likes pl_user
+              ON pl_user."postId" = p.id AND pl_user."userId" = $5`
+            : ""
+        }
+        LEFT JOIN files f ON f.id = p."thumbnail_image_id"
+        LEFT JOIN blogs b ON b.id = p."blogId"
+        LEFT JOIN users u ON u.id = p."authorId"
+        LEFT JOIN profiles pr ON pr."userId" = u.id
+
+        UNION ALL
+
+        SELECT
+          cp.id,
+          cp.title,
+          cp.slug,
+          LEFT(COALESCE(cp.content_markdown, cp.content), 200) as excerpt,
+          CASE
+            WHEN f.file_url IS NULL THEN LEFT(COALESCE(cp.content, cp.content_markdown), 8000)
+            ELSE NULL::text
+          END as content_html,
+          cp.tags as tags,
+          f.file_url as thumbnail,
+          'community'::text as source_type,
+          NULL::uuid as source_id,
+          cp."communityId" as community_id,
+          cp."authorId" as author_id,
+          cp."likeCount" as like_count,
+          cp."upvoteCount" as upvote_count,
+          cp."downvoteCount" as downvote_count,
+          cp."commentCount" as comment_count,
+          cp."viewCount" as view_count,
+          lc.created_at as created_at,
+          cp."updatedAt" as updated_at,
+          ${includeUserVote ? "cpl_user.type" : "NULL::text"} as user_vote,
+          cp."isNsfw" as is_nsfw,
+          cp."isSpoiler" as is_spoiler,
+          cp."isPinned" as is_pinned,
+          NULL::uuid as blog_id,
+          NULL::text as blog_slug,
+          NULL::text as blog_alias,
+          NULL::text as blog_name,
+          c.id as comm_id,
+          c.slug as comm_slug,
+          c.name as comm_name,
+          c."iconUrl" as comm_icon,
+          c."iconImageFit" as comm_icon_fit,
+          u.id as user_id,
+          u.username,
+          pr."profileImage"
+        FROM limited_candidates lc
+        INNER JOIN community_posts cp
+          ON cp.id = lc.id
+          AND lc.source_type = 'community'
+        INNER JOIN communities c
+          ON c.id = cp."communityId"
+          AND c."isPublic" = true
+          AND c."isPostDiscoverable" = true
+          AND c."joinPolicy" <> 'private'
+          AND c."deletedAt" IS NULL
+        LEFT JOIN users u ON u.id = cp."authorId"
+        LEFT JOIN profiles pr ON pr."userId" = u.id
+        ${
+          includeUserVote
+            ? `LEFT JOIN community_post_likes cpl_user
+              ON cpl_user."postId" = cp.id AND cpl_user."userId" = $5`
+            : ""
+        }
+        LEFT JOIN files f ON f.id = cp."thumbnailImageId"
+      ) AS optimized_unified_feed
+      ORDER BY created_at DESC, id DESC
+    `;
+
+    const params: any[] = [
+      cursor?.createdAt ?? null,
+      cursor?.id ?? null,
+      candidateLimit,
+      limit,
+    ];
+
+    if (includeUserVote) {
+      params.push(normalizedUserId as string);
+    }
+
+    const rawResults = await this.dataSource.query(query, params);
+    return rawResults.map((row: any) => this.mapToFeedItem(row));
+  }
+
   /**
    * 원시 쿼리 결과를 DTO로 매핑
    */
   private mapToFeedItem(row: any): UnifiedFeedItemDto {
     const sourceType: FeedSourceType = row.source_type;
-    const contentHtml =
-      typeof row.content_html === "string" ? row.content_html : "";
-    const preferredYouTubeId =
-      this.extractPreferredYouTubeVideoIdFromContent(contentHtml);
-    const youtubeVideoId =
-      preferredYouTubeId || this.extractYouTubeVideoIdFromContent(contentHtml);
 
     const item: UnifiedFeedItemDto = {
       id: row.id,
@@ -549,7 +831,6 @@ export class FeedService {
       slug: row.slug,
       excerpt: row.excerpt || undefined,
       thumbnail: row.thumbnail || undefined,
-      youtubeVideoId: youtubeVideoId || undefined,
       sourceType,
       author: {
         id: row.user_id,
@@ -603,29 +884,24 @@ export class FeedService {
       }
     }
 
-    if (contentHtml) {
+    const contentForMediaFallback =
+      typeof row.content_html === "string" ? row.content_html : null;
+    if (contentForMediaFallback) {
       if (!item.excerpt) {
-        const excerpt = this.createExcerptFromHtml(contentHtml);
+        const excerpt = this.createExcerptFromHtml(contentForMediaFallback);
         if (excerpt) {
           item.excerpt = excerpt;
         }
       }
 
-      if (contentHtml.includes("<img")) {
-        const inlineImages = this.extractImageUrls(contentHtml);
-        if (inlineImages.length > 0) {
-          item.images = inlineImages;
-          if (!item.thumbnail) {
-            item.thumbnail = inlineImages[0];
-          }
+      const inlineImages =
+        this.extractImageUrlsFromContent(contentForMediaFallback);
+      if (inlineImages.length > 0) {
+        item.images = inlineImages;
+        if (!item.thumbnail) {
+          item.thumbnail = inlineImages[0];
         }
       }
-    }
-
-    if (preferredYouTubeId) {
-      item.thumbnail = this.buildYouTubeThumbnailUrl(preferredYouTubeId);
-    } else if (!item.thumbnail && youtubeVideoId) {
-      item.thumbnail = this.buildYouTubeThumbnailUrl(youtubeVideoId);
     }
 
     const userVote = row.user_vote ?? null;
@@ -665,49 +941,6 @@ export class FeedService {
     return item;
   }
 
-  private extractPreferredYouTubeVideoIdFromContent(
-    content: string,
-  ): string | null {
-    if (!content) return null;
-
-    const match = content.match(
-      /<div[^>]*data-youtube-video[^>]*data-thumbnail=["']true["'][^>]*>[\s\S]*?<\/div>/i,
-    );
-    if (!match) return null;
-
-    return this.extractYouTubeVideoIdFromContent(match[0]);
-  }
-
-  private extractYouTubeVideoIdFromContent(content: string): string | null {
-    if (!content) return null;
-
-    const iframeMatch = content.match(
-      /https?:\/\/(?:www\.)?youtube(?:-nocookie)?\.com\/embed\/([a-zA-Z0-9_-]{11})/i,
-    );
-    if (iframeMatch?.[1]) {
-      return iframeMatch[1];
-    }
-
-    const originalUrlMatch = content.match(
-      /data-original-url=["']([^"']+)["']/i,
-    );
-    if (originalUrlMatch?.[1]) {
-      const urlMatch = originalUrlMatch[1].match(
-        /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
-      );
-      if (urlMatch?.[1]) return urlMatch[1];
-    }
-
-    const urlFallback = content.match(
-      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
-    );
-    return urlFallback?.[1] ?? null;
-  }
-
-  private buildYouTubeThumbnailUrl(videoId: string): string {
-    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
-  }
-
   /**
    * 피드 캐시 무효화
    */
@@ -718,14 +951,32 @@ export class FeedService {
   /**
    * HTML 문자열에서 이미지 URL 추출
    */
-  private extractImageUrls(html: string): string[] {
-    const regex = /<img[^>]+src=["']([^"']+)["']/gi;
+  private extractImageUrlsFromContent(content: string): string[] {
     const urls = new Set<string>();
     let match: RegExpExecArray | null;
 
-    while ((match = regex.exec(html)) !== null) {
+    const htmlRegex = /<img[^>]+src=["']([^"']+)["']/gi;
+    while ((match = htmlRegex.exec(content)) !== null) {
       const url = match[1]?.trim();
-      if (url) {
+      if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
+        urls.add(url);
+      }
+    }
+
+    const markdownRegex = /!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/gi;
+    while ((match = markdownRegex.exec(content)) !== null) {
+      const rawUrl = match[1]?.trim();
+      const url = rawUrl?.replace(/^<|>$/g, "");
+      if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
+        urls.add(url);
+      }
+    }
+
+    const plainImageUrlRegex =
+      /https?:\/\/[^\s)"']+\.(?:png|jpe?g|gif|webp|avif|svg)(?:\?[^\s)"']*)?/gi;
+    while ((match = plainImageUrlRegex.exec(content)) !== null) {
+      const url = match[0]?.trim();
+      if (url && !url.startsWith("javascript:")) {
         urls.add(url);
       }
     }
@@ -778,5 +1029,22 @@ export class FeedService {
       default:
         return null;
     }
+  }
+
+  private normalizeUserId(userId?: string | null): string | undefined {
+    if (!userId) {
+      return undefined;
+    }
+
+    const trimmed = userId.trim();
+    if (
+      !trimmed ||
+      trimmed.toLowerCase() === "null" ||
+      trimmed.toLowerCase() === "undefined"
+    ) {
+      return undefined;
+    }
+
+    return trimmed;
   }
 }
