@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "codebase-blog-oauth": {
+      "baseUrl": "http://localhost:3002/mcp-remote",
+      "headers": {
+        "Accept": "application/json"
+      },
+      "auth": "oauth",
+      "oauthRedirectUrl": "http://127.0.0.1:33334/callback"
+    }
+  },
+  "imports": []
+}

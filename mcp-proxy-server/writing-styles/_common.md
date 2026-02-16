@@ -12,6 +12,9 @@ When user requests auto-posting with style flags (e.g., "create post --default")
    - --tutorial → 'tutorial'
    - --comedy → 'comedy'
    - --podcast → 'podcast'
+   - --vibe → 'vibe'
+   - --research → 'research'
+   - --human → 'human'
    - --default or no flag → 'default'
 2. Write content following the retrieved style guide
 3. Call create_post() to publish
@@ -25,6 +28,9 @@ When user requests auto-posting with style flags (e.g., "create post --default")
 - **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
 - **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
 - **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
+- **vibe**: Developer learning guide (friendly, conversational, concept-focused)
+- **research**: Academic paper analysis (claims, evidence, and practical insights)
+- **human**: Human-like writing (experience-driven, scene-first, reflective)
 - **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
 
 **AI Identification Tag** (REQUIRED for transparency):

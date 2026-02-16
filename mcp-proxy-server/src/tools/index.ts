@@ -19,6 +19,11 @@ import {
 import { logger } from '../utils/logger.js';
 import { WritingStyleService } from '../services/WritingStyleService.js';
 import axios from 'axios';
+import {
+  MCP_SERVER_INSTRUCTIONS,
+  TOOL_CATALOG,
+  type ToolName,
+} from './catalog.js';
 
 import { MetricsService } from '../services/MetricsService.js';
 
@@ -69,112 +74,15 @@ export async function registerAllTools(
         title: 'Codebase.blog MCP Server',
         websiteUrl: 'https://codebase.blog'
       },
-      instructions: `# Codebase.blog Auto-posting MCP Server
-
-## Workflow
-
-When user requests auto-posting with style flags (e.g., "create post --default"):
-
-1. Call check_auth() to verify authentication
-2. Call get_writing_style_guide(style) with appropriate style parameter:
-   - --novel → 'novel'
-   - --tutorial → 'tutorial'
-   - --comedy → 'comedy'
-   - --podcast → 'podcast'
-   - --vibe → 'vibe'
-   - --default or no flag → 'default'
-3. Write content following the retrieved style guide
-4. **Select a category** that best describes the post content (REQUIRED)
-5. Call create_post() to publish (must include title, content_markdown, and category)
-
-## Available Styles
-
-**Priority:** Preset styles (default if no flag) → Custom markdown (if user provides)
-
-- **default**: Professional technical blog (formal, detailed analysis) - used when no flag specified
-- **novel**: Narrative storytelling (vivid descriptions, emotional journey)
-- **tutorial**: Step-by-step guide (beginner-friendly, verification checkpoints)
-- **comedy**: Humorous tone (self-deprecating, relatable developer experiences)
-- **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
-- **vibe**: Developer learning guide (friendly, conversational, concept-focused)
-- **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
-
-## Important Requirements
-
-- **Category is REQUIRED**: Every post must have exactly 1 category that describes its content
-- **Tags are optional**: Add up to 10 tags to help with post discoverability
-
-## Tools
-
-- **check_auth**: Verify authentication status (required first call)
-- **get_writing_style_guide**: Retrieve writing style guidelines
-- **create_post**: Publish blog post to codebase.blog (requires: title, content_markdown, category)`
+      instructions: MCP_SERVER_INSTRUCTIONS,
     };
   });
 
-  // 도구 정의
-  const tools = [
-    {
-      name: 'check_auth',
-      description: 'REQUIRED FIRST: Verify authentication status. Always call this before creating posts to confirm user identity and blog access.',
-      inputSchema: {
-        type: 'object',
-        properties: {},
-      },
-    },
-    {
-      name: 'get_writing_style_guide',
-      description: 'Retrieve writing style guidelines for blog posts. Returns comprehensive style guide with instructions and validation requirements.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          customMarkdown: {
-            type: 'string',
-            description: 'User-provided custom style markdown (highest priority). Use this when user provides their own style guide in the conversation.',
-          },
-          style: {
-            type: 'string',
-            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast', 'vibe'],
-            default: 'default',
-            description: 'Preset style (used if customMarkdown not provided)',
-          },
-        },
-      },
-    },
-    {
-      name: 'create_post',
-      description: 'Create and publish a new blog post to codebase.blog.',
-      inputSchema: {
-        type: 'object',
-        properties: {
-          title: {
-            type: 'string',
-            description: 'Post title',
-          },
-          content_markdown: {
-            type: 'string',
-            description: 'Post content in markdown format',
-          },
-          tags: {
-            type: 'array',
-            items: { type: 'string' },
-            description: 'Tags (optional, max 10)',
-          },
-          category: {
-            type: 'string',
-            description: 'Category (required) - Select exactly 1 category that best describes the post content',
-          },
-          writingStyle: {
-            type: 'string',
-            enum: ['default', 'novel', 'tutorial', 'comedy', 'podcast', 'vibe'],
-            default: 'default',
-            description: 'Writing style preset',
-          },
-        },
-        required: ['title', 'content_markdown', 'category'],
-      },
-    },
-  ];
+  const tools = TOOL_CATALOG.map(({ name, description, inputSchema }) => ({
+    name,
+    description,
+    inputSchema,
+  }));
 
   // 도구 목록 핸들러
   mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -184,40 +92,57 @@ When user requests auto-posting with style flags (e.g., "create post --default")
   // 도구 실행 핸들러
   mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
     const { name, arguments: args } = request.params;
+    const toolName = name as ToolName;
 
     logger.debug({
-      tool: name,
+      tool: toolName,
       userId: context.userData.userId.substring(0, 8),
       blogSlug: context.userData.blog.slug,
     }, '🔧 Tool called');
 
+    const handlers: Record<ToolName, (toolArgs: any) => Promise<any>> = {
+      check_auth: async () => handleCheckAuth(context),
+      get_writing_style_guide: async (toolArgs) =>
+        handleGetWritingStyleGuide((toolArgs || {}) as any, context),
+      create_post: async (toolArgs) => handleCreatePost((toolArgs || {}) as any, context),
+      get_image_upload_url: async (toolArgs) =>
+        handleGetImageUploadUrl((toolArgs || {}) as any, context),
+      finalize_uploaded_image: async (toolArgs) =>
+        handleFinalizeUploadedImage((toolArgs || {}) as any, context),
+    };
+
+    const handler = handlers[toolName];
+    if (!handler) {
+      context.metricsService.recordRequest('error', toolName);
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                status: 'failed',
+                error: `Tool '${toolName}' is not registered`,
+                availableTools: TOOL_CATALOG.map((tool) => tool.name),
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+
     try {
-      let result;
-
-      switch (name) {
-        case 'check_auth':
-          result = await handleCheckAuth(context);
-          break;
-
-        case 'get_writing_style_guide':
-          result = await handleGetWritingStyleGuide(args as any, context);
-          break;
-
-        case 'create_post':
-          result = await handleCreatePost(args as any, context);
-          break;
-
-        default:
-          throw new Error(`Tool '${name}' not found`);
-      }
+      const result = await handler(args);
 
       // 메트릭 기록 (성공)
-      context.metricsService.recordRequest('success', name);
+      context.metricsService.recordRequest('success', toolName);
 
       return result;
     } catch (error) {
       // 메트릭 기록 (실패)
-      context.metricsService.recordRequest('error', name);
+      context.metricsService.recordRequest('error', toolName);
       throw error;
     }
   });
@@ -399,21 +324,7 @@ async function handleCreatePost(
 
     // Backend MCP API 호출 (포스트 생성)
     // API Key 또는 OAuth 토큰 인증
-    const headers: Record<string, string> = {};
-
-    if (context.apiKey) {
-      // API Key 인증 모드 (기존 방식)
-      headers['X-API-Key'] = context.apiKey;
-    } else if (context.oauthToken) {
-      // OAuth 인증 모드 (Claude 커스텀 커넥터)
-      headers['Authorization'] = `Bearer ${context.oauthToken}`;
-      headers['X-OAuth-User-Id'] = context.userData.userId;
-      headers['X-OAuth-Blog-Id'] = context.userData.blogId;
-    }
-
-    if (context.config.MCP_SHARED_SECRET) {
-      headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
-    }
+    const headers = buildBackendAuthHeaders(context);
 
     const response = await axios.post(
       `${context.config.BACKEND_BASE_URL}/api/v1/mcp/posts`,
@@ -483,6 +394,173 @@ ${post._meta ? `\n_Processing in background: ${post._meta.processingTime || 'ong
     }
 
     throw new Error(errorMessage);
+  }
+}
+
+function buildBackendAuthHeaders(context: ToolContext): Record<string, string> {
+  const headers: Record<string, string> = {};
+
+  if (context.apiKey) {
+    headers['X-API-Key'] = context.apiKey;
+  } else if (context.oauthToken) {
+    headers['Authorization'] = `Bearer ${context.oauthToken}`;
+    headers['X-OAuth-User-Id'] = context.userData.userId;
+    headers['X-OAuth-Blog-Id'] = context.userData.blogId;
+  }
+
+  if (context.config.MCP_SHARED_SECRET) {
+    headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
+  }
+
+  return headers;
+}
+
+async function handleGetImageUploadUrl(
+  args: { mimeType?: string; fileSize?: number },
+  context: ToolContext
+): Promise<any> {
+  const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
+  const mimeType = args.mimeType || 'image/png';
+  const fileSize = args.fileSize || 1024 * 1024;
+  const extension = mimeType.split('/')[1] || 'png';
+  const fileName = `generated-${Date.now()}.${extension}`;
+
+  try {
+    const response = await axios.post(
+      `${backendUrl}/api/v1/mcp/files/upload-url`,
+      {
+        fileName,
+        mimeType,
+        fileSize,
+        fileType: mimeType.startsWith('image/') ? 'image' : 'general',
+      },
+      {
+        headers: buildBackendAuthHeaders(context),
+      }
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              uploadUrl: response.data.uploadUrl,
+              fileKey: response.data.fileKey,
+              instructions: `Run locally: curl -X PUT -H "Content-Type: ${mimeType}" -T <path_to_file> "${response.data.uploadUrl}"`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Failed to get upload URL');
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              status: 'failed',
+              endpoint: '/api/v1/mcp/files/upload-url',
+              error: error.response?.data?.message || error.message,
+              instruction:
+                "Image upload URL request failed. Stop retrying image upload and continue with text-only 'create_post'.",
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+}
+
+async function handleFinalizeUploadedImage(
+  args: { fileKey?: string; mimeType?: string; fileSize?: number },
+  context: ToolContext
+): Promise<any> {
+  if (!args.fileKey) {
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              status: 'failed',
+              error: 'fileKey is required',
+              instruction:
+                "Missing fileKey. Stop image finalization and continue with text-only 'create_post'.",
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
+  const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
+  const fileUrl = `https://cdn.codebase.blog/${args.fileKey}`;
+  const mimeType = args.mimeType || 'image/png';
+  const fileSize = args.fileSize || 0;
+
+  try {
+    await axios.post(
+      `${backendUrl}/api/v1/mcp/files/upload-complete`,
+      {
+        fileKey: args.fileKey,
+        fileUrl,
+        fileName: args.fileKey,
+        mimeType,
+        fileSize,
+      },
+      {
+        headers: buildBackendAuthHeaders(context),
+      }
+    );
+
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              success: true,
+              publicUrl: fileUrl,
+              descriptor: `![Generated Image](${fileUrl})`,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  } catch (error: any) {
+    logger.error({ error: error.message }, 'Failed to finalize upload');
+    return {
+      isError: true,
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(
+            {
+              status: 'failed',
+              endpoint: '/api/v1/mcp/files/upload-complete',
+              error: error.response?.data?.message || error.message,
+              instruction:
+                "Image finalization failed. Stop retrying and continue with text-only 'create_post'.",
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
   }
 }
 

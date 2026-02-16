@@ -1109,7 +1109,7 @@ export class CommunityPostService {
           // 최종 카운트 조회
           const post = await manager.findOne(CommunityPost, {
             where: { id: postId },
-            select: ["upvoteCount", "downvoteCount", "likeCount"],
+            select: ["communityId", "upvoteCount", "downvoteCount", "likeCount"],
           });
 
           const upvoteCount = post?.upvoteCount || 0;
@@ -1117,9 +1117,13 @@ export class CommunityPostService {
 
           // 비동기 캐시 무효화
           setImmediate(() => {
-            this.cacheService
-              .del(PostCacheKeys.POST_BY_ID(postId))
-              .catch(() => {});
+            Promise.all([
+              this.cacheService.del(PostCacheKeys.POST_BY_ID(postId)),
+              this.cacheService.deletePattern("feed:unified:*"),
+              ...(post?.communityId
+                ? [this.invalidatePostListCache(post.communityId)]
+                : []),
+            ]).catch(() => {});
           });
 
           return {
