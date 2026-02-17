@@ -20,6 +20,9 @@ export class GitHubStrategy extends PassportStrategy(Strategy, "github") {
       callbackURL:
         configService.get("GITHUB_CALLBACK_URL") ||
         "http://localhost:3000/api/v1/auth/github/callback",
+      // GitHub OAuth 계정 선택 화면을 강제한다.
+      authorizationURL:
+        "https://github.com/login/oauth/authorize?prompt=select_account",
       scope: ["user:email"], // Request email scope to get user's email
     });
 
