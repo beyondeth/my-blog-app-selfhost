@@ -21,11 +21,11 @@ struct CommentPage {
 
 actor FeedRepository {
     private let client: APIClient
-    private let feedPath = "/mobile/feed"
-    private let postsPath = "/mobile/posts"
+    private let feedPath = "/feed"
+    private let postsPath = "/posts"
     private let filesPath = "/files"
     private let communityPostsPath = "/community"
-    private let commentsPath = "/mobile/posts"
+    private let commentsPath = "/posts"
     private let commentsLegacyPath = "/comments/post"
     private var detailCache: [String: MobilePost] = [:]
     private var detailInFlightTasks: [String: Task<MobilePost, Error>] = [:]

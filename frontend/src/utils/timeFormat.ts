@@ -12,18 +12,17 @@
  */
 export function formatRelativeTime(date: string | Date): string {
   const now = new Date();
-  const past = new Date(date);
+  const past = parseDateInput(date);
+  if (!past) {
+    return '방금 전';
+  }
 
   // 시간 차이 계산 (밀리초)
   const diffMs = now.getTime() - past.getTime();
 
   // 음수인 경우 (미래 날짜) - 날짜 표기로 fallback
   if (diffMs < 0) {
-    return past.toLocaleDateString('ko-KR', {
-      year: 'numeric',
-      month: 'numeric',
-      day: 'numeric'
-    }).replace(/\//g, '. ');
+    return formatAbsoluteDate(past);
   }
 
   // 각 단위로 변환
@@ -76,4 +75,38 @@ export function formatRelativeTime(date: string | Date): string {
   // 365일 이상 (1년, 2년, 3년...)
   const diffYears = Math.floor(diffDays / 365);
   return `${diffYears}년 전`;
+}
+
+function parseDateInput(input: string | Date): Date | null {
+  if (input instanceof Date) {
+    return Number.isNaN(input.getTime()) ? null : input;
+  }
+
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    const raw = Number(trimmed);
+    if (!Number.isNaN(raw) && Number.isFinite(raw)) {
+      const millis = raw > 9_999_999_999 ? raw : raw * 1000;
+      const epochDate = new Date(millis);
+      if (!Number.isNaN(epochDate.getTime())) {
+        return epochDate;
+      }
+    }
+  }
+
+  const parsed = new Date(trimmed);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  return null;
+}
+
+function formatAbsoluteDate(date: Date): string {
+  const year = date.getFullYear();
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${year}. ${month}. ${day}.`;
 }

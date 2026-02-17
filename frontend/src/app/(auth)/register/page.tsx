@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { EmailVerification } from '@/components/auth/EmailVerification';
@@ -14,6 +14,7 @@ import { useTheme } from 'next-themes';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const queryClient = useQueryClient();
   const { register, isLoading, clearError, refreshUser } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -54,12 +55,38 @@ export default function RegisterPage() {
     allAccepted: false
   });
 
+  const isMcpOAuth = searchParams.get('mcp_oauth') === 'true';
+  const mcpState = searchParams.get('state');
+  const mcpCallbackUrl = searchParams.get('callback_url');
+  const mcpClientName = searchParams.get('client_name') || 'Claude';
+  const mcpScope = searchParams.get('scope') || 'mcp:tools';
+  const loginHref = isMcpOAuth && mcpState && mcpCallbackUrl
+    ? `/login?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
+    : '/login';
+
   // 컴포넌트 마운트 시 전역 에러 초기화
   useEffect(() => {
     clearError();
     // clearError는 컨텍스트에서 재생성될 수 있으므로 최초 마운트에서만 실행
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // MCP OAuth 컨텍스트 보존
+  // - 회원가입 페이지에서 직접 로그인/소셜 가입이 진행돼도
+  //   OAuth complete 단계가 이어질 수 있도록 state를 유지합니다.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (!isMcpOAuth || !mcpState || !mcpCallbackUrl) return;
+
+    const mcpOAuthData = {
+      state: mcpState,
+      callback_url: mcpCallbackUrl,
+      client_name: mcpClientName,
+      scope: mcpScope,
+    };
+
+    sessionStorage.setItem('mcpOAuth', JSON.stringify(mcpOAuthData));
+  }, [isMcpOAuth, mcpState, mcpCallbackUrl, mcpClientName, mcpScope]);
 
   // 비밀번호 강도 체크
   useEffect(() => {
@@ -295,7 +322,7 @@ export default function RegisterPage() {
               <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
                 이미 계정이 있으신가요?{' '}
                 <Link
-                  href="/login"
+                  href={loginHref}
                   className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
                 >
                   로그인

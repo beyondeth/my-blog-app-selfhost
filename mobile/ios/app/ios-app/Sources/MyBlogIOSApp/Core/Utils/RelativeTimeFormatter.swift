@@ -37,13 +37,34 @@ enum RelativeTimeFormatter {
     }
 
     private static func parseDate(_ source: String) -> Date? {
-        if let date = iso8601WithFractional.date(from: source) {
+        let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        if let epochDate = parseEpochDate(trimmed) {
+            return epochDate
+        }
+
+        if let date = iso8601WithFractional.date(from: trimmed) {
             return date
         }
-        if let date = iso8601.date(from: source) {
+        if let date = iso8601.date(from: trimmed) {
             return date
         }
+
+        for formatter in fallbackDateFormatters {
+            if let date = formatter.date(from: trimmed) {
+                return date
+            }
+        }
+
         return nil
+    }
+
+    private static func parseEpochDate(_ source: String) -> Date? {
+        guard let raw = Double(source) else { return nil }
+        let seconds = raw > 9_999_999_999 ? raw / 1000.0 : raw
+        guard seconds.isFinite else { return nil }
+        return Date(timeIntervalSince1970: seconds)
     }
 
     private static let iso8601WithFractional: ISO8601DateFormatter = {
@@ -56,6 +77,24 @@ enum RelativeTimeFormatter {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter
+    }()
+
+    private static let fallbackDateFormatters: [DateFormatter] = {
+        let patterns = [
+            "yyyy-MM-dd'T'HH:mm:ss.SSSSSSXXXXX",
+            "yyyy-MM-dd'T'HH:mm:ss.SSSXXXXX",
+            "yyyy-MM-dd'T'HH:mm:ssXXXXX",
+            "yyyy-MM-dd HH:mm:ss",
+            "yyyy-MM-dd'T'HH:mm:ss",
+        ]
+
+        return patterns.map { pattern in
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = pattern
+            return formatter
+        }
     }()
 
     private static let absoluteDateFormatter: DateFormatter = {

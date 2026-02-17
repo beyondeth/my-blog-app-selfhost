@@ -299,10 +299,10 @@ FEED_STATUS="$(curl --silent --show-error \
   --output "$FEED_BODY" \
   --write-out '%{http_code}' \
   "${AUTH_HEADERS[@]}" \
-  "${BACKEND_URL}/api/v1/mobile/feed?limit=${FEED_LIMIT}")"
+  "${BACKEND_URL}/api/v1/feed?limit=${FEED_LIMIT}")"
 
 if [[ "$FEED_STATUS" != "200" ]]; then
-  log "mobile feed 조회 실패(status=${FEED_STATUS}). 토큰 또는 권한을 확인해 주세요."
+  log "feed 조회 실패(status=${FEED_STATUS}). 토큰 또는 권한을 확인해 주세요."
   log "response: $(cat \"$FEED_BODY\" 2>/dev/null || true)"
   rm -f "$FEED_BODY"
   exit 2

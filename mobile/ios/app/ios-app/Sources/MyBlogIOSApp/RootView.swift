@@ -140,18 +140,32 @@ private struct MainTabShellView: View {
     @EnvironmentObject private var appStore: AppStore
     @Environment(\.colorScheme) private var colorScheme
     @Binding var selectedTab: Int
+    @State private var isBottomChromeVisible = true
 
     private let tabs = [
-        TabItem(title: "Home", icon: "house.fill"),
-        TabItem(title: "Community", icon: "bubble.left.and.bubble.right"),
-        TabItem(title: "Create", icon: "plus"),
-        TabItem(title: "Profile", icon: "person"),
+        TabItem(title: "Home", icon: "house.fill", destination: 0),
+        TabItem(title: "Community", icon: "bubble.left.and.bubble.right", destination: 1),
+        TabItem(title: "Compose", icon: "plus", destination: 2),
+        TabItem(title: "Profile", icon: "person", destination: 3),
     ]
 
     var body: some View {
         Group {
             if selectedTab == 0 {
-                FeedView()
+                FeedView { direction in
+                    switch direction {
+                    case .down:
+                        guard isBottomChromeVisible else { return }
+                        withAnimation(.spring(response: 0.24, dampingFraction: 0.9)) {
+                            isBottomChromeVisible = false
+                        }
+                    case .up:
+                        guard !isBottomChromeVisible else { return }
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.84)) {
+                            isBottomChromeVisible = true
+                        }
+                    }
+                }
             } else if selectedTab == 1 {
                 CommunityLandingView()
             } else if selectedTab == 2 {
@@ -166,18 +180,11 @@ private struct MainTabShellView: View {
         .background(shellBackgroundColor)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            VStack(spacing: 0) {
-                customTabBar
-                    .padding(.horizontal, 14)
-                    .padding(.top, 4)
-                    .padding(.bottom, 6)
-
-                Rectangle()
-                    .fill(shellBackgroundColor)
-                    .frame(height: 18)
-            }
-            .frame(maxWidth: .infinity)
-            .background(shellBackgroundColor)
+            Color.clear
+                .frame(height: selectedTab != 2 && isBottomChromeVisible ? 56 : 0)
+        }
+        .overlay(alignment: .bottom) {
+            bottomChrome
         }
         .overlay(alignment: .top) {
             GeometryReader { proxy in
@@ -194,51 +201,105 @@ private struct MainTabShellView: View {
         .environmentObject(appStore)
         .toolbar(.hidden, for: .navigationBar)
         .toolbar(.hidden, for: .tabBar)
-    }
-
-    private var customTabBar: some View {
-        HStack(spacing: 6) {
-            ForEach(Array(tabs.enumerated()), id: \.offset) { index, tab in
-                tabButton(at: index, item: tab)
+        .onChange(of: selectedTab) { _, tab in
+            if tab == 2 {
+                isBottomChromeVisible = false
+            } else {
+                withAnimation(.easeOut(duration: 0.16)) {
+                    isBottomChromeVisible = true
+                }
             }
         }
-        .padding(.horizontal, 18)
-        .padding(.vertical, 11)
-        .background(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(tabBarBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(tabStrokeColor, lineWidth: 1)
-        )
-        .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.34 : 0.18), radius: 14, x: 0, y: 7)
     }
 
-    private func tabButton(at index: Int, item: TabItem) -> some View {
-        let isCreate = index == 2
-        let isSelected = selectedTab == index
-        return Button {
-            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
-                selectedTab = index
-            }
-        } label: {
-            ZStack {
-                if isCreate {
-                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                        .fill(createButtonBackground)
-                        .frame(width: 58, height: 42)
-                } else if isSelected {
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
-                        .fill(selectionBackground)
-                        .frame(width: 52, height: 38)
+    private var bottomChrome: some View {
+        GeometryReader { proxy in
+            let bottomInset = proxy.safeAreaInsets.bottom
+
+            ZStack(alignment: .bottomTrailing) {
+                if selectedTab != 2, isBottomChromeVisible {
+                    VStack(spacing: 0) {
+                        HStack(spacing: 2) {
+                            ForEach(tabs, id: \.destination) { tab in
+                                tabButton(item: tab)
+                            }
+                        }
+                        .padding(.horizontal, 18)
+                        .frame(height: 56)
+                        .background(shellBackgroundColor.opacity(0.98))
+
+                        if bottomInset > 0 {
+                            shellBackgroundColor
+                                .frame(height: bottomInset)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .bottom)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                Image(systemName: item.icon)
-                    .font(.system(size: isCreate ? 20 : 19, weight: .semibold))
-                    .foregroundStyle(isSelected ? selectedIconColor : unselectedIconColor)
+                if selectedTab != 2, !isBottomChromeVisible {
+                    Button {
+                        withAnimation(.spring(response: 0.26, dampingFraction: 0.84)) {
+                            selectedTab = 2
+                        }
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 22, weight: .semibold))
+                            .foregroundStyle(selectedIconColor)
+                            .frame(width: 56, height: 56)
+                            .background(
+                                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                                    .fill(createButtonBackground)
+                            )
+                    }
+                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .padding(.trailing, 20)
+                    .padding(.bottom, max(bottomInset, 8) + 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
             }
-            .frame(maxWidth: .infinity, minHeight: 46)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+            .animation(.easeOut(duration: 0.12), value: isBottomChromeVisible)
+            .ignoresSafeArea(edges: .bottom)
+            .allowsHitTesting(selectedTab != 2)
+        }
+        .allowsHitTesting(selectedTab != 2)
+    }
+
+    private func tabButton(item: TabItem) -> some View {
+        let isSelected = selectedTab == item.destination
+        return Button {
+            withAnimation(.spring(response: 0.3, dampingFraction: 0.82)) {
+                selectedTab = item.destination
+            }
+        } label: {
+            Group {
+                if item.destination == 2 {
+                    Image(systemName: "plus")
+                        .font(.system(size: 21, weight: .semibold))
+                        .foregroundStyle(isSelected ? selectedIconColor : unselectedIconColor)
+                        .frame(width: 48, height: 48)
+                        .background(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(createButtonBackground)
+                        )
+                        .frame(maxWidth: .infinity, minHeight: 50)
+                } else {
+                    ZStack {
+                        if isSelected {
+                            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                .fill(selectionBackground)
+                                .frame(width: 54, height: 40)
+                        }
+
+                        Image(systemName: item.icon)
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(isSelected ? selectedIconColor : unselectedIconColor)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 50)
+                }
+            }
             .animation(.spring(response: 0.3, dampingFraction: 0.75), value: selectedTab)
         }
         .buttonStyle(.plain)
@@ -247,16 +308,6 @@ private struct MainTabShellView: View {
 
     private var shellBackgroundColor: Color {
         colorScheme == .dark ? .black : Color(.systemGroupedBackground)
-    }
-
-    private var tabStrokeColor: Color {
-        colorScheme == .dark ? Color.white.opacity(0.11) : Color.black.opacity(0.08)
-    }
-
-    private var tabBarBackground: Color {
-        colorScheme == .dark
-            ? Color(red: 0.07, green: 0.09, blue: 0.13)
-            : Color.white
     }
 
     private var selectionBackground: Color {
@@ -279,4 +330,5 @@ private struct MainTabShellView: View {
 private struct TabItem {
     let title: String
     let icon: String
+    let destination: Int
 }

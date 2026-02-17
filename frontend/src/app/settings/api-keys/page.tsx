@@ -21,6 +21,9 @@ import {
   getAntigravityConfig,
   getCodexConfig,
   getCodexEnvSnippet,
+  getMcporterOAuthSnippet,
+  getMcporterSetupSnippet,
+  getMcporterUsageSnippet,
   getCodexWindowsEnvSnippet,
   getCodexWindowsPersistentSnippet,
   getCursorConfig,
@@ -654,6 +657,74 @@ export default function ApiKeysPage() {
                 copyTitle="복사"
                 copyAriaLabel="Qwen Coder 설정 복사"
               />
+            )}
+          </div>
+
+          {/* MCPorter */}
+          <div className="border border-gray-200 dark:border-[#2F3440] rounded-lg overflow-hidden">
+            <button
+              onClick={() => toggleEnv('mcporter')}
+              className={`w-full flex items-center justify-between p-3 sm:p-4 min-h-[44px] transition ${
+                expandedEnv === 'mcporter'
+                  ? 'bg-gray-900 text-white dark:bg-[#6D79FF] dark:text-white'
+                  : 'bg-gray-50 dark:bg-[#1F2229] hover:bg-gray-100 dark:hover:bg-[#272C36] text-gray-900 dark:text-gray-100'
+              }`}
+            >
+              <div className="flex items-center gap-2 sm:gap-3">
+                {expandedEnv === 'mcporter' ? (
+                  <ChevronDown className={`w-5 h-5 ${expandedEnv === 'mcporter' ? 'text-white' : 'text-gray-600 dark:text-gray-300 dark:text-gray-300'}`} />
+                ) : (
+                  <ChevronRight className={`w-5 h-5 ${expandedEnv === 'mcporter' ? 'text-white' : 'text-gray-600 dark:text-gray-300 dark:text-gray-300'}`} />
+                )}
+                <span className={`font-semibold ${expandedEnv === 'mcporter' ? 'text-white' : 'text-gray-900 dark:text-gray-100'}`}>MCPorter (CLI)</span>
+              </div>
+            </button>
+            {expandedEnv === 'mcporter' && (
+              <div className="bg-gray-900 dark:bg-gray-900 p-3 sm:p-4 space-y-5 overflow-hidden">
+                <p className="text-xs sm:text-sm text-gray-400">
+                  MCPorter는 MCP 서버를 일반 명령어처럼 다루는 CLI입니다. OAuth 1회 연결 후에는 `mcporter call ...`만으로 자동포스팅을 실행할 수 있습니다.
+                  로그인 화면이 보이지 않으면 기존 codebase.blog 로그인 세션으로 자동 승인된 상태일 수 있습니다.
+                </p>
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-300 mb-2">
+                    1. OAuth 초기 설정 (서버 등록 + 브라우저 인증)
+                  </p>
+                  <CodeSnippetBlock
+                    code={getMcporterSetupSnippet(getCurrentApiKey())}
+                    onCopy={() => copyToClipboard(getMcporterSetupSnippet(getCurrentApiKey(), false))}
+                    containerClassName="bg-gray-950 dark:bg-black rounded"
+                    preClassName="p-3"
+                    copyTitle="초기 설정 복사"
+                    copyAriaLabel="MCPorter 초기 설정 복사"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-300 mb-2">
+                    2. 실제 사용 명령
+                  </p>
+                  <CodeSnippetBlock
+                    code={getMcporterUsageSnippet()}
+                    onCopy={() => copyToClipboard(getMcporterUsageSnippet(false))}
+                    containerClassName="bg-gray-950 dark:bg-black rounded"
+                    preClassName="p-3"
+                    copyTitle="사용 명령 복사"
+                    copyAriaLabel="MCPorter 사용 명령 복사"
+                  />
+                </div>
+                <div>
+                  <p className="text-xs sm:text-sm text-gray-300 mb-2">
+                    3. API Key 모드가 필요한 경우 (선택)
+                  </p>
+                  <CodeSnippetBlock
+                    code={getMcporterOAuthSnippet(getCurrentApiKey())}
+                    onCopy={() => copyToClipboard(getMcporterOAuthSnippet(getCurrentApiKey(), false))}
+                    containerClassName="bg-gray-950 dark:bg-black rounded"
+                    preClassName="p-3"
+                    copyTitle="API Key 설정 복사"
+                    copyAriaLabel="MCPorter API Key 설정 복사"
+                  />
+                </div>
+              </div>
             )}
           </div>
 

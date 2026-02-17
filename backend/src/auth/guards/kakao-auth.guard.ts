@@ -1,11 +1,39 @@
 import { Injectable, ExecutionContext } from "@nestjs/common";
 import { AuthGuard } from "@nestjs/passport";
 import { ConfigService } from "@nestjs/config";
+import {
+  appendQueryParams,
+  decodeMobileOAuthState,
+  encodeMobileOAuthState,
+  parseAllowedMobileSchemes,
+  sanitizeMobileRedirectUri,
+} from "../utils/oauth-mobile-redirect.util";
 
 @Injectable()
 export class KakaoAuthGuard extends AuthGuard("kakao") {
+  private readonly allowedMobileSchemes: Set<string>;
+
   constructor(private configService: ConfigService) {
     super();
+    this.allowedMobileSchemes = parseAllowedMobileSchemes(
+      this.configService.get<string>("MOBILE_AUTH_REDIRECT_SCHEMES"),
+    );
+  }
+
+  getAuthenticateOptions(context: ExecutionContext) {
+    const request = context.switchToHttp().getRequest();
+    const mobileRedirectUri = sanitizeMobileRedirectUri(
+      request?.query?.redirect_uri,
+      this.allowedMobileSchemes,
+    );
+
+    if (!mobileRedirectUri) {
+      return {};
+    }
+
+    return {
+      state: encodeMobileOAuthState(mobileRedirectUri),
+    };
   }
 
   /**
@@ -18,19 +46,38 @@ export class KakaoAuthGuard extends AuthGuard("kakao") {
     if (err || !user) {
       // 에러 코드 및 메시지 추출
       const errorCode = err?.response?.code || "oauth_error";
-      const errorMessage = encodeURIComponent(
-        err?.response?.message || err?.message || "로그인 실패",
-      );
-      const remainingDays = err?.response?.remainingDays || 0;
+      const errorMessage = err?.response?.message || err?.message || "로그인 실패";
+      const encodedErrorMessage = encodeURIComponent(errorMessage);
+      const remainingDays = String(err?.response?.remainingDays || 0);
       const frontendUrl =
         this.configService.get("FRONTEND_URL") || "http://localhost:3001";
 
+      const mobileRedirectUri = this.resolveMobileRedirectUri(context);
+      if (mobileRedirectUri) {
+        return response.redirect(
+          appendQueryParams(mobileRedirectUri, {
+            error: errorCode,
+            message: errorMessage,
+            remainingDays,
+          }),
+        );
+      }
+
       // 프론트엔드 콜백 페이지로 에러 정보와 함께 리다이렉트
       return response.redirect(
-        `${frontendUrl}/auth/callback?error=${errorCode}&message=${errorMessage}&remainingDays=${remainingDays}`,
+        `${frontendUrl}/auth/callback?error=${errorCode}&message=${encodedErrorMessage}&remainingDays=${remainingDays}`,
       );
     }
 
     return user;
+  }
+
+  private resolveMobileRedirectUri(context: ExecutionContext): string | null {
+    const request = context.switchToHttp().getRequest();
+    const statePayload = decodeMobileOAuthState(request?.query?.state);
+    return sanitizeMobileRedirectUri(
+      statePayload?.mobileRedirectUri,
+      this.allowedMobileSchemes,
+    );
   }
 }

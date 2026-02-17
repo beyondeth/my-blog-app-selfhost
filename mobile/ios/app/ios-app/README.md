@@ -16,7 +16,7 @@
 - Xcode에서 `mobile/ios/app/ios-app` 경로를 Open
 - 대상 스킴: `MyBlogIOSApp`
 - 실행 순서:
-  1. 백엔드가 올라간 상태에서 `cd /Users/sihyungpark/Desktop/code/my-blog-app/mobile/ios`
+  1. 백엔드가 올라간 상태에서 `cd /Users/sihyungpark/Desktop/code/my-blog-app-ios/mobile/ios`
   2. `MOBILE_IOS_BUNDLE_ID=kr.sihyung.MyBlogIOSApp ./scripts/run-simulator-flow.sh`
 - 환경 변수:
   - `MOBILE_API_BASE_URL=http://localhost:3000/api/v1` (기본값 동일)
@@ -24,7 +24,7 @@
 
 ### 3) 최소 동작 검증
 - 로그인 화면에서 계정 로그인
-- 홈 피드(`/mobile/feed`) 리스트 로드
+- 홈 피드(`/feed`) 리스트 로드
 - 피드 셀 탭 → 상세 화면 이동
 - Profile 탭 → 사용자 정보/로그아웃
 

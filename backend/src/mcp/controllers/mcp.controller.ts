@@ -11,7 +11,6 @@ import {
   HttpStatus,
   Query,
   ParseIntPipe,
-  Logger,
 } from "@nestjs/common";
 import { McpApiKeyService } from "../services/mcp-api-key.service";
 import { JwtAuthGuard } from "../../auth/guards/jwt-auth.guard";
@@ -35,8 +34,6 @@ import { ResourceType } from "../../common/enums/subscription.enum";
  */
 @Controller("mcp")
 export class McpController {
-  private readonly logger = new Logger(McpController.name);
-
   constructor(
     private readonly mcpApiKeyService: McpApiKeyService,
     private readonly usageService: UsageService,
@@ -327,6 +324,7 @@ export class McpController {
         "podcast",
         "tutorial",
         "vibe",
+        "research",
         "human",
       ];
       const styleData = [];
@@ -352,7 +350,7 @@ export class McpController {
             content: preview,
           });
         } catch (error) {
-          this.logger.warn(
+          console.warn(
             `[MCP] Failed to load style: ${styleName}. Returning fallback metadata.`,
           );
           // 스타일 로드 실패해도 계속 진행 (fallback)
@@ -405,6 +403,14 @@ export class McpController {
               code_block_ratio: 0.15,
               ai_tag_required: true,
             },
+            research: {
+              style_name: "Research Insight Analysis Style",
+              language: "korean",
+              min_length: 6000,
+              target_length: "6000-9000",
+              code_block_ratio: 0.1,
+              ai_tag_required: true,
+            },
             human: {
               style_name: "Human-Like Writing Style",
               language: "korean",
@@ -412,7 +418,6 @@ export class McpController {
               target_length: "5000-8000",
               code_block_ratio: 0.15,
               ai_tag_required: true,
-              persona: "편집장 K",
             },
           };
 
@@ -438,7 +443,7 @@ export class McpController {
         data: styleData,
       };
     } catch (error) {
-      this.logger.error("Failed to fetch writing styles:", error);
+      console.error("Failed to fetch writing styles:", error);
       return {
         success: false,
         error: "Failed to fetch writing styles",
@@ -473,6 +478,7 @@ export class McpController {
         "podcast",
         "tutorial",
         "vibe",
+        "research",
         "human",
       ];
       if (!validStyles.includes(style)) {
@@ -532,7 +538,7 @@ export class McpController {
         },
       };
     } catch (error) {
-      this.logger.error(`Failed to fetch writing style: ${style}`, error);
+      console.error(`Failed to fetch writing style: ${style}`, error);
       return {
         success: false,
         error: "Failed to fetch writing style",
