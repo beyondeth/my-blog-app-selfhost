@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(AuthenticationServices)
+import AuthenticationServices
+#endif
 #if canImport(UIKit)
 import UIKit
 private typealias LoginPlatformImage = UIImage
@@ -10,7 +13,7 @@ private typealias LoginPlatformImage = NSImage
 struct LoginView: View {
     @EnvironmentObject private var appStore: AppStore
     @Environment(\.openURL) private var openURL
-    @Environment(\.colorScheme) private var colorScheme
+    @StateObject private var socialAuthCoordinator = SocialAuthCoordinator()
     @State private var email = ""
     @State private var password = ""
     @State private var socialError: String?
@@ -18,39 +21,37 @@ struct LoginView: View {
     @State private var passwordValidationError: String?
     @State private var isPasswordVisible = false
     @State private var isLoggingIn = false
+    @State private var isSocialAuthenticating = false
     @State private var loginAttempts = 0
     private let maxLoginAttempts = 5
 
     var body: some View {
-        let isAuthenticating = appStore.isBusy || isLoggingIn
+        let isAuthenticating = appStore.isBusy || isLoggingIn || isSocialAuthenticating
 
         ZStack {
             LoginBackground()
 
             ScrollView {
-                VStack(spacing: 24) {
+                VStack(spacing: 20) {
                     VStack(spacing: 12) {
                         BrandResourceImage(
-                            resource: colorScheme == .dark ? "block-logo-dark" : "block-logo",
+                            resource: "block-logo-clean",
                             ext: "png",
                             subdirectory: "App",
-                            width: 58,
-                            height: 58,
+                            width: 62,
+                            height: 62,
                         )
 
-                        Text("다시 만나서 반가워요")
-                            .font(.system(size: 31, weight: .bold, design: .rounded))
+                        Text("Codebase")
+                            .font(.system(size: 29, weight: .semibold, design: .default))
+                            .tracking(-0.3)
                             .foregroundStyle(.primary)
                             .multilineTextAlignment(.center)
 
-                        Text("계정으로 로그인하세요")
-                            .font(.title3)
-                            .fontWeight(.semibold)
+                        Text("국내 최대 AI 커뮤니티 & 블로그 자동화")
+                            .font(.system(size: 15, weight: .regular, design: .default))
                             .foregroundStyle(.secondary)
-
-                        Text("웹 계정과 동일한 정책으로 바로 연결됩니다")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
 
                     if let socialError {
@@ -84,71 +85,63 @@ struct LoginView: View {
                         MessageBanner(text: message, style: .success)
                     }
 
-                    LoginCard {
-                        VStack(spacing: 14) {
-                            LoginInputField(
-                                title: "이메일",
-                                placeholder: "name@example.com",
-                                text: $email,
-                                keyboardType: .emailAddress,
-                                contentType: .emailAddress,
-                                validationMessage: emailValidationError,
-                                isEnabled: true
-                            )
+                    VStack(alignment: .leading, spacing: 14) {
+                        LoginInputField(
+                            title: "이메일",
+                            placeholder: "name@example.com",
+                            text: $email,
+                            keyboardType: .emailAddress,
+                            contentType: .emailAddress,
+                            validationMessage: emailValidationError,
+                            isEnabled: true
+                        )
 
-                            LoginSecureInputField(
-                                title: "비밀번호",
-                                placeholder: "비밀번호",
-                                text: $password,
-                                isVisible: $isPasswordVisible,
-                                validationMessage: passwordValidationError,
-                                isEnabled: true
-                            )
+                        LoginSecureInputField(
+                            title: "비밀번호",
+                            placeholder: "비밀번호",
+                            text: $password,
+                            isVisible: $isPasswordVisible,
+                            validationMessage: passwordValidationError,
+                            isEnabled: true
+                        )
 
-                            Button {
-                                Task {
-                                    await submitLogin()
-                                }
-                            } label: {
-                                HStack(spacing: 10) {
-                                    if isAuthenticating {
-                                        ProgressView()
-                                            .tint(.white)
-                                    } else {
-                                        Image(systemName: "arrow.right.circle.fill")
-                                        Text("이메일로 로그인")
-                                            .fontWeight(.semibold)
-                                    }
-                                }
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 50)
-                                .foregroundStyle(.white)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .fill(
-                                            LinearGradient(
-                                                colors: [Color(red: 0.14, green: 0.42, blue: 1.00), Color(red: 0.46, green: 0.35, blue: 1.0)],
-                                                startPoint: .leading,
-                                                endPoint: .trailing,
-                                            )
-                                        )
-                                )
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                        .stroke(Color.white.opacity(0.35), lineWidth: 1)
-                                )
-                                .shadow(color: Color.blue.opacity(0.28), radius: 12, y: 6)
+                        Button {
+                            Task {
+                                await submitLogin()
                             }
-                            .buttonStyle(.plain)
-                            .disabled(
-                                isAuthenticating
-                                || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                || password.isEmpty
-                                || loginAttempts >= maxLoginAttempts
+                        } label: {
+                            HStack(spacing: 10) {
+                                if isAuthenticating {
+                                    ProgressView()
+                                        .tint(.black.opacity(0.85))
+                                } else {
+                                    Image(systemName: "envelope")
+                                    Text("이메일로 로그인하기")
+                                        .fontWeight(.semibold)
+                                }
+                            }
+                            .frame(maxWidth: .infinity)
+                            .frame(height: 50)
+                            .foregroundStyle(Color.black.opacity(0.9))
+                            .background(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .fill(Color.white.opacity(0.95))
                             )
-                            .accessibilityHint(isAuthenticating ? "로그인 처리 중" : "로그인 실행")
-                            .accessibilityLabel("로그인 제출")
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                    .stroke(Color.white.opacity(0.3), lineWidth: 1)
+                            )
+                            .shadow(color: Color.black.opacity(0.18), radius: 10, y: 4)
                         }
+                        .buttonStyle(.plain)
+                        .disabled(
+                            isAuthenticating
+                            || email.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || password.isEmpty
+                            || loginAttempts >= maxLoginAttempts
+                        )
+                        .accessibilityHint(isAuthenticating ? "로그인 처리 중" : "로그인 실행")
+                        .accessibilityLabel("로그인 제출")
 
                         if loginAttempts > 0 {
                             Text("로그인 실패 횟수: \(loginAttempts)/\(maxLoginAttempts)")
@@ -161,10 +154,6 @@ struct LoginView: View {
                             Spacer()
                             ForgotLinkButton(url: forgotPasswordURL, label: "비밀번호를 잊으셨나요?")
                         }
-
-                        Divider()
-                            .overlay(.secondary)
-                            .padding(.vertical, 8)
 
                         SectionDivider(label: "또는")
                             .padding(.vertical, 4)
@@ -180,12 +169,6 @@ struct LoginView: View {
                             }
                         }
 
-                        Text("소셜 로그인은 웹 인증 후 앱으로 이동해 주세요.")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .multilineTextAlignment(.center)
-                            .lineLimit(nil)
-                            .padding(.top, 10)
                     }
 
                     HStack(spacing: 8) {
@@ -199,6 +182,8 @@ struct LoginView: View {
                 .padding(.horizontal, 20)
                 .padding(.top, 24)
                 .padding(.bottom, 32)
+                .frame(maxWidth: 460)
+                .frame(maxWidth: .infinity)
             }
             .scrollBounceBehavior(.basedOnSize)
         }
@@ -209,6 +194,9 @@ struct LoginView: View {
             socialError = nil
             emailValidationError = nil
             passwordValidationError = nil
+        }
+        .onDisappear {
+            socialAuthCoordinator.cancel()
         }
     }
 
@@ -282,17 +270,11 @@ struct LoginView: View {
     }
 
     private var registerURL: URL? {
-        guard let base = appStore.socialLoginURL(for: .google) else {
-            return nil
-        }
-        return base.deletingLastPathComponent().appendingPathComponent("register")
+        appStore.frontendBaseURL?.appendingPathComponent("register")
     }
 
     private var forgotPasswordURL: URL? {
-        guard let base = appStore.socialLoginURL(for: .google) else {
-            return nil
-        }
-        return base.deletingLastPathComponent().appendingPathComponent("forgot-password")
+        appStore.frontendBaseURL?.appendingPathComponent("forgot-password")
     }
 
     private func openSocialLogin(_ provider: SocialProvider) {
@@ -300,34 +282,139 @@ struct LoginView: View {
             socialError = "\(provider.label) 로그인 경로를 불러올 수 없습니다."
             return
         }
+        guard let callbackScheme = appStore.socialAuthCallbackScheme, !callbackScheme.isEmpty else {
+            socialError = "소셜 로그인 콜백 설정이 누락되었습니다."
+            return
+        }
         appStore.clearAuthError()
         socialError = nil
-        openURL(url)
-        socialError = "\(provider.label) 로그인 페이지를 열었습니다. 완료 후 앱으로 돌아와 주세요."
+        isSocialAuthenticating = true
+
+        socialAuthCoordinator.start(
+            url: url,
+            callbackScheme: callbackScheme,
+            onCallback: { callbackURL in
+                Task { @MainActor in
+                    await appStore.handleIncomingURL(callbackURL)
+                    isSocialAuthenticating = false
+                }
+            },
+            onCancel: {
+                isSocialAuthenticating = false
+            },
+            onFailure: { message in
+                socialError = message
+                isSocialAuthenticating = false
+            }
+        )
     }
 }
 
-private struct LoginBackground: View {
-    @Environment(\.colorScheme) private var colorScheme
+#if canImport(AuthenticationServices)
+@MainActor
+private final class SocialAuthCoordinator: NSObject, ObservableObject {
+    private var session: ASWebAuthenticationSession?
+    private lazy var presentationContextProvider = SocialAuthPresentationContextProvider()
 
+    func start(
+        url: URL,
+        callbackScheme: String,
+        onCallback: @escaping (URL) -> Void,
+        onCancel: @escaping () -> Void,
+        onFailure: @escaping (String) -> Void
+    ) {
+        cancel()
+
+        let authSession = ASWebAuthenticationSession(
+            url: url,
+            callbackURLScheme: callbackScheme
+        ) { [weak self] callbackURL, error in
+            Task { @MainActor in
+                self?.session = nil
+
+                if let callbackURL {
+                    onCallback(callbackURL)
+                    return
+                }
+
+                if let authError = error as? ASWebAuthenticationSessionError,
+                   authError.code == .canceledLogin {
+                    onCancel()
+                    return
+                }
+
+                onFailure(error?.localizedDescription ?? "소셜 로그인 인증을 완료하지 못했습니다.")
+            }
+        }
+
+        authSession.prefersEphemeralWebBrowserSession = true
+        authSession.presentationContextProvider = presentationContextProvider
+        session = authSession
+
+        if !authSession.start() {
+            session = nil
+            onFailure("소셜 로그인 세션을 시작하지 못했습니다.")
+        }
+    }
+
+    func cancel() {
+        session?.cancel()
+        session = nil
+    }
+}
+
+#if canImport(UIKit)
+private final class SocialAuthPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first(where: \.isKeyWindow) ?? ASPresentationAnchor()
+    }
+}
+#elseif canImport(AppKit)
+private final class SocialAuthPresentationContextProvider: NSObject, ASWebAuthenticationPresentationContextProviding {
+    func presentationAnchor(for session: ASWebAuthenticationSession) -> ASPresentationAnchor {
+        NSApplication.shared.keyWindow ?? ASPresentationAnchor()
+    }
+}
+#endif
+#else
+@MainActor
+private final class SocialAuthCoordinator: ObservableObject {
+    func start(
+        url: URL,
+        callbackScheme: String,
+        onCallback: @escaping (URL) -> Void,
+        onCancel: @escaping () -> Void,
+        onFailure: @escaping (String) -> Void
+    ) {
+        onFailure("이 플랫폼에서는 소셜 로그인 세션을 지원하지 않습니다.")
+    }
+
+    func cancel() {}
+}
+#endif
+
+private struct LoginBackground: View {
     var body: some View {
         GeometryReader { proxy in
-            let base = LinearGradient(
+            let baseGradient = LinearGradient(
                 colors: [
-                    colorScheme == .dark ? Color(red: 0.06, green: 0.08, blue: 0.14) : Color(red: 0.95, green: 0.97, blue: 1.0),
-                    colorScheme == .dark ? Color(red: 0.08, green: 0.11, blue: 0.19) : Color(red: 0.87, green: 0.9, blue: 1.0),
-                    colorScheme == .dark ? Color(red: 0.03, green: 0.04, blue: 0.08) : Color.white,
+                    Color(red: 0.04, green: 0.05, blue: 0.08),
+                    Color(red: 0.06, green: 0.08, blue: 0.12),
+                    Color(red: 0.03, green: 0.04, blue: 0.06),
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing,
             )
 
-            base
+            baseGradient
                 .ignoresSafeArea()
                 .overlay(
                     LinearGradient(
                         colors: [
-                            colorScheme == .dark ? Color.white.opacity(0.05) : Color.white.opacity(0.5),
+                            Color.white.opacity(0.04),
                             Color.clear,
                         ],
                         startPoint: .top,
@@ -336,72 +423,25 @@ private struct LoginBackground: View {
                 )
                 .overlay(
                     Circle()
-                        .fill(Color.blue.opacity(colorScheme == .dark ? 0.22 : 0.16))
-                        .frame(width: max(proxy.size.width, proxy.size.height) * 0.62)
-                        .blur(radius: 2)
+                        .fill(Color(red: 0.0, green: 0.72, blue: 0.84).opacity(0.16))
+                        .frame(width: max(proxy.size.width, proxy.size.height) * 0.56)
+                        .blur(radius: 14)
                         .offset(x: -proxy.size.width * 0.25, y: -proxy.size.height * 0.2),
                     alignment: .topLeading,
                 )
                 .overlay(
                     Circle()
-                        .fill(Color.purple.opacity(colorScheme == .dark ? 0.22 : 0.16))
-                        .frame(width: max(proxy.size.width, proxy.size.height) * 0.58)
-                        .blur(radius: 1)
+                        .fill(Color(red: 0.01, green: 0.63, blue: 0.86).opacity(0.11))
+                        .frame(width: max(proxy.size.width, proxy.size.height) * 0.52)
+                        .blur(radius: 18)
                         .offset(x: proxy.size.width * 0.25, y: proxy.size.height * 0.35),
                     alignment: .topLeading,
                 )
-                .overlay(
-                    Circle()
-                        .fill(Color.indigo.opacity(colorScheme == .dark ? 0.2 : 0.12))
-                        .frame(width: max(proxy.size.width, proxy.size.height) * 0.5)
-                        .blur(radius: 1)
-                        .offset(x: proxy.size.width * 0.4, y: -proxy.size.height * 0.35),
-                    alignment: .topLeading,
-                )
         }
-    }
-}
-
-private struct LoginCard<Content: View>: View {
-    @Environment(\.colorScheme) private var colorScheme
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            content
-        }
-        .padding(18)
-        .background(
-            RoundedRectangle(cornerRadius: 20, style: .continuous)
-                .fill(
-                    LinearGradient(
-                        colors: colorScheme == .dark
-                            ? [Color.white.opacity(0.12), Color.white.opacity(0.06)]
-                            : [Color.white.opacity(0.7), Color.white.opacity(0.4)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing,
-                    )
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20, style: .continuous)
-                        .stroke(
-                            LinearGradient(
-                                colors: colorScheme == .dark
-                                    ? [Color.white.opacity(0.28), Color.white.opacity(0.08)]
-                                    : [Color.white.opacity(0.7), Color.white.opacity(0.2)],
-                                startPoint: .top,
-                                endPoint: .bottom,
-                            ),
-                            lineWidth: 1,
-                        ),
-                )
-                .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.25 : 0.08), radius: 12, y: 8)
-        )
     }
 }
 
 private struct LoginInputField: View {
-    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let placeholder: String
     @Binding var text: String
@@ -421,20 +461,21 @@ private struct LoginInputField: View {
                 .keyboardType(keyboardType)
                 .textContentType(contentType)
                 .autocorrectionDisabled()
-                .foregroundStyle(colorScheme == .dark ? Color.white : Color.primary)
+                .foregroundStyle(Color.white.opacity(0.96))
                 .disabled(!isEnabled)
-                .padding(14)
+                .padding(.horizontal, 14)
+                .frame(height: 50)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color(uiColor: .systemBackground).opacity(0.92))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.1))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 12)
                         .stroke(
                             validationMessage == nil
-                                ? (colorScheme == .dark ? Color.white.opacity(0.2) : Color.secondary.opacity(0.18))
+                                ? Color.white.opacity(0.18)
                                 : Color.red.opacity(0.7),
-                            lineWidth: 0.8
+                            lineWidth: 1
                         ),
                 )
                 .onChange(of: text) {
@@ -448,7 +489,6 @@ private struct LoginInputField: View {
 }
 
 private struct LoginSecureInputField: View {
-    @Environment(\.colorScheme) private var colorScheme
     let title: String
     let placeholder: String
     @Binding var text: String
@@ -468,14 +508,14 @@ private struct LoginSecureInputField: View {
                         .textInputAutocapitalization(.never)
                         .textContentType(.password)
                         .autocorrectionDisabled()
-                        .foregroundStyle(colorScheme == .dark ? Color.white : Color.primary)
+                        .foregroundStyle(Color.white.opacity(0.96))
                         .disabled(!isEnabled)
                 } else {
                     SecureField(placeholder, text: $text)
                         .textInputAutocapitalization(.never)
                         .textContentType(.password)
                         .autocorrectionDisabled()
-                        .foregroundStyle(colorScheme == .dark ? Color.white : Color.primary)
+                        .foregroundStyle(Color.white.opacity(0.96))
                         .disabled(!isEnabled)
                 }
 
@@ -487,18 +527,19 @@ private struct LoginSecureInputField: View {
                 }
                 .buttonStyle(.plain)
             }
-            .padding(14)
+            .padding(.horizontal, 14)
+            .frame(height: 50)
                 .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(colorScheme == .dark ? Color.white.opacity(0.10) : Color(uiColor: .systemBackground).opacity(0.92))
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .fill(Color.white.opacity(0.1))
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 12)
                         .stroke(
                             validationMessage == nil
-                                ? (colorScheme == .dark ? Color.white.opacity(0.2) : Color.secondary.opacity(0.18))
+                                ? Color.white.opacity(0.18)
                                 : Color.red.opacity(0.7),
-                            lineWidth: 0.8
+                            lineWidth: 1
                         ),
                 )
         }
@@ -524,7 +565,6 @@ private struct SocialLoginButtonStyle {
 }
 
 private struct SocialLoginButton: View {
-    @Environment(\.colorScheme) private var colorScheme
     let style: SocialLoginButtonStyle
 
     var body: some View {
@@ -540,37 +580,20 @@ private struct SocialLoginButton: View {
                 Text(style.label)
                     .font(.subheadline)
                     .fontWeight(.semibold)
-                    .foregroundStyle(colorScheme == .dark ? Color.white : Color.primary)
+                    .foregroundStyle(Color.white.opacity(0.95))
                 Spacer()
             }
             .padding(.horizontal, 14)
-            .frame(height: 46)
+            .frame(height: 50)
             .background(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: colorScheme == .dark
-                                ? [Color.white.opacity(0.12), Color.white.opacity(0.07)]
-                                : [Color.white.opacity(0.98), Color.white.opacity(0.88)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing,
-                        )
-                    )
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .fill(Color.white.opacity(0.11))
             )
             .overlay(
-                RoundedRectangle(cornerRadius: 12, style: .continuous)
-                    .stroke(
-                        LinearGradient(
-                            colors: colorScheme == .dark
-                                ? [Color.white.opacity(0.2), Color.white.opacity(0.06)]
-                                : [Color.gray.opacity(0.25), Color.gray.opacity(0.08)],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing,
-                        ),
-                        lineWidth: 1,
-                    )
+                RoundedRectangle(cornerRadius: 13, style: .continuous)
+                    .stroke(Color.white.opacity(0.18), lineWidth: 1)
             )
-            .shadow(color: Color.black.opacity(colorScheme == .dark ? 0.2 : 0.06), radius: 8, y: 3)
+            .shadow(color: Color.black.opacity(0.2), radius: 6, y: 2)
             .opacity(style.isDisabled ? 0.55 : 1)
         }
         .buttonStyle(.plain)
@@ -665,13 +688,12 @@ private struct BrandResourceImage: View {
 
 private struct SocialBrandMark: View {
     let provider: SocialProvider
-    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         switch provider {
         case .google:
             BrandResourceImage(
-                resource: colorScheme == .dark ? "google_dark" : "google_light",
+                resource: "google_g",
                 ext: "png",
                 subdirectory: "Auth",
                 width: 20,
@@ -680,7 +702,7 @@ private struct SocialBrandMark: View {
             )
         case .github:
             BrandResourceImage(
-                resource: colorScheme == .dark ? "GitHub_Logo_White" : "GitHub_Logo",
+                resource: "github_flat_white",
                 ext: "png",
                 subdirectory: "Auth",
                 width: 20,
@@ -768,19 +790,32 @@ private enum AppResourceImageLoader {
 }
 
 private struct MessageBanner: View {
+    @Environment(\.colorScheme) private var colorScheme
+
     enum Style {
         case error
         case success
         case warning
 
+        var iconName: String {
+            switch self {
+            case .error:
+                return "xmark.circle.fill"
+            case .success:
+                return "checkmark.circle.fill"
+            case .warning:
+                return "exclamationmark.triangle.fill"
+            }
+        }
+
         var tint: Color {
             switch self {
             case .error:
-                return .red
+                return Color(red: 0.84, green: 0.24, blue: 0.21)
             case .success:
-                return .green
+                return Color(red: 0.09, green: 0.49, blue: 0.93)
             case .warning:
-                return .orange
+                return Color(red: 0.89, green: 0.53, blue: 0.0)
             }
         }
     }
@@ -789,15 +824,40 @@ private struct MessageBanner: View {
     let style: Style
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
-            Image(systemName: "info.circle")
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: style.iconName)
+                .font(.subheadline)
+                .foregroundStyle(style.tint)
+                .frame(width: 22, height: 22)
+                .background(
+                    Circle()
+                        .fill(style.tint.opacity(colorScheme == .dark ? 0.2 : 0.14))
+                )
+
             Text(text)
                 .font(.footnote)
                 .lineLimit(nil)
+                .foregroundStyle(colorScheme == .dark ? Color.white.opacity(0.92) : Color.black.opacity(0.8))
         }
-        .foregroundStyle(style.tint)
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(style.tint.opacity(0.1), in: RoundedRectangle(cornerRadius: 10))
+        .background(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            style.tint.opacity(colorScheme == .dark ? 0.2 : 0.12),
+                            colorScheme == .dark ? Color.white.opacity(0.07) : Color.white.opacity(0.9),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing,
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .stroke(style.tint.opacity(colorScheme == .dark ? 0.45 : 0.3), lineWidth: 1)
+        )
     }
 }

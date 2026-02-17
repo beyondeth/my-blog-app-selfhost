@@ -30,32 +30,43 @@ struct CommunityLandingView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 20) {
                     topBar
                     searchBar
                     communitySection(
+                        sectionLabel: "MY COMMUNITIES",
                         title: "내 커뮤니티",
                         communities: joinedCommunities,
                         emptyText: "참여 중인 커뮤니티가 없습니다."
                     )
                     communitySection(
+                        sectionLabel: "DISCOVER",
                         title: "추천 커뮤니티",
                         communities: recommendedCommunities,
                         emptyText: "추천 커뮤니티가 없습니다."
                     )
 
+                    if let errorMessage = vm.errorMessage {
+                        Text(errorMessage)
+                            .font(.footnote)
+                            .foregroundStyle(.red.opacity(0.95))
+                            .padding(.top, 2)
+                    }
+
                     if vm.hasMore {
                         ProgressView("다음 커뮤니티 로딩 중")
-                            .foregroundStyle(primaryText)
+                            .font(.footnote.weight(.medium))
+                            .foregroundStyle(secondaryText)
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.vertical, 12)
+                            .padding(.vertical, 16)
                             .task { await vm.loadMore() }
                     }
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
+                .padding(.bottom, 24)
             }
-            .background(backgroundColor)
+            .background(backgroundColor.ignoresSafeArea())
             .navigationBarHidden(true)
             .task {
                 vm.setRepository(appStore.makeCommunityRepository())
@@ -86,60 +97,82 @@ struct CommunityLandingView: View {
 
     private var topBar: some View {
         HStack {
-            Text("커뮤니티")
-                .font(.system(size: 28, weight: .bold, design: .rounded))
-                .foregroundStyle(primaryText)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("커뮤니티")
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(primaryText)
+                Text("내 관심사를 찾고 참여해 보세요")
+                    .font(.footnote)
+                    .foregroundStyle(secondaryText)
+            }
 
             Spacer()
 
-            Image(systemName: "person.3.sequence.fill")
-                .font(.title3)
-                .foregroundStyle(primaryText.opacity(0.8))
+            Image(systemName: "person.3.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(primaryText)
+                .frame(width: 36, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(surfaceBackground)
+                )
         }
-        .padding(.top, 4)
+        .padding(.top, 6)
     }
 
     private var searchBar: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 12) {
             Image(systemName: "magnifyingglass")
-                .foregroundStyle(.gray)
-                .frame(width: 16)
+                .foregroundStyle(secondaryText)
+                .frame(width: 16, height: 16)
 
             TextField("커뮤니티 검색", text: $searchText)
+                .font(.body)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .foregroundStyle(primaryText)
         }
         .padding(.horizontal, 14)
-        .padding(.vertical, 10)
+        .padding(.vertical, 12)
         .background(
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(surfaceBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(cardStroke, lineWidth: 1)
         )
     }
 
     @ViewBuilder
-    private func communitySection(title: String, communities: [Community], emptyText: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func communitySection(sectionLabel: String, title: String, communities: [Community], emptyText: String) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(sectionLabel)
+                .font(.caption2.weight(.bold))
+                .kerning(1.4)
+                .foregroundStyle(tertiaryText)
+
             Text(title)
                 .font(.headline.weight(.semibold))
                 .foregroundStyle(primaryText)
 
             if communities.isEmpty {
                 Text(emptyText)
-                    .font(.footnote)
-                    .foregroundStyle(.gray)
-                    .padding(.vertical, 6)
+                    .font(.footnote.weight(.medium))
+                    .foregroundStyle(secondaryText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 14)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        RoundedRectangle(cornerRadius: 12, style: .continuous)
+                            .fill(surfaceBackground)
+                    )
             } else {
-                ForEach(communities) { community in
-                    communityCard(community)
+                VStack(spacing: 10) {
+                    ForEach(communities) { community in
+                        communityCard(community)
+                    }
                 }
-            }
-
-            if let errorMessage = vm.errorMessage {
-                Text(errorMessage)
-                    .font(.footnote)
-                    .foregroundStyle(.red.opacity(0.95))
             }
         }
     }
@@ -152,51 +185,66 @@ struct CommunityLandingView: View {
         )
         let isMember = community.userMembership?.isMember == true
         let isProcessing = vm.processingCommunityId == community.id
+        let summaryText = (community.description?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false)
+            ? community.description!
+            : "/\(community.slug)"
 
-        return HStack(spacing: 12) {
+        return HStack(spacing: 14) {
             CommunityIconView(imageURL: imageURL)
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(community.name)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.subheadline.weight(.bold))
                     .foregroundStyle(primaryText)
                     .lineLimit(1)
 
-                Text("/\(community.slug)")
+                Text(summaryText)
                     .font(.caption)
-                    .foregroundStyle(.gray)
+                    .foregroundStyle(secondaryText)
+                    .lineLimit(2)
 
-                if let memberCount = community.memberCount {
-                    Text("멤버 \(memberCount)")
-                        .font(.caption2)
-                        .foregroundStyle(.gray.opacity(0.95))
+                HStack(spacing: 10) {
+                    if let memberCount = community.memberCount {
+                        Label("\(memberCount) 멤버", systemImage: "person.2.fill")
+                    }
+                    if let postCount = community.postCount {
+                        Label("\(postCount) 포스트", systemImage: "doc.text.fill")
+                    }
+                    if community.isNsfw == true {
+                        Label("NSFW", systemImage: "exclamationmark.triangle.fill")
+                    }
                 }
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(tertiaryText)
+                .lineLimit(1)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             Button {
                 Task { await vm.toggleMembership(community: community) }
             } label: {
-                if isProcessing {
-                    ProgressView()
-                        .controlSize(.small)
-                        .frame(width: 70, height: 32)
-                } else {
-                    Text(isMember ? "참여중" : "참여")
-                        .font(.footnote.weight(.semibold))
-                        .frame(width: 70, height: 32)
+                Group {
+                    if isProcessing {
+                        ProgressView()
+                            .controlSize(.small)
+                    } else {
+                        Text(isMember ? "참여중" : "참여")
+                            .font(.caption.weight(.bold))
+                    }
                 }
+                .frame(minWidth: 72, minHeight: 32)
+                .padding(.horizontal, 10)
             }
             .buttonStyle(.plain)
             .background(
                 Capsule()
-                    .fill(isMember ? surfaceBackground : selectedChipFill)
+                    .fill(isMember ? surfaceBackground : accentFill)
             )
-            .foregroundStyle(isMember ? primaryText : selectedChipText)
+            .foregroundStyle(isMember ? primaryText : accentText)
             .disabled(isProcessing || vm.repository == nil)
         }
-        .padding(12)
+        .padding(14)
         .background(
             RoundedRectangle(cornerRadius: 16, style: .continuous)
                 .fill(cardBackground)
@@ -227,16 +275,25 @@ struct CommunityLandingView: View {
         colorScheme == .dark ? .white : .primary
     }
 
-    private var selectedChipFill: Color {
+    private var secondaryText: Color {
+        colorScheme == .dark ? Color.white.opacity(0.68) : Color.black.opacity(0.58)
+    }
+
+    private var tertiaryText: Color {
+        colorScheme == .dark ? Color.white.opacity(0.52) : Color.black.opacity(0.52)
+    }
+
+    private var accentFill: Color {
         colorScheme == .dark ? .white : .black
     }
 
-    private var selectedChipText: Color {
+    private var accentText: Color {
         colorScheme == .dark ? .black : .white
     }
 }
 
 private struct CommunityIconView: View {
+    @Environment(\.colorScheme) private var colorScheme
     let imageURL: URL?
 
     var body: some View {
@@ -246,15 +303,23 @@ private struct CommunityIconView: View {
             downsampleWidth: 60
         ) {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.08))
+                .fill(placeholderFill)
                 .overlay(ProgressView().controlSize(.small))
         } failure: {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
-                .fill(Color.white.opacity(0.08))
-                .overlay(Image(systemName: "person.3").foregroundStyle(.gray))
+                .fill(placeholderFill)
+                .overlay(Image(systemName: "person.3.fill").foregroundStyle(placeholderIcon))
         }
         .frame(width: 60, height: 60)
         .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+    }
+
+    private var placeholderFill: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.05)
+    }
+
+    private var placeholderIcon: Color {
+        colorScheme == .dark ? Color.white.opacity(0.55) : Color.black.opacity(0.45)
     }
 }
 

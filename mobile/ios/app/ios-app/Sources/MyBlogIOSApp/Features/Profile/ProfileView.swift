@@ -10,25 +10,17 @@ struct ProfileHubView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack {
-                        Text("Profile")
-                            .font(.system(size: 32, weight: .bold, design: .rounded))
-                            .foregroundStyle(primaryText)
-                        Spacer()
-                        Image(systemName: "gearshape")
-                            .font(.title3)
-                            .foregroundStyle(primaryText.opacity(0.75))
-                    }
+                VStack(alignment: .leading, spacing: 18) {
+                    topBar
 
                     if vm.isLoading && vm.profile == nil && appStore.isBusy {
                         ProgressView("프로필 동기화 중")
                             .frame(maxWidth: .infinity, alignment: .center)
-                            .foregroundStyle(primaryText)
+                            .foregroundStyle(secondaryText)
                     }
 
                     if let profile = vm.profile ?? appStore.user {
-                            ProfileHeroCard(
+                        ProfileHubHeroCard(
                             profile: profile,
                             imageURL: resolveImageURL(
                                 profile.profileImage,
@@ -36,23 +28,22 @@ struct ProfileHubView: View {
                                 frontendBaseURL: appStore.frontendBaseURL,
                                 cacheBuster: appStore.profileImageCacheBuster,
                             ),
-                            previewImageData: nil,
                         )
                     }
 
-                    settingsGroup(title: "Settings Hub") {
-                        SettingsNavRow(icon: "person.crop.circle", title: "Account") {
+                    settingsGroup(title: "SETTINGS HUB") {
+                        SettingsNavRow(icon: "person.crop.circle", title: "Account", showsDivider: true) {
                             ProfileView()
                         }
-                        SettingsNavRow(icon: "lock.shield", title: "Security") {
+                        SettingsNavRow(icon: "lock.shield", title: "Security", showsDivider: true) {
                             ChangePasswordView()
                         }
-                        SettingsNavRow(icon: "person.3", title: "Communities") {
+                        SettingsNavRow(icon: "person.3", title: "Communities", showsDivider: false) {
                             CommunitySettingsView()
                         }
                     }
 
-                    settingsGroup(title: "Account Management") {
+                    settingsGroup(title: "ACCOUNT MANAGEMENT") {
                         Button(role: .destructive) {
                             Task { await appStore.logout() }
                         } label: {
@@ -70,18 +61,35 @@ struct ProfileHubView: View {
                             .foregroundStyle(.red)
                             .padding(.horizontal, 14)
                             .padding(.vertical, 12)
+                            .contentShape(Rectangle())
                         }
+                        .buttonStyle(.plain)
                     }
 
                     if let errorMessage = vm.errorMessage {
                         Text(errorMessage)
+                            .font(.footnote)
                             .foregroundStyle(.red.opacity(0.95))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(cardBackground)
+                            )
                     }
 
                     if let message = appStore.authMessage {
                         Text(message)
                             .font(.footnote)
                             .foregroundStyle(.green)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 10)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(
+                                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                                    .fill(cardBackground)
+                            )
                     }
                 }
                 .padding(.horizontal, 16)
@@ -101,11 +109,36 @@ struct ProfileHubView: View {
         }
     }
 
+    private var topBar: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Profile")
+                    .font(.system(size: 32, weight: .bold, design: .rounded))
+                    .foregroundStyle(primaryText)
+                Text("계정과 커뮤니티 환경설정을 관리합니다")
+                    .font(.footnote)
+                    .foregroundStyle(secondaryText)
+            }
+
+            Spacer()
+
+            Image(systemName: "gearshape.fill")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(primaryText.opacity(0.86))
+                .frame(width: 36, height: 36)
+                .background(
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(cardBackground)
+                )
+        }
+    }
+
     private func settingsGroup<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.gray)
+                .font(.caption2.weight(.bold))
+                .kerning(1.3)
+                .foregroundStyle(secondaryText)
             VStack(spacing: 0) {
                 content()
             }
@@ -135,17 +168,23 @@ struct ProfileHubView: View {
     private var primaryText: Color {
         colorScheme == .dark ? .white : .primary
     }
+
+    private var secondaryText: Color {
+        colorScheme == .dark ? Color.white.opacity(0.64) : Color.black.opacity(0.55)
+    }
 }
 
 private struct SettingsNavRow<Destination: View>: View {
     @Environment(\.colorScheme) private var colorScheme
     let icon: String
     let title: String
+    let showsDivider: Bool
     let destination: Destination
 
-    init(icon: String, title: String, @ViewBuilder destination: () -> Destination) {
+    init(icon: String, title: String, showsDivider: Bool = true, @ViewBuilder destination: () -> Destination) {
         self.icon = icon
         self.title = title
+        self.showsDivider = showsDivider
         self.destination = destination()
     }
 
@@ -171,13 +210,127 @@ private struct SettingsNavRow<Destination: View>: View {
         }
         .buttonStyle(.plain)
         .overlay(alignment: .bottom) {
-            Divider()
-                .padding(.leading, 46)
+            if showsDivider {
+                Divider()
+                    .padding(.leading, 46)
+            }
         }
     }
 
     private var primaryText: Color {
         colorScheme == .dark ? .white : .primary
+    }
+}
+
+private struct ProfileHubHeroCard: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let profile: UserProfile
+    let imageURL: URL?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                let avatarText = profile.username.trimmingCharacters(in: .whitespacesAndNewlines)
+                ProfileAvatarImage(
+                    imageURL: imageURL,
+                    fallbackText: avatarText.isEmpty ? "?" : String(avatarText.prefix(1)).uppercased(),
+                    size: 68,
+                )
+
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(profile.username)
+                        .font(.title3.weight(.semibold))
+                        .foregroundStyle(primaryText)
+
+                    Text(profileIdentity)
+                        .font(.subheadline)
+                        .foregroundStyle(secondaryText)
+
+                    if let jobTitle = profile.jobTitle, !jobTitle.isEmpty {
+                        Text(jobTitle)
+                            .font(.caption)
+                            .foregroundStyle(secondaryText)
+                    }
+                }
+                Spacer()
+            }
+
+            if let bio = profile.bio, !bio.isEmpty {
+                Text(bio)
+                    .font(.footnote)
+                    .foregroundStyle(secondaryText)
+                    .lineLimit(3)
+            }
+
+            HStack(spacing: 8) {
+                if let authProvider = profile.authProvider, !authProvider.isEmpty {
+                    ProfileMetaChip(title: authProvider)
+                }
+                if let subscriptionTier = profile.subscriptionTier, !subscriptionTier.isEmpty {
+                    ProfileMetaChip(title: subscriptionTier)
+                }
+                if profile.isEmailVerified == true {
+                    ProfileMetaChip(title: "verified")
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .stroke(cardStroke, lineWidth: 1)
+        )
+    }
+
+    private var cardBackground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.06) : Color.black.opacity(0.035)
+    }
+
+    private var cardStroke: Color {
+        colorScheme == .dark ? Color.white.opacity(0.08) : Color.black.opacity(0.08)
+    }
+
+    private var primaryText: Color {
+        colorScheme == .dark ? .white : .primary
+    }
+
+    private var secondaryText: Color {
+        colorScheme == .dark ? Color.white.opacity(0.65) : Color.black.opacity(0.58)
+    }
+
+    private var profileIdentity: String {
+        if let blogSlug = profile.blogSlug, !blogSlug.isEmpty {
+            return "@\(blogSlug)"
+        }
+        return profile.email
+    }
+}
+
+private struct ProfileMetaChip: View {
+    @Environment(\.colorScheme) private var colorScheme
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.caption2.weight(.semibold))
+            .foregroundStyle(chipText)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(chipBackground)
+            )
+    }
+
+    private var chipBackground: Color {
+        colorScheme == .dark ? Color.white.opacity(0.12) : Color.black.opacity(0.08)
+    }
+
+    private var chipText: Color {
+        colorScheme == .dark ? Color.white.opacity(0.88) : Color.black.opacity(0.72)
     }
 }
 

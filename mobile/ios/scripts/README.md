@@ -20,6 +20,10 @@ cd /Users/sihyungpark/Desktop/code/my-blog-app/mobile/ios
 - `MOBILE_IOS_BUNDLE_ID`: 런타임 앱 번들 ID (기본값: `kr.sihyung.MyBlogIOSApp`)
 - `MOBILE_IOS_SIMULATOR_UDID`: 타깃 시뮬레이터 UDID
 - `MOBILE_BACKEND_URL`: 헬스체크 대상 백엔드 URL
+- `MOBILE_API_BASE_URL`: 앱 API base URL (기본값: `${MOBILE_BACKEND_URL}/api/v1`)
+- `MOBILE_FRONTEND_URL`: 웹 프론트 base URL (기본값: `http://localhost:3001`)
+- `MOBILE_SOCKET_URL`: 소켓 URL (기본값: `MOBILE_API_BASE_URL`)
+- `MOBILE_OAUTH_CALLBACK_URL`: 소셜 로그인 앱 콜백 URL (기본값: `codebase://auth/callback`)
 - `MOBILE_IOS_TEST_ACCESS_TOKEN`: fallback 검증 시 feed 접근용 Bearer 토큰
 - `MOBILE_IOS_FEED_LIMIT`: `/api/v1/feed?limit=` 값(최대 50)
 - `MOBILE_IOS_COMMUNITY_FALLBACK_MAX_POSTS`: 검증할 feed 아이템 최대 개수
@@ -51,6 +55,7 @@ MOBILE_IOS_SESSION_EXPIRY_MODES="expired invalid expired_refresh missing_refresh
 - `run-ios-session-expiry-smoke.sh`는 모드별로 기본 fixture 토큰을 구성합니다.
 - `missing_refresh`는 refresh token이 빈값으로 들어가 `auth.expired`와 `auth.toast_shown`, `auth.login_shown` 플래그를 검증합니다.
 - `force_refresh_fail`은 refresh 시도 흔적(`request.refresh_failed`)과 로그인 복귀 흔적을 함께 검증합니다.
+- 운영/프로덕션에서는 `MOBILE_API_BASE_URL`, `MOBILE_FRONTEND_URL`를 localhost가 아닌 실도메인으로 반드시 지정하세요.
 ```
 
 복사/생성 규칙

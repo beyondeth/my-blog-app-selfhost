@@ -20,6 +20,7 @@ final class AppStore: ObservableObject {
     private var communityRepository: CommunityRepository?
     private var profileRepository: ProfileRepository?
     private let themePreferenceKey = "myblog.ios.theme.preference"
+    private var pendingIncomingURL: URL?
 
     var apiBaseURL: URL? {
         config?.baseURL
@@ -27,6 +28,10 @@ final class AppStore: ObservableObject {
 
     var frontendBaseURL: URL? {
         config?.frontendURL
+    }
+
+    var socialAuthCallbackScheme: String? {
+        config?.socialAuthCallbackURL.scheme
     }
 
     var preferredColorScheme: ColorScheme? {
@@ -77,6 +82,10 @@ final class AppStore: ObservableObject {
             authError = nil
             authMessage = nil
             isAuthenticated = false
+            if let pendingURL = pendingIncomingURL {
+                pendingIncomingURL = nil
+                await handleIncomingURL(pendingURL)
+            }
         } catch {
             IOSRunTrace.emit(
                 "bootstrap.fail",
@@ -84,7 +93,8 @@ final class AppStore: ObservableObject {
                 fields: ["error": "\(error)"],
             )
             isBootstrapping = false
-            authError = APIError(code: "CONFIG", message: "환경 변수가 없습니다", status: -1, type: .badRequest)
+            let message = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            authError = APIError(code: "CONFIG", message: message, status: -1, type: .badRequest)
             isAuthenticated = false
         }
     }
@@ -158,6 +168,16 @@ final class AppStore: ObservableObject {
     @MainActor
     func socialLoginURL(for provider: SocialProvider) -> URL? {
         authService?.socialAuthURL(for: provider)
+    }
+
+    @MainActor
+    func handleIncomingURL(_ url: URL) async {
+        guard let config else {
+            pendingIncomingURL = url
+            return
+        }
+        guard isMatchingSocialCallbackURL(url, expected: config.socialAuthCallbackURL) else { return }
+        await completeSocialLoginCallback(url)
     }
 
     @MainActor
@@ -446,6 +466,134 @@ final class AppStore: ObservableObject {
         } else {
             themePreference = .dark
         }
+    }
+
+    @MainActor
+    private func completeSocialLoginCallback(_ url: URL) async {
+        guard let authService else {
+            authError = APIError(
+                code: "NO_SERVICE",
+                message: "인증 서비스가 준비되지 않았습니다.",
+                status: -1,
+                type: .unknown
+            )
+            return
+        }
+
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            authError = APIError(
+                code: "SOCIAL_CALLBACK_INVALID",
+                message: "소셜 로그인 콜백 데이터를 해석할 수 없습니다.",
+                status: -1,
+                type: .badRequest
+            )
+            return
+        }
+
+        let queryItems = components.queryItems ?? []
+        if let code = queryValue(named: "error", in: queryItems), !code.isEmpty {
+            let message = queryValue(named: "message", in: queryItems) ?? "소셜 로그인에 실패했습니다."
+            authError = APIError(
+                code: code.uppercased(),
+                message: message,
+                status: 401,
+                type: .unauthorized
+            )
+            isAuthenticated = false
+            IOSRunTrace.emit(
+                "auth.social_callback",
+                category: "auth",
+                fields: ["result": "failed", "code": code],
+            )
+            return
+        }
+
+        let accessToken = queryValue(named: "access_token", in: queryItems)
+            ?? queryValue(named: "accessToken", in: queryItems)
+        let refreshToken = queryValue(named: "refresh_token", in: queryItems)
+            ?? queryValue(named: "refreshToken", in: queryItems)
+
+        guard let accessToken, let refreshToken, !accessToken.isEmpty, !refreshToken.isEmpty else {
+            authError = APIError(
+                code: "SOCIAL_CALLBACK_TOKEN_MISSING",
+                message: "소셜 로그인 토큰을 받지 못했습니다.",
+                status: 401,
+                type: .unauthorized
+            )
+            IOSRunTrace.emit(
+                "auth.social_callback",
+                category: "auth",
+                fields: ["result": "failed", "code": "SOCIAL_CALLBACK_TOKEN_MISSING"],
+            )
+            return
+        }
+
+        isBusy = true
+        authError = nil
+        authMessage = nil
+        requiresReauth = false
+        defer { isBusy = false }
+
+        await tokenStore.save(accessToken: accessToken, refreshToken: refreshToken, refreshAt: nil)
+
+        do {
+            let currentUser = try await authService.me()
+            user = currentUser
+            isAuthenticated = true
+            authMessage = "소셜 로그인이 완료되었습니다."
+            profileImageCacheBuster = nil
+            IOSRunTrace.emit(
+                "auth.social_callback",
+                category: "auth",
+                fields: ["result": "success", "userId": currentUser.id],
+            )
+        } catch let error as APIError {
+            await clearLocalSession()
+            authError = error
+            IOSRunTrace.emit(
+                "auth.social_callback",
+                category: "auth",
+                fields: ["result": "failed", "status": "\(error.status)", "code": error.code],
+            )
+        } catch {
+            await clearLocalSession()
+            authError = APIError(
+                code: "SOCIAL_CALLBACK_ERROR",
+                message: error.localizedDescription,
+                status: -1,
+                type: .unknown
+            )
+            IOSRunTrace.emit(
+                "auth.social_callback",
+                category: "auth",
+                fields: ["result": "failed", "error": error.localizedDescription],
+            )
+        }
+    }
+
+    private func queryValue(named name: String, in items: [URLQueryItem]) -> String? {
+        items.first(where: { $0.name == name })?.value?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func isMatchingSocialCallbackURL(_ incoming: URL, expected: URL) -> Bool {
+        guard let incomingScheme = incoming.scheme?.lowercased(),
+              let expectedScheme = expected.scheme?.lowercased(),
+              incomingScheme == expectedScheme else {
+            return false
+        }
+
+        let expectedHost = expected.host?.lowercased() ?? ""
+        if !expectedHost.isEmpty, incoming.host?.lowercased() != expectedHost {
+            return false
+        }
+
+        let normalizedExpectedPath = expected.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if !normalizedExpectedPath.isEmpty {
+            let normalizedIncomingPath = incoming.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            return normalizedIncomingPath == normalizedExpectedPath
+        }
+
+        return true
     }
 }
 
