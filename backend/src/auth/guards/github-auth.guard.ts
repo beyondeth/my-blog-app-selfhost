@@ -27,13 +27,17 @@ export class GitHubAuthGuard extends AuthGuard("github") {
       this.allowedMobileSchemes,
     );
 
+    const options: Record<string, string> = {
+      // GitHub OAuth에서 계정 자동선택을 피하고 계정 선택 화면을 강제한다.
+      prompt: "select_account",
+    };
+
     if (!mobileRedirectUri) {
-      return {};
+      return options;
     }
 
-    return {
-      state: encodeMobileOAuthState(mobileRedirectUri),
-    };
+    options.state = encodeMobileOAuthState(mobileRedirectUri);
+    return options;
   }
 
   canActivate(context: ExecutionContext) {
