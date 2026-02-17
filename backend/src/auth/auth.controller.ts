@@ -35,11 +35,18 @@ import { ConsentDto } from "./dto/consent.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
 import { User } from "../users/entities/user.entity";
+import {
+  appendQueryParams,
+  decodeMobileOAuthState,
+  parseAllowedMobileSchemes,
+  sanitizeMobileRedirectUri,
+} from "./utils/oauth-mobile-redirect.util";
 
 @ApiTags("auth")
 @Controller(["auth", "mobile/auth"])
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
+  private readonly allowedMobileRedirectSchemes: Set<string>;
 
   constructor(
     private readonly authService: AuthService,
@@ -48,7 +55,11 @@ export class AuthController {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly redisService: UnifiedRedisService,
-  ) {}
+  ) {
+    this.allowedMobileRedirectSchemes = parseAllowedMobileSchemes(
+      this.configService.get<string>("MOBILE_AUTH_REDIRECT_SCHEMES"),
+    );
+  }
 
   /**
    * 웹 로그인 시 MCP 세션과 동기화를 위한 헬퍼 메서드
@@ -82,6 +93,31 @@ export class AuthController {
       this.logger.error(`웹 세션 생성 실패: ${error.message}`);
       // 세션 생성 실패해도 로그인은 진행
     }
+  }
+
+  private frontendBaseURL(): string {
+    return this.configService.get<string>("FRONTEND_URL") || "http://localhost:3001";
+  }
+
+  private resolveMobileRedirectUri(req: ExpressRequest): string | null {
+    const statePayload = decodeMobileOAuthState(req.query?.state);
+    return sanitizeMobileRedirectUri(
+      statePayload?.mobileRedirectUri,
+      this.allowedMobileRedirectSchemes,
+    );
+  }
+
+  private tryRedirectToMobileCallback(
+    req: ExpressRequest,
+    res: Response,
+    params: Record<string, string | undefined>,
+  ): boolean {
+    const mobileRedirectUri = this.resolveMobileRedirectUri(req);
+    if (!mobileRedirectUri) {
+      return false;
+    }
+    res.redirect(appendQueryParams(mobileRedirectUri, params));
+    return true;
   }
 
   @Public()
@@ -188,13 +224,24 @@ export class AuthController {
   @Get("google/callback")
   @UseGuards(GoogleAuthGuard)
   @ApiOperation({ summary: "구글 로그인 콜백" })
-  async googleAuthRedirect(@Request() req, @Res() res) {
+  async googleAuthRedirect(
+    @Request() req: ExpressRequest & { user?: any },
+    @Res() res: Response,
+  ) {
     try {
       // OAuth Guard가 이미 사용자를 찾았는지 확인
       if (!req.user || !req.user.user) {
         this.logger.error(`[Google OAuth Callback] No user found in request`);
+        if (
+          this.tryRedirectToMobileCallback(req, res, {
+            error: "auth_failed",
+            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+          })
+        ) {
+          return;
+        }
         return res.redirect(
-          `${process.env.FRONTEND_URL}/login?error=auth_failed`,
+          `${this.frontendBaseURL()}/login?error=auth_failed`,
         );
       }
 
@@ -238,7 +285,17 @@ export class AuthController {
 
       // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
       const redirectPath = needsConsent ? "/consent" : "/";
-      res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+      if (
+        this.tryRedirectToMobileCallback(req, res, {
+          access_token: req.user.access_token,
+          refresh_token: req.user.refresh_token,
+          provider: "google",
+          needs_consent: needsConsent ? "1" : "0",
+        })
+      ) {
+        return;
+      }
+      res.redirect(`${this.frontendBaseURL()}${redirectPath}`);
     } catch (error) {
       this.logger.error(`[Google OAuth Callback] Error:`, error);
 
@@ -252,28 +309,73 @@ export class AuthController {
       if (!res.headersSent) {
         // Handle specific error codes
         const code = error.response?.code || error.code;
-        
-        if (code === "ACCOUNT_DELETED" || errorMessage.includes("계정이 삭제되었습니다")) {
-           return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
+
+        if (
+          code === "ACCOUNT_DELETED" ||
+          errorMessage.includes("계정이 삭제되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_deleted",
+              message: errorMessage,
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
-        
-        if (code === "ACCOUNT_SUSPENDED" || errorMessage.includes("계정이 정지되었습니다")) {
-             return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
+
+        if (
+          code === "ACCOUNT_SUSPENDED" ||
+          errorMessage.includes("계정이 정지되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_suspended",
+              message: errorMessage,
+              reason: error.response?.reason || error.reason || "",
+              until:
+                error.response?.suspensionUntil || error.suspensionUntil || "",
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
-        
-        if (code === "ACCOUNT_BANNED" || errorMessage.includes("계정이 영구 차단되었습니다")) {
-             return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
+
+        if (
+          code === "ACCOUNT_BANNED" ||
+          errorMessage.includes("계정이 영구 차단되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_banned",
+              message: errorMessage,
+              reason: error.response?.reason || error.reason || "",
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }
 
         // 기본 에러 처리
+        if (
+          this.tryRedirectToMobileCallback(req, res, {
+            error: "oauth_failed",
+            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+          })
+        ) {
+          return;
+        }
         return res.redirect(
-          `${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
+          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
         );
       }
     }
@@ -291,8 +393,24 @@ export class AuthController {
   @Get("kakao/callback")
   @UseGuards(KakaoAuthGuard)
   @ApiOperation({ summary: "카카오 로그인 콜백" })
-  async kakaoAuthRedirect(@Request() req, @Res() res) {
+  async kakaoAuthRedirect(
+    @Request() req: ExpressRequest & { user?: any },
+    @Res() res: Response,
+  ) {
     try {
+      if (!req.user || !req.user.user) {
+        this.logger.error(`[Kakao OAuth Callback] No user found in request`);
+        if (
+          this.tryRedirectToMobileCallback(req, res, {
+            error: "auth_failed",
+            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+          })
+        ) {
+          return;
+        }
+        return res.redirect(`${this.frontendBaseURL()}/login?error=auth_failed`);
+      }
+
       // HttpOnly 쿠키로 토큰들 설정
       res.cookie("access_token", req.user.access_token, {
         httpOnly: true,
@@ -322,7 +440,17 @@ export class AuthController {
 
       // 헤더가 이미 전송되었는지 확인
       if (!res.headersSent) {
-        res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+        if (
+          this.tryRedirectToMobileCallback(req, res, {
+            access_token: req.user.access_token,
+            refresh_token: req.user.refresh_token,
+            provider: "kakao",
+            needs_consent: needsConsent ? "1" : "0",
+          })
+        ) {
+          return;
+        }
+        res.redirect(`${this.frontendBaseURL()}${redirectPath}`);
       }
     } catch (error) {
       this.logger.error("카카오 로그인 콜백 처리 중 오류 발생:", error);
@@ -334,26 +462,71 @@ export class AuthController {
         const code = error.response?.code || error.code;
 
         // Handle specific error codes
-        if (code === "ACCOUNT_DELETED" || errorMessage.includes("계정이 삭제되었습니다")) {
+        if (
+          code === "ACCOUNT_DELETED" ||
+          errorMessage.includes("계정이 삭제되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_deleted",
+              message: errorMessage,
+            })
+          ) {
+            return;
+          }
           return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
+            `${this.frontendBaseURL()}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
 
-        if (code === "ACCOUNT_SUSPENDED" || errorMessage.includes("계정이 정지되었습니다")) {
-             return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
-          );
-        }
-        
-        if (code === "ACCOUNT_BANNED" || errorMessage.includes("계정이 영구 차단되었습니다")) {
-             return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
+        if (
+          code === "ACCOUNT_SUSPENDED" ||
+          errorMessage.includes("계정이 정지되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_suspended",
+              message: errorMessage,
+              reason: error.response?.reason || error.reason || "",
+              until:
+                error.response?.suspensionUntil || error.suspensionUntil || "",
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
 
+        if (
+          code === "ACCOUNT_BANNED" ||
+          errorMessage.includes("계정이 영구 차단되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_banned",
+              message: errorMessage,
+              reason: error.response?.reason || error.reason || "",
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
+          );
+        }
+
+        if (
+          this.tryRedirectToMobileCallback(req, res, {
+            error: "kakao_auth_failed",
+            message: errorMessage,
+          })
+        ) {
+          return;
+        }
         res.redirect(
-          `${process.env.FRONTEND_URL}/login?error=kakao_auth_failed&message=${encodeURIComponent(errorMessage)}`,
+          `${this.frontendBaseURL()}/login?error=kakao_auth_failed&message=${encodeURIComponent(errorMessage)}`,
         );
       }
     }
@@ -371,13 +544,24 @@ export class AuthController {
   @Get("github/callback")
   @UseGuards(GitHubAuthGuard)
   @ApiOperation({ summary: "GitHub 로그인 콜백" })
-  async githubAuthRedirect(@Request() req, @Res() res) {
+  async githubAuthRedirect(
+    @Request() req: ExpressRequest & { user?: any },
+    @Res() res: Response,
+  ) {
     try {
       // OAuth Guard가 이미 사용자를 찾았는지 확인
       if (!req.user || !req.user.user) {
         this.logger.error(`[GitHub OAuth Callback] No user found in request`);
+        if (
+          this.tryRedirectToMobileCallback(req, res, {
+            error: "auth_failed",
+            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+          })
+        ) {
+          return;
+        }
         return res.redirect(
-          `${process.env.FRONTEND_URL}/login?error=auth_failed`,
+          `${this.frontendBaseURL()}/login?error=auth_failed`,
         );
       }
 
@@ -407,7 +591,17 @@ export class AuthController {
 
       // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
       const redirectPath = needsConsent ? "/consent" : "/";
-      res.redirect(`${process.env.FRONTEND_URL}${redirectPath}`);
+      if (
+        this.tryRedirectToMobileCallback(req, res, {
+          access_token: req.user.access_token,
+          refresh_token: req.user.refresh_token,
+          provider: "github",
+          needs_consent: needsConsent ? "1" : "0",
+        })
+      ) {
+        return;
+      }
+      res.redirect(`${this.frontendBaseURL()}${redirectPath}`);
     } catch (error) {
       this.logger.error(`[GitHub OAuth Callback] Error:`, error);
 
@@ -421,28 +615,73 @@ export class AuthController {
       if (!res.headersSent) {
         // Handle specific error codes
         const code = error.response?.code || error.code;
-        
-        if (code === "ACCOUNT_DELETED" || errorMessage.includes("계정이 삭제되었습니다")) {
-           return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
+
+        if (
+          code === "ACCOUNT_DELETED" ||
+          errorMessage.includes("계정이 삭제되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_deleted",
+              message: errorMessage,
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_deleted&message=${encodeURIComponent(errorMessage)}`,
           );
         }
-        
-        if (code === "ACCOUNT_SUSPENDED" || errorMessage.includes("계정이 정지되었습니다")) {
-             return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
+
+        if (
+          code === "ACCOUNT_SUSPENDED" ||
+          errorMessage.includes("계정이 정지되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_suspended",
+              message: errorMessage,
+              reason: error.response?.reason || error.reason || "",
+              until:
+                error.response?.suspensionUntil || error.suspensionUntil || "",
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_suspended&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}&until=${encodeURIComponent(error.response?.suspensionUntil || error.suspensionUntil || "")}`,
           );
         }
-        
-        if (code === "ACCOUNT_BANNED" || errorMessage.includes("계정이 영구 차단되었습니다")) {
-             return res.redirect(
-            `${process.env.FRONTEND_URL}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
+
+        if (
+          code === "ACCOUNT_BANNED" ||
+          errorMessage.includes("계정이 영구 차단되었습니다")
+        ) {
+          if (
+            this.tryRedirectToMobileCallback(req, res, {
+              error: "account_banned",
+              message: errorMessage,
+              reason: error.response?.reason || error.reason || "",
+            })
+          ) {
+            return;
+          }
+          return res.redirect(
+            `${this.frontendBaseURL()}/login?error=account_banned&message=${encodeURIComponent(errorMessage)}&reason=${encodeURIComponent(error.response?.reason || error.reason || "")}`,
           );
         }
 
         // 기본 에러 처리
+        if (
+          this.tryRedirectToMobileCallback(req, res, {
+            error: "oauth_failed",
+            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+          })
+        ) {
+          return;
+        }
         return res.redirect(
-          `${process.env.FRONTEND_URL}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
+          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
         );
       }
     }
