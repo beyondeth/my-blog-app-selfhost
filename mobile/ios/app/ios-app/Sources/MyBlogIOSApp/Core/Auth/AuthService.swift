@@ -71,7 +71,35 @@ actor AuthService {
     }
 
     nonisolated func socialAuthURL(for provider: SocialProvider) -> URL? {
-        return config.frontendURL.appendingPathComponent(provider.path).absoluteURL
+        let backendRoot = normalizedBackendRootURL()
+        let authURL = backendRoot
+            .appendingPathComponent("api/v1/auth", isDirectory: true)
+            .appendingPathComponent(provider.rawValue, isDirectory: false)
+            .absoluteURL
+
+        guard var components = URLComponents(url: authURL, resolvingAgainstBaseURL: false) else {
+            return authURL
+        }
+
+        components.queryItems = [
+            URLQueryItem(name: "redirect_uri", value: config.socialAuthCallbackURL.absoluteString),
+        ]
+        return components.url ?? authURL
+    }
+
+    nonisolated private func normalizedBackendRootURL() -> URL {
+        guard var components = URLComponents(url: config.baseURL, resolvingAgainstBaseURL: false) else {
+            return config.baseURL
+        }
+
+        let path = components.path
+        if path.hasSuffix("/api/v1") {
+            components.path = String(path.dropLast("/api/v1".count))
+        } else if path.hasSuffix("/api/v1/") {
+            components.path = String(path.dropLast("/api/v1/".count))
+        }
+
+        return components.url ?? config.baseURL
     }
 }
 
@@ -204,15 +232,6 @@ enum SocialProvider: String, CaseIterable, Identifiable {
             return "Google"
         case .github:
             return "GitHub"
-        }
-    }
-
-    var path: String {
-        switch self {
-        case .google:
-            return "/auth/google"
-        case .github:
-            return "/auth/github"
         }
     }
 }

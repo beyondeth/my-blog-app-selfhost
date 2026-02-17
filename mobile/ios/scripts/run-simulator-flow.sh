@@ -7,6 +7,10 @@ SCHEME="${MOBILE_IOS_SCHEME:-MyBlogIOSApp}"
 UDID="${MOBILE_IOS_SIMULATOR_UDID:-AF9D69C4-9D68-4063-9B90-B72CBFED028E}"
 BUNDLE_ID="${MOBILE_IOS_BUNDLE_ID:-kr.sihyung.MyBlogIOSApp}"
 BACKEND_URL="${MOBILE_BACKEND_URL:-http://localhost:3000}"
+API_BASE_URL="${MOBILE_API_BASE_URL:-${BACKEND_URL%/}/api/v1}"
+FRONTEND_URL="${MOBILE_FRONTEND_URL:-http://localhost:3001}"
+SOCKET_URL="${MOBILE_SOCKET_URL:-${API_BASE_URL}}"
+OAUTH_CALLBACK_URL="${MOBILE_OAUTH_CALLBACK_URL:-codebase://auth/callback}"
 TRACE_SECONDS="${MOBILE_IOS_TRACE_SECONDS:-0}"
 TRACE_LOG="${MOBILE_IOS_TRACE_LOG:-}"
 SESSION_FIXTURE="${MOBILE_IOS_SESSION_FIXTURE:-}"
@@ -18,6 +22,12 @@ TRACE_LOG="${TRACE_LOG%\"}"
 TRACE_LOG="${TRACE_LOG#\"}"
 if [[ -z "${BUNDLE_ID}" ]]; then
   echo "MOBILE_IOS_BUNDLE_ID 환경변수 또는 기본값이 비어 있습니다."
+  exit 1
+fi
+
+OAUTH_CALLBACK_SCHEME="${OAUTH_CALLBACK_URL%%:*}"
+if [[ -z "${OAUTH_CALLBACK_SCHEME}" || "${OAUTH_CALLBACK_SCHEME}" == "${OAUTH_CALLBACK_URL}" ]]; then
+  echo "MOBILE_OAUTH_CALLBACK_URL이 올바르지 않습니다: ${OAUTH_CALLBACK_URL}"
   exit 1
 fi
 
@@ -108,6 +118,25 @@ cat > "$WRAP_APP_PATH/Info.plist" <<EOF2
     <string>1</string>
     <key>CFBundleShortVersionString</key>
     <string>1.0</string>
+    <key>MOBILE_API_BASE_URL</key>
+    <string>${API_BASE_URL}</string>
+    <key>MOBILE_FRONTEND_URL</key>
+    <string>${FRONTEND_URL}</string>
+    <key>MOBILE_SOCKET_URL</key>
+    <string>${SOCKET_URL}</string>
+    <key>MOBILE_OAUTH_CALLBACK_URL</key>
+    <string>${OAUTH_CALLBACK_URL}</string>
+    <key>CFBundleURLTypes</key>
+    <array>
+      <dict>
+        <key>CFBundleURLName</key>
+        <string>${BUNDLE_ID}.oauth</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+          <string>${OAUTH_CALLBACK_SCHEME}</string>
+        </array>
+      </dict>
+    </array>
     <key>MinimumOSVersion</key>
     <string>17.0</string>
     <key>LSRequiresIPhoneOS</key>
@@ -153,6 +182,10 @@ xcrun simctl uninstall "$UDID" "$BUNDLE_ID" || true
 xcrun simctl install "$UDID" "$WRAP_APP_PATH"
 
 LAUNCH_ARGS=()
+LAUNCH_ARGS+=(--env MOBILE_API_BASE_URL="${API_BASE_URL}")
+LAUNCH_ARGS+=(--env MOBILE_FRONTEND_URL="${FRONTEND_URL}")
+LAUNCH_ARGS+=(--env MOBILE_SOCKET_URL="${SOCKET_URL}")
+LAUNCH_ARGS+=(--env MOBILE_OAUTH_CALLBACK_URL="${OAUTH_CALLBACK_URL}")
 if [[ -n "${SESSION_FIXTURE}" ]]; then
   LAUNCH_ARGS+=(--env MOBILE_IOS_SESSION_FIXTURE="${SESSION_FIXTURE}")
 fi

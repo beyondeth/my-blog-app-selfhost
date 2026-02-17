@@ -13,6 +13,11 @@ struct MyBlogIOSApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appStore)
+                .onOpenURL { url in
+                    Task { @MainActor in
+                        await appStore.handleIncomingURL(url)
+                    }
+                }
         }
     }
 
