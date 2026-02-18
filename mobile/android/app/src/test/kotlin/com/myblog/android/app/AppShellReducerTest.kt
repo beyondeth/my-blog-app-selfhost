@@ -16,7 +16,13 @@ class AppShellReducerTest {
             current = AppShellState.Booting,
             event = AppShellEvent.SessionRestored(
                 authState = AuthState.LoggedIn(
-                    UserSession(userId = "u1", email = "a@b.com", displayName = "A"),
+                    UserSession(
+                        userId = "u1",
+                        email = "a@b.com",
+                        displayName = "A",
+                        username = "A",
+                        profileImageUrl = null,
+                    ),
                 ),
             ),
         )
@@ -36,7 +42,13 @@ class AppShellReducerTest {
         val main = AppShellState.Main(
             selectedTab = AppDestination.Feed,
             authState = AuthState.LoggedIn(
-                UserSession(userId = "u1", email = "a@b.com", displayName = "A"),
+                UserSession(
+                    userId = "u1",
+                    email = "a@b.com",
+                    displayName = "A",
+                    username = "A",
+                    profileImageUrl = null,
+                ),
             ),
         )
 

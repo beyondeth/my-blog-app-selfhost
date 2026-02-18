@@ -12,12 +12,14 @@ import {
 @Injectable()
 export class GitHubAuthGuard extends AuthGuard("github") {
   private readonly allowedMobileSchemes: Set<string>;
+  private readonly oauthStateSecret: string;
 
   constructor(private configService: ConfigService) {
     super();
     this.allowedMobileSchemes = parseAllowedMobileSchemes(
       this.configService.get<string>("MOBILE_AUTH_REDIRECT_SCHEMES"),
     );
+    this.oauthStateSecret = this.configService.get<string>("JWT_SECRET") ?? "";
   }
 
   getAuthenticateOptions(context: ExecutionContext) {
@@ -36,7 +38,10 @@ export class GitHubAuthGuard extends AuthGuard("github") {
       return options;
     }
 
-    options.state = encodeMobileOAuthState(mobileRedirectUri);
+    options.state = encodeMobileOAuthState(
+      mobileRedirectUri,
+      this.oauthStateSecret,
+    );
     return options;
   }
 
@@ -97,7 +102,10 @@ export class GitHubAuthGuard extends AuthGuard("github") {
 
   private resolveMobileRedirectUri(context: ExecutionContext): string | null {
     const request = context.switchToHttp().getRequest();
-    const statePayload = decodeMobileOAuthState(request?.query?.state);
+    const statePayload = decodeMobileOAuthState(
+      request?.query?.state,
+      this.oauthStateSecret,
+    );
     return sanitizeMobileRedirectUri(
       statePayload?.mobileRedirectUri,
       this.allowedMobileSchemes,

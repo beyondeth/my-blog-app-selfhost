@@ -8,6 +8,7 @@ import com.myblog.android.feature.auth.model.UserSession
 interface AuthRepository {
     suspend fun login(request: LoginRequest): ApiResult<AuthTokens>
     suspend fun refresh(refreshToken: String): ApiResult<AuthTokens>
+    suspend fun oauthExchange(code: String, redirectUri: String, provider: String?): ApiResult<AuthTokens>
     suspend fun me(): ApiResult<UserSession>
     suspend fun logout(): ApiResult<Unit>
 }

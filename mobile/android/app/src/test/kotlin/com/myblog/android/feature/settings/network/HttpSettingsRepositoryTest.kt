@@ -17,7 +17,7 @@ import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
-import kotlin.test.assertTrue
+import kotlin.test.assertNull
 
 class HttpSettingsRepositoryTest {
     @Test
@@ -60,11 +60,11 @@ class HttpSettingsRepositoryTest {
         val success = assertIs<ApiResult.Success<SettingsSnapshot>>(result)
         assertEquals(AppThemePreference.DARK, success.data.themePreference)
         assertEquals(false, success.data.notifications.marketingEnabled)
-        assertEquals(false, success.data.privacy.profileVisible)
+        assertEquals(true, success.data.privacy.profileVisible)
 
         val request = transport.requests.single()
         assertEquals("GET", request.method)
-        assertEquals("https://api.myblog.app/api/v1/mobile/settings", request.url)
+        assertEquals("https://api.myblog.app/api/v1/users/profile", request.url)
         assertEquals("Bearer access-1", request.headers["Authorization"])
     }
 
@@ -114,9 +114,8 @@ class HttpSettingsRepositoryTest {
         assertEquals(2, transport.requests.size)
         assertEquals("Bearer expired-access", transport.requests[0].headers["Authorization"])
         assertEquals("Bearer access-r1", transport.requests[1].headers["Authorization"])
-        assertEquals("PATCH", transport.requests[0].method)
-        val firstRequestBody = transport.requests[0].body
-        assertTrue(firstRequestBody != null && firstRequestBody.contains("\"themePreference\":\"LIGHT\""))
+        assertEquals("GET", transport.requests[0].method)
+        assertNull(transport.requests[0].body)
     }
 }
 
@@ -164,6 +163,14 @@ private class NoopAuthRepository : AuthRepository {
         return ApiResult.Failure(code = 401, message = "unused")
     }
 
+    override suspend fun oauthExchange(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ): ApiResult<AuthTokens> {
+        return ApiResult.Failure(code = 401, message = "unused")
+    }
+
     override suspend fun me(): ApiResult<UserSession> {
         return ApiResult.Failure(code = 500, message = "unused")
     }
@@ -186,6 +193,14 @@ private class RefreshOnlyAuthRepository : AuthRepository {
                 refreshToken = "refresh-$refreshToken",
             ),
         )
+    }
+
+    override suspend fun oauthExchange(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ): ApiResult<AuthTokens> {
+        return ApiResult.Failure(code = 401, message = "unused")
     }
 
     override suspend fun me(): ApiResult<UserSession> {

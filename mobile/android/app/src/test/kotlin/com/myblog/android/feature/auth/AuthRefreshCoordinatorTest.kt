@@ -78,6 +78,14 @@ private class FakeRefreshAuthRepository : AuthRepository {
         )
     }
 
+    override suspend fun oauthExchange(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ): ApiResult<AuthTokens> {
+        return ApiResult.Failure(code = 401, message = "unused")
+    }
+
     override suspend fun me(): ApiResult<UserSession> {
         return ApiResult.Failure(code = 500, message = "unused")
     }

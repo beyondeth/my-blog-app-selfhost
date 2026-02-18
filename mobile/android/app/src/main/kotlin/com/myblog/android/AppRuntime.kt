@@ -6,7 +6,11 @@ import com.myblog.android.core.di.AppDi
 import com.myblog.android.core.di.AppDiFactory
 
 object AppRuntime {
-    const val BASE_URL: String = "http://10.0.2.2:3000"
+    const val BASE_URL: String = BuildConfig.API_BASE_URL
+    const val OAUTH_CALLBACK_URL: String = BuildConfig.OAUTH_CALLBACK_URL
+    const val OAUTH_CALLBACK_SCHEME: String = "codebase"
+    const val OAUTH_CALLBACK_HOST: String = "auth"
+    const val OAUTH_CALLBACK_PATH: String = "/callback"
     private lateinit var appContext: Context
 
     fun init(context: Context) {

@@ -37,6 +37,30 @@ class MobileContractAuthRepository(
         }
     }
 
+    override suspend fun oauthExchange(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ): ApiResult<AuthTokens> {
+        val result = authApi.oauthExchange(
+            OAuthExchangeRequestDto(
+                code = code,
+                redirectUri = redirectUri,
+                provider = provider,
+            ),
+        )
+        return when (result) {
+            is ApiResult.Success -> ApiResult.Success(
+                AuthTokens(
+                    accessToken = result.data.accessToken,
+                    refreshToken = result.data.refreshToken,
+                ),
+            )
+
+            is ApiResult.Failure -> ApiResult.Failure(result.code, result.message)
+        }
+    }
+
     override suspend fun me(): ApiResult<UserSession> {
         val result = authApi.me()
         return when (result) {

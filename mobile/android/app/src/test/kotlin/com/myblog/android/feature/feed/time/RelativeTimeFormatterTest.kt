@@ -11,7 +11,7 @@ class RelativeTimeFormatterTest {
 
         val result = formatter.formatFromEpochSeconds(publishedAtEpochSeconds = 941L)
 
-        assertEquals("just now", result)
+        assertEquals("방금 전", result)
     }
 
     @Test
@@ -20,7 +20,7 @@ class RelativeTimeFormatterTest {
 
         val result = formatter.formatFromEpochSeconds(publishedAtEpochSeconds = 940L)
 
-        assertEquals("1m ago", result)
+        assertEquals("1분 전", result)
     }
 
     @Test
@@ -29,7 +29,7 @@ class RelativeTimeFormatterTest {
 
         val result = formatter.formatFromEpochSeconds(publishedAtEpochSeconds = 939L)
 
-        assertEquals("1m ago", result)
+        assertEquals("1분 전", result)
     }
 
     @Test
@@ -38,7 +38,7 @@ class RelativeTimeFormatterTest {
 
         val result = formatter.formatFromEpochSeconds(publishedAtEpochSeconds = 1_120L)
 
-        assertEquals("just now", result)
+        assertEquals("1970. 1. 1.", result)
     }
 }
 

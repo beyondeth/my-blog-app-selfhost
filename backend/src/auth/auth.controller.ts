@@ -36,6 +36,10 @@ import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
 import { User } from "../users/entities/user.entity";
 import {
+  MobileOAuthCodeService,
+  SocialProvider,
+} from "./services/mobile-oauth-code.service";
+import {
   appendQueryParams,
   decodeMobileOAuthState,
   parseAllowedMobileSchemes,
@@ -47,6 +51,7 @@ import {
 export class AuthController {
   private readonly logger = new Logger(AuthController.name);
   private readonly allowedMobileRedirectSchemes: Set<string>;
+  private readonly oauthStateSecret: string;
 
   constructor(
     private readonly authService: AuthService,
@@ -55,10 +60,12 @@ export class AuthController {
     private readonly usersService: UsersService,
     private readonly configService: ConfigService,
     private readonly redisService: UnifiedRedisService,
+    private readonly mobileOAuthCodeService: MobileOAuthCodeService,
   ) {
     this.allowedMobileRedirectSchemes = parseAllowedMobileSchemes(
       this.configService.get<string>("MOBILE_AUTH_REDIRECT_SCHEMES"),
     );
+    this.oauthStateSecret = this.configService.get<string>("JWT_SECRET") ?? "";
   }
 
   /**
@@ -100,7 +107,10 @@ export class AuthController {
   }
 
   private resolveMobileRedirectUri(req: ExpressRequest): string | null {
-    const statePayload = decodeMobileOAuthState(req.query?.state);
+    const statePayload = decodeMobileOAuthState(
+      req.query?.state,
+      this.oauthStateSecret,
+    );
     return sanitizeMobileRedirectUri(
       statePayload?.mobileRedirectUri,
       this.allowedMobileRedirectSchemes,
@@ -118,6 +128,89 @@ export class AuthController {
     }
     res.redirect(appendQueryParams(mobileRedirectUri, params));
     return true;
+  }
+
+  private mobileOAuthCallbackMode(): "dual" | "code" {
+    const rawMode = (
+      this.configService.get<string>("MOBILE_OAUTH_CALLBACK_MODE") || "dual"
+    )
+      .trim()
+      .toLowerCase();
+
+    if (rawMode === "code") {
+      return "code";
+    }
+    return "dual";
+  }
+
+  private async tryRedirectToMobileOAuthSuccess(
+    req: ExpressRequest,
+    res: Response,
+    payload: {
+      accessToken: string;
+      refreshToken: string;
+      userId: string;
+      provider: SocialProvider;
+      needsConsent: boolean;
+    },
+  ): Promise<boolean> {
+    const mobileRedirectUri = this.resolveMobileRedirectUri(req);
+    if (!mobileRedirectUri) {
+      return false;
+    }
+
+    const mode = this.mobileOAuthCallbackMode();
+
+    try {
+      const issueResult = await this.mobileOAuthCodeService.issueCode({
+        accessToken: payload.accessToken,
+        refreshToken: payload.refreshToken,
+        userId: payload.userId,
+        provider: payload.provider,
+        redirectUri: mobileRedirectUri,
+        needsConsent: payload.needsConsent,
+      });
+
+      const params: Record<string, string | undefined> = {
+        code: issueResult.code,
+        provider: payload.provider,
+        needs_consent: payload.needsConsent ? "1" : "0",
+        expires_in: String(issueResult.expiresInSeconds),
+      };
+
+      if (mode === "dual") {
+        params.access_token = payload.accessToken;
+        params.refresh_token = payload.refreshToken;
+      }
+
+      res.redirect(appendQueryParams(mobileRedirectUri, params));
+      return true;
+    } catch (error) {
+      this.logger.error(
+        `[Mobile OAuth] Failed to issue one-time code: ${error?.message || error}`,
+      );
+
+      if (mode === "dual") {
+        res.redirect(
+          appendQueryParams(mobileRedirectUri, {
+            access_token: payload.accessToken,
+            refresh_token: payload.refreshToken,
+            provider: payload.provider,
+            needs_consent: payload.needsConsent ? "1" : "0",
+            exchange_error: "1",
+          }),
+        );
+        return true;
+      }
+
+      res.redirect(
+        appendQueryParams(mobileRedirectUri, {
+          error: "oauth_exchange_unavailable",
+          message: "소셜 로그인 코드 발급에 실패했습니다. 다시 시도해주세요.",
+        }),
+      );
+      return true;
+    }
   }
 
   @Public()
@@ -286,11 +379,12 @@ export class AuthController {
       // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
       const redirectPath = needsConsent ? "/consent" : "/";
       if (
-        this.tryRedirectToMobileCallback(req, res, {
-          access_token: req.user.access_token,
-          refresh_token: req.user.refresh_token,
+        await this.tryRedirectToMobileOAuthSuccess(req, res, {
+          accessToken: req.user.access_token,
+          refreshToken: req.user.refresh_token,
+          userId: String(req.user.user.id),
           provider: "google",
-          needs_consent: needsConsent ? "1" : "0",
+          needsConsent,
         })
       ) {
         return;
@@ -441,11 +535,12 @@ export class AuthController {
       // 헤더가 이미 전송되었는지 확인
       if (!res.headersSent) {
         if (
-          this.tryRedirectToMobileCallback(req, res, {
-            access_token: req.user.access_token,
-            refresh_token: req.user.refresh_token,
+          await this.tryRedirectToMobileOAuthSuccess(req, res, {
+            accessToken: req.user.access_token,
+            refreshToken: req.user.refresh_token,
+            userId: String(req.user.user.id),
             provider: "kakao",
-            needs_consent: needsConsent ? "1" : "0",
+            needsConsent,
           })
         ) {
           return;
@@ -592,11 +687,12 @@ export class AuthController {
       // 약관 동의가 필요하면 /consent로, 아니면 홈으로 리다이렉트
       const redirectPath = needsConsent ? "/consent" : "/";
       if (
-        this.tryRedirectToMobileCallback(req, res, {
-          access_token: req.user.access_token,
-          refresh_token: req.user.refresh_token,
+        await this.tryRedirectToMobileOAuthSuccess(req, res, {
+          accessToken: req.user.access_token,
+          refreshToken: req.user.refresh_token,
+          userId: String(req.user.user.id),
           provider: "github",
-          needs_consent: needsConsent ? "1" : "0",
+          needsConsent,
         })
       ) {
         return;

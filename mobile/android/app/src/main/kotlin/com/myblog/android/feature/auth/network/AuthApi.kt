@@ -5,6 +5,7 @@ import com.myblog.android.core.network.ApiResult
 interface AuthApi {
     suspend fun login(request: LoginRequestDto): ApiResult<LoginResponseDto>
     suspend fun refresh(request: RefreshRequestDto): ApiResult<RefreshResponseDto>
+    suspend fun oauthExchange(request: OAuthExchangeRequestDto): ApiResult<LoginResponseDto>
     suspend fun me(): ApiResult<MeResponseDto>
     suspend fun logout(): ApiResult<Unit>
 }
@@ -16,6 +17,12 @@ data class LoginRequestDto(
 
 data class RefreshRequestDto(
     val refreshToken: String,
+)
+
+data class OAuthExchangeRequestDto(
+    val code: String,
+    val redirectUri: String,
+    val provider: String? = null,
 )
 
 data class LoginResponseDto(

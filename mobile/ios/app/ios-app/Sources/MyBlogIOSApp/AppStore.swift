@@ -508,6 +508,54 @@ final class AppStore: ObservableObject {
             return
         }
 
+        if let oauthCode = queryValue(named: "code", in: queryItems), !oauthCode.isEmpty {
+            let provider = queryValue(named: "provider", in: queryItems)
+            isBusy = true
+            authError = nil
+            authMessage = nil
+            requiresReauth = false
+            defer { isBusy = false }
+
+            do {
+                let session = try await authService.exchangeSocialCode(
+                    code: oauthCode,
+                    redirectURI: config.socialAuthCallbackURL,
+                    provider: provider,
+                )
+                user = session.user
+                isAuthenticated = true
+                authMessage = "소셜 로그인이 완료되었습니다."
+                profileImageCacheBuster = nil
+                IOSRunTrace.emit(
+                    "auth.social_callback",
+                    category: "auth",
+                    fields: ["result": "success", "mode": "code", "userId": session.user.id],
+                )
+            } catch let error as APIError {
+                await clearLocalSession()
+                authError = error
+                IOSRunTrace.emit(
+                    "auth.social_callback",
+                    category: "auth",
+                    fields: ["result": "failed", "mode": "code", "status": "\(error.status)", "code": error.code],
+                )
+            } catch {
+                await clearLocalSession()
+                authError = APIError(
+                    code: "SOCIAL_CALLBACK_ERROR",
+                    message: error.localizedDescription,
+                    status: -1,
+                    type: .unknown
+                )
+                IOSRunTrace.emit(
+                    "auth.social_callback",
+                    category: "auth",
+                    fields: ["result": "failed", "mode": "code", "error": error.localizedDescription],
+                )
+            }
+            return
+        }
+
         let accessToken = queryValue(named: "access_token", in: queryItems)
             ?? queryValue(named: "accessToken", in: queryItems)
         let refreshToken = queryValue(named: "refresh_token", in: queryItems)
@@ -545,7 +593,7 @@ final class AppStore: ObservableObject {
             IOSRunTrace.emit(
                 "auth.social_callback",
                 category: "auth",
-                fields: ["result": "success", "userId": currentUser.id],
+                fields: ["result": "success", "mode": "legacy", "userId": currentUser.id],
             )
         } catch let error as APIError {
             await clearLocalSession()
@@ -553,7 +601,7 @@ final class AppStore: ObservableObject {
             IOSRunTrace.emit(
                 "auth.social_callback",
                 category: "auth",
-                fields: ["result": "failed", "status": "\(error.status)", "code": error.code],
+                fields: ["result": "failed", "mode": "legacy", "status": "\(error.status)", "code": error.code],
             )
         } catch {
             await clearLocalSession()
@@ -566,7 +614,7 @@ final class AppStore: ObservableObject {
             IOSRunTrace.emit(
                 "auth.social_callback",
                 category: "auth",
-                fields: ["result": "failed", "error": error.localizedDescription],
+                fields: ["result": "failed", "mode": "legacy", "error": error.localizedDescription],
             )
         }
     }

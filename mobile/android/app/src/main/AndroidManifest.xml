@@ -25,7 +25,24 @@
             android:exported="false" />
         <activity
             android:name=".LoginActivity"
+            android:launchMode="singleTop"
             android:exported="false" />
+        <activity
+            android:name=".AuthCallbackActivity"
+            android:exported="true"
+            android:launchMode="singleTask"
+            android:theme="@style/Theme.MyBlogAndroid">
+            <intent-filter android:label="oauth-callback">
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <data
+                    android:scheme="codebase"
+                    android:host="auth"
+                    android:path="/callback" />
+            </intent-filter>
+        </activity>
         <activity
             android:name=".PostDetailActivity"
             android:exported="false" />

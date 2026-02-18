@@ -67,7 +67,7 @@ class HttpFeedRepositoryTest {
 
         val request = transport.requests.single()
         assertEquals("GET", request.method)
-        assertEquals("https://api.myblog.app/api/v1/mobile/feed?sort=recent&cursor=cursor+1", request.url)
+        assertEquals("https://api.myblog.app/api/v1/feed?sort=recent&limit=20&cursor=cursor+1", request.url)
         assertEquals("Bearer access-1", request.headers["Authorization"])
     }
 
@@ -158,6 +158,14 @@ private class NoopAuthRepository : AuthRepository {
         return ApiResult.Failure(code = 401, message = "unused")
     }
 
+    override suspend fun oauthExchange(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ): ApiResult<AuthTokens> {
+        return ApiResult.Failure(code = 401, message = "unused")
+    }
+
     override suspend fun me(): ApiResult<UserSession> {
         return ApiResult.Failure(code = 500, message = "unused")
     }
@@ -180,6 +188,14 @@ private class RefreshOnlyAuthRepository : AuthRepository {
                 refreshToken = "refresh-$refreshToken",
             ),
         )
+    }
+
+    override suspend fun oauthExchange(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ): ApiResult<AuthTokens> {
+        return ApiResult.Failure(code = 401, message = "unused")
     }
 
     override suspend fun me(): ApiResult<UserSession> {

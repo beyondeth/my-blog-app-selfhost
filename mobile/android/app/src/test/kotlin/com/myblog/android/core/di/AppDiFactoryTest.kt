@@ -77,7 +77,7 @@ class AppDiFactoryTest {
         assertEquals(false, success.data.hasMore)
 
         val request = transport.requests.single()
-        assertEquals("https://api.myblog.app/api/v1/mobile/feed?sort=recent", request.url)
+        assertEquals("https://api.myblog.app/api/v1/feed?sort=recent&limit=20", request.url)
         assertEquals("Bearer access-token", request.headers["Authorization"])
     }
 
@@ -118,7 +118,7 @@ class AppDiFactoryTest {
         assertEquals(AppThemePreference.SYSTEM, success.data.themePreference)
 
         val request = transport.requests.single()
-        assertEquals("https://api.myblog.app/api/v1/mobile/settings", request.url)
+        assertEquals("https://api.myblog.app/api/v1/users/profile", request.url)
         assertEquals("Bearer access-token", request.headers["Authorization"])
     }
 }

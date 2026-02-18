@@ -15,6 +15,7 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { KakaoStrategy } from "./strategies/kakao.strategy";
 import { GitHubStrategy } from "./strategies/github.strategy";
+import { MobileOAuthCodeService } from "./services/mobile-oauth-code.service";
 
 const providers: any[] = [
   AuthService,
@@ -22,6 +23,7 @@ const providers: any[] = [
   GoogleStrategy,
   KakaoStrategy,
   GitHubStrategy,
+  MobileOAuthCodeService,
 ];
 
 @Module({

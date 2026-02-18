@@ -4,6 +4,7 @@ import com.myblog.android.core.network.ApiResult
 import com.myblog.android.feature.auth.model.AuthTokens
 import com.myblog.android.feature.auth.model.LoginRequest
 import com.myblog.android.feature.auth.model.UserSession
+import com.myblog.android.feature.auth.network.OAuthExchangeRequestDto
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -21,6 +22,7 @@ class MobileContractAuthRepositoryTest {
                         id = "u1",
                         username = "tester",
                         email = "u@myblog.app",
+                        profileImage = null,
                     ),
                 ),
             ),
@@ -48,6 +50,7 @@ class MobileContractAuthRepositoryTest {
                     id = "u1",
                     username = "my-user",
                     email = "u@myblog.app",
+                    profileImage = null,
                 ),
             ),
             logoutResult = ApiResult.Success(Unit),
@@ -90,6 +93,8 @@ private class FakeAuthApi(
     override suspend fun login(request: LoginRequestDto): ApiResult<LoginResponseDto> = loginResult
 
     override suspend fun refresh(request: RefreshRequestDto): ApiResult<RefreshResponseDto> = refreshResult
+
+    override suspend fun oauthExchange(request: OAuthExchangeRequestDto): ApiResult<LoginResponseDto> = loginResult
 
     override suspend fun me(): ApiResult<MeResponseDto> = meResult
 
