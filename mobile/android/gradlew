@@ -114,6 +114,29 @@ case "$( uname )" in                #(
   NONSTOP* )        nonstop=true ;;
 esac
 
+# On macOS, force a stable JDK for Gradle when JAVA_HOME is unset/invalid or too new.
+if [ "$darwin" = true ] ; then
+    STUDIO_JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+    if [ -d "$STUDIO_JAVA_HOME" ] ; then
+        use_studio_jbr=false
+        if [ -z "$JAVA_HOME" ] ; then
+            use_studio_jbr=true
+        elif [ ! -x "$JAVA_HOME/bin/java" ] ; then
+            use_studio_jbr=true
+        else
+            current_java_major=$("$JAVA_HOME/bin/java" -version 2>&1 | sed -n '1s/.*version "\([0-9][0-9]*\).*/\1/p')
+            if [ -n "$current_java_major" ] && [ "$current_java_major" -ge 22 ] 2>/dev/null ; then
+                use_studio_jbr=true
+            fi
+        fi
+
+        if [ "$use_studio_jbr" = true ] ; then
+            JAVA_HOME="$STUDIO_JAVA_HOME"
+            export JAVA_HOME
+        fi
+    fi
+fi
+
 
 
 # Determine the Java command to use to start the JVM.
