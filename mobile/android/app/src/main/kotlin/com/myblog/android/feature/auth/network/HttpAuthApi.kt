@@ -95,7 +95,7 @@ class HttpAuthApi(
     override suspend fun oauthExchange(request: OAuthExchangeRequestDto): ApiResult<LoginResponseDto> {
         val providerField = request.provider
             ?.takeIf { it.isNotBlank() }
-            ?.let { """,\"provider\":\"${escapeJson(it)}\"""" }
+            ?.let { ""","provider":"${escapeJson(it)}"""" }
             .orEmpty()
 
         val body = """{"code":"${escapeJson(request.code)}","redirectUri":"${escapeJson(request.redirectUri)}"$providerField}"""

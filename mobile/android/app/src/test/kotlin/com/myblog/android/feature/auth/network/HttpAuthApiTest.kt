@@ -171,6 +171,50 @@ class HttpAuthApiTest {
     }
 
     @Test
+    fun oauthExchangeIncludesProviderAsValidJsonProperty() = runTest {
+        val transport = RecordingTransport(
+            result = ApiResult.Success(
+                HttpResponse(
+                    statusCode = 200,
+                    body = """
+                        {
+                          "accessToken": "oauth-access",
+                          "refreshToken": "oauth-refresh",
+                          "user": {
+                            "id": "user-oauth",
+                            "username": "OAuthUser",
+                            "email": "oauth@myblog.app"
+                          }
+                        }
+                    """.trimIndent(),
+                ),
+            ),
+        )
+        val authApi = HttpAuthApi(
+            transport = transport,
+            baseUrl = "https://api.myblog.app",
+        )
+
+        val result = authApi.oauthExchange(
+            OAuthExchangeRequestDto(
+                code = "oauth-code-1",
+                redirectUri = "myblogapp://oauth/callback",
+                provider = "google",
+            ),
+        )
+
+        val success = assertIs<ApiResult.Success<LoginResponseDto>>(result)
+        assertEquals("oauth-access", success.data.accessToken)
+        assertEquals("oauth-refresh", success.data.refreshToken)
+
+        val request = transport.requests.single()
+        assertEquals(
+            """{"code":"oauth-code-1","redirectUri":"myblogapp://oauth/callback","provider":"google"}""",
+            request.body,
+        )
+    }
+
+    @Test
     fun logoutUsesAuthHeaderAndSucceedsOn2xx() = runTest {
         val transport = RecordingTransport(
             result = ApiResult.Success(
