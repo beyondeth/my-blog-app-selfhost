@@ -7,6 +7,7 @@ This document lists mobile-oriented endpoints and behavior contracts.
 - Auth
   - POST `/mobile/auth/login`
   - POST `/mobile/auth/refresh`
+  - POST `/mobile/auth/oauth/exchange` (social callback one-time code exchange)
   - POST `/mobile/auth/logout`
   - GET `/mobile/auth/me`
 - Content
@@ -30,6 +31,13 @@ This document lists mobile-oriented endpoints and behavior contracts.
 ## Contract rule
 
 Backend must continue to support web cookie authentication. Mobile APIs can return explicit tokens for secure storage.
+
+### Social OAuth callback security rule
+
+- Mobile callback URI must not contain `accessToken` or `refreshToken` directly.
+- Backend redirects mobile callback with one-time `code` only.
+- Mobile app exchanges `code` via `POST /mobile/auth/oauth/exchange`.
+- OAuth exchange code is single-use and short-lived (default 90s).
 
 ## Compatibility decision
 

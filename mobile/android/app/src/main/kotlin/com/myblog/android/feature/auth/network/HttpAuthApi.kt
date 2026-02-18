@@ -92,6 +92,52 @@ class HttpAuthApi(
         }
     }
 
+    override suspend fun oauthExchange(request: OAuthExchangeRequestDto): ApiResult<LoginResponseDto> {
+        val providerField = request.provider
+            ?.takeIf { it.isNotBlank() }
+            ?.let { """,\"provider\":\"${escapeJson(it)}\"""" }
+            .orEmpty()
+
+        val body = """{"code":"${escapeJson(request.code)}","redirectUri":"${escapeJson(request.redirectUri)}"$providerField}"""
+        val httpRequest = HttpRequest(
+            method = "POST",
+            url = endpoint("/mobile/auth/oauth/exchange"),
+            headers = jsonHeaders(),
+            body = body,
+        )
+
+        return decodeResponse(transport.execute(httpRequest)) { response ->
+            val responseBody = response.body
+            val accessToken = findJsonValue(responseBody, "accessToken", "access_token")
+                ?: extractTokenFromSetCookie(response.headers, "access_token")
+            val refreshToken = findJsonValue(responseBody, "refreshToken", "refresh_token")
+                ?: extractTokenFromSetCookie(response.headers, "refresh_token")
+
+            if (accessToken.isNullOrBlank() || refreshToken.isNullOrBlank()) {
+                throw IllegalStateException("oauth exchange response is missing token data")
+            }
+
+            val userObject = requireUserObject(responseBody)
+            LoginResponseDto(
+                accessToken = accessToken,
+                refreshToken = refreshToken,
+                user = AuthUserDto(
+                    id = requireJsonString(userObject, "id"),
+                    username = requireJsonString(userObject, "username"),
+                    email = requireJsonString(userObject, "email"),
+                    profileImage = resolveMediaUrl(
+                        firstJsonString(
+                            userObject,
+                            "profileImage",
+                            "profileImageUrl",
+                            "avatarUrl",
+                        ),
+                    ),
+                ),
+            )
+        }
+    }
+
     override suspend fun me(): ApiResult<MeResponseDto> {
         val httpRequest = HttpRequest(
             method = "GET",

@@ -46,6 +46,38 @@ actor AuthService {
         return UserSession(user: response.user, accessToken: response.accessToken, refreshToken: response.refreshToken)
     }
 
+    func exchangeSocialCode(
+        code: String,
+        redirectURI: URL,
+        provider: String? = nil
+    ) async throws -> UserSession {
+        let body = OAuthCodeExchangeRequest(
+            code: code,
+            redirectUri: redirectURI.absoluteString,
+            provider: provider,
+        )
+        let req = EndpointRequest(
+            path: "/mobile/auth/oauth/exchange",
+            method: .post,
+            body: try JSONEncoder().encode(body)
+        )
+        let response: MobileAuthResponse = try await apiClient.request(
+            req,
+            as: MobileAuthResponse.self,
+            requiresAuthentication: false
+        )
+        await tokenStore.save(
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken,
+            refreshAt: nil
+        )
+        return UserSession(
+            user: response.user,
+            accessToken: response.accessToken,
+            refreshToken: response.refreshToken
+        )
+    }
+
     func logout() async throws {
         let req = EndpointRequest(path: "/mobile/auth/logout", method: .post)
         try await apiClient.requestVoid(req)
@@ -246,6 +278,11 @@ struct MessageResponse: Decodable {
     let message: String?
 }
 struct RefreshRequest: Encodable { let refreshToken: String }
+struct OAuthCodeExchangeRequest: Encodable {
+    let code: String
+    let redirectUri: String
+    let provider: String?
+}
 
 struct UserSession {
     let user: UserProfile

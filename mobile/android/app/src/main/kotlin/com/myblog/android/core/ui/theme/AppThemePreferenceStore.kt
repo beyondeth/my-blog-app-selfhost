@@ -10,7 +10,7 @@ private const val PREF_THEME_PREFERENCE = "theme_preference"
 object AppThemePreferenceStore {
     fun read(context: Context): AppThemePreference {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val preference = prefs.getString(PREF_THEME_PREFERENCE, AppThemePreference.SYSTEM.name)
+        val preference = prefs.getString(PREF_THEME_PREFERENCE, AppThemePreference.DARK.name)
         return parse(preference)
     }
 
@@ -33,6 +33,6 @@ object AppThemePreferenceStore {
 
     private fun parse(value: String?): AppThemePreference {
         return runCatching { AppThemePreference.valueOf(value.orEmpty()) }
-            .getOrElse { AppThemePreference.SYSTEM }
+            .getOrElse { AppThemePreference.DARK }
     }
 }

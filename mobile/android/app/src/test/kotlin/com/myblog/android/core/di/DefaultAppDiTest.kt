@@ -9,6 +9,7 @@ import com.myblog.android.feature.auth.network.AuthUserDto
 import com.myblog.android.feature.auth.network.LoginRequestDto
 import com.myblog.android.feature.auth.network.LoginResponseDto
 import com.myblog.android.feature.auth.network.MeResponseDto
+import com.myblog.android.feature.auth.network.OAuthExchangeRequestDto
 import com.myblog.android.feature.auth.network.RefreshRequestDto
 import com.myblog.android.feature.auth.network.RefreshResponseDto
 import kotlinx.coroutines.test.runTest
@@ -56,6 +57,7 @@ private class SuccessfulAuthApi : AuthApi {
                     id = "user-1",
                     username = "MyBlog User",
                     email = "user@myblog.app",
+                    profileImage = null,
                 ),
             ),
         )
@@ -70,12 +72,17 @@ private class SuccessfulAuthApi : AuthApi {
         )
     }
 
+    override suspend fun oauthExchange(request: OAuthExchangeRequestDto): ApiResult<LoginResponseDto> {
+        return login(LoginRequestDto(email = "oauth@myblog.app", password = "unused"))
+    }
+
     override suspend fun me(): ApiResult<MeResponseDto> {
         return ApiResult.Success(
             MeResponseDto(
                 id = "user-1",
                 username = "MyBlog User",
                 email = "user@myblog.app",
+                profileImage = null,
             ),
         )
     }

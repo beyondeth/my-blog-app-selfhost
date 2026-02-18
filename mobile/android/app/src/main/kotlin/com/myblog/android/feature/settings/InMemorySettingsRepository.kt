@@ -8,7 +8,7 @@ import com.myblog.android.feature.settings.model.SettingsSnapshot
 
 class InMemorySettingsRepository(
     initialSnapshot: SettingsSnapshot = SettingsSnapshot(
-        themePreference = AppThemePreference.SYSTEM,
+        themePreference = AppThemePreference.DARK,
         notifications = NotificationPreferences(
             pushEnabled = true,
             marketingEnabled = false,

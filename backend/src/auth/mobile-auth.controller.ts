@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
   NotFoundException,
   Logger,
+  BadRequestException,
 } from "@nestjs/common";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { AuthService } from "./auth.service";
@@ -17,6 +18,11 @@ import { JwtAuthGuard } from "./guards/jwt-auth.guard";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { UsersService } from "../users/users.service";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
+import { MobileOAuthExchangeDto } from "./dto/mobile-oauth-exchange.dto";
+import {
+  MobileOAuthCodeService,
+  MobileOAuthCodeExchangeError,
+} from "./services/mobile-oauth-code.service";
 
 @Controller("mobile/auth")
 @ApiTags("mobile-auth")
@@ -27,6 +33,7 @@ export class MobileAuthController {
     private readonly authService: AuthService,
     private readonly usersService: UsersService,
     private readonly redisService: UnifiedRedisService,
+    private readonly mobileOAuthCodeService: MobileOAuthCodeService,
   ) {}
 
   @Public()
@@ -42,6 +49,80 @@ export class MobileAuthController {
       refreshToken: authResponse.refresh_token,
       user: authResponse.user,
       message: "로그인 성공",
+    };
+  }
+
+  @Public()
+  @Post("oauth/exchange")
+  @ApiOperation({ summary: "모바일 OAuth 코드 교환" })
+  @ApiResponse({ status: 200, description: "OAuth 코드 교환 성공" })
+  @ApiResponse({ status: 401, description: "OAuth 코드 검증 실패" })
+  async mobileOAuthExchange(@Body() dto: MobileOAuthExchangeDto) {
+    if (!dto.code || !dto.redirectUri) {
+      throw new BadRequestException({
+        code: "OAUTH_EXCHANGE_BAD_REQUEST",
+        message: "code와 redirectUri는 필수입니다.",
+      });
+    }
+
+    let exchangeResult;
+    try {
+      exchangeResult = await this.mobileOAuthCodeService.exchangeCode({
+        code: dto.code,
+        redirectUri: dto.redirectUri,
+        provider: dto.provider,
+      });
+    } catch (error) {
+      if (error instanceof MobileOAuthCodeExchangeError) {
+        throw new UnauthorizedException({
+          code: error.code,
+          message: error.message,
+        });
+      }
+      throw new UnauthorizedException({
+        code: "OAUTH_CODE_INVALID",
+        message: "유효하지 않은 OAuth 코드입니다.",
+      });
+    }
+
+    const user = await this.authService.validateAccessToken(
+      exchangeResult.accessToken,
+    );
+    if (!user) {
+      throw new UnauthorizedException({
+        code: "OAUTH_CODE_INVALID",
+        message: "OAuth 코드 교환 후 사용자 검증에 실패했습니다.",
+      });
+    }
+
+    const fullUser = await this.usersService.findOne(user.id).catch(() => null);
+    const profile = fullUser ?? user;
+
+    return {
+      accessToken: exchangeResult.accessToken,
+      refreshToken: exchangeResult.refreshToken,
+      user: {
+        id: profile.id,
+        email: profile.email,
+        username: profile.username,
+        role: profile.role,
+        profileImage: profile.profileImage,
+        isEmailVerified: profile.isEmailVerified,
+        authProvider: profile.authProvider,
+        lastLoginProvider: profile.lastLoginProvider,
+        subscriptionTier: profile.subscriptionTier,
+        subscriptionStatus: profile.subscriptionStatus,
+        bio: profile.bio,
+        jobTitle: profile.jobTitle,
+        socialLinks: profile.socialLinks ?? [],
+        blogSlug: profile.blog?.slug || null,
+        termsAcceptedAt: profile.termsAcceptedAt,
+        privacyAcceptedAt: profile.privacyAcceptedAt,
+        marketingOptIn: profile.marketingOptIn,
+        newsletterOptIn: profile.newsletterOptIn,
+        createdAt: profile.createdAt,
+      },
+      message: "소셜 로그인 성공",
     };
   }
 

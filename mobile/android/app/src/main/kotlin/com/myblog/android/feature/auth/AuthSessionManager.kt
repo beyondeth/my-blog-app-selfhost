@@ -44,6 +44,29 @@ class AuthSessionManager(
         }
     }
 
+    suspend fun loginWithOAuthCode(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ) {
+        val exchangeResult = authRepository.oauthExchange(code, redirectUri, provider)
+        if (exchangeResult is ApiResult.Failure) {
+            mutableState.value = AuthStateMachine.reduce(
+                AuthEvent.SessionExpired(exchangeResult.message),
+            )
+            return
+        }
+
+        val tokens = (exchangeResult as ApiResult.Success).data
+        tokenStore.save(tokens.accessToken, tokens.refreshToken)
+
+        val sessionResult = authRepository.me()
+        mutableState.value = when (sessionResult) {
+            is ApiResult.Success -> AuthStateMachine.reduce(AuthEvent.LoginSucceeded(sessionResult.data))
+            is ApiResult.Failure -> AuthStateMachine.reduce(AuthEvent.SessionExpired(sessionResult.message))
+        }
+    }
+
     suspend fun logout() {
         authRepository.logout()
         tokenStore.clear()

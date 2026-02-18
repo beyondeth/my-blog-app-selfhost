@@ -281,18 +281,19 @@ class SettingsActivity : AppCompatActivity() {
 
             is SettingsState.Ready -> {
                 val snapshot = state.snapshot
+                val effectiveThemePreference = AppThemePreferenceStore.read(this)
                 isRestoringFromState = true
                 pushEnabledSwitch.isChecked = snapshot.notifications.pushEnabled
                 marketingEnabledSwitch.isChecked = snapshot.notifications.marketingEnabled
                 communityReplyEnabledSwitch.isChecked = snapshot.notifications.communityReplyEnabled
                 profileVisibleSwitch.isChecked = snapshot.privacy.profileVisible
                 activityVisibleSwitch.isChecked = snapshot.privacy.activityVisible
-                syncThemePanel(snapshot.themePreference)
+                syncThemePanel(effectiveThemePreference)
                 isRestoringFromState = false
 
                 settingsStatusText.text = buildString {
                     appendLine("Loaded from: ${AppRuntime.BASE_URL}/api/v1/users/profile")
-                    appendLine("themePreference: ${snapshot.themePreference}")
+                    appendLine("themePreference(local): $effectiveThemePreference")
                     appendLine("notifications.pushEnabled: ${snapshot.notifications.pushEnabled}")
                     appendLine("notifications.marketingEnabled: ${snapshot.notifications.marketingEnabled}")
                     append("privacy.activityVisible: ${snapshot.privacy.activityVisible}")

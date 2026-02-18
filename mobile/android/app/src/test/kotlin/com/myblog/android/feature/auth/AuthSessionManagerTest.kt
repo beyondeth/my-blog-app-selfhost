@@ -131,6 +131,14 @@ private class FakeAuthRepository(
         return refreshResult
     }
 
+    override suspend fun oauthExchange(
+        code: String,
+        redirectUri: String,
+        provider: String?,
+    ): ApiResult<AuthTokens> {
+        return ApiResult.Failure(code = 500, message = "unused")
+    }
+
     override suspend fun me(): ApiResult<UserSession> = meResult
 
     override suspend fun logout(): ApiResult<Unit> = logoutResult
@@ -160,5 +168,7 @@ private fun sampleSession(): UserSession {
         userId = "user-1",
         email = "user@myblog.app",
         displayName = "MyBlog User",
+        username = "myblog-user",
+        profileImageUrl = null,
     )
 }

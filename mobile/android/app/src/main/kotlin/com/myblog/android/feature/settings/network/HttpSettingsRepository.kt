@@ -113,7 +113,7 @@ class HttpSettingsRepository(
         val marketingOptIn = jsonBoolean(body, "marketingOptIn") ?: false
         val newsletterOptIn = jsonBoolean(body, "newsletterOptIn") ?: false
         return SettingsSnapshot(
-            themePreference = parseThemePreference(jsonString(body, "themePreference") ?: "SYSTEM"),
+            themePreference = parseThemePreference(jsonString(body, "themePreference") ?: "DARK"),
             notifications = NotificationPreferences(
                 pushEnabled = newsletterOptIn,
                 marketingEnabled = marketingOptIn,
@@ -128,10 +128,10 @@ class HttpSettingsRepository(
 
     private fun parseThemePreference(value: String?): AppThemePreference {
         if (value == null) {
-            return AppThemePreference.SYSTEM
+            return AppThemePreference.DARK
         }
         return runCatching { AppThemePreference.valueOf(value.uppercase()) }
-            .getOrElse { AppThemePreference.SYSTEM }
+            .getOrElse { AppThemePreference.DARK }
     }
 
     private fun extractFailureMessage(response: HttpResponse): String {
