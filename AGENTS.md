@@ -45,6 +45,10 @@ Detailed procedures and update history live in `docs/platform-coordination/`.
   - `docs/platform-coordination/WORKTREE_STATUS.md`
 - Pre-release checks before `integration/workspace -> main`:
   - `docs/platform-coordination/RELEASE_GATE.md`
+- Codex config/rules/skills/MCP standard:
+  - `docs/platform-coordination/CODEX_CONFIGURATION.md`
+- Multi-agent usage policy and safe patterns:
+  - `docs/platform-coordination/MULTI_AGENT_PLAYBOOK.md`
 - Document index and update history:
   - `docs/platform-coordination/README.md`
   - `docs/platform-coordination/CHANGELOG.md`

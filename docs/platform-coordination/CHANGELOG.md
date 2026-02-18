@@ -24,3 +24,23 @@ Track operational rule changes for worktree/branch coordination.
   - `docs/platform-coordination/WORKTREE_STATUS.md`
   - `docs/platform-coordination/RELEASE_GATE.md`
   - `docs/platform-coordination/README.md`
+
+### Additional update (OpenAI docs alignment)
+
+#### What changed
+- Added situation routing for Codex/MCP/skills/multi-agent docs in `AGENTS.md`.
+- Added `docs/platform-coordination/CODEX_CONFIGURATION.md`.
+- Added `docs/platform-coordination/MULTI_AGENT_PLAYBOOK.md`.
+- Updated `docs/platform-coordination/README.md` index.
+
+#### Why
+- Reduce repeated prompting by pinning where to read each operational standard.
+- Align repository operation model with OpenAI Codex official docs.
+
+#### How
+- Reviewed:
+  - https://developers.openai.com/codex/guides/agents-md
+  - https://developers.openai.com/codex/rules
+  - https://developers.openai.com/codex/mcp
+  - https://developers.openai.com/codex/skills
+  - https://developers.openai.com/codex/multi-agent

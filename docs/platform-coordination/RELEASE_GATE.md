@@ -14,6 +14,7 @@
 - [ ] Shared changes were committed in `my-blog-app-integ` (not platform worktrees).
 - [ ] Core smoke test done once (login/feed/settings/community/profile).
 - [ ] `docs/platform-coordination/WORKTREE_STATUS.md` is updated.
+- [ ] `AGENTS.md` routing and `docs/platform-coordination/README.md` index are in sync.
 - [ ] Runtime services used for final validation were started from `my-blog-app-integ`.
 
 ## Main Hygiene
