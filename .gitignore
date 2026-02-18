@@ -50,8 +50,7 @@ mobile/android/**/*.aab
 # MCP client settings (개인 API 키 포함)
 .mcp.json
 
-# Codex settings (개인 API 키 포함)
-.codex/
+# Codex settings (project-shared files may be tracked)
 
 # Local agent workspace
 .agent/

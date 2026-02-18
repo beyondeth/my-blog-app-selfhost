@@ -1,0 +1,68 @@
+name: platform-pr-guardrails
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce branch/path/body guardrails
+        env:
+          HEAD_REF: ${{ github.event.pull_request.head.ref }}
+          BASE_REF: ${{ github.event.pull_request.base.ref }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          set -euo pipefail
+
+          echo "HEAD_REF=$HEAD_REF"
+          echo "BASE_REF=$BASE_REF"
+
+          CHANGED_FILES="$(git diff --name-only "$BASE_SHA...$HEAD_SHA")"
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          is_platform_branch=false
+          if [[ "$HEAD_REF" =~ ^feature/(ios|aos|web)/ ]]; then
+            is_platform_branch=true
+          fi
+
+          # Platform branches must target integration/workspace.
+          if [[ "$is_platform_branch" == "true" && "$BASE_REF" != "integration/workspace" ]]; then
+            echo "ERROR: platform branch PRs must target integration/workspace."
+            exit 1
+          fi
+
+          # main can only be targeted from integration/workspace.
+          if [[ "$BASE_REF" == "main" && "$HEAD_REF" != "integration/workspace" ]]; then
+            echo "ERROR: only integration/workspace can open PR to main."
+            exit 1
+          fi
+
+          # Platform branches cannot modify shared paths directly.
+          if [[ "$is_platform_branch" == "true" ]]; then
+            if echo "$CHANGED_FILES" | grep -Eq '^(backend/|mobile/contracts/)' ; then
+              echo "ERROR: platform branches cannot change backend/** or mobile/contracts/**."
+              echo "Apply shared changes in my-blog-app-integ on integration/workspace."
+              exit 1
+            fi
+          fi
+
+          # Require PLATFORM-TRACK structure in PR body.
+          if [[ -z "${PR_BODY:-}" ]]; then
+            echo "ERROR: PR body is empty. Include PLATFORM-TRACK."
+            exit 1
+          fi
+          echo "$PR_BODY" | grep -q '\[PLATFORM-TRACK\]' || { echo "ERROR: missing [PLATFORM-TRACK]."; exit 1; }
+          echo "$PR_BODY" | grep -q '타겟:' || { echo "ERROR: missing 타겟."; exit 1; }
+          echo "$PR_BODY" | grep -q '작업유형:' || { echo "ERROR: missing 작업유형."; exit 1; }
+          echo "$PR_BODY" | grep -q '공유영향 확인:' || { echo "ERROR: missing 공유영향 확인."; exit 1; }
+          echo "$PR_BODY" | grep -q '요약:' || { echo "ERROR: missing 요약."; exit 1; }

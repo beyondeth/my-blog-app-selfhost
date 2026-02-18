@@ -25,12 +25,14 @@
 - `explorer`: repository search and dependency tracing.
 - `reviewer`: risk-based review (bugs, regressions, missing tests).
 - `docs-auditor`: checks AGENTS <-> runbooks consistency.
+- `pr-writer`: drafts PR body/checklist from PLATFORM-TRACK and test evidence.
 
 ## Safe Execution Pattern
 1. Parent agent defines scope and expected artifact.
 2. Spawn sub-agents for parallel investigation.
 3. Collect sub-agent outputs and resolve conflicts centrally.
 4. Parent agent performs edits, tests, commit, and push.
+5. Parent or human opens PR; sub-agent assists with summary/review comments only.
 
 ## When Not To Use Multi-Agent
 - Small one-file edits with obvious impact.

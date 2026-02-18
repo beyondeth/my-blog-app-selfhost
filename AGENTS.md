@@ -45,6 +45,8 @@ Detailed procedures and update history live in `docs/platform-coordination/`.
   - `docs/platform-coordination/WORKTREE_STATUS.md`
 - Pre-release checks before `integration/workspace -> main`:
   - `docs/platform-coordination/RELEASE_GATE.md`
+- PR routing/approval/automation boundary:
+  - `docs/platform-coordination/PR_REVIEW_POLICY.md`
 - Codex config/rules/skills/MCP standard:
   - `docs/platform-coordination/CODEX_CONFIGURATION.md`
 - Multi-agent usage policy and safe patterns:

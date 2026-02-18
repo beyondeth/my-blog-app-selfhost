@@ -44,3 +44,30 @@ Track operational rule changes for worktree/branch coordination.
   - https://developers.openai.com/codex/mcp
   - https://developers.openai.com/codex/skills
   - https://developers.openai.com/codex/multi-agent
+
+### Additional update (PR workflow + guardrails)
+
+#### What changed
+- Added repository PR template:
+  - `.github/pull_request_template.md`
+- Added PR guardrail workflow:
+  - `.github/workflows/platform-pr-guardrails.yml`
+- Added PR/approval policy runbook:
+  - `docs/platform-coordination/PR_REVIEW_POLICY.md`
+- Updated routing/index/checklist docs:
+  - `AGENTS.md`
+  - `docs/platform-coordination/README.md`
+  - `docs/platform-coordination/RELEASE_GATE.md`
+  - `docs/platform-coordination/MULTI_AGENT_PLAYBOOK.md`
+- Unignored `.codex/` in `.gitignore` for project-tracked Codex config.
+
+#### Why
+- Preserve auditable review history per platform PR.
+- Enforce branch and shared-path discipline automatically.
+- Separate sub-agent assist from final human approval/merge.
+
+#### How
+- Introduced CI guardrails for:
+  - base branch policy
+  - shared path ownership
+  - required PLATFORM-TRACK fields in PR body
