@@ -89,5 +89,5 @@ Track operational rule changes for worktree/branch coordination.
 
 #### How
 - Platform branch pushes now open PR automatically to `integration/workspace`.
-- Eligible PRs auto-merge after guardrail checks.
+- Eligible PRs auto-merge in automation path after guardrail-equivalent checks.
 - `manual-review` label provides opt-out path for sensitive changes.

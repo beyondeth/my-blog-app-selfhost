@@ -34,9 +34,10 @@
 ## Repository Automation (Implemented)
 - `.github/workflows/auto-open-platform-pr.yml`
   - On push to `feature/ios/**`, `feature/aos/**`, `feature/web/**`, opens PR to `integration/workspace` if none exists.
+  - Runs shared-path guard check and auto-merges eligible PRs (squash).
 - `.github/workflows/platform-pr-guardrails.yml`
   - Enforces PR guardrails.
-  - Auto-merges eligible platform PRs into `integration/workspace` with squash merge.
+  - Auto-merges eligible platform PRs into `integration/workspace` with squash merge (mainly for manually opened PR).
   - Add label `manual-review` to disable auto-merge for a PR.
 
 ## Enforced Repository Checks
