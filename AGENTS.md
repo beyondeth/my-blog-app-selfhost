@@ -35,33 +35,38 @@ Use this header whenever a platform task starts or handoff is needed:
 
 ### Recommended mapping
 - `my-blog-app` (root worktree): git metadata host/checkpoint only. Do not develop here.
-- `my-blog-app-integ`: integration execution + shared code ownership (`hotfix/auth-me-no-401`).
+- `my-blog-app-integ`: integration execution + shared code ownership (`integration/workspace`).
 - `mobile/ios` worktree: branch `feature/ios/<topic>` (`feature/ios/workspace` for coordination, then narrow topic branches if needed).
 - `mobile/android` worktree: branch `feature/aos/<topic>` (`feature/aos/workspace` for coordination, then narrow topic branches if needed).
 - Optional web worktree: branch `feature/web/<topic>`.
+
+### Enforced Shared-Code Rule (MUST / NEVER)
+- MUST: `backend/**`, `mobile/contracts/**`, shared coordination docs are edited only in `my-blog-app-integ` on `integration/workspace`.
+- NEVER: edit shared backend/contracts from iOS/AOS/Web worktrees.
+- MUST: if shared change is discovered during platform work, stop platform work, switch to integ, apply shared patch first, then sync platform branch with `integration/workspace`.
 
 ### Mandatory guardrails
 1. Do not write iOS code on an Android branch and do not write Android code on iOS branch.
 2. Before each feature, create or check out a dedicated branch in that platform worktree:
    - iOS: `git switch feature/ios/ui-sync-v1` (or new topic branch)
    - Android: `git switch feature/aos/ui-sync-v1` (or new topic branch)
-3. Shared code (`backend/**`, `mobile/contracts/**`, shared docs) must be changed in `my-blog-app-integ` on `hotfix/auth-me-no-401`.
+3. Shared code (`backend/**`, `mobile/contracts/**`, shared docs) must be changed in `my-blog-app-integ` on `integration/workspace`.
 4. 병합은 플랫폼 시뮬/스테이징 실동작(로그인/피드/설정 등 1회 핵심 시나리오) 완료 후에만 진행.
 5. Runtime services (`backend` 3000, `frontend` 3001, `mcp-proxy-server`) are started from `my-blog-app-integ` by default.
 6. Web worktree is for `frontend/**` changes. Backend changes are not owned by web worktree.
-7. Merge order: 플랫폼 브랜치 -> `hotfix/auth-me-no-401` -> `main`.
+7. Merge order: 플랫폼 브랜치 -> `integration/workspace` -> `main`.
 8. Do not force-push platform branches unless explicitly coordinated.
 
 ### Shared-change flow (while doing platform work)
 1. Platform worktree에서 작업 중 공용 코드 수정 필요 판단.
 2. Platform 브랜치 커밋/스태시 후 `my-blog-app-integ`로 이동.
-3. `hotfix/auth-me-no-401`에서 `backend/**`/`mobile/contracts/**` 수정 및 테스트.
-4. 공용 변경 먼저 푸시 후, 플랫폼 브랜치로 돌아가 `hotfix/auth-me-no-401` 최신 반영(merge/rebase).
+3. `integration/workspace`에서 `backend/**`/`mobile/contracts/**` 수정 및 테스트.
+4. 공용 변경 먼저 푸시 후, 플랫폼 브랜치로 돌아가 `integration/workspace` 최신 반영(merge/rebase).
 5. 플랫폼 작업 계속 진행.
 
 ### Safe branch deletion policy
 - Do not delete a platform or shared branch until:
-  - 해당 브랜치가 공유 브랜치(`hotfix/auth-me-no-401` 또는 `main`)로 병합되었고
+  - 해당 브랜치가 공유 브랜치(`integration/workspace` 또는 `main`)로 병합되었고
   - `git log` 또는 PR로 변경사항이 통합됨이 확인된 경우.
 - 병합 완료 후 삭제:
   - 로컬: `git branch -d feature/ios/xxx` / `git branch -d feature/aos/xxx`
@@ -77,7 +82,7 @@ Use this header whenever a platform task starts or handoff is needed:
   - `git switch feature/ios/<topic>` (ios)
   - `git switch feature/aos/<topic>` (android)
 - 통합:
-  - `git switch hotfix/auth-me-no-401`
+  - `git switch integration/workspace`
   - `git merge --no-ff feature/ios/<topic>` / `git merge --no-ff feature/aos/<topic>`
   - 테스트/문서 확인 후 `main`으로 정식 병합
 - 실행:
@@ -98,7 +103,7 @@ Use this header whenever a platform task starts or handoff is needed:
   - If shared code is required during platform work, stop and apply the shared change in `my-blog-app-integ`.
   - Commit with Conventional Commit.
   - Push only that platform branch.
-  - Merge platform branch into `hotfix/auth-me-no-401` explicitly.
+  - Merge platform branch into `integration/workspace` explicitly.
 
 ## Design Guidelines
 Design decisions related to layout, typography, color, and contrast must follow WCAG 3.0 accessibility standards, ensuring consistent readability and usability across the product.

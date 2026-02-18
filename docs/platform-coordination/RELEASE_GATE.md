@@ -4,8 +4,8 @@
 
 ## Preconditions
 
-- [ ] `hotfix/auth-me-no-401` is clean and pushed.
-- [ ] iOS/Android/Web branches are merged into `hotfix/auth-me-no-401`.
+- [ ] `integration/workspace` is clean and pushed.
+- [ ] iOS/Android/Web branches are merged into `integration/workspace`.
 - [ ] Shared backend/contracts changes are reviewed.
 - [ ] Shared changes were committed in `my-blog-app-integ` (not platform worktrees).
 - [ ] Core smoke test done once (login/feed/settings/community/profile).
