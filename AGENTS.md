@@ -33,6 +33,20 @@ Use this header whenever a platform task starts or handoff is needed:
 요약: 필수 확인 내용 등
 ```
 
+### Situation -> Required Doc Routing
+- Worktree/branch confusion or ownership check:
+  - `docs/platform-coordination/worktree-branch-playbook.md`
+  - `/Users/sihyungpark/Desktop/code/my-blog-app-integ/docs/platform-coordination/worktree-branch-playbook.md`
+- Current snapshot (which path/branch is active, clean/dirty state):
+  - `docs/platform-coordination/WORKTREE_STATUS.md`
+  - `/Users/sihyungpark/Desktop/code/my-blog-app-integ/docs/platform-coordination/WORKTREE_STATUS.md`
+- Before merge `integration/workspace` -> `main` (production CI/CD gate):
+  - `docs/platform-coordination/RELEASE_GATE.md`
+  - `/Users/sihyungpark/Desktop/code/my-blog-app-integ/docs/platform-coordination/RELEASE_GATE.md`
+- Shared backend/contracts change needed during iOS/AOS/Web work:
+  - First follow `Shared-change flow` in this file.
+  - Then apply patch only in `my-blog-app-integ` on `integration/workspace`.
+
 ### Recommended mapping
 - `my-blog-app` (root worktree): git metadata host/checkpoint only. Do not develop here.
 - `my-blog-app-integ`: integration execution + shared code ownership (`integration/workspace`).
