@@ -34,6 +34,12 @@
 4. Parent agent performs edits, tests, commit, and push.
 5. Parent or human opens PR; sub-agent assists with summary/review comments only.
 
+## With Auto PR/Merge Enabled
+- Parent/sub-agent pushes platform branch updates.
+- Repository automation opens PR to `integration/workspace`.
+- Guardrails run and eligible PR auto-merges unless `manual-review` label exists.
+- For sensitive changes, apply `manual-review` and require human merge.
+
 ## When Not To Use Multi-Agent
 - Small one-file edits with obvious impact.
 - High-risk secret/material handling tasks.

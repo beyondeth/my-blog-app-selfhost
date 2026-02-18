@@ -31,12 +31,28 @@
   - auto-approve and auto-merge without human gate.
   - bypass branch protection.
 
+## Repository Automation (Implemented)
+- `.github/workflows/auto-open-platform-pr.yml`
+  - On push to `feature/ios/**`, `feature/aos/**`, `feature/web/**`, opens PR to `integration/workspace` if none exists.
+- `.github/workflows/platform-pr-guardrails.yml`
+  - Enforces PR guardrails.
+  - Auto-merges eligible platform PRs into `integration/workspace` with squash merge.
+  - Add label `manual-review` to disable auto-merge for a PR.
+
 ## Enforced Repository Checks
 - `.github/workflows/platform-pr-guardrails.yml` enforces:
   - platform branches target `integration/workspace`.
   - only `integration/workspace` can target `main`.
   - platform branches cannot change `backend/**`, `mobile/contracts/**`.
   - PR body must include PLATFORM-TRACK fields.
+
+## Rollback Guidance
+- Auto-merged PRs can be reverted safely.
+- Prefer `git revert` over history rewrite:
+  - `git switch integration/workspace`
+  - `git revert -m 1 <merge_commit_sha>` (if merge commit)
+  - `git revert <commit_sha>` (if squash/rebase single commit)
+  - `git push origin integration/workspace`
 
 ## Manual Branch Protection Setup (GitHub UI)
 - Branch: `integration/workspace`

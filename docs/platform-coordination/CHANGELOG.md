@@ -71,3 +71,23 @@ Track operational rule changes for worktree/branch coordination.
   - base branch policy
   - shared path ownership
   - required PLATFORM-TRACK fields in PR body
+
+### Additional update (auto PR + auto merge)
+
+#### What changed
+- Added auto PR workflow:
+  - `.github/workflows/auto-open-platform-pr.yml`
+- Extended guardrail workflow for auto-merge:
+  - `.github/workflows/platform-pr-guardrails.yml`
+- Updated policy docs:
+  - `docs/platform-coordination/PR_REVIEW_POLICY.md`
+  - `docs/platform-coordination/MULTI_AGENT_PLAYBOOK.md`
+
+#### Why
+- Reduce manual overhead for platform-to-integration synchronization.
+- Keep consistent audit trail through PR-first integration.
+
+#### How
+- Platform branch pushes now open PR automatically to `integration/workspace`.
+- Eligible PRs auto-merge after guardrail checks.
+- `manual-review` label provides opt-out path for sensitive changes.
