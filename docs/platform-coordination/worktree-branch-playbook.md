@@ -2,6 +2,7 @@
 
 ## Purpose
 Prevent cross-platform branch collisions and mixed commits while running multiple terminals in parallel.
+Establish one rule for shared code: `backend/**` and contracts are owned by `my-blog-app-integ`.
 
 ## Related Docs
 - `docs/platform-coordination/WORKTREE_STATUS.md`
@@ -12,16 +13,27 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 - iOS only: `/Users/sihyungpark/Desktop/code/my-blog-app-ios`
 - Android only: `/Users/sihyungpark/Desktop/code/my-blog-app-aos`
 - Web only: `/Users/sihyungpark/Desktop/code/my-blog-app-web`
+- Root (`/Users/sihyungpark/Desktop/code/my-blog-app`) is metadata/checkpoint only. No feature work.
 
 ## Branch Strategy
 - `hotfix/auth-me-no-401`: integration branch for QA and release candidate validation.
-- `feature/shared/<task>`: shared backend/contracts/docs.
 - `feature/ios/<task>`: iOS implementation (`mobile/ios/**`).
 - `feature/aos/<task>`: Android implementation (`mobile/android/**`).
-- `feature/web/<task>`: Web implementation.
+- `feature/web/<task>`: Web implementation (`frontend/**`) only.
+- Shared code is applied directly in `hotfix/auth-me-no-401` from integration worktree.
+
+## PLATFORM-TRACK Template
+Add this header to task notes, PR descriptions, and handoff messages:
+```md
+[PLATFORM-TRACK]
+타겟: web | ios | android | multi
+작업유형: feature | bugfix | refactor | runbook
+공유영향 확인: YES/NO
+요약: 필수 확인 내용 등
+```
 
 ## Ownership Matrix
-- Shared:
+- Shared (integration worktree only):
   - `backend/**`
   - `mobile/contracts/**`
   - shared coordination docs
@@ -33,35 +45,52 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
   - `frontend/**`
 
 ## Merge Sequence
-1. Merge `feature/shared/*` into `hotfix/auth-me-no-401`.
-2. Merge platform branches into `hotfix/auth-me-no-401`.
-3. Validate integration behavior.
+1. Merge platform branches into `hotfix/auth-me-no-401`.
+2. Apply/review shared backend/contracts updates in `hotfix/auth-me-no-401`.
+3. Validate integration behavior from `my-blog-app-integ`.
 4. Merge `hotfix/auth-me-no-401` to `main` only after sign-off.
 
 ## Daily Workflow
 1. Open terminal in the platform worktree only.
 2. Create a task branch with the platform prefix.
 3. Commit only files owned by that platform.
-4. Open PR or merge into `hotfix/auth-me-no-401` from integration worktree.
+4. If shared code is needed, stop and patch it in `my-blog-app-integ`.
+5. Open PR or merge into `hotfix/auth-me-no-401` from integration worktree.
+
+## Shared Change Escalation Flow
+1. Detect shared impact (`backend/**`, `mobile/contracts/**`, shared docs).
+2. Pause platform branch work and move to `my-blog-app-integ`.
+3. Patch shared code on `hotfix/auth-me-no-401` and run required checks.
+4. Push shared change first.
+5. Return to platform worktree and merge/rebase `hotfix/auth-me-no-401`.
+6. Continue platform implementation.
+
+## Runtime Rule
+- Run default local services from integration worktree:
+  - backend (3000): `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/backend && pnpm start:dev`
+  - frontend (3001): `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/frontend && pnpm dev`
+  - mcp-proxy-server: `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/mcp-proxy-server && pnpm dev`
+- Watch-mode processes only track the files of the worktree where they are started.
 
 ## Conflict Prevention Rules
 - Never run feature development in `/Users/sihyungpark/Desktop/code/my-blog-app` base path.
 - Never share one branch across multiple worktrees.
-- If a change touches both shared and platform code, split into separate commits and branches.
+- Never patch `backend/**` from iOS/Android/Web worktrees.
+- If a task touches both shared and platform code, split into separate commits and apply shared changes in integ first.
 - Keep temp outputs excluded from Git tracking (`output/`, `sdd-tool-analysis/`).
 
 ## Recovery Procedure
 If mixed commits happen:
 1. Create backup branches from the mixed commit SHA.
-2. Split by path into clean branches (`shared`, `ios`, `aos`, `web`).
+2. Split by path into clean branches (`ios`, `aos`, `web`) and move shared changes to integ branch.
 3. Merge clean branches into `hotfix/auth-me-no-401`.
 4. Delete temporary split branches after verification.
 
-## Current Snapshot (2026-02-18 21:20 KST)
+## Current Snapshot (2026-02-18 22:51 KST)
 | Role | Path | Branch | Upstream | Ahead | Behind | Working tree |
 | --- | --- | --- | --- | ---: | ---: | --- |
-| checkpoint | `/Users/sihyungpark/Desktop/code/my-blog-app` | `codex/multi-mcp-skill-checkpoint-20260216` | `origin/codex/multi-mcp-skill-checkpoint-20260216` | 0 | 0 | dirty (untracked files present) |
-| integ | `/Users/sihyungpark/Desktop/code/my-blog-app-integ` | `hotfix/auth-me-no-401` | `origin/hotfix/auth-me-no-401` | 0 | 0 | clean |
+| checkpoint | `/Users/sihyungpark/Desktop/code/my-blog-app` | `codex/multi-mcp-skill-checkpoint-20260216` | `origin/codex/multi-mcp-skill-checkpoint-20260216` | 0 | 0 | clean |
+| integ | `/Users/sihyungpark/Desktop/code/my-blog-app-integ` | `hotfix/auth-me-no-401` | `origin/hotfix/auth-me-no-401` | 0 | 0 | dirty (docs update in progress) |
 | iOS | `/Users/sihyungpark/Desktop/code/my-blog-app-ios` | `feature/ios/workspace-20260217` | `origin/feature/ios/workspace-20260217` | 0 | 0 | clean |
 | Android | `/Users/sihyungpark/Desktop/code/my-blog-app-aos` | `feature/aos/api-feed-contract-sync` | `origin/feature/aos/api-feed-contract-sync` | 0 | 0 | clean |
 | Web | `/Users/sihyungpark/Desktop/code/my-blog-app-web` | `feature/web/workspace` | `origin/feature/web/workspace` | 0 | 0 | clean |

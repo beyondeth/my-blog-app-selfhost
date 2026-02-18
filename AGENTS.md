@@ -23,8 +23,19 @@ Copy `.env.production.example` into `.env.local` for each app, keep secrets out 
 - A **worktree** is a separate checkout folder tied to one branch for isolated work.
 - One platform team should work on one worktree/branch pair only.
 
+### PLATFORM-TRACK (Required in task notes / PR body)
+Use this header whenever a platform task starts or handoff is needed:
+```md
+[PLATFORM-TRACK]
+타겟: web | ios | android | multi
+작업유형: feature | bugfix | refactor | runbook
+공유영향 확인: YES/NO
+요약: 필수 확인 내용 등
+```
+
 ### Recommended mapping
-- `main` / `my-blog-app`: integration base branch (`hotfix/auth-me-no-401` currently used for pre-production baseline in this repo).
+- `my-blog-app` (root worktree): git metadata host/checkpoint only. Do not develop here.
+- `my-blog-app-integ`: integration execution + shared code ownership (`hotfix/auth-me-no-401`).
 - `mobile/ios` worktree: branch `feature/ios/<topic>` (`feature/ios/workspace` for coordination, then narrow topic branches if needed).
 - `mobile/android` worktree: branch `feature/aos/<topic>` (`feature/aos/workspace` for coordination, then narrow topic branches if needed).
 - Optional web worktree: branch `feature/web/<topic>`.
@@ -34,10 +45,19 @@ Copy `.env.production.example` into `.env.local` for each app, keep secrets out 
 2. Before each feature, create or check out a dedicated branch in that platform worktree:
    - iOS: `git switch feature/ios/ui-sync-v1` (or new topic branch)
    - Android: `git switch feature/aos/ui-sync-v1` (or new topic branch)
-3. Keep common mobile-contract/API fixes only on `hotfix/auth-me-no-401` or a clearly named shared branch, never directly inside platform feature branches.
+3. Shared code (`backend/**`, `mobile/contracts/**`, shared docs) must be changed in `my-blog-app-integ` on `hotfix/auth-me-no-401`.
 4. 병합은 플랫폼 시뮬/스테이징 실동작(로그인/피드/설정 등 1회 핵심 시나리오) 완료 후에만 진행.
-5. Merge order: 플랫폼 브랜치 -> 공유/핫픽스 브랜치(필요 시) -> `main`.
-6. Do not force-push platform branches unless explicitly coordinated.
+5. Runtime services (`backend` 3000, `frontend` 3001, `mcp-proxy-server`) are started from `my-blog-app-integ` by default.
+6. Web worktree is for `frontend/**` changes. Backend changes are not owned by web worktree.
+7. Merge order: 플랫폼 브랜치 -> `hotfix/auth-me-no-401` -> `main`.
+8. Do not force-push platform branches unless explicitly coordinated.
+
+### Shared-change flow (while doing platform work)
+1. Platform worktree에서 작업 중 공용 코드 수정 필요 판단.
+2. Platform 브랜치 커밋/스태시 후 `my-blog-app-integ`로 이동.
+3. `hotfix/auth-me-no-401`에서 `backend/**`/`mobile/contracts/**` 수정 및 테스트.
+4. 공용 변경 먼저 푸시 후, 플랫폼 브랜치로 돌아가 `hotfix/auth-me-no-401` 최신 반영(merge/rebase).
+5. 플랫폼 작업 계속 진행.
 
 ### Safe branch deletion policy
 - Do not delete a platform or shared branch until:
@@ -60,6 +80,10 @@ Copy `.env.production.example` into `.env.local` for each app, keep secrets out 
   - `git switch hotfix/auth-me-no-401`
   - `git merge --no-ff feature/ios/<topic>` / `git merge --no-ff feature/aos/<topic>`
   - 테스트/문서 확인 후 `main`으로 정식 병합
+- 실행:
+  - `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/backend && pnpm start:dev`
+  - `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/frontend && pnpm dev`
+  - `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/mcp-proxy-server && pnpm dev`
 
 ### Useful commands
 - Check active worktrees:
@@ -71,9 +95,10 @@ Copy `.env.production.example` into `.env.local` for each app, keep secrets out 
   - `git status --short -b`
 - Quick conflict-free workflow:
   - Implement in one worktree.
+  - If shared code is required during platform work, stop and apply the shared change in `my-blog-app-integ`.
   - Commit with Conventional Commit.
   - Push only that platform branch.
-  - Cherry-pick or open PR to shared branch explicitly.
+  - Merge platform branch into `hotfix/auth-me-no-401` explicitly.
 
 ## Design Guidelines
 Design decisions related to layout, typography, color, and contrast must follow WCAG 3.0 accessibility standards, ensuring consistent readability and usability across the product.
