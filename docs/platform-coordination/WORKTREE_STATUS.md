@@ -1,6 +1,9 @@
 # Worktree Status
 
-Last updated: 2026-02-18 22:51:09 KST
+- Scope: point-in-time snapshot of worktree/branch health.
+- Update history: `docs/platform-coordination/CHANGELOG.md`
+
+Last updated: 2026-02-18 23:03:47 KST
 
 | Role | Path | Branch | Upstream | Ahead | Behind | Working tree |
 | --- | --- | --- | --- | ---: | ---: | --- |

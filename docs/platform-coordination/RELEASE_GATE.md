@@ -2,6 +2,10 @@
 
 `main` merge triggers production CI/CD deployment. Complete this checklist before merge.
 
+- Scope: pre-release gate for `integration/workspace -> main`.
+- Last updated: 2026-02-18
+- Update history: `docs/platform-coordination/CHANGELOG.md`
+
 ## Preconditions
 
 - [ ] `integration/workspace` is clean and pushed.

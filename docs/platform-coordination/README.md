@@ -1,0 +1,19 @@
+# Platform Coordination Docs
+
+This folder is the source of truth for multi-platform worktree operations.
+`AGENTS.md` keeps only core rules and links here for details.
+
+## Documents
+- `worktree-branch-playbook.md`
+  - Use for ownership boundaries, shared-change escalation, and conflict recovery.
+- `WORKTREE_STATUS.md`
+  - Use for the latest path/branch/clean-dirty snapshot before integration work.
+- `RELEASE_GATE.md`
+  - Use before merging `integration/workspace` into `main`.
+- `CHANGELOG.md`
+  - Audit log for when/what/how coordination rules were changed.
+
+## Update Policy
+- Keep `AGENTS.md` concise.
+- Put operational detail and history only under this folder.
+- Every behavioral rule change must update `CHANGELOG.md`.

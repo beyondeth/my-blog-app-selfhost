@@ -19,12 +19,17 @@ Follow the Conventional Commit vocabulary already in the log (`feat(backend): �
 Copy `.env.production.example` into `.env.local` for each app, keep secrets out of Git, and record new configuration needs inside `ENV_SETUP.md` or `docs/`. Apply schema changes only through the TypeORM scripts (`pnpm --dir backend migration:run` / `migration:revert`) and sanitize any artifacts synced into `data/` or `postgres/` before sharing.
 
 ## Multi-Platform Workflow (Worktree + Branch Discipline)
-- A **branch** is a code line in git history.
-- A **worktree** is a separate checkout folder tied to one branch for isolated work.
-- One platform team should work on one worktree/branch pair only.
+This file intentionally keeps only enforceable core rules.
+Detailed procedures and update history live in `docs/platform-coordination/`.
 
-### PLATFORM-TRACK (Required in task notes / PR body)
-Use this header whenever a platform task starts or handoff is needed:
+### Core Rules (Enforced)
+- MUST: shared paths (`backend/**`, `mobile/contracts/**`, shared coordination docs) are edited only in `my-blog-app-integ` on `integration/workspace`.
+- NEVER: patch shared paths from `my-blog-app-ios`, `my-blog-app-aos`, or `my-blog-app-web`.
+- MUST: runtime services (`backend:3000`, `frontend:3001`, `mcp-proxy-server`) start from `my-blog-app-integ`.
+- MUST: merge order is `platform branch -> integration/workspace -> main`.
+- NEVER: do feature work in root `/Users/sihyungpark/Desktop/code/my-blog-app` (checkpoint/metadata only).
+
+### PLATFORM-TRACK (Required)
 ```md
 [PLATFORM-TRACK]
 타겟: web | ios | android | multi
@@ -33,91 +38,16 @@ Use this header whenever a platform task starts or handoff is needed:
 요약: 필수 확인 내용 등
 ```
 
-### Situation -> Required Doc Routing
-- Worktree/branch confusion or ownership check:
+### Situation -> Open This Doc
+- Worktree ownership/rules/conflict recovery:
   - `docs/platform-coordination/worktree-branch-playbook.md`
-  - `/Users/sihyungpark/Desktop/code/my-blog-app-integ/docs/platform-coordination/worktree-branch-playbook.md`
-- Current snapshot (which path/branch is active, clean/dirty state):
+- Current worktree snapshot (path/branch/clean-dirty):
   - `docs/platform-coordination/WORKTREE_STATUS.md`
-  - `/Users/sihyungpark/Desktop/code/my-blog-app-integ/docs/platform-coordination/WORKTREE_STATUS.md`
-- Before merge `integration/workspace` -> `main` (production CI/CD gate):
+- Pre-release checks before `integration/workspace -> main`:
   - `docs/platform-coordination/RELEASE_GATE.md`
-  - `/Users/sihyungpark/Desktop/code/my-blog-app-integ/docs/platform-coordination/RELEASE_GATE.md`
-- Shared backend/contracts change needed during iOS/AOS/Web work:
-  - First follow `Shared-change flow` in this file.
-  - Then apply patch only in `my-blog-app-integ` on `integration/workspace`.
-
-### Recommended mapping
-- `my-blog-app` (root worktree): git metadata host/checkpoint only. Do not develop here.
-- `my-blog-app-integ`: integration execution + shared code ownership (`integration/workspace`).
-- `mobile/ios` worktree: branch `feature/ios/<topic>` (`feature/ios/workspace` for coordination, then narrow topic branches if needed).
-- `mobile/android` worktree: branch `feature/aos/<topic>` (`feature/aos/workspace` for coordination, then narrow topic branches if needed).
-- Optional web worktree: branch `feature/web/<topic>`.
-
-### Enforced Shared-Code Rule (MUST / NEVER)
-- MUST: `backend/**`, `mobile/contracts/**`, shared coordination docs are edited only in `my-blog-app-integ` on `integration/workspace`.
-- NEVER: edit shared backend/contracts from iOS/AOS/Web worktrees.
-- MUST: if shared change is discovered during platform work, stop platform work, switch to integ, apply shared patch first, then sync platform branch with `integration/workspace`.
-
-### Mandatory guardrails
-1. Do not write iOS code on an Android branch and do not write Android code on iOS branch.
-2. Before each feature, create or check out a dedicated branch in that platform worktree:
-   - iOS: `git switch feature/ios/ui-sync-v1` (or new topic branch)
-   - Android: `git switch feature/aos/ui-sync-v1` (or new topic branch)
-3. Shared code (`backend/**`, `mobile/contracts/**`, shared docs) must be changed in `my-blog-app-integ` on `integration/workspace`.
-4. 병합은 플랫폼 시뮬/스테이징 실동작(로그인/피드/설정 등 1회 핵심 시나리오) 완료 후에만 진행.
-5. Runtime services (`backend` 3000, `frontend` 3001, `mcp-proxy-server`) are started from `my-blog-app-integ` by default.
-6. Web worktree is for `frontend/**` changes. Backend changes are not owned by web worktree.
-7. Merge order: 플랫폼 브랜치 -> `integration/workspace` -> `main`.
-8. Do not force-push platform branches unless explicitly coordinated.
-
-### Shared-change flow (while doing platform work)
-1. Platform worktree에서 작업 중 공용 코드 수정 필요 판단.
-2. Platform 브랜치 커밋/스태시 후 `my-blog-app-integ`로 이동.
-3. `integration/workspace`에서 `backend/**`/`mobile/contracts/**` 수정 및 테스트.
-4. 공용 변경 먼저 푸시 후, 플랫폼 브랜치로 돌아가 `integration/workspace` 최신 반영(merge/rebase).
-5. 플랫폼 작업 계속 진행.
-
-### Safe branch deletion policy
-- Do not delete a platform or shared branch until:
-  - 해당 브랜치가 공유 브랜치(`integration/workspace` 또는 `main`)로 병합되었고
-  - `git log` 또는 PR로 변경사항이 통합됨이 확인된 경우.
-- 병합 완료 후 삭제:
-  - 로컬: `git branch -d feature/ios/xxx` / `git branch -d feature/aos/xxx`
-  - 원격: `git push origin --delete feature/ios/xxx`
-- 병합 전 삭제가 필요한 긴급 회수는 `git branch -D` + 문서/PR 로그에 삭제 사유 기록 필수.
-- 병합 직후 최소 24시간은 브랜치 백업 태그(선택) 유지 후 정리 권장.
-
-### Worktree command set (권장)
-- 상태 확인:
-  - `git worktree list`
-  - 각 워크트리에서: `git branch --show-current`
-- 이동:
-  - `git switch feature/ios/<topic>` (ios)
-  - `git switch feature/aos/<topic>` (android)
-- 통합:
-  - `git switch integration/workspace`
-  - `git merge --no-ff feature/ios/<topic>` / `git merge --no-ff feature/aos/<topic>`
-  - 테스트/문서 확인 후 `main`으로 정식 병합
-- 실행:
-  - `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/backend && pnpm start:dev`
-  - `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/frontend && pnpm dev`
-  - `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/mcp-proxy-server && pnpm dev`
-
-### Useful commands
-- Check active worktrees:
-  - `git worktree list`
-- Create/attach worktree:
-  - `git worktree add /path/to/my-blog-app-ios feature/ios/workspace`
-  - `git worktree add /path/to/my-blog-app-aos feature/aos/workspace`
-- Verify branch in each worktree:
-  - `git status --short -b`
-- Quick conflict-free workflow:
-  - Implement in one worktree.
-  - If shared code is required during platform work, stop and apply the shared change in `my-blog-app-integ`.
-  - Commit with Conventional Commit.
-  - Push only that platform branch.
-  - Merge platform branch into `integration/workspace` explicitly.
+- Document index and update history:
+  - `docs/platform-coordination/README.md`
+  - `docs/platform-coordination/CHANGELOG.md`
 
 ## Design Guidelines
 Design decisions related to layout, typography, color, and contrast must follow WCAG 3.0 accessibility standards, ensuring consistent readability and usability across the product.
