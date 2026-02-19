@@ -22,6 +22,8 @@ import { PostsService } from "./posts.service";
 import { CreatePostDto } from "./dto/create-post.dto";
 import { VoteDto, VoteResponseDto } from "./dto/vote.dto";
 import { VoteService } from "./services/vote.service";
+import { ViewerIdUtil } from "../common/utils/viewer-id.util";
+import { ViewCountService } from "./view-count.service";
 
 @ApiTags("mobile-posts")
 @Controller("mobile/posts")
@@ -29,6 +31,7 @@ export class MobilePostsController {
   constructor(
     private readonly postsService: PostsService,
     private readonly voteService: VoteService,
+    private readonly viewCountService: ViewCountService,
   ) {}
 
   @Get(":id")
@@ -74,10 +77,15 @@ export class MobilePostsController {
   }
 
   @Post(":id/view")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "모바일 조회수 증가" })
   @ApiResponse({ status: 200, description: "조회수 증가 등록 성공" })
-  async incrementViewCount(@Param("id", ParseUUIDPipe) id: string) {
-    await this.postsService.incrementViewCount(id);
+  async incrementViewCount(@Param("id", ParseUUIDPipe) id: string, @Request() req: any) {
+    const userId = req.user?.id;
+    const viewerId = ViewerIdUtil.resolve(req);
+
+    await this.viewCountService.incrementViewCount(id, userId, viewerId);
     return { message: "View count queued for batch update" };
   }
 }

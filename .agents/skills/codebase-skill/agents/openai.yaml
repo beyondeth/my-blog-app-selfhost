@@ -1,0 +1,13 @@
+interface:
+  display_name: "Codebase Skill"
+  short_description: "Codebase.blog auto-posting via MCPorter (OAuth-first, explicit route guard)"
+  default_prompt: "Use skill route only: mcporter -> /mcp-remote, require OAuth 2.1 check_auth before create_post, and never fallback to API Key/direct MCP when skill route is selected."
+
+policy:
+  allow_implicit_invocation: false
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "codebase-blog-mcp"
+      description: "Codebase.blog MCP server (direct route only when user explicitly asks mcp route)"

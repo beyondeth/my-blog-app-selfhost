@@ -72,7 +72,7 @@ export default function PostDetailClient({ initialPost, params }: PostDetailClie
   });
 
   // 조회수 증가
-  useIncrementPostView(slug, postSlug);
+  useIncrementPostView(slug, post?.id);
 
   // Mutations
   const postVoteMutation = useCommunityPostVote(slug);

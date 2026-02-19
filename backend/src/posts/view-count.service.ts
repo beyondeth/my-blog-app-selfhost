@@ -33,9 +33,28 @@ export class ViewCountService {
   /**
    * 조회수 증가 (Redis 버퍼에 임시 저장)
    */
-  async incrementViewCount(postId: string): Promise<void> {
+  async incrementViewCount(
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): Promise<void> {
     const key = this.buildBufferKey(postId);
     try {
+      const uniqueKey = this.buildUniqueViewKey(postId, userId, viewerId);
+      if (uniqueKey) {
+        const dedupeResult = await this.redis.set(
+          uniqueKey,
+          "1",
+          "EX",
+          60 * 60 * 24,
+          "NX",
+        );
+
+        if (dedupeResult !== "OK") {
+          return;
+        }
+      }
+
       const pipeline = this.redis.multi();
       pipeline.incrby(key, 1);
       pipeline.expire(key, this.bufferTtlSeconds, "NX");
@@ -144,6 +163,22 @@ export class ViewCountService {
 
   private buildBufferKey(postId: string) {
     return `${this.bufferPrefix}:${postId}`;
+  }
+
+  private buildUniqueViewKey(
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): string | null {
+    if (userId) {
+      return `post:${postId}:view:user:${userId}`;
+    }
+
+    if (viewerId) {
+      return `post:${postId}:view:viewer:${viewerId}`;
+    }
+
+    return null;
   }
 
   private extractPostId(key: string) {

@@ -66,6 +66,7 @@ import { MonitoringService } from "../monitoring/monitoring.service";
 import { InjectRedis } from "@nestjs-modules/ioredis";
 import Redis from "ioredis";
 import { BlogResolverService } from "../common/services/blog-resolver.service";
+import { ViewerIdUtil } from "../common/utils/viewer-id.util";
 
 @ApiTags("posts")
 @Controller("posts")
@@ -813,12 +814,15 @@ export class PostsController {
 
   @Post(":id/view")
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "게시글 조회수 증가 (배치 처리)" })
   @ApiResponse({ status: 200, description: "조회수 증가 성공 (배치 대기중)" })
   @ApiResponse({ status: 404, description: "게시글을 찾을 수 없음" })
-  async incrementViewCount(@Param("id") id: string) {
-    // 배치 서비스로 조회수 증가 (메모리에 임시 저장)
-    await this.viewCountService.incrementViewCount(id);
+  async incrementViewCount(@Param("id") id: string, @Request() req: any) {
+    const userId = req.user?.id;
+    const viewerId = ViewerIdUtil.resolve(req);
+
+    await this.viewCountService.incrementViewCount(id, userId, viewerId);
     return { message: "View count queued for batch update" };
   }
 

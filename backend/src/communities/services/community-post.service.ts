@@ -375,9 +375,6 @@ export class CommunityPostService {
       this.enrichPostMetadata(post);
     }
 
-    // 조회수 증가 (비동기, 에러 무시)
-    this.incrementViewCount(post.id).catch(() => {});
-
     // 투표 상태 확인
     const result = post as CommunityPost & {
       userLiked?: boolean;
@@ -453,8 +450,6 @@ export class CommunityPostService {
     if (post) {
       this.enrichPostMetadata(post);
     }
-
-    this.incrementViewCount(post.id).catch(() => {});
 
     const result = post as CommunityPost & {
       userLiked?: boolean;
@@ -1427,6 +1422,33 @@ export class CommunityPostService {
     return likedMap;
   }
 
+  /**
+   * 게시물 조회수 증가 (명시적 endpoint 전용)
+   */
+  async incrementPostView(
+    communitySlug: string,
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): Promise<void> {
+    const post = await this.postRepository
+      .createQueryBuilder("post")
+      .innerJoin("post.community", "community")
+      .select(["post.id"])
+      .where("post.id = :postId", { postId })
+      .andWhere("community.slug = :communitySlug", { communitySlug })
+      .andWhere("post.status = :status", {
+        status: CommunityPostStatus.PUBLISHED,
+      })
+      .getOne();
+
+    if (!post) {
+      throw new NotFoundException("게시물을 찾을 수 없습니다");
+    }
+
+    await this.incrementViewCount(postId, userId, viewerId);
+  }
+
   // =========================================================================
   // 유틸리티
   // =========================================================================
@@ -1434,8 +1456,48 @@ export class CommunityPostService {
   /**
    * 조회수 증가 (비동기)
    */
-  private async incrementViewCount(postId: string): Promise<void> {
+  private async incrementViewCount(
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): Promise<void> {
+    const dedupeKey = this.buildViewDedupeKey(postId, userId, viewerId);
+
+    if (dedupeKey) {
+      const lockKey = `community:view:lock:${postId}`;
+      const lock = await this.redisLockService.acquireLock(lockKey, 3000);
+
+      try {
+        const alreadyViewed = await this.redisLockService.get(dedupeKey);
+        if (alreadyViewed) {
+          return;
+        }
+
+        await this.redisLockService.set(dedupeKey, "1", CacheTTL.DAY);
+      } finally {
+        if (lock) {
+          await this.redisLockService.releaseLock(lockKey, lock);
+        }
+      }
+    }
+
     await this.communityPostViewService.bufferView(postId);
+  }
+
+  private buildViewDedupeKey(
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): string | null {
+    if (userId) {
+      return `community:post:${postId}:view:user:${userId}`;
+    }
+
+    if (viewerId) {
+      return `community:post:${postId}:view:viewer:${viewerId}`;
+    }
+
+    return null;
   }
 
   /**

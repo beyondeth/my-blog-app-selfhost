@@ -56,6 +56,7 @@ import type {
   ReorderCommunityWidgetsInput,
 } from '@/types/community';
 import type { VoteType } from '@/types';
+import { getViewerId } from '@/lib/viewer-id';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -786,11 +787,15 @@ export async function votePost(
  */
 export async function incrementPostView(
   communitySlug: string,
-  postSlug: string,
+  postId: string,
 ): Promise<void> {
-  const response = await fetch(`${API_URL}/community/${communitySlug}/posts/${postSlug}/view`, {
+  const viewerId = getViewerId();
+  const response = await fetch(`${API_URL}/community/${communitySlug}/posts/${postId}/view`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      ...(viewerId ? { 'X-Viewer-Id': viewerId } : {}),
+    },
     credentials: 'include',
   });
 

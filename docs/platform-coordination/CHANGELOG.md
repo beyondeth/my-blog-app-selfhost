@@ -91,3 +91,65 @@ Track operational rule changes for worktree/branch coordination.
 - Platform branch pushes now open PR automatically to `integration/workspace`.
 - Eligible PRs auto-merge in automation path after guardrail-equivalent checks.
 - `manual-review` label provides opt-out path for sensitive changes.
+
+### Additional update (Codebase skill sync + policy hardening)
+
+#### What changed
+- Restored missing Codebase skill docs into this worktree:
+  - `.agents/skills/codebase-skill/*`
+  - `docs/skills/codebase-skill/*`
+- Added `agents/openai.yaml` for Codebase skill in both locations:
+  - `.agents/skills/codebase-skill/agents/openai.yaml`
+  - `docs/skills/codebase-skill/agents/openai.yaml`
+- Set `policy.allow_implicit_invocation: false` to require explicit invocation for posting flows.
+
+#### Why
+- `integration/workspace` worktree did not contain the skill docs copied in another branch/worktree, causing local parity validation mismatch.
+- Auto-posting is high-impact; explicit invocation reduces accidental posting risk.
+
+#### How
+- Copied canonical skill files from checkpoint branch worktree into `my-blog-app-integ`.
+- Re-ran MCP↔Skills parity script after sync to confirm path/tool consistency.
+
+### Additional update (Skill route strict OAuth guard)
+
+#### What changed
+- Strengthened Codebase skill docs to prohibit OAuth->API Key fallback on `skill` route:
+  - `.agents/skills/codebase-skill/SKILL.md`
+  - `.agents/skills/codebase-skill/MCPORTER_SKILL.md`
+  - `.agents/skills/codebase-skill/HEARTBEAT.md`
+  - `docs/skills/codebase-skill/SKILL.md`
+  - `docs/skills/codebase-skill/MCPORTER_SKILL.md`
+  - `docs/skills/codebase-skill/HEARTBEAT.md`
+- Added explicit OAuth alias-only fallback policy in `skill` route:
+  - `codebase-blog-oauth` -> `codebase-blog-oauth-prod` only
+- Corrected `agents/openai.yaml` format to official Codex Skills structure (`interface`, `policy`, `dependencies`) in both skill locations.
+
+#### Why
+- Prevent accidental route drift where `skill` intent could be executed as direct MCP/API Key.
+- Align skill metadata format with official Codex Skills docs and reduce implicit behavior ambiguity.
+
+#### How
+- Added hard safety contract sections to skill docs.
+- Added `allow_implicit_invocation: false` and route-specific default prompt to `agents/openai.yaml`.
+
+### Additional update (MCP post URL env-aware fix)
+
+#### What changed
+- Updated MCP `create_post` success message URL generation to use `FRONTEND_URL` instead of hardcoded `https://codebase.blog`.
+- Added `FRONTEND_URL` to MCP proxy runtime config flow:
+  - `mcp-proxy-server/src/config/env.validation.ts`
+  - `mcp-proxy-server/src/index.ts`
+  - `mcp-proxy-server/src/oauth/index.ts`
+  - `mcp-proxy-server/src/tools/index.ts`
+- Added missing env examples:
+  - `BACKEND_PUBLIC_URL`
+  - `FRONTEND_URL`
+  in `mcp-proxy-server/.env.example`.
+
+#### Why
+- Dev environment posts were showing production domain in success output, causing operator confusion and route validation mistakes.
+
+#### How
+- Introduced frontend base URL composition for relative post paths.
+- Kept absolute URLs from backend unchanged when already provided.

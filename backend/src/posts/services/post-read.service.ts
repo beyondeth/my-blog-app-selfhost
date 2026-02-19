@@ -22,7 +22,7 @@ import {
 } from "./post-interaction-status.service";
 import { GetPostsCursorDto } from "../dto/get-posts-cursor.dto";
 import { CursorPaginatedPostsDto } from "../dto/cursor-paginated-posts.dto";
-import { ViewCountService } from "../view-count.service";
+import { CacheService, CacheKeys, CacheTTL } from "../../cache/cache.service";
 
 /**
  * 포스트 조회 및 검색 서비스
@@ -36,6 +36,18 @@ import { ViewCountService } from "../view-count.service";
 @Injectable()
 export class PostReadService {
   private readonly logger = new Logger(PostReadService.name);
+  private readonly detailCacheTtl = CacheTTL.SHORT;
+  private readonly detailLockTtlSeconds = 5;
+  private readonly detailLockWaitMs = 700;
+  private readonly canonicalDetailRelations = new Set([
+    "author",
+    "author.profile",
+    "blog",
+    "thumbnailImage",
+    "attachedFiles",
+    "stats",
+    "metadata",
+  ]);
 
   constructor(
     @InjectRepository(Post)
@@ -47,9 +59,9 @@ export class PostReadService {
     private readonly postMapperService: PostMapperService,
     private readonly materializedViewService: MaterializedViewService,
     private readonly postInteractionStatusService: PostInteractionStatusService,
+    private readonly cacheService: CacheService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
-    private readonly viewCountService: ViewCountService,
   ) {}
 
   /**
@@ -159,6 +171,31 @@ export class PostReadService {
     relations: string[] = [],
     user?: User,
   ): Promise<any> {
+    const canUseReadCache = this.canUseCanonicalDetailCache(relations);
+    const cacheKey = CacheKeys.POST_CORE(id);
+    const lockKey = `post:detail:lock:id:${id}`;
+    let lockAcquired = false;
+
+    if (canUseReadCache) {
+      const cached = await this.cacheService.get<any>(cacheKey);
+      if (cached) {
+        return this.applyInteractionToDto(cached, user);
+      }
+
+      lockAcquired = await this.cacheService.acquireLock(
+        lockKey,
+        this.detailLockTtlSeconds,
+      );
+
+      if (!lockAcquired) {
+        await this.cacheService.waitForLock(lockKey, this.detailLockWaitMs);
+        const waitedCached = await this.cacheService.get<any>(cacheKey);
+        if (waitedCached) {
+          return this.applyInteractionToDto(waitedCached, user);
+        }
+      }
+    }
+
     // 쿼리 빌더로 최적화 - 필요한 관계만 선택적으로 로드
     const query = this.postsRepository
       .createQueryBuilder("post")
@@ -200,61 +237,51 @@ export class PostReadService {
       });
     }
 
-    const post = await query.getOne();
+    try {
+      const post = await query.getOne();
 
-    if (!post) {
-      throw new NotFoundException("포스트를 찾을 수 없습니다.");
-    }
-
-    // 게시글이 비공개인 경우
-    if (!post.isPublished) {
-      this.logger.debug(
-        `[findById] Post ${id} is not published. Checking permissions. User: ${user?.id}, Author: ${post.authorId}, BlogOwner: ${post.blog?.userId}`,
-      );
-
-      // 작성자 본인 또는 블로그 소유자만 접근 가능
-      if (!user) {
-        this.logger.warn(
-          `[findById] Unauthorized access attempt to draft post ${id}`,
-        );
-        throw new UnauthorizedException("로그인이 필요합니다.");
+      if (!post) {
+        throw new NotFoundException("포스트를 찾을 수 없습니다.");
       }
 
-      if (
-        post.authorId !== user.id &&
-        post.blog.userId !== user.id &&
-        user.role !== Role.ADMIN
-      ) {
-        this.logger.warn(
-          `[findById] Forbidden access attempt by user ${user.id} to draft post ${id}`,
+      // 게시글이 비공개인 경우
+      if (!post.isPublished) {
+        this.logger.debug(
+          `[findById] Post ${id} is not published. Checking permissions. User: ${user?.id}, Author: ${post.authorId}, BlogOwner: ${post.blog?.userId}`,
         );
-        throw new ForbiddenException("접근 권한이 없습니다.");
+
+        // 작성자 본인 또는 블로그 소유자만 접근 가능
+        if (!user) {
+          this.logger.warn(
+            `[findById] Unauthorized access attempt to draft post ${id}`,
+          );
+          throw new UnauthorizedException("로그인이 필요합니다.");
+        }
+
+        if (
+          post.authorId !== user.id &&
+          post.blog.userId !== user.id &&
+          user.role !== Role.ADMIN
+        ) {
+          this.logger.warn(
+            `[findById] Forbidden access attempt by user ${user.id} to draft post ${id}`,
+          );
+          throw new ForbiddenException("접근 권한이 없습니다.");
+        }
+      }
+
+      const baseDto = await this.toBaseDetailDto(post);
+
+      if (canUseReadCache && post.isPublished) {
+        await this.cachePublishedDetail(post, baseDto);
+      }
+
+      return this.applyInteractionToDto(baseDto, user);
+    } finally {
+      if (lockAcquired) {
+        await this.cacheService.releaseLock(lockKey);
       }
     }
-
-    // 사용자 상호작용 상태 확인 (북마크 + 좋아요 한 번에 조회)
-    let interactionStatus = { bookmarked: false, liked: false, userVote: null };
-    if (user) {
-      const interactionStatuses =
-        await this.postInteractionStatusService.getMultipleInteractionStatuses(
-          [post.id],
-          user.id,
-        );
-      interactionStatus = interactionStatuses.get(post.id) || {
-        bookmarked: false,
-        liked: false,
-        userVote: null,
-      };
-    }
-
-    // PostMapperService를 사용하여 DTO 변환
-    return this.postMapperService.toPostDto(post, {
-      user: post.author,
-      blog: post.blog,
-      bookmarked: interactionStatus.bookmarked,
-      liked: interactionStatus.liked,
-      userVote: interactionStatus.userVote,
-    });
   }
 
   /**
@@ -267,67 +294,140 @@ export class PostReadService {
   async findBySlug(slug: string, user?: User): Promise<any> {
     this.logger.log(`[findBySlug] Looking up slug: ${slug}`);
 
-    const post = await this.postsRepository.findOne({
-      where: { slug },
-      relations: [
-        "author",
-        "author.profile",
-        "blog",
-        "thumbnailImage",
-        "attachedFiles",
-        "stats",
-        "metadata",
-      ],
-    });
+    const cacheKey = CacheKeys.POST_BY_SLUG(slug);
+    const lockKey = `post:detail:lock:slug:${slug}`;
+    let lockAcquired = false;
 
-    if (!post) {
-      throw new NotFoundException("게시글을 찾을 수 없습니다.");
-    }
-
-    // 게시글이 비공개인 경우
-    if (!post.isPublished) {
-      // 작성자 본인 또는 블로그 소유자만 접근 가능
-      if (
-        !user ||
-        (post.authorId !== user.id && post.blog.userId !== user.id)
-      ) {
-        throw new NotFoundException("게시글을 찾을 수 없습니다.");
+    const cachedSlugEntry = await this.cacheService.get<any>(cacheKey);
+    if (cachedSlugEntry) {
+      if (typeof cachedSlugEntry === "string") {
+        const cachedById = await this.cacheService.get<any>(
+          CacheKeys.POST_CORE(cachedSlugEntry),
+        );
+        if (cachedById) {
+          return this.applyInteractionToDto(cachedById, user);
+        }
+      } else if (cachedSlugEntry?.id) {
+        // 이전 버전 호환: slug 키에 DTO가 저장되어 있던 경우
+        return this.applyInteractionToDto(cachedSlugEntry, user);
       }
     }
 
-    // 조회수 증가 (공개 게시글만)
-    if (post.isPublished) {
-      this.viewCountService.incrementViewCount(post.id).catch((error) => {
-        this.logger.error(
-          `Failed to increment view count for post ${post.id}:`,
-          error,
-        );
+    lockAcquired = await this.cacheService.acquireLock(
+      lockKey,
+      this.detailLockTtlSeconds,
+    );
+
+    if (!lockAcquired) {
+      await this.cacheService.waitForLock(lockKey, this.detailLockWaitMs);
+      const waitedSlugEntry = await this.cacheService.get<any>(cacheKey);
+      if (waitedSlugEntry) {
+        if (typeof waitedSlugEntry === "string") {
+          const waitedById = await this.cacheService.get<any>(
+            CacheKeys.POST_CORE(waitedSlugEntry),
+          );
+          if (waitedById) {
+            return this.applyInteractionToDto(waitedById, user);
+          }
+        } else if (waitedSlugEntry?.id) {
+          return this.applyInteractionToDto(waitedSlugEntry, user);
+        }
+      }
+    }
+
+    try {
+      const post = await this.postsRepository.findOne({
+        where: { slug },
+        relations: [
+          "author",
+          "author.profile",
+          "blog",
+          "thumbnailImage",
+          "attachedFiles",
+          "stats",
+          "metadata",
+        ],
       });
-    }
 
-    // 사용자 상호작용 상태 확인 (북마크 + 좋아요 한 번에 조회)
-    let interactionStatus = { bookmarked: false, liked: false, userVote: null };
-    if (user) {
-      const interactionStatuses =
-        await this.postInteractionStatusService.getMultipleInteractionStatuses(
-          [post.id],
-          user.id,
-        );
-      interactionStatus = interactionStatuses.get(post.id) || {
-        bookmarked: false,
-        liked: false,
-        userVote: null,
-      };
-    }
+      if (!post) {
+        throw new NotFoundException("게시글을 찾을 수 없습니다.");
+      }
 
-    // PostMapperService를 사용하여 DTO 변환
+      // 게시글이 비공개인 경우
+      if (!post.isPublished) {
+        // 작성자 본인 또는 블로그 소유자만 접근 가능
+        if (
+          !user ||
+          (post.authorId !== user.id && post.blog.userId !== user.id)
+        ) {
+          throw new NotFoundException("게시글을 찾을 수 없습니다.");
+        }
+      }
+
+      const baseDto = await this.toBaseDetailDto(post);
+
+      if (post.isPublished) {
+        await this.cachePublishedDetail(post, baseDto);
+      }
+
+      return this.applyInteractionToDto(baseDto, user);
+    } finally {
+      if (lockAcquired) {
+        await this.cacheService.releaseLock(lockKey);
+      }
+    }
+  }
+
+  private canUseCanonicalDetailCache(relations: string[]): boolean {
+    return relations.every((relation) =>
+      this.canonicalDetailRelations.has(relation),
+    );
+  }
+
+  private async toBaseDetailDto(post: Post): Promise<any> {
     return this.postMapperService.toPostDto(post, {
       user: post.author,
       blog: post.blog,
-      bookmarked: interactionStatus.bookmarked,
-      liked: interactionStatus.liked,
-      userVote: interactionStatus.userVote,
+      bookmarked: false,
+      liked: false,
+      userVote: null,
     });
+  }
+
+  private async cachePublishedDetail(post: Post, dto: any): Promise<void> {
+    await Promise.all([
+      this.cacheService.set(CacheKeys.POST_CORE(post.id), dto, this.detailCacheTtl),
+      this.cacheService.set(
+        CacheKeys.POST_BY_SLUG(post.slug),
+        post.id,
+        this.detailCacheTtl,
+      ),
+    ]);
+  }
+
+  private async applyInteractionToDto(dto: any, user?: User): Promise<any> {
+    const responseDto = { ...dto };
+
+    if (!user) {
+      return responseDto;
+    }
+
+    const interactionStatuses =
+      await this.postInteractionStatusService.getMultipleInteractionStatuses(
+        [dto.id],
+        user.id,
+      );
+    const interaction = interactionStatuses.get(dto.id) || {
+      bookmarked: false,
+      liked: false,
+      userVote: null,
+    };
+
+    responseDto.bookmarked = interaction.bookmarked;
+    responseDto.liked = interaction.liked;
+    responseDto.userVote = interaction.userVote;
+
+    return responseDto;
   }
 
   /**

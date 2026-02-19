@@ -47,6 +47,7 @@ import { GetRepliesDto } from "../../comments/dto/get-replies.dto";
 import { VoteType } from "../../posts/enums/vote-type.enum";
 import { VoteDto, VoteResponseDto } from "../../posts/dto/vote.dto";
 import { RateLimit } from "../../rate-limit/rate-limit.decorator";
+import { ViewerIdUtil } from "../../common/utils/viewer-id.util";
 
 /**
  * 커뮤니티 게시물 컨트롤러
@@ -391,6 +392,32 @@ export class CommunityPostController {
     return {
       success: true,
       data: result,
+    };
+  }
+
+  /**
+   * 게시물 조회수 증가
+   */
+  @Post(":postId/view")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard, CommunityVisibilityGuard)
+  @ApiOperation({ summary: "게시물 조회수 증가" })
+  @ApiParam({ name: "slug", description: "커뮤니티 slug" })
+  @ApiParam({ name: "postId", description: "게시물 ID" })
+  @ApiResponse({ status: 200, description: "조회수 증가 성공" })
+  async incrementViewCount(
+    @CommunitySlug() slug: string,
+    @CommunityPostId("postId") postId: string,
+    @Request() req: any,
+  ) {
+    const userId = req.user?.id;
+    const viewerId = ViewerIdUtil.resolve(req);
+
+    await this.postService.incrementPostView(slug, postId, userId, viewerId);
+
+    return {
+      success: true,
+      message: "View count queued for batch update",
     };
   }
 

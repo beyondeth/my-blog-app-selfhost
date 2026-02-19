@@ -172,8 +172,16 @@ final class PostDetailViewModel: ObservableObject {
                 return
             }
 
-        case .community:
+        case let .community(communitySlug, postId, _):
             hasSentViewCount = true
+            do {
+                _ = try await repository.incrementCommunityPostViewCount(
+                    communitySlug: communitySlug,
+                    postId: postId,
+                )
+            } catch {
+                return
+            }
 
         case .unsupported:
             return

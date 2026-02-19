@@ -764,6 +764,19 @@ actor FeedRepository {
         let req = EndpointRequest(path: "\(postsPath)/\(postId)/view", method: .post)
         return try await client.request(req, as: VoidResponse.self)
     }
+
+    func incrementCommunityPostViewCount(
+        communitySlug: String,
+        postId: String,
+    ) async throws -> VoidResponse {
+        let safeCommunitySlug = encodedPathComponent(communitySlug)
+        let safePostId = encodedPathComponent(postId)
+        let req = EndpointRequest(
+            path: "\(communityPostsPath)/\(safeCommunitySlug)/posts/\(safePostId)/view",
+            method: .post,
+        )
+        return try await client.request(req, as: VoidResponse.self)
+    }
 }
 
 struct MobilePostVotePayload: Encodable {

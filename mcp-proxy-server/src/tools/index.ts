@@ -45,6 +45,7 @@ export interface ToolContext {
     MCP_BASE_URL: string;
     BACKEND_BASE_URL: string;
     BACKEND_PUBLIC_URL: string;
+    FRONTEND_URL: string;
     MCP_SHARED_SECRET?: string;
   };
 }
@@ -362,6 +363,8 @@ async function handleCreatePost(
       userId: context.userData.userId.substring(0, 8),
     }, '✅ Post created (Fast Path)');
 
+    const publicPostUrl = toPublicPostUrl(post.url, context.config.FRONTEND_URL);
+
     return {
       content: [
         {
@@ -370,7 +373,7 @@ async function handleCreatePost(
 
 **Title:** ${post.title}
 **Slug:** ${post.slug}
-**URL:** https://codebase.blog${post.url}
+**URL:** ${publicPostUrl}
 
 The post has been published to your blog "${context.userData.blog.name}".
 ${post._meta ? `\n_Processing in background: ${post._meta.processingTime || 'ongoing'}_` : ''}`,
@@ -395,6 +398,16 @@ ${post._meta ? `\n_Processing in background: ${post._meta.processingTime || 'ong
 
     throw new Error(errorMessage);
   }
+}
+
+function toPublicPostUrl(pathOrUrl: string, frontendBaseUrl: string): string {
+  if (!pathOrUrl) return frontendBaseUrl;
+  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
+
+  const base = frontendBaseUrl.endsWith('/') ? frontendBaseUrl : `${frontendBaseUrl}/`;
+  const relativePath = pathOrUrl.startsWith('/') ? pathOrUrl.slice(1) : pathOrUrl;
+
+  return new URL(relativePath, base).toString();
 }
 
 function buildBackendAuthHeaders(context: ToolContext): Record<string, string> {

@@ -83,16 +83,19 @@ class HttpFeedRepository(
         communitySlug: String?,
     ): ApiResult<Unit> {
         val normalizedType = sourceType.lowercase()
-        if (normalizedType == "community") {
-            // Community post view endpoint can vary by backend deployment.
-            return ApiResult.Success(Unit)
+        val endpoint = if (normalizedType == "community") {
+            val slug = communitySlug?.takeIf { it.isNotBlank() }
+                ?: return ApiResult.Failure(code = 400, message = "community slug is missing")
+            "$normalizedBaseUrl/community/${encodePath(slug)}/posts/${encodePath(postId)}/view"
+        } else {
+            "$normalizedBaseUrl/posts/${encodePath(postId)}/view"
         }
 
         return requestExecutor.execute { accessToken ->
             when (val response = transport.execute(
                 HttpRequest(
                     method = "POST",
-                    url = "$normalizedBaseUrl/posts/${encodePath(postId)}/view",
+                    url = endpoint,
                     headers = requestHeaders(accessToken),
                 ),
             )) {

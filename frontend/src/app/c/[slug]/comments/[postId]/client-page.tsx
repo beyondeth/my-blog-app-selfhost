@@ -78,7 +78,7 @@ export default function CommunityPostDetailClient({
   });
 
   // 조회수 증가
-  useIncrementPostView(communitySlug, postSlug);
+  useIncrementPostView(communitySlug, post?.id);
 
   // Mutations
   const postVoteMutation = useCommunityPostVote(communitySlug);

@@ -49,6 +49,14 @@ const envSchema = z.object({
   BACKEND_API_URL: z.string().url('BACKEND_API_URL must be a valid URL'),
   // Backend 공개 URL (브라우저가 접근할 수 있는 URL)
   BACKEND_PUBLIC_URL: z.string().url('BACKEND_PUBLIC_URL must be a valid URL'),
+  // Frontend 공개 URL (포스트 URL 표시용)
+  FRONTEND_URL: z.string()
+    .url('FRONTEND_URL must be a valid URL')
+    .default(
+      process.env.NODE_ENV === 'production'
+        ? 'https://codebase.blog'
+        : 'http://localhost:3001'
+    ),
 
   // CORS 설정 (프로덕션에서 와일드카드 금지)
   CORS_ORIGINS: corsOriginsSchema,
@@ -150,6 +158,7 @@ export function validateEnv(): EnvConfig {
     console.log(`📍 MCP Base URL: ${env.MCP_BASE_URL}`);
     console.log(`📍 Backend: ${env.BACKEND_BASE_URL}`);
     console.log(`📍 Backend Public: ${env.BACKEND_PUBLIC_URL}`);
+    console.log(`📍 Frontend: ${env.FRONTEND_URL}`);
     console.log(`🔐 인증 방식: API Key (Bearer Token)`);
     console.log(`🛡️ Rate Limit: ${env.RATE_LIMIT_MAX_REQUESTS} req/${env.RATE_LIMIT_WINDOW_MS / 3600000}h`);
 

@@ -655,13 +655,6 @@ class MainActivity : AppCompatActivity() {
                 communitySlug = item.communitySlug,
             ),
         )
-        lifecycleScope.launch {
-            feedRepository.recordPostView(
-                postId = item.postId,
-                sourceType = item.sourceType,
-                communitySlug = item.communitySlug,
-            )
-        }
     }
 
     private fun openComments(item: FeedItem) {
