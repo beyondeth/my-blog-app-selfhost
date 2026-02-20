@@ -28,7 +28,8 @@ Detailed procedures and update history live in `docs/platform-coordination/`.
 - MUST: runtime services (`backend:3000`, `frontend:3001`, `mcp-proxy-server`) start from `my-blog-app-integ`.
 - MUST: merge order is `platform branch -> integration/workspace -> main`.
 - MUST: before starting implementation, check divergence between active platform branch and `integration/workspace` with `git rev-list --left-right --count <active_branch>...integration/workspace`.
-- MUST: if divergence exists on either side, report the exact counts to the user immediately and confirm sync strategy before continuing.
+- MUST: if divergence exists on either side, report the exact counts to the user immediately before continuing work.
+- NEVER: auto-sync branches only to force a match; sync is done only when user requests it or when merge/release flow requires it.
 - NEVER: do feature work in root `/Users/sihyungpark/Desktop/code/my-blog-app` (checkpoint/metadata only).
 
 ### PLATFORM-TRACK (Required)
