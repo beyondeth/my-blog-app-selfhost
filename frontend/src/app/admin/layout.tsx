@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
 import AdminLayout from '@/components/admin/AdminLayout';
 import { Shield, AlertCircle } from 'lucide-react';
+import { useAuth } from '@/providers/AuthProviderV2';
 
 // Admin 재인증 세션 키 (브라우저 탭 닫으면 자동 삭제)
 const ADMIN_SESSION_KEY = 'admin_reauth_verified';
@@ -28,69 +29,55 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   const [sessionExpired, setSessionExpired] = useState(false);
   const MAX_LOGIN_ATTEMPTS = 5;
   const router = useRouter();
+  const { user, isLoading: authLoading } = useAuth();
 
   useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/me`,
-          {
-            credentials: 'include',
-          }
-        );
+    if (authLoading) {
+      setLoading(true);
+      return;
+    }
 
-        if (response.ok) {
-          const data = await response.json();
-          if (!data) {
-            setIsAuthenticated(false);
-            setIsAdmin(false);
-            return;
-          }
+    if (!user) {
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+      setLoading(false);
+      return;
+    }
 
-          // Session Storage에서 재인증 플래그와 타임스탬프 확인
-          const isReauthVerified = sessionStorage.getItem(ADMIN_SESSION_KEY);
-          const sessionTimestamp = sessionStorage.getItem(ADMIN_SESSION_TIMESTAMP_KEY);
+    // Session Storage에서 재인증 플래그와 타임스탬프 확인
+    const isReauthVerified = sessionStorage.getItem(ADMIN_SESSION_KEY);
+    const sessionTimestamp = sessionStorage.getItem(ADMIN_SESSION_TIMESTAMP_KEY);
 
-          // 세션 타임아웃 검사
-          const now = Date.now();
-          const isSessionExpired = sessionTimestamp &&
-            (now - parseInt(sessionTimestamp)) > ADMIN_SESSION_TIMEOUT;
+    // 세션 타임아웃 검사
+    const now = Date.now();
+    const isSessionExpired =
+      !!sessionTimestamp &&
+      now - parseInt(sessionTimestamp, 10) > ADMIN_SESSION_TIMEOUT;
 
-          if (isSessionExpired) {
-            // 세션 만료 - 클린업하고 재인증 필요
-            sessionStorage.removeItem(ADMIN_SESSION_KEY);
-            sessionStorage.removeItem(ADMIN_SESSION_TIMESTAMP_KEY);
-            setSessionExpired(true); // 세션 만료 상태 설정
-          }
+    if (isSessionExpired) {
+      // 세션 만료 - 클린업하고 재인증 필요
+      sessionStorage.removeItem(ADMIN_SESSION_KEY);
+      sessionStorage.removeItem(ADMIN_SESSION_TIMESTAMP_KEY);
+      setSessionExpired(true);
+    } else {
+      setSessionExpired(false);
+    }
 
-          if (data.role === 'admin' && isReauthVerified && !isSessionExpired) {
-            // Admin 재인증 완료 상태 & 세션 유효 → 자동 접근 허용
-            setIsAuthenticated(true);
-            setIsAdmin(true);
-          } else if (data.role === 'admin' && (!isReauthVerified || isSessionExpired)) {
-            // Admin이지만 재인증 필요 (2중 보안) 또는 세션 만료
-            setIsAuthenticated(false);
-            setIsAdmin(false);
-          } else {
-            // 일반 사용자 → 조용히 홈으로 리다이렉트 (메시지 없이)
-            router.push('/');
-          }
-        } else {
-          // 로그인 안 된 경우 - 로그인 화면 표시
-          setIsAuthenticated(false);
-          setIsAdmin(false);
-        }
-      } catch (error) {
-        console.error('Auth check error:', error);
-        setIsAuthenticated(false);
-        setIsAdmin(false);
-      } finally {
-        setLoading(false);
-      }
-    };
+    if (user.role === 'admin' && isReauthVerified && !isSessionExpired) {
+      // Admin 재인증 완료 상태 & 세션 유효 → 자동 접근 허용
+      setIsAuthenticated(true);
+      setIsAdmin(true);
+    } else if (user.role === 'admin' && (!isReauthVerified || isSessionExpired)) {
+      // Admin이지만 재인증 필요 (2중 보안) 또는 세션 만료
+      setIsAuthenticated(false);
+      setIsAdmin(false);
+    } else {
+      // 일반 사용자 → 조용히 홈으로 리다이렉트 (메시지 없이)
+      router.push('/');
+    }
 
-    checkAuth();
-  }, [router]);
+    setLoading(false);
+  }, [authLoading, router, user]);
 
   const handleLogin = async () => {
     // Check for too many failed attempts
