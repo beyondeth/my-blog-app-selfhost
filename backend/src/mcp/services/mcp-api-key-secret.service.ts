@@ -21,8 +21,16 @@ export class McpApiKeySecretService {
     const mcpKey = process.env.MCP_API_KEY_ENCRYPTION_KEY;
     const fallbackKey = process.env.IP_ENCRYPTION_KEY;
     const keySource = mcpKey || fallbackKey;
+    const isDevelopment =
+      (process.env.NODE_ENV ?? "").toLowerCase() === "development";
 
     if (!keySource) {
+      if (!isDevelopment) {
+        throw new Error(
+          "MCP_API_KEY_ENCRYPTION_KEY (or IP_ENCRYPTION_KEY) must be configured outside development",
+        );
+      }
+
       this.logger.warn(
         "⚠️ MCP_API_KEY_ENCRYPTION_KEY not set. Using development key. DO NOT use in production!",
       );

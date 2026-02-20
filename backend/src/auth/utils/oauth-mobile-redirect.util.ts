@@ -86,9 +86,15 @@ export function decodeMobileOAuthState(
   const trimmed = rawState.trim();
   const [encodedPayload, signature] = trimmed.split(".", 2);
   const payloadForDecode = encodedPayload || trimmed;
+  const normalizedSecret = secret?.trim();
 
-  if (secret && signature) {
-    const expected = signStatePayload(payloadForDecode, secret);
+  if (normalizedSecret) {
+    // Secret이 설정된 환경에서는 반드시 서명된 state만 신뢰한다.
+    if (!signature) {
+      return null;
+    }
+
+    const expected = signStatePayload(payloadForDecode, normalizedSecret);
     if (!safeEqual(signature, expected)) {
       return null;
     }
