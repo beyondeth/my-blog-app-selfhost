@@ -1,11 +1,9 @@
 /**
- * MCP Proxy Server - API Key 인증 (Context7 스타일)
+ * MCP Proxy Server - Dual Auth (API Key + OAuth 2.1)
  *
- * 변경 사항:
- * - OAuth2 완전 제거 (SessionService, TransportManager 제거)
- * - Stateless 함수 기반 (요청마다 새 서버 생성)
- * - API Key Bearer 인증 (Backend 검증)
- * - 깔끔한 구조 (200줄, 기존 640줄)
+ * 인증 경로:
+ * - /mcp: API Key Bearer 인증 (stateless)
+ * - /mcp-remote: OAuth 2.1 Bearer 인증
  */
 
 import express from 'express';
@@ -505,8 +503,8 @@ const server = app.listen(port, '0.0.0.0', () => {
     port,
     host: '0.0.0.0',
     environment: config.NODE_ENV,
-    pattern: 'Stateless API Key (Context7 style)',
-    auth: 'Bearer token (blog_sk_...)',
+    pattern: 'Dual Route: /mcp (API Key) + /mcp-remote (OAuth 2.1)',
+    auth: 'Bearer token (blog_sk_... or OAuth access token)',
     backendUrl: config.BACKEND_BASE_URL,
   }, '🚀 MCP Proxy Server started');
 });

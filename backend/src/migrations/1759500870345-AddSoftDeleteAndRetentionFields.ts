@@ -7,11 +7,43 @@ export class AddSoftDeleteAndRetentionFields1759500870345
 
   public async up(queryRunner: QueryRunner): Promise<void> {
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" DROP CONSTRAINT "FK_bookmark_post"`,
+      `ALTER TABLE "bookmarks" DROP CONSTRAINT IF EXISTS "FK_bookmark_post"`,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" DROP CONSTRAINT "FK_bookmark_user"`,
+      `ALTER TABLE "bookmarks" DROP CONSTRAINT IF EXISTS "FK_bookmark_user"`,
     );
+    await queryRunner.query(`
+      DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'bookmarks'
+            AND column_name = 'userId'
+        ) THEN
+          EXECUTE 'ALTER TABLE "bookmarks" RENAME COLUMN "userId" TO "user_id"';
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'bookmarks'
+            AND column_name = 'postId'
+        ) THEN
+          EXECUTE 'ALTER TABLE "bookmarks" RENAME COLUMN "postId" TO "post_id"';
+        END IF;
+
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'bookmarks'
+            AND column_name = 'createdAt'
+        ) THEN
+          EXECUTE 'ALTER TABLE "bookmarks" RENAME COLUMN "createdAt" TO "created_at"';
+        END IF;
+      END
+      $$;
+    `);
     await queryRunner.query(`DROP INDEX "public"."idx_posts_search_vector"`);
     await queryRunner.query(`DROP INDEX "public"."idx_posts_published_search"`);
     await queryRunner.query(`DROP INDEX "public"."idx_posts_indexed_at"`);
@@ -174,10 +206,36 @@ export class AddSoftDeleteAndRetentionFields1759500870345
       `CREATE INDEX "idx_posts_search_vector" ON "posts" ("search_vector") `,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'bookmarks'
+            AND column_name = 'user_id'
+        ) THEN
+          EXECUTE 'ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_user" FOREIGN KEY ("user_id") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION';
+        ELSE
+          EXECUTE 'ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_user" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE CASCADE ON UPDATE NO ACTION';
+        END IF;
+      END
+      $$;`,
     );
     await queryRunner.query(
-      `ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_post" FOREIGN KEY ("post_id") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE NO ACTION`,
+      `DO $$
+      BEGIN
+        IF EXISTS (
+          SELECT 1 FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'bookmarks'
+            AND column_name = 'post_id'
+        ) THEN
+          EXECUTE 'ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_post" FOREIGN KEY ("post_id") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE NO ACTION';
+        ELSE
+          EXECUTE 'ALTER TABLE "bookmarks" ADD CONSTRAINT "FK_bookmark_post" FOREIGN KEY ("postId") REFERENCES "posts"("id") ON DELETE CASCADE ON UPDATE NO ACTION';
+        END IF;
+      END
+      $$;`,
     );
   }
 }

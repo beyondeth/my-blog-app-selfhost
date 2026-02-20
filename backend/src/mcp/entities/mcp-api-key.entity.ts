@@ -20,7 +20,7 @@ import { Blog } from "../../blogs/entities/blog.entity";
  * - 형식: blog_sk_{hint}_{secret}
  *
  * 정책:
- * - 사용자당 1개 제한 (신규 생성 시 기존 자동 삭제)
+ * - 사용자당 최대 3개
  * - 90일 자동 만료
  * - 사용자 기반 Rate Limiting (200req/h)
  */
@@ -48,6 +48,13 @@ export class McpApiKey {
    */
   @Column()
   keyHash: string;
+
+  /**
+   * 서버 암호화된 전체 API Key (AES-256-GCM)
+   * 복사/재표시를 위한 원문 보관용
+   */
+  @Column({ type: "text", nullable: true, select: false })
+  encryptedApiKey: string | null;
 
   /**
    * 사용자 지정 키 이름

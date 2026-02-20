@@ -231,6 +231,10 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
  */
 async function handleCheckAuth(context: ToolContext): Promise<any> {
   const authMode = context.oauthToken ? 'OAuth 2.1' : 'API Key';
+  const publicBlogUrl = toPublicBlogUrl(
+    context.userData.blog.slug,
+    context.config.FRONTEND_URL
+  );
 
   logger.info({
     userId: context.userData.userId.substring(0, 8),
@@ -244,7 +248,7 @@ async function handleCheckAuth(context: ToolContext): Promise<any> {
         type: 'text',
         text: `✅ *** CODEBASE.BLOG 유저 인증이 완료됨 ***
 ✅ ${context.userData.user.username} (${context.userData.user.email})
-✅ 블로그 주소 : https://www.codebase.blog/${context.userData.blog.slug}
+✅ 블로그 주소 : ${publicBlogUrl}
 ✅ 인증 방식 : ${authMode}`,
       },
     ],
@@ -408,6 +412,12 @@ function toPublicPostUrl(pathOrUrl: string, frontendBaseUrl: string): string {
   const relativePath = pathOrUrl.startsWith('/') ? pathOrUrl.slice(1) : pathOrUrl;
 
   return new URL(relativePath, base).toString();
+}
+
+function toPublicBlogUrl(blogSlug: string, frontendBaseUrl: string): string {
+  if (!blogSlug) return frontendBaseUrl;
+  const base = frontendBaseUrl.endsWith('/') ? frontendBaseUrl : `${frontendBaseUrl}/`;
+  return new URL(blogSlug, base).toString();
 }
 
 function buildBackendAuthHeaders(context: ToolContext): Record<string, string> {

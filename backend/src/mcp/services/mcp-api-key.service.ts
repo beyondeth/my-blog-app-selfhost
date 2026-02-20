@@ -6,7 +6,7 @@ import {
   Logger,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { MoreThan, Repository } from "typeorm";
 import * as bcrypt from "bcrypt";
 import { McpApiKey } from "../entities/mcp-api-key.entity";
 import { customAlphabet } from "nanoid";
@@ -14,6 +14,7 @@ import { UsageTracking } from "../../usage/entities/usage-tracking.entity";
 import { ResourceType } from "../../common/enums/subscription.enum";
 import { CacheService } from "../../cache/cache.service";
 import { format } from "date-fns";
+import { McpApiKeySecretService } from "./mcp-api-key-secret.service";
 
 /**
  * MCP API Key 서비스
@@ -21,11 +22,13 @@ import { format } from "date-fns";
  * Stripe 스타일 API Key 관리:
  * - 생성: blog_sk_{hint}_{secret}
  * - 검증: hint로 O(1) 조회 후 bcrypt 비교
- * - 정책: 사용자당 1개, 90일 만료
+ * - 정책: 사용자당 최대 3개, 90일 만료
  */
 @Injectable()
 export class McpApiKeyService {
   private readonly logger = new Logger(McpApiKeyService.name);
+  private readonly maxKeysPerUser = 3;
+  private encryptedApiKeyColumnExists: boolean | null = null;
 
   // 8자 hint 생성용 (소문자 + 숫자)
   private readonly hintGenerator = customAlphabet(
@@ -45,6 +48,7 @@ export class McpApiKeyService {
     @InjectRepository(UsageTracking)
     private readonly usageTrackingRepository: Repository<UsageTracking>,
     private readonly cacheService: CacheService,
+    private readonly mcpApiKeySecretService: McpApiKeySecretService,
   ) {}
 
   /**
@@ -56,7 +60,7 @@ export class McpApiKeyService {
    * @returns { apiKey: 전체 키 (1회만 표시), keyHint: 식별자 }
    *
    * 정책:
-   * - 사용자당 1개 제한 (기존 키 자동 삭제)
+   * - 사용자당 최대 3개 제한
    * - 90일 자동 만료
    */
   async create(
@@ -64,11 +68,28 @@ export class McpApiKeyService {
     blogId: string,
     name: string,
   ): Promise<{ apiKey: string; keyHint: string; expiresAt: Date }> {
-    // 1. 기존 키 삭제 (사용자당 1개 정책)
-    await this.mcpApiKeyRepository.delete({ userId });
+    const normalizedName = name.trim();
+    if (!normalizedName) {
+      throw new ConflictException("API key name is required");
+    }
+
+    // 1. 사용자별 활성 키 개수 제한 (최대 3개)
+    const activeKeyCount = await this.mcpApiKeyRepository.count({
+      where: {
+        userId,
+        isActive: true,
+        expiresAt: MoreThan(new Date()),
+      },
+    });
+
+    if (activeKeyCount >= this.maxKeysPerUser) {
+      throw new ConflictException(
+        `API key limit reached. You can create up to ${this.maxKeysPerUser} keys.`,
+      );
+    }
 
     // 2. 고유한 hint 생성 (최대 3번 재시도)
-    let keyHint: string;
+    let keyHint = "";
     let attempts = 0;
 
     while (attempts < 3) {
@@ -95,32 +116,118 @@ export class McpApiKeyService {
     // Cost factor 8: 검증 시간 30-60ms (기존 10: 80-150ms)
     // 보안성: 2^8 = 256 iterations (여전히 안전)
     const keyHash = await bcrypt.hash(apiKey, 8);
+    const supportsEncryptedColumn = await this.hasEncryptedApiKeyColumn();
+    const encryptedApiKey = supportsEncryptedColumn
+      ? this.mcpApiKeySecretService.encrypt(apiKey)
+      : null;
 
     // 6. 만료 시간 설정 (90일 후)
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 90);
 
     // 7. DB 저장
-    const mcpApiKey = this.mcpApiKeyRepository.create({
+    const insertPayload: Record<string, any> = {
       keyHint,
       keyHash,
-      name,
+      name: normalizedName,
       userId,
       blogId,
       expiresAt,
       isActive: true,
       requestCount: 0,
       postsCreated: 0,
-    });
+    };
 
-    await this.mcpApiKeyRepository.save(mcpApiKey);
+    if (supportsEncryptedColumn) {
+      insertPayload.encryptedApiKey = encryptedApiKey;
+    }
 
-    // 8. 전체 키는 1회만 반환 (재조회 불가)
+    try {
+      await this.mcpApiKeyRepository
+        .createQueryBuilder()
+        .insert()
+        .into(McpApiKey)
+        .values(insertPayload)
+        .execute();
+    } catch (error: any) {
+      if (supportsEncryptedColumn && this.isMissingEncryptedColumnError(error)) {
+        this.logger.warn(
+          "encryptedApiKey column not found at insert time. Falling back to legacy insert without encrypted payload.",
+        );
+        this.encryptedApiKeyColumnExists = false;
+        const legacyPayload = { ...insertPayload };
+        delete legacyPayload.encryptedApiKey;
+
+        await this.mcpApiKeyRepository
+          .createQueryBuilder()
+          .insert()
+          .into(McpApiKey)
+          .values(legacyPayload)
+          .execute();
+      } else {
+        throw error;
+      }
+    }
+
+    // 8. 생성 직후 원문 반환
     return {
       apiKey,
       keyHint,
       expiresAt,
     };
+  }
+
+  /**
+   * API Key 원문 조회 (본인 소유 키만)
+   */
+  async revealSecret(
+    keyId: string,
+    userId: string,
+  ): Promise<{ apiKey: string; keyHint: string; name: string }> {
+    const supportsEncryptedColumn = await this.hasEncryptedApiKeyColumn();
+    if (!supportsEncryptedColumn) {
+      throw new ConflictException(
+        "Encrypted API key storage is not ready yet. Run DB migration first.",
+      );
+    }
+
+    const mcpApiKey = await this.mcpApiKeyRepository
+      .createQueryBuilder("mcpApiKey")
+      .addSelect("mcpApiKey.encryptedApiKey")
+      .where("mcpApiKey.id = :id", { id: keyId })
+      .getOne();
+
+    if (!mcpApiKey) {
+      throw new NotFoundException("API key not found");
+    }
+
+    if (mcpApiKey.userId !== userId) {
+      throw new UnauthorizedException("Not authorized to access this API key");
+    }
+
+    if (!mcpApiKey.encryptedApiKey) {
+      throw new ConflictException(
+        "This key cannot be revealed. Please generate a new API key.",
+      );
+    }
+
+    try {
+      const apiKey = this.mcpApiKeySecretService.decrypt(
+        mcpApiKey.encryptedApiKey,
+      );
+      return {
+        apiKey,
+        keyHint: mcpApiKey.keyHint,
+        name: mcpApiKey.name,
+      };
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to decrypt API key: ${error?.message || "unknown error"}`,
+      );
+      throw new ConflictException(
+        "This key cannot be revealed. Please generate a new API key.",
+      );
+    }
   }
 
   /**
@@ -413,5 +520,45 @@ export class McpApiKeyService {
       // TTL이 설정되지 않았으면 설정
       await this.cacheService.expire(hourKey, 86400 * 7); // 7일
     }
+  }
+
+  private async hasEncryptedApiKeyColumn(): Promise<boolean> {
+    if (this.encryptedApiKeyColumnExists !== null) {
+      return this.encryptedApiKeyColumnExists;
+    }
+
+    try {
+      const result = await this.mcpApiKeyRepository.query(`
+        SELECT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_schema = 'public'
+            AND table_name = 'mcp_api_keys'
+            AND column_name = 'encryptedApiKey'
+        ) AS "exists"
+      `);
+
+      this.encryptedApiKeyColumnExists =
+        result?.[0]?.exists === true ||
+        result?.[0]?.exists === "t" ||
+        result?.[0]?.exists === "true";
+    } catch (error: any) {
+      this.logger.warn(
+        `Failed to detect encryptedApiKey column: ${error?.message || "unknown error"}`,
+      );
+      this.encryptedApiKeyColumnExists = false;
+    }
+
+    return this.encryptedApiKeyColumnExists;
+  }
+
+  private isMissingEncryptedColumnError(error: any): boolean {
+    const message = String(error?.message || "").toLowerCase();
+    return (
+      message.includes("encryptedapikey") &&
+      (message.includes("does not exist") ||
+        message.includes("undefined column") ||
+        message.includes("column"))
+    );
   }
 }

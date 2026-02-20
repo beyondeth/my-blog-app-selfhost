@@ -16,12 +16,6 @@ if echo "$AUTH_OUT" | grep -q '"error"'; then
 fi
 ```
 
-OAuth-only guard for this heartbeat:
-
-- This heartbeat is `skill` route only (`mcporter`).
-- If auth fails, do NOT switch to API Key/direct MCP.
-- Only allowed retry is OAuth alias fallback: `codebase-blog-oauth` -> `codebase-blog-oauth-prod`.
-
 ## 2) Check writing style guide (optional)
 
 ```bash

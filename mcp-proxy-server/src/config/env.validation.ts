@@ -1,13 +1,12 @@
 /**
- * 환경 변수 검증 시스템 - API Key 인증 버전
+ * 환경 변수 검증 시스템 - MCP Dual Auth 버전
  *
  * 서버 시작 전 모든 필수 환경 변수를 검증하여
  * 런타임 에러를 방지하고 설정 오류를 조기에 발견
  *
- * 변경 사항:
- * - OAuth2 세션 관련 변수 제거 (SESSION_ENCRYPTION_KEY, SESSION_TTL, SESSION_STRICT_MODE)
- * - API Key 인증 방식으로 전환 (Stateless)
- * - Rate Limiting 설정 유지 (200 req/h)
+ * 지원 인증 경로:
+ * - /mcp: API Key Bearer 인증
+ * - /mcp-remote: OAuth 2.1 Bearer 인증
  */
 
 import { z } from 'zod';
@@ -152,14 +151,14 @@ export function validateEnv(): EnvConfig {
     // 환경 변수 파싱 및 검증
     const env = envSchema.parse(process.env);
 
-    console.log('✅ 환경 변수 검증 완료 (API Key 인증 모드)');
+    console.log('✅ 환경 변수 검증 완료 (MCP Dual Auth 모드)');
     console.log(`📍 환경: ${env.NODE_ENV}`);
     console.log(`📍 MCP Proxy 포트: ${env.MCP_PROXY_PORT}`);
     console.log(`📍 MCP Base URL: ${env.MCP_BASE_URL}`);
     console.log(`📍 Backend: ${env.BACKEND_BASE_URL}`);
     console.log(`📍 Backend Public: ${env.BACKEND_PUBLIC_URL}`);
     console.log(`📍 Frontend: ${env.FRONTEND_URL}`);
-    console.log(`🔐 인증 방식: API Key (Bearer Token)`);
+    console.log(`🔐 인증 방식: API Key (/mcp) + OAuth 2.1 (/mcp-remote)`);
     console.log(`🛡️ Rate Limit: ${env.RATE_LIMIT_MAX_REQUESTS} req/${env.RATE_LIMIT_WINDOW_MS / 3600000}h`);
 
     // 프로덕션 환경 추가 검증

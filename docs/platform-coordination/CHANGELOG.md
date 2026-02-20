@@ -2,6 +2,102 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-02-19
+
+### What changed
+- Aligned MCP/skills user guidance with current runtime behavior and official vendor docs:
+  - Rewrote `mcp-proxy-server/README.md` to current dual-route architecture (`/mcp` + `/mcp-remote`).
+  - Updated MCP auth/status output to avoid production URL confusion in local/dev:
+    - `check_auth` blog URL now uses `FRONTEND_URL` base.
+  - Updated startup/env log messages to describe dual auth mode explicitly.
+  - Updated API key setup snippets for agent clients:
+    - Claude Code command switched to explicit HTTP transport form.
+    - Gemini CLI config path switched to `~/.gemini/settings.json`.
+    - Codex config snippet removed obsolete `rmcp_client` guidance and now focuses on MCP block only.
+  - Added inline caveat for Antigravity schema drift and explicit official-doc verification date in UI.
+
+### Why
+- Operators were seeing API Key-oriented text and production-style URLs even during OAuth/local workflows.
+- Setup snippets had drifted from current OpenAI/Anthropic/Gemini documentation, increasing onboarding failure risk.
+- README had stale endpoints (`/api/v1/mcp`) and outdated tool descriptions no longer matching code.
+
+### How
+- Updated:
+  - `mcp-proxy-server/README.md`
+  - `mcp-proxy-server/src/tools/index.ts`
+  - `mcp-proxy-server/src/config/env.validation.ts`
+  - `mcp-proxy-server/src/index.ts`
+  - `frontend/src/app/settings/api-keys/configSnippets.ts`
+  - `frontend/src/app/settings/api-keys/page.tsx`
+- Official references validated on 2026-02-19:
+  - OpenAI Codex Skills/Config/MCP docs
+  - Anthropic Claude Code Skills/Settings docs
+  - Gemini CLI docs (`skills`, `configuration`)
+
+### Additional update (skills onboarding UX simplification)
+
+#### What changed
+- Reworked API key settings UX to separate onboarding paths:
+  - Added explicit mode selector: `SKILLS 설치 (권장)` vs `MCP 직접 설정`.
+  - Moved skill onboarding above MCP guide.
+  - Removed `MCPorter` naming from user-facing onboarding section to avoid terminology confusion.
+- Simplified skill onboarding copy:
+  - kept only feature summary + install commands
+  - removed verbose usage flow and optional API key fallback explanation from the skills block
+
+#### Why
+- Existing wording and placement made users interpret skills as an MCP sub-option.
+- Overly long instructions increased onboarding friction for non-technical users.
+
+#### How
+- Updated:
+  - `frontend/src/app/settings/api-keys/page.tsx`
+  - `frontend/src/app/settings/api-keys/configSnippets.ts`
+
+### Additional update (API key page redesign + secure copy UX)
+
+#### What changed
+- Refactored API key section to a compact table-driven layout (`이름 / 비밀 키 / 최근에 사용됨 / 작업`) inspired by a cleaner admin-console pattern.
+- Replaced multi-card key creation flow with a single top-right `+ API 키 생성` action.
+- Restored usage visibility in key table (`요청 수`, `포스트 수`, `만료일`).
+- Applied secure copy policy:
+  - raw key is kept only in current runtime memory after creation
+  - no browser persistent storage (no localStorage/sessionStorage) for plaintext API keys
+  - if runtime plaintext is unavailable, UI shows `원문 없음` and guides regeneration
+
+#### Why
+- Existing key area looked visually fragmented and over-detailed.
+- One-time-only copy behavior caused repeated user friction during setup and reuse.
+- Browser-persistent plaintext storage created unnecessary key leakage risk.
+
+#### How
+- Updated:
+  - `frontend/src/app/settings/api-keys/page.tsx`
+- Constraints documented in implementation:
+  - backend stores only `keyHash` (bcrypt) and cannot reveal plaintext keys after creation.
+
+### Additional update (skills installation flow standardization)
+
+#### What changed
+- Replaced SKILLS onboarding command set from `mcporter config/auth` to `vercel-labs/skills` installation flow.
+- Added explicit command groups in web UI:
+  - one-shot multi-agent install
+  - per-agent install
+  - verify
+  - update/remove
+- Updated external distribution repo guide:
+  - `codebase-skills/README.md` now documents install/verify/update/remove with `npx skills`.
+
+#### Why
+- Previous SKILLS block behaved like MCP endpoint registration, which did not install `SKILL.md` files for agents.
+- Users needed a single reliable installation path across Codex, Claude Code, Gemini CLI, and Antigravity.
+
+#### How
+- Updated:
+  - `frontend/src/app/settings/api-keys/configSnippets.ts`
+  - `frontend/src/app/settings/api-keys/page.tsx`
+  - `/Users/sihyungpark/Desktop/code/codebase-skills/README.md`
+
 ## 2026-02-18
 
 ### What changed
@@ -153,3 +249,22 @@ Track operational rule changes for worktree/branch coordination.
 #### How
 - Introduced frontend base URL composition for relative post paths.
 - Kept absolute URLs from backend unchanged when already provided.
+
+### Additional update (Mixed changes snapshot + path ownership split)
+
+#### What changed
+- Created snapshot branch `checkpoint/mixed-snapshot-20260220` to preserve all in-progress changes.
+- Re-applied only shared/integration-owned paths onto `integration/workspace`:
+  - `.agents/skills/codebase-skill/**`
+  - `backend/**`
+  - `mcp-proxy-server/**`
+  - `docs/platform-coordination/CHANGELOG.md`
+- Planned separate re-apply for web-owned paths (`frontend/**`) on `feature/web/workspace`.
+
+#### Why
+- Recent edits were made in `my-blog-app-integ` while including web-owned files.
+- We need to preserve all history without loss and restore ownership boundaries defined in the worktree playbook.
+
+#### How
+- Snapshot commit first (no data loss), then selective path checkout by ownership.
+- Commit/push split by worktree role before PR routing (`platform -> integration -> main`).

@@ -27,8 +27,9 @@ import { ResourceType } from "../../common/enums/subscription.enum";
  * MCP API Key 관리 컨트롤러
  *
  * 엔드포인트:
- * - POST /api/v1/mcp/keys: API Key 생성 (사용자당 1개)
+ * - POST /api/v1/mcp/keys: API Key 생성 (사용자당 최대 3개)
  * - GET /api/v1/mcp/keys: 내 API Key 목록
+ * - GET /api/v1/mcp/keys/:id/reveal: API Key 원문 조회
  * - DELETE /api/v1/mcp/keys/:id: API Key 삭제
  * - POST /api/v1/mcp/validate-key: API Key 검증 (MCP Proxy → Backend)
  */
@@ -47,8 +48,7 @@ export class McpController {
    * @returns { apiKey: 전체 키 (1회만 표시), keyHint, expiresAt }
    *
    * 정책:
-   * - 사용자당 1개 제한 (기존 키 자동 삭제)
-   * - 생성된 API Key는 1회만 표시됨 (재조회 불가)
+   * - 사용자당 최대 3개 제한
    */
   @Post("keys")
   @UseGuards(JwtAuthGuard)
@@ -63,8 +63,7 @@ export class McpController {
     );
 
     return {
-      message:
-        "API Key created successfully. Save this key - it will not be shown again.",
+      message: "API Key created successfully.",
       data: result,
     };
   }
@@ -99,6 +98,23 @@ export class McpController {
 
     return {
       data: sanitizedKeys,
+    };
+  }
+
+  /**
+   * API Key 원문 조회 (복사용)
+   *
+   * @param req JWT 인증된 요청
+   * @param id API Key ID
+   */
+  @Get("keys/:id/reveal")
+  @UseGuards(JwtAuthGuard)
+  async revealKey(@Request() req: any, @Param("id") id: string) {
+    const userId = req.user.id;
+    const revealed = await this.mcpApiKeyService.revealSecret(id, userId);
+
+    return {
+      data: revealed,
     };
   }
 

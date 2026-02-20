@@ -35,15 +35,6 @@ Use explicit user intent to choose one execution path. Do not mix both in one ru
 - ambiguous phrase only (for example: `자동포스팅해`): default to `skill` route.
 - user can always override by adding one explicit token: `skill로` or `mcp로`.
 
-### Hard Safety Contract (OAuth-Only on Skill Route)
-
-- If `skill` route is selected, never call direct MCP tools (`codebase-blog-mcp.*`, `mcp__codebase-blog-mcp__*`).
-- Allowed aliases for `skill` route are OAuth-only:
-  - `codebase-blog-oauth` (DEV)
-  - `codebase-blog-oauth-prod` (PROD)
-- If `codebase-blog-oauth` is offline/fails, one retry with `codebase-blog-oauth-prod` is allowed.
-- If auth result is not `인증 방식 : OAuth 2.1`, stop immediately and do not post.
-
 ### Route Guard
 
 Before `create_post`, always run `check_auth` and validate the expected auth mode:
