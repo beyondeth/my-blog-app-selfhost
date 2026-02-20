@@ -13,7 +13,6 @@ import {
   FiBell,
   FiUsers,
   FiMessageCircle,
-  FiLogOut,
   FiKey,
 } from 'react-icons/fi';
 import { ArrowLeft, BarChart3 } from 'lucide-react';
@@ -56,7 +55,7 @@ const getSettingsNav = () => {
       icon: FiShield,
     },
     {
-      title: 'API Keys',
+      title: '자동포스팅 연결',
       href: '/settings/api-keys',
       icon: FiKey,
     },
@@ -121,9 +120,10 @@ function SettingsLayoutContent({
           </div>
         </div>
 
-        <div className="w-full overflow-hidden">
-          <div className="flex w-full items-center overflow-x-auto rounded-3xl border border-gray-100 bg-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-gray-800 dark:border-gray-700 no-scrollbar touch-pan-x">
-            <div className="flex min-w-full p-1">
+        <div className="w-full space-y-2">
+          <p className="px-1 text-xs font-medium text-gray-500 dark:text-gray-400">설정 메뉴</p>
+          <div className="rounded-2xl border border-gray-200 bg-[#FAFAFA] p-2 dark:border-[#2F3440] dark:bg-[#161B24]">
+            <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(132px,1fr))]">
               {settingsNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeTab === item.href;
@@ -131,24 +131,17 @@ function SettingsLayoutContent({
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold transition-colors whitespace-nowrap flex-shrink-0 rounded-2xl ${
+                    className={`flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold transition-all ${
                       isActive
-                        ? 'bg-white text-gray-900 shadow-sm dark:bg-[#1f2330] dark:text-white'
-                        : 'text-gray-600 hover:text-gray-900 hover:bg-white/50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5'
+                        ? 'border-[#0D0D0D] bg-[#0D0D0D] text-white dark:border-[#6D79FF] dark:bg-[#6D79FF] dark:text-white'
+                        : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900 dark:border-[#2F3440] dark:bg-[#1F2229] dark:text-gray-200 dark:hover:border-[#3A414F] dark:hover:text-white'
                     }`}
                   >
                     <Icon className="h-4 w-4" />
-                    {item.title}
+                    <span className="truncate">{item.title}</span>
                   </Link>
                 );
               })}
-              <button
-                onClick={() => logout('/')}
-                className="ml-auto flex items-center gap-2 px-4 py-2.5 text-sm font-bold text-gray-600 hover:text-gray-900 hover:bg-white/50 dark:text-gray-400 dark:hover:text-gray-200 dark:hover:bg-white/5 transition-colors whitespace-nowrap flex-shrink-0 rounded-2xl"
-              >
-                <FiLogOut className="h-4 w-4" />
-                로그아웃
-              </button>
             </div>
           </div>
         </div>

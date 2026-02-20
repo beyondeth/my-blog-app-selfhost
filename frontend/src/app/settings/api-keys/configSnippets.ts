@@ -13,7 +13,8 @@ export const getMcpJsonConfig = (apiKey: string) => `{
 
 export const getAntigravityConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
-    ? `// 설정 위치: Manage MCP Servers -> Configure
+    ? `// 설정 위치: Antigravity > Manage MCP Servers > View raw config (mcp_config.json)
+// 주의: Antigravity 버전에 따라 URL 키명이 serverUrl/httpUrl로 다를 수 있습니다.
 {
   "mcpServers": {
     "codebase-blog-mcp": {
@@ -64,8 +65,8 @@ export const getCursorConfig = (apiKey: string, includeComment: boolean = true) 
 export const getClaudeCodeConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
     ? `# 터미널에서 실행
-claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`
-    : `claude mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`;
+claude mcp add --transport http codebase-blog-mcp https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`
+    : `claude mcp add --transport http codebase-blog-mcp https://mcp.codebase.blog/mcp --header "Authorization: Bearer ${apiKey}"`;
 
 export const getWindsurfConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
@@ -117,7 +118,7 @@ export const getVSCodeConfig = (apiKey: string, includeComment: boolean = true) 
 
 export const getGeminiConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
-    ? `// 설정 위치: ~/.gemini/mcp.json
+    ? `// 설정 위치: ~/.gemini/settings.json
 {
   "mcpServers": {
     "codebase-blog-mcp": {
@@ -167,76 +168,59 @@ export const getQwenConfig = (apiKey: string, includeComment: boolean = true) =>
   }
 }`;
 
-export const getMcporterSetupSnippet = (apiKey: string, includeComment: boolean = true) =>
+const SKILL_SOURCE_REPO = "beyondeth/codebase-skills";
+const SKILL_NAME = "codebase-skill";
+const SKILL_AGENTS = "-a codex -a claude-code -a gemini-cli -a antigravity";
+const maybeGlobal = (isGlobal: boolean) => (isGlobal ? " -g" : "");
+
+export const getSkillsInstallSnippet = (
+  includeComment: boolean = true,
+  isGlobal: boolean = true,
+) =>
   includeComment
-    ? `# PROD (일반 사용자)
-npx -y mcporter config add codebase-blog-oauth --url https://mcp.codebase.blog/mcp-remote --auth oauth --oauth-redirect-url http://127.0.0.1:33333/callback --scope home
+    ? `# 멀티 에이전트 설치 (권장)
+# Codex + Claude Code + Gemini CLI + Antigravity
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} ${SKILL_AGENTS}${maybeGlobal(isGlobal)} -y`
+    : `npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} ${SKILL_AGENTS}${maybeGlobal(isGlobal)} -y`;
 
-# DEV (테스트용)
-npx -y mcporter config add codebase-blog-oauth-dev --url http://localhost:3002/mcp-remote --auth oauth --allow-http --oauth-redirect-url http://127.0.0.1:33334/callback --scope project
-
-# 브라우저 OAuth 인증 (초기 1회)
-npx -y mcporter auth codebase-blog-oauth`
-    : `npx -y mcporter config add codebase-blog-oauth --url https://mcp.codebase.blog/mcp-remote --auth oauth --oauth-redirect-url http://127.0.0.1:33333/callback --scope home
-npx -y mcporter config add codebase-blog-oauth-dev --url http://localhost:3002/mcp-remote --auth oauth --allow-http --oauth-redirect-url http://127.0.0.1:33334/callback --scope project
-npx -y mcporter auth codebase-blog-oauth`;
-
-export const getMcporterUsageSnippet = (includeComment: boolean = true) =>
+export const getSkillsPerAgentInstallSnippet = (
+  includeComment: boolean = true,
+  isGlobal: boolean = true,
+) =>
   includeComment
-    ? `# 0) 도구 스키마 확인 (5개 툴)
-npx -y mcporter list codebase-blog-oauth --schema
+    ? `# 에이전트별 설치
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a codex${maybeGlobal(isGlobal)} -y
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a claude-code${maybeGlobal(isGlobal)} -y
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a gemini-cli${maybeGlobal(isGlobal)} -y
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a antigravity${maybeGlobal(isGlobal)} -y`
+    : `npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a codex${maybeGlobal(isGlobal)} -y
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a claude-code${maybeGlobal(isGlobal)} -y
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a gemini-cli${maybeGlobal(isGlobal)} -y
+npx -y skills add ${SKILL_SOURCE_REPO} --skill ${SKILL_NAME} -a antigravity${maybeGlobal(isGlobal)} -y`;
 
-# 1) 안전 게이트 (권장)
-#    - check_auth 결과에 "error" 키가 있으면 발행 중단
-AUTH_OUT=$(npx -y mcporter call codebase-blog-oauth.check_auth --output json 2>&1 || true)
-echo "$AUTH_OUT"
-if echo "$AUTH_OUT" | rg -q '"error"'; then
-  echo "[STOP] OAuth verification failed. create_post not executed."
-  exit 1
-fi
-
-# 2) 글쓰기 스타일 가이드 조회
-npx -y mcporter call 'codebase-blog-oauth.get_writing_style_guide(style: "default")'
-
-# 3) (선택) 이미지 업로드 1단계
-npx -y mcporter call 'codebase-blog-oauth.get_image_upload_url(mimeType: "image/webp", fileSize: 245760)'
-
-# 4) (선택) 응답 uploadUrl로 파일 PUT
-curl -X PUT -H "Content-Type: image/webp" -T ./cover.webp "UPLOAD_URL_FROM_PREVIOUS_STEP"
-
-# 5) (선택) 이미지 업로드 2단계
-npx -y mcporter call 'codebase-blog-oauth.finalize_uploaded_image(fileKey: "uploads/...", mimeType: "image/webp", fileSize: 245760)'
-
-# 6) 포스트 발행
-npx -y mcporter call 'codebase-blog-oauth.create_post(title: "MCP 자동포스팅 예시", content_markdown: "# Hello\\n\\nmcporter로 발행한 글입니다.", category: "Tech", tags: ["mcp","automation"])'`
-    : `npx -y mcporter list codebase-blog-oauth --schema
-AUTH_OUT=$(npx -y mcporter call codebase-blog-oauth.check_auth --output json 2>&1 || true)
-echo "$AUTH_OUT"
-if echo "$AUTH_OUT" | rg -q '"error"'; then
-  echo "[STOP] OAuth verification failed. create_post not executed."
-  exit 1
-fi
-npx -y mcporter call 'codebase-blog-oauth.get_writing_style_guide(style: "default")'
-npx -y mcporter call 'codebase-blog-oauth.get_image_upload_url(mimeType: "image/webp", fileSize: 245760)'
-curl -X PUT -H "Content-Type: image/webp" -T ./cover.webp "UPLOAD_URL_FROM_PREVIOUS_STEP"
-npx -y mcporter call 'codebase-blog-oauth.finalize_uploaded_image(fileKey: "uploads/...", mimeType: "image/webp", fileSize: 245760)'
-npx -y mcporter call 'codebase-blog-oauth.create_post(title: "MCP 자동포스팅 예시", content_markdown: "# Hello\\n\\nmcporter로 발행한 글입니다.", category: "Tech", tags: ["mcp","automation"])'`;
-
-export const getMcporterOAuthSnippet = (apiKey: string, includeComment: boolean = true) =>
+export const getSkillsVerifySnippet = (
+  includeComment: boolean = true,
+  isGlobal: boolean = true,
+) =>
   includeComment
-    ? `# OAuth 로그인 화면이 안 뜨면
-# - 이미 codebase.blog 세션이 살아있어서 자동 승인될 수 있습니다.
-# - 강제 로그인 화면 확인이 필요하면 브라우저 시크릿 모드에서 아래 명령을 다시 실행하세요.
-#   npx -y mcporter auth codebase-blog-oauth --reset
+    ? `# 설치 확인
+npx -y skills list${maybeGlobal(isGlobal)}`
+    : `npx -y skills list${maybeGlobal(isGlobal)}`;
 
-# OAuth 대신 API Key 모드를 쓰는 경우 (선택)
-export CODEBASE_MCP_TOKEN="${apiKey}"
-npx -y mcporter config add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization=Bearer \${CODEBASE_MCP_TOKEN}" --header "Accept=application/json, text/event-stream" --scope home
-npx -y mcporter call codebase-blog-mcp.check_auth`
-    : `npx -y mcporter auth codebase-blog-oauth --reset
-export CODEBASE_MCP_TOKEN="${apiKey}"
-npx -y mcporter config add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --header "Authorization=Bearer \${CODEBASE_MCP_TOKEN}" --header "Accept=application/json, text/event-stream" --scope home
-npx -y mcporter call codebase-blog-mcp.check_auth`;
+export const getSkillsMaintenanceSnippet = (
+  includeComment: boolean = true,
+  isGlobal: boolean = true,
+) =>
+  includeComment
+    ? `# 업데이트 확인/적용
+npx -y skills check
+npx -y skills update
+
+# 제거
+npx -y skills remove ${SKILL_NAME} ${SKILL_AGENTS}${maybeGlobal(isGlobal)} -y`
+    : `npx -y skills check
+npx -y skills update
+npx -y skills remove ${SKILL_NAME} ${SKILL_AGENTS}${maybeGlobal(isGlobal)} -y`;
 
 export const getCodexEnvSnippet = (apiKey: string, includeComment: boolean = true) =>
   includeComment
@@ -259,24 +243,13 @@ setx CODEBASE_MCP_TOKEN "${apiKey}"`
 export const getCodexConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
     ? `# 설정 위치: ~/.codex/config.toml
-# 모델 설정이 이미 있다면 [features]/[mcp_servers] 블록만 추가하세요.
-model = "gpt-5-codex"
-model_reasoning_effort = "high"
-
-[features]
-rmcp_client = true
+# 기존 설정이 있다면 아래 MCP 블록만 추가하세요.
 
 [mcp_servers.codebase-blog-mcp]
 url = "https://mcp.codebase.blog/mcp"
 bearer_token_env_var = "CODEBASE_MCP_TOKEN"
 http_headers = { Accept = "application/json, text/event-stream" }`
-    : `model = "gpt-5-codex"
-model_reasoning_effort = "high"
-
-[features]
-rmcp_client = true
-
-[mcp_servers.codebase-blog-mcp]
+    : `[mcp_servers.codebase-blog-mcp]
 url = "https://mcp.codebase.blog/mcp"
 bearer_token_env_var = "CODEBASE_MCP_TOKEN"
 http_headers = { Accept = "application/json, text/event-stream" }`;

@@ -3,7 +3,6 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { cn } from '@/lib/utils';
 import { Settings, Users, Shield, ShieldAlert, LayoutPanelLeft, ArrowLeft, BarChart3 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCommunity } from '@/hooks/community';
@@ -125,9 +124,10 @@ export default function CommunityAdminLayout({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <div className="flex w-full items-center overflow-x-auto rounded-3xl border border-gray-100 bg-gray-200 shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-gray-800 dark:border-gray-700">
-            <div className="flex">
+        <div className="w-full space-y-2">
+          <p className="px-1 text-xs font-medium text-gray-500 dark:text-gray-400">관리 메뉴</p>
+          <div className="rounded-2xl border border-gray-200 bg-[#FAFAFA] p-2 dark:border-[#2F3440] dark:bg-[#161B24]">
+            <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(148px,1fr))]">
               {menuItems
                 .filter((item) => item.show)
                 .map((item) => {
@@ -138,24 +138,25 @@ export default function CommunityAdminLayout({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`flex items-center gap-2 px-4 py-3 text-sm font-bold transition-colors border-b-2 ${
+                      className={`flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border px-3 py-2 text-center text-sm font-semibold transition-all ${
                         active
-                          ? 'text-gray-900 dark:text-gray-50 border-[#5850ec] dark:border-[#818cf8]'
-                          : 'text-gray-600 dark:text-gray-200 border-transparent hover:text-gray-900 dark:hover:text-white'
+                          ? 'border-[#0D0D0D] bg-[#0D0D0D] text-white dark:border-[#6D79FF] dark:bg-[#6D79FF] dark:text-white'
+                          : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:text-gray-900 dark:border-[#2F3440] dark:bg-[#1F2229] dark:text-gray-200 dark:hover:border-[#3A414F] dark:hover:text-white'
                       }`}
                     >
-                      <Icon className="h-4 w-4" />
-                      {item.label}
+                      <Icon className="h-4 w-4 shrink-0" />
+                      <span className="truncate">{item.label}</span>
                     </Link>
                   );
                 })}
+              <button
+                type="button"
+                onClick={() => router.push(`/c/${slug}`)}
+                className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-center text-sm font-semibold text-gray-700 transition-all hover:border-gray-300 hover:text-gray-900 dark:border-[#2F3440] dark:bg-[#1F2229] dark:text-gray-200 dark:hover:border-[#3A414F] dark:hover:text-white"
+              >
+                커뮤니티로 이동
+              </button>
             </div>
-            <button
-              onClick={() => router.push(`/c/${slug}`)}
-              className="ml-auto flex items-center gap-2 px-4 py-3 text-sm font-bold border-b-2 border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-50 dark:text-gray-300 dark:hover:text-white dark:hover:bg-[#1f2330] transition-colors"
-            >
-              커뮤니티로 이동
-            </button>
           </div>
         </div>
 

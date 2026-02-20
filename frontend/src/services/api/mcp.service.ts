@@ -25,6 +25,12 @@ export interface CreateMcpApiKeyResponse {
   expiresAt: string;
 }
 
+export interface RevealMcpApiKeyResponse {
+  apiKey: string;
+  keyHint: string;
+  name: string;
+}
+
 interface ApiListResponse<T> {
   data: T;
 }
@@ -47,4 +53,13 @@ export async function createMcpApiKey(
 
 export async function deleteMcpApiKey(keyId: string): Promise<void> {
   await defaultApiClient.delete(`/mcp/keys/${keyId}`);
+}
+
+export async function revealMcpApiKey(
+  keyId: string,
+): Promise<RevealMcpApiKeyResponse> {
+  const response = await defaultApiClient.get<
+    ApiListResponse<RevealMcpApiKeyResponse>
+  >(`/mcp/keys/${keyId}/reveal`);
+  return response.data;
 }
