@@ -27,6 +27,8 @@ Detailed procedures and update history live in `docs/platform-coordination/`.
 - NEVER: patch shared paths from `my-blog-app-ios`, `my-blog-app-aos`, or `my-blog-app-web`.
 - MUST: runtime services (`backend:3000`, `frontend:3001`, `mcp-proxy-server`) start from `my-blog-app-integ`.
 - MUST: merge order is `platform branch -> integration/workspace -> main`.
+- MUST: before starting implementation, check divergence between active platform branch and `integration/workspace` with `git rev-list --left-right --count <active_branch>...integration/workspace`.
+- MUST: if divergence exists on either side, report the exact counts to the user immediately and confirm sync strategy before continuing.
 - NEVER: do feature work in root `/Users/sihyungpark/Desktop/code/my-blog-app` (checkpoint/metadata only).
 
 ### PLATFORM-TRACK (Required)
