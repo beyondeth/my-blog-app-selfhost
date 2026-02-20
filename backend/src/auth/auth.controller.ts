@@ -34,7 +34,7 @@ import { DeleteAccountDto } from "./dto/delete-account.dto";
 import { ConsentDto } from "./dto/consent.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
-import { User } from "../users/entities/user.entity";
+import { AuthProvider, User } from "../users/entities/user.entity";
 import {
   MobileOAuthCodeService,
   SocialProvider,
@@ -103,7 +103,9 @@ export class AuthController {
   }
 
   private frontendBaseURL(): string {
-    return this.configService.get<string>("FRONTEND_URL") || "http://localhost:3001";
+    return (
+      this.configService.get<string>("FRONTEND_URL") || "http://localhost:3001"
+    );
   }
 
   private resolveMobileRedirectUri(req: ExpressRequest): string | null {
@@ -251,7 +253,8 @@ export class AuthController {
     const isMobileRoute =
       req.originalUrl?.includes("/mobile/auth/") ||
       req.baseUrl?.includes("/mobile/auth");
-    const includeTokens = process.env.NODE_ENV !== "production" || isMobileRoute;
+    const includeTokens =
+      process.env.NODE_ENV !== "production" || isMobileRoute;
 
     // 항상 JSON 응답 반환 (프론트엔드에서 리다이렉트 처리)
     return res.json({
@@ -502,7 +505,9 @@ export class AuthController {
         ) {
           return;
         }
-        return res.redirect(`${this.frontendBaseURL()}/login?error=auth_failed`);
+        return res.redirect(
+          `${this.frontendBaseURL()}/login?error=auth_failed`,
+        );
       }
 
       // HttpOnly 쿠키로 토큰들 설정
@@ -883,9 +888,7 @@ export class AuthController {
     @Res() res: Response,
   ) {
     const refreshToken =
-      req.cookies?.refresh_token ||
-      body?.refreshToken ||
-      body?.refresh_token;
+      req.cookies?.refresh_token || body?.refreshToken || body?.refresh_token;
 
     if (!refreshToken) {
       return res.status(401).json({ message: "Refresh token not found" });
@@ -913,7 +916,8 @@ export class AuthController {
     const isMobileRoute =
       req.originalUrl?.includes("/mobile/auth/") ||
       req.baseUrl?.includes("/mobile/auth");
-    const includeTokens = process.env.NODE_ENV !== "production" || isMobileRoute;
+    const includeTokens =
+      process.env.NODE_ENV !== "production" || isMobileRoute;
 
     return res.json({
       user: authResponse.user,
@@ -932,30 +936,34 @@ export class AuthController {
   @ApiOperation({ summary: "현재 사용자 정보 조회" })
   @ApiResponse({ status: 200, description: "사용자 정보 조회 성공" })
   async getCurrentUser(@CurrentUser() user: any) {
-    // UsersService를 통해 CDN URL이 적용된 사용자 정보 가져오기
-    const fullUser = await this.usersService.findOne(user.id);
+    // 핵심 변경점:
+    // 과거에는 여기서 response 객체를 직접 조립했지만,
+    // 현재는 UsersService.getAuthContextRaw()가 동일한 응답 스키마를 조립한다.
+    const fullUser = await this.usersService.getAuthContextRaw(user.id);
 
     if (!fullUser) {
+      // 예외 대비 fallback:
+      // DB 조회 결과가 비어도 프론트 auth 흐름이 깨지지 않도록 JWT payload 기반 최소 응답을 유지한다.
       const fallbackResponse = {
         id: user.id,
-        email: user.email,
-        username: user.username,
-        role: user.role,
-        profileImage: user.profileImage,
-        isEmailVerified: user.isEmailVerified,
-        authProvider: user.authProvider, // 최초 가입 방법 (계정 관리용)
-        lastLoginProvider: user.lastLoginProvider, // 현재 로그인 방법 (계정 삭제 UX용)
-        subscriptionTier: user.subscriptionTier,
-        subscriptionStatus: user.subscriptionStatus,
-        bio: user.bio,
-        blogSlug: user.blog?.slug || null,
+        email: user.email ?? null,
+        username: user.username ?? null,
+        role: user.role ?? null,
+        profileImage: user.profileImage ?? null,
+        isEmailVerified: user.isEmailVerified ?? false,
+        authProvider: user.authProvider ?? AuthProvider.LOCAL, // 최초 가입 방법 (계정 관리용)
+        lastLoginProvider: user.lastLoginProvider ?? null, // 현재 로그인 방법 (계정 삭제 UX용)
+        subscriptionTier: user.subscriptionTier ?? null,
+        subscriptionStatus: user.subscriptionStatus ?? null,
+        bio: user.bio ?? null,
+        blogSlug: user.blogSlug || user.blog?.slug || null,
         jobTitle: user.jobTitle || null,
-        termsAcceptedAt: user.termsAcceptedAt,
-        privacyAcceptedAt: user.privacyAcceptedAt,
-        marketingOptIn: user.marketingOptIn,
-        newsletterOptIn: user.newsletterOptIn,
+        termsAcceptedAt: user.termsAcceptedAt ?? null,
+        privacyAcceptedAt: user.privacyAcceptedAt ?? null,
+        marketingOptIn: user.marketingOptIn ?? false,
+        newsletterOptIn: user.newsletterOptIn ?? false,
         socialLinks: user.socialLinks ?? [],
-        createdAt: user.createdAt,
+        createdAt: user.createdAt ?? null,
       };
 
       this.logger.debug(
@@ -964,33 +972,11 @@ export class AuthController {
       return fallbackResponse;
     }
 
-    // 보안을 위해 공개 정보만 반환 (CDN URL 적용됨)
-    const response = {
-      id: fullUser.id,
-      email: fullUser.email,
-      username: fullUser.username,
-      role: fullUser.role,
-      profileImage: fullUser.profileImage, // ✅ CDN URL로 변환됨
-      isEmailVerified: fullUser.isEmailVerified,
-      authProvider: fullUser.authProvider, // 최초 가입 방법 (계정 관리용)
-      lastLoginProvider: fullUser.lastLoginProvider, // 현재 로그인 방법 (계정 삭제 UX용)
-      subscriptionTier: fullUser.subscriptionTier,
-      subscriptionStatus: fullUser.subscriptionStatus,
-      bio: fullUser.bio,
-      jobTitle: fullUser.jobTitle,
-      socialLinks: fullUser.socialLinks ?? [],
-      blogSlug: fullUser.blog?.slug || null,
-      termsAcceptedAt: fullUser.termsAcceptedAt, // 약관 동의 시각
-      privacyAcceptedAt: fullUser.privacyAcceptedAt, // 개인정보 동의 시각
-      marketingOptIn: fullUser.marketingOptIn, // 마케팅 정보 수신 동의
-      newsletterOptIn: fullUser.newsletterOptIn, // 뉴스레터 수신 동의
-      createdAt: fullUser.createdAt,
-    };
-
     this.logger.debug(
-      `[/auth/me] Response for ${fullUser.email} - authProvider: ${response.authProvider}, lastLoginProvider: ${response.lastLoginProvider}`,
+      `[/auth/me] Response for ${fullUser.email} - authProvider: ${fullUser.authProvider}, lastLoginProvider: ${fullUser.lastLoginProvider}`,
     );
-    return response;
+    // getAuthContextRaw()에서 이미 profileImage CDN 변환/소셜링크 정규화까지 완료된 상태다.
+    return fullUser;
   }
 
   @Post("logout")
@@ -1009,7 +995,11 @@ export class AuthController {
       // 웹 세션 삭제
       await this.redisService.deleteCache("sessions", `user:${user.id}`);
 
-      // JWT validation 캐시 삭제 (JwtStrategy가 사용)
+      // JWT validation 캐시 삭제 (JwtStrategy 키 규칙과 일치)
+      await this.redisService.invalidatePattern(
+        `sessions:user_validate_${user.id}_*`,
+      );
+      // 레거시 키도 함께 정리 (하위 호환)
       await this.redisService.deleteCache(
         "sessions",
         `user_validate_${user.id}`,
@@ -1265,6 +1255,13 @@ export class AuthController {
       // 3. 웹 세션 삭제 (MCP 세션도 무효화되도록)
       try {
         await this.redisService.deleteCache("sessions", `user:${user.id}`);
+        await this.redisService.invalidatePattern(
+          `sessions:user_validate_${user.id}_*`,
+        );
+        await this.redisService.deleteCache(
+          "sessions",
+          `user_validate_${user.id}`,
+        );
         this.logger.debug(`Session deleted for user ${user.id}`);
       } catch (error) {
         this.logger.error(`Failed to delete session: ${error.message}`);

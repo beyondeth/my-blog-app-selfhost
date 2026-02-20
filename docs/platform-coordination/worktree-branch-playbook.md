@@ -2,7 +2,7 @@
 
 - Scope: multi-platform worktree ownership and day-to-day execution rules.
 - Owner: integration maintainers.
-- Last updated: 2026-02-18
+- Last updated: 2026-02-21
 - Update history: `docs/platform-coordination/CHANGELOG.md`
 
 ## Purpose
@@ -64,6 +64,34 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 - frontend (3001): `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/frontend && pnpm dev`
 - mcp-proxy-server: `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/mcp-proxy-server && pnpm dev`
 - Note: watch-mode processes only track files in the worktree where they are started.
+
+## Environment Variable Governance
+
+### Single Source of Truth
+- Canonical env files are managed in checkpoint root: `/Users/sihyungpark/Desktop/code/my-blog-app`.
+- Default canonical set:
+  - `/Users/sihyungpark/Desktop/code/my-blog-app/.env.local`
+  - `/Users/sihyungpark/Desktop/code/my-blog-app/.env.production`
+- Worktrees must consume canonical files by symlink, or record explicit exceptions in `WORKTREE_STATUS.md`.
+
+### Worktree Policy
+- `my-blog-app-integ` is the only place where shared runtime validation is executed.
+- If a worktree keeps its own `.env.local` copy, that is a managed exception and must be documented with owner/reason/date.
+- Never treat env divergence as "implicit"; either sync to canonical source or document exception.
+
+### Cross-Platform Sync Procedure (No Script)
+1. Determine impact scope (`web`, `backend`, `ios`, `android`, `multi`) and mark `PLATFORM-TRACK`.
+2. Add/change key in canonical source (`my-blog-app` env files).
+3. Reflect the same key in affected runtime environments:
+   - Web/Backend/MCP local runtime env files.
+   - iOS/Android local secret injection points for the same contract.
+4. Update coordination docs:
+   - `WORKTREE_STATUS.md` (current sync snapshot)
+   - `CHANGELOG.md` (what/why/how)
+5. Run minimum smoke checks from `my-blog-app-integ`:
+   - login/auth (`/auth/me`)
+   - settings mutation (for example marketing toggle)
+   - one protected API call per affected platform flow.
 
 ## Conflict Prevention
 - Never run feature development in root `my-blog-app`.

@@ -227,6 +227,9 @@ export class MobileAuthController {
 
     try {
       await this.redisService.deleteCache("sessions", `user:${user.id}`);
+      await this.redisService.invalidatePattern(
+        `sessions:user_validate_${user.id}_*`,
+      );
       await this.redisService.deleteCache(
         "sessions",
         `user_validate_${user.id}`,

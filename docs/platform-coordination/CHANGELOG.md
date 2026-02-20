@@ -2,6 +2,29 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-02-21
+
+### What changed
+- Added cross-platform environment-variable governance as an enforced rule in `AGENTS.md`.
+- Expanded worktree playbook with a dedicated env policy:
+  - canonical source-of-truth location
+  - documented exception policy
+  - no-script manual sync procedure across backend/frontend/ios/android/mcp.
+- Added env synchronization checks to release gate preconditions.
+- Added current env sync snapshot (including frontend local exception) to `WORKTREE_STATUS.md`.
+
+### Why
+- Multiple worktrees were causing env drift risk during integration testing.
+- Shared keys can silently diverge across backend/frontend/mobile unless there is one explicit source of truth plus documented exceptions.
+- Release validation needed an explicit env parity gate to prevent "works on one worktree only" failures.
+
+### How
+- Updated:
+  - `AGENTS.md`
+  - `docs/platform-coordination/worktree-branch-playbook.md`
+  - `docs/platform-coordination/RELEASE_GATE.md`
+  - `docs/platform-coordination/WORKTREE_STATUS.md`
+
 ## 2026-02-19
 
 ### What changed

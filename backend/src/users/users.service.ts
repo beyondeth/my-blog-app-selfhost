@@ -48,6 +48,52 @@ export interface MobileSettingsSnapshot {
   };
 }
 
+type SocialLink = { platform: string; url: string };
+
+interface AuthContextRawRow {
+  id: string;
+  email: string;
+  username: string | null;
+  role: Role;
+  isEmailVerified: boolean;
+  authProvider: AuthProvider;
+  createdAt: Date;
+  profileImage: string | null;
+  bio: string | null;
+  jobTitle: string | null;
+  socialLinks: unknown;
+  lastLoginProvider: string | null;
+  subscriptionTier: SubscriptionTier | null;
+  subscriptionStatus: SubscriptionStatus | null;
+  marketingOptIn: boolean | null;
+  newsletterOptIn: boolean | null;
+  termsAcceptedAt: Date | null;
+  privacyAcceptedAt: Date | null;
+  blogSlug: string | null;
+}
+
+export interface AuthContextResponse {
+  id: string;
+  email: string;
+  username: string | null;
+  role: Role;
+  profileImage: string | null;
+  isEmailVerified: boolean;
+  authProvider: AuthProvider;
+  lastLoginProvider: string | null;
+  subscriptionTier: SubscriptionTier | null;
+  subscriptionStatus: SubscriptionStatus | null;
+  bio: string | null;
+  jobTitle: string | null;
+  socialLinks: SocialLink[];
+  blogSlug: string | null;
+  termsAcceptedAt: Date | null;
+  privacyAcceptedAt: Date | null;
+  marketingOptIn: boolean;
+  newsletterOptIn: boolean;
+  createdAt: Date;
+}
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -250,6 +296,72 @@ export class UsersService {
     }
 
     return user;
+  }
+
+  async getAuthContextRaw(id: string): Promise<AuthContextResponse | null> {
+    // /auth/me 전용 경량 조회:
+    // relations 기반 entity 로딩 대신 raw select를 사용해 필요한 컬럼만 가져온다.
+    // 주의: /auth/me 필드 추가 시 아래 select + return 매핑을 반드시 함께 수정해야 한다.
+    const raw = await this.usersRepository
+      .createQueryBuilder("u")
+      .leftJoin(Profile, "profile", 'profile."userId" = u.id')
+      .leftJoin(Subscription, "subscription", 'subscription."userId" = u.id')
+      .leftJoin(
+        AccountSettings,
+        "settings",
+        'settings."userId" = u.id',
+      )
+      .leftJoin("blogs", "blog", 'blog."userId" = u.id')
+      .select([
+        'u.id AS "id"',
+        'u.email AS "email"',
+        'u.username AS "username"',
+        'u.role AS "role"',
+        'u."isEmailVerified" AS "isEmailVerified"',
+        'u."authProvider" AS "authProvider"',
+        'u."createdAt" AS "createdAt"',
+        'profile."profileImage" AS "profileImage"',
+        'profile.bio AS "bio"',
+        'profile."jobTitle" AS "jobTitle"',
+        'profile."socialLinks" AS "socialLinks"',
+        'profile."lastLoginProvider" AS "lastLoginProvider"',
+        'subscription."subscriptionTier" AS "subscriptionTier"',
+        'subscription."subscriptionStatus" AS "subscriptionStatus"',
+        'settings."marketingOptIn" AS "marketingOptIn"',
+        'settings."newsletterOptIn" AS "newsletterOptIn"',
+        'settings."termsAcceptedAt" AS "termsAcceptedAt"',
+        'settings."privacyAcceptedAt" AS "privacyAcceptedAt"',
+        'blog.slug AS "blogSlug"',
+      ])
+      .where("u.id = :id", { id })
+      .getRawOne<AuthContextRawRow>();
+
+    if (!raw) {
+      return null;
+    }
+
+    // /auth/me 최종 응답 스키마 조립 지점
+    return {
+      id: raw.id,
+      email: raw.email,
+      username: raw.username ?? null,
+      role: raw.role,
+      profileImage: this.normalizeProfileImage(raw.profileImage),
+      isEmailVerified: !!raw.isEmailVerified,
+      authProvider: raw.authProvider,
+      lastLoginProvider: raw.lastLoginProvider ?? null,
+      subscriptionTier: raw.subscriptionTier ?? null,
+      subscriptionStatus: raw.subscriptionStatus ?? null,
+      bio: raw.bio ?? null,
+      jobTitle: raw.jobTitle ?? null,
+      socialLinks: this.normalizeRawSocialLinks(raw.socialLinks),
+      blogSlug: raw.blogSlug ?? null,
+      termsAcceptedAt: raw.termsAcceptedAt ?? null,
+      privacyAcceptedAt: raw.privacyAcceptedAt ?? null,
+      marketingOptIn: !!raw.marketingOptIn,
+      newsletterOptIn: !!raw.newsletterOptIn,
+      createdAt: raw.createdAt,
+    };
   }
 
   async findByEmail(email: string): Promise<User | null> {
@@ -751,6 +863,40 @@ export class UsersService {
     this.logger.log(`User banned: ${user.email}`);
   }
 
+  private normalizeProfileImage(profileImage: string | null): string | null {
+    if (!profileImage) {
+      return null;
+    }
+
+    if (
+      profileImage.startsWith("v2/") ||
+      profileImage.startsWith("uploads/")
+    ) {
+      return this.cdnService.generateCdnUrlFromKey(profileImage);
+    }
+
+    return profileImage;
+  }
+
+  private normalizeRawSocialLinks(socialLinks: unknown): SocialLink[] {
+    const parsed = (() => {
+      if (Array.isArray(socialLinks)) {
+        return socialLinks;
+      }
+      if (typeof socialLinks === "string") {
+        try {
+          const value = JSON.parse(socialLinks);
+          return Array.isArray(value) ? value : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    })();
+
+    return this.normalizeSocialLinks(parsed as SocialLink[]);
+  }
+
   /**
    * 사용자의 상태 필드를 자동 복구
    * - 일시 정지 기간이 지났다면 해제
@@ -786,6 +932,30 @@ export class UsersService {
     });
 
     return user?.role === Role.ADMIN;
+  }
+
+  async findByIdForAuth(id: string): Promise<User | null> {
+    // JwtStrategy 캐시 미스 전용 경량 조회:
+    // 계정 상태 검증에 필요한 필수 컬럼만 선택하여 불필요한 JOIN을 피한다.
+    return this.usersRepository.findOne({
+      where: { id },
+      select: [
+        "id",
+        "email",
+        "username",
+        "role",
+        "isActive",
+        "isDeleted",
+        "authProvider",
+        "isEmailVerified",
+        "createdAt",
+        "suspensionUntil",
+        "suspensionReason",
+        "isBanned",
+        "banReason",
+        "bannedAt",
+      ],
+    });
   }
 
   async getUserStats(): Promise<{
