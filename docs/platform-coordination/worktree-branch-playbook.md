@@ -22,9 +22,12 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 
 ## Branch Strategy
 - `integration/workspace`: shared integration branch for QA and release candidate validation.
-- `feature/ios/<task>`: iOS implementation (`mobile/ios/**`).
-- `feature/aos/<task>`: Android implementation (`mobile/android/**`).
-- `feature/web/<task>`: Web implementation (`frontend/**`) only.
+- `feature/ios/workspace-safe`, `feature/aos/workspace-safe`, `feature/web/workspace-safe`:
+  - platform-safe baseline branches rebased to `origin/integration/workspace`.
+  - use these as default day-to-day platform heads.
+- `feature/ios/<task>`: iOS implementation (`mobile/ios/**`) from `feature/ios/workspace-safe`.
+- `feature/aos/<task>`: Android implementation (`mobile/android/**`) from `feature/aos/workspace-safe`.
+- `feature/web/<task>`: Web implementation (`frontend/**`) from `feature/web/workspace-safe`.
 
 ## Ownership Matrix
 - Shared (integration worktree only):
@@ -43,6 +46,8 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 - NEVER: patch shared paths from platform worktrees.
 - MUST: runtime services are started from `my-blog-app-integ` by default.
 - MUST: merge order is `platform branch -> integration/workspace -> main`.
+- MUST: divergence is reported first, not auto-synced.
+- MUST: run `git fetch origin --prune` before divergence checks and use `origin/integration/workspace` as comparison base.
 
 ## Shared Change Escalation Flow
 1. Detect shared impact (`backend/**`, `mobile/contracts/**`, shared docs).
@@ -54,10 +59,13 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 
 ## Daily Workflow
 1. Open terminal in the platform worktree only.
-2. Create/switch task branch with platform prefix.
-3. Commit only files owned by that platform.
-4. If shared code is needed, apply it in `my-blog-app-integ` first.
-5. Merge platform branch into `integration/workspace`.
+2. Sync refs, then report divergence against integration base:
+   - `git fetch origin --prune`
+   - `git rev-list --left-right --count <active_branch>...origin/integration/workspace`
+3. Create/switch task branch with platform prefix from `feature/<platform>/workspace-safe`.
+4. Commit only files owned by that platform.
+5. If shared code is needed, apply it in `my-blog-app-integ` first.
+6. Merge platform branch into `integration/workspace`.
 
 ## Runtime Rule
 - backend (3000): `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/backend && pnpm start:dev`
@@ -104,6 +112,13 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 3. Merge clean branches into `integration/workspace`.
 4. Delete temporary split branches after verification.
 
+## Safe Split Procedure (Recommended)
+1. Create/reset a safe baseline branch from integration:
+   - `git checkout -B feature/<platform>/workspace-safe origin/integration/workspace`
+2. Cherry-pick only platform-owned commits/files.
+3. Push safe baseline (`feature/<platform>/workspace-safe`) and continue task branches from there.
+4. Keep legacy mixed branches read-only until fully retired.
+
 ## Quick Commands
 ```bash
 # worktree overview
@@ -114,4 +129,12 @@ git -C /Users/sihyungpark/Desktop/code/my-blog-app-integ status -sb
 git -C /Users/sihyungpark/Desktop/code/my-blog-app-ios status -sb
 git -C /Users/sihyungpark/Desktop/code/my-blog-app-aos status -sb
 git -C /Users/sihyungpark/Desktop/code/my-blog-app-web status -sb
+
+# divergence checks (report first)
+git -C /Users/sihyungpark/Desktop/code/my-blog-app-ios fetch origin --prune
+git -C /Users/sihyungpark/Desktop/code/my-blog-app-ios rev-list --left-right --count feature/ios/workspace-safe...origin/integration/workspace
+git -C /Users/sihyungpark/Desktop/code/my-blog-app-aos fetch origin --prune
+git -C /Users/sihyungpark/Desktop/code/my-blog-app-aos rev-list --left-right --count feature/aos/workspace-safe...origin/integration/workspace
+git -C /Users/sihyungpark/Desktop/code/my-blog-app-web fetch origin --prune
+git -C /Users/sihyungpark/Desktop/code/my-blog-app-web rev-list --left-right --count feature/web/workspace-safe...origin/integration/workspace
 ```

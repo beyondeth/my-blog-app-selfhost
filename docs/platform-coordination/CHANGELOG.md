@@ -4,6 +4,28 @@ Track operational rule changes for worktree/branch coordination.
 
 ## 2026-02-21
 
+### Additional update (safe branch baseline + divergence reference hardening)
+
+#### What changed
+- Updated worktree playbook to standardize platform-safe baselines:
+  - `feature/ios/workspace-safe`
+  - `feature/aos/workspace-safe`
+  - `feature/web/workspace-safe`
+- Added explicit divergence check rule in playbook:
+  - run `git fetch origin --prune` first
+  - compare against `origin/integration/workspace` (report-first, no auto-sync)
+- Added safe split recovery steps for mixed branches (create safe baseline, cherry-pick platform-owned commits only).
+- Refreshed `WORKTREE_STATUS.md` snapshot to current safe branch heads and recorded legacy mixed branches as reference-only.
+
+#### Why
+- Local `integration/workspace` refs can differ across worktrees, causing divergence counts to look inconsistent.
+- We needed one explicit baseline branch per platform to keep day-to-day work clean and prevent shared-path contamination.
+
+#### How
+- Updated:
+  - `docs/platform-coordination/worktree-branch-playbook.md`
+  - `docs/platform-coordination/WORKTREE_STATUS.md`
+
 ### What changed
 - Added cross-platform environment-variable governance as an enforced rule in `AGENTS.md`.
 - Expanded worktree playbook with a dedicated env policy:
