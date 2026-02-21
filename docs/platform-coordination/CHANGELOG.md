@@ -15,6 +15,7 @@ Track operational rule changes for worktree/branch coordination.
   - `git fetch origin --prune`
   - `git rev-list --left-right --count <active_branch>...origin/integration/workspace`
 - Added parallel lane instruction in `AGENTS.md` and playbook for multi-worktree requests.
+- Added "ask-then-proceed" rule for ambiguous or potentially missed user requests.
 - Added explicit divergence check rule in playbook:
   - run `git fetch origin --prune` first
   - compare against `origin/integration/workspace` (report-first, no auto-sync)

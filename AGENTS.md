@@ -34,6 +34,7 @@ Detailed procedures and update history live in `docs/platform-coordination/`.
 - MUST: report divergence counts to the user first, then decide whether to keep working as-is or sync based on task context.
 - MUST: when a request spans multiple worktrees (for example `web` + `integ` shared/backend), execute and report as parallel lanes instead of frequent context switching in one lane.
 - MUST: for multi-worktree tasks, keep one active branch per worktree and include lane-level `PLATFORM-TRACK` context in progress updates.
+- MUST: if there is a risk of missing user intent or the request is ambiguous, ask a short clarification question first, then proceed immediately after the answer without requiring extra confirmation.
 - NEVER: auto-sync branches only to force a match; sync is done only when user requests it, when shared contract/dependency alignment is required, or when merge/release flow requires it.
 - NEVER: commit secret-bearing `.env*` files or create undocumented per-worktree env forks.
 - NEVER: do feature work in root `/Users/sihyungpark/Desktop/code/my-blog-app` (checkpoint/metadata only).

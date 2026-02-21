@@ -71,6 +71,7 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 - Use separate lanes when a request touches multiple worktrees (for example `web` UI + `integ` backend/shared).
 - Keep one active branch per lane/worktree and avoid "single-lane ping-pong" context switching.
 - Report progress by lane with `PLATFORM-TRACK` fields so pending/blocked state is visible per platform.
+- If there is ambiguity or a likely missed user intent, ask one concise clarification question first, then continue execution immediately after the user reply.
 
 ## Runtime Rule
 - backend (3000): `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/backend && pnpm start:dev`
