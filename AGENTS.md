@@ -29,9 +29,11 @@ Detailed procedures and update history live in `docs/platform-coordination/`.
 - MUST: environment variables use a single source of truth at `/Users/sihyungpark/Desktop/code/my-blog-app` (for example `.env.local`, `.env.production`), and worktrees consume them via links or explicitly documented exceptions.
 - MUST: any new/renamed env key is synchronized for all affected runtimes (`backend`, `frontend`, `ios`, `android`, `mcp-proxy-server`) and recorded in `docs/platform-coordination/` docs.
 - MUST: merge order is `platform branch -> integration/workspace -> main`.
-- MUST: before starting implementation, check divergence between active platform branch and `integration/workspace` with `git rev-list --left-right --count <active_branch>...integration/workspace`.
+- MUST: before starting implementation, check divergence between active platform branch and `origin/integration/workspace` with `git fetch origin --prune` then `git rev-list --left-right --count <active_branch>...origin/integration/workspace`.
 - MUST: platform branch being ahead of `integration/workspace` is a normal state; do not treat divergence itself as an error.
 - MUST: report divergence counts to the user first, then decide whether to keep working as-is or sync based on task context.
+- MUST: when a request spans multiple worktrees (for example `web` + `integ` shared/backend), execute and report as parallel lanes instead of frequent context switching in one lane.
+- MUST: for multi-worktree tasks, keep one active branch per worktree and include lane-level `PLATFORM-TRACK` context in progress updates.
 - NEVER: auto-sync branches only to force a match; sync is done only when user requests it, when shared contract/dependency alignment is required, or when merge/release flow requires it.
 - NEVER: commit secret-bearing `.env*` files or create undocumented per-worktree env forks.
 - NEVER: do feature work in root `/Users/sihyungpark/Desktop/code/my-blog-app` (checkpoint/metadata only).

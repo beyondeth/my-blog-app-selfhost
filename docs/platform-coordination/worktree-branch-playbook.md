@@ -67,6 +67,11 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 5. If shared code is needed, apply it in `my-blog-app-integ` first.
 6. Merge platform branch into `integration/workspace`.
 
+## Parallel Lane Execution (Recommended)
+- Use separate lanes when a request touches multiple worktrees (for example `web` UI + `integ` backend/shared).
+- Keep one active branch per lane/worktree and avoid "single-lane ping-pong" context switching.
+- Report progress by lane with `PLATFORM-TRACK` fields so pending/blocked state is visible per platform.
+
 ## Runtime Rule
 - backend (3000): `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/backend && pnpm start:dev`
 - frontend (3001): `cd /Users/sihyungpark/Desktop/code/my-blog-app-integ/frontend && pnpm dev`

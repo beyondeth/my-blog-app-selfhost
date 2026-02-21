@@ -11,6 +11,10 @@ Track operational rule changes for worktree/branch coordination.
   - `feature/ios/workspace-safe`
   - `feature/aos/workspace-safe`
   - `feature/web/workspace-safe`
+- Updated `AGENTS.md` divergence command to explicit remote base check:
+  - `git fetch origin --prune`
+  - `git rev-list --left-right --count <active_branch>...origin/integration/workspace`
+- Added parallel lane instruction in `AGENTS.md` and playbook for multi-worktree requests.
 - Added explicit divergence check rule in playbook:
   - run `git fetch origin --prune` first
   - compare against `origin/integration/workspace` (report-first, no auto-sync)
@@ -23,6 +27,7 @@ Track operational rule changes for worktree/branch coordination.
 
 #### How
 - Updated:
+  - `AGENTS.md`
   - `docs/platform-coordination/worktree-branch-playbook.md`
   - `docs/platform-coordination/WORKTREE_STATUS.md`
 
