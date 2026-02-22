@@ -3,7 +3,8 @@
  *
  * 인증 경로:
  * - /mcp: API Key Bearer 인증 (stateless)
- * - /mcp-remote: OAuth 2.1 Bearer 인증
+ * - /mcp-remote: OAuth 2.1 Bearer 인증 (Skills/MCPorter, Claude, 기타 OAuth 클라이언트)
+ * - /mcp-openai: OAuth 2.1 + ChatGPT App 전용 MCP
  */
 
 import express from 'express';
@@ -18,6 +19,7 @@ import { getDiscoveryTools } from './tools/catalog.js';
 import { RedisCacheService } from './services/RedisCacheService.js';
 import { MetricsService } from './services/MetricsService.js';
 import { createOAuthRouter } from './oauth/index.js';
+import { createOpenAiAppRouter } from './platforms/openai-app/index.js';
 import axios from 'axios';
 
 // Express 앱 초기화
@@ -48,7 +50,7 @@ const redisCache = new RedisCacheService(
 );
 
 // OAuth 라우터 초기화 (Core Redis 사용)
-const { wellKnownRouter, oauthRouter, mcpRemoteRouter } = createOAuthRouter(
+const { wellKnownRouter, oauthRouter, mcpRemoteRouter, storage } = createOAuthRouter(
   redisCore,
   metricsService
 );
@@ -60,8 +62,9 @@ setInterval(() => {
   metricsService.updateRedisConnection(isCoreConnected && isCacheConnected);
 }, 10000);
 
-// 미들웨어 (⚠️ MCP 경로는 제외 - StreamableHTTPServerTransport가 raw stream 필요)
-const skipBodyParsing = ['/mcp', '/mcp-remote'];
+// StreamableHTTPServerTransport가 raw stream을 직접 읽는 MCP 엔드포인트
+// ⚠️ 새 MCP 엔드포인트 추가 시 반드시 이 목록에도 추가할 것
+const skipBodyParsing = ['/mcp', '/mcp-remote', '/mcp-openai'];
 app.use((req, res, next) => {
   if (skipBodyParsing.includes(req.path)) {
     // MCP 경로는 body parsing 건너뛰기 (StreamableHTTPServerTransport가 직접 처리)
@@ -93,8 +96,9 @@ app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = config.CORS_ORIGINS.split(',').map(o => o.trim());
 
-  // MCP/OAuth 엔드포인트는 모든 origin 허용 (Bearer 토큰으로 보안)
-  const mcpPaths = ['/mcp', '/mcp-remote', '/oauth', '/.well-known'];
+  // Bearer 토큰으로 보호되는 MCP/OAuth 엔드포인트는 모든 origin 허용
+  // ⚠️ 새 MCP 엔드포인트 추가 시 반드시 이 목록에도 추가할 것
+  const mcpPaths = ['/mcp', '/mcp-remote', '/mcp-openai', '/oauth', '/.well-known'];
   const isMcpEndpoint = mcpPaths.some(p => req.path.startsWith(p));
 
   // Origin 검증
@@ -248,6 +252,7 @@ async function createMcpServer(userData: {
     userData,
     apiKey: userData.apiKey, // API Key 추가 (create_post에서 사용)
     metricsService, // 메트릭 서비스 추가 (도구 호출 추적용)
+    route: 'mcp',
     config: {
       MCP_BASE_URL: config.MCP_BASE_URL,
       BACKEND_BASE_URL: config.BACKEND_BASE_URL,
@@ -260,16 +265,22 @@ async function createMcpServer(userData: {
   return server;
 }
 
-// ===== OAuth 라우터 마운트 (Claude 커스텀 커넥터용) =====
+// ===== OAuth 라우터 마운트 (공유 OAuth 경로) =====
 
 // RFC 9728, 8414 메타데이터 엔드포인트
 app.use('/.well-known', wellKnownRouter);
 
-// OAuth 인증 엔드포인트 (DCR, authorize, token, revoke)
+// OAuth 인증 엔드포인트 (DCR, authorize, token, revoke) — 모든 OAuth 클라이언트 공유
 app.use('/oauth', oauthRouter);
 
-// OAuth 인증된 MCP 엔드포인트
+// OAuth 인증된 MCP 엔드포인트 (Skills/MCPorter, Claude, 기타 OAuth 클라이언트 공유)
 app.use('/mcp-remote', mcpRemoteRouter);
+
+// OpenAI ChatGPT App 전용 MCP 엔드포인트
+if (config.OPENAI_APP_ENABLED) {
+  app.use('/mcp-openai', createOpenAiAppRouter(storage, metricsService));
+  logger.info('🤖 OpenAI ChatGPT App endpoint enabled at /mcp-openai');
+}
 
 // ===== 기존 라우트 (API Key 인증) =====
 
@@ -289,6 +300,7 @@ app.get('/health', (req, res) => {
     endpoints: {
       apiKey: '/mcp',
       oauth: '/mcp-remote',
+      ...(config.OPENAI_APP_ENABLED ? { openai: '/mcp-openai' } : {}),
       metadata: {
         resource: `${serverUrl}/.well-known/oauth-protected-resource`,
         authServer: `${serverUrl}/.well-known/oauth-authorization-server`,
@@ -404,8 +416,8 @@ app.post('/mcp', async (req, res) => {
 
     // 8. 메트릭 기록
     const duration = Date.now() - startTime;
-    metricsService.recordRequest('success');
-    metricsService.recordRequestDuration(duration);
+    metricsService.recordRequest('success', undefined, 'mcp');
+    metricsService.recordRequestDuration(duration, undefined, 'mcp');
 
     // 9. 자동 cleanup (함수 종료 시 GC가 처리)
     logger.debug({
@@ -415,7 +427,7 @@ app.post('/mcp', async (req, res) => {
 
   } catch (error: any) {
     // 메트릭 기록 (에러)
-    metricsService.recordRequest('error');
+    metricsService.recordRequest('error', undefined, 'mcp');
 
     logger.error({
       error: error.message,
@@ -504,6 +516,7 @@ const server = app.listen(port, '0.0.0.0', () => {
     host: '0.0.0.0',
     environment: config.NODE_ENV,
     pattern: 'Dual Route: /mcp (API Key) + /mcp-remote (OAuth 2.1)',
+    ...(config.OPENAI_APP_ENABLED ? { openaiRoute: '/mcp-openai' } : {}),
     auth: 'Bearer token (blog_sk_... or OAuth access token)',
     backendUrl: config.BACKEND_BASE_URL,
   }, '🚀 MCP Proxy Server started');

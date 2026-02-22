@@ -48,6 +48,7 @@ export interface ToolContext {
     FRONTEND_URL: string;
     MCP_SHARED_SECRET?: string;
   };
+  route?: string;
 }
 
 /**
@@ -114,7 +115,7 @@ export async function registerAllTools(
 
     const handler = handlers[toolName];
     if (!handler) {
-      context.metricsService.recordRequest('error', toolName);
+      context.metricsService.recordRequest('error', toolName, context.route);
       return {
         isError: true,
         content: [
@@ -138,12 +139,12 @@ export async function registerAllTools(
       const result = await handler(args);
 
       // 메트릭 기록 (성공)
-      context.metricsService.recordRequest('success', toolName);
+      context.metricsService.recordRequest('success', toolName, context.route);
 
       return result;
     } catch (error) {
       // 메트릭 기록 (실패)
-      context.metricsService.recordRequest('error', toolName);
+      context.metricsService.recordRequest('error', toolName, context.route);
       throw error;
     }
   });
@@ -229,7 +230,7 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
  * 실제 인증은 MCP 연결 시점에 이미 완료되었으므로,
  * 이 함수는 인증된 사용자 정보를 표시하는 역할만 합니다.
  */
-async function handleCheckAuth(context: ToolContext): Promise<any> {
+export async function handleCheckAuth(context: ToolContext): Promise<any> {
   const authMode = context.oauthToken ? 'OAuth 2.1' : 'API Key';
   const publicBlogUrl = toPublicBlogUrl(
     context.userData.blog.slug,
@@ -258,7 +259,7 @@ async function handleCheckAuth(context: ToolContext): Promise<any> {
 /**
  * get_writing_style_guide 핸들러
  */
-async function handleGetWritingStyleGuide(
+export async function handleGetWritingStyleGuide(
   args: { style?: string; customMarkdown?: string },
   context: ToolContext
 ): Promise<any> {
@@ -305,7 +306,7 @@ async function handleGetWritingStyleGuide(
 /**
  * create_post 핸들러
  */
-async function handleCreatePost(
+export async function handleCreatePost(
   args: {
     title: string;
     content_markdown: string;
@@ -438,7 +439,7 @@ function buildBackendAuthHeaders(context: ToolContext): Record<string, string> {
   return headers;
 }
 
-async function handleGetImageUploadUrl(
+export async function handleGetImageUploadUrl(
   args: { mimeType?: string; fileSize?: number },
   context: ToolContext
 ): Promise<any> {
@@ -502,7 +503,7 @@ async function handleGetImageUploadUrl(
   }
 }
 
-async function handleFinalizeUploadedImage(
+export async function handleFinalizeUploadedImage(
   args: { fileKey?: string; mimeType?: string; fileSize?: number },
   context: ToolContext
 ): Promise<any> {

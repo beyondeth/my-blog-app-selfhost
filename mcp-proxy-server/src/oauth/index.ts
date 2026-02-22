@@ -1,7 +1,10 @@
 /**
  * OAuth 2.1 라우터 통합
  *
- * Claude 커스텀 커넥터를 위한 OAuth 2.1 엔드포인트
+ * OAuth 2.1 공유 엔드포인트
+ * - Skills (MCPorter)
+ * - Claude 커스텀 커넥터
+ * - 기타 OAuth 클라이언트
  *
  * 엔드포인트:
  * - /.well-known/oauth-protected-resource (RFC 9728)
@@ -36,7 +39,7 @@ import type { ValidatedToken } from './types.js';
  *
  * Bearer 토큰을 검증하고 req.oauth에 토큰 정보 추가
  */
-async function oauthMiddleware(
+export async function oauthMiddleware(
   storage: OAuthStorage,
   req: Request,
   res: Response,
@@ -112,7 +115,7 @@ async function oauthMiddleware(
 /**
  * OAuth 인증 사용자 정보 조회 (Backend에서)
  */
-async function getUserInfo(userId: string): Promise<{
+export async function getUserInfo(userId: string): Promise<{
   user: { id: string; username: string; email: string };
   blog: { id: string; name: string; slug: string };
 } | null> {
@@ -152,6 +155,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   wellKnownRouter: Router;
   oauthRouter: Router;
   mcpRemoteRouter: Router;
+  storage: OAuthStorage;
 } {
   const storage = new OAuthStorage(redis);
 
@@ -238,6 +242,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         apiKey: null,  // OAuth 모드에서는 API Key 없음
         oauthToken: oauth.token,  // 대신 OAuth 토큰 전달
         metricsService,
+        route: 'mcp-remote',
         config: {
           MCP_BASE_URL: config.MCP_BASE_URL,
           BACKEND_BASE_URL: config.BACKEND_BASE_URL,
@@ -261,15 +266,15 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
 
       // 메트릭 기록
       const duration = Date.now() - startTime;
-      metricsService.recordRequest('success');
-      metricsService.recordRequestDuration(duration);
+      metricsService.recordRequest('success', undefined, 'mcp-remote');
+      metricsService.recordRequestDuration(duration, undefined, 'mcp-remote');
 
       logger.debug({
         userId: oauth.userId.substring(0, 8),
         duration: `${duration}ms`,
       }, '✅ OAuth MCP request processed');
     } catch (error: any) {
-      metricsService.recordRequest('error');
+      metricsService.recordRequest('error', undefined, 'mcp-remote');
       logger.error({ error: error.message }, '❌ OAuth MCP request failed');
 
       if (!res.headersSent) {
@@ -325,6 +330,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     wellKnownRouter,
     oauthRouter,
     mcpRemoteRouter,
+    storage,
   };
 }
 

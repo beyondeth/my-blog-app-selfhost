@@ -2,6 +2,24 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-02-23
+
+### Additional update (ChatGPT App phase-1 + env sync tracking)
+
+#### What changed
+- Started `feature/integ/chatgpt-app` on integration worktree for shared-path-safe ChatGPT App rollout.
+- Added/updated env governance snapshot for new MCP feature flag:
+  - `OPENAI_APP_ENABLED` (default `false`)
+- Updated worktree snapshot for current branch and dirty-state tracking.
+
+#### Why
+- ChatGPT App route rollout introduces a new runtime toggle that must be tracked across environments.
+- Shared-path changes are implemented in integ worktree and need an explicit status snapshot.
+
+#### How
+- Updated:
+  - `docs/platform-coordination/WORKTREE_STATUS.md`
+
 ## 2026-02-21
 
 ### Additional update (safe branch baseline + divergence reference hardening)
