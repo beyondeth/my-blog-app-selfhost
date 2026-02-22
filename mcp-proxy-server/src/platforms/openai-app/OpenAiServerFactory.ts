@@ -1,6 +1,6 @@
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { registerOpenAiTools } from './ToolRegistrar.js';
-import type { ToolContext } from '../../tools/index.js';
+import type { ToolContext } from '../../core/types.js';
 
 export async function createOpenAiServer(context: ToolContext): Promise<McpServer> {
   const mcpServer = new McpServer(
@@ -19,4 +19,3 @@ export async function createOpenAiServer(context: ToolContext): Promise<McpServe
 
   return mcpServer;
 }
-

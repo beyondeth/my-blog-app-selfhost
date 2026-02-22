@@ -10,8 +10,8 @@ import {
   handleCheckAuth,
   handleCreatePost,
   handleGetWritingStyleGuide,
-  type ToolContext,
-} from '../../tools/index.js';
+} from '../../core/handlers/index.js';
+import type { ToolContext } from '../../core/types.js';
 import {
   ANNOTATIONS,
   OPENAI_MVP_TOOL_NAMES,
