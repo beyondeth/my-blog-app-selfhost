@@ -16,5 +16,5 @@
     "allowImportingTsExtensions": false
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "src/_oauth2_backup"]
+  "exclude": ["node_modules", "src/_oauth2_backup", "src/platforms/openai-app/widget/**/*"]
 }

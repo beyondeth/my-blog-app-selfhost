@@ -45,19 +45,61 @@ export async function oauthMiddleware(
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
+  const acceptsEventStream =
+    (req.headers.accept || '').includes('text/event-stream') ||
+    (((req.headers['user-agent'] as string) || '').toLowerCase().includes('openai-mcp') &&
+      req.method.toUpperCase() === 'GET');
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401)
-      .header('WWW-Authenticate', getWWWAuthenticateHeader())
-      .json({
+  const sendOAuthError = (
+    status: number,
+    message: string,
+    authenticateHeader?: string
+  ) => {
+    if (authenticateHeader) {
+      res.header('WWW-Authenticate', authenticateHeader);
+    }
+
+    if (acceptsEventStream) {
+      res.status(status);
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const payload = JSON.stringify({
         jsonrpc: '2.0',
         error: {
           code: -32000,
-          message: 'Unauthorized: Bearer token required',
+          message,
         },
         id: null,
       });
+
+      res.write(`event: error\ndata: ${payload}\n\n`);
+      res.end();
+      return;
+    }
+
+    res.status(status).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message,
+      },
+      id: null,
+    });
+  };
+
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    sendOAuthError(
+      401,
+      'Unauthorized: Bearer token required',
+      getWWWAuthenticateHeader(req, {
+        error: 'invalid_request',
+        errorDescription: 'Bearer token required',
+      })
+    );
     return;
   }
 
@@ -65,37 +107,68 @@ export async function oauthMiddleware(
   const accessToken = await storage.validateAccessToken(token);
 
   if (!accessToken) {
-    res.status(401)
-      .header('WWW-Authenticate', getWWWAuthenticateHeader())
-      .json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Unauthorized: Invalid or expired access token',
-        },
-        id: null,
-      });
+    sendOAuthError(
+      401,
+      'Unauthorized: Invalid or expired access token',
+      getWWWAuthenticateHeader(req, {
+        error: 'invalid_token',
+        errorDescription: 'Invalid or expired access token',
+      })
+    );
     return;
   }
 
   // 리소스(audience) 검증 (RFC 8707)
-  // URL 정규화 - trailing slash 제거하여 비교
-  const normalizeUrl = (url: string) => url.replace(/\/$/, '');
+  // 클라이언트마다 resource를 origin으로 보내거나, 보호 경로까지 포함해 보낼 수 있어 둘 다 허용한다.
+  const normalizeUrl = (url: string): string => {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}`.replace(/\/$/, '');
+    } catch {
+      return url.replace(/\/$/, '');
+    }
+  };
   const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
-  if (normalizeUrl(accessToken.resource) !== normalizeUrl(serverUrl)) {
+  const forwardedProto = ((req.headers['x-forwarded-proto'] as string) || '')
+    .split(',')[0]
+    ?.trim();
+  const forwardedHost = ((req.headers['x-forwarded-host'] as string) || '')
+    .split(',')[0]
+    ?.trim();
+  const requestHost = forwardedHost || req.headers.host || '';
+  const requestProto = forwardedProto || req.protocol || 'http';
+  const requestOrigin = requestHost ? `${requestProto}://${requestHost}` : null;
+  const requestBaseUrl = req.baseUrl || '';
+
+  const normalizedResource = normalizeUrl(accessToken.resource);
+  const normalizedServerUrl = normalizeUrl(serverUrl);
+  const allowedResources = new Set<string>([
+    normalizedServerUrl,
+    normalizeUrl(`${serverUrl}/mcp-remote`),
+    normalizeUrl(`${serverUrl}/mcp-openai`),
+  ]);
+  if (requestOrigin) {
+    allowedResources.add(normalizeUrl(requestOrigin));
+    if (requestBaseUrl) {
+      allowedResources.add(normalizeUrl(`${requestOrigin}${requestBaseUrl}`));
+    }
+  }
+
+  if (!allowedResources.has(normalizedResource)) {
     logger.warn({
       expected: serverUrl,
       actual: accessToken.resource,
+      allowedResources: Array.from(allowedResources),
     }, '⚠️ Token audience mismatch');
 
-    res.status(403).json({
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Forbidden: Token not valid for this resource',
-      },
-      id: null,
-    });
+    sendOAuthError(
+      403,
+      'Forbidden: Token not valid for this resource',
+      getWWWAuthenticateHeader(req, {
+        error: 'insufficient_scope',
+        errorDescription: 'Token not valid for this resource',
+      })
+    );
     return;
   }
 

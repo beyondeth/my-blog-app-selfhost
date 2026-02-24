@@ -5,6 +5,7 @@ const EXPECTED_TOOLS = [
   'get_writing_style_guide',
   'create_post',
 ];
+const EXPECTED_WIDGET_URI = 'ui://widget/codebase-dashboard-v20260224a.html';
 
 function fail(message) {
   console.error(`✗ ${message}`);
@@ -55,6 +56,18 @@ async function main() {
     } else {
       ok(`${endpoint} endpoint metadata is valid`);
     }
+
+    if (payload?.capabilities?.resources !== true) {
+      fail(`${endpoint} must expose resources capability`);
+    } else {
+      ok(`${endpoint} declares resources capability`);
+    }
+
+    if (payload?.widget?.resourceUri !== EXPECTED_WIDGET_URI) {
+      fail(`${endpoint} widget URI mismatch`);
+    } else {
+      ok(`${endpoint} widget URI metadata is valid`);
+    }
   } catch (error) {
     fail(`${endpoint} contract check failed: ${error.message}`);
   }
@@ -65,4 +78,3 @@ async function main() {
 }
 
 await main();
-

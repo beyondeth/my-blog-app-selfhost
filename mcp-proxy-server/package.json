@@ -9,7 +9,9 @@
     "dev": "nodemon --exec npx tsx src/index.ts",
     "clean": "rm -rf dist",
     "verify:tool-parity": "node scripts/verify-tool-parity.mjs",
-    "verify:openai-contract": "node scripts/verify-openai-app-contract.mjs"
+    "verify:openai-contract": "node scripts/verify-openai-app-contract.mjs",
+    "widget:build": "cd src/platforms/openai-app/widget && pnpm run build",
+    "widget:dev": "cd src/platforms/openai-app/widget && pnpm run dev"
   },
   "keywords": [],
   "author": "",

@@ -85,6 +85,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
         code_challenge,
         code_challenge_method,
         resource,
+        prompt,
       } = req.query as Record<string, string>;
 
       logger.debug({
@@ -92,6 +93,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
         redirect_uri,
         scope,
         state: state?.substring(0, 8),
+        prompt,
       }, '🔐 Authorization request');
 
       // 1. response_type 검증
@@ -152,6 +154,15 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
       backendAuthUrl.searchParams.set('client_name', client.clientName || 'MCP Client');
       backendAuthUrl.searchParams.set('scope', session.scope);
       backendAuthUrl.searchParams.set('callback_url', `${getServerUrl()}/oauth/callback`);
+      // prompt=login 요청이 들어오면 브라우저 기존 세션을 무시하고 재로그인을 강제한다.
+      // OpenAI/기타 OAuth 클라이언트에서 계정 전환 UX를 구현할 때 사용한다.
+      const forceLogin = prompt
+        ?.split(' ')
+        .map((value) => value.trim().toLowerCase())
+        .includes('login');
+      if (forceLogin) {
+        backendAuthUrl.searchParams.set('force_login', '1');
+      }
 
       logger.debug({ backendAuthUrl: backendAuthUrl.toString() }, '➡️ Redirecting to backend login');
       res.redirect(backendAuthUrl.toString());

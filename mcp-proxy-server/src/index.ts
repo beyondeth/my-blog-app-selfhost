@@ -282,6 +282,31 @@ if (config.OPENAI_APP_ENABLED) {
   logger.info('🤖 OpenAI ChatGPT App endpoint enabled at /mcp-openai');
 }
 
+// 내부 연동용 OAuth 토큰 무효화 엔드포인트 (Backend logout → MCP OAuth revoke)
+// - 외부 공개용이 아니므로 X-Internal-Secret이 일치할 때만 허용한다.
+app.post('/internal/oauth/revoke-user', async (req, res) => {
+  try {
+    const providedSecret = req.headers['x-internal-secret'];
+    const expectedSecret = config.MCP_SHARED_SECRET;
+
+    if (!expectedSecret || providedSecret !== expectedSecret) {
+      return res.status(403).json({ message: 'Forbidden' });
+    }
+
+    const userId = req.body?.userId;
+    if (!userId || typeof userId !== 'string') {
+      return res.status(400).json({ message: 'userId is required' });
+    }
+
+    await storage.revokeAllUserTokens(userId);
+    logger.info({ userId: userId.substring(0, 8) }, '✅ Internal OAuth revoke completed');
+    return res.json({ success: true });
+  } catch (error: any) {
+    logger.error({ error: error?.message }, '❌ Internal OAuth revoke failed');
+    return res.status(500).json({ message: 'Internal error' });
+  }
+});
+
 // ===== 기존 라우트 (API Key 인증) =====
 
 /**
