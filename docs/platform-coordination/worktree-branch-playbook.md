@@ -2,7 +2,7 @@
 
 - Scope: multi-platform worktree ownership and day-to-day execution rules.
 - Owner: integration maintainers.
-- Last updated: 2026-02-21
+- Last updated: 2026-02-24
 - Update history: `docs/platform-coordination/CHANGELOG.md`
 
 ## Purpose
@@ -46,16 +46,28 @@ Prevent cross-platform branch collisions and mixed commits while running multipl
 - NEVER: patch shared paths from platform worktrees.
 - MUST: runtime services are started from `my-blog-app-integ` by default.
 - MUST: merge order is `platform branch -> integration/workspace -> main`.
+- MUST: default operational boundary is `integration/workspace`; `main` merge/push is done only by explicit user request.
 - MUST: divergence is reported first, not auto-synced.
 - MUST: run `git fetch origin --prune` before divergence checks and use `origin/integration/workspace` as comparison base.
+- MUST: do not force immediate fan-out sync to `ios/aos/web` after each integration merge; sync each platform branch at task-start, pre-PR, or when shared contract/dependency alignment is required.
 
 ## Shared Change Escalation Flow
 1. Detect shared impact (`backend/**`, `mobile/contracts/**`, shared docs).
 2. Pause platform branch work and move to `my-blog-app-integ`.
 3. Patch shared code on `integration/workspace` and run required checks.
 4. Push shared change first.
-5. Return to platform worktree and merge/rebase `integration/workspace`.
+5. Return to platform worktree and sync from `integration/workspace` only when needed:
+   - starting the next platform task
+   - right before platform PR
+   - shared contract/dependency alignment is required
 6. Continue platform implementation.
+
+## Divergence Interpretation
+- Compare two things separately:
+  - `<active_branch>...origin/<active_branch>`: delivery state to branch remote.
+  - `<active_branch>...origin/integration/workspace`: integration-base drift snapshot.
+- `X ahead / Y behind` vs `origin/integration/workspace` is informational by default, not an automatic sync trigger.
+- Path ownership decides impact. Example: web/docs commits appearing in AOS `behind` count do not imply Android code regression.
 
 ## Daily Workflow
 1. Open terminal in the platform worktree only.

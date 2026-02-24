@@ -2,6 +2,35 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-02-24
+
+### Additional update (integration boundary + selective platform sync policy)
+
+#### What changed
+- Clarified default branch boundary:
+  - execution and merge flow stops at `integration/workspace` by default
+  - `main` merge/push requires explicit user request.
+- Added explicit selective-sync policy:
+  - no immediate fan-out to `ios/aos/web` after every integration merge
+  - platform sync timing is limited to task-start, pre-PR, or shared dependency/contract alignment.
+- Added divergence interpretation guidance and refreshed snapshot docs.
+- Updated worktree snapshot to current branch heads:
+  - `feature/integ/chatgpt-app`
+  - `feature/web/oauth-follow-fix`
+  - `feature/ios/workspace-safe`
+  - `feature/aos/workspace-safe`
+
+#### Why
+- Team workflow requires avoiding accidental `integration/workspace -> main` promotion due to CI side effects.
+- Immediate fan-out sync caused confusion when web/docs commits appeared as Android/iOS `behind` counts.
+- We needed a deterministic rule for when branch sync is required vs optional.
+
+#### How
+- Updated:
+  - `AGENTS.md`
+  - `docs/platform-coordination/worktree-branch-playbook.md`
+  - `docs/platform-coordination/WORKTREE_STATUS.md`
+
 ## 2026-02-23
 
 ### Additional update (ChatGPT App phase-1 + env sync tracking)
