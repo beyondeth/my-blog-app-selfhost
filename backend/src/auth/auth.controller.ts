@@ -108,6 +108,38 @@ export class AuthController {
     );
   }
 
+  /**
+   * MCP Proxy의 OAuth 토큰(Access/Refresh)을 사용자 단위로 무효화.
+   * 웹 로그아웃 시 GPT/Claude 커넥터 세션도 함께 끊기게 하기 위한 내부 연동이다.
+   */
+  private async revokeMcpOAuthTokens(userId: string): Promise<void> {
+    const mcpProxyUrl =
+      this.configService.get<string>("MCP_PROXY_INTERNAL_URL") ||
+      this.configService.get<string>("MCP_BASE_URL") ||
+      "http://localhost:3002";
+    const sharedSecret = this.configService.get<string>("MCP_SHARED_SECRET");
+
+    if (!sharedSecret) {
+      this.logger.warn("[Logout] MCP_SHARED_SECRET is missing; skip MCP OAuth revoke");
+      return;
+    }
+
+    const endpoint = `${mcpProxyUrl.replace(/\/+$/, "")}/internal/oauth/revoke-user`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": sharedSecret,
+      },
+      body: JSON.stringify({ userId }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`MCP revoke failed (${response.status}): ${body}`);
+    }
+  }
+
   private resolveMobileRedirectUri(req: ExpressRequest): string | null {
     const statePayload = decodeMobileOAuthState(
       req.query?.state,
@@ -990,6 +1022,17 @@ export class AuthController {
 
     await this.authService.logout(user.id);
 
+    // GPT App/Claude 커넥터 등 OAuth 기반 MCP 세션도 동시에 끊는다.
+    // (웹 로그아웃 후에도 커넥터가 같은 계정으로 남아있는 문제 방지)
+    try {
+      await this.revokeMcpOAuthTokens(user.id);
+      this.logger.log(`[Logout] MCP OAuth tokens revoked - userId: ${user.id}`);
+    } catch (error: any) {
+      this.logger.warn(
+        `[Logout] MCP OAuth revoke skipped/failed - userId: ${user.id}, reason: ${error?.message || "unknown"}`,
+      );
+    }
+
     // 웹 세션 삭제 (MCP 세션도 무효화되도록)
     try {
       // 웹 세션 삭제
@@ -1326,14 +1369,18 @@ export class AuthController {
     @Query("client_name") clientName: string,
     @Query("scope") scope: string,
     @Query("callback_url") callbackUrl: string,
+    @Query("force_login") forceLoginParam: string,
     @Request() req,
     @Res() res: Response,
   ) {
+    const forceLogin = forceLoginParam === "true" || forceLoginParam === "1";
+
     this.logger.debug(
       {
         state: state?.substring(0, 8),
         clientName,
         scope,
+        forceLogin,
       },
       "🔐 MCP OAuth login request",
     );
@@ -1346,10 +1393,11 @@ export class AuthController {
       });
     }
 
-    // 쿠키에서 access_token 확인 (이미 로그인된 사용자)
+    // force_login=true가 아닌 경우에만 기존 브라우저 세션(access_token 쿠키)을 재사용.
+    // - 기본 동작: 이미 로그인된 유저는 즉시 OAuth callback으로 진행 (UX 최적화)
+    // - force_login=true: 계정 전환/재인증을 위해 로그인 화면으로 강제 이동
     const accessToken = req.cookies?.access_token;
-
-    if (accessToken) {
+    if (!forceLogin && accessToken) {
       try {
         // JWT 검증하여 사용자 정보 추출
         const user = await this.authService.validateAccessToken(accessToken);
@@ -1383,6 +1431,9 @@ export class AuthController {
     );
     frontendLoginUrl.searchParams.set("scope", scope || "mcp:tools");
     frontendLoginUrl.searchParams.set("callback_url", callbackUrl);
+    if (forceLogin) {
+      frontendLoginUrl.searchParams.set("force_login", "1");
+    }
 
     this.logger.debug(
       { frontendLoginUrl: frontendLoginUrl.toString() },
