@@ -80,17 +80,22 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   useEffect(() => {
     if (!blog || !isClient) return;
 
+    const normalizedParams = new URLSearchParams(searchParams.toString());
+    // 외부 앱(ChatGPT 등)에서 전달하는 redirectUrl은 블로그 공개 페이지 URL 정규화 시 제거.
+    // 공개 URL에 외부 채팅 URL 파라미터가 남지 않도록 한다.
+    normalizedParams.delete('redirectUrl');
+    const normalizedQueryString = normalizedParams.toString();
+
     // 1. old_alias 리다이렉트 (기존 로직 유지)
     if (blog && 'shouldRedirect' in blog && blog.shouldRedirect && blog.redirectTo) {
-      const queryString = searchParams.toString();
-      const redirectPath = `/${blog.redirectTo}${queryString ? `?${queryString}` : ''}`;
+      const redirectPath = `/${blog.redirectTo}${normalizedQueryString ? `?${normalizedQueryString}` : ''}`;
       router.replace(redirectPath);
       return;
     }
 
     // 2. URL 정규화 - 항상 alias 우선
     if (!('shouldRedirect' in blog) || !blog.shouldRedirect) {
-      const queryString = searchParams.toString();
+      const queryString = normalizedQueryString;
       const currentPathWithQuery = `${window.location.pathname}${window.location.search || ''}`;
 
       // alias가 있는 경우 /@alias로, 없는 경우 /slug로 이동
