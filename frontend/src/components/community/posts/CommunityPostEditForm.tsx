@@ -42,7 +42,7 @@ import PublishTargetSelector, { type PublishTarget } from '@/components/publish/
 import type { CommunityPost } from '@/types/community';
 import { useCommunity } from '@/hooks/community';
 import { useVideoUpload } from '@/hooks/video/useVideoUpload';
-import { serializeImageAttributes, type MarkdownImageInfo } from '@/types/image-metadata.types';
+import type { MarkdownImageInfo } from '@/types/image-metadata.types';
 import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
 import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
 import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
@@ -446,37 +446,6 @@ export default function CommunityPostEditForm({
     form.setValue('content', nextValue, { shouldDirty: true, shouldTouch: true });
     autoConversionSkipRef.current = true;
   }, [form]);
-
-  const handleInsertImageFromList = useCallback(
-    (image: MarkdownImageInfo) => {
-      if (!image?.url) {
-        toast.error('이미지 정보를 불러오지 못했습니다.');
-        return;
-      }
-      
-      if (markdownEditorRef.current) {
-        markdownEditorRef.current.insertImageBlock({
-          url: image.url,
-          alt: image.name || 'image',
-          size: 'default',
-          caption: '',
-          fileId: image.id,
-        });
-        toast.success('이미지를 본문에 삽입했습니다.');
-        return;
-      }
-      
-      const attrs = serializeImageAttributes({
-        id: image.id,
-        size: 'default',
-        caption: '',
-      });
-      
-      insertMarkdownSnippet(`![${image.name || 'image'}](${image.url})${attrs}`);
-      toast.success('이미지를 본문에 삽입했습니다.');
-    },
-    [insertMarkdownSnippet],
-  );
 
   const handleMarkdownImageFile = useCallback(async (file: File) => {
     if (file.type === 'image/svg+xml' || file.name.toLowerCase().endsWith('.svg')) {
@@ -965,7 +934,6 @@ export default function CommunityPostEditForm({
                                       key={image.id}
                                       image={image}
                                       isActiveThumbnail={!selectedYouTubeThumbnailId && currentThumbnailFileId === image.id}
-                                      onInsert={handleInsertImageFromList}
                                       onSetThumbnail={setThumbnailByFileId}
                                     />
                                   ))}

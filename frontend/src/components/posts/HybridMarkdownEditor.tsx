@@ -23,7 +23,14 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
   ({ content, onChange, className, placeholder }, ref) => {
     const [blocks, setBlocks] = useState<MarkdownBlock[]>(() => parseMarkdownBlocks(content));
     const textareaRefs = useRef<Map<string, HTMLTextAreaElement>>(new Map());
+    const textSelectionRef = useRef<Map<string, { start: number; end: number }>>(new Map());
+    const activeTextBlockIdRef = useRef<string | null>(null);
+    const pendingFocusRef = useRef<{ id: string; cursor: number } | null>(null);
     const lastSerializedRef = useRef<string>(serializeBlocks(parseMarkdownBlocks(content)));
+
+    const createBlockId = useCallback((prefix: 'text' | 'img') => {
+      return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }, []);
     
     // 외부에서 content가 변경되었을 때 (예: 초기 로드, 리셋 등)
     // 타이핑 중에는 이 효과가 발생하지 않도록 주의해야 함.
@@ -70,25 +77,78 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
       });
     }, [blocks, syncTextareaHeight]);
 
+    useEffect(() => {
+      const pending = pendingFocusRef.current;
+      if (!pending) return;
+
+      const textarea = textareaRefs.current.get(pending.id);
+      if (!textarea) return;
+
+      textarea.focus();
+      textarea.setSelectionRange(pending.cursor, pending.cursor);
+      syncTextareaHeight(textarea);
+      activeTextBlockIdRef.current = pending.id;
+      textSelectionRef.current.set(pending.id, { start: pending.cursor, end: pending.cursor });
+      pendingFocusRef.current = null;
+    }, [blocks, syncTextareaHeight]);
+
+    const updateTextSelection = useCallback((id: string, textarea: HTMLTextAreaElement) => {
+      activeTextBlockIdRef.current = id;
+      const start = typeof textarea.selectionStart === 'number' ? textarea.selectionStart : textarea.value.length;
+      const end = typeof textarea.selectionEnd === 'number' ? textarea.selectionEnd : start;
+      textSelectionRef.current.set(id, { start, end });
+    }, []);
+
+    const insertImageAtCursor = useCallback((image: { url: string; alt: string; size: ImageSize; caption?: string; fileId?: string }) => {
+      const activeId = activeTextBlockIdRef.current;
+      if (!activeId) return false;
+
+      const targetIndex = blocks.findIndex((block) => block.type === 'text' && block.id === activeId);
+      if (targetIndex === -1) return false;
+
+      const targetBlock = blocks[targetIndex];
+      if (targetBlock.type !== 'text') return false;
+
+      const selection = textSelectionRef.current.get(activeId);
+      const rawStart = selection?.start ?? targetBlock.content.length;
+      const rawEnd = selection?.end ?? rawStart;
+      const start = Math.max(0, Math.min(rawStart, targetBlock.content.length));
+      const end = Math.max(start, Math.min(rawEnd, targetBlock.content.length));
+
+      const before = targetBlock.content.slice(0, start);
+      const after = targetBlock.content.slice(end);
+      const trailingTextId = createBlockId('text');
+
+      const nextBlocks: MarkdownBlock[] = [
+        ...blocks.slice(0, targetIndex),
+        { type: 'text', id: targetBlock.id, content: before },
+        { type: 'image', id: createBlockId('img'), ...image },
+        { type: 'text', id: trailingTextId, content: after },
+        ...blocks.slice(targetIndex + 1),
+      ];
+
+      pendingFocusRef.current = { id: trailingTextId, cursor: 0 };
+      updateBlocks(nextBlocks);
+      return true;
+    }, [blocks, createBlockId, updateBlocks]);
+
+    const insertImageAtEnd = useCallback((image: { url: string; alt: string; size: ImageSize; caption?: string; fileId?: string }) => {
+      const trailingTextId = createBlockId('text');
+      const nextBlocks: MarkdownBlock[] = [
+        ...blocks,
+        { type: 'image', id: createBlockId('img'), ...image },
+        { type: 'text', id: trailingTextId, content: '' },
+      ];
+      pendingFocusRef.current = { id: trailingTextId, cursor: 0 };
+      updateBlocks(nextBlocks);
+    }, [blocks, createBlockId, updateBlocks]);
+
     useImperativeHandle(ref, () => ({
       insertImageBlock: (image) => {
-        // 현재 커서 위치나 포커스된 블록을 알 수 없으므로,
-        // 가장 마지막 텍스트 블록 뒤나, 맨 뒤에 추가.
-        // 마크다운 에디터 UX상 맨 뒤 추가가 일반적.
-        // 혹은, 마지막 블록이 텍스트라면 그 텍스트 블록을 분할? (복잡함)
-        // 일단 맨 뒤에 추가.
-        
-        const newImageBlock: MarkdownBlock = {
-          type: 'image',
-          id: `img-${Date.now()}`,
-          ...image
-        };
-        
-        // 마지막 블록 뒤에 추가하되, 마지막이 텍스트이고 비어있으면 대체할 수도 있음?
-        // 그냥 추가하고 뒤에 빈 텍스트 블록 추가하여 계속 타이핑 가능하게 함.
-        
-        const newBlocks = [...blocks, newImageBlock, { type: 'text' as const, id: `text-${Date.now()}-end`, content: '' }];
-        updateBlocks(newBlocks);
+        const inserted = insertImageAtCursor(image);
+        if (!inserted) {
+          insertImageAtEnd(image);
+        }
       },
       insertText: (text: string) => {
         // 마지막 블록이 텍스트라면 거기에 추가, 아니면 새 텍스트 블록 추가
@@ -101,7 +161,7 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
           const contentToAdd = text.endsWith('\n') ? text : text + '\n';
           lastBlock.content += prefix + contentToAdd;
         } else {
-          newBlocks.push({ 
+          newBlocks.push({
             type: 'text' as const, 
             id: `text-${Date.now()}-inserted`, 
             content: text.endsWith('\n') ? text : text + '\n' 
@@ -109,7 +169,7 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
         }
         updateBlocks(newBlocks);
       }
-    }));
+    }), [blocks, insertImageAtCursor, insertImageAtEnd, updateBlocks]);
 
     const handleTextChange = (id: string, newContent: string) => {
       const newBlocks = blocks.map(block => 
@@ -189,6 +249,10 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
                 value={block.content}
                 onChange={(e) => handleTextChange(block.id, e.target.value)}
                 onInput={handleInput}
+                onFocus={(e) => updateTextSelection(block.id, e.currentTarget)}
+                onClick={(e) => updateTextSelection(block.id, e.currentTarget)}
+                onKeyUp={(e) => updateTextSelection(block.id, e.currentTarget)}
+                onSelect={(e) => updateTextSelection(block.id, e.currentTarget)}
                 ref={(node) => {
                   if (node) {
                     textareaRefs.current.set(block.id, node);

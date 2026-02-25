@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { postsAPI } from '@/lib/api';
 import { useRouter } from 'next/navigation';
 import { postQueryKeys } from './usePosts';
+import { feedQueryKeys } from '@/hooks/feed/useUnifiedFeed';
 
 export function useUpdatePost() {
   const queryClient = useQueryClient();
@@ -12,6 +13,12 @@ export function useUpdatePost() {
     onMutate: async (variables) => {
       // 낙관적 업데이트를 위해 현재 쿼리 취소
       await queryClient.cancelQueries({ queryKey: ['posts'] });
+      // 홈피드에서 실제로 화면에 떠 있는(active) 쿼리만 취소한다.
+      // broad cancel(all)은 불필요한 범위까지 건드릴 수 있어 제한한다.
+      await queryClient.cancelQueries({
+        queryKey: feedQueryKeys.all,
+        type: 'active',
+      });
 
       // 썸네일 변경 감지 로그
       if (variables.data && (variables.data.thumbnailImageId || variables.data.thumbnail)) {
@@ -46,6 +53,17 @@ export function useUpdatePost() {
         console.log('  Mutation variables:', variables.data);
         console.log('  Updated post thumbnail:', updatedPost.thumbnail);
         console.log('  Updated post thumbnailImageId:', (updatedPost as any).thumbnailImageId);
+
+        // 실제 홈/통합 피드 쿼리 키를 즉시 무효화한다.
+        // HomePageClient는 ['unified-feed', ...]를 사용한다.
+        queryClient.invalidateQueries({
+          queryKey: feedQueryKeys.all,
+          refetchType: 'active',
+        });
+        queryClient.refetchQueries({
+          queryKey: feedQueryKeys.all,
+          type: 'active',
+        });
 
         // 홈페이지 캐시 강제 리프레치 (invalidate + refetch)
         queryClient.invalidateQueries({

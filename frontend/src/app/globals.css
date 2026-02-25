@@ -1,7 +1,7 @@
 /* CSS @import 규칙 - CSS 표준에 따라 파일 맨 위에 위치 */
 @import '../styles/core.css';
-@import '../styles/themes/atom-one-light-custom.css' (prefers-color-scheme: light);
-@import 'highlight.js/styles/atom-one-dark.css' (prefers-color-scheme: dark);
+@import '../styles/themes/atom-one-light-custom.css';
+@import 'highlight.js/styles/atom-one-dark.css';
 
 /* TipTap Simple Editor 스타일 */
 @import '../styles/_variables.css';
@@ -127,8 +127,66 @@
 
 /* Highlight.js 테마 - 강제 테마 적용을 위한 클래스 기반 스타일 */
 .light .hljs {
-  background: #ffffff;  /* 순백색 배경으로 대비 향상 */
-  /* color 속성 제거 - syntax highlighting이 처리하도록 허용 */
+  background: transparent;
+  color: #e5e7eb;
+}
+
+.light .hljs-comment,
+.light .hljs-quote {
+  color: #9ca3af;
+  font-style: italic;
+}
+
+.light .hljs-doctag,
+.light .hljs-keyword,
+.light .hljs-formula {
+  color: #c084fc;
+}
+
+.light .hljs-section,
+.light .hljs-name,
+.light .hljs-selector-tag,
+.light .hljs-deletion,
+.light .hljs-subst {
+  color: #fca5a5;
+}
+
+.light .hljs-literal {
+  color: #67e8f9;
+}
+
+.light .hljs-string,
+.light .hljs-regexp,
+.light .hljs-addition,
+.light .hljs-attribute,
+.light .hljs-meta .hljs-string {
+  color: #86efac;
+}
+
+.light .hljs-attr,
+.light .hljs-variable,
+.light .hljs-template-variable,
+.light .hljs-type,
+.light .hljs-selector-class,
+.light .hljs-selector-attr,
+.light .hljs-selector-pseudo,
+.light .hljs-number {
+  color: #fcd34d;
+}
+
+.light .hljs-symbol,
+.light .hljs-bullet,
+.light .hljs-link,
+.light .hljs-meta,
+.light .hljs-selector-id,
+.light .hljs-title {
+  color: #93c5fd;
+}
+
+.light .hljs-built_in,
+.light .hljs-title.class_,
+.light .hljs-class .hljs-title {
+  color: #f9a8d4;
 }
 
 .dark .hljs {
