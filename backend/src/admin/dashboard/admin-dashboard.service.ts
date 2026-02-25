@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, Between, MoreThanOrEqual, LessThanOrEqual } from "typeorm";
 import { DateUtils } from "../../common/utils/date.utils";
@@ -64,6 +64,8 @@ export interface TrendData {
 
 @Injectable()
 export class AdminDashboardService {
+  private readonly logger = new Logger(AdminDashboardService.name);
+
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
@@ -480,7 +482,7 @@ export class AdminDashboardService {
       };
     } catch (error) {
       // 에러 발생 시 기본값 반환
-      console.error("시스템 상태 조회 실패:", error);
+      this.logger.error("시스템 상태 조회 실패:", error);
       return {
         status: "error",
         services: {

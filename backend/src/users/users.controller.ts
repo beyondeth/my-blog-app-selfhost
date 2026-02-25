@@ -12,6 +12,8 @@ import {
   DefaultValuePipe,
   ParseIntPipe,
   Patch,
+  ServiceUnavailableException,
+  UnauthorizedException,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -29,11 +31,16 @@ import { UpdateMarketingPreferencesDto } from "./dto/update-marketing-preference
 import { VerifyAdultDto, VerifyAdultResponseDto } from "./dto/verify-adult.dto";
 import { Public } from "../common/decorators/public.decorator";
 import { getAllCharacters } from "../common/utils/character.util";
+import { ConfigService } from "@nestjs/config";
+import { timingSafeEqual } from "crypto";
 
 @ApiTags("users")
 @Controller("users")
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+    private readonly configService: ConfigService,
+  ) {}
 
   @Get()
   @UseGuards(JwtAuthGuard, RolesGuard)
@@ -49,13 +56,16 @@ export class UsersController {
   @ApiOperation({ summary: "내 프로필 조회" })
   @ApiBearerAuth()
   async getProfile(@Request() req) {
-    const user = await this.usersService.findOne(req.user.id);
-    // toJSON()에서 email이 제외되므로, 본인 프로필에서는 명시적으로 추가
-    const userData = user.toJSON ? user.toJSON() : { ...user };
-    return {
-      ...userData,
-      email: user.email, // 본인 프로필에서는 이메일 표시
-    };
+    const accountId = req.user.id;
+    const authContext = await this.usersService.getAuthContextRaw(accountId);
+    if (!authContext) {
+      return {
+        id: req.user.id,
+        email: req.user.email ?? null,
+        username: req.user.username ?? null,
+      };
+    }
+    return authContext;
   }
 
   @Get("characters")
@@ -72,8 +82,32 @@ export class UsersController {
 
   @Get(":id")
   @ApiOperation({ summary: "특정 사용자 조회" })
-  findOne(@Param("id") id: string) {
-    return this.usersService.findOne(id);
+  async findOne(@Param("id") profileId: string, @Request() req) {
+    const user = await this.usersService.findOne(profileId);
+    const requestingAccountId = req.user?.id;
+    const requesterRole = req.user?.role;
+    const canSeeEmail =
+      requestingAccountId === user.id || requesterRole === Role.ADMIN;
+
+    return {
+      id: user.id,
+      username: user.username,
+      email: canSeeEmail ? user.email : null,
+      profileImage: user.profileImage ?? null,
+      bio: user.bio ?? null,
+      jobTitle: user.jobTitle ?? null,
+      socialLinks: user.socialLinks ?? [],
+      blog: user.blog
+        ? {
+            id: user.blog.id,
+            slug: user.blog.slug,
+            alias: user.blog.alias,
+            name: user.blog.name,
+          }
+        : null,
+      blogSlug: user.blog?.slug ?? null,
+      createdAt: user.createdAt,
+    };
   }
 
   /**
@@ -85,9 +119,32 @@ export class UsersController {
   @Get(":id/mcp-info")
   @Public() // 내부 통신용 - 실제 인증은 MCP Proxy에서 처리됨
   @ApiOperation({ summary: "MCP용 사용자 정보 조회 (내부 API)" })
-  async getMcpInfo(@Param("id") id: string) {
+  async getMcpInfo(@Param("id") accountId: string, @Request() req) {
+    const configuredSecret =
+      this.configService.get<string>("MCP_SHARED_SECRET");
+    if (!configuredSecret) {
+      throw new ServiceUnavailableException(
+        "MCP internal secret is not configured",
+      );
+    }
+
+    const providedSecret = req.headers["x-internal-secret"];
+    if (typeof providedSecret !== "string") {
+      throw new UnauthorizedException("Invalid internal signature");
+    }
+
+    const configuredBuffer = Buffer.from(configuredSecret, "utf8");
+    const providedBuffer = Buffer.from(providedSecret, "utf8");
+
+    if (
+      configuredBuffer.length !== providedBuffer.length ||
+      !timingSafeEqual(configuredBuffer, providedBuffer)
+    ) {
+      throw new UnauthorizedException("Invalid internal signature");
+    }
+
     // findOne은 이미 blog 관계를 포함
-    const user = await this.usersService.findOne(id);
+    const user = await this.usersService.findOne(accountId);
 
     if (!user) {
       return null;
@@ -114,22 +171,37 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "내 프로필 수정" })
   @ApiBearerAuth()
-  updateProfile(@Request() req, @Body() updateProfileDto: UpdateProfileDto) {
-    return this.usersService.update(req.user.id, updateProfileDto);
+  async updateProfile(
+    @Request() req,
+    @Body() updateProfileCommand: UpdateProfileDto,
+  ) {
+    const accountId = req.user.id;
+    await this.usersService.update(accountId, updateProfileCommand);
+    const authContext = await this.usersService.getAuthContextRaw(accountId);
+    if (!authContext) {
+      throw new UnauthorizedException("User not found");
+    }
+    return authContext;
   }
 
   @Patch("marketing-preferences")
   @UseGuards(JwtAuthGuard)
   @ApiOperation({ summary: "마케팅 정보 수신 설정 업데이트" })
   @ApiBearerAuth()
-  updateMarketingPreferences(
+  async updateMarketingPreferences(
     @Request() req,
-    @Body() updateMarketingPreferencesDto: UpdateMarketingPreferencesDto,
+    @Body() updateMarketingPreferencesCommand: UpdateMarketingPreferencesDto,
   ) {
-    return this.usersService.updateMarketingPreferences(
-      req.user.id,
-      updateMarketingPreferencesDto,
+    const accountId = req.user.id;
+    await this.usersService.updateMarketingPreferences(
+      accountId,
+      updateMarketingPreferencesCommand,
     );
+    const authContext = await this.usersService.getAuthContextRaw(accountId);
+    if (!authContext) {
+      throw new UnauthorizedException("User not found");
+    }
+    return authContext;
   }
 
   // ============================================================
@@ -158,11 +230,12 @@ export class UsersController {
   })
   async verifyAdult(
     @Request() req,
-    @Body() verifyAdultDto: VerifyAdultDto,
+    @Body() verifyAdultCommand: VerifyAdultDto,
   ): Promise<VerifyAdultResponseDto> {
+    const accountId = req.user.id;
     const result = await this.usersService.verifyAdult(
-      req.user.id,
-      verifyAdultDto.birthdate,
+      accountId,
+      verifyAdultCommand.birthdate,
     );
 
     return {
@@ -186,9 +259,9 @@ export class UsersController {
     description: "성인 인증 상태",
   })
   async getAdultVerificationStatus(@Request() req) {
-    const result = await this.usersService.getAdultVerificationStatus(
-      req.user.id,
-    );
+    const accountId = req.user.id;
+    const result =
+      await this.usersService.getAdultVerificationStatus(accountId);
 
     return {
       isAdultVerified: result.isAdultVerified,
@@ -205,9 +278,9 @@ export class UsersController {
   @Roles(Role.ADMIN)
   @ApiOperation({ summary: "사용자 삭제 (관리자만) - 180일 보관 후 자동 삭제" })
   @ApiBearerAuth()
-  async remove(@Param("id") id: string) {
+  async remove(@Param("id") accountIdToDelete: string) {
     // Soft Delete: 180일 보관 후 자동 삭제
-    await this.usersService.softDelete(id);
+    await this.usersService.softDelete(accountIdToDelete);
     return {
       message:
         "User deleted successfully. Will be permanently removed after 180 days.",
@@ -219,8 +292,9 @@ export class UsersController {
   @ApiOperation({ summary: "본인 계정 삭제" })
   @ApiBearerAuth()
   async deleteMyAccount(@Request() req) {
+    const accountId = req.user.id;
     // 본인 계정 삭제: Soft Delete (180일 보관)
-    await this.usersService.softDelete(req.user.id);
+    await this.usersService.softDelete(accountId);
     return {
       message:
         "Your account has been deleted. Data will be kept for 180 days for safety.",

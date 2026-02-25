@@ -1,0 +1,678 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/mainRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myblog_background"
+    android:fontFamily="sans-serif"
+    android:orientation="vertical">
+
+    <View
+        android:id="@+id/statusBarSpacer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp" />
+
+    <LinearLayout
+        android:id="@+id/headerRow"
+        android:layout_width="match_parent"
+        android:layout_height="60dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp">
+
+        <ImageView
+            android:id="@+id/headerMenuButton"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_header_icon_button"
+            android:clipToOutline="true"
+            android:contentDescription="@string/feed_menu_desc"
+            android:padding="8dp"
+            android:src="@drawable/ic_myblog_menu"
+            android:tint="@color/myblog_text_primary" />
+
+        <ImageView
+            android:id="@+id/headerLogoImage"
+            android:layout_width="0dp"
+            android:layout_height="38dp"
+            android:layout_weight="1"
+            android:contentDescription="@string/app_title"
+            android:adjustViewBounds="true"
+            android:scaleType="centerInside" />
+
+        <ImageView
+            android:id="@+id/headerSearchButton"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_header_icon_button"
+            android:clipToOutline="true"
+            android:contentDescription="@string/feed_search_desc"
+            android:padding="8dp"
+            android:src="@drawable/ic_myblog_search"
+            android:tint="@color/myblog_text_primary" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:id="@+id/feedHeaderContainer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="14dp">
+
+        <LinearLayout
+            android:id="@+id/quickComposeCard"
+            android:layout_width="match_parent"
+            android:layout_height="64dp"
+            android:layout_marginTop="4dp"
+            android:background="@drawable/bg_quick_compose"
+            android:clickable="true"
+            android:focusable="true"
+            android:foreground="?attr/selectableItemBackground"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:id="@+id/quickComposeAvatar"
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:background="@drawable/bg_avatar_circle"
+                android:clipToOutline="true"
+                android:scaleType="centerCrop" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/profileSummaryText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/myblog_text_primary"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/authStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/myblog_text_secondary"
+                    android:textSize="14sp" />
+            </LinearLayout>
+
+            <ImageView
+                android:id="@+id/openComposePlaceholderButton"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:contentDescription="@string/open_composer"
+                android:src="@drawable/ic_myblog_edit"
+                android:tint="@color/myblog_text_primary" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/feedSortRow"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/feedSortRecentButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="88dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_filter_chip_selected"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text="@string/feed_sort_recent"
+                android:textAllCaps="false"
+                android:textColor="@color/myblog_surface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/feedSortHotButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="88dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_filter_chip_unselected"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text="@string/feed_sort_hot"
+                android:textAllCaps="false"
+                android:textColor="@color/myblog_text_secondary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/feedSortTopButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="88dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_filter_chip_unselected"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text="@string/feed_sort_top"
+                android:textAllCaps="false"
+                android:textColor="@color/myblog_text_secondary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/bg_search_field"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_myblog_search"
+                android:tint="@color/myblog_text_secondary" />
+
+            <EditText
+                android:id="@+id/feedSearchInput"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/feed_search_hint"
+                android:imeOptions="actionSearch"
+                android:paddingStart="8dp"
+                android:textColor="@color/myblog_text_primary"
+                android:textColorHint="@color/myblog_text_secondary"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/tabContentContainer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <LinearLayout
+            android:id="@+id/feedPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/myblog_background"
+            android:orientation="vertical">
+
+            <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+                android:id="@+id/feedSwipeRefresh"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/feedRecycler"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingHorizontal="16dp"
+                    android:paddingBottom="8dp" />
+            </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+            <TextView
+                android:id="@+id/feedStateText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="20dp"
+                android:textColor="@color/myblog_text_secondary"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/communityPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/myblog_background"
+            android:orientation="vertical"
+            android:paddingHorizontal="14dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="56dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/community_title"
+                    android:textColor="@color/myblog_text_primary"
+                    android:textSize="18sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textStyle="bold" />
+
+                <ImageView
+                    android:id="@+id/openCommunityListButton"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:contentDescription="@string/open_community_list"
+                    android:src="@drawable/ic_myblog_people"
+                    android:tint="@color/myblog_text_primary" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="54dp"
+                android:layout_marginTop="8dp"
+                android:background="@drawable/bg_search_field"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="12dp">
+
+                <ImageView
+                    android:layout_width="22dp"
+                    android:layout_height="22dp"
+                    android:src="@drawable/ic_myblog_search"
+                    android:tint="@color/myblog_text_secondary" />
+
+                <EditText
+                    android:id="@+id/communitySearchInput"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_weight="1"
+                    android:background="@android:color/transparent"
+                    android:hint="@string/community_search_hint"
+                    android:paddingStart="8dp"
+                    android:textColor="@color/myblog_text_primary"
+                    android:textColorHint="@color/myblog_text_secondary"
+                    android:textSize="16sp" />
+            </LinearLayout>
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/communityRecycler"
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1"
+                android:clipToPadding="false"
+                android:paddingBottom="8dp"
+                android:paddingTop="8dp" />
+
+            <TextView
+                android:id="@+id/communityStateText"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center"
+                android:padding="20dp"
+                android:textColor="@color/myblog_text_secondary"
+                android:visibility="gone" />
+        </LinearLayout>
+
+        <ScrollView
+            android:id="@+id/composePanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/myblog_background"
+            android:fillViewport="true"
+            android:paddingHorizontal="14dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/compose_title"
+                        android:textColor="@color/myblog_text_primary"
+                        android:textSize="20sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textStyle="bold" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/composeSubmitButton"
+                        style="@style/Widget.MaterialComponents.Button.TextButton"
+                        android:layout_width="84dp"
+                        android:layout_height="44dp"
+                        android:background="@drawable/bg_filter_chip_unselected"
+                        android:insetLeft="0dp"
+                        android:insetRight="0dp"
+                        android:text="@string/compose_publish"
+                        android:textAllCaps="false"
+                        android:textColor="@color/myblog_text_secondary"
+                        android:textSize="15sp"
+                        android:textStyle="bold" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_quick_compose"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/compose_body_title"
+                        android:textColor="@color/myblog_text_secondary"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/composeBodyInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="160dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/bg_quick_compose"
+                        android:gravity="top|start"
+                        android:hint="@string/compose_body_hint"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:padding="16dp"
+                        android:textColor="@color/myblog_text_primary"
+                        android:textColorHint="@color/myblog_text_secondary"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:id="@+id/composeImageButton"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/compose_add_image"
+                            android:textColor="@color/myblog_text_primary"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/composeImageCountText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="@string/compose_image_count_placeholder"
+                            android:textColor="@color/myblog_text_secondary"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_quick_compose"
+                    android:orientation="vertical"
+                    android:padding="12dp">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/compose_category"
+                        android:textColor="@color/myblog_text_secondary"
+                        android:textSize="13sp" />
+
+                    <EditText
+                        android:id="@+id/composeCategoryInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="58dp"
+                        android:layout_marginTop="8dp"
+                        android:background="@drawable/bg_quick_compose"
+                        android:paddingHorizontal="14dp"
+                        android:textColor="@color/myblog_text_primary"
+                        android:textSize="16sp" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <TextView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:text="@string/compose_publish_now"
+                            android:textColor="@color/myblog_text_primary"
+                            android:textSize="16sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:textStyle="bold" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/composePublishSwitch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/composeStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:textColor="@color/myblog_text_secondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </ScrollView>
+
+        <ScrollView
+            android:id="@+id/profilePanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:background="@color/myblog_background"
+            android:paddingHorizontal="14dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:paddingTop="12dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/profile_title"
+                        android:textColor="@color/myblog_text_primary"
+                        android:textSize="20sp"
+                        android:fontFamily="sans-serif-medium"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/openSettingsFromProfileButton"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:gravity="center"
+                        android:text="⚙"
+                        android:textColor="@color/myblog_text_primary"
+                        android:textSize="24sp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="92dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_quick_compose"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal"
+                    android:paddingHorizontal="12dp">
+
+                    <ImageView
+                        android:id="@+id/profileAvatarImage"
+                        android:layout_width="62dp"
+                        android:layout_height="62dp"
+                        android:background="@drawable/bg_avatar_circle"
+                        android:clipToOutline="true"
+                        android:scaleType="centerCrop" />
+
+                    <LinearLayout
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="12dp"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/profileDisplayNameText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/myblog_text_primary"
+                            android:textSize="17sp"
+                            android:fontFamily="sans-serif-medium"
+                            android:textStyle="bold" />
+
+                        <TextView
+                            android:id="@+id/profileEmailText"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:textColor="@color/myblog_text_secondary"
+                            android:textSize="14sp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/profileMenuTitleText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:text="@string/profile_settings_hub"
+                    android:textColor="@color/myblog_text_secondary"
+                    android:textSize="14sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/profileLogoutButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="56dp"
+                    android:layout_marginTop="12dp"
+                    android:background="@drawable/bg_quick_compose"
+                    android:gravity="center_vertical"
+                    android:paddingHorizontal="14dp"
+                    android:text="@string/logout_button"
+                    android:textColor="@color/myblog_error"
+                    android:textSize="16sp"
+                    android:fontFamily="sans-serif-medium"
+                    android:textStyle="bold" />
+            </LinearLayout>
+        </ScrollView>
+    </FrameLayout>
+
+    <FrameLayout
+        android:id="@+id/bottomNavHost"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="14dp"
+        android:paddingEnd="14dp"
+        android:paddingTop="2dp">
+
+        <LinearLayout
+            android:id="@+id/bottomNav"
+            android:layout_width="match_parent"
+            android:layout_height="60dp"
+            android:layout_gravity="bottom"
+            android:background="@android:color/transparent"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="18dp"
+            android:paddingEnd="84dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabFeedButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_marginHorizontal="4dp"
+                android:layout_weight="1"
+                android:background="@drawable/bg_tab_item_selected"
+                android:gravity="center"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text=""
+                app:icon="@drawable/ic_myblog_feed"
+                app:iconGravity="textTop"
+                app:iconPadding="0dp"
+                app:iconSize="24dp"
+                app:iconTint="@color/myblog_text_primary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabCommunityButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_marginHorizontal="4dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text=""
+                app:icon="@drawable/ic_myblog_community"
+                app:iconGravity="textTop"
+                app:iconPadding="0dp"
+                app:iconSize="24dp"
+                app:iconTint="@color/myblog_text_secondary" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/tabProfileButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="52dp"
+                android:layout_marginHorizontal="4dp"
+                android:layout_weight="1"
+                android:gravity="center"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text=""
+                app:icon="@drawable/ic_myblog_profile"
+                app:iconGravity="textTop"
+                app:iconPadding="0dp"
+                app:iconSize="24dp"
+                app:iconTint="@color/myblog_text_secondary" />
+        </LinearLayout>
+
+        <com.google.android.material.floatingactionbutton.FloatingActionButton
+            android:id="@+id/composeFab"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="bottom|end"
+            android:layout_marginEnd="20dp"
+            android:layout_marginBottom="4dp"
+            android:contentDescription="@string/open_composer"
+            app:backgroundTint="@color/myblog_surface_variant"
+            app:srcCompat="@drawable/ic_myblog_compose"
+            app:tint="@color/myblog_text_primary" />
+    </FrameLayout>
+
+    <Button
+        android:id="@+id/openSettingsButton"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        android:visibility="gone" />
+</LinearLayout>

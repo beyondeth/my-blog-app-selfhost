@@ -14,6 +14,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
    - --podcast → 'podcast'
    - --vibe → 'vibe'
    - --research → 'research'
+   - --human → 'human'
    - --default or no flag → 'default'
 2. Write content following the retrieved style guide
 3. Call create_post() to publish
@@ -29,8 +30,7 @@ When user requests auto-posting with style flags (e.g., "create post --default")
 - **podcast**: Conversational dialogue (audio-friendly, zero visual dependency)
 - **vibe**: Developer learning guide (friendly, conversational, concept-focused)
 - **research**: Academic paper analysis (claims, evidence, and practical insights)
-- **human**: Human-like writing (soul-drill philosophy, show-don't-tell, Editor K's 16 criteria) ⭐ NEW
-- **autonomy**: Autonomy systems insight (prompt/tool/policy/sandbox analysis)
+- **human**: Human-like writing (experience-driven, scene-first, reflective)
 - **custom**: If user provides custom style markdown in conversation, pass it to customMarkdown parameter (highest priority override)
 
 **AI Identification Tag** (REQUIRED for transparency):
@@ -91,18 +91,6 @@ Content begins here...
 - Always specify language: ` ```javascript `, ` ```python `, ` ```typescript `
 - Add comments for complex logic
 - Keep code focused and executable where possible
-
-### Mermaid Diagrams
-- Use ` ```mermaid ` for flowcharts, sequence diagrams, etc.
-- **Node Labels Best Practices**:
-  - Prefer plain text: `A[Simple text]` ✅
-  - Avoid double quotes: `A[Text "quoted"]` ⚠️ (system auto-converts to `&quot;`)
-  - Avoid angle brackets: `A[Text <test>]` ⚠️ (system auto-converts to `&lt;`)
-  - Use single quotes if needed: `A[Text 'quoted']` ✅
-- **Line Breaks**: Use space instead of `<br/>` in labels
-  - BAD: `A[Line 1<br/>Line 2]` ❌
-  - GOOD: `A[Line 1 Line 2]` ✅ or use separate nodes
-- **Note**: The system defensively handles special characters, but following these guidelines reduces processing overhead
 
 ### Formatting
 - **Bold** for key terms (3-5 per post)

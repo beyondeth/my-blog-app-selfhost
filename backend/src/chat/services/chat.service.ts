@@ -94,12 +94,12 @@ export class ChatService {
         (conversation.user2Id === currentUserId && conversation.user2DeletedAt);
 
       if (currentUserLeft) {
-        console.log(
+        this.logger.debug(
           "[ChatService] User had left this conversation, but returning it (will reset on first message)",
         );
       }
 
-      console.log("[ChatService] Returning existing conversation:", {
+      this.logger.debug("[ChatService] Returning existing conversation:", {
         conversationId: conversation.id,
         user1Username: conversation.user1?.username,
         user2Username: conversation.user2?.username,
@@ -118,12 +118,12 @@ export class ChatService {
         .orIgnore() // PostgreSQL: ON CONFLICT DO NOTHING
         .execute();
 
-      console.log("[ChatService] New conversation created between:", {
+      this.logger.debug("[ChatService] New conversation created between:", {
         user1Id,
         user2Id,
       });
     } catch (error) {
-      console.error("[ChatService] Error creating conversation:", error);
+      this.logger.error("[ChatService] Error creating conversation:", error);
       // Continue to try fetching in case it was created by another request
     }
 
@@ -134,13 +134,13 @@ export class ChatService {
     });
 
     if (!conversation) {
-      console.error(
+      this.logger.error(
         "[ChatService] Failed to create or find conversation after insert attempt",
       );
       throw new Error("Failed to create or find conversation");
     }
 
-    console.log("[ChatService] Conversation ready:", {
+    this.logger.debug("[ChatService] Conversation ready:", {
       conversationId: conversation.id,
       user1Username: conversation.user1?.username,
       user2Username: conversation.user2?.username,
@@ -218,7 +218,10 @@ export class ChatService {
   async getConversations(userId: string): Promise<ConversationWithUnread[]> {
     // Only log in development mode
     if (process.env.NODE_ENV === "development") {
-      console.log("[ChatService] getConversations called for userId:", userId);
+      this.logger.debug(
+        "[ChatService] getConversations called for userId:",
+        userId,
+      );
     }
 
     // Check cache first
@@ -228,7 +231,7 @@ export class ChatService {
     >("chat", cacheKey);
     if (cached) {
       if (process.env.NODE_ENV === "development") {
-        console.log(
+        this.logger.debug(
           "[ChatService] Returning cached conversations for user:",
           userId,
         );
@@ -360,7 +363,7 @@ export class ChatService {
     page = 1,
     limit = 10,
   ): Promise<{ messages: Message[]; hasMore: boolean }> {
-    console.log("[ChatService] getMessages called:", {
+    this.logger.debug("[ChatService] getMessages called:", {
       conversationId,
       userId,
       userIdType: typeof userId,
@@ -375,7 +378,7 @@ export class ChatService {
         limit,
       );
       if (cachedMessages.length > 0) {
-        console.log(
+        this.logger.debug(
           "[ChatService] Returning cached messages:",
           cachedMessages.length,
         );
@@ -396,7 +399,7 @@ export class ChatService {
     });
 
     if (!conversation) {
-      console.error(
+      this.logger.error(
         "[ChatService] Conversation not found for messages:",
         conversationId,
       );
@@ -408,7 +411,7 @@ export class ChatService {
     const user2IdStr = String(conversation.user2Id).toLowerCase();
     const userIdStr = String(userId).toLowerCase();
 
-    console.log("[ChatService] Message authorization check:", {
+    this.logger.debug("[ChatService] Message authorization check:", {
       conversationId,
       user1Id: conversation.user1Id,
       user1Username: conversation.user1?.username,
@@ -420,14 +423,17 @@ export class ChatService {
     });
 
     if (user1IdStr !== userIdStr && user2IdStr !== userIdStr) {
-      console.error("[ChatService] Message authorization failed - FORBIDDEN:", {
-        conversationId,
-        user1IdStr,
-        user2IdStr,
-        userIdStr,
-        user1Username: conversation.user1?.username,
-        user2Username: conversation.user2?.username,
-      });
+      this.logger.error(
+        "[ChatService] Message authorization failed - FORBIDDEN:",
+        {
+          conversationId,
+          user1IdStr,
+          user2IdStr,
+          userIdStr,
+          user1Username: conversation.user1?.username,
+          user2Username: conversation.user2?.username,
+        },
+      );
       throw new ForbiddenException("Not authorized to view this conversation");
     }
 
@@ -488,7 +494,7 @@ export class ChatService {
   async sendMessage(senderId: string, dto: CreateMessageDto): Promise<Message> {
     // Only log in development
     if (process.env.NODE_ENV === "development") {
-      console.log("[ChatService] sendMessage called:", {
+      this.logger.debug("[ChatService] sendMessage called:", {
         senderId,
         conversationId: dto.conversationId,
         contentLength: dto.content?.length,
@@ -503,7 +509,7 @@ export class ChatService {
 
     if (!conversation) {
       if (process.env.NODE_ENV === "development") {
-        console.error(
+        this.logger.error(
           "[ChatService] Conversation not found:",
           dto.conversationId,
         );
@@ -526,7 +532,7 @@ export class ChatService {
 
     if (senderHadLeft) {
       if (process.env.NODE_ENV === "development") {
-        console.log(
+        this.logger.debug(
           "[ChatService] Sender is re-entering conversation, resetting deletedAt",
         );
       }
@@ -549,7 +555,7 @@ export class ChatService {
 
     if (user1IdStr !== senderIdStr && user2IdStr !== senderIdStr) {
       if (process.env.NODE_ENV === "development") {
-        console.error(
+        this.logger.error(
           "[ChatService] User not part of conversation - FORBIDDEN",
         );
       }
@@ -565,7 +571,7 @@ export class ChatService {
     const isBlocked = await this.checkBlock(senderId, recipientId);
     if (isBlocked) {
       if (process.env.NODE_ENV === "development") {
-        console.error(
+        this.logger.error(
           "[ChatService] Message blocked - users have blocked each other",
         );
       }
@@ -619,7 +625,7 @@ export class ChatService {
       await this.conversationRepository.update(dto.conversationId, updateData);
 
       if (process.env.NODE_ENV === "development") {
-        console.log(
+        this.logger.debug(
           `[ChatService] 수신자(${recipientId})가 대화방에 있어서 자동 읽음 처리`,
         );
       }
@@ -631,7 +637,7 @@ export class ChatService {
       (conversation.user2Id === recipientId && conversation.user2DeletedAt);
 
     if (recipientHasLeft && process.env.NODE_ENV === "development") {
-      console.log(
+      this.logger.debug(
         "[ChatService] 수신자가 삭제했던 대화에 새 메시지 전송 - 대화 목록에 다시 표시됨 (이전 메시지는 보이지 않음)",
       );
       // deletedAt은 유지하여 이전 메시지는 보이지 않도록 함
@@ -668,13 +674,13 @@ export class ChatService {
           });
 
         if (process.env.NODE_ENV === "development") {
-          console.log(
+          this.logger.debug(
             `[ChatService] 수신자(${recipientId})가 대화방에 없어서 message-notification 발생`,
           );
         }
       } else {
         if (process.env.NODE_ENV === "development") {
-          console.log(
+          this.logger.debug(
             `[ChatService] 수신자(${recipientId})가 대화방에 있어서 notification 생략 (자동 읽음 처리됨)`,
           );
         }
@@ -685,12 +691,12 @@ export class ChatService {
         this.chatGateway.server
           .to(`user:${recipientId}`)
           .emit("conversation-list-refresh");
-        console.log(
+        this.logger.debug(
           "[ChatService] Sent conversation-list-refresh event to recipient who had left",
         );
       }
 
-      console.log("[ChatService] Message broadcasted via WebSocket:", {
+      this.logger.debug("[ChatService] Message broadcasted via WebSocket:", {
         conversationId: dto.conversationId,
         messageId: fullMessage.id,
         recipientId,
@@ -824,7 +830,7 @@ export class ChatService {
   }
 
   async checkBlock(user1Id: string, user2Id: string): Promise<boolean> {
-    console.log("[ChatService] checkBlock called:", { user1Id, user2Id });
+    this.logger.debug("[ChatService] checkBlock called:", { user1Id, user2Id });
 
     try {
       // Check if either user has blocked the other
@@ -835,7 +841,7 @@ export class ChatService {
         ],
       });
 
-      console.log("[ChatService] Block check result:", {
+      this.logger.debug("[ChatService] Block check result:", {
         user1Id,
         user2Id,
         blockFound: !!block,
@@ -850,7 +856,7 @@ export class ChatService {
 
       return !!block;
     } catch (error) {
-      console.error("[ChatService] Error checking block:", error);
+      this.logger.error("[ChatService] Error checking block:", error);
       // On error, allow the message (don't block due to system error)
       return false;
     }
@@ -943,14 +949,14 @@ export class ChatService {
       await this.conversationRepository.update(conversationId, {
         user1DeletedAt: new Date(),
       });
-      console.log(
+      this.logger.debug(
         `[ChatService] User ${userId} left conversation ${conversationId} (as user1)`,
       );
     } else {
       await this.conversationRepository.update(conversationId, {
         user2DeletedAt: new Date(),
       });
-      console.log(
+      this.logger.debug(
         `[ChatService] User ${userId} left conversation ${conversationId} (as user2)`,
       );
     }
@@ -988,7 +994,7 @@ export class ChatService {
           userId: userId,
         });
 
-      console.log(
+      this.logger.debug(
         `[ChatService] Emitted user-left event for conversation ${conversationId}`,
       );
     }

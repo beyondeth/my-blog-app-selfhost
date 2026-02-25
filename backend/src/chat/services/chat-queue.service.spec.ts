@@ -122,8 +122,8 @@ describe("ChatQueueService", () => {
       expect(messages[2].id).toBe("msg3");
       expect(messages[3].id).toBe("msg4");
 
-      // 샤드 4개 + 기본 큐 1개 = 5번 호출
-      expect(pipelineMock.exec).toHaveBeenCalledTimes(5);
+      // 배치 크기 4를 샤드에서 모두 소진하므로 기본 큐는 조회하지 않음
+      expect(pipelineMock.exec).toHaveBeenCalledTimes(4);
     });
   });
 

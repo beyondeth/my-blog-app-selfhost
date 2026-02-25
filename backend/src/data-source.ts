@@ -1,9 +1,22 @@
 import { DataSource } from "typeorm";
 import * as dotenv from "dotenv";
+import * as fs from "fs";
+import * as path from "path";
 
 // 프로덕션 환경이 아닐 때만 dotenv 로드 (프로덕션에서는 환경변수가 이미 설정됨)
 if (process.env.NODE_ENV !== "production") {
-  dotenv.config();
+  const candidateEnvFiles = [
+    ".env.local",
+    ".env",
+    "../.env.local",
+    "../.env",
+  ].map((relativePath) => path.resolve(process.cwd(), relativePath));
+
+  for (const envFile of candidateEnvFiles) {
+    if (fs.existsSync(envFile)) {
+      dotenv.config({ path: envFile, override: false });
+    }
+  }
 }
 
 /**

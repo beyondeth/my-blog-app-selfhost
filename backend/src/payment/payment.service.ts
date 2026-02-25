@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from "@nestjs/common";
+import { Injectable, BadRequestException, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
@@ -27,6 +27,7 @@ import {
  */
 @Injectable()
 export class PaymentService {
+  private readonly logger = new Logger(PaymentService.name);
   private providers: Map<string, PaymentProvider> = new Map();
 
   constructor(
@@ -318,7 +319,7 @@ export class PaymentService {
         break;
 
       default:
-        console.log(`Unhandled webhook event type: ${event.type}`);
+        this.logger.warn(`Unhandled webhook event type: ${event.type}`);
     }
   }
 
@@ -399,7 +400,7 @@ export class PaymentService {
    */
   private async handleSubscriptionUpdated(data: any) {
     // 구독 상태 업데이트 로직
-    console.log("Subscription updated:", data);
+    this.logger.debug("Subscription updated:", data);
   }
 
   /**
@@ -424,7 +425,7 @@ export class PaymentService {
    */
   private async handleInvoicePaymentSuccess(data: any) {
     // 정기 결제 성공 처리
-    console.log("Invoice payment succeeded:", data);
+    this.logger.debug("Invoice payment succeeded:", data);
   }
 
   /**
@@ -433,6 +434,6 @@ export class PaymentService {
   private async handleInvoicePaymentFailed(data: any) {
     // 정기 결제 실패 처리
     // 재시도 또는 구독 일시 정지 등
-    console.log("Invoice payment failed:", data);
+    this.logger.debug("Invoice payment failed:", data);
   }
 }

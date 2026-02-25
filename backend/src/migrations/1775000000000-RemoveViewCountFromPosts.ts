@@ -53,24 +53,60 @@ export class RemoveViewCountFromPosts1775000000000
         `);
 
     await queryRunner.query(`
-            CREATE MATERIALIZED VIEW mv_popular_posts AS
-            SELECT p.id,
-                p.title,
-                p.slug,
-                p.excerpt,
-                p.thumbnail,
-                p."blogId",
-                p."authorId",
-                p."publishedAt",
-                p."createdAt",
-                ps."viewCount",
-                ps."likeCount",
-                ps."commentCount",
-                ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2 AS "popularityScore"
-            FROM posts p
-            LEFT JOIN post_stats ps ON p.id = ps."postId"
-            WHERE p."isPublished" = true AND p."isDeleted" = false
-            ORDER BY (ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2) DESC, p."publishedAt" DESC
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'posts'
+                      AND column_name = 'thumbnail'
+                ) THEN
+                    EXECUTE '
+                        CREATE MATERIALIZED VIEW mv_popular_posts AS
+                        SELECT p.id,
+                            p.title,
+                            p.slug,
+                            p.excerpt,
+                            p.thumbnail,
+                            p."blogId",
+                            p."authorId",
+                            p."publishedAt",
+                            p."createdAt",
+                            ps."viewCount",
+                            ps."likeCount",
+                            ps."commentCount",
+                            ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2 AS "popularityScore"
+                        FROM posts p
+                        LEFT JOIN post_stats ps ON p.id = ps."postId"
+                        WHERE p."isPublished" = true AND p."isDeleted" = false
+                        ORDER BY (ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2) DESC, p."publishedAt" DESC
+                    ';
+                ELSE
+                    EXECUTE '
+                        CREATE MATERIALIZED VIEW mv_popular_posts AS
+                        SELECT p.id,
+                            p.title,
+                            p.slug,
+                            p.excerpt,
+                            COALESCE(f."file_url", NULL) AS thumbnail,
+                            p."blogId",
+                            p."authorId",
+                            p."publishedAt",
+                            p."createdAt",
+                            ps."viewCount",
+                            ps."likeCount",
+                            ps."commentCount",
+                            ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2 AS "popularityScore"
+                        FROM posts p
+                        LEFT JOIN post_stats ps ON p.id = ps."postId"
+                        LEFT JOIN files f ON p."thumbnail_image_id" = f.id
+                        WHERE p."isPublished" = true AND p."isDeleted" = false
+                        ORDER BY (ps."viewCount" + ps."likeCount" * 3 + ps."commentCount" * 2) DESC, p."publishedAt" DESC
+                    ';
+                END IF;
+            END
+            $$;
         `);
 
     await queryRunner.query(`
@@ -120,23 +156,58 @@ export class RemoveViewCountFromPosts1775000000000
         `);
 
     await queryRunner.query(`
-            CREATE MATERIALIZED VIEW mv_popular_posts AS
-            SELECT id,
-                title,
-                slug,
-                excerpt,
-                thumbnail,
-                "blogId",
-                "authorId",
-                "publishedAt",
-                "createdAt",
-                "viewCount",
-                "likeCount",
-                "commentCount",
-                "viewCount" + "likeCount" * 3 + "commentCount" * 2 AS "popularityScore"
-            FROM posts p
-            WHERE "isPublished" = true AND "isDeleted" = false
-            ORDER BY ("viewCount" + "likeCount" * 3 + "commentCount" * 2) DESC, "publishedAt" DESC
+            DO $$
+            BEGIN
+                IF EXISTS (
+                    SELECT 1
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                      AND table_name = 'posts'
+                      AND column_name = 'thumbnail'
+                ) THEN
+                    EXECUTE '
+                        CREATE MATERIALIZED VIEW mv_popular_posts AS
+                        SELECT id,
+                            title,
+                            slug,
+                            excerpt,
+                            thumbnail,
+                            "blogId",
+                            "authorId",
+                            "publishedAt",
+                            "createdAt",
+                            "viewCount",
+                            "likeCount",
+                            "commentCount",
+                            "viewCount" + "likeCount" * 3 + "commentCount" * 2 AS "popularityScore"
+                        FROM posts p
+                        WHERE "isPublished" = true AND "isDeleted" = false
+                        ORDER BY ("viewCount" + "likeCount" * 3 + "commentCount" * 2) DESC, "publishedAt" DESC
+                    ';
+                ELSE
+                    EXECUTE '
+                        CREATE MATERIALIZED VIEW mv_popular_posts AS
+                        SELECT p.id,
+                            p.title,
+                            p.slug,
+                            p.excerpt,
+                            COALESCE(f."file_url", NULL) AS thumbnail,
+                            p."blogId",
+                            p."authorId",
+                            p."publishedAt",
+                            p."createdAt",
+                            p."viewCount",
+                            p."likeCount",
+                            p."commentCount",
+                            p."viewCount" + p."likeCount" * 3 + p."commentCount" * 2 AS "popularityScore"
+                        FROM posts p
+                        LEFT JOIN files f ON p."thumbnail_image_id" = f.id
+                        WHERE p."isPublished" = true AND p."isDeleted" = false
+                        ORDER BY (p."viewCount" + p."likeCount" * 3 + p."commentCount" * 2) DESC, p."publishedAt" DESC
+                    ';
+                END IF;
+            END
+            $$;
         `);
 
     await queryRunner.query(`

@@ -51,9 +51,6 @@ export function AuthProviderV2({ children }: { children: React.ReactNode }) {
 
       // MCP OAuth 데이터가 있고, 인증된 상태인 경우에만 처리
       if (mcpOAuthData && authValue.isAuthenticated) {
-        // 즉시 삭제하여 중복 처리 방지
-        sessionStorage.removeItem('mcpOAuth');
-
         try {
           const { state, callback_url } = JSON.parse(mcpOAuthData);
 
@@ -72,12 +69,23 @@ export function AuthProviderV2({ children }: { children: React.ReactNode }) {
           });
 
           if (!response.ok) {
-            throw new Error('MCP OAuth 완료 실패');
+            const errorPayload = await response.json().catch(() => null);
+            const errorCode = errorPayload?.code || errorPayload?.error;
+
+            // 약관 미동의는 정상 분기입니다.
+            // - 동의 페이지 완료 후 consent 페이지에서 자동으로 complete를 재시도합니다.
+            if (response.status === 403 && errorCode === 'CONSENT_REQUIRED') {
+              return;
+            }
+
+            throw new Error(errorPayload?.message || 'MCP OAuth 완료 실패');
           }
 
           const data = await response.json();
 
           if (data.success && data.redirect_url) {
+            // 성공 시에만 상태 제거
+            sessionStorage.removeItem('mcpOAuth');
             // MCP Proxy callback으로 리다이렉트 (Claude로 돌아감)
             window.location.href = data.redirect_url;
           }

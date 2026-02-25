@@ -10,6 +10,7 @@ import mixpanelBrowser from 'mixpanel-browser';
 
 // 초기화 상태 관리
 let isInitialized = false;
+let isDisabled = false;
 let initPromise: Promise<void> | null = null;
 
 // 이벤트 큐 (초기화 전 이벤트들을 임시 저장)
@@ -32,6 +33,10 @@ export const initMixpanel = (): Promise<void> => {
     return Promise.resolve(); // 서버 사이드에서는 실행하지 않음
   }
 
+  if (isDisabled) {
+    return Promise.resolve(); // 비활성화 상태면 no-op
+  }
+
   if (isInitialized) {
     return Promise.resolve(); // 이미 초기화됨
   }
@@ -44,7 +49,7 @@ export const initMixpanel = (): Promise<void> => {
 
   if (!token) {
     console.warn('⚠️  Mixpanel token이 설정되지 않았습니다. 환경변수 NEXT_PUBLIC_MIXPANEL_TOKEN을 추가하세요.');
-    isInitialized = true; // 초기화 실패 처리 방지를 위해 true로 설정
+    isDisabled = true; // 토큰이 없으면 추적 비활성화 (앱 동작에는 영향 없음)
     return Promise.resolve();
   }
 
@@ -68,7 +73,9 @@ export const initMixpanel = (): Promise<void> => {
           if (process.env.NODE_ENV === 'development' && delay > 100) {
             console.log(`⚠️ Event "${eventName}" was delayed by ${delay}ms`);
           }
-          mixpanelBrowser.track(eventName, properties);
+          safeMixpanelCall('track(queued)', () => {
+            mixpanelBrowser.track(eventName, properties);
+          });
         });
         // 큐 비우기
         eventQueue.length = 0;
@@ -77,9 +84,13 @@ export const initMixpanel = (): Promise<void> => {
       resolve();
     } catch (error) {
       console.error('📊 Mixpanel initialization failed:', error);
+      isDisabled = true; // 초기화 실패 시 추적 비활성화
       // 실패해도 큐에 있는 이벤트들이 계속 쌓이지 않도록 처리
       eventQueue.length = 0;
       resolve(); // 실패해도 Promise는 resolve하여 앱이 멈추지 않음
+    } finally {
+      // 초기화 시도 완료 후 재시도 가능하도록 해제
+      initPromise = null;
     }
   });
 
@@ -95,11 +106,25 @@ export const isMixpanelInitialized = (): boolean => isInitialized;
  * 초기화 대기
  */
 export const waitForInitialization = (): Promise<void> => {
+  if (isDisabled) {
+    return Promise.resolve();
+  }
   if (isInitialized) {
     return Promise.resolve();
   }
+  if (initPromise) {
+    return initPromise;
+  }
   return initMixpanel();
 };
+
+function safeMixpanelCall(name: string, fn: () => void) {
+  try {
+    fn();
+  } catch (error) {
+    console.error(`[Mixpanel] ${name} failed:`, error);
+  }
+}
 
 /**
  * Mixpanel 이벤트 추적 래퍼
@@ -111,9 +136,13 @@ export const mixpanel = {
    * @param properties 이벤트 속성
    */
   track: (eventName: string, properties?: Record<string, any>) => {
+    if (isDisabled) return;
+
     if (isInitialized) {
       // 이미 초기화됨: 바로 추적
-      mixpanelBrowser.track(eventName, properties);
+      safeMixpanelCall('track', () => {
+        mixpanelBrowser.track(eventName, properties);
+      });
     } else {
       // 초기화 안됨: 큐에 추가
       eventQueue.push({
@@ -135,8 +164,10 @@ export const mixpanel = {
    */
   identify: async (userId: string) => {
     await waitForInitialization();
-    if (isInitialized) {
-      mixpanelBrowser.identify(userId);
+    if (isInitialized && !isDisabled) {
+      safeMixpanelCall('identify', () => {
+        mixpanelBrowser.identify(userId);
+      });
     }
   },
 
@@ -147,8 +178,10 @@ export const mixpanel = {
   people: {
     set: async (properties: Record<string, any>) => {
       await waitForInitialization();
-      if (isInitialized) {
-        mixpanelBrowser.people.set(properties);
+      if (isInitialized && !isDisabled) {
+        safeMixpanelCall('people.set', () => {
+          mixpanelBrowser.people.set(properties);
+        });
       }
     },
 
@@ -159,8 +192,10 @@ export const mixpanel = {
      */
     increment: async (property: string, value: number = 1) => {
       await waitForInitialization();
-      if (isInitialized) {
-        mixpanelBrowser.people.increment(property, value);
+      if (isInitialized && !isDisabled) {
+        safeMixpanelCall('people.increment', () => {
+          mixpanelBrowser.people.increment(property, value);
+        });
       }
     },
   },
@@ -171,8 +206,10 @@ export const mixpanel = {
    */
   trackPageView: async (pageName?: string) => {
     await waitForInitialization();
-    if (isInitialized) {
-      mixpanelBrowser.track_pageview(pageName ? { page: pageName } : undefined);
+    if (isInitialized && !isDisabled) {
+      safeMixpanelCall('track_pageview', () => {
+        mixpanelBrowser.track_pageview(pageName ? { page: pageName } : undefined);
+      });
     }
   },
 
@@ -181,8 +218,10 @@ export const mixpanel = {
    */
   reset: async () => {
     await waitForInitialization();
-    if (isInitialized) {
-      mixpanelBrowser.reset();
+    if (isInitialized && !isDisabled) {
+      safeMixpanelCall('reset', () => {
+        mixpanelBrowser.reset();
+      });
     }
   },
 
@@ -192,8 +231,10 @@ export const mixpanel = {
    */
   timeEvent: async (eventName: string) => {
     await waitForInitialization();
-    if (isInitialized) {
-      mixpanelBrowser.time_event(eventName);
+    if (isInitialized && !isDisabled) {
+      safeMixpanelCall('time_event', () => {
+        mixpanelBrowser.time_event(eventName);
+      });
     }
   },
 };

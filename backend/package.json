@@ -163,6 +163,12 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "moduleNameMapper": {
+      "^marked$": "<rootDir>/../node_modules/marked/lib/marked.umd.js"
+    },
+    "transformIgnorePatterns": [
+      "/node_modules/(?!(marked)/)"
+    ],
     "collectCoverageFrom": [
       "**/*.(t|j)s"
     ],

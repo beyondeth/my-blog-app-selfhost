@@ -18,6 +18,7 @@ import { useToggleEditorPick } from '@/hooks/useEditorPicks';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { mixpanel } from '@/lib/mixpanel';
+import { getViewerId } from '@/lib/viewer-id';
 import RelatedPostsSection from '@/components/post/RelatedPostsSection';
 
 /**
@@ -311,9 +312,11 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
       hasViewed.current = true;  // 가장 먼저 설정하여 중복 실행 방지
 
       // Increment view count (에러 핸들링 개선)
+      const viewerId = getViewerId();
       fetch(`/api/v1/posts/${post.id}/view`, {
         method: 'POST',
-        credentials: 'include'  // 일관성을 위해 credentials 추가
+        credentials: 'include',  // 일관성을 위해 credentials 추가
+        headers: viewerId ? { 'X-Viewer-Id': viewerId } : undefined,
       }).catch((error) => {
         // 자산 오류만 기록, 사용자 경험에는 영향 주지 않음
         console.error('Failed to increment view count:', error);

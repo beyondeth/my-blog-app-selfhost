@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="myblog_background">#0B0E14</color>
+    <color name="myblog_grouped_background">#101521</color>
+    <color name="myblog_surface">#141A27</color>
+    <color name="myblog_surface_variant">#1A2233</color>
+    <color name="myblog_divider">#26FFFFFF</color>
+    <color name="myblog_text_primary">#F8FAFF</color>
+    <color name="myblog_text_body">#E5EAF5</color>
+    <color name="myblog_text_secondary">#9AA6BC</color>
+    <color name="myblog_tab_bar">#0F1626</color>
+    <color name="myblog_source_badge_bg">#F8FAFF</color>
+    <color name="myblog_success">#4FD4CF</color>
+    <color name="myblog_error">#FF6B6B</color>
+    <color name="myblog_inset_light">#334155</color>
+    <color name="myblog_tab_shell">#111A2D</color>
+    <color name="myblog_tab_shell_top">#182238</color>
+    <color name="myblog_tab_shell_bottom">#111A2D</color>
+    <color name="myblog_tab_shell_stroke">#2A3853</color>
+    <color name="myblog_tab_item_selected">#24314A</color>
+    <color name="myblog_chip_selected">#F8FAFF</color>
+    <color name="myblog_chip_unselected">#1A2233</color>
+    <color name="myblog_icon_muted">#9AA6BC</color>
+</resources>

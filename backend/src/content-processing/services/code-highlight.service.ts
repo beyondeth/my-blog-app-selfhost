@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { JSDOM } from "jsdom";
 
 /**
@@ -10,6 +10,8 @@ import { JSDOM } from "jsdom";
  */
 @Injectable()
 export class CodeHighlightService {
+  private readonly logger = new Logger(CodeHighlightService.name);
+
   /**
    * HTML 내의 코드 블록을 처리합니다.
    *
@@ -88,7 +90,7 @@ export class CodeHighlightService {
 
       return document.body.innerHTML;
     } catch (error) {
-      console.error("Error processing code blocks:", error);
+      this.logger.error("Error processing code blocks:", error);
       return html;
     }
   }
@@ -145,7 +147,7 @@ export class CodeHighlightService {
         }
       });
     } catch (error) {
-      console.error("Error extracting languages:", error);
+      this.logger.error("Error extracting languages:", error);
     }
 
     return Array.from(languages);
@@ -199,7 +201,7 @@ export class CodeHighlightService {
         stats.totalLines += lines;
       });
     } catch (error) {
-      console.error("Error calculating code stats:", error);
+      this.logger.error("Error calculating code stats:", error);
     }
 
     return stats;

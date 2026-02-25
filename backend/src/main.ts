@@ -15,11 +15,13 @@ import * as morgan from "morgan";
 import { randomBytes } from "crypto";
 import type { Request, Response } from "express";
 
+const bootstrapLogger = new Logger("Bootstrap");
+
 async function bootstrap() {
   // 서버 시작 시 타임존을 한국 시간으로 설정
   process.env.TZ = "Asia/Seoul";
 
-  const logger = new Logger("Bootstrap");
+  const logger = bootstrapLogger;
 
   // 환경에 따른 로그 레벨 설정
   // 프로덕션: ERROR, WARN만 출력 (LOG, DEBUG, VERBOSE 제외)
@@ -296,6 +298,6 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-  console.error("Application failed to start:", error);
+  bootstrapLogger.error("Application failed to start:", error);
   process.exit(1);
 });

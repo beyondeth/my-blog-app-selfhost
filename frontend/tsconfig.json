@@ -28,7 +28,9 @@
       ]
     },
     "types": [
-      "node"
+      "node",
+      "react",
+      "react-dom"
     ],
     "typeRoots": [
       "./node_modules/@types",

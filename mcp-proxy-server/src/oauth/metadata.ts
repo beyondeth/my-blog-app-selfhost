@@ -7,7 +7,7 @@
  * Claude 커스텀 커넥터가 서버를 발견하고 연결하는 데 사용
  */
 
-import { Router } from 'express';
+import { Router, type Request } from 'express';
 import { config } from '../config/env.validation.js';
 import type { AuthorizationServerMetadata, ProtectedResourceMetadata } from './types.js';
 
@@ -18,7 +18,18 @@ const router = Router();
  * - 개발: http://localhost:3002
  * - 프로덕션: https://mcp.codebase.blog
  */
-function getServerUrl(): string {
+function getServerUrl(req?: Request): string {
+  const forwardedProto = ((req?.headers['x-forwarded-proto'] as string) || '')
+    .split(',')[0]
+    ?.trim();
+  const forwardedHost = ((req?.headers['x-forwarded-host'] as string) || '')
+    .split(',')[0]
+    ?.trim();
+  const requestHost = forwardedHost || req?.headers.host || '';
+  if (requestHost) {
+    const proto = forwardedProto || req?.protocol || 'http';
+    return `${proto}://${requestHost}`;
+  }
   return config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
 }
 
@@ -33,10 +44,8 @@ function getServerUrl(): string {
  * Claude는 이 엔드포인트를 먼저 호출하여
  * 어떤 인증 서버를 사용해야 하는지 확인
  */
-router.get('/oauth-protected-resource', (req, res) => {
-  const serverUrl = getServerUrl();
-
-  const metadata: ProtectedResourceMetadata = {
+function buildProtectedResourceMetadata(serverUrl: string): ProtectedResourceMetadata {
+  return {
     // 리소스 식별자 (RFC 8707에서 토큰 요청 시 사용)
     resource: serverUrl,
 
@@ -50,22 +59,10 @@ router.get('/oauth-protected-resource', (req, res) => {
     // 문서 URL
     resource_documentation: 'https://codebase.blog/docs/mcp-oauth',
   };
+}
 
-  res.json(metadata);
-});
-
-/**
- * RFC 8414 - Authorization Server Metadata
- *
- * GET /.well-known/oauth-authorization-server
- *
- * 인증 서버의 모든 엔드포인트와 지원 기능을 선언
- * Claude는 이 정보를 바탕으로 OAuth 흐름 수행
- */
-router.get('/oauth-authorization-server', (req, res) => {
-  const serverUrl = getServerUrl();
-
-  const metadata: AuthorizationServerMetadata = {
+function buildAuthorizationServerMetadata(serverUrl: string): AuthorizationServerMetadata {
+  return {
     // 발급자 식별자 (토큰의 iss 클레임과 일치해야 함)
     issuer: serverUrl,
 
@@ -114,8 +111,46 @@ router.get('/oauth-authorization-server', (req, res) => {
     // UI 로케일
     ui_locales_supported: ['en', 'ko'],
   };
+}
 
-  res.json(metadata);
+router.get('/oauth-protected-resource', (req, res) => {
+  const serverUrl = getServerUrl(req);
+  res.json(buildProtectedResourceMetadata(serverUrl));
+});
+
+// 일부 클라이언트는 resource path suffix를 붙여 조회한다.
+router.get('/oauth-protected-resource/*path', (req, res) => {
+  const serverUrl = getServerUrl(req);
+  res.json(buildProtectedResourceMetadata(serverUrl));
+});
+
+/**
+ * RFC 8414 - Authorization Server Metadata
+ *
+ * GET /.well-known/oauth-authorization-server
+ *
+ * 인증 서버의 모든 엔드포인트와 지원 기능을 선언
+ * Claude는 이 정보를 바탕으로 OAuth 흐름 수행
+ */
+router.get('/oauth-authorization-server', (req, res) => {
+  const serverUrl = getServerUrl(req);
+  res.json(buildAuthorizationServerMetadata(serverUrl));
+});
+
+// 일부 MCP 클라이언트는 suffix path를 붙여 metadata를 조회한다.
+router.get('/oauth-authorization-server/*path', (req, res) => {
+  const serverUrl = getServerUrl(req);
+  res.json(buildAuthorizationServerMetadata(serverUrl));
+});
+
+// OpenAI SDK/aiohttp 계열 클라이언트 호환: OpenID metadata 조회 대응
+router.get('/openid-configuration', (req, res) => {
+  const serverUrl = getServerUrl(req);
+  res.json(buildAuthorizationServerMetadata(serverUrl));
+});
+router.get('/openid-configuration/*path', (req, res) => {
+  const serverUrl = getServerUrl(req);
+  res.json(buildAuthorizationServerMetadata(serverUrl));
 });
 
 /**
@@ -123,12 +158,28 @@ router.get('/oauth-authorization-server', (req, res) => {
  *
  * MCP 스펙에 따라 토큰이 필요할 때 메타데이터 URL 제공
  */
-export function getWWWAuthenticateHeader(): string {
-  const serverUrl = getServerUrl();
+export function getWWWAuthenticateHeader(
+  req?: Request,
+  options?: {
+    error?: 'invalid_token' | 'insufficient_scope' | 'invalid_request';
+    errorDescription?: string;
+  }
+): string {
+  const serverUrl = getServerUrl(req);
   const resourceMetadataUrl = `${serverUrl}/.well-known/oauth-protected-resource`;
 
   // RFC 9728 형식
-  return `Bearer resource_metadata="${resourceMetadataUrl}"`;
+  const parts = [`Bearer resource_metadata="${resourceMetadataUrl}"`];
+
+  if (options?.error) {
+    parts.push(`error="${options.error}"`);
+  }
+  if (options?.errorDescription) {
+    const escaped = options.errorDescription.replace(/"/g, '\\"');
+    parts.push(`error_description="${escaped}"`);
+  }
+
+  return parts.join(', ');
 }
 
 export default router;

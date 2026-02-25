@@ -1,7 +1,10 @@
 /**
  * OAuth 2.1 라우터 통합
  *
- * Claude 커스텀 커넥터를 위한 OAuth 2.1 엔드포인트
+ * OAuth 2.1 공유 엔드포인트
+ * - Skills (MCPorter)
+ * - Claude 커스텀 커넥터
+ * - 기타 OAuth 클라이언트
  *
  * 엔드포인트:
  * - /.well-known/oauth-protected-resource (RFC 9728)
@@ -22,6 +25,7 @@ import axios from 'axios';
 import { logger } from '../utils/logger.js';
 import { config } from '../config/env.validation.js';
 import { registerAllTools } from '../tools/index.js';
+import { getDiscoveryTools } from '../tools/catalog.js';
 import { MetricsService } from '../services/MetricsService.js';
 
 import { OAuthStorage } from './storage.js';
@@ -35,25 +39,67 @@ import type { ValidatedToken } from './types.js';
  *
  * Bearer 토큰을 검증하고 req.oauth에 토큰 정보 추가
  */
-async function oauthMiddleware(
+export async function oauthMiddleware(
   storage: OAuthStorage,
   req: Request,
   res: Response,
   next: NextFunction
 ): Promise<void> {
-  const authHeader = req.headers.authorization;
+  const acceptsEventStream =
+    (req.headers.accept || '').includes('text/event-stream') ||
+    (((req.headers['user-agent'] as string) || '').toLowerCase().includes('openai-mcp') &&
+      req.method.toUpperCase() === 'GET');
 
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.status(401)
-      .header('WWW-Authenticate', getWWWAuthenticateHeader())
-      .json({
+  const sendOAuthError = (
+    status: number,
+    message: string,
+    authenticateHeader?: string
+  ) => {
+    if (authenticateHeader) {
+      res.header('WWW-Authenticate', authenticateHeader);
+    }
+
+    if (acceptsEventStream) {
+      res.status(status);
+      res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
+      res.setHeader('Connection', 'keep-alive');
+
+      const payload = JSON.stringify({
         jsonrpc: '2.0',
         error: {
           code: -32000,
-          message: 'Unauthorized: Bearer token required',
+          message,
         },
         id: null,
       });
+
+      res.write(`event: error\ndata: ${payload}\n\n`);
+      res.end();
+      return;
+    }
+
+    res.status(status).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message,
+      },
+      id: null,
+    });
+  };
+
+  const authHeader = req.headers.authorization;
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    sendOAuthError(
+      401,
+      'Unauthorized: Bearer token required',
+      getWWWAuthenticateHeader(req, {
+        error: 'invalid_request',
+        errorDescription: 'Bearer token required',
+      })
+    );
     return;
   }
 
@@ -61,37 +107,68 @@ async function oauthMiddleware(
   const accessToken = await storage.validateAccessToken(token);
 
   if (!accessToken) {
-    res.status(401)
-      .header('WWW-Authenticate', getWWWAuthenticateHeader())
-      .json({
-        jsonrpc: '2.0',
-        error: {
-          code: -32000,
-          message: 'Unauthorized: Invalid or expired access token',
-        },
-        id: null,
-      });
+    sendOAuthError(
+      401,
+      'Unauthorized: Invalid or expired access token',
+      getWWWAuthenticateHeader(req, {
+        error: 'invalid_token',
+        errorDescription: 'Invalid or expired access token',
+      })
+    );
     return;
   }
 
   // 리소스(audience) 검증 (RFC 8707)
-  // URL 정규화 - trailing slash 제거하여 비교
-  const normalizeUrl = (url: string) => url.replace(/\/$/, '');
+  // 클라이언트마다 resource를 origin으로 보내거나, 보호 경로까지 포함해 보낼 수 있어 둘 다 허용한다.
+  const normalizeUrl = (url: string): string => {
+    try {
+      const parsed = new URL(url);
+      return `${parsed.origin}${parsed.pathname}`.replace(/\/$/, '');
+    } catch {
+      return url.replace(/\/$/, '');
+    }
+  };
   const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
-  if (normalizeUrl(accessToken.resource) !== normalizeUrl(serverUrl)) {
+  const forwardedProto = ((req.headers['x-forwarded-proto'] as string) || '')
+    .split(',')[0]
+    ?.trim();
+  const forwardedHost = ((req.headers['x-forwarded-host'] as string) || '')
+    .split(',')[0]
+    ?.trim();
+  const requestHost = forwardedHost || req.headers.host || '';
+  const requestProto = forwardedProto || req.protocol || 'http';
+  const requestOrigin = requestHost ? `${requestProto}://${requestHost}` : null;
+  const requestBaseUrl = req.baseUrl || '';
+
+  const normalizedResource = normalizeUrl(accessToken.resource);
+  const normalizedServerUrl = normalizeUrl(serverUrl);
+  const allowedResources = new Set<string>([
+    normalizedServerUrl,
+    normalizeUrl(`${serverUrl}/mcp-remote`),
+    normalizeUrl(`${serverUrl}/mcp-openai`),
+  ]);
+  if (requestOrigin) {
+    allowedResources.add(normalizeUrl(requestOrigin));
+    if (requestBaseUrl) {
+      allowedResources.add(normalizeUrl(`${requestOrigin}${requestBaseUrl}`));
+    }
+  }
+
+  if (!allowedResources.has(normalizedResource)) {
     logger.warn({
       expected: serverUrl,
       actual: accessToken.resource,
+      allowedResources: Array.from(allowedResources),
     }, '⚠️ Token audience mismatch');
 
-    res.status(403).json({
-      jsonrpc: '2.0',
-      error: {
-        code: -32001,
-        message: 'Forbidden: Token not valid for this resource',
-      },
-      id: null,
-    });
+    sendOAuthError(
+      403,
+      'Forbidden: Token not valid for this resource',
+      getWWWAuthenticateHeader(req, {
+        error: 'insufficient_scope',
+        errorDescription: 'Token not valid for this resource',
+      })
+    );
     return;
   }
 
@@ -111,7 +188,7 @@ async function oauthMiddleware(
 /**
  * OAuth 인증 사용자 정보 조회 (Backend에서)
  */
-async function getUserInfo(userId: string): Promise<{
+export async function getUserInfo(userId: string): Promise<{
   user: { id: string; username: string; email: string };
   blog: { id: string; name: string; slug: string };
 } | null> {
@@ -151,6 +228,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   wellKnownRouter: Router;
   oauthRouter: Router;
   mcpRemoteRouter: Router;
+  storage: OAuthStorage;
 } {
   const storage = new OAuthStorage(redis);
 
@@ -237,10 +315,12 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         apiKey: null,  // OAuth 모드에서는 API Key 없음
         oauthToken: oauth.token,  // 대신 OAuth 토큰 전달
         metricsService,
+        route: 'mcp-remote',
         config: {
           MCP_BASE_URL: config.MCP_BASE_URL,
           BACKEND_BASE_URL: config.BACKEND_BASE_URL,
           BACKEND_PUBLIC_URL: config.BACKEND_PUBLIC_URL,
+          FRONTEND_URL: config.FRONTEND_URL,
           MCP_SHARED_SECRET: config.MCP_SHARED_SECRET,
         },
       });
@@ -259,15 +339,15 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
 
       // 메트릭 기록
       const duration = Date.now() - startTime;
-      metricsService.recordRequest('success');
-      metricsService.recordRequestDuration(duration);
+      metricsService.recordRequest('success', undefined, 'mcp-remote');
+      metricsService.recordRequestDuration(duration, undefined, 'mcp-remote');
 
       logger.debug({
         userId: oauth.userId.substring(0, 8),
         duration: `${duration}ms`,
       }, '✅ OAuth MCP request processed');
     } catch (error: any) {
-      metricsService.recordRequest('error');
+      metricsService.recordRequest('error', undefined, 'mcp-remote');
       logger.error({ error: error.message }, '❌ OAuth MCP request failed');
 
       if (!res.headersSent) {
@@ -307,20 +387,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         authorization_server: serverUrl,
         protected_resource: `${serverUrl}/.well-known/oauth-protected-resource`,
       },
-      tools: [
-        {
-          name: 'check_auth',
-          description: 'Verify authentication status',
-        },
-        {
-          name: 'get_writing_style_guide',
-          description: 'Retrieve writing style guidelines',
-        },
-        {
-          name: 'create_post',
-          description: 'Create and publish blog posts to codebase.blog',
-        },
-      ],
+      tools: getDiscoveryTools(),
     });
   });
 
@@ -336,6 +403,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     wellKnownRouter,
     oauthRouter,
     mcpRemoteRouter,
+    storage,
   };
 }
 

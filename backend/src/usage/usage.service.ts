@@ -351,7 +351,7 @@ export class UsageService {
    */
   @Cron(CronExpression.EVERY_1ST_DAY_OF_MONTH_AT_MIDNIGHT)
   async resetMonthlyUsage(): Promise<void> {
-    console.log("[UsageService] 월별 사용량 초기화 시작");
+    this.logger.debug("[UsageService] 월별 사용량 초기화 시작");
 
     const lastMonth = new Date();
     lastMonth.setMonth(lastMonth.getMonth() - 1);
@@ -364,12 +364,12 @@ export class UsageService {
       },
     });
 
-    console.log(
+    this.logger.debug(
       `[UsageService] ${lastMonthUsages.length}개의 지난달 사용량 기록 보존`,
     );
 
     // 새로운 월 시작 - 자동으로 새 기록이 생성됨
-    console.log("[UsageService] 월별 사용량 초기화 완료");
+    this.logger.debug("[UsageService] 월별 사용량 초기화 완료");
   }
 
   /**
@@ -377,7 +377,7 @@ export class UsageService {
    */
   @Cron(CronExpression.EVERY_DAY_AT_NOON)
   async checkUsageWarnings(): Promise<void> {
-    console.log("[UsageService] 사용량 경고 체크 시작");
+    this.logger.debug("[UsageService] 사용량 경고 체크 시작");
 
     const currentPeriod = this.getCurrentPeriod();
 
@@ -395,7 +395,7 @@ export class UsageService {
       }
     }
 
-    console.log("[UsageService] 사용량 경고 체크 완료");
+    this.logger.debug("[UsageService] 사용량 경고 체크 완료");
   }
 
   // Helper Methods
@@ -612,7 +612,7 @@ export class UsageService {
     usage: UsageTracking,
   ): Promise<void> {
     // 여기에 이메일 또는 알림 발송 로직 구현
-    console.log(
+    this.logger.debug(
       `[UsageService] 사용량 경고 발송: User ${userId}, ` +
         `${this.getResourceDisplayName(resourceType)} ${usage.getUsagePercentage()}% 사용`,
     );

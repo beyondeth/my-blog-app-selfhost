@@ -10,6 +10,24 @@
 **/.next/
 **/build/
 
+# Mobile platform build artifacts
+mobile/ios/**/DerivedData/
+mobile/ios/**/*.xcuserstate
+mobile/ios/**/*.xccheckout
+mobile/ios/**/*.xcscmblueprint
+mobile/ios/**/*.xcscheme
+mobile/ios/**/*.xcworkspace/xcuserdata/
+mobile/ios/**/Build/
+mobile/android/**/.gradle/
+mobile/android/**/build/
+mobile/android/**/local.properties
+mobile/android/**/*.iml
+mobile/android/**/.idea/
+mobile/android/**/*.apk
+mobile/android/**/*.aab
+*.ipa
+*.dSYM
+
 # Environment variables (실제 값 포함된 파일들)
 **/.env
 **/.env.local
@@ -32,8 +50,7 @@
 # MCP client settings (개인 API 키 포함)
 .mcp.json
 
-# Codex settings (개인 API 키 포함)
-.codex/
+# Codex settings (project-shared files may be tracked)
 
 # Local agent workspace
 .agent/
@@ -134,9 +151,6 @@ backend/cors-config.json
 # Docker volume data (로컬 프로덕션 테스트용)
 # postgres, redis, victoriametrics, grafana 데이터 저장 폴더
 /data/ 
-# Documentation
-docs/
-backend/docs/
 .env
 
 # OpenClaw Isolated Environment

@@ -1,0 +1,122 @@
+name: auto-open-platform-pr
+
+on:
+  push:
+    branches:
+      - "feature/ios/**"
+      - "feature/aos/**"
+      - "feature/web/**"
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  open-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Auto open PR to integration/workspace
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const head = context.ref.replace("refs/heads/", "");
+            const base = "integration/workspace";
+
+            const m = head.match(/^feature\/(ios|aos|web)\//);
+            if (!m) {
+              core.info(`Skip non-platform branch: ${head}`);
+              return;
+            }
+
+            const platform = m[1];
+            const existing = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: "open",
+              head: `${owner}:${head}`,
+              base
+            });
+
+            let prNumber;
+            if (existing.length > 0) {
+              prNumber = existing[0].number;
+              core.info(`PR already exists: #${prNumber}`);
+            } else {
+              const title = `chore(${platform}): auto PR ${head} -> ${base}`;
+              const body = [
+                "## PLATFORM-TRACK",
+                "",
+                "[PLATFORM-TRACK]",
+                `타겟: ${platform === "web" ? "web" : platform === "ios" ? "ios" : "android"}`,
+                "작업유형: feature",
+                "공유영향 확인: NO",
+                "요약: 자동 생성 PR (필요 시 본문 수정)",
+                "",
+                "## Summary",
+                "- 자동 생성된 PR입니다.",
+                "",
+                "## Validation",
+                "- [ ] 빌드/테스트 결과 업데이트",
+                "- [ ] 수동 시나리오 체크 업데이트"
+              ].join("\n");
+
+              const { data: pr } = await github.rest.pulls.create({
+                owner,
+                repo,
+                title,
+                head,
+                base,
+                body
+              });
+
+              prNumber = pr.number;
+              core.info(`Created PR #${prNumber}`);
+            }
+
+            // Guardrail-equivalent check for shared paths.
+            const files = await github.paginate(github.rest.pulls.listFiles, {
+              owner,
+              repo,
+              pull_number: prNumber,
+              per_page: 100
+            });
+            const hasSharedPath = files.some((f) =>
+              f.filename.startsWith("backend/") || f.filename.startsWith("mobile/contracts/")
+            );
+
+            if (hasSharedPath) {
+              core.info("Shared path detected. Add manual-review label and skip auto-merge.");
+              await github.rest.issues.addLabels({
+                owner,
+                repo,
+                issue_number: prNumber,
+                labels: ["manual-review"]
+              });
+              return;
+            }
+
+            // Skip merge when manual-review label exists.
+            const { data: prState } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: prNumber
+            });
+            const labels = (prState.labels || []).map((l) => l.name);
+            if (labels.includes("manual-review")) {
+              core.info("manual-review label present. Skip auto-merge.");
+              return;
+            }
+
+            try {
+              await github.rest.pulls.merge({
+                owner,
+                repo,
+                pull_number: prNumber,
+                merge_method: "squash"
+              });
+              core.info(`Merged PR #${prNumber} automatically.`);
+            } catch (e) {
+              core.warning(`Auto-merge skipped/failed: ${e.message}`);
+            }

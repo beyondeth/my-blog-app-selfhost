@@ -10,7 +10,6 @@ import EditPostForm from '@/components/posts/EditPostForm';
 import LoadingSpinner from '@/components/ui/LoadingSpinner';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import { toast } from 'sonner';
-import { validateUUID } from '@/lib/utils/uuid';
 
 /**
  * 통합 수정 페이지
@@ -70,16 +69,31 @@ export default function EditPostPage() {
       }}
       isLoading={updatePost.isPending}
       onSubmit={(formData, isPublished) => {
-        // thumbnailImageId 유효성 검사 및 처리
-        const validFormData = {
-          ...formData,
-          // thumbnailImageId가 있고 빈 문자열이 아니고 유효한 UUID인 경우에만 포함
-          ...(formData.thumbnailImageId && formData.thumbnailImageId.trim() !== '' && {
-            thumbnailImageId: validateUUID(formData.thumbnailImageId)
-          }),
+        const normalizedCategories = Array.isArray(formData.categories)
+          ? formData.categories.map((value) => value.trim()).filter(Boolean)
+          : typeof (formData as any).category === 'string'
+            ? (formData as any).category.split('/').map((value: string) => value.trim()).filter(Boolean)
+            : [];
+        const nextCategory = normalizedCategories.join('/');
+        const { categories, ...restFormData } = formData;
+
+        const validFormData: any = {
+          ...restFormData,
+          category: nextCategory,
           // 발행 상태 업데이트 (명시적으로 전달된 경우 사용, 아니면 기존 상태 유지)
           isPublished: isPublished ?? post.isPublished ?? true,
         };
+
+        // 썸네일 필드가 폼에 존재하면 명시적으로 전달한다.
+        // - 값이 있으면 그대로 전달
+        // - 빈 값이면 null 전달 (서버에서 기존 썸네일 제거)
+        if (Object.prototype.hasOwnProperty.call(formData, 'thumbnailImageId')) {
+          const nextThumbnailId =
+            typeof formData.thumbnailImageId === 'string'
+              ? formData.thumbnailImageId.trim()
+              : '';
+          validFormData.thumbnailImageId = nextThumbnailId.length > 0 ? nextThumbnailId : null;
+        }
 
         // 디버그 로그
         console.log('🎯 [EDIT_PAGE] Submitting form with data:', {

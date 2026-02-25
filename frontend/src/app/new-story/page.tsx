@@ -63,7 +63,7 @@ import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownCo
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import { apiClient } from '@/lib/api';
-import { serializeImageAttributes, type MarkdownImageInfo } from '@/types/image-metadata.types';
+import type { MarkdownImageInfo } from '@/types/image-metadata.types';
 import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
 import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
 import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
@@ -514,39 +514,6 @@ export default function NewStoryPage() {
     autoConversionSkipRef.current = true;
   }, [form]);
 
-
-  const handleInsertImageFromList = useCallback(
-    (image: MarkdownImageInfo) => {
-      if (!image?.url) {
-        toast.error('이미지 정보를 불러오지 못했습니다.');
-        return;
-      }
-      
-      // HybridMarkdownEditor가 활성화된 경우, 이미지 블록 삽입
-      if (markdownEditorRef.current) {
-        markdownEditorRef.current.insertImageBlock({
-          url: image.url,
-          alt: image.name || 'image',
-          size: 'default',
-          caption: '',
-          fileId: image.id,
-        });
-        toast.success('이미지를 본문에 삽입했습니다.');
-        return;
-      }
-      
-      // Fallback: 기존 마크다운 텍스트 삽입
-      const attrs = serializeImageAttributes({
-        id: image.id,
-        size: 'default',
-        caption: '',
-      });
-      
-      insertMarkdownSnippet(`![${image.name || 'image'}](${image.url})${attrs}`);
-      toast.success('이미지를 본문에 삽입했습니다.');
-    },
-    [insertMarkdownSnippet],
-  );
 
   const scheduleDraftSave = useCallback(
     (forceImmediate = false) => {
@@ -1559,7 +1526,6 @@ export default function NewStoryPage() {
                                       key={image.id}
                                       image={image}
                                       isActiveThumbnail={!selectedYouTubeThumbnailId && currentThumbnailFileId === image.id}
-                                      onInsert={handleInsertImageFromList}
                                       onSetThumbnail={setThumbnailByFileId}
                                     />
                                   ))}

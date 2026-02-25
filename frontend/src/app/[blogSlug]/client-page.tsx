@@ -7,7 +7,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfiniteCursorPosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useBlogBySlug, useBlogCategories } from '@/hooks/useBlogs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
-import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
+import { parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 import { toast } from 'sonner';
 import { useQuery } from '@tanstack/react-query';
@@ -80,17 +80,22 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   useEffect(() => {
     if (!blog || !isClient) return;
 
+    const normalizedParams = new URLSearchParams(searchParams.toString());
+    // 외부 앱(ChatGPT 등)에서 전달하는 redirectUrl은 블로그 공개 페이지 URL 정규화 시 제거.
+    // 공개 URL에 외부 채팅 URL 파라미터가 남지 않도록 한다.
+    normalizedParams.delete('redirectUrl');
+    const normalizedQueryString = normalizedParams.toString();
+
     // 1. old_alias 리다이렉트 (기존 로직 유지)
     if (blog && 'shouldRedirect' in blog && blog.shouldRedirect && blog.redirectTo) {
-      const queryString = searchParams.toString();
-      const redirectPath = `/${blog.redirectTo}${queryString ? `?${queryString}` : ''}`;
+      const redirectPath = `/${blog.redirectTo}${normalizedQueryString ? `?${normalizedQueryString}` : ''}`;
       router.replace(redirectPath);
       return;
     }
 
     // 2. URL 정규화 - 항상 alias 우선
     if (!('shouldRedirect' in blog) || !blog.shouldRedirect) {
-      const queryString = searchParams.toString();
+      const queryString = normalizedQueryString;
       const currentPathWithQuery = `${window.location.pathname}${window.location.search || ''}`;
 
       // alias가 있는 경우 /@alias로, 없는 경우 /slug로 이동
@@ -155,6 +160,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
 
   // URL에서 검색 파라미터 파싱
   const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
+  const currentTag = isClient ? (searchParams.get('tag') || undefined) : undefined;
 
   // 블로그의 포스트 가져오기 (커서 페이지네이션 사용)
   const {
@@ -167,6 +173,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   } = useInfiniteCursorPosts({
     search: currentParams.search,
     category: currentParams.category,
+    tag: currentTag,
     blogId: blog?.id, // blogId를 직접 전달하여 정확한 필터링
 
     sort: sortBy,
@@ -188,8 +195,11 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   }, [blog, user]);
 
   const hasCategoryFilter = Boolean(currentParams.category);
-  const emptyStateMessage = hasCategoryFilter
-    ? "이 카테고리의 글이 삭제되어 더 이상 표시할 내용이 없습니다."
+  const hasTagFilter = Boolean(currentTag);
+  const emptyStateMessage = hasTagFilter
+    ? "이 태그의 글이 삭제되었거나 아직 발행되지 않아 표시할 내용이 없습니다."
+    : hasCategoryFilter
+    ? "이 카테고리의 글이 삭제되었거나 아직 발행되지 않아 표시할 내용이 없습니다."
     : isBlogOwner
       ? "아직 작성된 글이 없습니다. 첫 번째 글을 작성해보세요."
       : "아직 포스트가 없습니다.";
@@ -421,25 +431,26 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
 
   // 태그 클릭 처리 (검색으로 이동)
   const handleTagClick = useCallback((tag: string) => {
-    // 태그를 검색어로 사용하여 URL 업데이트
-    const newParams = {
-      search: tag,
-      page: 1,
-    };
-
-    const newUrl = createSearchUrl(newParams);
-    router.push(newUrl);
-  }, [router]);
+    // 블로그 내부 tag 필터를 사용하고, 충돌 가능성이 있는 search/category는 제거
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('tag', tag);
+    params.set('page', '1');
+    params.delete('search');
+    params.delete('category');
+    router.push(`/${blogSlug}?${params.toString()}`);
+  }, [router, blogSlug, searchParams]);
 
   // 카테고리 클릭 처리 (블로그 내 카테고리 필터링)
   const handleCategoryClick = useCallback((category: string) => {
-    // 현재 블로그 경로를 유지하면서 category 파라미터만 추가
-    const params = new URLSearchParams();
+    // 블로그 내부 category 필터를 사용하고, 충돌 가능성이 있는 search/tag는 제거
+    const params = new URLSearchParams(searchParams.toString());
     params.set('category', category);
     params.set('page', '1');
+    params.delete('search');
+    params.delete('tag');
 
     router.push(`/${blogSlug}?${params.toString()}`);
-  }, [router, blogSlug]);
+  }, [router, blogSlug, searchParams]);
 
   if (!isClient) {
     return <LoadingSpinner message="페이지를 불러오는 중..." />;

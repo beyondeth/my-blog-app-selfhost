@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/communityDetailRoot"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/myblog_background"
+    android:orientation="vertical">
+
+    <View
+        android:id="@+id/communityDetailStatusBarSpacer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingHorizontal="12dp">
+
+        <ImageView
+            android:id="@+id/communityDetailBackButton"
+            android:layout_width="38dp"
+            android:layout_height="38dp"
+            android:background="@drawable/bg_header_icon_button"
+            android:clipToOutline="true"
+            android:contentDescription="@string/community_detail_back"
+            android:padding="8dp"
+            android:src="@drawable/ic_myblog_back"
+            android:tint="@color/myblog_text_primary" />
+
+        <TextView
+            android:id="@+id/communityDetailTitleText"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textColor="@color/myblog_text_primary"
+            android:textSize="20sp"
+            android:textStyle="bold" />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="14dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:orientation="horizontal">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/communitySortNewestButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="84dp"
+                android:layout_height="38dp"
+                android:background="@drawable/bg_filter_chip_selected"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text="@string/community_sort_newest"
+                android:textAllCaps="false"
+                android:textColor="@color/myblog_surface"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/communitySortHotButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="84dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_filter_chip_unselected"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text="@string/community_sort_hot"
+                android:textAllCaps="false"
+                android:textColor="@color/myblog_text_secondary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/communitySortTopButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="84dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="8dp"
+                android:background="@drawable/bg_filter_chip_unselected"
+                android:insetLeft="0dp"
+                android:insetRight="0dp"
+                android:text="@string/community_sort_top"
+                android:textAllCaps="false"
+                android:textColor="@color/myblog_text_secondary"
+                android:textSize="14sp"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="54dp"
+            android:layout_marginTop="10dp"
+            android:background="@drawable/bg_search_field"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="12dp">
+
+            <ImageView
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:src="@drawable/ic_myblog_search"
+                android:tint="@color/myblog_text_secondary" />
+
+            <EditText
+                android:id="@+id/communityDetailSearchInput"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:background="@android:color/transparent"
+                android:hint="@string/community_detail_search_hint"
+                android:paddingStart="8dp"
+                android:textColor="@color/myblog_text_primary"
+                android:textColorHint="@color/myblog_text_secondary"
+                android:textSize="16sp" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
+        android:id="@+id/communityDetailSwipeRefresh"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/communityDetailRecycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingHorizontal="16dp"
+            android:paddingBottom="12dp" />
+    </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+    <TextView
+        android:id="@+id/communityDetailStateText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:padding="18dp"
+        android:textColor="@color/myblog_text_secondary"
+        android:visibility="gone" />
+</LinearLayout>

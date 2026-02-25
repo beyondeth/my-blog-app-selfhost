@@ -179,8 +179,8 @@
 /* 코드 블록 기본 스타일 - highlight.js 적용 전후 일관성 유지 */
 .prose pre,
 .code-block-wrapper pre {
-  background: #282c34; /* Atom One Dark 배경색 */
-  color: #abb2bf; /* Atom One Dark 텍스트 색상 */
+  background: #282c34; /* 기본값(다크) */
+  color: #abb2bf;
   padding: var(--space-lg);
   /* padding-top 제거 - Copy 버튼이 코드 위에 오버레이됨 */
   border-radius: var(--radius-lg);
@@ -194,6 +194,22 @@
   max-width: 100%;
   width: 100%;
   box-sizing: border-box;
+}
+
+/* 라이트 모드에서도 코드블록은 다크 캔버스로 유지 (요청사항 반영) */
+.light .prose pre,
+.light .code-block-wrapper pre {
+  background: #1f2937;
+  color: #e5e7eb;
+  border-color: #111827;
+}
+
+/* 다크 모드 명시(회귀 방지) */
+.dark .prose pre,
+.dark .code-block-wrapper pre {
+  background: #282c34;
+  color: #abb2bf;
+  border-color: #181a1f;
 }
 
 .prose pre code {
@@ -506,6 +522,14 @@
     background: linear-gradient(to right, transparent, rgba(40, 44, 52, 0.9));
     pointer-events: none;
     border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  }
+
+  .light .code-block-wrapper.has-overflow::after {
+    background: linear-gradient(to right, transparent, rgba(31, 41, 55, 0.92));
+  }
+
+  .dark .code-block-wrapper.has-overflow::after {
+    background: linear-gradient(to right, transparent, rgba(40, 44, 52, 0.9));
   }
 
   /* 테이블 수평 스크롤 처리 */

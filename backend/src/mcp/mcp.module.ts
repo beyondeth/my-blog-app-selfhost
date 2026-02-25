@@ -14,6 +14,7 @@ import { Blog } from "../blogs/entities/blog.entity";
 import { McpApiKey } from "./entities/mcp-api-key.entity";
 import { UsageTracking } from "../usage/entities/usage-tracking.entity";
 import { McpApiKeyService } from "./services/mcp-api-key.service";
+import { McpApiKeySecretService } from "./services/mcp-api-key-secret.service";
 
 /**
  * MCP (Model Context Protocol) 모듈
@@ -46,7 +47,7 @@ import { McpApiKeyService } from "./services/mcp-api-key.service";
     McpController, // API Key 관리
     McpProxyController, // MCP 자동포스팅
   ],
-  providers: [McpApiKeyService],
+  providers: [McpApiKeyService, McpApiKeySecretService],
   exports: [McpApiKeyService],
 })
 export class McpModule {}

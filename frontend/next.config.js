@@ -3,13 +3,6 @@ const nextConfig = {
   // Standalone 빌드 모드 (Docker 최적화: 메모리 49% 절감)
   output: 'standalone',
 
-  // 정적 생성 오류 무시 - 빌드 실패 방지
-  // 프리렌더링 실패 시 런타임에 동적으로 렌더링됨
-  experimental: {
-    // Turbopack 대신 Webpack 사용 (안정성 우선)
-    turbo: false,
-  },
-
   // 프로덕션 빌드 최적화: console 제거
   // error와 warn은 유지 (중요 에러 추적용)
   compiler: {

@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="MyBlogTextHeadline">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/myblog_text_primary</item>
+        <item name="android:textSize">22sp</item>
+    </style>
+
+    <style name="MyBlogTextTitleLarge">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/myblog_text_primary</item>
+        <item name="android:textSize">20sp</item>
+    </style>
+
+    <style name="MyBlogTextTitleMedium">
+        <item name="android:fontFamily">sans-serif-medium</item>
+        <item name="android:textColor">@color/myblog_text_primary</item>
+        <item name="android:textSize">17sp</item>
+    </style>
+
+    <style name="MyBlogTextBodyLarge">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textColor">@color/myblog_text_body</item>
+        <item name="android:textSize">16sp</item>
+    </style>
+
+    <style name="MyBlogTextBodyMedium">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textColor">@color/myblog_text_body</item>
+        <item name="android:textSize">15sp</item>
+    </style>
+
+    <style name="MyBlogTextMeta">
+        <item name="android:fontFamily">sans-serif</item>
+        <item name="android:textColor">@color/myblog_text_secondary</item>
+        <item name="android:textSize">13sp</item>
+    </style>
+</resources>

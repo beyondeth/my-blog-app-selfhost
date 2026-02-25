@@ -60,7 +60,7 @@ export class MetricsService {
     this.requestsCounter = new Counter({
       name: 'mcp_requests_total',
       help: 'Total number of MCP requests',
-      labelNames: ['status', 'tool'], // 성공/실패, 도구명
+      labelNames: ['status', 'tool', 'route'], // 성공/실패, 도구명, 라우트
       registers: [this.registry],
     });
 
@@ -87,7 +87,7 @@ export class MetricsService {
     this.requestDuration = new Histogram({
       name: 'mcp_request_duration_seconds',
       help: 'Request processing duration in seconds',
-      labelNames: ['tool'], // 도구명
+      labelNames: ['tool', 'route'], // 도구명, 라우트
       buckets: [0.01, 0.05, 0.1, 0.5, 1, 2, 5, 10], // 10ms ~ 10s
       registers: [this.registry],
     });
@@ -152,11 +152,11 @@ export class MetricsService {
    * 요청 처리 시간 기록
    *
    * @param durationMs 처리 시간 (밀리초)
-   * @param tool 도구명 (check_auth, get_writing_style_guide, create_post)
+   * @param tool 도구명 (check_auth, get_writing_style_guide, create_post, get_image_upload_url, finalize_uploaded_image)
    */
-  recordRequestDuration(durationMs: number, tool?: string): void {
+  recordRequestDuration(durationMs: number, tool?: string, route?: string): void {
     this.requestDuration.observe(
-      { tool: tool || 'unknown' },
+      { tool: tool || 'unknown', route: route || 'unknown' },
       durationMs / 1000
     );
   }
@@ -167,10 +167,11 @@ export class MetricsService {
    * @param status 상태 (success, error)
    * @param tool 도구명
    */
-  recordRequest(status: 'success' | 'error', tool?: string): void {
+  recordRequest(status: 'success' | 'error', tool?: string, route?: string): void {
     this.requestsCounter.inc({
       status,
       tool: tool || 'unknown',
+      route: route || 'unknown',
     });
   }
 

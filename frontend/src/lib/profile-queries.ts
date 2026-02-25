@@ -274,9 +274,20 @@ export const authQueryKeys = {
  * ```
  */
 export const useUser = () => {
-  return useQuery({
+  return useQuery<User | null>({
     queryKey: authQueryKeys.user(),
-    queryFn: () => apiRequest<User>('/auth/me'),
+    queryFn: async () => {
+      try {
+        return await apiRequest<User>('/auth/me');
+      } catch (error: any) {
+        // 비로그인(401)은 예외로 올리지 않고 "미인증 사용자(null)"로 처리
+        // UI가 에러 화면으로 깨지는 것을 방지하고, 인증 상태는 useAuthV2에서 판별한다.
+        if (error?.message === 'Unauthorized') {
+          return null;
+        }
+        throw error;
+      }
+    },
     staleTime: 2 * 60 * 1000,     // 5분 → 2분으로 단축 (더 자주 갱신)
     gcTime: 10 * 60 * 1000,        // 10분간 캐시 보관
     retry: (failureCount, error) => {

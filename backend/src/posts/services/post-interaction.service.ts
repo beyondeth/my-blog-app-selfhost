@@ -60,13 +60,11 @@ export class PostInteractionService {
     const lock = await this.redisLockService.acquireLock(lockKey, 3000);
 
     try {
-      // 사용자별 조회수 증가 (로그인 사용자)
-      if (userId) {
-        const userViewKey = CacheKeys.POST_USER_VIEW(postId, userId);
-        const hasViewed = await this.redisLockService.get(userViewKey);
+      const uniqueViewKey = this.buildUniqueViewKey(postId, userId);
+      if (uniqueViewKey) {
+        const hasViewed = await this.redisLockService.get(uniqueViewKey);
 
         if (hasViewed) {
-          // 이미 조회한 사용자이면 기존 조회수 반환
           const post = await this.postsRepository.findOne({
             where: { id: postId },
             relations: ["stats"],
@@ -74,8 +72,7 @@ export class PostInteractionService {
           return post?.stats?.viewCount || 0;
         }
 
-        // 24시간 동안 사용자 조회 기록 저장
-        await this.redisLockService.set(userViewKey, "1", CacheTTL.DAY);
+        await this.redisLockService.set(uniqueViewKey, "1", CacheTTL.DAY);
       }
 
       // PostStats에서 조회수 증가
@@ -114,6 +111,14 @@ export class PostInteractionService {
     } finally {
       await this.redisLockService.releaseLock(lockKey, lock);
     }
+  }
+
+  private buildUniqueViewKey(postId: string, userId?: string): string | null {
+    if (userId) {
+      return CacheKeys.POST_USER_VIEW(postId, userId);
+    }
+
+    return null;
   }
 
   /**

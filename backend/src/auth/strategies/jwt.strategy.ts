@@ -7,9 +7,28 @@ import { User } from "../../users/entities/user.entity";
 import { Request } from "express";
 import { UnifiedRedisService } from "../../redis/unified-redis.service";
 
+type CachedAuthPrincipal = {
+  id: string;
+  username: string | null;
+  role: User["role"];
+  authProvider: User["authProvider"] | null;
+  isEmailVerified: boolean;
+  isActive: boolean;
+  isDeleted: boolean;
+  suspensionUntil: Date | null;
+  suspensionReason: string | null;
+  isBanned: boolean;
+  banReason: string | null;
+  bannedAt: Date | null;
+  createdAt: Date | null;
+};
+
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   private readonly logger = new Logger(JwtStrategy.name);
+  // UUID v1~v8 공통 허용 (v7 포함)
+  private readonly uuidPattern =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
   constructor(
     private configService: ConfigService,
@@ -33,12 +52,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   async validate(payload: any) {
     // JWT payload has 'sub' field (standard claim)
-    const userId = payload.sub || payload.id;
+    const rawUserId = payload?.sub ?? payload?.id;
+    const userId = rawUserId == null ? "" : String(rawUserId);
     const tokenType = payload.tokenType;
 
     // 개발 환경 및 프로덕션에서 모두 로깅 (보안 마스킹 적용)
     this.logger.log(
-      `[JWT] Token validation - userId: ${userId ? userId.substring(0, 8) + "..." : "null"}, type: ${tokenType}`,
+      `[JWT] Token validation - userId: ${this.maskUserId(userId)}, type: ${tokenType}`,
     );
 
     // 개발 환경에서 더 상세한 디버그 로그 추가
@@ -46,9 +66,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       this.logger.debug(
         `[JWT] Starting validation for token type: ${tokenType}`,
       );
-      this.logger.debug(
-        `[JWT] User ID (masked): ${userId ? userId.substring(0, 8) + "..." : "null"}`,
-      );
+      this.logger.debug(`[JWT] User ID (masked): ${this.maskUserId(userId)}`);
     }
 
     const expectedIssuer = this.configService.get<string>(
@@ -62,6 +80,14 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     if (!userId) {
       this.logger.error("[JWT] No userId found in JWT payload");
+      return null;
+    }
+
+    // 레거시/손상 토큰 방어: UUID 형식이 아니면 인증 실패 처리 (500 방지)
+    if (!this.uuidPattern.test(userId)) {
+      this.logger.warn(
+        `[JWT] Invalid userId format in token payload: ${this.maskUserId(userId)}`,
+      );
       return null;
     }
 
@@ -94,22 +120,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const cacheKey = `user_validate_${userId}_${tokenType}`; // 토큰 타입도 포함하여 격리 강화
 
     // 1. 캐시에서 사용자 정보 조회
-    const cachedUser: User = await this.unifiedRedisService.getCache(
-      "sessions",
-      cacheKey,
-    );
-    if (cachedUser) {
-      this.logger.log(
-        `[JWT] Cache HIT for user: ${cachedUser.email} (ID: ${cachedUser.id.substring(0, 8)}...), cacheKey: ${cacheKey}`,
+    const cachedPrincipal =
+      await this.unifiedRedisService.getCache<CachedAuthPrincipal>(
+        "sessions",
+        cacheKey,
       );
-      return cachedUser;
+    if (cachedPrincipal) {
+      const principal = this.hydratePrincipal(cachedPrincipal, payload);
+      this.logger.log(
+        `[JWT] Cache HIT for user: ${this.maskEmail(principal.email)} (ID: ${this.maskUserId(principal.id)}), cacheKey: ${cacheKey}`,
+      );
+      return principal;
     }
 
     // 2. 캐시에 없으면 DB에서 조회
     this.logger.log(
-      `[JWT] Cache MISS for user ID: ${userId.substring(0, 8)}..., cacheKey: ${cacheKey}`,
+      `[JWT] Cache MISS for user ID: ${this.maskUserId(userId)}, cacheKey: ${cacheKey}`,
     );
-    const user = await this.usersService.findById(userId);
+    const user = await this.usersService.findByIdForAuth(userId);
 
     if (!user) {
       this.logger.error("[JWT] User not found in database");
@@ -167,10 +195,27 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     // 3. DB 조회 결과를 캐시에 저장
     // TTL 개선: 5초에서 30분으로 연장 (토큰 만료 시 자동 갱신)
     const cacheTTL = this.configService.get<number>("JWT_CACHE_TTL", 1800); // 30분
+    const principal = this.buildPrincipal(user, payload);
+    // 민감한 이메일은 Redis 캐시에 저장하지 않고 요청 컨텍스트에서만 사용한다.
+    const cachePrincipal: CachedAuthPrincipal = {
+      id: principal.id,
+      username: principal.username ?? null,
+      role: principal.role,
+      authProvider: principal.authProvider ?? null,
+      isEmailVerified: !!principal.isEmailVerified,
+      isActive: !!principal.isActive,
+      isDeleted: !!principal.isDeleted,
+      suspensionUntil: principal.suspensionUntil ?? null,
+      suspensionReason: principal.suspensionReason ?? null,
+      isBanned: !!principal.isBanned,
+      banReason: principal.banReason ?? null,
+      bannedAt: principal.bannedAt ?? null,
+      createdAt: principal.createdAt ?? null,
+    };
     await this.unifiedRedisService.setCache(
       "sessions",
       cacheKey,
-      user,
+      cachePrincipal,
       cacheTTL,
     );
 
@@ -181,6 +226,68 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       );
     }
 
-    return user;
+    return principal;
+  }
+
+  private maskUserId(value: unknown): string {
+    if (value == null) {
+      return "null";
+    }
+    const raw = String(value);
+    if (raw.length <= 8) {
+      return raw;
+    }
+    return `${raw.substring(0, 8)}...`;
+  }
+
+  private maskEmail(value: unknown): string {
+    if (!value || typeof value !== "string") {
+      return "unknown";
+    }
+    const [local, domain] = value.split("@");
+    if (!local || !domain) {
+      return "unknown";
+    }
+    return `${local.substring(0, 2)}***@${domain}`;
+  }
+
+  private buildPrincipal(user: User, payload: any): User {
+    return {
+      id: user.id,
+      email: user.email ?? payload?.email ?? null,
+      username: user.username ?? null,
+      role: user.role,
+      authProvider: user.authProvider ?? null,
+      isEmailVerified: !!user.isEmailVerified,
+      isActive: !!user.isActive,
+      isDeleted: !!user.isDeleted,
+      suspensionUntil: user.suspensionUntil ?? null,
+      suspensionReason: user.suspensionReason ?? null,
+      isBanned: !!user.isBanned,
+      banReason: user.banReason ?? null,
+      bannedAt: user.bannedAt ?? null,
+      createdAt: user.createdAt ?? null,
+      lastLoginProvider: payload?.lastLoginProvider ?? null,
+    } as User;
+  }
+
+  private hydratePrincipal(cached: CachedAuthPrincipal, payload: any): User {
+    return {
+      id: cached.id,
+      email: payload?.email ?? null,
+      username: cached.username ?? null,
+      role: cached.role,
+      authProvider: cached.authProvider ?? null,
+      isEmailVerified: !!cached.isEmailVerified,
+      isActive: !!cached.isActive,
+      isDeleted: !!cached.isDeleted,
+      suspensionUntil: cached.suspensionUntil ?? null,
+      suspensionReason: cached.suspensionReason ?? null,
+      isBanned: !!cached.isBanned,
+      banReason: cached.banReason ?? null,
+      bannedAt: cached.bannedAt ?? null,
+      createdAt: cached.createdAt ?? null,
+      lastLoginProvider: payload?.lastLoginProvider ?? null,
+    } as User;
   }
 }

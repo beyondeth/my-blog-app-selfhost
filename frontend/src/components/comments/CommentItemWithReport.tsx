@@ -7,6 +7,7 @@ import { useReport } from '@/hooks/useReport';
 import ReportModal from '@/components/reports/ReportModal';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
+import { formatRelativeTime } from '@/utils/timeFormat';
 
 interface Comment {
   id: string;
@@ -58,26 +59,6 @@ export default function CommentItemWithReport({
     setShowDropdown(false);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffTime = Math.abs(now.getTime() - date.getTime());
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
-    if (diffDays < 1) {
-      const diffHours = Math.ceil(diffTime / (1000 * 60 * 60));
-      if (diffHours < 1) {
-        const diffMinutes = Math.ceil(diffTime / (1000 * 60));
-        return `${diffMinutes}분 전`;
-      }
-      return `${diffHours}시간 전`;
-    } else if (diffDays < 7) {
-      return `${diffDays}일 전`;
-    } else {
-      return date.toLocaleDateString('ko-KR');
-    }
-  };
-
   return (
     <>
       <div className="flex space-x-3">
@@ -100,7 +81,7 @@ export default function CommentItemWithReport({
                   {comment.author.username}
                 </span>
                 <span className="text-xs text-gray-500">
-                  {formatDate(comment.createdAt)}
+                  {formatRelativeTime(comment.createdAt)}
                 </span>
               </div>
 

@@ -47,6 +47,7 @@ import { GetRepliesDto } from "../../comments/dto/get-replies.dto";
 import { VoteType } from "../../posts/enums/vote-type.enum";
 import { VoteDto, VoteResponseDto } from "../../posts/dto/vote.dto";
 import { RateLimit } from "../../rate-limit/rate-limit.decorator";
+import { ViewerIdUtil } from "../../common/utils/viewer-id.util";
 
 /**
  * 커뮤니티 게시물 컨트롤러
@@ -138,6 +139,31 @@ export class CommunityPostController {
   /**
    * 게시물 상세 조회
    */
+  @Get("id/:postId")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard, CommunityVisibilityGuard)
+  @ApiOperation({ summary: "게시물 상세 조회 (ID)" })
+  @ApiParam({ name: "slug", description: "커뮤니티 slug" })
+  @ApiParam({ name: "postId", description: "게시물 ID" })
+  @ApiResponse({ status: 200, description: "커뮤니티 게시물 상세 정보" })
+  @ApiResponse({ status: 404, description: "게시물 없음" })
+  async findOneById(
+    @CommunitySlug() slug: string,
+    @CommunityPostId("postId") postId: string,
+    @Request() req: any,
+  ) {
+    const userId = req.user?.id;
+    const post = await this.postService.findById(slug, postId, userId);
+
+    return {
+      success: true,
+      data: post,
+    };
+  }
+
+  /**
+   * 게시물 상세 조회
+   */
   @Get(":postSlug")
   @Public()
   @UseGuards(OptionalJwtAuthGuard, CommunityVisibilityGuard)
@@ -203,8 +229,10 @@ export class CommunityPostController {
   async delete(@CommunityPostId("postId") postId: string, @Request() req: any) {
     const userId = req.user.id;
     const userRole = req.communityMembership?.role;
+    const isPlatformAdmin =
+      String(req.user?.role || "").toLowerCase() === "admin";
 
-    await this.postService.delete(postId, userId, userRole);
+    await this.postService.delete(postId, userId, userRole, isPlatformAdmin);
 
     return;
   }
@@ -367,6 +395,32 @@ export class CommunityPostController {
     };
   }
 
+  /**
+   * 게시물 조회수 증가
+   */
+  @Post(":postId/view")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard, CommunityVisibilityGuard)
+  @ApiOperation({ summary: "게시물 조회수 증가" })
+  @ApiParam({ name: "slug", description: "커뮤니티 slug" })
+  @ApiParam({ name: "postId", description: "게시물 ID" })
+  @ApiResponse({ status: 200, description: "조회수 증가 성공" })
+  async incrementViewCount(
+    @CommunitySlug() slug: string,
+    @CommunityPostId("postId") postId: string,
+    @Request() req: any,
+  ) {
+    const userId = req.user?.id;
+    const viewerId = ViewerIdUtil.resolve(req);
+
+    await this.postService.incrementPostView(slug, postId, userId, viewerId);
+
+    return {
+      success: true,
+      message: "View count queued for batch update",
+    };
+  }
+
   // =========================================================================
   // 댓글
   // =========================================================================
@@ -375,6 +429,7 @@ export class CommunityPostController {
    * 댓글 목록 조회
    */
   @Get(":postId/comments/paginated")
+  @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "댓글 목록" })
   @ApiParam({ name: "slug", description: "커뮤니티 slug" })
@@ -428,6 +483,7 @@ export class CommunityPostController {
    * 대댓글 조회
    */
   @Get(":postId/comments/:commentId/replies")
+  @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "대댓글 목록" })
   async getReplies(

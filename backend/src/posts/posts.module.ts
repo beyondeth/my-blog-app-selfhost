@@ -39,18 +39,24 @@ import { PostProcessingProcessor } from "./processors/post-processing.processor"
 
 // Service Layer
 import { PostMapperService } from "./services/post-mapper.service";
+import { PostsReadRepository } from "./repositories/posts-read.repository";
 import { PostCacheService } from "./services/post-cache.service";
 import { PostFileService } from "./services/post-file.service";
 import { PostContentService } from "./services/post-content.service";
 import { PostReadService } from "./services/post-read.service";
 import { PostInteractionService } from "./services/post-interaction.service";
 import { PostCreationService } from "./services/post-creation.service";
+import { PostCreator } from "./services/post-creator";
+import { PostUpdater } from "./services/post-updater";
+import { PostDeleter } from "./services/post-deleter";
 import { PostLikeStatusService } from "./services/post-like-status.service";
 import { PostInteractionStatusService } from "./services/post-interaction-status.service";
 import { LikeService } from "./services/like.service";
 import { VoteService } from "./services/vote.service";
 import { ThumbnailService } from "./services/thumbnail.service";
 import { CloudflareModule } from "../cloudflare/cloudflare.module";
+import { MobilePostsController } from "./mobile-posts.controller";
+import { PostLifecycleListener } from "./listeners/post-lifecycle.listener";
 
 @Module({
   imports: [
@@ -102,13 +108,17 @@ import { CloudflareModule } from "../cloudflare/cloudflare.module";
   ],
   providers: [
     PostsService,
+    PostsReadRepository, // 조회 전용 레포지토리 (V4)
     PostMapperService, // DTO 변환 서비스
     PostCacheService, // 캐시 관리 서비스
     PostFileService, // 파일 관리 서비스
     PostContentService, // 콘텐츠 처리 서비스
     PostReadService, // 조회 및 검색 서비스
     PostInteractionService, // 상호작용 관리 서비스
-    PostCreationService, // 생성, 수정, 삭제 서비스
+    PostCreationService, // Facade (위임 전용)
+    PostCreator, // 포스트 생성 전담
+    PostUpdater, // 포스트 수정 전담
+    PostDeleter, // 포스트 삭제/복원 전담
     PostLikeStatusService, // 좋아요 상태 조회 서비스
     PostInteractionStatusService, // 상호작용 상태 통합 서비스
     VoteService, // Reddit 스타일 업보트/다운보트 서비스
@@ -120,8 +130,9 @@ import { CloudflareModule } from "../cloudflare/cloudflare.module";
     BlogStatsService, // 블로그 통계 서비스 (PostsModule로 이동)
     BlogStatsHandler, // 블로그 통계 이벤트 핸들러 (PostsModule로 이동)
     ThumbnailService, // 썸네일 관리 서비스
+    PostLifecycleListener, // 포스트 라이프사이클 이벤트 리스너 (after-commit)
   ],
-  controllers: [PostsController],
+  controllers: [PostsController, MobilePostsController],
   exports: [
     PostsService,
     ViewCountService,

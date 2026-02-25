@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import DOMPurify from "isomorphic-dompurify";
 import * as sanitizeHtml from "sanitize-html";
 
@@ -10,6 +10,8 @@ import * as sanitizeHtml from "sanitize-html";
  */
 @Injectable()
 export class HtmlSanitizerService {
+  private readonly logger = new Logger(HtmlSanitizerService.name);
+
   /**
    * DOMPurify 설정 옵션
    *
@@ -164,7 +166,17 @@ export class HtmlSanitizerService {
       a: ["href", "target", "rel", "title"],
       img: ["src", "alt", "title", "width", "height", "loading", "decoding"],
       button: ["data-code"],
-      iframe: ["src", "width", "height", "allow", "allowfullscreen", "frameborder", "title", "loading", "referrerpolicy"],
+      iframe: [
+        "src",
+        "width",
+        "height",
+        "allow",
+        "allowfullscreen",
+        "frameborder",
+        "title",
+        "loading",
+        "referrerpolicy",
+      ],
     },
     allowedSchemes: ["http", "https"],
     allowedSchemesByTag: {
@@ -233,7 +245,9 @@ export class HtmlSanitizerService {
       }
 
       if (!allowIframes) {
-        config.ALLOWED_TAGS = config.ALLOWED_TAGS.filter((tag) => tag !== "iframe");
+        config.ALLOWED_TAGS = config.ALLOWED_TAGS.filter(
+          (tag) => tag !== "iframe",
+        );
       }
 
       if (allowIframes) {
@@ -259,7 +273,7 @@ export class HtmlSanitizerService {
 
       // DOMPurify가 정상적으로 초기화되었는지 확인
       if (!DOMPurify || typeof DOMPurify.sanitize !== "function") {
-        console.error(
+        this.logger.error(
           "DOMPurify is not properly initialized, falling back to sanitize-html",
         );
         return this.fallbackSanitize(html, options);
@@ -284,7 +298,7 @@ export class HtmlSanitizerService {
 
       return sanitized;
     } catch (error) {
-      console.error(
+      this.logger.error(
         "DOMPurify sanitization failed, falling back to sanitize-html:",
         error,
       );
@@ -386,7 +400,7 @@ export class HtmlSanitizerService {
 
       return processed.trim();
     } catch (error) {
-      console.error("Mermaid content sanitization failed:", error);
+      this.logger.error("Mermaid content sanitization failed:", error);
       // Fallback: 기본 살균
       return DOMPurify.sanitize(content, {
         ALLOWED_TAGS: [],

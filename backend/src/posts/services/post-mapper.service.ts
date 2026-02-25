@@ -266,56 +266,32 @@ export class PostMapperService {
         dto.thumbnail = null;
       }
     }
-    // 3. 썸네일이 없으면 콘텐츠에서 추출 (thumbnailImageId가 유효하지 않은 경우도 포함)
-    if (!dto.thumbnail && post.content) {
-      const preferredYouTubeId =
-        this.extractPreferredYouTubeVideoIdFromContent(post.content);
-      if (preferredYouTubeId) {
-        dto.thumbnail = this.buildYouTubeThumbnailUrl(preferredYouTubeId);
-        if (process.env.NODE_ENV === "development") {
+    // 3. 썸네일이 선택되지 않은 경우에만 첫 번째 이미지를 썸네일로 사용
+    else if (post.content || post.content_markdown) {
+      const extractedUrl = this.extractFirstImageFromContent(
+        post.content,
+        post.content_markdown,
+      );
+      dto.thumbnail = extractedUrl;
+      if (process.env.NODE_ENV === "development") {
+        if (extractedUrl) {
           this.logger.debug(
-            `[POST_MAPPER] Using preferred YouTube thumbnail for post ${post.id}: ${dto.thumbnail?.substring(0, 100)}...`,
-          );
-        }
-      }
-
-      if (!dto.thumbnail) {
-        const extractedUrl = this.extractFirstImageFromContent(post.content);
-        dto.thumbnail = extractedUrl;
-        if (process.env.NODE_ENV === "development") {
-          if (extractedUrl) {
-            this.logger.debug(
-              `[POST_MAPPER] No thumbnail selected, using first image from content for post ${post.id}: ${extractedUrl.substring(0, 100)}...`,
+            `[POST_MAPPER] No thumbnail selected, using first image from content for post ${post.id}: ${extractedUrl.substring(0, 100)}...`,
           );
         } else {
           this.logger.debug(
             `[POST_MAPPER] No image found in content for post ${post.id}`,
-            );
-          }
+          );
         }
       }
     }
-
     // 4. 썸네일이 없는 경우 (콘텐츠도 없는 경우)
-    if (!dto.thumbnail && !post.content) {
+    else {
       dto.thumbnail = null;
       if (process.env.NODE_ENV === "development") {
         this.logger.debug(
           `[POST_MAPPER] No thumbnail for post ${post.id} - no content`,
         );
-      }
-    }
-
-    // YouTube 임베드가 있는 경우 (이미지 썸네일이 없을 때만)
-    if (!dto.thumbnail && post.content) {
-      const youtubeVideoId = this.extractYouTubeVideoIdFromContent(post.content);
-      if (youtubeVideoId) {
-        dto.thumbnail = this.buildYouTubeThumbnailUrl(youtubeVideoId);
-        if (process.env.NODE_ENV === "development") {
-          this.logger.debug(
-            `[POST_MAPPER] Using YouTube thumbnail for post ${post.id}: ${dto.thumbnail?.substring(0, 100)}...`,
-          );
-        }
       }
     }
 
@@ -391,6 +367,15 @@ export class PostMapperService {
     }
 
     dto.images = await this.resolvePostImageUrls(post);
+    if (
+      (!dto.images || dto.images.length === 0) &&
+      (post.content || post.content_markdown)
+    ) {
+      dto.images = this.extractInlineImageUrls(
+        post.content,
+        post.content_markdown,
+      );
+    }
     if ((!dto.images || dto.images.length === 0) && dto.thumbnail) {
       dto.images = [dto.thumbnail];
     }
@@ -530,7 +515,12 @@ export class PostMapperService {
       .map((file) => this.getCdnUrlForFile(file))
       .filter((url): url is string => Boolean(url));
 
-    return Array.from(new Set(urls));
+    const uniqueFileUrls = Array.from(new Set(urls));
+    if (uniqueFileUrls.length > 0) {
+      return uniqueFileUrls;
+    }
+
+    return this.extractInlineImageUrls(post.content, post.content_markdown);
   }
 
   /**
@@ -761,117 +751,52 @@ export class PostMapperService {
    * @param content HTML 콘텐츠
    * @returns 첫 번째 이미지 URL 또는 null
    */
-  private extractFirstImageFromContent(content: string): string | null {
-    if (!content) {
-      return null;
-    }
+  private extractFirstImageFromContent(
+    ...contents: Array<string | undefined | null>
+  ): string | null {
+    const urls = this.extractInlineImageUrls(...contents);
+    return urls.length > 0 ? urls[0] : null;
+  }
 
-    // 정규식으로 img 태그의 src 속성 추출
-    // data: URL은 제외
-    const imgTagRegex = /<img[^>]+src\s*=\s*["']([^"']+)["'][^>]*>/gi;
-    const match = imgTagRegex.exec(content);
+  private extractInlineImageUrls(
+    ...contents: Array<string | undefined | null>
+  ): string[] {
+    const urls = new Set<string>();
+    for (const rawContent of contents) {
+      const content = rawContent?.trim();
+      if (!content) {
+        continue;
+      }
 
-    if (match && match[1]) {
-      // 이미지 URL을 찾았으면 반환
-      const imageUrl = match[1];
+      let match: RegExpExecArray | null;
+      const htmlRegex = /<img[^>]+src\s*=\s*["']([^"']+)["'][^>]*>/gi;
+      while ((match = htmlRegex.exec(content)) !== null) {
+        const url = match[1]?.trim();
+        if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
+          urls.add(url);
+        }
+      }
 
-      // data: URL이 아닌 실제 URL만 반환
-      if (!imageUrl.startsWith("data:")) {
-        return imageUrl;
+      const markdownRegex = /!\[[^\]]*]\(([^)\s]+)(?:\s+"[^"]*")?\)/gi;
+      while ((match = markdownRegex.exec(content)) !== null) {
+        const rawUrl = match[1]?.trim();
+        const url = rawUrl?.replace(/^<|>$/g, "");
+        if (url && !url.startsWith("data:") && !url.startsWith("javascript:")) {
+          urls.add(url);
+        }
+      }
+
+      const plainImageUrlRegex =
+        /https?:\/\/[^\s)"']+\.(?:png|jpe?g|gif|webp|avif|svg)(?:\?[^\s)"']*)?/gi;
+      while ((match = plainImageUrlRegex.exec(content)) !== null) {
+        const url = match[0]?.trim();
+        if (url && !url.startsWith("javascript:")) {
+          urls.add(url);
+        }
       }
     }
 
-    return null;
-  }
-
-  /**
-   * 콘텐츠에서 첫 번째 YouTube 비디오 ID 추출
-   */
-  private extractYouTubeVideoIdFromContent(content: string): string | null {
-    if (!content) return null;
-
-    // 1) 일반 YouTube 블록에서 첫 번째 비디오 ID 추출
-    const blockMatch = content.match(
-      /<div[^>]*data-youtube-video[^>]*>[\s\S]*?<\/div>/i,
-    );
-    if (blockMatch?.[0]) {
-      const blockId = this.extractYouTubeVideoIdFromHtmlBlock(blockMatch[0]);
-      if (blockId) return blockId;
-    }
-
-    // 2) iframe src에서 직접 추출
-    const iframeMatch = content.match(/<iframe[^>]+src=["']([^"']+)["'][^>]*>/i);
-    if (iframeMatch?.[1]) {
-      const iframeId = this.extractYouTubeVideoIdFromUrl(iframeMatch[1]);
-      if (iframeId) return iframeId;
-    }
-
-    // 3) 본문에 포함된 YouTube URL에서 추출 (watch/shorts/short URL)
-    const urlMatch = content.match(
-      /https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtube\.com\/shorts\/|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
-    );
-    if (urlMatch?.[1]) {
-      return urlMatch[1];
-    }
-
-    return null;
-  }
-
-  /**
-   * data-thumbnail="true"가 설정된 YouTube 비디오 ID 추출
-   */
-  private extractPreferredYouTubeVideoIdFromContent(
-    content: string,
-  ): string | null {
-    if (!content) return null;
-
-    const preferredBlockMatch = content.match(
-      /<div[^>]*data-youtube-video[^>]*data-thumbnail=["']true["'][^>]*>[\s\S]*?<\/div>/i,
-    );
-    if (!preferredBlockMatch?.[0]) {
-      return null;
-    }
-
-    return this.extractYouTubeVideoIdFromHtmlBlock(preferredBlockMatch[0]);
-  }
-
-  /**
-   * HTML 블록에서 YouTube 비디오 ID 추출
-   */
-  private extractYouTubeVideoIdFromHtmlBlock(htmlBlock: string): string | null {
-    if (!htmlBlock) return null;
-
-    const dataUrlMatch = htmlBlock.match(/data-original-url=["']([^"']+)["']/i);
-    if (dataUrlMatch?.[1]) {
-      const id = this.extractYouTubeVideoIdFromUrl(dataUrlMatch[1]);
-      if (id) return id;
-    }
-
-    const iframeMatch = htmlBlock.match(/<iframe[^>]+src=["']([^"']+)["'][^>]*>/i);
-    if (iframeMatch?.[1]) {
-      const id = this.extractYouTubeVideoIdFromUrl(iframeMatch[1]);
-      if (id) return id;
-    }
-
-    return null;
-  }
-
-  /**
-   * YouTube URL에서 비디오 ID 추출
-   */
-  private extractYouTubeVideoIdFromUrl(url: string): string | null {
-    if (!url) return null;
-    const match = url.match(
-      /(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i,
-    );
-    return match?.[1] || null;
-  }
-
-  /**
-   * YouTube 비디오 ID로 썸네일 URL 생성
-   */
-  private buildYouTubeThumbnailUrl(videoId: string): string {
-    return `https://img.youtube.com/vi/${videoId}/hqdefault.jpg`;
+    return Array.from(urls);
   }
 
   /**

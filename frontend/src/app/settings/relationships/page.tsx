@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { useQuery, useInfiniteQuery, useMutation, useQueryClient, InfiniteData } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient, InfiniteData } from '@tanstack/react-query';
 import { Search, UserMinus, Check, X, Users, UserCheck, Ban } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UserAvatar from '@/components/ui/UserAvatar';
 import Link from 'next/link';
 import { useMyBlocks, useBlock } from '@/hooks/useBlock';
+import { useAuth } from '@/providers/AuthProviderV2';
 import {
   SETTINGS_CARD_CLASS,
   SETTINGS_INPUT_CLASS,
@@ -46,19 +47,7 @@ export default function RelationshipsPage() {
   const [actionFeedback, setActionFeedback] = useState<{ type: 'success' | 'error' | 'info'; text: string } | null>(null);
   const feedbackTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const queryClient = useQueryClient();
-
-  // Get current user info first
-  const { data: currentUser } = useQuery({
-    queryKey: ['auth', 'me'],
-    queryFn: async () => {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/auth/me`,
-        { credentials: 'include' }
-      );
-      if (!response.ok) throw new Error('Not authenticated');
-      return response.json();
-    },
-  });
+  const { user: currentUser } = useAuth();
 
   // Fetch following list (커서 기반 무한 스크롤)
   // Fetch following list (커서 기반 무한 스크롤)

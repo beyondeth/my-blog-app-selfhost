@@ -375,9 +375,6 @@ export class CommunityPostService {
       this.enrichPostMetadata(post);
     }
 
-    // 조회수 증가 (비동기, 에러 무시)
-    this.incrementViewCount(post.id).catch(() => {});
-
     // 투표 상태 확인
     const result = post as CommunityPost & {
       userLiked?: boolean;
@@ -388,6 +385,81 @@ export class CommunityPostService {
       const userVote = await this.getUserVote(post.id, userId);
       result.userVote = userVote;
       result.userLiked = userVote === VoteType.UPVOTE; // 하위 호환성
+    }
+
+    this.enrichPostMetadata(result);
+
+    return result;
+  }
+
+  /**
+   * 게시물 조회 (ID)
+   */
+  async findById(
+    communitySlug: string,
+    postId: string,
+    userId?: string,
+  ): Promise<
+    CommunityPost & { userLiked?: boolean; userVote?: VoteType | null }
+  > {
+    const community = await this.communityRepository.findOne({
+      where: { slug: communitySlug },
+      select: ["id"],
+    });
+
+    if (!community) {
+      throw new NotFoundException("커뮤니티를 찾을 수 없습니다");
+    }
+
+    const cacheKey = PostCacheKeys.POST_BY_ID(postId);
+    let post = await this.cacheService.get<CommunityPost>(cacheKey);
+
+    if (!post) {
+      post = await this.postRepository.findOne({
+        where: {
+          communityId: community.id,
+          id: postId,
+          status: In([
+            CommunityPostStatus.PUBLISHED,
+            CommunityPostStatus.DRAFT,
+          ]),
+        },
+        relations: [
+          "author",
+          "author.profile",
+          "flair",
+          "community",
+          "thumbnailImage",
+        ],
+      });
+
+      if (!post) {
+        throw new NotFoundException("게시물을 찾을 수 없습니다");
+      }
+
+      if (
+        post.status === CommunityPostStatus.DRAFT &&
+        post.authorId !== userId
+      ) {
+        throw new NotFoundException("게시물을 찾을 수 없습니다");
+      }
+
+      await this.cacheService.set(cacheKey, post, CacheTTL.MEDIUM);
+    }
+
+    if (post) {
+      this.enrichPostMetadata(post);
+    }
+
+    const result = post as CommunityPost & {
+      userLiked?: boolean;
+      userVote?: VoteType | null;
+    };
+
+    if (userId) {
+      const userVote = await this.getUserVote(post.id, userId);
+      result.userVote = userVote;
+      result.userLiked = userVote === VoteType.UPVOTE;
     }
 
     this.enrichPostMetadata(result);
@@ -825,6 +897,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      updated.id,
     );
 
     const refetched = await this.postRepository.findOne({
@@ -852,6 +925,7 @@ export class CommunityPostService {
     postId: string,
     userId: string,
     userRole?: CommunityRole,
+    isPlatformAdmin: boolean = false,
   ): Promise<void> {
     const post = await this.postRepository.findOne({
       where: { id: postId },
@@ -863,9 +937,10 @@ export class CommunityPostService {
     }
 
     const isAuthor = post.authorId === userId;
-    const isModerator = userRole && isModeratorOrAbove(userRole);
+    const isModerator = !!(userRole && isModeratorOrAbove(userRole));
+    const canModerate = isModerator || isPlatformAdmin;
 
-    if (!isAuthor && !isModerator) {
+    if (!isAuthor && !canModerate) {
       throw new ForbiddenException("게시물을 삭제할 권한이 없습니다");
     }
 
@@ -873,7 +948,7 @@ export class CommunityPostService {
     const wasPublished = post.status === CommunityPostStatus.PUBLISHED;
 
     // 모더레이터가 삭제하는 경우 로그 기록
-    if (isModerator && !isAuthor) {
+    if (canModerate && !isAuthor) {
       await this.modLogRepository.save({
         communityId: post.communityId,
         moderatorId: userId,
@@ -885,7 +960,7 @@ export class CommunityPostService {
     }
 
     // 삭제 주체에 따른 처리
-    if (isModerator && !isAuthor) {
+    if (canModerate && !isAuthor) {
       // 모더레이터 삭제: 소프트 삭제 (status: REMOVED)
       post.status = CommunityPostStatus.REMOVED;
       post.removedAt = new Date();
@@ -916,6 +991,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
   }
 
@@ -983,6 +1059,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
 
     this.logger.log(`게시물 스팸 표시: ${post.slug} by ${moderatorId}`);
@@ -1045,6 +1122,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
 
     this.logger.log(`게시물 승인: ${post.slug} by ${moderatorId}`);
@@ -1119,6 +1197,7 @@ export class CommunityPostService {
       post.communityId,
       post.community.slug,
       post.slug,
+      post.id,
     );
 
     this.logger.log(`게시물 삭제 (모더레이션): ${post.slug} by ${moderatorId}`);
@@ -1207,7 +1286,12 @@ export class CommunityPostService {
           // 최종 카운트 조회
           const post = await manager.findOne(CommunityPost, {
             where: { id: postId },
-            select: ["upvoteCount", "downvoteCount", "likeCount"],
+            select: [
+              "communityId",
+              "upvoteCount",
+              "downvoteCount",
+              "likeCount",
+            ],
           });
 
           const upvoteCount = post?.upvoteCount || 0;
@@ -1215,9 +1299,13 @@ export class CommunityPostService {
 
           // 비동기 캐시 무효화
           setImmediate(() => {
-            this.cacheService
-              .del(PostCacheKeys.POST_BY_ID(postId))
-              .catch(() => {});
+            Promise.all([
+              this.cacheService.del(PostCacheKeys.POST_BY_ID(postId)),
+              this.cacheService.deletePattern("feed:unified:*"),
+              ...(post?.communityId
+                ? [this.invalidatePostListCache(post.communityId)]
+                : []),
+            ]).catch(() => {});
           });
 
           return {
@@ -1339,6 +1427,33 @@ export class CommunityPostService {
     return likedMap;
   }
 
+  /**
+   * 게시물 조회수 증가 (명시적 endpoint 전용)
+   */
+  async incrementPostView(
+    communitySlug: string,
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): Promise<void> {
+    const post = await this.postRepository
+      .createQueryBuilder("post")
+      .innerJoin("post.community", "community")
+      .select(["post.id"])
+      .where("post.id = :postId", { postId })
+      .andWhere("community.slug = :communitySlug", { communitySlug })
+      .andWhere("post.status = :status", {
+        status: CommunityPostStatus.PUBLISHED,
+      })
+      .getOne();
+
+    if (!post) {
+      throw new NotFoundException("게시물을 찾을 수 없습니다");
+    }
+
+    await this.incrementViewCount(postId, userId, viewerId);
+  }
+
   // =========================================================================
   // 유틸리티
   // =========================================================================
@@ -1346,8 +1461,48 @@ export class CommunityPostService {
   /**
    * 조회수 증가 (비동기)
    */
-  private async incrementViewCount(postId: string): Promise<void> {
+  private async incrementViewCount(
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): Promise<void> {
+    const dedupeKey = this.buildViewDedupeKey(postId, userId, viewerId);
+
+    if (dedupeKey) {
+      const lockKey = `community:view:lock:${postId}`;
+      const lock = await this.redisLockService.acquireLock(lockKey, 3000);
+
+      try {
+        const alreadyViewed = await this.redisLockService.get(dedupeKey);
+        if (alreadyViewed) {
+          return;
+        }
+
+        await this.redisLockService.set(dedupeKey, "1", CacheTTL.DAY);
+      } finally {
+        if (lock) {
+          await this.redisLockService.releaseLock(lockKey, lock);
+        }
+      }
+    }
+
     await this.communityPostViewService.bufferView(postId);
+  }
+
+  private buildViewDedupeKey(
+    postId: string,
+    userId?: string,
+    viewerId?: string,
+  ): string | null {
+    if (userId) {
+      return `community:post:${postId}:view:user:${userId}`;
+    }
+
+    if (viewerId) {
+      return `community:post:${postId}:view:viewer:${viewerId}`;
+    }
+
+    return null;
   }
 
   /**
@@ -1376,11 +1531,15 @@ export class CommunityPostService {
     communityId: string,
     communitySlug: string,
     postSlug: string,
+    postId?: string,
   ): Promise<void> {
+    const postIdCache = postId ? PostCacheKeys.POST_BY_ID(postId) : null;
+
     await Promise.all([
       this.cacheService.del(
         PostCacheKeys.POST_BY_SLUG(communitySlug, postSlug),
       ),
+      ...(postIdCache ? [this.cacheService.del(postIdCache)] : []),
       this.invalidatePostListCache(communityId),
       this.cacheService.del(PostCacheKeys.PINNED_POSTS(communityId)),
     ]);

@@ -66,6 +66,7 @@ import { MonitoringService } from "../monitoring/monitoring.service";
 import { InjectRedis } from "@nestjs-modules/ioredis";
 import Redis from "ioredis";
 import { BlogResolverService } from "../common/services/blog-resolver.service";
+import { ViewerIdUtil } from "../common/utils/viewer-id.util";
 
 @ApiTags("posts")
 @Controller("posts")
@@ -289,12 +290,12 @@ export class PostsController {
       if (cached) {
         // 캐시 히트 로깅 (성능 모니터링용)
         const cacheType = actualBlogId ? "MY_BLOG" : "HOME_FEED";
-        console.log(`✅ [Cache HIT] ${cacheType} for ${cacheKey}`);
+        this.logger.debug(`✅ [Cache HIT] ${cacheType} for ${cacheKey}`);
         this.logger.log(`[Cache HIT] ${cacheType} - ${cacheKey}`);
         return cached;
       }
     } catch (error) {
-      console.error("Cache get error:", error);
+      this.logger.error("Cache get error:", error);
       this.logger.error(`Cache get error for ${cacheKey}:`, error);
     }
 
@@ -324,18 +325,20 @@ export class PostsController {
 
     // 캐시 미스 로깅
     const cacheType = actualBlogId ? "MY_BLOG" : "HOME_FEED";
-    console.log(`❌ [Cache MISS] ${cacheType} for ${cacheKey} - Querying DB`);
+    this.logger.debug(
+      `❌ [Cache MISS] ${cacheType} for ${cacheKey} - Querying DB`,
+    );
     this.logger.log(`[Cache MISS] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
 
     // 캐싱
     try {
       await this.cacheService.set(cacheKey, result, ttl);
-      console.log(
+      this.logger.debug(
         `📦 [Cache SET] ${cacheType} for ${cacheKey} with TTL ${ttl}s`,
       );
       this.logger.log(`[Cache SET] ${cacheType} - ${cacheKey}, TTL: ${ttl}s`);
     } catch (error) {
-      console.error("Cache set error:", error);
+      this.logger.error("Cache set error:", error);
       this.logger.error(`Cache set error for ${cacheKey}:`, error);
     }
 
@@ -811,12 +814,15 @@ export class PostsController {
 
   @Post(":id/view")
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "게시글 조회수 증가 (배치 처리)" })
   @ApiResponse({ status: 200, description: "조회수 증가 성공 (배치 대기중)" })
   @ApiResponse({ status: 404, description: "게시글을 찾을 수 없음" })
-  async incrementViewCount(@Param("id") id: string) {
-    // 배치 서비스로 조회수 증가 (메모리에 임시 저장)
-    await this.viewCountService.incrementViewCount(id);
+  async incrementViewCount(@Param("id") id: string, @Request() req: any) {
+    const userId = req.user?.id;
+    const viewerId = ViewerIdUtil.resolve(req);
+
+    await this.viewCountService.incrementViewCount(id, userId, viewerId);
     return { message: "View count queued for batch update" };
   }
 

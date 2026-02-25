@@ -1,4 +1,4 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger } from "@nestjs/common";
 import { marked } from "marked";
 import { JSDOM } from "jsdom";
 
@@ -6,6 +6,8 @@ type ImageSize = "small" | "medium" | "default" | "full";
 
 @Injectable()
 export class MarkdownRendererService {
+  private readonly logger = new Logger(MarkdownRendererService.name);
+
   constructor() {
     marked.use({
       gfm: true,
@@ -65,11 +67,11 @@ export class MarkdownRendererService {
     if (process.env.NODE_ENV === "development" && text.includes("```mermaid")) {
       const mermaidMatches = text.match(/```mermaid[\s\S]*?```/g);
       if (mermaidMatches) {
-        console.log(
+        this.logger.debug(
           "[Markdown Renderer] Mermaid blocks detected:",
           mermaidMatches.length,
         );
-        console.log(
+        this.logger.debug(
           "[Markdown Renderer] First block preview:",
           mermaidMatches[0].substring(0, 100) + "...",
         );
@@ -84,15 +86,15 @@ export class MarkdownRendererService {
     // 개발 환경에서 변환 결과 확인 (디버깅용)
     if (process.env.NODE_ENV === "development" && text.includes("```mermaid")) {
       const hasLanguageMermaid = enhancedHtml.includes("language-mermaid");
-      console.log(
+      this.logger.debug(
         "[Markdown Renderer] Output contains language-mermaid:",
         hasLanguageMermaid,
       );
       if (!hasLanguageMermaid) {
-        console.warn(
+        this.logger.warn(
           "[Markdown Renderer] WARNING: Mermaid blocks not properly converted!",
         );
-        console.log(
+        this.logger.debug(
           "[Markdown Renderer] Output preview:",
           enhancedHtml.substring(0, 300),
         );
@@ -254,7 +256,7 @@ export class MarkdownRendererService {
 
       return document.body.innerHTML;
     } catch (error) {
-      console.warn(
+      this.logger.warn(
         "[Markdown Renderer] Failed to apply image attributes:",
         error,
       );
@@ -275,7 +277,10 @@ export class MarkdownRendererService {
 
       return document.body.innerHTML;
     } catch (error) {
-      console.warn("[Markdown Renderer] Failed to apply YouTube embeds:", error);
+      this.logger.warn(
+        "[Markdown Renderer] Failed to apply YouTube embeds:",
+        error,
+      );
       return html;
     }
   }
@@ -375,10 +380,7 @@ export class MarkdownRendererService {
     );
 
     const iframe = document.createElement("iframe");
-    iframe.setAttribute(
-      "src",
-      `https://www.youtube.com/embed/${videoId}`,
-    );
+    iframe.setAttribute("src", `https://www.youtube.com/embed/${videoId}`);
     iframe.setAttribute("width", "100%");
     iframe.setAttribute("height", "100%");
     iframe.setAttribute("frameborder", "0");

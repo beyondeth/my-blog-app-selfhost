@@ -14,6 +14,7 @@ import {
   UseInterceptors,
   ClassSerializerInterceptor,
   Req,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -42,6 +43,8 @@ import { UserResponseDto } from "../users/dto/user-response.dto";
 @Controller("users")
 @UseInterceptors(ClassSerializerInterceptor)
 export class FollowsController {
+  private readonly logger = new Logger(FollowsController.name);
+
   constructor(private readonly followsService: FollowsService) {}
 
   @Post(":userId/follow")
@@ -60,8 +63,8 @@ export class FollowsController {
     @Param("userId", ParseUUIDPipe) userId: string,
     @Req() req: ExpressRequest & { user: { id: string } },
   ): Promise<void> {
-    console.log(
-      `[FollowController] Follow request - targetUserId: ${userId}, currentUserId: ${req.user.id}`,
+    this.logger.debug(
+      `Follow request: target=${this.maskId(userId)}, actor=${this.maskId(req.user.id)}`,
     );
     await this.followsService.follow(req.user.id, userId);
   }
@@ -78,8 +81,8 @@ export class FollowsController {
     @Param("userId", ParseUUIDPipe) userId: string,
     @Req() req: ExpressRequest & { user: { id: string } },
   ): Promise<void> {
-    console.log(
-      `[FollowController] Unfollow request - targetUserId: ${userId}, currentUserId: ${req.user.id}`,
+    this.logger.debug(
+      `Unfollow request: target=${this.maskId(userId)}, actor=${this.maskId(req.user.id)}`,
     );
     await this.followsService.unfollow(req.user.id, userId);
   }
@@ -147,16 +150,16 @@ export class FollowsController {
     @Req() req: ExpressRequest & { user?: { id: string } },
   ): Promise<FollowInfoDto> {
     const currentUserId = req.user?.id;
-    console.log(
-      `[FollowController] follow-info request - userId: ${userId}, currentUserId: ${currentUserId || "not authenticated"}`,
-    );
-    const hasCookies = req.headers?.cookie ? "Has cookies" : "No cookies";
-    console.log("[FollowController] Request headers:", hasCookies);
-    console.log(
-      "[FollowController] User object:",
-      req.user ? `User ID: ${req.user.id}` : "No user object",
+    this.logger.debug(
+      `Follow-info request: target=${this.maskId(userId)}, actor=${currentUserId ? this.maskId(currentUserId) : "anonymous"}`,
     );
     return this.followsService.getFollowInfo(userId, currentUserId);
+  }
+
+  private maskId(value?: string): string {
+    if (!value) return "none";
+    if (value.length <= 8) return value;
+    return `${value.slice(0, 4)}...${value.slice(-4)}`;
   }
 
   @Get(":userId/followers/cursor")

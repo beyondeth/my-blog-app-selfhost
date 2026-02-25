@@ -1,4 +1,11 @@
-import { Controller, Post, Body, UseGuards, Request } from "@nestjs/common";
+import {
+  Controller,
+  Post,
+  Body,
+  UseGuards,
+  Request,
+  Logger,
+} from "@nestjs/common";
 import { SubscriptionFacadeService } from "../shared/subscription-facade.service";
 import { SubscriptionService } from "../subscription/subscription.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
@@ -13,6 +20,8 @@ import {
  */
 @Controller("payment/webhook")
 export class PaymentWebhookController {
+  private readonly logger = new Logger(PaymentWebhookController.name);
+
   constructor(
     private readonly subscriptionFacade: SubscriptionFacadeService,
     private readonly subscriptionService: SubscriptionService,
@@ -34,8 +43,8 @@ export class PaymentWebhookController {
       billingCycle: BillingCycle;
     },
   ) {
-    console.log("[Mock Webhook] Received:", body);
-    console.log("[Mock Webhook] User ID:", req.user.id);
+    this.logger.debug("[Mock Webhook] Received:", body);
+    this.logger.debug("[Mock Webhook] User ID:", req.user.id);
 
     if (body.event === "checkout.session.completed") {
       // Mock 결제이므로 간단하게 처리
@@ -49,7 +58,7 @@ export class PaymentWebhookController {
             body.billingCycle,
           );
 
-        console.log("[Mock Webhook] Subscription updated:", subscription);
+        this.logger.debug("[Mock Webhook] Subscription updated:", subscription);
 
         return {
           success: true,
@@ -61,7 +70,7 @@ export class PaymentWebhookController {
           },
         };
       } catch (error) {
-        console.error("[Mock Webhook] Error updating subscription:", error);
+        this.logger.error("[Mock Webhook] Error updating subscription:", error);
         return {
           success: false,
           message: "구독 업데이트 중 오류가 발생했습니다",
@@ -82,7 +91,7 @@ export class PaymentWebhookController {
   @Post("stripe")
   async handleStripeWebhook(@Body() body: any) {
     // TODO: Stripe 웹훅 서명 검증 및 처리
-    console.log("[Stripe Webhook] Received:", body.type);
+    this.logger.debug("[Stripe Webhook] Received:", body.type);
     return { received: true };
   }
 
@@ -92,7 +101,7 @@ export class PaymentWebhookController {
   @Post("toss")
   async handleTossWebhook(@Body() body: any) {
     // TODO: Toss Payments 웹훅 처리
-    console.log("[Toss Webhook] Received:", body);
+    this.logger.debug("[Toss Webhook] Received:", body);
     return { received: true };
   }
 }

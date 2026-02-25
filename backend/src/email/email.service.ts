@@ -310,7 +310,7 @@ export class EmailService {
         replyTo: "noreply@codebase.blog", // 회신 주소를 noreply로 설정
       });
     } catch (error) {
-      console.error("Account deletion email sending error:", error);
+      this.logger.error("Account deletion email sending error:", error);
       // 이메일 발송 실패는 무시하고 계속 진행
     }
   }
@@ -333,7 +333,7 @@ export class EmailService {
         replyTo: "noreply@codebase.blog", // 회신 주소를 noreply로 설정
       });
     } catch (error) {
-      console.error("Account link email sending error:", error);
+      this.logger.error("Account link email sending error:", error);
       // 이메일 발송 실패는 무시하고 계속 진행
     }
   }
@@ -667,7 +667,7 @@ export class EmailService {
         replyTo: "noreply@codebase.blog", // 회신 주소를 noreply로 설정
       });
     } catch (error) {
-      console.error("Password reset email sending error:", error);
+      this.logger.error("Password reset email sending error:", error);
       throw new BadRequestException(
         "이메일 발송에 실패했습니다. 잠시 후 다시 시도해주세요.",
       );

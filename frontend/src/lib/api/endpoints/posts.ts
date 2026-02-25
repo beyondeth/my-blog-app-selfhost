@@ -41,6 +41,7 @@ export interface GetPostsCursorParams {
   limit?: number;      // 페이지당 포스트 수 (기본값: 20, 최대: 50)
   sort?: 'recent' | 'popular' | 'trending';
   category?: string;   // 카테고리 필터
+  tag?: string;        // 태그 필터
   blogSlug?: string;    // 블로그 alias 필터
   blogId?: string;      // 블로그 UUID 필터
   search?: string;     // 검색어

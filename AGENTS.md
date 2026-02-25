@@ -18,6 +18,55 @@ Follow the Conventional Commit vocabulary already in the log (`feat(backend): �
 ## Environment & Security Tips
 Copy `.env.production.example` into `.env.local` for each app, keep secrets out of Git, and record new configuration needs inside `ENV_SETUP.md` or `docs/`. Apply schema changes only through the TypeORM scripts (`pnpm --dir backend migration:run` / `migration:revert`) and sanitize any artifacts synced into `data/` or `postgres/` before sharing.
 
+## Multi-Platform Workflow (Worktree + Branch Discipline)
+This file intentionally keeps only enforceable core rules.
+Detailed procedures and update history live in `docs/platform-coordination/`.
+
+### Core Rules (Enforced)
+- MUST: shared paths (`backend/**`, `mobile/contracts/**`, shared coordination docs) are edited only in `my-blog-app-integ` on `integration/workspace`.
+- NEVER: patch shared paths from `my-blog-app-ios`, `my-blog-app-aos`, or `my-blog-app-web`.
+- MUST: runtime services (`backend:3000`, `frontend:3001`, `mcp-proxy-server`) start from `my-blog-app-integ`.
+- MUST: environment variables use a single source of truth at `/Users/sihyungpark/Desktop/code/my-blog-app` (for example `.env.local`, `.env.production`), and worktrees consume them via links or explicitly documented exceptions.
+- MUST: any new/renamed env key is synchronized for all affected runtimes (`backend`, `frontend`, `ios`, `android`, `mcp-proxy-server`) and recorded in `docs/platform-coordination/` docs.
+- MUST: merge order is `platform branch -> integration/workspace -> main`.
+- MUST: default execution scope ends at `integration/workspace`; `main` merge/push is performed only when explicitly requested by the user.
+- MUST: before starting implementation, check divergence between active platform branch and `origin/integration/workspace` with `git fetch origin --prune` then `git rev-list --left-right --count <active_branch>...origin/integration/workspace`.
+- MUST: platform branch being ahead of `integration/workspace` is a normal state; do not treat divergence itself as an error.
+- MUST: report divergence counts to the user first, then decide whether to keep working as-is or sync based on task context.
+- MUST: do not fan out every `integration/workspace` commit to all platform branches immediately; platform sync is done at task-start, pre-PR, or when shared contract/dependency alignment is required.
+- MUST: when a request spans multiple worktrees (for example `web` + `integ` shared/backend), execute and report as parallel lanes instead of frequent context switching in one lane.
+- MUST: for multi-worktree tasks, keep one active branch per worktree and include lane-level `PLATFORM-TRACK` context in progress updates.
+- MUST: if there is a risk of missing user intent or the request is ambiguous, ask a short clarification question first, then proceed immediately after the answer without requiring extra confirmation.
+- NEVER: auto-sync branches only to force a match; sync is done only when user requests it, when shared contract/dependency alignment is required, or when merge/release flow requires it.
+- NEVER: commit secret-bearing `.env*` files or create undocumented per-worktree env forks.
+- NEVER: do feature work in root `/Users/sihyungpark/Desktop/code/my-blog-app` (checkpoint/metadata only).
+
+### PLATFORM-TRACK (Required)
+```md
+[PLATFORM-TRACK]
+타겟: web | ios | android | multi
+작업유형: feature | bugfix | refactor | runbook
+공유영향 확인: YES/NO
+요약: 필수 확인 내용 등
+```
+
+### Situation -> Open This Doc
+- Worktree ownership/rules/conflict recovery:
+  - `docs/platform-coordination/worktree-branch-playbook.md`
+- Current worktree snapshot (path/branch/clean-dirty):
+  - `docs/platform-coordination/WORKTREE_STATUS.md`
+- Pre-release checks before `integration/workspace -> main`:
+  - `docs/platform-coordination/RELEASE_GATE.md`
+- PR routing/approval/automation boundary:
+  - `docs/platform-coordination/PR_REVIEW_POLICY.md`
+- Codex config/rules/skills/MCP standard:
+  - `docs/platform-coordination/CODEX_CONFIGURATION.md`
+- Multi-agent usage policy and safe patterns:
+  - `docs/platform-coordination/MULTI_AGENT_PLAYBOOK.md`
+- Document index and update history:
+  - `docs/platform-coordination/README.md`
+  - `docs/platform-coordination/CHANGELOG.md`
+
 ## Design Guidelines
 Design decisions related to layout, typography, color, and contrast must follow WCAG 3.0 accessibility standards, ensuring consistent readability and usability across the product.
 

@@ -18,6 +18,7 @@ export const postQueryKeys = {
   list: (filters: {
     search?: string;
     category?: string;
+    tag?: string;
     blogSlug?: string;
     blogId?: string;
     page?: number;
@@ -786,22 +787,24 @@ export const usePostCacheCleanup = () => {
 export function useInfiniteCursorPosts(options: {
   search?: string;
   category?: string;
+  tag?: string;
   blogSlug?: string;
   blogId?: string;
   sort?: 'recent' | 'popular' | 'trending';
   limit?: number;
   enabled?: boolean;
 } = {}) {
-  const { search, category, blogSlug, blogId, sort = 'recent', limit = 20, enabled = true } = options;
+  const { search, category, tag, blogSlug, blogId, sort = 'recent', limit = 20, enabled = true } = options;
 
   return useInfiniteQuery({
-    queryKey: postQueryKeys.list({ search, category, blogSlug, blogId, sort, cursor: true }),
+    queryKey: postQueryKeys.list({ search, category, tag, blogSlug, blogId, sort, cursor: true }),
     queryFn: ({ pageParam }) => postsAPI.getPostsCursor({
       cursor: pageParam || undefined, // pageParam이 string | undefined 타입이므로 처리
       limit,
       sort,
       search,
       category,
+      tag,
       blogSlug,
       blogId,
     }),

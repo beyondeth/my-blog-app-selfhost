@@ -30,7 +30,7 @@ import { apiClient } from '@/lib/api';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import ReactMarkdown from 'react-markdown';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
-import { serializeImageAttributes, type MarkdownImageInfo } from '@/types/image-metadata.types';
+import type { MarkdownImageInfo } from '@/types/image-metadata.types';
 import { MarkdownImageCard } from '@/components/posts/MarkdownImageCard';
 import { HybridMarkdownEditor, HybridMarkdownEditorRef } from '@/components/posts/HybridMarkdownEditor';
 import { MarkdownYouTubeCard } from '@/components/posts/MarkdownYouTubeCard';
@@ -113,6 +113,48 @@ function convertInlineLinksToImages(markdown: string): string {
   });
 }
 
+function normalizeComparableImageUrl(url: string): string {
+  const normalized = normalizeImageUrl(url || '').trim();
+  if (!normalized) {
+    return '';
+  }
+
+  try {
+    const parsed = new URL(normalized);
+    return `${parsed.origin}${parsed.pathname}`;
+  } catch {
+    return normalized.split('?')[0].split('#')[0];
+  }
+}
+
+function extractImageUrlsFromMarkdown(markdown: string): Set<string> {
+  const urls = new Set<string>();
+  if (!markdown) {
+    return urls;
+  }
+
+  const markdownImageRegex = /!\[[^\]]*]\(([^)]+)\)/g;
+  let markdownMatch: RegExpExecArray | null;
+  while ((markdownMatch = markdownImageRegex.exec(markdown)) !== null) {
+    const rawCandidate = (markdownMatch[1] || '').trim().split(/\s+/)[0];
+    const normalized = normalizeComparableImageUrl(rawCandidate);
+    if (normalized) {
+      urls.add(normalized);
+    }
+  }
+
+  const htmlImageRegex = /<img[^>]*src=["']([^"']+)["'][^>]*>/gi;
+  let htmlMatch: RegExpExecArray | null;
+  while ((htmlMatch = htmlImageRegex.exec(markdown)) !== null) {
+    const normalized = normalizeComparableImageUrl(htmlMatch[1] || '');
+    if (normalized) {
+      urls.add(normalized);
+    }
+  }
+
+  return urls;
+}
+
 interface EditPostFormProps {
   initialData?: {
     id?: string;
@@ -153,17 +195,6 @@ export default function EditPostForm({
   
   // 현재 발행 상태 확인 (기본값은 true로 설정하여 기존 글 수정 시 문제 없도록 함)
   const isPublished = initialData?.isPublished ?? true;
-
-  // 폼 제출 핸들러 래퍼
-  const handleFormSubmit = (targetIsPublished: boolean) => {
-    return form.handleSubmit((data) => {
-      // 3차 방어: 버튼 클릭 시 Form 제출 차단 (동기적 플래그 체크)
-      if (isSubmittingRef.current || isLoading || isLocalSubmitting) {
-        return;
-      }
-      onSubmit(data, targetIsPublished);
-    })();
-  };
 
   const rawMarkdownContent = initialData?.content_markdown ?? '';
   const initialYouTubeThumbnailId = extractYouTubeThumbnailMarker(rawMarkdownContent);
@@ -520,6 +551,46 @@ export default function EditPostForm({
   }, [editorMode, watchedContent, selectedYouTubeThumbnailId]);
 
   useEffect(() => {
+    if (editorMode !== 'markdown') {
+      return;
+    }
+
+    if (!Array.isArray(watchedFileIds) || watchedFileIds.length === 0) {
+      return;
+    }
+
+    const referencedUrls = extractImageUrlsFromMarkdown(watchedContent || '');
+    const nextFileIds = watchedFileIds.filter((fileId) => {
+      const metadata = fileMetadataRef.current.get(fileId);
+      if (!metadata?.url) {
+        return true;
+      }
+      const normalized = normalizeComparableImageUrl(metadata.url);
+      return normalized ? referencedUrls.has(normalized) : true;
+    });
+
+    if (nextFileIds.length === watchedFileIds.length) {
+      return;
+    }
+
+    handleFileIdsChange(nextFileIds);
+    syncMarkdownImages(nextFileIds);
+
+    if (watchedThumbnailImageId && !nextFileIds.includes(watchedThumbnailImageId)) {
+      const fallbackThumbnailId = nextFileIds[0] || null;
+      handleThumbnailChange(fallbackThumbnailId);
+    }
+  }, [
+    editorMode,
+    handleFileIdsChange,
+    handleThumbnailChange,
+    syncMarkdownImages,
+    watchedContent,
+    watchedFileIds,
+    watchedThumbnailImageId,
+  ]);
+
+  useEffect(() => {
     if (!watchedThumbnailImageId) {
       setThumbnailIndex(-1);
       return;
@@ -528,7 +599,35 @@ export default function EditPostForm({
     setThumbnailIndex(ids.indexOf(watchedThumbnailImageId));
   }, [form, watchedThumbnailImageId]);
 
-  const handleSubmit = (data: PostFormValues) => {
+  const buildSubmissionPayload = useCallback((data: PostFormValues) => {
+    const isMarkdownMode = editorMode === 'markdown';
+    const convertedHtml = isMarkdownMode ? convertMarkdownToHtml(data.content) : data.content;
+    const hasPreferredYouTube = !isMarkdownMode && /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(convertedHtml);
+
+    const formData: any = {
+      ...data,
+      content: convertedHtml,
+      content_type: 'html',
+    };
+
+    if (isMarkdownMode) {
+      // markdown 원본은 항상 별도 필드로 유지해 재진입 시 동일 모드/콘텐츠를 복원한다.
+      formData.content_markdown = appendYouTubeThumbnailMarker(
+        data.content,
+        selectedYouTubeThumbnailId,
+      );
+    } else if (hasPreferredYouTube) {
+      formData.thumbnailImageId = '';
+    }
+
+    // stale detail cache로 인한 optimistic lock 충돌(409)을 줄이기 위해
+    // 편집 화면 payload에서는 version을 전달하지 않는다.
+    delete formData.version;
+
+    return formData;
+  }, [editorMode, selectedYouTubeThumbnailId]);
+
+  const submitPreparedData = useCallback((data: PostFormValues, targetIsPublished?: boolean) => {
     // useRef를 통한 동기적 중복 제출 차단
     if (isSubmittingRef.current || isLoading || isLocalSubmitting) {
       return;
@@ -541,53 +640,24 @@ export default function EditPostForm({
       return;
     }
 
-    // 제출 시작
     isSubmittingRef.current = true;
     setIsLocalSubmitting(true);
 
-    // 카테고리 배열 → 문자열 변환 (백엔드는 "메인/서브" 형식 기대)
-    const categoryString = data.categories.join('/');
-
-    // 프론트엔드에서 안전하게 HTML로 변환 (백엔드 파싱 오류 방지)
-    const convertedHtml = isMarkdownMode ? convertMarkdownToHtml(data.content) : data.content;
-    const hasPreferredYouTube = !isMarkdownMode && /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(convertedHtml);
-
-    const formData: any = {
-      ...data,
-      category: categoryString,
-      content: convertedHtml,
-      content_type: 'html', // 항상 HTML 타입으로 전송
-    };
-
-    if (isMarkdownMode) {
-      formData.content_markdown = appendYouTubeThumbnailMarker(
-        data.content,
-        selectedYouTubeThumbnailId,
-      );
-      // content 필드는 HTML로 전송됨
-    } else if (hasPreferredYouTube) {
-      formData.thumbnailImageId = '';
-    }
-
-    // categories 필드 제거 (백엔드는 category 필드만 사용)
-    delete formData.categories;
-
-    if (typeof formData.version !== 'number') {
-      formData.version =
-        typeof data.version === 'number'
-          ? data.version
-          : typeof initialData?.version === 'number'
-            ? initialData.version
-            : undefined;
-    }
-
     try {
-      onSubmit(formData);
+      const formData = buildSubmissionPayload(data);
+      onSubmit(formData, targetIsPublished);
     } catch (error) {
       isSubmittingRef.current = false;
       setIsLocalSubmitting(false);
       throw error;
     }
+  }, [buildSubmissionPayload, editorMode, isLoading, isLocalSubmitting, onSubmit]);
+
+  // 저장 버튼 클릭과 엔터 제출이 동일한 변환 파이프라인을 타도록 강제한다.
+  const handleFormSubmit = (targetIsPublished: boolean) => {
+    return form.handleSubmit((data) => {
+      submitPreparedData(data, targetIsPublished);
+    })();
   };
 
   const insertMarkdownSnippet = useCallback((snippet: string) => {
@@ -659,39 +729,11 @@ export default function EditPostForm({
     void handleMarkdownImageFile(file);
   }, [handleMarkdownImageFile]);
 
-  const handleInsertImageFromList = useCallback((image: MarkdownImageInfo) => {
-    if (!image?.url) {
-      toast.error('이미지 정보를 불러오지 못했습니다.');
-      return;
-    }
-    
-    if (markdownEditorRef.current) {
-      markdownEditorRef.current.insertImageBlock({
-        url: image.url,
-        alt: image.name || 'image',
-        size: 'default',
-        caption: '',
-        fileId: image.id,
-      });
-      toast.success('이미지를 본문에 삽입했습니다.');
-      return;
-    }
-    
-    // Fallback
-    const attrs = serializeImageAttributes({
-      id: image.id,
-      size: 'default',
-      caption: '',
-    });
-    insertMarkdownSnippet(`![${image.name || 'image'}](${image.url})${attrs}`);
-    toast.success('이미지를 본문에 삽입했습니다.');
-  }, [insertMarkdownSnippet]);
-
   return (
     <div className="max-w-5xl mx-auto px-3 py-6">
       {/* 폼 */}
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <form onSubmit={form.handleSubmit((data) => submitPreparedData(data))} className="space-y-6">
           <Card className="border-0 shadow-none bg-transparent">
             <CardContent className="space-y-4 pt-16 px-4">
               {/* 제목 */}
@@ -818,30 +860,49 @@ export default function EditPostForm({
                               </span>
                             </div>
                             <div className="space-y-4">
-                              <div className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
-                                <HybridMarkdownEditor
-                                  key={`markdown-${initialData?.id ?? 'edit-post'}`}
-                                  ref={markdownEditorRef}
-                                  content={field.value}
-                                  onChange={(value) => field.onChange(value)}
-                                  className="min-h-[260px] lg:min-h-[360px]"
-                                />
-                              </div>
-                              <p className="text-xs text-gray-500 dark:text-gray-400">
-                                이미지는 시각적으로 편집할 수 있으며, 텍스트는 Markdown 문법을 따릅니다.
-                              </p>
-                              <div className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 p-4 lg:p-6 bg-white dark:bg-gray-900">
-                                <p className="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-3 flex items-center justify-between">
-                                  <span>실시간 미리보기</span>
-                                  <span className="text-[11px] text-gray-400 dark:text-gray-500">
-                                    게시글과 동일한 스타일로 렌더링됩니다.
-                                  </span>
-                                </p>
-                              <HtmlContentRenderer
-                                content={!isConfirmDialogOpen ? convertMarkdownToHtml(previewContent) : ''}
-                                options={{ enableImageModal: false }}
-                                className="markdown-content prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words"
-                              />
+                              <div className="grid gap-4 xl:grid-cols-2">
+                                <section className="rounded-2xl border border-gray-200 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/40 p-4">
+                                  <div className="mb-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
+                                    <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
+                                      <FileText className="h-3.5 w-3.5" />
+                                      <span>본문 작성</span>
+                                    </p>
+                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                      Markdown 편집
+                                    </span>
+                                  </div>
+                                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 p-3">
+                                    <HybridMarkdownEditor
+                                      key={`markdown-${initialData?.id ?? 'edit-post'}`}
+                                      ref={markdownEditorRef}
+                                      content={field.value}
+                                      onChange={(value) => field.onChange(value)}
+                                      className="min-h-[240px] lg:min-h-[340px]"
+                                    />
+                                  </div>
+                                  <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                                    이미지는 시각적으로 편집할 수 있으며, 텍스트는 Markdown 문법을 따릅니다.
+                                  </p>
+                                </section>
+
+                                <section className="rounded-2xl border border-dashed border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 p-4">
+                                  <div className="mb-3 flex items-center justify-between border-b border-gray-200 dark:border-gray-700 pb-2">
+                                    <p className="text-xs uppercase tracking-wide text-gray-600 dark:text-gray-300 flex items-center gap-1.5">
+                                      <ImageIcon className="h-3.5 w-3.5" />
+                                      <span>실시간 미리보기</span>
+                                    </p>
+                                    <span className="text-[11px] text-gray-500 dark:text-gray-400">
+                                      게시글과 동일한 스타일
+                                    </span>
+                                  </div>
+                                  <div className="rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50/60 dark:bg-gray-950/40 p-3">
+                                    <HtmlContentRenderer
+                                      content={!isConfirmDialogOpen ? convertMarkdownToHtml(previewContent) : ''}
+                                      options={{ enableImageModal: false }}
+                                      className="markdown-content prose-gray dark:prose-invert max-w-none text-sm leading-6 break-words"
+                                    />
+                                  </div>
+                                </section>
                               </div>
                             </div>
                             <div className="rounded-2xl border border-gray-200 dark:border-gray-700 p-4 space-y-3">
@@ -865,7 +926,6 @@ export default function EditPostForm({
                                       key={image.id}
                                       image={image}
                                       isActiveThumbnail={!selectedYouTubeThumbnailId && watchedThumbnailImageId === image.id}
-                                      onInsert={handleInsertImageFromList}
                                       onSetThumbnail={setThumbnailByFileId}
                                     />
                                   ))}

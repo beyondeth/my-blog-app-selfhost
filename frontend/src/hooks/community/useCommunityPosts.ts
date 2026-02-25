@@ -1,6 +1,7 @@
 'use client';
 
 import { useQuery, useInfiniteQuery, useMutation, useQueryClient, type InfiniteData } from '@tanstack/react-query';
+import { useEffect, useRef } from 'react';
 import { communityService } from '@/services/api/community.service';
 import type {
   CommunityPost,
@@ -560,11 +561,21 @@ export function useCommunityPostVote(communitySlug: string) {
 /**
  * 커뮤니티 게시물 조회수 증가 훅
  */
-export function useIncrementPostView(communitySlug: string, postSlug: string) {
-  return useMutation({
-    mutationFn: () => communityService.incrementPostView(communitySlug, postSlug),
+export function useIncrementPostView(communitySlug: string, postId?: string) {
+  const hasTrackedRef = useRef(false);
+  const mutation = useMutation({
+    mutationFn: (postId: string) =>
+      communityService.incrementPostView(communitySlug, postId),
     // 조회수는 낙관적 업데이트 없이 서버만 업데이트
   });
+
+  useEffect(() => {
+    if (!communitySlug || !postId || hasTrackedRef.current) return;
+    hasTrackedRef.current = true;
+    mutation.mutate(postId);
+  }, [communitySlug, mutation, postId]);
+
+  return mutation;
 }
 
 // =====================================================

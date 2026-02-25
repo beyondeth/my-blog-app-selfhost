@@ -64,17 +64,36 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
       if (!userId) {
         throw new Error('사용자 정보를 찾을 수 없습니다.');
       }
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${userId}/follow-info`,
-        {
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        }
-      );
+
+      const endpoint = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${userId}/follow-info`;
+      const requestInitBase = {
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      } as const;
+
+      // 1차: 쿠키 포함 요청 (로그인 사용자의 isFollowedByUser 계산)
+      let response = await fetch(endpoint, {
+        ...requestInitBase,
+        credentials: 'include',
+      });
+
+      // 2차: 인증 쿠키 이슈/만료로 401/403이면 익명 조회로 폴백
+      if (response.status === 401 || response.status === 403) {
+        response = await fetch(endpoint, {
+          ...requestInitBase,
+          credentials: 'omit',
+        });
+      }
 
       if (!response.ok) {
+        if (response.status === 401 || response.status === 403) {
+          return {
+            followersCount: 0,
+            followingCount: 0,
+            isFollowedByUser: false,
+          };
+        }
         console.error(`[BlogOwnerCard] Follow info API error: ${response.status} ${response.statusText}`);
         throw new Error(`Failed to fetch follow info: ${response.status}`);
       }

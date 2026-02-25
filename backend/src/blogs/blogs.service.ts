@@ -244,7 +244,7 @@ export class BlogsService {
   }
 
   async findOneBySlug(slug: string, user?: any): Promise<Blog> {
-    console.log(
+    this.logger.debug(
       `[BlogsService] findOneBySlug - slug: ${slug}, user: ${user?.id || "none"}`,
     );
 
@@ -257,10 +257,10 @@ export class BlogsService {
       throw new NotFoundException("블로그를 찾을 수 없습니다.");
     }
 
-    console.log(
+    this.logger.debug(
       `[BlogsService] Blog found - id: ${blog.id}, userId: ${blog.userId}, isPublic: ${blog.isPublic}`,
     );
-    console.log(
+    this.logger.debug(
       `[BlogsService] User check - user.id: ${user?.id}, blog.userId: ${blog.userId}, match: ${user?.id === blog.userId}`,
     );
 
@@ -269,7 +269,7 @@ export class BlogsService {
     const isOwner = user && String(user.id) === String(blog.userId);
 
     if (!blog.isPublic && !isOwner) {
-      console.log(
+      this.logger.debug(
         `[BlogsService] Private blog, not owner - returning limited info`,
       );
       return {
@@ -280,7 +280,9 @@ export class BlogsService {
       } as any;
     }
 
-    console.log(`[BlogsService] Returning full blog info - owner: ${isOwner}`);
+    this.logger.debug(
+      `[BlogsService] Returning full blog info - owner: ${isOwner}`,
+    );
     return blog;
   }
 

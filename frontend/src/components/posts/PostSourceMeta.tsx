@@ -116,7 +116,11 @@ export default function PostSourceMeta(props: PostSourceMetaProps) {
                   </span>
                 )}
                 {shouldShowHeaderTime && timestampIso && relativeTimeValue && (
-                  <time className={`text-[13px] ${metaTextClass}`} dateTime={timestampIso}>
+                  <time
+                    className={`text-[13px] ${metaTextClass}`}
+                    dateTime={timestampIso}
+                    suppressHydrationWarning
+                  >
                     {relativeTimeValue}
                   </time>
                 )}
@@ -172,7 +176,11 @@ export default function PostSourceMeta(props: PostSourceMetaProps) {
                     <span className={metaMutedClass} aria-hidden="true">
                       ·
                     </span>
-                    <time className={`text-[13px] ${metaTextClass}`} dateTime={timestampIso}>
+                    <time
+                      className={`text-[13px] ${metaTextClass}`}
+                      dateTime={timestampIso}
+                      suppressHydrationWarning
+                    >
                       {relativeTimeValue}
                     </time>
                   </>
@@ -216,7 +224,11 @@ export default function PostSourceMeta(props: PostSourceMetaProps) {
                   <span className={metaMutedClass} aria-hidden="true">
                     ·
                   </span>
-                  <time className={`text-[13px] ${metaTextClass}`} dateTime={timestampIso}>
+                  <time
+                    className={`text-[13px] ${metaTextClass}`}
+                    dateTime={timestampIso}
+                    suppressHydrationWarning
+                  >
                     {relativeTimeValue}
                   </time>
                 </>

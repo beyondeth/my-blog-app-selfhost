@@ -9,6 +9,7 @@ import {
   HttpCode,
   HttpStatus,
   ForbiddenException,
+  Logger,
 } from "@nestjs/common";
 import {
   ApiTags,
@@ -34,6 +35,8 @@ import { User } from "../users/entities/user.entity";
 @Roles(Role.ADMIN)
 @ApiBearerAuth()
 export class AdminFilesController {
+  private readonly logger = new Logger(AdminFilesController.name);
+
   constructor(
     @InjectRepository(File)
     private filesRepository: Repository<File>,
@@ -195,9 +198,11 @@ export class AdminFilesController {
       // DB에서 파일 정보 삭제
       await this.filesRepository.remove(file);
 
-      console.log(`[Admin] File deleted by ${admin.email}: ${file.fileKey}`);
+      this.logger.log(
+        `[Admin] File deleted by ${admin.email}: ${file.fileKey}`,
+      );
     } catch (error) {
-      console.error(`[Admin] Failed to delete file: ${error.message}`);
+      this.logger.error(`[Admin] Failed to delete file: ${error.message}`);
       throw error;
     }
   }

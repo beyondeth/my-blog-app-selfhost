@@ -4,7 +4,10 @@ import { PassportModule } from "@nestjs/passport";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthService } from "./auth.service";
+import { AuthQueryService } from "./services/auth-query.service";
+import { AuthCommandService } from "./services/auth-command.service";
 import { AuthController } from "./auth.controller";
+import { MobileAuthController } from "./mobile-auth.controller";
 import { UsersModule } from "../users/users.module";
 import { BlogsModule } from "../blogs/blogs.module";
 import { EmailModule } from "../email/email.module";
@@ -14,13 +17,17 @@ import { JwtStrategy } from "./strategies/jwt.strategy";
 import { GoogleStrategy } from "./strategies/google.strategy";
 import { KakaoStrategy } from "./strategies/kakao.strategy";
 import { GitHubStrategy } from "./strategies/github.strategy";
+import { MobileOAuthCodeService } from "./services/mobile-oauth-code.service";
 
 const providers: any[] = [
+  AuthQueryService,
+  AuthCommandService,
   AuthService,
   JwtStrategy,
   GoogleStrategy,
   KakaoStrategy,
   GitHubStrategy,
+  MobileOAuthCodeService,
 ];
 
 @Module({
@@ -41,7 +48,7 @@ const providers: any[] = [
     }),
   ],
   providers,
-  controllers: [AuthController],
-  exports: [AuthService],
+  controllers: [AuthController, MobileAuthController],
+  exports: [AuthQueryService, AuthCommandService, AuthService],
 })
 export class AuthModule {}

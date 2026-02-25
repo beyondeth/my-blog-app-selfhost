@@ -37,7 +37,7 @@ export class FollowsService {
     // Check if user is trying to follow themselves
     if (followerId === followingId) {
       // 자기 자신 팔로우 시도는 중요한 오류이므로 로그 유지
-      console.error("[FollowService] Error: User trying to follow themselves");
+      this.logger.warn("User tried to follow themselves");
       throw new BadRequestException("You cannot follow yourself");
     }
 
@@ -53,7 +53,7 @@ export class FollowsService {
 
       if (!followerExists || !followingExists) {
         // 사용자 미발견은 중요한 오류이므로 로그 유지
-        console.error("[FollowService] Error: User not found");
+        this.logger.warn("Follow request failed: user not found");
         throw new NotFoundException("User not found");
       }
 
@@ -95,9 +95,8 @@ export class FollowsService {
         const verifyFollow = await manager.findOne(Follow, {
           where: { id: savedFollow.id },
         });
-        console.log(
-          `[FollowService] Follow verification:`,
-          verifyFollow ? "Success" : "Failed",
+        this.logger.debug(
+          `Follow verification: ${verifyFollow ? "success" : "failed"}`,
         );
       }
 
@@ -111,7 +110,9 @@ export class FollowsService {
         // 알림 생성 성공 로그 제거 - 너무 빈번함
       } catch (error) {
         // 알림 생성 실패는 중요한 문제이므로 로그 유지
-        console.error("[FollowService] Error creating notification:", error);
+        const message = error instanceof Error ? error.message : String(error);
+        const stack = error instanceof Error ? error.stack : undefined;
+        this.logger.error(`Error creating notification: ${message}`, stack);
         // Don't throw - notification is not critical for follow operation
       }
     });
@@ -278,7 +279,10 @@ export class FollowsService {
           `SELECT * FROM follows WHERE follower_id = $1 AND following_id = $2`,
           [currentUserId, userId],
         );
-        console.log(`[FollowService] Debug - Raw query result:`, rawResult);
+        this.logger.debug(
+          `[FollowService] Debug - Raw query result:`,
+          rawResult,
+        );
       }
     }
 
@@ -307,7 +311,7 @@ export class FollowsService {
         process.env.DEBUG_FOLLOW === "true"
       ) {
         const sql = queryBuilder.getSql();
-        console.log(`[FollowService] Debug - Query SQL:`, sql);
+        this.logger.debug(`[FollowService] Debug - Query SQL:`, sql);
       }
 
       const follow = await queryBuilder.getOne();

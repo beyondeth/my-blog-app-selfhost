@@ -385,6 +385,30 @@ export class UnifiedRedisService {
   }
 
   /**
+   * 값을 원자적으로 1회 조회 후 삭제
+   * - OAuth code exchange에서 재사용 방지 용도
+   */
+  async consumeOnce(key: string): Promise<string | null> {
+    try {
+      const lua = `
+        local value = redis.call("GET", KEYS[1])
+        if value then
+          redis.call("DEL", KEYS[1])
+        end
+        return value
+      `;
+      const result = await this.redis.eval(lua, 1, key);
+      if (typeof result === "string") {
+        return result;
+      }
+      return null;
+    } catch (error) {
+      this.logger.error(`Failed to consume key atomically: ${key}`, error);
+      return null;
+    }
+  }
+
+  /**
    * 여러 키 한 번에 삭제
    * @param keys 삭제할 키 배열
    * @returns 삭제된 키 개수

@@ -138,6 +138,7 @@ export function VisualMarkdownImageBlock({
 
       {/* 이미지 렌더링 */}
       <figure className="m-0 w-full">
+        {/* eslint-disable-next-line @next/next/no-img-element -- editor supports arbitrary remote/blob URLs */}
         <img
           src={url}
           alt={alt}
