@@ -57,7 +57,8 @@ export class GoogleAuthGuard extends AuthGuard("google") {
     if (err || !user) {
       // 에러 코드 및 메시지 추출
       const errorCode = err?.response?.code || "auth_failed";
-      const errorMessage = err?.response?.message || err?.message || "로그인 실패";
+      const errorMessage =
+        err?.response?.message || err?.message || "로그인 실패";
       const encodedErrorMessage = encodeURIComponent(errorMessage);
       const remainingDays = String(err?.response?.remainingDays || 0);
       const reason = encodeURIComponent(err?.response?.reason || "");

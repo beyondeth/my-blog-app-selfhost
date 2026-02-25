@@ -162,4 +162,3 @@ export class MobileOAuthCodeService {
     return `temp:mobile_oauth:code:${hash}`;
   }
 }
-

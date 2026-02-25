@@ -11,6 +11,11 @@ import { FilesModule } from "../files/files.module";
 import { CacheModule } from "../cache/cache.module";
 import { MetricsModule } from "../metrics/metrics.module";
 import { CommonModule } from "../common/common.module";
+import { CommentsReadRepository } from "./repositories/comments-read.repository";
+import { CommentsCacheService } from "./services/comments-cache.service";
+import { CommentsMapperService } from "./services/comments-mapper.service";
+import { CommentsQueryService } from "./services/comments-query.service";
+import { CommentsCommandService } from "./services/comments-command.service";
 
 @Module({
   imports: [
@@ -22,8 +27,15 @@ import { CommonModule } from "../common/common.module";
     CacheModule,
     MetricsModule,
   ],
-  providers: [CommentsService],
+  providers: [
+    CommentsService,
+    CommentsReadRepository,
+    CommentsCacheService,
+    CommentsMapperService,
+    CommentsQueryService,
+    CommentsCommandService,
+  ],
   controllers: [CommentsController, MobileCommentsController],
-  exports: [CommentsService],
+  exports: [CommentsService, CommentsQueryService, CommentsCommandService],
 })
 export class CommentsModule {}

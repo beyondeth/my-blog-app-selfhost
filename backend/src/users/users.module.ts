@@ -2,6 +2,8 @@ import { Module, forwardRef } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { UsersService } from "./users.service";
+import { UsersQueryService } from "./services/users-query.service";
+import { UsersCommandService } from "./services/users-command.service";
 import { UsersController } from "./users.controller";
 import { MobileSettingsController } from "./mobile-settings.controller";
 import { User } from "./entities/user.entity";
@@ -48,6 +50,8 @@ import { AuditModule } from "../audit/audit.module";
     AuditModule,
   ],
   providers: [
+    UsersQueryService,
+    UsersCommandService,
     UsersService,
     UserDeletionService,
     UserDeletionDebugService,
@@ -56,6 +60,8 @@ import { AuditModule } from "../audit/audit.module";
   ],
   controllers: [UsersController, MobileSettingsController],
   exports: [
+    UsersQueryService,
+    UsersCommandService,
     UsersService,
     UserDeletionService,
     UserDeletionDebugService,

@@ -3,6 +3,7 @@ import { OnEvent } from "@nestjs/event-emitter";
 import { CacheService, CacheKeys, CacheTTL } from "./cache.service";
 import { BlogsService } from "../blogs/blogs.service";
 import { CacheInvalidationEvents } from "../common/events/cache.events";
+import { PostLifecycleEvents } from "../posts/events/post-lifecycle.events";
 
 /**
  * 단순화된 캐시 무효화 이벤트 리스너
@@ -22,12 +23,17 @@ export class CacheInvalidationListener {
 
   /**
    * 포스트 생성/수정/삭제 시 캐시 무효화
+   * CacheInvalidationEvents (1차 이벤트) + PostLifecycleEvents (after-commit 이벤트) 모두 수신
    */
   @OnEvent(
     [
       CacheInvalidationEvents.POST_CREATED,
       CacheInvalidationEvents.POST_UPDATED,
       CacheInvalidationEvents.POST_DELETED,
+      PostLifecycleEvents.CREATED,
+      PostLifecycleEvents.UPDATED,
+      PostLifecycleEvents.DELETED,
+      PostLifecycleEvents.RESTORED,
     ],
     { async: true },
   )

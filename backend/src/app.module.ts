@@ -128,7 +128,12 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     ScheduleModule.forRoot(),
 
     // Event-driven architecture (캐시 무효화용)
-    EventEmitterModule.forRoot(),
+    EventEmitterModule.forRoot({
+      wildcard: false,
+      delimiter: ".",
+      maxListeners: 50,
+      verboseMemoryLeak: true,
+    }),
 
     // Feature modules
     RedisModule, // Global Redis module for distributed state management

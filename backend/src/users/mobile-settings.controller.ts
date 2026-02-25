@@ -25,7 +25,8 @@ export class MobileSettingsController {
   getSettings(
     @CurrentUser() user: { id: string },
   ): Promise<MobileSettingsSnapshot> {
-    return this.usersService.getMobileSettings(user.id);
+    const accountId = user.id;
+    return this.usersService.getMobileSettings(accountId);
   }
 
   @Patch("theme")
@@ -33,11 +34,12 @@ export class MobileSettingsController {
   @ApiResponse({ status: 200, description: "모바일 테마 설정 변경 성공" })
   updateTheme(
     @CurrentUser() user: { id: string },
-    @Body() dto: UpdateMobileThemePreferenceDto,
+    @Body() updateThemeCommand: UpdateMobileThemePreferenceDto,
   ): Promise<MobileSettingsSnapshot> {
+    const accountId = user.id;
     return this.usersService.updateMobileThemePreference(
-      user.id,
-      dto.themePreference,
+      accountId,
+      updateThemeCommand.themePreference,
     );
   }
 
@@ -46,9 +48,13 @@ export class MobileSettingsController {
   @ApiResponse({ status: 200, description: "모바일 알림 설정 변경 성공" })
   updateNotifications(
     @CurrentUser() user: { id: string },
-    @Body() dto: UpdateMobileNotificationPreferencesDto,
+    @Body() updateNotificationsCommand: UpdateMobileNotificationPreferencesDto,
   ): Promise<MobileSettingsSnapshot> {
-    return this.usersService.updateMobileNotificationPreferences(user.id, dto);
+    const accountId = user.id;
+    return this.usersService.updateMobileNotificationPreferences(
+      accountId,
+      updateNotificationsCommand,
+    );
   }
 
   @Patch("privacy")
@@ -56,8 +62,12 @@ export class MobileSettingsController {
   @ApiResponse({ status: 200, description: "모바일 프라이버시 설정 변경 성공" })
   updatePrivacy(
     @CurrentUser() user: { id: string },
-    @Body() dto: UpdateMobilePrivacyPreferencesDto,
+    @Body() updatePrivacyCommand: UpdateMobilePrivacyPreferencesDto,
   ): Promise<MobileSettingsSnapshot> {
-    return this.usersService.updateMobilePrivacyPreferences(user.id, dto);
+    const accountId = user.id;
+    return this.usersService.updateMobilePrivacyPreferences(
+      accountId,
+      updatePrivacyCommand,
+    );
   }
 }

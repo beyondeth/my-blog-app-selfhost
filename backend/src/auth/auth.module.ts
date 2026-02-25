@@ -4,6 +4,8 @@ import { PassportModule } from "@nestjs/passport";
 import { ConfigModule, ConfigService } from "@nestjs/config";
 import { TypeOrmModule } from "@nestjs/typeorm";
 import { AuthService } from "./auth.service";
+import { AuthQueryService } from "./services/auth-query.service";
+import { AuthCommandService } from "./services/auth-command.service";
 import { AuthController } from "./auth.controller";
 import { MobileAuthController } from "./mobile-auth.controller";
 import { UsersModule } from "../users/users.module";
@@ -18,6 +20,8 @@ import { GitHubStrategy } from "./strategies/github.strategy";
 import { MobileOAuthCodeService } from "./services/mobile-oauth-code.service";
 
 const providers: any[] = [
+  AuthQueryService,
+  AuthCommandService,
   AuthService,
   JwtStrategy,
   GoogleStrategy,
@@ -45,6 +49,6 @@ const providers: any[] = [
   ],
   providers,
   controllers: [AuthController, MobileAuthController],
-  exports: [AuthService],
+  exports: [AuthQueryService, AuthCommandService, AuthService],
 })
 export class AuthModule {}

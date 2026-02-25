@@ -12,9 +12,13 @@ import { Post } from "../entities/post.entity";
 import { PostStats } from "../entities/post-stats.entity";
 import { User } from "../../users/entities/user.entity";
 import { Profile } from "../../users/entities/profile.entity";
-import { Role } from "../../common/enums/role.enum";
 import { Blog } from "../../blogs/entities/blog.entity";
+import { Role } from "../../common/enums/role.enum";
 import { PostMapperService } from "./post-mapper.service";
+import {
+  PostsReadRepository,
+  ReadPolicy,
+} from "../repositories/posts-read.repository";
 import { MaterializedViewService } from "../../common/services/materialized-view.service";
 import {
   PostInteractionStatusService,
@@ -56,6 +60,7 @@ export class PostReadService {
     private readonly postStatsRepository: Repository<PostStats>,
     @InjectRepository(Blog)
     private readonly blogsRepository: Repository<Blog>,
+    private readonly postsReadRepository: PostsReadRepository,
     private readonly postMapperService: PostMapperService,
     private readonly materializedViewService: MaterializedViewService,
     private readonly postInteractionStatusService: PostInteractionStatusService,
@@ -196,49 +201,14 @@ export class PostReadService {
       }
     }
 
-    // 쿼리 빌더로 최적화 - 필요한 관계만 선택적으로 로드
-    const query = this.postsRepository
-      .createQueryBuilder("post")
-      .leftJoinAndSelect("post.author", "author")
-      .leftJoinAndSelect("author.profile", "profile")
-      .leftJoinAndSelect("post.blog", "blog")
-      .leftJoinAndSelect("post.thumbnailImage", "thumbnailImage")
-      .leftJoinAndSelect("post.attachedFiles", "attachedFiles") // 상세 페이지에 필요
-      .leftJoinAndSelect("post.stats", "stats")
-      // metadata에서 필요한 컬럼만 선택
-      .leftJoin("post.metadata", "metadata")
-      .addSelect([
-        "metadata.excerpt",
-        "metadata.tags",
-        "metadata.category",
-        "metadata.content_rendered_at",
-        "metadata.isEditorPick",
-        "metadata.wordCount",
-        "metadata.readingTimeMinutes",
-      ])
-      .where("post.id = :id", { id });
-
-    // 추가 관계가 있으면 추가 (필요 시에만)
-    if (relations.length > 0) {
-      relations.forEach((relation) => {
-        if (
-          ![
-            "author",
-            "author.profile",
-            "blog",
-            "thumbnailImage",
-            "attachedFiles",
-            "stats",
-            "metadata",
-          ].includes(relation)
-        ) {
-          query.leftJoinAndSelect(`post.${relation}`, relation);
-        }
-      });
-    }
-
+    // 쿼리 빌더 최적화 로직은 Repository로 위임
     try {
-      const post = await query.getOne();
+      // V4: ReadPolicy.Replica (기본 지연 일관성 채택)
+      const post = await this.postsReadRepository.findByIdWithRelations(
+        id,
+        relations,
+        ReadPolicy.Replica,
+      );
 
       if (!post) {
         throw new NotFoundException("포스트를 찾을 수 없습니다.");
@@ -336,18 +306,11 @@ export class PostReadService {
     }
 
     try {
-      const post = await this.postsRepository.findOne({
-        where: { slug },
-        relations: [
-          "author",
-          "author.profile",
-          "blog",
-          "thumbnailImage",
-          "attachedFiles",
-          "stats",
-          "metadata",
-        ],
-      });
+      // V4: Repository 위임 및 기본 Replica 동작
+      const post = await this.postsReadRepository.findBySlugWithRelations(
+        slug,
+        ReadPolicy.Replica,
+      );
 
       if (!post) {
         throw new NotFoundException("게시글을 찾을 수 없습니다.");
@@ -396,7 +359,11 @@ export class PostReadService {
 
   private async cachePublishedDetail(post: Post, dto: any): Promise<void> {
     await Promise.all([
-      this.cacheService.set(CacheKeys.POST_CORE(post.id), dto, this.detailCacheTtl),
+      this.cacheService.set(
+        CacheKeys.POST_CORE(post.id),
+        dto,
+        this.detailCacheTtl,
+      ),
       this.cacheService.set(
         CacheKeys.POST_BY_SLUG(post.slug),
         post.id,
@@ -443,186 +410,23 @@ export class PostReadService {
   ): Promise<CursorPaginatedPostsDto> {
     this.logger.debug(`[getPostsCursor] Query: ${JSON.stringify(dto)}`);
 
-    // 최적화된 쿼리 빌더 (필수 관계만 로드)
-    const query = this.postsRepository
-      .createQueryBuilder("post")
-      .leftJoinAndSelect("post.author", "author")
-      .leftJoinAndSelect("author.profile", "profile")
-      .leftJoinAndSelect("post.blog", "blog")
-      .leftJoinAndSelect("post.thumbnailImage", "thumbnailImage")
-      .leftJoinAndSelect("post.stats", "stats")
-      // 성능 최적화: metadata에서 필요한 컬럼만 선택
-      .leftJoin("post.metadata", "metadata")
-      .addSelect([
-        "metadata.excerpt",
-        "metadata.tags",
-        "metadata.category",
-        "metadata.isEditorPick",
-      ]);
-    // 성능 최적화: attachedFiles는 필요할 때만 별도 조회 (파일 목록은 상세 페이지에서만 필요)
-
-    // where 조건 배열
-    const whereConditions: string[] = [];
-    const parameters: Record<string, any> = {};
-
-    // 게시된 글만 조회 (인증하지 않은 경우)
-    if (!user) {
-      whereConditions.push("post.isPublished = :isPublished");
-      whereConditions.push("blog.isPublic = :isPublic");
-      whereConditions.push("post.isDeleted = :isDeleted");
-      parameters.isPublished = true;
-      parameters.isPublic = true;
-      parameters.isDeleted = false;
-    }
-
-    // 특정 블로그 필터 (blogId 우선)
-    if (dto.blogId) {
-      whereConditions.push("blog.id = :blogId");
-      parameters.blogId = dto.blogId;
-    } else if (dto.blogSlug) {
-      whereConditions.push("blog.slug = :blogSlug");
-      parameters.blogSlug = dto.blogSlug;
-    }
-
-    // 카테고리 필터
-    if (dto.category) {
-      whereConditions.push("post.category = :category");
-      parameters.category = dto.category;
-    }
-
-    // 태그 필터 (JSONB 배열)
-    if (dto.tag) {
-      whereConditions.push("post.tags @> :tag");
-      parameters.tag = JSON.stringify([dto.tag]);
-    }
-
-    // 기본 where 조건을 먼저 적용하여 이후 검색 조건이 덮어씌워지지 않도록 함
-    if (whereConditions.length > 0) {
-      const [firstCondition, ...restConditions] = whereConditions;
-      query.where(firstCondition, parameters);
-      restConditions.forEach((condition) =>
-        query.andWhere(condition, parameters),
+    // 쿼리 빌더 최적화 로직은 Repository로 위임
+    // V4: ReadPolicy.Replica (기본 지연 일관성 채택)
+    const queryBuilder =
+      this.postsReadRepository.getCursorPaginatedQueryBuilder(
+        dto,
+        user,
+        ReadPolicy.Replica,
       );
-    }
-
-    // 검색 처리
-    if (dto.search) {
-      const sanitizedSearch = this.sanitizeSearchTerm(dto.search);
-      if (!sanitizedSearch) {
-        throw new BadRequestException(
-          "검색어에 허용되지 않는 문자가 포함되어 있습니다.",
-        );
-      }
-
-      const hasMultipleTerms = sanitizedSearch.includes(" ");
-      const tsQueryInput = hasMultipleTerms
-        ? sanitizedSearch.split(" ").join(" & ")
-        : sanitizedSearch;
-
-      try {
-        if (hasMultipleTerms) {
-          query
-            .addSelect(
-              `ts_rank(post.search_vector, to_tsquery('simple', :searchQuery))`,
-              "search_rank",
-            )
-            .andWhere(
-              `post.search_vector @@ to_tsquery('simple', :searchQuery)`,
-              { searchQuery: tsQueryInput },
-            );
-        } else {
-          query
-            .addSelect(
-              `ts_rank(post.search_vector, plainto_tsquery('simple', :searchQuery))`,
-              "search_rank",
-            )
-            .andWhere(
-              `post.search_vector @@ plainto_tsquery('simple', :searchQuery)`,
-              { searchQuery: tsQueryInput },
-            );
-        }
-      } catch (error) {
-        this.logger.warn(
-          `[Search] Full-text search failed, falling back to ILIKE: ${error.message}`,
-        );
-        query.andWhere(
-          `EXISTS (SELECT 1 FROM jsonb_array_elements_text(post.tags) as tag WHERE tag ILIKE :searchTerm)`,
-          { searchTerm: `%${sanitizedSearch}%` },
-        );
-      }
-    }
-
-    // 날짜 범위 필터
-    if (dto.dateFrom) {
-      whereConditions.push("post.publishedAt >= :dateFrom");
-      parameters.dateFrom = dto.dateFrom;
-    }
-    if (dto.dateTo) {
-      whereConditions.push("post.publishedAt <= :dateTo");
-      parameters.dateTo = dto.dateTo;
-    }
-
-    // 정렬 조건
-    switch (dto.sortBy) {
-      case "published":
-        query.orderBy("post.publishedAt", dto.sortOrder || "DESC");
-        break;
-      case "views":
-        query.orderBy("post.viewCount", dto.sortOrder || "DESC");
-        break;
-      case "likes":
-        query.orderBy("post.likeCount", dto.sortOrder || "DESC");
-        break;
-      case "comments":
-        query.orderBy("post.commentCount", dto.sortOrder || "DESC");
-        break;
-      case "title":
-        query.orderBy("post.title", dto.sortOrder || "ASC");
-        break;
-      case "editorPicks":
-        query
-          .orderBy("post.isEditorPick", "DESC")
-          .addOrderBy("post.publishedAt", "DESC");
-        break;
-      default:
-        if (dto.search) {
-          query
-            .orderBy("search_rank", "DESC")
-            .addOrderBy("post.publishedAt", "DESC");
-        } else {
-          query.orderBy("post.publishedAt", "DESC");
-        }
-    }
-
-    // 커서 페이징
-    if (dto.cursor) {
-      const cursorDirection = dto.sortOrder === "ASC" ? ">" : "<";
-      const sortField =
-        dto.sortBy === "editorPicks" ? "post.isEditorPick" : "post.publishedAt";
-
-      if (dto.search) {
-        query.andWhere(
-          `(search_rank, post.publishedAt) ${cursorDirection} (:searchRank, :cursor)`,
-          {
-            searchRank: dto.cursorRank || 0,
-            cursor: dto.cursor,
-          },
-        );
-      } else {
-        query.andWhere(`${sortField} ${cursorDirection} :cursor`, {
-          cursor: dto.cursor,
-        });
-      }
-    }
 
     // 결과 수 제한
     const limit = Math.min(dto.limit || 20, 100);
-    query.limit(limit + 1); // +1 for hasNext check
+    queryBuilder.limit(limit + 1); // +1 for hasNext check
 
     // 쿼리 실행
     let posts: Post[];
     try {
-      posts = await query.getMany();
+      posts = await queryBuilder.getMany();
     } catch (error) {
       if (
         error instanceof Error &&
@@ -1026,6 +830,67 @@ export class PostReadService {
       .getManyAndCount();
 
     return { posts, total };
+  }
+
+  /**
+   * 포스트 통계 조회 (관리자용)
+   */
+  async getPostStats(options?: {
+    startDate?: Date;
+    endDate?: Date;
+    blogId?: string;
+  }): Promise<{
+    totalPosts: number;
+    publishedPosts: number;
+    draftPosts: number;
+    totalViews: number;
+    totalLikes: number;
+    totalComments: number;
+  }> {
+    const query = this.postStatsRepository
+      .createQueryBuilder("stats")
+      .leftJoin("stats.post", "post")
+      .where("post.isDeleted = :isDeleted", { isDeleted: false });
+
+    if (options?.startDate) {
+      query.andWhere("post.createdAt >= :startDate", {
+        startDate: options.startDate,
+      });
+    }
+
+    if (options?.endDate) {
+      query.andWhere("post.createdAt <= :endDate", {
+        endDate: options.endDate,
+      });
+    }
+
+    if (options?.blogId) {
+      query.andWhere("post.blogId = :blogId", { blogId: options.blogId });
+    }
+
+    const result = await query
+      .select("COUNT(DISTINCT post.id)", "totalPosts")
+      .addSelect(
+        "COUNT(CASE WHEN post.isPublished = true THEN 1 END)",
+        "publishedPosts",
+      )
+      .addSelect(
+        "COUNT(CASE WHEN post.isPublished = false THEN 1 END)",
+        "draftPosts",
+      )
+      .addSelect("SUM(stats.viewCount)", "totalViews")
+      .addSelect("SUM(stats.likeCount)", "totalLikes")
+      .addSelect("SUM(stats.commentCount)", "totalComments")
+      .getRawOne();
+
+    return {
+      totalPosts: parseInt(result.totalPosts, 10) || 0,
+      publishedPosts: parseInt(result.publishedPosts, 10) || 0,
+      draftPosts: parseInt(result.draftPosts, 10) || 0,
+      totalViews: parseInt(result.totalViews, 10) || 0,
+      totalLikes: parseInt(result.totalLikes, 10) || 0,
+      totalComments: parseInt(result.totalComments, 10) || 0,
+    };
   }
 
   /**

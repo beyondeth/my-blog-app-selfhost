@@ -113,10 +113,7 @@ export class PostInteractionService {
     }
   }
 
-  private buildUniqueViewKey(
-    postId: string,
-    userId?: string,
-  ): string | null {
+  private buildUniqueViewKey(postId: string, userId?: string): string | null {
     if (userId) {
       return CacheKeys.POST_USER_VIEW(postId, userId);
     }

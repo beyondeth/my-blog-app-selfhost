@@ -1286,7 +1286,12 @@ export class CommunityPostService {
           // 최종 카운트 조회
           const post = await manager.findOne(CommunityPost, {
             where: { id: postId },
-            select: ["communityId", "upvoteCount", "downvoteCount", "likeCount"],
+            select: [
+              "communityId",
+              "upvoteCount",
+              "downvoteCount",
+              "likeCount",
+            ],
           });
 
           const upvoteCount = post?.upvoteCount || 0;

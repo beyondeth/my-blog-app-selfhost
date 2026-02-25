@@ -1,15 +1,15 @@
-import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { FeedService } from './feed.service';
-import { FeedFilterType, FeedSortType } from './dto';
-import { Community } from '../communities/entities/community.entity';
-import { CommunityPostService } from '../communities/services/community-post.service';
+import { Injectable, Logger } from "@nestjs/common";
+import { Cron, CronExpression } from "@nestjs/schedule";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { FeedService } from "./feed.service";
+import { FeedFilterType, FeedSortType } from "./dto";
+import { Community } from "../communities/entities/community.entity";
+import { CommunityPostService } from "../communities/services/community-post.service";
 import {
   CommunityPostSortBy,
   GetCommunityPostsQueryDto,
-} from '../communities/dto';
+} from "../communities/dto";
 
 /**
  * 통합 피드 캐시 워밍 서비스
@@ -63,19 +63,19 @@ export class FeedCacheWarmingService {
   @Cron(CronExpression.EVERY_MINUTE)
   async warmAllFeeds(): Promise<void> {
     if (this.warmingInProgress) {
-      this.logger.debug('Skip feed warming: previous cycle still running');
+      this.logger.debug("Skip feed warming: previous cycle still running");
       return;
     }
 
     this.warmingInProgress = true;
     try {
       // 1. 홈 피드 워밍
-      if (process.env.DISABLE_FEED_WARMING !== 'true') {
+      if (process.env.DISABLE_FEED_WARMING !== "true") {
         await this.warmUnifiedFeed();
       }
 
       // 2. 커뮤니티 피드 워밍
-      if (process.env.DISABLE_COMMUNITY_FEED_WARMING !== 'true') {
+      if (process.env.DISABLE_COMMUNITY_FEED_WARMING !== "true") {
         await this.warmCommunityFeeds();
       }
     } finally {
@@ -116,9 +116,9 @@ export class FeedCacheWarmingService {
     // 인기 커뮤니티 조회 (포스트 수 기준)
     // TODO: 추후 '활성 사용자'나 '최근 활동' 기준으로 변경 고려
     const communities = await this.communityRepository.find({
-      select: ['id', 'slug'],
+      select: ["id", "slug"],
       where: { isPublic: true, deletedAt: null },
-      order: { postCount: 'DESC' },
+      order: { postCount: "DESC" },
       take: limit,
     });
 

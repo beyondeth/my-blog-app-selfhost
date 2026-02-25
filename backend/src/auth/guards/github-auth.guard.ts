@@ -74,7 +74,8 @@ export class GitHubAuthGuard extends AuthGuard("github") {
     if (err || !user) {
       // 에러 코드 및 메시지 추출
       const errorCode = err?.response?.code || "oauth_error";
-      const errorMessage = err?.response?.message || err?.message || "로그인 실패";
+      const errorMessage =
+        err?.response?.message || err?.message || "로그인 실패";
       const encodedErrorMessage = encodeURIComponent(errorMessage);
       const remainingDays = String(err?.response?.remainingDays || 0);
       const frontendUrl =
