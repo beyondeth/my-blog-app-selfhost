@@ -1,5 +1,4 @@
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
-import { randomUUID } from 'node:crypto';
 import {
   InitializeRequestSchema,
   ListToolsRequestSchema,
@@ -27,6 +26,10 @@ import {
   getWidgetResourceTemplateEntry,
   readWidgetResource,
 } from './WidgetResource.js';
+import type {
+  OpenAiStyleStateStore,
+  SelectedStyleState,
+} from './OpenAiStyleStateStore.js';
 
 /**
  * OpenAI(ChatGPT) 전용 MCP 어댑터.
@@ -59,20 +62,6 @@ type StyleOption = {
 type OpenAiToolPresentation = {
   title: string;
   description: string;
-};
-
-type SelectedStyleState = {
-  styleId: string;
-  selectedAt: number;
-};
-
-type PendingStyleSelectionState = {
-  nonces: Array<{ nonce: string; issuedAt: number }>;
-};
-
-type StyleFlowState = {
-  startedAt: number;
-  styleConfirmedAt?: number;
 };
 
 const STYLE_OPTION_DETAILS: Record<string, Omit<StyleOption, 'id'>> = {
@@ -121,39 +110,10 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
   },
 };
 
-// OpenAI(ChatGPT) 라우트 전용 상태 저장소.
-// /mcp-openai 요청에서만 사용하며 /mcp, /mcp-remote에는 영향을 주지 않는다.
-const selectedStyleByUserId = new Map<string, SelectedStyleState>();
-const pendingStyleSelectionByUserId = new Map<string, PendingStyleSelectionState>();
-const styleFlowByUserId = new Map<string, StyleFlowState>();
 // 스타일 선택 세션은 비교적 길게 유지해, 대기 시간이 길어도 사용자가 위젯에서
 // 직접 선택/제출하면 플로우가 끊기지 않도록 한다. (/mcp-openai 전용 정책)
 const STYLE_SELECTION_TTL_MS = 24 * 60 * 60 * 1000;
 const STYLE_FLOW_TTL_MS = 24 * 60 * 60 * 1000;
-
-function createStyleSelectionNonce(userId: string): string {
-  const now = Date.now();
-  const nonce = randomUUID();
-  const current = pendingStyleSelectionByUserId.get(userId)?.nonces || [];
-  const fresh = current.filter((item) => now - item.issuedAt <= STYLE_SELECTION_TTL_MS);
-  // 모델 재시도로 nonce가 여러 번 갱신되더라도 이전 nonce를 충분히 허용한다.
-  const trimmed = fresh.slice(-200);
-  pendingStyleSelectionByUserId.set(userId, {
-    nonces: [...trimmed, { nonce, issuedAt: now }],
-  });
-  return nonce;
-}
-
-function getOrCreateStyleSelectionNonce(userId: string): string {
-  const now = Date.now();
-  const current = pendingStyleSelectionByUserId.get(userId)?.nonces || [];
-  const fresh = current.filter((item) => now - item.issuedAt <= STYLE_SELECTION_TTL_MS);
-  if (fresh.length > 0) {
-    pendingStyleSelectionByUserId.set(userId, { nonces: fresh.slice(-200) });
-    return fresh[fresh.length - 1].nonce;
-  }
-  return createStyleSelectionNonce(userId);
-}
 
 function summarizeMarkdown(raw: string | undefined): string {
   if (!raw) return '';
@@ -345,7 +305,8 @@ export function getOpenAiDiscoveryTools(): Array<{ name: string; description: st
 
 export async function registerOpenAiTools(
   mcpServer: McpServer,
-  context: ToolContext
+  context: ToolContext,
+  styleStateStore: OpenAiStyleStateStore
 ): Promise<void> {
   // OpenAI route는 tools + resources를 같이 노출해야 위젯 렌더링이 가능하다.
   mcpServer.setRequestHandler(InitializeRequestSchema, async () => {
@@ -462,9 +423,9 @@ export async function registerOpenAiTools(
           },
         };
       } else if (toolName === 'get_writing_style_guide') {
+        const userId = context.userData.userId;
         const styleArg = typeof args.style === 'string' ? args.style : undefined;
-        const flowState = styleFlowByUserId.get(context.userData.userId);
-        const selectedState = selectedStyleByUserId.get(context.userData.userId);
+        const selectedState = await styleStateStore.getSelectedStyle(userId);
         const hasReadyStyle = Boolean(selectedState);
 
         const nonceValidInRequest =
@@ -479,11 +440,11 @@ export async function registerOpenAiTools(
         // 단, 위젯에서 이제 막 제출된 순간(nonce가 넘어온 요청)이 아닐 때만 차단.
         if (hasReadyStyle && !nonceValidInRequest) {
           // AI가 이전 상태를 무단으로 우회 재사용하려는 경우 강제 초기화
-          selectedStyleByUserId.delete(context.userData.userId);
-          styleFlowByUserId.delete(context.userData.userId);
+          await styleStateStore.clearSelectedStyle(userId);
+          await styleStateStore.clearStyleFlow(userId);
         }
 
-        const recheckedSelectedState = selectedStyleByUserId.get(context.userData.userId);
+        const recheckedSelectedState = await styleStateStore.getSelectedStyle(userId);
 
         if (recheckedSelectedState) {
           const selectedStyle = getStyleOption(recheckedSelectedState.styleId);
@@ -513,7 +474,10 @@ export async function registerOpenAiTools(
           return result;
         }
         if (!styleArg) {
-          const nonce = getOrCreateStyleSelectionNonce(context.userData.userId);
+          const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
+            userId,
+            STYLE_SELECTION_TTL_MS
+          );
           result = {
             content: [
               {
@@ -548,7 +512,10 @@ export async function registerOpenAiTools(
 
         if (inputSource !== 'widget' || !inputNonce) {
           // 위젯 경로가 아닌 호출 → 스타일 선택 카드를 다시 보여준다.
-          const nonce = getOrCreateStyleSelectionNonce(context.userData.userId);
+          const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
+            userId,
+            STYLE_SELECTION_TTL_MS
+          );
           result = {
             content: [
               {
@@ -576,19 +543,18 @@ export async function registerOpenAiTools(
           return result;
         }
 
-        // 위젯 경로 nonce 검증
-        const pending = pendingStyleSelectionByUserId.get(context.userData.userId);
-        const nonceCheckNow = Date.now();
-        const freshPending = (pending?.nonces || []).filter(
-          (item) => nonceCheckNow - item.issuedAt <= STYLE_SELECTION_TTL_MS
+        // 위젯 경로 nonce 검증(1회성 소비 포함)
+        const nonceValid = await styleStateStore.consumeStyleSelectionNonce(
+          userId,
+          inputNonce,
+          STYLE_SELECTION_TTL_MS
         );
-        if (pending && freshPending.length !== pending.nonces.length) {
-          pendingStyleSelectionByUserId.set(context.userData.userId, { nonces: freshPending });
-        }
-        const nonceValid = freshPending.some((item) => item.nonce === inputNonce);
 
         if (!nonceValid) {
-          const nonce = createStyleSelectionNonce(context.userData.userId);
+          const nonce = await styleStateStore.createStyleSelectionNonce(
+            userId,
+            STYLE_SELECTION_TTL_MS
+          );
           result = {
             content: [
               {
@@ -614,16 +580,6 @@ export async function registerOpenAiTools(
           return result;
         }
 
-        // nonce 1회성 소비
-        const remaining = freshPending.filter((item) => item.nonce !== inputNonce);
-        if (remaining.length > 0) {
-          pendingStyleSelectionByUserId.set(context.userData.userId, { nonces: remaining });
-        } else {
-          pendingStyleSelectionByUserId.delete(context.userData.userId);
-        }
-
-        // nonce 소비는 위 위젯 경로 블록에서 처리 완료
-
         // 스타일 가이드는 원문 텍스트(content)를 유지하고 상태만 structuredContent로 전달
         const raw = await handleGetWritingStyleGuide(
           {
@@ -633,19 +589,27 @@ export async function registerOpenAiTools(
           context
         );
         const selectedStyle = getStyleOption(styleArg);
-        const currentFlow = styleFlowByUserId.get(context.userData.userId);
+        const currentFlow = await styleStateStore.getStyleFlow(userId);
         const confirmedAt = Date.now();
-        styleFlowByUserId.set(context.userData.userId, {
-          startedAt: currentFlow?.startedAt || confirmedAt,
-          styleConfirmedAt: confirmedAt,
-        });
-        selectedStyleByUserId.set(context.userData.userId, {
-          styleId: selectedStyle.id,
-          selectedAt: confirmedAt,
-        });
+        await styleStateStore.setStyleFlow(
+          userId,
+          {
+            startedAt: currentFlow?.startedAt || confirmedAt,
+            styleConfirmedAt: confirmedAt,
+          },
+          STYLE_FLOW_TTL_MS
+        );
+        await styleStateStore.setSelectedStyle(
+          userId,
+          {
+            styleId: selectedStyle.id,
+            selectedAt: confirmedAt,
+          },
+          STYLE_FLOW_TTL_MS
+        );
         // 스타일 확정 이후에는 추가 nonce를 발급하지 않는다.
         // 재호출은 idempotent guide_ready로 흡수하여 루프를 방지한다.
-        pendingStyleSelectionByUserId.delete(context.userData.userId);
+        await styleStateStore.clearPendingNonces(userId);
         result = {
           content: raw.content,
           structuredContent: {
@@ -666,17 +630,20 @@ export async function registerOpenAiTools(
           },
         };
       } else if (toolName === 'create_post') {
+        const userId = context.userData.userId;
         // OpenAI(ChatGPT) 라우트에서만 "스타일 선택 선행"을 강제한다.
         // 공용 create_post 핸들러(/mcp, /mcp-remote)는 변경하지 않는다.
         const requestedStyle = args.writingStyle as string | undefined;
-        const selectedState = selectedStyleByUserId.get(context.userData.userId);
+        const selectedState = await styleStateStore.getSelectedStyle(userId);
 
         if (!selectedState) {
           const markdown = (args.content_markdown as string | undefined) || '';
           const preview = summarizeMarkdown(markdown);
           const tags = Array.isArray(args.tags) ? (args.tags as string[]) : [];
-          const nonce = getOrCreateStyleSelectionNonce(context.userData.userId);
-          const reason = '스타일 선택이 선행되어야 합니다.';
+          const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
+            userId,
+            STYLE_SELECTION_TTL_MS
+          );
           result = {
             // isError를 빼면 ChatGPT 모델은 실패로 간주하지 않아 위젯을 정상적으로 렌더링함
             // 대신 우리는 content에 이 사실을 적어 모델이 인지하게 하고, UI 상태를 blocked로 줌
@@ -756,9 +723,7 @@ export async function registerOpenAiTools(
           };
           // 한 번 게시가 완료되면 스타일 선택 상태를 정리한다.
           // 다음 자동포스팅 요청에서는 다시 check_auth → 스타일 선택을 거치도록 강제한다.
-          selectedStyleByUserId.delete(context.userData.userId);
-          pendingStyleSelectionByUserId.delete(context.userData.userId);
-          styleFlowByUserId.delete(context.userData.userId);
+          await styleStateStore.clearAll(userId);
         }
       } else {
         result = {

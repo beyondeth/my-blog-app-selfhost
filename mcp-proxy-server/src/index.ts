@@ -278,7 +278,7 @@ app.use('/mcp-remote', mcpRemoteRouter);
 
 // OpenAI ChatGPT App 전용 MCP 엔드포인트
 if (config.OPENAI_APP_ENABLED) {
-  app.use('/mcp-openai', createOpenAiAppRouter(storage, metricsService));
+  app.use('/mcp-openai', createOpenAiAppRouter(storage, metricsService, redisCore));
   logger.info('🤖 OpenAI ChatGPT App endpoint enabled at /mcp-openai');
 }
 

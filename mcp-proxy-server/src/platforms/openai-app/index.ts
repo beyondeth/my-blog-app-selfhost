@@ -1,27 +1,27 @@
 import { Router, Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { logger } from '../../utils/logger.js';
 import { config } from '../../config/env.validation.js';
 import { oauthMiddleware, getUserInfo, type OAuthStorage } from '../../oauth/index.js';
 import { createOpenAiServer } from './OpenAiServerFactory.js';
-import { getOpenAiDiscoveryTools } from './ToolRegistrar.js';
-import { OPENAI_WIDGET_URI } from './WidgetResource.js';
+import { OpenAiStyleStateStore } from './OpenAiStyleStateStore.js';
 import type { MetricsService } from '../../services/MetricsService.js';
 import type { ValidatedToken } from '../../oauth/types.js';
+import type Redis from 'ioredis';
 
 /**
  * OpenAI(ChatGPT) 전용 MCP 라우터.
  * - 인증은 기존 OAuth 인프라(oauthMiddleware/getUserInfo)를 그대로 재사용
- * - 툴/리소스 어댑팅은 platforms/openai-app 내부에서만 처리
+ * - 전송 계층은 Streamable HTTP GET/POST 단일 엔드포인트만 사용한다.
  * - 기존 /mcp, /mcp-remote 라우트와 분리 유지
  */
 export function createOpenAiAppRouter(
   storage: OAuthStorage,
-  metricsService: MetricsService
+  metricsService: MetricsService,
+  redisCore: Redis
 ): Router {
   const router = Router();
-  const sseTransports = new Map<string, SSEServerTransport>();
+  const styleStateStore = new OpenAiStyleStateStore(redisCore);
 
   function getRequestServerUrl(req: Request): string {
     const forwardedProto = ((req.headers['x-forwarded-proto'] as string) || '')
@@ -75,8 +75,6 @@ export function createOpenAiAppRouter(
     }
 
     return {
-      oauth,
-      userInfo,
       context: {
         userData: {
           keyId: `oauth:${oauth.clientId}`,
@@ -100,15 +98,14 @@ export function createOpenAiAppRouter(
     };
   }
 
-  async function handleStreamablePost(req: Request, res: Response) {
+  async function handleStreamableRequest(req: Request, res: Response) {
     const hydrated = await buildOpenAiContext(req, res);
     if (!hydrated) {
       return;
     }
 
     try {
-      const mcpServer = await createOpenAiServer(hydrated.context as any);
-
+      const mcpServer = await createOpenAiServer(hydrated.context as any, styleStateStore);
       const transport = new StreamableHTTPServerTransport({
         sessionIdGenerator: undefined,
       });
@@ -141,88 +138,6 @@ export function createOpenAiAppRouter(
     }
   }
 
-  async function handleSseConnect(req: Request, res: Response) {
-    const hydrated = await buildOpenAiContext(req, res);
-    if (!hydrated) {
-      return;
-    }
-
-    try {
-      const mcpServer = await createOpenAiServer(hydrated.context as any);
-
-      // Legacy SSE compatibility:
-      // ChatGPT/일부 MCP 클라이언트가 text/event-stream을 기대할 때 사용한다.
-      // POST /mcp-openai/messages?sessionId=... 로 메시지를 전달한다.
-      const transport = new SSEServerTransport('/mcp-openai/messages', res);
-      sseTransports.set(transport.sessionId, transport);
-
-      transport.onclose = () => {
-        sseTransports.delete(transport.sessionId);
-      };
-      transport.onerror = (error) => {
-        logger.warn(
-          {
-            route: '/mcp-openai/sse',
-            sessionId: transport.sessionId,
-            error: error.message,
-          },
-          '⚠️ OpenAI SSE transport error'
-        );
-      };
-
-      await mcpServer.connect(transport);
-      metricsService.recordRequest('success', undefined, 'mcp-openai');
-    } catch (error: any) {
-      metricsService.recordRequest('error', undefined, 'mcp-openai');
-      logger.error(
-        { error: error.message, route: '/mcp-openai/sse' },
-        '❌ OpenAI SSE connection failed'
-      );
-      if (!res.headersSent) {
-        res.status(500).json({
-          error: 'sse_connection_failed',
-          message: 'Failed to establish SSE connection',
-        });
-      }
-    }
-  }
-
-  router.post('/', async (req: Request, res: Response) => {
-    await handleStreamablePost(req, res);
-  });
-
-  router.post('/messages', async (req: Request, res: Response) => {
-    const sessionId = req.query?.sessionId as string | undefined;
-    if (!sessionId) {
-      return res.status(400).json({ message: 'sessionId query is required' });
-    }
-
-    const transport = sseTransports.get(sessionId);
-    if (!transport) {
-      return res.status(400).json({ message: 'No transport found for sessionId' });
-    }
-
-    try {
-      const startTime = Date.now();
-      await transport.handlePostMessage(req as any, res, (req as any).body);
-      const duration = Date.now() - startTime;
-      metricsService.recordRequestDuration(duration, undefined, 'mcp-openai');
-    } catch (error: any) {
-      metricsService.recordRequest('error', undefined, 'mcp-openai');
-      logger.error(
-        { error: error.message, route: '/mcp-openai/messages', sessionId },
-        '❌ OpenAI SSE message handling failed'
-      );
-      if (!res.headersSent) {
-        res.status(500).json({ message: 'Failed to process SSE message' });
-      }
-    }
-  });
-
-  router.get('/sse', async (req: Request, res: Response) => {
-    await handleSseConnect(req, res);
-  });
-
   // 클라이언트 호환성:
   // 일부 클라이언트가 base URL을 /mcp-openai로 잡은 뒤 하위 .well-known을 조회한다.
   router.get('/.well-known/oauth-authorization-server', (req, res) => {
@@ -232,54 +147,20 @@ export function createOpenAiAppRouter(
     res.json(getAuthMetadata(getRequestServerUrl(req)));
   });
 
-  router.get('/', async (req, res) => {
-    const accept = req.headers.accept || '';
-    const userAgent = req.headers['user-agent'] || '';
-    // ChatGPT/legacy MCP client compatibility:
-    // URL을 /mcp-openai로 등록했는데 SSE를 기대하는 경우 자동 분기.
-    if (
-      accept.includes('text/event-stream') ||
-      (typeof userAgent === 'string' && userAgent.toLowerCase().includes('openai-mcp'))
-    ) {
-      await handleSseConnect(req, res);
-      return;
-    }
-
-    // 운영/검증용 discovery 엔드포인트(비인증)
-    // MCP 실제 호출은 POST /mcp-openai(JSON-RPC) + OAuth로 수행된다.
-    const serverUrl = getRequestServerUrl(req);
-    res.json({
-      name: 'codebase-blog-openai-mcp',
-      version: '1.0.0',
-      description: 'Codebase.blog ChatGPT App MCP Server',
-      capabilities: {
-        tools: true,
-        prompts: false,
-        resources: true,
-        logging: false,
-      },
-      endpoints: {
-        jsonrpc: '/mcp-openai',
-        sse: '/mcp-openai/sse',
-        messages: '/mcp-openai/messages',
-      },
-      authentication: ['oauth2'],
-      oauth: {
-        authorization_server: serverUrl,
-        protected_resource: `${serverUrl}/.well-known/oauth-protected-resource`,
-      },
-      // ChatGPT 위젯 템플릿 URI(툴 descriptor의 resourceUri와 동일해야 함)
-      widget: {
-        resourceUri: OPENAI_WIDGET_URI,
-      },
-      tools: getOpenAiDiscoveryTools(),
-    });
+  // OpenAI App 전용 MCP 진입점:
+  // Streamable HTTP GET/POST 단일 엔드포인트로만 처리한다.
+  router.get('/', async (req: Request, res: Response) => {
+    await handleStreamableRequest(req, res);
   });
 
-  router.delete('/', (req, res) => {
+  router.post('/', async (req: Request, res: Response) => {
+    await handleStreamableRequest(req, res);
+  });
+
+  router.delete('/', (_req, res) => {
     logger.debug('🔌 DELETE /mcp-openai');
     res.status(204).send();
   });
-  
+
   return router;
 }
