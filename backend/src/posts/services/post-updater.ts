@@ -277,10 +277,31 @@ export class PostUpdater {
         const updatedPost = await manager.save(post);
 
         // 12. 파일 처리
-        if (files) {
-          const fileIds = files.map((f) => f.id);
+        // update 경로에서도 attachedFileIds를 실제 파일 관계와 동기화해
+        // 수정 페이지 재진입 시 첨부 목록/썸네일 후보가 일관되게 유지되도록 한다.
+        let filesToSync = files;
+        if (!filesToSync && updatePostDto.attachedFileIds !== undefined) {
+          filesToSync = await this.loadFilesByIds(
+            updatePostDto.attachedFileIds,
+            user.id,
+            manager,
+          );
+        }
+
+        if (filesToSync || updatePostDto.attachedFileIds !== undefined) {
+          const fileIds = (filesToSync || []).map((f) => f.id);
           await this.postFileService.unlinkUnusedFiles(id, user.id, fileIds);
           await this.postFileService.linkFilesFromContent(updatedPost, user.id);
+
+          // 첨부 파일 동기화 이후 썸네일 파일이 더 이상 유지 목록에 없으면
+          // 고아 thumbnailImageId를 제거해 상세/피드 상태를 일치시킨다.
+          if (post.thumbnailImageId && !fileIds.includes(post.thumbnailImageId)) {
+            this.logger.log(
+              `[PostUpdater] Clearing orphan thumbnailImageId for postId=${id}, thumbnailImageId=${post.thumbnailImageId}`,
+            );
+            post.thumbnailImageId = null;
+            await manager.save(post);
+          }
         }
 
         // 13. 썸네일 변경 시 특정 이벤트 발행
@@ -377,6 +398,37 @@ export class PostUpdater {
     // 트랜잭션 커밋 성공 후 이벤트 발행 (best-effort)
     eventBuffer.flush(this.eventEmitter, this.logger);
     return result;
+  }
+
+  private async loadFilesByIds(
+    fileIds: string[],
+    userId: string,
+    manager: EntityManager,
+  ): Promise<File[]> {
+    const requestedIds = Array.from(
+      new Set((fileIds || []).filter((id): id is string => Boolean(id))),
+    );
+
+    if (requestedIds.length === 0) {
+      return [];
+    }
+
+    const files = await manager.find(File, {
+      where: {
+        id: In(requestedIds),
+        userId,
+      },
+    });
+
+    if (files.length !== requestedIds.length) {
+      const foundIds = new Set(files.map((file) => file.id));
+      const missingIds = requestedIds.filter((id) => !foundIds.has(id));
+      throw new NotFoundException(
+        `${missingIds.length}개의 파일을 찾을 수 없거나 권한이 없습니다.`,
+      );
+    }
+
+    return files;
   }
 
   /**
