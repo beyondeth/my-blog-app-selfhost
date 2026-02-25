@@ -38,9 +38,9 @@ describe("MobileOAuthCodeService", () => {
 
     expect(result.code).toBeTruthy();
     expect(result.expiresInSeconds).toBe(90);
-    expect((mockRedisService.setWithExpiry as jest.Mock).mock.calls.length).toBe(
-      1,
-    );
+    expect(
+      (mockRedisService.setWithExpiry as jest.Mock).mock.calls.length,
+    ).toBe(1);
   });
 
   it("exchanges valid code and returns token payload", async () => {
@@ -110,4 +110,3 @@ describe("MobileOAuthCodeService", () => {
     );
   });
 });
-

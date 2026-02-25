@@ -5,7 +5,7 @@ import { AuthGuard } from "@nestjs/passport";
 export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
   private readonly logger = new Logger(OptionalJwtAuthGuard.name);
 
-  canActivate(context: ExecutionContext) {
+  async canActivate(context: ExecutionContext): Promise<boolean> {
     // Get the request object
     const request = context.switchToHttp().getRequest();
 
@@ -17,8 +17,18 @@ export class OptionalJwtAuthGuard extends AuthGuard("jwt") {
       );
     }
 
-    // Try to authenticate
-    return super.canActivate(context);
+    // Optional 인증: JWT 검증을 시도하되 실패해도 요청은 통과.
+    // (비로그인 공개 페이지에서도 follow-info 같은 엔드포인트가 401 없이 동작해야 함)
+    try {
+      await super.canActivate(context);
+    } catch (error: any) {
+      if (process.env.NODE_ENV === "development") {
+        this.logger.debug(
+          `Optional auth failed but allowed: ${error?.message || "unknown"}`,
+        );
+      }
+    }
+    return true;
   }
 
   handleRequest(err: any, user: any, info: any, context: ExecutionContext) {

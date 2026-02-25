@@ -150,7 +150,10 @@ export class McpApiKeyService {
         .values(insertPayload)
         .execute();
     } catch (error: any) {
-      if (supportsEncryptedColumn && this.isMissingEncryptedColumnError(error)) {
+      if (
+        supportsEncryptedColumn &&
+        this.isMissingEncryptedColumnError(error)
+      ) {
         this.logger.warn(
           "encryptedApiKey column not found at insert time. Falling back to legacy insert without encrypted payload.",
         );

@@ -894,8 +894,9 @@ export class FeedService {
         }
       }
 
-      const inlineImages =
-        this.extractImageUrlsFromContent(contentForMediaFallback);
+      const inlineImages = this.extractImageUrlsFromContent(
+        contentForMediaFallback,
+      );
       if (inlineImages.length > 0) {
         item.images = inlineImages;
         if (!item.thumbnail) {

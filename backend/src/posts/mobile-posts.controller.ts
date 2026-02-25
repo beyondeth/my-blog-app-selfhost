@@ -81,7 +81,10 @@ export class MobilePostsController {
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "모바일 조회수 증가" })
   @ApiResponse({ status: 200, description: "조회수 증가 등록 성공" })
-  async incrementViewCount(@Param("id", ParseUUIDPipe) id: string, @Request() req: any) {
+  async incrementViewCount(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Request() req: any,
+  ) {
     const userId = req.user?.id;
     const viewerId = ViewerIdUtil.resolve(req);
 

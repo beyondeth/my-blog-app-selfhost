@@ -367,8 +367,14 @@ export class PostMapperService {
     }
 
     dto.images = await this.resolvePostImageUrls(post);
-    if ((!dto.images || dto.images.length === 0) && (post.content || post.content_markdown)) {
-      dto.images = this.extractInlineImageUrls(post.content, post.content_markdown);
+    if (
+      (!dto.images || dto.images.length === 0) &&
+      (post.content || post.content_markdown)
+    ) {
+      dto.images = this.extractInlineImageUrls(
+        post.content,
+        post.content_markdown,
+      );
     }
     if ((!dto.images || dto.images.length === 0) && dto.thumbnail) {
       dto.images = [dto.thumbnail];

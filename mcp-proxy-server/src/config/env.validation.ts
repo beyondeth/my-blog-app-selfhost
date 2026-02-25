@@ -42,6 +42,9 @@ const envSchema = z.object({
     .default('3002')
     .transform(Number),
   NODE_ENV: z.enum(['development', 'staging', 'production']).default('development'),
+  OPENAI_APP_ENABLED: z.string()
+    .default('false')
+    .transform((val) => val === 'true'),
 
   // Backend API 설정 (필수)
   BACKEND_BASE_URL: z.string().url('BACKEND_BASE_URL must be a valid URL'),
@@ -154,6 +157,7 @@ export function validateEnv(): EnvConfig {
     console.log('✅ 환경 변수 검증 완료 (MCP Dual Auth 모드)');
     console.log(`📍 환경: ${env.NODE_ENV}`);
     console.log(`📍 MCP Proxy 포트: ${env.MCP_PROXY_PORT}`);
+    console.log(`🤖 OpenAI App Route Enabled: ${env.OPENAI_APP_ENABLED ? 'yes' : 'no'}`);
     console.log(`📍 MCP Base URL: ${env.MCP_BASE_URL}`);
     console.log(`📍 Backend: ${env.BACKEND_BASE_URL}`);
     console.log(`📍 Backend Public: ${env.BACKEND_PUBLIC_URL}`);

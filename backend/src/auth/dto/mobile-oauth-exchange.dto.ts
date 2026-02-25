@@ -14,4 +14,3 @@ export class MobileOAuthExchangeDto {
   @IsIn(["google", "github", "kakao"])
   provider?: "google" | "github" | "kakao";
 }
-

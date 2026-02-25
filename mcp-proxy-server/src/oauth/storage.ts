@@ -26,6 +26,7 @@ const KEYS = {
   REFRESH_TOKEN: 'oauth:refresh:',   // 리프레시 토큰
   SESSION: 'oauth:session:',         // 인증 세션 (state)
   TOKEN_BY_USER: 'oauth:user:',      // 사용자별 토큰 목록
+  REFRESH_BY_USER: 'oauth:user:refresh:', // 사용자별 리프레시 토큰 목록
 } as const;
 
 // TTL 설정 (초)
@@ -306,6 +307,16 @@ export class OAuthStorage {
   async revokeAccessToken(token: string): Promise<void> {
     const hash = this.hashToken(token);
     const key = `${KEYS.ACCESS_TOKEN}${hash}`;
+    const tokenRaw = await this.redis.get(key);
+    if (tokenRaw) {
+      try {
+        const accessToken: AccessToken = JSON.parse(tokenRaw);
+        const userKey = `${KEYS.TOKEN_BY_USER}${accessToken.userId}`;
+        await this.redis.srem(userKey, hash);
+      } catch {
+        // ignore parse errors; key 삭제는 계속 진행
+      }
+    }
     await this.redis.del(key);
     logger.debug('🗑️ Access token revoked');
   }
@@ -328,6 +339,12 @@ export class OAuthStorage {
     }
 
     await this.redis.setex(key, ttl, JSON.stringify(refreshToken));
+
+    // 사용자별 리프레시 토큰 목록에 추가 (전체 무효화용)
+    const refreshUserKey = `${KEYS.REFRESH_BY_USER}${refreshToken.userId}`;
+    await this.redis.sadd(refreshUserKey, hash);
+    await this.redis.expire(refreshUserKey, TTL.REFRESH_TOKEN);
+
     logger.debug({ userId: refreshToken.userId.substring(0, 8) }, '✅ Refresh token saved');
   }
 
@@ -348,6 +365,10 @@ export class OAuthStorage {
 
     const refreshToken: RefreshToken = JSON.parse(data);
 
+    // 사용자별 리프레시 토큰 인덱스에서 제거
+    const refreshUserKey = `${KEYS.REFRESH_BY_USER}${refreshToken.userId}`;
+    await this.redis.srem(refreshUserKey, hash);
+
     // 만료 확인
     if (new Date(refreshToken.expiresAt) < new Date()) {
       logger.warn({ userId: refreshToken.userId.substring(0, 8) }, '⚠️ Refresh token expired');
@@ -367,21 +388,73 @@ export class OAuthStorage {
    */
   async revokeAllUserTokens(userId: string): Promise<void> {
     const userKey = `${KEYS.TOKEN_BY_USER}${userId}`;
-    const tokenHashes = await this.redis.smembers(userKey);
+    const refreshUserKey = `${KEYS.REFRESH_BY_USER}${userId}`;
+    const [tokenHashes, refreshHashesFromIndex] = await Promise.all([
+      this.redis.smembers(userKey),
+      this.redis.smembers(refreshUserKey),
+    ]);
 
-    if (tokenHashes.length === 0) {
+    // 레거시 토큰 호환:
+    // 과거에 REFRESH_BY_USER 인덱스 없이 발급된 리프레시 토큰이 남아 있을 수 있어
+    // 인덱스가 비어있으면 refresh 키 공간을 스캔해 해당 userId 토큰을 보강한다.
+    const refreshHashes = new Set<string>(refreshHashesFromIndex);
+    if (refreshHashes.size === 0) {
+      let cursor = '0';
+      do {
+        const [nextCursor, keys] = await this.redis.scan(
+          cursor,
+          'MATCH',
+          `${KEYS.REFRESH_TOKEN}*`,
+          'COUNT',
+          200
+        );
+        cursor = nextCursor;
+
+        if (keys.length > 0) {
+          const values = await this.redis.mget(...keys);
+          for (let i = 0; i < keys.length; i += 1) {
+            const raw = values[i];
+            if (!raw) continue;
+            try {
+              const token: RefreshToken = JSON.parse(raw);
+              if (token.userId === userId) {
+                const key = keys[i];
+                if (key) {
+                  refreshHashes.add(key.replace(KEYS.REFRESH_TOKEN, ''));
+                }
+              }
+            } catch {
+              // ignore parse errors for corrupted legacy tokens
+            }
+          }
+        }
+      } while (cursor !== '0');
+    }
+
+    if (tokenHashes.length === 0 && refreshHashes.size === 0) {
       return;
     }
 
-    // 모든 액세스 토큰 삭제
+    // 모든 액세스/리프레시 토큰 삭제
     const pipeline = this.redis.pipeline();
     for (const hash of tokenHashes) {
       pipeline.del(`${KEYS.ACCESS_TOKEN}${hash}`);
     }
+    for (const hash of refreshHashes) {
+      pipeline.del(`${KEYS.REFRESH_TOKEN}${hash}`);
+    }
     pipeline.del(userKey);
+    pipeline.del(refreshUserKey);
     await pipeline.exec();
 
-    logger.info({ userId: userId.substring(0, 8), count: tokenHashes.length }, '🗑️ All user tokens revoked');
+    logger.info(
+      {
+        userId: userId.substring(0, 8),
+        accessCount: tokenHashes.length,
+        refreshCount: refreshHashes.size,
+      },
+      '🗑️ All user tokens revoked'
+    );
   }
 
   // ===== 통계 =====

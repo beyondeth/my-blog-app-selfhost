@@ -952,128 +952,14 @@ export class PostsService {
     isEditorPick: boolean,
     user: User,
   ): Promise<void> {
-    if (user.role !== Role.ADMIN) {
-      throw new ForbiddenException(
-        "관리자만 Editor's Pick을 설정할 수 있습니다.",
-      );
-    }
-
-    const queryRunner = this.dataSource.createQueryRunner();
-    await queryRunner.connect();
-    await queryRunner.startTransaction();
-
-    try {
-      const post = await queryRunner.manager.findOne(Post, {
-        where: { id: postId },
-      });
-      if (!post) {
-        throw new NotFoundException("포스트를 찾을 수 없습니다.");
-      }
-
-      // 1. PostMetadata 엔티티 업데이트 (주 데이터 소스)
-      let metadata = await queryRunner.manager.findOne(PostMetadata, {
-        where: { postId },
-      });
-
-      if (!metadata) {
-        // PostMetadata가 없으면 새로 생성
-        metadata = queryRunner.manager.create(PostMetadata, {
-          postId,
-          isEditorPick,
-          editorPickedAt: isEditorPick ? new Date() : null,
-        });
-        await queryRunner.manager.save(metadata);
-      } else {
-        // 기존 PostMetadata 업데이트
-        // Entity method won't work on plain object returned by queryRunner if not careful,
-        // but TypeORM usually returns instances. Safer to update manually.
-        await queryRunner.manager.update(
-          PostMetadata,
-          { postId },
-          {
-            isEditorPick: isEditorPick,
-            editorPickedAt: isEditorPick ? new Date() : null,
-          },
-        );
-
-        // Re-fetch for logic below if needed, or just proceed knowing the state
-      }
-
-      // 2. Post 엔티티 업데이트 (동기화 복구: Atomic Double-Write)
-      // "Post" 테이블은 읽기 전용 캐시(Denormalization) 역할을 하므로
-      // "PostMetadata"와 항상 동일한 상태를 유지해야 함.
-      await queryRunner.manager.update(
-        Post,
-        { id: postId },
-        {
-          isEditorPick: isEditorPick,
-          editorPickedAt: isEditorPick ? new Date() : null,
-        },
-      );
-
-      // 3. FIFO: Editor's Pick 제한 (최대 5개) logic adapted for Transaction
-      if (isEditorPick) {
-        // 현재 Editor's Pick 목록 조회 (최신순)
-        const currentPicks = await queryRunner.manager.find(PostMetadata, {
-          where: { isEditorPick: true },
-          order: { editorPickedAt: "DESC" },
-        });
-
-        // 5개 초과 시 가장 오래된 pick 제거
-        if (currentPicks.length > 5) {
-          // If we just added one, and it was 5 before, now it is 6.
-          // Removing picks beyond 5
-          const picksToRemove = currentPicks.slice(5);
-          for (const pick of picksToRemove) {
-            await queryRunner.manager.update(
-              PostMetadata,
-              { postId: pick.postId },
-              {
-                isEditorPick: false,
-                editorPickedAt: null,
-              },
-            );
-            // Also sync Post table for removal!
-            await queryRunner.manager.update(
-              Post,
-              { id: pick.postId },
-              {
-                isEditorPick: false,
-                editorPickedAt: null,
-              },
-            );
-            this.logger.log(
-              `Removed oldest Editor's Pick: ${pick.postId} (limit exceeded)`,
-            );
-          }
-        }
-      }
-
-      await queryRunner.commitTransaction();
-
-      // Editor's Pick 캐시 무효화 이벤트 발행 (After Commit)
-      this.eventEmitter.emit(CacheInvalidationEvents.POST_EDITOR_PICK_TOGGLED, {
-        postId,
-        isPicked: isEditorPick,
-      });
-
-      // 기존 캐시 무효화
-      this.eventEmitter.emit("cache.posts.invalidate", {
-        postId,
-        blogId: post.blogId,
-        isPublished: post.isPublished,
-      });
-
-      this.logger.log(
-        `Set Editor's Pick for post: ${postId} to ${isEditorPick}`,
-      );
-    } catch (error) {
-      await queryRunner.rollbackTransaction();
-      this.logger.error(`Failed to set editor pick for post ${postId}:`, error);
-      throw error;
-    } finally {
-      await queryRunner.release();
-    }
+    this.logger.log(
+      `Setting editor pick for post: ${postId} to ${isEditorPick} by admin: ${user.id}`,
+    );
+    return await this.postCreationService.setEditorPick(
+      postId,
+      isEditorPick,
+      user,
+    );
   }
 
   /**
@@ -1083,48 +969,12 @@ export class PostsService {
     orderedIds: string[],
     user: User,
   ): Promise<void> {
-    if (user.role !== Role.ADMIN) {
-      throw new ForbiddenException(
-        "관리자만 Editor's Pick 순서를 변경할 수 있습니다.",
-      );
-    }
-
-    const uniqueIds = Array.from(new Set(orderedIds));
-    if (uniqueIds.length === 0 || uniqueIds.length > 5) {
-      throw new BadRequestException(
-        "Editor's Pick 순서는 1~5개 범위로 설정해야 합니다.",
-      );
-    }
-
-    const metadataList = await this.postMetadataRepository.find({
-      where: { postId: In(uniqueIds), isEditorPick: true },
-    });
-
-    if (metadataList.length !== uniqueIds.length) {
-      throw new BadRequestException(
-        "Editor's Pick 상태가 아닌 포스트가 포함되어 있습니다.",
-      );
-    }
-
-    const metadataMap = new Map(
-      metadataList.map((metadata) => [metadata.postId, metadata]),
-    );
-    const baseTime = Date.now();
-
-    const updatedMetadata = uniqueIds.map((postId, index) => {
-      const metadata = metadataMap.get(postId);
-      if (!metadata) {
-        throw new NotFoundException("포스트 메타데이터를 찾을 수 없습니다.");
-      }
-      metadata.editorPickedAt = new Date(baseTime - index * 1000);
-      return metadata;
-    });
-
-    await this.postMetadataRepository.save(updatedMetadata);
-    await this.postCacheService.invalidateEditorPicksCache();
-
     this.logger.log(
-      `Updated Editor's Pick order for ${uniqueIds.length} posts`,
+      `Updating editor picks order for ${orderedIds.length} posts by admin: ${user.id}`,
+    );
+    return await this.postCreationService.updateEditorPicksOrder(
+      orderedIds,
+      user,
     );
   }
 
@@ -1195,49 +1045,7 @@ export class PostsService {
     totalLikes: number;
     totalComments: number;
   }> {
-    const query = this.postStatsRepository
-      .createQueryBuilder("stats")
-      .leftJoin("stats.post", "post")
-      .where("post.isDeleted = :isDeleted", { isDeleted: false });
-
-    if (options?.startDate) {
-      query.andWhere("post.createdAt >= :startDate", {
-        startDate: options.startDate,
-      });
-    }
-
-    if (options?.endDate) {
-      query.andWhere("post.createdAt <= :endDate", {
-        endDate: options.endDate,
-      });
-    }
-
-    if (options?.blogId) {
-      query.andWhere("post.blogId = :blogId", { blogId: options.blogId });
-    }
-
-    const result = await query
-      .select("COUNT(DISTINCT post.id)", "totalPosts")
-      .addSelect(
-        "COUNT(CASE WHEN post.isPublished = true THEN 1 END)",
-        "publishedPosts",
-      )
-      .addSelect(
-        "COUNT(CASE WHEN post.isPublished = false THEN 1 END)",
-        "draftPosts",
-      )
-      .addSelect("SUM(stats.viewCount)", "totalViews")
-      .addSelect("SUM(stats.likeCount)", "totalLikes")
-      .addSelect("SUM(stats.commentCount)", "totalComments")
-      .getRawOne();
-
-    return {
-      totalPosts: parseInt(result.totalPosts, 10) || 0,
-      publishedPosts: parseInt(result.publishedPosts, 10) || 0,
-      draftPosts: parseInt(result.draftPosts, 10) || 0,
-      totalViews: parseInt(result.totalViews, 10) || 0,
-      totalLikes: parseInt(result.totalLikes, 10) || 0,
-      totalComments: parseInt(result.totalComments, 10) || 0,
-    };
+    this.logger.debug(`Getting post stats`);
+    return await this.postReadService.getPostStats(options);
   }
 }

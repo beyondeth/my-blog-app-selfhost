@@ -1,6 +1,5 @@
 import { Module, Global } from "@nestjs/common";
 import { TypeOrmModule } from "@nestjs/typeorm";
-import { EventEmitterModule } from "@nestjs/event-emitter";
 import { UsageLimitGuard } from "../subscription/guards/usage-limit.guard";
 import { SubscriptionFacadeService } from "./subscription-facade.service";
 import { SubscriptionController } from "../subscription/subscription.controller";
@@ -19,7 +18,6 @@ import { PaymentHistory } from "../subscription/entities/payment-history.entity"
 @Module({
   imports: [
     TypeOrmModule.forFeature([PaymentHistory]),
-    EventEmitterModule.forRoot(),
     // 순환 의존성 방지를 위해 순서 중요
     // UsageModule과 SubscriptionModule은 서로를 직접 import하지 않음
     UsageModule,

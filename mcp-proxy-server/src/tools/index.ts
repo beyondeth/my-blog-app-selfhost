@@ -18,37 +18,19 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../utils/logger.js';
 import { WritingStyleService } from '../services/WritingStyleService.js';
-import axios from 'axios';
 import {
   MCP_SERVER_INSTRUCTIONS,
   TOOL_CATALOG,
   type ToolName,
 } from './catalog.js';
-
-import { MetricsService } from '../services/MetricsService.js';
-
-/**
- * 도구 컨텍스트 (API Key 또는 OAuth 인증 결과)
- */
-export interface ToolContext {
-  userData: {
-    keyId: string;
-    userId: string;
-    blogId: string;
-    user: { id: string; username: string; email: string };
-    blog: { id: string; name: string; slug: string };
-  };
-  apiKey: string | null;     // API Key 인증 시 사용 (Backend 인증용)
-  oauthToken?: string;       // OAuth 인증 시 사용 (Claude 커스텀 커넥터용)
-  metricsService: MetricsService; // 메트릭 서비스 (도구 호출 추적용)
-  config: {
-    MCP_BASE_URL: string;
-    BACKEND_BASE_URL: string;
-    BACKEND_PUBLIC_URL: string;
-    FRONTEND_URL: string;
-    MCP_SHARED_SECRET?: string;
-  };
-}
+import type { ToolContext } from '../core/types.js';
+import {
+  handleCheckAuth,
+  handleCreatePost,
+  handleFinalizeUploadedImage,
+  handleGetImageUploadUrl,
+  handleGetWritingStyleGuide,
+} from '../core/handlers/index.js';
 
 /**
  * 모든 도구 등록
@@ -114,7 +96,7 @@ export async function registerAllTools(
 
     const handler = handlers[toolName];
     if (!handler) {
-      context.metricsService.recordRequest('error', toolName);
+      context.metricsService.recordRequest('error', toolName, context.route);
       return {
         isError: true,
         content: [
@@ -138,12 +120,12 @@ export async function registerAllTools(
       const result = await handler(args);
 
       // 메트릭 기록 (성공)
-      context.metricsService.recordRequest('success', toolName);
+      context.metricsService.recordRequest('success', toolName, context.route);
 
       return result;
     } catch (error) {
       // 메트릭 기록 (실패)
-      context.metricsService.recordRequest('error', toolName);
+      context.metricsService.recordRequest('error', toolName, context.route);
       throw error;
     }
   });
@@ -222,387 +204,11 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
   }, '✅ Prompts registered');
 }
 
-/**
- * check_auth 핸들러
- *
- * 사용자 인증 상태를 확인하고 안내 메시지를 반환합니다.
- * 실제 인증은 MCP 연결 시점에 이미 완료되었으므로,
- * 이 함수는 인증된 사용자 정보를 표시하는 역할만 합니다.
- */
-async function handleCheckAuth(context: ToolContext): Promise<any> {
-  const authMode = context.oauthToken ? 'OAuth 2.1' : 'API Key';
-  const publicBlogUrl = toPublicBlogUrl(
-    context.userData.blog.slug,
-    context.config.FRONTEND_URL
-  );
-
-  logger.info({
-    userId: context.userData.userId.substring(0, 8),
-    blogSlug: context.userData.blog.slug,
-    authMode,
-  }, '🔐 Authentication check');
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: `✅ *** CODEBASE.BLOG 유저 인증이 완료됨 ***
-✅ ${context.userData.user.username} (${context.userData.user.email})
-✅ 블로그 주소 : ${publicBlogUrl}
-✅ 인증 방식 : ${authMode}`,
-      },
-    ],
-  };
-}
-
-/**
- * get_writing_style_guide 핸들러
- */
-async function handleGetWritingStyleGuide(
-  args: { style?: string; customMarkdown?: string },
-  context: ToolContext
-): Promise<any> {
-  const styleService = new WritingStyleService();
-  let styleData;
-
-  // 우선순위 1: 사용자 제공 커스텀 마크다운 (최우선)
-  if (args.customMarkdown) {
-    logger.info({
-      userId: context.userData.userId.substring(0, 8),
-      source: 'custom-markdown',
-    }, '📖 Using user-provided custom markdown style');
-    styleData = await styleService.parseRawMarkdown(args.customMarkdown);
-  } else {
-    // 우선순위 2: 프리셋 스타일 (플래그 없으면 default)
-    const style = args.style || 'default';
-    logger.info({
-      style,
-      userId: context.userData.userId.substring(0, 8),
-      source: 'preset',
-    }, '📖 Writing style guide retrieved');
-    styleData = await styleService.loadAndParseStyle(style);
-  }
-
-  // 전체 스타일 가이드 조합
-  const fullGuide = [
-    `# ${styleData.metadata.styleName}`,
-    '',
-    `**Requirements:** ${styleData.metadata.minLength}+ chars (target: ${styleData.metadata.targetLength}) | Language: ${styleData.metadata.language} | AI tag: ${styleData.metadata.aiTagRequired ? 'required' : 'optional'}`,
-    '',
-    styleData.instructions,
-  ].join('\n');
-
-  return {
-    content: [
-      {
-        type: 'text',
-        text: fullGuide,
-      },
-    ],
-  };
-}
-
-/**
- * create_post 핸들러
- */
-async function handleCreatePost(
-  args: {
-    title: string;
-    content_markdown: string;
-    tags?: string[];
-    category?: string;
-    writingStyle?: string;
-  },
-  context: ToolContext
-): Promise<any> {
-  try {
-    // 태그 10개 제한
-    const tags = args.tags ? args.tags.slice(0, 10) : [];
-
-    logger.debug({
-      title: args.title,
-      contentLength: args.content_markdown.length,
-      tagCount: tags.length,
-      userId: context.userData.userId.substring(0, 8),
-      blogSlug: context.userData.blog.slug,
-    }, '📝 Creating post...');
-
-    // Backend MCP API 호출 (포스트 생성)
-    // API Key 또는 OAuth 토큰 인증
-    const headers = buildBackendAuthHeaders(context);
-
-    const response = await axios.post(
-      `${context.config.BACKEND_BASE_URL}/api/v1/mcp/posts`,
-      {
-        title: args.title,
-        content_markdown: args.content_markdown, // 원본 마크다운
-        tags,
-        category: args.category,
-      },
-      {
-        headers,
-        timeout: 30000,
-      }
-    );
-
-    // Backend MCP 엔드포인트는 Fast Path 응답 (status 202)
-    // response.data = { id, slug, title, url, blog, _meta }
-    const post = response.data;
-
-    // MCP API Key의 postsCreated 카운트 증가 (비동기, 블로킹 안 함)
-    // OAuth 모드에서는 API Key가 없으므로 건너뜀
-    if (context.apiKey && !context.userData.keyId.startsWith('oauth:')) {
-      incrementPostsCreated(
-        context.userData.keyId,
-        context.config.BACKEND_BASE_URL,
-        context.config.MCP_SHARED_SECRET
-      ).catch((err) => {
-        logger.warn({ error: err.message }, '⚠️ Failed to increment postsCreated');
-      });
-    }
-
-    logger.info({
-      postId: post.id.substring(0, 8),
-      slug: post.slug,
-      userId: context.userData.userId.substring(0, 8),
-    }, '✅ Post created (Fast Path)');
-
-    const publicPostUrl = toPublicPostUrl(post.url, context.config.FRONTEND_URL);
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `✅ Post created successfully!
-
-**Title:** ${post.title}
-**Slug:** ${post.slug}
-**URL:** ${publicPostUrl}
-
-The post has been published to your blog "${context.userData.blog.name}".
-${post._meta ? `\n_Processing in background: ${post._meta.processingTime || 'ongoing'}_` : ''}`,
-        },
-      ],
-    };
-  } catch (error: any) {
-    logger.error({
-      error: error.message,
-      userId: context.userData.userId.substring(0, 8),
-      title: args.title,
-    }, '❌ Failed to create post');
-
-    // 에러 메시지 포맷팅
-    let errorMessage = 'Failed to create post';
-
-    if (error.response?.data?.message) {
-      errorMessage = error.response.data.message;
-    } else if (error.message) {
-      errorMessage = error.message;
-    }
-
-    throw new Error(errorMessage);
-  }
-}
-
-function toPublicPostUrl(pathOrUrl: string, frontendBaseUrl: string): string {
-  if (!pathOrUrl) return frontendBaseUrl;
-  if (/^https?:\/\//i.test(pathOrUrl)) return pathOrUrl;
-
-  const base = frontendBaseUrl.endsWith('/') ? frontendBaseUrl : `${frontendBaseUrl}/`;
-  const relativePath = pathOrUrl.startsWith('/') ? pathOrUrl.slice(1) : pathOrUrl;
-
-  return new URL(relativePath, base).toString();
-}
-
-function toPublicBlogUrl(blogSlug: string, frontendBaseUrl: string): string {
-  if (!blogSlug) return frontendBaseUrl;
-  const base = frontendBaseUrl.endsWith('/') ? frontendBaseUrl : `${frontendBaseUrl}/`;
-  return new URL(blogSlug, base).toString();
-}
-
-function buildBackendAuthHeaders(context: ToolContext): Record<string, string> {
-  const headers: Record<string, string> = {};
-
-  if (context.apiKey) {
-    headers['X-API-Key'] = context.apiKey;
-  } else if (context.oauthToken) {
-    headers['Authorization'] = `Bearer ${context.oauthToken}`;
-    headers['X-OAuth-User-Id'] = context.userData.userId;
-    headers['X-OAuth-Blog-Id'] = context.userData.blogId;
-  }
-
-  if (context.config.MCP_SHARED_SECRET) {
-    headers['X-Internal-Secret'] = context.config.MCP_SHARED_SECRET;
-  }
-
-  return headers;
-}
-
-async function handleGetImageUploadUrl(
-  args: { mimeType?: string; fileSize?: number },
-  context: ToolContext
-): Promise<any> {
-  const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
-  const mimeType = args.mimeType || 'image/png';
-  const fileSize = args.fileSize || 1024 * 1024;
-  const extension = mimeType.split('/')[1] || 'png';
-  const fileName = `generated-${Date.now()}.${extension}`;
-
-  try {
-    const response = await axios.post(
-      `${backendUrl}/api/v1/mcp/files/upload-url`,
-      {
-        fileName,
-        mimeType,
-        fileSize,
-        fileType: mimeType.startsWith('image/') ? 'image' : 'general',
-      },
-      {
-        headers: buildBackendAuthHeaders(context),
-      }
-    );
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              uploadUrl: response.data.uploadUrl,
-              fileKey: response.data.fileKey,
-              instructions: `Run locally: curl -X PUT -H "Content-Type: ${mimeType}" -T <path_to_file> "${response.data.uploadUrl}"`,
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  } catch (error: any) {
-    logger.error({ error: error.message }, 'Failed to get upload URL');
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              status: 'failed',
-              endpoint: '/api/v1/mcp/files/upload-url',
-              error: error.response?.data?.message || error.message,
-              instruction:
-                "Image upload URL request failed. Stop retrying image upload and continue with text-only 'create_post'.",
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  }
-}
-
-async function handleFinalizeUploadedImage(
-  args: { fileKey?: string; mimeType?: string; fileSize?: number },
-  context: ToolContext
-): Promise<any> {
-  if (!args.fileKey) {
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              status: 'failed',
-              error: 'fileKey is required',
-              instruction:
-                "Missing fileKey. Stop image finalization and continue with text-only 'create_post'.",
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  }
-
-  const backendUrl = context.config.BACKEND_BASE_URL || 'http://localhost:3000';
-  const fileUrl = `https://cdn.codebase.blog/${args.fileKey}`;
-  const mimeType = args.mimeType || 'image/png';
-  const fileSize = args.fileSize || 0;
-
-  try {
-    await axios.post(
-      `${backendUrl}/api/v1/mcp/files/upload-complete`,
-      {
-        fileKey: args.fileKey,
-        fileUrl,
-        fileName: args.fileKey,
-        mimeType,
-        fileSize,
-      },
-      {
-        headers: buildBackendAuthHeaders(context),
-      }
-    );
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              success: true,
-              publicUrl: fileUrl,
-              descriptor: `![Generated Image](${fileUrl})`,
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  } catch (error: any) {
-    logger.error({ error: error.message }, 'Failed to finalize upload');
-    return {
-      isError: true,
-      content: [
-        {
-          type: 'text',
-          text: JSON.stringify(
-            {
-              status: 'failed',
-              endpoint: '/api/v1/mcp/files/upload-complete',
-              error: error.response?.data?.message || error.message,
-              instruction:
-                "Image finalization failed. Stop retrying and continue with text-only 'create_post'.",
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
-  }
-}
-
-/**
- * MCP API Key의 postsCreated 카운트 증가 (비동기)
- */
-async function incrementPostsCreated(
-  keyId: string,
-  backendUrl: string,
-  sharedSecret?: string
-): Promise<void> {
-  const headers: Record<string, string> = {};
-  if (sharedSecret) {
-    headers['X-Internal-Secret'] = sharedSecret;
-  }
-
-  await axios.post(
-    `${backendUrl}/api/v1/mcp/keys/${keyId}/increment-posts`,
-    {},
-    { timeout: 3000, headers }
-  );
-}
+export type { ToolContext } from '../core/types.js';
+export {
+  handleCheckAuth,
+  handleGetWritingStyleGuide,
+  handleCreatePost,
+  handleGetImageUploadUrl,
+  handleFinalizeUploadedImage,
+} from '../core/handlers/index.js';

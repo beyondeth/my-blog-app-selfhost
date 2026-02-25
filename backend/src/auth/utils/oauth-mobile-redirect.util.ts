@@ -62,10 +62,9 @@ export function encodeMobileOAuthState(
     rid: randomRequestId(),
     iat: Date.now(),
   };
-  const encodedPayload = Buffer.from(
-    JSON.stringify(payload),
-    "utf8",
-  ).toString("base64url");
+  const encodedPayload = Buffer.from(JSON.stringify(payload), "utf8").toString(
+    "base64url",
+  );
 
   if (!secret || !secret.trim()) {
     return encodedPayload;

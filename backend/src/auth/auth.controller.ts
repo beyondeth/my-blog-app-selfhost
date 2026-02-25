@@ -73,15 +73,15 @@ export class AuthController {
    * 웹에서 로그인하면 MCP 세션도 활성화 상태로 만들어 통일성 유지
    */
   private async createWebSessionInRedis(
-    userId: number | string,
+    accountId: number | string,
   ): Promise<void> {
     try {
       // userId는 UUID이므로 문자열로 유지
-      const userIdString = String(userId);
+      const accountIdString = String(accountId);
 
       // 웹 세션을 Redis에 저장 (MCP 세션 검증에 사용)
       const sessionData = {
-        userId: userIdString,
+        userId: accountIdString,
         isActive: true,
         loginAt: Date.now(),
         lastAccessAt: Date.now(),
@@ -90,12 +90,12 @@ export class AuthController {
       // 24시간 TTL로 세션 저장
       await this.redisService.setCache(
         "sessions",
-        `user:${userIdString}`,
+        `user:${accountIdString}`,
         sessionData,
         24 * 60 * 60, // 24시간
       );
 
-      this.logger.debug(`웹 세션 생성: userId=${userIdString}`);
+      this.logger.debug(`웹 세션 생성: accountId=${accountIdString}`);
     } catch (error) {
       this.logger.error(`웹 세션 생성 실패: ${error.message}`);
       // 세션 생성 실패해도 로그인은 진행
@@ -106,6 +106,40 @@ export class AuthController {
     return (
       this.configService.get<string>("FRONTEND_URL") || "http://localhost:3001"
     );
+  }
+
+  /**
+   * MCP Proxy의 OAuth 토큰(Access/Refresh)을 사용자 단위로 무효화.
+   * 웹 로그아웃 시 GPT/Claude 커넥터 세션도 함께 끊기게 하기 위한 내부 연동이다.
+   */
+  private async revokeMcpOAuthTokens(accountId: string): Promise<void> {
+    const mcpProxyUrl =
+      this.configService.get<string>("MCP_PROXY_INTERNAL_URL") ||
+      this.configService.get<string>("MCP_BASE_URL") ||
+      "http://localhost:3002";
+    const sharedSecret = this.configService.get<string>("MCP_SHARED_SECRET");
+
+    if (!sharedSecret) {
+      this.logger.warn(
+        "[Logout] MCP_SHARED_SECRET is missing; skip MCP OAuth revoke",
+      );
+      return;
+    }
+
+    const endpoint = `${mcpProxyUrl.replace(/\/+$/, "")}/internal/oauth/revoke-user`;
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Secret": sharedSecret,
+      },
+      body: JSON.stringify({ userId: accountId }),
+    });
+
+    if (!response.ok) {
+      const body = await response.text().catch(() => "");
+      throw new Error(`MCP revoke failed (${response.status}): ${body}`);
+    }
   }
 
   private resolveMobileRedirectUri(req: ExpressRequest): string | null {
@@ -984,32 +1018,46 @@ export class AuthController {
   @ApiOperation({ summary: "로그아웃" })
   @ApiResponse({ status: 200, description: "로그아웃 성공" })
   async logout(@CurrentUser() user: any, @Res() res: Response) {
+    const accountId = user.id;
     this.logger.log(
-      `[Logout] 로그아웃 시작 - userId: ${user.id}, email: ${user.email}`,
+      `[Logout] 로그아웃 시작 - accountId: ${accountId}, email: ${user.email}`,
     );
 
-    await this.authService.logout(user.id);
+    await this.authService.logout(accountId);
+
+    // GPT App/Claude 커넥터 등 OAuth 기반 MCP 세션도 동시에 끊는다.
+    // (웹 로그아웃 후에도 커넥터가 같은 계정으로 남아있는 문제 방지)
+    try {
+      await this.revokeMcpOAuthTokens(accountId);
+      this.logger.log(
+        `[Logout] MCP OAuth tokens revoked - accountId: ${accountId}`,
+      );
+    } catch (error: any) {
+      this.logger.warn(
+        `[Logout] MCP OAuth revoke skipped/failed - accountId: ${accountId}, reason: ${error?.message || "unknown"}`,
+      );
+    }
 
     // 웹 세션 삭제 (MCP 세션도 무효화되도록)
     try {
       // 웹 세션 삭제
-      await this.redisService.deleteCache("sessions", `user:${user.id}`);
+      await this.redisService.deleteCache("sessions", `user:${accountId}`);
 
       // JWT validation 캐시 삭제 (JwtStrategy 키 규칙과 일치)
       await this.redisService.invalidatePattern(
-        `sessions:user_validate_${user.id}_*`,
+        `sessions:user_validate_${accountId}_*`,
       );
       // 레거시 키도 함께 정리 (하위 호환)
       await this.redisService.deleteCache(
         "sessions",
-        `user_validate_${user.id}`,
+        `user_validate_${accountId}`,
       );
 
       // 해당 사용자의 모든 MCP 세션 찾아서 삭제
       // MCP 세션은 mcp:sessions:* 패턴으로 저장되어 있고, 세션 데이터에 userId가 포함됨
       // 여기서는 간단히 웹 세션만 삭제하고, MCP 세션은 검증 시 자동으로 무효화됨
       this.logger.debug(
-        `웹 세션 및 JWT validation 캐시 삭제: userId=${user.id}`,
+        `웹 세션 및 JWT validation 캐시 삭제: accountId=${accountId}`,
       );
     } catch (error) {
       this.logger.error(`세션 삭제 실패: ${error.message}`);
@@ -1033,7 +1081,7 @@ export class AuthController {
       path: "/",
     });
 
-    this.logger.log(`[Logout] 로그아웃 완료 - userId: ${user.id}`);
+    this.logger.log(`[Logout] 로그아웃 완료 - accountId: ${accountId}`);
 
     return res.json({ message: "로그아웃되었습니다." });
   }
@@ -1204,6 +1252,7 @@ export class AuthController {
     @Body() dto: DeleteAccountDto,
     @Res() res: Response,
   ) {
+    const accountId = user.id;
     /**
      * UX 개선: 현재 세션의 로그인 방법 기준으로 비밀번호 확인
      *
@@ -1243,26 +1292,26 @@ export class AuthController {
 
     try {
       // 1. 즉시 소프트 삭제 실행 (개인정보 마스킹 + 로그인 차단)
-      await this.usersService.softDelete(user.id);
-      this.logger.log(`User ${user.id} soft deleted, personal data masked`);
+      await this.usersService.softDelete(accountId);
+      this.logger.log(`User ${accountId} soft deleted, personal data masked`);
 
       // 2. 180일 후 자동 완전 삭제 (DataRetentionService가 매일 자정 처리)
       // scheduledDeletionAt이 account_settings 테이블에 저장됨
       this.logger.log(
-        `User ${user.id} scheduled for permanent deletion in 180 days`,
+        `User ${accountId} scheduled for permanent deletion in 180 days`,
       );
 
       // 3. 웹 세션 삭제 (MCP 세션도 무효화되도록)
       try {
-        await this.redisService.deleteCache("sessions", `user:${user.id}`);
+        await this.redisService.deleteCache("sessions", `user:${accountId}`);
         await this.redisService.invalidatePattern(
-          `sessions:user_validate_${user.id}_*`,
+          `sessions:user_validate_${accountId}_*`,
         );
         await this.redisService.deleteCache(
           "sessions",
-          `user_validate_${user.id}`,
+          `user_validate_${accountId}`,
         );
-        this.logger.debug(`Session deleted for user ${user.id}`);
+        this.logger.debug(`Session deleted for user ${accountId}`);
       } catch (error) {
         this.logger.error(`Failed to delete session: ${error.message}`);
       }
@@ -1295,7 +1344,10 @@ export class AuthController {
         },
       });
     } catch (error) {
-      this.logger.error(`Account deletion failed for user ${user.id}:`, error);
+      this.logger.error(
+        `Account deletion failed for user ${accountId}:`,
+        error,
+      );
       return res.status(400).json({
         success: false,
         message: error.message || "계정 삭제 중 오류가 발생했습니다.",
@@ -1326,14 +1378,18 @@ export class AuthController {
     @Query("client_name") clientName: string,
     @Query("scope") scope: string,
     @Query("callback_url") callbackUrl: string,
+    @Query("force_login") forceLoginParam: string,
     @Request() req,
     @Res() res: Response,
   ) {
+    const forceLogin = forceLoginParam === "true" || forceLoginParam === "1";
+
     this.logger.debug(
       {
         state: state?.substring(0, 8),
         clientName,
         scope,
+        forceLogin,
       },
       "🔐 MCP OAuth login request",
     );
@@ -1346,10 +1402,11 @@ export class AuthController {
       });
     }
 
-    // 쿠키에서 access_token 확인 (이미 로그인된 사용자)
+    // force_login=true가 아닌 경우에만 기존 브라우저 세션(access_token 쿠키)을 재사용.
+    // - 기본 동작: 이미 로그인된 유저는 즉시 OAuth callback으로 진행 (UX 최적화)
+    // - force_login=true: 계정 전환/재인증을 위해 로그인 화면으로 강제 이동
     const accessToken = req.cookies?.access_token;
-
-    if (accessToken) {
+    if (!forceLogin && accessToken) {
       try {
         // JWT 검증하여 사용자 정보 추출
         const user = await this.authService.validateAccessToken(accessToken);
@@ -1383,6 +1440,9 @@ export class AuthController {
     );
     frontendLoginUrl.searchParams.set("scope", scope || "mcp:tools");
     frontendLoginUrl.searchParams.set("callback_url", callbackUrl);
+    if (forceLogin) {
+      frontendLoginUrl.searchParams.set("force_login", "1");
+    }
 
     this.logger.debug(
       { frontendLoginUrl: frontendLoginUrl.toString() },

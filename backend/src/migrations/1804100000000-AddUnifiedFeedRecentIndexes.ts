@@ -43,4 +43,3 @@ export class AddUnifiedFeedRecentIndexes1804100000000
     );
   }
 }
-
