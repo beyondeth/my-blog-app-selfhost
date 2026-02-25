@@ -20,11 +20,17 @@ describe("PostReadService", () => {
       waitForLock: jest.fn(),
       releaseLock: jest.fn(),
     };
+    const postsReadRepository = {
+      findByIdWithRelations: jest.fn(),
+      findBySlugWithRelations: jest.fn(),
+      getCursorPaginatedQueryBuilder: jest.fn(),
+    };
 
     const service = new PostReadService(
       postsRepository as any,
       {} as any,
       {} as any,
+      postsReadRepository as any,
       postMapperService as any,
       {} as any,
       postInteractionStatusService as any,
@@ -35,6 +41,7 @@ describe("PostReadService", () => {
     return {
       service,
       postsRepository,
+      postsReadRepository,
       postMapperService,
       postInteractionStatusService,
       cacheService,
@@ -49,26 +56,21 @@ describe("PostReadService", () => {
     const {
       service,
       cacheService,
-      postsRepository,
+      postsReadRepository,
       postInteractionStatusService,
     } = createService();
 
-    cacheService.get
-      .mockResolvedValueOnce("post-1")
-      .mockResolvedValueOnce({
-        id: "post-1",
-        slug: "hello-world",
-        title: "Hello",
-        liked: false,
-        bookmarked: false,
-        userVote: null,
-      });
+    cacheService.get.mockResolvedValueOnce("post-1").mockResolvedValueOnce({
+      id: "post-1",
+      slug: "hello-world",
+      title: "Hello",
+      liked: false,
+      bookmarked: false,
+      userVote: null,
+    });
 
     const interactionMap = new Map<string, any>([
-      [
-        "post-1",
-        { liked: true, bookmarked: true, userVote: "upvote" },
-      ],
+      ["post-1", { liked: true, bookmarked: true, userVote: "upvote" }],
     ]);
     postInteractionStatusService.getMultipleInteractionStatuses.mockResolvedValue(
       interactionMap,
@@ -78,14 +80,14 @@ describe("PostReadService", () => {
       id: "user-1",
     } as any);
 
-    expect(postsRepository.findOne).not.toHaveBeenCalled();
+    expect(postsReadRepository.findBySlugWithRelations).not.toHaveBeenCalled();
     expect(result.liked).toBe(true);
     expect(result.bookmarked).toBe(true);
     expect(result.userVote).toBe("upvote");
   });
 
   it("loads from repository on slug cache miss and stores id/detail caches", async () => {
-    const { service, cacheService, postsRepository, postMapperService } =
+    const { service, cacheService, postsReadRepository, postMapperService } =
       createService();
 
     cacheService.get.mockResolvedValue(null);
@@ -100,7 +102,7 @@ describe("PostReadService", () => {
       author: { id: "author-1", username: "author" },
       blog: { id: "blog-1", userId: "author-1", slug: "blog-1", name: "Blog" },
     };
-    postsRepository.findOne.mockResolvedValue(postEntity);
+    postsReadRepository.findBySlugWithRelations.mockResolvedValue(postEntity);
     postMapperService.toPostDto.mockResolvedValue({
       id: "post-22",
       slug: "cache-me",
@@ -112,7 +114,7 @@ describe("PostReadService", () => {
 
     const result = await service.findBySlug("cache-me");
 
-    expect(postsRepository.findOne).toHaveBeenCalled();
+    expect(postsReadRepository.findBySlugWithRelations).toHaveBeenCalled();
     expect(cacheService.set).toHaveBeenCalledWith(
       CacheKeys.POST_CORE("post-22"),
       expect.objectContaining({ id: "post-22", slug: "cache-me" }),
@@ -130,7 +132,7 @@ describe("PostReadService", () => {
   });
 
   it("returns findById from cache without querying database", async () => {
-    const { service, cacheService, postsRepository } = createService();
+    const { service, cacheService, postsReadRepository } = createService();
 
     cacheService.get.mockResolvedValue({
       id: "post-9",
@@ -143,7 +145,7 @@ describe("PostReadService", () => {
 
     const result = await service.findById("post-9", ["author", "blog"]);
 
-    expect(postsRepository.createQueryBuilder).not.toHaveBeenCalled();
+    expect(postsReadRepository.findByIdWithRelations).not.toHaveBeenCalled();
     expect(result.id).toBe("post-9");
   });
 });

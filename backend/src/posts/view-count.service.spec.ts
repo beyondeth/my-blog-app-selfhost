@@ -42,7 +42,11 @@ describe("ViewCountService", () => {
     );
     expect(redis.multi).toHaveBeenCalled();
     expect(pipeline.incrby).toHaveBeenCalledWith("post:view:buffer:post-1", 1);
-    expect(pipeline.expire).toHaveBeenCalledWith("post:view:buffer:post-1", 300, "NX");
+    expect(pipeline.expire).toHaveBeenCalledWith(
+      "post:view:buffer:post-1",
+      300,
+      "NX",
+    );
     expect(pipeline.exec).toHaveBeenCalled();
   });
 

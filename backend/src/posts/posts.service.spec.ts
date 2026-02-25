@@ -3,265 +3,120 @@ import { Repository } from "typeorm";
 import { getRepositoryToken } from "@nestjs/typeorm";
 import { PostsService } from "./posts.service";
 import { Post } from "./entities/post.entity";
+import { PostStats } from "./entities/post-stats.entity";
+import { PostMetadata } from "./entities/post-metadata.entity";
 import { File } from "../files/entities/file.entity";
+import { FileContext } from "../files/entities/file-context.entity";
 import { Blog } from "../blogs/entities/blog.entity";
 import { User } from "../users/entities/user.entity";
 import { FilesService } from "../files/files.service";
+import { CdnService } from "../files/services/cdn.service";
 import { MarkdownRendererService } from "../common/services/markdown-renderer.service";
-import { Role } from "../common/enums/role.enum";
+import { ContentProcessingService } from "../content-processing/services/content-processing.service";
+import { CacheService } from "../cache/cache.service";
+import { CacheMetricsService } from "../metrics/cache-metrics.service";
+import { BookmarksService } from "../bookmarks/bookmarks.service";
+import { LikeService } from "./services/like.service";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { RedisLockService } from "../redis/redis-lock.service";
+import { PostMapperService } from "./services/post-mapper.service";
+import { PostCacheService } from "./services/post-cache.service";
+import { PostFileService } from "./services/post-file.service";
+import { PostContentService } from "./services/post-content.service";
+import { PostReadService } from "./services/post-read.service";
+import { PostInteractionService } from "./services/post-interaction.service";
+import { PostCreationService } from "./services/post-creation.service";
+import { ThumbnailService } from "./services/thumbnail.service";
+import { CloudflareService } from "../cloudflare/cloudflare.service";
+import { DataSource } from "typeorm";
+import { getQueueToken } from "@nestjs/bullmq";
+import { POST_PROCESSING_QUEUE } from "./queues/post-processing.queue";
 
-describe("PostsService - Image Optimization", () => {
+describe("PostsService - Facade", () => {
   let service: PostsService;
-  let postsRepository: jest.Mocked<Repository<Post>>;
-  let filesRepository: jest.Mocked<Repository<File>>;
-  let blogsRepository: jest.Mocked<Repository<Blog>>;
-  let filesService: jest.Mocked<FilesService>;
-
-  const mockUser: User = {
-    id: "user-1",
-    username: "testuser",
-    email: "test@example.com",
-    role: Role.USER,
-    profileImage: null,
-    bio: null,
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as User;
-
-  const mockBlog = {
-    id: "blog-1",
-    name: "Test Blog",
-    slug: "test-blog",
-    userId: "user-1",
-    description: "Test blog description",
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  };
-
-  const mockTempImageFile: File = {
-    id: "file-1",
-    originalName: "test-image.png",
-    fileName: "test-uuid.png",
-    fileKey: "uploads/images/test-uuid.png",
-    fileUrl: "uploads/images/test-uuid.png",
-    fileSize: 1024000,
-    mimeType: "image/png",
-    fileType: "image",
-    userId: "user-1",
-    user: null,
-    contextId: null,
-    context: null,
-    s3Bucket: null,
-    s3Region: null,
-    checksum: null,
-    isOptimized: false,
-    metadata: {},
-    expiresAt: null,
-    posts: Promise.resolve([]),
-    createdAt: new Date(),
-    updatedAt: new Date(),
-  } as File;
+  let postCreationService: jest.Mocked<PostCreationService>;
+  let postMapperService: jest.Mocked<PostMapperService>;
 
   beforeEach(async () => {
+    const mockPostCreationService = {
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+    };
+
+    const mockPostMapperService = {
+      toPostDto: jest.fn(),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PostsService,
-        {
-          provide: getRepositoryToken(Post),
-          useValue: {
-            create: jest.fn(),
-            save: jest.fn(),
-            findOne: jest.fn(),
-            find: jest.fn(),
-            update: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(File),
-          useValue: {
-            find: jest.fn(),
-            update: jest.fn(),
-          },
-        },
-        {
-          provide: getRepositoryToken(Blog),
-          useValue: {
-            findOne: jest.fn(),
-          },
-        },
-        {
-          provide: FilesService,
-          useValue: {
-            deleteFile: jest.fn(),
-          },
-        },
-        {
-          provide: MarkdownRendererService,
-          useValue: {
-            convertToHtml: jest.fn(),
-          },
-        },
+        { provide: DataSource, useValue: {} },
+        { provide: getRepositoryToken(Post), useValue: {} },
+        { provide: getRepositoryToken(PostStats), useValue: {} },
+        { provide: getRepositoryToken(PostMetadata), useValue: {} },
+        { provide: getRepositoryToken(File), useValue: {} },
+        { provide: getRepositoryToken(FileContext), useValue: {} },
+        { provide: getRepositoryToken(Blog), useValue: {} },
+        { provide: FilesService, useValue: {} },
+        { provide: CdnService, useValue: {} },
+        { provide: MarkdownRendererService, useValue: {} },
+        { provide: ContentProcessingService, useValue: {} },
+        { provide: CacheService, useValue: {} },
+        { provide: CacheMetricsService, useValue: {} },
+        { provide: BookmarksService, useValue: {} },
+        { provide: LikeService, useValue: {} },
+        { provide: EventEmitter2, useValue: {} },
+        { provide: RedisLockService, useValue: {} },
+        { provide: PostMapperService, useValue: mockPostMapperService },
+        { provide: PostCacheService, useValue: {} },
+        { provide: PostFileService, useValue: {} },
+        { provide: PostContentService, useValue: {} },
+        { provide: PostReadService, useValue: {} },
+        { provide: PostInteractionService, useValue: {} },
+        { provide: PostCreationService, useValue: mockPostCreationService },
+        { provide: ThumbnailService, useValue: {} },
+        { provide: CloudflareService, useValue: {} },
+        { provide: getQueueToken(POST_PROCESSING_QUEUE), useValue: {} },
       ],
     }).compile();
 
     service = module.get<PostsService>(PostsService);
-    postsRepository = module.get(getRepositoryToken(Post));
-    filesRepository = module.get(getRepositoryToken(File));
-    blogsRepository = module.get(getRepositoryToken(Blog));
-    filesService = module.get(FilesService);
+    postCreationService = module.get(
+      PostCreationService,
+    ) as jest.Mocked<PostCreationService>;
+    postMapperService = module.get(
+      PostMapperService,
+    ) as jest.Mocked<PostMapperService>;
   });
 
-  describe("임시 파일 삭제 테스트", () => {
-    it("게시글 생성 후 백그라운드에서 임시 파일이 최적화되고 정리되어야 함", async () => {
-      // Arrange
-      const createPostDto = {
-        title: "Test Post",
-        content: "<p>Test content with image</p>",
-        attachedFileIds: ["file-1"],
-        category: "Test Category",
-      };
+  it("should be defined", () => {
+    expect(service).toBeDefined();
+  });
 
-      const mockPost = {
-        id: "post-1",
-        title: "Test Post",
-        content: "<p>Test content with image</p>",
-        slug: "test-post-uuid",
-        attachedFiles: [mockTempImageFile],
-      };
+  describe("create", () => {
+    it("should delegate to PostCreationService and map to DTO", async () => {
+      const mockDto: any = { title: "Test" };
+      const mockUser: any = { id: "user1" };
+      const mockPost: any = { id: "post1", blog: {} };
+      const mockResponseDto: any = { id: "post1", title: "Test" };
 
-      // Mock blog exists
-      blogsRepository.findOne.mockResolvedValue(mockBlog as any);
+      postCreationService.create.mockResolvedValue(mockPost);
+      postMapperService.toPostDto.mockResolvedValue(mockResponseDto);
 
-      // Mock post creation
-      postsRepository.create.mockReturnValue(mockPost as any);
-      postsRepository.save.mockResolvedValue(mockPost as any);
+      const result = await service.create(mockDto, mockUser);
 
-      // Mock file operations
-      filesRepository.find.mockImplementation((options: any) => {
-        if (options?.where?.status === "temp") {
-          return Promise.resolve([
-            {
-              ...mockTempImageFile,
-              posts: Promise.resolve([mockPost]), // 이 포스트에 연결된 파일
-            },
-          ]);
-        }
-        return Promise.resolve([]);
+      expect(postCreationService.create).toHaveBeenCalledWith(
+        mockDto,
+        mockUser,
+        undefined,
+        undefined,
+      );
+      expect(postMapperService.toPostDto).toHaveBeenCalledWith(mockPost, {
+        user: mockUser,
+        blog: mockPost.blog,
       });
-
-      filesRepository.update.mockResolvedValue({ affected: 1 } as any);
-
-      // Act
-      const result = await service.create(createPostDto, mockUser);
-
-      // 백그라운드 작업이 완료될 때까지 대기
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // Assert
-      expect(result).toBeDefined();
-      expect(result.id).toBe("post-1");
-
-      // 임시 파일 조회가 호출되었는지 확인
-      expect(filesRepository.find).toHaveBeenCalledWith({
-        where: {
-          status: "temp",
-          fileType: "image",
-        },
-        relations: ["posts"],
-      });
-
-      // 파일 상태가 순차적으로 업데이트되었는지 확인
-      expect(filesRepository.update).toHaveBeenCalledWith("file-1", {
-        status: "processing",
-      });
-      expect(filesRepository.update).toHaveBeenCalledWith("file-1", {
-        status: "published",
-        optimizedUrl: expect.stringMatching(/\.webp$/), // WebP 확장자로 끝나는 URL
-        metadata: expect.objectContaining({
-          optimized: true,
-          optimizedAt: expect.any(String),
-          originalFormat: "image/png",
-          optimizedFormat: "image/webp",
-        }),
-      });
-
-      // 최소 2번 호출 (processing -> published)
-      expect(filesRepository.update).toHaveBeenCalledTimes(2);
-    }, 10000); // 10초 타임아웃
-
-    it("최적화 실패 시 파일이 temp 상태로 되돌아가야 함", async () => {
-      // Arrange
-      const createPostDto = {
-        title: "Test Post",
-        content: "<p>Test content</p>",
-        category: "Test Category",
-      };
-
-      const mockPost = { id: "post-1", title: "Test Post" };
-
-      blogsRepository.findOne.mockResolvedValue(mockBlog as any);
-      postsRepository.create.mockReturnValue(mockPost as any);
-      postsRepository.save.mockResolvedValue(mockPost as any);
-
-      // 임시 파일이 있지만 업데이트 실패 시뮬레이션
-      filesRepository.find.mockResolvedValue([
-        {
-          ...mockTempImageFile,
-          posts: Promise.resolve([mockPost]),
-        },
-      ]);
-
-      // 첫 번째 업데이트는 성공, 두 번째 업데이트에서 실패
-      filesRepository.update
-        .mockResolvedValueOnce({ affected: 1 } as any) // processing으로 변경 성공
-        .mockRejectedValueOnce(new Error("Update failed")); // published로 변경 실패
-
-      // Act
-      await service.create(createPostDto, mockUser);
-
-      // 백그라운드 작업 완료 대기
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-
-      // Assert - 실패 시 복구 로직 확인
-      expect(filesRepository.find).toHaveBeenCalledWith({
-        where: { status: "processing", fileType: "image" },
-      });
-
-      // 실패한 파일들을 temp로 되돌렸는지 확인
-      expect(filesRepository.update).toHaveBeenCalledWith(expect.any(String), {
-        status: "temp",
-      });
-    }, 10000);
-
-    it("포스트에 연결된 이미지가 없으면 최적화를 건너뛰어야 함", async () => {
-      // Arrange
-      const createPostDto = {
-        title: "Text Only Post",
-        content: "<p>No images here</p>",
-        category: "Test Category",
-      };
-
-      const mockPost = { id: "post-1", title: "Text Only Post" };
-
-      blogsRepository.findOne.mockResolvedValue(mockBlog as any);
-      postsRepository.create.mockReturnValue(mockPost as any);
-      postsRepository.save.mockResolvedValue(mockPost as any);
-
-      // 임시 파일이 없음
-      filesRepository.find.mockResolvedValue([]);
-
-      // Act
-      const result = await service.create(createPostDto, mockUser);
-
-      // 백그라운드 작업 완료 대기
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      // Assert
-      expect(result).toBeDefined();
-
-      // 임시 파일 조회는 했지만 업데이트는 하지 않음
-      expect(filesRepository.find).toHaveBeenCalled();
-      expect(filesRepository.update).not.toHaveBeenCalled();
+      expect(result).toEqual(mockResponseDto);
     });
   });
 });
