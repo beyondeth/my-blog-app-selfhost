@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Header from './components/Header';
 import MetaGrid from './components/MetaGrid';
 import StyleSelector from './components/StyleSelector';
@@ -15,6 +15,12 @@ export default function App() {
   const { ref, notify } = useNotifyHeight();
   const s = state.status;
   const out = state.out;
+
+  // Style submit callback from StyleSelector
+  const [styleSubmit, setStyleSubmit] = useState<{ fn: (() => void) | null; submitting: boolean }>({ fn: null, submitting: false });
+  const handleSubmitReady = useCallback((submit: (() => void) | null, isSubmitting: boolean) => {
+    setStyleSubmit({ fn: submit, submitting: isSubmitting });
+  }, []);
 
   // Notify height after every render
   useEffect(() => { notify(); });
@@ -46,6 +52,9 @@ export default function App() {
   } else if (s === 'guide_ready' || s === 'style_confirmed') {
     if (out.style || out.styleLabel) entries.push({ label: t('selected_style'), value: String(out.styleLabel || out.style) });
     if (out.hasCustomMarkdown !== undefined) entries.push({ label: t('custom_guide'), value: out.hasCustomMarkdown ? t('yes') : t('no') });
+  } else if (s === 'blocked' || s === 'awaiting_style_selection') {
+    // Style selection stage — style cards handle the UI, minimal meta
+    entries.push({ label: t('next_step'), value: t('select_style_hint') });
   } else {
     // General fallback
     if (out.toolName) entries.push({ label: t('task'), value: String(out.toolName) });
@@ -70,6 +79,7 @@ export default function App() {
   }
 
   const canSelect = Boolean(state.styleSelectionNonce) && canCallTool();
+  const showStyleSubmit = state.isStyleSelectionStage && state.styleOptions.length > 0;
 
   return (
     <div ref={ref} className="shell">
@@ -77,20 +87,19 @@ export default function App() {
         <Header status={s} />
 
         <div className="body">
-          {/* Hint messages */}
-          {out.connectionHint && <HintBox text={String(out.connectionHint)} />}
-          {out.confirmInstruction && <HintBox text={String(out.confirmInstruction)} isWarning />}
+          {/* Error messages only */}
           {out.message && s === 'error' && <HintBox text={String(out.message)} isWarning />}
 
           {/* Meta info */}
           <MetaGrid entries={entries} />
 
           {/* Style selection */}
-          {state.isStyleSelectionStage && state.styleOptions.length > 0 && (
+          {showStyleSubmit && (
             <StyleSelector
               options={state.styleOptions}
               nonce={state.styleSelectionNonce}
               canSelect={canSelect}
+              onSubmitReady={handleSubmitReady}
             />
           )}
 
@@ -101,7 +110,18 @@ export default function App() {
           />
         </div>
 
-        {/* Actions */}
+        {/* Actions — both buttons render in same position outside .body */}
+        {showStyleSubmit && (
+          <section className="actions">
+            <button
+              className="btn btn-primary"
+              disabled={styleSubmit.submitting || !styleSubmit.fn}
+              onClick={() => styleSubmit.fn?.()}
+            >
+              {styleSubmit.submitting ? t('guide_submitting') : t('guide_submit')}
+            </button>
+          </section>
+        )}
         <ActionButtons
           status={s}
           href={out.postUrl || out.blogUrl || ''}
@@ -110,3 +130,4 @@ export default function App() {
     </div>
   );
 }
+

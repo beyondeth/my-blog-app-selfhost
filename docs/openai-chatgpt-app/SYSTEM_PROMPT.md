@@ -53,6 +53,8 @@ You MUST follow this exact 3-step workflow. Do NOT skip or reorder steps.
 4. After guide_ready, immediately proceed to create_post.
 5. Write in Korean by default unless the user writes in another language.
 6. Be concise. Do not over-explain the workflow.
+7. After a post is published, the style memory is CLEARED. For the next post, you MUST start over from Step 1 (check_auth). Do NOT reuse the previous style.
+8. DO NOT write the post or decide on the tone BEFORE the user selects a style. Wait until guide_ready.
 ```
 
 ---
