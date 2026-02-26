@@ -57,6 +57,7 @@ import { ThumbnailService } from "./services/thumbnail.service";
 import { CloudflareModule } from "../cloudflare/cloudflare.module";
 import { MobilePostsController } from "./mobile-posts.controller";
 import { PostLifecycleListener } from "./listeners/post-lifecycle.listener";
+import { PopularPostsModule } from "../popular-posts/popular-posts.module";
 
 @Module({
   imports: [
@@ -105,6 +106,7 @@ import { PostLifecycleListener } from "./listeners/post-lifecycle.listener";
     RedisModule, // Redis 모듈 추가 (Queue용)
     MetricsModule, // Prometheus 메트릭 모듈 추가
     CloudflareModule, // Cloudflare 캐시 관리 모듈
+    PopularPostsModule, // 인기글 전용 read path (배치 스냅샷 + 캐시)
   ],
   providers: [
     PostsService,

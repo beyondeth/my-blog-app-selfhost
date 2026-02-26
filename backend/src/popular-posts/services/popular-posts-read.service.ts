@@ -1,0 +1,105 @@
+import { Injectable, Logger } from "@nestjs/common";
+import { PopularCacheService } from "./popular-cache.service";
+import { PopularSnapshotService } from "./popular-snapshot.service";
+import {
+  PopularCommunityResponse,
+  PopularPeriod,
+  PopularPostsResponse,
+  PopularSourceType,
+} from "../types/popular-post.types";
+
+@Injectable()
+export class PopularPostsReadService {
+  private readonly logger = new Logger(PopularPostsReadService.name);
+  private readonly maxLimit = 20;
+  private readonly preloadLimit = 200;
+
+  constructor(
+    private readonly popularCacheService: PopularCacheService,
+    private readonly popularSnapshotService: PopularSnapshotService,
+  ) {}
+
+  normalizePeriod(input?: string): PopularPeriod {
+    if (input === "daily" || input === "weekly" || input === "monthly") {
+      return input;
+    }
+    return "weekly";
+  }
+
+  normalizeLimit(input?: string | number, fallback = 5): number {
+    const parsed =
+      typeof input === "number" ? input : Number.parseInt(input ?? "", 10);
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      return fallback;
+    }
+    return Math.min(parsed, this.maxLimit);
+  }
+
+  async getBlogPopularPosts(
+    periodInput?: string,
+    limitInput?: string | number,
+  ): Promise<PopularPostsResponse> {
+    const period = this.normalizePeriod(periodInput);
+    const limit = this.normalizeLimit(limitInput, 5);
+
+    const items = await this.getPopularItems("blog", period, limit);
+    return {
+      posts: items,
+      total: items.length,
+    };
+  }
+
+  async getCommunityPopularPosts(
+    periodInput?: string,
+    limitInput?: string | number,
+  ): Promise<PopularCommunityResponse> {
+    const period = this.normalizePeriod(periodInput);
+    const limit = this.normalizeLimit(limitInput, 5);
+
+    const items = await this.getPopularItems("community", period, limit);
+    return {
+      items,
+      total: items.length,
+    };
+  }
+
+  private async getPopularItems(
+    source: PopularSourceType,
+    period: PopularPeriod,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    // 인기 API는 요청 시점에 집계를 계산하지 않는다.
+    // 1) redis 스냅샷 -> 2) snapshot 테이블 fallback 순서로만 읽는다.
+    const cached = await this.popularCacheService.get(source, period);
+    if (cached?.items?.length) {
+      return cached.items.slice(0, limit);
+    }
+
+    const snapshots = await this.popularSnapshotService.getTop(
+      source,
+      period,
+      this.preloadLimit,
+    );
+
+    const items = snapshots.map((snapshot) => snapshot.metaJson);
+    if (!items.length) {
+      return [];
+    }
+
+    const generatedAt =
+      snapshots[0]?.snapshotAt?.toISOString() ?? new Date().toISOString();
+
+    try {
+      await this.popularCacheService.setAtomic(source, period, {
+        generatedAt,
+        items,
+      });
+    } catch (error) {
+      this.logger.warn(
+        `[Popular Read] cache refill failed for ${source}:${period} - serving snapshot data`,
+      );
+    }
+
+    return items.slice(0, limit);
+  }
+}

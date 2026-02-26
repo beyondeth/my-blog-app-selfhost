@@ -6,3 +6,4 @@ export * from "./community-post.controller";
 export * from "./community-moderation.controller";
 export * from "./community-report.controller";
 export * from "./community-widget.controller";
+export * from "./popular-community-posts.controller";
