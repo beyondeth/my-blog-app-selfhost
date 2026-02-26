@@ -86,6 +86,7 @@
     "class-validator": "^0.14.0",
     "compression": "^1.7.4",
     "cookie-parser": "^1.4.7",
+    "cron": "^4.4.0",
     "date-fns": "^4.1.0",
     "dotenv": "^17.2.1",
     "express-session": "^1.18.2",
