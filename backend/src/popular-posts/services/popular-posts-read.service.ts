@@ -1,6 +1,7 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { PopularCacheService } from "./popular-cache.service";
 import { PopularSnapshotService } from "./popular-snapshot.service";
+import { PopularScoreQueryService } from "./popular-score-query.service";
 import {
   PopularCommunityResponse,
   PopularPeriod,
@@ -17,6 +18,7 @@ export class PopularPostsReadService {
   constructor(
     private readonly popularCacheService: PopularCacheService,
     private readonly popularSnapshotService: PopularSnapshotService,
+    private readonly popularScoreQueryService: PopularScoreQueryService,
   ) {}
 
   normalizePeriod(input?: string): PopularPeriod {
@@ -68,8 +70,8 @@ export class PopularPostsReadService {
     period: PopularPeriod,
     limit: number,
   ): Promise<Record<string, unknown>[]> {
-    // 인기 API는 요청 시점에 집계를 계산하지 않는다.
-    // 1) redis 스냅샷 -> 2) snapshot 테이블 fallback 순서로만 읽는다.
+    // 기본 경로는 캐시/스냅샷 read-only다.
+    // 단, 신규 배포 직후처럼 데이터가 완전히 비어 있으면 1회 계산으로 seed를 만든다.
     const cached = await this.popularCacheService.get(source, period);
     if (cached?.items?.length) {
       return cached.items.slice(0, limit);
@@ -83,7 +85,7 @@ export class PopularPostsReadService {
 
     const items = snapshots.map((snapshot) => snapshot.metaJson);
     if (!items.length) {
-      return [];
+      return this.seedFromLiveQuery(source, period, limit);
     }
 
     const generatedAt =
@@ -101,5 +103,50 @@ export class PopularPostsReadService {
     }
 
     return items.slice(0, limit);
+  }
+
+  private async seedFromLiveQuery(
+    source: PopularSourceType,
+    period: PopularPeriod,
+    limit: number,
+  ): Promise<Record<string, unknown>[]> {
+    const snapshotAt = new Date();
+    try {
+      const rows = await this.popularScoreQueryService.calculatePopularRows(
+        source,
+        period,
+        this.preloadLimit,
+      );
+
+      if (!rows.length) {
+        return [];
+      }
+
+      const items = rows.map((row) => row.metaJson);
+
+      // 다음 요청부터는 배치 스냅샷 경로를 그대로 재사용하도록 seed를 남긴다.
+      await this.popularSnapshotService.replaceSnapshot(
+        source,
+        period,
+        snapshotAt,
+        rows,
+      );
+      await this.popularCacheService.setAtomic(source, period, {
+        generatedAt: snapshotAt.toISOString(),
+        items,
+      });
+
+      this.logger.warn(
+        `[Popular Read] seeded ${source}:${period} from live query due to empty snapshot/cache`,
+      );
+
+      return items.slice(0, limit);
+    } catch (error) {
+      this.logger.error(
+        `[Popular Read] live seed failed for ${source}:${period}`,
+        error instanceof Error ? error.stack : String(error),
+      );
+      return [];
+    }
   }
 }

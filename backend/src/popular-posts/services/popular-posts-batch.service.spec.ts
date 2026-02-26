@@ -17,6 +17,16 @@ describe("PopularPostsBatchService", () => {
     setAtomic: jest.fn(),
   };
 
+  const mockConfigService = {
+    get: jest.fn(),
+  };
+
+  const mockSchedulerRegistry = {
+    addCronJob: jest.fn(),
+    getCronJob: jest.fn(),
+    deleteCronJob: jest.fn(),
+  };
+
   const defaultRows = [
     {
       postId: "post-1",
@@ -30,11 +40,25 @@ describe("PopularPostsBatchService", () => {
       mockPopularScoreQueryService as any,
       mockPopularSnapshotService as any,
       mockPopularCacheService as any,
+      mockConfigService as any,
+      mockSchedulerRegistry as any,
     );
+    mockConfigService.get.mockImplementation((key: string) => {
+      if (key === "POPULAR_BATCH_CRON") {
+        return "0 4 * * *";
+      }
+      if (key === "POPULAR_BATCH_TIMEZONE") {
+        return "Asia/Seoul";
+      }
+      return undefined;
+    });
+    mockSchedulerRegistry.getCronJob.mockImplementation(() => {
+      throw new Error("not found");
+    });
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   it("processes all buckets and writes both snapshot and cache", async () => {
@@ -103,5 +127,23 @@ describe("PopularPostsBatchService", () => {
     expect(mockPopularCacheService.setAtomic).toHaveBeenCalledTimes(5);
     expect(errorSpy).toHaveBeenCalled();
     expect((service as any).isRunning).toBe(false);
+  });
+
+  it("registers cron job using runtime config values", () => {
+    service.onModuleInit();
+
+    expect(mockConfigService.get).toHaveBeenCalledWith("POPULAR_BATCH_CRON");
+    expect(mockConfigService.get).toHaveBeenCalledWith("POPULAR_BATCH_TIMEZONE");
+    expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledWith(
+      "popular-posts-batch",
+      expect.any(Object),
+    );
+
+    const registeredJob = mockSchedulerRegistry.addCronJob.mock.calls[0]?.[1];
+    mockSchedulerRegistry.getCronJob.mockReturnValue(registeredJob);
+    service.onModuleDestroy();
+    expect(mockSchedulerRegistry.deleteCronJob).toHaveBeenCalledWith(
+      "popular-posts-batch",
+    );
   });
 });
