@@ -2,6 +2,24 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-02-26
+
+### Additional update (feed period hot/top cache-warming env tracking)
+
+#### What changed
+- Added env tracking entries for feed period hot/top optimization flags:
+  - `FEED_HOT_PERIOD_TTL_SECONDS` (default `600`)
+  - `DISABLE_FEED_PERIOD_WARMING` (default `false`)
+- Updated environment sync snapshot table in `WORKTREE_STATUS.md`.
+
+#### Why
+- Feed period hot/top path now has explicit runtime knobs for TTL and warming behavior.
+- New keys must be tracked in platform coordination docs to avoid env drift across worktrees and deploy targets.
+
+#### How
+- Updated:
+  - `docs/platform-coordination/WORKTREE_STATUS.md`
+
 ## 2026-02-24
 
 ### Additional update (integration boundary + selective platform sync policy)
