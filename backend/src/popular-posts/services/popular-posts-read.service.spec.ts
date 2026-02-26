@@ -10,17 +10,26 @@ describe("PopularPostsReadService", () => {
 
   const mockPopularSnapshotService = {
     getTop: jest.fn(),
+    replaceSnapshot: jest.fn(),
+  };
+
+  const mockPopularScoreQueryService = {
+    calculatePopularRows: jest.fn(),
   };
 
   beforeEach(() => {
     service = new PopularPostsReadService(
       mockPopularCacheService as any,
       mockPopularSnapshotService as any,
+      mockPopularScoreQueryService as any,
     );
+    mockPopularCacheService.setAtomic.mockResolvedValue(undefined);
+    mockPopularSnapshotService.replaceSnapshot.mockResolvedValue(undefined);
+    mockPopularScoreQueryService.calculatePopularRows.mockResolvedValue([]);
   });
 
   afterEach(() => {
-    jest.clearAllMocks();
+    jest.resetAllMocks();
   });
 
   it("normalizes period and limit safely", () => {
@@ -51,6 +60,9 @@ describe("PopularPostsReadService", () => {
     });
     expect(mockPopularSnapshotService.getTop).not.toHaveBeenCalled();
     expect(mockPopularCacheService.setAtomic).not.toHaveBeenCalled();
+    expect(
+      mockPopularScoreQueryService.calculatePopularRows,
+    ).not.toHaveBeenCalled();
   });
 
   it("reads snapshot on cache miss, refills cache, and returns limited community items", async () => {
@@ -108,10 +120,62 @@ describe("PopularPostsReadService", () => {
   it("returns empty list when cache and snapshot are both empty", async () => {
     mockPopularCacheService.get.mockResolvedValue(null);
     mockPopularSnapshotService.getTop.mockResolvedValue([]);
+    mockPopularScoreQueryService.calculatePopularRows.mockResolvedValue([]);
 
     const result = await service.getBlogPopularPosts("daily", 5);
 
     expect(result).toEqual({ posts: [], total: 0 });
+    expect(mockPopularScoreQueryService.calculatePopularRows).toHaveBeenCalledWith(
+      "blog",
+      "daily",
+      200,
+    );
+    expect(mockPopularSnapshotService.replaceSnapshot).not.toHaveBeenCalled();
     expect(mockPopularCacheService.setAtomic).not.toHaveBeenCalled();
+  });
+
+  it("seeds snapshot/cache from live query when cache and snapshot are empty", async () => {
+    mockPopularCacheService.get.mockResolvedValue(null);
+    mockPopularSnapshotService.getTop.mockResolvedValue([]);
+    mockPopularScoreQueryService.calculatePopularRows.mockResolvedValue([
+      {
+        postId: "seed-1",
+        score: 10,
+        metaJson: { id: "seed-1" },
+      },
+      {
+        postId: "seed-2",
+        score: 8,
+        metaJson: { id: "seed-2" },
+      },
+    ]);
+
+    const result = await service.getCommunityPopularPosts("weekly", 1);
+
+    const replaceCall = mockPopularSnapshotService.replaceSnapshot.mock.calls[0];
+    const cacheCall = mockPopularCacheService.setAtomic.mock.calls[0];
+    const seededAt = replaceCall[2] as Date;
+
+    expect(replaceCall).toEqual([
+      "community",
+      "weekly",
+      expect.any(Date),
+      [
+        { postId: "seed-1", score: 10, metaJson: { id: "seed-1" } },
+        { postId: "seed-2", score: 8, metaJson: { id: "seed-2" } },
+      ],
+    ]);
+    expect(cacheCall).toEqual([
+      "community",
+      "weekly",
+      {
+        generatedAt: seededAt.toISOString(),
+        items: [{ id: "seed-1" }, { id: "seed-2" }],
+      },
+    ]);
+    expect(result).toEqual({
+      items: [{ id: "seed-1" }],
+      total: 1,
+    });
   });
 });
