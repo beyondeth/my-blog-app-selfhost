@@ -3,7 +3,7 @@ import { Cron, CronExpression } from "@nestjs/schedule";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { FeedService } from "./feed.service";
-import { FeedFilterType, FeedSortType } from "./dto";
+import { FeedFilterType, FeedPeriodType, FeedSortType } from "./dto";
 import { Community } from "../communities/entities/community.entity";
 import { CommunityPostService } from "../communities/services/community-post.service";
 import {
@@ -27,6 +27,15 @@ export class FeedCacheWarmingService {
     FeedSortType.RECENT,
     FeedSortType.HOT,
     FeedSortType.TOP,
+  ];
+  private readonly periodHotTopSortsToWarm: FeedSortType[] = [
+    FeedSortType.HOT,
+    FeedSortType.TOP,
+  ];
+  private readonly periodsToWarm: FeedPeriodType[] = [
+    FeedPeriodType.DAILY,
+    FeedPeriodType.WEEKLY,
+    FeedPeriodType.MONTHLY,
   ];
 
   // 커뮤니티 피드 워밍 대상 정렬
@@ -53,6 +62,13 @@ export class FeedCacheWarmingService {
       return 0;
     }
     return Math.min(parsed, 20); // 최대 20개로 제한
+  }
+
+  /**
+   * period 기반 hot/top 워밍 비활성화 플래그
+   */
+  private get isPeriodWarmingDisabled(): boolean {
+    return process.env.DISABLE_FEED_PERIOD_WARMING === "true";
   }
 
   /**
@@ -87,6 +103,7 @@ export class FeedCacheWarmingService {
    * 홈 피드 워밍 로직
    */
   private async warmUnifiedFeed(): Promise<void> {
+    // baseline(all period) 워밍
     for (const sort of this.feedSortsToWarm) {
       try {
         await this.feedService.getUnifiedFeed(
@@ -102,6 +119,34 @@ export class FeedCacheWarmingService {
         this.logger.warn(
           `Unified feed warmup failed for sort=${sort}: ${error.message}`,
         );
+      }
+    }
+
+    if (this.isPeriodWarmingDisabled) {
+      return;
+    }
+
+    // period + hot/top 조합 워밍
+    for (const sort of this.periodHotTopSortsToWarm) {
+      for (const period of this.periodsToWarm) {
+        try {
+          await this.feedService.getUnifiedFeed(
+            {
+              filter: FeedFilterType.ALL,
+              sort,
+              period,
+              limit: 20,
+            },
+            undefined,
+          );
+          this.logger.debug(
+            `Warm unified feed cache for sort=${sort}, period=${period}`,
+          );
+        } catch (error) {
+          this.logger.warn(
+            `Unified feed period warmup failed for sort=${sort}, period=${period}: ${error.message}`,
+          );
+        }
       }
     }
   }

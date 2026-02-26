@@ -44,6 +44,7 @@ import {
   CommunityModerationController,
   CommunityReportController,
   CommunityWidgetController,
+  PopularCommunityPostsController,
 } from "./controllers";
 import { CommunityStatsController } from "./controllers/community-stats.controller";
 
@@ -60,6 +61,7 @@ import { UsersModule } from "../users/users.module";
 import { CacheModule } from "../cache/cache.module";
 import { RedisModule } from "../redis/redis.module";
 import { FilesModule } from "../files/files.module";
+import { PopularPostsModule } from "../popular-posts/popular-posts.module";
 
 /**
  * 커뮤니티 모듈
@@ -108,6 +110,7 @@ import { FilesModule } from "../files/files.module";
     CacheModule,
     RedisModule,
     FilesModule, // V2 ContextualFile 이미지 업로드
+    PopularPostsModule, // 커뮤니티 인기글 전용 API read path
   ],
   providers: [
     // 서비스
@@ -134,6 +137,7 @@ import { FilesModule } from "../files/files.module";
     CommunityReportController,
     CommunityWidgetController,
     CommunityStatsController,
+    PopularCommunityPostsController,
   ],
   exports: [
     // 다른 모듈에서 사용할 수 있도록 export

@@ -15,6 +15,8 @@ import {
 } from "./dto";
 import { FeedRankingService, RankedEntry } from "./feed-ranking.service";
 
+type UserVoteType = "upvote" | "downvote";
+
 /**
  * 커서 데이터 인터페이스
  */
@@ -31,11 +33,12 @@ interface CursorData {
  * **설계 원칙:**
  * - UNION ALL 쿼리로 두 테이블 통합
  * - 커서 기반 페이지네이션 (대용량 데이터 지원)
- * - Redis 캐싱 (첫 페이지 30초)
+ * - Redis 캐싱 + 워밍 기반 응답 최적화
  */
 @Injectable()
 export class FeedService {
   private readonly logger = new Logger(FeedService.name);
+  private readonly periodHotTopTtlSeconds = this.resolvePeriodHotTopTtlSeconds();
 
   constructor(
     @InjectRepository(Post)
@@ -75,25 +78,41 @@ export class FeedService {
       }
     }
 
-    // 캐시 키 (사용자 컨텍스트 없을 때만 캐싱)
-    const cacheKey = !normalizedUserId
-      ? CacheKeys.FEED_UNIFIED(filter, sort, {
-          limit,
-          cursor: cursorRaw ?? null,
-        })
-      : null;
+    // 통합 피드는 사용자 여부와 관계없이 공용 payload를 캐시한다.
+    // 사용자별 차이는 userVote/liked만 후처리로 덧입혀 DB 부하를 줄인다.
+    const cacheKey = CacheKeys.FEED_UNIFIED(filter, sort, period, {
+      limit,
+      cursor: cursorRaw ?? null,
+    });
 
-    if (cacheKey) {
-      const cached =
-        await this.cacheService.get<UnifiedFeedResponseDto>(cacheKey);
-      if (cached) {
-        return cached;
+    const cached = await this.cacheService.get<UnifiedFeedResponseDto>(cacheKey);
+    if (cached) {
+      this.logger.debug(
+        `[Feed] cache hit filter=${filter}, sort=${sort}, period=${period}, user=${normalizedUserId ? "yes" : "no"}`,
+      );
+      if (normalizedUserId) {
+        try {
+          return await this.attachUserVotesToResponse(cached, normalizedUserId);
+        } catch (error) {
+          this.logger.warn(
+            `[Feed] failed to attach user votes on cache hit: ${
+              error instanceof Error ? error.message : String(error)
+            }`,
+          );
+          return cached;
+        }
       }
+      return cached;
     }
+    this.logger.debug(
+      `[Feed] cache miss filter=${filter}, sort=${sort}, period=${period}, user=${normalizedUserId ? "yes" : "no"}`,
+    );
 
     let items: UnifiedFeedItemDto[] = [];
     let fetchedFromRanking = false;
 
+    // [중요] 이 분기는 "통합 피드(/feed)" 전용이다.
+    // 사이드바 인기글 API(/posts/popular, /communities/popular)와는 별도 경로로 동작한다.
     // period가 ALL이 아닌 경우 랭킹 사용 안 함 (기간 필터링 필요)
     const useRanking =
       !cursorData &&
@@ -105,7 +124,7 @@ export class FeedService {
         filter,
         sort,
         limit + 1,
-        normalizedUserId,
+        undefined,
       );
       if (rankedItems.length > 0) {
         items = rankedItems;
@@ -119,7 +138,7 @@ export class FeedService {
         sort,
         limit + 1,
         cursorData,
-        normalizedUserId,
+        undefined,
         period,
       );
     }
@@ -148,9 +167,20 @@ export class FeedService {
       count: items.length,
     };
 
-    // 첫 페이지 캐싱 (HOME_FEED TTL)
-    if (cacheKey) {
-      await this.cacheService.set(cacheKey, response, CacheTTL.HOME_FEED);
+    const cacheTtl = this.getFeedCacheTtl(sort, period);
+    await this.cacheService.set(cacheKey, response, cacheTtl);
+
+    if (normalizedUserId) {
+      try {
+        return await this.attachUserVotesToResponse(response, normalizedUserId);
+      } catch (error) {
+        this.logger.warn(
+          `[Feed] failed to attach user votes after query: ${
+            error instanceof Error ? error.message : String(error)
+          }`,
+        );
+        return response;
+      }
     }
 
     return response;
@@ -215,6 +245,146 @@ export class FeedService {
     }
 
     return { blogIds, communityIds };
+  }
+
+  /**
+   * [통합 피드(/feed) 전용]
+   * 기간별 HOT/TOP은 쿼리 비용이 높아 캐시 TTL을 더 길게 적용한다.
+   * 이를 통해 period 조합의 cold miss 빈도를 줄인다.
+   *
+   * 주의:
+   * - 이 TTL 정책은 "사이드바 인기글" API에 영향을 주지 않는다.
+   * - 사이드바는 /posts/popular, /communities/popular 전용 캐시/조회 경로를 사용한다.
+   */
+  private getFeedCacheTtl(sort: FeedSortType, period: FeedPeriodType): number {
+    const isPeriodHotTop =
+      (sort === FeedSortType.HOT || sort === FeedSortType.TOP) &&
+      period !== FeedPeriodType.ALL;
+    if (isPeriodHotTop) {
+      return this.periodHotTopTtlSeconds;
+    }
+    return CacheTTL.HOME_FEED;
+  }
+
+  private resolvePeriodHotTopTtlSeconds(): number {
+    const raw = process.env.FEED_HOT_PERIOD_TTL_SECONDS;
+    const parsed = raw ? Number.parseInt(raw, 10) : NaN;
+    if (Number.isNaN(parsed) || parsed <= 0) {
+      return 600;
+    }
+    return parsed;
+  }
+
+  /**
+   * 공용 피드 payload에 사용자 투표 상태만 덧입힌다.
+   * - 본문/정렬/페이징은 공용 캐시를 재사용
+   * - 사용자별 차이는 post_like / community_post_like만 조회
+   */
+  private async attachUserVotesToResponse(
+    response: UnifiedFeedResponseDto,
+    userId: string,
+  ): Promise<UnifiedFeedResponseDto> {
+    if (!response.items.length) {
+      return response;
+    }
+
+    const blogIds: string[] = [];
+    const communityIds: string[] = [];
+
+    for (const item of response.items) {
+      if (item.sourceType === "blog") {
+        blogIds.push(item.id);
+      } else if (item.sourceType === "community") {
+        communityIds.push(item.id);
+      }
+    }
+
+    const [blogVoteMap, communityVoteMap] = await Promise.all([
+      this.getBlogVoteMap(blogIds, userId),
+      this.getCommunityVoteMap(communityIds, userId),
+    ]);
+
+    const items = response.items.map((item) => {
+      const vote =
+        item.sourceType === "blog"
+          ? blogVoteMap.get(item.id)
+          : communityVoteMap.get(item.id);
+      return this.applyUserVote(item, vote);
+    });
+
+    return { ...response, items };
+  }
+
+  private applyUserVote(
+    item: UnifiedFeedItemDto,
+    vote?: UserVoteType,
+  ): UnifiedFeedItemDto {
+    if (!vote) {
+      return item;
+    }
+    return {
+      ...item,
+      userVote: vote,
+      liked: vote === "upvote",
+    };
+  }
+
+  private async getBlogVoteMap(
+    postIds: string[],
+    userId: string,
+  ): Promise<Map<string, UserVoteType>> {
+    if (!postIds.length) {
+      return new Map();
+    }
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT pl."postId" AS "postId", pl.type::text AS type
+      FROM post_likes pl
+      WHERE pl."userId" = $1
+        AND pl."postId" = ANY($2::uuid[])
+      `,
+      [userId, postIds],
+    );
+
+    return this.toVoteMap(rows);
+  }
+
+  private async getCommunityVoteMap(
+    postIds: string[],
+    userId: string,
+  ): Promise<Map<string, UserVoteType>> {
+    if (!postIds.length) {
+      return new Map();
+    }
+
+    const rows = await this.dataSource.query(
+      `
+      SELECT cpl."postId" AS "postId", cpl.type::text AS type
+      FROM community_post_likes cpl
+      WHERE cpl."userId" = $1
+        AND cpl."postId" = ANY($2::uuid[])
+      `,
+      [userId, postIds],
+    );
+
+    return this.toVoteMap(rows);
+  }
+
+  private toVoteMap(rows: any[]): Map<string, UserVoteType> {
+    const voteMap = new Map<string, UserVoteType>();
+    for (const row of rows) {
+      const vote = row?.type;
+      const postId = row?.postId;
+      if (
+        postId &&
+        (vote === "upvote" || vote === "downvote") &&
+        !voteMap.has(postId)
+      ) {
+        voteMap.set(postId, vote);
+      }
+    }
+    return voteMap;
   }
 
   private async fetchFeedItemsByIds(

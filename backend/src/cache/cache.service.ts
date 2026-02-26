@@ -40,18 +40,23 @@ export const CacheKeys = {
   FEED_UNIFIED: (
     filter: string,
     sort: string,
+    period: string,
     options: { cursor?: string | null; limit?: number } = {},
   ) => {
     const limit = options.limit ?? 20;
     const cursorToken = options.cursor
       ? createHash("md5").update(options.cursor).digest("hex").substring(0, 8)
       : "first";
-    return `feed:unified:${filter}:${sort}:limit:${limit}:cursor:${cursorToken}`;
+    return `feed:unified:${filter}:${sort}:period:${period}:limit:${limit}:cursor:${cursorToken}`;
   },
   FEED_EDITOR_PICKS: (limit?: number) =>
     limit ? `feed:editor-picks:v2:limit:${limit}` : "feed:editor-picks:v2",
   FEED_POPULAR: (period: "daily" | "weekly" | "monthly", limit?: number) =>
     limit ? `feed:popular:${period}:limit:${limit}` : `feed:popular:${period}`,
+  POPULAR_V2: (
+    source: "blog" | "community",
+    period: "daily" | "weekly" | "monthly",
+  ) => `popular:v2:${source}:${period}`,
   FEED_SEARCH: (query: string, page: number = 1) => {
     const hash = createHash("md5").update(query).digest("hex").substring(0, 8);
     return `feed:search:${hash}:page:${page}`;

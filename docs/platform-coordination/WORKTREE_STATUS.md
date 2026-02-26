@@ -41,3 +41,5 @@ Notes:
 | `my-blog-app-integ/frontend/.env.local` | standalone file (not symlink) | exception | decide: symlink to canonical source, or maintain manual sync and keep this exception documented |
 | `my-blog-app-integ/.env.production*` | not present in worktree | by design | manage in canonical source (`/Users/sihyungpark/Desktop/code/my-blog-app`) |
 | `mcp-proxy-server/OPENAI_APP_ENABLED` | 신규 feature flag (`false` 기본) | pending sync | affected env files/docs에 동일 키 반영 및 stage/prod 값 확정 필요 |
+| `backend/FEED_HOT_PERIOD_TTL_SECONDS` | 신규 feed 기간별 HOT/TOP TTL override (기본 `600`) | synced | canonical `.env.local/.env.production` 반영 완료. 배포 런타임 값만 확인 |
+| `backend/DISABLE_FEED_PERIOD_WARMING` | 신규 feed period 워밍 토글 (`true`로 운영 비활성) | synced | canonical `.env.local/.env.production` 반영 완료. 배포 런타임 값만 확인 |
