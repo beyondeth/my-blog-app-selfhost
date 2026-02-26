@@ -6,7 +6,7 @@ import Image from "next/image";
 import { useQuery } from "@tanstack/react-query";
 import { Flame } from "lucide-react";
 import SidebarSection from "./SidebarSection";
-import { getUnifiedFeed } from "@/services/api/feed.service";
+import { getPopularCommunityPosts } from "@/services/api/popular.service";
 
 type Period = "daily" | "weekly" | "monthly";
 
@@ -46,13 +46,7 @@ const TrendingCommunityPostsSection = React.memo(function TrendingCommunityPosts
   const [period, setPeriod] = useState<Period>("weekly");
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["trending-community-posts", period],
-    queryFn: () =>
-      getUnifiedFeed({
-        filter: "community",
-        sort: "hot",
-        limit: 5,
-        period: period,
-      }),
+    queryFn: () => getPopularCommunityPosts(period, 5),
     staleTime: 2 * 60 * 1000,
   });
 
