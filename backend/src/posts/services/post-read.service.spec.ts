@@ -148,4 +148,60 @@ describe("PostReadService", () => {
     expect(postsReadRepository.findByIdWithRelations).not.toHaveBeenCalled();
     expect(result.id).toBe("post-9");
   });
+
+  it("applies popular sort to cursor query when sort is popular", async () => {
+    const { service, postsReadRepository } = createService();
+    const queryBuilder = {
+      addSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+
+    postsReadRepository.getCursorPaginatedQueryBuilder.mockReturnValue(
+      queryBuilder,
+    );
+
+    const result = await service.getPostsCursor({
+      sort: "popular",
+      limit: 20,
+    } as any);
+
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith("post.likeCount", "DESC");
+    expect(queryBuilder.limit).toHaveBeenCalledWith(21);
+    expect(result.posts).toEqual([]);
+    expect(result.hasMore).toBe(false);
+    expect(result.count).toBe(0);
+  });
+
+  it("orders by search rank when searching with recent sort", async () => {
+    const { service, postsReadRepository } = createService();
+    const queryBuilder = {
+      addSelect: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      limit: jest.fn().mockReturnThis(),
+      getMany: jest.fn().mockResolvedValue([]),
+    };
+
+    postsReadRepository.getCursorPaginatedQueryBuilder.mockReturnValue(
+      queryBuilder,
+    );
+
+    await service.getPostsCursor({
+      sortBy: "recent",
+      search: "react hooks",
+      limit: 20,
+    } as any);
+
+    expect(queryBuilder.addSelect).toHaveBeenCalled();
+    expect(queryBuilder.orderBy).toHaveBeenCalledWith("search_rank", "DESC");
+    expect(queryBuilder.addOrderBy).toHaveBeenCalledWith(
+      "post.publishedAt",
+      "DESC",
+    );
+  });
 });

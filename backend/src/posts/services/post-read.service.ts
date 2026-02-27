@@ -261,46 +261,55 @@ export class PostReadService {
    * @param user 사용자 정보 (인증 상태 확인용)
    * @returns 포스트 상세 정보
    */
-  async findBySlug(slug: string, user?: User): Promise<any> {
-    this.logger.log(`[findBySlug] Looking up slug: ${slug}`);
+  async findBySlug(
+    slug: string,
+    user?: User,
+    options?: { bypassCache?: boolean },
+  ): Promise<any> {
+    const shouldBypassCache = options?.bypassCache === true;
+    this.logger.log(
+      `[findBySlug] Looking up slug: ${slug}${shouldBypassCache ? " (bypass-cache)" : ""}`,
+    );
 
     const cacheKey = CacheKeys.POST_BY_SLUG(slug);
     const lockKey = `post:detail:lock:slug:${slug}`;
     let lockAcquired = false;
 
-    const cachedSlugEntry = await this.cacheService.get<any>(cacheKey);
-    if (cachedSlugEntry) {
-      if (typeof cachedSlugEntry === "string") {
-        const cachedById = await this.cacheService.get<any>(
-          CacheKeys.POST_CORE(cachedSlugEntry),
-        );
-        if (cachedById) {
-          return this.applyInteractionToDto(cachedById, user);
-        }
-      } else if (cachedSlugEntry?.id) {
-        // 이전 버전 호환: slug 키에 DTO가 저장되어 있던 경우
-        return this.applyInteractionToDto(cachedSlugEntry, user);
-      }
-    }
-
-    lockAcquired = await this.cacheService.acquireLock(
-      lockKey,
-      this.detailLockTtlSeconds,
-    );
-
-    if (!lockAcquired) {
-      await this.cacheService.waitForLock(lockKey, this.detailLockWaitMs);
-      const waitedSlugEntry = await this.cacheService.get<any>(cacheKey);
-      if (waitedSlugEntry) {
-        if (typeof waitedSlugEntry === "string") {
-          const waitedById = await this.cacheService.get<any>(
-            CacheKeys.POST_CORE(waitedSlugEntry),
+    if (!shouldBypassCache) {
+      const cachedSlugEntry = await this.cacheService.get<any>(cacheKey);
+      if (cachedSlugEntry) {
+        if (typeof cachedSlugEntry === "string") {
+          const cachedById = await this.cacheService.get<any>(
+            CacheKeys.POST_CORE(cachedSlugEntry),
           );
-          if (waitedById) {
-            return this.applyInteractionToDto(waitedById, user);
+          if (cachedById) {
+            return this.applyInteractionToDto(cachedById, user);
           }
-        } else if (waitedSlugEntry?.id) {
-          return this.applyInteractionToDto(waitedSlugEntry, user);
+        } else if (cachedSlugEntry?.id) {
+          // 이전 버전 호환: slug 키에 DTO가 저장되어 있던 경우
+          return this.applyInteractionToDto(cachedSlugEntry, user);
+        }
+      }
+
+      lockAcquired = await this.cacheService.acquireLock(
+        lockKey,
+        this.detailLockTtlSeconds,
+      );
+
+      if (!lockAcquired) {
+        await this.cacheService.waitForLock(lockKey, this.detailLockWaitMs);
+        const waitedSlugEntry = await this.cacheService.get<any>(cacheKey);
+        if (waitedSlugEntry) {
+          if (typeof waitedSlugEntry === "string") {
+            const waitedById = await this.cacheService.get<any>(
+              CacheKeys.POST_CORE(waitedSlugEntry),
+            );
+            if (waitedById) {
+              return this.applyInteractionToDto(waitedById, user);
+            }
+          } else if (waitedSlugEntry?.id) {
+            return this.applyInteractionToDto(waitedSlugEntry, user);
+          }
         }
       }
     }
@@ -329,7 +338,7 @@ export class PostReadService {
 
       const baseDto = await this.toBaseDetailDto(post);
 
-      if (post.isPublished) {
+      if (!shouldBypassCache && post.isPublished) {
         await this.cachePublishedDetail(post, baseDto);
       }
 
@@ -418,6 +427,135 @@ export class PostReadService {
         user,
         ReadPolicy.Replica,
       );
+
+    if (dto.search) {
+      const sanitizedSearch = this.sanitizeSearchTerm(dto.search);
+      if (!sanitizedSearch) {
+        throw new BadRequestException(
+          "검색어에 허용되지 않는 문자가 포함되어 있습니다.",
+        );
+      }
+
+      const hasMultipleTerms = sanitizedSearch.includes(" ");
+      const tsQueryInput = hasMultipleTerms
+        ? sanitizedSearch.split(" ").join(" & ")
+        : sanitizedSearch;
+
+      try {
+        if (hasMultipleTerms) {
+          queryBuilder
+            .addSelect(
+              `ts_rank(post.search_vector, to_tsquery('simple', :searchQuery))`,
+              "search_rank",
+            )
+            .andWhere(
+              `post.search_vector @@ to_tsquery('simple', :searchQuery)`,
+              { searchQuery: tsQueryInput },
+            );
+        } else {
+          queryBuilder
+            .addSelect(
+              `ts_rank(post.search_vector, plainto_tsquery('simple', :searchQuery))`,
+              "search_rank",
+            )
+            .andWhere(
+              `post.search_vector @@ plainto_tsquery('simple', :searchQuery)`,
+              { searchQuery: tsQueryInput },
+            );
+        }
+      } catch (error) {
+        this.logger.warn(
+          `[Search] Full-text search failed, falling back to ILIKE: ${error instanceof Error ? error.message : String(error)}`,
+        );
+        queryBuilder.andWhere(
+          `EXISTS (SELECT 1 FROM jsonb_array_elements_text(post.tags) as tag WHERE tag ILIKE :searchTerm)`,
+          { searchTerm: `%${sanitizedSearch}%` },
+        );
+      }
+    }
+
+    const effectiveSortBy: NonNullable<GetPostsCursorDto["sortBy"]> = (() => {
+      if (dto.sort && (!dto.sortBy || dto.sortBy === "recent")) {
+        switch (dto.sort) {
+          case "popular":
+            return "likes";
+          case "trending":
+            return "views";
+          default:
+            return "recent";
+        }
+      }
+
+      if (!dto.sortBy) {
+        return "recent";
+      }
+
+      if (dto.sortBy === "popular") {
+        return "likes";
+      }
+
+      if (dto.sortBy === "trending") {
+        return "views";
+      }
+
+      return dto.sortBy;
+    })();
+    const sortOrder = dto.sortOrder || "DESC";
+
+    switch (effectiveSortBy) {
+      case "recent":
+        if (dto.search) {
+          queryBuilder
+            .orderBy("search_rank", "DESC")
+            .addOrderBy("post.publishedAt", "DESC");
+        } else {
+          queryBuilder.orderBy("post.publishedAt", "DESC");
+        }
+        break;
+      case "published":
+        queryBuilder.orderBy("post.publishedAt", sortOrder);
+        break;
+      case "views":
+        queryBuilder.orderBy("post.viewCount", sortOrder);
+        break;
+      case "likes":
+        queryBuilder.orderBy("post.likeCount", sortOrder);
+        break;
+      case "comments":
+        queryBuilder.orderBy("post.commentCount", sortOrder);
+        break;
+      case "title":
+        queryBuilder.orderBy("post.title", sortOrder === "ASC" ? "ASC" : "DESC");
+        break;
+      case "editorPicks":
+        queryBuilder
+          .orderBy("post.isEditorPick", "DESC")
+          .addOrderBy("post.publishedAt", "DESC");
+        break;
+      default:
+        queryBuilder.orderBy("post.publishedAt", "DESC");
+    }
+
+    if (dto.cursor) {
+      const cursorDirection = sortOrder === "ASC" ? ">" : "<";
+      if (dto.search) {
+        queryBuilder.andWhere(
+          `(search_rank, post.publishedAt) ${cursorDirection} (:searchRank, :cursor)`,
+          {
+            searchRank: dto.cursorRank || 0,
+            cursor: dto.cursor,
+          },
+        );
+      } else {
+        const sortField =
+          effectiveSortBy === "editorPicks"
+            ? "post.isEditorPick"
+            : "post.publishedAt";
+        queryBuilder.andWhere(`${sortField} ${cursorDirection} :cursor`, {
+          cursor: dto.cursor,
+        });
+      }
+    }
 
     // 결과 수 제한
     const limit = Math.min(dto.limit || 20, 100);

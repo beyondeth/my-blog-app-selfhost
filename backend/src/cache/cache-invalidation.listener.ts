@@ -37,21 +37,29 @@ export class CacheInvalidationListener {
     ],
     { async: true },
   )
-  async handlePostChange(payload: { postId: string; blogSlug?: string }) {
+  async handlePostChange(payload: {
+    postId: string;
+    blogSlug?: string;
+    blogId?: string;
+  }) {
     this.logger.debug(
       `🔄 [Post Change] Invalidating cache for: ${payload.postId}`,
     );
 
-    const patterns: string[] = [
+    const patterns = Array.from(new Set<string>([
       // 개별 포스트 캐시
       `post:${payload.postId}`,
+      `post:core:${payload.postId}`,
+      `post:${payload.postId}:*`,
+      `post:core:${payload.postId}:*`,
       // 홈 피드 (전체)
       "feed:home:page:*",
       // 통합 피드 캐시
       "feed:unified:*",
       // 블로그 피드 (해당 블로그 전체)
       ...(payload.blogSlug ? [`feed:blog:${payload.blogSlug}:page:*`] : []),
-    ];
+      ...(payload.blogId ? [`feed:blog:${payload.blogId}:page:*`] : []),
+    ]));
 
     await this.invalidatePatterns(patterns);
   }

@@ -80,12 +80,19 @@ export class PostsReadRepository {
       parameters.isDeleted = false;
     }
 
+    const normalizedBlogIdentifier = dto.blogSlug?.startsWith("@")
+      ? dto.blogSlug.slice(1)
+      : dto.blogSlug;
+
     if (dto.blogId) {
       whereConditions.push("blog.id = :blogId");
       parameters.blogId = dto.blogId;
-    } else if (dto.blogSlug) {
-      whereConditions.push("blog.slug = :blogSlug");
-      parameters.blogSlug = dto.blogSlug;
+    } else if (normalizedBlogIdentifier) {
+      // blogSlug 파라미터는 slug/alias 둘 다 허용한다.
+      whereConditions.push(
+        "(blog.slug = :blogIdentifier OR blog.alias = :blogIdentifier)",
+      );
+      parameters.blogIdentifier = normalizedBlogIdentifier;
     }
 
     if (dto.category) {
