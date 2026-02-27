@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useQuery } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
@@ -38,6 +38,7 @@ export default function LeftSidebar() {
   const { user } = useAuth();
   const { isOpen } = useSidebarStore();
   const pathname = usePathname();
+  const router = useRouter();
   const { openModal: openDMModal } = useDMModal();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -173,8 +174,9 @@ export default function LeftSidebar() {
               href="/new-story"
               prefetch={true}
               onMouseEnter={() => {
-                // 에디터 모듈 사전 로드
-                import('@/editor').catch(() => {});
+                // 전역 스타일 사이드이펙트를 막기 위해 에디터 모듈 직접 import는 피하고,
+                // 라우트 prefetch만 수행한다.
+                router.prefetch('/new-story');
               }}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
                 pathname === '/new-story' || pathname?.startsWith('/edit/')
