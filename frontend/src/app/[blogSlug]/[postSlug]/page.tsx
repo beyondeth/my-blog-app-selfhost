@@ -36,19 +36,25 @@ interface Post {
 
 // 포스트 데이터 가져오기 (서버 컴포넌트용)
 // cache로 감싸서 동일한 렌더링 사이클 내 중복 호출 방지
-const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post | null> => {
+const getPost = cache(
+  async (
+    blogSlug: string,
+    postSlug: string,
+    options?: { fresh?: boolean },
+  ): Promise<Post | null> => {
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
+    const requestPath = options?.fresh
+      ? `${apiUrl}/posts/slug/${postSlug}?fresh=1`
+      : `${apiUrl}/posts/slug/${postSlug}`;
     const response = await fetch(
-      `${apiUrl}/posts/slug/${postSlug}`,
+      requestPath,
       {
-        // 서버 컴포넌트에서는 revalidate 옵션 사용
-        next: { revalidate: 60 }, // 60초마다 재검증 (캐시 사용으로 성능 향상)
+        // 수정 직후 상세 페이지 stale 노출 방지를 위해 항상 최신 데이터를 가져온다.
+        cache: 'no-store',
         headers: {
           'Content-Type': 'application/json',
         },
-        // 서버 사이드에서도 쿠키를 포함해야 인증된 사용자의 포스트에 접근 가능
-        // cache: 'no-store' 제거 - revalidate과 함께 사용할 수 없음
       }
     );
 
@@ -71,7 +77,8 @@ const getPost = cache(async (blogSlug: string, postSlug: string): Promise<Post |
     console.error('Error fetching post for metadata:', error);
     return null;
   }
-});
+  },
+);
 
 // 동적 메타데이터 생성 함수
 export async function generateMetadata(
@@ -272,14 +279,20 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
 // 서버 컴포넌트 페이지
 export default async function BlogPostDetailPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ blogSlug: string; postSlug: string }>;
+  searchParams: Promise<{ fresh?: string; t?: string }>;
 }) {
   // Next.js 16: params는 Promise
   const { blogSlug, postSlug } = await params;
+  const resolvedSearchParams = await searchParams;
+  const forceFresh =
+    resolvedSearchParams.fresh === '1' ||
+    resolvedSearchParams.fresh === 'true';
 
   // 포스트 데이터 미리 가져오기 (404 체크용)
-  const post = await getPost(blogSlug, postSlug);
+  const post = await getPost(blogSlug, postSlug, { fresh: forceFresh });
 
   // 포스트가 없으면 404 페이지로
   if (!post) {

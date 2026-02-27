@@ -7,6 +7,7 @@ import {
   FeedSortType,
   UnifiedFeedResponse,
 } from '@/services/api/feed.service';
+import { filterClientDeletedFeedItems } from './clientDeletedPostIds';
 
 /**
  * useUnifiedFeed 훅 옵션
@@ -44,13 +45,21 @@ export function useUnifiedFeed(options: UseUnifiedFeedOptions = {}) {
 
   return useInfiniteQuery<UnifiedFeedResponse>({
     queryKey: ['unified-feed', filter, sort, limit],
-    queryFn: async ({ pageParam }) => {
-      return getUnifiedFeed({
+    queryFn: async ({ pageParam, signal }) => {
+      const response = await getUnifiedFeed(
+        {
         cursor: pageParam as string | undefined,
         limit,
         filter,
         sort,
-      });
+        },
+        { signal },
+      );
+
+      return {
+        ...response,
+        items: filterClientDeletedFeedItems(response.items),
+      };
     },
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (lastPage) => {
@@ -59,7 +68,9 @@ export function useUnifiedFeed(options: UseUnifiedFeedOptions = {}) {
       return lastPage.nextCursor ?? undefined;
     },
     enabled,
-    staleTime: 30 * 1000, // 30초
+    // 홈 복귀 시 오래된 hydration 데이터에 묶이지 않도록 즉시 재검증한다.
+    refetchOnMount: 'always',
+    staleTime: 10 * 1000, // 10초
     gcTime: 5 * 60 * 1000, // 5분
   });
 }

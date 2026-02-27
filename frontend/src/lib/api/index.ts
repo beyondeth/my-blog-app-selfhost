@@ -68,7 +68,9 @@ export class ExtendedApiClient extends ApiClient {
   // Posts API - 레거시 메서드
   async getPosts(params?: any) { return this.posts.getPosts(params); }
   async getPost(id: string) { return this.posts.getPost(id); }
-  async getPostBySlug(slug: string) { return this.posts.getPostBySlug(slug); }
+  async getPostBySlug(slug: string, options?: { fresh?: boolean }) {
+    return this.posts.getPostBySlug(slug, options);
+  }
   async createPost(data: any) { return this.posts.createPost(data); }
   async updatePost(id: string, data: any) { return this.posts.updatePost(id, data); }
   async deletePost(id: string) { return this.posts.deletePost(id); }
@@ -219,7 +221,8 @@ export const logout = () => apiClient.logout();
 export const getProfile = () => apiClient.getProfile();
 export const getPosts = (params?: any) => apiClient.getPosts(params);
 export const getPost = (id: string) => apiClient.getPost(id);
-export const getPostBySlug = (slug: string) => apiClient.getPostBySlug(slug);
+export const getPostBySlug = (slug: string, options?: { fresh?: boolean }) =>
+  apiClient.getPostBySlug(slug, options);
 export const createPost = (data: any) => apiClient.createPost(data);
 export const updatePost = (id: string, data: any) => apiClient.updatePost(id, data);
 export const deletePost = (id: string) => apiClient.deletePost(id);
@@ -253,7 +256,8 @@ export const postsAPI = {
   getPosts: (params?: any) => apiClient.getPosts(params),
   getPostsCursor: (params?: any) => apiClient.posts.getPostsCursor(params),
   getPost: (id: string) => apiClient.getPost(id),
-  getPostBySlug: (slug: string) => apiClient.getPostBySlug(slug),
+  getPostBySlug: (slug: string, options?: { fresh?: boolean }) =>
+    apiClient.getPostBySlug(slug, options),
   createPost: (data: any) => apiClient.createPost(data),
   updatePost: (id: string, data: any) => apiClient.updatePost(id, data),
   deletePost: (id: string) => apiClient.deletePost(id),

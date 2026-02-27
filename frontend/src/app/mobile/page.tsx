@@ -2,7 +2,7 @@ import { HydrationBoundary, QueryClient, dehydrate } from '@tanstack/react-query
 import { getUnifiedFeed, getEditorPicks } from '@/services/api/feed.service';
 import HomePageClient from '@/components/home/HomePageClient';
 
-export const revalidate = 60; // ISR 60 seconds
+export const revalidate = 10; // ISR 10 seconds
 
 export default async function MobileHomePage() {
 

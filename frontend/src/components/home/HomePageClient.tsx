@@ -29,6 +29,7 @@ import SidebarFooter from '@/components/home/SidebarFooter';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useDeletePost } from '@/hooks/usePosts';
 import { feedQueryKeys } from '@/hooks/feed/useUnifiedFeed';
+import { filterClientDeletedFeedItems } from '@/hooks/feed/clientDeletedPostIds';
 import { EditorPickCard } from '@/components/home/EditorPickCard';
 
 // 사이드바 컴포넌트 lazy loading (초기 로딩 최적화)
@@ -178,7 +179,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
         }
       });
     });
-    return Array.from(itemsMap.values());
+    return filterClientDeletedFeedItems(Array.from(itemsMap.values()));
   }, [data?.pages]);
 
   const filteredItems = useMemo(() => {
