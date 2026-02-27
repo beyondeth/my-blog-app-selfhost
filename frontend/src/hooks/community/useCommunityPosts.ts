@@ -105,6 +105,12 @@ export function useCreateCommunityPost(communitySlug: string) {
       queryClient.invalidateQueries({
         queryKey: ['community', communitySlug],
       });
+
+      // 홈 통합 피드 즉시 stale + active refetch (작성 직후 반영)
+      queryClient.invalidateQueries({
+        queryKey: feedQueryKeys.all,
+        refetchType: 'active',
+      });
     },
   });
 }
@@ -190,6 +196,12 @@ export function useDeleteCommunityPost(communitySlug: string) {
           };
         }
       );
+
+      // 서버와 즉시 동기화 (현재 화면 active query 재검증)
+      queryClient.invalidateQueries({
+        queryKey: feedQueryKeys.all,
+        refetchType: 'active',
+      });
     },
   });
 }

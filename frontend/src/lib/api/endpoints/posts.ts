@@ -87,12 +87,17 @@ export class PostsAPI {
    * @returns 포스트 상세 정보
    * @description UUID인 경우 /posts/:id, 슬러그인 경우 /posts/slug/:slug 엔드포인트 사용
    */
-  async getPostBySlug(slugOrId: string): Promise<Post> {
+  async getPostBySlug(
+    slugOrId: string,
+    options?: { fresh?: boolean },
+  ): Promise<Post> {
+    const queryString = options?.fresh ? "?fresh=1" : "";
+
     // UUID 검증: UUID면 ID 엔드포인트, 아니면 slug 엔드포인트 사용
     if (isUUID(slugOrId)) {
-      return this.client.get<Post>(`/posts/${slugOrId}`);
+      return this.client.get<Post>(`/posts/${slugOrId}${queryString}`);
     }
-    return this.client.get<Post>(`/posts/slug/${slugOrId}`);
+    return this.client.get<Post>(`/posts/slug/${slugOrId}${queryString}`);
   }
 
   /**

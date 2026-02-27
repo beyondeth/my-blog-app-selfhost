@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { FiBarChart2 } from "react-icons/fi";
 import { usePopularPosts } from "@/hooks/usePopularPosts";
+import { normalizeImageUrl } from "@/utils/imageUtils";
 import SidebarSection from "./SidebarSection";
 
 const AuthorAvatar = ({
@@ -14,10 +15,12 @@ const AuthorAvatar = ({
   src?: string | null;
   label?: string | null;
 }) => {
-  if (src) {
+  const normalizedSrc = src ? normalizeImageUrl(src) : "";
+
+  if (normalizedSrc) {
     return (
       <Image
-        src={src}
+        src={normalizedSrc}
         alt={label ?? "작성자"}
         width={32}
         height={32}

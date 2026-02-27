@@ -112,7 +112,9 @@ export function useUpdatePost() {
         router.push('/drafts');
       } else if (updatedPost.blog?.slug) {
         // 발행 상태이면 상세 페이지로 이동 (새 URL 구조)
-        router.push(`/${updatedPost.blog.slug}/${updatedPost.slug || updatedPost.id}`);
+        router.push(
+          `/${updatedPost.blog.slug}/${updatedPost.slug || updatedPost.id}?fresh=1&t=${Date.now()}`,
+        );
       } else {
         // blog 없으면 홈으로 (발생 안 함)
         router.push('/');

@@ -122,6 +122,8 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
 
   const postSlug = params.postSlug as string;
+  const forceFresh =
+    searchParams.get('fresh') === '1' || searchParams.get('fresh') === 'true';
 
   // 블로그 정보 가져오기 (alias 리다이렉트 확인용)
   const { data: blog } = useBlogBySlug(blogSlug);
@@ -148,6 +150,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   const { data: post, error, isError, refetch } = usePost(postSlug, {
     initialData: initialPost,
     refetchOnMount: 'always',
+    fresh: forceFresh,
   });
   const deletePostMutation = useDeletePost();
   // 투표 뮤테이션 (업보트/다운보트)

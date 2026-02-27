@@ -12,7 +12,7 @@ export enum CacheTTL {
 
   // 온 데이터 (중간 가치)
   SHORT = 30, // 30초 - 실시간 데이터
-  HOME_FEED = 120, // 홈 피드 (2분, 워밍/재계산 부하 완화)
+  HOME_FEED = 30, // 홈 피드 (30초, 즉시성/부하 균형)
   MEDIUM = 150, // 2분 30초 - 블로그/커뮤니티 정보 등 중간 가치 데이터
 
   // 콜드 데이터 (낮은 가치)
@@ -409,15 +409,25 @@ export class CacheService implements OnModuleInit {
    * 포스트 관련 캐시 무효화
    */
   async invalidatePostCache(postId: string, blogSlug?: string): Promise<void> {
-    // 특정 포스트 캐시 삭제
-    await this.del(CacheKeys.POST_DETAIL(postId));
+    // 특정 포스트 상세 캐시 삭제 (legacy + core 키 모두 정리)
+    await Promise.all([
+      this.del(CacheKeys.POST_DETAIL(postId)),
+      this.del(CacheKeys.POST_CORE(postId)),
+      this.deletePattern(`post:${postId}:*`),
+      this.deletePattern(`post:core:${postId}:*`),
+    ]);
 
     // 포스트 목록 캐시 무효화
     if (blogSlug) {
       await this.deletePattern(`posts:list:*:*:${blogSlug}`);
+      await this.deletePattern(`feed:blog:${blogSlug}:page:*`);
     } else {
       await this.deletePattern("posts:list:*");
     }
+
+    // 홈/통합 피드 캐시 무효화
+    await this.deletePattern("feed:home:page:*");
+    await this.deletePattern("feed:unified:*");
 
     // 통계 캐시 무효화
     await this.deletePattern("stats:*");

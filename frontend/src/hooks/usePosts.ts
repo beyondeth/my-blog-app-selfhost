@@ -9,7 +9,13 @@ import { useRouter } from 'next/navigation'; // useRouter 훅 추가
 import { getPostUrl } from '@/lib/utils/blogUrl';
 import type { GetPostsCursorParams } from '@/lib/api/endpoints/posts';
 import { feedQueryKeys } from '@/hooks/feed/useUnifiedFeed';
+import {
+  markClientDeletedPost,
+  unmarkClientDeletedPost,
+} from '@/hooks/feed/clientDeletedPostIds';
 import type { UnifiedFeedResponse } from '@/services/api/feed.service';
+
+const inFlightDeletePostIds = new Set<string>();
 
 // Query 키 팩토리 패턴 (표준화)
 export const postQueryKeys = {
@@ -90,6 +96,7 @@ interface UsePostOptions {
   initialData?: any; // Post 타입으로 나중에 변경 가능
   enabled?: boolean;
   refetchOnMount?: boolean | 'always';
+  fresh?: boolean;
 }
 
 export function usePost(
@@ -100,7 +107,7 @@ export function usePost(
 
   return useQuery({
     queryKey: postQueryKeys.detail(slugOrId),
-    queryFn: () => postsAPI.getPostBySlug(slugOrId),
+    queryFn: () => postsAPI.getPostBySlug(slugOrId, { fresh: options?.fresh }),
     enabled: options?.enabled ?? !!slugOrId,
     ...commonQueryOptions,
     initialData: options?.initialData,
@@ -138,6 +145,12 @@ export function useCreatePost() {
         refetchType: 'active'
       });
 
+      // 1-0. 홈 통합 피드 즉시 stale + active refetch (작성 직후 홈 반영)
+      queryClient.invalidateQueries({
+        queryKey: feedQueryKeys.all,
+        refetchType: 'active',
+      });
+
       // 1-1. 작성자 블로그 캐시 즉시 무효화
       if (newPost.blog?.slug) {
         queryClient.invalidateQueries({
@@ -153,6 +166,13 @@ export function useCreatePost() {
           exact: false
         });
       }, 100); // 100ms 후 추가 refetch (DB 트랜잭 보장)
+
+      setTimeout(() => {
+        queryClient.refetchQueries({
+          queryKey: feedQueryKeys.all,
+          type: 'active',
+        });
+      }, 100);
 
       // 2. 무한 스크롤 쿼리의 첫 번째 페이지에 새 게시글 추가 (낙관적 업데이트)
       queryClient.setQueriesData(
@@ -233,25 +253,66 @@ export function useUpdatePost() {
         }
       );
 
-      // 4. Active 쿼리들 즉시 refetch (최신 데이터 보장)
+      // 4. 통합 피드에서도 수정된 내용을 즉시 반영
+      queryClient.setQueriesData(
+        { queryKey: feedQueryKeys.all },
+        (oldData: InfiniteData<UnifiedFeedResponse> | undefined) => {
+          if (!oldData?.pages) return oldData;
+
+          return {
+            ...oldData,
+            pages: oldData.pages.map((page) => ({
+              ...page,
+              items: page.items.map((item) => {
+                if (item.sourceType !== 'blog' || item.id !== updatedPost.id) {
+                  return item;
+                }
+
+                return {
+                  ...item,
+                  title: updatedPost.title ?? item.title,
+                  slug: updatedPost.slug ?? item.slug,
+                  excerpt: updatedPost.excerpt ?? item.excerpt,
+                  tags: updatedPost.tags ?? item.tags,
+                  thumbnail: updatedPost.thumbnail ?? item.thumbnail,
+                  updatedAt: updatedPost.updatedAt ?? item.updatedAt,
+                  likeCount: updatedPost.likeCount ?? item.likeCount,
+                  upvoteCount: updatedPost.upvoteCount ?? item.upvoteCount,
+                  downvoteCount: updatedPost.downvoteCount ?? item.downvoteCount,
+                  score: updatedPost.score ?? item.score,
+                  commentCount: updatedPost.commentCount ?? item.commentCount,
+                  viewCount: updatedPost.viewCount ?? item.viewCount,
+                };
+              }),
+            })),
+          };
+        }
+      );
+
+      // 5. Active 쿼리들 즉시 refetch (최신 데이터 보장)
       queryClient.refetchQueries({
         queryKey: postQueryKeys.lists(),
         type: 'active',
       });
 
-      // 5. Inactive 쿼리들은 stale로 표시 (사용자가 돌아갈 때 자동 refetch)
+      queryClient.invalidateQueries({
+        queryKey: feedQueryKeys.all,
+        refetchType: 'active',
+      });
+
+      // 6. Inactive 쿼리들은 stale로 표시 (사용자가 돌아갈 때 자동 refetch)
       queryClient.invalidateQueries({
         queryKey: postQueryKeys.lists(),
         refetchType: 'none',
       });
 
-      // 6. 인기포스트 캐시 무효화 (포스트 수정 시 인기포스트도 업데이트 필요)
+      // 7. 인기포스트 캐시 무효화 (포스트 수정 시 인기포스트도 업데이트 필요)
       queryClient.invalidateQueries({
         queryKey: ['popular-posts'],
         refetchType: 'none', // stale만 마킹, 사용자가 다시 볼 때 자동 refetch
       });
 
-      // 7. 블로그 관련 캐시도 무효화
+      // 8. 블로그 관련 캐시도 무효화
       if (updatedPost.blog?.slug) {
         queryClient.invalidateQueries({ queryKey: ['blog', updatedPost.blog.slug] });
         queryClient.invalidateQueries({
@@ -270,14 +331,26 @@ export function useDeletePost() {
 
   const mutation = useMutation({
     // mutationFn: 하위 호환성을 위해 string | { postId, blogSlug? } 모두 지원
-    mutationFn: (variables: string | { postId: string; blogSlug?: string }) => {
+    mutationFn: async (variables: string | { postId: string; blogSlug?: string }) => {
       const postId = typeof variables === 'string' ? variables : variables.postId;
-      return postsAPI.deletePost(postId);
+      if (inFlightDeletePostIds.has(postId)) {
+        return;
+      }
+
+      inFlightDeletePostIds.add(postId);
+      try {
+        await postsAPI.deletePost(postId);
+      } finally {
+        inFlightDeletePostIds.delete(postId);
+      }
     },
     onMutate: async (variables) => {
       // 파라미터에서 postId와 blogSlug 추출
       const deletedId = typeof variables === 'string' ? variables : variables.postId;
       let blogSlug = typeof variables === 'string' ? undefined : variables.blogSlug;
+
+      // 삭제 진행 중/성공 직후에는 stale 응답으로 재등장하지 않도록 tombstone 처리
+      markClientDeletedPost(deletedId);
 
       // 1. 진행 중인 리페치 취소 (Race condition 방지)
       await queryClient.cancelQueries({ queryKey: postQueryKeys.lists() });
@@ -373,6 +446,9 @@ export function useDeletePost() {
   React.useEffect(() => {
     if (mutation.isError && mutation.error && mutation.variables) {
       const variables = mutation.variables;
+      const deletedId = typeof variables === 'string' ? variables : variables.postId;
+      // 삭제 실패 시에는 다시 보이도록 tombstone 해제
+      unmarkClientDeletedPost(deletedId);
       const context = mutation.context as { previousPost?: Post; blogSlug?: string; previousLists?: Array<[any, any]>; previousFeed?: Array<[any, any]> };
 
       // 롤백: 이전 데이터로 복구
@@ -388,7 +464,6 @@ export function useDeletePost() {
       }
 
       // 상세 캐시 복구
-      const deletedId = typeof variables === 'string' ? variables : variables.postId;
       if (context?.previousPost) {
         queryClient.setQueryData(
           postQueryKeys.detail(deletedId),
@@ -401,9 +476,9 @@ export function useDeletePost() {
   // 성공 처리
   React.useEffect(() => {
     if (mutation.isSuccess) {
-      // 서버 동기화: stale 마킹하여 다음 접근 시 최신 데이터 가져오기
-      // refetchType: 'none' - 즉시 refetch 안함 (낙관적 업데이트 유지)
-      // 모든 list 캐시를 stale로 마킹 (홈, 블로그, 검색 등)
+      // 서버 동기화: 즉시 재요청 대신 stale 마킹 후 지연 재검증
+      // 삭제 직후에는 백엔드 이벤트 기반 캐시 무효화가 전파 중일 수 있어
+      // 즉시 refetch하면 stale payload가 다시 화면에 나타날 수 있다.
       queryClient.invalidateQueries({
         queryKey: postQueryKeys.lists(),
         refetchType: 'none'

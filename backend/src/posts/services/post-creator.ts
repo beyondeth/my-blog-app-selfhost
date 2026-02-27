@@ -18,6 +18,7 @@ import {
   PostLifecycleEvents,
   PostLifecyclePayload,
 } from "../events/post-lifecycle.events";
+import { CacheService } from "../../cache/cache.service";
 
 /**
  * 포스트 생성 전담 서비스
@@ -27,7 +28,9 @@ import {
  * - 파일 로드 및 연결
  * - 콘텐츠 처리 및 메타데이터 생성
  *
- * ⚠️ 캐시 무효화: CacheInvalidationListener가 PostLifecycleEvents 구독으로 전담 (단일 경로 정책)
+ * ⚠️ 캐시 무효화:
+ * 기본은 CacheInvalidationListener가 PostLifecycleEvents 구독으로 처리.
+ * 생성 직후 홈피드 지연을 줄이기 위해 발행 포스트는 응답 전에 핵심 캐시를 동기 정리한다.
  */
 @Injectable()
 export class PostCreator {
@@ -40,6 +43,7 @@ export class PostCreator {
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
     private readonly ipSecurityService: IpSecurityService,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -368,6 +372,24 @@ export class PostCreator {
         return postWithBlog || savedPost; // blog 관계 로드 실패 시 원본 post 반환
       },
     );
+
+    // 발행 포스트는 응답 전에 핵심 피드 캐시를 선제 무효화한다.
+    if (result.isPublished) {
+      try {
+        await this.cacheService.invalidatePostCache(result.id, result.blog?.slug);
+        if (result.blog?.id) {
+          await this.cacheService.deletePattern(
+            `feed:blog:${result.blog.id}:page:*`,
+          );
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[PostCreator] Synchronous cache invalidation failed: ${message}`,
+        );
+      }
+    }
 
     // 트랜잭션 커밋 성공 후 이벤트 발행 (best-effort)
     eventBuffer.flush(this.eventEmitter, this.logger);

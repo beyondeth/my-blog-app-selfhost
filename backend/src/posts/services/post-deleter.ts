@@ -19,6 +19,7 @@ import {
   PostLifecycleEvents,
   PostLifecyclePayload,
 } from "../events/post-lifecycle.events";
+import { CacheService } from "../../cache/cache.service";
 
 /**
  * 포스트 삭제/복원/발행 전담 서비스
@@ -39,6 +40,7 @@ export class PostDeleter {
     private readonly postsRepository: Repository<Post>,
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -49,6 +51,9 @@ export class PostDeleter {
    */
   async delete(id: string, user: User): Promise<void> {
     const eventBuffer = new TransactionEventBuffer();
+    let cacheInvalidationContext:
+      | { postId: string; blogSlug?: string; blogId?: string }
+      | undefined;
 
     await this.dataSource.transaction(async (manager: EntityManager) => {
       this.logger.log(`Deleting post: ${id} by user: ${user.id}`);
@@ -104,8 +109,36 @@ export class PostDeleter {
         wasEditorPick,
       } as PostLifecyclePayload);
 
+      cacheInvalidationContext = {
+        postId: id,
+        blogId: post.blogId,
+        blogSlug: post.blog?.slug,
+      };
+
       this.logger.log(`Post deleted successfully: ${id}`);
     });
+
+    // 삭제 API 응답 전에 핵심 캐시를 즉시 정리해서 홈 피드 재등장을 최소화
+    if (cacheInvalidationContext) {
+      try {
+        await this.cacheService.invalidatePostCache(
+          cacheInvalidationContext.postId,
+          cacheInvalidationContext.blogSlug,
+        );
+
+        if (cacheInvalidationContext.blogId) {
+          await this.cacheService.deletePattern(
+            `feed:blog:${cacheInvalidationContext.blogId}:page:*`,
+          );
+        }
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Failed to synchronously invalidate post cache after delete: ${message}`,
+        );
+      }
+    }
 
     // 트랜잭션 커밋 성공 후 이벤트 발행 (best-effort)
     eventBuffer.flush(this.eventEmitter, this.logger);

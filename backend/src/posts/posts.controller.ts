@@ -499,14 +499,21 @@ export class PostsController {
   @Public()
   @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "Slug로 게시글 조회" })
-  findBySlug(@Param("slug") slug: string, @Request() req: any) {
+  findBySlug(
+    @Param("slug") slug: string,
+    @Request() req: any,
+    @Query("fresh") fresh?: string,
+  ) {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
+    const shouldBypassCache = fresh === "1" || fresh === "true";
 
     // URL 파라미터 안전하게 디코딩 및 정제
     const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
 
-    return this.postsService.findBySlug(sanitizedSlug, user);
+    return this.postsService.findBySlug(sanitizedSlug, user, {
+      bypassCache: shouldBypassCache,
+    });
   }
 
   @Get("editor-picks/admin")
@@ -1017,15 +1024,19 @@ export class PostsController {
     @Param("blogId", ParseUUIDPipe) blogId: string,
     @Param("slug") slug: string,
     @Request() req: any,
+    @Query("fresh") fresh?: string,
   ) {
     // OptionalJwtAuthGuard로 인증 확인 (로그인 안 해도 접근 가능)
     const user = req.user || null;
+    const shouldBypassCache = fresh === "1" || fresh === "true";
 
     // URL 파라미터 안전하게 디코딩 및 정제
     const sanitizedSlug = UrlSanitizerUtil.sanitizeSlug(slug);
 
     // blogId는 validation 용도로만 사용하고, 실제로는 slug로 조회
-    return this.postsService.findBySlug(sanitizedSlug, user);
+    return this.postsService.findBySlug(sanitizedSlug, user, {
+      bypassCache: shouldBypassCache,
+    });
   }
 
   // ⚠️ 주의: 이 라우트는 반드시 모든 정적 라우트 아래에 위치해야 합니다.

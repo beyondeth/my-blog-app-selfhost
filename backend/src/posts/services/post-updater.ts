@@ -31,6 +31,7 @@ import {
   PostLifecycleEvents,
   PostLifecyclePayload,
 } from "../events/post-lifecycle.events";
+import { CacheService, CacheKeys } from "../../cache/cache.service";
 
 /**
  * 포스트 수정 전담 서비스
@@ -42,7 +43,9 @@ import {
  * - 콘텐츠 재렌더링
  * - 버전 관리 및 낙관적 잠금
  *
- * ⚠️ 캐시 무효화: CacheInvalidationListener가 PostLifecycleEvents 구독으로 전담 (단일 경로 정책)
+ * ⚠️ 캐시 무효화:
+ * 기본은 CacheInvalidationListener가 PostLifecycleEvents 구독으로 처리.
+ * 수정 직후 상세/피드 반영 지연을 줄이기 위해 응답 전에 핵심 캐시를 동기 정리한다.
  */
 @Injectable()
 export class PostUpdater {
@@ -58,6 +61,7 @@ export class PostUpdater {
     private readonly postCacheService: PostCacheService,
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
+    private readonly cacheService: CacheService,
   ) {}
 
   /**
@@ -394,6 +398,28 @@ export class PostUpdater {
         }
         throw error;
       });
+
+    // 수정 직후 stale 상세/피드가 재노출되지 않도록 응답 전에 핵심 캐시를 선제 무효화한다.
+    try {
+      await Promise.all([
+        this.cacheService.del(CacheKeys.POST_CORE(result.id)),
+        this.cacheService.del(CacheKeys.POST_BY_SLUG(result.slug)),
+      ]);
+
+      if (result.isPublished) {
+        await this.cacheService.invalidatePostCache(result.id, result.blog?.slug);
+        if (result.blog?.id) {
+          await this.cacheService.deletePattern(
+            `feed:blog:${result.blog.id}:page:*`,
+          );
+        }
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(
+        `[PostUpdater] Synchronous cache invalidation failed: ${message}`,
+      );
+    }
 
     // 트랜잭션 커밋 성공 후 이벤트 발행 (best-effort)
     eventBuffer.flush(this.eventEmitter, this.logger);

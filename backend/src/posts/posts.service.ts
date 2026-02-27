@@ -292,9 +292,13 @@ export class PostsService {
   /**
    * slug로 포스트 조회
    */
-  async findBySlug(slug: string, user?: User): Promise<PostResponseDto> {
+  async findBySlug(
+    slug: string,
+    user?: User,
+    options?: { bypassCache?: boolean },
+  ): Promise<PostResponseDto> {
     this.logger.debug(`Finding post by slug: ${slug}`);
-    return await this.postReadService.findBySlug(slug, user);
+    return await this.postReadService.findBySlug(slug, user, options);
   }
 
   /**
