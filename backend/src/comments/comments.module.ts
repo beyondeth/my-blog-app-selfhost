@@ -11,6 +11,7 @@ import { FilesModule } from "../files/files.module";
 import { CacheModule } from "../cache/cache.module";
 import { MetricsModule } from "../metrics/metrics.module";
 import { CommonModule } from "../common/common.module";
+import { Post } from "../posts/entities/post.entity";
 import { CommentsReadRepository } from "./repositories/comments-read.repository";
 import { CommentsCacheService } from "./services/comments-cache.service";
 import { CommentsMapperService } from "./services/comments-mapper.service";
@@ -19,7 +20,7 @@ import { CommentsCommandService } from "./services/comments-command.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Comment, CommentLike]),
+    TypeOrmModule.forFeature([Comment, CommentLike, Post]),
     UsersModule,
     PostsModule,
     FilesModule, // CDN 서비스를 위해 추가

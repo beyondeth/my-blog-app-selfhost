@@ -9,6 +9,7 @@ import {
   MaxLength,
   Matches,
   IsUUID,
+  IsIn,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
 import { Transform } from "class-transformer";
@@ -117,4 +118,14 @@ export class CreatePostDto {
   @IsOptional()
   @IsBoolean()
   isPublished?: boolean;
+
+  @ApiPropertyOptional({
+    description: "포스트 공개 범위 (public | private)",
+    example: "public",
+    enum: ["public", "private"],
+    default: "public",
+  })
+  @IsOptional()
+  @IsIn(["public", "private"])
+  visibility?: "public" | "private";
 }

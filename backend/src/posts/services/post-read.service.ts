@@ -13,7 +13,6 @@ import { PostStats } from "../entities/post-stats.entity";
 import { User } from "../../users/entities/user.entity";
 import { Profile } from "../../users/entities/profile.entity";
 import { Blog } from "../../blogs/entities/blog.entity";
-import { Role } from "../../common/enums/role.enum";
 import { PostMapperService } from "./post-mapper.service";
 import {
   PostsReadRepository,
@@ -27,6 +26,7 @@ import {
 import { GetPostsCursorDto } from "../dto/get-posts-cursor.dto";
 import { CursorPaginatedPostsDto } from "../dto/cursor-paginated-posts.dto";
 import { CacheService, CacheKeys, CacheTTL } from "../../cache/cache.service";
+import { PostAccessPolicyService } from "./post-access-policy.service";
 
 /**
  * 포스트 조회 및 검색 서비스
@@ -65,6 +65,7 @@ export class PostReadService {
     private readonly materializedViewService: MaterializedViewService,
     private readonly postInteractionStatusService: PostInteractionStatusService,
     private readonly cacheService: CacheService,
+    private readonly postAccessPolicyService: PostAccessPolicyService,
     @InjectDataSource()
     private readonly dataSource: DataSource,
   ) {}
@@ -96,6 +97,7 @@ export class PostReadService {
     // 최신순 정렬
     const relevanceQuery = this.postsRepository
       .createQueryBuilder("post")
+      .innerJoin("post.blog", "blog")
       .leftJoinAndSelect("post.thumbnailImage", "thumbnailImage")
       .leftJoinAndSelect("post.stats", "stats") // 조회수, 좋아요 표시용
       .leftJoin("post.metadata", "metadata") // 메타데이터 조건용
@@ -103,7 +105,12 @@ export class PostReadService {
       .where("post.blogId = :blogId", { blogId })
       .andWhere("post.id != :postId", { postId }) // 현재 포스트 제외
       .andWhere("post.isPublished = true")
-      .andWhere("post.isDeleted = false");
+      .andWhere("post.isDeleted = false")
+      .andWhere("post.visibility = :publicVisibility", {
+        publicVisibility:
+          this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+      })
+      .andWhere("blog.isPublic = true");
 
     // 카테고리 또는 태그 조건 (OR 로직)
     const conditions: string[] = [];
@@ -142,6 +149,7 @@ export class PostReadService {
     if (remainingLimit > 0) {
       popularPosts = await this.postsRepository
         .createQueryBuilder("post")
+        .innerJoin("post.blog", "blog")
         .leftJoinAndSelect("post.thumbnailImage", "thumbnailImage")
         .leftJoinAndSelect("post.stats", "stats")
         .leftJoin("post.metadata", "metadata")
@@ -150,6 +158,11 @@ export class PostReadService {
         .andWhere("post.id NOT IN (:...excludedIds)", { excludedIds })
         .andWhere("post.isPublished = true")
         .andWhere("post.isDeleted = false")
+        .andWhere("post.visibility = :publicVisibility", {
+          publicVisibility:
+            this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+        })
+        .andWhere("blog.isPublic = true")
 
         // PostStats와 조인하여 viewCount 정렬 (Index 활용 확인 필요하지만 일단 기능 구현)
         // Note: Post 엔티티에 viewCount 컬럼(역정규화)이 있다면 그것을 쓰는게 빠름.
@@ -183,7 +196,7 @@ export class PostReadService {
 
     if (canUseReadCache) {
       const cached = await this.cacheService.get<any>(cacheKey);
-      if (cached) {
+      if (cached && this.canAccessCachedPost(cached, user)) {
         return this.applyInteractionToDto(cached, user);
       }
 
@@ -195,7 +208,7 @@ export class PostReadService {
       if (!lockAcquired) {
         await this.cacheService.waitForLock(lockKey, this.detailLockWaitMs);
         const waitedCached = await this.cacheService.get<any>(cacheKey);
-        if (waitedCached) {
+        if (waitedCached && this.canAccessCachedPost(waitedCached, user)) {
           return this.applyInteractionToDto(waitedCached, user);
         }
       }
@@ -214,6 +227,11 @@ export class PostReadService {
         throw new NotFoundException("포스트를 찾을 수 없습니다.");
       }
 
+      const isOwnerOrAdmin = this.postAccessPolicyService.isOwnerOrAdmin(user, {
+        authorId: post.authorId,
+        blogOwnerId: post.blog?.userId,
+      });
+
       // 게시글이 비공개인 경우
       if (!post.isPublished) {
         this.logger.debug(
@@ -228,11 +246,7 @@ export class PostReadService {
           throw new UnauthorizedException("로그인이 필요합니다.");
         }
 
-        if (
-          post.authorId !== user.id &&
-          post.blog.userId !== user.id &&
-          user.role !== Role.ADMIN
-        ) {
+        if (!isOwnerOrAdmin) {
           this.logger.warn(
             `[findById] Forbidden access attempt by user ${user.id} to draft post ${id}`,
           );
@@ -240,9 +254,26 @@ export class PostReadService {
         }
       }
 
+      // 포스트가 비공개인 경우 (소유자/관리자만 접근 가능)
+      if (
+        this.postAccessPolicyService.normalizeVisibility(post.visibility) ===
+          this.postAccessPolicyService.PRIVATE_VISIBILITY &&
+        !isOwnerOrAdmin
+      ) {
+        throw new NotFoundException("게시글을 찾을 수 없습니다.");
+      }
+
+      // 블로그가 비공개인 경우 (소유자/관리자만 접근 가능)
+      if (post.blog && !post.blog.isPublic && !isOwnerOrAdmin) {
+        throw new NotFoundException("게시글을 찾을 수 없습니다.");
+      }
+
       const baseDto = await this.toBaseDetailDto(post);
 
-      if (canUseReadCache && post.isPublished) {
+      if (
+        canUseReadCache &&
+        this.postAccessPolicyService.isPubliclyReadablePost(post, post.blog)
+      ) {
         await this.cachePublishedDetail(post, baseDto);
       }
 
@@ -282,10 +313,13 @@ export class PostReadService {
           const cachedById = await this.cacheService.get<any>(
             CacheKeys.POST_CORE(cachedSlugEntry),
           );
-          if (cachedById) {
+          if (cachedById && this.canAccessCachedPost(cachedById, user)) {
             return this.applyInteractionToDto(cachedById, user);
           }
-        } else if (cachedSlugEntry?.id) {
+        } else if (
+          cachedSlugEntry?.id &&
+          this.canAccessCachedPost(cachedSlugEntry, user)
+        ) {
           // 이전 버전 호환: slug 키에 DTO가 저장되어 있던 경우
           return this.applyInteractionToDto(cachedSlugEntry, user);
         }
@@ -304,10 +338,13 @@ export class PostReadService {
             const waitedById = await this.cacheService.get<any>(
               CacheKeys.POST_CORE(waitedSlugEntry),
             );
-            if (waitedById) {
+            if (waitedById && this.canAccessCachedPost(waitedById, user)) {
               return this.applyInteractionToDto(waitedById, user);
             }
-          } else if (waitedSlugEntry?.id) {
+          } else if (
+            waitedSlugEntry?.id &&
+            this.canAccessCachedPost(waitedSlugEntry, user)
+          ) {
             return this.applyInteractionToDto(waitedSlugEntry, user);
           }
         }
@@ -325,20 +362,42 @@ export class PostReadService {
         throw new NotFoundException("게시글을 찾을 수 없습니다.");
       }
 
+      const isOwnerOrAdmin = this.postAccessPolicyService.isOwnerOrAdmin(user, {
+        authorId: post.authorId,
+        blogOwnerId: post.blog?.userId,
+      });
+
       // 게시글이 비공개인 경우
       if (!post.isPublished) {
         // 작성자 본인 또는 블로그 소유자만 접근 가능
         if (
           !user ||
-          (post.authorId !== user.id && post.blog.userId !== user.id)
+          !isOwnerOrAdmin
         ) {
           throw new NotFoundException("게시글을 찾을 수 없습니다.");
         }
       }
 
+      // 포스트가 비공개인 경우 (소유자/관리자만 접근 가능)
+      if (
+        this.postAccessPolicyService.normalizeVisibility(post.visibility) ===
+          this.postAccessPolicyService.PRIVATE_VISIBILITY &&
+        !isOwnerOrAdmin
+      ) {
+        throw new NotFoundException("게시글을 찾을 수 없습니다.");
+      }
+
+      // 블로그가 비공개인 경우 (소유자/관리자만 접근 가능)
+      if (post.blog && !post.blog.isPublic && !isOwnerOrAdmin) {
+        throw new NotFoundException("게시글을 찾을 수 없습니다.");
+      }
+
       const baseDto = await this.toBaseDetailDto(post);
 
-      if (!shouldBypassCache && post.isPublished) {
+      if (
+        !shouldBypassCache &&
+        this.postAccessPolicyService.isPubliclyReadablePost(post, post.blog)
+      ) {
         await this.cachePublishedDetail(post, baseDto);
       }
 
@@ -353,6 +412,31 @@ export class PostReadService {
   private canUseCanonicalDetailCache(relations: string[]): boolean {
     return relations.every((relation) =>
       this.canonicalDetailRelations.has(relation),
+    );
+  }
+
+  private canAccessCachedPost(cachedPost: any, user?: User): boolean {
+    const authorId = cachedPost?.author?.id ?? cachedPost?.authorId;
+    const blogOwnerId = cachedPost?.blog?.userId;
+    const isOwnerOrAdmin = this.postAccessPolicyService.isOwnerOrAdmin(user, {
+      authorId,
+      blogOwnerId,
+    });
+
+    if (isOwnerOrAdmin) {
+      return true;
+    }
+
+    const normalizedVisibility = this.postAccessPolicyService.normalizeVisibility(
+      cachedPost?.visibility,
+    );
+
+    return (
+      cachedPost?.isPublished !== false &&
+      cachedPost?.isDeleted !== true &&
+      normalizedVisibility ===
+        this.postAccessPolicyService.getPublicVisibilityQueryValue() &&
+      cachedPost?.blog?.isPublic !== false
     );
   }
 
@@ -525,7 +609,10 @@ export class PostReadService {
         queryBuilder.orderBy("post.commentCount", sortOrder);
         break;
       case "title":
-        queryBuilder.orderBy("post.title", sortOrder === "ASC" ? "ASC" : "DESC");
+        queryBuilder.orderBy(
+          "post.title",
+          sortOrder === "ASC" ? "ASC" : "DESC",
+        );
         break;
       case "editorPicks":
         queryBuilder
@@ -793,6 +880,10 @@ export class PostReadService {
       ])
       .where("post.isPublished = :isPublished", { isPublished: true })
       .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+      })
+      .andWhere("blog.isPublic = true")
       .andWhere("metadata.isEditorPick = :isEditorPick", { isEditorPick: true })
       .orderBy("metadata.editorPickedAt", "DESC")
       .addOrderBy("post.publishedAt", "DESC")
@@ -840,8 +931,15 @@ export class PostReadService {
   async getCategories(): Promise<string[]> {
     const result = await this.postsRepository
       .createQueryBuilder("post")
+      .innerJoin("post.blog", "blog")
       .select("DISTINCT post.category", "category")
       .where("post.isPublished = true")
+      .andWhere("post.isDeleted = false")
+      .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+      })
+      .andWhere("blog.isPublic = true")
       .andWhere("post.category IS NOT NULL")
       .andWhere("post.category != ''")
       .orderBy("category", "ASC")
@@ -875,6 +973,12 @@ export class PostReadService {
       .leftJoin("post.metadata", "metadata")
       .addSelect(["metadata.excerpt", "metadata.tags", "metadata.category"])
       .where("post.isPublished = :isPublished", { isPublished: true })
+      .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
+      .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+      })
+      .andWhere("blog.isPublic = true")
       .andWhere("post.category = :category", { category })
       .orderBy("post.publishedAt", "DESC")
       .skip((page - 1) * limit)
@@ -883,12 +987,18 @@ export class PostReadService {
     const posts = await query.getMany();
 
     // 전체 개수는 간단히 카운트
-    const total = await this.postsRepository.count({
-      where: {
-        isPublished: true,
-        category,
-      },
-    });
+    const total = await this.postsRepository
+      .createQueryBuilder("post")
+      .innerJoin("post.blog", "blog")
+      .where("post.isPublished = :isPublished", { isPublished: true })
+      .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
+      .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+      })
+      .andWhere("blog.isPublic = true")
+      .andWhere("post.category = :category", { category })
+      .getCount();
 
     return { posts, total };
   }
@@ -905,10 +1015,16 @@ export class PostReadService {
     // PostgreSQL JSONB 배열을 풀어서 집계하는 쿼리
     const result = await this.postsRepository
       .createQueryBuilder("post")
+      .innerJoin("post.blog", "blog")
       .select("jsonb_array_elements_text(post.tags) as tag")
       .addSelect("COUNT(*)", "count")
       .where("post.isPublished = true")
+      .andWhere("post.isDeleted = false")
       .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+      })
+      .andWhere("blog.isPublic = true")
       .andWhere("jsonb_array_length(post.tags) > 0")
       .groupBy("tag")
       .orderBy("count", "DESC")

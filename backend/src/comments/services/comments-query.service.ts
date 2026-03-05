@@ -11,6 +11,9 @@ import { CommentsReadRepository } from "../repositories/comments-read.repository
 import { CommentsCacheService } from "./comments-cache.service";
 import { CommentsMapperService } from "./comments-mapper.service";
 import { CacheKeys, CacheTTL } from "../../cache/cache.service";
+import { BlogResolverService } from "../../common/services/blog-resolver.service";
+import { Post } from "../../posts/entities/post.entity";
+import { PostAccessPolicyService } from "../../posts/services/post-access-policy.service";
 
 @Injectable()
 export class CommentsQueryService {
@@ -19,9 +22,13 @@ export class CommentsQueryService {
   constructor(
     @InjectRepository(Comment)
     private commentsRepository: Repository<Comment>,
+    @InjectRepository(Post)
+    private readonly postsRepository: Repository<Post>,
     private readonly commentsReadRepository: CommentsReadRepository,
     private readonly commentsCacheService: CommentsCacheService,
     private readonly commentsMapperService: CommentsMapperService,
+    private readonly blogResolverService: BlogResolverService,
+    private readonly postAccessPolicyService: PostAccessPolicyService,
   ) {}
 
   private encodeCursor(cursor: {
@@ -53,6 +60,9 @@ export class CommentsQueryService {
     postId: string,
     user?: User,
   ): Promise<CommentResponseDto[]> {
+    // 비공개 블로그 포스트 댓글 접근 차단
+    await this.validatePostAccess(postId, user);
+
     const allComments = await this.commentsReadRepository.findAllByPost(
       postId,
       user?.id,
@@ -116,6 +126,10 @@ export class CommentsQueryService {
     user?: User,
   ): Promise<PaginatedCommentsDto> {
     const { cursor, limit = 20, sort = "recent", snapshotTimestamp } = dto;
+
+    // 비공개 블로그 포스트 댓글 접근 차단
+    await this.validatePostAccess(postId, user);
+
     const isFirstPage = !cursor;
     const cacheKey = isFirstPage
       ? CacheKeys.COMMENTS_PAGE_FIRST(postId, sort)
@@ -228,6 +242,17 @@ export class CommentsQueryService {
     }
 
     const decodedCursor = cursor ? this.decodeCursor(cursor) : null;
+
+    // 대댓글 우회 차단 방어 로직 (부모 댓글의 postId 추출 및 검증)
+    const parentComment = await this.commentsRepository.findOne({
+      where: { id: parentCommentId, isDeleted: false },
+      select: ["id", "postId"],
+    });
+    if (!parentComment) {
+      throw new NotFoundException("부모 댓글을 찾을 수 없습니다.");
+    }
+    await this.validatePostAccess(parentComment.postId, user);
+
     const {
       comments: rawComments,
       hasMore,
@@ -291,5 +316,31 @@ export class CommentsQueryService {
     }
 
     return response;
+  }
+
+  /**
+   * 포스트의 블로그 공개 상태를 검증
+   * 비공개 블로그 포스트의 댓글은 소유자/작성자만 조회 가능
+   */
+  private async validatePostAccess(postId: string, user?: User): Promise<void> {
+    const post = await this.postsRepository.findOne({
+      where: { id: postId },
+      select: ["id", "blogId", "authorId", "isPublished", "isDeleted", "visibility"],
+    });
+
+    if (!post) {
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
+    }
+
+    const blog = post.blogId
+      ? await this.blogResolverService.findBlogById(post.blogId)
+      : null;
+
+    const canRead = this.postAccessPolicyService.canReadPost(post, blog, user);
+
+    if (!canRead) {
+      // 접근 제어는 404로 은닉
+      throw new NotFoundException("포스트를 찾을 수 없습니다.");
+    }
   }
 }

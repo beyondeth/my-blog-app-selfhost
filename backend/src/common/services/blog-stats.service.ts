@@ -59,8 +59,11 @@ export class BlogStatsService {
    */
   async getBlogCategoriesWithCountById(
     blogId: string,
+    options?: { includePrivate?: boolean },
   ): Promise<Array<{ category: string; count: number }>> {
-    const cacheKey = `blog:stats:categories:id:${blogId}`;
+    const includePrivate = options?.includePrivate === true;
+    const scope = includePrivate ? "all" : "public";
+    const cacheKey = `blog:stats:categories:id:${blogId}:${scope}`;
 
     // 캐시 확인
     const cached =
@@ -82,6 +85,13 @@ export class BlogStatsService {
       .where("post.blogId = :blogId", { blogId })
       .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
       .andWhere("post.isPublished = :isPublished", { isPublished: true }) // 발행된 포스트만
+      .andWhere("post.status = :publishedStatus", {
+        publishedStatus: "published",
+      })
+      .andWhere(
+        includePrivate ? "1=1" : "post.visibility = :publicVisibility",
+        includePrivate ? {} : { publicVisibility: "public" },
+      )
       .groupBy("post.category")
       .orderBy("count", "DESC")
       .getRawMany();

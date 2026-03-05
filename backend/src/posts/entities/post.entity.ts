@@ -47,6 +47,7 @@ import { generateShortId } from "../utils/post.utils";
  */
 @Entity("posts")
 @Index(["isPublished"])
+@Index(["visibility"])
 @Index(["authorId"])
 @Index(["blogId"])
 @Index(["isDeleted"])
@@ -160,12 +161,23 @@ export class Post {
   commentCount: number;
 
   /**
-   * 발행 상태
-   * - true: 공개 (모두 볼 수 있음)
-   * - false: 비공개 (draft, 작성자만 볼 수 있음)
+   * 발행 상태 (워크플로)
+   * - true: 발행됨
+   * - false: 초안
+   *
+   * 실제 노출 범위는 visibility + blog.isPublic 조합으로 결정됩니다.
    */
   @Column({ default: false })
   isPublished: boolean;
+
+  /**
+   * 노출 범위
+   * - public: 전체 공개
+   * - private: 작성자/블로그 소유자/관리자만 조회
+   */
+  @Column({ type: "varchar", length: 20, default: "public" })
+  @Index()
+  visibility: "public" | "private";
 
   /**
    * 소프트 삭제 플래그
@@ -424,6 +436,7 @@ export class Post {
       content: this.content,
       content_markdown: this.content_markdown,
       isPublished: this.isPublished,
+      visibility: this.visibility,
       status: this.status,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt,

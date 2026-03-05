@@ -139,6 +139,21 @@ export class PostsAPI {
     });
   }
 
+  async updatePostVisibility(
+    id: string,
+    visibility: 'public' | 'private',
+    version?: number,
+  ): Promise<Post> {
+    return this.client.patch<Post>(`/posts/${id}/visibility`, {
+      visibility,
+      ...(typeof version === 'number' ? { version } : {}),
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
   /**
    * 포스트 삭제
    * @param id - 삭제할 포스트 ID

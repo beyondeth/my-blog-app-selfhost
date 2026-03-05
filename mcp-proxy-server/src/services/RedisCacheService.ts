@@ -31,6 +31,7 @@ export interface ApiKeyValidationCache {
     id: string;
     name: string;
     slug: string;
+    isPublic?: boolean;
   };
 }
 

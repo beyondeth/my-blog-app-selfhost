@@ -8,7 +8,11 @@ import {
 import { PopularPeriod, PopularSourceType } from "../types/popular-post.types";
 
 @Entity("popular_post_snapshots")
-@Index("idx_popular_snapshots_source_period_rank", ["sourceType", "period", "rank"])
+@Index("idx_popular_snapshots_source_period_rank", [
+  "sourceType",
+  "period",
+  "rank",
+])
 @Index("idx_popular_snapshots_source_period_post", [
   "sourceType",
   "period",

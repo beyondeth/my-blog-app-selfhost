@@ -75,6 +75,8 @@ export default function BlogSettingsPage() {
     public: null,
     comments: null,
   });
+  const [isPublicSaving, setIsPublicSaving] = useState(false);
+  const [isCommentsSaving, setIsCommentsSaving] = useState(false);
 
   // Alias 관련 state (체크포인트 2)
   const [newAlias, setNewAlias] = useState('');
@@ -358,6 +360,8 @@ export default function BlogSettingsPage() {
    * 토글 변경 시 즉시 API 호출하여 백엔드 업데이트
    */
   const handlePublicSettingChange = async (isPublic: boolean) => {
+    if (isPublicSaving) return;
+    setIsPublicSaving(true);
     updatePrivacyFeedback('public', { type: 'info', text: '설정을 저장하고 있습니다...' });
     try {
       const response = await fetch(
@@ -398,6 +402,8 @@ export default function BlogSettingsPage() {
           text: err.message || '블로그 공개 설정 업데이트에 실패했습니다.',
         }
       );
+    } finally {
+      setIsPublicSaving(false);
     }
   };
 
@@ -406,6 +412,8 @@ export default function BlogSettingsPage() {
    * 토글 변경 시 즉시 API 호출하여 백엔드 업데이트
    */
   const handleCommentsSettingChange = async (allowComments: boolean) => {
+    if (isCommentsSaving) return;
+    setIsCommentsSaving(true);
     updatePrivacyFeedback('comments', { type: 'info', text: '설정을 저장하고 있습니다...' });
     try {
       const response = await fetch(
@@ -446,6 +454,8 @@ export default function BlogSettingsPage() {
           text: err.message || '댓글 허용 설정 업데이트에 실패했습니다.',
         }
       );
+    } finally {
+      setIsCommentsSaving(false);
     }
   };
 
@@ -887,6 +897,7 @@ export default function BlogSettingsPage() {
               </div>
               <Switch
                 checked={formData.isPublic}
+                disabled={isPublicSaving}
                 onCheckedChange={async (newValue) => {
                   setFormData({ ...formData, isPublic: newValue });
                   await handlePublicSettingChange(newValue);
@@ -919,6 +930,7 @@ export default function BlogSettingsPage() {
               </div>
               <Switch
                 checked={formData.allowComments}
+                disabled={isCommentsSaving}
                 onCheckedChange={async (newValue) => {
                   setFormData({ ...formData, allowComments: newValue });
                   await handleCommentsSettingChange(newValue);

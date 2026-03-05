@@ -175,6 +175,9 @@ export interface Post {
   images?: string[];
   thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   isPublished: boolean;
+  visibility?: 'public' | 'private';
+  effectiveVisibility?: 'public' | 'private';
+  visibilityBlockedByBlogPrivacy?: boolean;
   status?: string;  // 포스트 상태 ('published', 'draft', 'deleted')
   isDeleted?: boolean;  // 소프트 삭제 여부
   viewCount: number;
@@ -279,6 +282,7 @@ export interface PostForm {
   thumbnailImageId?: string;  // 썸네일 이미지 파일 ID
   tags?: string[];
   category: string;  // 카테고리 (필수)
+  visibility?: 'public' | 'private';
   attachedFileIds?: string[];
   version?: number;
 }

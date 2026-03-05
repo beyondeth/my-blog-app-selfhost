@@ -689,6 +689,7 @@ export async function registerOpenAiTools(
               content_markdown: args.content_markdown as string,
               tags: args.tags as string[] | undefined,
               category: args.category as string | undefined,
+              visibility: args.visibility as 'public' | 'private' | undefined,
               writingStyle: finalStyle.id,
             },
             context

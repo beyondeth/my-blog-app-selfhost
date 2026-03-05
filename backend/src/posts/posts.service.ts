@@ -287,6 +287,46 @@ export class PostsService {
     );
   }
 
+  async findMine(
+    userId: string,
+    options?: {
+      status?: "draft" | "published";
+      visibility?: "public" | "private";
+    },
+  ): Promise<PostResponseDto[]> {
+    const query = this.postsRepository
+      .createQueryBuilder("post")
+      .leftJoinAndSelect("post.blog", "blog")
+      .leftJoinAndSelect("post.author", "author")
+      .leftJoinAndSelect("post.stats", "stats")
+      .leftJoinAndSelect("post.metadata", "metadata")
+      .where("post.authorId = :userId", { userId })
+      .andWhere("post.isDeleted = false")
+      .orderBy("post.updatedAt", "DESC");
+
+    if (options?.status === "draft") {
+      query.andWhere("post.status = :draftStatus", { draftStatus: "draft" });
+    }
+
+    if (options?.status === "published") {
+      query
+        .andWhere("post.isPublished = true")
+        .andWhere("post.status = :publishedStatus", {
+          publishedStatus: "published",
+        });
+    }
+
+    if (options?.visibility) {
+      query.andWhere("post.visibility = :visibility", {
+        visibility: options.visibility,
+      });
+    }
+
+    const posts = await query.getMany();
+
+    return Promise.all(posts.map((post) => this.postMapperService.toPostDto(post)));
+  }
+
   // ========== Read Operations (PostReadService로 위임) ==========
 
   /**
@@ -831,18 +871,30 @@ export class PostsService {
   > {
     this.logger.debug(`Getting all published posts for sitemap`);
 
-    const posts = await this.postsRepository.find({
-      where: { isPublished: true, isDeleted: false },
-      relations: ["blog"],
-      select: ["id", "slug", "updatedAt", "blog"],
-      order: { updatedAt: "DESC" },
-    });
+    const rows = await this.postsRepository
+      .createQueryBuilder("post")
+      .innerJoin("post.blog", "blog")
+      .select("post.slug", "slug")
+      .addSelect("COALESCE(blog.alias, blog.slug)", "blogSlug")
+      .addSelect("post.updatedAt", "updatedAt")
+      .where("post.isPublished = true")
+      .andWhere("post.isDeleted = false")
+      .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: "public",
+      })
+      .andWhere("blog.isPublic = true")
+      .orderBy("post.updatedAt", "DESC")
+      .getRawMany<{
+        slug: string;
+        blogSlug: string;
+        updatedAt: Date;
+      }>();
 
-    // 필요한 형식으로 변환
-    return posts.map((post) => ({
-      slug: post.slug,
-      blogSlug: post.blog.slug,
-      updatedAt: post.updatedAt,
+    return rows.map((row) => ({
+      slug: row.slug,
+      blogSlug: row.blogSlug,
+      updatedAt: new Date(row.updatedAt),
     }));
   }
 

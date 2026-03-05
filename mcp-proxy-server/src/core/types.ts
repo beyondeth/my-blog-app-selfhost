@@ -9,7 +9,7 @@ export interface ToolContext {
     userId: string;
     blogId: string;
     user: { id: string; username: string; email: string };
-    blog: { id: string; name: string; slug: string };
+    blog: { id: string; name: string; slug: string; isPublic?: boolean };
   };
   apiKey: string | null; // API Key 인증 시 사용 (Backend 인증용)
   oauthToken?: string; // OAuth 인증 시 사용 (커스텀 커넥터용)

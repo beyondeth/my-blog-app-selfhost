@@ -38,7 +38,8 @@ interface CursorData {
 @Injectable()
 export class FeedService {
   private readonly logger = new Logger(FeedService.name);
-  private readonly periodHotTopTtlSeconds = this.resolvePeriodHotTopTtlSeconds();
+  private readonly periodHotTopTtlSeconds =
+    this.resolvePeriodHotTopTtlSeconds();
 
   constructor(
     @InjectRepository(Post)
@@ -85,7 +86,8 @@ export class FeedService {
       cursor: cursorRaw ?? null,
     });
 
-    const cached = await this.cacheService.get<UnifiedFeedResponseDto>(cacheKey);
+    const cached =
+      await this.cacheService.get<UnifiedFeedResponseDto>(cacheKey);
     if (cached) {
       this.logger.debug(
         `[Feed] cache hit filter=${filter}, sort=${sort}, period=${period}, user=${normalizedUserId ? "yes" : "no"}`,
@@ -263,7 +265,7 @@ export class FeedService {
     if (isPeriodHotTop) {
       return this.periodHotTopTtlSeconds;
     }
-    return CacheTTL.HOME_FEED;
+    return CacheTTL.SHORT;
   }
 
   private resolvePeriodHotTopTtlSeconds(): number {
@@ -488,12 +490,13 @@ export class FeedService {
           : ""
       }
       LEFT JOIN files f ON f.id = p."thumbnail_image_id"
-      LEFT JOIN blogs b ON b.id = p."blogId"
+      INNER JOIN blogs b ON b.id = p."blogId" AND b."isPublic" = true
       LEFT JOIN users u ON u.id = p."authorId"
       LEFT JOIN profiles pr ON pr."userId" = u.id
       WHERE p."isPublished" = true
         AND p."isDeleted" = false
         AND p.status = 'published'
+        AND p.visibility = 'public'
     `;
 
     const params = includeUserVote ? [blogIds, userId as string] : [blogIds];
@@ -673,12 +676,13 @@ export class FeedService {
             : ""
         }
         LEFT JOIN files f ON f.id = p."thumbnail_image_id"
-        LEFT JOIN blogs b ON b.id = p."blogId"
+        INNER JOIN blogs b ON b.id = p."blogId" AND b."isPublic" = true
         LEFT JOIN users u ON u.id = p."authorId"
         LEFT JOIN profiles pr ON pr."userId" = u.id
         WHERE p."isPublished" = true
           AND p."isDeleted" = false
           AND p.status = 'published'
+          AND p.visibility = 'public'
           ${periodCondition ? `AND p."createdAt" >= ${periodCondition}` : ""}
           ${cursor ? `AND (p."createdAt", p.id) < ($1, $2)` : ""}
       `
@@ -816,9 +820,11 @@ export class FeedService {
           p.id,
           p."createdAt" as created_at
         FROM posts p
+        INNER JOIN blogs b ON b.id = p."blogId" AND b."isPublic" = true
         WHERE p."isPublished" = true
           AND p."isDeleted" = false
           AND p.status = 'published'
+          AND p.visibility = 'public'
           ${periodCondition ? `AND p."createdAt" >= ${periodCondition}` : ""}
           AND ($1::timestamptz IS NULL OR (p."createdAt", p.id) < ($1::timestamptz, $2::uuid))
         ORDER BY p."createdAt" DESC, p.id DESC
@@ -898,6 +904,7 @@ export class FeedService {
         INNER JOIN posts p
           ON p.id = lc.id
           AND lc.source_type = 'blog'
+          AND p.visibility = 'public'
         LEFT JOIN post_metadata pm ON pm."postId" = p.id
         LEFT JOIN post_stats ps ON ps."postId" = p.id
         ${
@@ -907,7 +914,7 @@ export class FeedService {
             : ""
         }
         LEFT JOIN files f ON f.id = p."thumbnail_image_id"
-        LEFT JOIN blogs b ON b.id = p."blogId"
+        INNER JOIN blogs b ON b.id = p."blogId" AND b."isPublic" = true
         LEFT JOIN users u ON u.id = p."authorId"
         LEFT JOIN profiles pr ON pr."userId" = u.id
 

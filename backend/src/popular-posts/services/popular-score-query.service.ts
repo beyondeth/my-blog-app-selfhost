@@ -26,7 +26,10 @@ export class PopularScoreQueryService {
   }
 
   private getMinScore(): number {
-    const configured = Number.parseInt(process.env.POPULAR_MIN_SCORE ?? "1", 10);
+    const configured = Number.parseInt(
+      process.env.POPULAR_MIN_SCORE ?? "1",
+      10,
+    );
     if (Number.isNaN(configured) || configured < 0) {
       return 1;
     }
@@ -80,13 +83,14 @@ export class PopularScoreQueryService {
       FROM posts p
       LEFT JOIN post_stats ps ON ps."postId" = p.id
       LEFT JOIN post_metadata pm ON pm."postId" = p.id
-      LEFT JOIN blogs b ON b.id = p."blogId"
+      INNER JOIN blogs b ON b.id = p."blogId" AND b."isPublic" = true
       LEFT JOIN users u ON u.id = p."authorId"
       LEFT JOIN profiles pr ON pr."userId" = u.id
       LEFT JOIN files f ON f.id = p."thumbnail_image_id"
       WHERE p."isPublished" = true
         AND p."isDeleted" = false
         AND p.status = 'published'
+        AND p.visibility = 'public'
         -- rolling window로 범위를 제한해 전체 테이블 스캔을 피한다.
         AND COALESCE(p."publishedAt", p."createdAt") >= NOW() - INTERVAL '${interval}'
         AND (COALESCE(ps."viewCount", 0) + COALESCE(ps."likeCount", 0) * 3 + COALESCE(ps."commentCount", 0) * 2) >= $2

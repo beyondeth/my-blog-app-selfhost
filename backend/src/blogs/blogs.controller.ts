@@ -24,6 +24,7 @@ import { User } from "../users/entities/user.entity";
 import { OptionalJwtAuthGuard } from "../common/guards/optional-jwt-auth.guard";
 import { BlogStatsService } from "../common/services/blog-stats.service";
 import { BlogResolverService } from "../common/services/blog-resolver.service";
+import { Role } from "../common/enums/role.enum";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { plainToInstance } from "class-transformer";
 import { BlogResponseDto } from "./dto/blog-response.dto";
@@ -144,6 +145,7 @@ export class BlogsController {
    */
   @Get("slug/:slug/categories")
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "블로그의 카테고리별 포스트 개수 조회" })
   @ApiResponse({
     status: 200,
@@ -151,6 +153,7 @@ export class BlogsController {
   })
   async getBlogCategories(
     @Param("slug") slug: string,
+    @CurrentUser() user?: User,
     @Query("limit") limitQuery?: string,
     @Query("cursor") cursor?: string,
   ): Promise<{
@@ -177,9 +180,27 @@ export class BlogsController {
     this.logger.debug(
       `📡 [CATEGORIES API] Found blog: ${blog.id} (${blog.slug}, alias: ${blog.alias})`,
     );
+
+    const isOwner = !!user && String(user.id) === String(blog.userId);
+    const isAdmin = user?.role === Role.ADMIN;
+    const canReadPrivateBlog = isOwner || isAdmin;
+
+    if (!blog.isPublic && !canReadPrivateBlog) {
+      this.logger.warn(
+        `📡 [CATEGORIES API] Private blog access denied for slug: ${slug}`,
+      );
+      return {
+        items: [],
+        total: 0,
+        hasMore: false,
+        nextCursor: null,
+      };
+    }
+
     // blogId로 카테고리 조회 (안정적인 blogId 기반)
     const result = await this.blogStatsService.getBlogCategoriesWithCountById(
       blog.id,
+      { includePrivate: canReadPrivateBlog },
     );
 
     const limit = this.parseLimit(limitQuery);

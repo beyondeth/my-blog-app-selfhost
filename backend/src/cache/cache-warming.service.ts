@@ -34,7 +34,7 @@ export class CacheWarmingService {
       await this.cacheService.set(
         CacheKeys.FEED_HOME(1),
         dummyHomeFeedData,
-        CacheTTL.HOME_FEED,
+        CacheTTL.SHORT,
       );
 
       this.logger.debug("✅ [WARM] Home feed warmed");

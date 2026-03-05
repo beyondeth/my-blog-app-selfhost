@@ -15,6 +15,7 @@ import { CdnService } from "../../files/services/cdn.service";
 import { R2Service } from "../../files/services/r2.service";
 import { VoteType } from "../enums/vote-type.enum";
 import { UrlSanitizerUtil } from "../../common/utils/url-sanitizer.util";
+import { PostAccessPolicyService } from "./post-access-policy.service";
 
 /**
  * Post 관련 DTO 변환을 담당하는 서비스
@@ -34,6 +35,7 @@ export class PostMapperService {
     private readonly filesRepository: Repository<File>,
     @InjectRepository(Video)
     private readonly videoRepository: Repository<Video>,
+    private readonly postAccessPolicyService: PostAccessPolicyService,
     private readonly filesService: FilesService,
     private readonly cdnService: CdnService,
     private readonly r2Service: R2Service,
@@ -133,6 +135,19 @@ export class PostMapperService {
     if (dto.userVote === undefined) {
       dto.userVote = null;
     }
+
+    // 저장 visibility와 실제 노출 visibility를 분리해 응답한다.
+    // (blog 전체 비공개 게이트가 개별 공개를 막는 경우를 프론트에서 명확히 안내하기 위함)
+    const sourceBlog = options?.blog || post.blog;
+    dto.effectiveVisibility = this.postAccessPolicyService.getEffectiveVisibility(
+      post,
+      sourceBlog,
+    );
+    dto.visibilityBlockedByBlogPrivacy =
+      this.postAccessPolicyService.isVisibilityBlockedByBlogPrivacy(
+        post,
+        sourceBlog,
+      );
 
     // 썸네일 URL 처리
     if (process.env.NODE_ENV === "development") {

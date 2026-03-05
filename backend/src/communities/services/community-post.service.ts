@@ -695,7 +695,7 @@ export class CommunityPostService {
     };
 
     if (cacheKey) {
-      await this.cacheService.set(cacheKey, response, CacheTTL.HOME_FEED);
+      await this.cacheService.set(cacheKey, response, CacheTTL.SHORT);
     }
 
     return response;

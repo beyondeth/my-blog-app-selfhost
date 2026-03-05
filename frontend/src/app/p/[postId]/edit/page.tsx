@@ -57,7 +57,8 @@ export default function EditPostPage() {
   // Blog 정보 추출 (post.blog에서)
   const blogInfo = post.blog ? {
     name: post.blog.name,
-    slug: post.blog.slug
+    slug: post.blog.slug,
+    isPublic: post.blog.isPublic,
   } : undefined;
 
   return (

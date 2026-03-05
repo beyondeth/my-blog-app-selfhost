@@ -215,6 +215,11 @@ export class PostUpdater {
               .filter((tag) => !!tag) ?? [];
         }
 
+        if (updatePostDto.visibility !== undefined) {
+          post.visibility =
+            updatePostDto.visibility === "private" ? "private" : "public";
+        }
+
         // 6. 발행 상태 변경
         if (
           updatePostDto.isPublished !== undefined &&
@@ -299,7 +304,10 @@ export class PostUpdater {
 
           // 첨부 파일 동기화 이후 썸네일 파일이 더 이상 유지 목록에 없으면
           // 고아 thumbnailImageId를 제거해 상세/피드 상태를 일치시킨다.
-          if (post.thumbnailImageId && !fileIds.includes(post.thumbnailImageId)) {
+          if (
+            post.thumbnailImageId &&
+            !fileIds.includes(post.thumbnailImageId)
+          ) {
             this.logger.log(
               `[PostUpdater] Clearing orphan thumbnailImageId for postId=${id}, thumbnailImageId=${post.thumbnailImageId}`,
             );
@@ -407,7 +415,10 @@ export class PostUpdater {
       ]);
 
       if (result.isPublished) {
-        await this.cacheService.invalidatePostCache(result.id, result.blog?.slug);
+        await this.cacheService.invalidatePostCache(
+          result.id,
+          result.blog?.slug,
+        );
         if (result.blog?.id) {
           await this.cacheService.deletePattern(
             `feed:blog:${result.blog.id}:page:*`,

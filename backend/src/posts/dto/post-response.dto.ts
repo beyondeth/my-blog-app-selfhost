@@ -52,6 +52,15 @@ export class PostResponseDto {
   isPublished: boolean;
 
   @Expose()
+  visibility: "public" | "private";
+
+  @Expose()
+  effectiveVisibility?: "public" | "private";
+
+  @Expose()
+  visibilityBlockedByBlogPrivacy?: boolean;
+
+  @Expose()
   isDeleted: boolean;
 
   @Expose()

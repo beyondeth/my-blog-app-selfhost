@@ -16,6 +16,8 @@ import { Follow } from "../follows/entities/follow.entity";
 import { RedisLockService } from "../redis/redis-lock.service";
 import { CacheService, CacheKeys, CacheTTL } from "../cache/cache.service";
 import { CdnService } from "../files/services/cdn.service";
+import { EventEmitter2 } from "@nestjs/event-emitter";
+import { CacheInvalidationEvents } from "../common/events/cache.events";
 
 @Injectable()
 export class BlogsService {
@@ -174,6 +176,7 @@ export class BlogsService {
     private redisLockService: RedisLockService,
     private cacheService: CacheService,
     private cdnService: CdnService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   async create(createBlogDto: CreateBlogDto, user: User): Promise<Blog> {
@@ -336,6 +339,10 @@ export class BlogsService {
   async update(id: string, updateBlogDto: UpdateBlogDto): Promise<Blog> {
     const blog = await this.findOne(id);
 
+    // 변경 전 스냅샷 (캐시 무효화 이벤트용)
+    const previousIsPublic = blog.isPublic;
+    const previousAllowComments = blog.allowComments;
+
     // isPublic과 allowComments 필드가 없는 경우 기본값 설정
     // 데이터베이스에 필드가 아직 없을 수 있으므로 임시로 처리
     const updatedBlog = {
@@ -352,6 +359,39 @@ export class BlogsService {
     }
 
     await this.blogRepository.save(updatedBlog);
+
+    // isPublic 변경 시 피드 캐시 무효화 이벤트 발행
+    if (
+      updateBlogDto.isPublic !== undefined &&
+      updateBlogDto.isPublic !== previousIsPublic
+    ) {
+      this.logger.log(
+        `Blog ${id} visibility changed: ${previousIsPublic} → ${updateBlogDto.isPublic}`,
+      );
+      this.eventEmitter.emit(CacheInvalidationEvents.BLOG_UPDATED, {
+        blogId: blog.id,
+        blogSlug: blog.alias || blog.slug,
+        changes: { isPublic: true },
+      });
+    }
+
+    // allowComments 변경 시 이벤트 발행
+    if (
+      updateBlogDto.allowComments !== undefined &&
+      updateBlogDto.allowComments !== previousAllowComments
+    ) {
+      this.logger.log(
+        `Blog ${id} allowComments changed: ${previousAllowComments} → ${updateBlogDto.allowComments}`,
+      );
+      this.eventEmitter.emit(CacheInvalidationEvents.BLOG_SETTINGS_CHANGED, {
+        blogId: blog.id,
+        blogSlug: blog.alias || blog.slug,
+        settingKey: "allowComments",
+        oldValue: previousAllowComments,
+        newValue: updateBlogDto.allowComments,
+      });
+    }
+
     return await this.findOne(id);
   }
 

@@ -17,6 +17,7 @@ export async function handleCreatePost(
     tags?: string[];
     category?: string;
     writingStyle?: string;
+    visibility?: 'public' | 'private';
   },
   context: ToolContext
 ): Promise<any> {
@@ -43,6 +44,7 @@ export async function handleCreatePost(
         content_markdown: args.content_markdown,
         tags,
         category: args.category,
+        visibility: args.visibility,
       },
       {
         headers,

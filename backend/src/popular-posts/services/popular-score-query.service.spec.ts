@@ -11,7 +11,9 @@ describe("PopularScoreQueryService", () => {
   const originalMinScore = process.env.POPULAR_MIN_SCORE;
 
   beforeEach(() => {
-    service = new PopularScoreQueryService(mockDataSource as unknown as DataSource);
+    service = new PopularScoreQueryService(
+      mockDataSource as unknown as DataSource,
+    );
   });
 
   afterEach(() => {
@@ -27,12 +29,17 @@ describe("PopularScoreQueryService", () => {
 
     const result = await service.calculatePopularRows("blog", "daily", 15);
 
-    expect(result).toEqual([{ postId: "p1", score: 10, metaJson: { id: "p1" } }]);
+    expect(result).toEqual([
+      { postId: "p1", score: 10, metaJson: { id: "p1" } },
+    ]);
     const [query, params] = mockDataSource.query.mock.calls[0] as [
       string,
       [number, number],
     ];
     expect(query).toContain(`INTERVAL '24 hours'`);
+    expect(query).toContain(`INNER JOIN blogs b`);
+    expect(query).toContain(`b."isPublic" = true`);
+    expect(query).toContain(`p.visibility = 'public'`);
     expect(params).toEqual([15, 3]);
   });
 

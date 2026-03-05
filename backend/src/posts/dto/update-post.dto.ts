@@ -6,6 +6,7 @@ import {
   IsNumber,
   IsBoolean,
   IsUUID,
+  IsIn,
 } from "class-validator";
 import { Transform, Type } from "class-transformer";
 
@@ -42,6 +43,10 @@ export class UpdatePostDto extends PartialType(CreatePostDto) {
   @IsOptional()
   @IsBoolean()
   isPublished?: boolean;
+
+  @IsOptional()
+  @IsIn(["public", "private"])
+  visibility?: "public" | "private";
 
   /**
    * 업데이트 경로에서 썸네일 제거를 지원하기 위해 오버라이드
