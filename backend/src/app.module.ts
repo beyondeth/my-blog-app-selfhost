@@ -24,6 +24,7 @@ import { BlogsModule } from "./blogs/blogs.module";
 import { TagsModule } from "./tags/tags.module";
 import { McpModule } from "./mcp/mcp.module";
 import { EmailModule } from "./email/email.module";
+import { FeedbackModule } from "./feedback/feedback.module";
 import { ReportsModule } from "./reports/reports.module";
 import { AuditModule } from "./audit/audit.module";
 import { AdminModule } from "./admin/admin.module";
@@ -155,6 +156,7 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     BookmarksModule,
     McpModule,
     EmailModule,
+    FeedbackModule,
     ReportsModule,
     AuditModule,
     AdminModule,

@@ -38,6 +38,11 @@ import { RedisModule } from "../redis/redis.module";
 import { CommunitiesModule } from "../communities/communities.module";
 import { AdminCommunitiesService } from "./communities/admin-communities.service";
 
+// Feedback Management
+import { AdminFeedbackController } from "./feedback/admin-feedback.controller";
+import { AdminFeedbackService } from "./feedback/admin-feedback.service";
+import { FeedbackTicket } from "../feedback/entities/feedback-ticket.entity";
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -49,6 +54,7 @@ import { AdminCommunitiesService } from "./communities/admin-communities.service
       AuditLog,
       File,
       EmailApproval,
+      FeedbackTicket,
     ]),
     AuditModule,
     FilesModule,
@@ -63,13 +69,15 @@ import { AdminCommunitiesService } from "./communities/admin-communities.service
     AdminDebugController,
     AdminCommunitiesController,
     AdminPostsController,
+    AdminFeedbackController,
   ],
   providers: [
     AdminDashboardService,
     AdminUsersService,
     AdminPostsService,
     AdminCommunitiesService,
+    AdminFeedbackService,
   ],
-  exports: [AdminDashboardService, AdminUsersService, AdminPostsService],
+  exports: [AdminDashboardService, AdminUsersService, AdminPostsService, AdminFeedbackService],
 })
 export class AdminModule {}
