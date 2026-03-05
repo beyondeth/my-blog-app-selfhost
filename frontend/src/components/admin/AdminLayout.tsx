@@ -52,6 +52,7 @@ const navigation: NavigationItem[] = [
   { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true },
   { name: '커뮤니티 복구', href: '/admin/communities', icon: ShieldAlert, adminOnly: true },
   { name: '유저 모더레이션', href: '/admin/moderation/logs', icon: Flag, adminOnly: true },
+  { name: '고객의 소리', href: '/admin/feedback', icon: Flag },
   { name: t.navigation.reports, href: '/admin/reports', icon: Flag },
   { name: '디버그 콘솔', href: '/admin/debug', icon: Bug, adminOnly: true },
   { name: t.navigation.settings, href: '/admin/settings', icon: Settings },

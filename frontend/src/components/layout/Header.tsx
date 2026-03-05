@@ -5,7 +5,7 @@ import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback, memo, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { FiSearch } from 'react-icons/fi';
+import { FiSearch, FiMessageSquare } from 'react-icons/fi';
 import { routes } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import MobileProfileDropdown from './MobileProfileDropdown';
@@ -16,6 +16,8 @@ import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { FEATURES } from '@/lib/features';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useTheme } from 'next-themes';
+import { useFeedbackStore } from '@/stores/feedbackStore';
+import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 
 // ============================================
 // SearchParamsSync: useSearchParams 사용 컴포넌트 (Suspense 필요)
@@ -39,6 +41,7 @@ function SearchParamsSync({ onSearchQueryChange }: SearchParamsSyncProps) {
 function HeaderComponent() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
   const { toggleSidebar } = useSidebarStore();
+  const { openModal } = useFeedbackStore();
   const { resolvedTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
@@ -222,6 +225,17 @@ function HeaderComponent() {
               {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
               {/* <MusicPlayerButton /> */}
 
+              {/* 피드백 버튼 (프로필 좌측) */}
+              {user && (
+                <button
+                  onClick={openModal}
+                  className="hidden sm:flex items-center justify-center px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground border border-border/80 bg-background hover:bg-muted dark:hover:bg-[#1A232E] rounded-full transition-colors"
+                  title="고객의 소리"
+                >
+                  고객 피드백
+                </button>
+              )}
+
               <ThemeSwitch />
 
               {!mounted ? (
@@ -269,6 +283,17 @@ function HeaderComponent() {
             {/* 음악 플레이어 버튼 (모바일) - 자체 상태 관리 */}
             {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
             {/* <MusicPlayerButton /> */}
+
+            {/* 모바일 피드백 버튼 (프로필 좌측) */}
+            {user && (
+              <button
+                onClick={openModal}
+                className="flex sm:hidden items-center justify-center px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border/80 bg-background hover:bg-muted dark:hover:bg-[#1A232E] rounded-full transition-colors"
+                title="피드백"
+              >
+                고객 피드백
+              </button>
+            )}
 
             {/* Theme Switch - Always visible */}
             <ThemeSwitch />
@@ -327,6 +352,8 @@ function HeaderComponent() {
         </div>
 
       </div>
+      
+      <FeedbackModal />
     </header>
   );
 }
