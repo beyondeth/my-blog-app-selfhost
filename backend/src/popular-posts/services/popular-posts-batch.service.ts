@@ -9,10 +9,7 @@ import { SchedulerRegistry } from "@nestjs/schedule";
 import { PopularCacheService } from "./popular-cache.service";
 import { PopularScoreQueryService } from "./popular-score-query.service";
 import { PopularSnapshotService } from "./popular-snapshot.service";
-import {
-  PopularPeriod,
-  PopularSourceType,
-} from "../types/popular-post.types";
+import { PopularPeriod, PopularSourceType } from "../types/popular-post.types";
 
 @Injectable()
 export class PopularPostsBatchService implements OnModuleInit, OnModuleDestroy {
@@ -125,7 +122,11 @@ export class PopularPostsBatchService implements OnModuleInit, OnModuleDestroy {
         rows,
       );
 
-      this.popularSnapshotService.logSnapshotResult(source, period, rows.length);
+      this.popularSnapshotService.logSnapshotResult(
+        source,
+        period,
+        rows.length,
+      );
 
       const items = rows.map((row) => row.metaJson);
       await this.popularCacheService.setAtomic(source, period, {

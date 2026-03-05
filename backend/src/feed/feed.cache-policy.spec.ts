@@ -141,7 +141,7 @@ describe("FeedService - Cache Policy", () => {
       FeedPeriodType.ALL,
     );
     expect(mockCacheService.set).toHaveBeenCalledTimes(1);
-    expect(mockCacheService.set.mock.calls[0][2]).toBe(CacheTTL.HOME_FEED);
+    expect(mockCacheService.set.mock.calls[0][2]).toBe(CacheTTL.SHORT);
     expect(voteSpy).toHaveBeenCalledTimes(1);
   });
 

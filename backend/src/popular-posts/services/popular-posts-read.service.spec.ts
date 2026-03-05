@@ -107,7 +107,9 @@ describe("PopularPostsReadService", () => {
         metaJson: { id: "p2" },
       },
     ]);
-    mockPopularCacheService.setAtomic.mockRejectedValue(new Error("redis down"));
+    mockPopularCacheService.setAtomic.mockRejectedValue(
+      new Error("redis down"),
+    );
 
     const result = await service.getBlogPopularPosts("monthly", 5);
 
@@ -125,11 +127,9 @@ describe("PopularPostsReadService", () => {
     const result = await service.getBlogPopularPosts("daily", 5);
 
     expect(result).toEqual({ posts: [], total: 0 });
-    expect(mockPopularScoreQueryService.calculatePopularRows).toHaveBeenCalledWith(
-      "blog",
-      "daily",
-      200,
-    );
+    expect(
+      mockPopularScoreQueryService.calculatePopularRows,
+    ).toHaveBeenCalledWith("blog", "daily", 200);
     expect(mockPopularSnapshotService.replaceSnapshot).not.toHaveBeenCalled();
     expect(mockPopularCacheService.setAtomic).not.toHaveBeenCalled();
   });
@@ -152,7 +152,8 @@ describe("PopularPostsReadService", () => {
 
     const result = await service.getCommunityPopularPosts("weekly", 1);
 
-    const replaceCall = mockPopularSnapshotService.replaceSnapshot.mock.calls[0];
+    const replaceCall =
+      mockPopularSnapshotService.replaceSnapshot.mock.calls[0];
     const cacheCall = mockPopularCacheService.setAtomic.mock.calls[0];
     const seededAt = replaceCall[2] as Date;
 

@@ -42,6 +42,7 @@ import { UpdatePostDto } from "./dto/update-post.dto";
 import { SetThumbnailDto } from "./dto/set-thumbnail.dto";
 import { GetPostsCursorDto } from "./dto/get-posts-cursor.dto";
 import { UpdateEditorPicksOrderDto } from "./dto/update-editor-picks-order.dto";
+import { UpdatePostVisibilityDto } from "./dto/update-post-visibility.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { OptionalJwtAuthGuard } from "../common/guards/optional-jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
@@ -154,6 +155,28 @@ export class PostsController {
   @ApiBearerAuth()
   async findDrafts(@CurrentUser() user: User) {
     return this.postsService.findDrafts(user.id);
+  }
+
+  @Get("mine")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "내 포스트 목록 조회 (상태/공개범위 필터)" })
+  @ApiBearerAuth()
+  async findMine(
+    @CurrentUser() user: User,
+    @Query("status") status?: "draft" | "published",
+    @Query("visibility") visibility?: "public" | "private",
+  ) {
+    const normalizedStatus =
+      status === "draft" || status === "published" ? status : undefined;
+    const normalizedVisibility =
+      visibility === "public" || visibility === "private"
+        ? visibility
+        : undefined;
+
+    return this.postsService.findMine(user.id, {
+      status: normalizedStatus,
+      visibility: normalizedVisibility,
+    });
   }
 
   @Get(":id/related")
@@ -322,7 +345,7 @@ export class PostsController {
       ttl = CacheTTL.MY_BLOG; // 10초
     } else {
       // 홈 피드: 긴 TTL
-      ttl = pageNumber === 1 ? CacheTTL.HOME_FEED : CacheTTL.HOME_FEED * 2;
+      ttl = pageNumber === 1 ? CacheTTL.SHORT : CacheTTL.SHORT * 2;
     }
 
     // 캐시 미스 로깅
@@ -686,6 +709,26 @@ export class PostsController {
     }
 
     return updated;
+  }
+
+  @Patch(":id/visibility")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN, Role.USER)
+  @ApiOperation({ summary: "게시글 공개 범위 변경" })
+  @ApiBearerAuth()
+  async updateVisibility(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() dto: UpdatePostVisibilityDto,
+    @CurrentUser() user: User,
+  ) {
+    return this.postsService.update(
+      id,
+      {
+        visibility: dto.visibility,
+        ...(typeof dto.version === "number" ? { version: dto.version } : {}),
+      },
+      user,
+    );
   }
 
   @Delete(":id")

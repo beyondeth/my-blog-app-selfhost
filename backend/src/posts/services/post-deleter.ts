@@ -132,8 +132,7 @@ export class PostDeleter {
           );
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `Failed to synchronously invalidate post cache after delete: ${message}`,
         );

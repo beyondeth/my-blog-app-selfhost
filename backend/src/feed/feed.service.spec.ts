@@ -73,4 +73,28 @@ describe("FeedService - Community Visibility Filters", () => {
     expect(query).toContain('c."isPostDiscoverable" = true');
     expect(query).toContain("c.\"joinPolicy\" <> 'private'");
   });
+
+  it("includes blog isPublic filter in unified blog query", async () => {
+    await (service as any).executeUnifiedQuery(
+      "blog",
+      FeedSortType.RECENT,
+      10,
+      null,
+      undefined,
+    );
+
+    const query = mockQueryRunner.query.mock.calls[0][0] as string;
+    expect(query).toContain("INNER JOIN blogs b");
+    expect(query).toContain('b."isPublic" = true');
+    expect(query).toContain("p.visibility = 'public'");
+  });
+
+  it("includes blog isPublic filter in blog feed items fetch", async () => {
+    await (service as any).fetchFeedItemsByIds(["blog-post-id"], [], undefined);
+
+    const query = mockDataSource.query.mock.calls[0][0] as string;
+    expect(query).toContain("INNER JOIN blogs b");
+    expect(query).toContain('b."isPublic" = true');
+    expect(query).toContain("p.visibility = 'public'");
+  });
 });

@@ -68,9 +68,9 @@ describe("PopularPostsBatchService", () => {
 
     await service.executeBatch("manual");
 
-    expect(mockPopularScoreQueryService.calculatePopularRows).toHaveBeenCalledTimes(
-      6,
-    );
+    expect(
+      mockPopularScoreQueryService.calculatePopularRows,
+    ).toHaveBeenCalledTimes(6);
     expect(mockPopularSnapshotService.replaceSnapshot).toHaveBeenCalledTimes(6);
     expect(mockPopularCacheService.setAtomic).toHaveBeenCalledTimes(6);
 
@@ -100,7 +100,9 @@ describe("PopularPostsBatchService", () => {
     await service.executeBatch("manual");
 
     expect(warnSpy).toHaveBeenCalled();
-    expect(mockPopularScoreQueryService.calculatePopularRows).not.toHaveBeenCalled();
+    expect(
+      mockPopularScoreQueryService.calculatePopularRows,
+    ).not.toHaveBeenCalled();
   });
 
   it("continues other buckets when one bucket fails", async () => {
@@ -120,9 +122,9 @@ describe("PopularPostsBatchService", () => {
 
     await service.executeBatch("manual");
 
-    expect(mockPopularScoreQueryService.calculatePopularRows).toHaveBeenCalledTimes(
-      6,
-    );
+    expect(
+      mockPopularScoreQueryService.calculatePopularRows,
+    ).toHaveBeenCalledTimes(6);
     expect(mockPopularSnapshotService.replaceSnapshot).toHaveBeenCalledTimes(5);
     expect(mockPopularCacheService.setAtomic).toHaveBeenCalledTimes(5);
     expect(errorSpy).toHaveBeenCalled();
@@ -133,7 +135,9 @@ describe("PopularPostsBatchService", () => {
     service.onModuleInit();
 
     expect(mockConfigService.get).toHaveBeenCalledWith("POPULAR_BATCH_CRON");
-    expect(mockConfigService.get).toHaveBeenCalledWith("POPULAR_BATCH_TIMEZONE");
+    expect(mockConfigService.get).toHaveBeenCalledWith(
+      "POPULAR_BATCH_TIMEZONE",
+    );
     expect(mockSchedulerRegistry.addCronJob).toHaveBeenCalledWith(
       "popular-posts-batch",
       expect.any(Object),

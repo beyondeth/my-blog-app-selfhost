@@ -79,7 +79,8 @@ export class MarkdownRendererService {
     }
 
     const { protectedText, tokens } = this.protectImageAttributeBlocks(text);
-    const html = marked.parse(protectedText) as string;
+    const fixedText = this.fixKoreanEmphasis(protectedText);
+    const html = marked.parse(fixedText) as string;
     const restoredHtml = this.restoreImageAttributeBlocks(html, tokens);
     const enhancedHtml = this.applyExtendedImageAttributes(restoredHtml);
 
@@ -140,6 +141,21 @@ export class MarkdownRendererService {
     });
 
     return restored;
+  }
+
+  private fixKoreanEmphasis(text: string): string {
+    if (!text) return text;
+    // 마크다운에서 **텍스트**(괄호 포함) 바로 뒤에 한글 조사/단어가 오면
+    // 볼드 처리가 깨지는 문제(CommonMark 단어 경계 스펙)를 해결하기 위해
+    // 닫는 ** 또는 __ 뒤에 폭 없는 공백(&#8203;)을 삽입합니다.
+    // 단, 코드 블록(```...```)이나 인라인 코드(`...`) 내부는 건너뜁니다.
+    return text.replace(
+      /(```[\s\S]*?```|`[^`\n]+`)|(\*\*|__)([^\n]*?)\2(?=[가-힣a-zA-Z0-9])/g,
+      (match, code, asterisks, content) => {
+        if (code) return match; // 코드 블록은 원본 그대로 반환
+        return `${asterisks}${content}${asterisks}&#8203;`;
+      },
+    );
   }
 
   private applyExtendedImageAttributes(html: string): string {

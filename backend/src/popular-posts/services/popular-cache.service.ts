@@ -16,7 +16,10 @@ export class PopularCacheService {
 
   constructor(@InjectRedis("cache") private readonly redis: Redis) {}
 
-  private getCacheKey(source: PopularSourceType, period: PopularPeriod): string {
+  private getCacheKey(
+    source: PopularSourceType,
+    period: PopularPeriod,
+  ): string {
     return CacheKeys.POPULAR_V2(source, period);
   }
 

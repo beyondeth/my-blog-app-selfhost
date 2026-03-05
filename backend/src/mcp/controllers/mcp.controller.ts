@@ -170,6 +170,7 @@ export class McpController {
           id: mcpApiKey.blog.id,
           name: mcpApiKey.blog.name,
           slug: mcpApiKey.blog.alias || mcpApiKey.blog.slug, // Phase 2: alias 우선 표시
+          isPublic: mcpApiKey.blog.isPublic,
         },
       },
     };

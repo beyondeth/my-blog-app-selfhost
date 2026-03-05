@@ -23,6 +23,7 @@ import { CreatePostDto } from "../../posts/dto/create-post.dto";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { User } from "../../users/entities/user.entity";
+import { Blog } from "../../blogs/entities/blog.entity";
 import { ExternalImageDownloadService } from "../../files/services/external-image-download.service";
 import { Public } from "../../common/decorators/public.decorator";
 import { UsageService } from "../../usage/usage.service";
@@ -50,6 +51,8 @@ export class McpProxyController {
     private readonly postsService: PostsService,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
+    @InjectRepository(Blog)
+    private readonly blogRepository: Repository<Blog>,
     private readonly usageService: UsageService,
     private readonly externalImageDownloadService: ExternalImageDownloadService,
     private readonly filesService: FilesService,
@@ -109,6 +112,7 @@ export class McpProxyController {
       tags: createPostDto.tags,
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore,
+      visibility: createPostDto.visibility,
       thumbnail: null, // thumbnail field removed - using thumbnailImageId only
       hasContent: !!createPostDto.content,
       thumbnailImageId: createPostDto.thumbnailImageId,
@@ -129,12 +133,36 @@ export class McpProxyController {
       throw new BadRequestException("카테고리는 필수 항목입니다");
     }
 
+    let defaultVisibility: "public" | "private" = "private";
+    try {
+      const blog = await this.blogRepository.findOne({
+        where: { id: blogId },
+        select: ["id", "isPublic", "userId"],
+      });
+
+      if (blog?.userId === userId) {
+        defaultVisibility = blog.isPublic ? "public" : "private";
+      }
+    } catch (error) {
+      this.logger.warn(
+        `[MCP Visibility] Failed to load blog visibility, fallback to private: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    const resolvedVisibility: "public" | "private" =
+      createPostDto.visibility === "private"
+        ? "private"
+        : createPostDto.visibility === "public"
+          ? "public"
+          : defaultVisibility;
+
     const postData: CreatePostDto = {
       title: createPostDto.title,
       content_markdown: createPostDto.content_markdown, // 원본 마크다운 콘텐츠 그대로 전달
       tags: createPostDto.tags, // 태그는 그대로 전달 (PostCreationService에서 처리)
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore, // AI 품질 점수
+      visibility: resolvedVisibility,
       // thumbnail field removed - using thumbnailImageId only
       ...(createPostDto.thumbnailImageId && {
         thumbnailImageId: createPostDto.thumbnailImageId,

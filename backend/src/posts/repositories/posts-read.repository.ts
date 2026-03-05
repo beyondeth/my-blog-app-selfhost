@@ -4,6 +4,7 @@ import { Repository, DataSource, SelectQueryBuilder } from "typeorm";
 import { Post } from "../entities/post.entity";
 import { GetPostsCursorDto } from "../dto/get-posts-cursor.dto";
 import { User } from "../../users/entities/user.entity";
+import { PostAccessPolicyService } from "../services/post-access-policy.service";
 
 /**
  * 읽기 쿼리 라우팅/일관성 정책
@@ -28,6 +29,7 @@ export class PostsReadRepository {
     private readonly dataSource: DataSource,
     @InjectRepository(Post)
     private readonly postsRepository: Repository<Post>,
+    private readonly postAccessPolicyService: PostAccessPolicyService,
   ) {}
 
   /**
@@ -71,13 +73,29 @@ export class PostsReadRepository {
     const whereConditions: string[] = [];
     const parameters: Record<string, any> = {};
 
-    if (!user) {
-      whereConditions.push("post.isPublished = :isPublished");
+    // 기본 필터: 항상 적용 (로그인 여부 무관)
+    whereConditions.push("post.isPublished = :isPublished");
+    whereConditions.push("post.isDeleted = :isDeleted");
+    whereConditions.push("post.status = :publishedStatus");
+    parameters.isPublished = true;
+    parameters.isDeleted = false;
+    parameters.publishedStatus = "published";
+
+    // visibility 필터: 소유자/관리자만 비공개 블로그/비공개 포스트 접근 허용
+    if (user) {
+      whereConditions.push(
+        "((blog.isPublic = true AND post.visibility = :postVisibility) OR blog.userId = :viewerId OR post.authorId = :viewerId OR :userRole = 'admin')",
+      );
+      parameters.postVisibility =
+        this.postAccessPolicyService.getPublicVisibilityQueryValue();
+      parameters.viewerId = user.id;
+      parameters.userRole = user.role;
+    } else {
       whereConditions.push("blog.isPublic = :isPublic");
-      whereConditions.push("post.isDeleted = :isDeleted");
-      parameters.isPublished = true;
+      whereConditions.push("post.visibility = :postVisibility");
       parameters.isPublic = true;
-      parameters.isDeleted = false;
+      parameters.postVisibility =
+        this.postAccessPolicyService.getPublicVisibilityQueryValue();
     }
 
     const normalizedBlogIdentifier = dto.blogSlug?.startsWith("@")

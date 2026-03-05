@@ -5,8 +5,7 @@ describe("FeedCacheWarmingService", () => {
   const originalDisableFeedWarming = process.env.DISABLE_FEED_WARMING;
   const originalDisableCommunityWarming =
     process.env.DISABLE_COMMUNITY_FEED_WARMING;
-  const originalDisablePeriodWarming =
-    process.env.DISABLE_FEED_PERIOD_WARMING;
+  const originalDisablePeriodWarming = process.env.DISABLE_FEED_PERIOD_WARMING;
 
   const mockFeedService = {
     getUnifiedFeed: jest.fn(),
@@ -38,7 +37,8 @@ describe("FeedCacheWarmingService", () => {
 
   afterEach(() => {
     process.env.DISABLE_FEED_WARMING = originalDisableFeedWarming;
-    process.env.DISABLE_COMMUNITY_FEED_WARMING = originalDisableCommunityWarming;
+    process.env.DISABLE_COMMUNITY_FEED_WARMING =
+      originalDisableCommunityWarming;
     process.env.DISABLE_FEED_PERIOD_WARMING = originalDisablePeriodWarming;
     jest.clearAllMocks();
   });

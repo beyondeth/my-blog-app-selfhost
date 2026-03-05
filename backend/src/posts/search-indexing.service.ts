@@ -1,6 +1,6 @@
 import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository, IsNull } from "typeorm";
+import { IsNull, Not, Repository } from "typeorm";
 import { Post } from "./entities/post.entity";
 import { Cron } from "@nestjs/schedule";
 import { InjectRedis } from "@nestjs-modules/ioredis";
@@ -104,33 +104,35 @@ export class SearchIndexingService {
    * 인덱싱 안 된 포스트 찾기
    */
   private async findUnindexedPosts(limit: number): Promise<Post[]> {
-    return this.postsRepository.find({
-      where: {
-        indexedAt: IsNull(),
-        isPublished: true, // 공개된 포스트만 인덱싱
-        status: "published", // Worker 처리 완료된 포스트만 인덱싱
-        isDeleted: false, // 삭제되지 않은 포스트만 인덱싱
-      },
-      order: {
-        createdAt: "ASC", // 오래된 포스트부터 처리
-      },
-      take: limit,
-      select: ["id", "title", "excerpt", "tags"], // content 제외
-    });
+    return this.postsRepository
+      .createQueryBuilder("post")
+      .innerJoin("post.blog", "blog")
+      .where("post.indexedAt IS NULL")
+      .andWhere("post.isPublished = true")
+      .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.isDeleted = false")
+      .andWhere("post.visibility = :postVisibility", { postVisibility: "public" })
+      .andWhere("blog.isPublic = true")
+      .orderBy("post.createdAt", "ASC")
+      .take(limit)
+      .select(["post.id", "post.title", "post.excerpt", "post.tags"])
+      .getMany();
   }
 
   /**
    * 인덱싱 안 된 포스트 개수 확인
    */
   private async countUnindexedPosts(): Promise<number> {
-    return this.postsRepository.count({
-      where: {
-        indexedAt: IsNull(),
-        isPublished: true,
-        status: "published", // Worker 처리 완료된 포스트만 카운트
-        isDeleted: false, // 삭제되지 않은 포스트만 카운트
-      },
-    });
+    return this.postsRepository
+      .createQueryBuilder("post")
+      .innerJoin("post.blog", "blog")
+      .where("post.indexedAt IS NULL")
+      .andWhere("post.isPublished = true")
+      .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.isDeleted = false")
+      .andWhere("post.visibility = :postVisibility", { postVisibility: "public" })
+      .andWhere("blog.isPublic = true")
+      .getCount();
   }
 
   /**
@@ -204,12 +206,15 @@ export class SearchIndexingService {
       // 평균 인덱싱 지연 시간
       const avgDelayResult = await this.postsRepository.query(`
         SELECT
-          AVG(EXTRACT(EPOCH FROM (NOW() - "createdAt"))) as avg_delay_seconds
-        FROM "posts"
+          AVG(EXTRACT(EPOCH FROM (NOW() - p."createdAt"))) as avg_delay_seconds
+        FROM "posts" p
+        INNER JOIN "blogs" b ON b.id = p."blogId" AND b."isPublic" = true
         WHERE
-          "indexed_at" IS NULL
-          AND "isPublished" = true
-          AND "status" = 'published'
+          p."indexed_at" IS NULL
+          AND p."isPublished" = true
+          AND p."status" = 'published'
+          AND p."isDeleted" = false
+          AND p."visibility" = 'public'
       `);
 
       const avgDelaySeconds = avgDelayResult[0]?.avg_delay_seconds || 0;
@@ -277,6 +282,3 @@ export class SearchIndexingService {
     await this.indexPendingPosts();
   }
 }
-
-// Not 연산자 import 추가
-import { Not } from "typeorm";

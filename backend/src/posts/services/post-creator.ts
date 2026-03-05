@@ -203,6 +203,8 @@ export class PostCreator {
           createPostDto.tags
             ?.map((tag) => UrlSanitizerUtil.sanitizeDisplayText(tag, 64))
             .filter((tag) => !!tag) ?? [];
+        const visibility =
+          createPostDto.visibility === "private" ? "private" : "public";
 
         // 4. 썸네일 설정 (thumbnailImageId만 사용 - thumbnail 필드는 PostMapperService에서 동적 생성)
         // thumbnailImageId 우선순위: 명시적 thumbnailImageId
@@ -244,6 +246,7 @@ export class PostCreator {
           category: sanitizedCategory,
           tags: sanitizedTags,
           isPublished: isPublished, // 파라미터로 받은 값 사용
+          visibility,
           authorId: author.id,
           blogId: blog.id,
           content_type: createPostDto.content_markdown ? "markdown" : "html",
@@ -376,15 +379,17 @@ export class PostCreator {
     // 발행 포스트는 응답 전에 핵심 피드 캐시를 선제 무효화한다.
     if (result.isPublished) {
       try {
-        await this.cacheService.invalidatePostCache(result.id, result.blog?.slug);
+        await this.cacheService.invalidatePostCache(
+          result.id,
+          result.blog?.slug,
+        );
         if (result.blog?.id) {
           await this.cacheService.deletePattern(
             `feed:blog:${result.blog.id}:page:*`,
           );
         }
       } catch (error) {
-        const message =
-          error instanceof Error ? error.message : String(error);
+        const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `[PostCreator] Synchronous cache invalidation failed: ${message}`,
         );

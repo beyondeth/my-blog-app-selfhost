@@ -100,9 +100,11 @@ export class FeedRankingService {
                COALESCE(ps."viewCount", 0) AS view_count
         FROM posts p
         LEFT JOIN post_stats ps ON ps."postId" = p.id
+        INNER JOIN blogs b ON b.id = p."blogId" AND b."isPublic" = true
         WHERE p."isPublished" = true
           AND p."isDeleted" = false
           AND p.status = 'published'
+          AND p.visibility = 'public'
         UNION ALL
         SELECT cp.id,
                'community'::text AS source_type,

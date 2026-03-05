@@ -6,7 +6,9 @@ import { PopularPostsReadService } from "../../popular-posts/services/popular-po
 @ApiTags("Community")
 @Controller("communities")
 export class PopularCommunityPostsController {
-  constructor(private readonly popularPostsReadService: PopularPostsReadService) {}
+  constructor(
+    private readonly popularPostsReadService: PopularPostsReadService,
+  ) {}
 
   @Get("popular/:period")
   @Public()

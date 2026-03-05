@@ -95,6 +95,7 @@ export class ApiKeyGuard implements CanActivate {
           id: mcpApiKey.blog.id,
           name: mcpApiKey.blog.name,
           slug: mcpApiKey.blog.alias || mcpApiKey.blog.slug,
+          isPublic: mcpApiKey.blog.isPublic,
         },
         authMode: "api_key",
       };
@@ -158,6 +159,7 @@ export class ApiKeyGuard implements CanActivate {
           id: blog.id,
           name: blog.name,
           slug: blog.alias || blog.slug,
+          isPublic: blog.isPublic,
         },
         authMode: "oauth",
       };
