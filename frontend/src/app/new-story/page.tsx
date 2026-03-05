@@ -189,6 +189,7 @@ export default function NewStoryPage() {
   const [selectedFlairId, setSelectedFlairId] = useState<string | null>(null);
   const [isNsfw, setIsNsfw] = useState(false);
   const [isSpoiler, setIsSpoiler] = useState(false);
+  const [postVisibility, setPostVisibility] = useState<'public' | 'private'>('public');
 
   // 커뮤니티 포스트 생성 뮤테이션 (대상이 커뮤니티인 경우)
   const communitySlugForMutation =
@@ -344,6 +345,14 @@ export default function NewStoryPage() {
       setIsSpoiler(false);
     }
   }, [publishTarget]);
+
+  useEffect(() => {
+    if (publishTarget?.type !== 'blog') {
+      return;
+    }
+
+    setPostVisibility(blog?.isPublic === false ? 'private' : 'public');
+  }, [blog?.isPublic, publishTarget?.type]);
 
   const availableCommunityFlairs = useMemo(() => {
     return publishTarget?.type === 'community'
@@ -1018,6 +1027,7 @@ export default function NewStoryPage() {
           title: data.title,
           category: categoryString,
           tags: data.tags,
+          visibility: postVisibility,
           attachedFileIds: data.fileIds,
           ...(thumbnailImageId && !hasPreferredYouTube && { thumbnailImageId }),
         };
@@ -1151,6 +1161,11 @@ export default function NewStoryPage() {
   const isSaving = isSubmitting || isMutationPending;
   const isSaveDisabled = isSaving || hasPendingVideoUploads;
   const isCommunityTarget = publishTarget?.type === 'community';
+  const isBlogPublic = blog?.isPublic !== false;
+  const isPublicTransitionLocked =
+    publishTarget?.type === 'blog' &&
+    blog?.isPublic === false &&
+    postVisibility === 'private';
   const lacksCommunityPermission =
     isCommunityTarget &&
     selectedCommunity &&
@@ -1375,6 +1390,36 @@ export default function NewStoryPage() {
                   </FormItem>
                 )}
               />
+              {publishTarget?.type === 'blog' && (
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center justify-end gap-2">
+                    <Label className="text-xs font-medium leading-none">
+                      {isPublicTransitionLocked
+                        ? '포스트 비공개(잠금)'
+                        : postVisibility === 'public'
+                          ? '포스트 공개'
+                          : '포스트 비공개'}
+                    </Label>
+                    <Switch
+                      checked={postVisibility === 'public'}
+                      onCheckedChange={(checked) => {
+                        if (checked && !isBlogPublic) {
+                          return;
+                        }
+                        setPostVisibility(checked ? 'public' : 'private');
+                      }}
+                      disabled={isMutationPending || isPublicTransitionLocked}
+                      title={isPublicTransitionLocked ? '전체 비공개 잠금' : undefined}
+                      className="focus-visible:ring-gray-400 data-[state=checked]:bg-gray-500 dark:data-[state=checked]:bg-gray-500 [&>span:first-child]:bg-gray-500 dark:[&>span:first-child]:bg-gray-500"
+                    />
+                  </div>
+                  {isPublicTransitionLocked && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      TIP. 공개로 변경하려면 '블로그 설정'에서 전체 공개로 바꿔주세요.
+                    </p>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -1698,6 +1743,7 @@ export default function NewStoryPage() {
                       title: data.title,
                       category: categoryString || '기타',
                       tags: data.tags,
+                      visibility: postVisibility,
                       attachedFileIds: data.fileIds,
                       ...(thumbnailImageId && { thumbnailImageId }),
                       isPublished: false, // 초안으로 저장

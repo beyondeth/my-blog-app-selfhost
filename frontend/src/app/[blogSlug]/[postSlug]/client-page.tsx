@@ -8,7 +8,7 @@ import AuthorInfo from '@/components/posts/AuthorInfo';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import CommentSectionPaginated from '@/components/comments/CommentSectionPaginated';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { usePost, useDeletePost } from '@/hooks/usePosts';
+import { usePost, useDeletePost, postQueryKeys } from '@/hooks/usePosts';
 import { useBlogBySlug } from '@/hooks/useBlogs';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { VoteButton } from '@/components/ui/VoteButton';
@@ -20,6 +20,9 @@ import { cn } from '@/lib/utils';
 import { mixpanel } from '@/lib/mixpanel';
 import { getViewerId } from '@/lib/viewer-id';
 import RelatedPostsSection from '@/components/post/RelatedPostsSection';
+import { useQueryClient } from '@tanstack/react-query';
+import { postsAPI } from '@/lib/api';
+import { feedQueryKeys } from '@/hooks/feed/useUnifiedFeed';
 
 /**
  * 댓글 섹션 Lazy Loading 컴포넌트
@@ -90,8 +93,10 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAdmin } = useAuth();
+  const queryClient = useQueryClient();
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isVisibilityPending, setIsVisibilityPending] = useState(false);
   const hasViewed = useRef(false);
 
   const blogSlug = params.blogSlug as string;
@@ -183,6 +188,50 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   const handleDelete = useCallback(() => {
     setDeleteDialogOpen(true);
   }, []);
+
+  const handleToggleVisibility = useCallback(async () => {
+    if (!post?.id) return;
+
+    const canEdit = user?.id === post.author?.id || isAdmin;
+    if (!canEdit || isVisibilityPending) return;
+
+    const nextVisibility = post.visibility === 'private' ? 'public' : 'private';
+    const isBlockedByBlogPrivacy =
+      post.blog?.isPublic === false && nextVisibility === 'public';
+    if (isBlockedByBlogPrivacy) return;
+
+    setIsVisibilityPending(true);
+    try {
+      const updatedPost = await postsAPI.updatePostVisibility(
+        post.id,
+        nextVisibility,
+        post.version,
+      );
+
+      queryClient.setQueryData(postQueryKeys.detail(post.id), updatedPost);
+      if (post.slug) {
+        queryClient.setQueryData(postQueryKeys.detail(post.slug), updatedPost);
+      }
+
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: postQueryKeys.lists() }),
+        queryClient.invalidateQueries({ queryKey: feedQueryKeys.all }),
+      ]);
+
+      await refetch();
+    } catch (error) {
+      console.error('Failed to update post visibility:', error);
+    } finally {
+      setIsVisibilityPending(false);
+    }
+  }, [
+    post,
+    user?.id,
+    isAdmin,
+    isVisibilityPending,
+    queryClient,
+    refetch,
+  ]);
 
   const handleConfirmDelete = useCallback(async () => {
     if (!post || deletePostMutation.isPending) return;
@@ -489,6 +538,9 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
 
   const isAuthor = user?.id === post.author?.id;
   const canEditDelete = isAuthor || isAdmin;
+  const isBlogGloballyPrivate = post.blog?.isPublic === false;
+  const isVisibilityPublicTransitionBlocked =
+    isBlogGloballyPrivate && (post.visibility === 'private' || post.visibilityBlockedByBlogPrivacy === true);
 
   return (
     <>
@@ -513,6 +565,12 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
                 <p className="mt-1 text-xs text-gray-500">잠시만 기다려주세요</p>
               </div>
             </div>
+          </div>
+        )}
+
+        {canEditDelete && isBlogGloballyPrivate && (
+          <div className="mb-3 inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-[11px] text-gray-500 dark:border-gray-700 dark:text-gray-400">
+            전체 비공개 중: 개별 공개 불가
           </div>
         )}
 
@@ -542,6 +600,15 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
           isEditorPick={post.isEditorPick || false}
           onToggleEditorPick={handleToggleEditorPick}
           editorPickPending={editorPickMutation.isPending}
+          visibility={post.visibility === 'private' ? 'private' : 'public'}
+          onToggleVisibility={canEditDelete ? handleToggleVisibility : undefined}
+          visibilityPending={isVisibilityPending}
+          visibilityToggleDisabled={isVisibilityPublicTransitionBlocked}
+          visibilityToggleDisabledReason={
+            isVisibilityPublicTransitionBlocked
+              ? '전체 비공개 중'
+              : undefined
+          }
         />
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}

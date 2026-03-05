@@ -6,6 +6,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   Form,
   FormControl,
@@ -73,6 +75,7 @@ const postFormSchema = z.object({
   thumbnail: z.string().optional(),
   thumbnailImageId: z.string().optional(),
   attachedFileIds: z.array(z.string()).optional(),
+  visibility: z.enum(['public', 'private']).optional(),
   version: z.number().optional(),
 });
 
@@ -169,6 +172,7 @@ interface EditPostFormProps {
     attachedFiles?: FileUpload[];
     version?: number;
     isPublished?: boolean;
+    visibility?: 'public' | 'private';
   };
   isLoading?: boolean;
   onSubmit: (data: PostFormValues, isPublished?: boolean) => void;
@@ -179,6 +183,7 @@ interface EditPostFormProps {
   blogInfo?: {
     name: string;
     slug: string;
+    isPublic?: boolean;
   };
 }
 
@@ -203,6 +208,9 @@ export default function EditPostForm({
   const [editorMode, setEditorMode] = useState<EditorMode>(initialEditorMode);
   const [isSwitchingEditorMode, setIsSwitchingEditorMode] = useState(false);
   const [isLocalSubmitting, setIsLocalSubmitting] = useState(false);
+  const [postVisibility, setPostVisibility] = useState<'public' | 'private'>(
+    initialData?.visibility === 'private' ? 'private' : 'public',
+  );
   const [isConfirmDialogOpen, setIsConfirmDialogOpen] = useState(false);
   const [pendingEditorMode, setPendingEditorMode] = useState<EditorMode | null>(null);
   const [selectedYouTubeThumbnailId, setSelectedYouTubeThumbnailId] = useState<string | null>(initialYouTubeThumbnailId);
@@ -222,6 +230,9 @@ export default function EditPostForm({
     const targetId = initialData?.thumbnailImageId || '';
     return targetId ? attachedFileIds.indexOf(targetId) : -1;
   });
+  const isBlogPublic = blogInfo?.isPublic !== false;
+  const isPublicTransitionLocked =
+    blogInfo?.isPublic === false && postVisibility === 'private';
 
   const form = useForm<PostFormValues>({
     resolver: zodResolver(postFormSchema),
@@ -233,6 +244,7 @@ export default function EditPostForm({
       thumbnail: initialData?.thumbnail || '',
       thumbnailImageId: initialData?.thumbnailImageId || undefined, // 빈 문자열 대신 undefined 사용
       attachedFileIds: initialData?.attachedFiles?.map((file) => file.id).filter(Boolean) ?? [],
+      visibility: initialData?.visibility === 'private' ? 'private' : 'public',
     },
   });
   const watchedFileIds = form.watch('attachedFileIds');
@@ -250,6 +262,16 @@ export default function EditPostForm({
       form.setValue('categories', categories);
     }
   }, [initialData?.category, form]);
+
+  useEffect(() => {
+    const nextVisibility =
+      initialData?.visibility === 'private' ? 'private' : 'public';
+    setPostVisibility(nextVisibility);
+    form.setValue('visibility', nextVisibility, {
+      shouldDirty: false,
+      shouldTouch: false,
+    });
+  }, [form, initialData?.visibility]);
 
   useEffect(() => {
     const attachedFiles = initialData?.attachedFiles ?? [];
@@ -608,6 +630,7 @@ export default function EditPostForm({
       ...data,
       content: convertedHtml,
       content_type: 'html',
+      visibility: postVisibility,
     };
 
     if (isMarkdownMode) {
@@ -625,7 +648,7 @@ export default function EditPostForm({
     delete formData.version;
 
     return formData;
-  }, [editorMode, selectedYouTubeThumbnailId]);
+  }, [editorMode, postVisibility, selectedYouTubeThumbnailId]);
 
   const submitPreparedData = useCallback((data: PostFormValues, targetIsPublished?: boolean) => {
     // useRef를 통한 동기적 중복 제출 차단
@@ -782,7 +805,44 @@ export default function EditPostForm({
                   </FormItem>
                 )}
               />
-                    </CardContent>
+              <div className="flex flex-col items-end gap-1.5">
+                <div className="flex items-center gap-2">
+                  <Label className="text-xs font-medium">
+                    {isPublicTransitionLocked
+                      ? '포스트 비공개(잠금)'
+                      : postVisibility === 'public'
+                        ? '포스트 공개'
+                        : '포스트 비공개'}
+                  </Label>
+                  <Switch
+                    checked={postVisibility === 'public'}
+                    onCheckedChange={(checked) => {
+                      if (checked && !isBlogPublic) {
+                        return;
+                      }
+                      const nextVisibility = checked ? 'public' : 'private';
+                      setPostVisibility(nextVisibility);
+                      form.setValue('visibility', nextVisibility, {
+                        shouldDirty: true,
+                        shouldTouch: true,
+                      });
+                    }}
+                    disabled={
+                      isLoading ||
+                      isLocalSubmitting ||
+                      isPublicTransitionLocked
+                    }
+                    title={isPublicTransitionLocked ? '전체 비공개 잠금' : undefined}
+                    className="focus-visible:ring-gray-400 data-[state=checked]:bg-gray-500 dark:data-[state=checked]:bg-gray-500 [&>span:first-child]:bg-gray-500 dark:[&>span:first-child]:bg-gray-500"
+                  />
+                </div>
+                {isPublicTransitionLocked && (
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    TIP. 공개로 변경하려면 '블로그 설정'에서 전체 공개로 바꿔주세요.
+                  </p>
+                )}
+              </div>
+            </CardContent>
           </Card>
 
           {/* 내용 */}

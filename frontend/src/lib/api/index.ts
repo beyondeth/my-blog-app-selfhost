@@ -73,6 +73,13 @@ export class ExtendedApiClient extends ApiClient {
   }
   async createPost(data: any) { return this.posts.createPost(data); }
   async updatePost(id: string, data: any) { return this.posts.updatePost(id, data); }
+  async updatePostVisibility(
+    id: string,
+    visibility: 'public' | 'private',
+    version?: number,
+  ) {
+    return this.posts.updatePostVisibility(id, visibility, version);
+  }
   async deletePost(id: string) { return this.posts.deletePost(id); }
   async toggleLike(id: string) { return this.posts.toggleLike(id); }
   async batchUpdateLikes(batch: Record<string, boolean>) {
@@ -225,6 +232,11 @@ export const getPostBySlug = (slug: string, options?: { fresh?: boolean }) =>
   apiClient.getPostBySlug(slug, options);
 export const createPost = (data: any) => apiClient.createPost(data);
 export const updatePost = (id: string, data: any) => apiClient.updatePost(id, data);
+export const updatePostVisibility = (
+  id: string,
+  visibility: 'public' | 'private',
+  version?: number,
+) => apiClient.updatePostVisibility(id, visibility, version);
 export const deletePost = (id: string) => apiClient.deletePost(id);
 export const toggleLike = (postId: string) => apiClient.toggleLike(postId);
 export const batchUpdateLikes = (batch: Record<string, boolean>) => apiClient.batchUpdateLikes(batch);
@@ -260,6 +272,11 @@ export const postsAPI = {
     apiClient.getPostBySlug(slug, options),
   createPost: (data: any) => apiClient.createPost(data),
   updatePost: (id: string, data: any) => apiClient.updatePost(id, data),
+  updatePostVisibility: (
+    id: string,
+    visibility: 'public' | 'private',
+    version?: number,
+  ) => apiClient.updatePostVisibility(id, visibility, version),
   deletePost: (id: string) => apiClient.deletePost(id),
   /** @deprecated vote 사용 권장 */
   toggleLike: (id: string) => apiClient.toggleLike(id),

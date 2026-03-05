@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget, FiPlus, FiMinus } from 'react-icons/fi';
+import { FiUser, FiCalendar, FiEye, FiTag, FiArrowLeft, FiEdit3, FiTrash2, FiHeart, FiShare2, FiMoreVertical, FiFlag, FiBookmark, FiUpload, FiMessageCircle, FiTarget, FiPlus, FiMinus, FiLock, FiGlobe } from 'react-icons/fi';
 import { Post } from '@/types';
 import { ReactNode } from 'react';
 import { Avatar } from '@/components/ui/avatar';
@@ -31,6 +31,11 @@ interface PostHeaderWithReportProps {
   isEditorPick?: boolean;
   onToggleEditorPick?: () => void;
   editorPickPending?: boolean;
+  visibility?: 'public' | 'private';
+  onToggleVisibility?: () => void;
+  visibilityPending?: boolean;
+  visibilityToggleDisabled?: boolean;
+  visibilityToggleDisabledReason?: string;
   LikeButtonComponent?: ReactNode;
 }
 
@@ -52,12 +57,23 @@ export default function PostHeaderWithReport({
   isEditorPick = false,
   onToggleEditorPick,
   editorPickPending = false,
+  visibility = 'public',
+  onToggleVisibility,
+  visibilityPending = false,
+  visibilityToggleDisabled = false,
+  visibilityToggleDisabledReason,
   LikeButtonComponent
 }: PostHeaderWithReportProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const { isReportModalOpen, reportTarget, openReportModal, closeReportModal, submitReport, isSubmitting } = useReport();
   const { user } = useAuth();
   const closeDropdown = useCallback(() => setShowDropdown(false), []);
+  const actionButtonBase =
+    'flex items-center px-2.5 py-1.5 text-xs font-medium rounded-md border transition-colors disabled:opacity-60 disabled:cursor-not-allowed';
+  const neutralActionButton =
+    'border-gray-300 bg-white text-gray-700 hover:bg-gray-100 hover:border-gray-400 hover:text-gray-900 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-200 dark:hover:bg-gray-800 dark:hover:text-gray-100';
+  const dangerActionButton =
+    'border-gray-300 bg-white text-gray-600 hover:border-red-300 hover:bg-red-50 hover:text-red-700 dark:border-gray-700 dark:bg-gray-900/40 dark:text-gray-300 dark:hover:border-red-900/70 dark:hover:bg-red-950/30 dark:hover:text-red-300';
 
   useMobileOverlayReset(closeDropdown, showDropdown);
 
@@ -200,23 +216,56 @@ export default function PostHeaderWithReport({
 
           {/* 오른쪽 그룹: 수정/삭제 버튼 - 작성자 전용 */}
           {canEdit && onEdit && onDelete && (
-            <div className="flex items-center space-x-3">
-              <button
-                onClick={onEdit}
-                className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                title="수정"
-              >
-                <FiEdit3 className="mr-1 w-3 h-3" />
-                수정
-              </button>
-              <button
-                onClick={onDelete}
-                className="flex items-center px-2 py-1 text-xs text-gray-600 hover:text-gray-900 hover:bg-gray-100 dark:text-gray-400 dark:hover:text-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
-                title="삭제"
-              >
-                <FiTrash2 className="mr-1 w-3 h-3" />
-                삭제
-              </button>
+            <div className="flex flex-col items-end gap-1.5">
+              <div className="flex items-center space-x-3">
+                <button
+                  onClick={onEdit}
+                  className={`${actionButtonBase} ${neutralActionButton}`}
+                  title="수정"
+                >
+                  <FiEdit3 className="mr-1 w-3 h-3" />
+                  수정
+                </button>
+                {onToggleVisibility && (
+                  <>
+                    <button
+                      onClick={onToggleVisibility}
+                      disabled={visibilityPending || visibilityToggleDisabled}
+                      className={`${actionButtonBase} ${neutralActionButton}`}
+                      title={visibilityToggleDisabledReason || (
+                        visibility === 'private'
+                          ? '공개로 변경'
+                          : '비공개로 변경'
+                      )}
+                    >
+                      {visibilityPending ? (
+                        <>
+                          <span className="mr-1 inline-block h-3 w-3 animate-spin rounded-full border border-current border-t-transparent" />
+                          변경 중...
+                        </>
+                      ) : visibility === 'private' ? (
+                        <>
+                          <FiGlobe className="mr-1 w-3 h-3" />
+                          공개로 변경
+                        </>
+                      ) : (
+                        <>
+                          <FiLock className="mr-1 w-3 h-3" />
+                          비공개로 변경
+                        </>
+                      )}
+                    </button>
+                  </>
+                )}
+                <button
+                  onClick={onDelete}
+                  className={`${actionButtonBase} ${dangerActionButton}`}
+                  title="삭제"
+                >
+                  <FiTrash2 className="mr-1 w-3 h-3" />
+                  삭제
+                </button>
+              </div>
             </div>
           )}
         </div>
