@@ -190,7 +190,7 @@ export async function oauthMiddleware(
  */
 export async function getUserInfo(userId: string): Promise<{
   user: { id: string; username: string; email: string };
-  blog: { id: string; name: string; slug: string };
+  blog: { id: string; name: string; slug: string; isPublic?: boolean };
 } | null> {
   try {
     // Backend에서 사용자 정보 조회

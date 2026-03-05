@@ -157,7 +157,7 @@ async function validateApiKey(apiKey: string): Promise<{
   userId: string;
   blogId: string;
   user: { id: string; username: string; email: string };
-  blog: { id: string; name: string; slug: string };
+  blog: { id: string; name: string; slug: string; isPublic?: boolean };
 } | null> {
   const startTime = Date.now();
 

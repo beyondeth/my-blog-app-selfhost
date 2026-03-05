@@ -92,6 +92,12 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
           description:
             'Category (required) - Select exactly 1 category that best describes the post content',
         },
+        visibility: {
+          type: 'string',
+          enum: ['public', 'private'],
+          description:
+            'Post visibility (optional). If omitted, backend applies the user/blog default.',
+        },
         writingStyle: {
           type: 'string',
           enum: WRITING_STYLE_PRESETS,
