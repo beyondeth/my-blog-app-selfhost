@@ -11,6 +11,17 @@ const mcpRoot = path.resolve(repoRoot, "mcp-proxy-server");
 
 const TOOL_NAMES = [
   "check_auth",
+  "list_my_published_posts",
+  "search_my_published_posts",
+  "read_my_published_post",
+  "get_writing_style_guide",
+  "create_post",
+  "get_image_upload_url",
+  "finalize_uploaded_image",
+];
+
+const DOC_WORKFLOW_TOOL_NAMES = [
+  "check_auth",
   "get_writing_style_guide",
   "create_post",
   "get_image_upload_url",
@@ -20,12 +31,12 @@ const TOOL_NAMES = [
 const STYLE_PRESETS = [
   "default",
   "novel",
-  "tutorial",
-  "comedy",
   "podcast",
   "vibe",
   "research",
-  "human",
+  "pm",
+  "designer",
+  "marketer",
 ];
 
 function fail(message) {
@@ -86,9 +97,7 @@ async function verifyStaticParity() {
   ) {
     fail("WRITING_STYLE_PRESETS order mismatch in src/tools/catalog.ts");
   } else {
-    ok(
-      `Style presets include expected ${STYLE_PRESETS.length} values (including research/human)`
-    );
+    ok(`Style presets include expected ${STYLE_PRESETS.length} values`);
   }
 
   const srcIndex = await fs.readFile(
@@ -121,11 +130,11 @@ async function verifyStaticParity() {
 
   for (const doc of docsFiles) {
     const content = await read(doc);
-    const missing = TOOL_NAMES.filter((name) => !content.includes(name));
+    const missing = DOC_WORKFLOW_TOOL_NAMES.filter((name) => !content.includes(name));
     if (missing.length > 0) {
       fail(`${doc} is missing tool names: ${missing.join(", ")}`);
     } else {
-      ok(`${doc} includes all 5 tool names`);
+      ok(`${doc} includes required workflow tool names`);
     }
   }
 
@@ -177,7 +186,7 @@ async function verifyHttpParity() {
         continue;
       }
 
-      ok(`${endpoint} exposes expected 5-tool catalog`);
+      ok(`${endpoint} exposes expected ${TOOL_NAMES.length}-tool catalog`);
     } catch (error) {
       fail(`${endpoint} HTTP check failed: ${error.message}`);
     }

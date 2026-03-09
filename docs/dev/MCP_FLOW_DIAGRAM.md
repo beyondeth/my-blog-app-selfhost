@@ -279,7 +279,7 @@ sequenceDiagram
         Proxy->>StyleService: parseRawMarkdown(customMarkdown)
         Note over StyleService: 사용자 제공 스타일<br/>(최우선)
     else 프리셋 스타일
-        Proxy->>StyleService: loadAndParseStyle(style)<br/>(default/novel/tutorial/<br/>comedy/podcast)
+        Proxy->>StyleService: loadAndParseStyle(style)<br/>(default/novel/podcast/<br/>vibe/research/pm)
         Note over StyleService: 프리셋 스타일 파일<br/>읽기 및 파싱
     end
 

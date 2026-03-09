@@ -25,10 +25,8 @@ Use this style to transform technical experiences into compelling narratives wit
 **Emotional intent**: User wants to share the experience, not just the solution
 
 ### When Another Style Fits Better
-- **Step-by-step instructions needed** → Use `tutorial` style
 - **Balanced technical explanation** → Use `default` style
-- **Humorous take on mistakes** → Use `comedy` style
-- **Code-heavy content (>10%)** → Use `default` or `tutorial` style
+- **Code-heavy content (>10%)** → Use `default` or `research` style
 
 ---
 

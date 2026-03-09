@@ -181,13 +181,15 @@ export class PostsController {
 
   @Get(":id/related")
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "연관 포스트 조회" })
   @ApiResponse({ status: 200, description: "연관 포스트 목록 반환" })
   async getRelatedPosts(
     @Param("id", ParseUUIDPipe) id: string,
     @Query("limit", new DefaultValuePipe(6), ParseIntPipe) limit: number,
+    @CurrentUser() user?: User,
   ) {
-    return this.postsService.getRelatedPosts(id, limit);
+    return this.postsService.getRelatedPosts(id, limit, user);
   }
 
   @Get()

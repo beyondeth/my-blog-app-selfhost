@@ -9,8 +9,12 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../../utils/logger.js';
 import { TOOL_CATALOG, WRITING_STYLE_PRESETS } from '../../tools/catalog.js';
+import { getScopeAuthorizationError } from '../../tools/ScopePolicy.js';
 import {
   handleCheckAuth,
+  handleListMyPublishedPosts,
+  handleReadMyPublishedPost,
+  handleSearchMyPublishedPosts,
   handleCreatePost,
   handleGetWritingStyleGuide,
 } from '../../core/handlers/index.js';
@@ -67,12 +71,12 @@ type OpenAiToolPresentation = {
 const STYLE_OPTION_DETAILS: Record<string, Omit<StyleOption, 'id'>> = {
   default: { label: '기본', description: '균형 잡힌 톤으로 일반 독자에게 적합합니다.' },
   novel: { label: '소설형', description: '감정선과 서사를 강조하는 스토리텔링 톤입니다.' },
-  tutorial: { label: '튜토리얼형', description: '단계별 설명 중심의 명확한 가이드 톤입니다.' },
-  comedy: { label: '유머형', description: '가벼운 위트를 유지하면서 핵심을 전달합니다.' },
   podcast: { label: '팟캐스트형', description: '말하듯 자연스럽고 대화형 흐름을 제공합니다.' },
-  vibe: { label: '트렌디형', description: '감성적이고 공유하기 쉬운 표현을 사용합니다.' },
+  vibe: { label: '개발 성장형', description: '학습법, 커리어 성장, 멘토링 인사이트에 맞춘 톤입니다.' },
   research: { label: '리서치형', description: '근거와 분석 중심으로 신뢰도를 높입니다.' },
-  human: { label: '휴먼형', description: '개인 경험과 공감 중심으로 진정성을 강화합니다.' },
+  pm: { label: 'PM형', description: '문제 정의, 의사결정 이유, trade-off를 설득력 있게 정리합니다.' },
+  designer: { label: '디자이너형', description: '맥락, 제약, 선택 근거와 사용자 영향을 case study로 풀어냅니다.' },
+  marketer: { label: '마케터형', description: '가설, 실험, 전환 지표와 배운 점을 growth 중심으로 정리합니다.' },
 };
 
 const STYLE_OPTIONS: StyleOption[] = WRITING_STYLE_PRESETS.map((preset) => ({
@@ -87,6 +91,21 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
     title: '연결 상태 확인',
     description:
       '현재 연결된 Codebase.blog 계정을 확인합니다. 새 포스트 작성 전 반드시 가장 먼저 호출하세요.',
+  },
+  list_my_published_posts: {
+    title: '내 발행글 목록',
+    description:
+      '현재 연결된 계정이 발행한 글 목록을 페이지, 태그, 카테고리, 기간 기준으로 조회합니다.',
+  },
+  search_my_published_posts: {
+    title: '내 발행글 검색',
+    description:
+      '현재 연결된 계정의 발행글에서 키워드 검색을 실행합니다. 검색어와 메타데이터 필터를 함께 사용할 수 있습니다.',
+  },
+  read_my_published_post: {
+    title: '내 발행글 읽기',
+    description:
+      '현재 연결된 계정이 발행한 글 1건의 본문과 메타데이터를 읽습니다.',
   },
   get_writing_style_guide: {
     title: '글쓰기 스타일 가이드 불러오기',
@@ -114,6 +133,11 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
 // 직접 선택/제출하면 플로우가 끊기지 않도록 한다. (/mcp-openai 전용 정책)
 const STYLE_SELECTION_TTL_MS = 24 * 60 * 60 * 1000;
 const STYLE_FLOW_TTL_MS = 24 * 60 * 60 * 1000;
+const OPENAI_WIDGET_TOOL_NAMES = new Set<OpenAiMvpToolName>([
+  'check_auth',
+  'get_writing_style_guide',
+  'create_post',
+]);
 
 function summarizeMarkdown(raw: string | undefined): string {
   if (!raw) return '';
@@ -259,25 +283,29 @@ function getOpenAiToolDescriptors() {
       inputSchema: getOpenAiInputSchema(toolName, catalog.inputSchema),
       annotations: ANNOTATIONS[toolName],
       _meta: {
-        // 모든 tool에 위젯 첨부 — 스타일 선택 등 인터랙티브 UI가 필요
-        ui: {
-          resourceUri: OPENAI_WIDGET_URI,
-          visibility: ['model', 'app'],
-        },
-        'openai/outputTemplate': OPENAI_WIDGET_URI,
-        'openai/widgetAccessible': true,
-        'openai/visibility': 'public',
         'openai/toolInvocation/invoking':
           toolName === 'create_post'
             ? '포스트 발행 중…'
             : toolName === 'check_auth'
             ? '연결 상태 확인 중…'
+            : toolName === 'list_my_published_posts'
+            ? '발행글 목록 불러오는 중…'
+            : toolName === 'search_my_published_posts'
+            ? '발행글 검색 중…'
+            : toolName === 'read_my_published_post'
+            ? '글 읽는 중…'
             : '가이드 불러오는 중…',
         'openai/toolInvocation/invoked':
           toolName === 'create_post'
             ? '발행 완료'
             : toolName === 'check_auth'
             ? '연결 완료'
+            : toolName === 'list_my_published_posts'
+            ? '목록 준비 완료'
+            : toolName === 'search_my_published_posts'
+            ? '검색 완료'
+            : toolName === 'read_my_published_post'
+            ? '글 로드 완료'
             : '가이드 준비 완료',
         // 확인 다이얼로그 한글화 (ChatGPT native UI 제어)
         ...(toolName === 'create_post'
@@ -286,6 +314,17 @@ function getOpenAiToolDescriptors() {
               'openai/confirmation/acceptLabel': '발행',
               'openai/confirmation/rejectLabel': '취소',
               'openai/confirmation/message': '선택한 스타일에 맞춰 블로그에 게시합니다.',
+            }
+          : {}),
+        ...(OPENAI_WIDGET_TOOL_NAMES.has(toolName)
+          ? {
+              ui: {
+                resourceUri: OPENAI_WIDGET_URI,
+                visibility: ['model', 'app'],
+              },
+              'openai/outputTemplate': OPENAI_WIDGET_URI,
+              'openai/widgetAccessible': true,
+              'openai/visibility': 'public',
             }
           : {}),
       },
@@ -329,6 +368,10 @@ export async function registerOpenAiTools(
         '',
         '## Step 1: Authentication',
         '- Always call `check_auth` first to verify the connection.',
+        '',
+        '## Optional: Review Existing Posts',
+        '- To review previous writing, call `list_my_published_posts`, `search_my_published_posts`, or `read_my_published_post` as needed.',
+        '- These tools are read-only and do not change the posting workflow.',
         '',
         '## Step 2: Show Style Widget',
         '- You MUST call `get_writing_style_guide` (without arguments) to display the style selection widget to the user.',
@@ -378,6 +421,46 @@ export async function registerOpenAiTools(
     const args = (request.params.arguments || {}) as Record<string, unknown>;
 
     try {
+      const scopeError = getScopeAuthorizationError(toolName, context);
+      if (scopeError) {
+        context.metricsService.recordRequest('error', toolName, context.route);
+        logger.warn(
+          {
+            route: 'mcp-openai',
+            toolName,
+            userId: context.userData.userId.substring(0, 8),
+            missingScopes: scopeError.missingScopes,
+            grantedScopes: scopeError.grantedScopes,
+          },
+          '⛔ OpenAI tool blocked by OAuth scope policy'
+        );
+        return {
+          isError: true,
+          content: [
+            {
+              type: 'text',
+              text:
+                `이 도구를 실행할 권한이 없습니다. `
+                + `필요 scope: ${scopeError.requiredScopes.join(', ')} / `
+                + `현재 scope: ${scopeError.grantedScopes.join(', ') || '(none)'}`,
+            },
+          ],
+          structuredContent: {
+            status: 'forbidden',
+            error: 'insufficient_scope',
+            tool: toolName,
+            requiredScopes: scopeError.requiredScopes,
+            grantedScopes: scopeError.grantedScopes,
+            missingScopes: scopeError.missingScopes,
+          },
+          _meta: {
+            summary: `권한 부족으로 ${toolName} 호출이 차단되었습니다.`,
+            status: 'forbidden',
+            route: 'mcp-openai',
+          },
+        } satisfies ToolResult;
+      }
+
       let result: ToolResult;
 
       if (toolName === 'check_auth') {
@@ -409,7 +492,13 @@ export async function registerOpenAiTools(
             blogUrl,
             authMode: context.oauthToken ? 'oauth2' : 'api_key',
             workflowStage: 'awaiting_style_selection',
-            capabilities: ['load_style_guide', 'create_post'],
+            capabilities: [
+              'load_style_guide',
+              'create_post',
+              'list_my_published_posts',
+              'search_my_published_posts',
+              'read_my_published_post',
+            ],
             connectionHint,
           },
           _meta: {
@@ -422,6 +511,38 @@ export async function registerOpenAiTools(
             route: 'mcp-openai',
           },
         };
+      } else if (toolName === 'list_my_published_posts') {
+        result = await handleListMyPublishedPosts(
+          {
+            page: typeof args.page === 'number' ? args.page : undefined,
+            limit: typeof args.limit === 'number' ? args.limit : undefined,
+            category: typeof args.category === 'string' ? args.category : undefined,
+            tag: typeof args.tag === 'string' ? args.tag : undefined,
+            dateFrom: typeof args.dateFrom === 'string' ? args.dateFrom : undefined,
+            dateTo: typeof args.dateTo === 'string' ? args.dateTo : undefined,
+          },
+          context
+        );
+      } else if (toolName === 'search_my_published_posts') {
+        result = await handleSearchMyPublishedPosts(
+          {
+            query: typeof args.query === 'string' ? args.query : '',
+            page: typeof args.page === 'number' ? args.page : undefined,
+            limit: typeof args.limit === 'number' ? args.limit : undefined,
+            category: typeof args.category === 'string' ? args.category : undefined,
+            tag: typeof args.tag === 'string' ? args.tag : undefined,
+            dateFrom: typeof args.dateFrom === 'string' ? args.dateFrom : undefined,
+            dateTo: typeof args.dateTo === 'string' ? args.dateTo : undefined,
+          },
+          context
+        );
+      } else if (toolName === 'read_my_published_post') {
+        result = await handleReadMyPublishedPost(
+          {
+            postId: typeof args.postId === 'string' ? args.postId : '',
+          },
+          context
+        );
       } else if (toolName === 'get_writing_style_guide') {
         const userId = context.userData.userId;
         const styleArg = typeof args.style === 'string' ? args.style : undefined;
@@ -585,6 +706,7 @@ export async function registerOpenAiTools(
           {
             style: styleArg,
             customMarkdown: args.customMarkdown as string | undefined,
+            styleAlias: args.styleAlias as string | undefined,
           },
           context
         );
@@ -613,6 +735,7 @@ export async function registerOpenAiTools(
         result = {
           content: raw.content,
           structuredContent: {
+            ...((raw.structuredContent as Record<string, unknown> | undefined) || {}),
             status: 'guide_ready',
             style: selectedStyle.id,
             styleLabel: selectedStyle.label,

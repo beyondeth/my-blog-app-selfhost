@@ -9,6 +9,7 @@ import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { safeDecodeMessage, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
+import { parseMcpScopes } from '@/lib/mcpScopes';
 
 const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
 
@@ -55,6 +56,7 @@ function LoginPageContent() {
   const mcpCallbackUrl = searchParams.get('callback_url');
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
+  const requestedMcpScopes = parseMcpScopes(mcpScope);
   const registerHref = isMcpOAuth && mcpState && mcpCallbackUrl
     ? `/register?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
     : '/register';
@@ -383,8 +385,19 @@ function LoginPageContent() {
                     <p className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300 mt-1">
                       로그인하여 {mcpClientName}에 블로그 접근 권한을 부여합니다.
                     </p>
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-2">
-                      요청된 권한: {mcpScope.split(' ').join(', ')}
+                    <div className="mt-3 space-y-2">
+                      {requestedMcpScopes.map((scope) => (
+                        <div
+                          key={scope.scope}
+                          className="rounded-lg border border-indigo-100 bg-white/60 px-3 py-2 text-xs dark:border-indigo-800/60 dark:bg-indigo-950/30"
+                        >
+                          <p className="font-semibold text-indigo-900 dark:text-indigo-100">{scope.label}</p>
+                          <p className="mt-1 text-indigo-700 dark:text-indigo-300">{scope.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-3">
+                      연결 후에는 설정의 Connected Apps에서 언제든 권한을 취소할 수 있습니다.
                     </p>
                   </div>
                 </div>

@@ -19,6 +19,8 @@ import {
   PostLifecyclePayload,
 } from "../events/post-lifecycle.events";
 import { CacheService } from "../../cache/cache.service";
+import { PostMetadataSyncService } from "./post-metadata-sync.service";
+import { PostSearchVectorService } from "./post-search-vector.service";
 
 /**
  * 포스트 생성 전담 서비스
@@ -44,6 +46,8 @@ export class PostCreator {
     private readonly dataSource: DataSource,
     private readonly ipSecurityService: IpSecurityService,
     private readonly cacheService: CacheService,
+    private readonly postMetadataSyncService: PostMetadataSyncService,
+    private readonly postSearchVectorService: PostSearchVectorService,
   ) {}
 
   /**
@@ -273,21 +277,6 @@ export class PostCreator {
           `[PostCreator] Post saved - ID: ${savedPost.id}, Tags: ${JSON.stringify(savedPost.tags)}, Input Tags: ${JSON.stringify(createPostDto.tags)}`,
         );
 
-        // 6.1. 검색 벡터 업데이트 (트리거 없이 직접 처리)
-        if (savedPost.title || savedPost.content) {
-          const searchText =
-            `${savedPost.title || ""} ${savedPost.content || ""}`.trim();
-          if (searchText) {
-            await manager.query(
-              `UPDATE posts SET search_vector = to_tsvector('simple', $1) WHERE id = $2`,
-              [searchText, savedPost.id],
-            );
-            this.logger.debug(
-              `[PostCreator] Search vector updated for post: ${savedPost.id}`,
-            );
-          }
-        }
-
         // 7. PostStats 생성
         const stats = manager.create(PostStats, {
           postId: savedPost.id,
@@ -314,17 +303,35 @@ export class PostCreator {
           readingTime: readingStats.readingTimeMinutes,
         });
 
-        const metadata = manager.create(PostMetadata, {
-          postId: savedPost.id,
-          category: createPostDto.category, // 카테고리 저장
-          tags: createPostDto.tags || [], // 태그 저장
-          excerpt: excerpt, // 요약문 저장
-          wordCount: readingStats.wordCount,
-          readingTimeMinutes: readingStats.readingTimeMinutes,
-          lastEditedAt: new Date(),
-          editCount: 0,
-        });
+        const metadata = this.postMetadataSyncService.syncShadowFromPost(
+          savedPost,
+          manager.create(PostMetadata, {
+            postId: savedPost.id,
+            wordCount: readingStats.wordCount,
+            readingTimeMinutes: readingStats.readingTimeMinutes,
+            lastEditedAt: new Date(),
+            editCount: 0,
+          }),
+        );
+
+        metadata.excerpt = excerpt;
+        metadata.wordCount = readingStats.wordCount;
+        metadata.readingTimeMinutes = readingStats.readingTimeMinutes;
+        metadata.lastEditedAt = new Date();
+        metadata.editCount = 0;
         await manager.save(metadata);
+
+        if (savedPost.isPublished) {
+          await this.postSearchVectorService.syncSearchVector(
+            savedPost.id,
+            savedPost,
+            manager,
+          );
+          savedPost.indexedAt = new Date();
+          this.logger.debug(
+            `[PostCreator] Search vector synced for post: ${savedPost.id}`,
+          );
+        }
 
         // Debug: 저장된 메타데이터의 태그 확인
         this.logger.debug(

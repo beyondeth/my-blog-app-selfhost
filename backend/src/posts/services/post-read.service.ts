@@ -70,6 +70,125 @@ export class PostReadService {
     private readonly dataSource: DataSource,
   ) {}
 
+  async findMyPublishedPosts(
+    userId: string,
+    options?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      category?: string;
+      tag?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    },
+  ): Promise<{ posts: Post[]; total: number; page: number; limit: number }> {
+    const page = Math.max(1, options?.page || 1);
+    const limit = Math.min(50, Math.max(1, options?.limit || 20));
+    const queryBuilder = this.postsRepository
+      .createQueryBuilder("post")
+      .leftJoinAndSelect("post.blog", "blog")
+      .leftJoinAndSelect("post.author", "author")
+      .leftJoinAndSelect("author.profile", "profile")
+      .leftJoinAndSelect("post.stats", "stats")
+      .leftJoin("post.metadata", "metadata")
+      .addSelect([
+        "metadata.readingTimeMinutes",
+        "metadata.wordCount",
+        "metadata.lastEditedAt",
+      ])
+      .where("post.authorId = :userId", { userId })
+      .andWhere("post.isPublished = true")
+      .andWhere("post.status = :status", { status: "published" })
+      .andWhere("post.isDeleted = false");
+
+    if (options?.category) {
+      queryBuilder.andWhere("post.category = :category", {
+        category: options.category,
+      });
+    }
+
+    if (options?.tag) {
+      queryBuilder.andWhere("post.tags @> :tag", {
+        tag: JSON.stringify([options.tag]),
+      });
+    }
+
+    if (options?.dateFrom) {
+      queryBuilder.andWhere(`post.publishedAt >= :dateFrom`, {
+        dateFrom: options.dateFrom,
+      });
+    }
+
+    if (options?.dateTo) {
+      queryBuilder.andWhere(`post.publishedAt <= :dateTo`, {
+        dateTo: options.dateTo,
+      });
+    }
+
+    const sanitizedSearch = options?.search
+      ?.trim()
+      .replace(/[^\p{L}\p{N}\s_-]/gu, " ")
+      .replace(/\s+/g, " ");
+
+    if (sanitizedSearch) {
+      queryBuilder
+        .addSelect(
+          `ts_rank(post.search_vector, plainto_tsquery('simple', :searchQuery))`,
+          "search_rank",
+        )
+        .andWhere(
+          `(post.search_vector @@ plainto_tsquery('simple', :searchQuery)
+            OR post.title ILIKE :searchLike
+            OR post.excerpt ILIKE :searchLike
+            OR EXISTS (
+              SELECT 1
+              FROM jsonb_array_elements_text(post.tags) AS tag
+              WHERE tag ILIKE :searchLike
+            ))`,
+          {
+            searchQuery: sanitizedSearch,
+            searchLike: `%${sanitizedSearch}%`,
+          },
+        )
+        .orderBy("search_rank", "DESC")
+        .addOrderBy("post.publishedAt", "DESC");
+    } else {
+      queryBuilder.orderBy("post.publishedAt", "DESC");
+    }
+
+    queryBuilder.skip((page - 1) * limit).take(limit);
+
+    const [posts, total] = await queryBuilder.getManyAndCount();
+    return { posts, total, page, limit };
+  }
+
+  async findMyPublishedPostById(userId: string, postId: string): Promise<Post> {
+    const post = await this.postsRepository.findOne({
+      where: {
+        id: postId,
+        authorId: userId,
+        isPublished: true,
+        status: "published",
+        isDeleted: false,
+      },
+      relations: [
+        "blog",
+        "author",
+        "author.profile",
+        "stats",
+        "metadata",
+        "thumbnailImage",
+        "attachedFiles",
+      ],
+    });
+
+    if (!post) {
+      throw new NotFoundException("발행된 포스트를 찾을 수 없습니다.");
+    }
+
+    return post;
+  }
+
   /**
    * 연관 포스트 추천 (Relevance + Popularity)
    *
@@ -77,21 +196,29 @@ export class PostReadService {
    * @param limit 반환할 개수 (default: 6)
    * @returns 추천 포스트 목록
    */
-  async getRelatedPosts(postId: string, limit: number = 6): Promise<Post[]> {
+  async getRelatedPosts(
+    postId: string,
+    limit: number = 6,
+    user?: User,
+  ): Promise<Post[]> {
     // 1. 기준 포스트 정보 조회 (Category, Tags, BlogId)
     const post = await this.postsRepository.findOne({
       where: { id: postId },
       relations: ["blog"],
-      select: ["id", "category", "tags", "blogId"],
+      select: ["id", "category", "tags", "blogId", "authorId"],
     });
 
     if (!post || !post.blogId) {
       return [];
     }
 
+    const isOwnerOrAdmin = this.postAccessPolicyService.isOwnerOrAdmin(user, {
+      authorId: post.authorId,
+      blogOwnerId: post.blog?.userId,
+    });
+
     const { blogId, category, tags } = post;
     const relevanceLimit = Math.ceil(limit * 0.7); // 70% 연관성
-    const popularityLimit = limit - relevanceLimit; // 30% 인기성
 
     // 2. 연관성 기반 조회 (같은 카테고리 OR 태그 겹침)
     // 최신순 정렬
@@ -105,12 +232,16 @@ export class PostReadService {
       .where("post.blogId = :blogId", { blogId })
       .andWhere("post.id != :postId", { postId }) // 현재 포스트 제외
       .andWhere("post.isPublished = true")
-      .andWhere("post.isDeleted = false")
-      .andWhere("post.visibility = :publicVisibility", {
-        publicVisibility:
-          this.postAccessPolicyService.getPublicVisibilityQueryValue(),
-      })
-      .andWhere("blog.isPublic = true");
+      .andWhere("post.isDeleted = false");
+
+    if (!isOwnerOrAdmin) {
+      relevanceQuery
+        .andWhere("post.visibility = :publicVisibility", {
+          publicVisibility:
+            this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+        })
+        .andWhere("blog.isPublic = true");
+    }
 
     // 카테고리 또는 태그 조건 (OR 로직)
     const conditions: string[] = [];
@@ -147,7 +278,7 @@ export class PostReadService {
 
     let popularPosts: Post[] = [];
     if (remainingLimit > 0) {
-      popularPosts = await this.postsRepository
+      const popularityQuery = this.postsRepository
         .createQueryBuilder("post")
         .innerJoin("post.blog", "blog")
         .leftJoinAndSelect("post.thumbnailImage", "thumbnailImage")
@@ -157,16 +288,21 @@ export class PostReadService {
         .where("post.blogId = :blogId", { blogId })
         .andWhere("post.id NOT IN (:...excludedIds)", { excludedIds })
         .andWhere("post.isPublished = true")
-        .andWhere("post.isDeleted = false")
-        .andWhere("post.visibility = :publicVisibility", {
-          publicVisibility:
-            this.postAccessPolicyService.getPublicVisibilityQueryValue(),
-        })
-        .andWhere("blog.isPublic = true")
+        .andWhere("post.isDeleted = false");
 
-        // PostStats와 조인하여 viewCount 정렬 (Index 활용 확인 필요하지만 일단 기능 구현)
-        // Note: Post 엔티티에 viewCount 컬럼(역정규화)이 있다면 그것을 쓰는게 빠름.
-        // Post 엔티티에 viewCount가 있으므로 그것을 사용.
+      if (!isOwnerOrAdmin) {
+        popularityQuery
+          .andWhere("post.visibility = :publicVisibility", {
+            publicVisibility:
+              this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+          })
+          .andWhere("blog.isPublic = true");
+      }
+
+      // PostStats와 조인하여 viewCount 정렬 (Index 활용 확인 필요하지만 일단 기능 구현)
+      // Note: Post 엔티티에 viewCount 컬럼(역정규화)이 있다면 그것을 쓰는게 빠름.
+      // Post 엔티티에 viewCount가 있으므로 그것을 사용.
+      popularPosts = await popularityQuery
         .orderBy("post.viewCount", "DESC")
         .take(remainingLimit)
         .getMany();
@@ -370,10 +506,7 @@ export class PostReadService {
       // 게시글이 비공개인 경우
       if (!post.isPublished) {
         // 작성자 본인 또는 블로그 소유자만 접근 가능
-        if (
-          !user ||
-          !isOwnerOrAdmin
-        ) {
+        if (!user || !isOwnerOrAdmin) {
           throw new NotFoundException("게시글을 찾을 수 없습니다.");
         }
       }
@@ -427,9 +560,8 @@ export class PostReadService {
       return true;
     }
 
-    const normalizedVisibility = this.postAccessPolicyService.normalizeVisibility(
-      cachedPost?.visibility,
-    );
+    const normalizedVisibility =
+      this.postAccessPolicyService.normalizeVisibility(cachedPost?.visibility);
 
     return (
       cachedPost?.isPublished !== false &&
@@ -881,7 +1013,8 @@ export class PostReadService {
       .where("post.isPublished = :isPublished", { isPublished: true })
       .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
       .andWhere("post.visibility = :postVisibility", {
-        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+        postVisibility:
+          this.postAccessPolicyService.getPublicVisibilityQueryValue(),
       })
       .andWhere("blog.isPublic = true")
       .andWhere("metadata.isEditorPick = :isEditorPick", { isEditorPick: true })
@@ -937,7 +1070,8 @@ export class PostReadService {
       .andWhere("post.isDeleted = false")
       .andWhere("post.status = :status", { status: "published" })
       .andWhere("post.visibility = :postVisibility", {
-        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+        postVisibility:
+          this.postAccessPolicyService.getPublicVisibilityQueryValue(),
       })
       .andWhere("blog.isPublic = true")
       .andWhere("post.category IS NOT NULL")
@@ -976,7 +1110,8 @@ export class PostReadService {
       .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
       .andWhere("post.status = :status", { status: "published" })
       .andWhere("post.visibility = :postVisibility", {
-        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+        postVisibility:
+          this.postAccessPolicyService.getPublicVisibilityQueryValue(),
       })
       .andWhere("blog.isPublic = true")
       .andWhere("post.category = :category", { category })
@@ -994,7 +1129,8 @@ export class PostReadService {
       .andWhere("post.isDeleted = :isDeleted", { isDeleted: false })
       .andWhere("post.status = :status", { status: "published" })
       .andWhere("post.visibility = :postVisibility", {
-        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+        postVisibility:
+          this.postAccessPolicyService.getPublicVisibilityQueryValue(),
       })
       .andWhere("blog.isPublic = true")
       .andWhere("post.category = :category", { category })
@@ -1022,7 +1158,8 @@ export class PostReadService {
       .andWhere("post.isDeleted = false")
       .andWhere("post.status = :status", { status: "published" })
       .andWhere("post.visibility = :postVisibility", {
-        postVisibility: this.postAccessPolicyService.getPublicVisibilityQueryValue(),
+        postVisibility:
+          this.postAccessPolicyService.getPublicVisibilityQueryValue(),
       })
       .andWhere("blog.isPublic = true")
       .andWhere("jsonb_array_length(post.tags) > 0")

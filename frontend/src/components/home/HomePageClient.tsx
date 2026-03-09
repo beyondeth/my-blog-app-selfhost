@@ -39,6 +39,7 @@ const ConnectionsSection = lazy(() => import('@/components/ConnectionsSection'))
 const TrendingCommunityPostsSection = lazy(() => import('@/components/layout/TrendingCommunityPostsSection'));
 const MyCommunitiesSection = lazy(() => import('@/components/layout/MyCommunitiesSection'));
 import SidebarCtaSection from '@/components/layout/SidebarCtaSection';
+import KakaoOpenChatSection from '@/components/layout/KakaoOpenChatSection';
 
 /**
  * 홈 페이지 메인 컴포넌트 (Client Side)
@@ -648,6 +649,8 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                   <MyCommunitiesSection />
                 </Suspense>
               )}
+
+              <KakaoOpenChatSection />
 
               {/* Trending Community Posts */}
               <Suspense fallback={<div className="h-64 bg-[#EEF3F8] dark:bg-[#1A232E] animate-pulse rounded-3xl" />}>

@@ -119,7 +119,7 @@ export default function HowItWorksSection() {
               </div>
               <div className="flex-1">
                 <div className="bg-cyan-600 text-white px-4 py-2 rounded-2xl rounded-tl-sm inline-block">
-                  <p className="text-sm">위 내용 자동포스팅해줘 --tutorial</p>
+                  <p className="text-sm">위 내용 자동포스팅해줘 --default</p>
                 </div>
               </div>
             </div>
@@ -129,13 +129,13 @@ export default function HowItWorksSection() {
               </div>
               <div className="flex-1">
                 <div className="bg-gray-700 text-gray-100 px-4 py-2 rounded-2xl rounded-tl-sm inline-block">
-                  <p className="text-sm">네, 튜토리얼 스타일로 작성하겠습니다! 🚀</p>
+                  <p className="text-sm">네, 기본 스타일로 정리해서 발행할게요. 🚀</p>
                 </div>
               </div>
             </div>
           </div>
           <div className="flex flex-wrap gap-2">
-            {['--tutorial', '--novel', '--comedy', '--podcast', '--default'].map((style) => (
+            {['--default', '--novel', '--podcast', '--pm', '--marketer'].map((style) => (
               <span
                 key={style}
                 className="px-3 py-1 bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 rounded-full text-xs font-mono font-semibold"

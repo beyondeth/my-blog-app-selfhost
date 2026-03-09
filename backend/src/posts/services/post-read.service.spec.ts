@@ -234,6 +234,142 @@ describe("PostReadService", () => {
     );
   });
 
+  describe("findMyPublishedPosts", () => {
+    const createListQueryBuilder = () => {
+      const qb: any = {
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        skip: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getManyAndCount: jest.fn().mockResolvedValue([[{ id: "post-1" }], 1]),
+      };
+      return qb;
+    };
+
+    it("queries only the user's published posts with filters", async () => {
+      const { service, postsRepository } = createService();
+      const queryBuilder = createListQueryBuilder();
+      postsRepository.createQueryBuilder.mockReturnValue(queryBuilder);
+
+      const result = await service.findMyPublishedPosts("user-1", {
+        page: 2,
+        limit: 10,
+        category: "Tech",
+        tag: "mcp",
+        dateFrom: "2026-03-01",
+        dateTo: "2026-03-31",
+      });
+
+      expect(postsRepository.createQueryBuilder).toHaveBeenCalledWith("post");
+      expect(queryBuilder.where).toHaveBeenCalledWith(
+        "post.authorId = :userId",
+        {
+          userId: "user-1",
+        },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        "post.isPublished = true",
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        "post.status = :status",
+        { status: "published" },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        "post.isDeleted = false",
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        "post.category = :category",
+        { category: "Tech" },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith("post.tags @> :tag", {
+        tag: JSON.stringify(["mcp"]),
+      });
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        "post.publishedAt >= :dateFrom",
+        { dateFrom: "2026-03-01" },
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        "post.publishedAt <= :dateTo",
+        { dateTo: "2026-03-31" },
+      );
+      expect(queryBuilder.orderBy).toHaveBeenCalledWith(
+        "post.publishedAt",
+        "DESC",
+      );
+      expect(queryBuilder.skip).toHaveBeenCalledWith(10);
+      expect(queryBuilder.take).toHaveBeenCalledWith(10);
+      expect(result).toEqual({
+        posts: [{ id: "post-1" }],
+        total: 1,
+        page: 2,
+        limit: 10,
+      });
+    });
+
+    it("applies search rank ordering when search is provided", async () => {
+      const { service, postsRepository } = createService();
+      const queryBuilder = createListQueryBuilder();
+      postsRepository.createQueryBuilder.mockReturnValue(queryBuilder);
+
+      await service.findMyPublishedPosts("user-1", {
+        search: "react@hooks",
+      });
+
+      expect(queryBuilder.addSelect).toHaveBeenCalledWith(
+        `ts_rank(post.search_vector, plainto_tsquery('simple', :searchQuery))`,
+        "search_rank",
+      );
+      expect(queryBuilder.andWhere).toHaveBeenCalledWith(
+        expect.stringContaining("post.search_vector @@ plainto_tsquery"),
+        {
+          searchQuery: "react hooks",
+          searchLike: "%react hooks%",
+        },
+      );
+      expect(queryBuilder.orderBy).toHaveBeenCalledWith("search_rank", "DESC");
+      expect(queryBuilder.addOrderBy).toHaveBeenCalledWith(
+        "post.publishedAt",
+        "DESC",
+      );
+    });
+  });
+
+  describe("findMyPublishedPostById", () => {
+    it("returns a published post owned by the user", async () => {
+      const { service, postsRepository } = createService();
+      postsRepository.findOne.mockResolvedValue({ id: "post-7" });
+
+      const result = await service.findMyPublishedPostById("user-1", "post-7");
+
+      expect(postsRepository.findOne).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            id: "post-7",
+            authorId: "user-1",
+            isPublished: true,
+            status: "published",
+            isDeleted: false,
+          }),
+        }),
+      );
+      expect(result).toEqual({ id: "post-7" });
+    });
+
+    it("throws when the post is not found for the user", async () => {
+      const { service, postsRepository } = createService();
+      postsRepository.findOne.mockResolvedValue(null);
+
+      await expect(
+        service.findMyPublishedPostById("user-1", "post-missing"),
+      ).rejects.toThrow("발행된 포스트를 찾을 수 없습니다.");
+    });
+  });
+
   describe("Blog isPublic 2nd Defense", () => {
     it("throws NotFoundException when non-owner accesses post from private blog via slug", async () => {
       const {
@@ -412,7 +548,10 @@ describe("PostReadService", () => {
       });
 
       await expect(
-        service.findBySlug("secret-post", { id: "other-user", role: "user" } as any),
+        service.findBySlug("secret-post", {
+          id: "other-user",
+          role: "user",
+        } as any),
       ).rejects.toThrow("게시글을 찾을 수 없습니다.");
     });
 
@@ -455,15 +594,103 @@ describe("PostReadService", () => {
         new Map(),
       );
 
-      await service.findBySlug(
-        "owner-secret-post",
-        { id: "author-1", role: "user" } as any,
-      );
+      await service.findBySlug("owner-secret-post", {
+        id: "author-1",
+        role: "user",
+      } as any);
 
       expect(cacheService.set).not.toHaveBeenCalledWith(
         CacheKeys.POST_CORE("post-private-visibility-2"),
         expect.anything(),
         expect.anything(),
+      );
+    });
+  });
+
+  describe("getRelatedPosts visibility", () => {
+    const createQueryBuilderMock = () => {
+      const qb: any = {
+        innerJoin: jest.fn().mockReturnThis(),
+        leftJoinAndSelect: jest.fn().mockReturnThis(),
+        leftJoin: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([]),
+      };
+      return qb;
+    };
+
+    it("applies public filters for anonymous viewer", async () => {
+      const { service, postsRepository } = createService();
+      const relevanceQb = createQueryBuilderMock();
+      const popularityQb = createQueryBuilderMock();
+
+      postsRepository.findOne.mockResolvedValue({
+        id: "post-1",
+        blogId: "blog-1",
+        authorId: "author-1",
+        category: "Tech",
+        tags: ["ai"],
+        blog: { userId: "author-1", isPublic: false },
+      });
+      postsRepository.createQueryBuilder
+        .mockReturnValueOnce(relevanceQb)
+        .mockReturnValueOnce(popularityQb);
+
+      await service.getRelatedPosts("post-1", 6, undefined);
+
+      expect(relevanceQb.andWhere).toHaveBeenCalledWith(
+        "post.visibility = :publicVisibility",
+        { publicVisibility: "public" },
+      );
+      expect(relevanceQb.andWhere).toHaveBeenCalledWith("blog.isPublic = true");
+      expect(popularityQb.andWhere).toHaveBeenCalledWith(
+        "post.visibility = :publicVisibility",
+        { publicVisibility: "public" },
+      );
+      expect(popularityQb.andWhere).toHaveBeenCalledWith(
+        "blog.isPublic = true",
+      );
+    });
+
+    it("does not apply public filters for owner viewer", async () => {
+      const { service, postsRepository } = createService();
+      const relevanceQb = createQueryBuilderMock();
+      const popularityQb = createQueryBuilderMock();
+
+      postsRepository.findOne.mockResolvedValue({
+        id: "post-1",
+        blogId: "blog-1",
+        authorId: "author-1",
+        category: "Tech",
+        tags: ["ai"],
+        blog: { userId: "author-1", isPublic: false },
+      });
+      postsRepository.createQueryBuilder
+        .mockReturnValueOnce(relevanceQb)
+        .mockReturnValueOnce(popularityQb);
+
+      await service.getRelatedPosts("post-1", 6, {
+        id: "author-1",
+        role: "user",
+      } as any);
+
+      expect(relevanceQb.andWhere).not.toHaveBeenCalledWith(
+        "post.visibility = :publicVisibility",
+        expect.anything(),
+      );
+      expect(relevanceQb.andWhere).not.toHaveBeenCalledWith(
+        "blog.isPublic = true",
+      );
+      expect(popularityQb.andWhere).not.toHaveBeenCalledWith(
+        "post.visibility = :publicVisibility",
+        expect.anything(),
+      );
+      expect(popularityQb.andWhere).not.toHaveBeenCalledWith(
+        "blog.isPublic = true",
       );
     });
   });

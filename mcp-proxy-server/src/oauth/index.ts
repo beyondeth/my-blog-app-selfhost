@@ -314,6 +314,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         },
         apiKey: null,  // OAuth 모드에서는 API Key 없음
         oauthToken: oauth.token,  // 대신 OAuth 토큰 전달
+        oauthScope: oauth.scope,
         metricsService,
         route: 'mcp-remote',
         config: {

@@ -25,10 +25,8 @@ Use this style for analyzing academic papers and translating them into clear, pr
 **Intent**: Reader wants to understand a paper's contribution and what it means in practice
 
 ### When Another Style Fits Better
-- **Step-by-step implementation** → Use `tutorial` style
 - **General concept explanation** → Use `default` style
 - **Story-driven experience** → Use `novel` style
-- **Humorous take** → Use `comedy` style
 - **Conversational dialogue** → Use `podcast` style
 - **Mentoring/learning guide** → Use `vibe` style
 

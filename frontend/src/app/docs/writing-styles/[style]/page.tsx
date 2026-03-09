@@ -16,16 +16,17 @@ import {
  * 개별 스타일의 원본 마크다운 가이드를 표시하고 복사 기능 제공
  */
 
-const VALID_STYLES = ['default', 'novel', 'tutorial', 'comedy', 'podcast', 'vibe', 'research', '_common'];
+const VALID_STYLES = ['default', 'novel', 'podcast', 'vibe', 'research', 'pm', 'designer', 'marketer', '_common'];
 
 const STYLE_NAMES: Record<string, string> = {
   default: 'Default - 전문적인 기술 블로그',
   novel: 'Novel - 서사적인 스토리텔링',
-  tutorial: 'Tutorial - 단계별 튜토리얼',
-  comedy: 'Comedy - 유머러스한 경험 공유',
   podcast: 'Podcast - 대화형 팟캐스트',
   vibe: 'Vibe - 개발자 학습 가이드',
   research: 'Research - 논문 분석 인사이트',
+  pm: 'PM - 제품 전략과 의사결정',
+  designer: 'Designer - 디자인 케이스 스터디',
+  marketer: 'Marketer - 성장과 퍼포먼스 마케팅',
   _common: 'Common Rules - 공통 규칙',
 };
 

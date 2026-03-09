@@ -25,10 +25,9 @@ Use this style for audio-friendly, conversational content formatted as dialogue 
 **Intent**: Conversational, easy-to-follow explanation without visual dependency
 
 ### When Another Style Fits Better
-- **Code-heavy implementation** → Use `tutorial` style
+- **Code-heavy implementation** → Use `default` style
 - **Visual diagrams essential** → Use `default` style
 - **Narrative storytelling** → Use `novel` style
-- **Humorous take** → Use `comedy` style
 
 ---
 

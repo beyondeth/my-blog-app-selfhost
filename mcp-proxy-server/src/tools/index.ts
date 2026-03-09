@@ -23,12 +23,16 @@ import {
   TOOL_CATALOG,
   type ToolName,
 } from './catalog.js';
+import { getScopeAuthorizationError } from './ScopePolicy.js';
 import type { ToolContext } from '../core/types.js';
 import {
   handleCheckAuth,
   handleCreatePost,
   handleFinalizeUploadedImage,
   handleGetImageUploadUrl,
+  handleListMyPublishedPosts,
+  handleReadMyPublishedPost,
+  handleSearchMyPublishedPosts,
   handleGetWritingStyleGuide,
 } from '../core/handlers/index.js';
 
@@ -83,8 +87,46 @@ export async function registerAllTools(
       blogSlug: context.userData.blog.slug,
     }, '🔧 Tool called');
 
+    const scopeError = getScopeAuthorizationError(toolName, context);
+    if (scopeError) {
+      context.metricsService.recordRequest('error', toolName, context.route);
+      logger.warn({
+        tool: toolName,
+        route: context.route,
+        userId: context.userData.userId.substring(0, 8),
+        missingScopes: scopeError.missingScopes,
+        grantedScopes: scopeError.grantedScopes,
+      }, '⛔ Tool blocked by OAuth scope policy');
+      return {
+        isError: true,
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(
+              {
+                status: 'forbidden',
+                error: 'insufficient_scope',
+                tool: toolName,
+                requiredScopes: scopeError.requiredScopes,
+                grantedScopes: scopeError.grantedScopes,
+                missingScopes: scopeError.missingScopes,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+
     const handlers: Record<ToolName, (toolArgs: any) => Promise<any>> = {
       check_auth: async () => handleCheckAuth(context),
+      list_my_published_posts: async (toolArgs) =>
+        handleListMyPublishedPosts((toolArgs || {}) as any, context),
+      search_my_published_posts: async (toolArgs) =>
+        handleSearchMyPublishedPosts((toolArgs || {}) as any, context),
+      read_my_published_post: async (toolArgs) =>
+        handleReadMyPublishedPost((toolArgs || {}) as any, context),
       get_writing_style_guide: async (toolArgs) =>
         handleGetWritingStyleGuide((toolArgs || {}) as any, context),
       create_post: async (toolArgs) => handleCreatePost((toolArgs || {}) as any, context),
@@ -145,7 +187,7 @@ export async function registerAllTools(
  */
 async function registerPrompts(mcpServer: McpServer): Promise<void> {
   const styleService = new WritingStyleService();
-  const defaultStyle = await styleService.loadAndParseStyle('default');
+  const commonPrompts = await styleService.loadCommonPromptBundle();
 
   const prompts = [
     {
@@ -173,13 +215,13 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
 
     switch (name) {
       case 'markdown_quality_guidelines':
-        content = defaultStyle.qualityGuidelinesPrompt;
+        content = commonPrompts.qualityGuidelinesPrompt;
         break;
       case 'blog_post_template':
-        content = defaultStyle.blogPostTemplatePrompt;
+        content = commonPrompts.blogPostTemplatePrompt;
         break;
       case 'improve_markdown':
-        content = defaultStyle.improveMarkdownPrompt;
+        content = commonPrompts.improveMarkdownPrompt;
         break;
       default:
         throw new Error(`Prompt '${name}' not found`);
@@ -207,6 +249,9 @@ async function registerPrompts(mcpServer: McpServer): Promise<void> {
 export type { ToolContext } from '../core/types.js';
 export {
   handleCheckAuth,
+  handleListMyPublishedPosts,
+  handleSearchMyPublishedPosts,
+  handleReadMyPublishedPost,
   handleGetWritingStyleGuide,
   handleCreatePost,
   handleGetImageUploadUrl,

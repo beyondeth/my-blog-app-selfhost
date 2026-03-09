@@ -324,7 +324,55 @@ export class PostsService {
 
     const posts = await query.getMany();
 
-    return Promise.all(posts.map((post) => this.postMapperService.toPostDto(post)));
+    return Promise.all(
+      posts.map((post) => this.postMapperService.toPostDto(post)),
+    );
+  }
+
+  async findMyPublishedPostsForMcp(
+    userId: string,
+    options?: {
+      page?: number;
+      limit?: number;
+      search?: string;
+      category?: string;
+      tag?: string;
+      dateFrom?: string;
+      dateTo?: string;
+    },
+  ): Promise<{
+    items: PostResponseDto[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const result = await this.postReadService.findMyPublishedPosts(
+      userId,
+      options,
+    );
+
+    const items = await Promise.all(
+      result.posts.map((post) => this.postMapperService.toPostDto(post)),
+    );
+
+    return {
+      items,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    };
+  }
+
+  async findMyPublishedPostForMcp(
+    userId: string,
+    postId: string,
+  ): Promise<PostResponseDto> {
+    const post = await this.postReadService.findMyPublishedPostById(
+      userId,
+      postId,
+    );
+
+    return this.postMapperService.toPostDto(post);
   }
 
   // ========== Read Operations (PostReadService로 위임) ==========
@@ -402,12 +450,17 @@ export class PostsService {
   async getRelatedPosts(
     postId: string,
     limit: number = 6,
+    user?: User,
   ): Promise<PostResponseDto[]> {
     this.logger.debug(
       `Getting related posts for post: ${postId}, limit: ${limit}`,
     );
 
-    const posts = await this.postReadService.getRelatedPosts(postId, limit);
+    const posts = await this.postReadService.getRelatedPosts(
+      postId,
+      limit,
+      user,
+    );
 
     // DTO 변환 (병렬 처리)
     return await Promise.all(

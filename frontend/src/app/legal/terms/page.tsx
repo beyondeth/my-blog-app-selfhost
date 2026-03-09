@@ -2,8 +2,8 @@ import { Metadata } from 'next';
 import LegalPageLayout from '@/components/legal/LegalPageLayout';
 
 export const metadata: Metadata = {
-  title: '이용약관 | DevLog',
-  description: 'DevLog 서비스 이용약관을 확인하세요.',
+  title: '이용약관 | Codebase.blog',
+  description: 'Codebase.blog 서비스 이용약관을 확인하세요.',
 };
 
 /**

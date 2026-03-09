@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { FiTrash2, FiCalendar, FiActivity, FiShield } from 'react-icons/fi';
 import { useRouter } from 'next/navigation';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
+import { getMcpScopeLabel } from '@/lib/mcpScopes';
 
 /**
  * 연결된 OAuth 토큰 타입 정의
@@ -96,13 +97,7 @@ export default function ConnectedAppsPage() {
    * 권한 스코프를 사용자 친화적인 텍스트로 변환
    */
   const getScopeDescription = (scope: string): string => {
-    const scopeDescriptions: { [key: string]: string } = {
-      'mcp:post:create': '블로그에 포스트 작성',
-      'read': '블로그 정보 읽기',
-      'write': '블로그 수정',
-      'delete': '블로그 콘텐츠 삭제',
-    };
-    return scopeDescriptions[scope] || scope;
+    return getMcpScopeLabel(scope);
   };
 
   /**

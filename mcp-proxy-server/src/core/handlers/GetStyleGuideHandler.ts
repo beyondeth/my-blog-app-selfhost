@@ -6,18 +6,23 @@ import type { ToolContext } from '../types.js';
  * get_writing_style_guide 핸들러
  */
 export async function handleGetWritingStyleGuide(
-  args: { style?: string; customMarkdown?: string },
+  args: { style?: string; customMarkdown?: string; styleAlias?: string },
   context: ToolContext
 ): Promise<any> {
   const styleService = new WritingStyleService();
   let styleData;
+  let resolvedStyleId = args.style || 'default';
+  let resolvedStyleSource: 'preset' | 'custom' = 'preset';
 
   // 우선순위 1: 사용자 제공 커스텀 마크다운 (최우선)
   if (args.customMarkdown) {
+    resolvedStyleId = args.styleAlias || 'custom';
+    resolvedStyleSource = 'custom';
     logger.info(
       {
         userId: context.userData.userId.substring(0, 8),
         source: 'custom-markdown',
+        styleAlias: resolvedStyleId,
       },
       '📖 Using user-provided custom markdown style'
     );
@@ -34,6 +39,7 @@ export async function handleGetWritingStyleGuide(
       '📖 Writing style guide retrieved'
     );
     styleData = await styleService.loadAndParseStyle(style);
+    resolvedStyleId = style;
   }
 
   const fullGuide = [
@@ -51,5 +57,14 @@ export async function handleGetWritingStyleGuide(
         text: fullGuide,
       },
     ],
+    structuredContent: {
+      resolvedStyleId,
+      resolvedStyleSource,
+      styleName: styleData.metadata.styleName,
+      minLength: styleData.metadata.minLength,
+      targetLength: styleData.metadata.targetLength,
+      language: styleData.metadata.language,
+      aiTagRequired: styleData.metadata.aiTagRequired,
+    },
   };
 }

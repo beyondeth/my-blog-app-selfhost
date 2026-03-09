@@ -59,6 +59,8 @@ import { MobilePostsController } from "./mobile-posts.controller";
 import { PostLifecycleListener } from "./listeners/post-lifecycle.listener";
 import { PopularPostsModule } from "../popular-posts/popular-posts.module";
 import { PostAccessPolicyService } from "./services/post-access-policy.service";
+import { PostMetadataSyncService } from "./services/post-metadata-sync.service";
+import { PostSearchVectorService } from "./services/post-search-vector.service";
 
 @Module({
   imports: [
@@ -125,6 +127,8 @@ import { PostAccessPolicyService } from "./services/post-access-policy.service";
     PostLikeStatusService, // 좋아요 상태 조회 서비스
     PostInteractionStatusService, // 상호작용 상태 통합 서비스
     PostAccessPolicyService, // 포스트 접근 정책(공개/비공개/권한)
+    PostMetadataSyncService, // posts -> post_metadata shadow sync
+    PostSearchVectorService, // search_vector 단일 정책
     VoteService, // Reddit 스타일 업보트/다운보트 서비스
     LikeService, // 레거시 좋아요 서비스 (VoteService로 위임)
     MarkdownRendererService,
@@ -146,6 +150,8 @@ import { PostAccessPolicyService } from "./services/post-access-policy.service";
     PostInteractionService,
     PostCreationService,
     PostAccessPolicyService,
+    PostMetadataSyncService,
+    PostSearchVectorService,
     VoteService,
   ],
 })

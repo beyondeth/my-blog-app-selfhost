@@ -1,5 +1,8 @@
 export const OPENAI_MVP_TOOL_NAMES = [
   'check_auth',
+  'list_my_published_posts',
+  'search_my_published_posts',
+  'read_my_published_post',
   'get_writing_style_guide',
   'create_post',
 ] as const;
@@ -15,6 +18,21 @@ export const ANNOTATIONS: Record<
     openWorldHint: false,
     destructiveHint: false,
   },
+  list_my_published_posts: {
+    readOnlyHint: true,
+    openWorldHint: false,
+    destructiveHint: false,
+  },
+  search_my_published_posts: {
+    readOnlyHint: true,
+    openWorldHint: false,
+    destructiveHint: false,
+  },
+  read_my_published_post: {
+    readOnlyHint: true,
+    openWorldHint: false,
+    destructiveHint: false,
+  },
   get_writing_style_guide: {
     readOnlyHint: true,
     openWorldHint: false,
@@ -26,4 +44,3 @@ export const ANNOTATIONS: Record<
     destructiveHint: false,
   },
 };
-

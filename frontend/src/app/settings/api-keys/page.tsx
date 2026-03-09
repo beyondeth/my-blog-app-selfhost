@@ -852,7 +852,7 @@ export default function ApiKeysPage() {
             </span>
             <h3 className="mt-2 text-base font-semibold text-gray-900 dark:text-white">사용법 알아보기</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              자동포스팅 예시와 스타일별 가이드를 한 화면에서 확인할 수 있습니다.
+              자동포스팅 예시와 현재 제공 중인 8개 스타일 가이드를 한 화면에서 확인할 수 있습니다.
             </p>
           </div>
           <button

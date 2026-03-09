@@ -22,14 +22,14 @@ import { OAuthErrorCodes } from './types.js';
 
 const router = Router();
 
-// 허용된 redirect URI 패턴 (Claude, ChatGPT)
+// 허용된 redirect URI 패턴 (Claude, ChatGPT, OpenAI review)
 const ALLOWED_REDIRECT_PATTERNS = [
-  /^https:\/\/claude\.ai\//,                    // Claude 프로덕션
-  /^https:\/\/.*\.claude\.ai\//,                // Claude 서브도메인
-  /^https:\/\/chatgpt\.com\//,                  // ChatGPT 프로덕션
-  /^https:\/\/.*\.chatgpt\.com\//,              // ChatGPT 서브도메인
-  /^http:\/\/localhost(:\d+)?\//,               // 로컬 개발
-  /^http:\/\/127\.0\.0\.1(:\d+)?\//,            // 로컬 개발
+  /^https:\/\/claude\.ai\/api\/mcp\/auth_callback(?:\/.*)?$/, // Claude 프로덕션
+  /^https:\/\/.*\.claude\.ai\/api\/mcp\/auth_callback(?:\/.*)?$/, // Claude 서브도메인
+  /^https:\/\/chatgpt\.com\/connector\/oauth\/[^/]+$/, // ChatGPT connector callback
+  /^https:\/\/platform\.openai\.com\/apps-manage\/oauth$/, // OpenAI app review callback
+  /^http:\/\/localhost(?::\d+)?\/.+$/, // 로컬 개발
+  /^http:\/\/127\.0\.0\.1(?::\d+)?\/.+$/, // 로컬 개발
 ];
 
 /**
@@ -161,37 +161,6 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
       }
 
       const request = validation.data!;
-
-      // 중복 등록 체크 (같은 redirect_uri로 이미 등록된 클라이언트 반환)
-      // Claude는 항상 같은 콜백 URL을 사용하므로 중복 방지 가능
-      const primaryRedirectUri = request.redirect_uris[0];
-      const existingClient = await storage.findClientByRedirectUri(primaryRedirectUri);
-
-      if (existingClient) {
-        logger.debug({
-          clientId: existingClient.clientId,
-          redirectUri: primaryRedirectUri,
-        }, '♻️ Returning existing client (duplicate prevention)');
-
-        // 기존 클라이언트 반환 (secret은 재발급하지 않음)
-        const response: ClientRegistrationResponse = {
-          client_id: existingClient.clientId,
-          client_secret: existingClient.clientSecret,
-          client_id_issued_at: existingClient.clientIdIssuedAt,
-          client_secret_expires_at: existingClient.clientSecretExpiresAt || 0,
-          redirect_uris: existingClient.redirectUris,
-          client_name: existingClient.clientName,
-          client_uri: existingClient.clientUri,
-          scope: existingClient.scope,
-          token_endpoint_auth_method: existingClient.tokenEndpointAuthMethod,
-          grant_types: existingClient.grantTypes,
-          response_types: existingClient.responseTypes,
-          software_id: existingClient.softwareId,
-          software_version: existingClient.softwareVersion,
-        };
-
-        return res.status(200).json(response);
-      }
 
       // 새 클라이언트 생성
       const clientId = storage.generateClientId();

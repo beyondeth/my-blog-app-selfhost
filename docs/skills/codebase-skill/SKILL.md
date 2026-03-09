@@ -30,7 +30,7 @@ Use explicit user intent to choose one execution path. Do not mix both in one ru
 
 ### Route Selection
 
-- `skill` route (via `mcporter`): if user says `codebase-skill`, `skill 사용`, `skill로`, `스킬로`, or uses style flags like `--podcast`, `--research`, `--tutorial`.
+- `skill` route (via `mcporter`): if user says `codebase-skill`, `skill 사용`, `skill로`, `스킬로`, or uses style flags like `--podcast`, `--research`, `--pm`.
 - `mcp` route (direct MCP tools): if user says `mcp로`, `MCP tool`, `codebase-blog-mcp`, `툴로 직접`.
 - ambiguous phrase only (for example: `자동포스팅해`): default to `skill` route.
 - user can always override by adding one explicit token: `skill로` or `mcp로`.
