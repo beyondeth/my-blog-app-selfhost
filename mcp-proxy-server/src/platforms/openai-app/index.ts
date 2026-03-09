@@ -85,6 +85,7 @@ export function createOpenAiAppRouter(
         },
         apiKey: null,
         oauthToken: oauth.token,
+        oauthScope: oauth.scope,
         metricsService,
         route: 'mcp-openai' as const,
         config: {

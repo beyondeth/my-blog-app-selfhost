@@ -7,18 +7,21 @@ type InputSchema = {
 export const WRITING_STYLE_PRESETS = [
   'default',
   'novel',
-  'tutorial',
-  'comedy',
   'podcast',
   'vibe',
   'research',
-  'human',
+  'pm',
+  'designer',
+  'marketer',
 ] as const;
 
 export type WritingStylePreset = (typeof WRITING_STYLE_PRESETS)[number];
 
 export const TOOL_NAMES = [
   'check_auth',
+  'list_my_published_posts',
+  'search_my_published_posts',
+  'read_my_published_post',
   'get_writing_style_guide',
   'create_post',
   'get_image_upload_url',
@@ -46,6 +49,97 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
     },
   },
   {
+    name: 'list_my_published_posts',
+    description:
+      'List the authenticated user\'s published blog posts. Supports pagination and optional tag/category/date filters.',
+    discoveryDescription: 'List your published blog posts',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        page: {
+          type: 'number',
+          description: 'Page number (default: 1)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Items per page (default: 20, max: 50)',
+        },
+        category: {
+          type: 'string',
+          description: 'Optional category filter',
+        },
+        tag: {
+          type: 'string',
+          description: 'Optional tag filter',
+        },
+        dateFrom: {
+          type: 'string',
+          description: 'Optional ISO date lower bound for publishedAt',
+        },
+        dateTo: {
+          type: 'string',
+          description: 'Optional ISO date upper bound for publishedAt',
+        },
+      },
+    },
+  },
+  {
+    name: 'search_my_published_posts',
+    description:
+      'Search the authenticated user\'s published blog posts by keyword, with optional pagination and metadata filters.',
+    discoveryDescription: 'Search your published blog posts',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query',
+        },
+        page: {
+          type: 'number',
+          description: 'Page number (default: 1)',
+        },
+        limit: {
+          type: 'number',
+          description: 'Items per page (default: 20, max: 50)',
+        },
+        category: {
+          type: 'string',
+          description: 'Optional category filter',
+        },
+        tag: {
+          type: 'string',
+          description: 'Optional tag filter',
+        },
+        dateFrom: {
+          type: 'string',
+          description: 'Optional ISO date lower bound for publishedAt',
+        },
+        dateTo: {
+          type: 'string',
+          description: 'Optional ISO date upper bound for publishedAt',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_my_published_post',
+    description:
+      'Read a single published blog post owned by the authenticated user, including full content and metadata.',
+    discoveryDescription: 'Read one of your published blog posts',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        postId: {
+          type: 'string',
+          description: 'Published post ID',
+        },
+      },
+      required: ['postId'],
+    },
+  },
+  {
     name: 'get_writing_style_guide',
     description:
       'Retrieve writing style guidelines for blog posts. Returns comprehensive style guide with instructions and validation requirements.',
@@ -57,6 +151,11 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
           type: 'string',
           description:
             'User-provided custom style markdown (highest priority). Use this when user provides their own style guide in the conversation.',
+        },
+        styleAlias: {
+          type: 'string',
+          description:
+            'Optional alias for a custom style markdown. Use this when customMarkdown came from a local skill or named custom preset.',
         },
         style: {
           type: 'string',
@@ -100,9 +199,8 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
         },
         writingStyle: {
           type: 'string',
-          enum: WRITING_STYLE_PRESETS,
-          default: 'default',
-          description: 'Writing style preset',
+          description:
+            'Writing style identifier for analytics or traceability. Use a preset id, or pass custom:<alias> when a custom markdown style was used.',
         },
       },
       required: ['title', 'content_markdown', 'category'],
@@ -156,13 +254,15 @@ export const MCP_SERVER_INSTRUCTIONS = `# Codebase.blog Auto-posting MCP Server
 ## Workflow
 
 1. Call check_auth() first
-2. Call get_writing_style_guide(style)
-3. Write content
-4. If image upload is needed:
+2. To review existing writing, use list_my_published_posts(), search_my_published_posts(), or read_my_published_post()
+3. To create a new post, call get_writing_style_guide(style)
+4. Write content
+   - If you have a local custom style file, pass it via customMarkdown (+ styleAlias when available)
+5. If image upload is needed:
    - get_image_upload_url(...)
    - upload with local curl PUT
    - finalize_uploaded_image(...)
-5. Call create_post() to publish
+6. Call create_post() to publish
 
 ## Important Rules
 
@@ -173,6 +273,9 @@ export const MCP_SERVER_INSTRUCTIONS = `# Codebase.blog Auto-posting MCP Server
 ## Available Tools
 
 - check_auth
+- list_my_published_posts
+- search_my_published_posts
+- read_my_published_post
 - get_writing_style_guide
 - create_post
 - get_image_upload_url

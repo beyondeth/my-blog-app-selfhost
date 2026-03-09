@@ -45,8 +45,8 @@ export async function getRelatedPosts(
     headers: {
       'Content-Type': 'application/json',
     },
-    // Public API이므로 credentials 불필요할 수 있으나, 일관성을 위해 유지하거나 필요에 따라 제거
-    // GET /posts/:id/related는 Public이므로 토큰 없이도 호출 가능
+    // Optional auth 경로에서도 소유자 컨텍스트를 전달하기 위해 쿠키 포함
+    credentials: 'include',
   });
 
   if (!response.ok) {

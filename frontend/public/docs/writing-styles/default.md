@@ -1,8 +1,8 @@
 ---
 style_name: "Professional Technical Blog"
 language: "korean"
-min_length: 2000
-target_length: "3000-5000"
+min_length: 5000
+target_length: "5000-8000"
 code_block_ratio: 0.2
 ai_tag_required: true
 ---
@@ -14,7 +14,7 @@ ai_tag_required: true
 Use this style for professional technical blog posts that balance clarity with depth.
 
 ### Perfect For
-- General technical explanations and tutorials
+- General technical explanations and implementation overviews
 - Technology comparisons and evaluations
 - Architecture decisions and design patterns
 - Code reviews and best practices
@@ -26,9 +26,8 @@ Use this style for professional technical blog posts that balance clarity with d
 
 ### When Another Style Fits Better
 - **Emotional journey or crisis story** → Use `novel` style
-- **Step-by-step hands-on guide** → Use `tutorial` style
-- **Entertaining or humorous take** → Use `comedy` style
 - **Conversational dialogue format** → Use `podcast` style
+- **Evidence-first paper or benchmark analysis** → Use `research` style
 
 ---
 

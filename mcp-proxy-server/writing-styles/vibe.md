@@ -26,10 +26,9 @@ Use this style for educational content that guides developers on effective learn
 **Intent**: Reader is looking for direction and methods to become a better developer
 
 ### When Another Style Fits Better
-- **Code-heavy hands-on guides** → Use `tutorial` style
+- **Code-heavy hands-on guides** → Use `default` style
 - **Deep technical concept analysis** → Use `default` style
 - **Developer experience stories** → Use `novel` style
-- **Humorous tech content** → Use `comedy` style
 - **Conversational discussion** → Use `podcast` style
 
 ---

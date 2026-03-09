@@ -2,10 +2,12 @@ import { Injectable, Logger } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { IsNull, Not, Repository } from "typeorm";
 import { Post } from "./entities/post.entity";
+import { PostMetadata } from "./entities/post-metadata.entity";
 import { Cron } from "@nestjs/schedule";
 import { InjectRedis } from "@nestjs-modules/ioredis";
 import Redis from "ioredis";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
+import { PostSearchVectorService } from "./services/post-search-vector.service";
 
 /**
  * 검색 인덱싱 배치 처리 서비스
@@ -26,9 +28,12 @@ export class SearchIndexingService {
   constructor(
     @InjectRepository(Post)
     private postsRepository: Repository<Post>,
+    @InjectRepository(PostMetadata)
+    private readonly postMetadataRepository: Repository<PostMetadata>,
     @InjectRedis()
     private readonly redis: Redis,
     private readonly unifiedRedisService: UnifiedRedisService,
+    private readonly postSearchVectorService: PostSearchVectorService,
   ) {}
 
   /**
@@ -111,11 +116,20 @@ export class SearchIndexingService {
       .andWhere("post.isPublished = true")
       .andWhere("post.status = :status", { status: "published" })
       .andWhere("post.isDeleted = false")
-      .andWhere("post.visibility = :postVisibility", { postVisibility: "public" })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: "public",
+      })
       .andWhere("blog.isPublic = true")
       .orderBy("post.createdAt", "ASC")
       .take(limit)
-      .select(["post.id", "post.title", "post.excerpt", "post.tags"])
+      .select([
+        "post.id",
+        "post.title",
+        "post.excerpt",
+        "post.tags",
+        "post.content",
+        "post.content_markdown",
+      ])
       .getMany();
   }
 
@@ -130,7 +144,9 @@ export class SearchIndexingService {
       .andWhere("post.isPublished = true")
       .andWhere("post.status = :status", { status: "published" })
       .andWhere("post.isDeleted = false")
-      .andWhere("post.visibility = :postVisibility", { postVisibility: "public" })
+      .andWhere("post.visibility = :postVisibility", {
+        postVisibility: "public",
+      })
       .andWhere("blog.isPublic = true")
       .getCount();
   }
@@ -142,25 +158,9 @@ export class SearchIndexingService {
   private async batchUpdateSearchVectors(posts: Post[]): Promise<void> {
     if (posts.length === 0) return;
 
-    const postIds = posts.map((p) => p.id);
-
-    // PostgreSQL의 tsvector 생성 (content 제외)
-    const query = `
-      UPDATE "posts"
-      SET
-        "search_vector" =
-          setweight(to_tsvector('simple', COALESCE(title, '')), 'A') ||
-          setweight(to_tsvector('simple', COALESCE(excerpt, '')), 'B') ||
-          setweight(to_tsvector('simple', COALESCE("tags"::text, '')), 'C'),
-        "indexed_at" = NOW()
-      WHERE
-        id = ANY($1::uuid[])
-        AND "indexed_at" IS NULL
-    `;
-
     try {
-      const result = await this.postsRepository.query(query, [postIds]);
-      this.logger.debug(`배치 업데이트 완료: ${result[1]}개 포스트`);
+      await this.postSearchVectorService.syncSearchVectors(posts);
+      this.logger.debug(`배치 업데이트 완료: ${posts.length}개 포스트`);
     } catch (error) {
       this.logger.error("배치 업데이트 실패:", error);
       throw error;
@@ -251,7 +251,7 @@ export class SearchIndexingService {
   async forceIndexPost(postId: string): Promise<void> {
     const post = await this.postsRepository.findOne({
       where: { id: postId },
-      select: ["id", "title", "excerpt", "tags"],
+      select: ["id", "title", "excerpt", "tags", "content", "content_markdown"],
     });
 
     if (!post) {
@@ -277,6 +277,19 @@ export class SearchIndexingService {
       },
       { indexedAt: null },
     );
+    await this.postMetadataRepository
+      .createQueryBuilder()
+      .update(PostMetadata)
+      .set({ indexedAt: null })
+      .where(
+        `"postId" IN (
+        SELECT id FROM posts
+        WHERE "isPublished" = true
+          AND "status" = :status
+      )`,
+        { status: "published" },
+      )
+      .execute();
 
     // 배치 인덱싱 실행
     await this.indexPendingPosts();

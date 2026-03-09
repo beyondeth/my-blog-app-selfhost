@@ -37,6 +37,7 @@ import {
   PostProcessingJobData,
   PostProcessingResult,
 } from "../queues/post-processing.queue";
+import { PostMetadataSyncService } from "../services/post-metadata-sync.service";
 
 @Processor(POST_PROCESSING_QUEUE, {
   concurrency: 1, // 한 번에 하나의 Job만 처리 (순차 처리)
@@ -64,6 +65,7 @@ export class PostProcessingProcessor
     private readonly videoCleanupService: VideoCleanupService,
     @Inject(forwardRef(() => VideoLifecycleService))
     private readonly videoLifecycleService: VideoLifecycleService,
+    private readonly postMetadataSyncService: PostMetadataSyncService,
   ) {
     super();
   }
@@ -171,33 +173,27 @@ export class PostProcessingProcessor
 
       // 6. Post 및 PostMetadata 업데이트
       // 참고: search_vector는 search-indexing.service.ts의 배치 처리가 담당 (30분마다)
+      const completedAt = new Date();
+      post.content = processedContent;
+      post.excerpt = excerpt;
+      post.status = "published";
+      post.processingCompletedAt = completedAt;
+      post.processingError = null;
+      await this.postRepository.save(post);
 
-      // 6-1. Post 테이블 업데이트 (호환성 유지)
-      await this.postRepository
-        .createQueryBuilder()
-        .update(Post)
-        .set({
-          content: processedContent,
-          excerpt: excerpt, // 호환성 유지
-          status: "published",
-          processingCompletedAt: new Date(),
-          processingError: null,
-        })
-        .where("id = :id", { id: postId })
-        .execute();
-
-      // 6-2. PostMetadata 테이블 업데이트 (Phase 1-2-3 리팩토링)
-      await this.postMetadataRepository
-        .createQueryBuilder()
-        .update(PostMetadata)
-        .set({
-          excerpt: excerpt, // 실제 content 기반 excerpt로 업데이트
-          content_rendered_at: new Date(), // HTML 렌더링 완료 시각
-          processingCompletedAt: new Date(),
-          processingError: null,
-        })
-        .where("postId = :postId", { postId })
-        .execute();
+      const existingMetadata = await this.postMetadataRepository.findOne({
+        where: { postId },
+      });
+      const metadataRecord = this.postMetadataSyncService.syncShadowFromPost(
+        post,
+        existingMetadata,
+        {
+          contentRenderedAt: completedAt,
+        },
+      );
+      metadataRecord.excerpt = excerpt;
+      metadataRecord.content_rendered_at = completedAt;
+      await this.postMetadataRepository.save(metadataRecord);
 
       // 6-3. 포스트 발행 완료 후 캐시 무효화를 위한 이벤트 발생
       // 블로그 정보를 포함해서 POST_UPDATED 이벤트 발생 (캐시 무효화에 필요)

@@ -299,7 +299,7 @@ export class McpController {
   /**
    * Writing Styles 목록 조회
    *
-   * @returns 5가지 Writing Style 목록 (미리보기)
+   * @returns 현재 노출 중인 Writing Style 목록 (미리보기)
    *
    * 용도:
    * - /mcp 페이지에서 스타일 목록 표시
@@ -337,12 +337,12 @@ export class McpController {
       const styles = [
         "default",
         "novel",
-        "comedy",
         "podcast",
-        "tutorial",
         "vibe",
         "research",
-        "human",
+        "pm",
+        "designer",
+        "marketer",
       ];
       const styleData = [];
 
@@ -388,28 +388,12 @@ export class McpController {
               code_block_ratio: 0.05,
               ai_tag_required: true,
             },
-            comedy: {
-              style_name: "Tech Comedy Blog Style",
-              language: "korean",
-              min_length: 2000,
-              target_length: "3000-4500",
-              code_block_ratio: 0.15,
-              ai_tag_required: true,
-            },
             podcast: {
               style_name: "Tech Podcast Script Style",
               language: "korean",
               min_length: 2500,
               target_length: "3500-5000",
               code_block_ratio: 0.05,
-              ai_tag_required: true,
-            },
-            tutorial: {
-              style_name: "Step-by-Step Tutorial Style",
-              language: "korean",
-              min_length: 3000,
-              target_length: "4000-7000",
-              code_block_ratio: 0.35,
               ai_tag_required: true,
             },
             vibe: {
@@ -428,12 +412,28 @@ export class McpController {
               code_block_ratio: 0.1,
               ai_tag_required: true,
             },
-            human: {
-              style_name: "Human-Like Writing Style",
+            pm: {
+              style_name: "Product Manager Narrative Style",
               language: "korean",
               min_length: 5000,
               target_length: "5000-8000",
-              code_block_ratio: 0.15,
+              code_block_ratio: 0.05,
+              ai_tag_required: true,
+            },
+            designer: {
+              style_name: "Product Designer Case Study Style",
+              language: "korean",
+              min_length: 5000,
+              target_length: "5000-8000",
+              code_block_ratio: 0.05,
+              ai_tag_required: true,
+            },
+            marketer: {
+              style_name: "Growth & Performance Marketing Style",
+              language: "korean",
+              min_length: 5000,
+              target_length: "5000-8000",
+              code_block_ratio: 0.02,
               ai_tag_required: true,
             },
           };
@@ -472,7 +472,7 @@ export class McpController {
   /**
    * 특정 Writing Style 전체 가이드 조회
    *
-   * @param style 스타일 이름 (default, novel, comedy, podcast, tutorial)
+   * @param style 스타일 이름 (default, novel, podcast, vibe, research, pm, designer, marketer)
    * @returns 전체 Writing Style 가이드 (Markdown)
    *
    * 용도:
@@ -491,12 +491,12 @@ export class McpController {
       const validStyles = [
         "default",
         "novel",
-        "comedy",
         "podcast",
-        "tutorial",
         "vibe",
         "research",
-        "human",
+        "pm",
+        "designer",
+        "marketer",
       ];
       if (!validStyles.includes(style)) {
         return {

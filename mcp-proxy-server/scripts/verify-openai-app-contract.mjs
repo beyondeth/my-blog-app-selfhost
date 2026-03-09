@@ -2,6 +2,9 @@
 
 const EXPECTED_TOOLS = [
   'check_auth',
+  'list_my_published_posts',
+  'search_my_published_posts',
+  'read_my_published_post',
   'get_writing_style_guide',
   'create_post',
 ];

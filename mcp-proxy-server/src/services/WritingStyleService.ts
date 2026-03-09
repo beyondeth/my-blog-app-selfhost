@@ -38,8 +38,23 @@ export interface WritingStyle {
   improveMarkdownPrompt: string;
 }
 
+const PROMPT_ONLY_SECTIONS = new Set([
+  'QUALITY ENHANCEMENT GUIDE',
+  'ENHANCEMENT TECHNIQUES',
+  'QUALITY CHECKLIST',
+]);
+
 export class WritingStyleService {
-  private readonly PRESETS = ['novel', 'tutorial', 'comedy', 'podcast', 'default', 'vibe', 'research', 'human'];
+  private readonly PRESETS = [
+    'default',
+    'novel',
+    'podcast',
+    'vibe',
+    'research',
+    'pm',
+    'designer',
+    'marketer',
+  ];
   private readonly STYLES_DIR = path.join(__dirname, '../../writing-styles');
   private styleCache: Map<string, WritingStyle> = new Map();  // 스타일 캐시
   private commonInstructionsCache: string | null = null;  // 공통 지침 캐시
@@ -100,7 +115,7 @@ export class WritingStyleService {
       const presets = files
         .filter((file) => file.endsWith('.md'))
         .map((file) => file.replace('.md', ''));
-      return presets;
+      return this.PRESETS.filter((preset) => presets.includes(preset));
     } catch (error: any) {
       console.error(`[WritingStyle] 프리셋 목록 조회 실패: ${error.message}`);
       return this.PRESETS; // 기본 프리셋 반환
@@ -209,17 +224,7 @@ export class WritingStyleService {
           codeBlockRatio: metadata.code_block_ratio || 0.2,
           aiTagRequired: metadata.ai_tag_required !== false,
         },
-        // 공통 지침이 먼저, 스타일별 지침이 덮어씌움
-        instructions: this.mergeInstructions(
-          sections['COMMON INSTRUCTIONS'] || '',
-          sections['STYLE OVERVIEW'] || '',
-          sections['CORE WRITING PRINCIPLES'] || '',
-          sections['CORE NARRATIVE PRINCIPLES'] || '',
-          sections['CORE TUTORIAL PRINCIPLES'] || '',
-          sections['CORE COMEDY PRINCIPLES'] || '',
-          sections['CORE PODCAST PRINCIPLES'] || '',
-          sections['CORE VIBE PRINCIPLES'] || ''
-        ),
+        instructions: this.buildInstructions(sections),
         createPostDescription: sections['WRITING GUIDELINES'] || '',
         qualityGuidelinesPrompt: sections['QUALITY ENHANCEMENT GUIDE'] || '',
         blogPostTemplatePrompt: sections['ENHANCEMENT TECHNIQUES'] || '',
@@ -248,8 +253,14 @@ export class WritingStyleService {
    */
   async parseRawMarkdown(markdown: string): Promise<WritingStyle> {
     try {
+      const commonContent = await this.loadCommonInstructions();
+      const commonSections = this.parseSections(commonContent);
+
       // YAML front matter 파싱 (있으면)
       const { metadata, body } = this.parseYamlFrontMatter(markdown);
+      const styleSections = this.parseSections(body);
+      const hasStructuredSections = Object.keys(styleSections).length > 0;
+      const sections = { ...commonSections, ...styleSections };
 
       const writingStyle: WritingStyle = {
         metadata: {
@@ -260,12 +271,18 @@ export class WritingStyleService {
           codeBlockRatio: metadata.code_block_ratio || 0.2,
           aiTagRequired: metadata.ai_tag_required !== false,
         },
-        // 사용자가 제공한 본문을 그대로 전달 (LLM이 알아서 해석)
-        instructions: body.trim(),
-        createPostDescription: '',
-        qualityGuidelinesPrompt: '',
-        blogPostTemplatePrompt: '',
-        improveMarkdownPrompt: '',
+        instructions: hasStructuredSections
+          ? this.buildInstructions(sections)
+          : this.mergeInstructions(
+              commonSections['COMMON INSTRUCTIONS'] || '',
+              body.trim()
+            ),
+        createPostDescription: hasStructuredSections
+          ? sections['WRITING GUIDELINES'] || ''
+          : '',
+        qualityGuidelinesPrompt: sections['QUALITY ENHANCEMENT GUIDE'] || '',
+        blogPostTemplatePrompt: sections['ENHANCEMENT TECHNIQUES'] || '',
+        improveMarkdownPrompt: sections['QUALITY CHECKLIST'] || '',
       };
 
       console.log(`✅ [WritingStyle] 커스텀 마크다운 파싱 완료: ${writingStyle.metadata.styleName}`);
@@ -285,6 +302,20 @@ export class WritingStyleService {
     return sections
       .filter(section => section && section.trim())
       .join('\n\n---\n\n');
+  }
+
+  async loadCommonPromptBundle(): Promise<Pick<
+    WritingStyle,
+    'qualityGuidelinesPrompt' | 'blogPostTemplatePrompt' | 'improveMarkdownPrompt'
+  >> {
+    const commonContent = await this.loadCommonInstructions();
+    const sections = this.parseSections(commonContent);
+
+    return {
+      qualityGuidelinesPrompt: sections['QUALITY ENHANCEMENT GUIDE'] || '',
+      blogPostTemplatePrompt: sections['ENHANCEMENT TECHNIQUES'] || '',
+      improveMarkdownPrompt: sections['QUALITY CHECKLIST'] || '',
+    };
   }
 
   /**
@@ -360,5 +391,19 @@ export class WritingStyleService {
     }
 
     return sections;
+  }
+
+  private buildInstructions(sections: Record<string, string>): string {
+    const orderedSections = Object.entries(sections)
+      .filter(([sectionName, sectionContent]) => {
+        return (
+          sectionContent &&
+          sectionContent.trim() &&
+          !PROMPT_ONLY_SECTIONS.has(sectionName)
+        );
+      })
+      .map(([, sectionContent]) => sectionContent);
+
+    return this.mergeInstructions(...orderedSections);
   }
 }

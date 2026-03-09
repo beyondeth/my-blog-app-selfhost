@@ -92,7 +92,7 @@ export default function SolutionSection() {
                     className="flex justify-end"
                   >
                     <div className="bg-cyan-600 text-white px-4 py-3 rounded-2xl rounded-tr-sm max-w-md">
-                      <p>위 내용 자동포스팅해줘 --tutorial</p>
+                      <p>위 내용 자동포스팅해줘 --default</p>
                     </div>
                   </motion.div>
 
@@ -105,7 +105,7 @@ export default function SolutionSection() {
                     className="flex justify-start"
                   >
                     <div className="bg-gray-700 text-gray-100 px-4 py-3 rounded-2xl rounded-tl-sm max-w-md">
-                      <p className="mb-2">네, 튜토리얼 스타일로 작성하겠습니다.</p>
+                      <p className="mb-2">네, 기본 스타일로 정리해 발행하겠습니다.</p>
                       <div className="flex items-center gap-2 text-cyan-400">
                         <motion.div
                           animate={{ rotate: 360 }}

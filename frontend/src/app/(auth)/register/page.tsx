@@ -11,6 +11,7 @@ import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import { validatePasswordStrength, getPasswordStrengthColor, getPasswordStrengthWidth } from '@/lib/password-utils';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
+import { parseMcpScopes } from '@/lib/mcpScopes';
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -60,6 +61,7 @@ export default function RegisterPage() {
   const mcpCallbackUrl = searchParams.get('callback_url');
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
+  const requestedMcpScopes = parseMcpScopes(mcpScope);
   const loginHref = isMcpOAuth && mcpState && mcpCallbackUrl
     ? `/login?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
     : '/login';
@@ -329,6 +331,35 @@ export default function RegisterPage() {
                 </Link>
               </p>
             </div>
+
+            {isMcpOAuth && mcpState && mcpCallbackUrl && (
+              <div className="mb-3 sm:mb-6 w-full rounded-lg border border-indigo-200 bg-indigo-50 p-4 sm:p-5 dark:border-indigo-700 dark:bg-indigo-900/20">
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-800">
+                    <Lock className="h-5 w-5 text-indigo-600 dark:text-indigo-300" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-sm sm:text-base font-semibold text-indigo-900 dark:text-indigo-100">
+                      {mcpClientName} 연결을 위한 계정 준비
+                    </h3>
+                    <p className="mt-1 text-xs sm:text-sm text-indigo-700 dark:text-indigo-300">
+                      회원가입 후 {mcpClientName}가 사용할 권한은 아래와 같습니다.
+                    </p>
+                    <div className="mt-3 space-y-2">
+                      {requestedMcpScopes.map((scope) => (
+                        <div
+                          key={scope.scope}
+                          className="rounded-lg border border-indigo-100 bg-white/60 px-3 py-2 text-xs dark:border-indigo-800/60 dark:bg-indigo-950/30"
+                        >
+                          <p className="font-semibold text-indigo-900 dark:text-indigo-100">{scope.label}</p>
+                          <p className="mt-1 text-indigo-700 dark:text-indigo-300">{scope.description}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* 섹션 1: OAuth 회원가입 */}
             <div className="w-full">

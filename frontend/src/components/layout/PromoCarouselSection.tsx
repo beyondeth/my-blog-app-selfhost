@@ -33,7 +33,7 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
       id: 'writing-styles',
       icon: FiBell,
       title: 'Writing Styles',
-      description: '다양한 스타일로 자동 포스팅',
+      description: '현재 제공 중인 8개 스타일 가이드와 예시 프롬프트를 확인할 수 있습니다.',
       ctaText: '스타일 가이드 보기',
       ctaLink: '/docs/writing-styles',
       styles: [
@@ -43,13 +43,13 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
           color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
         },
         {
-          name: 'Tutorial',
-          emoji: '📚',
+          name: 'PM',
+          emoji: '🧭',
           color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
         },
         {
-          name: 'Comedy',
-          emoji: '😄',
+          name: 'Marketer',
+          emoji: '📈',
           color: 'bg-transparent text-[#4B5563] border border-[#D9E0EA] dark:border-[#4B5563] dark:text-[#C7D1DD]'
         },
       ],

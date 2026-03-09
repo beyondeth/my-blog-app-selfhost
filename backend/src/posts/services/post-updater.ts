@@ -32,6 +32,8 @@ import {
   PostLifecyclePayload,
 } from "../events/post-lifecycle.events";
 import { CacheService, CacheKeys } from "../../cache/cache.service";
+import { PostMetadataSyncService } from "./post-metadata-sync.service";
+import { PostSearchVectorService } from "./post-search-vector.service";
 
 /**
  * 포스트 수정 전담 서비스
@@ -62,6 +64,8 @@ export class PostUpdater {
     private readonly eventEmitter: EventEmitter2,
     private readonly dataSource: DataSource,
     private readonly cacheService: CacheService,
+    private readonly postMetadataSyncService: PostMetadataSyncService,
+    private readonly postSearchVectorService: PostSearchVectorService,
   ) {}
 
   /**
@@ -180,15 +184,17 @@ export class PostUpdater {
 
           post.excerpt = this.postContentService.extractExcerpt(rawInput);
 
-          if (post.metadata) {
-            const readingTime =
-              this.postContentService.calculateReadingTime(rawInput);
-            post.metadata.wordCount = readingTime.wordCount;
-            post.metadata.readingTimeMinutes = readingTime.readingTimeMinutes;
-            post.metadata.lastEditedAt = new Date();
-            post.metadata.editCount = (post.metadata.editCount || 0) + 1;
-            await manager.save(post.metadata);
-          }
+          const metadata = this.postMetadataSyncService.ensureMetadata(
+            post.id,
+            post.metadata,
+          );
+          const readingTime =
+            this.postContentService.calculateReadingTime(rawInput);
+          metadata.wordCount = readingTime.wordCount;
+          metadata.readingTimeMinutes = readingTime.readingTimeMinutes;
+          metadata.lastEditedAt = new Date();
+          metadata.editCount = (metadata.editCount || 0) + 1;
+          post.metadata = metadata;
         }
 
         // 5. 기본 정보 업데이트
@@ -229,6 +235,8 @@ export class PostUpdater {
           if (updatePostDto.isPublished && !post.publishedAt) {
             post.publishedAt = new Date();
             post.status = "published";
+          } else if (!updatePostDto.isPublished) {
+            post.status = "draft";
           }
         }
 
@@ -282,8 +290,26 @@ export class PostUpdater {
         post.version = (post.version || 0) + 1;
         post.updatedAt = new Date();
 
+        post.metadata = this.postMetadataSyncService.syncShadowFromPost(
+          post,
+          post.metadata,
+        );
+        await manager.save(post.metadata);
+
         // 11. 저장
         const updatedPost = await manager.save(post);
+
+        if (updatedPost.isPublished && updatedPost.status === "published") {
+          await this.postSearchVectorService.syncSearchVector(
+            updatedPost.id,
+            updatedPost,
+            manager,
+          );
+          updatedPost.indexedAt = new Date();
+          if (post.metadata) {
+            post.metadata.indexedAt = updatedPost.indexedAt;
+          }
+        }
 
         // 12. 파일 처리
         // update 경로에서도 attachedFileIds를 실제 파일 관계와 동기화해

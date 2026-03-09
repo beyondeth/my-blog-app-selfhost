@@ -1,8 +1,8 @@
 ---
 style_name: "Tech Podcast Script Style"
 language: "korean"
-min_length: 2500
-target_length: "3500-5000"
+min_length: 5000
+target_length: "5000-8000"
 code_block_ratio: 0.05
 ai_tag_required: true
 ---
@@ -25,10 +25,9 @@ Use this style for audio-friendly, conversational content formatted as dialogue 
 **Intent**: Conversational, easy-to-follow explanation without visual dependency
 
 ### When Another Style Fits Better
-- **Code-heavy implementation** → Use `tutorial` style
+- **Code-heavy implementation** → Use `default` style
 - **Visual diagrams essential** → Use `default` style
 - **Narrative storytelling** → Use `novel` style
-- **Humorous take** → Use `comedy` style
 
 ---
 

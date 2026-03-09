@@ -36,7 +36,16 @@ interface StylePreview {
   tags: string[];
 }
 
-type StyleId = 'default' | 'novel' | 'tutorial' | 'comedy' | 'podcast' | 'vibe' | 'research' | '_common';
+type StyleId =
+  | 'default'
+  | 'novel'
+  | 'podcast'
+  | 'vibe'
+  | 'research'
+  | 'pm'
+  | 'designer'
+  | 'marketer'
+  | '_common';
 
 interface PreviewCase {
   id: string;
@@ -59,18 +68,6 @@ const WRITING_STYLES: StyleGuide[] = [
     shortDescription: '스토리텔링 중심',
   },
   {
-    id: 'tutorial',
-    name: 'Tutorial',
-    description: '단계별 튜토리얼 스타일. 초보자도 따라할 수 있도록 상세한 가이드와 검증 단계를 제공합니다.',
-    shortDescription: '단계별 실전 가이드',
-  },
-  {
-    id: 'comedy',
-    name: 'Comedy',
-    description: '유머러스한 경험 공유 스타일. 자조적이고 공감 가는 개발자 경험을 재치있게 전달합니다.',
-    shortDescription: '가볍고 유머러스한 톤',
-  },
-  {
     id: 'podcast',
     name: 'Podcast',
     description: '대화형 팟캐스트 스타일. 음성으로 듣기 좋게 구성되며 시각적 요소에 의존하지 않습니다.',
@@ -87,6 +84,24 @@ const WRITING_STYLES: StyleGuide[] = [
     name: 'Research',
     description: '논문 분석 인사이트 스타일. 연구 결과를 검증 근거와 함께 요약하고 실무 적용 포인트를 제시합니다.',
     shortDescription: '근거 중심 분석',
+  },
+  {
+    id: 'pm',
+    name: 'PM',
+    description: '제품 전략과 의사결정 스타일. 문제 정의, 옵션 비교, 트레이드오프와 의사결정 기준을 분명히 드러냅니다.',
+    shortDescription: '제품 전략/의사결정',
+  },
+  {
+    id: 'designer',
+    name: 'Designer',
+    description: '디자인 케이스 스터디 스타일. 맥락, 제약, 탐색 과정과 사용자 영향까지 구조적으로 설명합니다.',
+    shortDescription: '디자인 케이스 스터디',
+  },
+  {
+    id: 'marketer',
+    name: 'Marketer',
+    description: '성장·퍼포먼스 마케팅 스타일. 가설, 실험, 숫자 변화와 다음 액션을 설득력 있게 정리합니다.',
+    shortDescription: '성장/퍼포먼스 마케팅',
   },
   {
     id: '_common',
@@ -142,46 +157,6 @@ const STYLE_PREVIEWS: Record<StyleId, StylePreview> = {
       },
     ],
     tags: ['incident', 'storytelling', 'ops'],
-  },
-  tutorial: {
-    prompt: '초보자용으로 작성해줘 --tutorial',
-    title: '초보자를 위한 자동포스팅 스타일 설정 5단계',
-    summary: '설치부터 첫 자동포스팅까지 바로 따라할 수 있는 단계형 가이드 예시입니다.',
-    category: 'Guide',
-    readTime: '6 min',
-    sections: [
-      {
-        heading: 'Step 1',
-        content:
-          '설치 명령을 실행해 스킬을 연결합니다. 설치 후 `skills list`로 연결 상태를 먼저 확인합니다.',
-      },
-      {
-        heading: 'Step 2',
-        content:
-          '요청 문장 끝에 스타일 플래그를 붙여 테스트합니다. 결과물을 확인하고 필요한 톤으로 스타일을 교체합니다.',
-      },
-    ],
-    tags: ['tutorial', 'onboarding', 'skills'],
-  },
-  comedy: {
-    prompt: '실패담 중심으로 유쾌하게 써줘 --comedy',
-    title: '포트 충돌과 함께 시작된 나의 평화로운 배포',
-    summary: '현실적인 실수와 복구 과정을 가볍고 재치 있는 톤으로 보여주는 예시입니다.',
-    category: 'Dev Life',
-    readTime: '5 min',
-    sections: [
-      {
-        heading: '상황',
-        content:
-          '3001도 이미 사용 중, 3002도 이미 사용 중. 서버 두 개가 동시에 나를 반겼고, 나는 그제야 터미널 탭을 세기 시작했습니다.',
-      },
-      {
-        heading: '정리',
-        content:
-          '정답은 단순했습니다. 먼저 실행 중인 프로세스를 정리하고, 환경변수를 다시 맞춘 뒤 순서대로 올렸습니다.',
-      },
-    ],
-    tags: ['comedy', 'devlog', 'troubleshooting'],
   },
   podcast: {
     prompt: '대화형 요약으로 풀어줘 --podcast',
@@ -242,6 +217,66 @@ const STYLE_PREVIEWS: Record<StyleId, StylePreview> = {
       },
     ],
     tags: ['research', 'benchmark', 'redis'],
+  },
+  pm: {
+    prompt: '이 기능을 왜 지금 출시했는지 PM 관점으로 작성해줘 --pm',
+    title: '기능보다 문제를 먼저 설명한 출시 회고',
+    summary: '문제 신호, 선택지, 트레이드오프, 출시 후 의미를 제품 관점에서 정리한 예시입니다.',
+    category: 'Product',
+    readTime: '8 min',
+    sections: [
+      {
+        heading: '문제 신호',
+        content:
+          '사용자는 글을 발행하기 전까지는 구조화된 생각을 다시 찾기 어려웠습니다. 좋은 답변이 쌓여도 재사용 흐름이 없어서 활성화가 낮았습니다.',
+      },
+      {
+        heading: '의사결정과 트레이드오프',
+        content:
+          '이번에는 완전한 지식베이스 대신 발행글 read 기능부터 열었습니다. 복잡한 문서 구조보다 사용자가 바로 체감할 검색과 재활용을 우선했기 때문입니다.',
+      },
+    ],
+    tags: ['pm', 'activation', 'decision-making'],
+  },
+  designer: {
+    prompt: '온보딩 화면 리디자인을 디자인 케이스 스터디로 정리해줘 --designer',
+    title: '첫 30초 안에 무엇을 이해시키는가: 온보딩 리디자인 기록',
+    summary: '정보 계층과 탐색 흐름을 어떻게 조정했는지 디자인 케이스 스터디 형식으로 풀어낸 예시입니다.',
+    category: 'Design',
+    readTime: '7 min',
+    sections: [
+      {
+        heading: '기존 문제',
+        content:
+          '사용자는 가입 직후 무엇을 눌러야 하는지, API 키 생성과 MCP 연결이 왜 필요한지 한 화면 안에서 이해하지 못했습니다.',
+      },
+      {
+        heading: '선택한 방향',
+        content:
+          '설명 문구를 줄이고 단계 카드를 명확히 나눴습니다. 사용자가 “지금 해야 할 한 가지 행동”에만 집중하도록 정보 우선순위를 재배치했습니다.',
+      },
+    ],
+    tags: ['designer', 'ux', 'onboarding'],
+  },
+  marketer: {
+    prompt: '랜딩페이지 카피 실험 결과를 성장 마케팅 글로 정리해줘 --marketer',
+    title: '기능 설명보다 사용자 문장을 앞세웠더니 전환이 바뀌었다',
+    summary: '카피 실험의 가설, 결과, 해석과 다음 실험안을 성장 마케팅 관점으로 정리한 예시입니다.',
+    category: 'Growth',
+    readTime: '7 min',
+    sections: [
+      {
+        heading: '가설',
+        content:
+          '“자동포스팅” 기능 설명보다 “대화가 블로그가 된다”는 문제-해결 문장이 더 빠르게 가치를 전달할 것이라고 가정했습니다.',
+      },
+      {
+        heading: '결과 해석',
+        content:
+          '설치 가이드 클릭률은 늘었지만 가입 전환은 메시지별로 차이가 있었습니다. 기능보다 상황 언어가 초기 관심을 더 강하게 만들었습니다.',
+      },
+    ],
+    tags: ['marketer', 'landing-page', 'conversion'],
   },
   _common: {
     prompt: '위 내용 자동포스팅해줘',
@@ -398,16 +433,22 @@ const PREVIEW_CASES: PreviewCase[] = [
     },
   },
   {
-    id: 'tutorial-quickstart',
-    styleId: 'tutorial',
-    label: '초보자 빠른 시작',
-    preview: STYLE_PREVIEWS.tutorial,
+    id: 'pm-launch-retro',
+    styleId: 'pm',
+    label: '출시 의사결정 회고',
+    preview: STYLE_PREVIEWS.pm,
   },
   {
-    id: 'comedy-dev-life',
-    styleId: 'comedy',
-    label: '개발 일상 유머',
-    preview: STYLE_PREVIEWS.comedy,
+    id: 'designer-onboarding-case-study',
+    styleId: 'designer',
+    label: '온보딩 리디자인',
+    preview: STYLE_PREVIEWS.designer,
+  },
+  {
+    id: 'marketer-copy-test',
+    styleId: 'marketer',
+    label: '랜딩 카피 실험',
+    preview: STYLE_PREVIEWS.marketer,
   },
   {
     id: 'common-rules',
@@ -514,11 +555,12 @@ export default function WritingStylesPage() {
               </span>
             </div>
             <p>&ldquo;이 주제를 스토리텔링으로 작성해줘 --novel&rdquo;</p>
-            <p>&ldquo;초보자용으로 작성해줘 --tutorial&rdquo;</p>
-            <p>&ldquo;실패담 중심으로 유쾌하게 써줘 --comedy&rdquo;</p>
             <p>&ldquo;대화형 요약으로 풀어줘 --podcast&rdquo;</p>
             <p>&ldquo;인사이트 중심으로 정리해줘 --vibe&rdquo;</p>
             <p>&ldquo;근거 기반 분석으로 정리해줘 --research&rdquo;</p>
+            <p>&ldquo;왜 이 결정을 했는지 PM 관점으로 정리해줘 --pm&rdquo;</p>
+            <p>&ldquo;디자인 케이스 스터디로 정리해줘 --designer&rdquo;</p>
+            <p>&ldquo;성장 마케팅 실험 회고로 정리해줘 --marketer&rdquo;</p>
           </div>
         </section>
 

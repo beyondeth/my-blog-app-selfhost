@@ -36,6 +36,7 @@ describe("PostsService - Facade", () => {
   let service: PostsService;
   let postCreationService: jest.Mocked<PostCreationService>;
   let postMapperService: jest.Mocked<PostMapperService>;
+  let postReadService: jest.Mocked<PostReadService>;
 
   beforeEach(async () => {
     const mockPostCreationService = {
@@ -46,6 +47,12 @@ describe("PostsService - Facade", () => {
 
     const mockPostMapperService = {
       toPostDto: jest.fn(),
+    };
+
+    const mockPostReadService = {
+      findMyPublishedPosts: jest.fn(),
+      findMyPublishedPostById: jest.fn(),
+      getRelatedPosts: jest.fn(),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -72,7 +79,7 @@ describe("PostsService - Facade", () => {
         { provide: PostCacheService, useValue: {} },
         { provide: PostFileService, useValue: {} },
         { provide: PostContentService, useValue: {} },
-        { provide: PostReadService, useValue: {} },
+        { provide: PostReadService, useValue: mockPostReadService },
         { provide: PostInteractionService, useValue: {} },
         { provide: PostCreationService, useValue: mockPostCreationService },
         { provide: ThumbnailService, useValue: {} },
@@ -88,6 +95,9 @@ describe("PostsService - Facade", () => {
     postMapperService = module.get(
       PostMapperService,
     ) as jest.Mocked<PostMapperService>;
+    postReadService = module.get(
+      PostReadService,
+    ) as jest.Mocked<PostReadService>;
   });
 
   it("should be defined", () => {
@@ -117,6 +127,75 @@ describe("PostsService - Facade", () => {
         blog: mockPost.blog,
       });
       expect(result).toEqual(mockResponseDto);
+    });
+  });
+
+  describe("findMyPublishedPostsForMcp", () => {
+    it("should delegate to PostReadService and map the results", async () => {
+      const options = {
+        page: 2,
+        limit: 10,
+        search: "mcp",
+        category: "Tech",
+        tag: "read",
+      };
+      const posts = [
+        { id: "post-1", blog: { id: "blog-1" } },
+        { id: "post-2", blog: { id: "blog-1" } },
+      ] as any[];
+
+      postReadService.findMyPublishedPosts.mockResolvedValue({
+        posts: posts as any,
+        total: 2,
+        page: 2,
+        limit: 10,
+      });
+      postMapperService.toPostDto
+        .mockResolvedValueOnce({ id: "post-1", title: "First" } as any)
+        .mockResolvedValueOnce({ id: "post-2", title: "Second" } as any);
+
+      const result = await service.findMyPublishedPostsForMcp(
+        "user-1",
+        options,
+      );
+
+      expect(postReadService.findMyPublishedPosts).toHaveBeenCalledWith(
+        "user-1",
+        options,
+      );
+      expect(postMapperService.toPostDto).toHaveBeenNthCalledWith(1, posts[0]);
+      expect(postMapperService.toPostDto).toHaveBeenNthCalledWith(2, posts[1]);
+      expect(result).toEqual({
+        items: [
+          { id: "post-1", title: "First" },
+          { id: "post-2", title: "Second" },
+        ],
+        total: 2,
+        page: 2,
+        limit: 10,
+      });
+    });
+  });
+
+  describe("findMyPublishedPostForMcp", () => {
+    it("should delegate to PostReadService and map a single post", async () => {
+      const post = { id: "post-9", blog: { id: "blog-1" } } as any;
+      const dto = { id: "post-9", title: "Deep dive" } as any;
+
+      postReadService.findMyPublishedPostById.mockResolvedValue(post);
+      postMapperService.toPostDto.mockResolvedValue(dto);
+
+      const result = await service.findMyPublishedPostForMcp(
+        "user-1",
+        "post-9",
+      );
+
+      expect(postReadService.findMyPublishedPostById).toHaveBeenCalledWith(
+        "user-1",
+        "post-9",
+      );
+      expect(postMapperService.toPostDto).toHaveBeenCalledWith(post);
+      expect(result).toEqual(dto);
     });
   });
 });

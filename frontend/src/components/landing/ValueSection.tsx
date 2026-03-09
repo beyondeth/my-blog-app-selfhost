@@ -34,7 +34,7 @@ export default function ValueSection() {
       gradient: 'from-cyan-500 to-blue-500',
       bgGradient: 'from-cyan-500/10 to-blue-500/10',
       iconBg: 'bg-cyan-500/20',
-      stats: '5가지 스타일 지원',
+      stats: '8가지 스타일 지원',
     },
     {
       icon: Brain,

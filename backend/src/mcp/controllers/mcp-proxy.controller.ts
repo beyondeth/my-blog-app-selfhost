@@ -1,7 +1,10 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
+  Query,
+  Param,
   UseGuards,
   Req,
   HttpCode,
@@ -30,19 +33,20 @@ import { UsageService } from "../../usage/usage.service";
 import { FilesService } from "../../files/files.service";
 import { CreateUploadUrlDto } from "../../files/dto/create-upload-url.dto";
 import { UploadCompleteDto } from "../../files/dto/upload-complete.dto";
+import { appendMcpAiDisclosureFooter } from "../utils/ai-disclosure-footer.util";
 
 /**
  * MCP Proxy 컨트롤러
  * MCP 서버가 API Key를 사용하여 블로그에 포스트를 생성할 수 있도록 하는 프록시 엔드포인트
  * 보안을 위해 오직 포스트 생성만 허용하며, 다른 작업은 모두 차단됨
  *
- * Rate Limit: 분당 3회, 시간당 10회, 하루 20회 (ThrottlerGuard 사용)
+ * Rate Limit: 분당 20회, 시간당 30회, 하루 50회 (ThrottlerGuard 사용)
  * 인증: API Key (X-API-Key 헤더)
  */
 @ApiTags("MCP")
 @Controller("mcp")
 @Public() // JWT 가드를 우회
-@UseGuards(ThrottlerGuard) // Rate Limit 적용 (분당 3회, 시간당 10회, 하루 20회)
+@UseGuards(ThrottlerGuard) // Rate Limit 적용 (분당 20회, 시간당 30회, 하루 50회)
 @ApiBearerAuth()
 export class McpProxyController {
   private readonly logger = new Logger(McpProxyController.name);
@@ -75,6 +79,57 @@ export class McpProxyController {
       timestamp: new Date().toISOString(),
       message: "MCP 서버가 정상 작동 중입니다.",
     };
+  }
+
+  @Get("posts")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "MCP 발행글 목록/검색",
+    description:
+      "API Key에 연결된 사용자의 발행 완료 글만 조회합니다. 검색/카테고리/태그/기간 필터를 지원합니다.",
+  })
+  @ApiResponse({ status: 200, description: "발행글 목록 반환" })
+  async listPublishedPosts(
+    @Req() req: any,
+    @Query("page") page?: string,
+    @Query("limit") limit?: string,
+    @Query("search") search?: string,
+    @Query("category") category?: string,
+    @Query("tag") tag?: string,
+    @Query("dateFrom") dateFrom?: string,
+    @Query("dateTo") dateTo?: string,
+  ) {
+    const { userId } = req.apiKey;
+    const pageNumber = Math.max(1, Number.parseInt(page || "1", 10) || 1);
+    const limitNumber = Math.min(
+      50,
+      Math.max(1, Number.parseInt(limit || "20", 10) || 20),
+    );
+
+    return this.postsService.findMyPublishedPostsForMcp(userId, {
+      page: pageNumber,
+      limit: limitNumber,
+      search,
+      category,
+      tag,
+      dateFrom,
+      dateTo,
+    });
+  }
+
+  @Get("posts/:postId")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "MCP 발행글 단건 읽기",
+    description:
+      "API Key에 연결된 사용자의 발행 완료 글 1건을 상세 조회합니다.",
+  })
+  @ApiResponse({ status: 200, description: "발행글 상세 반환" })
+  async readPublishedPost(@Req() req: any, @Param("postId") postId: string) {
+    const { userId } = req.apiKey;
+    return this.postsService.findMyPublishedPostForMcp(userId, postId);
   }
 
   /**
@@ -359,7 +414,10 @@ export class McpProxyController {
       // 다운로드한 이미지들을 attachedFileIds에 포함 (수동 포스팅과 동일한 동작)
       const finalPostData = {
         ...postData,
-        content_markdown: processedContent,
+        content_markdown:
+          typeof processedContent === "string"
+            ? appendMcpAiDisclosureFooter(processedContent)
+            : processedContent,
         ...(downloadedFileIds.length > 0 && {
           attachedFileIds: downloadedFileIds,
         }),

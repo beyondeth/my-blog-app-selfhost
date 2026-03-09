@@ -2,6 +2,25 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-03-09
+
+### Additional update (MCP read rollout + app review runbooks)
+
+#### What changed
+- Added integration-side runbooks for:
+  - published-post metadata shadow cleanup
+  - OpenAI ChatGPT App review and live verification
+- Confirmed MCP published-post read rollout remains scoped to `integration/workspace` until explicit release/deploy steps.
+
+#### Why
+- The current branch includes shared-path changes across `backend`, `frontend`, and `mcp-proxy-server`.
+- Deploy/push sequencing needs explicit handoff docs so later work can continue without re-auditing the same rollout assumptions.
+
+#### How
+- Added/updated:
+  - `docs/platform-coordination/POST_METADATA_SHADOW_CLEANUP_RUNBOOK.md`
+  - `docs/openai-chatgpt-app/APP_REVIEW_RUNBOOK.md`
+
 ## 2026-02-26
 
 ### Additional update (feed period hot/top cache-warming env tracking)
