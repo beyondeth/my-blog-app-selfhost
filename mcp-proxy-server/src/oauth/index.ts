@@ -254,12 +254,10 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   // /mcp-remote 라우터 (OAuth 인증된 MCP 엔드포인트)
   const mcpRemoteRouter = Router();
 
-  /**
-   * POST /mcp-remote - OAuth 인증된 MCP 요청 처리
-   *
-   * /mcp와 동일한 MCP 처리 로직이지만 OAuth 토큰으로 인증
-   */
-  mcpRemoteRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
+  const handleOAuthMcpRequest = async (
+    req: Request,
+    res: Response,
+  ): Promise<void> => {
     // OAuth 토큰 검증 미들웨어
     await oauthMiddleware(storage, req, res, () => {});
 
@@ -271,15 +269,19 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
     const oauth = (req as any).oauth as ValidatedToken;
 
     try {
-      logger.debug({
-        userId: oauth.userId.substring(0, 8),
-        clientId: oauth.clientId.substring(0, 12),
-      }, '🔐 OAuth MCP request');
+      logger.debug(
+        {
+          method: req.method,
+          userId: oauth.userId.substring(0, 8),
+          clientId: oauth.clientId.substring(0, 12),
+        },
+        '🔐 OAuth MCP request',
+      );
 
       // 사용자 정보 조회
       const userInfo = await getUserInfo(oauth.userId);
       if (!userInfo) {
-        return res.status(403).json({
+        res.status(403).json({
           jsonrpc: '2.0',
           error: {
             code: -32002,
@@ -287,6 +289,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
           },
           id: null,
         });
+        return;
       }
 
       // MCP 서버 생성
@@ -300,7 +303,7 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
             tools: {},
             prompts: {},
           },
-        }
+        },
       );
 
       // 도구 등록 (OAuth 모드 - API Key 없음)
@@ -312,8 +315,8 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
           user: userInfo.user,
           blog: userInfo.blog,
         },
-        apiKey: null,  // OAuth 모드에서는 API Key 없음
-        oauthToken: oauth.token,  // 대신 OAuth 토큰 전달
+        apiKey: null,
+        oauthToken: oauth.token,
         oauthScope: oauth.scope,
         metricsService,
         route: 'mcp-remote',
@@ -331,25 +334,29 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         sessionIdGenerator: undefined,
       });
 
-      // MCP 서버와 Transport 연결
       await mcpServer.connect(transport);
 
-      // 요청 처리
       const startTime = Date.now();
       await transport.handleRequest(req, res);
 
-      // 메트릭 기록
       const duration = Date.now() - startTime;
       metricsService.recordRequest('success', undefined, 'mcp-remote');
       metricsService.recordRequestDuration(duration, undefined, 'mcp-remote');
 
-      logger.debug({
-        userId: oauth.userId.substring(0, 8),
-        duration: `${duration}ms`,
-      }, '✅ OAuth MCP request processed');
+      logger.debug(
+        {
+          method: req.method,
+          userId: oauth.userId.substring(0, 8),
+          duration: `${duration}ms`,
+        },
+        '✅ OAuth MCP request processed',
+      );
     } catch (error: any) {
       metricsService.recordRequest('error', undefined, 'mcp-remote');
-      logger.error({ error: error.message }, '❌ OAuth MCP request failed');
+      logger.error(
+        { error: error.message, method: req.method },
+        '❌ OAuth MCP request failed',
+      );
 
       if (!res.headersSent) {
         res.status(500).json({
@@ -362,12 +369,36 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
         });
       }
     }
+  };
+
+  const isTransportGetRequest = (req: Request): boolean => {
+    const acceptHeader = (req.headers.accept || '').toLowerCase();
+    return (
+      acceptHeader.includes('text/event-stream') ||
+      typeof req.headers.authorization === 'string' ||
+      typeof req.headers['mcp-session-id'] === 'string' ||
+      typeof req.headers['mcp-protocol-version'] === 'string'
+    );
+  };
+
+  /**
+   * POST /mcp-remote - OAuth 인증된 MCP 요청 처리
+   *
+   * /mcp와 동일한 MCP 처리 로직이지만 OAuth 토큰으로 인증
+   */
+  mcpRemoteRouter.post('/', async (req: Request, res: Response) => {
+    await handleOAuthMcpRequest(req, res);
   });
 
   /**
    * GET /mcp-remote - Server Discovery (OAuth 버전)
    */
-  mcpRemoteRouter.get('/', (req, res) => {
+  mcpRemoteRouter.get('/', async (req, res) => {
+    if (isTransportGetRequest(req)) {
+      await handleOAuthMcpRequest(req, res);
+      return;
+    }
+
     const serverUrl = config.MCP_BASE_URL || `http://localhost:${config.MCP_PROXY_PORT}`;
 
     res.json({
@@ -395,9 +426,8 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
   /**
    * DELETE /mcp-remote - 세션 종료
    */
-  mcpRemoteRouter.delete('/', (req, res) => {
-    logger.debug('🔌 DELETE /mcp-remote');
-    res.status(204).send();
+  mcpRemoteRouter.delete('/', async (req, res) => {
+    await handleOAuthMcpRequest(req, res);
   });
 
   return {

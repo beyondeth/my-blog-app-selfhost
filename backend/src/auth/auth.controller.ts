@@ -1438,7 +1438,10 @@ export class AuthController {
       "client_name",
       clientName || "MCP Client",
     );
-    frontendLoginUrl.searchParams.set("scope", scope || "mcp:tools");
+    frontendLoginUrl.searchParams.set(
+      "scope",
+      scope || "mcp:tools mcp:read mcp:write",
+    );
     frontendLoginUrl.searchParams.set("callback_url", callbackUrl);
     if (forceLogin) {
       frontendLoginUrl.searchParams.set("force_login", "1");

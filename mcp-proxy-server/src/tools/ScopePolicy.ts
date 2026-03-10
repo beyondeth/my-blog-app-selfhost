@@ -1,5 +1,6 @@
 import type { ToolContext } from '../core/types.js';
 import type { ToolName } from './catalog.js';
+import { expandLegacyScopeTokens } from '../oauth/scope-normalization.js';
 
 const TOOL_REQUIRED_SCOPES: Record<ToolName, string[]> = {
   check_auth: ['mcp:tools'],
@@ -11,15 +12,6 @@ const TOOL_REQUIRED_SCOPES: Record<ToolName, string[]> = {
   get_image_upload_url: ['mcp:tools', 'mcp:write'],
   finalize_uploaded_image: ['mcp:tools', 'mcp:write'],
 };
-
-function parseScopes(scope: string | undefined): Set<string> {
-  return new Set(
-    (scope || '')
-      .split(/\s+/)
-      .map((value) => value.trim())
-      .filter(Boolean),
-  );
-}
 
 export function getRequiredScopes(toolName: ToolName): string[] {
   return TOOL_REQUIRED_SCOPES[toolName] || ['mcp:tools'];
@@ -35,7 +27,7 @@ export function getScopeAuthorizationError(
   }
 
   const requiredScopes = getRequiredScopes(toolName);
-  const grantedScopes = parseScopes(context.oauthScope);
+  const grantedScopes = expandLegacyScopeTokens(context.oauthScope);
   const missingScopes = requiredScopes.filter((scope) => !grantedScopes.has(scope));
 
   if (missingScopes.length === 0) {
