@@ -1,6 +1,6 @@
 'use client';
 
-import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import PostHeaderWithReport from '@/components/posts/PostHeaderWithReport';
@@ -90,6 +90,7 @@ interface BlogPostDetailClientProps {
 
 export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClientProps) {
   const params = useParams();
+  const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, isAdmin } = useAuth();
@@ -146,11 +147,16 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
         ? redirectPath
         : redirectPath.replace(`/${blog.redirectTo}`, `/@${blog.redirectTo}`);
 
+      const currentPathWithQuery = `${pathname}${searchParams?.toString() ? `?${searchParams.toString()}` : ''}`;
+      if (currentPathWithQuery === finalRedirectPath) {
+        return;
+      }
+
       // Next.js router를 사용하여 소프트 네비게이션 (음악 플레이어 상태 유지)
       router.replace(finalRedirectPath);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps -- router는 stable reference
-  }, [blog, postSlug, searchParams]);
+  }, [blog, postSlug, searchParams, pathname]);
 
   // Fetch post details - 항상 최신 데이터 가져오기
   const { data: post, error, isError, refetch } = usePost(postSlug, {
