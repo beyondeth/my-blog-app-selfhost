@@ -20,7 +20,8 @@ import {
   FiTrendingUp,
   FiFileText,
   FiBookmark,
-  FiHelpCircle
+  FiHelpCircle,
+  FiKey,
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
 import { useMyCommunities } from '@/hooks/community/useCommunities';
@@ -103,6 +104,11 @@ export default function MobileProfileDropdown({
         <DropdownMenuItem onClick={() => handleNavigation('/settings/blog')} className="cursor-pointer">
           <FiSettings className="mr-2 h-4 w-4" />
           <span>블로그 설정</span>
+        </DropdownMenuItem>
+
+        <DropdownMenuItem onClick={() => handleNavigation('/settings/api-keys')} className="cursor-pointer">
+          <FiKey className="mr-2 h-4 w-4" />
+          <span>자동포스팅 연결</span>
         </DropdownMenuItem>
 
         <DropdownMenuSeparator />

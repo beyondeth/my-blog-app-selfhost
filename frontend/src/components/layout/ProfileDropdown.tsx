@@ -149,6 +149,14 @@ export default function ProfileDropdown({
           <span>블로그 설정</span>
         </DropdownMenuItem>
 
+        <DropdownMenuItem
+          onClick={() => handleNavigation('/settings/api-keys')}
+          className="cursor-pointer"
+        >
+          <FiKey className="mr-2 h-4 w-4" />
+          <span>자동포스팅 연결</span>
+        </DropdownMenuItem>
+
         <DropdownMenuSeparator />
 
         {/* 내 초안 */}
