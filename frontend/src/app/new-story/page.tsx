@@ -25,7 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Save, Plus, AlertCircle, ImageIcon, Film, FileText, X } from 'lucide-react';
+import { Save, Plus, AlertCircle, ImageIcon, Film, FileText, X, Github } from 'lucide-react';
 import ConfirmDialog from '@/components/ui/ConfirmDialog';
 import {
   AlertDialog,
@@ -73,6 +73,7 @@ import {
   extractYouTubeThumbnailMarker,
   stripYouTubeThumbnailMarker,
 } from '@/utils/youtubeMarkdown';
+import GithubResourcePopover from '@/components/posts/GithubResourcePopover';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogSimpleEditor = dynamic(
@@ -101,6 +102,8 @@ const postSchema = z.object({
   categories: categoriesSchema.optional(),
   content: z.string().min(1, '내용을 입력해주세요.'),
   tags: z.array(z.string()).optional(),
+  githubUrl: z.string().optional(),
+  githubDescription: z.string().optional(),
   fileIds: z.array(z.string()).optional(),
   thumbnailIndex: z.number().optional(), // 썸네일 인덱스 (0-based, -1 = 미선택)
 });
@@ -215,6 +218,8 @@ export default function NewStoryPage() {
       categories: [],
       content: '',
       tags: [],
+      githubUrl: '',
+      githubDescription: '',
       fileIds: [],
       thumbnailIndex: -1, // 초기값: 미선택
     },
@@ -1027,6 +1032,8 @@ export default function NewStoryPage() {
           title: data.title,
           category: categoryString,
           tags: data.tags,
+          githubUrl: data.githubUrl?.trim() ?? '',
+          githubDescription: data.githubDescription?.trim() ?? '',
           visibility: postVisibility,
           attachedFileIds: data.fileIds,
           ...(thumbnailImageId && !hasPreferredYouTube && { thumbnailImageId }),
@@ -1505,6 +1512,22 @@ export default function NewStoryPage() {
                                 <Film className="h-4 w-4 mr-1.5" />
                                 영상 업로드
                               </Button>
+                              <GithubResourcePopover
+                                githubUrl={form.watch('githubUrl') ?? ''}
+                                githubDescription={form.watch('githubDescription') ?? ''}
+                                onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
+                                onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
+                              >
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="px-2.5"
+                                  title="GitHub 리소스"
+                                >
+                                  <Github className="h-4 w-4" />
+                                </Button>
+                              </GithubResourcePopover>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
                                   이미지 업로드 중...
@@ -1638,6 +1661,10 @@ export default function NewStoryPage() {
                                 initialThumbnailIndex={thumbnailIndex}
                                 onThumbnailIndexChange={handleThumbnailChange}
                                 onFileIdsChange={handleFileIdsChange}
+                                githubUrl={form.watch('githubUrl') ?? ''}
+                                githubDescription={form.watch('githubDescription') ?? ''}
+                                onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
+                                onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
                               />
                             </div>
                           </div>
@@ -1743,6 +1770,8 @@ export default function NewStoryPage() {
                       title: data.title,
                       category: categoryString || '기타',
                       tags: data.tags,
+                      githubUrl: data.githubUrl?.trim() ?? '',
+                      githubDescription: data.githubDescription?.trim() ?? '',
                       visibility: postVisibility,
                       attachedFileIds: data.fileIds,
                       ...(thumbnailImageId && { thumbnailImageId }),

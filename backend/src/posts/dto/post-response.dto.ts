@@ -137,6 +137,15 @@ export class PostResponseDto {
   @Expose()
   editorPickExcerpt?: string; // Editor's Pick 전용 요약
 
+  @Expose()
+  hasGithubResource?: boolean;
+
+  @Expose()
+  githubDescription?: string | null;
+
+  @Expose()
+  githubUrl?: string | null;
+
   // 첨부 파일 - 프론트엔드에서 필요하므로 노출
   @Expose()
   @Type(() => FileResponseDto)

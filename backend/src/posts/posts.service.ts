@@ -372,7 +372,10 @@ export class PostsService {
       postId,
     );
 
-    return this.postMapperService.toPostDto(post);
+    return this.postMapperService.toPostDto(post, {
+      viewer: { id: userId } as User,
+      exposeGithubResourceUrl: true,
+    });
   }
 
   // ========== Read Operations (PostReadService로 위임) ==========
@@ -966,7 +969,11 @@ export class PostsService {
       throw new NotFoundException("포스트를 찾을 수 없습니다.");
     }
 
-    return await this.postMapperService.toPostDto(post, { user });
+    return await this.postMapperService.toPostDto(post, {
+      user,
+      viewer: user,
+      exposeGithubResourceUrl: true,
+    });
   }
 
   /**
@@ -1011,7 +1018,9 @@ export class PostsService {
       liked?: boolean;
       bookmarked?: boolean;
       user?: User;
+      viewer?: User;
       blog?: Blog;
+      exposeGithubResourceUrl?: boolean;
     },
   ): Promise<PostResponseDto> {
     return await this.postMapperService.toPostDto(post, options);

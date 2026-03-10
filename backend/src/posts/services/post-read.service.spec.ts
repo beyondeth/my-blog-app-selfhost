@@ -75,12 +75,11 @@ describe("PostReadService", () => {
     jest.clearAllMocks();
   });
 
-  it("resolves slug via cache mapping and applies user interaction overlay", async () => {
+  it("resolves slug via public cache mapping for anonymous detail reads", async () => {
     const {
       service,
       cacheService,
       postsReadRepository,
-      postInteractionStatusService,
     } = createService();
 
     cacheService.get.mockResolvedValueOnce("post-1").mockResolvedValueOnce({
@@ -92,21 +91,10 @@ describe("PostReadService", () => {
       userVote: null,
     });
 
-    const interactionMap = new Map<string, any>([
-      ["post-1", { liked: true, bookmarked: true, userVote: "upvote" }],
-    ]);
-    postInteractionStatusService.getMultipleInteractionStatuses.mockResolvedValue(
-      interactionMap,
-    );
-
-    const result = await service.findBySlug("hello-world", {
-      id: "user-1",
-    } as any);
+    const result = await service.findBySlug("hello-world");
 
     expect(postsReadRepository.findBySlugWithRelations).not.toHaveBeenCalled();
-    expect(result.liked).toBe(true);
-    expect(result.bookmarked).toBe(true);
-    expect(result.userVote).toBe("upvote");
+    expect(result.id).toBe("post-1");
   });
 
   it("loads from repository on slug cache miss and stores id/detail caches", async () => {
@@ -158,6 +146,70 @@ describe("PostReadService", () => {
       "post:detail:lock:slug:cache-me",
     );
     expect(result.id).toBe("post-22");
+  });
+
+  it("bypasses public detail cache for authenticated slug reads to build a gated viewer DTO", async () => {
+    const {
+      service,
+      cacheService,
+      postsReadRepository,
+      postMapperService,
+      postInteractionStatusService,
+    } = createService();
+
+    const postEntity = {
+      id: "post-77",
+      slug: "member-only-resource",
+      title: "Member only resource",
+      isPublished: true,
+      isDeleted: false,
+      visibility: "public",
+      authorId: "author-1",
+      author: { id: "author-1", username: "author" },
+      blog: {
+        id: "blog-1",
+        userId: "author-1",
+        slug: "blog-1",
+        name: "Blog",
+        isPublic: true,
+      },
+      metadata: {
+        githubUrl: "https://github.com/example/repo",
+      },
+    };
+
+    postsReadRepository.findBySlugWithRelations.mockResolvedValue(postEntity);
+    postMapperService.toPostDto
+      .mockResolvedValueOnce({
+        id: "post-77",
+        slug: "member-only-resource",
+        githubUrl: null,
+        hasGithubResource: true,
+      })
+      .mockResolvedValueOnce({
+        id: "post-77",
+        slug: "member-only-resource",
+        githubUrl: "https://github.com/example/repo",
+        hasGithubResource: true,
+      });
+    postInteractionStatusService.getMultipleInteractionStatuses.mockResolvedValue(
+      new Map<string, any>(),
+    );
+
+    const result = await service.findBySlug("member-only-resource", {
+      id: "viewer-1",
+    } as any);
+
+    expect(cacheService.get).not.toHaveBeenCalled();
+    expect(postMapperService.toPostDto).toHaveBeenNthCalledWith(
+      2,
+      postEntity,
+      expect.objectContaining({
+        viewer: expect.objectContaining({ id: "viewer-1" }),
+        exposeGithubResourceUrl: true,
+      }),
+    );
+    expect(result.githubUrl).toBe("https://github.com/example/repo");
   });
 
   it("returns findById from cache without querying database", async () => {

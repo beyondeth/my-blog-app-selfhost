@@ -325,7 +325,7 @@ export class PostReadService {
     relations: string[] = [],
     user?: User,
   ): Promise<any> {
-    const canUseReadCache = this.canUseCanonicalDetailCache(relations);
+    const canUseReadCache = !user && this.canUseCanonicalDetailCache(relations);
     const cacheKey = CacheKeys.POST_CORE(id);
     const lockKey = `post:detail:lock:id:${id}`;
     let lockAcquired = false;
@@ -413,6 +413,11 @@ export class PostReadService {
         await this.cachePublishedDetail(post, baseDto);
       }
 
+      if (user) {
+        const viewerDto = await this.toViewerDetailDto(post, user);
+        return this.applyInteractionToDto(viewerDto, user);
+      }
+
       return this.applyInteractionToDto(baseDto, user);
     } finally {
       if (lockAcquired) {
@@ -434,6 +439,7 @@ export class PostReadService {
     options?: { bypassCache?: boolean },
   ): Promise<any> {
     const shouldBypassCache = options?.bypassCache === true;
+    const canUseReadCache = !user && !shouldBypassCache;
     this.logger.log(
       `[findBySlug] Looking up slug: ${slug}${shouldBypassCache ? " (bypass-cache)" : ""}`,
     );
@@ -442,7 +448,7 @@ export class PostReadService {
     const lockKey = `post:detail:lock:slug:${slug}`;
     let lockAcquired = false;
 
-    if (!shouldBypassCache) {
+    if (canUseReadCache) {
       const cachedSlugEntry = await this.cacheService.get<any>(cacheKey);
       if (cachedSlugEntry) {
         if (typeof cachedSlugEntry === "string") {
@@ -528,10 +534,15 @@ export class PostReadService {
       const baseDto = await this.toBaseDetailDto(post);
 
       if (
-        !shouldBypassCache &&
+        canUseReadCache &&
         this.postAccessPolicyService.isPubliclyReadablePost(post, post.blog)
       ) {
         await this.cachePublishedDetail(post, baseDto);
+      }
+
+      if (user) {
+        const viewerDto = await this.toViewerDetailDto(post, user);
+        return this.applyInteractionToDto(viewerDto, user);
       }
 
       return this.applyInteractionToDto(baseDto, user);
@@ -579,6 +590,18 @@ export class PostReadService {
       bookmarked: false,
       liked: false,
       userVote: null,
+    });
+  }
+
+  private async toViewerDetailDto(post: Post, viewer: User): Promise<any> {
+    return this.postMapperService.toPostDto(post, {
+      user: post.author,
+      viewer,
+      blog: post.blog,
+      bookmarked: false,
+      liked: false,
+      userVote: null,
+      exposeGithubResourceUrl: true,
     });
   }
 

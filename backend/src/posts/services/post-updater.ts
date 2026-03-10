@@ -34,6 +34,10 @@ import {
 import { CacheService, CacheKeys } from "../../cache/cache.service";
 import { PostMetadataSyncService } from "./post-metadata-sync.service";
 import { PostSearchVectorService } from "./post-search-vector.service";
+import {
+  normalizeGithubResourceUrl,
+  sanitizeGithubResourceDescription,
+} from "../utils/github-resource.util";
 
 /**
  * 포스트 수정 전담 서비스
@@ -123,6 +127,12 @@ export class PostUpdater {
           throw new ForbiddenException("수정 권한이 없습니다.");
         }
 
+        const metadata = this.postMetadataSyncService.ensureMetadata(
+          post.id,
+          post.metadata,
+        );
+        post.metadata = metadata;
+
         // 3. 발행 상태 변경 처리
         const wasPublished = post.isPublished;
         const willBePublished =
@@ -184,10 +194,6 @@ export class PostUpdater {
 
           post.excerpt = this.postContentService.extractExcerpt(rawInput);
 
-          const metadata = this.postMetadataSyncService.ensureMetadata(
-            post.id,
-            post.metadata,
-          );
           const readingTime =
             this.postContentService.calculateReadingTime(rawInput);
           metadata.wordCount = readingTime.wordCount;
@@ -224,6 +230,20 @@ export class PostUpdater {
         if (updatePostDto.visibility !== undefined) {
           post.visibility =
             updatePostDto.visibility === "private" ? "private" : "public";
+        }
+
+        if (updatePostDto.githubUrl !== undefined) {
+          const githubUrl = normalizeGithubResourceUrl(updatePostDto.githubUrl);
+          metadata.githubUrl = githubUrl;
+          if (!githubUrl && updatePostDto.githubDescription === undefined) {
+            metadata.githubDescription = null;
+          }
+        }
+
+        if (updatePostDto.githubDescription !== undefined) {
+          metadata.githubDescription = metadata.githubUrl
+            ? sanitizeGithubResourceDescription(updatePostDto.githubDescription)
+            : null;
         }
 
         // 6. 발행 상태 변경

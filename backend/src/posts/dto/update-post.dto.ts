@@ -48,6 +48,14 @@ export class UpdatePostDto extends PartialType(CreatePostDto) {
   @IsIn(["public", "private"])
   visibility?: "public" | "private";
 
+  @IsOptional()
+  @IsString()
+  githubUrl?: string;
+
+  @IsOptional()
+  @IsString()
+  githubDescription?: string;
+
   /**
    * 업데이트 경로에서 썸네일 제거를 지원하기 위해 오버라이드
    * - "" -> null 로 정규화

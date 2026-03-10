@@ -14,6 +14,9 @@ interface Post {
   slug: string;
   thumbnail?: string | null;  // 썸네일 이미지 URL
   visibility?: 'public' | 'private';
+  hasGithubResource?: boolean;
+  githubDescription?: string | null;
+  githubUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   viewCount?: number;

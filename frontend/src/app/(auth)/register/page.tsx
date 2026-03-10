@@ -12,6 +12,9 @@ import { validatePasswordStrength, getPasswordStrengthColor, getPasswordStrength
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { parseMcpScopes } from '@/lib/mcpScopes';
+import { isSafeRedirectUrl } from '@/lib/utils/sanitize';
+
+const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -62,9 +65,76 @@ export default function RegisterPage() {
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
   const requestedMcpScopes = parseMcpScopes(mcpScope);
+  const normalizeRedirectTarget = (target?: string | null) => {
+    if (typeof window === 'undefined' || !target) {
+      return '/';
+    }
+
+    const trimmed = target.trim();
+    if (!trimmed) {
+      return '/';
+    }
+
+    if (AUTH_REDIRECT_BLOCKLIST.some(path => trimmed === path || trimmed.startsWith(`${path}?`))) {
+      return '/';
+    }
+
+    try {
+      if (!isSafeRedirectUrl(trimmed)) {
+        return '/';
+      }
+    } catch {
+      return '/';
+    }
+
+    if (trimmed.startsWith('http')) {
+      try {
+        const parsed = new URL(trimmed);
+        if (parsed.origin !== window.location.origin) {
+          return '/';
+        }
+        return `${parsed.pathname}${parsed.search}${parsed.hash}` || '/';
+      } catch {
+        return '/';
+      }
+    }
+
+    return trimmed;
+  };
+
+  const getRedirectTargetFromParams = () => {
+    if (typeof window === 'undefined') {
+      return null;
+    }
+
+    const params = [searchParams.get('returnUrl'), searchParams.get('redirect')];
+    for (const value of params) {
+      if (!value) continue;
+      try {
+        if (isSafeRedirectUrl(value)) {
+          return value;
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    return null;
+  };
+
+  const resolveRedirectTarget = () => {
+    const paramTarget = getRedirectTargetFromParams();
+    const sessionTarget = typeof window !== 'undefined'
+      ? sessionStorage.getItem('redirectAfterLogin')
+      : null;
+
+    return normalizeRedirectTarget(paramTarget || sessionTarget || '/');
+  };
+
+  const returnUrlParam = getRedirectTargetFromParams();
   const loginHref = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? `/login?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
-    : '/login';
+    ? `/login?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}${returnUrlParam ? `&returnUrl=${encodeURIComponent(returnUrlParam)}` : ''}`
+    : `/login${returnUrlParam ? `?returnUrl=${encodeURIComponent(returnUrlParam)}` : ''}`;
 
   // 컴포넌트 마운트 시 전역 에러 초기화
   useEffect(() => {
@@ -251,7 +321,11 @@ export default function RegisterPage() {
       // ConsentGuard 타이밍 이슈 방지
       await refreshUser();
 
-      router.push('/');
+      const redirectTarget = resolveRedirectTarget();
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('redirectAfterLogin');
+      }
+      router.push(redirectTarget);
     } catch (error: any) {
       // 에러 메시지에 따라 적절한 필드에 에러 표시
       const message = error.message || '회원가입에 실패했습니다.';

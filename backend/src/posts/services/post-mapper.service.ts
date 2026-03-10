@@ -55,7 +55,9 @@ export class PostMapperService {
       bookmarked?: boolean;
       userVote?: VoteType | null;
       user?: User;
+      viewer?: User;
       blog?: Blog;
+      exposeGithubResourceUrl?: boolean;
     },
   ): Promise<PostResponseDto> {
     // plainToInstance로 자동 변환 (@Expose 필드만 포함됨)
@@ -76,6 +78,20 @@ export class PostMapperService {
     dto.title = sanitizeString(dto.title, 500) ?? "";
     dto.excerpt = sanitizeString(dto.excerpt, 2000) ?? "";
     dto.category = sanitizeString(dto.category, 120) ?? "";
+    const githubDescriptionSource =
+      post.metadata?.githubDescription ?? (post as any).githubDescription;
+    const githubUrlSource = post.metadata?.githubUrl ?? (post as any).githubUrl;
+    const hasGithubResourceSource =
+      typeof (post as any).hasGithubResource === "boolean"
+        ? (post as any).hasGithubResource
+        : Boolean(githubUrlSource);
+
+    dto.githubDescription = sanitizeString(githubDescriptionSource, 240) ?? null;
+    dto.hasGithubResource = hasGithubResourceSource;
+    dto.githubUrl =
+      options?.exposeGithubResourceUrl && options.viewer && githubUrlSource
+        ? sanitizeString(githubUrlSource, 500) ?? null
+        : null;
 
     // 추가 필드 설정
     if (options) {

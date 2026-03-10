@@ -197,6 +197,9 @@ export interface Post {
   bookmarked?: boolean;  // 북마크 여부
   tags?: string[];
   category: string;  // 카테고리 (필수)
+  hasGithubResource?: boolean;
+  githubDescription?: string | null;
+  githubUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   publishedAt?: string;
@@ -283,6 +286,8 @@ export interface PostForm {
   tags?: string[];
   category: string;  // 카테고리 (필수)
   visibility?: 'public' | 'private';
+  githubUrl?: string;
+  githubDescription?: string;
   attachedFileIds?: string[];
   version?: number;
 }

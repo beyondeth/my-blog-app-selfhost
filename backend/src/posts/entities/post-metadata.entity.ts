@@ -187,6 +187,21 @@ export class PostMetadata {
   editCount: number;
 
   /**
+   * 회원가입 사용자에게만 공개할 GitHub 리소스 주소
+   * - 포스트 상세 CTA에서 사용
+   * - null: 게이트할 GitHub 리소스 없음
+   */
+  @Column({ type: "varchar", length: 500, nullable: true })
+  githubUrl: string | null;
+
+  /**
+   * GitHub 리소스 한줄 설명
+   * - 비로그인 사용자 게이트 카드 카피
+   */
+  @Column({ type: "varchar", length: 240, nullable: true })
+  githubDescription: string | null;
+
+  /**
    * 전문 검색 벡터 (PostgreSQL tsvector)
    * - title + content + tags의 텍스트를 벡터화
    * - GIN 인덱스 적용으로 빠른 전문 검색
