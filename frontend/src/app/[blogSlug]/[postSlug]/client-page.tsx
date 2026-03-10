@@ -139,15 +139,18 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   // old_alias로 접속한 경우 현재 alias로 영구 리다이렉트
   useEffect(() => {
     if (blog && 'shouldRedirect' in blog && blog.shouldRedirect && blog.redirectTo) {
+      const queryString = searchParams.toString();
+      const querySuffix = queryString ? `?${queryString}` : '';
+
       // SEO를 위한 301 영구 리다이렉트
-      const redirectPath = `/${blog.redirectTo}/${postSlug}${searchParams ? `?${searchParams.toString()}` : ''}`;
+      const redirectPath = `/${blog.redirectTo}/${postSlug}${querySuffix}`;
 
       // @ 접두사가 있는 경우 항상 추가
       const finalRedirectPath = blog.redirectTo.startsWith('@')
         ? redirectPath
         : redirectPath.replace(`/${blog.redirectTo}`, `/@${blog.redirectTo}`);
 
-      const currentPathWithQuery = `${pathname}${searchParams?.toString() ? `?${searchParams.toString()}` : ''}`;
+      const currentPathWithQuery = `${pathname}${querySuffix}`;
       if (currentPathWithQuery === finalRedirectPath) {
         return;
       }

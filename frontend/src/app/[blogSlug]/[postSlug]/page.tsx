@@ -1,8 +1,9 @@
 import { Metadata } from 'next';
 import { cache } from 'react';
 import { cookies } from 'next/headers';
+import Link from 'next/link';
 import BlogPostDetailClient from './client-page';
-import { notFound, permanentRedirect } from 'next/navigation';
+import { notFound } from 'next/navigation';
 
 // 포스트 데이터 타입 정의 (백엔드 실제 구조 반영)
 interface Post {
@@ -56,12 +57,12 @@ const getPost = cache(
   async (
     blogSlug: string,
     postSlug: string,
-    options?: { fresh?: boolean },
+    fresh: boolean = false,
   ): Promise<Post | PrivateBlogSentinel | null> => {
 
   try {
     const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-    const requestPath = options?.fresh
+    const requestPath = fresh
       ? `${apiUrl}/posts/slug/${postSlug}?fresh=1`
       : `${apiUrl}/posts/slug/${postSlug}`;
 
@@ -135,7 +136,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   // Next.js 16: params는 Promise
   const { blogSlug, postSlug } = await params;
-  const post = await getPost(blogSlug, postSlug);
+  const post = await getPost(blogSlug, postSlug, false);
 
   if (!post) {
     return {
@@ -360,22 +361,46 @@ export default async function BlogPostDetailPage({
     resolvedSearchParams.fresh === 'true';
 
   // 포스트 데이터 미리 가져오기 (404 체크용)
-  const post = await getPost(blogSlug, postSlug, { fresh: forceFresh });
+  const post = await getPost(blogSlug, postSlug, forceFresh);
 
+  // 비공개 블로그 접근 시 전용 안내 페이지
   if (post && '__isPrivateBlog' in post) {
-    notFound();
+    return (
+      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
+        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-6">
+          <svg
+            className="w-10 h-10 text-gray-400 dark:text-gray-500"
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
+            strokeWidth={1.5}
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
+            />
+          </svg>
+        </div>
+        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
+          비공개 블로그입니다
+        </h1>
+        <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-sm">
+          이 블로그는 비공개 상태입니다. 블로그 소유자만 볼 수 있습니다.
+        </p>
+        <Link
+          href="/"
+          className="px-5 py-2.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 transition-opacity"
+        >
+          홈으로 돌아가기
+        </Link>
+      </div>
+    );
   }
 
   // 포스트가 없으면 404 페이지로
   if (!post) {
     notFound();
-  }
-
-  const canonicalBlogPath = getCanonicalBlogPath(post.blog);
-  const requestedPath = `/${blogSlug}/${postSlug}`;
-  const canonicalPostPath = `${canonicalBlogPath}/${postSlug}`;
-  if (canonicalBlogPath && requestedPath !== canonicalPostPath) {
-    permanentRedirect(canonicalPostPath);
   }
 
   // JSON-LD 구조화된 데이터 생성
