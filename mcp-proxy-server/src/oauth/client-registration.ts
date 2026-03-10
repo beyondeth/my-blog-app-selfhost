@@ -19,6 +19,7 @@ import type {
   StoredClient,
 } from './types.js';
 import { OAuthErrorCodes } from './types.js';
+import { normalizeLegacyScope } from './scope-normalization.js';
 
 const router = Router();
 
@@ -168,6 +169,8 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
       const now = Math.floor(Date.now() / 1000);
 
       // 저장할 클라이언트 데이터
+      const normalizedScope = normalizeLegacyScope(request.scope);
+
       const client: StoredClient = {
         clientId,
         clientSecret,
@@ -176,7 +179,7 @@ export function createClientRegistrationRouter(storage: OAuthStorage): Router {
         redirectUris: request.redirect_uris,
         clientName: request.client_name || 'Unknown Client',
         clientUri: request.client_uri,
-        scope: request.scope || 'mcp:tools mcp:read mcp:write',
+        scope: normalizedScope,
         tokenEndpointAuthMethod: request.token_endpoint_auth_method || 'client_secret_post',
         grantTypes: request.grant_types || ['authorization_code', 'refresh_token'],
         responseTypes: request.response_types || ['code'],

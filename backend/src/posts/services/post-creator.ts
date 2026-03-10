@@ -21,6 +21,10 @@ import {
 import { CacheService } from "../../cache/cache.service";
 import { PostMetadataSyncService } from "./post-metadata-sync.service";
 import { PostSearchVectorService } from "./post-search-vector.service";
+import {
+  normalizeGithubResourceUrl,
+  sanitizeGithubResourceDescription,
+} from "../utils/github-resource.util";
 
 /**
  * 포스트 생성 전담 서비스
@@ -209,6 +213,10 @@ export class PostCreator {
             .filter((tag) => !!tag) ?? [];
         const visibility =
           createPostDto.visibility === "private" ? "private" : "public";
+        const githubUrl = normalizeGithubResourceUrl(createPostDto.githubUrl);
+        const githubDescription = githubUrl
+          ? sanitizeGithubResourceDescription(createPostDto.githubDescription)
+          : null;
 
         // 4. 썸네일 설정 (thumbnailImageId만 사용 - thumbnail 필드는 PostMapperService에서 동적 생성)
         // thumbnailImageId 우선순위: 명시적 thumbnailImageId
@@ -319,6 +327,8 @@ export class PostCreator {
         metadata.readingTimeMinutes = readingStats.readingTimeMinutes;
         metadata.lastEditedAt = new Date();
         metadata.editCount = 0;
+        metadata.githubUrl = githubUrl;
+        metadata.githubDescription = githubDescription;
         await manager.save(metadata);
 
         if (savedPost.isPublished) {

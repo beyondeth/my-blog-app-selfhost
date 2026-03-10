@@ -16,6 +16,7 @@ import { logger } from '../utils/logger.js';
 import { config } from '../config/env.validation.js';
 import { OAuthStorage } from './storage.js';
 import { OAuthErrorCodes } from './types.js';
+import { normalizeLegacyScope } from './scope-normalization.js';
 import type {
   AuthorizationCode,
   AccessToken,
@@ -133,11 +134,13 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
       const resourceUri = resource || getServerUrl();
 
       // 6. 세션 저장 (state 검증용)
+      const normalizedScope = normalizeLegacyScope(scope || client.scope);
+
       const session: OAuthSession = {
         state: state || crypto.randomBytes(16).toString('hex'),
         clientId: client_id,
         redirectUri: redirect_uri,
-        scope: scope || client.scope,
+        scope: normalizedScope,
         codeChallenge: code_challenge,
         codeChallengeMethod: 'S256',
         resource: resourceUri,
@@ -351,11 +354,13 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
 
         // 액세스 토큰 생성
         const accessTokenValue = storage.generateToken('mcp_at', 32);
+        const normalizedScope = normalizeLegacyScope(authCode.scope);
+
         const accessToken: AccessToken = {
           token: accessTokenValue,
           clientId: authCode.clientId,
           userId: authCode.userId,
-          scope: authCode.scope,
+          scope: normalizedScope,
           resource: requestedResource,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.ACCESS_TOKEN * 1000),
           createdAt: new Date(),
@@ -368,7 +373,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token: refreshTokenValue,
           clientId: authCode.clientId,
           userId: authCode.userId,
-          scope: authCode.scope,
+          scope: normalizedScope,
           resource: requestedResource,
           accessToken: accessTokenValue,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.REFRESH_TOKEN * 1000),
@@ -381,7 +386,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token_type: 'Bearer',
           expires_in: TOKEN_LIFETIME.ACCESS_TOKEN,
           refresh_token: refreshTokenValue,
-          scope: authCode.scope,
+          scope: normalizedScope,
         };
 
         logger.info({
@@ -420,11 +425,13 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
 
         // 새 액세스 토큰 생성
         const newAccessTokenValue = storage.generateToken('mcp_at', 32);
+        const normalizedScope = normalizeLegacyScope(storedRefreshToken.scope);
+
         const newAccessToken: AccessToken = {
           token: newAccessTokenValue,
           clientId: storedRefreshToken.clientId,
           userId: storedRefreshToken.userId,
-          scope: storedRefreshToken.scope,
+          scope: normalizedScope,
           resource: storedRefreshToken.resource,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.ACCESS_TOKEN * 1000),
           createdAt: new Date(),
@@ -437,7 +444,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token: newRefreshTokenValue,
           clientId: storedRefreshToken.clientId,
           userId: storedRefreshToken.userId,
-          scope: storedRefreshToken.scope,
+          scope: normalizedScope,
           resource: storedRefreshToken.resource,
           accessToken: newAccessTokenValue,
           expiresAt: new Date(Date.now() + TOKEN_LIFETIME.REFRESH_TOKEN * 1000),
@@ -450,7 +457,7 @@ export function createAuthorizationRouter(storage: OAuthStorage): Router {
           token_type: 'Bearer',
           expires_in: TOKEN_LIFETIME.ACCESS_TOKEN,
           refresh_token: newRefreshTokenValue,
-          scope: storedRefreshToken.scope,
+          scope: normalizedScope,
         };
 
         logger.info({

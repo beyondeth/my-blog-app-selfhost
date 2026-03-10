@@ -97,6 +97,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [isVisibilityPending, setIsVisibilityPending] = useState(false);
+  const [showGithubGate, setShowGithubGate] = useState(false);
   const hasViewed = useRef(false);
 
   const blogSlug = params.blogSlug as string;
@@ -345,6 +346,39 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
     bookmarkMutation.mutate();
   }, [post, user, bookmarkMutation]);
 
+  const handleGithubResource = useCallback(async () => {
+    if (!post?.hasGithubResource) {
+      return;
+    }
+
+    if (!user) {
+      setShowGithubGate(true);
+      return;
+    }
+
+    if (!post.githubUrl) {
+      toast.error('GitHub 주소를 아직 불러오지 못했습니다.', {
+        duration: 3000,
+        position: 'bottom-right',
+      });
+      return;
+    }
+
+    try {
+      await navigator.clipboard.writeText(post.githubUrl);
+      toast.success('GitHub 주소가 클립보드에 복사되었습니다.', {
+        duration: 3000,
+        position: 'bottom-right',
+      });
+    } catch (error) {
+      console.error('GitHub 주소 복사 실패:', error);
+      toast.error('GitHub 주소 복사에 실패했습니다.', {
+        duration: 3000,
+        position: 'bottom-right',
+      });
+    }
+  }, [post, user]);
+
   // Editor's Pick 토글 핸들러 (Admin 전용)
   const handleToggleEditorPick = useCallback(() => {
     // 기본 유효성 검사
@@ -541,6 +575,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
   const isBlogGloballyPrivate = post.blog?.isPublic === false;
   const isVisibilityPublicTransitionBlocked =
     isBlogGloballyPrivate && (post.visibility === 'private' || post.visibilityBlockedByBlogPrivacy === true);
+  const currentDetailPath = `/${blogSlug}/${postSlug}${searchParams?.toString() ? `?${searchParams.toString()}` : ''}`;
 
   return (
     <>
@@ -591,6 +626,7 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
               displayMode="separated"
             />
           }
+          onGithubResource={post.hasGithubResource ? handleGithubResource : undefined}
           onShare={handleShare}
           onCopy={handleCopyContent}
           onBookmark={handleBookmark}
@@ -610,6 +646,35 @@ export default function BlogPostDetailClient({ initialPost }: BlogPostDetailClie
               : undefined
           }
         />
+
+        {showGithubGate && post.hasGithubResource && (
+          <div className="mb-8 rounded-2xl border border-gray-200 bg-gray-50/90 p-5 dark:border-gray-800 dark:bg-gray-900/60">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                  회원가입 후 GitHub 주소를 확인할 수 있습니다.
+                </p>
+                <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
+                  {post.githubDescription || '이 글과 연결된 GitHub 리소스를 로그인 후 바로 복사할 수 있습니다.'}
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Link
+                  href={`/login?returnUrl=${encodeURIComponent(currentDetailPath)}`}
+                  className="inline-flex items-center justify-center rounded-lg bg-gray-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-gray-800 dark:bg-white dark:text-gray-900 dark:hover:bg-gray-100"
+                >
+                  로그인
+                </Link>
+                <Link
+                  href={`/register?returnUrl=${encodeURIComponent(currentDetailPath)}`}
+                  className="inline-flex items-center justify-center rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100 dark:border-gray-700 dark:text-gray-200 dark:hover:bg-gray-800"
+                >
+                  회원가입
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Article Body - 14px 크기, 모티브 블로그와 동일한 색상 */}
         <div className="blog-content">

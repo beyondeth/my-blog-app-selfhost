@@ -4,6 +4,30 @@ Track operational rule changes for worktree/branch coordination.
 
 ## 2026-03-09
 
+### Additional update (post-detail GitHub resource gate)
+
+#### What changed
+- Added optional per-post GitHub resource fields stored in `post_metadata`:
+  - `githubUrl`
+  - `githubDescription`
+- Extended blog post create/edit flows to manage those fields.
+- Added a gated GitHub CTA to the public post detail page:
+  - authenticated viewers can copy the GitHub URL
+  - anonymous viewers see login/register CTAs and return to the same post after auth
+- Updated detail-read behavior so authenticated viewers bypass the public detail cache and receive gated GitHub URLs, while anonymous responses keep the URL hidden.
+
+#### Why
+- The post detail page needs a membership-style conversion surface for open-source links without leaking the GitHub URL to anonymous clients or cached public responses.
+- Signup/login redirect continuity is required so the detail page can function as an acquisition landing page.
+
+#### How
+- Updated shared paths across:
+  - `backend/src/posts/**`
+  - `frontend/src/app/[blogSlug]/[postSlug]/**`
+  - `frontend/src/app/new-story/page.tsx`
+  - `frontend/src/components/posts/EditPostForm.tsx`
+  - `frontend/src/app/(auth)/register/page.tsx`
+
 ### Additional update (MCP read rollout + app review runbooks)
 
 #### What changed

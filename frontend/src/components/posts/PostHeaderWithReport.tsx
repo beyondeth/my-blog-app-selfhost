@@ -12,6 +12,7 @@ import RelativeTime from '@/components/ui/RelativeTime';
 import FollowButton from '@/components/FollowButton';
 import UserLinkWithTooltip from '@/components/UserLinkWithTooltip';
 import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
+import { Github } from 'lucide-react';
 
 interface PostHeaderWithReportProps {
   post: Post;
@@ -22,6 +23,7 @@ interface PostHeaderWithReportProps {
   liked?: boolean;
   likeCount?: number;
   onLike?: () => void;
+  onGithubResource?: () => void;
   onShare?: () => void;
   onCopy?: () => void;
   onBookmark?: () => void;
@@ -48,6 +50,7 @@ export default function PostHeaderWithReport({
   liked = false,
   likeCount = 0,
   onLike,
+  onGithubResource,
   onShare,
   onCopy,
   onBookmark,
@@ -313,6 +316,16 @@ export default function PostHeaderWithReport({
 
           {/* Right: Share, Copy, PDF, Bookmark, More Menu */}
           <div className="flex items-center space-x-3">
+            {onGithubResource && (
+              <button
+                onClick={onGithubResource}
+                className="flex items-center justify-center p-1 rounded-full text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-300 dark:hover:bg-gray-700 dark:hover:text-gray-100 transition-colors"
+                title={user ? 'GitHub 주소 복사' : '로그인 후 GitHub 주소 보기'}
+              >
+                <Github className="w-5 h-5" />
+              </button>
+            )}
+
             {/* 공유 버튼 */}
             {onShare && (
               <button

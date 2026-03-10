@@ -128,4 +128,22 @@ export class CreatePostDto {
   @IsOptional()
   @IsIn(["public", "private"])
   visibility?: "public" | "private";
+
+  @ApiPropertyOptional({
+    description: "회원가입 사용자에게만 공개할 GitHub 리소스 주소",
+    example: "https://github.com/beyondeth/codebase-skills",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  githubUrl?: string;
+
+  @ApiPropertyOptional({
+    description: "GitHub 리소스 한줄 설명",
+    example: "이 글에서 소개한 예제 코드를 받아볼 수 있습니다.",
+  })
+  @IsOptional()
+  @IsString()
+  @MaxLength(240)
+  githubDescription?: string;
 }

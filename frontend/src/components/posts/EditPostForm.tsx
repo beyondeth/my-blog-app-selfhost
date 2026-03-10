@@ -6,6 +6,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -17,7 +18,7 @@ import {
 } from '@/components/ui/form';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent } from '@/components/ui/card';
-import { Save, Plus, ImageIcon, FileText } from 'lucide-react';
+import { Save, Plus, ImageIcon, FileText, Github } from 'lucide-react';
 import type { FileUpload } from '@/types';
 import { FloatingTitleField, TagInputField, EditCategoryField } from '@/components/posts/form-fields';
 import { toast } from 'sonner';
@@ -42,6 +43,7 @@ import {
   extractYouTubeThumbnailMarker,
   stripYouTubeThumbnailMarker,
 } from '@/utils/youtubeMarkdown';
+import GithubResourcePopover from '@/components/posts/GithubResourcePopover';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -72,6 +74,8 @@ const postFormSchema = z.object({
   content: z.string()
     .min(1, { message: "내용을 입력해주세요." }),
   tags: z.array(z.string()).optional(),
+  githubUrl: z.string().optional(),
+  githubDescription: z.string().optional(),
   thumbnail: z.string().optional(),
   thumbnailImageId: z.string().optional(),
   attachedFileIds: z.array(z.string()).optional(),
@@ -167,6 +171,8 @@ interface EditPostFormProps {
     content_markdown?: string;
     content_type?: 'html' | 'markdown';
     tags?: string[];
+    githubUrl?: string | null;
+    githubDescription?: string | null;
     thumbnail?: string;
     thumbnailImageId?: string;
     attachedFiles?: FileUpload[];
@@ -241,6 +247,8 @@ export default function EditPostForm({
       categories: [],  // useEffect에서 파싱하여 설정
       content: initialEditorMode === 'markdown' ? cleanedMarkdownContent : (initialData?.content ?? ''),
       tags: initialData?.tags || [],
+      githubUrl: initialData?.githubUrl || '',
+      githubDescription: initialData?.githubDescription || '',
       thumbnail: initialData?.thumbnail || '',
       thumbnailImageId: initialData?.thumbnailImageId || undefined, // 빈 문자열 대신 undefined 사용
       attachedFileIds: initialData?.attachedFiles?.map((file) => file.id).filter(Boolean) ?? [],
@@ -910,6 +918,22 @@ export default function EditPostForm({
                                 <ImageIcon className="h-4 w-4 mr-1.5" />
                                 이미지 업로드
                               </Button>
+                              <GithubResourcePopover
+                                githubUrl={form.watch('githubUrl') ?? ''}
+                                githubDescription={form.watch('githubDescription') ?? ''}
+                                onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
+                                onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
+                              >
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  className="px-2.5"
+                                  title="GitHub 리소스"
+                                >
+                                  <Github className="h-4 w-4" />
+                                </Button>
+                              </GithubResourcePopover>
                               {isMarkdownImageUploading && (
                                 <span className="text-xs text-gray-500 dark:text-gray-400">
                                   이미지 업로드 중...
@@ -1047,6 +1071,10 @@ export default function EditPostForm({
                                 setThumbnailIndex(index);
                               }}
                               onFileIdsChange={handleFileIdsChange}
+                              githubUrl={form.watch('githubUrl') ?? ''}
+                              githubDescription={form.watch('githubDescription') ?? ''}
+                              onGithubUrlChange={(value) => form.setValue('githubUrl', value, { shouldDirty: true, shouldTouch: true })}
+                              onGithubDescriptionChange={(value) => form.setValue('githubDescription', value, { shouldDirty: true, shouldTouch: true })}
                             />
                           </div>
                         )}

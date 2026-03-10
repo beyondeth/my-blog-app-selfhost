@@ -71,11 +71,13 @@ import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button"
 import { ArrowLeftIcon } from "@/components/tiptap-icons/arrow-left-icon"
 import { HighlighterIcon } from "@/components/tiptap-icons/highlighter-icon"
 import { LinkIcon } from "@/components/tiptap-icons/link-icon"
+import { Github } from "lucide-react"
 
 // --- Hooks ---
 import { useIsMobile } from "@/hooks/use-mobile"
 import { useWindowSize } from "@/hooks/use-window-size"
 import { useCursorVisibility } from "@/hooks/use-cursor-visibility"
+import GithubResourcePopover from "@/components/posts/GithubResourcePopover"
 
 
 // --- Styles ---
@@ -88,10 +90,18 @@ const MainToolbarContent = ({
   onHighlighterClick,
   onLinkClick,
   isMobile,
+  githubUrl,
+  githubDescription,
+  onGithubUrlChange,
+  onGithubDescriptionChange,
 }: {
   onHighlighterClick: () => void
   onLinkClick: () => void
   isMobile: boolean
+  githubUrl: string
+  githubDescription: string
+  onGithubUrlChange: (value: string) => void
+  onGithubDescriptionChange: (value: string) => void
 }) => {
   return (
     <>
@@ -151,6 +161,21 @@ const MainToolbarContent = ({
       <ToolbarGroup>
         <ImageUploadButton text="Image" />
         <VideoUploadButton text="Video" />
+        <GithubResourcePopover
+          githubUrl={githubUrl}
+          githubDescription={githubDescription}
+          onGithubUrlChange={onGithubUrlChange}
+          onGithubDescriptionChange={onGithubDescriptionChange}
+        >
+          <Button
+            type="button"
+            tooltip="GitHub 리소스"
+            aria-label="GitHub 리소스"
+            data-active-state={githubUrl.trim() ? "on" : "off"}
+          >
+            <Github className="tiptap-button-icon" />
+          </Button>
+        </GithubResourcePopover>
       </ToolbarGroup>
 
       <Spacer />
@@ -230,6 +255,10 @@ export interface BlogSimpleEditorProps {
    * 파일 ID 목록 변경 시 호출되는 콜백
    */
   onFileIdsChange?: (fileIds: string[]) => void
+  githubUrl?: string
+  githubDescription?: string
+  onGithubUrlChange?: (value: string) => void
+  onGithubDescriptionChange?: (value: string) => void
 }
 
 export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
@@ -242,6 +271,10 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   initialThumbnailIndex,
   onThumbnailIndexChange,
   onFileIdsChange,
+  githubUrl = "",
+  githubDescription = "",
+  onGithubUrlChange = () => undefined,
+  onGithubDescriptionChange = () => undefined,
 }: BlogSimpleEditorProps = {}) {
   const isMobile = useIsMobile()
   const { height } = useWindowSize()
@@ -588,6 +621,10 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
           onHighlighterClick={() => setMobileView("highlighter")}
           onLinkClick={() => setMobileView("link")}
           isMobile={isMobile}
+          githubUrl={githubUrl}
+          githubDescription={githubDescription}
+          onGithubUrlChange={onGithubUrlChange}
+          onGithubDescriptionChange={onGithubDescriptionChange}
         />
       ) : (
         <MobileToolbarContent

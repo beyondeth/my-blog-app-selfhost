@@ -1,9 +1,8 @@
 import { Metadata } from 'next';
 import { cache } from 'react';
 import { cookies } from 'next/headers';
-import Link from 'next/link';
 import BlogPostDetailClient from './client-page';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 
 // 포스트 데이터 타입 정의 (백엔드 실제 구조 반영)
 interface Post {
@@ -14,6 +13,9 @@ interface Post {
   slug: string;
   thumbnail?: string | null;  // 썸네일 이미지 URL
   visibility?: 'public' | 'private';
+  hasGithubResource?: boolean;
+  githubDescription?: string | null;
+  githubUrl?: string | null;
   createdAt: string;
   updatedAt: string;
   viewCount?: number;
@@ -30,6 +32,7 @@ interface Post {
     id: string;
     name: string;
     slug: string;
+    alias?: string | null;
     description?: string;
     isPublic?: boolean;
     allowComments?: boolean;
@@ -40,6 +43,11 @@ interface Post {
 /** 비공개 블로그임을 나타내는 sentinel 타입 */
 interface PrivateBlogSentinel {
   __isPrivateBlog: true;
+}
+
+function getCanonicalBlogPath(blog: Post['blog'] | undefined): string {
+  if (!blog) return '';
+  return blog.alias ? `/@${blog.alias}` : `/${blog.slug}`;
 }
 
 // 포스트 데이터 가져오기 (서버 컴포넌트용)
@@ -167,7 +175,8 @@ export async function generateMetadata(
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
 
   // 포스트 전체 URL
-  const postUrl = `${siteUrl}/${blogSlug}/${postSlug}`;
+  const canonicalBlogPath = getCanonicalBlogPath(post.blog);
+  const postUrl = `${siteUrl}${canonicalBlogPath}/${postSlug}`;
 
   // 썸네일 이미지 URL (절대 경로로 변환)
   const ogImage = post.thumbnail
@@ -247,7 +256,8 @@ export async function generateMetadata(
 function generateStructuredData(post: Post, params: { blogSlug: string; postSlug: string }) {
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
-  const postUrl = `${siteUrl}/${params.blogSlug}/${params.postSlug}`;
+  const canonicalBlogPath = getCanonicalBlogPath(post.blog);
+  const postUrl = `${siteUrl}${canonicalBlogPath}/${params.postSlug}`;
 
   // 썸네일 이미지 URL (절대 경로로 변환)
   const imageUrl = post.thumbnail
@@ -268,7 +278,7 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
     author: {
       '@type': 'Person',
       name: post.author?.username || post.blog?.name || 'Unknown Author',
-      url: `${siteUrl}/${params.blogSlug}`,
+      url: `${siteUrl}${canonicalBlogPath}`,
     },
     publisher: {
       '@type': 'Organization',
@@ -320,7 +330,7 @@ function generateStructuredData(post: Post, params: { blogSlug: string; postSlug
         '@type': 'ListItem',
         position: 2,
         name: post.blog.name,
-        item: `${siteUrl}/${params.blogSlug}`,
+        item: `${siteUrl}${canonicalBlogPath}`,
       },
       {
         '@type': 'ListItem',
@@ -352,44 +362,20 @@ export default async function BlogPostDetailPage({
   // 포스트 데이터 미리 가져오기 (404 체크용)
   const post = await getPost(blogSlug, postSlug, { fresh: forceFresh });
 
-  // 비공개 블로그 접근 시 전용 안내 페이지
   if (post && '__isPrivateBlog' in post) {
-    return (
-      <div className="min-h-[60vh] flex flex-col items-center justify-center px-4 text-center">
-        <div className="w-20 h-20 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center mb-6">
-          <svg
-            className="w-10 h-10 text-gray-400 dark:text-gray-500"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-            strokeWidth={1.5}
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"
-            />
-          </svg>
-        </div>
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
-          비공개 블로그입니다
-        </h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mb-8 max-w-sm">
-          이 블로그는 비공개 상태입니다. 블로그 소유자만 볼 수 있습니다.
-        </p>
-        <Link
-          href="/"
-          className="px-5 py-2.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900 text-sm font-medium hover:opacity-90 transition-opacity"
-        >
-          홈으로 돌아가기
-        </Link>
-      </div>
-    );
+    notFound();
   }
 
   // 포스트가 없으면 404 페이지로
   if (!post) {
     notFound();
+  }
+
+  const canonicalBlogPath = getCanonicalBlogPath(post.blog);
+  const requestedPath = `/${blogSlug}/${postSlug}`;
+  const canonicalPostPath = `${canonicalBlogPath}/${postSlug}`;
+  if (canonicalBlogPath && requestedPath !== canonicalPostPath) {
+    permanentRedirect(canonicalPostPath);
   }
 
   // JSON-LD 구조화된 데이터 생성
