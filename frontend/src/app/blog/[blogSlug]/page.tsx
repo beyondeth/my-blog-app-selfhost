@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
 /**
  * 레거시 블로그 홈 라우트 - 301 리다이렉트
@@ -14,5 +14,5 @@ export default async function LegacyBlogHomePage({
   params: Promise<{ blogSlug: string }>
 }) {
   const { blogSlug } = await params;
-  redirect(`/${blogSlug}`);
+  permanentRedirect(`/${blogSlug}`);
 }
