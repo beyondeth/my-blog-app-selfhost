@@ -467,6 +467,8 @@ export async function registerOpenAiTools(
         // shared handler 재사용 + ChatGPT 노출용 개인정보 최소화(email 제거)
         const raw = await handleCheckAuth(context);
         const rawText = raw?.content?.[0]?.text || '';
+        const userId = context.userData.userId;
+        const selectedStyleState = await styleStateStore.getSelectedStyle(userId);
 
         // 기존 버전에서는 여기서 상태를 초기화했으나,
         // LLM이 워크플로우 중간에 check_auth를 재호출하면 기껏 선택한 스타일이 날아가는 버그가 발생하여 삭제함.
@@ -474,39 +476,79 @@ export async function registerOpenAiTools(
         const connectionHint = context.oauthToken
           ? 'OAuth로 연결되었습니다.'
           : 'API Key 방식으로 연결되었습니다.';
-        const sanitizedText = `${sanitizeAuthText(rawText)}\n\n`
-          + 'NEXT STEP: You MUST call get_writing_style_guide tool NOW (without style argument). '
-          + 'DO NOT list or present style options as text. The widget will handle style selection UI. '
-          + 'DO NOT ask the user to choose a style in chat. Just call the tool. '
-          + 'CRITICAL: DO NOT write any draft or blog post content until you receive the guide_ready status.';
         const blogUrl = getBlogUrl(context);
+        const baseStructuredContent = {
+          tool: 'check_auth',
+          username: context.userData.user.username,
+          blogName: context.userData.blog.name,
+          blogSlug: context.userData.blog.slug,
+          blogUrl,
+          authMode: context.oauthToken ? 'oauth2' : 'api_key',
+          connectionHint,
+          capabilities: [
+            'load_style_guide',
+            'create_post',
+            'list_my_published_posts',
+            'search_my_published_posts',
+            'read_my_published_post',
+          ],
+        };
+
+        if (selectedStyleState) {
+          const selectedStyle = getStyleOption(selectedStyleState.styleId);
+          const sanitizedText = `${sanitizeAuthText(rawText)}\n\n`
+            + `Style '${selectedStyle.label}' is already confirmed for this posting flow. `
+            + 'DO NOT ask the user to choose a style again. Proceed to create_post.';
+
+          result = {
+            content: [{ type: 'text', text: sanitizedText }],
+            structuredContent: {
+              ...baseStructuredContent,
+              status: 'guide_ready',
+              workflowStage: 'style_confirmed',
+              style: selectedStyle.id,
+              styleLabel: selectedStyle.label,
+              styleDescription: selectedStyle.description,
+              hasCustomMarkdown: false,
+            },
+            _meta: {
+              summary: `연결 완료. 스타일 '${selectedStyle.label}'이 이미 확정되어 있습니다.`,
+              confirmInstruction:
+                'The style is already confirmed for this flow. DO NOT ask for style selection again. Call create_post.',
+              status: 'guide_ready',
+              selectedStyle: selectedStyle.id,
+              publicUrl: blogUrl,
+              route: 'mcp-openai',
+            },
+          };
+          return result;
+        }
+
+        const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
+          userId,
+          STYLE_SELECTION_TTL_MS
+        );
+        const sanitizedText = `${sanitizeAuthText(rawText)}\n\n`
+          + 'The style selection widget is already displayed below. '
+          + 'DO NOT ask the user to type a style in chat. Wait for the widget submission before drafting.';
 
         result = {
           content: [{ type: 'text', text: sanitizedText }],
           structuredContent: {
-            status: 'connected',
-            tool: 'check_auth',
-            username: context.userData.user.username,
-            blogName: context.userData.blog.name,
-            blogSlug: context.userData.blog.slug,
-            blogUrl,
-            authMode: context.oauthToken ? 'oauth2' : 'api_key',
+            ...baseStructuredContent,
+            status: 'awaiting_style_selection',
             workflowStage: 'awaiting_style_selection',
-            capabilities: [
-              'load_style_guide',
-              'create_post',
-              'list_my_published_posts',
-              'search_my_published_posts',
-              'read_my_published_post',
-            ],
-            connectionHint,
+            styleSelectionNonce: nonce,
+            styleOptions: STYLE_OPTIONS,
+            canSelectStyle: true,
           },
           _meta: {
-            summary: `연결 완료. 즉시 get_writing_style_guide를 호출하세요.`,
+            summary: '연결 완료. 아래 UI에서 글쓰기 스타일을 선택해 주세요.',
             confirmInstruction:
-              'You MUST call get_writing_style_guide tool NOW without any style argument. '
-              + 'DO NOT list styles as text. DO NOT recommend styles. The inline widget handles this.',
-            status: 'connected',
+              'The style selection widget is already shown. DO NOT ask the user to type their style in chat. Wait for the widget.',
+            status: 'awaiting_style_selection',
+            styleSelectionNonce: nonce,
+            styleOptions: STYLE_OPTIONS,
             publicUrl: blogUrl,
             route: 'mcp-openai',
           },
