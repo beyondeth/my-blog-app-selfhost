@@ -46,6 +46,7 @@ function extractPayload(): { out: ToolOutput; meta: Record<string, unknown>; con
 
 export interface WidgetState {
   status: string;
+  workflowStage: string;
   out: ToolOutput;
   meta: Record<string, unknown>;
   content: unknown[];
@@ -62,7 +63,15 @@ export function useWidgetState(): WidgetState {
     const { out, meta, content } = extractPayload();
     const api = bridge();
     const input = api.toolInput || {};
-    const status = String(out.status || (meta.status as string) || 'ready').toLowerCase();
+    const rawStatus = String(out.status || (meta.status as string) || 'ready').toLowerCase();
+    const persistedProgressStage =
+      typeof api.widgetState?.privateContent?.progressStage === 'string'
+        ? api.widgetState.privateContent.progressStage
+        : '';
+    const workflowStage = String(
+      out.workflowStage || (meta.workflowStage as string) || persistedProgressStage || rawStatus
+    ).toLowerCase();
+    const status = workflowStage === 'drafting' ? 'drafting' : rawStatus;
 
     const nonceCandidate =
       (typeof meta.styleSelectionNonce === 'string' && meta.styleSelectionNonce) ||
@@ -79,6 +88,7 @@ export function useWidgetState(): WidgetState {
 
     return {
       status,
+      workflowStage,
       out,
       meta,
       content,
