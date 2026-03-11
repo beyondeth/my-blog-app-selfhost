@@ -54,6 +54,11 @@ RUN pnpm install --frozen-lockfile --prod=false
 # 소스 코드 복사
 COPY . .
 
+# OpenAI widget 의존성 설치 및 정적 번들 빌드
+RUN cd src/platforms/openai-app/widget && \
+    pnpm install --frozen-lockfile && \
+    pnpm run build
+
 # TypeScript 빌드
 RUN pnpm run build
 
@@ -74,6 +79,7 @@ WORKDIR /app
 
 # 필요한 파일만 복사 (빌드된 파일 + 프로덕션 의존성)
 COPY --from=builder --chown=mcp:nodejs /app/dist ./dist
+COPY --from=builder --chown=mcp:nodejs /app/src/platforms/openai-app/widget/dist ./dist/platforms/openai-app/widget/dist
 COPY --from=builder --chown=mcp:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=mcp:nodejs /app/package.json ./package.json
 COPY --from=builder --chown=mcp:nodejs /app/writing-styles ./writing-styles
