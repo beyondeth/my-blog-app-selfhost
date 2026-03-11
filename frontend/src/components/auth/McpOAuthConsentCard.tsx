@@ -65,12 +65,19 @@ export function McpOAuthConsentCard({
                     className="object-contain"
                   />
                 </div>
+                <h3 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                  {clientName} 권한 요청
+                </h3>
+                <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                  요청 권한을 확인해 주세요.
+                </p>
               </div>
 
               <McpOAuthRequestPanel
                 clientName={clientName}
                 requestedMcpScopes={requestedMcpScopes}
                 showBadge={false}
+                showHeader={false}
               />
 
               {error && (
