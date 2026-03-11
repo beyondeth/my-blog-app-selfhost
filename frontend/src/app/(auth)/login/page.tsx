@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { AlertCircle, Eye, EyeOff, ArrowLeft, Link2, ShieldCheck } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
@@ -377,48 +377,40 @@ function LoginPageContent() {
 
             {/* MCP OAuth 연결 요청 안내 (Claude 커스텀 커넥터) */}
             {isMcpOAuth && mcpState && mcpCallbackUrl && (
-              <div className="mb-3 sm:mb-6 rounded-2xl border border-black/8 bg-white/70 p-4 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none w-full">
-                <div className="flex items-start gap-4">
-                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900">
-                    <Link2 className="h-5 w-5" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
-                        Connected App
-                      </span>
-                      <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
-                        OAuth permissions review
-                      </span>
+              <div className="mb-3 sm:mb-6 w-full rounded-2xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900/40">
+                <div className="flex items-center gap-2">
+                  <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
+                    APP CONNECTION
+                  </span>
+                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
+                    {mcpClientName}
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <h3 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-zinc-100">
+                    {mcpClientName}에서 Codebase.blog 접근 권한을 요청했습니다
+                  </h3>
+                  <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                    로그인 후 아래 권한을 검토하고 연결을 완료합니다.
+                  </p>
+                </div>
+                <div className="mt-4 divide-y divide-zinc-200/80 rounded-xl border border-zinc-200/80 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950/60">
+                  {requestedMcpScopes.map((scope) => (
+                    <div
+                      key={scope.scope}
+                      className="px-4 py-3"
+                    >
+                      <p className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                        {scope.label}
+                      </p>
+                      <p className="mt-1 text-[11px] sm:text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+                        {scope.description}
+                      </p>
                     </div>
-                    <h3 className="mt-3 text-sm sm:text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                      {mcpClientName} 연결 요청
-                    </h3>
-                    <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                      로그인하면 <span className="font-medium text-zinc-900 dark:text-zinc-100">{mcpClientName}</span>가
-                      Codebase.blog 계정에 요청한 권한을 확인하고 연결을 완료합니다.
-                    </p>
-                    <div className="mt-4 grid gap-2">
-                      {requestedMcpScopes.map((scope) => (
-                        <div
-                          key={scope.scope}
-                          className="rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-3 py-3 text-xs dark:border-zinc-800 dark:bg-zinc-950/40"
-                        >
-                          <div className="flex items-start gap-2">
-                            <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-500 dark:text-zinc-400" />
-                            <div>
-                              <p className="font-semibold text-zinc-900 dark:text-zinc-100">{scope.label}</p>
-                              <p className="mt-1 leading-5 text-zinc-600 dark:text-zinc-400">{scope.description}</p>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200/80 pt-3 text-[11px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
-                      <span>연결 후에는 Connected Apps에서 언제든 권한을 취소할 수 있습니다.</span>
-                      <span>{requestedMcpScopes.length} permissions requested</span>
-                    </div>
-                  </div>
+                  ))}
+                </div>
+                <div className="mt-3 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+                  연결 후에는 설정의 Connected Apps에서 언제든 권한을 취소할 수 있습니다.
                 </div>
               </div>
             )}
