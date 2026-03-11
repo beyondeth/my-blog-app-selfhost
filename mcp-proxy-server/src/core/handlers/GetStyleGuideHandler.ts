@@ -65,6 +65,7 @@ export async function handleGetWritingStyleGuide(
       targetLength: styleData.metadata.targetLength,
       language: styleData.metadata.language,
       aiTagRequired: styleData.metadata.aiTagRequired,
+      compactBrief: styleData.compactBrief,
     },
   };
 }

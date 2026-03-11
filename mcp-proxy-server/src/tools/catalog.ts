@@ -254,7 +254,7 @@ export const MCP_SERVER_INSTRUCTIONS = `# Codebase.blog Auto-posting MCP Server
 ## Workflow
 
 1. Call check_auth() first
-2. To review existing writing, use list_my_published_posts(), search_my_published_posts(), or read_my_published_post()
+2. During auto-posting, do not call list_my_published_posts(), search_my_published_posts(), or read_my_published_post() unless the user explicitly asks to review previous posts
 3. To create a new post, call get_writing_style_guide() without arguments first so the user can choose a style
 4. Write content
    - If you have a local custom style file, pass it via customMarkdown (+ styleAlias when available)
@@ -269,6 +269,7 @@ export const MCP_SERVER_INSTRUCTIONS = `# Codebase.blog Auto-posting MCP Server
 - create_post() must execute even if image upload fails.
 - If image upload fails, stop retrying and continue with text-only create_post().
 - Category is required and tags are optional (max 10).
+- Do not inspect previous posts to infer category or style during auto-posting. Pick the best fitting category from the current request.
 
 ## Available Tools
 
