@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, ArrowLeft, Link2, ShieldCheck } from 'lucide-react';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
@@ -60,6 +60,12 @@ function LoginPageContent() {
   const registerHref = isMcpOAuth && mcpState && mcpCallbackUrl
     ? `/register?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
     : '/register';
+  const loginHeading = isMcpOAuth && mcpState && mcpCallbackUrl
+    ? `${mcpClientName} 연결을 승인하려면 로그인하세요`
+    : '다시 만나서 반가워요';
+  const loginSubheading = isMcpOAuth && mcpState && mcpCallbackUrl
+    ? '계정을 확인한 뒤 요청된 권한을 검토하고 연결을 완료합니다.'
+    : '계정으로 로그인하세요';
 
   const normalizeRedirectTarget = (target?: string | null) => {
     if (typeof window === 'undefined' || !target) {
@@ -362,43 +368,56 @@ function LoginPageContent() {
                 />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                다시 만나서 반가워요
+                {loginHeading}
               </h1>
               <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                계정으로 <span className="font-medium">로그인</span>하세요
+                {loginSubheading}
               </p>
             </div>
 
             {/* MCP OAuth 연결 요청 안내 (Claude 커스텀 커넥터) */}
             {isMcpOAuth && mcpState && mcpCallbackUrl && (
-              <div className="mb-3 sm:mb-6 p-4 sm:p-5 rounded-lg bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-700 w-full">
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-indigo-100 dark:bg-indigo-800 flex items-center justify-center">
-                    <svg className="w-5 h-5 text-indigo-600 dark:text-indigo-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                    </svg>
+              <div className="mb-3 sm:mb-6 rounded-2xl border border-black/8 bg-white/70 p-4 shadow-[0_20px_50px_rgba(15,23,42,0.06)] backdrop-blur-sm dark:border-white/10 dark:bg-white/[0.04] dark:shadow-none w-full">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-zinc-900 text-white shadow-sm dark:bg-zinc-100 dark:text-zinc-900">
+                    <Link2 className="h-5 w-5" />
                   </div>
                   <div className="flex-1">
-                    <h3 className="text-sm sm:text-base font-semibold text-indigo-900 dark:text-indigo-100">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded-full border border-zinc-200 bg-zinc-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-zinc-500 dark:border-zinc-800 dark:bg-zinc-900/60 dark:text-zinc-400">
+                        Connected App
+                      </span>
+                      <span className="text-[11px] font-medium text-zinc-500 dark:text-zinc-400">
+                        OAuth permissions review
+                      </span>
+                    </div>
+                    <h3 className="mt-3 text-sm sm:text-base font-semibold text-zinc-900 dark:text-zinc-100">
                       {mcpClientName} 연결 요청
                     </h3>
-                    <p className="text-xs sm:text-sm text-indigo-700 dark:text-indigo-300 mt-1">
-                      로그인하여 {mcpClientName}에 블로그 접근 권한을 부여합니다.
+                    <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
+                      로그인하면 <span className="font-medium text-zinc-900 dark:text-zinc-100">{mcpClientName}</span>가
+                      Codebase.blog 계정에 요청한 권한을 확인하고 연결을 완료합니다.
                     </p>
-                    <div className="mt-3 space-y-2">
+                    <div className="mt-4 grid gap-2">
                       {requestedMcpScopes.map((scope) => (
                         <div
                           key={scope.scope}
-                          className="rounded-lg border border-indigo-100 bg-white/60 px-3 py-2 text-xs dark:border-indigo-800/60 dark:bg-indigo-950/30"
+                          className="rounded-xl border border-zinc-200/80 bg-zinc-50/80 px-3 py-3 text-xs dark:border-zinc-800 dark:bg-zinc-950/40"
                         >
-                          <p className="font-semibold text-indigo-900 dark:text-indigo-100">{scope.label}</p>
-                          <p className="mt-1 text-indigo-700 dark:text-indigo-300">{scope.description}</p>
+                          <div className="flex items-start gap-2">
+                            <ShieldCheck className="mt-0.5 h-4 w-4 flex-shrink-0 text-zinc-500 dark:text-zinc-400" />
+                            <div>
+                              <p className="font-semibold text-zinc-900 dark:text-zinc-100">{scope.label}</p>
+                              <p className="mt-1 leading-5 text-zinc-600 dark:text-zinc-400">{scope.description}</p>
+                            </div>
+                          </div>
                         </div>
                       ))}
                     </div>
-                    <p className="text-xs text-indigo-600 dark:text-indigo-400 mt-3">
-                      연결 후에는 설정의 Connected Apps에서 언제든 권한을 취소할 수 있습니다.
-                    </p>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-zinc-200/80 pt-3 text-[11px] text-zinc-500 dark:border-zinc-800 dark:text-zinc-400">
+                      <span>연결 후에는 Connected Apps에서 언제든 권한을 취소할 수 있습니다.</span>
+                      <span>{requestedMcpScopes.length} permissions requested</span>
+                    </div>
                   </div>
                 </div>
               </div>
