@@ -253,8 +253,8 @@ function getOpenAiInputSchema(toolName: OpenAiMvpToolName, schema: unknown): unk
             '선택 사항: 직접 작성한 스타일 가이드 마크다운. 입력 시 프리셋보다 우선 적용됩니다.',
         },
       },
-      // style만 필수 — nonce가 있으면 위젯 경로, 없으면 모델 직접 선택으로 간주
-      required: ['style'],
+      // 첫 호출은 반드시 인자 없이 허용해야 위젯(UI) 선택 플로우가 열린다.
+      required: (source.required || []).filter((name) => name !== 'style'),
     };
   }
 
