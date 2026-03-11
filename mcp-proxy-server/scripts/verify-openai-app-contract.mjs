@@ -8,7 +8,7 @@ const EXPECTED_TOOLS = [
   'get_writing_style_guide',
   'create_post',
 ];
-const EXPECTED_WIDGET_URI = 'ui://widget/codebase-dashboard-v20260224a.html';
+const EXPECTED_WIDGET_URI = 'ui://widget/codebase-dashboard-v20260311b.html';
 
 function fail(message) {
   console.error(`✗ ${message}`);
