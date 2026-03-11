@@ -22,6 +22,7 @@ function McpConsentContent() {
   const searchParams = useSearchParams();
   const { user, isLoading } = useAuth();
   const [oauthData, setOauthData] = useState<McpOAuthSessionData | null>(null);
+  const [isOauthDataResolved, setIsOauthDataResolved] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
@@ -37,20 +38,23 @@ function McpConsentContent() {
     if (queryData) {
       writeMcpOAuthSession(queryData);
       setOauthData(queryData);
+      setIsOauthDataResolved(true);
       return;
     }
 
     const storedData = readMcpOAuthSession();
     if (storedData) {
       setOauthData(storedData);
+      setIsOauthDataResolved(true);
       return;
     }
 
     setOauthData(null);
+    setIsOauthDataResolved(true);
   }, [searchParams]);
 
   useEffect(() => {
-    if (isLoading) {
+    if (isLoading || !isOauthDataResolved) {
       return;
     }
 
@@ -67,7 +71,7 @@ function McpConsentContent() {
     if (!user.termsAcceptedAt || !user.privacyAcceptedAt) {
       router.replace('/consent');
     }
-  }, [isLoading, oauthData, router, user]);
+  }, [isLoading, isOauthDataResolved, oauthData, router, user]);
 
   const requestedMcpScopes = oauthData ? parseMcpScopes(oauthData.scope) : [];
 
@@ -129,7 +133,14 @@ function McpConsentContent() {
     }
   };
 
-  if (isLoading || !oauthData || !user || !user.termsAcceptedAt || !user.privacyAcceptedAt) {
+  if (
+    isLoading ||
+    !isOauthDataResolved ||
+    !oauthData ||
+    !user ||
+    !user.termsAcceptedAt ||
+    !user.privacyAcceptedAt
+  ) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
         <div className="text-center">
