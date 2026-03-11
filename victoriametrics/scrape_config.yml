@@ -53,7 +53,8 @@ scrape_configs:
   - job_name: 'nestjs-backend'
     static_configs:
       - targets: ['backend:3000']
-    metrics_path: '/api/v1/metrics'
+    # Hidden internal scrape path. Keep this in sync with METRICS_PATH.
+    metrics_path: '/internal/health-check-2f4a8b9c'
     scrape_interval: 15s
     scrape_timeout: 10s
     honor_timestamps: true

@@ -28,7 +28,8 @@ scrape_configs:
   - job_name: 'nestjs-chat-app'
     static_configs:
       - targets: ['host.docker.internal:3000']
-    metrics_path: '/api/v1/metrics'
+    # Hidden internal scrape path. Keep this in sync with METRICS_PATH.
+    metrics_path: '/internal/health-check-2f4a8b9c'
     scrape_interval: 30s      # 10s → 30s (최적화)
     scrape_timeout: 10s       # 5s → 10s (안정성)
     # 메트릭 엔드포인트가 없을 경우 무시

@@ -192,6 +192,35 @@ export class HtmlSanitizerService {
     allowCommentTag: true,
   };
 
+  private isDomPurifyReady(): boolean {
+    return !!DOMPurify && typeof DOMPurify.sanitize === "function";
+  }
+
+  private canUseDomPurifyHooks(): boolean {
+    return (
+      this.isDomPurifyReady() &&
+      typeof DOMPurify.addHook === "function" &&
+      typeof DOMPurify.removeAllHooks === "function"
+    );
+  }
+
+  private sanitizeWithDomPurify(
+    html: string,
+    config: Record<string, unknown>,
+    fallback: () => string,
+  ): string {
+    if (!this.isDomPurifyReady()) {
+      return fallback();
+    }
+
+    try {
+      return DOMPurify.sanitize(html, config);
+    } catch (error) {
+      this.logger.error("DOMPurify sanitize call failed:", error);
+      return fallback();
+    }
+  }
+
   /**
    * HTML 콘텐츠를 살균합니다.
    *
@@ -250,7 +279,16 @@ export class HtmlSanitizerService {
         );
       }
 
-      if (allowIframes) {
+      const canUseHooks = this.canUseDomPurifyHooks();
+
+      if (!this.isDomPurifyReady()) {
+        this.logger.error(
+          "DOMPurify is not properly initialized, falling back to sanitize-html",
+        );
+        return this.fallbackSanitize(html, options);
+      }
+
+      if (allowIframes && canUseHooks) {
         // YouTube iframe만 허용
         const allowYouTubeIframes = (node: Element) => {
           if (node.tagName !== "IFRAME") return;
@@ -271,18 +309,12 @@ export class HtmlSanitizerService {
         DOMPurify.addHook("uponSanitizeElement", allowYouTubeIframes);
       }
 
-      // DOMPurify가 정상적으로 초기화되었는지 확인
-      if (!DOMPurify || typeof DOMPurify.sanitize !== "function") {
-        this.logger.error(
-          "DOMPurify is not properly initialized, falling back to sanitize-html",
-        );
-        return this.fallbackSanitize(html, options);
-      }
-
       let sanitized = DOMPurify.sanitize(processedHtml, config);
 
       // 등록한 hook 정리 (전역 오염 방지)
-      DOMPurify.removeAllHooks();
+      if (allowIframes && canUseHooks) {
+        DOMPurify.removeAllHooks();
+      }
 
       // Mermaid 블록 복원
       if (preserveMermaid) {
@@ -351,7 +383,14 @@ export class HtmlSanitizerService {
       ALLOWED_URI_REGEXP: /^https?:\/\//i,
     };
 
-    return DOMPurify.sanitize(html, strictConfig);
+    return this.sanitizeWithDomPurify(html, strictConfig, () =>
+      sanitizeHtml(html, {
+        allowedTags: ["p", "br", "strong", "em", "a", "code"],
+        allowedAttributes: {
+          a: ["href", "target", "rel"],
+        },
+      }),
+    );
   }
 
   /**
@@ -362,11 +401,15 @@ export class HtmlSanitizerService {
   extractText(html: string): string {
     if (!html) return "";
 
-    return DOMPurify.sanitize(html, {
-      ALLOWED_TAGS: [],
-      ALLOWED_ATTR: [],
-      KEEP_CONTENT: true,
-    });
+    return this.sanitizeWithDomPurify(
+      html,
+      {
+        ALLOWED_TAGS: [],
+        ALLOWED_ATTR: [],
+        KEEP_CONTENT: true,
+      },
+      () => sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
+    );
   }
 
   /**
@@ -392,21 +435,29 @@ export class HtmlSanitizerService {
       processed = processed.replace(/<br\s*\/?>/gi, "<br/>");
 
       // 3. 위험한 태그만 제거 (스크립트, 이벤트 핸들러 등)
-      processed = DOMPurify.sanitize(processed, {
-        ALLOWED_TAGS: ["br"], // br 태그만 허용
-        ALLOWED_ATTR: [],
-        KEEP_CONTENT: true,
-      });
+      processed = this.sanitizeWithDomPurify(
+        processed,
+        {
+          ALLOWED_TAGS: ["br"], // br 태그만 허용
+          ALLOWED_ATTR: [],
+          KEEP_CONTENT: true,
+        },
+        () => sanitizeHtml(processed, { allowedTags: ["br"] }),
+      );
 
       return processed.trim();
     } catch (error) {
       this.logger.error("Mermaid content sanitization failed:", error);
       // Fallback: 기본 살균
-      return DOMPurify.sanitize(content, {
-        ALLOWED_TAGS: [],
-        ALLOWED_ATTR: [],
-        KEEP_CONTENT: true,
-      });
+      return this.sanitizeWithDomPurify(
+        content,
+        {
+          ALLOWED_TAGS: [],
+          ALLOWED_ATTR: [],
+          KEEP_CONTENT: true,
+        },
+        () => sanitizeHtml(content, { allowedTags: [], allowedAttributes: {} }),
+      );
     }
   }
 

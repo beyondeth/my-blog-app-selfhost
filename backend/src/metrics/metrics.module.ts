@@ -10,7 +10,10 @@ import { MetricsService } from "./metrics.service";
 import { ChatMetricsService } from "./chat-metrics.service";
 import { CacheMetricsService } from "./cache-metrics.service";
 import { AdminMetricsController } from "./admin-metrics.controller";
-import { MetricsController } from "./metrics.controller";
+import {
+  InternalMetricsController,
+  MetricsController,
+} from "./metrics.controller";
 import { RedisModule } from "../redis/redis.module";
 
 @Module({
@@ -33,7 +36,11 @@ import { RedisModule } from "../redis/redis.module";
     }),
     RedisModule,
   ],
-  controllers: [MetricsController, AdminMetricsController],
+  controllers: [
+    MetricsController,
+    InternalMetricsController,
+    AdminMetricsController,
+  ],
   providers: [MetricsService, ChatMetricsService, CacheMetricsService],
   exports: [MetricsService, ChatMetricsService, CacheMetricsService],
 })

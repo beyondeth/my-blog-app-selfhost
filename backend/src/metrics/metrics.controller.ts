@@ -8,8 +8,6 @@ import {
   Controller,
   Get,
   Req,
-  ForbiddenException,
-  SetMetadata,
   UseGuards,
   Logger,
 } from "@nestjs/common";
@@ -18,8 +16,34 @@ import { register } from "prom-client";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
 import { RolesGuard } from "../common/guards/roles.guard";
 import { Roles } from "../auth/decorators/roles.decorator";
+import { Public } from "../common/decorators/public.decorator";
 import { Role } from "../common/enums/role.enum";
 import { ApiBearerAuth } from "@nestjs/swagger";
+
+const INTERNAL_METRICS_PATH = (
+  process.env.METRICS_PATH || "/internal/health-check-2f4a8b9c"
+).replace(/^\//, "");
+
+@Controller()
+export class InternalMetricsController {
+  private readonly logger = new Logger(InternalMetricsController.name);
+
+  /**
+   * Docker/VictoriaMetrics 내부 스크랩 전용 메트릭 엔드포인트
+   * - 글로벌 JwtAuthGuard가 metrics path + private IP 여부를 추가 검증한다.
+   * - public 도메인에는 노출되지 않는 숨김 경로를 사용한다.
+   */
+  @Public()
+  @Get(INTERNAL_METRICS_PATH)
+  async getInternalMetrics(@Req() req: Request): Promise<string> {
+    const clientIP = req.ip || req.connection.remoteAddress || "";
+    this.logger.debug(
+      `[InternalMetricsController] Internal scrape granted for IP: ${clientIP}`,
+    );
+
+    return register.metrics();
+  }
+}
 
 @Controller("metrics")
 @UseGuards(JwtAuthGuard, RolesGuard)
