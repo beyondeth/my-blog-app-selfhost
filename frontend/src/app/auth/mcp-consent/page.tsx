@@ -149,7 +149,7 @@ function McpConsentContent() {
       onBack={() => router.back()}
       onCancel={handleCancel}
       onApprove={handleApprove}
-      approveLabel={isSubmitting ? '연결 중...' : '허용하고 연결'}
+      approveLabel={isSubmitting ? '연결 중...' : '연결하기'}
     />
   );
 }

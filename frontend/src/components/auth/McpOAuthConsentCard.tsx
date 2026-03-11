@@ -25,7 +25,7 @@ export function McpOAuthConsentCard({
   onBack,
   onCancel,
   onApprove,
-  approveLabel = '허용하고 연결',
+  approveLabel = '연결하기',
   backLabel = 'Back',
 }: McpOAuthConsentCardProps) {
   return (
