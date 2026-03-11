@@ -53,7 +53,9 @@ export default function App() {
     if (out.style || out.styleLabel) entries.push({ label: t('selected_style'), value: String(out.styleLabel || out.style) });
     if (out.hasCustomMarkdown !== undefined) entries.push({ label: t('custom_guide'), value: out.hasCustomMarkdown ? t('yes') : t('no') });
   } else if (s === 'blocked' || s === 'awaiting_style_selection') {
-    // Style selection stage — style cards handle the UI, minimal meta
+    if (out.username) entries.push({ label: t('account'), value: String(out.username) });
+    if (out.blogName) entries.push({ label: t('blog'), value: String(out.blogName) });
+    if (out.authMode) entries.push({ label: t('auth_mode'), value: humanizeAuthMode(String(out.authMode)) });
     entries.push({ label: t('next_step'), value: t('select_style_hint') });
   } else {
     // General fallback
@@ -130,4 +132,3 @@ export default function App() {
     </div>
   );
 }
-
