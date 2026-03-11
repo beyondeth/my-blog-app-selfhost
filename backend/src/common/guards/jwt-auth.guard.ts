@@ -39,12 +39,14 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
     // Handle the actual metrics endpoint
     if (request.url === metricsPath) {
       const clientIp = request.ip || request.connection?.remoteAddress || "";
-      const allowedIps = process.env.METRICS_ALLOWED_IPS?.split(",").map((ip) =>
-        ip.trim(),
-      ) || ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"];
+      const allowedIps =
+        process.env.METRICS_ALLOWED_IPS
+          ?.split(",")
+          .map((ip) => ip.trim())
+          .filter(Boolean) || [];
 
       // Check if IP is allowed
-      if (!allowedIps.includes(clientIp)) {
+      if (!this.isAllowedMetricsIp(clientIp, allowedIps)) {
         // Return 404 for unauthorized IPs (hide the existence of this endpoint)
         const response = context.switchToHttp().getResponse();
         response.status(404).json({
@@ -149,5 +151,116 @@ export class JwtAuthGuard extends AuthGuard("jwt") {
 
     // 보호된 경로인데 사용자가 없는 경우 에러 발생
     throw err || new UnauthorizedException();
+  }
+
+  private isAllowedMetricsIp(clientIp: string, allowedIps: string[]): boolean {
+    const normalizedIp = this.normalizeIp(clientIp);
+
+    if (!normalizedIp) {
+      return false;
+    }
+
+    if (
+      allowedIps.some((allowedIp) =>
+        this.matchesAllowedMetricsIp(normalizedIp, allowedIp),
+      )
+    ) {
+      return true;
+    }
+
+    return this.isPrivateOrLoopbackIp(normalizedIp);
+  }
+
+  private matchesAllowedMetricsIp(
+    normalizedIp: string,
+    allowedIp: string,
+  ): boolean {
+    const normalizedAllowedIp = this.normalizeIp(allowedIp);
+    if (!normalizedAllowedIp) {
+      return false;
+    }
+
+    if (!normalizedAllowedIp.includes("/")) {
+      return normalizedIp === normalizedAllowedIp;
+    }
+
+    const [baseIp, prefixLengthValue] = normalizedAllowedIp.split("/");
+    const prefixLength = Number(prefixLengthValue);
+    const ipInt = this.ipv4ToInt(normalizedIp);
+    const baseIpInt = this.ipv4ToInt(baseIp);
+
+    if (
+      ipInt === null ||
+      baseIpInt === null ||
+      Number.isNaN(prefixLength) ||
+      prefixLength < 0 ||
+      prefixLength > 32
+    ) {
+      return false;
+    }
+
+    const mask =
+      prefixLength === 0
+        ? 0
+        : ((0xffffffff << (32 - prefixLength)) >>> 0) >>> 0;
+
+    return (ipInt & mask) === (baseIpInt & mask);
+  }
+
+  private isPrivateOrLoopbackIp(normalizedIp: string): boolean {
+    if (normalizedIp === "localhost" || normalizedIp === "::1") {
+      return true;
+    }
+
+    const ipInt = this.ipv4ToInt(normalizedIp);
+    if (ipInt === null) {
+      return false;
+    }
+
+    const octets = normalizedIp.split(".").map(Number);
+    const [a, b] = octets;
+
+    return (
+      a === 10 ||
+      a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168)
+    );
+  }
+
+  private normalizeIp(ip: string): string {
+    if (!ip) {
+      return "";
+    }
+
+    if (ip === "::1") {
+      return "::1";
+    }
+
+    if (ip.startsWith("::ffff:")) {
+      return ip.slice(7);
+    }
+
+    return ip;
+  }
+
+  private ipv4ToInt(ip: string): number | null {
+    const octets = ip.split(".");
+    if (octets.length !== 4) {
+      return null;
+    }
+
+    const values = octets.map((segment) => Number(segment));
+    if (values.some((value) => Number.isNaN(value) || value < 0 || value > 255)) {
+      return null;
+    }
+
+    return (
+      (((values[0] << 24) >>> 0) |
+        ((values[1] << 16) >>> 0) |
+        ((values[2] << 8) >>> 0) |
+        (values[3] >>> 0)) >>>
+      0
+    );
   }
 }
