@@ -21,7 +21,7 @@ export function McpOAuthRequestPanel({
           {clientName} 권한 요청
         </h3>
         <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-          아래 권한만 확인하면 됩니다.
+          요청 권한을 확인해 주세요.
         </p>
       </div>
       <div className="mt-4 divide-y divide-zinc-200/80 rounded-xl border border-zinc-200/80 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950/60">

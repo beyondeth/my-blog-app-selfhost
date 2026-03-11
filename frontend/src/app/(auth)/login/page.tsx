@@ -11,6 +11,7 @@ import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { safeDecodeMessage, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
 import { parseMcpScopes } from '@/lib/mcpScopes';
+import { buildMcpOAuthConsentPath, writeMcpOAuthSession } from '@/lib/mcpOAuth';
 
 const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
 
@@ -197,7 +198,7 @@ function LoginPageContent() {
       scope: mcpScope,
     };
 
-    sessionStorage.setItem('mcpOAuth', JSON.stringify(mcpOAuthData));
+    writeMcpOAuthSession(mcpOAuthData);
   }, [isMcpOAuth, mcpState, mcpCallbackUrl, mcpClientName, mcpScope]);
 
   const validateEmail = (email: string) => {
@@ -277,6 +278,18 @@ function LoginPageContent() {
       // 로그인 직후 user 정보 새로고침하여 약관 동의 필드 최신화
       // ConsentGuard 타이밍 이슈 방지 (회원가입과 동일한 처리)
       await refreshUser();
+
+      if (isMcpOAuth && mcpState && mcpCallbackUrl) {
+        const mcpOAuthData = {
+          state: mcpState,
+          callback_url: mcpCallbackUrl,
+          client_name: mcpClientName,
+          scope: mcpScope,
+        };
+        writeMcpOAuthSession(mcpOAuthData);
+        router.push(buildMcpOAuthConsentPath(mcpOAuthData));
+        return;
+      }
 
       // OAuth 콜백 URL인 경우 직접 리다이렉트 (localhost:7777/callback)
       if (returnUrl && returnUrl.includes('localhost:7777/callback')) {

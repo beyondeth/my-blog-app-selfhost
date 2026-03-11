@@ -9,6 +9,11 @@ import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { ArrowLeft } from 'lucide-react';
 import { useRefreshAuthenticatedUser } from '@/lib/profile-queries';
+import {
+  buildMcpOAuthConsentPath,
+  clearMcpOAuthSession,
+  parseMcpOAuthSessionData,
+} from '@/lib/mcpOAuth';
 
 /**
  * OAuth 로그인 후 약관 동의 페이지
@@ -161,27 +166,14 @@ export default function ConsentPage() {
       const mcpOAuthRaw = sessionStorage.getItem('mcpOAuth');
       if (mcpOAuthRaw) {
         try {
-          const { state, callback_url } = JSON.parse(mcpOAuthRaw);
-          if (state && callback_url) {
-            const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
-            const completeResponse = await fetch(`${apiUrl}/auth/oauth/mcp/complete`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ state, callback_url }),
-            });
-
-            if (completeResponse.ok) {
-              const completeData = await completeResponse.json();
-              if (completeData.success && completeData.redirect_url) {
-                sessionStorage.removeItem('mcpOAuth');
-                window.location.href = completeData.redirect_url;
-                return;
-              }
-            }
+          const mcpOAuthData = parseMcpOAuthSessionData(mcpOAuthRaw);
+          if (mcpOAuthData) {
+            router.push(buildMcpOAuthConsentPath(mcpOAuthData));
+            return;
           }
         } catch (mcpError) {
           console.error('MCP OAuth completion after consent failed:', mcpError);
+          clearMcpOAuthSession();
         }
       }
 
