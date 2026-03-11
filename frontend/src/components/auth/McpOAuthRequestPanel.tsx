@@ -38,13 +38,13 @@ export function McpOAuthRequestPanel({
             <p className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100">
               {scope.label}
             </p>
-            <p className="mt-1 text-[11px] sm:text-xs leading-5 text-zinc-500 dark:text-zinc-400">
+            <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-500 dark:text-zinc-400">
               {scope.description}
             </p>
           </div>
         ))}
       </div>
-      <div className="mt-3 text-center text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
+      <div className="mt-3 text-center text-xs sm:text-sm leading-6 text-zinc-500 dark:text-zinc-400">
         연결 후에는 언제든 권한을 취소할 수 있습니다.
       </div>
     </div>
