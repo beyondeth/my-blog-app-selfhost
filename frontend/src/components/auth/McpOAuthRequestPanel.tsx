@@ -11,7 +11,7 @@ export function McpOAuthRequestPanel({
 }: McpOAuthRequestPanelProps) {
   return (
     <div className="mb-3 sm:mb-6 w-full rounded-2xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-      <div className="flex items-center">
+      <div className="flex items-center justify-center">
         <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
           APP CONNECTION
         </span>

@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
+import { McpOAuthRequestPanel } from '@/components/auth/McpOAuthRequestPanel';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { safeDecodeMessage, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
@@ -61,10 +62,10 @@ function LoginPageContent() {
     ? `/register?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
     : '/register';
   const loginHeading = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? `${mcpClientName} 연결을 승인하려면 로그인하세요`
+    ? '앱 연결'
     : '다시 만나서 반가워요';
   const loginSubheading = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? '계정을 확인한 뒤 요청된 권한을 검토하고 연결을 완료합니다.'
+    ? '로그인 후 연결을 완료합니다.'
     : '계정으로 로그인하세요';
 
   const normalizeRedirectTarget = (target?: string | null) => {
@@ -377,42 +378,10 @@ function LoginPageContent() {
 
             {/* MCP OAuth 연결 요청 안내 (Claude 커스텀 커넥터) */}
             {isMcpOAuth && mcpState && mcpCallbackUrl && (
-              <div className="mb-3 sm:mb-6 w-full rounded-2xl border border-zinc-200/80 bg-zinc-50/70 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-900/40">
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
-                    APP CONNECTION
-                  </span>
-                  <span className="text-[11px] text-zinc-500 dark:text-zinc-400">
-                    {mcpClientName}
-                  </span>
-                </div>
-                <div className="mt-3">
-                  <h3 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                    {mcpClientName}에서 Codebase.blog 접근 권한을 요청했습니다
-                  </h3>
-                  <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                    로그인 후 아래 권한을 검토하고 연결을 완료합니다.
-                  </p>
-                </div>
-                <div className="mt-4 divide-y divide-zinc-200/80 rounded-xl border border-zinc-200/80 bg-white dark:divide-zinc-800 dark:border-zinc-800 dark:bg-zinc-950/60">
-                  {requestedMcpScopes.map((scope) => (
-                    <div
-                      key={scope.scope}
-                      className="px-4 py-3"
-                    >
-                      <p className="text-xs sm:text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                        {scope.label}
-                      </p>
-                      <p className="mt-1 text-[11px] sm:text-xs leading-5 text-zinc-500 dark:text-zinc-400">
-                        {scope.description}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-                <div className="mt-3 text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
-                  연결 후에는 설정의 Connected Apps에서 언제든 권한을 취소할 수 있습니다.
-                </div>
-              </div>
+              <McpOAuthRequestPanel
+                clientName={mcpClientName}
+                requestedMcpScopes={requestedMcpScopes}
+              />
             )}
 
             {/* 삭제된 계정 경고 */}
