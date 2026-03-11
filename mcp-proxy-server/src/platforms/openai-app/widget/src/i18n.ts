@@ -2,9 +2,11 @@ const _i18n: Record<string, Record<string, string>> = {
   ko: {
     connected: '연결됨', published: '발행 완료', blocked: '진행 대기',
     error: '오류', guide_ready: '가이드 준비', style_confirmed: '스타일 확정',
+    drafting: '글 작성 중',
     awaiting: '스타일 선택 필요', awaiting_style_selection: '스타일 선택 필요', ready: '준비됨',
     step_publish: '3/3 발행 완료', step_style: '2/3 스타일 확정',
     step_select: '2/3 스타일 선택', step_connect: '1/3 연결', step_error: '확인 필요',
+    step_drafting: '2/3 글 작성',
     oauth: 'OAuth 연결', apikey: 'API Key 연결',
     refreshing: '상태를 새로고침하는 중입니다...', refreshed: '최신 상태를 반영했습니다.',
     refresh: '새로고침',
@@ -28,13 +30,23 @@ const _i18n: Record<string, Record<string, string>> = {
     selected_style: '선택 스타일', custom_guide: '커스텀 가이드',
     task: '작업', status: '상태', reason: '사유',
     yes: '사용', no: '미사용',
+    progress_label: '자동포스팅 진행 단계',
+    progress_select_title: '스타일 선택',
+    progress_select_desc: '글쓰기 톤을 확정합니다',
+    progress_draft_title: '글 작성 중',
+    progress_draft_desc: '내용을 정리하고 초안을 만드는 중입니다',
+    progress_publish_title: '발행 중',
+    progress_publish_desc: '초안이 완성되면 바로 발행합니다',
+    progress_publish_done_desc: '포스트 발행이 완료되었습니다',
   },
   en: {
     connected: 'Connected', published: 'Published', blocked: 'Action Needed',
     error: 'Error', guide_ready: 'Guide Ready', style_confirmed: 'Style Confirmed',
+    drafting: 'Drafting',
     awaiting: 'Style Selection Needed', awaiting_style_selection: 'Style Selection Needed', ready: 'Ready',
     step_publish: '3/3 Published', step_style: '2/3 Style Confirmed',
     step_select: '2/3 Select Style', step_connect: '1/3 Connect', step_error: 'Check Required',
+    step_drafting: '2/3 Drafting',
     oauth: 'OAuth', apikey: 'API Key',
     refreshing: 'Refreshing...', refreshed: 'State refreshed.',
     refresh: 'Refresh',
@@ -58,6 +70,14 @@ const _i18n: Record<string, Record<string, string>> = {
     selected_style: 'Selected Style', custom_guide: 'Custom Guide',
     task: 'Task', status: 'Status', reason: 'Reason',
     yes: 'Yes', no: 'No',
+    progress_label: 'Autopost progress',
+    progress_select_title: 'Style Selected',
+    progress_select_desc: 'Confirm the tone for this post',
+    progress_draft_title: 'Drafting',
+    progress_draft_desc: 'Organizing the content and writing the post',
+    progress_publish_title: 'Publishing',
+    progress_publish_desc: 'The post will be published when drafting is complete',
+    progress_publish_done_desc: 'The post has been published',
   },
 };
 
@@ -75,6 +95,7 @@ export function humanizeAuthMode(mode: string): string {
 export function humanizeWorkflow(stage: string): string {
   const map: Record<string, string> = {
     awaiting_style_selection: t('awaiting_style_selection'),
+    drafting: t('drafting'),
     style_confirmed: t('style_confirmed'),
     published: t('published'),
   };
@@ -102,6 +123,7 @@ export function getStatusLabel(status: string): string {
 export function getStepBadge(status: string): string {
   const s = status.toLowerCase();
   if (s === 'published') return t('step_publish');
+  if (s === 'drafting') return t('step_drafting');
   if (s === 'guide_ready' || s === 'style_confirmed') return t('step_style');
   if (s === 'blocked' || s === 'awaiting_style_selection') return t('step_select');
   if (s === 'error') return t('step_error');

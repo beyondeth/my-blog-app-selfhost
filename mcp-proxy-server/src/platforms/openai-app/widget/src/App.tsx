@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import Header from './components/Header';
 import MetaGrid from './components/MetaGrid';
 import StyleSelector from './components/StyleSelector';
+import ProgressStepper from './components/ProgressStepper';
 import ContentPreview from './components/ContentPreview';
 import HintBox from './components/HintBox';
 import ActionButtons from './components/ActionButtons';
@@ -14,7 +15,9 @@ export default function App() {
   const state = useWidgetState();
   const { ref, notify } = useNotifyHeight();
   const s = state.status;
+  const workflowStage = state.workflowStage;
   const out = state.out;
+  const headerStatus = workflowStage === 'drafting' ? 'drafting' : s;
 
   // Style submit callback from StyleSelector
   const [styleSubmit, setStyleSubmit] = useState<{ fn: (() => void) | null; submitting: boolean }>({ fn: null, submitting: false });
@@ -38,6 +41,11 @@ export default function App() {
     if (out.blogName) entries.push({ label: t('blog'), value: String(out.blogName) });
     if (out.authMode) entries.push({ label: t('auth_mode'), value: humanizeAuthMode(String(out.authMode)) });
     entries.push({ label: t('next_step'), value: t('select_style_hint') });
+  } else if (workflowStage === 'drafting' || s === 'drafting') {
+    if (out.styleLabel || out.style) entries.push({ label: t('selected_style'), value: String(out.styleLabel || out.style) });
+    if (out.blogName) entries.push({ label: t('blog'), value: String(out.blogName) });
+    if (out.authMode) entries.push({ label: t('auth_mode'), value: humanizeAuthMode(String(out.authMode)) });
+    entries.push({ label: t('next_step'), value: t('progress_publish_desc') });
   } else if (s === 'published') {
     if (out.title) entries.push({ label: t('title'), value: String(out.title) });
     if (out.category) entries.push({ label: t('category'), value: String(out.category) });
@@ -71,7 +79,7 @@ export default function App() {
     return (
       <div ref={ref} className="shell">
         <div className="card">
-          <Header status={s} />
+          <Header status={headerStatus} />
           <div className="body">
             <HintBox text={t('empty')} />
           </div>
@@ -86,11 +94,15 @@ export default function App() {
   return (
     <div ref={ref} className="shell">
       <div className="card">
-        <Header status={s} />
+        <Header status={headerStatus} />
 
         <div className="body">
           {/* Error messages only */}
           {out.message && s === 'error' && <HintBox text={String(out.message)} isWarning />}
+
+          {(state.isStyleSelectionStage || workflowStage === 'drafting' || s === 'published') && (
+            <ProgressStepper stage={workflowStage || s} />
+          )}
 
           {/* Meta info */}
           <MetaGrid entries={entries} />

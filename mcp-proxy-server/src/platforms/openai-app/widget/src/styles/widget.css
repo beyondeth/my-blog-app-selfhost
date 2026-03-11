@@ -163,6 +163,76 @@ body {
   font-weight: 500;
 }
 
+/* Progress Steps */
+.progress-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--sys-color-elevated);
+  border-radius: var(--sys-radius-md);
+  border: 1px solid var(--sys-color-border);
+  padding: 16px;
+}
+
+.progress-item {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.progress-marker {
+  width: 26px;
+  height: 26px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+  border: 1px solid var(--sys-color-border);
+  color: var(--sys-color-text-muted);
+  background: var(--sys-color-secondary);
+}
+
+.progress-copy {
+  min-width: 0;
+}
+
+.progress-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sys-color-text);
+}
+
+.progress-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sys-color-text-muted);
+}
+
+.progress-item-done .progress-marker {
+  border-color: var(--sys-color-info);
+  background: var(--sys-color-secondary);
+  color: var(--sys-color-info);
+}
+
+.progress-item-done .progress-title {
+  color: var(--sys-color-text);
+}
+
+.progress-item-active .progress-marker {
+  border-color: var(--sys-color-info);
+  background: var(--sys-color-secondary);
+  color: var(--sys-color-info);
+}
+
+.progress-item-active .progress-title {
+  color: var(--sys-color-info);
+}
+
 /* MetaGrid - Card-based lists */
 .meta-grid {
   display: flex;

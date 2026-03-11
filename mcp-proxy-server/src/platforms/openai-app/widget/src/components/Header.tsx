@@ -9,6 +9,7 @@ const STATUS_COLORS: Record<string, string> = {
   published: '#007aff',
   blocked: '#ffcc00',
   error: '#ff3b30',
+  drafting: '#3b82f6',
   guide_ready: '#5ac8fa',
   style_confirmed: '#5ac8fa',
   awaiting_style_selection: '#ffcc00',

@@ -783,6 +783,7 @@ export async function registerOpenAiTools(
             structuredContent: {
               ...((raw.structuredContent as Record<string, unknown> | undefined) || {}),
               status: 'guide_ready',
+              workflowStage: 'drafting',
               tool: 'confirm_style',
               style: selectedStyle.id,
               styleLabel: selectedStyle.label,
@@ -791,10 +792,11 @@ export async function registerOpenAiTools(
             hasCustomMarkdown: Boolean(args.customMarkdown),
           },
           _meta: {
-            summary: `스타일 '${selectedStyle.label}'이 확정되었습니다. 즈시 create_post를 호출하여 포스트를 작성하세요.`,
+            summary: `스타일 '${selectedStyle.label}'이 확정되었습니다. 이제 포스트 초안을 작성합니다.`,
             confirmInstruction:
               'Style is confirmed. DO NOT suggest or ask about styles. Call create_post now.',
             status: 'guide_ready',
+            workflowStage: 'drafting',
             selectedStyle: selectedStyle.id,
             route: 'mcp-openai',
           },

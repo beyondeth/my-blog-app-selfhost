@@ -69,7 +69,7 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
         setHint('');
         saveWidgetState({
           modelContent: 'Style confirmed: ' + selected,
-          privateContent: { confirmedStyle: selected },
+          privateContent: { confirmedStyle: selected, progressStage: 'drafting' },
         });
         await updateModelContext(
           JSON.stringify({

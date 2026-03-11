@@ -20,7 +20,7 @@ export interface OpenAIBridge {
 
 export interface WidgetPersistedState {
   modelContent?: string;
-  privateContent?: { confirmedStyle?: string };
+  privateContent?: { confirmedStyle?: string; progressStage?: string };
 }
 
 export interface ToolResponse {
@@ -77,6 +77,7 @@ export type WidgetStatus =
   | 'published'
   | 'blocked'
   | 'error'
+  | 'drafting'
   | 'guide_ready'
   | 'style_confirmed'
   | 'awaiting_style_selection'
