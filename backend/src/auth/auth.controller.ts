@@ -1361,7 +1361,7 @@ export class AuthController {
    * MCP OAuth 로그인 페이지
    *
    * MCP Proxy Server에서 OAuth 인증 시작 시 사용자를 이 URL로 리다이렉트
-   * 이미 로그인된 사용자는 바로 MCP Proxy callback으로 전달
+   * 이미 로그인된 사용자는 Frontend 승인 화면으로 전달
    * 로그인되지 않은 사용자는 로그인 페이지로 리다이렉트
    *
    * 쿼리 파라미터:
@@ -1403,7 +1403,7 @@ export class AuthController {
     }
 
     // force_login=true가 아닌 경우에만 기존 브라우저 세션(access_token 쿠키)을 재사용.
-    // - 기본 동작: 이미 로그인된 유저는 즉시 OAuth callback으로 진행 (UX 최적화)
+    // - 기본 동작: 이미 로그인된 유저는 승인 화면으로 바로 진행
     // - force_login=true: 계정 전환/재인증을 위해 로그인 화면으로 강제 이동
     const accessToken = req.cookies?.access_token;
     if (!forceLogin && accessToken) {
@@ -1412,16 +1412,27 @@ export class AuthController {
         const user = await this.authService.validateAccessToken(accessToken);
 
         if (user) {
-          // 이미 로그인된 사용자 - MCP Proxy callback으로 리다이렉트
+          // 이미 로그인된 사용자 - Frontend 승인 화면으로 리다이렉트
           this.logger.log(
-            `✅ MCP OAuth - Already logged in, userId: ${user.id.substring(0, 8)}, clientName: ${clientName}`,
+            `✅ MCP OAuth - Already logged in, redirecting to consent, userId: ${user.id.substring(0, 8)}, clientName: ${clientName}`,
           );
 
-          const redirectUrl = new URL(callbackUrl);
-          redirectUrl.searchParams.set("state", state);
-          redirectUrl.searchParams.set("user_id", user.id);
+          const consentUrl = new URL(
+            `${this.frontendBaseURL()}/auth/mcp-consent`,
+          );
+          consentUrl.searchParams.set("mcp_oauth", "true");
+          consentUrl.searchParams.set("state", state);
+          consentUrl.searchParams.set(
+            "client_name",
+            clientName || "MCP Client",
+          );
+          consentUrl.searchParams.set(
+            "scope",
+            scope || "mcp:tools mcp:read mcp:write",
+          );
+          consentUrl.searchParams.set("callback_url", callbackUrl);
 
-          return res.redirect(redirectUrl.toString());
+          return res.redirect(consentUrl.toString());
         }
       } catch (error) {
         // 토큰 검증 실패 - 로그인 페이지로 이동
@@ -1431,7 +1442,7 @@ export class AuthController {
 
     // 로그인되지 않은 사용자 - Frontend 로그인 페이지로 리다이렉트
     // MCP OAuth 파라미터를 쿼리스트링으로 전달
-    const frontendLoginUrl = new URL(`${process.env.FRONTEND_URL}/login`);
+    const frontendLoginUrl = new URL(`${this.frontendBaseURL()}/login`);
     frontendLoginUrl.searchParams.set("mcp_oauth", "true");
     frontendLoginUrl.searchParams.set("state", state);
     frontendLoginUrl.searchParams.set(
