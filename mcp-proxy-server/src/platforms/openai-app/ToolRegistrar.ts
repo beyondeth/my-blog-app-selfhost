@@ -493,10 +493,7 @@ export async function registerOpenAiTools(
         const raw = await handleCheckAuth(context);
         const rawText = raw?.content?.[0]?.text || '';
         const userId = context.userData.userId;
-        const selectedStyleState = await styleStateStore.getSelectedStyle(userId);
-
-        // 기존 버전에서는 여기서 상태를 초기화했으나,
-        // LLM이 워크플로우 중간에 check_auth를 재호출하면 기껏 선택한 스타일이 날아가는 버그가 발생하여 삭제함.
+        await styleStateStore.clearAll(userId);
 
         const connectionHint = context.oauthToken
           ? 'OAuth로 연결되었습니다.'
@@ -521,74 +518,27 @@ export async function registerOpenAiTools(
         };
 
         const sanitizedText = `${sanitizeAuthText(rawText)}\n\n`
-          + (selectedStyleState
-            ? 'A writing style is already confirmed for the current flow. Proceed to create_post.'
-            : 'Next step: call render_style_picker. Do not ask the user to type their style in chat.');
+          + 'Next step: call render_style_picker. Do not ask the user to type their style in chat.';
 
         result = {
           content: [{ type: 'text', text: sanitizedText }],
           structuredContent: {
             ...baseStructuredContent,
-            status: selectedStyleState ? 'guide_ready' : 'connected',
-            workflowStage: selectedStyleState ? 'style_confirmed' : 'connected',
-            ...(selectedStyleState
-              ? {
-                  style: selectedStyleState.styleId,
-                  styleLabel: getStyleOption(selectedStyleState.styleId).label,
-                  styleDescription: getStyleOption(selectedStyleState.styleId).description,
-                  hasCustomMarkdown: false,
-                }
-              : {}),
+            status: 'connected',
+            workflowStage: 'connected',
           },
           _meta: {
-            summary: selectedStyleState
-              ? `연결 완료. 스타일 '${getStyleOption(selectedStyleState.styleId).label}'이 이미 확정되어 있습니다.`
-              : '연결 완료. 다음 단계로 render_style_picker를 호출하세요.',
+            summary: '연결 완료. 다음 단계로 render_style_picker를 호출하세요.',
             confirmInstruction:
-              selectedStyleState
-                ? 'The style is already confirmed for this flow. Call create_post.'
-                : 'Call render_style_picker next. Do not ask the user to type a style in chat.',
-            status: selectedStyleState ? 'guide_ready' : 'connected',
+              'Call render_style_picker next. Do not ask the user to type a style in chat.',
+            status: 'connected',
             publicUrl: blogUrl,
             route: 'mcp-openai',
           },
         };
       } else if (toolName === 'render_style_picker') {
         const userId = context.userData.userId;
-        const selectedStyleState = await styleStateStore.getSelectedStyle(userId);
         const blogUrl = getBlogUrl(context);
-
-        if (selectedStyleState) {
-          const selectedStyle = getStyleOption(selectedStyleState.styleId);
-          result = {
-            content: [
-              {
-                type: 'text',
-                text: `스타일 '${selectedStyle.label}'이 이미 확정되었습니다. 스타일을 다시 묻지 말고 바로 create_post를 호출하세요.`,
-              },
-            ],
-            structuredContent: {
-              status: 'guide_ready',
-              tool: 'render_style_picker',
-              workflowStage: 'style_confirmed',
-              style: selectedStyle.id,
-              styleLabel: selectedStyle.label,
-              styleDescription: selectedStyle.description,
-              username: context.userData.user.username,
-              blogName: context.userData.blog.name,
-              blogSlug: context.userData.blog.slug,
-              blogUrl,
-              authMode: context.oauthToken ? 'oauth2' : 'api_key',
-            },
-            _meta: {
-              summary: `스타일 '${selectedStyle.label}'이 이미 확정되어 있습니다. create_post로 진행하세요.`,
-              status: 'guide_ready',
-              selectedStyle: selectedStyle.id,
-              route: 'mcp-openai',
-            },
-          };
-          return result;
-        }
 
         const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
           userId,

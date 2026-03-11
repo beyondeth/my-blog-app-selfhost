@@ -2,6 +2,21 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-03-11
+
+### Additional update (OpenAI autopost style reset at flow entry)
+
+#### What changed
+- Changed `/mcp-openai` autopost entry behavior so `check_auth` always clears prior style state and returns `connected`.
+- Removed the `render_style_picker` short-circuit that reused a previously confirmed style and skipped the picker UI.
+
+#### Why
+- A prior user-level style selection could leak into a new ChatGPT conversation and incorrectly push the flow straight to `create_post`.
+- The intended UX is that each new autopost request restarts from style selection.
+
+#### How
+- Updated `mcp-proxy-server/src/platforms/openai-app/ToolRegistrar.ts` to treat `check_auth` as a fresh-post boundary and to always open a new style picker session.
+
 ## 2026-03-09
 
 ### Additional update (post-detail GitHub resource gate)
