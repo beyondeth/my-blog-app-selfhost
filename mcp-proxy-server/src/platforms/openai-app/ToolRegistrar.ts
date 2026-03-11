@@ -9,7 +9,7 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { logger } from '../../utils/logger.js';
 import { TOOL_CATALOG, WRITING_STYLE_PRESETS } from '../../tools/catalog.js';
-import { getScopeAuthorizationError } from '../../tools/ScopePolicy.js';
+import { expandLegacyScopeTokens } from '../../oauth/scope-normalization.js';
 import {
   handleCheckAuth,
   handleListMyPublishedPosts,
@@ -66,6 +66,7 @@ type StyleOption = {
 type OpenAiToolPresentation = {
   title: string;
   description: string;
+  inputSchema: ObjectInputSchema;
 };
 
 const STYLE_OPTION_DETAILS: Record<string, Omit<StyleOption, 'id'>> = {
@@ -91,42 +92,94 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
     title: '연결 상태 확인',
     description:
       '현재 연결된 Codebase.blog 계정을 확인합니다. 새 포스트 작성 전 반드시 가장 먼저 호출하세요.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
   },
   list_my_published_posts: {
     title: '내 발행글 목록',
     description:
       '현재 연결된 계정이 발행한 글 목록을 페이지, 태그, 카테고리, 기간 기준으로 조회합니다.',
+    inputSchema: toObjectInputSchema(
+      TOOL_CATALOG.find((tool) => tool.name === 'list_my_published_posts')?.inputSchema
+    ),
   },
   search_my_published_posts: {
     title: '내 발행글 검색',
     description:
       '현재 연결된 계정의 발행글에서 키워드 검색을 실행합니다. 검색어와 메타데이터 필터를 함께 사용할 수 있습니다.',
+    inputSchema: toObjectInputSchema(
+      TOOL_CATALOG.find((tool) => tool.name === 'search_my_published_posts')?.inputSchema
+    ),
   },
   read_my_published_post: {
     title: '내 발행글 읽기',
     description:
       '현재 연결된 계정이 발행한 글 1건의 본문과 메타데이터를 읽습니다.',
+    inputSchema: toObjectInputSchema(
+      TOOL_CATALOG.find((tool) => tool.name === 'read_my_published_post')?.inputSchema
+    ),
   },
-  get_writing_style_guide: {
-    title: '글쓰기 스타일 가이드 불러오기',
+  render_style_picker: {
+    title: '글쓰기 스타일 선택',
     description:
-      '스타일 프리셋과 작성 규칙을 불러와 글의 톤을 먼저 선택합니다. '
-      + 'CRITICAL WORKFLOW RULES: '
-      + '(1) Call this tool ONCE without style arg to show the style selection widget. '
-      + '(2) CRITICAL: DO NOT PRE-WRITE THE POST, DO NOT DECIDE THE TONE, DO NOT ASK QUESTIONS before the user selects a style in the widget. Just call the tool and wait silently. '
-      + '(3) DO NOT call this tool again while waiting. '
-      + '(4) When this tool returns status=guide_ready, you MUST use that exact style for your writing. '
-      + '(5) For every NEW blog post, you MUST call this tool again without arguments to let the user pick a style anew.',
+      '글쓰기 스타일 선택 UI를 표시합니다. 이 도구만 위젯을 렌더링합니다. '
+      + '사용자가 위젯에서 선택할 때까지 기다리세요. 스타일을 채팅으로 다시 묻지 마세요.',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  confirm_style: {
+    title: '글쓰기 스타일 확정',
+    description:
+      'INTERNAL UI SUBMISSION TOOL. The widget uses this to confirm the selected style. '
+      + 'The assistant must never call it directly unless explicitly instructed by the UI flow.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        style: getStyleInputSchemaField(),
+        selectionSource: {
+          type: 'string',
+          enum: ['widget'],
+          description: 'INTERNAL UI FIELD. The assistant must leave this empty.',
+        },
+        selectionNonce: {
+          type: 'string',
+          description: 'INTERNAL UI FIELD. The assistant must leave this empty.',
+        },
+        customMarkdown: {
+          type: 'string',
+          description: 'Optional custom style guide markdown.',
+        },
+        styleAlias: {
+          type: 'string',
+          description: 'Optional alias for customMarkdown styles.',
+        },
+      },
+      required: ['style', 'selectionSource', 'selectionNonce'],
+    },
   },
   create_post: {
     title: '블로그 포스트 발행',
     description:
-      '위젯 스타일 제출 완료 후 실행되는 최종 블로그 포스트 발행 도구입니다. '
-      + 'CRITICAL RULES: '
-      + '(1) Only call this AFTER get_writing_style_guide returns status=guide_ready. '
-      + '(2) If the tool returns blocked, YOU MUST DROP your current drafted text and wait for the user. '
-      + '(3) ONCE PUBLISHED, the style memory is CLEARED. For the NEXT post, you MUST NOT reuse the previous style. You MUST restart the flow by showing the widget again.',
+      '스타일 확정 후 실행되는 최종 블로그 포스트 발행 도구입니다. '
+      + '스타일이 아직 확정되지 않았다면 이 도구는 차단됩니다.',
+    inputSchema: toObjectInputSchema(
+      TOOL_CATALOG.find((tool) => tool.name === 'create_post')?.inputSchema
+    ),
   },
+};
+
+const OPENAI_REQUIRED_SCOPES: Record<OpenAiMvpToolName, string[]> = {
+  check_auth: ['mcp:tools'],
+  list_my_published_posts: ['mcp:tools', 'mcp:read'],
+  search_my_published_posts: ['mcp:tools', 'mcp:read'],
+  read_my_published_post: ['mcp:tools', 'mcp:read'],
+  render_style_picker: ['mcp:tools'],
+  confirm_style: ['mcp:tools'],
+  create_post: ['mcp:tools', 'mcp:write'],
 };
 
 // 스타일 선택 세션은 비교적 길게 유지해, 대기 시간이 길어도 사용자가 위젯에서
@@ -134,9 +187,7 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
 const STYLE_SELECTION_TTL_MS = 24 * 60 * 60 * 1000;
 const STYLE_FLOW_TTL_MS = 24 * 60 * 60 * 1000;
 const OPENAI_WIDGET_TOOL_NAMES = new Set<OpenAiMvpToolName>([
-  'check_auth',
-  'get_writing_style_guide',
-  'create_post',
+  'render_style_picker',
 ]);
 
 function summarizeMarkdown(raw: string | undefined): string {
@@ -220,67 +271,36 @@ function getStyleOption(style: string | undefined): StyleOption {
   );
 }
 
-function getOpenAiInputSchema(toolName: OpenAiMvpToolName, schema: unknown): unknown {
-  if (toolName === 'check_auth') {
-    return schema;
+function getOpenAiScopeAuthorizationError(
+  toolName: OpenAiMvpToolName,
+  context: ToolContext
+): { requiredScopes: string[]; grantedScopes: string[]; missingScopes: string[] } | null {
+  if (!context.oauthToken) {
+    return null;
   }
 
-  // OpenAI(ChatGPT) 라우트(/mcp-openai) 전용 입력 스키마 오버라이드.
-  // 공용 TOOL_CATALOG는 수정하지 않고, ChatGPT 입력 UX에 필요한 메타만
-  // 어댑터에서 확장한다. (/mcp, /mcp-remote에는 영향 없음)
-  const source = toObjectInputSchema(schema);
-  const baseProperties = source.properties || {};
+  const requiredScopes = OPENAI_REQUIRED_SCOPES[toolName] || ['mcp:tools'];
+  const grantedScopes = Array.from(expandLegacyScopeTokens(context.oauthScope));
+  const missingScopes = requiredScopes.filter((scope) => !grantedScopes.includes(scope));
 
-  if (toolName === 'get_writing_style_guide') {
-    return {
-      ...source,
-      properties: {
-        ...baseProperties,
-        style: getStyleInputSchemaField(),
-        selectionSource: {
-          type: 'string',
-          enum: ['widget'],
-          description: 'CRITICAL: AI MUST NEVER PROVIDE THIS. LEAVE EMPTY. UI will inject it.',
-        },
-        selectionNonce: {
-          type: 'string',
-          description: 'CRITICAL: AI MUST NEVER PROVIDE THIS. LEAVE EMPTY. UI will inject it.',
-        },
-        customMarkdown: {
-          ...((baseProperties.customMarkdown as Record<string, unknown>) || {}),
-          type: 'string',
-          description:
-            '선택 사항: 직접 작성한 스타일 가이드 마크다운. 입력 시 프리셋보다 우선 적용됩니다.',
-        },
-      },
-      // 첫 호출은 반드시 인자 없이 허용해야 위젯(UI) 선택 플로우가 열린다.
-      required: (source.required || []).filter((name) => name !== 'style'),
-    };
+  if (missingScopes.length === 0) {
+    return null;
   }
 
-  // create_post 전용 확장: 스타일 선택 입력을 명시한다.
-  // 이 오버라이드는 /mcp-openai에서만 적용되며 공용 tool schema는 변경하지 않는다.
   return {
-    ...source,
-    properties: {
-      ...baseProperties,
-    },
-    required: [...(source.required || [])],
+    requiredScopes,
+    grantedScopes,
+    missingScopes,
   };
 }
 
 function getOpenAiToolDescriptors() {
   return OPENAI_MVP_TOOL_NAMES.map((toolName) => {
-    const catalog = TOOL_CATALOG.find((tool) => tool.name === toolName);
-    if (!catalog) {
-      throw new Error(`Missing tool catalog for ${toolName}`);
-    }
-
     return {
-      name: catalog.name,
+      name: toolName,
       title: OPENAI_TOOL_PRESENTATION[toolName].title,
       description: OPENAI_TOOL_PRESENTATION[toolName].description,
-      inputSchema: getOpenAiInputSchema(toolName, catalog.inputSchema),
+      inputSchema: OPENAI_TOOL_PRESENTATION[toolName].inputSchema,
       annotations: ANNOTATIONS[toolName],
       _meta: {
         'openai/toolInvocation/invoking':
@@ -288,25 +308,33 @@ function getOpenAiToolDescriptors() {
             ? '포스트 발행 중…'
             : toolName === 'check_auth'
             ? '연결 상태 확인 중…'
+            : toolName === 'render_style_picker'
+            ? '스타일 선택 UI 여는 중…'
+            : toolName === 'confirm_style'
+            ? '선택한 스타일 확정 중…'
             : toolName === 'list_my_published_posts'
             ? '발행글 목록 불러오는 중…'
             : toolName === 'search_my_published_posts'
             ? '발행글 검색 중…'
             : toolName === 'read_my_published_post'
             ? '글 읽는 중…'
-            : '가이드 불러오는 중…',
+            : '처리 중…',
         'openai/toolInvocation/invoked':
           toolName === 'create_post'
             ? '발행 완료'
             : toolName === 'check_auth'
             ? '연결 완료'
+            : toolName === 'render_style_picker'
+            ? '스타일 선택 준비 완료'
+            : toolName === 'confirm_style'
+            ? '스타일 확정 완료'
             : toolName === 'list_my_published_posts'
             ? '목록 준비 완료'
             : toolName === 'search_my_published_posts'
             ? '검색 완료'
             : toolName === 'read_my_published_post'
             ? '글 로드 완료'
-            : '가이드 준비 완료',
+            : '처리 완료',
         // 확인 다이얼로그 한글화 (ChatGPT native UI 제어)
         ...(toolName === 'create_post'
           ? {
@@ -333,13 +361,10 @@ function getOpenAiToolDescriptors() {
 }
 
 export function getOpenAiDiscoveryTools(): Array<{ name: string; description: string }> {
-  return OPENAI_MVP_TOOL_NAMES.map((toolName) => {
-    const catalog = TOOL_CATALOG.find((tool) => tool.name === toolName);
-    if (!catalog) {
-      throw new Error(`Missing tool catalog for ${toolName}`);
-    }
-    return { name: catalog.name, description: catalog.discoveryDescription };
-  });
+  return OPENAI_MVP_TOOL_NAMES.map((toolName) => ({
+    name: toolName,
+    description: OPENAI_TOOL_PRESENTATION[toolName].description,
+  }));
 }
 
 export async function registerOpenAiTools(
@@ -374,12 +399,12 @@ export async function registerOpenAiTools(
         '- These tools are read-only and do not change the posting workflow.',
         '',
         '## Step 2: Show Style Widget',
-        '- You MUST call `get_writing_style_guide` (without arguments) to display the style selection widget to the user.',
+        '- You MUST call `render_style_picker` to display the style selection widget to the user.',
         '- CRITICAL RULE: DO NOT write any draft, DO NOT decide on a tone, and DO NOT ask the user to type their style choice in chat. Just call the tool and wait.',
         '',
         '## Step 3: Wait for User',
-        "- Wait silently for the widget to return the user's choice. The widget handles everything.",
-        '- When the tool returns `status="guide_ready"`, you will receive the exact style instructions.',
+        "- Wait silently for the widget to return the user's choice. The widget handles `confirm_style` internally.",
+        '- When style confirmation completes, you will receive the exact style instructions.',
         '',
         '## Step 4: Draft and Publish',
         '- Write the post using ONLY the exact style chosen by the user in Step 3.',
@@ -387,9 +412,9 @@ export async function registerOpenAiTools(
         '',
         '## Step 5: NEXT POST',
         '- After publishing, ALL tools (like create_post) remain perfectly active and available.',
-        '- To write the next post, call `check_auth` first, then call `get_writing_style_guide` WITHOUT any arguments.',
+        '- To write the next post, call `check_auth` first, then call `render_style_picker`.',
         '- DO NOT ask the user to select a style in chat. Just wait for the widget.',
-        '- If you ever receive `status="guide_ready"` from get_writing_style_guide, YOU MUST IMMEDIATELY PROCEED TO `create_post`. NEVER ask for reconfirmation if the status is ready.',
+        '- If you ever receive `status="guide_ready"` after style confirmation, YOU MUST IMMEDIATELY PROCEED TO `create_post`. NEVER ask for reconfirmation if the status is ready.',
       ].join('\n'),
     };
   });
@@ -421,7 +446,7 @@ export async function registerOpenAiTools(
     const args = (request.params.arguments || {}) as Record<string, unknown>;
 
     try {
-      const scopeError = getScopeAuthorizationError(toolName, context);
+      const scopeError = getOpenAiScopeAuthorizationError(toolName, context);
       if (scopeError) {
         context.metricsService.recordRequest('error', toolName, context.route);
         logger.warn(
@@ -486,7 +511,8 @@ export async function registerOpenAiTools(
           authMode: context.oauthToken ? 'oauth2' : 'api_key',
           connectionHint,
           capabilities: [
-            'load_style_guide',
+            'render_style_picker',
+            'confirm_style',
             'create_post',
             'list_my_published_posts',
             'search_my_published_posts',
@@ -494,30 +520,70 @@ export async function registerOpenAiTools(
           ],
         };
 
+        const sanitizedText = `${sanitizeAuthText(rawText)}\n\n`
+          + (selectedStyleState
+            ? 'A writing style is already confirmed for the current flow. Proceed to create_post.'
+            : 'Next step: call render_style_picker. Do not ask the user to type their style in chat.');
+
+        result = {
+          content: [{ type: 'text', text: sanitizedText }],
+          structuredContent: {
+            ...baseStructuredContent,
+            status: selectedStyleState ? 'guide_ready' : 'connected',
+            workflowStage: selectedStyleState ? 'style_confirmed' : 'connected',
+            ...(selectedStyleState
+              ? {
+                  style: selectedStyleState.styleId,
+                  styleLabel: getStyleOption(selectedStyleState.styleId).label,
+                  styleDescription: getStyleOption(selectedStyleState.styleId).description,
+                  hasCustomMarkdown: false,
+                }
+              : {}),
+          },
+          _meta: {
+            summary: selectedStyleState
+              ? `연결 완료. 스타일 '${getStyleOption(selectedStyleState.styleId).label}'이 이미 확정되어 있습니다.`
+              : '연결 완료. 다음 단계로 render_style_picker를 호출하세요.',
+            confirmInstruction:
+              selectedStyleState
+                ? 'The style is already confirmed for this flow. Call create_post.'
+                : 'Call render_style_picker next. Do not ask the user to type a style in chat.',
+            status: selectedStyleState ? 'guide_ready' : 'connected',
+            publicUrl: blogUrl,
+            route: 'mcp-openai',
+          },
+        };
+      } else if (toolName === 'render_style_picker') {
+        const userId = context.userData.userId;
+        const selectedStyleState = await styleStateStore.getSelectedStyle(userId);
+        const blogUrl = getBlogUrl(context);
+
         if (selectedStyleState) {
           const selectedStyle = getStyleOption(selectedStyleState.styleId);
-          const sanitizedText = `${sanitizeAuthText(rawText)}\n\n`
-            + `Style '${selectedStyle.label}' is already confirmed for this posting flow. `
-            + 'DO NOT ask the user to choose a style again. Proceed to create_post.';
-
           result = {
-            content: [{ type: 'text', text: sanitizedText }],
+            content: [
+              {
+                type: 'text',
+                text: `스타일 '${selectedStyle.label}'이 이미 확정되었습니다. 스타일을 다시 묻지 말고 바로 create_post를 호출하세요.`,
+              },
+            ],
             structuredContent: {
-              ...baseStructuredContent,
               status: 'guide_ready',
+              tool: 'render_style_picker',
               workflowStage: 'style_confirmed',
               style: selectedStyle.id,
               styleLabel: selectedStyle.label,
               styleDescription: selectedStyle.description,
-              hasCustomMarkdown: false,
+              username: context.userData.user.username,
+              blogName: context.userData.blog.name,
+              blogSlug: context.userData.blog.slug,
+              blogUrl,
+              authMode: context.oauthToken ? 'oauth2' : 'api_key',
             },
             _meta: {
-              summary: `연결 완료. 스타일 '${selectedStyle.label}'이 이미 확정되어 있습니다.`,
-              confirmInstruction:
-                'The style is already confirmed for this flow. DO NOT ask for style selection again. Call create_post.',
+              summary: `스타일 '${selectedStyle.label}'이 이미 확정되어 있습니다. create_post로 진행하세요.`,
               status: 'guide_ready',
               selectedStyle: selectedStyle.id,
-              publicUrl: blogUrl,
               route: 'mcp-openai',
             },
           };
@@ -528,24 +594,28 @@ export async function registerOpenAiTools(
           userId,
           STYLE_SELECTION_TTL_MS
         );
-        const sanitizedText = `${sanitizeAuthText(rawText)}\n\n`
-          + 'The style selection widget is already displayed below. '
-          + 'DO NOT ask the user to type a style in chat. Wait for the widget submission before drafting.';
-
         result = {
-          content: [{ type: 'text', text: sanitizedText }],
+          content: [
+            {
+              type: 'text',
+              text: '아래 UI에서 글쓰기 스타일을 선택하고 [가이드 제출]을 눌러주세요. 스타일 확정 전에는 초안을 쓰지 마세요.',
+            },
+          ],
           structuredContent: {
-            ...baseStructuredContent,
             status: 'awaiting_style_selection',
+            tool: 'render_style_picker',
             workflowStage: 'awaiting_style_selection',
+            username: context.userData.user.username,
+            blogName: context.userData.blog.name,
+            blogSlug: context.userData.blog.slug,
+            blogUrl,
+            authMode: context.oauthToken ? 'oauth2' : 'api_key',
             styleSelectionNonce: nonce,
             styleOptions: STYLE_OPTIONS,
             canSelectStyle: true,
           },
           _meta: {
-            summary: '연결 완료. 아래 UI에서 글쓰기 스타일을 선택해 주세요.',
-            confirmInstruction:
-              'The style selection widget is already shown. DO NOT ask the user to type their style in chat. Wait for the widget.',
+            summary: '아래 UI에서 글쓰기 스타일을 선택해 주세요.',
             status: 'awaiting_style_selection',
             styleSelectionNonce: nonce,
             styleOptions: STYLE_OPTIONS,
@@ -585,7 +655,7 @@ export async function registerOpenAiTools(
           },
           context
         );
-      } else if (toolName === 'get_writing_style_guide') {
+      } else if (toolName === 'confirm_style') {
         const userId = context.userData.userId;
         const styleArg = typeof args.style === 'string' ? args.style : undefined;
         const selectedState = await styleStateStore.getSelectedStyle(userId);
@@ -620,6 +690,7 @@ export async function registerOpenAiTools(
             ],
             structuredContent: {
               status: 'guide_ready',
+              tool: 'confirm_style',
               style: selectedStyle.id,
               styleLabel: selectedStyle.label,
               styleDescription: selectedStyle.description,
@@ -637,30 +708,22 @@ export async function registerOpenAiTools(
           return result;
         }
         if (!styleArg) {
-          const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
-            userId,
-            STYLE_SELECTION_TTL_MS
-          );
           result = {
             content: [
               {
                 type: 'text',
-                text: 'UI 화면(위젯)에서 다음 글을 위한 스타일을 고르고 [가이드 제출] 버튼을 눌러주세요. UI가 자동으로 진행합니다.',
+                text: '스타일 확정에는 style 인자와 위젯 nonce가 필요합니다. 먼저 render_style_picker를 호출하세요.',
               },
             ],
             structuredContent: {
               status: 'blocked',
-              tool: 'get_writing_style_guide',
-              reason: '위젯(UI)에서 스타일 선택 필요',
+              tool: 'confirm_style',
+              reason: '먼저 render_style_picker를 호출해 스타일 선택 UI를 표시해야 합니다.',
               workflowStage: 'awaiting_style_selection',
             },
             _meta: {
-              summary: '표시된 UI 위젯에서 스타일을 선택하고 [가이드 제출]을 클릭해주세요.',
-              confirmInstruction:
-                '사용자가 위젯에서 스타일을 확정할 때까지 get_writing_style_guide를 재호출하지 마세요.',
+              summary: '먼저 render_style_picker를 호출해 스타일 선택 UI를 표시하세요.',
               status: 'blocked',
-              styleSelectionNonce: nonce,
-              styleOptions: STYLE_OPTIONS,
               route: 'mcp-openai',
             },
           };
@@ -674,31 +737,22 @@ export async function registerOpenAiTools(
         const inputSource = typeof args.selectionSource === 'string' ? args.selectionSource : undefined;
 
         if (inputSource !== 'widget' || !inputNonce) {
-          // 위젯 경로가 아닌 호출 → 스타일 선택 카드를 다시 보여준다.
-          const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
-            userId,
-            STYLE_SELECTION_TTL_MS
-          );
           result = {
             content: [
               {
                 type: 'text',
-                text: 'UI 화면(위젯)에서 다음 글을 위한 스타일을 고르고 [가이드 제출] 버튼을 눌러주세요. UI가 자동으로 진행합니다.',
+                text: 'confirm_style는 위젯 내부 제출 전용입니다. 먼저 render_style_picker에서 스타일을 고르세요.',
               },
             ],
             structuredContent: {
               status: 'blocked',
-              tool: 'get_writing_style_guide',
-              reason: '위젯(UI)에서 스타일 선택 필요',
+              tool: 'confirm_style',
+              reason: 'confirm_style는 위젯 제출 전용입니다.',
               workflowStage: 'awaiting_style_selection',
             },
             _meta: {
-              summary: '표시된 UI 위젯에서 스타일을 선택하고 [가이드 제출]을 클릭해주세요.',
-              confirmInstruction:
-                '사용자가 위젯에서 스타일을 확정할 때까지 get_writing_style_guide를 재호출하지 마세요.',
+              summary: 'render_style_picker를 호출한 뒤 위젯에서 스타일을 선택하세요.',
               status: 'blocked',
-              styleSelectionNonce: nonce,
-              styleOptions: STYLE_OPTIONS,
               route: 'mcp-openai',
             },
           };
@@ -727,7 +781,7 @@ export async function registerOpenAiTools(
             ],
             structuredContent: {
               status: 'blocked',
-              tool: 'get_writing_style_guide',
+              tool: 'confirm_style',
               reason: '스타일 선택 재확인 필요',
               workflowStage: 'awaiting_style_selection',
             },
@@ -776,12 +830,13 @@ export async function registerOpenAiTools(
         await styleStateStore.clearPendingNonces(userId);
         result = {
           content: raw.content,
-          structuredContent: {
-            ...((raw.structuredContent as Record<string, unknown> | undefined) || {}),
-            status: 'guide_ready',
-            style: selectedStyle.id,
-            styleLabel: selectedStyle.label,
-            styleDescription: selectedStyle.description,
+            structuredContent: {
+              ...((raw.structuredContent as Record<string, unknown> | undefined) || {}),
+              status: 'guide_ready',
+              tool: 'confirm_style',
+              style: selectedStyle.id,
+              styleLabel: selectedStyle.label,
+              styleDescription: selectedStyle.description,
             styleOptions: STYLE_OPTIONS,
             hasCustomMarkdown: Boolean(args.customMarkdown),
           },
@@ -805,18 +860,12 @@ export async function registerOpenAiTools(
           const markdown = (args.content_markdown as string | undefined) || '';
           const preview = summarizeMarkdown(markdown);
           const tags = Array.isArray(args.tags) ? (args.tags as string[]) : [];
-          const nonce = await styleStateStore.getOrCreateStyleSelectionNonce(
-            userId,
-            STYLE_SELECTION_TTL_MS
-          );
           result = {
-            // isError를 빼면 ChatGPT 모델은 실패로 간주하지 않아 위젯을 정상적으로 렌더링함
-            // 대신 우리는 content에 이 사실을 적어 모델이 인지하게 하고, UI 상태를 blocked로 줌
             content: [
               {
                 type: 'text',
                 text:
-                  '[SYSTEM ALERT] 스타일 선택이 누락되었습니다. 당신이 미리 작성한 글이나 선택한 톤(tone)을 모두 버리고, 사용자가 위젯에서 새로운 스타일을 선택할 때까지 대기하세요.',
+                  '[SYSTEM ALERT] 스타일 선택이 누락되었습니다. 초안 작성을 멈추고 render_style_picker를 호출해 사용자가 위젯에서 스타일을 고를 때까지 기다리세요.',
               },
             ],
             structuredContent: {
@@ -834,12 +883,10 @@ export async function registerOpenAiTools(
             },
             _meta: {
               summary:
-                `'${(args.title as string | undefined) || '제목 없음'}' 발행 전 스타일 선택 위젯이 표시되었습니다.`,
+                `'${(args.title as string | undefined) || '제목 없음'}' 발행 전 스타일 선택이 필요합니다.`,
               confirmInstruction:
-                'CRITICAL: DO NOT write any blog post content or suggest a tone yet. Wait for the user to select a style in the widget. DROP any drafted content from your memory.',
+                'Call render_style_picker next. Do not write or suggest a tone before the user confirms a style.',
               status: 'blocked',
-              styleSelectionNonce: nonce,
-              styleOptions: STYLE_OPTIONS,
               route: 'mcp-openai',
             },
           };

@@ -3,7 +3,8 @@ export const OPENAI_MVP_TOOL_NAMES = [
   'list_my_published_posts',
   'search_my_published_posts',
   'read_my_published_post',
-  'get_writing_style_guide',
+  'render_style_picker',
+  'confirm_style',
   'create_post',
 ] as const;
 
@@ -33,7 +34,12 @@ export const ANNOTATIONS: Record<
     openWorldHint: false,
     destructiveHint: false,
   },
-  get_writing_style_guide: {
+  render_style_picker: {
+    readOnlyHint: true,
+    openWorldHint: false,
+    destructiveHint: false,
+  },
+  confirm_style: {
     readOnlyHint: true,
     openWorldHint: false,
     destructiveHint: false,
