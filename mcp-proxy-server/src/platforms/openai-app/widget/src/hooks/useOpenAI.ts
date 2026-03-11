@@ -122,5 +122,8 @@ export async function openExternal(href: string): Promise<void> {
 
 /** Check if callTool is available. */
 export function canCallTool(): boolean {
-  return typeof bridge().callTool === 'function';
+  if (typeof bridge().callTool === 'function') {
+    return true;
+  }
+  return typeof window !== 'undefined' && window.parent !== null;
 }

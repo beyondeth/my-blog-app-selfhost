@@ -84,7 +84,8 @@ export function humanizeWorkflow(stage: string): string {
 export function humanizeAction(tool: string): string {
   const map: Record<string, string> = {
     check_auth: t('connected'),
-    get_writing_style_guide: t('guide_ready'),
+    render_style_picker: t('awaiting_style_selection'),
+    confirm_style: t('guide_ready'),
     create_post: t('published'),
   };
   return map[tool] || tool;

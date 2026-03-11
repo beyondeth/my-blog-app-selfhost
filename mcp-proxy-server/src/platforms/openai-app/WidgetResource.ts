@@ -13,7 +13,7 @@ const __dirname = path.dirname(__filename);
  * - 이 파일은 /mcp-openai 전용이며 /mcp, /mcp-remote와 분리된다.
  */
 // ChatGPT 커넥터의 리소스 캐시를 안정적으로 갱신하기 위한 버전드 URI
-export const OPENAI_WIDGET_URI = 'ui://widget/codebase-dashboard-v20260311b.html';
+export const OPENAI_WIDGET_URI = 'ui://widget/codebase-dashboard-v20260312a.html';
 export const OPENAI_WIDGET_MIME_TYPE = 'text/html;profile=mcp-app';
 
 type DomainSet = {

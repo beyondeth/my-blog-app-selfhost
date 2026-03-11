@@ -5,10 +5,11 @@ const EXPECTED_TOOLS = [
   'list_my_published_posts',
   'search_my_published_posts',
   'read_my_published_post',
-  'get_writing_style_guide',
+  'render_style_picker',
+  'confirm_style',
   'create_post',
 ];
-const EXPECTED_WIDGET_URI = 'ui://widget/codebase-dashboard-v20260311b.html';
+const EXPECTED_WIDGET_URI = 'ui://widget/codebase-dashboard-v20260312a.html';
 
 function fail(message) {
   console.error(`✗ ${message}`);

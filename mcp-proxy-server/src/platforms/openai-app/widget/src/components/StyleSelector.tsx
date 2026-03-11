@@ -49,7 +49,7 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
     setHint(`'${selected}' ` + t('submitting_style'));
 
     try {
-      const response = await callTool('get_writing_style_guide', {
+      const response = await callTool('confirm_style', {
         style: selected,
         selectionSource: 'widget',
         selectionNonce: activeNonce,
