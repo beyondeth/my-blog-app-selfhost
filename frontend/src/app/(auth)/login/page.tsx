@@ -29,6 +29,7 @@ function LoginPageContent() {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const MAX_LOGIN_ATTEMPTS = 5;
   const [loginErrorMessage, setLoginErrorMessage] = useState<string | null>(null);
+  const [mcpAuthPhase, setMcpAuthPhase] = useState<'idle' | 'authenticating' | 'redirecting'>('idle');
 
   const [formData, setFormData] = useState({
     email: '',
@@ -63,10 +64,16 @@ function LoginPageContent() {
     ? `/register?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
     : '/register';
   const loginHeading = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? '앱 연결'
+    ? (mcpAuthPhase === 'idle' ? '앱 연결' : '연결 확인 중')
     : '다시 만나서 반가워요';
   const loginSubheading = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? '로그인 후 연결을 완료합니다.'
+    ? (
+      mcpAuthPhase === 'redirecting'
+        ? '승인 화면으로 이동하고 있습니다.'
+        : mcpAuthPhase === 'authenticating'
+          ? '로그인 상태와 연결 정보를 확인하고 있습니다.'
+          : '로그인 후 연결을 완료합니다.'
+    )
     : '계정으로 로그인하세요';
 
   const normalizeRedirectTarget = (target?: string | null) => {
@@ -267,6 +274,9 @@ function LoginPageContent() {
 
     setIsSubmitting(true);
     setLoginErrorMessage(null);
+    if (isMcpOAuth && mcpState && mcpCallbackUrl) {
+      setMcpAuthPhase('authenticating');
+    }
 
     try {
       // returnUrl 파라미터 확인 (OAuth 콜백 대기 중인 경우)
@@ -287,6 +297,7 @@ function LoginPageContent() {
           scope: mcpScope,
         };
         writeMcpOAuthSession(mcpOAuthData);
+        setMcpAuthPhase('redirecting');
         router.push(buildMcpOAuthConsentPath(mcpOAuthData));
         return;
       }
@@ -340,6 +351,7 @@ function LoginPageContent() {
       const errorMessage = error.message || '이메일 또는 비밀번호가 일치하지 않습니다';
       setValidationErrors(prev => ({ ...prev, password: '' }));
       setLoginErrorMessage(errorMessage);
+      setMcpAuthPhase('idle');
 
       // 에러 발생 시에만 버튼 활성화 (성공 시에는 리다이렉트 전까지 비활성화 유지)
       setIsSubmitting(false);
@@ -391,10 +403,29 @@ function LoginPageContent() {
 
             {/* MCP OAuth 연결 요청 안내 (Claude 커스텀 커넥터) */}
             {isMcpOAuth && mcpState && mcpCallbackUrl && (
-              <McpOAuthRequestPanel
-                clientName={mcpClientName}
-                requestedMcpScopes={requestedMcpScopes}
-              />
+              <>
+                <McpOAuthRequestPanel
+                  clientName={mcpClientName}
+                  requestedMcpScopes={requestedMcpScopes}
+                />
+                {mcpAuthPhase !== 'idle' && (
+                  <div className="mb-3 sm:mb-6 w-full rounded-2xl border border-zinc-200/80 bg-white/90 px-4 py-4 dark:border-zinc-800 dark:bg-zinc-950/70">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-0.5 h-5 w-5 animate-spin rounded-full border-2 border-zinc-300 border-t-zinc-900 dark:border-zinc-700 dark:border-t-zinc-100" />
+                      <div>
+                        <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+                          {mcpAuthPhase === 'redirecting' ? '승인 화면으로 이동 중' : '로그인 확인 중'}
+                        </p>
+                        <p className="mt-1 text-xs leading-5 text-zinc-600 dark:text-zinc-300">
+                          {mcpAuthPhase === 'redirecting'
+                            ? '잠시 후 권한 승인 화면이 열립니다.'
+                            : '계정 상태와 연결 요청 정보를 확인하고 있습니다.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* 삭제된 계정 경고 */}
