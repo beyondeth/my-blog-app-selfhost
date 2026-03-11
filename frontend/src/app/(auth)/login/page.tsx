@@ -6,11 +6,9 @@ import Link from 'next/link';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { AlertCircle, Eye, EyeOff, ArrowLeft } from 'lucide-react';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
-import { McpOAuthRequestPanel } from '@/components/auth/McpOAuthRequestPanel';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { safeDecodeMessage, isSafeRedirectUrl, sanitizeUserInput } from '@/lib/utils/sanitize';
-import { parseMcpScopes } from '@/lib/mcpScopes';
 import { buildMcpOAuthConsentPath, writeMcpOAuthSession } from '@/lib/mcpOAuth';
 
 const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
@@ -58,7 +56,6 @@ function LoginPageContent() {
   const mcpCallbackUrl = searchParams.get('callback_url');
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
-  const requestedMcpScopes = parseMcpScopes(mcpScope);
   const registerHref = isMcpOAuth && mcpState && mcpCallbackUrl
     ? `/register?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}`
     : '/register';
@@ -388,14 +385,6 @@ function LoginPageContent() {
                 {loginSubheading}
               </p>
             </div>
-
-            {/* MCP OAuth 연결 요청 안내 (Claude 커스텀 커넥터) */}
-            {isMcpOAuth && mcpState && mcpCallbackUrl && (
-              <McpOAuthRequestPanel
-                clientName={mcpClientName}
-                requestedMcpScopes={requestedMcpScopes}
-              />
-            )}
 
             {/* 삭제된 계정 경고 */}
             {accountDeletedError && (
