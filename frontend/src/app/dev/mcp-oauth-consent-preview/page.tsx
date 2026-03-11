@@ -1,22 +1,18 @@
+'use client';
+
 import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
 import { McpOAuthConsentCard } from '@/components/auth/McpOAuthConsentCard';
 import { parseMcpScopes } from '@/lib/mcpScopes';
 
-type PreviewPageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>;
-};
-
-function getParam(value: string | string[] | undefined, fallback: string): string {
-  if (Array.isArray(value)) {
-    return value[0] || fallback;
-  }
+function getParam(value: string | null, fallback: string): string {
   return value || fallback;
 }
 
-export default async function McpOAuthConsentPreviewPage({ searchParams }: PreviewPageProps) {
-  const resolved = searchParams ? await searchParams : {};
-  const clientName = getParam(resolved.client_name, 'ChatGPT');
-  const scopeValue = getParam(resolved.scope, 'mcp:tools mcp:read mcp:write');
+export default function McpOAuthConsentPreviewPage() {
+  const searchParams = useSearchParams();
+  const clientName = getParam(searchParams.get('client_name'), 'ChatGPT');
+  const scopeValue = getParam(searchParams.get('scope'), 'mcp:tools mcp:read mcp:write');
   const requestedMcpScopes = parseMcpScopes(scopeValue);
 
   return (

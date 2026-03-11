@@ -1,3 +1,5 @@
+'use client';
+
 import Image from 'next/image';
 import { ArrowLeft, Check, X } from 'lucide-react';
 import { McpOAuthRequestPanel } from '@/components/auth/McpOAuthRequestPanel';
