@@ -44,7 +44,7 @@ export function McpOAuthRequestPanel({
           </div>
         ))}
       </div>
-      <div className="mt-3 text-center text-xs sm:text-sm leading-6 text-zinc-500 dark:text-zinc-400">
+      <div className="mt-3 text-center text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
         연결 후에는 언제든 권한을 취소할 수 있습니다.
       </div>
     </div>
