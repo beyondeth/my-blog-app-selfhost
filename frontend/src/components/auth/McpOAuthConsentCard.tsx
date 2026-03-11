@@ -50,6 +50,11 @@ export function McpOAuthConsentCard({
           <div className="auth-card rounded-2xl px-4 py-8 sm:px-8 fade-in-up">
             <div className="mx-auto w-full max-w-xl">
               <div className="mb-6 text-center">
+                <div className="mb-4 flex items-center justify-center">
+                  <span className="rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[10px] font-semibold tracking-[0.14em] text-zinc-500 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-400">
+                    APP CONNECTION
+                  </span>
+                </div>
                 <div className="inline-flex items-center justify-center mb-4">
                   <Image
                     src="/assets/logo.svg"
@@ -65,6 +70,7 @@ export function McpOAuthConsentCard({
               <McpOAuthRequestPanel
                 clientName={clientName}
                 requestedMcpScopes={requestedMcpScopes}
+                showBadge={false}
               />
 
               {error && (
