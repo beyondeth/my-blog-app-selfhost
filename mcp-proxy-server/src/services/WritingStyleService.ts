@@ -32,6 +32,7 @@ export interface WritingStyleMetadata {
 export interface WritingStyle {
   metadata: WritingStyleMetadata;
   instructions: string;
+  compactBrief: string;
   createPostDescription: string;
   qualityGuidelinesPrompt: string;
   blogPostTemplatePrompt: string;
@@ -225,6 +226,18 @@ export class WritingStyleService {
           aiTagRequired: metadata.ai_tag_required !== false,
         },
         instructions: this.buildInstructions(sections),
+        compactBrief: this.buildCompactBrief(
+          metadata.style_name || normalizedStyle,
+          {
+            styleName: metadata.style_name || normalizedStyle,
+            language: metadata.language || 'korean',
+            minLength: metadata.min_length || 2000,
+            targetLength: metadata.target_length || '3000-5000',
+            codeBlockRatio: metadata.code_block_ratio || 0.2,
+            aiTagRequired: metadata.ai_tag_required !== false,
+          },
+          sections
+        ),
         createPostDescription: sections['WRITING GUIDELINES'] || '',
         qualityGuidelinesPrompt: sections['QUALITY ENHANCEMENT GUIDE'] || '',
         blogPostTemplatePrompt: sections['ENHANCEMENT TECHNIQUES'] || '',
@@ -277,6 +290,19 @@ export class WritingStyleService {
               commonSections['COMMON INSTRUCTIONS'] || '',
               body.trim()
             ),
+        compactBrief: this.buildCompactBrief(
+          metadata.style_name || 'Custom Style',
+          {
+            styleName: metadata.style_name || 'Custom Style',
+            language: metadata.language || 'korean',
+            minLength: metadata.min_length || 2000,
+            targetLength: metadata.target_length || '3000-5000',
+            codeBlockRatio: metadata.code_block_ratio || 0.2,
+            aiTagRequired: metadata.ai_tag_required !== false,
+          },
+          sections,
+          body.trim()
+        ),
         createPostDescription: hasStructuredSections
           ? sections['WRITING GUIDELINES'] || ''
           : '',
@@ -405,5 +431,55 @@ export class WritingStyleService {
       .map(([, sectionContent]) => sectionContent);
 
     return this.mergeInstructions(...orderedSections);
+  }
+
+  private buildCompactBrief(
+    styleName: string,
+    metadata: WritingStyleMetadata,
+    sections: Record<string, string>,
+    fallbackBody?: string
+  ): string {
+    const aiTagRule = metadata.aiTagRequired
+      ? 'AI 태그를 포함합니다.'
+      : 'AI 태그는 선택 사항입니다.';
+    const highlights = this.extractCompactHighlights(
+      [
+        sections['STYLE OVERVIEW'] || '',
+        sections['CORE WRITING PRINCIPLES'] || '',
+        sections['WRITING GUIDELINES'] || '',
+        fallbackBody || '',
+      ].filter(Boolean).join('\n\n')
+    );
+
+    return [
+      '# Writing Style Brief',
+      '',
+      `- 스타일: ${styleName}`,
+      `- 언어: ${metadata.language === 'korean' ? '한국어' : metadata.language}`,
+      `- ${aiTagRule}`,
+      '- 아래 원칙을 우선 적용합니다.',
+      ...highlights.map((line) => `- ${line}`),
+    ].join('\n');
+  }
+
+  private extractCompactHighlights(raw: string, limit = 6): string[] {
+    const lines = raw
+      .split('\n')
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((line) => line.replace(/^[-*]\s+/, '').replace(/^\d+\.\s+/, '').trim())
+      .filter((line) => {
+        if (!line) return false;
+        if (line.startsWith('#')) return false;
+        if (line.startsWith('```')) return false;
+        if (line === '---') return false;
+        if (line.length < 12) return false;
+        if (/^perfect for$/i.test(line)) return false;
+        if (/^recommended signals$/i.test(line)) return false;
+        if (/^when another style fits better$/i.test(line)) return false;
+        return true;
+      });
+
+    return Array.from(new Set(lines)).slice(0, limit);
   }
 }

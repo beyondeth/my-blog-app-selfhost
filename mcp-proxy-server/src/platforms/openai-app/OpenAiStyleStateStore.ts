@@ -4,6 +4,7 @@ import type Redis from 'ioredis';
 export type SelectedStyleState = {
   styleId: string;
   selectedAt: number;
+  styleBrief?: string;
 };
 
 export type PendingStyleSelectionState = {
@@ -50,6 +51,54 @@ export class OpenAiStyleStateStore {
     }
   }
 
+  private parsePendingNonces(raw: string | null, ttlMs: number): Array<{ nonce: string; issuedAt: number }> {
+    if (!raw) {
+      return [];
+    }
+    try {
+      const parsed = JSON.parse(raw) as PendingStyleSelectionState;
+      const current = parsed?.nonces || [];
+      const now = Date.now();
+      return current.filter((item) => now - item.issuedAt <= ttlMs);
+    } catch {
+      return [];
+    }
+  }
+
+  private async mutatePendingNonces<T>(
+    userId: string,
+    ttlMs: number,
+    mutator: (fresh: Array<{ nonce: string; issuedAt: number }>) => {
+      next: Array<{ nonce: string; issuedAt: number }>;
+      result: T;
+    }
+  ): Promise<T> {
+    const key = this.pendingKey(userId);
+    const ttlSeconds = toTtlSeconds(ttlMs);
+
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await this.redis.watch(key);
+      const raw = await this.redis.get(key);
+      const fresh = this.parsePendingNonces(raw, ttlMs);
+      const { next, result } = mutator(fresh);
+      const normalizedNext = next.slice(-MAX_PENDING_NONCES);
+      const multi = this.redis.multi();
+
+      if (normalizedNext.length === 0) {
+        multi.del(key);
+      } else {
+        multi.setex(key, ttlSeconds, JSON.stringify({ nonces: normalizedNext }));
+      }
+
+      const execResult = await multi.exec();
+      if (execResult !== null) {
+        return result;
+      }
+    }
+
+    throw new Error('Failed to update OpenAI style nonce state');
+  }
+
   async getSelectedStyle(userId: string): Promise<SelectedStyleState | null> {
     return this.getJson<SelectedStyleState>(this.selectedKey(userId));
   }
@@ -70,6 +119,20 @@ export class OpenAiStyleStateStore {
     await this.redis.del(this.selectedKey(userId));
   }
 
+  async updateSelectedStyleBrief(
+    userId: string,
+    styleBrief: string,
+    ttlMs: number
+  ): Promise<SelectedStyleState | null> {
+    const current = await this.getSelectedStyle(userId);
+    if (!current) {
+      return null;
+    }
+    const next = { ...current, styleBrief };
+    await this.setSelectedStyle(userId, next, ttlMs);
+    return next;
+  }
+
   async getStyleFlow(userId: string): Promise<StyleFlowState | null> {
     return this.getJson<StyleFlowState>(this.flowKey(userId));
   }
@@ -86,16 +149,53 @@ export class OpenAiStyleStateStore {
     await this.redis.del(this.flowKey(userId));
   }
 
+  async resetConfirmedStyle(userId: string): Promise<void> {
+    await this.redis.del(this.selectedKey(userId), this.flowKey(userId));
+  }
+
+  async confirmStyleSelection(
+    userId: string,
+    state: {
+      styleId: string;
+      selectedAt: number;
+      styleBrief?: string;
+      startedAt?: number;
+    },
+    ttlMs: number
+  ): Promise<void> {
+    const currentFlow = await this.getStyleFlow(userId);
+    const startedAt = state.startedAt || currentFlow?.startedAt || state.selectedAt;
+    const multi = this.redis.multi();
+
+    multi.setex(
+      this.flowKey(userId),
+      toTtlSeconds(ttlMs),
+      JSON.stringify({
+        startedAt,
+        styleConfirmedAt: state.selectedAt,
+      } satisfies StyleFlowState)
+    );
+    multi.setex(
+      this.selectedKey(userId),
+      toTtlSeconds(ttlMs),
+      JSON.stringify({
+        styleId: state.styleId,
+        selectedAt: state.selectedAt,
+        styleBrief: state.styleBrief,
+      } satisfies SelectedStyleState)
+    );
+    multi.del(this.pendingKey(userId));
+    await multi.exec();
+  }
+
   async getFreshPendingNonces(
     userId: string,
     ttlMs: number
   ): Promise<Array<{ nonce: string; issuedAt: number }>> {
-    const current =
-      (await this.getJson<PendingStyleSelectionState>(this.pendingKey(userId)))?.nonces || [];
-    const now = Date.now();
-    const fresh = current.filter((item) => now - item.issuedAt <= ttlMs);
-    if (fresh.length !== current.length) {
-      await this.setPendingNonces(userId, fresh, ttlMs);
+    const raw = await this.redis.get(this.pendingKey(userId));
+    const fresh = this.parsePendingNonces(raw, ttlMs);
+    if (fresh.length === 0) {
+      await this.redis.del(this.pendingKey(userId));
     }
     return fresh;
   }
@@ -117,20 +217,29 @@ export class OpenAiStyleStateStore {
   }
 
   async createStyleSelectionNonce(userId: string, ttlMs: number): Promise<string> {
-    const fresh = await this.getFreshPendingNonces(userId, ttlMs);
-    const nonce = randomUUID();
-    const next = [...fresh.slice(-(MAX_PENDING_NONCES - 1)), { nonce, issuedAt: Date.now() }];
-    await this.setPendingNonces(userId, next, ttlMs);
-    return nonce;
+    return this.mutatePendingNonces(userId, ttlMs, (fresh) => {
+      const nonce = randomUUID();
+      return {
+        next: [...fresh.slice(-(MAX_PENDING_NONCES - 1)), { nonce, issuedAt: Date.now() }],
+        result: nonce,
+      };
+    });
   }
 
   async getOrCreateStyleSelectionNonce(userId: string, ttlMs: number): Promise<string> {
-    const fresh = await this.getFreshPendingNonces(userId, ttlMs);
-    if (fresh.length > 0) {
-      await this.setPendingNonces(userId, fresh.slice(-MAX_PENDING_NONCES), ttlMs);
-      return fresh[fresh.length - 1].nonce;
-    }
-    return this.createStyleSelectionNonce(userId, ttlMs);
+    return this.mutatePendingNonces(userId, ttlMs, (fresh) => {
+      if (fresh.length > 0) {
+        return {
+          next: fresh.slice(-MAX_PENDING_NONCES),
+          result: fresh[fresh.length - 1].nonce,
+        };
+      }
+      const nonce = randomUUID();
+      return {
+        next: [{ nonce, issuedAt: Date.now() }],
+        result: nonce,
+      };
+    });
   }
 
   async consumeStyleSelectionNonce(
@@ -138,14 +247,13 @@ export class OpenAiStyleStateStore {
     nonce: string,
     ttlMs: number
   ): Promise<boolean> {
-    const fresh = await this.getFreshPendingNonces(userId, ttlMs);
-    const exists = fresh.some((item) => item.nonce === nonce);
-    if (!exists) {
-      return false;
-    }
-    const remaining = fresh.filter((item) => item.nonce !== nonce);
-    await this.setPendingNonces(userId, remaining, ttlMs);
-    return true;
+    return this.mutatePendingNonces(userId, ttlMs, (fresh) => {
+      const exists = fresh.some((item) => item.nonce === nonce);
+      return {
+        next: exists ? fresh.filter((item) => item.nonce !== nonce) : fresh,
+        result: exists,
+      };
+    });
   }
 
   async clearPendingNonces(userId: string): Promise<void> {

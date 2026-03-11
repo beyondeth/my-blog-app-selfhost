@@ -32,7 +32,6 @@ import {
 } from './WidgetResource.js';
 import type {
   OpenAiStyleStateStore,
-  SelectedStyleState,
 } from './OpenAiStyleStateStore.js';
 
 /**
@@ -165,7 +164,8 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
     title: '블로그 포스트 발행',
     description:
       '스타일 확정 후 실행되는 최종 블로그 포스트 발행 도구입니다. '
-      + '스타일이 아직 확정되지 않았다면 이 도구는 차단됩니다.',
+      + '스타일이 아직 확정되지 않았다면 이 도구는 차단됩니다. '
+      + '카테고리는 기존 글을 조회하지 말고 현재 글에 가장 맞는 하나를 바로 선택하세요.',
     inputSchema: toObjectInputSchema(
       TOOL_CATALOG.find((tool) => tool.name === 'create_post')?.inputSchema
     ),
@@ -394,9 +394,9 @@ export async function registerOpenAiTools(
         '## Step 1: Authentication',
         '- Always call `check_auth` first to verify the connection.',
         '',
-        '## Optional: Review Existing Posts',
-        '- To review previous writing, call `list_my_published_posts`, `search_my_published_posts`, or `read_my_published_post` as needed.',
-        '- These tools are read-only and do not change the posting workflow.',
+        '## Read Tools Policy',
+        '- During auto-posting, DO NOT call `list_my_published_posts`, `search_my_published_posts`, or `read_my_published_post` unless the user explicitly asks to review previous posts.',
+        '- DO NOT use read tools to decide category, tone, or writing direction during auto-posting.',
         '',
         '## Step 2: Show Style Widget',
         '- You MUST call `render_style_picker` to display the style selection widget to the user.',
@@ -404,10 +404,11 @@ export async function registerOpenAiTools(
         '',
         '## Step 3: Wait for User',
         "- Wait silently for the widget to return the user's choice. The widget handles `confirm_style` internally.",
-        '- When style confirmation completes, you will receive the exact style instructions.',
+        '- When style confirmation completes, you will receive a compact execution brief. Use it directly and continue.',
         '',
         '## Step 4: Draft and Publish',
         '- Write the post using ONLY the exact style chosen by the user in Step 3.',
+        '- Pick the best fitting category directly from the current request. Do not inspect previous posts to infer it.',
         '- Call `create_post` to publish it.',
         '',
         '## Step 5: NEXT POST',
@@ -623,27 +624,51 @@ export async function registerOpenAiTools(
         // 단, 위젯에서 이제 막 제출된 순간(nonce가 넘어온 요청)이 아닐 때만 차단.
         if (hasReadyStyle && !nonceValidInRequest) {
           // AI가 이전 상태를 무단으로 우회 재사용하려는 경우 강제 초기화
-          await styleStateStore.clearSelectedStyle(userId);
-          await styleStateStore.clearStyleFlow(userId);
+          await styleStateStore.resetConfirmedStyle(userId);
         }
 
         const recheckedSelectedState = await styleStateStore.getSelectedStyle(userId);
 
         if (recheckedSelectedState) {
           const selectedStyle = getStyleOption(recheckedSelectedState.styleId);
+          let styleBrief = recheckedSelectedState.styleBrief || '';
+
+          if (!styleBrief) {
+            const regenerated = await handleGetWritingStyleGuide(
+              { style: recheckedSelectedState.styleId },
+              context
+            );
+            const regeneratedStructuredContent =
+              (regenerated?.structuredContent as Record<string, unknown> | undefined) || {};
+            styleBrief = typeof regeneratedStructuredContent.compactBrief === 'string'
+              ? regeneratedStructuredContent.compactBrief
+              : '';
+            if (styleBrief) {
+              await styleStateStore.updateSelectedStyleBrief(
+                userId,
+                styleBrief,
+                STYLE_FLOW_TTL_MS
+              );
+            }
+          }
+
           result = {
             content: [
               {
                 type: 'text',
-                text: `스타일 '${selectedStyle.label}'이 이미 확정되었습니다. 스타일을 다시 묻거나 추천하지 마세요. 즉시 create_post를 호출하여 포스트를 작성하세요.`,
+                text:
+                  styleBrief
+                    || `스타일 '${selectedStyle.label}'이 이미 확정되었습니다. 스타일을 다시 묻거나 추천하지 마세요. 즉시 create_post를 호출하여 포스트를 작성하세요.`,
               },
             ],
             structuredContent: {
               status: 'guide_ready',
+              workflowStage: 'drafting',
               tool: 'confirm_style',
               style: selectedStyle.id,
               styleLabel: selectedStyle.label,
               styleDescription: selectedStyle.description,
+              styleBrief,
               hasCustomMarkdown: false,
             },
             _meta: {
@@ -757,37 +782,39 @@ export async function registerOpenAiTools(
           context
         );
         const selectedStyle = getStyleOption(styleArg);
-        const currentFlow = await styleStateStore.getStyleFlow(userId);
         const confirmedAt = Date.now();
-        await styleStateStore.setStyleFlow(
-          userId,
-          {
-            startedAt: currentFlow?.startedAt || confirmedAt,
-            styleConfirmedAt: confirmedAt,
-          },
-          STYLE_FLOW_TTL_MS
-        );
-        await styleStateStore.setSelectedStyle(
+        const rawStructuredContent = (raw.structuredContent as Record<string, unknown> | undefined) || {};
+        const styleBrief =
+          typeof rawStructuredContent.compactBrief === 'string'
+            ? rawStructuredContent.compactBrief
+            : '';
+        await styleStateStore.confirmStyleSelection(
           userId,
           {
             styleId: selectedStyle.id,
             selectedAt: confirmedAt,
+            styleBrief,
           },
           STYLE_FLOW_TTL_MS
         );
-        // 스타일 확정 이후에는 추가 nonce를 발급하지 않는다.
-        // 재호출은 idempotent guide_ready로 흡수하여 루프를 방지한다.
-        await styleStateStore.clearPendingNonces(userId);
         result = {
-          content: raw.content,
-            structuredContent: {
-              ...((raw.structuredContent as Record<string, unknown> | undefined) || {}),
-              status: 'guide_ready',
-              workflowStage: 'drafting',
-              tool: 'confirm_style',
-              style: selectedStyle.id,
-              styleLabel: selectedStyle.label,
-              styleDescription: selectedStyle.description,
+          content: [
+            {
+              type: 'text',
+              text:
+                styleBrief
+                  || `스타일 '${selectedStyle.label}'이 확정되었습니다. 이 스타일로 글을 작성하고 발행하세요.`,
+            },
+          ],
+          structuredContent: {
+            ...rawStructuredContent,
+            status: 'guide_ready',
+            workflowStage: 'drafting',
+            tool: 'confirm_style',
+            style: selectedStyle.id,
+            styleLabel: selectedStyle.label,
+            styleDescription: selectedStyle.description,
+            styleBrief,
             styleOptions: STYLE_OPTIONS,
             hasCustomMarkdown: Boolean(args.customMarkdown),
           },

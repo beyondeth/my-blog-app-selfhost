@@ -2,6 +2,31 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-03-12
+
+### Additional update (OpenAI autopost instruction narrowing + compact style brief)
+
+#### What changed
+- Removed `/mcp-openai` instruction text that proactively suggested `list_my_published_posts`, `search_my_published_posts`, and `read_my_published_post` during auto-posting.
+- Replaced it with an explicit rule: read tools stay available, but are only for cases where the user explicitly asks to inspect previous posts.
+- Changed OpenAI style confirmation to return a compact execution brief instead of the full long-form style guide.
+- Removed duplicate post-style payload injection from the widget follow-up path.
+- Moved compact style brief generation into the shared writing-style service so the OpenAI adapter no longer keeps a parallel style-rule map.
+- Refactored OpenAI style state persistence so confirmed-style writes and nonce mutation are more centralized in the store.
+
+#### Why
+- Auto-posting was detouring into read tools to infer category or writing direction, which added avoidable network/tool latency.
+- After style confirmation, the OpenAI route was still passing a large style guide and then sending similar text again from the widget, which increased drafting delay.
+
+#### How
+- Updated:
+  - `mcp-proxy-server/src/platforms/openai-app/ToolRegistrar.ts`
+  - `mcp-proxy-server/src/tools/catalog.ts`
+  - `mcp-proxy-server/src/platforms/openai-app/widget/src/components/StyleSelector.tsx`
+  - `mcp-proxy-server/src/services/WritingStyleService.ts`
+  - `mcp-proxy-server/src/core/handlers/GetStyleGuideHandler.ts`
+  - `mcp-proxy-server/src/platforms/openai-app/OpenAiStyleStateStore.ts`
+
 ## 2026-03-11
 
 ### Additional update (OpenAI autopost style reset at flow entry)
