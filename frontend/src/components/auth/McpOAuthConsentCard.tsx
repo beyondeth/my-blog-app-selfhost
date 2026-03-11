@@ -49,7 +49,7 @@ export function McpOAuthConsentCard({
 
           <div className="auth-card rounded-2xl px-4 py-8 sm:px-8 fade-in-up">
             <div className="mx-auto w-full max-w-xl">
-              <div className="mb-8 text-center">
+              <div className="mb-6 text-center">
                 <div className="inline-flex items-center justify-center mb-4">
                   <Image
                     src="/assets/logo.svg"
@@ -60,12 +60,6 @@ export function McpOAuthConsentCard({
                     className="object-contain"
                   />
                 </div>
-                <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  앱 연결
-                </h1>
-                <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                  요청 권한을 검토하고 연결을 완료하세요.
-                </p>
               </div>
 
               <McpOAuthRequestPanel
