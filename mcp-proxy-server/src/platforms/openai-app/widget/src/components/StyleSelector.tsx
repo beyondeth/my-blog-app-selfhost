@@ -1,7 +1,13 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { StyleOption } from '../types';
 import { t } from '../i18n';
-import { callTool, saveWidgetState, updateModelContext, canCallTool } from '../hooks/useOpenAI';
+import {
+  callTool,
+  saveWidgetState,
+  updateModelContext,
+  sendUserMessage,
+  canCallTool,
+} from '../hooks/useOpenAI';
 
 interface StyleSelectorProps {
   options: StyleOption[];
@@ -52,6 +58,12 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
       const out = response?.structuredContent || {};
       const meta = response?._meta || {};
       const status = String(out.status || (meta as Record<string, unknown>).status || '').toLowerCase();
+      const guideText = Array.isArray(response?.content)
+        ? response.content
+            .map((item) => (typeof item?.text === 'string' ? item.text : ''))
+            .filter(Boolean)
+            .join('\n\n')
+        : '';
 
       if (status === 'guide_ready') {
         setHint('');
@@ -65,10 +77,19 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
             selectedStyle: selected,
             styleLabel: out.styleLabel || selected,
             readyForPost: true,
+            guideText,
             instruction: 'IMPORTANT: The user has confirmed their writing style via the widget. '
               + 'DO NOT ask about styles again. DO NOT recommend a different style. '
               + 'Immediately call create_post to draft and publish the blog post using this confirmed style.',
           })
+        );
+        await sendUserMessage(
+          [
+            `The user has already confirmed the writing style via the widget: ${String(out.styleLabel || selected)}.`,
+            'This choice is final. Do not ask for the style again. Continue the original posting request now.',
+            'Call create_post as the next step.',
+            guideText ? `Use this exact style guide:\n\n${guideText}` : '',
+          ].filter(Boolean).join('\n\n')
         );
       } else if (status === 'blocked') {
         const reason = String(out.reason || meta.summary || t('session_renewed'));

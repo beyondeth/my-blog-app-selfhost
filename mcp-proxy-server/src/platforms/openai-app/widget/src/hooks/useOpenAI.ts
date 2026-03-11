@@ -43,14 +43,29 @@ export async function callTool(name: string, args: Record<string, unknown>): Pro
 /** Update model context (structured, replaces sendFollowUpMessage). */
 export async function updateModelContext(text: string): Promise<void> {
   const api = bridge();
-  if (typeof api.sendFollowUpMessage === 'function') {
-    // sendFollowUpMessage is simpler but less structured
-    await api.sendFollowUpMessage({ prompt: text });
-    return;
-  }
   rpcRequest('ui/update-model-context', {
     content: [{ type: 'text', text }],
   });
+}
+
+/** Send a follow-up user message to resume the model loop. */
+export async function sendUserMessage(text: string): Promise<void> {
+  const api = bridge();
+  if (typeof api.sendFollowUpMessage === 'function') {
+    await api.sendFollowUpMessage({ prompt: text });
+    return;
+  }
+  window.parent.postMessage(
+    {
+      jsonrpc: '2.0',
+      method: 'ui/message',
+      params: {
+        role: 'user',
+        content: [{ type: 'text', text }],
+      },
+    },
+    '*'
+  );
 }
 
 /** Save widget state for persistence. */
