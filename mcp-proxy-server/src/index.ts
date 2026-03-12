@@ -270,6 +270,12 @@ async function createMcpServer(userData: {
 // RFC 9728, 8414 메타데이터 엔드포인트
 app.use('/.well-known', wellKnownRouter);
 
+// 일부 호스트/클라이언트는 제공한 MCP base path 하위에서 .well-known 메타데이터를 조회한다.
+// 퍼플렉시티 등에서 /mcp/.well-known/* 형태로 probe하는 경우를 위해 alias를 제공한다.
+app.use('/mcp/.well-known', wellKnownRouter);
+app.use('/mcp-remote/.well-known', wellKnownRouter);
+app.use('/mcp-openai/.well-known', wellKnownRouter);
+
 // OAuth 인증 엔드포인트 (DCR, authorize, token, revoke) — 모든 OAuth 클라이언트 공유
 app.use('/oauth', oauthRouter);
 
