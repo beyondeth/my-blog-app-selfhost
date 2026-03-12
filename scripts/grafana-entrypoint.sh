@@ -22,14 +22,15 @@ if [ -n "$GRAFANA_PASSWORD" ]; then
     if wget --quiet --tries=1 --spider "http://127.0.0.1:3000/api/health"; then
       grafana cli admin reset-admin-password "$GRAFANA_PASSWORD" >/tmp/grafana-admin-reset.log 2>&1 || true
       auth_header=$(printf '%s' "${GRAFANA_USER}:${GRAFANA_PASSWORD}" | base64 | tr -d '\n')
-      wget \
+      if wget \
         --quiet \
         --tries=1 \
         --post-data='' \
         --header="Authorization: Basic ${auth_header}" \
         -O- \
-        "http://127.0.0.1:3000/api/admin/provisioning/alerting/reload" >/tmp/grafana-alerting-reload.log 2>&1 || true
-      break
+        "http://127.0.0.1:3000/api/admin/provisioning/alerting/reload" >/tmp/grafana-alerting-reload.log 2>&1; then
+        break
+      fi
     fi
     sleep 1
   done

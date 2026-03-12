@@ -19,17 +19,49 @@ groups:
     rules:
       - uid: backend-down
         title: Backend 응답 중단
-        condition: A
+        condition: B
         data:
           - refId: A
-            queryType: instant
+            queryType: ""
             relativeTimeRange:
               from: 60
               to: 0
             datasourceUid: victoriametrics
             model:
               expr: sum(up{job="nestjs-backend"}) < bool 1
+              hide: false
               intervalMs: 15000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: "-100"
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
         noDataState: OK
         execErrState: Error
         for: 1m
@@ -43,17 +75,49 @@ groups:
 
       - uid: mcp-proxy-down
         title: MCP Proxy 응답 중단
-        condition: A
+        condition: B
         data:
           - refId: A
-            queryType: instant
+            queryType: ""
             relativeTimeRange:
               from: 60
               to: 0
             datasourceUid: victoriametrics
             model:
               expr: sum(up{job="mcp-proxy-server"}) < bool 1
+              hide: false
               intervalMs: 15000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: "-100"
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
         noDataState: OK
         execErrState: Error
         for: 1m
@@ -67,17 +131,49 @@ groups:
 
       - uid: redis-down
         title: Redis 연결 이상
-        condition: A
+        condition: B
         data:
           - refId: A
-            queryType: instant
+            queryType: ""
             relativeTimeRange:
               from: 60
               to: 0
             datasourceUid: victoriametrics
             model:
               expr: min(redis_up) < bool 1
+              hide: false
               intervalMs: 15000
+              maxDataPoints: 43200
+              refId: A
+          - refId: B
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - A
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: "-100"
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: B
+              type: classic_conditions
         noDataState: OK
         execErrState: Error
         for: 1m
