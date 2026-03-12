@@ -133,7 +133,7 @@ groups:
               to: 0
             datasourceUid: victoriametrics
             model:
-              expr: up{job="nestjs-backend"} == 0
+              expr: sum(up{job="nestjs-backend"}) < bool 1
               intervalMs: 15000
         noDataState: OK
         execErrState: Error
@@ -157,7 +157,7 @@ groups:
               to: 0
             datasourceUid: victoriametrics
             model:
-              expr: up{job="mcp-proxy-server"} == 0
+              expr: sum(up{job="mcp-proxy-server"}) < bool 1
               intervalMs: 15000
         noDataState: OK
         execErrState: Error
@@ -181,7 +181,7 @@ groups:
               to: 0
             datasourceUid: victoriametrics
             model:
-              expr: up{job="redis"} == 0
+              expr: sum(up{job="redis"}) < bool 1
               intervalMs: 15000
         noDataState: OK
         execErrState: Error
@@ -205,7 +205,7 @@ groups:
               to: 0
             datasourceUid: victoriametrics
             model:
-              expr: up{job="victoriametrics"} == 0
+              expr: sum(up{job="victoriametrics"}) < bool 1
               intervalMs: 15000
         noDataState: OK
         execErrState: Error
