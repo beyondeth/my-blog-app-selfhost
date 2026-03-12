@@ -1,5 +1,17 @@
 apiVersion: 1
 
+deleteRules:
+  - orgId: 1
+    uid: victoriametrics-down
+  - orgId: 1
+    uid: cpu-high-scale-down
+  - orgId: 1
+    uid: memory-high
+  - orgId: 1
+    uid: backend-memory-high
+  - orgId: 1
+    uid: postgresql-memory-high
+
 groups:
   - name: core-availability
     folder: Codebase Ops
