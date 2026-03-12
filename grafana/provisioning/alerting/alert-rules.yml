@@ -19,7 +19,7 @@ groups:
     rules:
       - uid: backend-down
         title: Backend 응답 중단
-        condition: B
+        condition: C
         data:
           - refId: A
             queryType: ""
@@ -40,28 +40,32 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - A
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
               hide: false
               intervalMs: 1000
               maxDataPoints: 43200
               refId: B
-              type: classic_conditions
+              reducer: last
+              type: reduce
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: $B > 0
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: math
         noDataState: OK
         execErrState: Error
         for: 1m
@@ -75,7 +79,7 @@ groups:
 
       - uid: mcp-proxy-down
         title: MCP Proxy 응답 중단
-        condition: B
+        condition: C
         data:
           - refId: A
             queryType: ""
@@ -96,28 +100,32 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - A
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
               hide: false
               intervalMs: 1000
               maxDataPoints: 43200
               refId: B
-              type: classic_conditions
+              reducer: last
+              type: reduce
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: $B > 0
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: math
         noDataState: OK
         execErrState: Error
         for: 1m
@@ -131,7 +139,7 @@ groups:
 
       - uid: redis-down
         title: Redis 연결 이상
-        condition: B
+        condition: C
         data:
           - refId: A
             queryType: ""
@@ -152,28 +160,32 @@ groups:
               to: 0
             datasourceUid: "-100"
             model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - A
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
               datasource:
                 type: __expr__
                 uid: "-100"
+              expression: A
               hide: false
               intervalMs: 1000
               maxDataPoints: 43200
               refId: B
-              type: classic_conditions
+              reducer: last
+              type: reduce
+          - refId: C
+            queryType: ""
+            relativeTimeRange:
+              from: 0
+              to: 0
+            datasourceUid: "-100"
+            model:
+              datasource:
+                type: __expr__
+                uid: "-100"
+              expression: $B > 0
+              hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+              type: math
         noDataState: OK
         execErrState: Error
         for: 1m
