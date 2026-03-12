@@ -1,0 +1,19 @@
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: silent-drop
+    receivers: []
+
+  - orgId: 1
+    name: telegram-ops
+    receivers:
+      - uid: telegram-ops-receiver
+        type: telegram
+        disableResolveMessage: false
+        settings:
+          bottoken: ${TELEGRAM_BOT_TOKEN}
+          chatid: ${TELEGRAM_CHAT_ID}
+          disable_notification: false
+          disable_web_page_preview: true
+          protect_content: false

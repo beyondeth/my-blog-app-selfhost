@@ -1,0 +1,82 @@
+name: Daily Production Monitoring Summary
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  daily-summary:
+    name: Send Daily Production Summary
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Prepare monitor SSH key
+        env:
+          MONITOR_SSH_KEY: ${{ secrets.MONITOR_SSH_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${MONITOR_SSH_KEY}" ]; then
+            echo "::error::MONITOR_SSH_KEY secret is missing"
+            exit 1
+          fi
+
+          mkdir -p "$HOME/.ssh"
+          printf '%s\n' "$MONITOR_SSH_KEY" > "$HOME/.ssh/monitor_key"
+          chmod 600 "$HOME/.ssh/monitor_key"
+
+      - name: Generate production summary
+        env:
+          MONITOR_SSH_HOST: ${{ secrets.MONITOR_SSH_HOST }}
+          MONITOR_SSH_USER: ${{ secrets.MONITOR_SSH_USER }}
+          MONITOR_SSH_KEY_PATH: /home/runner/.ssh/monitor_key
+          PUBLIC_SITE_URL: https://www.codebase.blog
+          MCP_HEALTH_URL: https://mcp.codebase.blog/health
+          COMPOSE_PROJECT_NAME: codebase-prod
+        run: |
+          set -euo pipefail
+          bash scripts/monitoring-daily-summary.sh > summary.txt
+          cat summary.txt >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Send Telegram summary
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN}" ] || [ -z "${TELEGRAM_CHAT_ID}" ]; then
+            echo "::error::TELEGRAM_BOT_TOKEN or TELEGRAM_CHAT_ID secret is missing"
+            exit 1
+          fi
+
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text@summary.txt"
+
+      - name: Send Telegram failure notice
+        if: failure()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TELEGRAM_BOT_TOKEN}" ] || [ -z "${TELEGRAM_CHAT_ID}" ]; then
+            exit 0
+          fi
+
+          message="$(printf '[Codebase Daily Ops] %s\noverall: 위험\n\nGitHub Actions daily monitoring summary workflow failed.\nRun URL: https://github.com/%s/actions/runs/%s\n' "$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST')" "${GITHUB_REPOSITORY}" "${GITHUB_RUN_ID}")"
+
+          curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "disable_web_page_preview=true" \
+            --data-urlencode "text=${message}"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f "$HOME/.ssh/monitor_key"

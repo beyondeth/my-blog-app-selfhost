@@ -348,9 +348,8 @@ services:
       - .env.production
     volumes:
       - ${GRAFANA_DATA_DIR:-/mnt/data/grafana}:/var/lib/grafana
-      # VictoriaMetrics 데이터소스 설정
-      - ./grafana/provisioning/datasources/victoriametrics.yml:/etc/grafana/provisioning/datasources/victoriametrics.yml:ro
-      - ./grafana/provisioning/dashboards/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+      # Grafana provisioning (datasources, dashboards, alerting)
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
       # 대시보드 파일 디렉토리
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
     environment:
@@ -358,6 +357,10 @@ services:
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
       - GF_SECURITY_ALLOW_EMBEDDING=true
       - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      - GF_ALERTING_ENABLED=true
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_CHAT_ID=${TELEGRAM_CHAT_ID:-}
       # 나머지 설정은 .env.production에서 로드
       # GF_SECURITY_ADMIN_USER, GF_SECURITY_ADMIN_PASSWORD
       # GRAFANA_ROOT_URL -> GF_SERVER_ROOT_URL
