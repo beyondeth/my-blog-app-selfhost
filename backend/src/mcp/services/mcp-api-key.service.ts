@@ -51,6 +51,11 @@ export class McpApiKeyService {
     private readonly mcpApiKeySecretService: McpApiKeySecretService,
   ) {}
 
+  private extractKeyHint(apiKey: string): string {
+    const parts = apiKey.split("_");
+    return parts.length === 4 ? parts[2] : "unknown";
+  }
+
   /**
    * API Key 생성
    *
@@ -247,8 +252,11 @@ export class McpApiKeyService {
    * 4. 만료/활성 상태 확인
    */
   async validateKey(apiKey: string): Promise<McpApiKey> {
+    const keyHint = this.extractKeyHint(apiKey);
+
     // 1. 키 형식 검증 (blog_sk_{hint}_{secret})
     if (!apiKey.startsWith("blog_sk_")) {
+      this.logger.warn(`❌ API key format mismatch: hint=${keyHint}`);
       throw new UnauthorizedException("Invalid API key format");
     }
 
@@ -256,10 +264,9 @@ export class McpApiKeyService {
     const parts = apiKey.split("_");
     if (parts.length !== 4) {
       // ['blog', 'sk', hint, secret]
+      this.logger.warn(`❌ API key format mismatch: hint=${keyHint}`);
       throw new UnauthorizedException("Invalid API key format");
     }
-
-    const keyHint = parts[2];
 
     // 3. hint로 O(1) 조회
     const mcpApiKey = await this.mcpApiKeyRepository.findOne({
@@ -268,24 +275,30 @@ export class McpApiKeyService {
     });
 
     if (!mcpApiKey) {
+      this.logger.warn(`❌ API key hint not found: hint=${keyHint}`);
       throw new UnauthorizedException("Invalid API key");
     }
 
     // 4. bcrypt 비교 (전체 키)
     const isValid = await bcrypt.compare(apiKey, mcpApiKey.keyHash);
     if (!isValid) {
+      this.logger.warn(`❌ API key hash mismatch: hint=${keyHint}`);
       throw new UnauthorizedException("Invalid API key");
     }
 
     // 5. 활성 상태 확인
     if (!mcpApiKey.isActive) {
+      this.logger.warn(`❌ API key inactive: hint=${keyHint}`);
       throw new UnauthorizedException("API key is inactive");
     }
 
     // 6. 만료 확인
     if (mcpApiKey.expiresAt < new Date()) {
+      this.logger.warn(`❌ API key expired: hint=${keyHint}`);
       throw new UnauthorizedException("API key has expired");
     }
+
+    this.logger.log(`✅ API key validated: hint=${keyHint}, user=${mcpApiKey.userId.substring(0, 8)}`);
 
     // 7. 마지막 사용 시간 업데이트 (비동기, 응답 블로킹 안 함)
     this.updateLastUsed(mcpApiKey.id).catch((err) => {
