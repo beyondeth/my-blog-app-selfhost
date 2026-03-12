@@ -129,6 +129,7 @@ export class SearchIndexingService {
         "post.tags",
         "post.content",
         "post.content_markdown",
+        "post.createdAt",
       ])
       .getMany();
   }
