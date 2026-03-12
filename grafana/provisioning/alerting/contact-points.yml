@@ -2,10 +2,6 @@ apiVersion: 1
 
 contactPoints:
   - orgId: 1
-    name: silent-drop
-    receivers: []
-
-  - orgId: 1
     name: telegram-ops
     receivers:
       - uid: telegram-ops-receiver
