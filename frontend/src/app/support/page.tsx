@@ -35,10 +35,8 @@ const legalDocuments = [
 const faqs = [
   {
     question: '자동 포스팅 시 MCP를 어떻게 연결해야 하나요?',
-    answer: '공개 설치 가이드는 Codebase Skills 저장소에서 확인할 수 있습니다.',
+    answer: '설정 > API-KEY 메뉴에서 키 생성이 가능합니다. 자세한 설명은 아래 링크에서 확인 가능합니다.',
     hasLink: true,
-    href: 'https://github.com/beyondeth/codebase-skills',
-    linkLabel: '설치 가이드 보기 →',
   },
   {
     question: 'MCP 사용은 무료인가요?',
@@ -104,15 +102,13 @@ export default function SupportPage() {
                 </summary>
                 <div className="mt-3 text-sm text-gray-600 dark:text-gray-400 leading-relaxed">
                   <p>{faq.answer}</p>
-                  {(faq as any).hasLink && faq.href && (
-                    <a
-                      href={faq.href}
-                      target="_blank"
-                      rel="noreferrer"
+                  {(faq as any).hasLink && (
+                    <Link
+                      href="/settings/api-keys"
                       className="inline-flex items-center gap-1 mt-2 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:underline"
                     >
-                      {faq.linkLabel || '자세히 보기 →'}
-                    </a>
+                      API 키 관리 페이지로 이동 →
+                    </Link>
                   )}
                 </div>
               </details>

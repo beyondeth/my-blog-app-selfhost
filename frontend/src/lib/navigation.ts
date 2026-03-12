@@ -3,6 +3,7 @@ import { z } from 'zod';
 // 라우트 정의
 export const routes = {
   home: () => '/',
+  updates: () => '/updates',
   posts: (params?: { slug?: string }) =>
     params?.slug ? `/posts/${params.slug}` : '/posts',
   postsEdit: (slug: string) => `/posts/edit/${slug}`,
@@ -63,4 +64,4 @@ export const createSearchUrl = (params: HomeSearchParams): string => {
   }
 
   return url.pathname + url.search;
-}; 
+};
