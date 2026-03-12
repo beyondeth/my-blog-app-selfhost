@@ -2,14 +2,14 @@ apiVersion: 1
 
 policies:
   - orgId: 1
-    receiver: silent-drop
+    receiver: telegram-ops
     group_by:
       - alertname
       - component
       - severity
-    group_wait: 2m
+    group_wait: 5m
     group_interval: 15m
-    repeat_interval: 12h
+    repeat_interval: 6h
     routes:
       - receiver: telegram-ops
         object_matchers:
