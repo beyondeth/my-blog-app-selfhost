@@ -31,6 +31,44 @@ humanize_http_status() {
   esac
 }
 
+disk_usage_percent() {
+  local raw="${1:-n/a}"
+  local use_field
+
+  use_field="$(printf '%s' "$raw" | awk -F'|' '{print $4}')"
+  if [ -z "$use_field" ] || [ "$use_field" = "n/a" ]; then
+    echo "0"
+    return
+  fi
+
+  printf '%s' "${use_field%%%}"
+}
+
+format_disk_summary() {
+  local label="$1"
+  local raw="${2:-n/a}"
+  local total used avail usep
+
+  if [ "$raw" = "n/a" ]; then
+    echo "- ${label}: 수집 불가"
+    return
+  fi
+
+  IFS='|' read -r total used avail usep <<< "$raw"
+  echo "- ${label}: ${used} / ${total} 사용 (${usep}), 여유 ${avail}"
+}
+
+format_error_summary() {
+  local prefix="$1"
+  local raw="${2:-none}"
+
+  if [ "$raw" = "none" ] || [ -z "$raw" ]; then
+    echo "- ${prefix}: 눈에 띄는 오류 없음"
+  else
+    echo "- ${prefix}: ${raw}"
+  fi
+}
+
 public_site_code="$(http_code "$PUBLIC_SITE_URL")"
 mcp_health_code="$(http_code "$MCP_HEALTH_URL")"
 
@@ -47,8 +85,20 @@ project="${COMPOSE_PROJECT_NAME:-codebase-prod}"
 backend="${project}-backend"
 mcp="${project}-mcp-proxy"
 
-root_disk="$(df -h / | awk 'NR==2 {print $5}')"
-data_disk="$(df -h /mnt/data 2>/dev/null | awk 'NR==2 {print $5}')"
+summarize_counts() {
+  local pairs="$1"
+  if [ -z "$pairs" ]; then
+    echo "none"
+    return
+  fi
+
+  printf '%s\n' "$pairs" |
+    awk -F'|' '$2 + 0 > 0 {printf "%s%s %s건", sep, $1, $2; sep=", "}' |
+    sed 's/^$/none/'
+}
+
+root_disk="$(df -h / | awk 'NR==2 {print $2 "|" $3 "|" $4 "|" $5}')"
+data_disk="$(df -h /mnt/data 2>/dev/null | awk 'NR==2 {print $2 "|" $3 "|" $4 "|" $5}')"
 if [ -z "$data_disk" ]; then
   data_disk="n/a"
 fi
@@ -81,8 +131,35 @@ if [ -z "$build_cache_reclaimable" ]; then
   build_cache_reclaimable="n/a"
 fi
 
-backend_error_count="$(docker logs --since 24h "$backend" 2>&1 | grep -Eci 'error|exception|failed' || true)"
-mcp_error_count="$(docker logs --since 24h "$mcp" 2>&1 | grep -Eci 'error|exception|failed' || true)"
+backend_log="$(mktemp)"
+mcp_log="$(mktemp)"
+trap 'rm -f "$backend_log" "$mcp_log"' EXIT
+
+docker logs --since 24h "$backend" >"$backend_log" 2>&1 || true
+docker logs --since 24h "$mcp" >"$mcp_log" 2>&1 || true
+
+backend_metrics_count="$(grep -Fc '/api/v1/metrics - Sensitive operation failed' "$backend_log" || true)"
+backend_indexing_count="$(grep -Fc 'distinctAlias.post_createdAt does not exist' "$backend_log" || true)"
+backend_notfound_count="$(grep -Ec '블로그를 찾을 수 없습니다|게시글을 찾을 수 없습니다|Cannot POST /api/route' "$backend_log" || true)"
+
+backend_summary="$(
+  summarize_counts "$(
+    cat <<EOF_COUNTS
+metrics 인증 실패|$backend_metrics_count
+검색 인덱싱 SQL 오류|$backend_indexing_count
+외부 요청 404/스캐너|$backend_notfound_count
+EOF_COUNTS
+  )"
+)"
+
+mcp_api_key_count="$(grep -Fc 'API Key validation failed' "$mcp_log" || true)"
+mcp_summary="$(
+  summarize_counts "$(
+    cat <<EOF_COUNTS
+API Key validation 실패(401)|$mcp_api_key_count
+EOF_COUNTS
+  )"
+)"
 
 alerts_json="$(curl -fsS http://127.0.0.1:8428/api/v1/alerts 2>/dev/null || true)"
 alerts_json_b64="$(printf '%s' "$alerts_json" | base64 | tr -d '\n')"
@@ -93,8 +170,8 @@ echo "UNHEALTHY_COUNT=$unhealthy_count"
 echo "UNHEALTHY_CONTAINERS=$unhealthy_containers"
 echo "IMAGE_RECLAIMABLE=$image_reclaimable"
 echo "BUILD_CACHE_RECLAIMABLE=$build_cache_reclaimable"
-echo "BACKEND_ERRORS_24H=$backend_error_count"
-echo "MCP_ERRORS_24H=$mcp_error_count"
+echo "BACKEND_ERROR_SUMMARY=$backend_summary"
+echo "MCP_ERROR_SUMMARY=$mcp_summary"
 echo "ALERTS_JSON_B64=$alerts_json_b64"
 EOF
 )"
@@ -105,8 +182,8 @@ UNHEALTHY_COUNT="0"
 UNHEALTHY_CONTAINERS="none"
 IMAGE_RECLAIMABLE="n/a"
 BUILD_CACHE_RECLAIMABLE="n/a"
-BACKEND_ERRORS_24H="0"
-MCP_ERRORS_24H="0"
+BACKEND_ERROR_SUMMARY="none"
+MCP_ERROR_SUMMARY="none"
 FIRING_ALERTS="0"
 FIRING_ALERTS_JSON="[]"
 ALERTS_JSON_B64=""
@@ -119,8 +196,8 @@ while IFS='=' read -r key value; do
     UNHEALTHY_CONTAINERS) UNHEALTHY_CONTAINERS="$value" ;;
     IMAGE_RECLAIMABLE) IMAGE_RECLAIMABLE="$value" ;;
     BUILD_CACHE_RECLAIMABLE) BUILD_CACHE_RECLAIMABLE="$value" ;;
-    BACKEND_ERRORS_24H) BACKEND_ERRORS_24H="$value" ;;
-    MCP_ERRORS_24H) MCP_ERRORS_24H="$value" ;;
+    BACKEND_ERROR_SUMMARY) BACKEND_ERROR_SUMMARY="$value" ;;
+    MCP_ERROR_SUMMARY) MCP_ERROR_SUMMARY="$value" ;;
     ALERTS_JSON_B64) ALERTS_JSON_B64="$value" ;;
   esac
 done <<< "$remote_snapshot"
@@ -168,9 +245,9 @@ done <<< "$parsed_alerts"
 overall="정상"
 if [ "$public_site_code" != "200" ] || [ "$mcp_health_code" != "200" ] || [ "${UNHEALTHY_COUNT:-0}" -gt 0 ] || [ "${FIRING_ALERTS:-0}" -gt 0 ]; then
   overall="위험"
-elif [ "${ROOT_DISK:-n/a}" != "n/a" ] && [ "${ROOT_DISK%%%}" -ge 85 ] 2>/dev/null; then
+elif [ "$(disk_usage_percent "${ROOT_DISK:-n/a}")" -ge 85 ] 2>/dev/null; then
   overall="주의"
-elif [ "${DATA_DISK:-n/a}" != "n/a" ] && [ "${DATA_DISK%%%}" -ge 85 ] 2>/dev/null; then
+elif [ "$(disk_usage_percent "${DATA_DISK:-n/a}")" -ge 85 ] 2>/dev/null; then
   overall="주의"
 fi
 
@@ -187,10 +264,12 @@ echo "- 신뢰 경보: ${FIRING_ALERTS:-0}"
 echo
 
 echo "운영 체크"
-echo "- 루트 디스크: ${ROOT_DISK:-n/a}"
-echo "- 데이터 디스크: ${DATA_DISK:-n/a}"
-echo "- 최근 24시간 오류: backend ${BACKEND_ERRORS_24H:-0}건, mcp-proxy ${MCP_ERRORS_24H:-0}건"
-echo "- 정리 가능 용량: 이미지 ${IMAGE_RECLAIMABLE:-n/a}, 빌드 캐시 ${BUILD_CACHE_RECLAIMABLE:-n/a}"
+format_disk_summary "루트 디스크" "${ROOT_DISK:-n/a}"
+format_disk_summary "데이터 디스크" "${DATA_DISK:-n/a}"
+format_error_summary "최근 24시간 backend 주요 오류" "${BACKEND_ERROR_SUMMARY:-none}"
+format_error_summary "최근 24시간 mcp-proxy 주요 오류" "${MCP_ERROR_SUMMARY:-none}"
+echo "- 즉시 정리 가능: 빌드 캐시 ${BUILD_CACHE_RECLAIMABLE:-n/a}"
+echo "- 선택 정리 가능: 미사용 이미지 ${IMAGE_RECLAIMABLE:-n/a}"
 echo
 
 echo "즉시 확인 항목"

@@ -38,6 +38,7 @@ const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
   'simple',
   'support',
   'terms',
+  'updates',
 ]);
 
 function safeDecode(segment: string): string {

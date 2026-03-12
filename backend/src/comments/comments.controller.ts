@@ -21,6 +21,7 @@ import { CommentsService } from "./comments.service";
 import { GetCommentsDto } from "./dto/get-comments-query.dto";
 import { GetRepliesDto } from "./dto/get-replies.dto";
 import { JwtAuthGuard } from "../auth/guards/jwt-auth.guard";
+import { OptionalJwtAuthGuard } from "../common/guards/optional-jwt-auth.guard";
 import { Public } from "../common/decorators/public.decorator";
 import { CurrentUser } from "../common/decorators/current-user.decorator";
 import { User } from "../users/entities/user.entity";
@@ -40,6 +41,7 @@ export class CommentsController {
 
   @Get("post/:postId")
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({ summary: "게시글별 댓글 조회" })
   findAllByPost(@Param("postId") postId: string, @CurrentUser() user?: User) {
     return this.commentsService.findAllByPost(postId, user);
@@ -101,6 +103,7 @@ export class CommentsController {
 
   @Get("post/:postId/paginated")
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: "부모 댓글 페이지네이션 조회 (최신순/인기순)",
     description: `
@@ -147,6 +150,7 @@ export class CommentsController {
 
   @Get(":commentId/replies")
   @Public()
+  @UseGuards(OptionalJwtAuthGuard)
   @ApiOperation({
     summary: "답글 페이지네이션 조회",
     description: `

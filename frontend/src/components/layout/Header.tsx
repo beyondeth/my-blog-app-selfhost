@@ -221,6 +221,13 @@ function HeaderComponent() {
 
             {/* Desktop Auth Section */}
             <div className="flex items-center space-x-4">
+              <Link
+                href={routes.updates()}
+                className="hidden sm:flex items-center justify-center px-3 py-1.5 text-[13px] font-medium text-[#3557C8] hover:text-[#2446B8] border border-[#D7E3FF] bg-[#F3F7FF] hover:bg-[#EAF1FF] dark:text-[#AFC7FF] dark:border-[#314B73] dark:bg-[#142033] dark:hover:bg-[#182842] rounded-full transition-colors"
+              >
+                업데이트
+              </Link>
+
               {/* 음악 플레이어 버튼 - 자체 상태 관리 (Header 리렌더링과 분리) */}
               {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
               {/* <MusicPlayerButton /> */}
@@ -280,6 +287,13 @@ function HeaderComponent() {
 
           {/* Mobile Auth Section - 간격 축소 (space-x-1, xs:space-x-2) */}
           <div className="md:hidden absolute right-2 xs:right-3 sm:right-4 flex items-center space-x-1 xs:space-x-2">
+            <Link
+              href={routes.updates()}
+              className="flex items-center justify-center px-2.5 py-1 text-[11px] font-medium text-[#3557C8] border border-[#D7E3FF] bg-[#F3F7FF] dark:text-[#AFC7FF] dark:border-[#314B73] dark:bg-[#142033] rounded-full transition-colors hover:bg-[#EAF1FF] dark:hover:bg-[#182842]"
+            >
+              업데이트
+            </Link>
+
             {/* 음악 플레이어 버튼 (모바일) - 자체 상태 관리 */}
             {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
             {/* <MusicPlayerButton /> */}

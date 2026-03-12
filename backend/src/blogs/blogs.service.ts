@@ -412,7 +412,7 @@ export class BlogsService {
   > {
     const blogs = await this.blogRepository
       .createQueryBuilder("blog")
-      .select(["blog.slug", "blog.alias", "blog.updatedAt"])
+      .select(["blog.slug", "blog.updatedAt"])
       .where("blog.isPublic = :isPublic", { isPublic: true })
       .orderBy("blog.updatedAt", "DESC")
       .getMany();
@@ -420,7 +420,7 @@ export class BlogsService {
     this.logger.debug(`[Sitemap] Found ${blogs.length} public blogs`);
 
     return blogs.map((blog) => ({
-      slug: blog.alias ? `@${blog.alias}` : blog.slug,
+      slug: blog.slug,
       updatedAt: blog.updatedAt,
     }));
   }
