@@ -31,6 +31,23 @@ humanize_http_status() {
   esac
 }
 
+derive_public_site_status() {
+  local external_code="$1"
+  local server_code="$2"
+
+  if [ "$external_code" = "200" ] && [ "$server_code" = "200" ]; then
+    echo "정상 (외부 200 / 서버 200)"
+  elif [ "$server_code" = "200" ] && [ "$external_code" = "403" ]; then
+    echo "주의 (외부 403 / 서버 200, Cloudflare/WAF 가능성)"
+  elif [ "$server_code" = "200" ]; then
+    echo "주의 (외부 ${external_code} / 서버 200)"
+  elif [ "$external_code" = "$server_code" ]; then
+    echo "이상 (외부 ${external_code} / 서버 ${server_code})"
+  else
+    echo "이상 (외부 ${external_code} / 서버 ${server_code})"
+  fi
+}
+
 disk_usage_percent() {
   local raw="${1:-n/a}"
   local use_field
@@ -78,12 +95,13 @@ remote_snapshot="$(
     -o BatchMode=yes \
     -o StrictHostKeyChecking=accept-new \
     "${MONITOR_SSH_USER}@${MONITOR_SSH_HOST}" \
-    "COMPOSE_PROJECT_NAME='${COMPOSE_PROJECT_NAME}' bash -s" <<'EOF'
+    "PUBLIC_SITE_URL='${PUBLIC_SITE_URL}' COMPOSE_PROJECT_NAME='${COMPOSE_PROJECT_NAME}' bash -s" <<'EOF'
 set -euo pipefail
 
 project="${COMPOSE_PROJECT_NAME:-codebase-prod}"
 backend="${project}-backend"
 mcp="${project}-mcp-proxy"
+public_site_url="${PUBLIC_SITE_URL:-https://www.codebase.blog}"
 
 summarize_counts() {
   local pairs="$1"
@@ -172,6 +190,7 @@ echo "IMAGE_RECLAIMABLE=$image_reclaimable"
 echo "BUILD_CACHE_RECLAIMABLE=$build_cache_reclaimable"
 echo "BACKEND_ERROR_SUMMARY=$backend_summary"
 echo "MCP_ERROR_SUMMARY=$mcp_summary"
+echo "PUBLIC_SITE_SERVER_CODE=$(curl -L -sS -o /dev/null -w '%{http_code}' --max-time 15 "$public_site_url" || echo '000')"
 echo "ALERTS_JSON_B64=$alerts_json_b64"
 EOF
 )"
@@ -187,6 +206,7 @@ MCP_ERROR_SUMMARY="none"
 FIRING_ALERTS="0"
 FIRING_ALERTS_JSON="[]"
 ALERTS_JSON_B64=""
+PUBLIC_SITE_SERVER_CODE="000"
 
 while IFS='=' read -r key value; do
   case "$key" in
@@ -198,6 +218,7 @@ while IFS='=' read -r key value; do
     BUILD_CACHE_RECLAIMABLE) BUILD_CACHE_RECLAIMABLE="$value" ;;
     BACKEND_ERROR_SUMMARY) BACKEND_ERROR_SUMMARY="$value" ;;
     MCP_ERROR_SUMMARY) MCP_ERROR_SUMMARY="$value" ;;
+    PUBLIC_SITE_SERVER_CODE) PUBLIC_SITE_SERVER_CODE="$value" ;;
     ALERTS_JSON_B64) ALERTS_JSON_B64="$value" ;;
   esac
 done <<< "$remote_snapshot"
@@ -243,8 +264,10 @@ while IFS='=' read -r key value; do
 done <<< "$parsed_alerts"
 
 overall="정상"
-if [ "$public_site_code" != "200" ] || [ "$mcp_health_code" != "200" ] || [ "${UNHEALTHY_COUNT:-0}" -gt 0 ] || [ "${FIRING_ALERTS:-0}" -gt 0 ]; then
+if [ "$PUBLIC_SITE_SERVER_CODE" != "200" ] || [ "$mcp_health_code" != "200" ] || [ "${UNHEALTHY_COUNT:-0}" -gt 0 ] || [ "${FIRING_ALERTS:-0}" -gt 0 ]; then
   overall="위험"
+elif [ "$public_site_code" != "200" ]; then
+  overall="주의"
 elif [ "$(disk_usage_percent "${ROOT_DISK:-n/a}")" -ge 85 ] 2>/dev/null; then
   overall="주의"
 elif [ "$(disk_usage_percent "${DATA_DISK:-n/a}")" -ge 85 ] 2>/dev/null; then
@@ -257,7 +280,7 @@ echo "[Codebase Ops Summary] ${timestamp_kst}"
 echo "판정: ${overall}"
 echo
 echo "현재 상태"
-echo "- 공개 사이트: $(humanize_http_status "$public_site_code")"
+echo "- 공개 사이트: $(derive_public_site_status "$public_site_code" "$PUBLIC_SITE_SERVER_CODE")"
 echo "- MCP 헬스: $(humanize_http_status "$mcp_health_code")"
 echo "- 비정상 컨테이너: ${UNHEALTHY_COUNT:-0}"
 echo "- 신뢰 경보: ${FIRING_ALERTS:-0}"
@@ -275,10 +298,15 @@ echo
 echo "즉시 확인 항목"
 issues_printed=0
 
-if [ "$public_site_code" != "200" ]; then
+if [ "$PUBLIC_SITE_SERVER_CODE" != "200" ]; then
   echo "- 공개 사이트 응답 이상"
-  echo "  영향: 사용자 웹 접속이 실패하거나 불안정할 수 있습니다."
-  echo "  조치: frontend 컨테이너와 https 응답을 확인하세요."
+  echo "  영향: 실제 사용자 웹 접속이 실패하거나 불안정할 수 있습니다."
+  echo "  조치: frontend 컨테이너, Cloudflare, https 응답을 함께 확인하세요."
+  issues_printed=1
+elif [ "$public_site_code" != "200" ]; then
+  echo "- 외부 러너에서 공개 사이트 응답 이상"
+  echo "  영향: GitHub Actions 같은 외부 환경에서 차단되거나 접근이 불안정할 수 있습니다."
+  echo "  조치: Cloudflare/WAF 정책과 외부 봇 차단 설정을 확인하세요."
   issues_printed=1
 fi
 
