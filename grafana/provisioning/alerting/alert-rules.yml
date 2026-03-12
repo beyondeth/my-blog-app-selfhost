@@ -1,129 +1,12 @@
-# ============================================
-# Grafana Alerting Rules
-# ============================================
-# 운영 즉시 알림은 Grafana Unified Alerting -> Telegram 경로를 기준으로 합니다.
-# VictoriaMetrics/Prometheus rule 파일은 쿼리 자산을 공유하지만, 실제 연락처/정책은
-# 같은 provisioning 디렉토리의 contact-points.yml / notification-policies.yml 에서 관리합니다.
-# ============================================
-
 apiVersion: 1
 
 groups:
-  # ============================================
-  # 리소스 모니터링 그룹
-  # ============================================
-  - name: resource-monitoring
-    folder: Codebase Ops
-    interval: 1m
-    rules:
-      # CPU 사용률 90% 초과 (PM2 Scale Down)
-      - uid: cpu-high-scale-down
-        title: CPU 사용률 90% 초과 - PM2 워커 감소 필요
-        condition: A
-        data:
-          - refId: A
-            queryType: instant
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: victoriametrics
-            model:
-              expr: sum(rate(container_cpu_usage_seconds_total[5m])) / 4 > 0.9
-              intervalMs: 15000
-              maxDataPoints: 43200
-        noDataState: OK
-        execErrState: Error
-        for: 5m
-        annotations:
-          description: "평균 CPU 사용률이 90%를 초과했습니다. scripts/auto-scale.sh가 PM2 워커를 자동으로 줄입니다."
-          summary: "CPU 사용률 {{ $values.A.Value | humanizePercentage }}"
-        labels:
-          severity: critical
-          component: resource
-          action: scale_down
-
-      # 메모리 사용률 85% 초과
-      - uid: memory-high
-        title: 메모리 사용률 85% 초과
-        condition: A
-        data:
-          - refId: A
-            queryType: instant
-            relativeTimeRange:
-              from: 180
-              to: 0
-            datasourceUid: victoriametrics
-            model:
-              expr: (sum(container_memory_usage_bytes) / (24 * 1024 * 1024 * 1024)) > 0.85
-              intervalMs: 15000
-        noDataState: OK
-        execErrState: Error
-        for: 3m
-        annotations:
-          description: "메모리 사용률이 85%를 초과했습니다. OOM 위험이 있습니다."
-          summary: "메모리 사용: {{ $values.A.Value | humanizePercentage }}"
-        labels:
-          severity: critical
-          component: resource
-
-      # Backend 메모리 높음
-      - uid: backend-memory-high
-        title: Backend 메모리 사용량 높음
-        condition: A
-        data:
-          - refId: A
-            queryType: instant
-            relativeTimeRange:
-              from: 180
-              to: 0
-            datasourceUid: victoriametrics
-            model:
-              expr: container_memory_usage_bytes{name=~".*backend.*"} > 3.8 * 1024 * 1024 * 1024
-              intervalMs: 15000
-        noDataState: OK
-        execErrState: Error
-        for: 3m
-        annotations:
-          description: "Backend 컨테이너 메모리 사용량이 3.8GB를 초과했습니다."
-          summary: "현재 사용량: {{ $values.A.Value | humanize1024 }}B (제한: 4GB)"
-        labels:
-          severity: critical
-          component: backend
-
-      # PostgreSQL 메모리 높음
-      - uid: postgresql-memory-high
-        title: PostgreSQL 메모리 사용량 높음
-        condition: A
-        data:
-          - refId: A
-            queryType: instant
-            relativeTimeRange:
-              from: 300
-              to: 0
-            datasourceUid: victoriametrics
-            model:
-              expr: container_memory_usage_bytes{name=~".*postgres.*"} > 7 * 1024 * 1024 * 1024
-              intervalMs: 15000
-        noDataState: OK
-        execErrState: Error
-        for: 5m
-        annotations:
-          description: "PostgreSQL 메모리 사용량이 7GB를 초과했습니다."
-          summary: "현재 사용량: {{ $values.A.Value | humanize1024 }}B (제한: 7.5GB)"
-        labels:
-          severity: warning
-          component: postgresql
-
-  # ============================================
-  # 서비스 헬스체크 그룹
-  # ============================================
-  - name: service-health
+  - name: core-availability
     folder: Codebase Ops
     interval: 30s
     rules:
-      # Backend 다운
       - uid: backend-down
-        title: Backend 서버 다운
+        title: Backend 응답 중단
         condition: A
         data:
           - refId: A
@@ -139,15 +22,15 @@ groups:
         execErrState: Error
         for: 1m
         annotations:
-          description: "Backend 서버가 응답하지 않습니다. 즉시 확인이 필요합니다."
-          summary: "Backend 서버 다운 감지"
+          summary: "Backend 응답 중단"
+          impact: "웹 API와 자동포스팅이 실패할 수 있습니다."
+          action: "backend 컨테이너 상태와 /health 응답을 확인하세요."
         labels:
           severity: critical
           component: backend
 
-      # MCP Proxy 다운
       - uid: mcp-proxy-down
-        title: MCP Proxy 서버 다운
+        title: MCP Proxy 응답 중단
         condition: A
         data:
           - refId: A
@@ -163,15 +46,15 @@ groups:
         execErrState: Error
         for: 1m
         annotations:
-          description: "MCP Proxy 서버가 응답하지 않습니다."
-          summary: "MCP Proxy 서버 다운 감지"
+          summary: "MCP Proxy 응답 중단"
+          impact: "ChatGPT 자동포스팅과 MCP 연결이 실패할 수 있습니다."
+          action: "mcp-proxy 컨테이너와 /metrics, /health, OAuth 경로를 확인하세요."
         labels:
           severity: critical
           component: mcp-proxy
 
-      # Redis 다운
       - uid: redis-down
-        title: Redis 서버 다운
+        title: Redis 연결 이상
         condition: A
         data:
           - refId: A
@@ -181,38 +64,15 @@ groups:
               to: 0
             datasourceUid: victoriametrics
             model:
-              expr: sum(up{job="redis"}) < bool 1
+              expr: min(redis_up) < bool 1
               intervalMs: 15000
         noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
-          description: "Redis 서버가 응답하지 않습니다. 캐시 및 큐 시스템이 작동하지 않습니다."
-          summary: "Redis 서버 다운 감지"
+          summary: "Redis 연결 이상"
+          impact: "캐시, 큐, 세션 계층이 불안정해질 수 있습니다."
+          action: "redis exporter와 실제 redis-core/redis-cache 컨테이너 상태를 확인하세요."
         labels:
           severity: critical
           component: redis
-
-      # VictoriaMetrics 다운
-      - uid: victoriametrics-down
-        title: VictoriaMetrics 다운
-        condition: A
-        data:
-          - refId: A
-            queryType: instant
-            relativeTimeRange:
-              from: 60
-              to: 0
-            datasourceUid: victoriametrics
-            model:
-              expr: sum(up{job="victoriametrics"}) < bool 1
-              intervalMs: 15000
-        noDataState: OK
-        execErrState: Error
-        for: 1m
-        annotations:
-          description: "VictoriaMetrics가 응답하지 않습니다. 메트릭 수집과 알림 평가가 중단될 수 있습니다."
-          summary: "VictoriaMetrics 다운 감지"
-        labels:
-          severity: critical
-          component: monitoring
