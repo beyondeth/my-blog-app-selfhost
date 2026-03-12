@@ -253,7 +253,7 @@ fi
 
 timestamp_kst="$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST')"
 
-echo "[Codebase Daily Ops] ${timestamp_kst}"
+echo "[Codebase Ops Summary] ${timestamp_kst}"
 echo "판정: ${overall}"
 echo
 echo "현재 상태"
