@@ -13,7 +13,7 @@ contactPoints:
         disableResolveMessage: false
         settings:
           bottoken: ${TELEGRAM_BOT_TOKEN}
-          chatid: ${TELEGRAM_CHAT_ID}
+          chatid: "${TELEGRAM_CHAT_ID}"
           disable_notification: false
           disable_web_page_preview: true
           protect_content: false
