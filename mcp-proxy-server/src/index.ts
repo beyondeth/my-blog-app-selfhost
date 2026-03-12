@@ -222,6 +222,15 @@ async function validateApiKey(apiKey: string): Promise<{
   }
 }
 
+function isApiKeyTransportGetRequest(req: express.Request): boolean {
+  const acceptHeader = (req.headers.accept || '').toLowerCase();
+  return (
+    acceptHeader.includes('text/event-stream') ||
+    typeof req.headers['mcp-session-id'] === 'string' ||
+    typeof req.headers['mcp-protocol-version'] === 'string'
+  );
+}
+
 /**
  * MCP 서버 생성 (요청마다 새로 생성 - Context7 스타일)
  *
@@ -385,7 +394,7 @@ app.get('/metrics/stats', async (req, res) => {
  * 5. 요청 처리
  * 6. 자동 cleanup (GC)
  */
-app.post('/mcp', async (req, res) => {
+async function handleApiKeyMcpRequest(req: express.Request, res: express.Response) {
   try {
     // 1. Authorization 헤더 검증
     const authHeader = req.headers.authorization;
@@ -478,6 +487,10 @@ app.post('/mcp', async (req, res) => {
       });
     }
   }
+}
+
+app.post('/mcp', async (req, res) => {
+  await handleApiKeyMcpRequest(req, res);
 });
 
 /**
@@ -487,6 +500,11 @@ app.post('/mcp', async (req, res) => {
  * 클라이언트는 이 정보를 통해 서버와의 통신 방식을 결정합니다.
  */
 app.get('/mcp', (req, res) => {
+  if (isApiKeyTransportGetRequest(req)) {
+    void handleApiKeyMcpRequest(req, res);
+    return;
+  }
+
   // MCP 서버 Discovery 응답
   res.json({
     name: 'codebase-blog-mcp',
