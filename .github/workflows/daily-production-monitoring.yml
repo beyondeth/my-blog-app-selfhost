@@ -1,13 +1,13 @@
-name: Daily Production Monitoring Summary
+name: Production Monitoring Summary
 
 on:
   schedule:
-    - cron: '0 0 * * *'
+    - cron: '0 * * * *'
   workflow_dispatch:
 
 jobs:
-  daily-summary:
-    name: Send Daily Production Summary
+  summary:
+    name: Send Production Summary
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: production
@@ -70,7 +70,7 @@ jobs:
             exit 0
           fi
 
-          message="$(printf '[Codebase Daily Ops] %s\noverall: 위험\n\nGitHub Actions daily monitoring summary workflow failed.\nRun URL: https://github.com/%s/actions/runs/%s\n' "$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST')" "${GITHUB_REPOSITORY}" "${GITHUB_RUN_ID}")"
+          message="$(printf '[Codebase Ops Summary] %s\n판정: 위험\n\nGitHub Actions monitoring summary workflow failed.\nRun URL: https://github.com/%s/actions/runs/%s\n' "$(TZ=Asia/Seoul date '+%Y-%m-%d %H:%M KST')" "${GITHUB_REPOSITORY}" "${GITHUB_RUN_ID}")"
 
           curl -fsS -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
