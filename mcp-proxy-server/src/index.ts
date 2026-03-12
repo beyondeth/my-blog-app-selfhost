@@ -160,16 +160,16 @@ async function validateApiKey(apiKey: string): Promise<{
   blog: { id: string; name: string; slug: string; isPublic?: boolean };
 } | null> {
   const startTime = Date.now();
+  const parts = apiKey.split('_');
+  const keyHint = parts.length === 4 ? parts[2] : 'unknown';
 
   try {
     // 1. API Key hint 추출 (blog_sk_{hint}_{secret})
-    const parts = apiKey.split('_');
     if (parts.length !== 4) {
-      logger.warn('⚠️ Invalid API key format');
+      logger.warn({ keyHint }, '⚠️ Invalid API key format');
       metricsService.recordError('invalid_format', 400);
       return null;
     }
-    const keyHint = parts[2]; // hint (8자)
 
     // 2. Redis 캐시 확인 (1-3ms)
     const cached = await redisCache.getApiKeyValidation(keyHint);
@@ -206,14 +206,16 @@ async function validateApiKey(apiKey: string): Promise<{
       await redisCache.setApiKeyValidation(keyHint, userData);
 
       metricsService.recordValidationDuration(duration, false);
+      logger.info({ keyHint, userId: userData.userId?.substring(0, 8) }, '✅ API key validated');
       return userData;
     }
 
     metricsService.recordError('validation_failed', 401);
+    logger.warn({ keyHint }, '⚠️ API key validation returned invalid response');
     return null;
   } catch (error: any) {
     const duration = Date.now() - startTime;
-    logger.warn({ error: error.message }, '⚠️ API Key validation failed');
+    logger.warn({ error: error.message, keyHint }, '⚠️ API Key validation failed');
     metricsService.recordValidationDuration(duration, false);
     metricsService.recordError('backend_error', 500);
     return null;
