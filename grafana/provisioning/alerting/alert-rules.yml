@@ -13,6 +13,7 @@ groups:
   # 리소스 모니터링 그룹
   # ============================================
   - name: resource-monitoring
+    folder: Codebase Ops
     interval: 1m
     rules:
       # CPU 사용률 90% 초과 (PM2 Scale Down)
@@ -117,6 +118,7 @@ groups:
   # 서비스 헬스체크 그룹
   # ============================================
   - name: service-health
+    folder: Codebase Ops
     interval: 30s
     rules:
       # Backend 다운
