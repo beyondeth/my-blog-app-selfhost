@@ -1,4 +1,4 @@
-import { permanentRedirect } from 'next/navigation';
+import { redirect } from 'next/navigation';
 
 /**
  * 레거시 포스트 상세 라우트 - 301 리다이렉트
@@ -14,5 +14,5 @@ export default async function LegacyPostDetailPage({
   params: Promise<{ blogSlug: string; postSlug: string }>
 }) {
   const { blogSlug, postSlug } = await params;
-  permanentRedirect(`/${blogSlug}/${postSlug}`);
+  redirect(`/${blogSlug}/${postSlug}`);
 }
