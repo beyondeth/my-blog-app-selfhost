@@ -18,17 +18,27 @@ shutdown() {
 trap shutdown INT TERM
 
 if [ -n "$GRAFANA_PASSWORD" ]; then
+  reload_alerting() {
+    auth_header=$(printf '%s' "${GRAFANA_USER}:${GRAFANA_PASSWORD}" | base64 | tr -d '\n')
+    wget \
+      --quiet \
+      --tries=1 \
+      --post-data='' \
+      --header="Authorization: Basic ${auth_header}" \
+      -O- \
+      "http://127.0.0.1:3000/api/admin/provisioning/alerting/reload" >/tmp/grafana-alerting-reload.log 2>&1
+  }
+
   for _ in $(seq 1 60); do
     if wget --quiet --tries=1 --spider "http://127.0.0.1:3000/api/health"; then
       grafana cli admin reset-admin-password "$GRAFANA_PASSWORD" >/tmp/grafana-admin-reset.log 2>&1 || true
-      auth_header=$(printf '%s' "${GRAFANA_USER}:${GRAFANA_PASSWORD}" | base64 | tr -d '\n')
-      if wget \
-        --quiet \
-        --tries=1 \
-        --post-data='' \
-        --header="Authorization: Basic ${auth_header}" \
-        -O- \
-        "http://127.0.0.1:3000/api/admin/provisioning/alerting/reload" >/tmp/grafana-alerting-reload.log 2>&1; then
+      if reload_alerting; then
+        # Grafana can finish warming alert state shortly after /api/health succeeds.
+        # A second delayed reload clears stale scheduler state that survives the first pass.
+        (
+          sleep 15
+          reload_alerting || true
+        ) &
         break
       fi
     fi
