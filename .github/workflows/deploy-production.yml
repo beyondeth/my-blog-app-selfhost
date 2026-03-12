@@ -22,7 +22,7 @@ jobs:
     steps:
       # 1. 코드 체크아웃
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       # 2. Environment Secrets에서 .env.production 생성
       - name: Create .env.production from Environment Secrets
