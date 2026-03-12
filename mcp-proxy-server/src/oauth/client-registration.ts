@@ -28,7 +28,7 @@ const ALLOWED_REDIRECT_PATTERNS = [
   /^https:\/\/claude\.ai\/api\/mcp\/auth_callback(?:\/.*)?$/, // Claude 프로덕션
   /^https:\/\/.*\.claude\.ai\/api\/mcp\/auth_callback(?:\/.*)?$/, // Claude 서브도메인
   /^https:\/\/chatgpt\.com\/connector\/oauth\/[^/]+$/, // ChatGPT connector callback
-  /^https:\/\/(?:www|enterprise)\.perplexity\.(?:ai|com)\/rest\/connections\/oauth_callback(?:\/.*)?$/, // Perplexity connector callback
+  /^https:\/\/(?:[a-z0-9-]+\.)?perplexity\.(?:ai|com)\/rest\/connections\/oauth_callback(?:\/.*)?$/, // Perplexity connector callback
   /^https:\/\/platform\.openai\.com\/apps-manage\/oauth$/, // OpenAI app review callback
   /^http:\/\/localhost(?::\d+)?\/.+$/, // 로컬 개발
   /^http:\/\/127\.0\.0\.1(?::\d+)?\/.+$/, // 로컬 개발
