@@ -344,6 +344,7 @@ services:
   grafana:
     image: grafana/grafana:11.3.0
     container_name: ${COMPOSE_PROJECT_NAME:-codebase-prod}-grafana
+    entrypoint: ["/bin/sh", "/usr/local/bin/grafana-entrypoint.sh"]
     env_file:
       - .env.production
     volumes:
@@ -352,6 +353,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       # 대시보드 파일 디렉토리
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./scripts/grafana-entrypoint.sh:/usr/local/bin/grafana-entrypoint.sh:ro
     environment:
       - GF_INSTALL_PLUGINS=  # 플러그인 불필요 (VictoriaMetrics는 Prometheus 호환)
       - GF_SERVER_SERVE_FROM_SUB_PATH=true
