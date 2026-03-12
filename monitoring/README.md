@@ -29,6 +29,35 @@
 - **Grafana** (Port 3030) - 대시보드 시각화 (2개 대시보드)
 - **Redis Exporter** (Port 9121) - Redis 메트릭 수집 (최적화됨)
 
+## 🚨 운영 알림 방식
+
+프로덕션 운영 기준은 두 축으로 고정합니다.
+
+- **즉시 알림**: Grafana Unified Alerting -> Telegram
+- **일일 요약**: GitHub Actions `daily-production-monitoring.yml` -> Telegram
+
+주의할 점:
+
+- Grafana 알림은 `grafana/provisioning/alerting/` 아래 provisioning 파일로 관리합니다.
+- 실제 프로덕션 compose가 이 디렉토리를 마운트해야 즉시 알림이 살아납니다.
+- Telegram bot token / chat id는 **Grafana 런타임 변수**이므로 `.env.production`과 GitHub `ENV_FILE`에 함께 들어가야 합니다.
+- `MONITOR_SSH_*`는 앱 런타임 값이 아니므로 `.env.production`이 아니라 GitHub `production` environment secret으로만 둡니다.
+
+### 필요한 GitHub Environment Secrets
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+- `MONITOR_SSH_HOST`
+- `MONITOR_SSH_USER`
+- `MONITOR_SSH_KEY`
+
+### 필요한 런타임 환경변수
+
+- `TELEGRAM_BOT_TOKEN`
+- `TELEGRAM_CHAT_ID`
+
+이 두 값은 Grafana 컨테이너가 provisioning contact point를 해석할 때 필요합니다.
+
 > **시스템 메트릭**: Oracle Cloud Console 또는 `docker stats` 명령어로 확인
 > (Node Exporter는 중복으로 인해 제거됨)
 
@@ -249,6 +278,19 @@ curl -X POST http://localhost:9090/-/reload
 # Grafana 컨테이너 접속
 docker exec -it unified-grafana grafana-cli admin reset-admin-password <새비밀번호>
 ```
+
+### 일일 운영 요약 수동 실행
+
+GitHub Actions에서 `Daily Production Monitoring Summary` workflow를 수동 실행하면 됩니다.
+
+요약 항목:
+
+- 공개 health (`www.codebase.blog`, `mcp.codebase.blog/health`)
+- 디스크 사용률
+- unhealthy 컨테이너 수
+- 현재 firing alert 수
+- Docker reclaimable 용량
+- backend / mcp-proxy 최근 24시간 오류 수
 
 ## 🔄 기존 모니터링 시스템 마이그레이션
 
