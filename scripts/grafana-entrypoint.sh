@@ -25,7 +25,7 @@ if [ -n "$GRAFANA_PASSWORD" ]; then
       wget \
         --quiet \
         --tries=1 \
-        --method=POST \
+        --post-data='' \
         --header="Authorization: Basic ${auth_header}" \
         -O- \
         "http://127.0.0.1:3000/api/admin/provisioning/alerting/reload" >/tmp/grafana-alerting-reload.log 2>&1 || true
