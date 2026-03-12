@@ -31,12 +31,12 @@ groups:
               expr: sum(rate(container_cpu_usage_seconds_total[5m])) / 4 > 0.9
               intervalMs: 15000
               maxDataPoints: 43200
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         annotations:
           description: "평균 CPU 사용률이 90%를 초과했습니다. scripts/auto-scale.sh가 PM2 워커를 자동으로 줄입니다."
-          summary: "CPU 사용률 {{ $value | humanizePercentage }}"
+          summary: "CPU 사용률 {{ $values.A.Value | humanizePercentage }}"
         labels:
           severity: critical
           component: resource
@@ -56,12 +56,12 @@ groups:
             model:
               expr: (sum(container_memory_usage_bytes) / (24 * 1024 * 1024 * 1024)) > 0.85
               intervalMs: 15000
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 3m
         annotations:
           description: "메모리 사용률이 85%를 초과했습니다. OOM 위험이 있습니다."
-          summary: "메모리 사용: {{ $value | humanizePercentage }}"
+          summary: "메모리 사용: {{ $values.A.Value | humanizePercentage }}"
         labels:
           severity: critical
           component: resource
@@ -80,12 +80,12 @@ groups:
             model:
               expr: container_memory_usage_bytes{name=~".*backend.*"} > 3.8 * 1024 * 1024 * 1024
               intervalMs: 15000
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 3m
         annotations:
           description: "Backend 컨테이너 메모리 사용량이 3.8GB를 초과했습니다."
-          summary: "현재 사용량: {{ $value | humanize1024 }}B (제한: 4GB)"
+          summary: "현재 사용량: {{ $values.A.Value | humanize1024 }}B (제한: 4GB)"
         labels:
           severity: critical
           component: backend
@@ -104,12 +104,12 @@ groups:
             model:
               expr: container_memory_usage_bytes{name=~".*postgres.*"} > 7 * 1024 * 1024 * 1024
               intervalMs: 15000
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 5m
         annotations:
           description: "PostgreSQL 메모리 사용량이 7GB를 초과했습니다."
-          summary: "현재 사용량: {{ $value | humanize1024 }}B (제한: 7.5GB)"
+          summary: "현재 사용량: {{ $values.A.Value | humanize1024 }}B (제한: 7.5GB)"
         labels:
           severity: warning
           component: postgresql
@@ -135,7 +135,7 @@ groups:
             model:
               expr: up{job="nestjs-backend"} == 0
               intervalMs: 15000
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
@@ -159,7 +159,7 @@ groups:
             model:
               expr: up{job="mcp-proxy-server"} == 0
               intervalMs: 15000
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
@@ -183,7 +183,7 @@ groups:
             model:
               expr: up{job="redis"} == 0
               intervalMs: 15000
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
@@ -207,7 +207,7 @@ groups:
             model:
               expr: up{job="victoriametrics"} == 0
               intervalMs: 15000
-        noDataState: Alerting
+        noDataState: OK
         execErrState: Error
         for: 1m
         annotations:
