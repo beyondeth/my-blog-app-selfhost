@@ -43,6 +43,15 @@ import { AdminFeedbackController } from "./feedback/admin-feedback.controller";
 import { AdminFeedbackService } from "./feedback/admin-feedback.service";
 import { FeedbackTicket } from "../feedback/entities/feedback-ticket.entity";
 
+// Marketplace Admin
+import { AdminMarketplaceController } from "./controllers/admin-marketplace.controller";
+import { AdminMarketplaceService } from "./services/admin-marketplace.service";
+import { ProductDetail } from "../marketplace/entities/product-detail.entity";
+import { Order } from "../marketplace/entities/order.entity";
+import { RefundRequest } from "../marketplace/entities/refund-request.entity";
+import { HttpModule } from "@nestjs/axios";
+import { TossApiClient } from "../payment/providers/toss-api.client";
+
 @Module({
   imports: [
     TypeOrmModule.forFeature([
@@ -55,7 +64,11 @@ import { FeedbackTicket } from "../feedback/entities/feedback-ticket.entity";
       File,
       EmailApproval,
       FeedbackTicket,
+      ProductDetail,
+      Order,
+      RefundRequest,
     ]),
+    HttpModule,
     AuditModule,
     FilesModule,
     UsersModule,
@@ -70,6 +83,7 @@ import { FeedbackTicket } from "../feedback/entities/feedback-ticket.entity";
     AdminCommunitiesController,
     AdminPostsController,
     AdminFeedbackController,
+    AdminMarketplaceController,
   ],
   providers: [
     AdminDashboardService,
@@ -77,6 +91,8 @@ import { FeedbackTicket } from "../feedback/entities/feedback-ticket.entity";
     AdminPostsService,
     AdminCommunitiesService,
     AdminFeedbackService,
+    AdminMarketplaceService,
+    TossApiClient,
   ],
   exports: [AdminDashboardService, AdminUsersService, AdminPostsService, AdminFeedbackService],
 })

@@ -4,12 +4,12 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  OneToOne,
   ManyToOne,
   JoinColumn,
   Index,
   BeforeInsert,
 } from "typeorm";
-import { User } from "../../users/entities/user.entity";
 import { SubscriptionPlan } from "./subscription-plan.entity";
 import {
   SubscriptionTier,
@@ -18,8 +18,15 @@ import {
   PaymentProvider,
 } from "../../common/enums/subscription.enum";
 
+/**
+ * 구독 엔티티 (통합)
+ *
+ * User와 1:1 관계 — 사용자당 하나의 활성 구독만 존재
+ * 법적 보관 의무: 전자상거래법 5년 보관을 위해 onDelete: SET NULL 사용
+ * 결제 기록은 PaymentHistory 엔티티에서 별도 관리
+ */
 @Entity("subscriptions")
-@Index(["userId"])
+@Index(["userId"], { unique: true })
 @Index(["status"])
 @Index(["tier"])
 @Index(["nextBillingDate"])
@@ -27,19 +34,20 @@ export class Subscription {
   @PrimaryGeneratedColumn("uuid")
   id: string;
 
-  @Column({ type: "uuid" })
+  @Column({ type: "uuid", nullable: true })
   userId: string;
 
   // 법적 보관 의무: 전자상거래법 5년 보관 (결제 기록)
   // 사용자 삭제 시 CASCADE 아닌 SET NULL로 변경하여 법적 보관 기간 준수
-  @ManyToOne(() => User, { onDelete: "SET NULL" })
+  // User 엔티티에서 역방향 참조: user.subscription
+  @OneToOne("User", "subscription", { onDelete: "SET NULL" })
   @JoinColumn({ name: "userId" })
-  user: User;
+  user: any;
 
   @Column({ type: "uuid", nullable: true })
   planId: string;
 
-  @ManyToOne(() => SubscriptionPlan, { eager: true })
+  @ManyToOne(() => SubscriptionPlan)
   @JoinColumn({ name: "planId" })
   plan: SubscriptionPlan;
 
@@ -85,7 +93,7 @@ export class Subscription {
   @Column({ type: "decimal", precision: 10, scale: 2, default: 0 })
   price: number;
 
-  @Column({ length: 3, default: "USD" })
+  @Column({ length: 3, default: "KRW" })
   currency: string;
 
   @Column({ default: true })
@@ -126,6 +134,10 @@ export class Subscription {
 
   @Column({ type: "timestamp", nullable: true })
   discountEndDate: Date;
+
+  // 체험 관련
+  @Column({ default: false })
+  isTrialUsed: boolean;
 
   // 메타데이터
   @Column("jsonb", { nullable: true })
@@ -224,5 +236,47 @@ export class Subscription {
       return this.price;
     }
     return this.price * (1 - this.discountPercentage / 100);
+  }
+
+  /**
+   * 유료 사용자 여부
+   * FREE가 아니고 구독이 활성 상태인 경우
+   */
+  isPaidUser(): boolean {
+    return this.tier !== SubscriptionTier.FREE && this.isActive();
+  }
+
+  /**
+   * 구독 만료 임박 여부 (7일 이내)
+   */
+  isExpiringSoon(): boolean {
+    if (!this.endDate) return false;
+    const daysUntilExpiry = Math.ceil(
+      (this.endDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    );
+    return daysUntilExpiry <= 7 && daysUntilExpiry > 0;
+  }
+
+  /**
+   * 공개 JSON 변환 (민감정보 제외)
+   */
+  toPublicJSON() {
+    return {
+      id: this.id,
+      tier: this.tier,
+      status: this.status,
+      billingCycle: this.billingCycle,
+      startDate: this.startDate,
+      endDate: this.endDate,
+      trialEndDate: this.trialEndDate,
+      nextBillingDate: this.nextBillingDate,
+      autoRenew: this.autoRenew,
+      price: this.price,
+      currency: this.currency,
+      isActive: this.isActive(),
+      isInTrial: this.isInTrial(),
+      isPaidUser: this.isPaidUser(),
+      isExpiringSoon: this.isExpiringSoon(),
+    };
   }
 }

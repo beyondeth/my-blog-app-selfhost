@@ -3,7 +3,7 @@ import { cache } from 'react';
 import { cookies } from 'next/headers';
 import Link from 'next/link';
 import BlogPostDetailClient from './client-page';
-import { notFound } from 'next/navigation';
+import { notFound, redirect } from 'next/navigation';
 
 // 포스트 데이터 타입 정의 (백엔드 실제 구조 반영)
 interface Post {
@@ -13,6 +13,7 @@ interface Post {
   excerpt?: string;           // 백엔드에서 제공하는 요약 (200자)
   slug: string;
   thumbnail?: string | null;  // 썸네일 이미지 URL
+  postType?: 'blog' | 'product';
   visibility?: 'public' | 'private';
   hasGithubResource?: boolean;
   githubDescription?: string | null;
@@ -401,6 +402,11 @@ export default async function BlogPostDetailPage({
   // 포스트가 없으면 404 페이지로
   if (!post) {
     notFound();
+  }
+
+  // 상품 포스트는 마켓플레이스로 서버 사이드 리다이렉트 (클라이언트 렌더링 없이 즉시 이동)
+  if ('postType' in post && post.postType === 'product') {
+    redirect(`/marketplace/${postSlug}`);
   }
 
   // JSON-LD 구조화된 데이터 생성

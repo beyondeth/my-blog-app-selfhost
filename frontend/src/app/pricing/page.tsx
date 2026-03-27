@@ -11,64 +11,128 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FiCheck } from 'react-icons/fi';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { useMySubscription, useSubscriptionPlans, useCreateCheckout } from '@/hooks/useSubscription';
+import { useMySubscription, useSubscriptionPlans, useSimulateUpgrade } from '@/hooks/useSubscription';
+import { useTossPayments } from '@/hooks/useTossPayments';
+import { requestTossBillingAuth, scheduleDowngrade, upgradeSubscription } from '@/services/api/subscription.service';
 import { SubscriptionTier, BillingCycle, SubscriptionPlan } from '@/types/subscription';
 import { toast } from 'sonner';
 
 export default function PricingPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, authStatus } = useAuth();
   const { data: plansData, isLoading: plansLoading } = useSubscriptionPlans();
   const { data: subscription } = useMySubscription();
-  const createCheckout = useCreateCheckout();
+  const { requestBillingAuth } = useTossPayments();
   const [selectedBilling, setSelectedBilling] = useState<BillingCycle>(BillingCycle.MONTHLY);
   const [processingTier, setProcessingTier] = useState<SubscriptionTier | null>(null);
+  const simulateUpgrade = useSimulateUpgrade();
+  const [upgradePreview, setUpgradePreview] = useState<any>(null);
+  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
+  const [upgradingTier, setUpgradingTier] = useState<SubscriptionTier | null>(null);
 
-  // 현재 사용자의 구독 티어
+  // 현재 사용자의 구독 정보
   const currentTier = subscription?.subscription?.tier || SubscriptionTier.FREE;
+  const currentStatus = (subscription?.subscription?.status || 'active').toLowerCase();
+  const isCanceled = currentStatus === 'canceled' || currentStatus === 'cancelled';
+
+  // 티어 순서 (비교용)
+  const tierOrder: Record<string, number> = {
+    [SubscriptionTier.FREE]: 0,
+    [SubscriptionTier.STARTER]: 1,
+    [SubscriptionTier.PRO]: 2,
+  };
 
   /**
    * 구독 버튼 클릭 핸들러
-   * 로그인하지 않은 경우 로그인 페이지로 이동
-   * 로그인한 경우 체크아웃 세션 생성
+   * - 미로그인: 로그인 페이지 이동
+   * - 동일 플랜: 안내 메시지
+   * - 다운그레이드: 결제 없이 다음 주기부터 적용 예약
+   * - 업그레이드/신규 가입: 토스 결제창으로 이동
    */
   const handleSubscribe = async (tier: SubscriptionTier) => {
-    // 1차 방어: 이미 처리 중이면 무시
-    if (createCheckout.isPending) {
-      return;
-    }
+    if (processingTier) return;
 
     if (!user) {
-      // 로그인하지 않은 경우 로그인 페이지로 이동
       router.push('/login?redirect=/pricing');
       return;
     }
 
-    // Free 플랜은 체크아웃 필요 없음
+    // FREE 선택 시
     if (tier === SubscriptionTier.FREE) {
-      toast.info('Free 플랜은 가입 시 자동으로 적용됩니다.');
+      if (currentTier === SubscriptionTier.FREE) {
+        toast.info('이미 Free 플랜을 사용 중입니다.');
+        return;
+      }
+      // 이미 취소된 구독이면 기간 끝나면 자동 FREE 전환 — 추가 액션 불필요
+      if (isCanceled) {
+        toast.info('이미 구독이 취소되었습니다. 현재 기간 종료 후 자동으로 Free 플랜으로 전환됩니다.');
+        return;
+      }
+      // 활성 유료 구독 → FREE 다운그레이드 (구독 취소와 동일)
+      setProcessingTier(tier);
+      try {
+        const result = await scheduleDowngrade({ tier: 'free' });
+        // toast 제거 — billing 페이지의 구독 상태 카드에서 변경 확인
+        router.push('/settings/billing');
+      } catch (error: any) {
+        toast.error(error?.message || '다운그레이드 요청에 실패했습니다.');
+      } finally {
+        setProcessingTier(null);
+      }
       return;
     }
 
-    // 이미 해당 플랜을 구독 중인 경우
-    if (currentTier === tier) {
+    if (currentTier === tier && !isCanceled) {
       toast.info('이미 해당 플랜을 구독 중입니다.');
       return;
     }
 
-    // 처리 중 상태 설정 (UI 피드백용)
     setProcessingTier(tier);
 
     try {
-      // 체크아웃 세션 생성 및 리다이렉트
-      await createCheckout.mutateAsync({
-        tier,
-        billingCycle: selectedBilling,
-        provider: 'mock', // 임시로 mock provider 사용
+      const isDowngrade = !isCanceled && tierOrder[currentTier] > tierOrder[tier];
+
+      if (isDowngrade) {
+        // ── 다운그레이드: 결제 없이 예약 ──
+        const result = await scheduleDowngrade({
+          tier,
+          billingCycle: selectedBilling,
+        });
+        // toast 제거 — billing 페이지의 구독 상태 카드에서 변경 확인
+        router.push('/settings/billing');
+        return;
+      }
+
+      // ── 업그레이드: 기존 빌링키가 있으면 비례배분 확인 모달, 없으면 토스 결제창 ──
+      const isUpgrade = !isCanceled && tierOrder[currentTier] < tierOrder[tier] && currentTier !== SubscriptionTier.FREE;
+
+      if (isUpgrade) {
+        // 비례배분 시뮬레이션 조회
+        try {
+          const simResult = await simulateUpgrade.mutateAsync({ tier, billingCycle: selectedBilling });
+          setUpgradePreview(simResult);
+          setUpgradingTier(tier);
+          setShowUpgradeModal(true);
+          return; // 모달에서 확인 후 진행
+        } catch {
+          // 시뮬레이션 실패 → 기존 플로우로 폴백
+        }
+      }
+
+      // 신규 가입 또는 FREE→유료: 토스 결제창
+      const authData = await requestTossBillingAuth(tier, selectedBilling);
+      await requestBillingAuth({
+        customerKey: authData.customerKey,
+        successUrl: authData.successUrl,
+        failUrl: authData.failUrl,
       });
-    } catch (error) {
-      console.error('Checkout error:', error);
-      toast.error('결제 처리 중 오류가 발생했습니다.');
+      // 토스 결제창으로 리다이렉트됨
+    } catch (error: any) {
+      if (error?.code === 'USER_CANCEL') {
+        toast.info('결제가 취소되었습니다.');
+      } else {
+        toast.error(error?.message || '결제 처리 중 오류가 발생했습니다.');
+      }
     } finally {
       setProcessingTier(null);
     }
@@ -79,19 +143,22 @@ export default function PricingPage() {
    */
   const getButtonText = (tier: SubscriptionTier) => {
     if (processingTier === tier) return '처리 중...';
-
     if (!user) return '시작하기';
+
+    // 현재 플랜이 취소된 상태
+    if (isCanceled) {
+      // FREE는 기간 끝나면 자동 전환되므로 "전환 예정"
+      if (tier === SubscriptionTier.FREE) return '전환 예정';
+      // 같은 플랜 재구독
+      if (currentTier === tier) return '재구독';
+      // 다른 유료 플랜
+      return '구독하기';
+    }
 
     if (currentTier === tier) return '현재 플랜';
 
-    const tierOrder = {
-      [SubscriptionTier.FREE]: 0,
-      [SubscriptionTier.STARTER]: 1,
-      [SubscriptionTier.PRO]: 2,
-    };
-
     if (tierOrder[currentTier] > tierOrder[tier]) {
-      return '다운그레이드';
+      return '다운그레이드 예약';
     }
 
     return '업그레이드';
@@ -101,12 +168,16 @@ export default function PricingPage() {
    * 플랜 카드의 버튼 비활성화 여부
    */
   const isButtonDisabled = (tier: SubscriptionTier) => {
-    if (createCheckout.isPending || processingTier) return true;
-    if (user && currentTier === tier) return true;
+    if (!!processingTier) return true;
+    // 취소된 구독 + FREE 선택 = 자동 전환 예정이므로 비활성
+    if (isCanceled && tier === SubscriptionTier.FREE) return true;
+    // 활성 구독에서 현재 플랜 선택 불가
+    if (user && currentTier === tier && !isCanceled) return true;
     return false;
   };
 
-  if (plansLoading) {
+  // auth 로딩 중 flicker 방지
+  if (authStatus === 'loading' || plansLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
@@ -178,17 +249,17 @@ export default function PricingPage() {
                 {/* 인기 배지 */}
                 {isPopular && (
                   <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                    <span className="bg-gradient-to-r from-blue-500 to-purple-500 dark:from-blue-400 dark:to-purple-400 text-white px-4 py-1 rounded-full text-sm font-semibold">
+                    <span className="bg-gradient-to-r from-blue-500 to-blue-700 dark:from-blue-400 dark:to-blue-600 text-white px-4 py-1 rounded-full text-sm font-semibold">
                       가장 인기
                     </span>
                   </div>
                 )}
 
-                {/* 현재 플랜 배지 - 강조된 스타일 */}
+                {/* 현재 플랜 배지 */}
                 {isCurrentPlan && (
                   <div className="absolute -top-4 right-4">
-                    <span className="bg-green-600 dark:bg-green-500 text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg">
-                      현재 플랜
+                    <span className={`${isCanceled ? 'bg-zinc-500' : 'bg-green-600 dark:bg-green-500'} text-white px-3 py-1 rounded-full text-xs font-semibold shadow-lg`}>
+                      {isCanceled ? '취소 예정' : '현재 플랜'}
                     </span>
                   </div>
                 )}
@@ -227,7 +298,7 @@ export default function PricingPage() {
                   <button
                     onClick={(e) => {
                       // 2차 방어: 버튼 클릭 시 중복 방지
-                      if (createCheckout.isPending) {
+                      if (!!processingTier) {
                         e.preventDefault();
                         e.stopPropagation();
                         return;
@@ -239,7 +310,7 @@ export default function PricingPage() {
                       isCurrentPlan
                         ? 'bg-green-600 dark:bg-green-500 text-white cursor-not-allowed shadow-lg'
                         : isPopular
-                        ? 'bg-gradient-to-r from-blue-500 to-purple-500 dark:from-blue-400 dark:to-purple-400 text-white hover:from-blue-600 hover:to-purple-600 dark:hover:from-blue-500 dark:hover:to-purple-500'
+                        ? 'bg-gradient-to-r from-blue-500 to-blue-700 dark:from-blue-400 dark:to-blue-600 text-white hover:from-blue-600 hover:to-blue-800 dark:hover:from-blue-500 dark:hover:to-blue-700'
                         : 'bg-gray-900 dark:bg-gray-700 text-white hover:bg-gray-800 dark:hover:bg-gray-600'
                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                   >
@@ -316,7 +387,7 @@ export default function PricingPage() {
               <div className="text-left">
                 <h3 className="font-semibold text-gray-900 dark:text-gray-100">결제는 어떻게 이루어지나요?</h3>
                 <p className="mt-2 text-gray-600 dark:text-gray-400">
-                  현재는 테스트 모드로 실제 결제가 이루어지지 않습니다. 추후 Toss Payments를 통해 안전하게 결제할 수 있습니다.
+                  Toss Payments를 통해 안전하게 결제가 이루어집니다. 카드 정보는 토스페이먼츠에서 안전하게 관리됩니다.
                 </p>
               </div>
               <div className="text-left">
@@ -339,6 +410,97 @@ export default function PricingPage() {
           </p>
         </div>
       </div>
+
+      {/* ═══ 업그레이드 비례배분 확인 모달 ═══ */}
+      {showUpgradeModal && upgradePreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-4">
+              업그레이드 확인
+            </h3>
+
+            <div className="space-y-3 mb-6">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 dark:text-gray-400">현재 플랜</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {upgradePreview.currentPlan?.tier?.toUpperCase()} (₩{(upgradePreview.currentPlan?.price || 0).toLocaleString()}/월)
+                </span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-500 dark:text-gray-400">변경 플랜</span>
+                <span className="font-medium text-gray-900 dark:text-gray-100">
+                  {upgradePreview.newPlan?.displayName} (₩{(upgradePreview.newPlan?.price || 0).toLocaleString()}/월)
+                </span>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-500 dark:text-gray-400">잔여 기간</span>
+                  <span className="text-gray-700 dark:text-gray-300">{upgradePreview.remainingDays}일 / {upgradePreview.totalDays}일</span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-gray-500 dark:text-gray-400">기존 플랜 잔여가치</span>
+                  <span className="text-gray-700 dark:text-gray-300">-₩{(upgradePreview.currentPlan?.remainingValue || 0).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between text-sm mt-1">
+                  <span className="text-gray-500 dark:text-gray-400">새 플랜 잔여가치</span>
+                  <span className="text-gray-700 dark:text-gray-300">₩{(upgradePreview.newPlan?.remainingValue || 0).toLocaleString()}</span>
+                </div>
+              </div>
+
+              <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                <div className="flex justify-between">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">지금 결제할 금액</span>
+                  <span className="text-lg font-bold text-gray-900 dark:text-gray-100">
+                    ₩{(upgradePreview.proratedAmount || 0).toLocaleString()}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                  다음 결제일부터 ₩{(upgradePreview.newPlan?.price || 0).toLocaleString()}/{upgradePreview.billingCycle === 'yearly' ? '년' : '월'} 청구
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowUpgradeModal(false);
+                  setUpgradePreview(null);
+                  setUpgradingTier(null);
+                  setProcessingTier(null);
+                }}
+                className="flex-1 py-2.5 rounded-lg border border-gray-200 dark:border-gray-600 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+              >
+                취소
+              </button>
+              <button
+                onClick={async () => {
+                  if (!upgradingTier) return;
+                  try {
+                    const result = await upgradeSubscription({
+                      tier: upgradingTier,
+                      billingCycle: selectedBilling,
+                    });
+                    // toast 제거 — billing 페이지로 이동하여 확인
+                    setShowUpgradeModal(false);
+                    setUpgradePreview(null);
+                    setUpgradingTier(null);
+                    router.push('/settings/billing');
+                  } catch (error: any) {
+                    toast.error(error?.message || '업그레이드에 실패했습니다');
+                  } finally {
+                    setProcessingTier(null);
+                  }
+                }}
+                disabled={!!processingTier && processingTier !== upgradingTier}
+                className="flex-1 py-2.5 rounded-lg bg-gray-900 dark:bg-gray-100 text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-200 transition-colors disabled:opacity-50"
+              >
+                업그레이드 확인
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

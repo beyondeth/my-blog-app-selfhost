@@ -135,16 +135,6 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
     return categoryPagesData?.pages?.[0]?.total ?? 0;
   }, [categoryPagesData?.pages]);
 
-  // 디버그 로그
-  console.log('🔍 [CATEGORIES DEBUG]', {
-    blogSlug,
-    categoriesLoading,
-    categoriesLength: flattenedCategories.length,
-    totalCategoriesCount,
-    hasMoreCategories,
-    error: categoriesError
-  });
-
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -157,6 +147,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   });
 
   const [sortBy, setSortBy] = useState<SortType>('recent');
+  const [activeTab, setActiveTab] = useState<'posts' | 'products'>('posts');
 
   // URL에서 검색 파라미터 파싱
   const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
@@ -174,11 +165,26 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
     search: currentParams.search,
     category: currentParams.category,
     tag: currentTag,
-    blogId: blog?.id, // blogId를 직접 전달하여 정확한 필터링
-
+    blogId: blog?.id,
+    postType: 'blog',
     sort: sortBy,
     limit: 20,
-    enabled: isClient && !!blog?.id, // blog.id가 있을 때만 쿼리 실행
+    enabled: isClient && !!blog?.id && activeTab === 'posts',
+  });
+
+  // 상품 탭용 쿼리 (판매 상품만)
+  const {
+    data: productData,
+    fetchNextPage: fetchNextProducts,
+    hasNextPage: hasNextProducts,
+    isFetchingNextPage: isFetchingNextProducts,
+    isLoading: isLoadingProducts,
+  } = useInfiniteCursorPosts({
+    blogId: blog?.id,
+    postType: 'product',
+    sort: 'recent',
+    limit: 20,
+    enabled: isClient && !!blog?.id && activeTab === 'products',
   });
 
   const deletePostMutation = useDeletePost();
@@ -506,6 +512,42 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                 />
               </div>
 
+              {/* ── 글 / 상품 탭 ── */}
+              <div className="max-w-[780px] mx-auto flex items-center justify-between border-b border-gray-200 dark:border-zinc-800 mb-4">
+                <div className="flex gap-1">
+                  <button
+                    onClick={() => setActiveTab('posts')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'posts'
+                        ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
+                        : 'border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
+                    }`}
+                  >
+                    글
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('products')}
+                    className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === 'products'
+                        ? 'border-gray-900 text-gray-900 dark:border-white dark:text-white'
+                        : 'border-transparent text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300'
+                    }`}
+                  >
+                    상품
+                  </button>
+                </div>
+                {isBlogOwner && activeTab === 'products' && (
+                  <a
+                    href="/marketplace/seller"
+                    className="text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300 underline underline-offset-2 pb-2"
+                  >
+                    판매 관리
+                  </a>
+                )}
+              </div>
+
+              {/* 정렬 옵션 (글 탭에서만 표시) */}
+              {activeTab === 'posts' && (
               <div className="max-w-[780px] mx-auto flex flex-wrap gap-2">
                 {sortOptions.map((option) => {
                   const Icon = option.icon;
@@ -531,7 +573,10 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                   );
                 })}
               </div>
+              )}
 
+              {/* ── 글 탭 콘텐츠 ── */}
+              {activeTab === 'posts' && (
               <div className="max-w-[780px] mx-auto space-y-3 sm:space-y-4">
                 {isLoading && !hasAnyPosts ? (
                   <div className="flex justify-center items-center py-12 sm:py-16">
@@ -575,6 +620,86 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                   </div>
                 )}
               </div>
+              )}
+
+              {/* ── 상품 탭 콘텐츠 ── */}
+              {activeTab === 'products' && (
+                <div className="max-w-[780px] mx-auto">
+                  {isLoadingProducts ? (
+                    <div className="flex justify-center py-12">
+                      <Spinner size="lg" />
+                    </div>
+                  ) : (() => {
+                    const allProducts = productData?.pages.flatMap(page => page?.posts || []) || [];
+                    if (allProducts.length === 0) {
+                      return (
+                        <div className="text-center py-16">
+                          <p className="text-sm text-gray-500 dark:text-zinc-400">
+                            아직 등록된 상품이 없습니다
+                          </p>
+                          {isBlogOwner && (
+                            <a href="/new-product" className="mt-3 inline-block text-sm text-gray-700 dark:text-zinc-300 underline underline-offset-2">
+                              상품 등록하기
+                            </a>
+                          )}
+                        </div>
+                      );
+                    }
+                    return (
+                      <>
+                        {/* 블로그 소유자: 상품 추가 등록 버튼 (상품 수 관계없이 항상 표시) */}
+                        {isBlogOwner && (
+                          <div className="mb-4 flex justify-end">
+                            <a
+                              href="/new-product"
+                              className="px-4 py-2 rounded-lg bg-gray-900 dark:bg-white text-sm font-medium text-white dark:text-gray-900 hover:bg-gray-800 dark:hover:bg-gray-100 transition-colors"
+                            >
+                              + 상품 등록
+                            </a>
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {allProducts.map((product: any) => (
+                            <a
+                              key={product.id}
+                              href={`/marketplace/${product.slug}`}
+                              className="block rounded-xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-4 hover:border-gray-300 dark:hover:border-zinc-700 transition-colors"
+                            >
+                              <h3 className="text-sm font-semibold text-gray-900 dark:text-white line-clamp-2">
+                                {product.title}
+                              </h3>
+                              {product.excerpt && (
+                                <p className="mt-1 text-xs text-gray-500 dark:text-zinc-400 line-clamp-2">
+                                  {product.excerpt}
+                                </p>
+                              )}
+                              <div className="mt-3 flex items-center justify-between">
+                                <span className="text-xs text-gray-400 dark:text-zinc-500">
+                                  {product.category || '상품'}
+                                </span>
+                                <span className="text-sm font-bold text-gray-900 dark:text-white">
+                                  ₩{(product.productDetail?.price || 0).toLocaleString()}
+                                </span>
+                              </div>
+                            </a>
+                          ))}
+                        </div>
+                        {hasNextProducts && (
+                          <div className="mt-6 text-center">
+                            <button
+                              onClick={() => fetchNextProducts()}
+                              disabled={isFetchingNextProducts}
+                              className="px-6 py-2 rounded-lg border border-gray-200 dark:border-zinc-700 text-sm text-gray-600 dark:text-zinc-400 hover:bg-gray-50 dark:hover:bg-zinc-800"
+                            >
+                              {isFetchingNextProducts ? '로딩 중...' : '더 보기'}
+                            </button>
+                          </div>
+                        )}
+                      </>
+                    );
+                  })()}
+                </div>
+              )}
             </div>
           </main>
 
@@ -604,25 +729,16 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
               />
 
               {/* 카테고리별 현황 섹션 */}
-              {(() => {
-                console.log('🔍 [CATEGORY RENDER CONDITION]', {
-                  shouldRender: !categoriesLoading && flattenedCategories.length > 0,
-                  categoriesLoading,
-                  categoriesLength: flattenedCategories.length,
-                  totalCategoriesCount,
-                  hasMoreCategories,
-                });
-                return !categoriesLoading && flattenedCategories.length > 0 && (
-                  <CategorySection
-                    categories={flattenedCategories as any[]}
-                    onCategoryClick={handleCategoryClick}
-                    hasMore={!!hasMoreCategories}
-                    onLoadMore={hasMoreCategories ? () => fetchNextCategories() : undefined}
-                    isLoadingMore={isFetchingNextCategories}
-                    className="bg-white"
-                  />
-                );
-              })()}
+              {!categoriesLoading && flattenedCategories.length > 0 && (
+                <CategorySection
+                  categories={flattenedCategories as any[]}
+                  onCategoryClick={handleCategoryClick}
+                  hasMore={!!hasMoreCategories}
+                  onLoadMore={hasMoreCategories ? () => fetchNextCategories() : undefined}
+                  isLoadingMore={isFetchingNextCategories}
+                  className="bg-white"
+                />
+              )}
 
               <RecentPostsSection posts={recentPosts} className="bg-white" />
 

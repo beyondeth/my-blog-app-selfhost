@@ -194,6 +194,11 @@ export default function NewStoryPage() {
   const [isSpoiler, setIsSpoiler] = useState(false);
   const [postVisibility, setPostVisibility] = useState<'public' | 'private'>('public');
 
+  // 마켓플레이스 판매 상품 상태
+  const [isSellMode, setIsSellMode] = useState(false);
+  const [sellPrice, setSellPrice] = useState<number | ''>('');
+  const [sellCategory, setSellCategory] = useState('ai_prompts');
+
   // 커뮤니티 포스트 생성 뮤테이션 (대상이 커뮤니티인 경우)
   const communitySlugForMutation =
     publishTarget?.type === 'community'
@@ -1037,7 +1042,26 @@ export default function NewStoryPage() {
           visibility: postVisibility,
           attachedFileIds: data.fileIds,
           ...(thumbnailImageId && !hasPreferredYouTube && { thumbnailImageId }),
+          // 마켓플레이스 판매 상품 필드
+          ...(isSellMode && {
+            postType: 'product',
+            price: Number(sellPrice) || 0,
+            productCategory: sellCategory,
+          }),
         };
+
+        // [DEBUG] 상품 모드 + postType 확인
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('[DEBUG] isSellMode:', isSellMode, 'postData.postType:', postData.postType, 'sellPrice:', sellPrice);
+        }
+
+        // 판매 상품 유효성 검증
+        if (isSellMode) {
+          if (!sellPrice || Number(sellPrice) < 100) {
+            toast.error('상품 가격은 최소 100원 이상이어야 합니다');
+            return;
+          }
+        }
 
         if (isMarkdownMode) {
           const contentWithYouTubeMarker = appendYouTubeThumbnailMarker(
@@ -1067,9 +1091,13 @@ export default function NewStoryPage() {
           queryKey: postQueryKeys.lists()
         });
 
-        // 성공 시 해당 블로그의 포스트로 이동
+        // 성공 시 이동: 상품은 마켓플레이스, 일반 포스트는 블로그
         clearDraft();
-        router.push(`/${blog!.slug}/${result.slug}`);
+        if (postData.postType === 'product') {
+          router.push(`/marketplace/${result.slug}`);
+        } else {
+          router.push(`/${blog!.slug}/${result.slug}`);
+        }
       }
       // 커뮤니티에 포스트 발행
       else {
@@ -1424,6 +1452,59 @@ export default function NewStoryPage() {
                     <p className="text-xs text-gray-500 dark:text-gray-400">
                       TIP. 공개로 변경하려면 '블로그 설정'에서 전체 공개로 바꿔주세요.
                     </p>
+                  )}
+                </div>
+              )}
+
+              {/* ── 상품으로 판매 토글 ── */}
+              {publishTarget?.type === 'blog' && (
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs font-medium leading-none text-gray-700 dark:text-zinc-300">
+                      상품으로 판매
+                    </Label>
+                    <Switch
+                      checked={isSellMode}
+                      onCheckedChange={setIsSellMode}
+                      disabled={isMutationPending}
+                    />
+                  </div>
+
+                  {isSellMode && (
+                    <div className="mt-3 space-y-3">
+                      {/* 가격 입력 */}
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                          가격 (원)
+                        </label>
+                        <input
+                          type="number"
+                          min={100}
+                          value={sellPrice}
+                          onChange={(e) => setSellPrice(e.target.value ? Number(e.target.value) : '')}
+                          placeholder="최소 100원"
+                          className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none focus:ring-1 focus:ring-gray-300 dark:focus:ring-zinc-600"
+                        />
+                      </div>
+                      {/* 상품 카테고리 */}
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-zinc-400 mb-1">
+                          상품 카테고리
+                        </label>
+                        <select
+                          value={sellCategory}
+                          onChange={(e) => setSellCategory(e.target.value)}
+                          className="w-full h-9 px-3 text-sm rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-gray-900 dark:text-white focus:outline-none"
+                        >
+                          <option value="ai_prompts">AI 프롬프트</option>
+                          <option value="coding_templates">코딩 템플릿</option>
+                          <option value="tech_guides">기술 가이드</option>
+                          <option value="ai_workflows">AI 스킬/워크플로</option>
+                          <option value="data_analytics">데이터/분석</option>
+                          <option value="others">기타</option>
+                        </select>
+                      </div>
+                    </div>
                   )}
                 </div>
               )}

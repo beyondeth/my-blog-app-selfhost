@@ -28,6 +28,28 @@ When the user requests auto-posting with style flags:
 - `pm`: product narrative and decision rationale
 - `designer`: design case study and UX reasoning
 - `marketer`: growth and performance storytelling
+- `sell`: marketplace product listing (requires price and productCategory)
+
+## Marketplace Product Posting (`--sell`)
+
+**IMPORTANT:** Only activate sell mode when the user **explicitly** includes `--sell` in their request.
+Do NOT treat natural language like "판매", "상품", "팔아줘" as sell triggers — these words can appear in normal blog posts about commerce topics.
+
+**Trigger:** `--sell` flag only. Examples:
+- "자동포스팅해줘 --sell" ✅
+- "이거 --sell로 올려줘" ✅
+- "판매 전략에 대해 포스팅해줘" ❌ (normal blog post about sales strategy)
+- "상품 리뷰 써줘" ❌ (normal product review blog post)
+
+When `--sell` is explicitly present:
+
+1. Call `get_writing_style_guide(style='sell')`.
+2. If price is not provided, ask the user for price (KRW, minimum 100).
+3. If category is not provided, ask the user to choose from: `ai_prompts`, `coding_templates`, `tech_guides`, `ai_workflows`, `data_analytics`, `others`.
+4. Write content using the sell style guide. Include `<!-- preview-end -->` comment to separate free preview from paid content.
+5. Call `create_post(sell=true, price=<price>, productCategory=<category>, ...)`.
+
+**Important:** The `sell`, `price`, and `productCategory` parameters are passed to `create_post()`, NOT to `get_writing_style_guide()`.
 
 ## AI Identification Tag
 

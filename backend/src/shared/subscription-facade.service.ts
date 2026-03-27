@@ -1,14 +1,16 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, Logger, BadRequestException } from "@nestjs/common";
 import { EventEmitter2 } from "@nestjs/event-emitter";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { SubscriptionService } from "../subscription/subscription.service";
 import { UsageService } from "../usage/usage.service";
 import { PaymentHistory } from "../subscription/entities/payment-history.entity";
+import { TossApiClient } from "../payment/providers/toss-api.client";
 import {
   SubscriptionTier,
   BillingCycle,
   ResourceType,
+  PaymentStatus,
 } from "../common/enums/subscription.enum";
 
 /**
@@ -18,12 +20,15 @@ import {
  */
 @Injectable()
 export class SubscriptionFacadeService {
+  private readonly logger = new Logger(SubscriptionFacadeService.name);
+
   constructor(
     private readonly subscriptionService: SubscriptionService,
     private readonly usageService: UsageService,
     private readonly eventEmitter: EventEmitter2,
     @InjectRepository(PaymentHistory)
     private readonly paymentHistoryRepository: Repository<PaymentHistory>,
+    private readonly tossApiClient: TossApiClient,
   ) {}
 
   /**
@@ -77,7 +82,7 @@ export class SubscriptionFacadeService {
 
     // 같은 플랜으로는 변경 불가
     if (currentSubscription?.tier === data.tier) {
-      throw new Error("이미 동일한 플랜을 사용 중입니다");
+      throw new BadRequestException("이미 동일한 플랜을 사용 중입니다");
     }
 
     // 다운그레이드 체크
@@ -90,9 +95,8 @@ export class SubscriptionFacadeService {
         data.tier,
       );
       if (!canDowngrade) {
-        throw new Error(
-          "현재 사용량이 선택한 플랜의 제한을 초과합니다. " +
-            "사용량을 줄인 후 다시 시도해주세요.",
+        throw new BadRequestException(
+          "현재 사용량이 선택한 플랜의 제한을 초과합니다. 사용량을 줄인 후 다시 시도해주세요.",
         );
       }
     }
@@ -146,11 +150,26 @@ export class SubscriptionFacadeService {
 
   /**
    * 결제 수단 목록 조회
-   * 실제로는 PaymentService에서 처리하지만, 이벤트로 요청
+   * 토스 빌링키 테이블에서 활성 카드 정보를 조회
    */
   async getPaymentMethods(userId: string) {
-    // 이벤트를 통한 비동기 요청 또는 Mock 데이터 반환
-    return [];
+    const billingKeyRepo = this.paymentHistoryRepository.manager.getRepository(
+      "toss_billing_keys",
+    );
+
+    const billingKeys = await billingKeyRepo.find({
+      where: { userId, isActive: true },
+      order: { createdAt: "DESC" },
+    });
+
+    // 프론트엔드에 필요한 필드만 반환 (billingKey 자체는 노출하지 않음)
+    return billingKeys.map((bk: any) => ({
+      id: bk.id,
+      cardCompany: bk.cardCompany,
+      cardNumber: bk.cardNumber,
+      cardType: bk.cardType,
+      createdAt: bk.createdAt,
+    }));
   }
 
   /**
@@ -188,42 +207,9 @@ export class SubscriptionFacadeService {
   }
 
   /**
-   * 업그레이드 시뮬레이션
-   */
-  async simulateUpgrade(
-    userId: string,
-    tier: SubscriptionTier,
-    billingCycle: BillingCycle,
-  ) {
-    const currentSubscription =
-      await this.subscriptionService.getUserSubscription(userId);
-    const targetPlan = await this.subscriptionService.getPlanByTier(tier);
-
-    if (!targetPlan) {
-      throw new Error("플랜을 찾을 수 없습니다");
-    }
-
-    // 시뮬레이션 결과 계산
-    const monthlyPrice = targetPlan.getMonthlyPrice();
-    const yearlyPrice = targetPlan.getYearlyPrice();
-    const selectedPrice =
-      billingCycle === BillingCycle.MONTHLY ? monthlyPrice : yearlyPrice;
-
-    return {
-      currentTier: currentSubscription?.tier || SubscriptionTier.FREE,
-      targetTier: tier,
-      billingCycle,
-      price: selectedPrice,
-      features: targetPlan.features,
-      changeDate: new Date(),
-    };
-  }
-
-  /**
    * 웹훅 처리
    */
   async handleWebhook(provider: string, payload: any, signature?: string) {
-    // 웹훅 처리를 이벤트로 전달
     this.eventEmitter.emit("payment.webhook.received", {
       provider,
       payload,
@@ -231,5 +217,126 @@ export class SubscriptionFacadeService {
     });
 
     return { success: true };
+  }
+
+  /**
+   * 사용자 구독 조회 (위임)
+   */
+  async getUserSubscription(userId: string) {
+    return this.subscriptionService.getUserSubscription(userId);
+  }
+
+  /**
+   * 구독 업데이트 (위임)
+   * PaymentWebhookController 등에서 SubscriptionService를 직접 주입하지 않도록
+   */
+  async updateUserSubscription(
+    userId: string,
+    tier: SubscriptionTier,
+    billingCycle?: BillingCycle,
+  ) {
+    return this.subscriptionService.updateUserSubscription(
+      userId,
+      tier,
+      billingCycle,
+    );
+  }
+
+  /**
+   * 플랜 티어 조회 (위임)
+   */
+  async getPlanByTier(tier: SubscriptionTier) {
+    return this.subscriptionService.getPlanByTier(tier);
+  }
+
+  /**
+   * 구독 취소 (위임)
+   */
+  async cancelSubscription(userId: string, reason?: string) {
+    return this.subscriptionService.cancelSubscription(userId, reason);
+  }
+
+  /**
+   * 구독 재개 (위임)
+   */
+  async resumeSubscription(userId: string) {
+    return this.subscriptionService.resumeSubscription(userId);
+  }
+
+  /**
+   * 업그레이드 비례배분 결제
+   * 기존 빌링키로 차액만 결제하고 구독 tier 즉시 변경
+   */
+  async chargeUpgradeProration(
+    userId: string,
+    currentSubscription: unknown,
+    proration: {
+      proratedAmount: number;
+      currentPlan: { tier: string };
+      newPlan: { tier: string; displayName: string };
+      remainingDays: number;
+    },
+    newTier: SubscriptionTier,
+    newBillingCycle: BillingCycle,
+  ) {
+    // 빌링키 조회 (PaymentModule 순환 의존 방지 — manager 활용)
+    const billingKeyRepo =
+      this.paymentHistoryRepository.manager.getRepository("toss_billing_keys");
+    const billingKeyEntity = await billingKeyRepo.findOne({
+      where: { userId, isActive: true },
+      order: { createdAt: "DESC" },
+    }) as { billingKey: string; customerKey: string } | null;
+
+    if (!billingKeyEntity) {
+      throw new BadRequestException("등록된 결제 수단이 없습니다. 결제 수단을 먼저 등록해주세요.");
+    }
+
+    // ── [1] Toss 빌링키로 비례배분 금액 실제 결제 ──
+    const orderId = `proration_${userId.substring(0, 8)}_${Date.now()}`;
+    const orderName = `업그레이드 비례배분: ${proration.currentPlan.tier} → ${proration.newPlan.displayName}`;
+
+    const paymentResult = await this.tossApiClient.chargeBilling(
+      billingKeyEntity.billingKey,
+      {
+        customerKey: billingKeyEntity.customerKey,
+        amount: proration.proratedAmount,
+        orderId,
+        orderName,
+        taxFreeAmount: 0,
+      },
+    );
+
+    this.logger.log(
+      `비례배분 결제 성공: orderId=${orderId}, paymentKey=${paymentResult.paymentKey}, amount=${proration.proratedAmount}`,
+    );
+
+    // ── [2] 결제 성공 후 구독 tier 변경 ──
+    const subscription = await this.subscriptionService.updateSubscriptionTier(
+      userId,
+      newTier,
+      newBillingCycle,
+    );
+
+    // ── [3] 결제 이력 저장 ──
+    await this.paymentHistoryRepository.save(
+      this.paymentHistoryRepository.create({
+        userId,
+        subscriptionId: subscription.id,
+        amount: proration.proratedAmount,
+        currency: "KRW",
+        status: PaymentStatus.SUCCEEDED,
+        provider: "toss",
+        description: `업그레이드 비례배분: ${proration.currentPlan.tier} → ${proration.newPlan.tier} (잔여 ${proration.remainingDays}일)`,
+        metadata: {
+          type: "proration",
+          proration,
+          paymentKey: paymentResult.paymentKey,
+          orderId,
+          receiptUrl: paymentResult.receipt?.url,
+        },
+      }),
+    );
+
+    return { subscription };
   }
 }

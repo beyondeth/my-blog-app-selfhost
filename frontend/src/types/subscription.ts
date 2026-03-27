@@ -151,13 +151,33 @@ export interface PaymentHistory {
   paymentMethod?: string;
   provider?: string;
   providerId?: string;
+  transactionId?: string;
   invoiceUrl?: string;
+  receiptUrl?: string;
+  description?: string;
   failureReason?: string;
+  failureCode?: string;
   refundAmount?: number;
   refundReason?: string;
   paidAt?: string;
   createdAt: string;
   updatedAt: string;
+  /** 거래 상세 — 승인일시, 카드 정보 등 */
+  metadata?: {
+    orderId?: string;
+    approvedAt?: string;
+    requestedAt?: string;
+    card?: {
+      approveNo?: string;
+      issuerCode?: string;
+      cardCompany?: string;
+      cardNumber?: string;
+      cardType?: string;
+      ownerType?: string;
+      installmentPlanMonths?: number;
+    };
+    [key: string]: any;
+  };
 }
 
 /**

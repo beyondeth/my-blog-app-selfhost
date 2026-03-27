@@ -90,6 +90,12 @@ export class PostResponseDto {
   @Expose()
   category: string;
 
+  @Expose()
+  postType: string;
+
+  @Expose()
+  productDetail: any;
+
   // 내부 ID 필드는 민감정보로 간주하여 제외
   @Exclude()
   authorId: string;

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "skills": {
+    "codebase-skill": {
+      "source": "beyondeth/codebase-skills",
+      "sourceType": "github",
+      "computedHash": "ececcb234972e59eb4ad34dc54db2cd2b9d9c47761f405a52f5577ba7b456fdd"
+    }
+  }
+}

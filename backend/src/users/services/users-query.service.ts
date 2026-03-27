@@ -3,7 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
 import { User, AuthProvider } from "../entities/user.entity";
 import { Profile } from "../entities/profile.entity";
-import { Subscription } from "../entities/subscription.entity";
+import { Subscription } from "../../subscription/entities/subscription.entity";
 import { AccountSettings } from "../entities/account-settings.entity";
 import { Role } from "../../common/enums/role.enum";
 import {
@@ -123,8 +123,8 @@ export class UsersQueryService {
         'profile."jobTitle" AS "jobTitle"',
         'profile."socialLinks" AS "socialLinks"',
         'profile."lastLoginProvider" AS "lastLoginProvider"',
-        'subscription."subscriptionTier" AS "subscriptionTier"',
-        'subscription."subscriptionStatus" AS "subscriptionStatus"',
+        'subscription."tier" AS "subscriptionTier"',
+        'subscription."status" AS "subscriptionStatus"',
         'settings."marketingOptIn" AS "marketingOptIn"',
         'settings."newsletterOptIn" AS "newsletterOptIn"',
         'settings."termsAcceptedAt" AS "termsAcceptedAt"',
@@ -435,11 +435,10 @@ export class UsersQueryService {
     }
 
     if (user.subscription) {
-      user.subscriptionTier = user.subscription.subscriptionTier;
-      user.subscriptionStatus = user.subscription.subscriptionStatus;
-      user.subscriptionStartDate = user.subscription.subscriptionStartDate;
-      user.subscriptionEndDate = user.subscription.subscriptionEndDate;
-      user.stripeCustomerId = user.subscription.stripeCustomerId;
+      user.subscriptionTier = user.subscription.tier;
+      user.subscriptionStatus = user.subscription.status;
+      user.subscriptionStartDate = user.subscription.startDate;
+      user.subscriptionEndDate = user.subscription.endDate;
       user.paymentCustomerId = user.subscription.paymentCustomerId;
       user.paymentSubscriptionId = user.subscription.paymentSubscriptionId;
     }

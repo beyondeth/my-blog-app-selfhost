@@ -77,6 +77,7 @@ const STYLE_OPTION_DETAILS: Record<string, Omit<StyleOption, 'id'>> = {
   pm: { label: 'PM형', description: '문제 정의, 의사결정 이유, trade-off를 설득력 있게 정리합니다.' },
   designer: { label: '디자이너형', description: '맥락, 제약, 선택 근거와 사용자 영향을 case study로 풀어냅니다.' },
   marketer: { label: '마케터형', description: '가설, 실험, 전환 지표와 배운 점을 growth 중심으로 정리합니다.' },
+  sell: { label: '마켓플레이스', description: '디지털 상품 판매 페이지 작성에 최적화된 전환 중심 톤입니다.' },
 };
 
 const STYLE_OPTIONS: StyleOption[] = WRITING_STYLE_PRESETS.map((preset) => ({
@@ -220,6 +221,30 @@ function sanitizeAuthText(text: string): string {
 function extractFirstUrl(text: string): string | null {
   const match = text.match(/https?:\/\/[^\s)]+/i);
   return match?.[0] || null;
+}
+
+function getStringField(payload: Record<string, unknown> | undefined, key: string): string | undefined {
+  const value = payload?.[key];
+  return typeof value === 'string' && value.trim() ? value : undefined;
+}
+
+function getBooleanField(
+  payload: Record<string, unknown> | undefined,
+  key: string
+): boolean | undefined {
+  const value = payload?.[key];
+  return typeof value === 'boolean' ? value : undefined;
+}
+
+function getStringArrayField(
+  payload: Record<string, unknown> | undefined,
+  key: string
+): string[] {
+  const value = payload?.[key];
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value.filter((item): item is string => typeof item === 'string');
 }
 
 function getBlogUrl(context: ToolContext): string {
@@ -887,14 +912,28 @@ export async function registerOpenAiTools(
           );
 
           const text = raw?.content?.[0]?.text || '';
-          const postUrl = extractFirstUrl(text);
+          const rawStructured = raw?.structuredContent;
+          const postUrl = getStringField(rawStructured, 'postUrl') || extractFirstUrl(text);
           const tags = Array.isArray(args.tags) ? (args.tags as string[]) : [];
+          const postVisibility = getStringField(rawStructured, 'postVisibility');
+          const effectiveVisibility = getStringField(rawStructured, 'effectiveVisibility');
+          const visibilityBlockedByBlogPrivacy =
+            getBooleanField(rawStructured, 'visibilityBlockedByBlogPrivacy') ?? false;
+          const blogIsPublic =
+            getBooleanField(rawStructured, 'blogIsPublic')
+            ?? (typeof context.userData.blog.isPublic === 'boolean'
+              ? context.userData.blog.isPublic
+              : undefined);
+          const blogVisibilityStatus = getStringField(rawStructured, 'blogVisibilityStatus')
+            || (blogIsPublic === undefined ? undefined : blogIsPublic ? 'public' : 'private');
+          const warnings = getStringArrayField(rawStructured, 'warnings');
           result = {
             content: raw.content,
             structuredContent: {
               status: 'published',
               tool: 'create_post',
               postUrl,
+              postId: getStringField(rawStructured, 'postId'),
               title: args.title as string,
               category: args.category as string,
               writingStyle: finalStyle.label,
@@ -902,7 +941,16 @@ export async function registerOpenAiTools(
               contentPreview: summarizeMarkdown(args.content_markdown as string | undefined),
               estimatedWordCount: estimateWordCount(args.content_markdown as string | undefined),
               publishedAt: new Date().toISOString(),
-              blogName: context.userData.blog.name,
+              blogName: getStringField(rawStructured, 'blogName') || context.userData.blog.name,
+              blogSlug: getStringField(rawStructured, 'blogSlug') || context.userData.blog.slug,
+              blogIsPublic,
+              blogVisibilityStatus,
+              isPublished: getBooleanField(rawStructured, 'isPublished') ?? true,
+              postVisibility,
+              effectiveVisibility,
+              visibilityBlockedByBlogPrivacy,
+              processingTimeMs: rawStructured?.processingTimeMs,
+              warnings,
               workflowStage: 'published',
             },
             _meta: {

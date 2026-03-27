@@ -149,4 +149,12 @@ export class GetPostsCursorDto {
   @IsOptional()
   @IsString()
   search?: string;
+
+  @ApiPropertyOptional({
+    description: "포스트 유형 필터 (blog: 일반 포스트, product: 판매 상품)",
+    enum: ["blog", "product"],
+  })
+  @IsOptional()
+  @IsIn(["blog", "product"])
+  postType?: "blog" | "product";
 }

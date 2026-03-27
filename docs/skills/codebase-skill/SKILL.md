@@ -108,34 +108,74 @@ if echo "$AUTH_OUT" | grep -q '"error"'; then
 fi
 ```
 
+## JSON Args Standard (Required)
+
+Use `--args <json>` as the default publish path for this skill.
+
+- Do not wrap long markdown inside a shell-quoted function-call string.
+- For short scalar inputs, inline JSON is fine.
+- For long markdown, build the JSON payload with Node and pass it via `--args`.
+
+## Visible Staged Flow (Recommended)
+
+When running auto-posting in terminal, make the workflow visible to the user with explicit step logs.
+
+Recommended order:
+
+1. print route line
+2. print `[1/3] OAuth 인증 확인`
+3. call `check_auth`
+4. print `[2/3] 스타일 가이드 확인`
+5. call `get_writing_style_guide`
+6. print `[3/3] 포스트 발행`
+7. call `create_post`
+
+If the post body is already prewritten, you may still call `get_writing_style_guide` as a visible progress step so the user can see the workflow advancing. Do not silently skip all intermediate steps unless the user explicitly asked for the fastest possible path.
+
 ## Publish
 
 ```bash
-npx -y mcporter call 'codebase-blog-oauth.create_post(
-  title: "자동포스팅 테스트",
-  content_markdown: "## Hello\\n\\nmcporter로 발행한 글입니다.",
-  category: "Tech",
-  tags: ["mcp","mcporter","automation"]
-)'
+POST_PAYLOAD=$(node - <<'NODE'
+const fs = require('fs');
+
+process.stdout.write(JSON.stringify({
+  title: '자동포스팅 테스트',
+  content_markdown: fs.readFileSync('./post.md', 'utf8'),
+  category: 'Tech',
+  tags: ['mcp', 'mcporter', 'automation'],
+}));
+NODE
+)
+
+STYLE_ARGS='{"style":"default"}'
+
+echo '[Route] mode=skill transport=mcporter endpoint=/mcp-remote alias=codebase-blog-oauth'
+echo '[1/3] OAuth 인증 확인'
+npx -y mcporter call codebase-blog-oauth.check_auth --output json
+echo '[2/3] 스타일 가이드 확인'
+npx -y mcporter call codebase-blog-oauth.get_writing_style_guide --args "$STYLE_ARGS"
+echo '[3/3] 포스트 발행'
+npx -y mcporter call codebase-blog-oauth.create_post --args "$POST_PAYLOAD"
 ```
 
 ## Writing Style Guide (Optional)
 
 ```bash
-npx -y mcporter call 'codebase-blog-oauth.get_writing_style_guide(style: "default")'
+STYLE_ARGS='{"style":"default"}'
+npx -y mcporter call codebase-blog-oauth.get_writing_style_guide --args "$STYLE_ARGS"
 ```
 
 ## Image Upload (Optional)
 
 ```bash
 # 1) ask for presigned URL
-npx -y mcporter call 'codebase-blog-oauth.get_image_upload_url(mimeType: "image/webp", fileSize: 245760)'
+npx -y mcporter call codebase-blog-oauth.get_image_upload_url --args '{"mimeType":"image/webp","fileSize":245760}'
 
 # 2) upload with curl PUT (use uploadUrl from step 1)
 curl -X PUT -H "Content-Type: image/webp" -T ./cover.webp "UPLOAD_URL_FROM_PREVIOUS_STEP"
 
 # 3) finalize upload
-npx -y mcporter call 'codebase-blog-oauth.finalize_uploaded_image(fileKey: "uploads/...", mimeType: "image/webp", fileSize: 245760)'
+npx -y mcporter call codebase-blog-oauth.finalize_uploaded_image --args '{"fileKey":"uploads/...","mimeType":"image/webp","fileSize":245760}'
 ```
 
 ## Troubleshooting
@@ -143,3 +183,4 @@ npx -y mcporter call 'codebase-blog-oauth.finalize_uploaded_image(fileKey: "uplo
 - If the login UI does not appear: you may already be logged in. Try a private window or `npx -y mcporter auth codebase-blog-oauth --reset`.
 - If you see `SSE error: Invalid content type, expected "text/event-stream"` during `mcporter auth`: tokens may still be saved. Run `check_auth` to confirm.
 - If port `33333` is in use: pick another fixed callback port and re-add the server.
+- If your markdown contains quotes, backticks, or many newlines: stay on the `--args` path. Do not switch back to shell-quoted function-call syntax.

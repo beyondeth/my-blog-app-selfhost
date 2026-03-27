@@ -15,7 +15,7 @@ import {
   FiMessageCircle,
   FiKey,
 } from 'react-icons/fi';
-import { ArrowLeft, BarChart3 } from 'lucide-react';
+import { ArrowLeft, BarChart3, CreditCard } from 'lucide-react';
 import { FEATURES } from '@/lib/features';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
@@ -48,6 +48,11 @@ const getSettingsNav = () => {
       title: '블로그 분석',
       href: '/settings/analytics',
       icon: BarChart3,
+    },
+    {
+      title: '결제 관리',
+      href: '/settings/billing',
+      icon: CreditCard,
     },
     {
       title: '보안',

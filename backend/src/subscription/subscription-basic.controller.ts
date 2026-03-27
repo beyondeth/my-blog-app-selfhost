@@ -9,16 +9,18 @@ import {
 } from "@nestjs/common";
 import { SubscriptionService } from "./subscription.service";
 import { JwtAuthGuard } from "../common/guards/jwt-auth.guard";
-import { OptionalJwtAuthGuard } from "../common/guards/optional-jwt-auth.guard";
 import { Public } from "../common/decorators/public.decorator";
 
 /**
  * 구독 기본 컨트롤러
- * 핵심 구독 기능만 포함한 최소 버전
+ * 핵심 구독 기능만 포함 — Payment 의존 없음
+ * 토스 결제 엔드포인트는 PaymentModule의 TossCheckoutController로 분리
  */
 @Controller("subscription")
 export class SubscriptionBasicController {
-  constructor(private readonly subscriptionService: SubscriptionService) {}
+  constructor(
+    private readonly subscriptionService: SubscriptionService,
+  ) {}
 
   /**
    * 모든 구독 플랜 조회 (공개 엔드포인트)
@@ -162,4 +164,7 @@ export class SubscriptionBasicController {
       message: "구독이 재개되었습니다.",
     };
   }
+
+  // 토스 결제 엔드포인트는 PaymentModule의 TossCheckoutController에서 관리
+  // (순환 의존성 방지 — SubscriptionModule은 PaymentModule을 import하지 않음)
 }

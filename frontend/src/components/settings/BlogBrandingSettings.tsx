@@ -2,8 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect, type ReactNode } from 'react';
 import { FiUpload, FiX, FiCheck, FiDroplet, FiImage, FiSquare, FiType } from 'react-icons/fi';
-import { useUploadFile } from '@/hooks/useFiles';
-import { FileType, Blog } from '@/types';
+import { Blog } from '@/types';
 import { cn } from '@/lib/utils';
 import TintedImagePreview from './TintedImagePreview';
 import ImageCropperModal from '@/components/ui/ImageCropperModal';
@@ -168,9 +167,6 @@ export default function BlogBrandingSettings({
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [croppingField, setCroppingField] = useState<BrandingField | null>(null);
 
-  // 파일 업로드 훅
-  const uploadFileMutation = useUploadFile();
-
   // 파일 입력 참조
   const logoInputRef = useRef<HTMLInputElement>(null);
   const iconInputRef = useRef<HTMLInputElement>(null);
@@ -265,6 +261,34 @@ type BrandingUpdatePayload = {
     return response.json();
   }, [blog.id]);
 
+  const uploadBrandingAsset = useCallback(async (field: BrandingField, file: File) => {
+    const assetPath =
+      field === 'logoUrl' ? 'logo' : field === 'iconUrl' ? 'favicon' : 'banner';
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(
+      `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/files/v2/blogs/${blog.id}/${assetPath}`,
+      {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      }
+    );
+
+    const payload = await response.json().catch(() => null);
+    if (!response.ok) {
+      throw new Error(payload?.message || '브랜딩 이미지 업로드에 실패했습니다.');
+    }
+
+    if (!payload?.url || typeof payload.url !== 'string') {
+      throw new Error('브랜딩 이미지 URL을 받지 못했습니다.');
+    }
+
+    return payload.url as string;
+  }, [blog.id]);
+
   /**
    * 이미지 업로드 핸들러
    */
@@ -287,14 +311,10 @@ type BrandingUpdatePayload = {
     setUploadingField(field);
 
     try {
-      // 파일 업로드 (WebP 자동 변환)
-      const uploadedFile = await uploadFileMutation.mutateAsync({
-        file,
-        fileType: FileType.IMAGE,
-      });
+      const uploadedUrl = await uploadBrandingAsset(field, file);
 
-      // CDN URL로 브랜딩 업데이트
-      await updateBranding({ [field]: uploadedFile.accessUrl || uploadedFile.fileUrl });
+      // 영구 컨텍스트 URL로 브랜딩 업데이트
+      await updateBranding({ [field]: uploadedUrl });
 
       setFeedbackMessage(field, { type: 'success', text: '이미지를 업로드했습니다.' });
       await onRefresh();
@@ -309,7 +329,7 @@ type BrandingUpdatePayload = {
     } finally {
       setUploadingField(null);
     }
-  }, [setFeedbackMessage, uploadFileMutation, updateBranding, onRefresh]);
+  }, [setFeedbackMessage, uploadBrandingAsset, updateBranding, onRefresh]);
 
   /**
    * 이미지 삭제 핸들러

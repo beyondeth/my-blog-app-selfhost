@@ -160,6 +160,30 @@ export class FilesV2Controller {
   }
 
   /**
+   * 블로그 파비콘 업로드
+   */
+  @Post("blogs/:blogId/favicon")
+  @UseInterceptors(FileInterceptor("file"))
+  @ApiConsumes("multipart/form-data")
+  @ApiOperation({ summary: "Upload blog favicon" })
+  @ApiResponse({
+    status: 201,
+    description: "Blog favicon uploaded successfully",
+  })
+  async uploadBlogFavicon(
+    @CurrentUser() user: User,
+    @Param("blogId", ParseUUIDPipe) blogId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    return this.contextualFileService.uploadBlogAsset(
+      user.id,
+      blogId,
+      file,
+      "favicon",
+    );
+  }
+
+  /**
    * 블로그 배너 업로드
    */
   @Post("blogs/:blogId/banner")

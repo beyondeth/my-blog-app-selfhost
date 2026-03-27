@@ -31,6 +31,7 @@ export const postQueryKeys = {
     limit?: number;
     sort?: string;
     cursor?: boolean;
+    postType?: string;
   }) => {
     // 정렬된 키 생성으로 캐시 일관성 보장
     const sortedFilters = Object.entries(filters).reduce((acc, [key, value]) => {
@@ -868,13 +869,14 @@ export function useInfiniteCursorPosts(options: {
   sort?: 'recent' | 'popular' | 'trending';
   limit?: number;
   enabled?: boolean;
+  postType?: 'blog' | 'product';
 } = {}) {
-  const { search, category, tag, blogSlug, blogId, sort = 'recent', limit = 20, enabled = true } = options;
+  const { search, category, tag, blogSlug, blogId, sort = 'recent', limit = 20, enabled = true, postType } = options;
 
   return useInfiniteQuery({
-    queryKey: postQueryKeys.list({ search, category, tag, blogSlug, blogId, sort, cursor: true }),
+    queryKey: postQueryKeys.list({ search, category, tag, blogSlug, blogId, sort, cursor: true, postType }),
     queryFn: ({ pageParam }) => postsAPI.getPostsCursor({
-      cursor: pageParam || undefined, // pageParam이 string | undefined 타입이므로 처리
+      cursor: pageParam || undefined,
       limit,
       sort,
       search,
@@ -882,6 +884,7 @@ export function useInfiniteCursorPosts(options: {
       tag,
       blogSlug,
       blogId,
+      postType,
     }),
     getNextPageParam: (lastPage) => lastPage?.nextCursor || undefined,
     initialPageParam: undefined as string | undefined, // 명시적인 타입 지정

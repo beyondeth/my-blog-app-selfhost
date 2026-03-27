@@ -7,6 +7,7 @@ import { User } from "../users/entities/user.entity";
 import { PaymentHistory } from "../subscription/entities/payment-history.entity";
 import { PaymentProvider } from "./interfaces/payment-provider.interface";
 import { MockProvider } from "./providers/mock.provider";
+import { TossProvider } from "./providers/toss.provider";
 import {
   SubscriptionTier,
   BillingCycle,
@@ -37,6 +38,7 @@ export class PaymentService {
     private readonly paymentHistoryRepository: Repository<PaymentHistory>,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly tossProvider: TossProvider,
   ) {
     // 결제 제공자 초기화
     this.initializeProviders();
@@ -50,15 +52,11 @@ export class PaymentService {
     // Mock Provider는 항상 등록 (개발/테스트용)
     this.providers.set("mock", new MockProvider());
 
-    // Stripe Provider (추후 구현)
-    // if (this.configService.get('STRIPE_SECRET_KEY')) {
-    //   this.providers.set('stripe', new StripeProvider(...));
-    // }
-
-    // Toss Provider (추후 구현)
-    // if (this.configService.get('TOSS_SECRET_KEY')) {
-    //   this.providers.set('toss', new TossProvider(...));
-    // }
+    // Toss Provider 등록 (시크릿 키가 설정되어 있으면)
+    if (this.configService.get("TOSS_SECRET_KEY")) {
+      this.providers.set("toss", this.tossProvider);
+      this.logger.log("토스페이먼츠 Provider 등록 완료");
+    }
   }
 
   /**
@@ -83,12 +81,12 @@ export class PaymentService {
     const prices = {
       [SubscriptionTier.FREE]: 0,
       [SubscriptionTier.STARTER]: {
-        [BillingCycle.MONTHLY]: 900, // $9/월
-        [BillingCycle.YEARLY]: 9000, // $90/년 (2개월 할인)
+        [BillingCycle.MONTHLY]: 5900, // ₩5,900/월
+        [BillingCycle.YEARLY]: 59000, // ₩59,000/년
       },
       [SubscriptionTier.PRO]: {
-        [BillingCycle.MONTHLY]: 1900, // $19/월
-        [BillingCycle.YEARLY]: 19000, // $190/년 (2개월 할인)
+        [BillingCycle.MONTHLY]: 12900, // ₩12,900/월
+        [BillingCycle.YEARLY]: 129000, // ₩129,000/년
       },
     };
 
@@ -121,22 +119,22 @@ export class PaymentService {
     const price = this.calculatePrice(options.tier, options.billingCycle);
 
     // 고객 ID가 없으면 생성
-    if (!user.stripeCustomerId && options.provider === "stripe") {
+    if (!user.paymentCustomerId) {
       const customerId = await provider.createCustomer({
         email: user.email,
         name: user.name || user.email,
         metadata: { userId: user.id.toString() },
       });
 
-      user.stripeCustomerId = customerId;
+      user.paymentCustomerId = customerId;
       await this.userRepository.save(user);
     }
 
     // 체크아웃 세션 생성
     const session = await provider.createCheckoutSession({
-      customerId: user.stripeCustomerId,
+      customerId: user.paymentCustomerId,
       priceAmount: price,
-      currency: "usd",
+      currency: "KRW",
       productName: `${options.tier.toUpperCase()} Plan`,
       billingCycle: options.billingCycle,
       metadata: {
@@ -152,7 +150,7 @@ export class PaymentService {
     await this.paymentHistoryRepository.save({
       user,
       amount: price,
-      currency: "usd",
+      currency: "KRW",
       status: PaymentStatus.PENDING,
       provider: options.provider,
       providerId: session.id,
@@ -174,13 +172,13 @@ export class PaymentService {
       where: { id: userId },
     });
 
-    if (!user || !user.stripeCustomerId) {
+    if (!user || !user.paymentCustomerId) {
       return [];
     }
 
     // 현재는 Mock provider만 있으므로 Mock 데이터 반환
     const provider = this.getProvider("mock");
-    return await provider.listPaymentMethods(user.stripeCustomerId);
+    return await provider.listPaymentMethods(user.paymentCustomerId);
   }
 
   /**
@@ -191,13 +189,13 @@ export class PaymentService {
       where: { id: userId },
     });
 
-    if (!user || !user.stripeCustomerId) {
+    if (!user || !user.paymentCustomerId) {
       throw new BadRequestException("결제 고객 정보가 없습니다");
     }
 
     const provider = this.getProvider("mock"); // 실제로는 동적으로 선택
     await provider.setDefaultPaymentMethod(
-      user.stripeCustomerId,
+      user.paymentCustomerId,
       paymentMethodId,
     );
   }
@@ -280,11 +278,12 @@ export class PaymentService {
   async handleWebhook(provider: string, payload: any, signature?: string) {
     const paymentProvider = this.getProvider(provider);
 
-    // 서명 검증
-    if (
-      signature &&
-      !paymentProvider.verifyWebhookSignature(payload, signature)
-    ) {
+    // 서명 검증 — 프로덕션에서는 서명 필수 (서명 헤더 생략으로 우회 방지)
+    if (!signature) {
+      if (process.env.NODE_ENV === "production") {
+        throw new BadRequestException("Webhook signature is required");
+      }
+    } else if (!paymentProvider.verifyWebhookSignature(payload, signature)) {
       throw new BadRequestException("Invalid webhook signature");
     }
 

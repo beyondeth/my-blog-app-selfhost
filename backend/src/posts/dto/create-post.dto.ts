@@ -146,4 +146,47 @@ export class CreatePostDto {
   @IsString()
   @MaxLength(240)
   githubDescription?: string;
+
+  // ── 마켓플레이스 판매 상품 필드 ──
+
+  @ApiPropertyOptional({
+    description: "포스트 유형 (blog: 일반 포스트, product: 판매 상품)",
+    example: "product",
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(["blog", "product"])
+  postType?: "blog" | "product";
+
+  @ApiPropertyOptional({
+    description: "상품 가격 (KRW, 최소 100). postType=product일 때 필수",
+    example: 4900,
+  })
+  @IsOptional()
+  @IsNumber()
+  @Min(100)
+  price?: number;
+
+  @ApiPropertyOptional({
+    description: "상품 카테고리. postType=product일 때 필수",
+    example: "ai_prompts",
+  })
+  @IsOptional()
+  @IsString()
+  @IsIn(["ai_prompts", "coding_templates", "tech_guides", "ai_workflows", "data_analytics", "others"])
+  productCategory?: string;
+
+  @ApiPropertyOptional({
+    description: "구매자 전용 배송 콘텐츠 (HTML). DeliveryItem으로 저장됨",
+  })
+  @IsOptional()
+  @IsString()
+  deliveryContent?: string;
+
+  @ApiPropertyOptional({
+    description: "직접 작성한 미리보기 콘텐츠 (HTML). ProductDetail.previewContent로 저장",
+  })
+  @IsOptional()
+  @IsString()
+  previewContent?: string;
 }

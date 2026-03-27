@@ -3,7 +3,6 @@ import { TypeOrmModule } from "@nestjs/typeorm";
 import { ScheduleModule } from "@nestjs/schedule";
 import { EventEmitterModule } from "@nestjs/event-emitter";
 import { SubscriptionService } from "./subscription.service";
-// import { SubscriptionController } from './subscription.controller';
 import { SubscriptionBasicController } from "./subscription-basic.controller";
 import { Subscription } from "./entities/subscription.entity";
 import { SubscriptionPlan } from "./entities/subscription-plan.entity";
@@ -15,10 +14,9 @@ import { SubscriptionPlanSeeder } from "./seeders/subscription-plan.seeder";
 /**
  * 구독 모듈
  * 구독 관련 핵심 서비스와 엔티티 제공
- * PaymentModule과 UsageModule과의 순환 의존성 제거
- * SharedSubscriptionModule의 SubscriptionFacadeService를 통해 통합 관리
- * SubscriptionController는 SharedSubscriptionModule로 이동 (SubscriptionFacadeService 의존성 때문)
- * EventEmitterModule 추가: 구독 변경 이벤트를 UsageService에 전달하여 캐시 무효화
+ * PaymentModule을 import하지 않음 — 순환 의존성 방지
+ * 결제 관련 컨트롤러(토스 체크아웃)는 PaymentModule에서 관리
+ * EventEmitterModule: 구독 변경 이벤트를 UsageService에 전달하여 캐시 무효화
  */
 @Module({
   imports: [
@@ -29,11 +27,9 @@ import { SubscriptionPlanSeeder } from "./seeders/subscription-plan.seeder";
       User,
     ]),
     ScheduleModule.forRoot(),
-    EventEmitterModule, // EventEmitter 모듈 추가
-    // PaymentModule과 UsageModule은 제거
-    // SubscriptionController는 SharedSubscriptionModule로 이동됨
+    EventEmitterModule,
   ],
-  controllers: [SubscriptionBasicController], // SubscriptionController 제거
+  controllers: [SubscriptionBasicController],
   providers: [SubscriptionService, SubscriptionGuard, SubscriptionPlanSeeder],
   exports: [SubscriptionService, SubscriptionGuard],
 })

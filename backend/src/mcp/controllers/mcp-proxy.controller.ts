@@ -24,7 +24,7 @@ import { ApiKeyGuard } from "../guards/api-key.guard";
 import { PostsService } from "../../posts/posts.service";
 import { CreatePostDto } from "../../posts/dto/create-post.dto";
 import { InjectRepository } from "@nestjs/typeorm";
-import { Repository } from "typeorm";
+import { Repository, DataSource } from "typeorm";
 import { User } from "../../users/entities/user.entity";
 import { Blog } from "../../blogs/entities/blog.entity";
 import { ExternalImageDownloadService } from "../../files/services/external-image-download.service";
@@ -60,6 +60,7 @@ export class McpProxyController {
     private readonly usageService: UsageService,
     private readonly externalImageDownloadService: ExternalImageDownloadService,
     private readonly filesService: FilesService,
+    private readonly dataSource: DataSource,
   ) {}
 
   /**
@@ -218,6 +219,8 @@ export class McpProxyController {
       category: createPostDto.category,
       qualityScore: createPostDto.qualityScore, // AI 품질 점수
       visibility: resolvedVisibility,
+      // 마켓플레이스 판매 상품 필드
+      postType: createPostDto.postType || "blog",
       // thumbnail field removed - using thumbnailImageId only
       ...(createPostDto.thumbnailImageId && {
         thumbnailImageId: createPostDto.thumbnailImageId,
@@ -437,6 +440,36 @@ export class McpProxyController {
 
       const postDto = await this.postsService.createFast(finalPostData, user);
 
+      // 4.5. 판매 상품인 경우 ProductDetail 레코드 생성
+      if (createPostDto.postType === "product" && createPostDto.price) {
+        try {
+          const { extractPreviewContent } = await import("../../marketplace/utils/preview-extractor");
+          const previewContent = extractPreviewContent(
+            createPostDto.content_markdown || createPostDto.content,
+          );
+
+          const productDetailRepo = this.dataSource.getRepository("product_details");
+          await productDetailRepo.save({
+            postId: postDto.id,
+            price: createPostDto.price,
+            currency: "KRW",
+            productCategory: createPostDto.productCategory || "others",
+            previewContent,
+            deliveryType: "content",
+            isActive: true,
+            commissionRate: 20.0,
+          });
+          this.logger.log(
+            `🏷️ [MCP Product Created] ProductDetail for Post ${postDto.id}, price=${createPostDto.price}`,
+          );
+        } catch (pdError) {
+          // ProductDetail 생성 실패는 포스트 자체를 실패시키지 않음
+          this.logger.error(
+            `ProductDetail 생성 실패 (포스트는 생성됨): postId=${postDto.id}`,
+          );
+        }
+      }
+
       // 5. MCP 포스트 사용량 추적 (usage_tracking 테이블에 기록)
       await this.usageService.trackMcpPost(userId);
       this.logger.log(
@@ -475,6 +508,11 @@ export class McpProxyController {
         title: postDto.title,
         url: url,
         blog: postDto.blog, // 프론트엔드 캐시 무효화를 위해 blog 정보 포함
+        isPublished: postDto.isPublished,
+        visibility: postDto.visibility,
+        effectiveVisibility: postDto.effectiveVisibility,
+        visibilityBlockedByBlogPrivacy:
+          postDto.visibilityBlockedByBlogPrivacy,
         _meta: {
           processingTime: Date.now() - startTime,
           status: "created",

@@ -8,7 +8,7 @@ import { UsersController } from "./users.controller";
 import { MobileSettingsController } from "./mobile-settings.controller";
 import { User } from "./entities/user.entity";
 import { Profile } from "./entities/profile.entity";
-import { Subscription } from "./entities/subscription.entity";
+import { Subscription } from "../subscription/entities/subscription.entity";
 import { AccountSettings } from "./entities/account-settings.entity";
 import { UserIdentity } from "./entities/user-identity.entity";
 import { UserDeletionLog } from "./entities/user-deletion-log.entity";

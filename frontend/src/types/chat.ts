@@ -23,6 +23,8 @@ export interface Message {
   conversationId: string;
   senderId: string;
   content: string;
+  /** 메시지 유형: text(일반) | system(자동 생성) | product_card(상품 컨텍스트) */
+  messageType?: 'text' | 'system' | 'product_card';
   createdAt: Date;
   updatedAt?: Date;
   isEdited: boolean;
@@ -32,7 +34,6 @@ export interface Message {
   sender?: ChatUser;
   status?: MessageStatus;
   tempId?: string; // For optimistic updates
-  // isRead, readAt 제거 - 대화 레벨에서만 읽음 상태 관리
 }
 
 // Conversation types
@@ -40,6 +41,12 @@ export interface Conversation {
   id: string;
   user1Id: string;
   user2Id: string;
+  /** 대화 유형: social(소셜 DM) | transaction(거래 채팅) */
+  type?: 'social' | 'transaction';
+  /** 연결된 주문 ID (거래 채팅 전용) */
+  orderId?: string | null;
+  /** 연결된 상품 포스트 ID (거래 채팅 전용) */
+  productPostId?: string | null;
   user1?: ChatUser;
   user2?: ChatUser;
   lastMessage?: Message;
@@ -51,6 +58,23 @@ export interface Conversation {
   user2DeletedAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** 거래 채팅 컨텍스트 (상단 고정 카드용) */
+export interface TransactionContext {
+  product: {
+    title: string;
+    slug: string;
+    price: number;
+    thumbnailImageId: string | null;
+  };
+  order: {
+    orderId: string;
+    status: string;
+    amount: number;
+    createdAt: string;
+  };
+  refundStatus?: string;
 }
 
 // Loading states

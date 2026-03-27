@@ -262,6 +262,7 @@ export class PostCreator {
           authorId: author.id,
           blogId: blog.id,
           content_type: createPostDto.content_markdown ? "markdown" : "html",
+          postType: createPostDto.postType || "blog", // 마켓플레이스 상품 구분
           version: 1, // 명시적으로 초기 버전 설정
           ipAddress: this.ipSecurityService.encrypt(ip), // 암호화하여 저장
           userAgent: "Unknown", // Controller에서 userAgent도 받으면 좋지만 일단 IP만
@@ -347,6 +348,56 @@ export class PostCreator {
         this.logger.debug(
           `[PostCreator] Metadata saved - PostId: ${savedPost.id}, Metadata Tags: ${JSON.stringify(metadata.tags)}`,
         );
+
+        // 8.5. 마켓플레이스 상품인 경우 ProductDetail + DeliveryItem 생성
+        if (createPostDto.postType === "product" && createPostDto.price) {
+          try {
+            const { extractPreviewContent } = await import(
+              "../../marketplace/utils/preview-extractor"
+            );
+            // 직접 작성한 미리보기 우선, 없으면 자동 추출
+            const previewContent =
+              createPostDto.previewContent ||
+              extractPreviewContent(rawContent);
+
+            // ProductDetail 생성
+            const productDetailRepo = manager.getRepository("product_details");
+            const productDetail = await productDetailRepo.save({
+              postId: savedPost.id,
+              price: createPostDto.price,
+              currency: "KRW",
+              productCategory: createPostDto.productCategory || "others",
+              descriptionHtml: rawContent,
+              previewContent,
+              deliveryType: "content",
+              isActive: true,
+              commissionRate: 20.0,
+              deliveryItemCount: 1,
+            });
+
+            // DeliveryItem 생성 (3-Layer 콘텐츠 모델)
+            // deliveryContent가 있으면 사용 (별도 에디터), 없으면 Post.content 폴백
+            const deliveryHtml = createPostDto.deliveryContent || rawContent;
+            const deliveryItemRepo = manager.getRepository("delivery_items");
+            await deliveryItemRepo.save({
+              productDetailId: (productDetail as unknown as { id: string }).id,
+              type: "content_html",
+              label: "본문 콘텐츠",
+              sortOrder: 0,
+              contentHtml: deliveryHtml,
+              isActive: true,
+            });
+
+            this.logger.log(
+              `상품 등록 완료: postId=${savedPost.id}, price=${createPostDto.price}`,
+            );
+          } catch (pdError) {
+            // ProductDetail 생성 실패는 포스트 자체를 실패시키지 않음 (로그만)
+            this.logger.error(
+              `ProductDetail 생성 실패 (포스트는 생성됨): postId=${savedPost.id}`,
+            );
+          }
+        }
 
         // 9. 파일 연결 (있는 경우) - 트랜잭션 내에서 직접 처리
         if (files && files.length > 0) {

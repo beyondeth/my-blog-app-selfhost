@@ -2,6 +2,7 @@
 @import '../styles/core.css';
 @import '../styles/themes/atom-one-light-custom.css';
 @import 'highlight.js/styles/atom-one-dark.css';
+@import 'react-image-crop/dist/ReactCrop.css';
 
 /* TipTap Simple Editor 스타일 */
 @import '../styles/_variables.css';

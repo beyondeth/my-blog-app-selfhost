@@ -1,0 +1,343 @@
+{
+  "generatedAt": "2026-03-16T13:52:29.016Z",
+  "dateRange": {
+    "start": "2025-07-17",
+    "end": "2026-03-16"
+  },
+  "mentalHealthMetrics": {
+    "burnout": {
+      "score": 42,
+      "label": "번아웃 지수 (MBI)"
+    },
+    "anxiety": {
+      "score": 31,
+      "label": "불안 지표 (BAI)"
+    },
+    "depression": {
+      "score": 28,
+      "label": "우울 경향 (BDI)"
+    },
+    "obsessive": {
+      "score": 44,
+      "label": "강박 코딩 지수"
+    },
+    "wellbeing": {
+      "score": 64,
+      "label": "종합 웰빙 지수"
+    },
+    "rawStats": {
+      "totalMessages": 10640,
+      "totalStressKeywords": 2516,
+      "totalPositiveKeywords": 2131,
+      "totalLateNightMessages": 4542,
+      "lateNightRatio": 42.69,
+      "stressRatio": 23.65,
+      "uniqueDays": 153,
+      "avgMessagesPerDay": 69.54
+    }
+  },
+  "monthlyActivities": [
+    {
+      "month": "2025-07",
+      "totalMessages": 208,
+      "lateNightMessages": 82,
+      "stressKeywordCount": 61,
+      "avgFilterScore": 3.87,
+      "activeDays": 4,
+      "sessionsCount": 16
+    },
+    {
+      "month": "2025-08",
+      "totalMessages": 29,
+      "lateNightMessages": 0,
+      "stressKeywordCount": 0,
+      "avgFilterScore": 3.41,
+      "activeDays": 2,
+      "sessionsCount": 3
+    },
+    {
+      "month": "2025-09",
+      "totalMessages": 82,
+      "lateNightMessages": 32,
+      "stressKeywordCount": 3,
+      "avgFilterScore": 3.09,
+      "activeDays": 7,
+      "sessionsCount": 14
+    },
+    {
+      "month": "2025-10",
+      "totalMessages": 2988,
+      "lateNightMessages": 1277,
+      "stressKeywordCount": 620,
+      "avgFilterScore": 4.01,
+      "activeDays": 18,
+      "sessionsCount": 16
+    },
+    {
+      "month": "2025-11",
+      "totalMessages": 2551,
+      "lateNightMessages": 1094,
+      "stressKeywordCount": 980,
+      "avgFilterScore": 3.86,
+      "activeDays": 29,
+      "sessionsCount": 18
+    },
+    {
+      "month": "2025-12",
+      "totalMessages": 1366,
+      "lateNightMessages": 536,
+      "stressKeywordCount": 243,
+      "avgFilterScore": 4.46,
+      "activeDays": 26,
+      "sessionsCount": 40
+    },
+    {
+      "month": "2026-01",
+      "totalMessages": 1145,
+      "lateNightMessages": 626,
+      "stressKeywordCount": 193,
+      "avgFilterScore": 4.35,
+      "activeDays": 28,
+      "sessionsCount": 45
+    },
+    {
+      "month": "2026-02",
+      "totalMessages": 1413,
+      "lateNightMessages": 645,
+      "stressKeywordCount": 247,
+      "avgFilterScore": 4.13,
+      "activeDays": 25,
+      "sessionsCount": 96
+    },
+    {
+      "month": "2026-03",
+      "totalMessages": 858,
+      "lateNightMessages": 250,
+      "stressKeywordCount": 169,
+      "avgFilterScore": 4.08,
+      "activeDays": 14,
+      "sessionsCount": 35
+    }
+  ],
+  "techNodes": [
+    {
+      "name": "MCP",
+      "category": "tool",
+      "count": 699,
+      "firstSeen": "2025-08",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Next.js",
+      "category": "framework",
+      "count": 135,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-02"
+    },
+    {
+      "name": "Redis",
+      "category": "infra",
+      "count": 131,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Cloudflare",
+      "category": "infra",
+      "count": 125,
+      "firstSeen": "2025-09",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Claude",
+      "category": "ai",
+      "count": 103,
+      "firstSeen": "2025-08",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "NestJS",
+      "category": "framework",
+      "count": 100,
+      "firstSeen": "2025-07",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "PostgreSQL",
+      "category": "infra",
+      "count": 93,
+      "firstSeen": "2025-07",
+      "lastSeen": "2026-02"
+    },
+    {
+      "name": "GPT",
+      "category": "ai",
+      "count": 78,
+      "firstSeen": "2025-08",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Gemini",
+      "category": "ai",
+      "count": 74,
+      "firstSeen": "2025-07",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Docker",
+      "category": "infra",
+      "count": 69,
+      "firstSeen": "2025-07",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Oracle Cloud",
+      "category": "infra",
+      "count": 67,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "ChatGPT",
+      "category": "ai",
+      "count": 55,
+      "firstSeen": "2025-08",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "React",
+      "category": "framework",
+      "count": 53,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "AWS S3",
+      "category": "infra",
+      "count": 51,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Nginx",
+      "category": "infra",
+      "count": 36,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-01"
+    },
+    {
+      "name": "Flutter",
+      "category": "framework",
+      "count": 29,
+      "firstSeen": "2025-07",
+      "lastSeen": "2025-11"
+    },
+    {
+      "name": "Tiptap",
+      "category": "tool",
+      "count": 25,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-01"
+    },
+    {
+      "name": "Dart",
+      "category": "language",
+      "count": 22,
+      "firstSeen": "2025-07",
+      "lastSeen": "2025-12"
+    },
+    {
+      "name": "TypeScript",
+      "category": "language",
+      "count": 21,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "TypeORM",
+      "category": "tool",
+      "count": 18,
+      "firstSeen": "2025-07",
+      "lastSeen": "2026-02"
+    },
+    {
+      "name": "Python",
+      "category": "language",
+      "count": 11,
+      "firstSeen": "2025-08",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "BullMQ",
+      "category": "tool",
+      "count": 11,
+      "firstSeen": "2025-10",
+      "lastSeen": "2026-02"
+    },
+    {
+      "name": "JavaScript",
+      "category": "language",
+      "count": 10,
+      "firstSeen": "2025-09",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Supabase",
+      "category": "infra",
+      "count": 8,
+      "firstSeen": "2025-12",
+      "lastSeen": "2026-03"
+    },
+    {
+      "name": "Firebase",
+      "category": "infra",
+      "count": 7,
+      "firstSeen": "2025-07",
+      "lastSeen": "2025-07"
+    }
+  ],
+  "projectNodes": [
+    {
+      "name": "my-blog-app",
+      "label": "my-blog-app",
+      "messagesCount": 5627,
+      "firstSeen": "2025-10",
+      "lastSeen": "2025-12"
+    },
+    {
+      "name": "blockchain",
+      "label": "blockchain",
+      "messagesCount": 11,
+      "firstSeen": "2025-12",
+      "lastSeen": "2025-12"
+    },
+    {
+      "name": "rag",
+      "label": "rag",
+      "messagesCount": 7,
+      "firstSeen": "2025-11",
+      "lastSeen": "2025-11"
+    },
+    {
+      "name": "curling",
+      "label": "curling",
+      "messagesCount": 2,
+      "firstSeen": "2025-12",
+      "lastSeen": "2025-12"
+    },
+    {
+      "name": "backend",
+      "label": "backend",
+      "messagesCount": 2,
+      "firstSeen": "2026-01",
+      "lastSeen": "2026-01"
+    },
+    {
+      "name": "orderman",
+      "label": "orderman",
+      "messagesCount": 1,
+      "firstSeen": "2025-11",
+      "lastSeen": "2025-11"
+    }
+  ]
+}
