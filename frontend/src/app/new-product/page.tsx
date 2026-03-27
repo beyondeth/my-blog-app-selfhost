@@ -164,10 +164,10 @@ export default function NewProductPage() {
       </header>
 
       {/* 메인 폼 */}
-      <main className="max-w-3xl mx-auto px-4 py-8 space-y-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 pb-24 space-y-8">
 
         {/* 상품명 */}
-        <div>
+        <div className="pb-6 border-b border-gray-100 dark:border-zinc-800/50">
           <input
             type="text"
             value={title}
@@ -176,6 +176,11 @@ export default function NewProductPage() {
             className="w-full text-2xl font-bold text-gray-900 dark:text-white placeholder-gray-300 dark:placeholder-zinc-600 bg-transparent border-none outline-none"
             maxLength={100}
           />
+          <div className="flex justify-end mt-1">
+            <span className={`text-xs ${title.length > 80 ? 'text-red-500' : 'text-gray-300 dark:text-zinc-600'}`}>
+              {title.length}/100
+            </span>
+          </div>
         </div>
 
         {/* 상품 정보 카드 */}
@@ -193,7 +198,7 @@ export default function NewProductPage() {
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as ProductCategory)}
-                className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-gray-900 dark:text-white"
+                className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-900/10 dark:focus:ring-zinc-100/10 focus:border-gray-400 dark:focus:border-zinc-500 outline-none transition-colors"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
@@ -216,7 +221,7 @@ export default function NewProductPage() {
                   onChange={(e) => setPrice(e.target.value)}
                   placeholder="최소 100"
                   min={100}
-                  className="w-full h-10 pl-8 pr-3 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500"
+                  className="w-full h-10 pl-8 pr-3 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:ring-2 focus:ring-gray-900/10 dark:focus:ring-zinc-100/10 focus:border-gray-400 dark:focus:border-zinc-500 outline-none transition-colors [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
               {price && Number(price) > 0 && (
@@ -310,7 +315,26 @@ export default function NewProductPage() {
 
       {/* 하단 액션 바 */}
       <footer className="sticky bottom-0 border-t border-gray-200 dark:border-zinc-800 bg-white/80 dark:bg-[#0E141B]/80 backdrop-blur-sm">
-        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-end gap-3">
+        <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
+          {/* 작성 진행도 */}
+          <div className="hidden sm:flex items-center gap-3 text-xs text-gray-400 dark:text-zinc-500">
+            <span className={title.trim() ? 'text-green-600 dark:text-green-400' : ''}>
+              {title.trim() ? '1' : '0'} 상품명
+            </span>
+            <span className="text-gray-200 dark:text-zinc-700">/</span>
+            <span className={price && Number(price) >= 100 ? 'text-green-600 dark:text-green-400' : ''}>
+              {price && Number(price) >= 100 ? '2' : '0'} 가격
+            </span>
+            <span className="text-gray-200 dark:text-zinc-700">/</span>
+            <span className={descriptionContent.trim() ? 'text-green-600 dark:text-green-400' : ''}>
+              {descriptionContent.trim() ? '3' : '0'} 소개
+            </span>
+            <span className="text-gray-200 dark:text-zinc-700">/</span>
+            <span className={deliveryContent.trim() ? 'text-green-600 dark:text-green-400' : ''}>
+              {deliveryContent.trim() ? '4' : '0'} 콘텐츠
+            </span>
+          </div>
+          <div className="flex items-center gap-3">
           <button
             onClick={() => router.back()}
             className="px-4 py-2 rounded-lg text-sm text-gray-600 dark:text-zinc-400 hover:bg-gray-100 dark:hover:bg-zinc-800 transition-colors"
@@ -331,6 +355,7 @@ export default function NewProductPage() {
           >
             {isSubmitting ? '등록 중...' : '상품 등록'}
           </button>
+          </div>
         </div>
       </footer>
     </div>
