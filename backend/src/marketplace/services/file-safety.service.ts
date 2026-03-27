@@ -8,7 +8,7 @@ import { Repository } from "typeorm";
 import { ConfigService } from "@nestjs/config";
 import { FileQuarantine } from "../entities/file-quarantine.entity";
 import { DeliveryItem } from "../entities/delivery-item.entity";
-import { S3Service } from "../../files/services/s3.service";
+import { R2Service } from "../../files/services/r2.service";
 
 /**
  * 파일 안전성 검증 서비스
@@ -48,12 +48,41 @@ export class FileSafetyService {
     "application/epub+zip",
   ]);
 
+  // 업로드 허용 MIME 타입 전체 (프론트엔드와 동기화)
+  private static readonly ALLOWED_UPLOAD_MIMES = new Set([
+    // 문서
+    "application/pdf",
+    "application/epub+zip",
+    "application/msword",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.ms-powerpoint",
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    "application/vnd.ms-excel",
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    // 압축
+    "application/zip",
+    "application/x-7z-compressed",
+    "application/gzip",
+    // 이미지
+    "image/png",
+    "image/jpeg",
+    "image/gif",
+    "image/webp",
+    "image/svg+xml",
+    // 텍스트
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/json",
+    "text/html",
+  ]);
+
   constructor(
     @InjectRepository(FileQuarantine)
     private readonly quarantineRepository: Repository<FileQuarantine>,
     @InjectRepository(DeliveryItem)
     private readonly deliveryItemRepository: Repository<DeliveryItem>,
-    private readonly s3Service: S3Service,
+    private readonly r2Service: R2Service,
     private readonly configService: ConfigService,
   ) {
     this.virusScanEnabled =
@@ -73,6 +102,13 @@ export class FileSafetyService {
       deliveryItemId?: string;
     },
   ): Promise<{ uploadUrl: string; quarantineId: string; quarantineKey: string }> {
+    // MIME 타입 화이트리스트 검증 (프론트엔드 우회 방지)
+    if (!FileSafetyService.ALLOWED_UPLOAD_MIMES.has(dto.mimeType)) {
+      throw new BadRequestException(
+        `허용되지 않는 파일 형식입니다: ${dto.mimeType}`,
+      );
+    }
+
     // 파일 크기 제한 (100MB)
     if (dto.fileSize > 100 * 1024 * 1024) {
       throw new BadRequestException("파일 크기는 100MB를 초과할 수 없습니다");
@@ -82,8 +118,8 @@ export class FileSafetyService {
     const uuid = crypto.randomUUID();
     const quarantineKey = `marketplace/quarantine/${uploaderId}/${uuid}.${ext}`;
 
-    // presigned upload URL 생성
-    const presigned = await this.s3Service.generatePresignedUploadUrl(
+    // R2 presigned upload URL 생성 (마켓플레이스 전용)
+    const presigned = await this.r2Service.generateMarketplaceUploadUrl(
       quarantineKey,
       dto.mimeType,
       dto.fileSize,
@@ -138,7 +174,7 @@ export class FileSafetyService {
       const signatures = FileSafetyService.MAGIC_SIGNATURES[record.mimeType];
       if (signatures) {
         // S3에서 첫 16바이트만 읽어 검증
-        const fileExists = await this.s3Service.checkFileExists(
+        const fileExists = await this.r2Service.checkFileExists(
           record.quarantineKey,
         );
         if (!fileExists) {

@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useProductDetail, usePreparePurchase } from '@/hooks/useMarketplace';
 import { useTossPayments } from '@/hooks/useTossPayments';
-import { getDownloadUrl } from '@/services/api/marketplace.service';
+import { getItemDownloadUrl } from '@/services/api/marketplace.service';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -27,6 +27,37 @@ export default function ProductDetailPage() {
 
   const { data: product, isLoading, refetch } = useProductDetail(slug);
   const prepareMut = usePreparePurchase();
+
+  // 다운로드 상태
+  const [downloadingItemId, setDownloadingItemId] = useState<string | null>(null);
+
+  /** 파일 다운로드 핸들러 */
+  const handleItemDownload = async (orderId: string, itemId: string) => {
+    if (downloadingItemId) return;
+    setDownloadingItemId(itemId);
+    try {
+      const { downloadUrl, fileName, remainingDownloads } =
+        await getItemDownloadUrl(orderId, itemId);
+
+      // presigned URL로 브라우저 다운로드 트리거
+      const a = document.createElement('a');
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+
+      if (remainingDownloads <= 1) {
+        toast.info(`남은 다운로드 횟수: ${remainingDownloads}회`);
+      }
+    } catch (error: unknown) {
+      toast.error(
+        (error as { message?: string })?.message || '다운로드에 실패했습니다',
+      );
+    } finally {
+      setDownloadingItemId(null);
+    }
+  };
 
   // 환불 모달 상태
   const [showRefundModal, setShowRefundModal] = useState(false);
@@ -211,10 +242,11 @@ export default function ProductDetailPage() {
                           </p>
                         </div>
                         <button
-                          onClick={() => toast.info('다운로드 기능이 곧 지원됩니다')}
-                          className="flex-shrink-0 ml-3 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100"
+                          onClick={() => product.orderId && handleItemDownload(product.orderId, item.id)}
+                          disabled={downloadingItemId === item.id || !product.orderId}
+                          className="flex-shrink-0 ml-3 px-3 py-1.5 text-xs font-medium bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-800 dark:hover:bg-gray-100 disabled:opacity-50"
                         >
-                          다운로드
+                          {downloadingItemId === item.id ? '준비 중...' : '다운로드'}
                         </button>
                       </div>
                     )}
@@ -281,20 +313,13 @@ export default function ProductDetailPage() {
               </div>
             )}
 
-            {/* 디지털 파일 다운로드 (구매 완료 + 파일 상품) */}
-            {product.isFullContent && pd.deliveryType === 'file' && (
+            {/* 디지털 파일 다운로드 안내 (구매 완료 + 파일 상품, DeliveryItem이 없는 레거시) */}
+            {product.isFullContent && pd.deliveryType === 'file' && (!product.deliveryItems || product.deliveryItems.length === 0) && (
               <div className="mt-6 rounded-xl border border-gray-200 dark:border-zinc-800 p-4">
-                <button
-                  onClick={async () => {
-                    // 구매 주문에서 orderId를 가져와야 하지만, 현재 product detail에는 없으므로
-                    // 추후 order 정보를 포함하도록 개선 필요
-                    toast.info('다운로드 기능이 곧 지원됩니다');
-                  }}
-                  className="inline-flex items-center gap-2 text-sm font-medium text-gray-900 dark:text-white hover:underline"
-                >
+                <p className="inline-flex items-center gap-2 text-sm text-gray-500 dark:text-zinc-400">
                   <Download className="h-4 w-4" />
-                  파일 다운로드
-                </button>
+                  위 구매한 콘텐츠 섹션에서 개별 파일을 다운로드하세요
+                </p>
               </div>
             )}
           </div>

@@ -355,10 +355,18 @@ export class PostCreator {
             const { extractPreviewContent } = await import(
               "../../marketplace/utils/preview-extractor"
             );
-            // 직접 작성한 미리보기 우선, 없으면 자동 추출
             const previewContent =
               createPostDto.previewContent ||
               extractPreviewContent(rawContent);
+
+            // 파일 기반 vs HTML 콘텐츠 기반 결정
+            const hasDeliveryFiles =
+              createPostDto.deliveryFiles &&
+              createPostDto.deliveryFiles.length > 0;
+            const deliveryType = hasDeliveryFiles ? "file" : "content";
+            const deliveryItemCount = hasDeliveryFiles
+              ? createPostDto.deliveryFiles!.length
+              : 1;
 
             // ProductDetail 생성
             const productDetailRepo = manager.getRepository("product_details");
@@ -369,27 +377,68 @@ export class PostCreator {
               productCategory: createPostDto.productCategory || "others",
               descriptionHtml: rawContent,
               previewContent,
-              deliveryType: "content",
+              deliveryType,
               isActive: true,
               commissionRate: 20.0,
-              deliveryItemCount: 1,
+              deliveryItemCount,
             });
 
-            // DeliveryItem 생성 (3-Layer 콘텐츠 모델)
-            // deliveryContent가 있으면 사용 (별도 에디터), 없으면 Post.content 폴백
-            const deliveryHtml = createPostDto.deliveryContent || rawContent;
+            const pdId = (productDetail as unknown as { id: string }).id;
             const deliveryItemRepo = manager.getRepository("delivery_items");
-            await deliveryItemRepo.save({
-              productDetailId: (productDetail as unknown as { id: string }).id,
-              type: "content_html",
-              label: "본문 콘텐츠",
-              sortOrder: 0,
-              contentHtml: deliveryHtml,
-              isActive: true,
-            });
+
+            if (hasDeliveryFiles) {
+              // 파일 기반 배송: 격리 완료된 파일들을 DeliveryItem으로 생성
+              const quarantineRepo =
+                manager.getRepository("file_quarantine");
+
+              for (let i = 0; i < createPostDto.deliveryFiles!.length; i++) {
+                const file = createPostDto.deliveryFiles![i];
+
+                // 격리 레코드 조회 (소유권 + clean 상태 검증)
+                const quarantine = await quarantineRepo.findOne({
+                  where: {
+                    id: file.quarantineId,
+                    uploaderId: author.id,
+                    status: "clean",
+                  },
+                });
+
+                if (!quarantine || !quarantine.verifiedKey) {
+                  this.logger.warn(
+                    `유효하지 않은 격리 파일: quarantineId=${file.quarantineId}, userId=${author.id.substring(0, 8)}...`,
+                  );
+                  continue; // 무효한 파일은 스킵
+                }
+
+                await deliveryItemRepo.save({
+                  productDetailId: pdId,
+                  type: "file",
+                  label: file.fileName,
+                  sortOrder: i,
+                  fileKey: quarantine.verifiedKey,
+                  fileName: file.fileName,
+                  fileSize: file.fileSize,
+                  mimeType: file.mimeType,
+                  quarantineStatus: "clean",
+                  isActive: true,
+                });
+              }
+            } else {
+              // HTML 콘텐츠 기반 배송 (하위 호환)
+              const deliveryHtml =
+                createPostDto.deliveryContent || rawContent;
+              await deliveryItemRepo.save({
+                productDetailId: pdId,
+                type: "content_html",
+                label: "본문 콘텐츠",
+                sortOrder: 0,
+                contentHtml: deliveryHtml,
+                isActive: true,
+              });
+            }
 
             this.logger.log(
-              `상품 등록 완료: postId=${savedPost.id}, price=${createPostDto.price}`,
+              `상품 등록 완료: postId=${savedPost.id}, price=${createPostDto.price}, deliveryType=${deliveryType}`,
             );
           } catch (pdError) {
             // ProductDetail 생성 실패는 포스트 자체를 실패시키지 않음 (로그만)

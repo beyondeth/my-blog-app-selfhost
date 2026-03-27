@@ -113,6 +113,30 @@ export async function getDownloadUrl(orderId: string): Promise<{
   return result.data;
 }
 
+/** 개별 배송 아이템 다운로드 URL 발급 (DeliveryItem 기반) */
+export async function getItemDownloadUrl(
+  orderId: string,
+  itemId: string,
+): Promise<{
+  downloadUrl: string;
+  expiresIn: number;
+  downloadCount: number;
+  maxDownloads: number;
+  remainingDownloads: number;
+  fileName: string;
+}> {
+  const response = await fetch(
+    `${API_URL}/marketplace/purchase/download/${orderId}/item/${itemId}`,
+    { credentials: 'include' },
+  );
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || '다운로드 URL 발급에 실패했습니다');
+  }
+  const result = await response.json();
+  return result.data;
+}
+
 /** 내 환불 요청 내역 */
 export async function getMyRefundRequests(): Promise<any[]> {
   const response = await fetch(

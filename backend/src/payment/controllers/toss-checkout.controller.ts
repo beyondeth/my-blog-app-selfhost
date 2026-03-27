@@ -222,9 +222,9 @@ export class TossCheckoutController {
         throw new BadRequestException("유효하지 않은 결제 금액입니다");
       }
 
-      // 토스 스펙: 결제 금액 범위 ₩100 ~ ₩1,000,000,000
-      if (price < 100) {
-        throw new BadRequestException("최소 결제 금액은 100원입니다");
+      // 토스 스펙: 결제 금액 범위 ₩100 ~ ₩1,000,000,000 (마켓플레이스 최소 ₩1,000)
+      if (price < 1000) {
+        throw new BadRequestException("최소 결제 금액은 1,000원입니다");
       }
 
       // ── [5] 첫 결제 실행 (구독 생성보다 먼저 — 실패 시 롤백 불필요) ──

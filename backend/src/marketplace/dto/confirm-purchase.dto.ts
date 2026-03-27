@@ -15,6 +15,6 @@ export class ConfirmPurchaseDto {
 
   /** 결제 금액 (서버에서 재검증 — 프론트엔드 값은 신뢰하지 않음) */
   @IsInt()
-  @Min(100)
+  @Min(1000)
   amount: number;
 }

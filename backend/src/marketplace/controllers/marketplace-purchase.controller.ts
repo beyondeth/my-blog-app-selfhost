@@ -107,4 +107,24 @@ export class MarketplacePurchaseController {
 
     return { success: true, data: result };
   }
+
+  /**
+   * 개별 배송 아이템 다운로드 URL 발급
+   * DeliveryItem.fileKey 기반 presigned URL (1시간 만료) + 횟수 제한
+   */
+  @Get("download/:orderId/item/:itemId")
+  @ApiOperation({ summary: "개별 파일 다운로드 URL 발급" })
+  async getItemDownloadUrl(
+    @Request() req: { user: { id: string } },
+    @Param("orderId") orderId: string,
+    @Param("itemId") itemId: string,
+  ) {
+    const result = await this.downloadService.getSecureItemDownloadUrl(
+      req.user.id,
+      orderId,
+      itemId,
+    );
+
+    return { success: true, data: result };
+  }
 }

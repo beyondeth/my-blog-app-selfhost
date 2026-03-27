@@ -27,7 +27,7 @@ import { ProductCategory } from "../../common/enums/product-category.enum";
 @Index(["productCategory"])
 @Index(["price"])
 @Index(["salesCount"])
-@Check(`"price" >= 100`)
+@Check(`"price" >= 1000`)
 export class ProductDetail {
   @PrimaryGeneratedColumn("uuid")
   id: string;
@@ -40,7 +40,7 @@ export class ProductDetail {
   @JoinColumn({ name: "postId" })
   post: Post;
 
-  /** 가격 (KRW, 최소 100원) */
+  /** 가격 (KRW, 최소 1,000원) */
   @Column({ type: "integer" })
   price: number;
 

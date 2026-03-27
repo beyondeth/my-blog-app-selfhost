@@ -10,9 +10,31 @@ import {
   Matches,
   IsUUID,
   IsIn,
+  ValidateNested,
 } from "class-validator";
 import { ApiProperty, ApiPropertyOptional } from "@nestjs/swagger";
-import { Transform } from "class-transformer";
+import { Transform, Type } from "class-transformer";
+
+/**
+ * 파일 기반 배송 아이템 DTO
+ * 격리 업로드 완료 후 quarantineId로 연결
+ */
+export class DeliveryFileDto {
+  @IsString()
+  quarantineId: string;
+
+  @IsString()
+  @MaxLength(300)
+  fileName: string;
+
+  @IsNumber()
+  @Min(1)
+  fileSize: number;
+
+  @IsString()
+  @MaxLength(100)
+  mimeType: string;
+}
 
 export class CreatePostDto {
   @ApiProperty({
@@ -164,7 +186,7 @@ export class CreatePostDto {
   })
   @IsOptional()
   @IsNumber()
-  @Min(100)
+  @Min(1000)
   price?: number;
 
   @ApiPropertyOptional({
@@ -182,6 +204,16 @@ export class CreatePostDto {
   @IsOptional()
   @IsString()
   deliveryContent?: string;
+
+  @ApiPropertyOptional({
+    description:
+      "파일 기반 배송 아이템 배열. 격리 업로드 완료된 파일의 quarantineId로 연결",
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => DeliveryFileDto)
+  deliveryFiles?: DeliveryFileDto[];
 
   @ApiPropertyOptional({
     description: "직접 작성한 미리보기 콘텐츠 (HTML). ProductDetail.previewContent로 저장",
