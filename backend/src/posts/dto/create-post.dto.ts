@@ -173,7 +173,7 @@ export class CreatePostDto {
   })
   @IsOptional()
   @IsString()
-  @IsIn(["ai_prompts", "coding_templates", "tech_guides", "ai_workflows", "data_analytics", "others"])
+  @MaxLength(50)
   productCategory?: string;
 
   @ApiPropertyOptional({

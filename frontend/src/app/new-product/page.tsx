@@ -8,8 +8,7 @@ import { ArrowLeft, Tag } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useMyBlogs } from '@/hooks/useBlogs';
 import { useCreatePost } from '@/hooks/usePosts';
-import { ProductCategoryLabel } from '@/types/marketplace';
-import type { ProductCategory } from '@/types/marketplace';
+// ProductCategory type은 백엔드 전송 시 사용
 
 // 에디터 동적 로드 (SSR 비활성화)
 const BlogSimpleEditor = dynamic(
@@ -22,14 +21,14 @@ const BlogSimpleEditor = dynamic(
   }
 );
 
-const CATEGORIES: { value: ProductCategory; label: string }[] = [
-  { value: 'ai_prompts', label: ProductCategoryLabel.ai_prompts },
-  { value: 'coding_templates', label: ProductCategoryLabel.coding_templates },
-  { value: 'tech_guides', label: ProductCategoryLabel.tech_guides },
-  { value: 'ai_workflows', label: ProductCategoryLabel.ai_workflows },
-  { value: 'data_analytics', label: ProductCategoryLabel.data_analytics },
-  { value: 'others', label: ProductCategoryLabel.others },
-];
+const CATEGORIES = [
+  { value: 'ai_prompts', label: 'AI / 프롬프트' },
+  { value: 'coding_templates', label: '개발 / 템플릿' },
+  { value: 'tech_guides', label: '가이드 / 튜토리얼' },
+  { value: 'data_analytics', label: '데이터 / 분석' },
+  { value: 'others', label: '기타' },
+  { value: '_custom', label: '직접 입력' },
+] as const;
 
 /**
  * 상품 등록 전용 페이지
@@ -48,7 +47,8 @@ export default function NewProductPage() {
   // 상품 정보
   const [title, setTitle] = useState('');
   const [price, setPrice] = useState<string>('');
-  const [category, setCategory] = useState<ProductCategory>('ai_prompts');
+  const [category, setCategory] = useState<string>('ai_prompts');
+  const [customCategory, setCustomCategory] = useState('');
 
   // 에디터 콘텐츠 (2개: 공개 설명 + 구매자 전용)
   const [descriptionContent, setDescriptionContent] = useState('');
@@ -107,7 +107,7 @@ export default function NewProductPage() {
         content: descriptionContent,
         postType: 'product',
         price: Number(price),
-        productCategory: category,
+        productCategory: category === '_custom' ? (customCategory.trim() || 'others') : category,
         deliveryContent,
         isPublished: !asDraft,
         ...(previewMode === 'custom' && customPreview.trim()
@@ -197,13 +197,23 @@ export default function NewProductPage() {
               </label>
               <select
                 value={category}
-                onChange={(e) => setCategory(e.target.value as ProductCategory)}
+                onChange={(e) => setCategory(e.target.value)}
                 className="w-full h-10 px-3 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-gray-900 dark:text-white focus:ring-2 focus:ring-gray-900/10 dark:focus:ring-zinc-100/10 focus:border-gray-400 dark:focus:border-zinc-500 outline-none transition-colors"
               >
                 {CATEGORIES.map((c) => (
                   <option key={c.value} value={c.value}>{c.label}</option>
                 ))}
               </select>
+              {category === '_custom' && (
+                <input
+                  type="text"
+                  value={customCategory}
+                  onChange={(e) => setCustomCategory(e.target.value)}
+                  placeholder="카테고리를 직접 입력하세요"
+                  maxLength={30}
+                  className="w-full h-10 px-3 mt-2 rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 text-sm text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-zinc-500 focus:ring-2 focus:ring-gray-900/10 dark:focus:ring-zinc-100/10 focus:border-gray-400 dark:focus:border-zinc-500 outline-none transition-colors"
+                />
+              )}
             </div>
 
             {/* 가격 */}
@@ -233,6 +243,22 @@ export default function NewProductPage() {
           </div>
         </div>
 
+        {/* 에디터 툴바 줄바꿈 스타일 — overflow-x: auto를 flex-wrap: wrap으로 오버라이드 */}
+        <style jsx global>{`
+          .product-editor .tiptap-toolbar[data-variant="fixed"] {
+            overflow-x: visible !important;
+            flex-wrap: wrap !important;
+            height: auto !important;
+            min-height: var(--tt-toolbar-height);
+            padding-top: 0.25rem;
+            padding-bottom: 0.25rem;
+            gap: 2px 0;
+          }
+          .product-editor .tiptap-toolbar-group {
+            flex-wrap: nowrap;
+          }
+        `}</style>
+
         {/* 섹션 1: 상품 소개 (공개) */}
         <div className="space-y-3">
           <div>
@@ -243,7 +269,7 @@ export default function NewProductPage() {
               구매 전 모든 사용자에게 보이는 마케팅 설명입니다
             </p>
           </div>
-          <div className="rounded-xl border border-gray-200 dark:border-zinc-800 overflow-hidden">
+          <div className="product-editor rounded-xl border border-gray-200 dark:border-zinc-800 overflow-hidden">
             <BlogSimpleEditor
               content={descriptionContent}
               onChange={setDescriptionContent}
@@ -265,7 +291,7 @@ export default function NewProductPage() {
               구매 완료 후에만 열람할 수 있는 실제 상품 콘텐츠입니다
             </p>
           </div>
-          <div className="rounded-xl border border-green-200 dark:border-green-900/50 overflow-hidden">
+          <div className="product-editor rounded-xl border border-green-200 dark:border-green-900/50 overflow-hidden">
             <BlogSimpleEditor
               content={deliveryContent}
               onChange={setDeliveryContent}
