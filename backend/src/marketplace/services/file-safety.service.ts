@@ -231,8 +231,9 @@ export class FileSafetyService {
       ? `marketplace/verified/${record.deliveryItemId}/${uuid}.${ext}`
       : `marketplace/verified/${record.uploaderId}/${uuid}.${ext}`;
 
-    // S3 복사 + 원본 삭제는 실제 구현에서 수행
-    // 현재는 키만 기록 (S3 CopyObject API 연동 필요)
+    // R2에서 quarantine → verified 경로로 파일 복사 + 원본 삭제
+    await this.r2Service.copyObject(record.quarantineKey, verifiedKey);
+    await this.r2Service.deleteFile(record.quarantineKey);
 
     await this.quarantineRepository.update(quarantineId, {
       status: "clean",

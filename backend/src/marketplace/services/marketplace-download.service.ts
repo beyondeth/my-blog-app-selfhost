@@ -13,10 +13,12 @@ import { DeliveryItem } from "../entities/delivery-item.entity";
 import { OrderStatus } from "../../common/enums/order-status.enum";
 import { R2Service } from "../../files/services/r2.service";
 
-/** 다운로드 횟수 제한 */
-const MAX_DOWNLOADS = 5;
+/** 다운로드 세션 제한 (5세션, 각 세션에서 모든 파일 다운로드 가능) */
+const MAX_DOWNLOAD_SESSIONS = 5;
 /** presigned URL 만료 시간 (초) */
 const URL_EXPIRY_SECONDS = 3600; // 1시간
+/** 같은 세션으로 간주하는 시간 (밀리초) — 10분 이내 재다운로드는 횟수 미증가 */
+const SESSION_WINDOW_MS = 10 * 60 * 1000;
 
 /**
  * 마켓플레이스 보안 파일 전달 서비스
@@ -72,22 +74,22 @@ export class MarketplaceDownloadService {
       );
     }
 
-    const newDownloadCount = await this.incrementDownloadCount(order.id);
+    const newDownloadCount = await this.checkAndIncrementDownloadSession(order.id);
 
     const s3Key = this.extractS3Key(productDetail.digitalDeliveryUrl);
     const downloadUrl =
       await this.r2Service.generatePresignedDownloadUrl(s3Key);
 
     this.logger.log(
-      `다운로드 URL 발급: orderId=${orderId}, count=${newDownloadCount}/${MAX_DOWNLOADS}`,
+      `다운로드 URL 발급: orderId=${orderId}, count=${newDownloadCount}/${MAX_DOWNLOAD_SESSIONS}`,
     );
 
     return {
       downloadUrl,
       expiresIn: URL_EXPIRY_SECONDS,
       downloadCount: newDownloadCount,
-      maxDownloads: MAX_DOWNLOADS,
-      remainingDownloads: MAX_DOWNLOADS - newDownloadCount,
+      maxDownloads: MAX_DOWNLOAD_SESSIONS,
+      remainingDownloads: MAX_DOWNLOAD_SESSIONS - newDownloadCount,
     };
   }
 
@@ -136,7 +138,7 @@ export class MarketplaceDownloadService {
       throw new BadRequestException("유효하지 않은 파일 경로입니다");
     }
 
-    const newDownloadCount = await this.incrementDownloadCount(order.id);
+    const newDownloadCount = await this.checkAndIncrementDownloadSession(order.id);
 
     // S3Service의 내부 클라이언트로 Content-Disposition 포함 presigned URL 생성
     const downloadUrl =
@@ -146,15 +148,15 @@ export class MarketplaceDownloadService {
       );
 
     this.logger.log(
-      `아이템 다운로드 URL 발급: orderId=${orderId}, itemId=${deliveryItemId}, file=${fileName}, count=${newDownloadCount}/${MAX_DOWNLOADS}`,
+      `아이템 다운로드 URL 발급: orderId=${orderId}, itemId=${deliveryItemId}, file=${fileName}, count=${newDownloadCount}/${MAX_DOWNLOAD_SESSIONS}`,
     );
 
     return {
       downloadUrl,
       expiresIn: URL_EXPIRY_SECONDS,
       downloadCount: newDownloadCount,
-      maxDownloads: MAX_DOWNLOADS,
-      remainingDownloads: MAX_DOWNLOADS - newDownloadCount,
+      maxDownloads: MAX_DOWNLOAD_SESSIONS,
+      remainingDownloads: MAX_DOWNLOAD_SESSIONS - newDownloadCount,
       fileName,
     };
   }
@@ -178,10 +180,49 @@ export class MarketplaceDownloadService {
     return order;
   }
 
-  /** 다운로드 횟수 원자적 증가 (TOCTOU 방지) */
-  private async incrementDownloadCount(
+  /**
+   * 세션 기반 다운로드 횟수 관리
+   *
+   * 같은 세션(10분 이내) 재다운로드 → 횟수 미증가 (모든 파일 자유롭게 다운로드)
+   * 새 세션 → 횟수 +1 (최대 5세션)
+   *
+   * 이렇게 하면 5파일 상품을 한번에 받아도 1세션으로 카운트
+   */
+  private async checkAndIncrementDownloadSession(
     orderPkId: string,
   ): Promise<number> {
+    // 현재 메타데이터 조회
+    const order = await this.orderRepository.findOne({
+      where: { id: orderPkId },
+      select: ["metadata"],
+    });
+
+    const metadata = (order?.metadata || {}) as Record<string, unknown>;
+    const downloadCount = (metadata.downloadCount as number) || 0;
+    const lastDownloadAt = metadata.lastDownloadAt as string | undefined;
+
+    // 같은 세션인지 확인 (10분 이내)
+    if (lastDownloadAt) {
+      const elapsed = Date.now() - new Date(lastDownloadAt).getTime();
+      if (elapsed < SESSION_WINDOW_MS) {
+        // 같은 세션 — 횟수 미증가, 타임스탬프만 갱신
+        await this.orderRepository
+          .createQueryBuilder()
+          .update()
+          .set({
+            metadata: () => `
+              COALESCE(metadata, '{}'::jsonb)
+              || jsonb_build_object('lastDownloadAt', '"${new Date().toISOString()}"'::jsonb)
+            `,
+          })
+          .where("id = :id", { id: orderPkId })
+          .execute();
+
+        return downloadCount;
+      }
+    }
+
+    // 새 세션 — 횟수 증가 (원자적, TOCTOU 방지)
     const incrementResult = await this.orderRepository
       .createQueryBuilder()
       .update()
@@ -190,31 +231,25 @@ export class MarketplaceDownloadService {
           COALESCE(metadata, '{}'::jsonb)
           || jsonb_build_object(
             'downloadCount', (COALESCE((metadata->>'downloadCount')::int, 0) + 1),
-            'maxDownloads', ${MAX_DOWNLOADS}
+            'maxDownloads', ${MAX_DOWNLOAD_SESSIONS},
+            'lastDownloadAt', '"${new Date().toISOString()}"'::jsonb
           )
         `,
       })
       .where("id = :id", { id: orderPkId })
       .andWhere(
         "COALESCE((metadata->>'downloadCount')::int, 0) < :max",
-        { max: MAX_DOWNLOADS },
+        { max: MAX_DOWNLOAD_SESSIONS },
       )
       .execute();
 
     if (incrementResult.affected === 0) {
       throw new ForbiddenException(
-        `다운로드 횟수를 초과했습니다 (최대 ${MAX_DOWNLOADS}회). 고객센터에 문의해주세요.`,
+        `다운로드 횟수를 초과했습니다 (최대 ${MAX_DOWNLOAD_SESSIONS}회). 고객센터에 문의해주세요.`,
       );
     }
 
-    const updated = await this.orderRepository.findOne({
-      where: { id: orderPkId },
-      select: ["metadata"],
-    });
-    return (
-      (updated?.metadata as Record<string, unknown>)
-        ?.downloadCount as number
-    ) || 1;
+    return downloadCount + 1;
   }
 
   /** digitalDeliveryUrl에서 S3 key 추출 (레거시 호환) */

@@ -20,6 +20,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  CopyObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as fs from "fs";
@@ -289,7 +290,36 @@ export class R2Service {
   }
 
   /**
-   * 비디오 파일 삭제
+   * R2 객체 복사 (quarantine → verified 이동 등)
+   */
+  async copyObject(
+    sourceKey: string,
+    destinationKey: string,
+  ): Promise<void> {
+    this.ensureConfigured();
+
+    try {
+      const copyCommand = new CopyObjectCommand({
+        Bucket: this.bucket,
+        CopySource: `${this.bucket}/${sourceKey}`,
+        Key: destinationKey,
+      });
+
+      await this.s3Client.send(copyCommand);
+      this.logger.log(
+        `R2 object copied: ${sourceKey} → ${destinationKey}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to copy R2 object: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to copy file");
+    }
+  }
+
+  /**
+   * 파일 삭제
    */
   async deleteFile(fileKey: string): Promise<void> {
     this.ensureConfigured();

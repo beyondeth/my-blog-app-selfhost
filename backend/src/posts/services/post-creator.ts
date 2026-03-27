@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource, EntityManager, In } from "typeorm";
 import { Post } from "../entities/post.entity";
@@ -391,6 +396,7 @@ export class PostCreator {
               const quarantineRepo =
                 manager.getRepository("file_quarantine");
 
+              let actualItemCount = 0;
               for (let i = 0; i < createPostDto.deliveryFiles!.length; i++) {
                 const file = createPostDto.deliveryFiles![i];
 
@@ -407,14 +413,14 @@ export class PostCreator {
                   this.logger.warn(
                     `유효하지 않은 격리 파일: quarantineId=${file.quarantineId}, userId=${author.id.substring(0, 8)}...`,
                   );
-                  continue; // 무효한 파일은 스킵
+                  continue;
                 }
 
                 await deliveryItemRepo.save({
                   productDetailId: pdId,
                   type: "file",
                   label: file.fileName,
-                  sortOrder: i,
+                  sortOrder: actualItemCount,
                   fileKey: quarantine.verifiedKey,
                   fileName: file.fileName,
                   fileSize: file.fileSize,
@@ -422,6 +428,22 @@ export class PostCreator {
                   quarantineStatus: "clean",
                   isActive: true,
                 });
+                actualItemCount++;
+              }
+
+              // 실제 생성된 수로 deliveryItemCount 보정
+              if (actualItemCount !== deliveryItemCount) {
+                await productDetailRepo.update(
+                  { id: pdId },
+                  { deliveryItemCount: actualItemCount },
+                );
+              }
+
+              // 유효한 파일이 0개면 에러 (빈 상품 방지)
+              if (actualItemCount === 0) {
+                throw new BadRequestException(
+                  "유효한 판매 파일이 없습니다. 파일을 다시 업로드해주세요.",
+                );
               }
             } else {
               // HTML 콘텐츠 기반 배송 (하위 호환)
