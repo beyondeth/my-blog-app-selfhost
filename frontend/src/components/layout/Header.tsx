@@ -14,6 +14,7 @@ import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 import { MusicPlayerButton } from '@/components/music';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { FEATURES } from '@/lib/features';
+import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import { useSidebarStore } from '@/stores/sidebarStore';
 import { useTheme } from 'next-themes';
 import { useFeedbackStore } from '@/stores/feedbackStore';
@@ -49,6 +50,7 @@ function HeaderComponent() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const canManageSubscription = canAccessSubscriptionUi(isAdmin);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   // 테마 마운트 상태 관리 (Hydration mismatch 방지)
@@ -259,7 +261,7 @@ function HeaderComponent() {
                   />
 
                   {/* Subscription Badge (Feature Flag) */}
-                  {FEATURES.SUBSCRIPTION && <SubscriptionBadge user={user} />}
+                  {canManageSubscription && <SubscriptionBadge user={user} />}
                 </>
               ) : (
                 <>

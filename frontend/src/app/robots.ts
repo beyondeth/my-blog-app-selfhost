@@ -21,7 +21,6 @@ export default function robots(): MetadataRoute.Robots {
       allow: [
         // 공개 페이지 허용
         '/',
-        '/pricing',
         '/support',
         '/landing',
         '/legal/',
@@ -84,6 +83,7 @@ export default function robots(): MetadataRoute.Robots {
         '/dm/*',
         '/bookmarks',
         '/new-story',
+        '/pricing',
         '/account/subscription',
         '/p/*/edit',
 

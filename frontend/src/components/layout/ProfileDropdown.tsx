@@ -29,6 +29,7 @@ import {
   FiBookmark
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
+import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import {
   Tooltip,
   TooltipContent,
@@ -58,6 +59,9 @@ export default function ProfileDropdown({
   };
 
   const { data: myCommunities } = useMyCommunities({ enabled: !!user && mounted });
+  const canManageSubscription = canAccessSubscriptionUi(
+    user?.role?.toLowerCase() === 'admin'
+  );
 
   // 관리 중인 커뮤니티 필터링 (Owner or Moderator)
   const managedCommunities = myCommunities?.filter(community => 
@@ -107,7 +111,7 @@ export default function ProfileDropdown({
         <DropdownMenuSeparator />
 
         {/* 구독 관련 메뉴 (Feature Flag) */}
-        {FEATURES.SUBSCRIPTION && (
+        {canManageSubscription && (
         <>
         {/* 구독 관리 */}
         <DropdownMenuItem

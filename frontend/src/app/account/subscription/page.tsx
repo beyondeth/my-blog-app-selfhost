@@ -9,22 +9,22 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { FiPackage, FiArrowLeft } from 'react-icons/fi';
-import { useAuth } from '@/providers/AuthProviderV2';
+import { useSubscriptionUiGuard } from '@/hooks/useSubscriptionUiGuard';
 
 export default function SubscriptionManagementPage() {
   const router = useRouter();
-  const { user, isLoading: authLoading } = useAuth();
+  const { canAccess, isRedirecting } = useSubscriptionUiGuard({
+    authenticatedRedirectTo: '/settings',
+    unauthenticatedRedirectTo: '/',
+  });
 
-  // 로그인하지 않은 경우 리다이렉트
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login?redirect=/account/subscription');
+    if (!isRedirecting && canAccess) {
+      router.replace('/settings/billing');
     }
-  }, [user, authLoading, router]);
+  }, [canAccess, isRedirecting, router]);
 
-  // 로그인 체크 중이거나 로그인하지 않은 경우
-  if (authLoading || !user) {
+  if (isRedirecting || !canAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900"></div>
@@ -32,49 +32,7 @@ export default function SubscriptionManagementPage() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-      <div className="max-w-md w-full">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 text-center">
-          {/* 아이콘 */}
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-blue-50 rounded-full mb-6">
-            <FiPackage className="w-8 h-8 text-blue-600" />
-          </div>
-
-          {/* 제목 */}
-          <h1 className="text-2xl font-bold text-gray-900 mb-3">
-            구독 기능 준비 중
-          </h1>
-
-          {/* 설명 */}
-          <p className="text-gray-600 mb-8">
-            더 나은 서비스를 제공하기 위해 구독 기능을 준비하고 있습니다.
-            <br />
-            곧 다양한 플랜과 함께 찾아뵙겠습니다.
-          </p>
-
-          {/* 현재 상태 안내 */}
-          <div className="bg-blue-50 border border-blue-100 rounded-lg p-4 mb-6">
-            <p className="text-sm text-blue-900 font-medium mb-1">
-              현재 이용 가능한 기능
-            </p>
-            <p className="text-sm text-blue-700">
-              모든 기본 기능을 무료로 이용하실 수 있습니다.
-            </p>
-          </div>
-
-          {/* 홈으로 돌아가기 버튼 */}
-          <button
-            onClick={() => router.push('/')}
-            className="inline-flex items-center justify-center w-full px-6 py-3 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
-          >
-            <FiArrowLeft className="w-4 h-4 mr-2" />
-            홈으로 돌아가기
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  return null;
 }
 
 /*

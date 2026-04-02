@@ -882,34 +882,41 @@ export default function LandingClientPage() {
         </section>
 
         {/* ════════════════════════════════════════════════════════════
-            PRICING
+            ACCESS
         ════════════════════════════════════════════════════════════ */}
         <section
-          id="pricing"
+          id="access"
           className="border-y border-zinc-100 dark:border-white/[0.06] bg-zinc-50/60 dark:bg-white/[0.01] py-24 lg:py-32"
         >
           <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12">
             <FadeInSection>
               <div className="text-center max-w-2xl mx-auto mb-14 [word-break:keep-all]">
+                <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
+                  이용 안내
+                </p>
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight text-zinc-900 dark:text-white leading-tight">
-                  무료로 시작하고,
+                  지금은 핵심 기능에
                   <br />
-                  필요할 때 확장하세요
+                  바로 집중할 수 있습니다
                 </h2>
+                <p className="mt-5 text-base leading-relaxed text-zinc-500 dark:text-zinc-400">
+                  공개 결제는 아직 열지 않았습니다. 현재는 기본 경험을 먼저 사용할 수 있고,
+                  팀 도입이나 별도 운영이 필요하면 문의를 통해 안내합니다.
+                </p>
               </div>
             </FadeInSection>
 
             <div className="grid gap-5 lg:grid-cols-3 max-w-4xl mx-auto">
-              {/* Starter */}
+              {/* 개인 사용자 */}
               <FadeInSection delay={0} className="h-full">
                 <div className="h-full flex flex-col rounded-2xl border border-zinc-200 dark:border-white/[0.06] bg-white dark:bg-zinc-900/50 p-7 [word-break:keep-all]">
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-white">Starter</h3>
-                  <p className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">개인 사용자를 위한 무료 플랜</p>
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white">개인 사용자</h3>
+                  <p className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">핵심 기능을 빠르게 체험</p>
                   <p className="mt-6 text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">
-                    ₩0<span className="text-sm font-normal text-zinc-400 ml-1">/월</span>
+                    즉시 시작
                   </p>
                   <ul className="mt-6 space-y-3">
-                    {['AI 1개 플랫폼 MCP 연동', '월 10개 포스트 자동 생성', '기본 SEO 최적화', '커뮤니티 참여'].map(
+                    {['계정 생성 후 기본 기능 사용', 'AI 기록 정리와 발행 경험 확인', '커뮤니티 참여', '서비스 흐름 빠르게 체험'].map(
                       (item) => (
                         <li key={item} className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
                           <Check className="h-4 w-4 text-zinc-400 dark:text-zinc-600 mt-0.5 shrink-0" />
@@ -927,25 +934,23 @@ export default function LandingClientPage() {
                 </div>
               </FadeInSection>
 
-              {/* Pro — 강조 카드 */}
+              {/* 팀 운영 */}
               <FadeInSection delay={0.06} className="h-full">
                 <div className="h-full flex flex-col rounded-2xl border-2 border-emerald-500/30 dark:border-emerald-400/30 bg-white dark:bg-zinc-900/50 p-7 relative shadow-lg shadow-emerald-500/5 dark:shadow-emerald-400/5 [word-break:keep-all]">
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-emerald-600 dark:bg-emerald-500 px-3.5 py-1 text-[11px] font-bold text-white tracking-wide">
-                    인기
+                    추천
                   </div>
-                  <h3 className="text-base font-bold text-zinc-900 dark:text-white">Pro</h3>
-                  <p className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">크리에이터 & 팀</p>
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-white">팀 운영</h3>
+                  <p className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">반복 발행과 협업이 필요한 워크플로우</p>
                   <p className="mt-6 text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">
-                    ₩5,900<span className="text-sm font-normal text-zinc-400 ml-1">/월</span>
+                    도입 상담
                   </p>
                   <ul className="mt-6 space-y-3">
                     {[
-                      'AI 무제한 플랫폼 MCP 연동',
-                      '무제한 포스트 자동 생성',
-                      '고급 SEO & 애널리틱스',
-                      '커스텀 도메인',
-                      '마켓 판매 기능',
-                      '우선 지원',
+                      '여러 워크플로우에 맞춘 운영 설계',
+                      '반복 발행 자동화 범위 검토',
+                      '팀 단위 사용 시나리오 상담',
+                      '출시 시점 우선 안내',
                     ].map((item) => (
                       <li key={item} className="flex items-start gap-2.5 text-sm text-zinc-600 dark:text-zinc-400">
                         <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400 mt-0.5 shrink-0" />
@@ -954,10 +959,10 @@ export default function LandingClientPage() {
                     ))}
                   </ul>
                   <Link
-                    href="/pricing"
+                    href="/support"
                     className="mt-auto pt-8 flex h-12 items-center justify-center rounded-xl bg-emerald-600 dark:bg-emerald-500 text-sm font-semibold text-white transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.02] active:scale-[0.98]"
                   >
-                    플랜 자세히 보기
+                    도입 문의하기
                   </Link>
                 </div>
               </FadeInSection>
@@ -967,7 +972,7 @@ export default function LandingClientPage() {
                 <div className="h-full flex flex-col rounded-2xl border border-zinc-200 dark:border-white/[0.06] bg-white dark:bg-zinc-900/50 p-7 [word-break:keep-all]">
                   <h3 className="text-base font-bold text-zinc-900 dark:text-white">Enterprise</h3>
                   <p className="mt-1 text-sm text-zinc-400 dark:text-zinc-500">조직과 기업을 위한 맞춤형</p>
-                  <p className="mt-6 text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">맞춤형</p>
+                  <p className="mt-6 text-3xl font-bold text-zinc-900 dark:text-white tracking-tight">별도 협의</p>
                   <ul className="mt-6 space-y-3">
                     {['Pro 전체 기능 포함', 'SSO & RBAC 관리', 'SLA 보장 (99.9%)', '전담 기술 지원', 'On-premise 배포 옵션'].map(
                       (item) => (
@@ -979,10 +984,10 @@ export default function LandingClientPage() {
                     )}
                   </ul>
                   <Link
-                    href="/register"
+                    href="/support"
                     className="mt-auto pt-8 flex h-12 items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 text-sm font-semibold text-zinc-700 dark:text-zinc-300 transition-all duration-300 hover:bg-zinc-50 dark:hover:bg-white/[0.04]"
                   >
-                    문의하기
+                    상담 요청하기
                   </Link>
                 </div>
               </FadeInSection>

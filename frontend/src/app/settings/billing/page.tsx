@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/providers/AuthProviderV2';
+import { SUBSCRIPTION_INTERNAL_NOTICE } from '@/lib/subscription-access';
+import { useSubscriptionUiGuard } from '@/hooks/useSubscriptionUiGuard';
 import { toast } from 'sonner';
 import {
   useMySubscription,
@@ -91,7 +92,10 @@ function getPaymentBadge(status?: string): { label: string; cls: string } {
 /* ─────────────────────── 메인 페이지 ─────────────────────── */
 
 export default function BillingSettingsPage() {
-  const { user, authStatus } = useAuth();
+  const { user, authStatus, isAdmin, canAccess, isRedirecting } = useSubscriptionUiGuard({
+    authenticatedRedirectTo: '/settings',
+    unauthenticatedRedirectTo: '/',
+  });
   const router = useRouter();
 
   // 데이터
@@ -150,7 +154,9 @@ export default function BillingSettingsPage() {
   };
 
   // 인증 로딩 중 → 빈 화면 (뒤로가기 시 로그인 플리커 방지)
-  if (authStatus === 'loading') return null;
+  if (isRedirecting || authStatus === 'loading') return null;
+
+  if (!canAccess) return null;
 
   if (!user) {
     return (
@@ -179,6 +185,12 @@ export default function BillingSettingsPage() {
           판매자 대시보드
         </button>
       </div>
+
+      {isAdmin && (
+        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+          {SUBSCRIPTION_INTERNAL_NOTICE}
+        </div>
+      )}
 
       {/* PAST_DUE 경고 */}
       {isPastDue && (

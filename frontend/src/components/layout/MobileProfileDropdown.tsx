@@ -24,6 +24,7 @@ import {
   FiKey,
 } from 'react-icons/fi';
 import { FEATURES } from '@/lib/features';
+import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import { useMyCommunities } from '@/hooks/community/useCommunities';
 
 interface MobileProfileDropdownProps {
@@ -49,6 +50,9 @@ export default function MobileProfileDropdown({
   };
 
   const { data: myCommunities } = useMyCommunities({ enabled: !!user });
+  const canManageSubscription = canAccessSubscriptionUi(
+    user?.role?.toLowerCase() === 'admin'
+  );
 
   // 관리 중인 커뮤니티 필터링 (Owner or Moderator)
   const managedCommunities = myCommunities?.filter(community => 
@@ -81,7 +85,7 @@ export default function MobileProfileDropdown({
         <DropdownMenuSeparator />
 
         {/* Feature Flag: Subscription */}
-        {FEATURES.SUBSCRIPTION && (
+        {canManageSubscription && (
           <>
             <DropdownMenuItem onClick={() => handleNavigation('/account/subscription')} className="cursor-pointer">
               <FiCreditCard className="mr-2 h-4 w-4" />

@@ -40,7 +40,7 @@ export default function SubscriptionBadge({ user }: SubscriptionBadgeProps) {
   // 구독 티어에 따라 다른 링크로 이동
   // FREE 플랜은 pricing으로 (업그레이드 유도)
   // 유료 플랜은 구독 관리 페이지로 이동
-  const badgeLink = currentTier === SubscriptionTier.FREE ? '/pricing' : '/account/subscription';
+  const badgeLink = currentTier === SubscriptionTier.FREE ? '/pricing' : '/settings/billing';
 
   return (
     <Link

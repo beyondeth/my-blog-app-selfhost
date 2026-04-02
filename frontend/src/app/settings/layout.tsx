@@ -17,12 +17,13 @@ import {
 } from 'react-icons/fi';
 import { ArrowLeft, BarChart3, CreditCard } from 'lucide-react';
 import { FEATURES } from '@/lib/features';
+import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { DESTRUCTIVE_ACTION_CLASS } from '@/constants/accessibility';
 import { Button } from '@/components/ui/button';
 
 // Feature Flag에 따라 동적으로 메뉴 구성
-const getSettingsNav = () => {
+const getSettingsNav = (canManageBilling: boolean) => {
   const baseNav = [
     {
       title: '프로필',
@@ -50,11 +51,6 @@ const getSettingsNav = () => {
       icon: BarChart3,
     },
     {
-      title: '결제 관리',
-      href: '/settings/billing',
-      icon: CreditCard,
-    },
-    {
       title: '보안',
       href: '/settings/security',
       icon: FiShield,
@@ -65,6 +61,14 @@ const getSettingsNav = () => {
       icon: FiKey,
     },
   ];
+
+  if (canManageBilling) {
+    baseNav.splice(5, 0, {
+      title: '결제 관리',
+      href: '/settings/billing',
+      icon: CreditCard,
+    });
+  }
 
   // 알림 기능이 활성화된 경우에만 메뉴에 추가
   if (FEATURES.NOTIFICATIONS) {
@@ -78,8 +82,6 @@ const getSettingsNav = () => {
   return baseNav;
 };
 
-const settingsNav = getSettingsNav();
-
 /**
  * 설정 레이아웃 메인 컴포넌트
  * useSearchParams를 사용하므로 Suspense로 감싸야 함
@@ -91,9 +93,10 @@ function SettingsLayoutContent({
 }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const { logout } = useAuth();
+  const { logout, isAdmin } = useAuth();
   const router = useRouter();
   const [activeTab, setActiveTab] = useState(pathname);
+  const settingsNav = getSettingsNav(canAccessSubscriptionUi(isAdmin));
 
   useEffect(() => {
     setActiveTab(pathname);

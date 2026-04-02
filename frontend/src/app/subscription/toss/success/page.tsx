@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
+import { useSubscriptionUiGuard } from "@/hooks/useSubscriptionUiGuard";
 
 const API_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000/api/v1";
@@ -58,6 +59,7 @@ function formatDate(dateStr?: string): string {
  * 백엔드에서 빌링키 발급 + 첫 결제 실행 후 결과를 화면에 표시
  */
 export default function TossSuccessPage() {
+  const { canAccess, isRedirecting } = useSubscriptionUiGuard();
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "success" | "error">(
@@ -70,6 +72,10 @@ export default function TossSuccessPage() {
   const isProcessing = useRef(false);
 
   useEffect(() => {
+    if (!canAccess) {
+      return;
+    }
+
     const confirmBillingAuth = async () => {
       const authKey = searchParams.get("authKey");
       const customerKey = searchParams.get("customerKey");
@@ -153,7 +159,15 @@ export default function TossSuccessPage() {
     };
 
     confirmBillingAuth();
-  }, [searchParams]);
+  }, [canAccess, searchParams]);
+
+  if (isRedirecting) {
+    return null;
+  }
+
+  if (!canAccess) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-zinc-50 dark:bg-zinc-950 px-4">

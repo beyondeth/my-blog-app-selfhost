@@ -1,6 +1,7 @@
 "use client";
 
 import { useSearchParams, useRouter } from "next/navigation";
+import { useSubscriptionUiGuard } from "@/hooks/useSubscriptionUiGuard";
 
 /**
  * 토스페이먼츠 빌링인증 실패 페이지
@@ -9,8 +10,17 @@ import { useSearchParams, useRouter } from "next/navigation";
  * URL 쿼리에서 code, message를 추출하여 에러 메시지 표시
  */
 export default function TossFailPage() {
+  const { canAccess, isRedirecting } = useSubscriptionUiGuard();
   const searchParams = useSearchParams();
   const router = useRouter();
+
+  if (isRedirecting) {
+    return null;
+  }
+
+  if (!canAccess) {
+    return null;
+  }
 
   const errorCode = searchParams.get("code") || "UNKNOWN";
   const errorMessage =

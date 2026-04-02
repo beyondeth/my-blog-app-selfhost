@@ -8,6 +8,8 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { SUBSCRIPTION_INTERNAL_NOTICE } from '@/lib/subscription-access';
+import { useSubscriptionUiGuard } from '@/hooks/useSubscriptionUiGuard';
 import { SubscriptionTier, BillingCycle } from '@/types/subscription';
 
 /**
@@ -15,6 +17,7 @@ import { SubscriptionTier, BillingCycle } from '@/types/subscription';
  * useSearchParams를 사용하므로 Suspense로 감싸야 함
  */
 function MockCheckoutPageContent() {
+  const { canAccess, isRedirecting } = useSubscriptionUiGuard();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [processing, setProcessing] = useState(false);
@@ -91,6 +94,14 @@ function MockCheckoutPageContent() {
 
   const priceInfo = getPriceInfo();
 
+  if (isRedirecting) {
+    return null;
+  }
+
+  if (!canAccess) {
+    return null;
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
@@ -104,6 +115,10 @@ function MockCheckoutPageContent() {
               개발 모드
             </span>
           </p>
+        </div>
+
+        <div className="mb-6 rounded-lg border border-amber-200 bg-amber-50 p-4">
+          <p className="text-sm font-medium text-amber-900">{SUBSCRIPTION_INTERNAL_NOTICE}</p>
         </div>
 
         {/* 상품 정보 */}

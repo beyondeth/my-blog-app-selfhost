@@ -10,7 +10,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FiCheck } from 'react-icons/fi';
-import { useAuth } from '@/providers/AuthProviderV2';
+import { SUBSCRIPTION_INTERNAL_NOTICE } from '@/lib/subscription-access';
+import { useSubscriptionUiGuard } from '@/hooks/useSubscriptionUiGuard';
 import { useMySubscription, useSubscriptionPlans, useSimulateUpgrade } from '@/hooks/useSubscription';
 import { useTossPayments } from '@/hooks/useTossPayments';
 import { requestTossBillingAuth, scheduleDowngrade, upgradeSubscription } from '@/services/api/subscription.service';
@@ -19,7 +20,7 @@ import { toast } from 'sonner';
 
 export default function PricingPage() {
   const router = useRouter();
-  const { user, authStatus } = useAuth();
+  const { user, authStatus, isAdmin, canAccess, isRedirecting } = useSubscriptionUiGuard();
   const { data: plansData, isLoading: plansLoading } = useSubscriptionPlans();
   const { data: subscription } = useMySubscription();
   const { requestBillingAuth } = useTossPayments();
@@ -177,12 +178,16 @@ export default function PricingPage() {
   };
 
   // auth 로딩 중 flicker 방지
-  if (authStatus === 'loading' || plansLoading) {
+  if (isRedirecting || authStatus === 'loading' || plansLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gray-900 dark:border-gray-100"></div>
       </div>
     );
+  }
+
+  if (!canAccess) {
+    return null;
   }
 
   const plans = plansData || [];
@@ -199,6 +204,12 @@ export default function PricingPage() {
             필요에 맞는 플랜을 선택하고 더 많은 기능을 활용하세요
           </p>
         </div>
+
+        {isAdmin && (
+          <div className="mx-auto mt-8 max-w-3xl rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-medium text-amber-900 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-200">
+            {SUBSCRIPTION_INTERNAL_NOTICE}
+          </div>
+        )}
 
         {/* 결제 주기 선택 */}
         <div className="mt-12 flex justify-center">
