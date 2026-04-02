@@ -1,11 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { Switch } from '@/components/ui/switch';
 import { ShoppingBag, AlertTriangle } from 'lucide-react';
+import { canAccessMarketplaceSellerTools } from '@/lib/marketplace-access';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
@@ -41,9 +43,11 @@ const refundStatusLabel: Record<string, string> = {
 type TabKey = 'overview' | 'orders' | 'products' | 'refunds';
 
 export default function SellerDashboardPage() {
-  const { user } = useAuth();
+  const router = useRouter();
+  const { user, authStatus, isAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<TabKey>('overview');
+  const canAccess = canAccessMarketplaceSellerTools(isAdmin);
 
   // 거부 모달
   const [rejectTarget, setRejectTarget] = useState<string | null>(null);
@@ -116,10 +120,18 @@ export default function SellerDashboardPage() {
     onError: (e: Error) => setRefundError(e.message),
   });
 
-  if (!user) {
+  useEffect(() => {
+    if (authStatus === 'loading' || canAccess) {
+      return;
+    }
+
+    router.replace('/marketplace');
+  }, [authStatus, canAccess, router]);
+
+  if (authStatus === 'loading' || !canAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500 dark:text-zinc-400">로그인이 필요합니다</p>
+        <p className="text-gray-500 dark:text-zinc-400">페이지를 불러오는 중입니다</p>
       </div>
     );
   }

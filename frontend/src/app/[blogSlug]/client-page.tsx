@@ -28,6 +28,7 @@ import { BlogBrandingHero } from '@/components/blog/BlogBrandingHero';
 import { hexToRgb } from '@/lib/color';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import VirtualizedPostItem from '@/components/posts/VirtualizedPostItem';
+import { canAccessMarketplaceSellerTools } from '@/lib/marketplace-access';
 
 // 클라이언트 사이드 체크 훅
 function useIsClient() {
@@ -65,6 +66,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   const isClient = useIsClient();
   const searchParams = useSearchParams();
   const { getCacheStatus } = useNavigationCache();
+  const canManageMarketplace = canAccessMarketplaceSellerTools(isAdmin);
   
   // 모바일/데스크탑 감지 (사이드바는 lg 이상에서만 표시)
   const isDesktop = useMediaQuery('(min-width: 1024px)');
@@ -536,7 +538,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                     상품
                   </button>
                 </div>
-                {isBlogOwner && activeTab === 'products' && (
+                {isBlogOwner && canManageMarketplace && activeTab === 'products' && (
                   <a
                     href="/marketplace/seller"
                     className="text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300 underline underline-offset-2 pb-2"
@@ -637,7 +639,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                           <p className="text-sm text-gray-500 dark:text-zinc-400">
                             아직 등록된 상품이 없습니다
                           </p>
-                          {isBlogOwner && (
+                          {isBlogOwner && canManageMarketplace && (
                             <a href="/new-product" className="mt-3 inline-block text-sm text-gray-700 dark:text-zinc-300 underline underline-offset-2">
                               상품 등록하기
                             </a>
@@ -648,7 +650,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                     return (
                       <>
                         {/* 블로그 소유자: 상품 추가 등록 버튼 (상품 수 관계없이 항상 표시) */}
-                        {isBlogOwner && (
+                        {isBlogOwner && canManageMarketplace && (
                           <div className="mb-4 flex justify-end">
                             <a
                               href="/new-product"

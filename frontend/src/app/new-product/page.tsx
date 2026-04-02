@@ -10,6 +10,7 @@ import { useMyBlogs } from '@/hooks/useBlogs';
 import { useCreatePost } from '@/hooks/usePosts';
 import ProductFileUpload from '@/components/marketplace/ProductFileUpload';
 import type { UploadedDeliveryFile } from '@/components/marketplace/ProductFileUpload';
+import { canAccessMarketplaceSellerTools } from '@/lib/marketplace-access';
 
 // 에디터 동적 로드 (SSR 비활성화)
 const BlogSimpleEditor = dynamic(
@@ -33,9 +34,10 @@ const CATEGORIES = [
 
 export default function NewProductPage() {
   const router = useRouter();
-  const { user, authStatus } = useAuth();
+  const { user, authStatus, isAdmin } = useAuth();
   const { data: blogs, isLoading: isBlogsLoading } = useMyBlogs();
   const createPostMutation = useCreatePost();
+  const canAccess = canAccessMarketplaceSellerTools(isAdmin);
 
   // 상품 정보
   const [title, setTitle] = useState('');
@@ -58,18 +60,17 @@ export default function NewProductPage() {
 
   // 인증 체크
   useEffect(() => {
-    if (authStatus !== 'loading' && !user) {
-      toast.error('로그인이 필요합니다.');
-      router.push('/login?redirect=/new-product');
+    if (authStatus !== 'loading' && !canAccess) {
+      router.replace('/marketplace');
     }
-  }, [user, authStatus, router]);
+  }, [authStatus, canAccess, router]);
 
   useEffect(() => {
-    if (!isBlogsLoading && user && !blog) {
+    if (!isBlogsLoading && canAccess && user && !blog) {
       toast.error('블로그를 먼저 생성해주세요.');
       router.push('/');
     }
-  }, [blog, isBlogsLoading, user, router]);
+  }, [blog, canAccess, isBlogsLoading, user, router]);
 
   // 진행 상태 계산
   const hasTitle = title.trim().length > 0;
@@ -147,7 +148,7 @@ export default function NewProductPage() {
   };
 
   // 로딩 상태
-  if (authStatus === 'loading' || isBlogsLoading) {
+  if (authStatus === 'loading' || isBlogsLoading || !canAccess) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0E141B]">
         <div className="w-8 h-8 border-2 border-gray-200 dark:border-zinc-700 border-t-gray-900 dark:border-t-zinc-100 rounded-full animate-spin" />
@@ -155,7 +156,7 @@ export default function NewProductPage() {
     );
   }
 
-  if (!user || !blog) return null;
+  if (!user || !blog || !canAccess) return null;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-[#0E141B]">

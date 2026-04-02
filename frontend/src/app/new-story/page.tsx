@@ -74,6 +74,7 @@ import {
   stripYouTubeThumbnailMarker,
 } from '@/utils/youtubeMarkdown';
 import GithubResourcePopover from '@/components/posts/GithubResourcePopover';
+import { canAccessMarketplaceSellerTools } from '@/lib/marketplace-access';
 
 // Dynamic import for editor - 초기 로딩 속도 개선
 const BlogSimpleEditor = dynamic(
@@ -158,7 +159,7 @@ export default function NewStoryPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
-  const { user, isLoading: isUserLoading } = useAuth();
+  const { user, isLoading: isUserLoading, isAdmin } = useAuth();
   const forcedCommunitySlug = searchParams.get('communitySlug') || '';
   const { data: blogs, isLoading: isBlogsLoading } = useMyBlogs();
   const createPostMutation = useCreatePost();
@@ -198,6 +199,7 @@ export default function NewStoryPage() {
   const [isSellMode, setIsSellMode] = useState(false);
   const [sellPrice, setSellPrice] = useState<number | ''>('');
   const [sellCategory, setSellCategory] = useState('ai_prompts');
+  const canManageMarketplace = canAccessMarketplaceSellerTools(isAdmin);
 
   // 커뮤니티 포스트 생성 뮤테이션 (대상이 커뮤니티인 경우)
   const communitySlugForMutation =
@@ -363,6 +365,14 @@ export default function NewStoryPage() {
 
     setPostVisibility(blog?.isPublic === false ? 'private' : 'public');
   }, [blog?.isPublic, publishTarget?.type]);
+
+  useEffect(() => {
+    if (!canManageMarketplace && isSellMode) {
+      setIsSellMode(false);
+      setSellPrice('');
+      setSellCategory('ai_prompts');
+    }
+  }, [canManageMarketplace, isSellMode]);
 
   const availableCommunityFlairs = useMemo(() => {
     return publishTarget?.type === 'community'
@@ -1457,7 +1467,7 @@ export default function NewStoryPage() {
               )}
 
               {/* ── 상품으로 판매 토글 ── */}
-              {publishTarget?.type === 'blog' && (
+              {publishTarget?.type === 'blog' && canManageMarketplace && (
                 <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
                   <div className="flex items-center justify-between">
                     <Label className="text-xs font-medium leading-none text-gray-700 dark:text-zinc-300">

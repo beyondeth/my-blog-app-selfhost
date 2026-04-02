@@ -9,6 +9,10 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { useProductDetail, usePreparePurchase } from '@/hooks/useMarketplace';
 import { useTossPayments } from '@/hooks/useTossPayments';
 import { getItemDownloadUrl } from '@/services/api/marketplace.service';
+import {
+  MARKETPLACE_PURCHASE_PENDING_NOTICE,
+  canAccessMarketplacePurchase,
+} from '@/lib/marketplace-access';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
@@ -22,11 +26,12 @@ export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params.productSlug as string;
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const { requestPayment } = useTossPayments();
 
-  const { data: product, isLoading, refetch } = useProductDetail(slug);
+  const { data: product, isLoading } = useProductDetail(slug);
   const prepareMut = usePreparePurchase();
+  const canPurchase = canAccessMarketplacePurchase(isAdmin);
 
   // 다운로드 상태
   const [downloadingItemId, setDownloadingItemId] = useState<string | null>(null);
@@ -109,6 +114,11 @@ export default function ProductDetailPage() {
 
   /** 구매하기 클릭 */
   const handlePurchase = async () => {
+    if (!canPurchase) {
+      toast.info(MARKETPLACE_PURCHASE_PENDING_NOTICE);
+      return;
+    }
+
     if (!user) {
       router.push(`/login?redirect=/marketplace/${slug}`);
       return;
@@ -281,7 +291,7 @@ export default function ProductDetailPage() {
                   <div className="rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 p-8 text-center">
                     <Lock className="h-8 w-8 text-gray-300 dark:text-zinc-600 mx-auto mb-3" />
                     <p className="text-sm font-medium text-gray-700 dark:text-zinc-300">
-                      전체 콘텐츠를 보려면 구매가 필요합니다
+                      구매 기능 오픈 후 전체 콘텐츠를 확인할 수 있습니다
                     </p>
                   </div>
                 </div>
@@ -290,7 +300,7 @@ export default function ProductDetailPage() {
               <div className="mt-8 rounded-xl border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900 p-12 text-center">
                 <Lock className="h-10 w-10 text-gray-300 dark:text-zinc-600 mx-auto mb-3" />
                 <p className="text-sm text-gray-500 dark:text-zinc-400">
-                  구매 후 콘텐츠를 확인할 수 있습니다
+                  구매 기능 오픈 후 콘텐츠를 확인할 수 있습니다
                 </p>
               </div>
             )}
@@ -348,6 +358,19 @@ export default function ProductDetailPage() {
               ) : product.isOwner ? (
                 <div className="text-center py-3 text-sm text-gray-400 dark:text-zinc-500">
                   내 상품
+                </div>
+              ) : !canPurchase ? (
+                <div className="space-y-3 text-center">
+                  <button
+                    type="button"
+                    disabled
+                    className="w-full py-3 rounded-lg bg-gray-100 dark:bg-zinc-800 text-gray-400 dark:text-zinc-500 font-semibold text-sm cursor-not-allowed"
+                  >
+                    준비 중
+                  </button>
+                  <p className="text-xs text-gray-500 dark:text-zinc-400">
+                    {MARKETPLACE_PURCHASE_PENDING_NOTICE}
+                  </p>
                 </div>
               ) : (
                 <button

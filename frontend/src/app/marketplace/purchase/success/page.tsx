@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { CheckCircle2, ExternalLink, ShoppingBag, CreditCard } from 'lucide-react';
 import { confirmPurchase } from '@/services/api/marketplace.service';
 import type { Order } from '@/types/marketplace';
+import { useAuth } from '@/providers/AuthProviderV2';
+import { canAccessMarketplacePurchase } from '@/lib/marketplace-access';
 
 /** 금액 포맷팅 */
 function formatPrice(n: number): string {
@@ -37,12 +39,23 @@ function formatCardNumber(number: string): string {
 export default function PurchaseSuccessPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { authStatus, isAdmin } = useAuth();
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [order, setOrder] = useState<Order | null>(null);
   const [errorMessage, setErrorMessage] = useState('');
   const isProcessing = useRef(false);
+  const canAccess = canAccessMarketplacePurchase(isAdmin);
 
   useEffect(() => {
+    if (authStatus === 'loading') {
+      return;
+    }
+
+    if (!canAccess) {
+      router.replace('/marketplace');
+      return;
+    }
+
     const confirm = async () => {
       const paymentKey = searchParams.get('paymentKey');
       const orderId = searchParams.get('orderId');
@@ -96,7 +109,7 @@ export default function PurchaseSuccessPage() {
     };
 
     confirm();
-  }, [searchParams]);
+  }, [authStatus, canAccess, router, searchParams]);
 
   // 카드 정보 추출
   const card = order?.metadata?.card as
@@ -108,8 +121,15 @@ export default function PurchaseSuccessPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-white dark:bg-[#0E141B] px-4">
       <div className="max-w-md w-full">
+        {authStatus === 'loading' && (
+          <div className="rounded-xl border border-gray-200 dark:border-zinc-800 p-8 text-center">
+            <div className="w-10 h-10 border-3 border-gray-200 dark:border-zinc-700 border-t-gray-900 dark:border-t-zinc-100 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-gray-500 dark:text-zinc-400">페이지를 불러오는 중입니다...</p>
+          </div>
+        )}
+
         {/* ── 로딩 ── */}
-        {status === 'loading' && (
+        {authStatus !== 'loading' && status === 'loading' && (
           <div className="rounded-xl border border-gray-200 dark:border-zinc-800 p-8 text-center">
             <div className="w-10 h-10 border-3 border-gray-200 dark:border-zinc-700 border-t-gray-900 dark:border-t-zinc-100 rounded-full animate-spin mx-auto mb-4" />
             <p className="text-sm text-gray-500 dark:text-zinc-400">결제를 확인하고 있습니다...</p>

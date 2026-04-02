@@ -13,7 +13,6 @@ import {
   Plug,
   Search,
   Users,
-  ChevronRight,
   Check,
   ShoppingBag,
   MessageSquare,
@@ -271,20 +270,13 @@ export default function LandingClientPage() {
                 </FadeInSection>
 
                 <FadeInSection delay={0.3}>
-                  <div className="mt-10 flex flex-col sm:flex-row items-start gap-3">
+                  <div className="mt-10 flex items-start">
                     <Link
                       href="/register"
                       className="group inline-flex h-14 items-center justify-center rounded-xl bg-zinc-900 dark:bg-white px-8 text-base font-semibold text-white dark:text-zinc-900 transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-zinc-900/10 dark:shadow-black/20"
                     >
                       무료로 시작하기
                       <ArrowRight className="ml-2.5 h-4.5 w-4.5 transition-transform duration-300 group-hover:translate-x-1" />
-                    </Link>
-                    <Link
-                      href="#pipeline"
-                      className="inline-flex h-14 items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 bg-white/50 dark:bg-white/5 backdrop-blur-sm px-8 text-base font-medium text-zinc-600 dark:text-zinc-400 transition-all duration-300 hover:bg-zinc-50 dark:hover:bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]"
-                    >
-                      작동 원리 보기
-                      <ChevronRight className="ml-1.5 h-4 w-4" />
                     </Link>
                   </div>
                 </FadeInSection>
@@ -530,8 +522,17 @@ export default function LandingClientPage() {
                                     className="flex items-center gap-3 rounded-lg border border-zinc-100 dark:border-white/[0.06] p-3"
                                   >
                                     <PIcon className="h-4 w-4 shrink-0" style={{ color: p.color }} />
-                                    <div className="h-2 flex-1 rounded-full bg-zinc-100 dark:bg-white/[0.06]" />
-                                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                    <div className="min-w-0 flex-1">
+                                      <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
+                                        {p.name} 세션 연결
+                                      </p>
+                                      <p className="text-xs text-zinc-400 dark:text-zinc-500">
+                                        최근 대화 12건 동기화 준비 완료
+                                      </p>
+                                    </div>
+                                    <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                      수집됨
+                                    </span>
                                   </div>
                                 );
                               })}
@@ -539,27 +540,47 @@ export default function LandingClientPage() {
                           )}
                           {i === 1 && (
                             <div className="flex items-start gap-3">
-                              <div className="h-8 w-8 rounded-full bg-zinc-200 dark:bg-white/10 shrink-0" />
-                              <div className="flex-1 space-y-2">
-                                <div className="h-2.5 w-3/4 rounded-full bg-zinc-100 dark:bg-white/[0.06]" />
-                                <div className="h-2 w-full rounded-full bg-zinc-100 dark:bg-white/[0.06]" />
-                                <div className="h-2 w-5/6 rounded-full bg-zinc-100 dark:bg-white/[0.06]" />
-                                <div className="flex gap-3 pt-2">
-                                  <div className="h-7 w-16 rounded-md bg-zinc-100 dark:bg-white/[0.06]" />
-                                  <div className="h-7 w-16 rounded-md bg-zinc-100 dark:bg-white/[0.06]" />
+                              <div className="flex h-8 w-8 items-center justify-center rounded-full bg-zinc-200 text-xs font-bold text-zinc-700 dark:bg-white/10 dark:text-zinc-200 shrink-0">
+                                AI
+                              </div>
+                              <div className="flex-1 space-y-3">
+                                <div className="rounded-2xl rounded-tl-md bg-zinc-100 px-4 py-3 dark:bg-white/[0.06]">
+                                  <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
+                                    포스트 초안 생성 완료
+                                  </p>
+                                  <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+                                    기술블로그 스타일, SEO 메타데이터, 제목 3안 포함
+                                  </p>
+                                </div>
+                                <div className="flex gap-2 pt-1">
+                                  <span className="inline-flex h-7 items-center rounded-md bg-zinc-100 px-3 text-xs font-medium text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300">
+                                    초안 공유
+                                  </span>
+                                  <span className="inline-flex h-7 items-center rounded-md bg-emerald-50 px-3 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                    커뮤니티 게시
+                                  </span>
                                 </div>
                               </div>
                             </div>
                           )}
                           {i === 2 && (
                             <div className="grid grid-cols-2 gap-2.5">
-                              {[1, 2, 3, 4].map((n) => (
+                              {[
+                                ['프롬프트 팩', '₩12,000'],
+                                ['블로그 템플릿', '₩8,900'],
+                                ['MCP 설정집', '₩15,000'],
+                                ['자동화 노하우', '₩19,000'],
+                              ].map(([title, price]) => (
                                 <div
-                                  key={n}
+                                  key={title}
                                   className="rounded-lg border border-zinc-100 dark:border-white/[0.06] p-3 space-y-2"
                                 >
-                                  <div className="h-2 w-2/3 rounded-full bg-zinc-100 dark:bg-white/[0.06]" />
-                                  <div className="h-5 w-1/2 rounded bg-zinc-100 dark:bg-white/[0.06]" />
+                                  <p className="text-xs font-medium text-zinc-900 dark:text-zinc-100">
+                                    {title}
+                                  </p>
+                                  <p className="text-sm font-bold text-emerald-700 dark:text-emerald-300">
+                                    {price}
+                                  </p>
                                 </div>
                               ))}
                             </div>
@@ -925,12 +946,14 @@ export default function LandingClientPage() {
                       ),
                     )}
                   </ul>
-                  <Link
-                    href="/register"
-                    className="mt-auto pt-8 flex h-12 items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 text-sm font-semibold text-zinc-700 dark:text-zinc-300 transition-all duration-300 hover:bg-zinc-50 dark:hover:bg-white/[0.04]"
-                  >
-                    무료로 시작하기
-                  </Link>
+                  <div className="mt-auto pt-8">
+                    <Link
+                      href="/register"
+                      className="flex h-12 w-full items-center justify-center rounded-xl border border-zinc-200 text-center text-sm font-semibold text-zinc-700 transition-all duration-300 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/[0.04]"
+                    >
+                      무료로 시작하기
+                    </Link>
+                  </div>
                 </div>
               </FadeInSection>
 
@@ -958,12 +981,14 @@ export default function LandingClientPage() {
                       </li>
                     ))}
                   </ul>
-                  <Link
-                    href="/support"
-                    className="mt-auto pt-8 flex h-12 items-center justify-center rounded-xl bg-emerald-600 dark:bg-emerald-500 text-sm font-semibold text-white transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.02] active:scale-[0.98]"
-                  >
-                    도입 문의하기
-                  </Link>
+                  <div className="mt-auto pt-8">
+                    <Link
+                      href="/support"
+                      className="flex h-12 w-full items-center justify-center rounded-xl bg-emerald-600 text-center text-sm font-semibold text-white transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.02] active:scale-[0.98] dark:bg-emerald-500"
+                    >
+                      도입 문의하기
+                    </Link>
+                  </div>
                 </div>
               </FadeInSection>
 
@@ -983,12 +1008,14 @@ export default function LandingClientPage() {
                       ),
                     )}
                   </ul>
-                  <Link
-                    href="/support"
-                    className="mt-auto pt-8 flex h-12 items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 text-sm font-semibold text-zinc-700 dark:text-zinc-300 transition-all duration-300 hover:bg-zinc-50 dark:hover:bg-white/[0.04]"
-                  >
-                    상담 요청하기
-                  </Link>
+                  <div className="mt-auto pt-8">
+                    <Link
+                      href="/support"
+                      className="flex h-12 w-full items-center justify-center rounded-xl border border-zinc-200 text-center text-sm font-semibold text-zinc-700 transition-all duration-300 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/[0.04]"
+                    >
+                      상담 요청하기
+                    </Link>
+                  </div>
                 </div>
               </FadeInSection>
             </div>
