@@ -12,6 +12,7 @@ import {
   ProductCategory,
   ProductCategoryLabel,
 } from "../../common/enums/product-category.enum";
+import { Role } from "../../common/enums/role.enum";
 import {
   extractPreviewContent,
   extractTableOfContents,
@@ -149,7 +150,7 @@ export class MarketplaceService {
    * - 미구매 시: previewContent만 반환 (본문은 게이팅)
    * - 구매 완료 시: 전체 본문 + 다운로드 URL 반환
    */
-  async getProductDetail(slug: string, userId?: string) {
+  async getProductDetail(slug: string, userId?: string, userRole?: string | null) {
     const product = await this.postRepository
       .createQueryBuilder("p")
       .innerJoinAndSelect("p.productDetail", "pd")
@@ -163,6 +164,13 @@ export class MarketplaceService {
       .getOne();
 
     if (!product) {
+      throw new NotFoundException("상품을 찾을 수 없습니다");
+    }
+
+    const isOwner = userId === product.authorId;
+    const isAdmin = userRole === Role.ADMIN;
+
+    if (!product.isPublished && !isOwner && !isAdmin) {
       throw new NotFoundException("상품을 찾을 수 없습니다");
     }
 
@@ -186,9 +194,11 @@ export class MarketplaceService {
     let refundStatus: string | null = null;
     if (hasPurchased && userId && purchaseOrderId) {
       const refundReq = await this.refundRequestRepository.findOne({
-        where: { buyerId: userId },
+        where: {
+          buyerId: userId,
+          orderId: purchaseOrderId,
+        },
         select: ["status"],
-        order: { createdAt: "DESC" },
       });
       refundStatus = refundReq?.status || null;
     }
@@ -199,9 +209,6 @@ export class MarketplaceService {
       hasPurchased = false;
       refundStatus = null; // 환불 완료 후에는 재구매 가능 상태
     }
-
-    // 본인 상품인지 확인
-    const isOwner = userId === product.authorId;
 
     // 구매자가 전문 콘텐츠를 열람하면 contentAccessed 플래그 동기 기록 (환불 자격 검증용)
     // 반드시 콘텐츠 반환 전에 완료 — 비동기 시 환불 레이스 컨디션 발생

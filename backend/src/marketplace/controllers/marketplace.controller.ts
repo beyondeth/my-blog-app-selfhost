@@ -57,7 +57,12 @@ export class MarketplaceController {
     @Request() req,
   ) {
     const userId = req.user?.id || null;
-    const product = await this.marketplaceService.getProductDetail(slug, userId);
+    const userRole = req.user?.role || null;
+    const product = await this.marketplaceService.getProductDetail(
+      slug,
+      userId,
+      userRole,
+    );
     return { success: true, data: product };
   }
 }
