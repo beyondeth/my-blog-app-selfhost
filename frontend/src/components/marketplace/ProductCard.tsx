@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { ShoppingBag } from 'lucide-react';
 import type { MarketplaceProduct } from '@/types/marketplace';
@@ -28,11 +29,12 @@ export default function ProductCard({ product }: ProductCardProps) {
       {/* 썸네일 */}
       <div className="aspect-[16/10] bg-gray-100 dark:bg-zinc-800 relative overflow-hidden">
         {product.thumbnailImageId ? (
-          <img
+          <Image
             src={`${process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3000'}/api/v1/files/${product.thumbnailImageId}`}
             alt={product.title}
-            className="w-full h-full object-cover transition-transform group-hover:scale-105"
-            loading="lazy"
+            fill
+            sizes="(min-width: 1280px) 320px, (min-width: 768px) 50vw, 100vw"
+            className="object-cover transition-transform group-hover:scale-105"
           />
         ) : (
           <div className="w-full h-full flex items-center justify-center">

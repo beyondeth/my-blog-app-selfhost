@@ -142,6 +142,8 @@ export default function ImageCropperModal({
                 ruleOfThirds
                 className="max-h-full"
               >
+                {/* react-image-crop requires a real HTMLImageElement ref for canvas cropping */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   ref={imageRef}
                   src={imageSrc}
