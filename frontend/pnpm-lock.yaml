@@ -6,6 +6,7 @@ settings:
 
 overrides:
   '@tanstack/query-core': 5.81.2
+  baseline-browser-mapping: 2.10.8
 
 importers:
 
@@ -149,6 +150,9 @@ importers:
       '@tiptap/suggestion':
         specifier: ^3.10.1
         version: 3.12.1(@tiptap/core@3.12.1(@tiptap/pm@3.12.1))(@tiptap/pm@3.12.1)
+      '@tosspayments/tosspayments-sdk':
+        specifier: ^2.6.0
+        version: 2.6.0
       '@types/highlight.js':
         specifier: ^10.1.0
         version: 10.1.0
@@ -318,9 +322,6 @@ importers:
       autoprefixer:
         specifier: ^10.4.24
         version: 10.4.24(postcss@8.5.6)
-      baseline-browser-mapping:
-        specifier: ^2.10.0
-        version: 2.10.0
       eslint:
         specifier: ^8.54.0
         version: 8.57.1
@@ -1672,6 +1673,9 @@ packages:
       '@tiptap/core': ^3.12.1
       '@tiptap/pm': ^3.12.1
 
+  '@tosspayments/tosspayments-sdk@2.6.0':
+    resolution: {integrity: sha512-d/9tCj5d+Jbj312bWYXo9dtGNzQaWRxTKWmw6rTwuDgw5g4mrJWV9dP9qiN6/x9PYaphbYDjxGenguHoVQXTGA==}
+
   '@tybys/wasm-util@0.10.1':
     resolution: {integrity: sha512-9tTaPJLSiejZKx+Bmog4uSubteqTvFrVrURwkmHixBo0G4seD0zUxp98E1DzUBJxLQ3NPwXrGKDiVjwx/DpPsg==}
 
@@ -2107,8 +2111,8 @@ packages:
     resolution: {integrity: sha512-I3yl4r9QB5ZRY3XuJVEPfc2XhZO6YweFPI+UovAzn+8/hb3oJ6lnysaFcjVpkCPfVWFUDvoZ8kmVDP7WyRtYtQ==}
     engines: {node: '>= 0.6.0'}
 
-  baseline-browser-mapping@2.10.0:
-    resolution: {integrity: sha512-lIyg0szRfYbiy67j9KN8IyeD7q7hcmqnJ1ddWmNt19ItGpNN64mnllmxUNFIOdOm6by97jlL6wfpTTJrmnjWAA==}
+  baseline-browser-mapping@2.10.8:
+    resolution: {integrity: sha512-PCLz/LXGBsNTErbtB6i5u4eLpHeMfi93aUv5duMmj6caNu6IphS4q6UevDnL36sZQv9lrP11dbPKGMaXPwMKfQ==}
     engines: {node: '>=6.0.0'}
     hasBin: true
 
@@ -5841,6 +5845,8 @@ snapshots:
       '@tiptap/core': 3.12.1(@tiptap/pm@3.12.1)
       '@tiptap/pm': 3.12.1
 
+  '@tosspayments/tosspayments-sdk@2.6.0': {}
+
   '@tybys/wasm-util@0.10.1':
     dependencies:
       tslib: 2.8.1
@@ -6300,7 +6306,7 @@ snapshots:
 
   base64-arraybuffer@1.0.2: {}
 
-  baseline-browser-mapping@2.10.0: {}
+  baseline-browser-mapping@2.10.8: {}
 
   binary-extensions@2.3.0: {}
 
@@ -6323,7 +6329,7 @@ snapshots:
 
   browserslist@4.28.1:
     dependencies:
-      baseline-browser-mapping: 2.10.0
+      baseline-browser-mapping: 2.10.8
       caniuse-lite: 1.0.30001770
       electron-to-chromium: 1.5.264
       node-releases: 2.0.27

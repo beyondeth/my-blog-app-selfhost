@@ -123,6 +123,18 @@ export class PostsReadRepository {
       parameters.tag = JSON.stringify([dto.tag]);
     }
 
+    // postType 필터: 지정 시 해당 유형만, 미지정 시 blog만 (마켓플레이스 상품 제외)
+    if (dto.postType) {
+      whereConditions.push('post."postType" = :postType');
+      parameters.postType = dto.postType;
+      // product 조회 시 ProductDetail도 함께 로드 (가격, 카테고리 등)
+      if (dto.postType === "product") {
+        query.leftJoinAndSelect("post.productDetail", "productDetail");
+      }
+    } else {
+      whereConditions.push('COALESCE(post."postType", \'blog\') = \'blog\'');
+    }
+
     if (whereConditions.length > 0) {
       const [firstCondition, ...restConditions] = whereConditions;
       query.where(firstCondition, parameters);

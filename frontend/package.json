@@ -5,14 +5,15 @@
   "scripts": {
     "dev": "next dev -p 3001 --turbopack",
     "dev:trace": "NODE_OPTIONS='--trace-deprecation' next dev -p 3001 --turbopack",
-    "build": "next build --webpack",
+    "build": "node ./scripts/run-next-build.js",
     "start": "next start -p 3001",
     "lint": "eslint .",
     "type-check": "tsc --noEmit"
   },
   "pnpm": {
     "overrides": {
-      "@tanstack/query-core": "5.81.2"
+      "@tanstack/query-core": "5.81.2",
+      "baseline-browser-mapping": "2.10.8"
     }
   },
   "dependencies": {
@@ -62,6 +63,7 @@
     "@tiptap/react": "^3.10.1",
     "@tiptap/starter-kit": "^3.10.1",
     "@tiptap/suggestion": "^3.10.1",
+    "@tosspayments/tosspayments-sdk": "^2.6.0",
     "@types/highlight.js": "^10.1.0",
     "apexcharts": "^5.3.3",
     "axios": "^1.6.0",
@@ -120,7 +122,6 @@
     "@types/react-dom": "^18.2.17",
     "@types/react-syntax-highlighter": "^15.5.11",
     "autoprefixer": "^10.4.24",
-    "baseline-browser-mapping": "^2.10.0",
     "eslint": "^8.54.0",
     "eslint-config-next": "14.0.3",
     "eslint-config-prettier": "^10.1.8",

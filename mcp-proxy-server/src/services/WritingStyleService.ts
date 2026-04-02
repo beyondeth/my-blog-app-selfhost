@@ -55,6 +55,7 @@ export class WritingStyleService {
     'pm',
     'designer',
     'marketer',
+    'sell',
   ];
   private readonly STYLES_DIR = path.join(__dirname, '../../writing-styles');
   private styleCache: Map<string, WritingStyle> = new Map();  // 스타일 캐시

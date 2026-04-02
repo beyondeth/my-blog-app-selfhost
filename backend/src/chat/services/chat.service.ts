@@ -865,6 +865,7 @@ export class ChatService {
   async deleteMessage(messageId: string, userId: string): Promise<void> {
     const message = await this.messageRepository.findOne({
       where: { id: messageId },
+      relations: ["conversation"],
     });
 
     if (!message) {
@@ -873,6 +874,13 @@ export class ChatService {
 
     if (message.senderId !== userId) {
       throw new ForbiddenException("Can only delete your own messages");
+    }
+
+    // 거래 채팅 메시지는 삭제 불가 (법적 보존 의무)
+    if (message.conversation?.type === "transaction") {
+      throw new ForbiddenException(
+        "거래 관련 메시지는 삭제할 수 없습니다",
+      );
     }
 
     // Soft delete

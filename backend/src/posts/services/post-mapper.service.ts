@@ -132,6 +132,19 @@ export class PostMapperService {
       .map((tag: string) => UrlSanitizerUtil.sanitizeDisplayText(tag, 64))
       .filter((tag) => !!tag);
 
+    // 포스트 유형 + 상품 상세 정보
+    dto.postType = post.postType || "blog";
+    if (post.productDetail) {
+      dto.productDetail = {
+        price: post.productDetail.price,
+        currency: post.productDetail.currency,
+        productCategory: post.productDetail.productCategory,
+        salesCount: post.productDetail.salesCount,
+        isActive: post.productDetail.isActive,
+        deliveryType: post.productDetail.deliveryType,
+      };
+    }
+
     // Editor's Pick 정보는 PostMetadata가 단일 소스이므로 명시적으로 덮어씀
     dto.isEditorPick =
       post.metadata?.isEditorPick ?? post.isEditorPick ?? false;

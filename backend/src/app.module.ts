@@ -36,12 +36,12 @@ import { MetricsModule } from "./metrics/metrics.module";
 import { CommonModule } from "./common/common.module";
 import { EventsModule } from "./common/events/events.module";
 // import { AnalyticsModule } from './analytics/analytics.module';
-// FUTURE: 구독제 기능 활성화 시 주석 해제
-// import { SubscriptionModule } from './subscription/subscription.module';
-// import { PaymentModule } from './payment/payment.module';
-// import { UsageModule } from './usage/usage.module';
-// import { PaymentEventsModule } from './payment/payment-events.module';
-// import { SharedSubscriptionModule } from './shared/shared-subscription.module';
+import { SubscriptionModule } from './subscription/subscription.module';
+import { PaymentModule } from './payment/payment.module';
+import { UsageModule } from './usage/usage.module';
+// PaymentEventsModule은 빈 모듈 — EventEmitterModule.forRoot()이 대신 사용됨
+import { SharedSubscriptionModule } from './shared/shared-subscription.module';
+import { MarketplaceModule } from './marketplace/marketplace.module';
 
 // Guards
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
@@ -171,11 +171,11 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     ReputationModule, // 사용자 평판(Ranking) 시스템
     ModerationModule, // 모더레이션 시스템
     // AnalyticsModule,
-    // FUTURE: 구독제 기능 활성화 시 주석 해제
-    // SubscriptionModule, // UsersModule 이후에 로드
-    // UsageModule, // SubscriptionModule과 UsersModule 이후에 로드
-    // SharedSubscriptionModule, // UsageModule 이후에 로드 (UsageLimitGuard 제공)
-    // PaymentModule, // 마지막에 로드 (이벤트 기반으로 다른 모듈과 통신)
+    SubscriptionModule, // UsersModule 이후에 로드
+    UsageModule, // SubscriptionModule과 UsersModule 이후에 로드
+    SharedSubscriptionModule, // UsageModule 이후에 로드
+    PaymentModule, // 마지막에 로드 (이벤트 기반으로 다른 모듈과 통신)
+    MarketplaceModule, // 마켓플레이스 (상품 브라우징, 구매, 판매자 대시보드)
   ],
   providers: [
     // Global guards

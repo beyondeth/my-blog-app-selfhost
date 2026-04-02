@@ -25,6 +25,7 @@ import { Bookmark } from "../../bookmarks/entities/bookmark.entity";
 import { PostStats } from "./post-stats.entity";
 import { PostMetadata } from "./post-metadata.entity";
 import { PostLike } from "./post-like.entity";
+import { ProductDetail } from "../../marketplace/entities/product-detail.entity";
 import { generateShortId } from "../utils/post.utils";
 
 /**
@@ -223,6 +224,15 @@ export class Post {
   @Index()
   status: "draft" | "processing" | "published" | "failed";
 
+  /**
+   * 포스트 유형
+   * - blog: 일반 블로그 포스트 (기본값, 기존 전체 데이터)
+   * - product: 마켓플레이스 판매 상품
+   */
+  @Column({ type: "varchar", length: 20, default: "blog" })
+  @Index()
+  postType: "blog" | "product";
+
   @CreateDateColumn()
   createdAt: Date;
 
@@ -253,6 +263,17 @@ export class Post {
     eager: false,
   })
   metadata?: PostMetadata;
+
+  /**
+   * ProductDetail 관계 (1:1)
+   * - 상품 전용 정보 (가격, 카테고리, 판매 통계)
+   * - postType === 'product'인 경우에만 존재
+   * - eager: false → 마켓플레이스 조회 시에만 명시적 JOIN
+   */
+  @OneToOne(() => ProductDetail, (pd) => pd.post, {
+    eager: false,
+  })
+  productDetail?: ProductDetail;
 
   /**
    * User 관계 (작성자)

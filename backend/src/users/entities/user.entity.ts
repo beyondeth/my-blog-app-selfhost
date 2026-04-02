@@ -23,7 +23,7 @@ import { Notification } from "../../notifications/entities/notification.entity";
 import { Blog } from "../../blogs/entities/blog.entity";
 import { UserIdentity } from "./user-identity.entity";
 import { Profile } from "./profile.entity";
-import { Subscription } from "./subscription.entity";
+import { Subscription } from "../../subscription/entities/subscription.entity";
 import { AccountSettings } from "./account-settings.entity";
 
 /**
@@ -293,9 +293,10 @@ export class User {
   /**
    * Subscription 관계 (1:1)
    * - 구독/결제 정보 (tier, status, payment 등)
+   * - cascade: insert/update만 (remove 제외 — 법적 보관 의무)
    */
   @OneToOne(() => Subscription, (subscription) => subscription.user, {
-    cascade: true,
+    cascade: ["insert", "update"],
     eager: false,
   })
   subscription?: Subscription;
@@ -480,8 +481,8 @@ export class User {
       accountSecurityLevel: this.profile?.accountSecurityLevel || "basic",
 
       // Subscription 데이터 (join 시에만 포함)
-      subscriptionTier: this.subscription?.subscriptionTier || null,
-      subscriptionStatus: this.subscription?.subscriptionStatus || null,
+      subscriptionTier: this.subscription?.tier || null,
+      subscriptionStatus: this.subscription?.status || null,
       isPaidUser: this.subscription?.isPaidUser() || false,
 
       // AccountSettings 데이터 (join 시에만 포함)

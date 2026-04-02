@@ -20,6 +20,7 @@ import {
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  CopyObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import * as fs from "fs";
@@ -289,7 +290,36 @@ export class R2Service {
   }
 
   /**
-   * 비디오 파일 삭제
+   * R2 객체 복사 (quarantine → verified 이동 등)
+   */
+  async copyObject(
+    sourceKey: string,
+    destinationKey: string,
+  ): Promise<void> {
+    this.ensureConfigured();
+
+    try {
+      const copyCommand = new CopyObjectCommand({
+        Bucket: this.bucket,
+        CopySource: `${this.bucket}/${sourceKey}`,
+        Key: destinationKey,
+      });
+
+      await this.s3Client.send(copyCommand);
+      this.logger.log(
+        `R2 object copied: ${sourceKey} → ${destinationKey}`,
+      );
+    } catch (error) {
+      this.logger.error(
+        `Failed to copy R2 object: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException("Failed to copy file");
+    }
+  }
+
+  /**
+   * 파일 삭제
    */
   async deleteFile(fileKey: string): Promise<void> {
     this.ensureConfigured();
@@ -337,6 +367,87 @@ export class R2Service {
   }
 
   /**
+   * 마켓플레이스 파일 업로드용 Presigned URL 생성
+   * 비디오와 달리 fileKey를 직접 받고, MIME 검증은 호출자(FileSafetyService)가 담당
+   */
+  async generateMarketplaceUploadUrl(
+    fileKey: string,
+    mimeType: string,
+    fileSize: number,
+  ): Promise<R2PresignedUrlResponse> {
+    this.ensureConfigured();
+
+    try {
+      const putObjectCommand = new PutObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+        ContentType: mimeType,
+        ContentLength: fileSize,
+        Metadata: {
+          "upload-date": new Date().toISOString(),
+          "upload-type": "marketplace",
+        },
+      });
+
+      const expiresIn = 15 * 60; // 15분 (파일 업로드)
+      const uploadUrl = await getSignedUrl(this.s3Client, putObjectCommand, {
+        expiresIn,
+        signableHeaders: new Set(["content-type"]),
+      });
+
+      this.logger.log(
+        `R2 marketplace upload URL generated: ${fileKey}`,
+      );
+
+      return { uploadUrl, fileKey, expiresIn };
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate R2 marketplace upload URL: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        "Failed to generate marketplace upload URL",
+      );
+    }
+  }
+
+  /**
+   * Content-Disposition 포함 다운로드 URL (구매자 파일 다운로드 시 파일명 지정)
+   */
+  async generatePresignedDownloadUrlWithDisposition(
+    fileKey: string,
+    fileName: string,
+    expiresIn: number = 3600,
+  ): Promise<string> {
+    this.ensureConfigured();
+
+    try {
+      const getObjectCommand = new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: fileKey,
+        ResponseContentDisposition: `attachment; filename="${encodeURIComponent(fileName)}"`,
+      });
+
+      const url = await getSignedUrl(this.s3Client, getObjectCommand, {
+        expiresIn,
+      });
+
+      this.logger.log(
+        `R2 download URL with disposition generated: ${fileKey} → ${fileName}`,
+      );
+      return url;
+    } catch (error) {
+      this.logger.error(
+        `Failed to generate R2 download URL: ${error.message}`,
+        error.stack,
+      );
+      throw new InternalServerErrorException(
+        "Failed to generate download URL",
+      );
+    }
+  }
+
+  /**
    * Public URL 생성 (R2 Custom Domain 또는 Workers 사용 시)
    */
   getPublicUrl(fileKey: string): string | null {
@@ -352,7 +463,7 @@ export class R2Service {
   private ensureConfigured(): void {
     if (!this.isConfigured) {
       throw new BadRequestException(
-        "Video upload is not configured. R2 credentials are missing.",
+        "R2 스토리지가 설정되지 않았습니다. R2 인증 정보를 확인하세요.",
       );
     }
   }

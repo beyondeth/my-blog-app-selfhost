@@ -291,3 +291,175 @@ export async function checkUsageLimit(resourceType: string) {
     limit: data.limit,
   };
 }
+
+/**
+ * 등록된 결제 수단 목록 조회
+ */
+export async function getPaymentMethods() {
+  const response = await fetch(`${API_URL}/subscription/payment-methods`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) return [];
+    throw new Error('결제 수단 조회에 실패했습니다');
+  }
+
+  const result = await response.json();
+  return result.data || result;
+}
+
+/**
+ * 결제 수단 삭제 (토스 빌링키 비활성화)
+ */
+export async function deletePaymentMethod(id: string) {
+  const response = await fetch(`${API_URL}/subscription/toss/billing-key/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || '결제 수단 삭제에 실패했습니다');
+  }
+
+  return response.json();
+}
+
+/**
+ * 플랜 다운그레이드 예약
+ * 현재 결제 기간 종료 후 낮은 플랜으로 자동 전환
+ */
+export async function scheduleDowngrade(data: {
+  tier: string;
+  billingCycle?: string;
+}) {
+  const response = await fetch(`${API_URL}/subscription/schedule-downgrade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || '다운그레이드 요청에 실패했습니다');
+  }
+
+  const result = await response.json();
+  return result.data || result;
+}
+
+/**
+ * 업그레이드 실행 (비례배분 차액 결제)
+ */
+export async function upgradeSubscription(data: {
+  tier: string;
+  billingCycle: string;
+}) {
+  const response = await fetch(`${API_URL}/subscription/upgrade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || '업그레이드에 실패했습니다');
+  }
+
+  const result = await response.json();
+  return result.data || result;
+}
+
+/**
+ * 다운그레이드 예약 취소
+ */
+export async function cancelDowngrade() {
+  const response = await fetch(`${API_URL}/subscription/cancel-downgrade`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || '다운그레이드 예약 취소에 실패했습니다');
+  }
+
+  const result = await response.json();
+  return result.data || result;
+}
+
+// ====================================
+// 토스페이먼츠 빌링인증 API
+// ====================================
+
+/**
+ * 토스 빌링인증 요청 파라미터 조회
+ * requestBillingAuth()에 필요한 customerKey, successUrl, failUrl 반환
+ */
+export async function requestTossBillingAuth(
+  tier: string,
+  billingCycle: "monthly" | "yearly",
+): Promise<{
+  customerKey: string;
+  amount: number;
+  orderName: string;
+  successUrl: string;
+  failUrl: string;
+}> {
+  const response = await fetch(
+    `${API_URL}/subscription/toss/billing-auth`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tier, billingCycle }),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "빌링인증 요청 실패");
+  }
+
+  const result = await response.json();
+  return result.data;
+}
+
+/**
+ * 토스 빌링인증 확인 (빌링키 발급 + 첫 결제)
+ */
+export async function confirmTossBillingAuth(params: {
+  authKey: string;
+  customerKey: string;
+  tier: string;
+  billingCycle: string;
+}): Promise<{
+  subscription: any;
+  paymentKey: string;
+  amount: number;
+}> {
+  const response = await fetch(
+    `${API_URL}/subscription/toss/billing-auth/confirm`,
+    {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    },
+  );
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.message || "결제 확인 실패");
+  }
+
+  const result = await response.json();
+  return result.data;
+}

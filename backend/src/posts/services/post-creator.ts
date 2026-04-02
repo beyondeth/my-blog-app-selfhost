@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from "@nestjs/common";
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource, EntityManager, In } from "typeorm";
 import { Post } from "../entities/post.entity";
@@ -262,6 +267,7 @@ export class PostCreator {
           authorId: author.id,
           blogId: blog.id,
           content_type: createPostDto.content_markdown ? "markdown" : "html",
+          postType: createPostDto.postType || "blog", // 마켓플레이스 상품 구분
           version: 1, // 명시적으로 초기 버전 설정
           ipAddress: this.ipSecurityService.encrypt(ip), // 암호화하여 저장
           userAgent: "Unknown", // Controller에서 userAgent도 받으면 좋지만 일단 IP만
@@ -347,6 +353,122 @@ export class PostCreator {
         this.logger.debug(
           `[PostCreator] Metadata saved - PostId: ${savedPost.id}, Metadata Tags: ${JSON.stringify(metadata.tags)}`,
         );
+
+        // 8.5. 마켓플레이스 상품인 경우 ProductDetail + DeliveryItem 생성
+        if (createPostDto.postType === "product" && createPostDto.price) {
+          try {
+            const { extractPreviewContent } = await import(
+              "../../marketplace/utils/preview-extractor"
+            );
+            const previewContent =
+              createPostDto.previewContent ||
+              extractPreviewContent(rawContent);
+
+            // 파일 기반 vs HTML 콘텐츠 기반 결정
+            const hasDeliveryFiles =
+              createPostDto.deliveryFiles &&
+              createPostDto.deliveryFiles.length > 0;
+            const deliveryType = hasDeliveryFiles ? "file" : "content";
+            const deliveryItemCount = hasDeliveryFiles
+              ? createPostDto.deliveryFiles!.length
+              : 1;
+
+            // ProductDetail 생성
+            const productDetailRepo = manager.getRepository("product_details");
+            const productDetail = await productDetailRepo.save({
+              postId: savedPost.id,
+              price: createPostDto.price,
+              currency: "KRW",
+              productCategory: createPostDto.productCategory || "others",
+              descriptionHtml: rawContent,
+              previewContent,
+              deliveryType,
+              isActive: true,
+              commissionRate: 20.0,
+              deliveryItemCount,
+            });
+
+            const pdId = (productDetail as unknown as { id: string }).id;
+            const deliveryItemRepo = manager.getRepository("delivery_items");
+
+            if (hasDeliveryFiles) {
+              // 파일 기반 배송: 격리 완료된 파일들을 DeliveryItem으로 생성
+              const quarantineRepo =
+                manager.getRepository("file_quarantine");
+
+              let actualItemCount = 0;
+              for (let i = 0; i < createPostDto.deliveryFiles!.length; i++) {
+                const file = createPostDto.deliveryFiles![i];
+
+                // 격리 레코드 조회 (소유권 + clean 상태 검증)
+                const quarantine = await quarantineRepo.findOne({
+                  where: {
+                    id: file.quarantineId,
+                    uploaderId: author.id,
+                    status: "clean",
+                  },
+                });
+
+                if (!quarantine || !quarantine.verifiedKey) {
+                  this.logger.warn(
+                    `유효하지 않은 격리 파일: quarantineId=${file.quarantineId}, userId=${author.id.substring(0, 8)}...`,
+                  );
+                  continue;
+                }
+
+                await deliveryItemRepo.save({
+                  productDetailId: pdId,
+                  type: "file",
+                  label: file.fileName,
+                  sortOrder: actualItemCount,
+                  fileKey: quarantine.verifiedKey,
+                  fileName: file.fileName,
+                  fileSize: file.fileSize,
+                  mimeType: file.mimeType,
+                  quarantineStatus: "clean",
+                  isActive: true,
+                });
+                actualItemCount++;
+              }
+
+              // 실제 생성된 수로 deliveryItemCount 보정
+              if (actualItemCount !== deliveryItemCount) {
+                await productDetailRepo.update(
+                  { id: pdId },
+                  { deliveryItemCount: actualItemCount },
+                );
+              }
+
+              // 유효한 파일이 0개면 에러 (빈 상품 방지)
+              if (actualItemCount === 0) {
+                throw new BadRequestException(
+                  "유효한 판매 파일이 없습니다. 파일을 다시 업로드해주세요.",
+                );
+              }
+            } else {
+              // HTML 콘텐츠 기반 배송 (하위 호환)
+              const deliveryHtml =
+                createPostDto.deliveryContent || rawContent;
+              await deliveryItemRepo.save({
+                productDetailId: pdId,
+                type: "content_html",
+                label: "본문 콘텐츠",
+                sortOrder: 0,
+                contentHtml: deliveryHtml,
+                isActive: true,
+              });
+            }
+
+            this.logger.log(
+              `상품 등록 완료: postId=${savedPost.id}, price=${createPostDto.price}, deliveryType=${deliveryType}`,
+            );
+          } catch (pdError) {
+            // ProductDetail 생성 실패는 포스트 자체를 실패시키지 않음 (로그만)
+            this.logger.error(
+              `ProductDetail 생성 실패 (포스트는 생성됨): postId=${savedPost.id}`,
+            );
+          }
+        }
 
         // 9. 파일 연결 (있는 경우) - 트랜잭션 내에서 직접 처리
         if (files && files.length > 0) {

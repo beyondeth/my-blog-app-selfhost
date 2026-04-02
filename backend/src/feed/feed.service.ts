@@ -495,6 +495,7 @@ export class FeedService {
       LEFT JOIN profiles pr ON pr."userId" = u.id
       WHERE p."isPublished" = true
         AND p."isDeleted" = false
+        AND COALESCE(p."postType", 'blog') = 'blog'
         AND p.status = 'published'
         AND p.visibility = 'public'
     `;
@@ -681,6 +682,7 @@ export class FeedService {
         LEFT JOIN profiles pr ON pr."userId" = u.id
         WHERE p."isPublished" = true
           AND p."isDeleted" = false
+          AND COALESCE(p."postType", 'blog') = 'blog'
           AND p.status = 'published'
           AND p.visibility = 'public'
           ${periodCondition ? `AND p."createdAt" >= ${periodCondition}` : ""}
@@ -823,6 +825,7 @@ export class FeedService {
         INNER JOIN blogs b ON b.id = p."blogId" AND b."isPublic" = true
         WHERE p."isPublished" = true
           AND p."isDeleted" = false
+          AND COALESCE(p."postType", 'blog') = 'blog'
           AND p.status = 'published'
           AND p.visibility = 'public'
           ${periodCondition ? `AND p."createdAt" >= ${periodCondition}` : ""}

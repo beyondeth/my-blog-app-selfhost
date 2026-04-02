@@ -155,3 +155,4 @@ backend/cors-config.json
 
 # OpenClaw Isolated Environment
 openclaw-lab/
+.gstack/

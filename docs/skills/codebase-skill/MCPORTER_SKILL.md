@@ -44,34 +44,72 @@ if echo "$AUTH_OUT" | grep -q '"error"'; then
 fi
 ```
 
+## JSON Args Standard
+
+Use `--args <json>` for all examples in this route.
+
+- Inline JSON is acceptable for short scalar inputs.
+- Long markdown or custom style files should be loaded with Node and serialized once.
+- Do not use shell-quoted function-call syntax for publish operations.
+
+## Visible Staged Flow
+
+For terminal UX, do not collapse everything into one silent publish call.
+
+Print and execute these stages in order:
+
+1. `[Route] ...`
+2. `[1/3] OAuth 인증 확인` + `check_auth`
+3. `[2/3] 스타일 가이드 확인` + `get_writing_style_guide`
+4. `[3/3] 포스트 발행` + `create_post`
+
+If the body is already written, the style guide step can still be used as a visible progress checkpoint instead of being silently omitted.
+
 ## 2) Publish
 
 ```bash
-npx -y mcporter call 'codebase-blog-oauth.create_post(
-  title: "MCP 자동포스팅 예시",
-  content_markdown: "## Hello\n\nmcporter로 발행한 글입니다.",
-  category: "Tech",
-  tags: ["mcp","mcporter","automation"]
-)'
+POST_PAYLOAD=$(node - <<'NODE'
+const fs = require('fs');
+
+process.stdout.write(JSON.stringify({
+  title: 'MCP 자동포스팅 예시',
+  content_markdown: fs.readFileSync('./post.md', 'utf8'),
+  category: 'Tech',
+  tags: ['mcp', 'mcporter', 'automation'],
+}));
+NODE
+)
+
+STYLE_ARGS='{"style":"default"}'
+
+echo '[Route] mode=skill transport=mcporter endpoint=/mcp-remote alias=codebase-blog-oauth'
+echo '[1/3] OAuth 인증 확인'
+npx -y mcporter call codebase-blog-oauth.check_auth --output json
+echo '[2/3] 스타일 가이드 확인'
+npx -y mcporter call codebase-blog-oauth.get_writing_style_guide --args "$STYLE_ARGS"
+echo '[3/3] 포스트 발행'
+npx -y mcporter call codebase-blog-oauth.create_post --args "$POST_PAYLOAD"
 ```
 
 ## 3) Optional: Style Guide
 
 ```bash
-npx -y mcporter call 'codebase-blog-oauth.get_writing_style_guide(style: "default")'
+STYLE_ARGS='{"style":"default"}'
+npx -y mcporter call codebase-blog-oauth.get_writing_style_guide --args "$STYLE_ARGS"
 ```
 
 ## 4) Optional: Image Upload
 
 ```bash
-npx -y mcporter call 'codebase-blog-oauth.get_image_upload_url(mimeType: "image/webp", fileSize: 245760)'
+npx -y mcporter call codebase-blog-oauth.get_image_upload_url --args '{"mimeType":"image/webp","fileSize":245760}'
 
 curl -X PUT -H "Content-Type: image/webp" -T ./cover.webp "UPLOAD_URL_FROM_PREVIOUS_STEP"
 
-npx -y mcporter call 'codebase-blog-oauth.finalize_uploaded_image(fileKey: "uploads/...", mimeType: "image/webp", fileSize: 245760)'
+npx -y mcporter call codebase-blog-oauth.finalize_uploaded_image --args '{"fileKey":"uploads/...","mimeType":"image/webp","fileSize":245760}'
 ```
 
 ## Troubleshooting
 
 - If the login UI does not appear: you may already be logged in. Try `npx -y mcporter auth codebase-blog-oauth --reset`.
 - If you see `SSE error: Invalid content type, expected "text/event-stream"` during `auth`: tokens may still be saved. Run `check_auth` to confirm.
+- If the body contains quotes, backticks, or long code fences: keep using `--args` and do not wrap the payload in a shell-quoted function call.

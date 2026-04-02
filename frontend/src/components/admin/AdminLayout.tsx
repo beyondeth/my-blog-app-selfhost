@@ -23,6 +23,7 @@ import {
   ShieldAlert,
   Trophy,
   Star,
+  ShoppingBag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/providers/AuthProviderV2';
@@ -47,6 +48,7 @@ const navigation: NavigationItem[] = [
   { name: '이미지 관리', href: '/admin/images', icon: Image },
   { name: '음악 관리', href: '/admin/music', icon: Music, adminOnly: true },
   { name: 'MCP 대시보드', href: '/admin/mcp', icon: Key, adminOnly: true, badge: 'New' },
+  { name: '마켓플레이스', href: '/admin/marketplace', icon: ShoppingBag, adminOnly: true },
   { name: '평판 시스템', href: '/admin/reputation', icon: Trophy, adminOnly: true },
   { name: '보안 모니터링', href: '/admin/monitoring', icon: AlertTriangle, adminOnly: true },
   { name: 'Redis 모니터링', href: '/admin/redis', icon: Database, adminOnly: true },

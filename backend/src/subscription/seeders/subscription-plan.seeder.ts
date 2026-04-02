@@ -64,8 +64,8 @@ export class SubscriptionPlanSeeder {
         displayName: "스타터 플랜",
         description: "개인 크리에이터와 소규모 팀을 위한 플랜",
         pricing: {
-          monthly: 990, // ₩990
-          yearly: 9860, // ₩9,860 (연간 결제 시 17% 할인: 990 × 12 × 0.83)
+          monthly: 5900, // ₩5,900/월
+          yearly: 59000, // ₩59,000/년
           currency: "KRW",
           discountPercentage: 17,
         },
@@ -98,8 +98,8 @@ export class SubscriptionPlanSeeder {
         displayName: "프로 플랜",
         description: "전문 블로거와 기업을 위한 프리미엄 플랜",
         pricing: {
-          monthly: 1500, // ₩1,500
-          yearly: 14940, // ₩14,940 (연간 결제 시 17% 할인: 1500 × 12 × 0.83)
+          monthly: 12900, // ₩12,900/월
+          yearly: 129000, // ₩129,000/년
           currency: "KRW",
           discountPercentage: 17,
         },

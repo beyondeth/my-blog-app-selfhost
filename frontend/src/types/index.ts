@@ -290,6 +290,10 @@ export interface PostForm {
   githubDescription?: string;
   attachedFileIds?: string[];
   version?: number;
+  // 마켓플레이스 판매 상품 필드
+  postType?: 'blog' | 'product';
+  price?: number;
+  productCategory?: string;
 }
 
 export interface CommentForm {

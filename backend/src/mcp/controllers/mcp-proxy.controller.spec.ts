@@ -30,6 +30,8 @@ describe("McpProxyController", () => {
     };
     const filesService = {};
 
+    const dataSource = { getRepository: jest.fn() };
+
     const controller = new McpProxyController(
       postsService as any,
       userRepository as any,
@@ -37,6 +39,7 @@ describe("McpProxyController", () => {
       usageService as any,
       externalImageDownloadService as any,
       filesService as any,
+      dataSource as any,
     );
 
     return {
@@ -76,10 +79,14 @@ describe("McpProxyController", () => {
       id: "post-1",
       slug: "hello-world",
       title: "Hello World",
-      blog: { slug: "codebase" },
+      blog: { slug: "codebase", isPublic: true },
+      isPublished: true,
+      visibility: "public",
+      effectiveVisibility: "public",
+      visibilityBlockedByBlogPrivacy: false,
     });
 
-    await controller.createPost(
+    const result = await controller.createPost(
       { apiKey: { userId: "user-1", blogId: "blog-1" } },
       {
         title: "Hello World",
@@ -99,6 +106,20 @@ describe("McpProxyController", () => {
       }),
       expect.objectContaining({ id: "user-1" }),
     );
+    expect(result).toMatchObject({
+      id: "post-1",
+      slug: "hello-world",
+      title: "Hello World",
+      url: "/codebase/hello-world",
+      blog: { slug: "codebase", isPublic: true },
+      isPublished: true,
+      visibility: "public",
+      effectiveVisibility: "public",
+      visibilityBlockedByBlogPrivacy: false,
+      _meta: expect.objectContaining({
+        status: "created",
+      }),
+    });
   });
 
   it("keeps a pre-existing AI disclosure footer idempotent", async () => {
@@ -147,6 +168,62 @@ describe("McpProxyController", () => {
       }),
       expect.objectContaining({ id: "user-1" }),
     );
+  });
+
+  it("returns effective private visibility when blog privacy overrides a public post", async () => {
+    const {
+      controller,
+      postsService,
+      userRepository,
+      blogRepository,
+      usageService,
+      externalImageDownloadService,
+    } = createController();
+
+    blogRepository.findOne.mockResolvedValue({
+      id: "blog-1",
+      isPublic: false,
+      userId: "user-1",
+    });
+    usageService.checkMcpPostLimit.mockResolvedValue({ canPost: true });
+    usageService.trackMcpPost.mockResolvedValue(undefined);
+    userRepository.findOne.mockResolvedValue({ id: "user-1" });
+    externalImageDownloadService.extractExternalImageUrls.mockReturnValue([]);
+    postsService.createFast.mockResolvedValue({
+      id: "post-3",
+      slug: "private-blog-post",
+      title: "Private Blog Post",
+      blog: { slug: "codebase", alias: "codebase", isPublic: false },
+      isPublished: true,
+      visibility: "public",
+      effectiveVisibility: "private",
+      visibilityBlockedByBlogPrivacy: true,
+    });
+
+    const result = await controller.createPost(
+      { apiKey: { userId: "user-1", blogId: "blog-1" } },
+      {
+        title: "Private Blog Post",
+        content_markdown: "본문",
+        category: "Tech",
+        visibility: "public",
+      } as any,
+    );
+
+    expect(result).toMatchObject({
+      id: "post-3",
+      slug: "private-blog-post",
+      title: "Private Blog Post",
+      url: "/codebase/private-blog-post",
+      blog: { alias: "codebase", isPublic: false },
+      isPublished: true,
+      visibility: "public",
+      effectiveVisibility: "private",
+      visibilityBlockedByBlogPrivacy: true,
+      _meta: expect.objectContaining({
+        status: "created",
+      }),
+    });
   });
 
   it("lists only the authenticated user's published posts for MCP read", async () => {

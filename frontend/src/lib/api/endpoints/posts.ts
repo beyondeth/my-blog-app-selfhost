@@ -45,6 +45,7 @@ export interface GetPostsCursorParams {
   blogSlug?: string;    // 블로그 alias 필터
   blogId?: string;      // 블로그 UUID 필터
   search?: string;     // 검색어
+  postType?: 'blog' | 'product';  // 포스트 유형 필터
 }
 
 /**
@@ -122,15 +123,6 @@ export class PostsAPI {
    * @description 본인의 포스트만 수정 가능
    */
   async updatePost(id: string, data: Partial<PostForm>): Promise<Post> {
-    // 🎯 [DEBUG] 포스트 수정 요청 로그
-    console.log('🎯 [API] updatePost called with:');
-    console.log('  - Post ID:', id);
-    console.log('  - Data keys:', Object.keys(data));
-    console.log('  - Full data:', JSON.stringify(data, null, 2));
-    console.log('  - thumbnailImageId:', data.thumbnailImageId);
-    console.log('  - thumbnail:', data.thumbnail);
-    console.log('  - Timestamp:', new Date().toISOString());
-
     // FormData 대신 JSON으로 전송 (NestJS 파싱 문제 해결)
     return this.client.patch<Post>(`/posts/${id}`, data, {
       headers: {

@@ -10,7 +10,7 @@ import { EventEmitter2 } from "@nestjs/event-emitter";
 import * as bcrypt from "bcrypt";
 import { User } from "../entities/user.entity";
 import { Profile } from "../entities/profile.entity";
-import { Subscription } from "../entities/subscription.entity";
+import { Subscription } from "../../subscription/entities/subscription.entity";
 import { AccountSettings } from "../entities/account-settings.entity";
 import { Post } from "../../posts/entities/post.entity";
 import { Comment } from "../../comments/entities/comment.entity";
@@ -77,7 +77,8 @@ export class UsersCommandService {
           accountSecurityLevel: "basic",
         }),
         subscription: this.subscriptionRepository.create({
-          subscriptionTier: SubscriptionTier.FREE,
+          tier: SubscriptionTier.FREE,
+          status: SubscriptionStatus.ACTIVE,
           isTrialUsed: false,
         }),
         accountSettings: this.accountSettingsRepository.create({
@@ -333,8 +334,8 @@ export class UsersCommandService {
           isEmailVerified: user.isEmailVerified,
           createdAt: user.createdAt,
           lastLoginAt: user.lastLoginAt,
-          subscriptionTier: user.subscriptionTier,
-          subscriptionStatus: user.subscriptionStatus,
+          subscriptionTier: user.subscription?.tier,
+          subscriptionStatus: user.subscription?.status,
         },
         newData: { isDeleted: true, deletedAt: now, scheduledDeletionAt },
         metadata: { retentionDays, reason: "사용자 계정 삭제 요청" },

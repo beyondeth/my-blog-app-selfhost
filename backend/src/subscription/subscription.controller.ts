@@ -23,6 +23,7 @@ import { SubscriptionService } from "./subscription.service";
 import { SubscriptionFacadeService } from "../shared/subscription-facade.service";
 import {
   SubscriptionTier,
+  SubscriptionStatus,
   BillingCycle,
 } from "../common/enums/subscription.enum";
 
@@ -174,6 +175,102 @@ export class SubscriptionController {
   }
 
   /**
+   * 플랜 다운그레이드 예약
+   * 현재 결제 기간 종료 후 다음 주기부터 낮은 플랜 적용
+   * 결제 없이 예약만 — 다음 정기결제 시 새 플랜 가격으로 청구
+   */
+  @Post("schedule-downgrade")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "플랜 다운그레이드 예약" })
+  @HttpCode(HttpStatus.OK)
+  async scheduleDowngrade(
+    @Request() req,
+    @Body() body: { tier: string; billingCycle?: string },
+  ) {
+    const userId = req.user.id;
+    const subscription = await this.subscriptionService.getUserSubscription(userId);
+
+    if (!subscription) {
+      throw new BadRequestException("활성 구독이 없습니다");
+    }
+
+    // 다운그레이드 검증
+    const tierOrder: Record<string, number> = { free: 0, starter: 1, pro: 2 };
+    const currentLevel = tierOrder[subscription.tier?.toLowerCase()] ?? 0;
+    const targetLevel = tierOrder[body.tier?.toLowerCase()] ?? 0;
+
+    // 이미 FREE면 다운그레이드 불가
+    if (currentLevel === 0) {
+      throw new BadRequestException("이미 Free 플랜입니다. 다운그레이드할 수 없습니다.");
+    }
+
+    if (targetLevel >= currentLevel) {
+      throw new BadRequestException("다운그레이드는 현재 플랜보다 낮은 플랜만 가능합니다");
+    }
+
+    // 이미 취소된 구독은 다운그레이드 불가
+    if (subscription.status === SubscriptionStatus.CANCELED) {
+      throw new BadRequestException("이미 취소된 구독입니다. 구독을 재활성화한 후 다운그레이드해주세요.");
+    }
+
+    // FREE로 다운그레이드 = 구독 취소와 동일
+    if (body.tier?.toLowerCase() === "free") {
+      await this.subscriptionService.cancelSubscription(userId, "다운그레이드: Free 플랜으로 전환");
+      return {
+        success: true,
+        message: `현재 결제 기간 종료 후 Free 플랜으로 전환됩니다`,
+        effectiveDate: subscription.endDate || subscription.nextBillingDate,
+      };
+    }
+
+    // 유료 플랜 간 다운그레이드: metadata에 예약 정보 저장
+    // 다음 정기결제 시 BillingProcessor가 새 플랜 가격으로 청구
+    subscription.metadata = {
+      ...subscription.metadata,
+      scheduledDowngrade: {
+        targetTier: body.tier,
+        targetBillingCycle: body.billingCycle || subscription.billingCycle,
+        scheduledAt: new Date().toISOString(),
+      },
+    };
+
+    await this.subscriptionService.saveSubscription(subscription);
+
+    return {
+      success: true,
+      message: `현재 결제 기간 종료 후 ${body.tier} 플랜으로 변경됩니다`,
+      effectiveDate: subscription.endDate || subscription.nextBillingDate,
+    };
+  }
+
+  /**
+   * 플랜 다운그레이드 예약 취소
+   */
+  @Post("cancel-downgrade")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "다운그레이드 예약 취소" })
+  @HttpCode(HttpStatus.OK)
+  async cancelDowngrade(@Request() req) {
+    const subscription = await this.subscriptionService.getUserSubscription(req.user.id);
+
+    if (!subscription?.metadata?.scheduledDowngrade) {
+      throw new BadRequestException("예약된 다운그레이드가 없습니다");
+    }
+
+    // metadata에서 예약 정보 제거
+    const { scheduledDowngrade, ...restMetadata } = subscription.metadata as any;
+    subscription.metadata = restMetadata;
+    await this.subscriptionService.saveSubscription(subscription);
+
+    return {
+      success: true,
+      message: "다운그레이드 예약이 취소되었습니다. 현재 플랜이 유지됩니다.",
+    };
+  }
+
+  /**
    * 사용량 통계 조회
    * 현재 월의 사용량과 제한 정보
    */
@@ -315,13 +412,13 @@ export class SubscriptionController {
   }
 
   /**
-   * 플랜 업그레이드 시뮬레이션
-   * 실제 결제 없이 업그레이드 시 변경사항 미리보기
+   * 플랜 업그레이드 시뮬레이션 (비례배분 미리보기)
+   * 실제 결제 없이 차액, 잔여일수 등 계산 결과 반환
    */
   @Post("simulate-upgrade")
   @UseGuards(JwtAuthGuard)
   @ApiBearerAuth()
-  @ApiOperation({ summary: "업그레이드 시뮬레이션" })
+  @ApiOperation({ summary: "업그레이드 비례배분 시뮬레이션" })
   async simulateUpgrade(
     @Request() req,
     @Body()
@@ -330,16 +427,95 @@ export class SubscriptionController {
       billingCycle: BillingCycle;
     },
   ) {
-    // SubscriptionFacadeService를 통해 업그레이드 시뮬레이션
-    const simulation = await this.facadeService.simulateUpgrade(
-      req.user.id,
+    const subscription = await this.subscriptionService.getUserSubscription(req.user.id);
+    const proration = await this.subscriptionService.calculateProration(
+      subscription,
       body.tier,
       body.billingCycle,
     );
 
     return {
       success: true,
-      data: simulation,
+      data: proration,
+    };
+  }
+
+  /**
+   * 즉시 업그레이드 (비례배분 차액 결제)
+   * 기존 빌링키로 차액만 결제하고 플랜 즉시 변경
+   */
+  @Post("upgrade")
+  @UseGuards(JwtAuthGuard)
+  @ApiBearerAuth()
+  @ApiOperation({ summary: "구독 업그레이드 (비례배분)" })
+  @HttpCode(HttpStatus.OK)
+  async upgradeSubscription(
+    @Request() req,
+    @Body()
+    body: {
+      tier: SubscriptionTier;
+      billingCycle: BillingCycle;
+    },
+  ) {
+    const userId = req.user.id;
+    const subscription = await this.subscriptionService.getUserSubscription(userId);
+
+    // 업그레이드 검증
+    const tierOrder: Record<string, number> = { free: 0, starter: 1, pro: 2 };
+    const currentLevel = tierOrder[subscription.tier?.toLowerCase()] ?? 0;
+    const targetLevel = tierOrder[body.tier?.toLowerCase()] ?? 0;
+
+    if (targetLevel <= currentLevel) {
+      throw new BadRequestException("업그레이드는 현재 플랜보다 높은 플랜만 가능합니다");
+    }
+
+    if (subscription.status !== SubscriptionStatus.ACTIVE) {
+      throw new BadRequestException("활성 구독만 업그레이드할 수 있습니다");
+    }
+
+    // 비례배분 계산
+    const proration = await this.subscriptionService.calculateProration(
+      subscription,
+      body.tier,
+      body.billingCycle,
+    );
+
+    // 차액이 있으면 기존 빌링키로 결제
+    if (proration.proratedAmount > 0) {
+      const result = await this.facadeService.chargeUpgradeProration(
+        userId,
+        subscription,
+        proration,
+        body.tier,
+        body.billingCycle,
+      );
+
+      return {
+        success: true,
+        data: {
+          subscription: result.subscription,
+          chargedAmount: proration.proratedAmount,
+          proration,
+          message: `${proration.newPlan.displayName} 플랜으로 업그레이드되었습니다`,
+        },
+      };
+    }
+
+    // 차액이 0이면 (무료→유료 등) 플랜만 변경
+    const updated = await this.subscriptionService.updateUserSubscription(
+      userId,
+      body.tier,
+      body.billingCycle,
+    );
+
+    return {
+      success: true,
+      data: {
+        subscription: updated,
+        chargedAmount: 0,
+        proration,
+        message: `${proration.newPlan.displayName} 플랜으로 업그레이드되었습니다`,
+      },
     };
   }
 

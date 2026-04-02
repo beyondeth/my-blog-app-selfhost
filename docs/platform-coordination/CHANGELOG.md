@@ -2,6 +2,51 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-03-19
+
+### Additional update (blog branding uploads moved to persistent blog context)
+
+#### What changed
+- Switched blog branding uploads in `frontend/src/components/settings/BlogBrandingSettings.tsx` from generic `files/upload-*` flow to contextual `files/v2/blogs/:blogId/{logo|favicon|banner}` endpoints.
+- Added `POST /api/v1/files/v2/blogs/:blogId/favicon` in `backend/src/files/controllers/files-v2.controller.ts` so `iconUrl` can use the same persistent blog-owned storage path as logo and cover images.
+- Confirmed the existing 404 issue was caused by blog branding fields storing CDN URLs for files created under `system/content` temporary context instead of `blog` context.
+
+#### Why
+- Generic uploads are created under temporary/system content context and can later be marked orphaned by the file lifecycle cleanup job.
+- Blog branding images are long-lived assets, so they must not share the temporary upload lifecycle used for draft/post content.
+
+#### How
+- Kept the existing `blogs.logoUrl/iconUrl/coverImageUrl` contract intact.
+- Changed only the upload source of truth so future uploads return a persistent contextual CDN URL before the branding record is updated.
+- Verified the broken example blog (`alias=park1818`) had branding URLs under `uploads/image/...`, while the surviving logo file was still attached to a `system/content` context and already had an `expiresAt` deletion schedule.
+
+### Additional update (temporary `/landing2` route removed)
+
+#### What changed
+- Removed the temporary app route files for `/landing2`.
+- Updated `/landing` CTA links that pointed to `/landing2` so they now go directly to the creator pilot inquiry mail link.
+- Removed `landing2` from the reserved top-level segment list in `frontend/src/proxy.ts`.
+
+#### Why
+- The route existed only for temporary validation and was no longer intended to ship.
+- Leaving it in place caused Next route type generation to keep `/landing2` in the app route set and contributed to validator drift during frontend type-check.
+
+### Additional update (baseline-browser-mapping build warning filtered at script level)
+
+#### What changed
+- Removed the direct `baseline-browser-mapping` devDependency from `frontend/package.json`.
+- Added a `pnpm.overrides` pin to keep the transitive `baseline-browser-mapping` version on `2.10.8`.
+- Switched the frontend build script to `frontend/scripts/run-next-build.js`, which still runs `next build --webpack` but filters only the repeated `baseline-browser-mapping` warning line from build output.
+
+#### Why
+- The warning was build-time noise rather than an application/runtime failure.
+- Updating the transitive dependency alone did not stop Next 16.0.10 from printing the stale-data warning in this workspace, so the safest practical fix was to preserve the build command and suppress only that one known line.
+
+#### How
+- Kept `next build --webpack` as the actual production build command.
+- Preserved build exit codes by forwarding the child process result from the wrapper script.
+- Re-verified with `pnpm --dir frontend build` and `pnpm --dir frontend type-check`.
+
 ## 2026-03-12
 
 ### Additional update (OpenAI autopost instruction narrowing + compact style brief)

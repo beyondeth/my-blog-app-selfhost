@@ -13,6 +13,7 @@ export const WRITING_STYLE_PRESETS = [
   'pm',
   'designer',
   'marketer',
+  'sell',
 ] as const;
 
 export type WritingStylePreset = (typeof WRITING_STYLE_PRESETS)[number];
@@ -201,6 +202,29 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
           type: 'string',
           description:
             'Writing style identifier for analytics or traceability. Use a preset id, or pass custom:<alias> when a custom markdown style was used.',
+        },
+        sell: {
+          type: 'boolean',
+          description:
+            '판매 상품으로 등록. true면 마켓플레이스에 등록됩니다. price와 productCategory가 필수입니다.',
+        },
+        price: {
+          type: 'number',
+          description:
+            '상품 가격 (KRW, 최소 100). sell=true일 때 필수.',
+        },
+        productCategory: {
+          type: 'string',
+          enum: [
+            'ai_prompts',
+            'coding_templates',
+            'tech_guides',
+            'ai_workflows',
+            'data_analytics',
+            'others',
+          ],
+          description:
+            '상품 카테고리. sell=true일 때 필수.',
         },
       },
       required: ['title', 'content_markdown', 'category'],

@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   Logger,
+  OnModuleInit,
 } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, DataSource } from "typeorm";
@@ -25,9 +26,17 @@ import {
   RefundPayload,
   SubscriptionCancelledPayload,
 } from "../payment/interfaces/payment-event-payloads.interface";
+import { SubscriptionPlanSeeder } from "./seeders/subscription-plan.seeder";
+
+/** 티어 비교용 순서 맵 (중복 정의 방지) */
+const TIER_ORDER: Record<SubscriptionTier, number> = {
+  [SubscriptionTier.FREE]: 0,
+  [SubscriptionTier.STARTER]: 1,
+  [SubscriptionTier.PRO]: 2,
+};
 
 @Injectable()
-export class SubscriptionService {
+export class SubscriptionService implements OnModuleInit {
   private readonly logger = new Logger(SubscriptionService.name);
 
   constructor(
@@ -41,7 +50,12 @@ export class SubscriptionService {
     private userRepository: Repository<User>,
     private dataSource: DataSource,
     private eventEmitter: EventEmitter2,
+    private readonly planSeeder: SubscriptionPlanSeeder,
   ) {}
+
+  async onModuleInit() {
+    await this.planSeeder.seed();
+  }
 
   /**
    * 사용 가능한 구독 플랜 목록 조회
@@ -50,6 +64,111 @@ export class SubscriptionService {
     return await this.subscriptionPlanRepository.find({
       order: { name: "ASC" },
     });
+  }
+
+  /**
+   * 구독 엔티티 직접 저장 (metadata 업데이트 등)
+   */
+  async saveSubscription(subscription: Subscription): Promise<Subscription> {
+    return this.subscriptionRepository.save(subscription);
+  }
+
+  /**
+   * 비례배분(Proration) 계산
+   * 업그레이드 시 잔여 기간에 대한 차액을 계산
+   *
+   * 공식:
+   *   잔여일수 = endDate - today
+   *   기존 잔여가치 = 기존플랜가격 × (잔여일수 / 총일수)
+   *   새 잔여가치 = 새플랜가격 × (잔여일수 / 총일수)
+   *   차액 = max(새 잔여가치 - 기존 잔여가치, 0)
+   */
+  async calculateProration(
+    subscription: Subscription,
+    newTier: SubscriptionTier,
+    newBillingCycle?: BillingCycle,
+  ) {
+    const newPlan = await this.getPlanByTier(newTier);
+    const cycle = newBillingCycle || subscription.billingCycle || BillingCycle.MONTHLY;
+
+    // 현재 플랜 가격
+    const currentPrice = subscription.price
+      || (subscription.billingCycle === BillingCycle.YEARLY
+        ? subscription.plan?.pricing?.yearly
+        : subscription.plan?.pricing?.monthly)
+      || 0;
+
+    // 새 플랜 가격
+    const newPrice = cycle === BillingCycle.YEARLY
+      ? (newPlan.pricing?.yearly || 0)
+      : (newPlan.pricing?.monthly || 0);
+
+    // 잔여일수 계산
+    const now = new Date();
+    const startDate = subscription.startDate ? new Date(subscription.startDate) : now;
+    const endDate = subscription.endDate
+      ? new Date(subscription.endDate)
+      : subscription.nextBillingDate
+        ? new Date(subscription.nextBillingDate)
+        : new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const totalMs = endDate.getTime() - startDate.getTime();
+    const remainingMs = Math.max(endDate.getTime() - now.getTime(), 0);
+    const totalDays = Math.max(Math.ceil(totalMs / (24 * 60 * 60 * 1000)), 1);
+    const remainingDays = Math.ceil(remainingMs / (24 * 60 * 60 * 1000));
+    const ratio = remainingDays / totalDays;
+
+    // 비례배분 금액 (원 단위 반올림)
+    const currentRemainingValue = Math.round(currentPrice * ratio);
+    const newRemainingValue = Math.round(newPrice * ratio);
+    const proratedAmount = Math.max(newRemainingValue - currentRemainingValue, 0);
+
+    return {
+      currentPlan: {
+        tier: subscription.tier,
+        price: currentPrice,
+        remainingValue: currentRemainingValue,
+      },
+      newPlan: {
+        tier: newTier,
+        price: newPrice,
+        remainingValue: newRemainingValue,
+        displayName: newPlan.displayName || newPlan.name,
+      },
+      proratedAmount,
+      remainingDays,
+      totalDays,
+      billingCycle: cycle,
+    };
+  }
+
+  /**
+   * 구독 tier만 즉시 변경 (업그레이드 비례배분 시 사용)
+   * endDate/nextBillingDate는 유지 — 다음 정기결제 시 새 플랜 가격으로 청구
+   */
+  async updateSubscriptionTier(
+    userId: string,
+    newTier: SubscriptionTier,
+    newBillingCycle?: BillingCycle,
+  ): Promise<Subscription> {
+    const subscription = await this.getUserSubscription(userId);
+    const newPlan = await this.getPlanByTier(newTier);
+
+    subscription.planId = newPlan.id;
+    subscription.plan = newPlan;
+    subscription.tier = newTier;
+    if (newBillingCycle) {
+      subscription.billingCycle = newBillingCycle;
+    }
+    subscription.status = SubscriptionStatus.ACTIVE;
+    subscription.autoRenew = true;
+    subscription.canceledAt = null;
+    subscription.cancelReason = null;
+
+    // endDate와 nextBillingDate는 유지 — 기존 결제 주기 끝까지 동일
+    // 다음 정기결제 시 BillingProcessor가 새 플랜 가격으로 청구
+
+    return this.subscriptionRepository.save(subscription);
   }
 
   /**
@@ -67,13 +186,7 @@ export class SubscriptionService {
     }
 
     // 현재 플랜보다 낮은 티어인지 확인
-    const tierOrder = {
-      [SubscriptionTier.FREE]: 0,
-      [SubscriptionTier.STARTER]: 1,
-      [SubscriptionTier.PRO]: 2,
-    };
-
-    return tierOrder[targetTier] < tierOrder[currentSubscription.tier];
+    return TIER_ORDER[targetTier] < TIER_ORDER[currentSubscription.tier];
   }
 
   /**
@@ -93,10 +206,10 @@ export class SubscriptionService {
       throw new NotFoundException("Target plan not found");
     }
 
-    // 비례 배분 계산 등
-    const proratedAmount = this.calculateProratedAmount(
+    // 올바른 비례배분 계산 사용 (calculateProration은 차액만 반환)
+    const proration = await this.calculateProration(
       currentSubscription,
-      targetPlan,
+      targetTier,
       billingCycle,
     );
 
@@ -104,25 +217,10 @@ export class SubscriptionService {
       currentTier: currentSubscription.tier,
       targetTier,
       billingCycle,
-      proratedAmount,
+      proratedAmount: proration.proratedAmount,
+      proration,
       nextBillingDate: this.calculateNextBillingDate(billingCycle),
     };
-  }
-
-  /**
-   * 비례 배분 금액 계산
-   */
-  private calculateProratedAmount(
-    currentSubscription: Subscription,
-    targetPlan: SubscriptionPlan,
-    billingCycle: BillingCycle,
-  ): number {
-    // 간단한 구현 - 실제로는 더 복잡한 로직 필요
-    if (billingCycle === BillingCycle.MONTHLY) {
-      return targetPlan.getMonthlyPrice() || 0;
-    } else {
-      return targetPlan.getYearlyPrice() || 0;
-    }
   }
 
   /**
@@ -166,13 +264,6 @@ export class SubscriptionService {
 
     await this.subscriptionRepository.save(subscription);
 
-    // User 엔티티도 업데이트
-    await this.userRepository.update(userId, {
-      subscriptionTier: SubscriptionTier.FREE,
-      subscriptionStatus: SubscriptionStatus.ACTIVE,
-      subscriptionStartDate: new Date(),
-    });
-
     return subscription;
   }
 
@@ -197,15 +288,7 @@ export class SubscriptionService {
       throw new BadRequestException("선택한 플랜은 현재 이용할 수 없습니다");
     }
 
-    // 다운그레이드 체크 - Mock 환경에서는 모든 플랜 변경 허용
-    const currentSubscription = await this.getUserSubscription(userId);
-    // Mock 환경에서는 다운그레이드 체크 생략 (개발/테스트 목적)
-    // 실제 프로덕션에서는 결제 시스템과 연동하여 처리
-    // if (this.isDowngrade(currentSubscription.tier, plan.tier)) {
-    //   throw new BadRequestException(
-    //     '다운그레이드는 현재 결제 주기가 끝난 후에만 가능합니다'
-    //   );
-    // }
+    // 다운그레이드 체크는 Toss 결제 경로(SubscriptionController.upgradeSubscription)에서 처리
 
     // 가격 계산
     const price =
@@ -220,20 +303,6 @@ export class SubscriptionService {
       url: `http://localhost:3001/mock-checkout?session=${sessionId}&tier=${plan.tier}&cycle=${billingCycle}`,
       id: sessionId,
     };
-    /* 실제 결제 서비스 연동 시:
-    const session = await this.paymentService.createCheckoutSession({
-      customerId: user.paymentCustomerId,
-      priceAmount: price,
-      currency: plan.pricing.currency,
-      productName: plan.displayName || plan.name,
-      billingCycle,
-      metadata: {
-        userId,
-        planId,
-        tier: plan.tier,
-      },
-    });
-    */
 
     return {
       checkoutUrl: session.url,
@@ -294,13 +363,6 @@ export class SubscriptionService {
       currentSubscription.endDate = new Date();
       await queryRunner.manager.save(currentSubscription);
 
-      // User 엔티티 업데이트
-      await queryRunner.manager.update(User, userId, {
-        subscriptionTier: newPlan.tier,
-        subscriptionStatus: SubscriptionStatus.ACTIVE,
-        subscriptionStartDate: new Date(),
-      });
-
       await queryRunner.commitTransaction();
       return newSubscription;
     } catch (error) {
@@ -340,10 +402,16 @@ export class SubscriptionService {
 
     await this.subscriptionRepository.save(subscription);
 
-    // User 엔티티 업데이트
-    await this.userRepository.update(userId, {
-      subscriptionStatus: SubscriptionStatus.CANCELED,
+    // 예약된 정기결제 스케줄 취소 이벤트 발행
+    // BillingSchedulerService가 이 이벤트를 수신하여 BullMQ 큐에서 Job 제거
+    this.eventEmitter.emit(PaymentEvents.SUBSCRIPTION_CANCELLED, {
+      userId,
+      subscriptionId: subscription.id,
     });
+
+    this.logger.log(
+      `구독 취소 완료: subscriptionId=${subscription.id}, autoRenew=false, 결제 스케줄 취소 이벤트 발행`,
+    );
 
     return subscription;
   }
@@ -361,6 +429,7 @@ export class SubscriptionService {
     let subscription = await this.subscriptionRepository.findOne({
       where: { userId },
       relations: ["plan"],
+      order: { createdAt: "DESC" },
     });
 
     // 새로운 플랜 가져오기
@@ -413,20 +482,6 @@ export class SubscriptionService {
 
     await this.subscriptionRepository.save(subscription);
 
-    // User 엔티티 업데이트
-    // userId가 유효한지 확인
-    if (!userId) {
-      throw new BadRequestException("유효하지 않은 사용자 ID입니다");
-    }
-
-    await this.userRepository.update(
-      { id: userId }, // where 조건을 명시적으로 지정
-      {
-        subscriptionTier: tier,
-        subscriptionStatus: SubscriptionStatus.ACTIVE,
-      },
-    );
-
     // 결제 이력 추가
     const paymentHistory = this.paymentHistoryRepository.create({
       user: { id: userId } as User, // userId 대신 user 관계 설정
@@ -444,7 +499,7 @@ export class SubscriptionService {
     await this.paymentHistoryRepository.save(paymentHistory);
 
     // 구독 변경 이벤트 발생 (UsageService 캐시 무효화)
-    this.eventEmitter.emit("subscription.updated", {
+    this.eventEmitter.emit(PaymentEvents.SUBSCRIPTION_UPDATED, {
       userId,
       tier,
     });
@@ -482,11 +537,6 @@ export class SubscriptionService {
     subscription.cancelReason = null;
 
     await this.subscriptionRepository.save(subscription);
-
-    // User 엔티티 업데이트
-    await this.userRepository.update(userId, {
-      subscriptionStatus: SubscriptionStatus.ACTIVE,
-    });
 
     return subscription;
   }
@@ -533,19 +583,10 @@ export class SubscriptionService {
   /**
    * Webhook 처리
    */
-  async handleWebhook(event: any): Promise<void> {
+  async handleWebhook(event: { type: string; data: Record<string, unknown> }): Promise<void> {
     switch (event.type) {
       case "checkout.session.completed":
         await this.handleCheckoutCompleted(event.data);
-        break;
-      case "customer.subscription.updated":
-        await this.handleSubscriptionUpdated(event.data);
-        break;
-      case "customer.subscription.deleted":
-        await this.handleSubscriptionDeleted(event.data);
-        break;
-      case "invoice.payment_failed":
-        await this.handlePaymentFailed(event.data);
         break;
     }
   }
@@ -572,33 +613,19 @@ export class SubscriptionService {
 
     await this.subscriptionRepository.save(subscription);
 
-    // User 엔티티 업데이트
-    await this.userRepository.update(userId, {
-      subscriptionTier: tier,
-      subscriptionStatus: SubscriptionStatus.ACTIVE,
-      paymentCustomerId: data.customer,
-      paymentSubscriptionId: data.subscription,
-    });
-
     // 결제 이력 저장
     await this.paymentHistoryRepository.save({
       userId,
       subscriptionId: subscription.id,
-      amount: data.amount_total / 100, // cents to dollars
-      currency: data.currency,
+      amount: data.amount_total, // KRW은 zero-decimal 통화 (분할 불필요)
+      currency: data.currency || "KRW",
       status: PaymentStatus.SUCCEEDED,
-      paymentProvider: "stripe",
+      paymentProvider: "toss",
       transactionId: data.payment_intent,
     });
   }
 
-  private async handleSubscriptionUpdated(data: any): Promise<void> {
-    // 구독 업데이트 처리
-  }
-
-  private async handleSubscriptionDeleted(data: any): Promise<void> {
-    // 구독 삭제 처리
-  }
+  // handleSubscriptionUpdated / handleSubscriptionDeleted: 미사용 Stripe 스텁 제거 (dead code)
 
   // Helper methods
 
@@ -606,24 +633,14 @@ export class SubscriptionService {
     current: SubscriptionTier,
     target: SubscriptionTier,
   ): boolean {
-    const tierOrder = {
-      [SubscriptionTier.FREE]: 0,
-      [SubscriptionTier.STARTER]: 1,
-      [SubscriptionTier.PRO]: 2,
-    };
-    return tierOrder[target] > tierOrder[current];
+    return TIER_ORDER[target] > TIER_ORDER[current];
   }
 
   private isDowngrade(
     current: SubscriptionTier,
     target: SubscriptionTier,
   ): boolean {
-    const tierOrder = {
-      [SubscriptionTier.FREE]: 0,
-      [SubscriptionTier.STARTER]: 1,
-      [SubscriptionTier.PRO]: 2,
-    };
-    return tierOrder[target] < tierOrder[current];
+    return TIER_ORDER[target] < TIER_ORDER[current];
   }
 
   private calculateNextBillingDate(billingCycle: BillingCycle): Date {
@@ -656,7 +673,8 @@ export class SubscriptionService {
       return;
     }
 
-    // 결제 처리 로직을 여기서 직접 실행
+    // 결제 처리 로직 — 트랜잭션으로 원자성 보장
+    // 기존 구독 종료 + 새 구독 생성이 분리되면 중간 크래시 시 무구독 상태 발생
     const plan = await this.subscriptionPlanRepository.findOne({
       where: { tier },
     });
@@ -668,43 +686,38 @@ export class SubscriptionService {
       return;
     }
 
-    // 기존 구독 종료 처리
-    const existingSubscription = await this.subscriptionRepository.findOne({
-      where: { userId: userId.toString(), status: SubscriptionStatus.ACTIVE },
-    });
+    await this.dataSource.transaction(async (manager) => {
+      // 기존 구독 종료 처리
+      const existingSubscription = await manager.findOne(Subscription, {
+        where: { userId: userId.toString(), status: SubscriptionStatus.ACTIVE },
+      });
 
-    if (existingSubscription) {
-      existingSubscription.status = SubscriptionStatus.CANCELED;
-      existingSubscription.endDate = new Date();
-      await this.subscriptionRepository.save(existingSubscription);
-    }
+      if (existingSubscription) {
+        existingSubscription.status = SubscriptionStatus.CANCELED;
+        existingSubscription.endDate = new Date();
+        await manager.save(Subscription, existingSubscription);
+      }
 
-    // 새로운 구독 생성
-    const subscription = this.subscriptionRepository.create({
-      userId: userId.toString(),
-      planId: plan.id,
-      plan,
-      tier,
-      status: SubscriptionStatus.ACTIVE,
-      billingCycle,
-      price:
-        billingCycle === BillingCycle.YEARLY
-          ? plan.pricing.yearly
-          : plan.pricing.monthly,
-      currency: plan.pricing.currency,
-      startDate: new Date(),
-      nextBillingDate: this.calculateNextBillingDate(billingCycle),
-      paymentSubscriptionId: subscriptionId,
-      autoRenew: true,
-    });
+      // 새로운 구독 생성
+      const subscription = manager.create(Subscription, {
+        userId: userId.toString(),
+        planId: plan.id,
+        plan,
+        tier,
+        status: SubscriptionStatus.ACTIVE,
+        billingCycle,
+        price:
+          billingCycle === BillingCycle.YEARLY
+            ? plan.pricing.yearly
+            : plan.pricing.monthly,
+        currency: plan.pricing.currency,
+        startDate: new Date(),
+        nextBillingDate: this.calculateNextBillingDate(billingCycle),
+        paymentSubscriptionId: subscriptionId,
+        autoRenew: true,
+      });
 
-    await this.subscriptionRepository.save(subscription);
-
-    // User 엔티티 업데이트
-    await this.userRepository.update(userId, {
-      subscriptionTier: tier,
-      subscriptionStatus: SubscriptionStatus.ACTIVE,
-      subscriptionStartDate: new Date(),
+      await manager.save(Subscription, subscription);
     });
   }
 
@@ -730,6 +743,8 @@ export class SubscriptionService {
   /**
    * 구독 취소 이벤트 처리
    * 외부 결제 서비스에서 구독이 취소된 경우
+   * 주의: cancelSubscription()을 호출하면 동일 이벤트가 재발행되어 무한 루프 발생
+   *       → 직접 상태 변경만 수행
    */
   @OnEvent(PaymentEvents.SUBSCRIPTION_CANCELLED)
   async handleSubscriptionCancelled(payload: SubscriptionCancelledPayload) {
@@ -737,9 +752,30 @@ export class SubscriptionService {
       `[SubscriptionService] Subscription cancelled event received for user ${payload.userId}`,
     );
 
-    await this.cancelSubscription(
-      payload.userId.toString(),
-      payload.reason || "Subscription cancelled by payment provider",
+    // cancelSubscription() 대신 직접 상태 변경 (이벤트 재발행 방지)
+    const subscription = await this.subscriptionRepository.findOne({
+      where: {
+        userId: payload.userId.toString(),
+        status: SubscriptionStatus.ACTIVE,
+      },
+    });
+
+    if (!subscription) {
+      this.logger.warn(
+        `[SubscriptionService] 취소할 활성 구독 없음: userId=${payload.userId}`,
+      );
+      return;
+    }
+
+    subscription.status = SubscriptionStatus.CANCELED;
+    subscription.canceledAt = new Date();
+    subscription.cancelReason =
+      payload.reason || "Subscription cancelled by payment provider";
+    subscription.autoRenew = false;
+
+    await this.subscriptionRepository.save(subscription);
+    this.logger.log(
+      `[SubscriptionService] 외부 취소 처리 완료: subscriptionId=${subscription.id}`,
     );
   }
 

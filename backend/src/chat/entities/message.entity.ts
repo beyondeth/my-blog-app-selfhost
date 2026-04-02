@@ -25,6 +25,10 @@ export class Message {
   @Column({ type: "text" })
   content: string;
 
+  /** 메시지 유형: text(일반) | system(자동 생성) | product_card(상품 컨텍스트) */
+  @Column({ type: "varchar", length: 20, default: "text" })
+  messageType: "text" | "system" | "product_card";
+
   @Column({ default: false })
   isEdited: boolean;
 
