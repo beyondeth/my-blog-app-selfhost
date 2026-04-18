@@ -4,6 +4,25 @@ Track operational rule changes for worktree/branch coordination.
 
 ## 2026-04-18
 
+### Additional update (direct MCP now blocks raw Mermaid and legacy Mermaid can be backfilled to diagram blocks)
+
+#### What changed
+- Added a backend-side raw Mermaid guard on the direct MCP create path (`/api/v1/mcp/posts`) so API Key / direct MCP posting cannot store new ` ```mermaid ` fences anymore.
+- Added a legacy Mermaid conversion utility that rewrites supported Mermaid flowcharts into D2-backed `diagram` fenced blocks.
+- Added a new backfill command, `pnpm --dir backend content:backfill-mermaid`, for repairing already stored legacy Mermaid posts after deploy.
+- Added regression tests for both the direct MCP guard and the Mermaid-to-diagram conversion path.
+
+#### Why
+- Production verification showed the broken post was not a frontend-only issue: the post itself was stored with a raw Mermaid fence.
+- The skill/mcporter route already had a raw Mermaid guard, but the direct MCP/API Key backend route still accepted Mermaid markdown, so legacy Mermaid posts continued to accumulate in production.
+
+#### How
+- Kept the long-term policy simple: new auto-posted diagrams must go through `diagram` blocks, not runtime Mermaid authoring.
+- Avoided broad Mermaid compatibility logic in the web renderer. Instead, the fix is split into:
+  - prevention for new posts at the backend ingress
+  - one-time repair for already stored legacy posts via command/backfill
+- The backfill intentionally converts only supported flowchart-style Mermaid blocks and safely skips unsupported Mermaid syntaxes.
+
 ### Additional update (KB cold-start publish path now normalizes marketplace categories before approval)
 
 #### What changed
