@@ -377,6 +377,9 @@ export const MCP_SERVER_INSTRUCTIONS = `# Codebase.blog Auto-posting MCP Server
 - If image upload fails, stop retrying and continue with text-only create_post().
 - Category is required and tags are optional (max 10).
 - Do not inspect previous posts to infer category or style during auto-posting. Pick the best fitting category from the current request.
+- For any structure diagram, workflow, flowchart, architecture map, or "mermaid" request, author visuals with \`diagram\` fenced blocks for the D2 renderer.
+- Do not generate raw \`mermaid\` fenced blocks in new posts.
+- Treat "mermaid" in the user request as visual intent, not as a requirement to emit Mermaid syntax.
 
 ## Available Tools
 
