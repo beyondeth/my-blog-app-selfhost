@@ -38,6 +38,7 @@ import {
   PostProcessingResult,
 } from "../queues/post-processing.queue";
 import { PostMetadataSyncService } from "../services/post-metadata-sync.service";
+import { KnowledgeEvents } from "../../knowledge/knowledge.constants";
 
 @Processor(POST_PROCESSING_QUEUE, {
   concurrency: 1, // 한 번에 하나의 Job만 처리 (순차 처리)
@@ -100,9 +101,11 @@ export class PostProcessingProcessor
         throw new Error(`Post not found: ${postId}`);
       }
 
-      if (post.status !== "processing") {
-        this.logger.warn(
-          `Post ${postId} is not in processing state: ${post.status}`,
+      const processingMode = this.resolveProcessingMode(post);
+
+      if (!processingMode.canProcess) {
+        this.logger.error(
+          `[POST_PROCESSING_INVALID_STATE] postId=${postId} status=${post.status} processingCompletedAt=${post.processingCompletedAt?.toISOString?.() ?? "null"} processingError=${post.processingError ?? "null"}`,
         );
         return {
           success: false,
@@ -112,6 +115,10 @@ export class PostProcessingProcessor
           processingTime: Date.now() - startTime,
         };
       }
+
+      this.logger.debug(
+        `[POST_PROCESSING_ACCEPTED] postId=${postId} mode=${processingMode.mode} status=${post.status} processingCompletedAt=${post.processingCompletedAt?.toISOString?.() ?? "null"}`,
+      );
 
       // 2. Markdown → HTML 변환 (콘텐츠 타입에 따라 분기)
       const isMarkdown = post.content_type === "markdown";
@@ -212,6 +219,13 @@ export class PostProcessingProcessor
             postId: postData.id,
             blogSlug: postData.blog.slug,
             userId: postData.blog.userId,
+            status: "published",
+          });
+
+          this.eventEmitter.emit(KnowledgeEvents.POST_PROCESSING_COMPLETED, {
+            postId,
+            blogId,
+            userId,
             status: "published",
           });
 
@@ -397,6 +411,15 @@ export class PostProcessingProcessor
    */
   @OnWorkerEvent("completed")
   onCompleted(job: Job<PostProcessingJobData>) {
+    const result = job.returnvalue as PostProcessingResult | undefined;
+
+    if (result && result.success === false) {
+      this.logger.warn(
+        `[POST_PROCESSING_COMPLETED_WITH_FAILURE] jobId=${job.id} postId=${job.data.postId} error=${result.error ?? "unknown"} processingTime=${result.processingTime}`,
+      );
+      return;
+    }
+
     this.logger.debug(`Job ${job.id} completed for post ${job.data.postId}`);
   }
 
@@ -496,5 +519,23 @@ export class PostProcessingProcessor
     }
 
     this.logger.log("✅ PostProcessingProcessor 리소스 정리 완료");
+  }
+
+  private resolveProcessingMode(
+    post: Pick<Post, "status" | "processingCompletedAt" | "processingError">,
+  ): { canProcess: boolean; mode: "processing" | "fast-path-published" | "published-reprocess" | "invalid" } {
+    if (post.status === "processing") {
+      return { canProcess: true, mode: "processing" };
+    }
+
+    if (post.status === "published") {
+      if (post.processingCompletedAt) {
+        return { canProcess: true, mode: "published-reprocess" };
+      }
+
+      return { canProcess: true, mode: "fast-path-published" };
+    }
+
+    return { canProcess: false, mode: "invalid" };
   }
 }

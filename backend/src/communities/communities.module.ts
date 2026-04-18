@@ -62,6 +62,7 @@ import { CacheModule } from "../cache/cache.module";
 import { RedisModule } from "../redis/redis.module";
 import { FilesModule } from "../files/files.module";
 import { PopularPostsModule } from "../popular-posts/popular-posts.module";
+import { PostsModule } from "../posts/posts.module";
 
 /**
  * 커뮤니티 모듈
@@ -111,6 +112,7 @@ import { PopularPostsModule } from "../popular-posts/popular-posts.module";
     RedisModule,
     FilesModule, // V2 ContextualFile 이미지 업로드
     PopularPostsModule, // 커뮤니티 인기글 전용 API read path
+    PostsModule,
   ],
   providers: [
     // 서비스

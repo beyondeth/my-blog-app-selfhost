@@ -17,6 +17,7 @@ groups:
     folder: Codebase Ops
     interval: 30s
     rules:
+      # VictoriaMetrics datasource outage는 component down으로 fan-out page 하지 않는다.
       - uid: backend-down
         title: Backend 응답 중단
         condition: C
@@ -67,7 +68,7 @@ groups:
               refId: C
               type: math
         noDataState: OK
-        execErrState: Error
+        execErrState: OK
         for: 1m
         annotations:
           summary: "Backend 응답 중단"
@@ -127,7 +128,7 @@ groups:
               refId: C
               type: math
         noDataState: OK
-        execErrState: Error
+        execErrState: OK
         for: 1m
         annotations:
           summary: "MCP Proxy 응답 중단"
@@ -187,7 +188,7 @@ groups:
               refId: C
               type: math
         noDataState: OK
-        execErrState: Error
+        execErrState: OK
         for: 1m
         annotations:
           summary: "Redis 연결 이상"

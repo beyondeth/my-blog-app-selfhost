@@ -69,6 +69,9 @@ import Redis from "ioredis";
 import { BlogResolverService } from "../common/services/blog-resolver.service";
 import { ViewerIdUtil } from "../common/utils/viewer-id.util";
 import { PopularPostsReadService } from "../popular-posts/services/popular-posts-read.service";
+import { KnowledgePublicReadService } from "../knowledge/services/knowledge-public-read.service";
+import { SubmitKnowledgeDraftDto } from "../knowledge/dto/knowledge-draft.dto";
+import { KnowledgeCandidateGraphService } from "../knowledge/services/knowledge-candidate-graph.service";
 
 @ApiTags("posts")
 @Controller("posts")
@@ -90,6 +93,8 @@ export class PostsController {
     private readonly likeService: LikeService,
     private readonly voteService: VoteService,
     private readonly popularPostsReadService: PopularPostsReadService,
+    private readonly knowledgePublicReadService: KnowledgePublicReadService,
+    private readonly knowledgeCandidateGraphService: KnowledgeCandidateGraphService,
     @InjectRedis() private readonly redis: Redis,
   ) {}
 
@@ -190,6 +195,43 @@ export class PostsController {
     @CurrentUser() user?: User,
   ) {
     return this.postsService.getRelatedPosts(id, limit, user);
+  }
+
+  @Get(":id/knowledge-context")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "포스트 공개 Knowledge 컨텍스트 조회" })
+  async getKnowledgeContext(
+    @Param("id", ParseUUIDPipe) id: string,
+    @CurrentUser() user?: User,
+  ) {
+    return this.knowledgePublicReadService.getPostKnowledgeContext(id, user);
+  }
+
+  @Post(":id/knowledge-draft")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "포스트 KB draft 제출" })
+  @ApiBearerAuth()
+  async submitKnowledgeDraft(
+    @Param("id", ParseUUIDPipe) id: string,
+    @Body() body: SubmitKnowledgeDraftDto,
+    @CurrentUser() user: User,
+  ) {
+    const artifact = await this.knowledgeCandidateGraphService.submitDraft({
+      userId: user.id,
+      postId: id,
+      draft: body,
+    });
+
+    if (!artifact) {
+      throw new NotFoundException("포스트를 찾을 수 없거나 draft를 제출할 권한이 없습니다.");
+    }
+
+    return {
+      success: true,
+      postId: id,
+      artifactId: artifact.id,
+    };
   }
 
   @Get()

@@ -18,6 +18,8 @@ This folder is the source of truth for multi-platform worktree operations.
   - Use for safe multi-agent operation and role split.
 - `CHANGELOG.md`
   - Audit log for when/what/how coordination rules were changed.
+- `PLATFORMS/web.md`
+  - Web lane log for user-facing feature and rendering changes that need platform impact tracking.
 
 ## Update Policy
 - Keep `AGENTS.md` concise.

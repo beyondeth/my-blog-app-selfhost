@@ -9,6 +9,7 @@ import { OptionalJwtAuthGuard } from "../auth/guards/optional-jwt-auth.guard";
 import { FeedService } from "./feed.service";
 import { GetUnifiedFeedDto, UnifiedFeedResponseDto } from "./dto";
 import { Public } from "../common/decorators/public.decorator";
+import { KnowledgePublicReadService } from "../knowledge/services/knowledge-public-read.service";
 
 /**
  * 통합 피드 컨트롤러
@@ -27,7 +28,10 @@ import { Public } from "../common/decorators/public.decorator";
 @ApiTags("Feed")
 @Controller("feed")
 export class FeedController {
-  constructor(private readonly feedService: FeedService) {}
+  constructor(
+    private readonly feedService: FeedService,
+    private readonly knowledgePublicReadService: KnowledgePublicReadService,
+  ) {}
 
   /**
    * 통합 피드 조회
@@ -61,5 +65,17 @@ export class FeedController {
     const userId = req.user?.id;
 
     return this.feedService.getUnifiedFeed(dto, userId);
+  }
+
+  @Get("knowledge/trending")
+  @Public()
+  @ApiOperation({
+    summary: "홈피드용 공개 Knowledge 트렌딩 노드 조회",
+  })
+  async getTrendingKnowledgeNodes(
+    @Query("limit") limit?: string,
+  ) {
+    const safeLimit = Number.isFinite(Number(limit)) ? Number(limit) : 5;
+    return this.knowledgePublicReadService.getTrendingNodes(safeLimit);
   }
 }

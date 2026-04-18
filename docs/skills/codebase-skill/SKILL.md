@@ -88,22 +88,32 @@ npx -y mcporter auth codebase-blog-oauth
 
 ## Verify (Always First)
 
-> Important: treat `check_auth` as the real success gate. Do not rely on the browser page text alone.
+> Important: `Authorization successful / You can return to the CLI.` is not just browser text. It is the callback that wakes the waiting `mcporter auth` process. Use `auth` to wait for login completion, then use `check_auth` only to validate the final auth mode.
+
+### Stage A. Wait for OAuth login completion
+
+Use `mcporter auth` as the callback-aware wait step.
 
 ```bash
-npx -y mcporter call codebase-blog-oauth.check_auth
+npx -y mcporter --oauth-timeout 180000 auth codebase-blog-oauth
 ```
 
-## Safe Gate (Recommended)
+Behavior:
 
-`mcporter` may print errors without a non-zero exit code. Gate on the presence of `"error"` in the output before posting.
+- If already logged in, this returns quickly.
+- If login is required, it opens the browser and returns as soon as the callback is received.
+- If no callback arrives before the timeout, stop and do not post.
+
+### Stage B. Validate OAuth auth status
+
+After `auth` returns, run `check_auth` as the final success gate.
 
 ```bash
 AUTH_OUT=$(npx -y mcporter call codebase-blog-oauth.check_auth --output json 2>&1 || true)
 echo "$AUTH_OUT"
 
-if echo "$AUTH_OUT" | grep -q '"error"'; then
-  echo "[STOP] OAuth verification failed. create_post not executed."
+if ! echo "$AUTH_OUT" | grep -q 'OAuth 2.1'; then
+  echo "[STOP] OAuth mode verification failed. create_post not executed."
   exit 1
 fi
 ```
@@ -123,12 +133,14 @@ When running auto-posting in terminal, make the workflow visible to the user wit
 Recommended order:
 
 1. print route line
-2. print `[1/3] OAuth 인증 확인`
-3. call `check_auth`
-4. print `[2/3] 스타일 가이드 확인`
-5. call `get_writing_style_guide`
-6. print `[3/3] 포스트 발행`
-7. call `create_post`
+2. print `[1/4] OAuth 로그인 완료 대기`
+3. call `mcporter auth`
+4. print `[2/4] OAuth 인증 상태 검증`
+5. call `check_auth`
+6. print `[3/4] 스타일 가이드 확인`
+7. call `get_writing_style_guide`
+8. print `[4/4] 포스트 발행`
+9. call `create_post`
 
 If the post body is already prewritten, you may still call `get_writing_style_guide` as a visible progress step so the user can see the workflow advancing. Do not silently skip all intermediate steps unless the user explicitly asked for the fastest possible path.
 
@@ -150,11 +162,13 @@ NODE
 STYLE_ARGS='{"style":"default"}'
 
 echo '[Route] mode=skill transport=mcporter endpoint=/mcp-remote alias=codebase-blog-oauth'
-echo '[1/3] OAuth 인증 확인'
+echo '[1/4] OAuth 로그인 완료 대기'
+npx -y mcporter --oauth-timeout 180000 auth codebase-blog-oauth
+echo '[2/4] OAuth 인증 상태 검증'
 npx -y mcporter call codebase-blog-oauth.check_auth --output json
-echo '[2/3] 스타일 가이드 확인'
+echo '[3/4] 스타일 가이드 확인'
 npx -y mcporter call codebase-blog-oauth.get_writing_style_guide --args "$STYLE_ARGS"
-echo '[3/3] 포스트 발행'
+echo '[4/4] 포스트 발행'
 npx -y mcporter call codebase-blog-oauth.create_post --args "$POST_PAYLOAD"
 ```
 
@@ -181,6 +195,8 @@ npx -y mcporter call codebase-blog-oauth.finalize_uploaded_image --args '{"fileK
 ## Troubleshooting
 
 - If the login UI does not appear: you may already be logged in. Try a private window or `npx -y mcporter auth codebase-blog-oauth --reset`.
+- If the browser shows `Authorization successful`: the callback has already reached the waiting `mcporter auth` process. The next step should run immediately after `auth` returns; do not start a separate manual polling loop.
 - If you see `SSE error: Invalid content type, expected "text/event-stream"` during `mcporter auth`: tokens may still be saved. Run `check_auth` to confirm.
+- If you see `EADDRINUSE ... 127.0.0.1:33334`: treat it as a local callback-port collision, not an auth failure. Retry once, then use `mcporter auth codebase-blog-oauth --reset` or reconfigure the callback port if needed.
 - If port `33333` is in use: pick another fixed callback port and re-add the server.
 - If your markdown contains quotes, backticks, or many newlines: stay on the `--args` path. Do not switch back to shell-quoted function-call syntax.

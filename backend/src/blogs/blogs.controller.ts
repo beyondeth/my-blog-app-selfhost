@@ -9,6 +9,7 @@ import {
   UseGuards,
   Request,
   UnauthorizedException,
+  NotFoundException,
   Logger,
   UseInterceptors,
   ClassSerializerInterceptor,
@@ -28,6 +29,7 @@ import { Role } from "../common/enums/role.enum";
 import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { plainToInstance } from "class-transformer";
 import { BlogResponseDto } from "./dto/blog-response.dto";
+import { KnowledgePublicReadService } from "../knowledge/services/knowledge-public-read.service";
 
 @ApiTags("blogs")
 @Controller("blogs")
@@ -38,6 +40,7 @@ export class BlogsController {
     private readonly blogsService: BlogsService,
     private readonly blogStatsService: BlogStatsService,
     private readonly blogResolverService: BlogResolverService,
+    private readonly knowledgePublicReadService: KnowledgePublicReadService,
   ) {}
 
   @Post()
@@ -220,6 +223,242 @@ export class BlogsController {
       hasMore,
       nextCursor,
     };
+  }
+
+  @Get("slug/:slug/knowledge-tree")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "블로그 공개 Knowledge 트리 조회" })
+  async getBlogKnowledgeTree(
+    @Param("slug") slug: string,
+    @CurrentUser() user?: User,
+  ) {
+    const blog = await this.blogResolverService.resolveBlogByIdentifier(slug);
+
+    if (!blog) {
+      return {
+        tree: [],
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    const isOwner = !!user && String(user.id) === String(blog.userId);
+    const isAdmin = user?.role === Role.ADMIN;
+    if (!blog.isPublic && !isOwner && !isAdmin) {
+      return {
+        tree: [],
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    return this.knowledgePublicReadService.getBlogKnowledgeTree(blog, user);
+  }
+
+  @Get("slug/:slug/knowledge-map")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "블로그 공개 Knowledge 맵 조회" })
+  async getBlogKnowledgeMap(
+    @Param("slug") slug: string,
+    @Query("focus") focus?: string,
+    @Query("limit") limit?: string,
+    @CurrentUser() user?: User,
+  ) {
+    const blog = await this.blogResolverService.resolveBlogByIdentifier(slug);
+
+    if (!blog) {
+      return {
+        focusNode: null,
+        nodes: [],
+        edges: [],
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    const isOwner = !!user && String(user.id) === String(blog.userId);
+    const isAdmin = user?.role === Role.ADMIN;
+    if (!blog.isPublic && !isOwner && !isAdmin) {
+      return {
+        focusNode: null,
+        nodes: [],
+        edges: [],
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    const parsedLimit = Number.isFinite(Number(limit)) ? Number(limit) : 12;
+    return this.knowledgePublicReadService.getBlogKnowledgeMap(
+      blog,
+      user,
+      focus,
+      parsedLimit,
+    );
+  }
+
+  @Get("slug/:slug/knowledge-canvas")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "블로그 공개 Knowledge 캔버스 조회" })
+  async getBlogKnowledgeCanvas(
+    @Param("slug") slug: string,
+    @Query("focus") focus?: string,
+    @Query("limit") limit?: string,
+    @CurrentUser() user?: User,
+  ) {
+    const blog = await this.blogResolverService.resolveBlogByIdentifier(slug);
+
+    if (!blog) {
+      return {
+        requestedFocusSlug: focus ?? null,
+        resolvedFocusSlug: null,
+        requestedFocusFound: focus ? false : true,
+        rootNode: null,
+        focusNode: null,
+        pathFromRoot: [],
+        nodes: [],
+        treeEdges: [],
+        factEdges: [],
+        provenance: {
+          nodes: {},
+          edges: [],
+        },
+        insights: null,
+        viewerCanSeeInsights: false,
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    const isOwner = !!user && String(user.id) === String(blog.userId);
+    const isAdmin = user?.role === Role.ADMIN;
+    if (!blog.isPublic && !isOwner && !isAdmin) {
+      return {
+        requestedFocusSlug: focus ?? null,
+        resolvedFocusSlug: null,
+        requestedFocusFound: focus ? false : true,
+        rootNode: null,
+        focusNode: null,
+        pathFromRoot: [],
+        nodes: [],
+        treeEdges: [],
+        factEdges: [],
+        provenance: {
+          nodes: {},
+          edges: [],
+        },
+        insights: null,
+        viewerCanSeeInsights: false,
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    const parsedLimit = Number.isFinite(Number(limit)) ? Number(limit) : 36;
+    return this.knowledgePublicReadService.getBlogKnowledgeCanvas(
+      blog,
+      user,
+      focus,
+      parsedLimit,
+    );
+  }
+
+  @Get("slug/:slug/knowledge-flow-board")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "블로그 공개 Knowledge Flow Board 조회" })
+  async getBlogKnowledgeFlowBoard(
+    @Param("slug") slug: string,
+    @Query("focus") focus?: string,
+    @Query("limit") limit?: string,
+    @CurrentUser() user?: User,
+  ) {
+    const blog = await this.blogResolverService.resolveBlogByIdentifier(slug);
+
+    if (!blog) {
+      return {
+        requestedFocusSlug: focus ?? null,
+        resolvedFocusSlug: null,
+        requestedFocusFound: focus ? false : true,
+        rootPath: [],
+        focus: null,
+        primaryFlow: null,
+        detailPanels: [],
+        outputs: {
+          title: "관련 포스트",
+          posts: [],
+        },
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    const isOwner = !!user && String(user.id) === String(blog.userId);
+    const isAdmin = user?.role === Role.ADMIN;
+    if (!blog.isPublic && !isOwner && !isAdmin) {
+      return {
+        requestedFocusSlug: focus ?? null,
+        resolvedFocusSlug: null,
+        requestedFocusFound: focus ? false : true,
+        rootPath: [],
+        focus: null,
+        primaryFlow: null,
+        detailPanels: [],
+        outputs: {
+          title: "관련 포스트",
+          posts: [],
+        },
+        hotNodes: [],
+        nodeCount: 0,
+        lastUpdatedAt: null,
+      };
+    }
+
+    const parsedLimit = Number.isFinite(Number(limit)) ? Number(limit) : 24;
+    return this.knowledgePublicReadService.getBlogKnowledgeFlowBoard(
+      blog,
+      user,
+      focus,
+      parsedLimit,
+    );
+  }
+
+  @Get("slug/:slug/knowledge/nodes/:nodeSlug")
+  @Public()
+  @UseGuards(OptionalJwtAuthGuard)
+  @ApiOperation({ summary: "블로그 공개 Knowledge 노드 상세 조회" })
+  async getBlogKnowledgeNodeDetail(
+    @Param("slug") slug: string,
+    @Param("nodeSlug") nodeSlug: string,
+    @CurrentUser() user?: User,
+  ) {
+    const blog = await this.blogResolverService.resolveBlogByIdentifier(slug);
+
+    if (!blog) {
+      throw new NotFoundException("블로그를 찾을 수 없습니다.");
+    }
+
+    const isOwner = !!user && String(user.id) === String(blog.userId);
+    const isAdmin = user?.role === Role.ADMIN;
+    if (!blog.isPublic && !isOwner && !isAdmin) {
+      throw new NotFoundException("블로그를 조회할 수 없습니다.");
+    }
+
+    return this.knowledgePublicReadService.readBlogNodeDetail(
+      blog,
+      nodeSlug,
+      user,
+    );
   }
 
   /**

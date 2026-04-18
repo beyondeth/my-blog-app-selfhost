@@ -34,6 +34,8 @@ import { FilesService } from "../../files/files.service";
 import { CreateUploadUrlDto } from "../../files/dto/create-upload-url.dto";
 import { UploadCompleteDto } from "../../files/dto/upload-complete.dto";
 import { appendMcpAiDisclosureFooter } from "../utils/ai-disclosure-footer.util";
+import { KnowledgeQueryService } from "../../knowledge/services/knowledge-query.service";
+import { toKnowledgeSlug } from "../../knowledge/utils/knowledge-slug.util";
 
 /**
  * MCP Proxy 컨트롤러
@@ -61,6 +63,7 @@ export class McpProxyController {
     private readonly externalImageDownloadService: ExternalImageDownloadService,
     private readonly filesService: FilesService,
     private readonly dataSource: DataSource,
+    private readonly knowledgeQueryService: KnowledgeQueryService,
   ) {}
 
   /**
@@ -131,6 +134,82 @@ export class McpProxyController {
   async readPublishedPost(@Req() req: any, @Param("postId") postId: string) {
     const { userId } = req.apiKey;
     return this.postsService.findMyPublishedPostForMcp(userId, postId);
+  }
+
+  @Get("knowledge/manifest")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "사용자 KB manifest 조회",
+    description:
+      "API Key에 연결된 사용자의 compact knowledge manifest를 조회합니다.",
+  })
+  async getKnowledgeManifest(@Req() req: any) {
+    const { userId } = req.apiKey;
+    return this.knowledgeQueryService.getManifest(userId);
+  }
+
+  @Get("knowledge/search")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "사용자 KB node 검색",
+    description: "사용자 knowledge node를 title/slug/path 기준으로 검색합니다.",
+  })
+  async searchKnowledgeNodes(
+    @Req() req: any,
+    @Query("query") query?: string,
+    @Query("limit") limit?: string,
+  ) {
+    const { userId } = req.apiKey;
+    if (!query?.trim()) {
+      throw new BadRequestException("query는 필수 항목입니다");
+    }
+
+    const limitNumber = Math.min(
+      20,
+      Math.max(1, Number.parseInt(limit || "10", 10) || 10),
+    );
+    return this.knowledgeQueryService.searchNodes(userId, query.trim(), limitNumber);
+  }
+
+  @Get("knowledge/nodes/:slug")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "사용자 KB node 상세 조회",
+    description: "node와 연결된 포스트/edge를 함께 조회합니다.",
+  })
+  async readKnowledgeNode(@Req() req: any, @Param("slug") slug: string) {
+    const { userId } = req.apiKey;
+    return this.knowledgeQueryService.readNode(userId, toKnowledgeSlug(slug));
+  }
+
+  @Get("knowledge/followups")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "후속 포스팅 제안 목록 조회",
+    description: "pending/dismissed/accepted follow-up suggestion을 조회합니다.",
+  })
+  async listFollowupSuggestions(
+    @Req() req: any,
+    @Query("status") status?: string,
+  ) {
+    const { userId } = req.apiKey;
+    return this.knowledgeQueryService.listFollowups(userId, status);
+  }
+
+  @Post("knowledge/followups/:id/dismiss")
+  @UseGuards(ApiKeyGuard)
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: "후속 포스팅 제안 dismiss",
+    description: "원하지 않는 follow-up suggestion을 dismissed 처리합니다.",
+  })
+  async dismissFollowupSuggestion(@Req() req: any, @Param("id") id: string) {
+    const { userId } = req.apiKey;
+    return this.knowledgeQueryService.dismissFollowup(userId, id);
   }
 
   /**

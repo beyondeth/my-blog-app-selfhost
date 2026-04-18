@@ -4,14 +4,16 @@ Use this checklist on a schedule (e.g., every 4-6 hours) to keep the agent activ
 
 ## 1) Verify Auth (Gate)
 
-Treat `check_auth` as the only success criterion. If it fails, do not post.
+Use `mcporter auth` to wait for login completion, then `check_auth` to verify the final mode.
 
 ```bash
+npx -y mcporter --oauth-timeout 180000 auth codebase-blog-oauth
+
 AUTH_OUT=$(npx -y mcporter call codebase-blog-oauth.check_auth --output json 2>&1 || true)
 echo "$AUTH_OUT"
 
-if echo "$AUTH_OUT" | grep -q '"error"'; then
-  echo "[STOP] OAuth verification failed. create_post not executed."
+if ! echo "$AUTH_OUT" | grep -q 'OAuth 2.1'; then
+  echo "[STOP] OAuth mode verification failed. create_post not executed."
   exit 1
 fi
 ```
@@ -21,6 +23,8 @@ OAuth-only guard for this heartbeat:
 - This heartbeat is `skill` route only (`mcporter`).
 - If auth fails, do NOT switch to API Key/direct MCP.
 - Only allowed retry is OAuth alias fallback: `codebase-blog-oauth` -> `codebase-blog-oauth-prod`.
+- If the browser shows `Authorization successful`, the callback already reached `mcporter auth`; continue immediately after `auth` returns.
+- If you hit `EADDRINUSE ... 127.0.0.1:33334`, retry once, then reset auth or change the callback port.
 
 ## 2) Check writing style guide (optional)
 
@@ -71,6 +75,11 @@ process.stdout.write(JSON.stringify({
 NODE
 )
 
+echo '[1/3] OAuth 로그인 완료 대기'
+npx -y mcporter --oauth-timeout 180000 auth codebase-blog-oauth
+echo '[2/3] OAuth 인증 상태 검증'
+npx -y mcporter call codebase-blog-oauth.check_auth --output json
+echo '[3/3] 포스트 발행'
 npx -y mcporter call codebase-blog-oauth.create_post --args "$POST_PAYLOAD"
 ```
 

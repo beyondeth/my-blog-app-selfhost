@@ -35,7 +35,9 @@
     "migrate:files": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts",
     "migrate:files:dry": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --dry-run",
     "migrate:files:execute": "ts-node -r tsconfig-paths/register scripts/migrate-files.ts --execute",
+    "knowledge:rebuild-blog": "ts-node -r tsconfig-paths/register src/commands/rebuild-blog-knowledge.command.ts",
     "seed:subscription-plans": "ts-node -r tsconfig-paths/register src/commands/seed-subscription-plans.command.ts",
+    "seed:knowledge-mock-posts": "ts-node -r tsconfig-paths/register src/commands/seed-knowledge-mock-posts.command.ts",
     "seed:plan": "ts-node -r tsconfig-paths/register scripts/seed_plan.ts"
   },
   "keywords": [],

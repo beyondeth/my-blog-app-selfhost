@@ -42,6 +42,7 @@ import { UsageModule } from './usage/usage.module';
 // PaymentEventsModule은 빈 모듈 — EventEmitterModule.forRoot()이 대신 사용됨
 import { SharedSubscriptionModule } from './shared/shared-subscription.module';
 import { MarketplaceModule } from './marketplace/marketplace.module';
+import { KnowledgeModule } from "./knowledge/knowledge.module";
 
 // Guards
 import { JwtAuthGuard } from "./common/guards/jwt-auth.guard";
@@ -168,6 +169,7 @@ import { IpBlockMiddleware } from "./common/middleware/ip-block.middleware";
     CommunitiesModule, // Reddit 스타일 커뮤니티 시스템
     FeedModule, // 통합 피드 (블로그 + 커뮤니티 포스트)
     OpenGraphModule, // URL 메타데이터 추출 (링크 카드용)
+    KnowledgeModule, // Async shadow knowledge graph
     ReputationModule, // 사용자 평판(Ranking) 시스템
     ModerationModule, // 모더레이션 시스템
     // AnalyticsModule,

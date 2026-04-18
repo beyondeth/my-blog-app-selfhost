@@ -1,4 +1,5 @@
 import { NotFoundException } from "@nestjs/common";
+import { CommunityPostStatus } from "../enums";
 import { CommunityPostService } from "./community-post.service";
 
 describe("CommunityPostService", () => {
@@ -11,8 +12,29 @@ describe("CommunityPostService", () => {
       getOne: jest.fn(),
     };
 
+    const communityRepository = {
+      findOne: jest.fn(),
+      increment: jest.fn(),
+      decrement: jest.fn(),
+    };
+
     const postRepository = {
       createQueryBuilder: jest.fn().mockReturnValue(queryBuilder),
+      create: jest.fn((input) => input),
+      save: jest.fn(async (input) => ({ id: input.id ?? "post-created", ...input })),
+      findOne: jest.fn(),
+    };
+
+    const flairRepository = {
+      findOne: jest.fn(),
+    };
+
+    const memberRepository = {
+      findOne: jest.fn(),
+    };
+
+    const modLogRepository = {
+      save: jest.fn(),
     };
 
     const redisLockService = {
@@ -26,25 +48,44 @@ describe("CommunityPostService", () => {
       bufferView: jest.fn(),
     };
 
+    const cacheService = {
+      get: jest.fn(),
+      set: jest.fn(),
+      del: jest.fn(),
+      deletePattern: jest.fn(),
+    };
+
+    const postContentService = {
+      processContent: jest.fn(),
+      extractThumbnail: jest.fn(),
+    };
+
     const service = new CommunityPostService(
-      {} as any,
+      communityRepository as any,
       postRepository as any,
       {} as any,
+      memberRepository as any,
+      flairRepository as any,
+      modLogRepository as any,
       {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
-      {} as any,
+      cacheService as any,
       redisLockService as any,
       communityPostViewService as any,
+      postContentService as any,
     );
 
     return {
       service,
+      communityRepository,
       postRepository,
       queryBuilder,
+      flairRepository,
+      memberRepository,
+      modLogRepository,
       redisLockService,
       communityPostViewService,
+      cacheService,
+      postContentService,
     };
   };
 
@@ -111,5 +152,98 @@ describe("CommunityPostService", () => {
     await expect(
       service.incrementPostView("community-a", "missing-post", "user-1"),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it("renders html from markdown when creating a community post", async () => {
+    const {
+      service,
+      communityRepository,
+      postRepository,
+      postContentService,
+    } = createService();
+
+    communityRepository.findOne.mockResolvedValue({
+      id: "community-1",
+      slug: "community-slug",
+      isLocked: false,
+    });
+    postContentService.processContent.mockResolvedValue({
+      html: "<h1>Title</h1><p>Body</p>",
+      markdown: "# Title\n\nBody",
+      isMarkdown: true,
+    });
+
+    await service.create(
+      "community-1",
+      {
+        title: "Title",
+        content: "<p>legacy html</p>",
+        contentMarkdown: "# Title\n\nBody",
+        isPublished: true,
+      } as any,
+      "author-1",
+    );
+
+    expect(postContentService.processContent).toHaveBeenCalledWith(
+      "# Title\n\nBody",
+      expect.objectContaining({
+        forceMarkdown: true,
+      }),
+    );
+    expect(postRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "<h1>Title</h1><p>Body</p>",
+        content_markdown: "# Title\n\nBody",
+        status: CommunityPostStatus.PUBLISHED,
+      }),
+    );
+  });
+
+  it("renders html from markdown when updating a community post", async () => {
+    const { service, postRepository, postContentService } = createService();
+
+    postRepository.findOne.mockResolvedValue({
+      id: "post-1",
+      authorId: "author-1",
+      communityId: "community-1",
+      community: { id: "community-1", slug: "community-slug" },
+      content: "<p>old</p>",
+      content_markdown: "old",
+      status: CommunityPostStatus.PUBLISHED,
+      flairId: null,
+      tags: [],
+      isNsfw: false,
+      isSpoiler: false,
+      thumbnailImageId: null,
+      isPinned: false,
+      isLocked: false,
+    });
+    postContentService.processContent.mockResolvedValue({
+      html: "<p>updated</p>",
+      markdown: "updated",
+      isMarkdown: true,
+    });
+
+    await service.update(
+      "post-1",
+      {
+        content: "<p>stale html</p>",
+        contentMarkdown: "updated",
+      } as any,
+      "author-1",
+    );
+
+    expect(postContentService.processContent).toHaveBeenCalledWith(
+      "updated",
+      expect.objectContaining({
+        forceMarkdown: true,
+      }),
+    );
+    expect(postRepository.save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        content: "<p>updated</p>",
+        content_markdown: "updated",
+      }),
+    );
   });
 });

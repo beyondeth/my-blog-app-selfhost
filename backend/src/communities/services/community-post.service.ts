@@ -32,6 +32,7 @@ import { CacheService, CacheTTL } from "../../cache/cache.service";
 import { RedisLockService } from "../../redis/redis-lock.service";
 import { CursorPaginationHelper } from "../../common/dto/pagination.dto";
 import { CommunityPostViewService } from "./community-post-view.service";
+import { PostContentService } from "../../posts/services/post-content.service";
 
 /**
  * 게시물 캐시 키 상수
@@ -90,6 +91,7 @@ export class CommunityPostService {
     private readonly cacheService: CacheService,
     private readonly redisLockService: RedisLockService,
     private readonly communityPostViewService: CommunityPostViewService,
+    private readonly postContentService: PostContentService,
   ) {}
 
   // =========================================================================
@@ -150,14 +152,19 @@ export class CommunityPostService {
       }
     }
 
+    const canonicalContent = await this.resolveCanonicalContent(
+      dto.content,
+      dto.contentMarkdown,
+    );
+
     // 게시물 생성
     const post = this.postRepository.create({
       communityId,
       authorId,
       title: dto.title,
       slug: generateSlug(dto.title), // SEO 친화적 URL
-      content: dto.content,
-      content_markdown: dto.contentMarkdown,
+      content: canonicalContent.html,
+      content_markdown: canonicalContent.markdown,
       flairId: dto.flairId,
       thumbnailImageId: dto.thumbnailImageId,
       status: dto.isPublished
@@ -791,9 +798,16 @@ export class CommunityPostService {
     // 작성자만 수정 가능한 필드
     if (isAuthor) {
       if (dto.title) post.title = dto.title;
-      if (dto.content !== undefined) post.content = dto.content;
-      if (dto.contentMarkdown !== undefined)
-        post.content_markdown = dto.contentMarkdown;
+      const hasMarkdownUpdate = dto.contentMarkdown !== undefined;
+      const hasHtmlUpdate = dto.content !== undefined;
+      if (hasMarkdownUpdate || hasHtmlUpdate) {
+        const canonicalContent = await this.resolveCanonicalContent(
+          dto.content,
+          dto.contentMarkdown,
+        );
+        post.content = canonicalContent.html;
+        post.content_markdown = canonicalContent.markdown;
+      }
       if (dto.flairId !== undefined) post.flairId = dto.flairId;
       if (dto.tags !== undefined) post.tags = dto.tags;
       if (dto.isNsfw !== undefined) post.isNsfw = dto.isNsfw;
@@ -916,6 +930,34 @@ export class CommunityPostService {
     }
 
     return refetched;
+  }
+
+  private async resolveCanonicalContent(
+    htmlContent?: string,
+    markdownContent?: string,
+  ): Promise<{ html: string; markdown: string | null }> {
+    if (markdownContent !== undefined) {
+      const processedContent = await this.postContentService.processContent(
+        markdownContent,
+        {
+          sanitize: true,
+          processCode: true,
+          processImages: true,
+          preserveMermaid: true,
+          forceMarkdown: true,
+        },
+      );
+
+      return {
+        html: processedContent.html,
+        markdown: markdownContent,
+      };
+    }
+
+    return {
+      html: htmlContent ?? "",
+      markdown: null,
+    };
   }
 
   /**

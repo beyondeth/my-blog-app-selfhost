@@ -319,8 +319,8 @@ services:
       - '--promscrape.config=/etc/victoriametrics/scrape_config.yml'
       - '--promscrape.config.strictParse=false'  # Prometheus 호환성을 위한 엄격한 파싱 비활성화
       - '--httpListenAddr=:8428'
-      # 메모리 최적화
-      - '--memory.allowedPercent=80'
+      # 스크랩/쿼리 캐시가 100MB 한도에서 반복 재시작하지 않도록 OS 여유 메모리 확보
+      - '--memory.allowedPercent=60'
     volumes:
       - ${VICTORIAMETRICS_DATA_DIR:-/mnt/data/victoriametrics}:/storage
       - ./victoriametrics/scrape_config.yml:/etc/victoriametrics/scrape_config.yml:ro
@@ -333,10 +333,10 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-    # 리소스 제한 (Prometheus 400MB → VictoriaMetrics 100MB)
+    # 리소스 제한 (100MB는 현재 프로덕션 scrape/query 부하에서 너무 타이트함)
     cpus: 0.1
-    mem_limit: 100m
-    mem_reservation: 50m
+    mem_limit: 256m
+    mem_reservation: 128m
 
   # ============================================
   # Grafana (모니터링 대시보드)
@@ -449,7 +449,7 @@ networks:
 #   redis-core:       1.0 OCPU, 2 GB (maxmemory 1.8GB)
 #   redis-cache:      1.0 OCPU, 2 GB (maxmemory 1.8GB)
 #   mcp-proxy:        1.0 OCPU, 800 MB
-#   victoriametrics:  0.1 OCPU, 100 MB
+#   victoriametrics:  0.1 OCPU, 256 MB
 #   grafana:          0.2 OCPU, 300 MB
 #   redis-exporter:   0.2 OCPU, 100 MB (core + cache)
 #

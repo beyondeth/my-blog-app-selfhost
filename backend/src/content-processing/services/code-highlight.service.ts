@@ -40,12 +40,10 @@ export class CodeHighlightService {
         if (languageClass) {
           const language = languageClass.replace("language-", "");
 
-          // Mermaid 블록은 특별 처리 (건드리지 않음)
-          if (language === "mermaid") {
-            // Mermaid 블록에 표준 속성만 추가 (data-diagram 제거)
-            // data-diagram 속성은 파싱 문제를 일으킬 수 있으므로 제거
-            codeElement.setAttribute("data-language", "mermaid");
-            preElement.setAttribute("data-language", "mermaid");
+          // Mermaid/diagram 블록은 특별 처리 (건드리지 않음)
+          if (language === "mermaid" || language === "diagram") {
+            codeElement.setAttribute("data-language", language);
+            preElement.setAttribute("data-language", language);
             // class는 그대로 유지 (language-mermaid)
             return;
           }
@@ -140,7 +138,7 @@ export class CodeHighlightService {
 
         if (languageClass) {
           const language = languageClass.replace("language-", "");
-          if (language !== "mermaid") {
+          if (language !== "mermaid" && language !== "diagram") {
             // Mermaid는 프로그래밍 언어가 아님
             languages.add(language);
           }

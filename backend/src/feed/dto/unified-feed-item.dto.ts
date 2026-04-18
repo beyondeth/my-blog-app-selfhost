@@ -76,6 +76,9 @@ export class UnifiedFeedItemDto {
   @ApiPropertyOptional({ description: "포스트 요약 (excerpt)" })
   excerpt?: string;
 
+  @ApiPropertyOptional({ description: "포스트 카테고리" })
+  category?: string;
+
   @ApiPropertyOptional({
     description: "첨부 이미지 URL 목록",
     type: [String],
