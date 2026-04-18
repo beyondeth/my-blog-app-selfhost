@@ -4,6 +4,24 @@ Track operational rule changes for worktree/branch coordination.
 
 ## 2026-04-18
 
+### Additional update (workspace state split into backup/shared/web lanes and production env source re-aligned)
+
+#### What changed
+- Saved the full dirty multi-lane workspace into `wip/2026-04-18-multi-savepoint` before any branch cleanup.
+- Split the active work into:
+  - shared lane on `integration/workspace`
+  - web lane on `feature/web/2026-04-18-knowledge-ui-save`
+- Refreshed `WORKTREE_STATUS.md` to match the actual active branches and clean/dirty state.
+- Restored the canonical root `.env.production` by removing an accidentally pasted shell command so the file is valid dotenv input again.
+
+#### Why
+- The integration worktree had both shared/backend and `frontend/**` changes mixed together, which violated the documented worktree ownership model and made later PR/deploy flow risky.
+- The canonical production env file had become unparsable during manual recovery, which would have made local validation and GitHub secret re-sync unreliable.
+
+#### How
+- Kept a recoverable backup branch first, then replayed shared paths and web paths onto their correct lanes from that snapshot.
+- Treated GitHub Actions `production` `ENV_FILE` as the deployment source of truth and revalidated the local canonical env file before syncing it back.
+
 ### Additional update (production monitoring noise reduced by separating datasource outages from component pages)
 
 #### What changed
