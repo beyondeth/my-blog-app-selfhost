@@ -749,6 +749,19 @@ export class KnowledgeCandidateGraphService {
     }
 
     if (candidate.nodeType === "domain") {
+      if (await this.shouldAutoApproveColdStartDomain(candidate, evidence, manager)) {
+        return this.ensureApprovedNode(
+          manager,
+          candidate.userId,
+          candidate.blogId,
+          candidate.slug,
+          candidate.title,
+          candidate.nodeType,
+          null,
+          candidate.summary,
+        );
+      }
+
       if (candidate.postCount < 3 || sectionBackedPostCount < 2) {
         return null;
       }
@@ -785,6 +798,42 @@ export class KnowledgeCandidateGraphService {
       candidate.nodeType,
       approvedParent?.slug || candidate.proposedParentSlug,
       candidate.summary,
+    );
+  }
+
+  private async shouldAutoApproveColdStartDomain(
+    candidate: KnowledgeCandidateNodeEntity,
+    evidence: CandidateNodeEvidence[],
+    manager: EntityManager,
+  ) {
+    if (candidate.nodeType !== "domain") {
+      return false;
+    }
+
+    if (candidate.postCount < 1 || this.countSectionBackedPosts(evidence) < 1) {
+      return false;
+    }
+
+    const hasRootEvidence = evidence.some((item) => item.role === "root");
+    if (!hasRootEvidence) {
+      return false;
+    }
+
+    const approvedDomains = await manager.getRepository(KnowledgeNode).find({
+      where: {
+        userId: candidate.userId,
+        nodeType: "domain",
+        status: "active",
+      },
+    });
+
+    return approvedDomains.every((node) => this.isGenericRootNode(node));
+  }
+
+  private isGenericRootNode(node: Pick<KnowledgeNode, "slug" | "title">) {
+    return Boolean(
+      resolveKnowledgeSeedRoot(node.slug)?.generic ||
+        resolveKnowledgeSeedRoot(node.title)?.generic,
     );
   }
 

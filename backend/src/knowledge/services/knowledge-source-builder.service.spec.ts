@@ -66,4 +66,23 @@ describe("KnowledgeSourceBuilderService", () => {
 
     expect(first.contentHash).toBe(second.contentHash);
   });
+
+  it("normalizes marketplace categories into KB taxonomy roots", () => {
+    const post = {
+      title: "Contracts Through Demand Types",
+      content_markdown: "# Overview",
+      content: "<h1>Overview</h1><p>Summary</p>",
+      content_type: "markdown",
+    } as Post;
+    const metadata = {
+      category: "tech_guides",
+      tags: ["게임이론"],
+      excerpt: "논문 요약",
+    } as PostMetadata;
+
+    const { snapshot } = service.buildSnapshot(post, metadata);
+
+    expect(snapshot.category).toBe("개발/기술 가이드");
+    expect(snapshot.categorySegments).toEqual(["개발", "기술 가이드"]);
+  });
 });
