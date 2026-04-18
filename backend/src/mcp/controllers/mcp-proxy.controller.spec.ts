@@ -29,6 +29,13 @@ describe("McpProxyController", () => {
       removeFailedImages: jest.fn(),
     };
     const filesService = {};
+    const knowledgeQueryService = {
+      getManifest: jest.fn(),
+      searchNodes: jest.fn(),
+      readNode: jest.fn(),
+      listFollowups: jest.fn(),
+      dismissFollowup: jest.fn(),
+    };
 
     const dataSource = { getRepository: jest.fn() };
 
@@ -40,6 +47,7 @@ describe("McpProxyController", () => {
       externalImageDownloadService as any,
       filesService as any,
       dataSource as any,
+      knowledgeQueryService as any,
     );
 
     return {

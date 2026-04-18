@@ -63,10 +63,19 @@ export class PostLifecycleListener {
         // content는 payload에 없으므로 DB에서 조회
         const post = await this.postsRepository.findOne({
           where: { id: payload.postId },
-          select: ["id", "title", "content", "tags", "category"],
+          select: [
+            "id",
+            "title",
+            "content",
+            "tags",
+            "category",
+            "status",
+            "processingError",
+            "processingCompletedAt",
+          ],
         });
 
-        await this.postProcessingQueue.add(
+        const job = await this.postProcessingQueue.add(
           "process-published-post",
           {
             postId: payload.postId,
@@ -82,6 +91,10 @@ export class PostLifecycleListener {
             delay: 1000,
             attempts: 3,
           },
+        );
+
+        this.logger.log(
+          `[PostLifecycle] Enqueued post-processing jobId=${job.id} postId=${payload.postId} status=${post?.status ?? "unknown"} processingCompletedAt=${post?.processingCompletedAt?.toISOString?.() ?? "null"} processingError=${post?.processingError ?? "null"}`,
         );
       } catch (err) {
         this.logger.error(
@@ -112,10 +125,19 @@ export class PostLifecycleListener {
       try {
         const post = await this.postsRepository.findOne({
           where: { id: payload.postId },
-          select: ["id", "title", "content", "tags", "category"],
+          select: [
+            "id",
+            "title",
+            "content",
+            "tags",
+            "category",
+            "status",
+            "processingError",
+            "processingCompletedAt",
+          ],
         });
 
-        await this.postProcessingQueue.add(
+        const job = await this.postProcessingQueue.add(
           "process-published-post",
           {
             postId: payload.postId,
@@ -131,6 +153,10 @@ export class PostLifecycleListener {
             delay: 1000,
             attempts: 3,
           },
+        );
+
+        this.logger.log(
+          `[PostLifecycle] Enqueued post-processing jobId=${job.id} postId=${payload.postId} status=${post?.status ?? "unknown"} processingCompletedAt=${post?.processingCompletedAt?.toISOString?.() ?? "null"} processingError=${post?.processingError ?? "null"}`,
         );
       } catch (err) {
         this.logger.error(

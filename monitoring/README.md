@@ -58,6 +58,13 @@
 `victoriametrics` 자체 장애는 같은 datasource에서 자기 자신을 평가하면 신뢰도가 떨어지므로,
 즉시 알림보다 daily summary와 별도 운영 점검에서 우선 확인합니다.
 
+추가 원칙:
+
+- core availability rule의 `execErrState`는 `OK`로 유지합니다.
+- 이유: datasource 단절 시 Grafana가 `DatasourceError`를 backend / mcp-proxy / redis 각각의 장애처럼 fan-out해서 Telegram으로 보내면 운영자가 실제 다운으로 오인할 수 있습니다.
+- datasource 오류는 component page 신호가 아니라 VictoriaMetrics/Grafana 운영 이슈로 분리해서 확인합니다.
+- 이 경우 우선 확인 항목은 `codebase-prod-victoriametrics` 재시작 여부, 메모리 headroom, 그리고 Grafana 컨테이너 내부에서의 datasource query 성공 여부입니다.
+
 ## Telegram 메시지 원칙
 
 Telegram 알림은 raw metric dump가 아니라 아래 구조를 기준으로 읽히게 유지합니다.

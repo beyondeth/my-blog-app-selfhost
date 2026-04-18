@@ -222,34 +222,27 @@ npx -y skills remove ${SKILL_NAME} ${SKILL_AGENTS}${maybeGlobal(isGlobal)} -y`
 npx -y skills update
 npx -y skills remove ${SKILL_NAME} ${SKILL_AGENTS}${maybeGlobal(isGlobal)} -y`;
 
-export const getCodexEnvSnippet = (apiKey: string, includeComment: boolean = true) =>
-  includeComment
-    ? `# macOS / Linux: ~/.zshrc 또는 ~/.bashrc
-export CODEBASE_MCP_TOKEN="${apiKey}"`
-    : `export CODEBASE_MCP_TOKEN="${apiKey}"`;
-
-export const getCodexWindowsEnvSnippet = (apiKey: string, includeComment: boolean = true) =>
-  includeComment
-    ? `# 현재 PowerShell 세션에서 즉시 반영
-$Env:CODEBASE_MCP_TOKEN = "${apiKey}"`
-    : `$Env:CODEBASE_MCP_TOKEN = "${apiKey}"`;
-
-export const getCodexWindowsPersistentSnippet = (apiKey: string, includeComment: boolean = true) =>
-  includeComment
-    ? `# 새 PowerShell을 열 때마다 유지 (실행 후 새 터미널을 열어야 적용)
-setx CODEBASE_MCP_TOKEN "${apiKey}"`
-    : `setx CODEBASE_MCP_TOKEN "${apiKey}"`;
-
 export const getCodexConfig = (apiKey: string, includeComment: boolean = true) =>
   includeComment
     ? `# 설정 위치: ~/.codex/config.toml
-# 기존 설정이 있다면 아래 MCP 블록만 추가하세요.
+# 기존 codebase-blog-mcp 블록이 있으면 아래 내용으로 교체하세요.
 
 [mcp_servers.codebase-blog-mcp]
 url = "https://mcp.codebase.blog/mcp"
-bearer_token_env_var = "CODEBASE_MCP_TOKEN"
-http_headers = { Accept = "application/json, text/event-stream" }`
+http_headers = { Authorization = "Bearer ${apiKey}" }`
     : `[mcp_servers.codebase-blog-mcp]
 url = "https://mcp.codebase.blog/mcp"
-bearer_token_env_var = "CODEBASE_MCP_TOKEN"
-http_headers = { Accept = "application/json, text/event-stream" }`;
+http_headers = { Authorization = "Bearer ${apiKey}" }`;
+
+export const getCodexConfigOpenCommand = (
+  target: 'mac-linux' | 'windows' | 'wsl',
+) => {
+  switch (target) {
+    case 'windows':
+      return 'New-Item -ItemType Directory -Force $env:USERPROFILE\\.codex | Out-Null; if (!(Test-Path $env:USERPROFILE\\.codex\\config.toml)) { New-Item -ItemType File $env:USERPROFILE\\.codex\\config.toml | Out-Null }; notepad $env:USERPROFILE\\.codex\\config.toml';
+    case 'wsl':
+    case 'mac-linux':
+    default:
+      return 'mkdir -p ~/.codex && touch ~/.codex/config.toml && ${EDITOR:-nano} ~/.codex/config.toml';
+  }
+};

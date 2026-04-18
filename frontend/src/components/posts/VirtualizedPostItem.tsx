@@ -9,6 +9,7 @@ interface VirtualizedPostItemProps {
   initialVisible?: boolean;
   className?: string;
   placeholder?: React.ReactNode;
+  observerRoot?: Element | null;
 }
 
 /**
@@ -26,6 +27,7 @@ const VirtualizedPostItem = React.memo(function VirtualizedPostItem({
   initialVisible = false,
   className,
   placeholder,
+  observerRoot = null,
 }: VirtualizedPostItemProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -39,10 +41,11 @@ const VirtualizedPostItem = React.memo(function VirtualizedPostItem({
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (!entry) return;
-        const rootBounds = entry.rootBounds ?? {
-          top: 0,
-          bottom: typeof window !== 'undefined' ? window.innerHeight : 0,
-        };
+        const rootBounds = entry.rootBounds ??
+          observerRoot?.getBoundingClientRect() ?? {
+            top: 0,
+            bottom: typeof window !== 'undefined' ? window.innerHeight : 0,
+          };
         const aboveDistance = rootBounds.top - entry.boundingClientRect.bottom;
         const belowDistance = entry.boundingClientRect.top - rootBounds.bottom;
         if (entry.isIntersecting || entry.intersectionRatio > 0) {
@@ -54,7 +57,7 @@ const VirtualizedPostItem = React.memo(function VirtualizedPostItem({
         }
       },
       {
-        root: null,
+        root: observerRoot,
         rootMargin: OBSERVER_ROOT_MARGIN,
         threshold: 0,
       },
@@ -62,7 +65,7 @@ const VirtualizedPostItem = React.memo(function VirtualizedPostItem({
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, []);
+  }, [observerRoot]);
 
   useEffect(() => {
     if (!shouldRenderContent || !contentRef.current) return;

@@ -2,11 +2,14 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { FiTag, FiFolder, FiChevronDown, FiChevronRight } from 'react-icons/fi';
+import { cn } from '@/lib/utils';
 import SidebarSection from './SidebarSection';
+import SidebarNodeIcon from './SidebarNodeIcon';
 
 interface CategorySectionProps {
   categories: Array<{ category: string; count: number }>;
   onCategoryClick?: (category: string) => void;
+  selectedCategory?: string | null;
   hasMore?: boolean;
   onLoadMore?: () => void;
   isLoadingMore?: boolean;
@@ -20,6 +23,17 @@ const parseCategory = (category: string): { parent: string; child?: string } => 
     parent: parts[0],
     child: parts[1] || undefined,
   };
+};
+
+const isParentCategorySelected = (parent: string, selectedCategory?: string | null) => {
+  if (!selectedCategory) {
+    return false;
+  }
+
+  return (
+    selectedCategory === parent ||
+    selectedCategory.startsWith(`${parent}/`)
+  );
 };
 
 // 트리 구조 데이터 타입
@@ -44,6 +58,7 @@ interface CategoryTreeNode {
 const CategorySection = React.memo(function CategorySection({
   categories,
   onCategoryClick,
+  selectedCategory,
   hasMore = false,
   onLoadMore,
   isLoadingMore = false,
@@ -70,6 +85,27 @@ const CategorySection = React.memo(function CategorySection({
       return prev;
     });
   }, [categories.length]);
+
+  useEffect(() => {
+    if (!selectedCategory) {
+      return;
+    }
+
+    const { parent, child } = parseCategory(selectedCategory);
+    if (!child) {
+      return;
+    }
+
+    setExpandedParents((prev) => {
+      if (prev.has(parent)) {
+        return prev;
+      }
+
+      const next = new Set(prev);
+      next.add(parent);
+      return next;
+    });
+  }, [selectedCategory]);
 
   const visibleCategories = useMemo(() => {
     if (
@@ -161,6 +197,10 @@ const CategorySection = React.memo(function CategorySection({
           const hasChildren = node.children.length > 0;
           const isSingle = !hasChildren && node.singleCategory;
           const isExpanded = expandedParents.has(node.parent);
+          const isSingleActive =
+            Boolean(node.singleCategory) &&
+            selectedCategory === node.singleCategory?.fullPath;
+          const isParentActive = hasChildren && isParentCategorySelected(node.parent, selectedCategory);
 
           return (
             <div key={index}>
@@ -169,16 +209,41 @@ const CategorySection = React.memo(function CategorySection({
                 // 단일 카테고리 (child 없음)
                 <button
                   onClick={() => handleCategoryClick(node.singleCategory!.fullPath)}
-                  className="w-full flex items-center justify-between px-3 py-2 text-[14px] rounded-lg transition-colors bg-gray-50 hover:bg-gray-100 dark:bg-black/20 dark:hover:bg-black/30 text-left group"
+                  data-category-path={node.singleCategory!.fullPath}
+                  data-category-node-type="single"
+                  className={cn(
+                    "group flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[14px] transition-colors",
+                    isSingleActive
+                      ? "bg-[#EEF4FB] hover:bg-[#E6F0FB] dark:bg-[#141E28] dark:hover:bg-[#182433]"
+                      : "bg-gray-50 hover:bg-gray-100 dark:bg-black/20 dark:hover:bg-black/30",
+                  )}
                   aria-label={`${node.parent} 카테고리 (${node.singleCategory!.count}개)`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <FiFolder className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
-                    <span className="text-gray-800 dark:text-gray-200 truncate group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
+                    <SidebarNodeIcon
+                      icon={FiFolder}
+                      isActive={isSingleActive}
+                      iconClassName="text-gray-600 dark:text-gray-400"
+                    />
+                    <span
+                      className={cn(
+                        "truncate transition-colors",
+                        isSingleActive
+                          ? "font-semibold text-[#1B2430] dark:text-[#E6EDF3]"
+                          : "text-gray-800 group-hover:text-gray-900 dark:text-gray-200 dark:group-hover:text-gray-100",
+                      )}
+                    >
                       {node.parent}
                     </span>
                   </div>
-                  <span className="flex-shrink-0 text-[13px] text-gray-500 dark:text-gray-400 font-medium ml-2">
+                  <span
+                    className={cn(
+                      "ml-2 flex-shrink-0 text-[13px] font-medium",
+                      isSingleActive
+                        ? "text-[#264653] dark:text-[#9FE2D7]"
+                        : "text-gray-500 dark:text-gray-400",
+                    )}
+                  >
                     {node.singleCategory!.count}
                   </span>
                 </button>
@@ -187,12 +252,30 @@ const CategorySection = React.memo(function CategorySection({
                 <>
                   <button
                     onClick={() => toggleParent(node.parent)}
-                    className="w-full flex items-center justify-between px-3 py-2 text-[14px] rounded-lg transition-colors bg-gray-50 hover:bg-gray-100 dark:bg-black/20 dark:hover:bg-black/30 text-left group"
+                    data-category-parent={node.parent}
+                    data-category-node-type="parent"
+                    className={cn(
+                      "group flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-[14px] transition-colors",
+                      isParentActive
+                        ? "bg-[#EEF4FB] hover:bg-[#E6F0FB] dark:bg-[#141E28] dark:hover:bg-[#182433]"
+                        : "bg-gray-50 hover:bg-gray-100 dark:bg-black/20 dark:hover:bg-black/30",
+                    )}
                     aria-label={`${node.parent} 카테고리 펼치기/접기`}
                   >
                     <div className="flex items-center gap-2 min-w-0 overflow-hidden">
-                      <FiFolder className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
-                      <span className="text-gray-800 dark:text-gray-200 font-medium truncate group-hover:text-gray-900 dark:group-hover:text-gray-100 transition-colors">
+                      <SidebarNodeIcon
+                        icon={FiFolder}
+                        isActive={isParentActive}
+                        iconClassName="text-gray-600 dark:text-gray-400"
+                      />
+                      <span
+                        className={cn(
+                          "truncate transition-colors",
+                          isParentActive
+                            ? "font-semibold text-[#1B2430] dark:text-[#E6EDF3]"
+                            : "font-medium text-gray-800 group-hover:text-gray-900 dark:text-gray-200 dark:group-hover:text-gray-100",
+                        )}
+                      >
                         {node.parent}
                       </span>
                       {isExpanded ? (
@@ -201,7 +284,14 @@ const CategorySection = React.memo(function CategorySection({
                         <FiChevronRight className="flex-shrink-0 w-4 h-4 text-gray-600 dark:text-gray-400" />
                       )}
                     </div>
-                    <span className="flex-shrink-0 text-[13px] text-gray-500 dark:text-gray-400 font-medium ml-2">
+                    <span
+                      className={cn(
+                        "ml-2 flex-shrink-0 text-[13px] font-medium",
+                        isParentActive
+                          ? "text-[#264653] dark:text-[#9FE2D7]"
+                          : "text-gray-500 dark:text-gray-400",
+                      )}
+                    >
                       {node.totalCount}
                     </span>
                   </button>
@@ -209,23 +299,49 @@ const CategorySection = React.memo(function CategorySection({
                   {/* Children 카테고리 (확장 시) */}
                   {isExpanded && (
                     <div className="ml-6 mt-1 space-y-1">
-                      {node.children.map((childNode, childIndex) => (
+                      {node.children.map((childNode, childIndex) => {
+                        const isChildActive =
+                          selectedCategory === childNode.fullPath;
+
+                        return (
                         <button
                           key={childIndex}
                           onClick={() => handleCategoryClick(childNode.fullPath)}
-                          className="w-full flex items-center justify-between px-3 py-1.5 text-[13px] rounded-lg transition-colors hover:bg-gray-100 dark:hover:bg-black/20 text-left group"
+                          data-category-path={childNode.fullPath}
+                          data-category-node-type="child"
+                          className={cn(
+                            "group flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-left text-[13px] transition-colors",
+                            isChildActive
+                              ? "bg-[#EEF4FB] hover:bg-[#E6F0FB] dark:bg-[#141E28] dark:hover:bg-[#182433]"
+                              : "hover:bg-gray-100 dark:hover:bg-black/20",
+                          )}
                           aria-label={`${childNode.child} 카테고리 (${childNode.count}개)`}
                         >
                           <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="text-gray-600 dark:text-gray-400 truncate group-hover:text-gray-800 dark:group-hover:text-gray-300 transition-colors">
+                            <span
+                              className={cn(
+                                "truncate transition-colors",
+                                isChildActive
+                                  ? "font-semibold text-[#1B2430] dark:text-[#E6EDF3]"
+                                  : "text-gray-600 group-hover:text-gray-800 dark:text-gray-400 dark:group-hover:text-gray-300",
+                              )}
+                            >
                               - {childNode.child}
                             </span>
                           </div>
-                          <span className="flex-shrink-0 text-[12px] text-gray-500 dark:text-gray-400 font-medium ml-2">
+                          <span
+                            className={cn(
+                              "ml-2 flex-shrink-0 text-[12px] font-medium",
+                              isChildActive
+                                ? "text-[#264653] dark:text-[#9FE2D7]"
+                                : "text-gray-500 dark:text-gray-400",
+                            )}
+                          >
                             {childNode.count}
                           </span>
                         </button>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </>

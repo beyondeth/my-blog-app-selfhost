@@ -58,7 +58,7 @@ export function adaptUnifiedFeedItem(item: UnifiedFeedItem): AdaptedFeedItem {
     userVote: item.userVote ?? (item.liked ? 'upvote' : null),
     bookmarked: false,
     tags: item.tags ?? [],
-    category: item.sourceType === 'blog' ? 'blog' : 'community',
+    category: item.category ?? (item.sourceType === 'blog' ? 'blog' : 'community'),
     createdAt: item.createdAt,
     updatedAt: item.updatedAt,
     publishedAt: item.createdAt,

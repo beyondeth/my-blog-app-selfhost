@@ -32,14 +32,16 @@ npx -y mcporter config add codebase-blog-oauth-prod \
 npx -y mcporter auth codebase-blog-oauth
 ```
 
-## 1) Safe Gate (Always First)
+## 1) Ensure OAuth Session (Always First)
 
 ```bash
+npx -y mcporter --oauth-timeout 180000 auth codebase-blog-oauth
+
 AUTH_OUT=$(npx -y mcporter call codebase-blog-oauth.check_auth --output json 2>&1 || true)
 echo "$AUTH_OUT"
 
-if echo "$AUTH_OUT" | grep -q '"error"'; then
-  echo "[STOP] OAuth verification failed. create_post not executed."
+if ! echo "$AUTH_OUT" | grep -q 'OAuth 2.1'; then
+  echo "[STOP] OAuth mode verification failed. create_post not executed."
   exit 1
 fi
 ```
@@ -59,9 +61,10 @@ For terminal UX, do not collapse everything into one silent publish call.
 Print and execute these stages in order:
 
 1. `[Route] ...`
-2. `[1/3] OAuth 인증 확인` + `check_auth`
-3. `[2/3] 스타일 가이드 확인` + `get_writing_style_guide`
-4. `[3/3] 포스트 발행` + `create_post`
+2. `[1/4] OAuth 로그인 완료 대기` + `mcporter auth`
+3. `[2/4] OAuth 인증 상태 검증` + `check_auth`
+4. `[3/4] 스타일 가이드 확인` + `get_writing_style_guide`
+5. `[4/4] 포스트 발행` + `create_post`
 
 If the body is already written, the style guide step can still be used as a visible progress checkpoint instead of being silently omitted.
 
@@ -83,11 +86,13 @@ NODE
 STYLE_ARGS='{"style":"default"}'
 
 echo '[Route] mode=skill transport=mcporter endpoint=/mcp-remote alias=codebase-blog-oauth'
-echo '[1/3] OAuth 인증 확인'
+echo '[1/4] OAuth 로그인 완료 대기'
+npx -y mcporter --oauth-timeout 180000 auth codebase-blog-oauth
+echo '[2/4] OAuth 인증 상태 검증'
 npx -y mcporter call codebase-blog-oauth.check_auth --output json
-echo '[2/3] 스타일 가이드 확인'
+echo '[3/4] 스타일 가이드 확인'
 npx -y mcporter call codebase-blog-oauth.get_writing_style_guide --args "$STYLE_ARGS"
-echo '[3/3] 포스트 발행'
+echo '[4/4] 포스트 발행'
 npx -y mcporter call codebase-blog-oauth.create_post --args "$POST_PAYLOAD"
 ```
 
@@ -111,5 +116,7 @@ npx -y mcporter call codebase-blog-oauth.finalize_uploaded_image --args '{"fileK
 ## Troubleshooting
 
 - If the login UI does not appear: you may already be logged in. Try `npx -y mcporter auth codebase-blog-oauth --reset`.
+- If the browser shows `Authorization successful`: that callback already woke the waiting `mcporter auth` process. Continue immediately after `auth` returns instead of starting a manual poll loop.
 - If you see `SSE error: Invalid content type, expected "text/event-stream"` during `auth`: tokens may still be saved. Run `check_auth` to confirm.
+- If you see `EADDRINUSE ... 127.0.0.1:33334`: treat it as a callback-port collision, retry once, then try `npx -y mcporter auth codebase-blog-oauth --reset` or move the callback port.
 - If the body contains quotes, backticks, or long code fences: keep using `--args` and do not wrap the payload in a shell-quoted function call.

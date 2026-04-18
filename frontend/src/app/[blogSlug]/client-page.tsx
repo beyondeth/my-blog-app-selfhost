@@ -7,6 +7,7 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { useInfiniteCursorPosts, useDeletePost, useTogglePostLike } from '@/hooks/usePosts';
 import { useBlogBySlug, useBlogCategories } from '@/hooks/useBlogs';
 import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { postsAPI } from '@/lib/api';
 import { parseSearchParams } from '@/lib/navigation';
 import { useNavigationCache } from '@/hooks/useNavigationCache';
 import { toast } from 'sonner';
@@ -28,6 +29,7 @@ import { BlogBrandingHero } from '@/components/blog/BlogBrandingHero';
 import { hexToRgb } from '@/lib/color';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import VirtualizedPostItem from '@/components/posts/VirtualizedPostItem';
+import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
 import { canAccessMarketplaceSellerTools } from '@/lib/marketplace-access';
 
 // 클라이언트 사이드 체크 훅
@@ -70,6 +72,8 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   
   // 모바일/데스크탑 감지 (사이드바는 lg 이상에서만 표시)
   const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [feedScrollElement, setFeedScrollElement] = useState<HTMLElement | null>(null);
+  const feedObserverRoot = isDesktop ? feedScrollElement : null;
 
   // 블로그 정보 가져오기 (React Query 캐싱 사용)
   const {
@@ -137,6 +141,8 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
     return categoryPagesData?.pages?.[0]?.total ?? 0;
   }, [categoryPagesData?.pages]);
 
+  useScrollRestoration(`blog-feed-${blogSlug}`, { scrollElement: feedObserverRoot });
+
   // 삭제 다이얼로그 상태
   const [deleteDialog, setDeleteDialog] = useState<{
     isOpen: boolean;
@@ -187,6 +193,19 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
     sort: 'recent',
     limit: 20,
     enabled: isClient && !!blog?.id && activeTab === 'products',
+  });
+
+  const { data: sidebarPostsData } = useQuery({
+    queryKey: ['blog-sidebar-posts', blog?.id],
+    queryFn: () =>
+      postsAPI.getPostsCursor({
+        blogId: blog?.id,
+        postType: 'blog',
+        sort: 'recent',
+        limit: 20,
+      }),
+    enabled: isClient && isDesktop && !!blog?.id,
+    staleTime: 5 * 60 * 1000,
   });
 
   const deletePostMutation = useDeletePost();
@@ -360,18 +379,20 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   // 최근 포스트 (처음 5개) - 데스크탑에서만 계산
   const recentPosts = useMemo(() => {
     if (!isDesktop) return []; // 모바일에서는 계산 스킵
-    if (allPosts.length === 0) return []; // 조기 종료
-    return allPosts.slice(0, 5);
-  }, [allPosts, isDesktop]);
+    const sidebarPosts = sidebarPostsData?.posts ?? [];
+    if (sidebarPosts.length === 0) return []; // 조기 종료
+    return sidebarPosts.slice(0, 5);
+  }, [isDesktop, sidebarPostsData?.posts]);
 
   // 실제 포스트에서 태그 추출 - 메모이제이션 (데스크탑에서만)
   const tags = useMemo(() => {
     if (!isDesktop) return []; // 모바일에서는 계산 스킵
-    if (allPosts.length === 0) return []; // 조기 종료: 빈 배열 루프 제거
+    const sidebarPosts = sidebarPostsData?.posts ?? [];
+    if (sidebarPosts.length === 0) return []; // 조기 종료: 빈 배열 루프 제거
 
     const tagMap = new Map<string, number>();
 
-    allPosts.forEach(post => {
+    sidebarPosts.forEach(post => {
       if (post && post.tags && Array.isArray(post.tags)) {
         post.tags.forEach((tag: string) => {
           if (tag && tag.trim()) {
@@ -387,7 +408,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
       .sort((a, b) => b[1] - a[1])
       .slice(0, 20)
       .map(([tag]) => tag);
-  }, [allPosts, isDesktop]);
+  }, [isDesktop, sidebarPostsData?.posts]);
 
   const handleEditPost = useCallback((id: string) => {
     router.push(`/p/${id}/edit`);
@@ -502,9 +523,12 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
       style={pageBrandingStyles}
     >
       <div className="max-w-7xl mx-auto px-6 pb-16 pt-20">
-        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
+        <div className="flex flex-col gap-6 lg:grid lg:h-[calc(100vh-7rem)] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch lg:overflow-hidden">
           {/* Main Content Area */}
-          <main className="flex-1 min-w-0 pt-0">
+          <main
+            ref={setFeedScrollElement}
+            className="min-w-0 pt-0 lg:h-full lg:min-h-0 lg:overflow-y-auto desktop-feed-scroll desktop-independent-scroll"
+          >
             <div className="space-y-8">
               <div className="max-w-[780px] mx-auto">
                 <BlogBrandingHero
@@ -590,6 +614,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                       <VirtualizedPostItem
                         key={post.id}
                         initialVisible={index < 5}
+                        observerRoot={feedObserverRoot}
                       >
                         <PostArticle
                           post={post}
@@ -610,6 +635,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                       totalPosts={allPosts.length}
                       currentPostsCount={allPosts.length}
                       onLoadMore={loadMorePosts}
+                      observerRoot={feedObserverRoot}
                       error={error ?? null}
                       onRetry={loadMorePosts}
                     />
@@ -706,7 +732,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
           </main>
 
           {/* Sidebar - sticky positioning */}
-          <aside className="hidden lg:block lg:sticky lg:top-28 lg:h-[calc(100vh-7rem)] lg:overflow-y-auto sidebar-scroll bg-white dark:bg-[#0E141B]">
+          <aside className="hidden bg-white dark:bg-[#0E141B] lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto sidebar-scroll desktop-independent-scroll">
             <div className="space-y-4 sm:space-y-6">
               {/* Blog Owner Card at the top */}
               <BlogOwnerCard

@@ -14,6 +14,12 @@ import type {
 
 const API_BASE_URL = (typeof window === 'undefined' ? process.env.BACKEND_API_URL : process.env.NEXT_PUBLIC_API_URL) || 'http://localhost:3000/api/v1';
 
+function pruneUndefined<T extends Record<string, unknown>>(value: T): T {
+  return Object.fromEntries(
+    Object.entries(value).filter(([, entry]) => entry !== undefined)
+  ) as T;
+}
+
 /**
  * API 클라이언트 클래스
  * @description SaaS 플랫폼을 위한 멀티 테넌트 지원 API 클라이언트
@@ -155,36 +161,80 @@ export class ApiClient {
    * @returns 표준화된 API 에러
    */
   private handleError(error: any): ApiError {
-    const status = error.response?.status;
-    const url = error.config?.url || '';
+    const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+    const url = axios.isAxiosError(error) ? error.config?.url || '' : '';
+    const responseData = axios.isAxiosError(error) ? error.response?.data : undefined;
+    const responseHeaders = axios.isAxiosError(error) ? error.response?.headers : undefined;
+
+    const requestId =
+      responseHeaders?.['x-request-id'] ||
+      responseHeaders?.['x-correlation-id'] ||
+      responseHeaders?.['x-trace-id'];
+
+    const backendMessage = Array.isArray(responseData?.message)
+      ? responseData.message.join(', ')
+      : responseData?.message;
+
+    const fallbackMessage =
+      backendMessage ||
+      error?.message ||
+      (typeof error === 'string' ? error : undefined) ||
+      '오류가 발생했습니다';
 
     // 409 Conflict for check-alias is an expected validation error, not a system error.
     const isAliasCheckConflict = status === 409 && url.includes('/blogs/check-alias/');
+    const isClientError = status !== undefined && status >= 400 && status < 500;
+    const shouldSkipLogging = status === 401 || status === 404 || isAliasCheckConflict;
 
-    // 401, 404는 정상적인 비즈니스 로직이므로 로그 제외
-    if (status !== 401 && status !== 404 && !isAliasCheckConflict) {
-      apiLogger.error('API 오류', {
-        url: error.config?.url,
-        method: error.config?.method,
-        status: status,
-        response: error.response?.data,
-        message: error.response?.data?.message || error.message,
-        // 개발 환경에서는 더 상세한 정보
-        ...(process.env.NODE_ENV === 'development' && {
-          stack: error.stack,
-          config: {
-            params: error.config?.params,
-            data: error.config?.data,
-          }
-        })
-      });
+    const errorPayload = pruneUndefined({
+      url: axios.isAxiosError(error) ? error.config?.url : undefined,
+      method: axios.isAxiosError(error) ? error.config?.method?.toUpperCase?.() : undefined,
+      status,
+      statusText: axios.isAxiosError(error) ? error.response?.statusText : undefined,
+      code:
+        responseData?.code ||
+        (axios.isAxiosError(error) ? error.code : undefined),
+      message: fallbackMessage,
+      error:
+        responseData?.error ||
+        (error instanceof Error ? error.name : undefined),
+      requestId: typeof requestId === 'string' ? requestId : undefined,
+      response: responseData,
+      ...(process.env.NODE_ENV === 'development' && {
+        stack: error instanceof Error ? error.stack : undefined,
+        config: axios.isAxiosError(error)
+          ? pruneUndefined({
+              baseURL: error.config?.baseURL,
+              timeout: error.config?.timeout,
+              params: error.config?.params,
+              data: error.config?.data,
+            })
+          : undefined,
+        rawError:
+          error && typeof error === 'object'
+            ? {
+                type: error.constructor?.name || 'UnknownError',
+                keys: Object.keys(error).slice(0, 10),
+              }
+            : undefined,
+      }),
+    });
+
+    // 4xx handled failures should not surface as dev overlay console errors.
+    if (!shouldSkipLogging) {
+      if (isClientError) {
+        apiLogger.warn('API 요청 실패', errorPayload);
+      } else {
+        apiLogger.error('API 오류', errorPayload);
+      }
     }
 
     const apiError: ApiError = {
-      message: error.response?.data?.message || error.message || '오류가 발생했습니다',
+      message: fallbackMessage,
       statusCode: status || 500,
-      error: error.response?.data?.error,
-      details: error.response?.data?.details,
+      error: responseData?.error,
+      code: responseData?.code,
+      details: responseData?.details,
     };
 
     return apiError;

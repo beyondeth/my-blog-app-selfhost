@@ -116,6 +116,33 @@ npx -y mcporter call 'codebase-blog-oauth.create_post(
 npx -y mcporter call 'codebase-blog-oauth.get_writing_style_guide(style: "default")'
 ```
 
+## Diagram Authoring Rule
+
+When the user asks for a flowchart, structure diagram, workflow, or system overview:
+
+- keep the post source as normal Markdown
+- prefer a fenced `diagram` block inside `content_markdown`
+- use `mermaid` only when the user explicitly asks for Mermaid or when legacy compatibility is required
+
+Example:
+
+```md
+```diagram
+type: flow
+style: clean
+direction: vertical
+nodes:
+  - id: draft
+    label: 포스트 저장
+  - id: artifact
+    label: source artifact 생성
+edges:
+  - from: draft
+    to: artifact
+    label: 저장 후 처리
+```
+```
+
 ## Image Upload (Optional)
 
 ```bash

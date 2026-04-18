@@ -8,7 +8,8 @@
     "build": "node ./scripts/run-next-build.js",
     "start": "next start -p 3001",
     "lint": "eslint .",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:e2e:kb-map": "playwright test tests/e2e/kb-map.spec.ts --reporter=line"
   },
   "pnpm": {
     "overrides": {
@@ -40,6 +41,7 @@
     "@tanstack/react-query": "^5.81.2",
     "@tanstack/react-query-devtools": "^5.81.2",
     "@tanstack/react-query-persist-client": "^5.81.2",
+    "@terrastruct/d2": "^0.1.33",
     "@tiptap/core": "^3.10.1",
     "@tiptap/extension-code-block": "^3.10.1",
     "@tiptap/extension-code-block-lowlight": "^3.10.1",
@@ -116,6 +118,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@types/lodash.throttle": "^4.1.9",
     "@types/node": "^20.10.0",
     "@types/react": "^18.2.42",

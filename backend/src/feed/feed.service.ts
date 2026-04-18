@@ -425,6 +425,7 @@ export class FeedService {
         p.title,
         p.slug,
         COALESCE(pm.excerpt, LEFT(COALESCE(p.content_markdown, p.content), 200)) as excerpt,
+        pm.category as category,
         CASE
           WHEN f.file_url IS NULL THEN LEFT(COALESCE(p.content, p.content_markdown), 8000)
           ELSE NULL::text
@@ -464,6 +465,7 @@ export class FeedService {
         SELECT
           meta."postId",
           meta.excerpt,
+          meta.category,
           meta.tags
         FROM post_metadata meta
         WHERE meta."postId" = ANY($1::uuid[])
@@ -522,6 +524,7 @@ export class FeedService {
         cp.title,
         cp.slug,
         LEFT(COALESCE(cp.content_markdown, cp.content), 200) as excerpt,
+        NULL::text as category,
         CASE
           WHEN f.file_url IS NULL THEN LEFT(COALESCE(cp.content, cp.content_markdown), 8000)
           ELSE NULL::text
@@ -632,6 +635,7 @@ export class FeedService {
           p.title,
           p.slug,
           COALESCE(pm.excerpt, LEFT(COALESCE(p.content_markdown, p.content), 200)) as excerpt,
+          pm.category as category,
           CASE
             WHEN f.file_url IS NULL THEN LEFT(COALESCE(p.content, p.content_markdown), 8000)
             ELSE NULL::text
@@ -699,6 +703,7 @@ export class FeedService {
           cp.title,
           cp.slug,
           LEFT(COALESCE(cp.content_markdown, cp.content), 200) as excerpt,
+          NULL::text as category,
           CASE
             WHEN f.file_url IS NULL THEN LEFT(COALESCE(cp.content, cp.content_markdown), 8000)
             ELSE NULL::text
@@ -870,6 +875,7 @@ export class FeedService {
           p.title,
           p.slug,
           COALESCE(pm.excerpt, LEFT(COALESCE(p.content_markdown, p.content), 200)) as excerpt,
+          pm.category as category,
           CASE
             WHEN f.file_url IS NULL THEN LEFT(COALESCE(p.content, p.content_markdown), 8000)
             ELSE NULL::text
@@ -928,6 +934,7 @@ export class FeedService {
           cp.title,
           cp.slug,
           LEFT(COALESCE(cp.content_markdown, cp.content), 200) as excerpt,
+          NULL::text as category,
           CASE
             WHEN f.file_url IS NULL THEN LEFT(COALESCE(cp.content, cp.content_markdown), 8000)
             ELSE NULL::text
@@ -1010,6 +1017,7 @@ export class FeedService {
       title: row.title,
       slug: row.slug,
       excerpt: row.excerpt || undefined,
+      category: row.category || undefined,
       thumbnail: row.thumbnail || undefined,
       sourceType,
       author: {

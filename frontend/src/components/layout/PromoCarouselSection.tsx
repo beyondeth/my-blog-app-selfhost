@@ -26,7 +26,7 @@ const PromoCarouselSection = React.memo(function PromoCarouselSection() {
       title: 'MCP 자동 포스팅',
       description: 'AI 와 MCP 를 연결하여 Idea 를 자동으로 포스팅 할 수 있습니다.',
       ctaText: 'MCP 알아보기',
-      ctaLink: '/landing',
+      ctaLink: '/product',
       styles: [] as { name: string; emoji: string; color: string }[],
     },
     {

@@ -314,8 +314,10 @@ export class FilesService {
           "image/jpg",
         ];
         if (!allowedImageTypes.includes(mimeType)) {
-          throw new Error(
-            "지원되지 않는 이미지 형식입니다. WebP, PNG, JPEG만 허용됩니다.",
+          throw new BadRequestException(
+            mimeType === "image/svg+xml"
+              ? "SVG 업로드는 보안 정책상 허용되지 않습니다. PNG, JPEG, WebP 이미지를 사용하세요."
+              : "지원되지 않는 이미지 형식입니다. WebP, PNG, JPEG만 허용됩니다.",
           );
         }
       }

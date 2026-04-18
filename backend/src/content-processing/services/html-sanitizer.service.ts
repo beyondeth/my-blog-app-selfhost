@@ -245,20 +245,33 @@ export class HtmlSanitizerService {
     } = options || {};
 
     try {
-      // Mermaid 코드 블록 보존
+      // Mermaid / diagram 코드 블록 보존
       let processedHtml = html;
-      const mermaidBlocks: { placeholder: string; content: string }[] = [];
+      const preservedBlocks: Array<{
+        placeholder: string;
+        content: string;
+        language: "mermaid" | "diagram";
+      }> = [];
 
       if (preserveMermaid) {
-        // Mermaid 코드 블록을 임시 플레이스홀더로 교체
-        // data-language 속성이 있는 경우도 지원 (code-highlight.service.ts와 호환)
-        processedHtml = processedHtml.replace(
-          /<pre[^>]*><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
-          (match, content) => {
-            const placeholder = `<!--MERMAID_BLOCK_${mermaidBlocks.length}-->`;
-            mermaidBlocks.push({ placeholder, content });
+        const preserveCodeBlock = (
+          language: "mermaid" | "diagram",
+          pattern: RegExp,
+        ) => {
+          processedHtml = processedHtml.replace(pattern, (match, content) => {
+            const placeholder = `<!--${language.toUpperCase()}_BLOCK_${preservedBlocks.length}-->`;
+            preservedBlocks.push({ placeholder, content, language });
             return placeholder;
-          },
+          });
+        };
+
+        preserveCodeBlock(
+          "mermaid",
+          /<pre[^>]*><code[^>]*class="[^"]*language-mermaid[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+        );
+        preserveCodeBlock(
+          "diagram",
+          /<pre[^>]*><code[^>]*class="[^"]*language-diagram[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
         );
       }
 
@@ -316,14 +329,13 @@ export class HtmlSanitizerService {
         DOMPurify.removeAllHooks();
       }
 
-      // Mermaid 블록 복원
+      // Mermaid / diagram 블록 복원
       if (preserveMermaid) {
-        mermaidBlocks.forEach(({ placeholder, content }) => {
-          // Mermaid 콘텐츠 전처리 및 살균
+        preservedBlocks.forEach(({ placeholder, content, language }) => {
           const sanitizedContent = this.sanitizeMermaidContent(content);
           sanitized = sanitized.replace(
             placeholder,
-            `<pre><code class="language-mermaid">${sanitizedContent}</code></pre>`,
+            `<pre><code class="language-${language}">${sanitizedContent}</code></pre>`,
           );
         });
       }

@@ -15,17 +15,17 @@ import { createMcpApiKey, deleteMcpApiKey, revealMcpApiKey } from '@/services/ap
 import {
   getClaudeCodeConfig,
   getAntigravityConfig,
-  getCodexEnvSnippet,
-  getCodexWindowsPersistentSnippet,
+  getCodexConfig,
+  getCodexConfigOpenCommand,
   getSkillsInstallSnippet,
   getSkillsPerAgentInstallSnippet,
-  getCodexWindowsEnvSnippet,
   getCursorConfig,
   getGeminiConfig,
   getQwenConfig,
   getVSCodeConfig,
   getWindsurfConfig,
 } from './configSnippets';
+import { APP_CONNECTION_DOCS } from '@/lib/app-connection-docs';
 
 /**
  * MCP API Key 관리 페이지
@@ -39,6 +39,8 @@ import {
  */
 
 export default function ApiKeysPage() {
+  type SetupMode = 'web-app' | 'skills' | 'mcp' | 'agents';
+
   const maxApiKeys = 3;
   const router = useRouter();
   const { blog, loading: blogLoading } = useUserBlogV2();
@@ -52,10 +54,10 @@ export default function ApiKeysPage() {
   const [newKey, setNewKey] = useState<CreateMcpApiKeyResponse | null>(null);
   const [selectedBlogId, setSelectedBlogId] = useState<string>('');
   const [runtimeApiKeys, setRuntimeApiKeys] = useState<Record<string, string>>({});
-  const [setupMode, setSetupMode] = useState<'skills' | 'mcp' | 'agents'>('skills');
+  const [setupMode, setSetupMode] = useState<SetupMode>('web-app');
   const [selectedSkillAgent, setSelectedSkillAgent] = useState<'codex' | 'claude-code' | 'gemini-cli' | 'antigravity'>('codex');
   const [selectedMcpClient, setSelectedMcpClient] = useState<'codex' | 'claude-code' | 'gemini' | 'antigravity' | 'cursor' | 'windsurf' | 'vscode' | 'qwen'>('codex');
-  const [codexOs, setCodexOs] = useState<'mac-linux' | 'windows'>('mac-linux');
+  const [selectedCodexOpenTarget, setSelectedCodexOpenTarget] = useState<'mac-linux' | 'windows' | 'wsl'>('mac-linux');
   const [statusMessage, setStatusMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [revealingKeyId, setRevealingKeyId] = useState<string | null>(null);
   const [createModal, setCreateModal] = useState<{
@@ -265,7 +267,7 @@ export default function ApiKeysPage() {
     }
   };
 
-  const selectSetupMode = (mode: 'skills' | 'mcp' | 'agents') => {
+  const selectSetupMode = (mode: SetupMode) => {
     setSetupMode(mode);
   };
 
@@ -287,17 +289,17 @@ export default function ApiKeysPage() {
     'npx -y skills list -g -a codex -a claude-code -a gemini-cli -a antigravity';
   const llmAgentsInstallGuideFetchCommand =
     'curl -s https://raw.githubusercontent.com/beyondeth/codebase-skills/refs/heads/main/docs/guide/installation.md';
-  const codexEnvSessionCommand =
-    codexOs === 'mac-linux'
-      ? getCodexEnvSnippet(getCurrentApiKey(), false)
-      : getCodexWindowsEnvSnippet(getCurrentApiKey(), false);
-  const codexEnvPersistentCommand =
-    codexOs === 'mac-linux'
-      ? `echo 'export CODEBASE_MCP_TOKEN="${getCurrentApiKey()}"' >> ~/.zshrc && source ~/.zshrc`
-      : getCodexWindowsPersistentSnippet(getCurrentApiKey(), false);
-  const codexMcpAddCommand =
-    'codex mcp add codebase-blog-mcp --url https://mcp.codebase.blog/mcp --bearer-token-env-var CODEBASE_MCP_TOKEN';
+  const codexConfigOpenCommand = getCodexConfigOpenCommand(selectedCodexOpenTarget);
   const codexMcpVerifyCommand = 'codex mcp get codebase-blog-mcp';
+  const codexOpenTargetCards: Array<{
+    id: 'mac-linux' | 'windows' | 'wsl';
+    title: string;
+    description: string;
+  }> = [
+    { id: 'mac-linux', title: 'macOS / Linux', description: '~/.codex/config.toml' },
+    { id: 'windows', title: 'Windows', description: '%USERPROFILE%\\.codex\\config.toml' },
+    { id: 'wsl', title: 'WSL2', description: 'Linux 홈 디렉터리의 ~/.codex/config.toml' },
+  ];
 
   const mcpClientCards: Array<{
     id: 'codex' | 'claude-code' | 'gemini' | 'antigravity' | 'cursor' | 'windsurf' | 'vscode' | 'qwen';
@@ -316,6 +318,7 @@ export default function ApiKeysPage() {
   ];
 
   const mcpConfigByClient = {
+    codex: getCodexConfig(getCurrentApiKey(), false),
     'claude-code': getClaudeCodeConfig(getCurrentApiKey(), false),
     gemini: getGeminiConfig(getCurrentApiKey(), false),
     antigravity: getAntigravityConfig(getCurrentApiKey(), false),
@@ -358,6 +361,17 @@ export default function ApiKeysPage() {
   ].filter((card) => card.command);
   const selectedSkillAgentCard =
     skillAgentCards.find((card) => card.id === selectedSkillAgent) ?? skillAgentCards[0];
+  const webAppCards = APP_CONNECTION_DOCS.map((doc) => ({
+    id: doc.slug,
+    title: doc.shortTitle,
+    description: doc.summary,
+    docsHref: `/docs/apps/${doc.slug}`,
+    statusLabel: doc.statusLabel,
+    statusClassName:
+      doc.status === 'manual-verify'
+        ? 'border-[#F5D08A] bg-[#FFF8E8] text-[#8A5B00] dark:border-[#5E4720] dark:bg-[#261D0C] dark:text-[#F6D58A]'
+        : 'border-[#CFE2FF] bg-[#EEF5FF] text-[#1A56B5] dark:border-[#24406A] dark:bg-[#101A2A] dark:text-[#93C5FD]',
+  }));
 
   const formatRelativeTime = (iso: string | null) => {
     if (!iso) return '사용 안 함';
@@ -434,10 +448,21 @@ export default function ApiKeysPage() {
       <div className={`${SETTINGS_CARD_CLASS} space-y-4 p-4 sm:p-6`}>
         <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">설치 방법 선택</h2>
         <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-[#2F3440]">
-          <div className="grid gap-0 sm:grid-cols-3">
+          <div className="grid gap-0 sm:grid-cols-2 xl:grid-cols-4">
+            <button
+              onClick={() => selectSetupMode('web-app')}
+              className={`border-b border-gray-200 px-4 py-4 text-center transition sm:border-r xl:border-b-0 dark:border-[#2F3440] ${
+                setupMode === 'web-app'
+                  ? 'bg-gray-900 text-white dark:bg-[#6D79FF]'
+                  : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
+              }`}
+            >
+              <p className="text-sm font-semibold">웹/앱</p>
+              <p className={`mt-1 text-xs ${setupMode === 'web-app' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>ChatGPT · Claude · Perplexity</p>
+            </button>
             <button
               onClick={() => selectSetupMode('skills')}
-              className={`border-b border-gray-200 px-4 py-4 text-center transition sm:border-b-0 sm:border-r dark:border-[#2F3440] ${
+              className={`border-b border-gray-200 px-4 py-4 text-center transition xl:border-b-0 xl:border-r dark:border-[#2F3440] ${
                 setupMode === 'skills'
                   ? 'bg-gray-900 text-white dark:bg-[#6D79FF]'
                   : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
@@ -448,7 +473,7 @@ export default function ApiKeysPage() {
             </button>
             <button
               onClick={() => selectSetupMode('mcp')}
-              className={`border-b border-gray-200 px-4 py-4 text-center transition sm:border-b-0 sm:border-r dark:border-[#2F3440] ${
+              className={`border-b border-gray-200 px-4 py-4 text-center transition sm:border-r xl:border-b-0 xl:border-r dark:border-[#2F3440] ${
                 setupMode === 'mcp'
                   ? 'bg-gray-900 text-white dark:bg-[#6D79FF]'
                   : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
@@ -471,6 +496,79 @@ export default function ApiKeysPage() {
           </div>
         </div>
       </div>
+
+      {setupMode === 'web-app' && (
+        <div className={`${SETTINGS_CARD_CLASS} space-y-5 p-4 sm:p-6`}>
+          <div className="space-y-2">
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">웹/앱 연결</h3>
+            <p className="text-sm text-gray-600 dark:text-gray-300">
+              ChatGPT, Claude, Perplexity 같은 웹/앱 환경에서 Codebase 연결 흐름을 확인합니다.
+              단계별 설명은 공식 문서를 기준으로 정리했고, 스크린샷은 문서 자산 경로에 파일만
+              교체하면 바로 반영되도록 구성했습니다.
+            </p>
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-3">
+            <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">1</div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">환경 선택</h4>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                현재 사용 중인 웹/앱 환경을 선택하고 해당 연결 문서를 엽니다.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">2</div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">공식 문서 기준 확인</h4>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                각 가이드는 공식 문서를 기준으로 유지합니다. 문서 안의 스크린샷 슬롯은{' '}
+                <code>frontend/public/docs/apps/...</code> 파일을 교체하면 자동 반영됩니다.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
+              <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">3</div>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">연결 상태 관리</h4>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                이미 승인된 OAuth/앱 연결은 연결된 앱 화면에서 다시 확인하거나 정리할 수 있습니다.
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-3">
+            {webAppCards.map((card) => (
+              <div
+                key={card.id}
+                className="rounded-[28px] border border-gray-200 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] dark:border-[#2F3440] dark:bg-[#1F2229] dark:shadow-none"
+              >
+                <span className={`inline-flex rounded-full border px-3 py-1 text-xs font-medium ${card.statusClassName}`}>
+                  {card.statusLabel}
+                </span>
+                <h4 className="mt-4 text-lg font-semibold text-gray-900 dark:text-gray-100">
+                  {card.title}
+                </h4>
+                <p className="mt-2 text-sm leading-7 text-gray-600 dark:text-gray-300">
+                  {card.description}
+                </p>
+                <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => router.push(card.docsHref)}
+                    className="inline-flex flex-1 items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 dark:bg-[#6D79FF] dark:hover:bg-[#5A66E4]"
+                  >
+                    설정 가이드 보기
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => router.push('/settings/connected-apps')}
+                    className={`${SETTINGS_SUBTLE_BUTTON_CLASS} flex-1`}
+                  >
+                    연결 상태 관리
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {setupMode === 'skills' && (
         <div className={`${SETTINGS_CARD_CLASS} space-y-5 p-4 sm:p-6`}>
@@ -749,74 +847,101 @@ export default function ApiKeysPage() {
             </div>
 
             {selectedMcpClient === 'codex' && (
-              <div className="mb-3 inline-flex rounded-lg border border-gray-200 bg-gray-100 p-1 dark:border-[#2F3440] dark:bg-[#1F2229]">
-                <button
-                  onClick={() => setCodexOs('mac-linux')}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                    codexOs === 'mac-linux'
-                      ? 'bg-white text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
-                >
-                  macOS/Linux
-                </button>
-                <button
-                  onClick={() => setCodexOs('windows')}
-                  className={`rounded-md px-3 py-1.5 text-xs font-semibold ${
-                    codexOs === 'windows'
-                      ? 'bg-white text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100'
-                      : 'text-gray-600 dark:text-gray-400'
-                  }`}
-                >
-                  Windows
-                </button>
+              <div className="mb-3 rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  OpenAI Codex 공식 문서 기준으로 <code>codex mcp add</code>는 일반 MCP 등록용 CLI이지만,
+                  static <code>Authorization</code> header를 직접 넣는 공식 one-line install은 없습니다.
+                </p>
+                <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
+                  그래서 이 서버는 <code>~/.codex/config.toml</code>의 <code>http_headers</code>를 직접 수정하는 방식이
+                  정식 경로입니다. 기존 <code>codebase-blog-mcp</code> 블록이 있으면 아래 내용으로 교체한 뒤 Codex를 재시작하세요.
+                </p>
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                  공식 문서:{' '}
+                  <a
+                    href="https://developers.openai.com/codex/mcp"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 hover:text-gray-700 dark:hover:text-gray-200"
+                  >
+                    Model Context Protocol
+                  </a>
+                  {' · '}
+                  <a
+                    href="https://developers.openai.com/codex/config-reference"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2 hover:text-gray-700 dark:hover:text-gray-200"
+                  >
+                    Config Reference
+                  </a>
+                </p>
+                <div className="mt-4 rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">config.toml 열기</p>
+                      <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                        현재 Codex를 실행하는 환경에 맞는 경로를 선택하세요.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 md:grid-cols-3">
+                    {codexOpenTargetCards.map((card) => (
+                      <button
+                        key={card.id}
+                        onClick={() => setSelectedCodexOpenTarget(card.id)}
+                        className={`rounded-xl border p-3 text-left transition ${
+                          selectedCodexOpenTarget === card.id
+                            ? 'border-gray-900 bg-gray-900 text-white dark:border-[#6D79FF] dark:bg-[#6D79FF]'
+                            : 'border-gray-200 bg-white text-gray-900 hover:bg-gray-50 dark:border-[#2F3440] dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
+                        }`}
+                        type="button"
+                      >
+                        <p className="text-sm font-semibold">{card.title}</p>
+                        <p className={`mt-1 text-xs ${selectedCodexOpenTarget === card.id ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>
+                          {card.description}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                  <QuickCommandBar
+                    command={codexConfigOpenCommand}
+                    copyLabel="Codex config 열기 명령 복사"
+                    onCopy={() => {
+                      copyToClipboard(codexConfigOpenCommand);
+                      showStatusMessage('success', 'Codex config 열기 명령을 복사했습니다.');
+                    }}
+                  />
+                  {selectedCodexOpenTarget === 'windows' && (
+                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                      PowerShell 기준입니다. Windows에서 WSL2 안의 Codex를 사용 중이면 Windows 경로 대신 아래 WSL2 탭의 Linux 경로를 여세요.
+                    </p>
+                  )}
+                  {selectedCodexOpenTarget === 'wsl' && (
+                    <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
+                      WSL2에서 실행 중인 Codex는 Windows <code>%USERPROFILE%\\.codex</code>가 아니라 Linux 홈 디렉터리의{' '}
+                      <code>~/.codex/config.toml</code>을 읽습니다.
+                    </p>
+                  )}
+                </div>
               </div>
             )}
 
-            {selectedMcpClient === 'codex' && (
-              <div className="space-y-3">
-                <div className="rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">1</span>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">토큰 등록 (터미널)</p>
-                  </div>
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    Codex는 보안상 키를 설정 파일에 직접 넣지 않습니다. 먼저 환경 변수로 등록하세요.
-                  </p>
-                  <QuickCommandBar
-                    command={codexEnvSessionCommand}
-                    copyLabel="현재 세션 토큰 명령 복사"
-                    onCopy={() => {
-                      copyToClipboard(codexEnvSessionCommand);
-                      showStatusMessage('success', '현재 세션 토큰 명령을 복사했습니다.');
-                    }}
-                  />
-                  <QuickCommandBar
-                    command={codexEnvPersistentCommand}
-                    copyLabel="지속 토큰 명령 복사"
-                    onCopy={() => {
-                      copyToClipboard(codexEnvPersistentCommand);
-                      showStatusMessage('success', '지속 토큰 명령을 복사했습니다.');
-                    }}
-                  />
-                </div>
+            <QuickCodeBlock
+              code={mcpConfigByClient[selectedMcpClient]}
+              onCopy={() => {
+                copyToClipboard(mcpConfigByClient[selectedMcpClient]);
+                showStatusMessage('success', `${selectedMcpCard.title} 설정을 복사했습니다.`);
+              }}
+              copyLabel={`${selectedMcpCard.title} 설정 복사`}
+            />
 
-                <div className="rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
-                  <div className="flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-gray-100 text-xs font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">2</span>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">MCP 서버 등록 및 확인</p>
-                  </div>
-                  <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                    공식 권장 방식으로 CLI에서 바로 등록한 뒤 정상 등록 여부를 확인하세요.
-                  </p>
-                  <QuickCommandBar
-                    command={codexMcpAddCommand}
-                    copyLabel="Codex MCP 추가 명령 복사"
-                    onCopy={() => {
-                      copyToClipboard(codexMcpAddCommand);
-                      showStatusMessage('success', 'Codex MCP 추가 명령을 복사했습니다.');
-                    }}
-                  />
+            {selectedMcpClient === 'codex' && (
+              <div className="mt-3 rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
+                <p className="text-sm text-gray-600 dark:text-gray-300">
+                  저장 후 Codex를 다시 열고 아래 명령으로 등록 상태를 확인하세요.
+                </p>
+                <div className="mt-3">
                   <QuickCommandBar
                     command={codexMcpVerifyCommand}
                     copyLabel="Codex MCP 확인 명령 복사"
@@ -827,17 +952,6 @@ export default function ApiKeysPage() {
                   />
                 </div>
               </div>
-            )}
-
-            {selectedMcpClient !== 'codex' && (
-              <QuickCodeBlock
-                code={mcpConfigByClient[selectedMcpClient as Exclude<typeof selectedMcpClient, 'codex'>]}
-                onCopy={() => {
-                  copyToClipboard(mcpConfigByClient[selectedMcpClient as Exclude<typeof selectedMcpClient, 'codex'>]);
-                  showStatusMessage('success', `${selectedMcpCard.title} 설정을 복사했습니다.`);
-                }}
-                copyLabel={`${selectedMcpCard.title} 설정 복사`}
-              />
             )}
           </div>
         </div>

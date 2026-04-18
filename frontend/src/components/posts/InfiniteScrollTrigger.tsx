@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import { useInfiniteScroll } from '@/hooks/useInfiniteScroll';
-import { PostSkeletonWithShimmer } from './PostSkeleton';
 
 interface InfiniteScrollTriggerProps {
   hasNextPage: boolean;
@@ -10,6 +9,7 @@ interface InfiniteScrollTriggerProps {
   totalPosts: number;
   currentPostsCount: number;
   onLoadMore: () => void;
+  observerRoot?: Element | null;
   error?: Error | null;
   onRetry?: () => void;
   tone?: 'default' | 'harbor';
@@ -21,19 +21,20 @@ const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
   totalPosts,
   currentPostsCount,
   onLoadMore,
+  observerRoot = null,
   error,
   onRetry,
   tone = 'default',
 }: InfiniteScrollTriggerProps) {
   const isHarbor = tone === 'harbor';
   const mutedTextClass = isHarbor ? 'text-[#7B8794] dark:text-[#A9B4C2]' : 'text-gray-500';
-  const subtleTextClass = isHarbor ? 'text-[#9AA4B2] dark:text-[#728093]' : 'text-gray-400';
   const retryButtonClass = isHarbor
     ? 'bg-[#264653] text-[#F9FBFD] hover:bg-[#2F5B6B] dark:bg-[#6CC3B2] dark:text-[#0E141B] dark:hover:bg-[#7DD1C0]'
     : 'bg-black text-white hover:bg-gray-800';
   const { targetRef } = useInfiniteScroll({
     threshold: 0.5,          // 50% 보이면 트리거
     rootMargin: '100px',     // 100px 전에 미리 로드
+    root: observerRoot,
     enabled: hasNextPage && !isFetchingNextPage && !error,
     onLoadMore,
     hasMore: hasNextPage,
@@ -107,31 +108,18 @@ const InfiniteScrollTrigger = React.memo(function InfiniteScrollTrigger({
     );
   }
 
-  // 로딩 중
-  if (isFetchingNextPage) {
-    return (
-      <div className="py-4">
-        <PostSkeletonWithShimmer count={3} tone={tone} />
-        <div className={`text-center py-4 ${mutedTextClass} text-sm`}>
-          더 많은 포스트를 불러오는 중...
-        </div>
-      </div>
-    );
-  }
-
-  // 무한 스크롤 트리거 (보이지 않는 센티널 요소)
   if (hasNextPage) {
     return (
-      <div 
-        ref={targetRef}
-        className="h-10 flex items-center justify-center"
+      <div
+        className="relative h-px overflow-hidden"
+        style={{ overflowAnchor: 'none' }}
         aria-hidden="true"
       >
-        {process.env.NODE_ENV === 'development' && (
-          <span className={`text-xs ${subtleTextClass}`}>
-            [스크롤 트리거 영역]
-          </span>
-        )}
+        <div
+          ref={targetRef}
+          className="pointer-events-none absolute inset-0 opacity-0"
+          aria-hidden="true"
+        />
       </div>
     );
   }

@@ -27,7 +27,11 @@ import { BlogSimpleEditor } from '@/editor'; // 정적 import로 변경하여 fl
 import { validateUUID } from '@/lib/utils/uuid';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
-import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
+import {
+  convertMarkdownToHtml,
+  convertHtmlToMarkdown,
+  getRichEditorCompatibilityIssues,
+} from '@/utils/markdownConversion';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import { apiClient } from '@/lib/api';
 import { validateContentSecurity } from '@/utils/contentSecurity';
@@ -431,6 +435,11 @@ export default function EditPostForm({
         form.setValue('content', markdown, { shouldDirty: true, shouldTouch: true });
         autoConversionSkipRef.current = true;
       } else {
+        const issues = getRichEditorCompatibilityIssues(currentContent);
+        if (issues.length > 0) {
+          toast.error(`리치 편집기로 안전하게 전환할 수 없는 요소가 있습니다: ${issues.join(', ')}`);
+          return;
+        }
         const html = convertMarkdownToHtml(currentContent);
         form.setValue('content', html || '<p></p>', { shouldDirty: true, shouldTouch: true });
       }
@@ -631,23 +640,24 @@ export default function EditPostForm({
 
   const buildSubmissionPayload = useCallback((data: PostFormValues) => {
     const isMarkdownMode = editorMode === 'markdown';
-    const convertedHtml = isMarkdownMode ? convertMarkdownToHtml(data.content) : data.content;
-    const hasPreferredYouTube = !isMarkdownMode && /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(convertedHtml);
+    const canonicalMarkdown = appendYouTubeThumbnailMarker(
+      isMarkdownMode ? data.content : convertHtmlToMarkdown(data.content),
+      selectedYouTubeThumbnailId,
+    );
+    const convertedHtml = convertMarkdownToHtml(canonicalMarkdown);
+    const hasPreferredYouTube = /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(
+      isMarkdownMode ? convertedHtml : data.content,
+    );
 
     const formData: any = {
       ...data,
       content: convertedHtml,
-      content_type: 'html',
+      content_type: 'markdown',
+      content_markdown: canonicalMarkdown,
       visibility: postVisibility,
     };
 
-    if (isMarkdownMode) {
-      // markdown 원본은 항상 별도 필드로 유지해 재진입 시 동일 모드/콘텐츠를 복원한다.
-      formData.content_markdown = appendYouTubeThumbnailMarker(
-        data.content,
-        selectedYouTubeThumbnailId,
-      );
-    } else if (hasPreferredYouTube) {
+    if (hasPreferredYouTube) {
       formData.thumbnailImageId = '';
     }
 

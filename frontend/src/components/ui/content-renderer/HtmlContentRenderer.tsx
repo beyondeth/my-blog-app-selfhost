@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { parseContent, extractContentMetadata } from './utils/content-parser';
 import { ContentProcessingOptions, ContentMetadata } from './types';
@@ -8,6 +8,7 @@ import HtmlRenderer from './components/HtmlRenderer';
 import CodeRenderer from './components/CodeRenderer';
 import YouTubeRenderer from './components/YouTubeRenderer';
 import VideoRenderer from './components/VideoRenderer';
+import DiagramRenderer from './components/DiagramRenderer';
 import LinkCard from '../LinkCard';
 import { useModal } from '@/hooks/useModal';
 import Modal from '../Modal';
@@ -63,18 +64,19 @@ export default function HtmlContentRenderer({
   const {
     enableCodeHighlight = true,
     enableMermaid = true,
+    enableDiagram = true,
     enableImageModal = true,
     enableCodeCopy = true,
     enableYouTube = true,
   } = options;
 
   // 통합 모달 상태 관리
-  const { modalData, isModalOpen, closeModal, handleImageClick, handleMermaidClick } = useModal();
+  const { modalData, isModalOpen, closeModal, handleImageClick, handleDiagramClick } = useModal();
 
   /**
    * 콘텐츠를 파싱하고 메타데이터를 추출합니다.
    */
-  const { parts, metadata } = useMemo(() => {
+  const { parts } = useMemo(() => {
     if (!content) {
       return { parts: [], metadata: {} };
     }
@@ -90,6 +92,7 @@ export default function HtmlContentRenderer({
       imageCount: extractedMetadata.imageCount,
       codeBlockCount: extractedMetadata.codeBlockCount,
       mermaidCount: extractedMetadata.mermaidCount,
+      diagramCount: extractedMetadata.diagramCount,
       youtubeCount: extractedMetadata.youtubeCount,
       languages: extractedMetadata.languages,
       readingTime,
@@ -162,7 +165,28 @@ export default function HtmlContentRenderer({
                   key={part.id}
                   id={part.id}
                   content={part.content}
-                  onClick={enableImageModal ? handleMermaidClick : undefined}
+                  onClick={
+                    enableImageModal
+                      ? (svg) => handleDiagramClick(svg, 'Mermaid 다이어그램')
+                      : undefined
+                  }
+                />
+              );
+
+            case 'diagram':
+              if (!enableDiagram) {
+                return (
+                  <pre key={`diagram-${index}`} className="code-block">
+                    <code className="language-diagram">{part.content}</code>
+                  </pre>
+                );
+              }
+              return (
+                <DiagramRenderer
+                  key={part.id}
+                  id={part.id}
+                  content={part.content}
+                  modalTitle="다이어그램"
                 />
               );
 
@@ -212,7 +236,7 @@ export default function HtmlContentRenderer({
         })}
       </div>
 
-      {/* 통합 모달 (이미지 & Mermaid) */}
+      {/* 통합 모달 (이미지 & 다이어그램) */}
       {enableImageModal && modalData && (
         <Modal
           type={modalData.type}

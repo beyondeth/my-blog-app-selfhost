@@ -1,4 +1,5 @@
 import { MetadataRoute } from 'next';
+import { WRITING_STYLE_DOCS } from '@/lib/writing-style-docs';
 
 /**
  * Next.js 14 Native Sitemap 생성
@@ -58,15 +59,60 @@ const staticRoutes = [
     changeFrequency: 'daily' as const,
   },
   {
+    url: '/product',
+    priority: 0.8,
+    changeFrequency: 'weekly' as const,
+  },
+  {
+    url: '/pricing',
+    priority: 0.8,
+    changeFrequency: 'weekly' as const,
+  },
+  {
+    url: '/updates',
+    priority: 0.7,
+    changeFrequency: 'weekly' as const,
+  },
+  {
     url: '/support',
     priority: 0.6,
     changeFrequency: 'monthly' as const,
   },
   {
-    url: '/landing',
+    url: '/docs',
     priority: 0.7,
+    changeFrequency: 'weekly' as const,
+  },
+  {
+    url: '/docs/get-started',
+    priority: 0.7,
+    changeFrequency: 'weekly' as const,
+  },
+  {
+    url: '/docs/publishing-flow',
+    priority: 0.6,
+    changeFrequency: 'weekly' as const,
+  },
+  {
+    url: '/docs/mcp',
+    priority: 0.6,
+    changeFrequency: 'weekly' as const,
+  },
+  {
+    url: '/docs/faq',
+    priority: 0.5,
     changeFrequency: 'monthly' as const,
   },
+  {
+    url: '/docs/writing-styles',
+    priority: 0.6,
+    changeFrequency: 'monthly' as const,
+  },
+  ...WRITING_STYLE_DOCS.map((style) => ({
+    url: `/docs/writing-styles/${style.id}`,
+    priority: 0.5,
+    changeFrequency: 'monthly' as const,
+  })),
   {
     url: '/c',
     priority: 0.9,

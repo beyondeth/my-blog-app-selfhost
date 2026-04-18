@@ -10,6 +10,7 @@ import { FeedCacheWarmingService } from "./feed-cache-warming.service";
 import { CacheModule } from "../cache/cache.module";
 import { FeedRankingService } from "./feed-ranking.service";
 import { CommunitiesModule } from "../communities/communities.module";
+import { KnowledgeModule } from "../knowledge/knowledge.module";
 
 /**
  * 피드 모듈
@@ -30,6 +31,7 @@ import { CommunitiesModule } from "../communities/communities.module";
     TypeOrmModule.forFeature([Post, CommunityPost, Community]),
     CacheModule,
     CommunitiesModule, // 커뮤니티 피드 워밍 통합을 위해 추가
+    KnowledgeModule,
   ],
   controllers: [FeedController, MobileFeedController],
   providers: [FeedService, FeedCacheWarmingService, FeedRankingService],

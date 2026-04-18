@@ -23,6 +23,11 @@ export const TOOL_NAMES = [
   'list_my_published_posts',
   'search_my_published_posts',
   'read_my_published_post',
+  'get_knowledge_manifest',
+  'search_knowledge_nodes',
+  'read_knowledge_node',
+  'list_followup_suggestions',
+  'dismiss_followup_suggestion',
   'get_writing_style_guide',
   'create_post',
   'get_image_upload_url',
@@ -138,6 +143,84 @@ export const TOOL_CATALOG: ToolCatalogItem[] = [
         },
       },
       required: ['postId'],
+    },
+  },
+  {
+    name: 'get_knowledge_manifest',
+    description:
+      'Read the authenticated user\'s compact knowledge manifest generated from published posts.',
+    discoveryDescription: 'Read your compact knowledge manifest',
+    inputSchema: {
+      type: 'object',
+      properties: {},
+    },
+  },
+  {
+    name: 'search_knowledge_nodes',
+    description:
+      'Search the authenticated user\'s knowledge nodes by title, slug, or path.',
+    discoveryDescription: 'Search your knowledge nodes',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query',
+        },
+        limit: {
+          type: 'number',
+          description: 'Items per page (default: 10, max: 20)',
+        },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'read_knowledge_node',
+    description:
+      'Read a single knowledge node owned by the authenticated user, including linked posts and edges.',
+    discoveryDescription: 'Read one of your knowledge nodes',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        slug: {
+          type: 'string',
+          description: 'Knowledge node slug',
+        },
+      },
+      required: ['slug'],
+    },
+  },
+  {
+    name: 'list_followup_suggestions',
+    description:
+      'List follow-up post suggestions derived from the authenticated user\'s knowledge graph.',
+    discoveryDescription: 'List your follow-up post suggestions',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        status: {
+          type: 'string',
+          enum: ['pending', 'dismissed', 'accepted'],
+          description: 'Optional status filter',
+        },
+      },
+    },
+  },
+  {
+    name: 'dismiss_followup_suggestion',
+    description:
+      'Dismiss one follow-up post suggestion from the authenticated user\'s knowledge graph.',
+    discoveryDescription: 'Dismiss a follow-up post suggestion',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        suggestionId: {
+          type: 'string',
+          description: 'Suggestion ID',
+        },
+      },
+      required: ['suggestionId'],
     },
   },
   {

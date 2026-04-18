@@ -12,11 +12,12 @@ import { MusicProvider } from '@/providers/MusicProvider';
 import { MusicPlayerDropdown } from '@/components/music';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { initMixpanel } from '@/lib/mixpanel';
 import Script from 'next/script';
 import { Debug } from '@/components/debug/Debug';
 import { CacheClearButton } from '@/components/CacheClearButton';
 import { isMobileInteraction, MOBILE_RESET_EVENT } from '@/utils/interaction';
+import PublicSiteFrame from '@/components/public-site/PublicSiteFrame';
+import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 
 interface LayoutClientProps {
   children: React.ReactNode;
@@ -27,14 +28,18 @@ interface LayoutClientProps {
  *
  * 경로별 동적 레이아웃 제어:
  * - 인증 페이지: 헤더/사이드바 숨김
- * - 랜딩 페이지: 헤더만 표시
+ * - public 사이트: 전용 헤더/푸터 프레임 사용
  * - 일반 페이지: 전체 레이아웃 (헤더 + 사이드바 + 하단바)
  */
 export default function LayoutClient({ children }: LayoutClientProps) {
   const pathname = usePathname();
   const [shouldHideLayout, setShouldHideLayout] = useState(false);
-  const [isLandingPage, setIsLandingPage] = useState(false);
-  const isHomePage = pathname === '/';
+  const isPublicSitePage =
+    pathname === '/product' ||
+    pathname === '/pricing' ||
+    pathname === '/updates' ||
+    pathname === '/support' ||
+    pathname.startsWith('/docs');
 
   // 경로별 레이아웃 제어 로직
   // 중요: 함수형 업데이트로 의존성에서 상태 제거 (pathname 변경 시만 실행)
@@ -42,7 +47,6 @@ export default function LayoutClient({ children }: LayoutClientProps) {
   // (Header 리렌더링 → 음악 끊김/UI 깜빡임 문제 해결)
   useEffect(() => {
     let newShouldHide = false;
-    let newIsLanding = false;
 
     // 커스텀 레이아웃 페이지: 전역 헤더/사이드바 숨김
     const layoutlessPaths = [
@@ -56,14 +60,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
 
     if (isLayoutlessPage) {
       newShouldHide = true;
-      newIsLanding = false;
-    } else if (pathname === '/landing') {
-      // 랜딩페이지 - 헤더만 표시, 사이드바 제거
-      newShouldHide = false;
-      newIsLanding = true;
     } else {
-      newIsLanding = false;
-
       // 인증 페이지 목록
       const authPaths = ['/login', '/register', '/consent', '/forgot-password', '/reset-password'];
       const isAuthPage = authPaths.some(path => pathname.startsWith(path));
@@ -98,7 +95,6 @@ export default function LayoutClient({ children }: LayoutClientProps) {
     // 함수형 업데이트: 이전 값과 비교하여 변경 시에만 업데이트
     // 의존성 배열에서 상태 제거하여 이중 실행 방지
     setShouldHideLayout(prev => prev !== newShouldHide ? newShouldHide : prev);
-    setIsLandingPage(prev => prev !== newIsLanding ? newIsLanding : prev);
   }, [pathname]);
 
   useEffect(() => {
@@ -151,7 +147,7 @@ export default function LayoutClient({ children }: LayoutClientProps) {
             {/* Header: 항상 렌더링, 조건에 따라 CSS 숨김 처리 (언마운트 방지) */}
             {/* 음악 플레이어 버튼만 Header에 있고, 드롭다운은 Portal로 body에 직접 렌더링 */}
             {/* Suspense 제거: useSearchParams는 Header 내부에서 개별 Suspense 처리 */}
-            {!shouldHideLayout && (
+            {!shouldHideLayout && !isPublicSitePage && (
               <>
                 <Header />
                 <div className="h-[132px] md:h-[88px]" />
@@ -159,19 +155,14 @@ export default function LayoutClient({ children }: LayoutClientProps) {
             )}
 
             {/* 메인 콘텐츠 영역: 조건부 렌더링 유지 */}
-            {shouldHideLayout ? (
+            {isPublicSitePage ? (
+              <PublicSiteFrame>{children}</PublicSiteFrame>
+            ) : shouldHideLayout ? (
               // 인증 페이지 또는 법적 문서 페이지(인증에서 온 경우): 사이드바 없이 콘텐츠만
               <div className="min-h-screen bg-white dark:bg-[#0E141B]">
                 <MainContent>
                   {children}
                 </MainContent>
-              </div>
-            ) : isLandingPage ? (
-              // 랜딩페이지: 사이드바/하단바 제거
-              <div className="min-h-screen bg-white dark:bg-[#0E141B]">
-                <div className="w-full">
-                  {children}
-                </div>
               </div>
             ) : (
               // 일반 레이아웃: 사이드바 + 메인 콘텐츠 + 하단 바텀바
@@ -190,6 +181,8 @@ export default function LayoutClient({ children }: LayoutClientProps) {
                 <BottomNavBar />
               </div>
             )}
+
+            <FeedbackModal />
 
             {/* 음악 플레이어 드롭다운: Portal로 body에 직접 렌더링 (Header 리렌더링과 완전 분리)
                 페이지 이동 시에도 음악 재생이 끊기지 않도록 최상위 레벨에 배치 */}

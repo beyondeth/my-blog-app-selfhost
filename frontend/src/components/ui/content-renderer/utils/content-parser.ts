@@ -16,6 +16,7 @@ const MAX_AUTO_LINK_CARDS = 5;
 // 상수 정의 - 매직 넘버 제거
 const PLACEHOLDER_TYPES = {
   MERMAID: 'MERMAID',
+  DIAGRAM: 'DIAGRAM',
   CODE: 'CODE',
   YOUTUBE: 'YOUTUBE',
   VIDEO: 'VIDEO',
@@ -53,6 +54,7 @@ function createParsingPipeline(html: string) {
   let processedHtml = html;
   const extractedBlocks: ExtractedBlocks = {
     mermaid: [],
+    diagram: [],
     code: [],
     youtube: [],
     video: [],
@@ -73,8 +75,8 @@ function createParsingPipeline(html: string) {
 }
 
 /**
- * 특수 콘텐츠(Mermaid, Code, YouTube, Video) 추출
- * 순서가 중요: Mermaid → Code → YouTube → Video
+ * 특수 콘텐츠(Mermaid, Diagram, Code, YouTube, Video) 추출
+ * 순서가 중요: Mermaid → Diagram → Code → YouTube → Video
  */
 function extractSpecialContent(html: string, blocks: ExtractedBlocks): string {
   let processedHtml = html;
@@ -83,6 +85,11 @@ function extractSpecialContent(html: string, blocks: ExtractedBlocks): string {
   const mermaidResult = extractMermaidBlocks(processedHtml);
   processedHtml = mermaidResult.processedHtml;
   blocks.mermaid = mermaidResult.blocks;
+
+  // Custom diagram 블록 추출
+  const diagramResult = extractDiagramBlocks(processedHtml);
+  processedHtml = diagramResult.processedHtml;
+  blocks.diagram = diagramResult.blocks;
 
   // 일반 코드 블록 추출
   const codeResult = extractCodeBlocks(processedHtml);
@@ -120,6 +127,7 @@ function handleParsingError(error: unknown, originalHtml: string): ContentPart[]
 // 타입 정의
 interface ExtractedBlocks {
   mermaid: Array<{ placeholder: string; part: ContentPart }>;
+  diagram: Array<{ placeholder: string; part: ContentPart }>;
   code: Array<{ placeholder: string; part: ContentPart }>;
   youtube: Array<{ placeholder: string; part: ContentPart }>;
   video: Array<{ placeholder: string; part: ContentPart }>;
@@ -160,6 +168,31 @@ function extractMermaidBlocks(html: string): {
   return { processedHtml, blocks };
 }
 
+function extractDiagramBlocks(html: string): {
+  processedHtml: string;
+  blocks: Array<{ placeholder: string; part: ContentPart }>;
+} {
+  const blocks: Array<{ placeholder: string; part: ContentPart }> = [];
+  let processedHtml = html;
+
+  const patterns = {
+    standard: /<pre[^>]*><code[^>]*class="[^"]*language-diagram[^"]*"[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+    dataLang: /<pre[^>]*data-language="diagram"[^>]*><code[^>]*(?:class="[^"]*language-diagram[^"]*")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi,
+  };
+
+  for (const [patternName, pattern] of Object.entries(patterns)) {
+    processedHtml = extractWithPattern(
+      processedHtml,
+      pattern,
+      blocks,
+      'diagram',
+      patternName,
+    );
+  }
+
+  return { processedHtml, blocks };
+}
+
 /**
  * 패턴을 사용한 콘텐츠 추출 헬퍼 함수
  * 책임: 정규식 패턴으로 콘텐츠 매칭 및 추출
@@ -168,7 +201,7 @@ function extractWithPattern(
   html: string,
   pattern: RegExp,
   blocks: Array<{ placeholder: string; part: ContentPart }>,
-  type: 'mermaid' | 'code',
+  type: 'mermaid' | 'diagram' | 'code',
   patternName: string
 ): string {
   let processedHtml = html;
@@ -256,8 +289,8 @@ function extractCodeBlocks(html: string): {
   const blocks: Array<{ placeholder: string; part: ContentPart }> = [];
   let processedHtml = html;
 
-  // 코드 블록 패턴 - Mermaid를 명시적으로 제외, data-code-id 캡처 추가
-  const codePattern = /<pre[^>]*(?:data-code-id="([^"]*)")?[^>]*(?:data-language="([^"]*)")?[^>]*><code[^>]*(?:class="[^"]*language-(?!mermaid)([^"]*)")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi;
+  // 코드 블록 패턴 - Mermaid/diagram을 명시적으로 제외, data-code-id 캡처 추가
+  const codePattern = /<pre[^>]*(?:data-code-id="([^"]*)")?[^>]*(?:data-language="([^"]*)")?[^>]*><code[^>]*(?:class="[^"]*language-(?!mermaid\b|diagram\b)([^"]*)")?[^>]*>([\s\S]*?)<\/code><\/pre>/gi;
 
   let match;
   let index = 0;
@@ -656,6 +689,7 @@ function createPlaceholderMap(
   // 모든 블록 타입을 맵에 추가
   const allBlocks = [
     ...blocks.mermaid,
+    ...blocks.diagram,
     ...blocks.code,
     ...blocks.youtube,
     ...blocks.video,
@@ -869,6 +903,7 @@ export function extractContentMetadata(parts: ContentPart[]): {
   imageCount: number;
   codeBlockCount: number;
   mermaidCount: number;
+  diagramCount: number;
   youtubeCount: number;
   languages: string[];
 } {
@@ -890,6 +925,7 @@ function initializeMetadata() {
     imageCount: 0,
     codeBlockCount: 0,
     mermaidCount: 0,
+    diagramCount: 0,
     youtubeCount: 0,
     languages: new Set<string>(),
   };
@@ -906,6 +942,10 @@ function updateMetadataForPart(
   switch (part.type) {
     case 'mermaid':
       metadata.mermaidCount++;
+      break;
+
+    case 'diagram':
+      metadata.diagramCount++;
       break;
 
     case 'code':
@@ -945,6 +985,7 @@ function finalizeMetadata(
   imageCount: number;
   codeBlockCount: number;
   mermaidCount: number;
+  diagramCount: number;
   youtubeCount: number;
   languages: string[];
 } {
@@ -952,6 +993,7 @@ function finalizeMetadata(
     imageCount: metadata.imageCount,
     codeBlockCount: metadata.codeBlockCount,
     mermaidCount: metadata.mermaidCount,
+    diagramCount: metadata.diagramCount,
     youtubeCount: metadata.youtubeCount,
     languages: Array.from(metadata.languages).sort(), // 알파벳 순 정렬
   };

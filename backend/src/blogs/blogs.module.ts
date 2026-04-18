@@ -11,6 +11,7 @@ import { CommonModule } from "../common/common.module";
 import { EventsModule } from "../common/events/events.module";
 import { PostsModule } from "../posts/posts.module";
 import { FilesModule } from "../files/files.module";
+import { KnowledgeModule } from "../knowledge/knowledge.module";
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { FilesModule } from "../files/files.module";
     EventsModule, // 이벤트 시스템 모듈 추가
     PostsModule, // BlogStatsService를 사용하기 위해 PostsModule 임포트
     FilesModule, // CdnService를 사용하기 위해 FilesModule 임포트
+    KnowledgeModule,
   ],
   controllers: [BlogsController, BlogStatsController],
   providers: [BlogsService],

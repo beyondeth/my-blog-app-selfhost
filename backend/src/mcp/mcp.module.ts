@@ -15,6 +15,7 @@ import { McpApiKey } from "./entities/mcp-api-key.entity";
 import { UsageTracking } from "../usage/entities/usage-tracking.entity";
 import { McpApiKeyService } from "./services/mcp-api-key.service";
 import { McpApiKeySecretService } from "./services/mcp-api-key-secret.service";
+import { KnowledgeModule } from "../knowledge/knowledge.module";
 
 /**
  * MCP (Model Context Protocol) 모듈
@@ -42,6 +43,7 @@ import { McpApiKeySecretService } from "./services/mcp-api-key-secret.service";
     UsageModule, // 관리자 통계용
     UsersModule, // OAuth 인증용
     BlogsModule, // OAuth 인증용
+    KnowledgeModule,
   ],
   controllers: [
     McpController, // API Key 관리

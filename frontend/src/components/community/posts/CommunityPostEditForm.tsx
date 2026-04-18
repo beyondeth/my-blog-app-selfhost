@@ -20,7 +20,11 @@ import "@/styles/elevated-editor.css";
 import { BlogSimpleEditor } from '@/editor'; 
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useUploadFile } from '@/hooks/useFiles';
-import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
+import {
+  convertMarkdownToHtml,
+  convertHtmlToMarkdown,
+  getRichEditorCompatibilityIssues,
+} from '@/utils/markdownConversion';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import { apiClient } from '@/lib/api';
 import { validateContentSecurity } from '@/utils/contentSecurity';
@@ -348,6 +352,11 @@ export default function CommunityPostEditForm({
         autoConversionSkipRef.current = true;
         resetMarkdownVideo();
       } else {
+        const issues = getRichEditorCompatibilityIssues(currentContent);
+        if (issues.length > 0) {
+          toast.error(`리치 편집기로 안전하게 전환할 수 없는 요소가 있습니다: ${issues.join(', ')}`);
+          return;
+        }
         const html = convertMarkdownToHtml(currentContent);
         form.setValue('content', html || '<p></p>', { shouldDirty: true, shouldTouch: true });
       }
@@ -397,16 +406,19 @@ export default function CommunityPostEditForm({
     isSubmittingRef.current = true;
     setIsLocalSubmitting(true);
 
-    const convertedHtml = isMarkdownMode ? convertMarkdownToHtml(data.content) : data.content;
-    const hasPreferredYouTube = !isMarkdownMode && /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(convertedHtml);
-    const contentWithYouTubeMarker = isMarkdownMode
-      ? appendYouTubeThumbnailMarker(data.content, selectedYouTubeThumbnailId)
-      : data.content;
+    const contentWithYouTubeMarker = appendYouTubeThumbnailMarker(
+      isMarkdownMode ? data.content : convertHtmlToMarkdown(data.content),
+      selectedYouTubeThumbnailId,
+    );
+    const convertedHtml = convertMarkdownToHtml(contentWithYouTubeMarker);
+    const hasPreferredYouTube = /data-youtube-video[^>]*data-thumbnail=["']true["']/i.test(
+      isMarkdownMode ? convertedHtml : data.content,
+    );
 
     const formData = {
       title: data.title,
       content: convertedHtml,
-      contentMarkdown: isMarkdownMode ? contentWithYouTubeMarker : undefined,
+      contentMarkdown: contentWithYouTubeMarker,
       flairId: data.flairId,
       tags: data.tags,
       thumbnailImageId: hasPreferredYouTube ? '' : data.thumbnailImageId || undefined,

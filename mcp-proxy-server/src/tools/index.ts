@@ -30,9 +30,14 @@ import {
   handleCreatePost,
   handleFinalizeUploadedImage,
   handleGetImageUploadUrl,
+  handleGetKnowledgeManifest,
   handleListMyPublishedPosts,
+  handleListFollowupSuggestions,
+  handleDismissFollowupSuggestion,
   handleReadMyPublishedPost,
+  handleReadKnowledgeNode,
   handleSearchMyPublishedPosts,
+  handleSearchKnowledgeNodes,
   handleGetWritingStyleGuide,
 } from '../core/handlers/index.js';
 
@@ -127,6 +132,16 @@ export async function registerAllTools(
         handleSearchMyPublishedPosts((toolArgs || {}) as any, context),
       read_my_published_post: async (toolArgs) =>
         handleReadMyPublishedPost((toolArgs || {}) as any, context),
+      get_knowledge_manifest: async () =>
+        handleGetKnowledgeManifest({} as never, context),
+      search_knowledge_nodes: async (toolArgs) =>
+        handleSearchKnowledgeNodes((toolArgs || {}) as any, context),
+      read_knowledge_node: async (toolArgs) =>
+        handleReadKnowledgeNode((toolArgs || {}) as any, context),
+      list_followup_suggestions: async (toolArgs) =>
+        handleListFollowupSuggestions((toolArgs || {}) as any, context),
+      dismiss_followup_suggestion: async (toolArgs) =>
+        handleDismissFollowupSuggestion((toolArgs || {}) as any, context),
       get_writing_style_guide: async (toolArgs) =>
         handleGetWritingStyleGuide((toolArgs || {}) as any, context),
       create_post: async (toolArgs) => handleCreatePost((toolArgs || {}) as any, context),
