@@ -61,6 +61,7 @@ export async function handleCreatePost(
   try {
     const tags = args.tags ? args.tags.slice(0, 10) : [];
     const isSell = args.sell === true;
+    const hasRawMermaidBlock = /```mermaid\b/i.test(args.content_markdown);
 
     // --sell 유효성 검증
     if (isSell) {
@@ -76,6 +77,18 @@ export async function handleCreatePost(
           isError: true,
         };
       }
+    }
+
+    if (hasRawMermaidBlock) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: '❌ 새 자동포스팅에서는 raw Mermaid 블록을 사용할 수 없습니다. 구조도, 다이어그램, flow, workflow 요청은 반드시 ```diagram fenced block으로 다시 작성하세요. "mermaid"라는 표현이 요청에 있어도 diagram(D2) 경로로 변환해야 합니다.',
+          },
+        ],
+        isError: true,
+      };
     }
 
     logger.debug(

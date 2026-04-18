@@ -231,41 +231,10 @@ function normalizePieChartData(content: string, options?: PieChartOptions): stri
  * @returns HTML 엔티티로 치환된 코드
  */
 function sanitizeNodeLabels(content: string): string {
-  // 패턴: nodeId[label], nodeId(label), nodeId{label} 등
-  const patterns = [
-    // 대괄호: A[label] - [^\]]* 로 변경 (따옴표 포함 모든 문자 매칭)
-    { regex: /([\w]+)\[([^\]]*)\]/g, bracket: ['[', ']'] as const },
-    // 소괄호: A(label)
-    { regex: /([\w]+)\(([^\)]*)\)/g, bracket: ['(', ')'] as const },
-    // 중괄호: A{label}
-    { regex: /([\w]+)\{([^\}]*)\}/g, bracket: ['{', '}'] as const },
-  ];
-
-  let result = content;
-
-  patterns.forEach(({ regex, bracket }) => {
-    result = result.replace(regex, (match, nodeId, label) => {
-      // 이미 따옴표로 감싸진 경우 건너뛰기 (이중 처리 방지)
-      if (label.trim().startsWith('"') && label.trim().endsWith('"')) {
-        return match;
-      }
-
-      // 문제 문자 확인: 큰따옴표, 부등호
-      if (/["<>]/.test(label)) {
-        // HTML 엔티티로 치환 (Mermaid htmlLabels: true로 자동 렌더링됨)
-        const safe = label
-          .replace(/"/g, '&quot;')
-          .replace(/</g, '&lt;')
-          .replace(/>/g, '&gt;');
-        
-        return `${nodeId}${bracket[0]}${safe}${bracket[1]}`;
-      }
-
-      return match;
-    });
-  });
-
-  return result;
+  // Legacy Mermaid source should be rendered as close to the original as possible.
+  // Global regex rewrites were corrupting valid labels such as `f(S)` inside node text,
+  // so destructive label sanitization is intentionally disabled.
+  return content;
 }
 
 /**
@@ -316,14 +285,12 @@ function normalizeMermaidContent(content: string, options?: PieChartOptions): st
   // Mermaid 노드 레이블 안에서 <br/>는 문제를 일으킬 수 있으므로 공백으로 변환
   normalized = normalized.replace(/<br\s*\/?>/gi, ' ');
 
-  // 2.5. 노드 레이블 내 문제 문자 HTML 엔티티로 치환 (방어적 파싱)
-  // AI 자동포스팅이나 사용자 수동 입력에서 특수문자가 들어올 수 있으므로 자동 처리
+  // 2.5. 레거시 Mermaid 라벨은 원문 그대로 렌더링합니다.
   normalized = sanitizeNodeLabels(normalized);
 
 
-  // 3. 노드 레이블의 특수문자 처리
-  // 대괄호 안의 텍스트에 특수문자가 있으면 따옴표로 감싸기
-  // ER 다이어그램의 경우 속성 블록 {}을 파괴할 수 있으므로 제외
+  // 3. 새 자동포스팅 다이어그램은 D2 기반 `diagram` 블록을 사용합니다.
+  // 레거시 Mermaid는 자동 재작성 없이 원문을 보존합니다.
   if (!/^\s*erDiagram/i.test(normalized)) {
     normalized = fixNodeLabels(normalized);
   }
@@ -389,86 +356,10 @@ function fixErDiagramEntityQuotes(content: string): string {
  * 특수문자가 포함된 레이블을 따옴표로 감싸줍니다.
  */
 function fixNodeLabels(content: string): string {
-  // 특수문자 패턴 (이제 사용하지 않음 - 모든 레이블을 따옴표로 감쌈)
-  // const specialCharsPattern = /[\/\{\}:\|<>]/;
-
-  // 노드 레이블 패턴 매칭
-  // 형태: nodeId[label] 또는 nodeId(label) 등
-  const nodeLabelPatterns = [
-    // 0. 복합 형태 (우선 순위 높음) - 무조건 따옴표 처리
-    // Database: nodeId[(label)]
-    {
-      pattern: /(\w+)\[\(([^"\)]+)\)\]/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        return `${nodeId}[("${label.trim()}")]`;
-      }
-    },
-    // Subroutine: nodeId[[label]]
-    {
-      pattern: /(\w+)\[\[([^"\]]+)\]\]/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        return `${nodeId}[["${label.trim()}"]]`;
-      }
-    },
-    // Circle: nodeId((label))
-    {
-      pattern: /(\w+)\(\(([^"\)]+)\)\)/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        return `${nodeId}(("${label.trim()}")`;
-      }
-    },
-    // Stadium: nodeId([label])
-    {
-      pattern: /(\w+)\(\[([^"\]]+)\]\)/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        return `${nodeId}(["${label.trim()}"])`;
-      }
-    },
-    // Asymmetric: nodeId>label]
-    {
-      pattern: /(\w+)>([^"\]]+)\]/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        return `${nodeId}>"${label.trim()}"]`;
-      }
-    },
-    
-    // 1. 대괄호 형태: nodeId[label]
-    // 주의: [( or [[ 같은 복합 형태와 매칭되지 않도록 lookahead 사용
-    {
-      pattern: /(\w+)\[(?![\[\(])([^\]"]+)\]/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
-        return `${nodeId}["${label.trim()}"]`;
-      }
-    },
-    // 2. 소괄호 형태: nodeId(label)
-    // 주의: (( or ([ 와 매칭되지 않도록 lookahead 사용
-    {
-      pattern: /(\w+)\((?![\[\(])([^\)"]+)\)/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
-        return `${nodeId}("${label.trim()}")`;
-      }
-    },
-    // 3. 중괄호 형태: nodeId{label}
-    // 주의: {{ (Hexagon) 와 매칭되지 않도록 lookahead 사용
-    {
-      pattern: /(\w+)\{(?!\{)([^\}"]+)\}/g,
-      replacer: (match: string, nodeId: string, label: string) => {
-        if (label.trim().startsWith('"') && label.trim().endsWith('"')) return match;
-        return `${nodeId}{"${label.trim()}"}`;
-      }
-    }
-  ];
-
-  let result = content;
-
-  // 각 패턴에 대해 처리
-  for (const { pattern, replacer } of nodeLabelPatterns) {
-    result = result.replace(pattern, replacer);
-  }
-
-  return result;
+  // Keep Mermaid labels untouched. The previous regex-based rewriter corrupted
+  // valid legacy diagrams, so new diagrams should use the D2-backed `diagram`
+  // block and Mermaid content is preserved as-is.
+  return content;
 }
 
 /**

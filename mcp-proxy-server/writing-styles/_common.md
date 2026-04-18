@@ -79,6 +79,28 @@ Do not include front matter inside `content_markdown`.
 - Use tables only when comparison speed matters
 - Use bold sparingly for real emphasis, not decoration
 
+## Diagram Authoring Rules
+
+- If the user asks for a structure diagram, flow, workflow, architecture map, or even explicitly says `mermaid`, write it as a `diagram` fenced block.
+- Never emit raw `mermaid` fenced blocks in new auto-posted posts.
+- Treat `mermaid` in the user request as diagram intent, not as a syntax requirement.
+- Existing Mermaid posts are legacy-readable, but new authoring must target the D2-backed `diagram` path.
+
+```diagram
+type: flow
+style: clean
+direction: horizontal
+title: Example flow
+nodes:
+  - id: start
+    label: 시작
+  - id: end
+    label: 완료
+edges:
+  - from: start
+    to: end
+```
+
 ## Content Quality Principles
 
 ### 1. Strong Point of View

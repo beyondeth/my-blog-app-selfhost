@@ -22,6 +22,8 @@ import TagsSection from '@/components/layout/TagsSection';
 import CategorySection from '@/components/layout/CategorySection';
 import BlogOwnerCard from '@/components/layout/BlogOwnerCard';
 import BlogRecommendations from '@/components/layout/BlogRecommendations';
+import KnowledgeTreeSection from '@/components/layout/KnowledgeTreeSection';
+import SidebarViewTabs, { type SidebarViewTabOption } from '@/components/layout/SidebarViewTabs';
 import SidebarFooter from '@/components/home/SidebarFooter';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import Spinner from '@/components/ui/Spinner';
@@ -52,7 +54,12 @@ const sortOptions = [
 ] as const;
 
 type SortType = (typeof sortOptions)[number]['value'];
+type BlogSidebarView = 'categories' | 'knowledge';
 
+const sidebarViewOptions: SidebarViewTabOption<BlogSidebarView>[] = [
+  { value: 'categories', label: '카테고리' },
+  { value: 'knowledge', label: '지식 지도' },
+];
 
 interface BlogClientPageProps {
   initialBlog: any;
@@ -125,8 +132,6 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   // 모바일에서는 사이드바가 숨겨져 있으므로 불필요한 API 호출 방지
   const {
     data: categoryPagesData,
-    isLoading: categoriesLoading,
-    error: categoriesError,
     fetchNextPage: fetchNextCategories,
     hasNextPage: hasMoreCategories,
     isFetchingNextPage: isFetchingNextCategories,
@@ -135,10 +140,6 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
   const flattenedCategories = useMemo(() => {
     if (!categoryPagesData?.pages) return [];
     return categoryPagesData.pages.flatMap(page => page.items);
-  }, [categoryPagesData?.pages]);
-
-  const totalCategoriesCount = useMemo(() => {
-    return categoryPagesData?.pages?.[0]?.total ?? 0;
   }, [categoryPagesData?.pages]);
 
   useScrollRestoration(`blog-feed-${blogSlug}`, { scrollElement: feedObserverRoot });
@@ -156,6 +157,7 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
 
   const [sortBy, setSortBy] = useState<SortType>('recent');
   const [activeTab, setActiveTab] = useState<'posts' | 'products'>('posts');
+  const [sidebarView, setSidebarView] = useState<BlogSidebarView>('categories');
 
   // URL에서 검색 파라미터 파싱
   const currentParams = isClient ? parseSearchParams(searchParams.toString()) : { page: 1 };
@@ -409,6 +411,8 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
       .slice(0, 20)
       .map(([tag]) => tag);
   }, [isDesktop, sidebarPostsData?.posts]);
+
+  const selectedCategory = currentParams.category ?? null;
 
   const handleEditPost = useCallback((id: string) => {
     router.push(`/p/${id}/edit`);
@@ -756,17 +760,34 @@ export default function BlogClientPage({ initialBlog, blogSlug }: BlogClientPage
                 className="mb-6"
               />
 
-              {/* 카테고리별 현황 섹션 */}
-              {!categoriesLoading && flattenedCategories.length > 0 && (
-                <CategorySection
-                  categories={flattenedCategories as any[]}
-                  onCategoryClick={handleCategoryClick}
-                  hasMore={!!hasMoreCategories}
-                  onLoadMore={hasMoreCategories ? () => fetchNextCategories() : undefined}
-                  isLoadingMore={isFetchingNextCategories}
-                  className="bg-white"
+              <div className="space-y-3">
+                <SidebarViewTabs
+                  options={sidebarViewOptions}
+                  value={sidebarView}
+                  onChange={setSidebarView}
                 />
-              )}
+
+                {sidebarView === 'categories' ? (
+                  <div data-blog-sidebar-panel="categories">
+                    <CategorySection
+                      categories={flattenedCategories as any[]}
+                      onCategoryClick={handleCategoryClick}
+                      selectedCategory={selectedCategory}
+                      hasMore={!!hasMoreCategories}
+                      onLoadMore={hasMoreCategories ? () => fetchNextCategories() : undefined}
+                      isLoadingMore={isFetchingNextCategories}
+                      className="bg-white"
+                    />
+                  </div>
+                ) : (
+                  <div data-blog-sidebar-panel="knowledge">
+                    <KnowledgeTreeSection
+                      blogSlug={blogSlug}
+                      className="bg-white"
+                    />
+                  </div>
+                )}
+              </div>
 
               <RecentPostsSection posts={recentPosts} className="bg-white" />
 

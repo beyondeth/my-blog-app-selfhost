@@ -434,6 +434,8 @@ export async function registerOpenAiTools(
         '## Step 4: Draft and Publish',
         '- Write the post using ONLY the exact style chosen by the user in Step 3.',
         '- Pick the best fitting category directly from the current request. Do not inspect previous posts to infer it.',
+        '- If the user asks for a structure diagram, workflow, flowchart, architecture map, or even says "mermaid", you MUST author that visual as a `diagram` fenced block for the D2 renderer.',
+        '- NEVER emit raw `mermaid` fenced blocks in new posts.',
         '- Call `create_post` to publish it.',
         '',
         '## Step 5: NEXT POST',
