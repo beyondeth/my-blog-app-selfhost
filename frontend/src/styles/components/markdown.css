@@ -11,6 +11,41 @@
   line-height: var(--leading-relaxed);
 }
 
+.docs-prose {
+  font-family: var(--font-docs);
+}
+
+.docs-prose h1,
+.docs-prose h2,
+.docs-prose h3,
+.docs-prose h4,
+.docs-prose h5,
+.docs-prose h6 {
+  font-weight: 500;
+  letter-spacing: -0.02em;
+}
+
+.docs-prose h2 {
+  font-size: 1.3rem;
+  line-height: 1.3;
+  margin-top: 3rem;
+  margin-bottom: 0.75rem;
+}
+
+.docs-prose h3 {
+  font-size: 1.08rem;
+  line-height: 1.35;
+  margin-top: 2rem;
+  margin-bottom: 0.5rem;
+}
+
+.docs-prose h4 {
+  font-size: 1rem;
+  line-height: 1.4;
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+}
+
 /* 제목 스타일 */
 .prose h1 {
   font-size: var(--text-3xl);
@@ -133,6 +168,10 @@
   font-weight: normal;
 }
 
+.docs-prose code:not(pre code) {
+  font-family: var(--font-docs-mono);
+}
+
 /* 코드 블록 wrapper */
 .code-block-wrapper {
   position: relative;
@@ -225,6 +264,11 @@
   /* min-width 제거 - 모바일 overflow 근본 원인이었음 */
   /* 코드 내용이 컨테이너보다 길면 min-width가 확장시켜서 overflow 발생 */
   width: 100%;
+}
+
+.docs-prose pre,
+.docs-prose pre code {
+  font-family: var(--font-docs-mono);
 }
 
 /* highlight.js 적용 후에도 일관된 스타일 유지 */

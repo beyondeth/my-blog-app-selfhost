@@ -25,6 +25,8 @@ import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import VirtualizedPostItem from '@/components/posts/VirtualizedPostItem';
 import NoticeBoard from '@/components/community/NoticeBoard';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
+import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
 
 interface CommunityDetailClientProps {
   initialCommunity: Community;
@@ -125,6 +127,9 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
   const router = useRouter();
   const searchParams = useSearchParams();
   const { isAuthenticated, user, isAdmin } = useAuth();
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
+  const [feedScrollElement, setFeedScrollElement] = useState<HTMLElement | null>(null);
+  const feedObserverRoot = isDesktop ? feedScrollElement : null;
   const searchQuery = searchParams.get('search')?.trim() || '';
 
   const [sortBy, setSortBy] = useState<CommunityPostSortByType>('newest');
@@ -305,6 +310,8 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
     { value: 'top' as const, label: 'TOP', icon: TrendingUp },
   ];
 
+  useScrollRestoration(`community-feed-${slug}`, { scrollElement: feedObserverRoot });
+
   // 로딩 상태
   if (isCommunityLoading) {
     return (
@@ -422,13 +429,16 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
     <WidgetEditorProvider community={community}>
       <div className="min-h-screen w-full bg-white text-[#1B2430] dark:bg-[#0E141B] dark:text-[#E6EDF3]">
         <div className="max-w-7xl mx-auto px-6 pb-16 pt-16">
-          <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
+          <div className="flex flex-col gap-6 lg:grid lg:h-[calc(100vh-7rem)] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_320px] lg:grid-rows-[auto_minmax(0,1fr)] lg:items-stretch lg:overflow-hidden">
           <div className="lg:col-span-2">
             <CommunityHeader community={community} />
           </div>
 
           {/* 피드 영역 */}
-          <main className="flex-1 min-w-0 pt-0">
+          <main
+            ref={setFeedScrollElement}
+            className="min-w-0 pt-0 lg:h-full lg:min-h-0 lg:overflow-y-auto desktop-feed-scroll desktop-independent-scroll"
+          >
             {/* 정렬 탭 */}
             <div className="mb-4">
               <div className="max-w-[780px] mx-auto flex items-center justify-start gap-2">
@@ -502,6 +512,7 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
                     <VirtualizedPostItem
                       key={post.id}
                       initialVisible={index < 5}
+                      observerRoot={feedObserverRoot}
                     >
                       <PostArticle
                         post={feedPost}
@@ -543,6 +554,7 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
                   totalPosts={totalPostCount}
                   currentPostsCount={totalPostCount}
                   onLoadMore={requestNextPage}
+                  observerRoot={feedObserverRoot}
                   error={postsError ?? null}
                   onRetry={requestNextPage}
                 />
@@ -551,7 +563,7 @@ export default function CommunityDetailClient({ initialCommunity, slug }: Commun
           </main>
 
           {/* 사이드바 (데스크톱) */}
-          <aside className="hidden lg:block lg:sticky lg:top-28 lg:h-[calc(100vh-7rem)] lg:overflow-y-auto sidebar-scroll bg-white dark:bg-[#0E141B]">
+          <aside className="hidden bg-white dark:bg-[#0E141B] lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto sidebar-scroll desktop-independent-scroll">
             <div className="space-y-4 sm:space-y-6 lg:pt-[56px]">
               <CommunitySidebar
                 community={community}

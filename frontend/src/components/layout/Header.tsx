@@ -5,20 +5,15 @@ import Image from 'next/image';
 import { useState, useEffect, useRef, useCallback, memo, Suspense } from 'react';
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
-import { FiSearch, FiMessageSquare } from 'react-icons/fi';
+import { FiSearch } from 'react-icons/fi';
 import { routes } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import MobileProfileDropdown from './MobileProfileDropdown';
 import SubscriptionBadge from '../subscription/SubscriptionBadge';
 import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
-import { MusicPlayerButton } from '@/components/music';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
-import { FEATURES } from '@/lib/features';
 import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import { useSidebarStore } from '@/stores/sidebarStore';
-import { useTheme } from 'next-themes';
-import { useFeedbackStore } from '@/stores/feedbackStore';
-import { FeedbackModal } from '@/components/feedback/FeedbackModal';
 
 // ============================================
 // SearchParamsSync: useSearchParams 사용 컴포넌트 (Suspense 필요)
@@ -42,8 +37,6 @@ function SearchParamsSync({ onSearchQueryChange }: SearchParamsSyncProps) {
 function HeaderComponent() {
   const { user, isAdmin, logout, isLoading: authLoading } = useAuth();
   const { toggleSidebar } = useSidebarStore();
-  const { openModal } = useFeedbackStore();
-  const { resolvedTheme } = useTheme();
   const router = useRouter();
   const pathname = usePathname();
   // useSearchParams는 SearchParamsSync 컴포넌트로 분리 (Suspense 경계 내에서만 사용)
@@ -182,7 +175,7 @@ function HeaderComponent() {
                   alt="Codebase Blog Logo"
                   width={36}
                   height={36}
-                  className="object-contain w-9 h-9 md:w-12 md:h-12 dark:invert"
+                  className="object-contain w-9 h-9 md:w-12 md:h-12"
                   priority
                 />
               </div>
@@ -223,27 +216,9 @@ function HeaderComponent() {
 
             {/* Desktop Auth Section */}
             <div className="flex items-center space-x-4">
-              <Link
-                href={routes.updates()}
-                className="hidden sm:flex items-center justify-center px-3 py-1.5 text-[13px] font-medium text-[#3557C8] hover:text-[#2446B8] border border-[#D7E3FF] bg-[#F3F7FF] hover:bg-[#EAF1FF] dark:text-[#AFC7FF] dark:border-[#314B73] dark:bg-[#142033] dark:hover:bg-[#182842] rounded-full transition-colors"
-              >
-                업데이트
-              </Link>
-
               {/* 음악 플레이어 버튼 - 자체 상태 관리 (Header 리렌더링과 분리) */}
               {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
               {/* <MusicPlayerButton /> */}
-
-              {/* 피드백 버튼 (프로필 좌측) */}
-              {user && (
-                <button
-                  onClick={openModal}
-                  className="hidden sm:flex items-center justify-center px-3 py-1.5 text-[13px] font-medium text-muted-foreground hover:text-foreground border border-border/80 bg-background hover:bg-muted dark:hover:bg-[#1A232E] rounded-full transition-colors"
-                  title="고객의 소리"
-                >
-                  고객 피드백
-                </button>
-              )}
 
               <ThemeSwitch />
 
@@ -289,27 +264,9 @@ function HeaderComponent() {
 
           {/* Mobile Auth Section - 간격 축소 (space-x-1, xs:space-x-2) */}
           <div className="md:hidden absolute right-2 xs:right-3 sm:right-4 flex items-center space-x-1 xs:space-x-2">
-            <Link
-              href={routes.updates()}
-              className="flex items-center justify-center px-2.5 py-1 text-[11px] font-medium text-[#3557C8] border border-[#D7E3FF] bg-[#F3F7FF] dark:text-[#AFC7FF] dark:border-[#314B73] dark:bg-[#142033] rounded-full transition-colors hover:bg-[#EAF1FF] dark:hover:bg-[#182842]"
-            >
-              업데이트
-            </Link>
-
             {/* 음악 플레이어 버튼 (모바일) - 자체 상태 관리 */}
             {/* MusicPlayerDropdown은 layout-client.tsx에서 Portal로 렌더링 */}
             {/* <MusicPlayerButton /> */}
-
-            {/* 모바일 피드백 버튼 (프로필 좌측) */}
-            {user && (
-              <button
-                onClick={openModal}
-                className="flex sm:hidden items-center justify-center px-2.5 py-1 text-[11px] font-medium text-muted-foreground hover:text-foreground border border-border/80 bg-background hover:bg-muted dark:hover:bg-[#1A232E] rounded-full transition-colors"
-                title="피드백"
-              >
-                고객 피드백
-              </button>
-            )}
 
             {/* Theme Switch - Always visible */}
             <ThemeSwitch />
@@ -369,7 +326,6 @@ function HeaderComponent() {
 
       </div>
       
-      <FeedbackModal />
     </header>
   );
 }

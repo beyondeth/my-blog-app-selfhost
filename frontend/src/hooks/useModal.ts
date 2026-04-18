@@ -1,8 +1,8 @@
 import { useState, useCallback } from 'react';
 
 interface ModalData {
-  type: 'image' | 'mermaid';
-  content: string; // image는 src URL, mermaid는 SVG string
+  type: 'image' | 'diagram';
+  content: string; // image는 src URL, diagram은 SVG string
   alt?: string;
   title?: string;
 }
@@ -13,12 +13,12 @@ interface UseModalReturn {
   openModal: (data: ModalData) => void;
   closeModal: () => void;
   handleImageClick: (e: React.MouseEvent<HTMLElement>) => void;
-  handleMermaidClick: (svg: string, content: string) => void;
+  handleDiagramClick: (svg: string, title?: string) => void;
 }
 
 /**
  * 통합 모달 상태와 이벤트 처리를 관리하는 커스텀 훅
- * 이미지와 Mermaid 다이어그램 모달을 모두 처리
+ * 이미지와 SVG 다이어그램 모달을 모두 처리
  *
  * @returns 모달 상태와 핸들러들
  */
@@ -52,13 +52,13 @@ export function useModal(): UseModalReturn {
     }
   }, [openModal]);
 
-  // Mermaid 다이어그램 클릭 처리
-  const handleMermaidClick = useCallback((svg: string, content: string) => {
+  // SVG 다이어그램 클릭 처리
+  const handleDiagramClick = useCallback((svg: string, title = '다이어그램') => {
     openModal({
-      type: 'mermaid',
+      type: 'diagram',
       content: svg,
-      alt: 'Mermaid 다이어그램',
-      title: 'Mermaid 다이어그램'
+      alt: title,
+      title,
     });
   }, [openModal]);
 
@@ -68,6 +68,6 @@ export function useModal(): UseModalReturn {
     openModal,
     closeModal,
     handleImageClick,
-    handleMermaidClick
+    handleDiagramClick
   };
 }

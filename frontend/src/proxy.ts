@@ -30,6 +30,7 @@ const RESERVED_TOP_LEVEL_SEGMENTS = new Set([
   'mock-home-shell-ko',
   'new-story',
   'p',
+  'product',
   'pricing',
   'privacy',
   'register',

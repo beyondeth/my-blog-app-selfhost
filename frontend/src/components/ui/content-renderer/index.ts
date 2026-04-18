@@ -13,6 +13,7 @@ export { default as HtmlContentRenderer } from './HtmlContentRenderer';
 export { default as HtmlRenderer } from './components/HtmlRenderer';
 export { default as CodeRenderer } from './components/CodeRenderer';
 export { default as MermaidRenderer } from './components/MermaidRenderer';
+export { default as DiagramRenderer } from './components/DiagramRenderer';
 export { default as YouTubeRenderer } from './components/YouTubeRenderer';
 
 // 유틸리티
@@ -25,6 +26,7 @@ export type {
   ImageInfo,
   CodeBlockInfo,
   MermaidInfo,
+  DiagramInfo,
   ContentMetadata,
   RendererContext,
 } from './types';

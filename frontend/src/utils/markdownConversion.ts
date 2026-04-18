@@ -3,11 +3,62 @@ import { parseImageAttributes } from '@/types/image-metadata.types';
 const INLINE_BOLD = /\*\*(.*?)\*\*/g;
 const INLINE_ITALIC = /\*(.*?)\*/g;
 const INLINE_CODE = /`([^`]+)`/g;
+const INLINE_HIGHLIGHT = /==(.+?)==/g;
 const INLINE_LINK = /\[([^\]]+)]\(([^)]+)\)/g;
 // 기본 마크다운 이미지 (확장 속성 없음)
 const INLINE_IMAGE = /!\[([^\]]*)]\(([^)]+)\)/g;
 // 확장 마크다운 이미지 (속성 포함): ![alt](url){#id size=value caption="text"}
 const EXTENDED_IMAGE = /!\[([^\]]*)\]\(([^)]+)\)\s*(?:\{([^}]+)\})?/g;
+
+const ALLOWED_INLINE_HTML_TAGS = ["u", "sub", "sup", "mark"] as const;
+const SAFE_BLOCK_HTML_PATTERNS = [
+  /^<figure\b[^>]*data-medium-image[^>]*>.*<\/figure>$/i,
+  /^<figure\b[^>]*data-video-embed[^>]*>.*<\/figure>$/i,
+  /^<video\b[^>]*data-video-id[^>]*>.*<\/video>$/i,
+  /^<div\b[^>]*data-youtube-video[^>]*>.*<\/div>$/i,
+  /^<(?:p|div|blockquote|h[1-6])\b[^>]*style=["'][^"']*text-align\s*:\s*(?:left|center|right|justify)[^"']*["'][^>]*>.*<\/(?:p|div|blockquote|h[1-6])>$/i,
+];
+
+export function getRichEditorCompatibilityIssues(markdown: string): string[] {
+  if (!markdown?.trim()) {
+    return [];
+  }
+
+  const normalized = stripCodeBlocks(markdown);
+  const htmlScanSource = normalized
+    .split(/\r?\n/)
+    .map((line) => (isSafeStandaloneHtml(line.trim()) ? "" : line))
+    .join("\n");
+  const issues = new Set<string>();
+
+  if (/\|(?:[^\n|]+\|){1,}[^\n]*\n\|(?:\s*:?-+:?\s*\|){1,}/m.test(normalized)) {
+    issues.add("표");
+  }
+
+  if (/^\s*(?:[-*+]|\d+\.)\s+\[[ xX]\]\s+/m.test(normalized)) {
+    issues.add("체크리스트");
+  }
+
+  const htmlPattern = /<([a-z][\w-]*)(\s[^>]*)?>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = htmlPattern.exec(htmlScanSource)) !== null) {
+    const rawTag = match[0];
+    if (
+      isAllowedInlineHtml(rawTag) ||
+      isSafeBlockHtml(rawTag, htmlScanSource, match.index)
+    ) {
+      continue;
+    }
+
+    const tagName = match[1]?.toLowerCase();
+    if (tagName) {
+      issues.add("지원되지 않는 HTML 블록");
+      break;
+    }
+  }
+
+  return Array.from(issues);
+}
 
 /**
  * 이미지 속성이 줄바꿈되어 있는 경우 한 줄로 병합하는 스캐너 함수 (ReDoS 안전)
@@ -192,6 +243,12 @@ export function convertMarkdownToHtml(markdown: string): string {
       continue;
     }
 
+    if (isSafeStandaloneHtml(line.trim())) {
+      flushLists();
+      htmlLines.push(line.trim());
+      continue;
+    }
+
     const headingMatch = line.match(/^(#{1,6})\s+(.*)$/);
     if (headingMatch) {
       flushLists();
@@ -309,6 +366,23 @@ function serializeNode(node: Node, context?: ListContext): string {
 
   const tag = node.tagName.toLowerCase();
 
+  if (tag === 'div' && node.hasAttribute('data-youtube-video')) {
+    return formatYouTubeEmbed(node);
+  }
+
+  if (tag === 'figure' && node.hasAttribute('data-video-embed')) {
+    return formatRawHtmlBlock(node.outerHTML);
+  }
+
+  if (tag === 'video' && node.hasAttribute('data-video-id')) {
+    return formatRawHtmlBlock(node.outerHTML);
+  }
+
+  const alignedBlock = formatAlignedBlock(node, tag);
+  if (alignedBlock) {
+    return alignedBlock;
+  }
+
   switch (tag) {
     case 'br':
       return '  \n';
@@ -319,10 +393,16 @@ function serializeNode(node: Node, context?: ListContext): string {
     case 'i':
       return wrapInline(`*${serializeNodes(Array.from(node.childNodes), context)}*`);
     case 'u':
-      return wrapInline(`__${serializeNodes(Array.from(node.childNodes), context)}__`);
+      return wrapInline(`<u>${serializeNodes(Array.from(node.childNodes), context)}</u>`);
     case 's':
     case 'del':
       return wrapInline(`~~${serializeNodes(Array.from(node.childNodes), context)}~~`);
+    case 'mark':
+      return wrapInline(`==${serializeNodes(Array.from(node.childNodes), context)}==`);
+    case 'sub':
+      return wrapInline(`<sub>${serializeNodes(Array.from(node.childNodes), context)}</sub>`);
+    case 'sup':
+      return wrapInline(`<sup>${serializeNodes(Array.from(node.childNodes), context)}</sup>`);
     case 'code':
       if (node.parentElement && node.parentElement.tagName.toLowerCase() === 'pre') {
         // will be handled by <pre>
@@ -443,6 +523,37 @@ function formatFigure(node: HTMLElement): string {
   return `\n\n![${alt}](${src})${attrString}\n\n`;
 }
 
+function formatYouTubeEmbed(node: HTMLElement): string {
+  const originalUrl = node.getAttribute('data-original-url')?.trim();
+  const iframeSrc = node.querySelector('iframe')?.getAttribute('src')?.trim();
+  const fallbackText = node.textContent?.trim();
+  const resolved = originalUrl || iframeSrc || fallbackText;
+
+  if (!resolved) {
+    return '';
+  }
+
+  return `\n\n${resolved}\n\n`;
+}
+
+function formatAlignedBlock(node: HTMLElement, tag: string): string | null {
+  if (!['p', 'div', 'blockquote', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tag)) {
+    return null;
+  }
+
+  const textAlign = (node.style.textAlign || '').trim().toLowerCase();
+  if (!textAlign || !['left', 'center', 'right', 'justify'].includes(textAlign)) {
+    return null;
+  }
+
+  return formatRawHtmlBlock(node.outerHTML);
+}
+
+function formatRawHtmlBlock(html: string): string {
+  const normalized = html.trim();
+  return normalized ? `\n\n${normalized}\n\n` : '';
+}
+
 function formatList(node: HTMLElement, ordered: boolean, parentContext?: ListContext): string {
   const items = Array.from(node.children).filter(
     (child) => child instanceof HTMLElement && child.tagName.toLowerCase() === 'li',
@@ -520,6 +631,7 @@ function transformInline(text: string): string {
 
   // 1. 이미지 처리를 HTML 이스케이프 전에 수행 (속성 파싱을 위해)
   const imagePlaceholders: string[] = [];
+  const inlineHtmlPlaceholders: string[] = [];
   
   // 원본 텍스트에서 이미지 처리
   let output = text.replace(EXTENDED_IMAGE, (match, alt, url, attrs) => {
@@ -551,6 +663,15 @@ function transformInline(text: string): string {
     imagePlaceholders.push(html);
     return token;
   });
+
+  output = output.replace(
+    /<(u|sub|sup|mark)>([\s\S]*?)<\/\1>/gi,
+    (fullMatch) => {
+      const token = `__INLINE_HTML_${inlineHtmlPlaceholders.length}__`;
+      inlineHtmlPlaceholders.push(fullMatch);
+      return token;
+    },
+  );
 
   // 2. HTML 이스케이프
   output = escapeHtml(output);
@@ -588,6 +709,7 @@ function transformInline(text: string): string {
   });
 
   output = output.replace(INLINE_CODE, (_, code) => createCodePlaceholder(code));
+  output = output.replace(INLINE_HIGHLIGHT, (_, content) => `<mark>${content}</mark>`);
   
   // Bold/Italic 처리 시 unescape 후 재귀 호출? 아니면...
   // 기존 로직을 최대한 건드리지 않기 위해, 이미지만 Placeholder로 처리하고 나머지는 그대로 둠.
@@ -628,7 +750,33 @@ function transformInline(text: string): string {
     });
   }
 
+  if (inlineHtmlPlaceholders.length > 0) {
+    inlineHtmlPlaceholders.forEach((replacement, index) => {
+      const token = new RegExp(`__INLINE_HTML_${index}__`, 'g');
+      output = output.replace(token, replacement);
+    });
+  }
+
   return output;
+}
+
+function isAllowedInlineHtml(tag: string): boolean {
+  return ALLOWED_INLINE_HTML_TAGS.some((allowedTag) =>
+    new RegExp(`^<\\/?${allowedTag}(\\s|>|$)`, 'i').test(tag.trim()),
+  );
+}
+
+function isSafeStandaloneHtml(line: string): boolean {
+  return SAFE_BLOCK_HTML_PATTERNS.some((pattern) => pattern.test(line));
+}
+
+function isSafeBlockHtml(tag: string, fullText: string, index: number): boolean {
+  const remainder = fullText.slice(index).split('\n')[0]?.trim() ?? tag.trim();
+  return isSafeStandaloneHtml(remainder);
+}
+
+function stripCodeBlocks(markdown: string): string {
+  return markdown.replace(/```[\s\S]*?```/g, '');
 }
 
 function extractYouTubeUrlFromLine(line: string): string | null {

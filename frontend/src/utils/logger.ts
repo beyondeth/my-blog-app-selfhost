@@ -82,6 +82,43 @@ function sanitizeData(data: any): any {
     return data.map(item => sanitizeData(item));
   }
 
+  if (typeof FormData !== 'undefined' && data instanceof FormData) {
+    const keys: string[] = [];
+    for (const key of data.keys()) {
+      keys.push(key);
+      if (keys.length >= 10) {
+        break;
+      }
+    }
+
+    return {
+      type: 'FormData',
+      keys,
+      truncated: keys.length >= 10,
+    };
+  }
+
+  if (typeof File !== 'undefined' && data instanceof File) {
+    return {
+      type: 'File',
+      name: data.name,
+      size: data.size,
+      mimeType: data.type,
+    };
+  }
+
+  if (typeof Blob !== 'undefined' && data instanceof Blob) {
+    return {
+      type: 'Blob',
+      size: data.size,
+      mimeType: data.type,
+    };
+  }
+
+  if (data instanceof Date) {
+    return data.toISOString();
+  }
+
   if (typeof data === 'function') {
     return `[Function${data.name ? `:${data.name}` : ''}]`;
   }
@@ -192,17 +229,19 @@ class SecureLogger {
         if (arg === null || arg === undefined) {
           return arg;
         }
+
         if (typeof arg === 'object') {
-          try {
-            return JSON.parse(JSON.stringify(arg));
-          } catch {
+          if (typeof structuredClone === 'function') {
             try {
-              return String(arg);
+              return structuredClone(arg);
             } catch {
-              return '[UNSERIALIZABLE_ARG]';
+              return arg;
             }
           }
+
+          return arg;
         }
+
         return arg;
       });
 

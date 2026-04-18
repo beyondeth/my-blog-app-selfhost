@@ -100,6 +100,17 @@ export default function RootLayout({
         />
         {/* eslint-disable-next-line @next/next/no-page-custom-font */}
         <link
+          rel="preload"
+          href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..600,0..100&family=Google+Sans+Code:ital,wght@0,400;0,500;1,400&display=swap"
+          as="style"
+        />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..600,0..100&family=Google+Sans+Code:ital,wght@0,400;0,500;1,400&display=swap"
+        />
+        {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+        <link
           href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700;800;900&display=swap"
           rel="stylesheet"
         />

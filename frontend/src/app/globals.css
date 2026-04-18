@@ -47,6 +47,24 @@
 @tailwind components;
 @tailwind utilities;
 
+@media (min-width: 1024px) {
+  .desktop-independent-scroll {
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+  }
+
+  .desktop-independent-scroll::-webkit-scrollbar {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  .desktop-feed-scroll {
+    overflow-anchor: none;
+  }
+}
+
 /* ============================
    View Transition API - 테마 전환 애니메이션
    Chrome 111+, Edge 111+ 지원
@@ -377,14 +395,83 @@ mark.search-highlight {
   color: black !important;
 }
 
-/* 사이드바 스크롤바 숨기기 - 모든 브라우저 지원 */
+/* 사이드바 스크롤바 - 평소 숨기되 일부 사이드바에서만 호버시 슬림 노출 */
 .sidebar-scroll {
-  -ms-overflow-style: none;  /* IE and Edge */
-  scrollbar-width: none;  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
 }
 
 .sidebar-scroll::-webkit-scrollbar {
-  display: none;  /* Chrome, Safari, Opera */
+  width: 6px;
+}
+
+.sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-scroll::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 99px;
+}
+
+.sidebar-scroll:not(.desktop-independent-scroll):hover {
+  scrollbar-color: rgba(180, 192, 204, 0.35) transparent;
+}
+
+.sidebar-scroll:not(.desktop-independent-scroll):hover::-webkit-scrollbar-thumb {
+  background: rgba(180, 192, 204, 0.35);
+}
+
+.sidebar-scroll:not(.desktop-independent-scroll):hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 156, 172, 0.55);
+}
+
+.dark .sidebar-scroll:not(.desktop-independent-scroll):hover {
+  scrollbar-color: rgba(94, 110, 129, 0.4) transparent;
+}
+
+.dark .sidebar-scroll:not(.desktop-independent-scroll):hover::-webkit-scrollbar-thumb {
+  background: rgba(94, 110, 129, 0.35);
+}
+
+.dark .sidebar-scroll:not(.desktop-independent-scroll):hover::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 140, 160, 0.55);
+}
+
+/* 지식 지도 사이드바 - 항상 표시되는 슬림 스크롤바 */
+.knowledge-sidebar-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(180, 192, 204, 0.4) transparent;
+}
+
+.knowledge-sidebar-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.knowledge-sidebar-scroll::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 12px 0;
+}
+
+.knowledge-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(180, 192, 204, 0.35);
+  border-radius: 99px;
+}
+
+.knowledge-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(140, 156, 172, 0.55);
+}
+
+.dark .knowledge-sidebar-scroll {
+  scrollbar-color: rgba(94, 110, 129, 0.4) transparent;
+}
+
+.dark .knowledge-sidebar-scroll::-webkit-scrollbar-thumb {
+  background: rgba(94, 110, 129, 0.35);
+}
+
+.dark .knowledge-sidebar-scroll::-webkit-scrollbar-thumb:hover {
+  background: rgba(120, 140, 160, 0.55);
 }
 
 /* DM Chat animations */
@@ -428,7 +515,8 @@ mark.search-highlight {
     0 24px 48px 0 rgba(0, 0, 0, 0.10);
 }
 
-/* 모달 내 Mermaid 스타일 - 전체 공간 활용 */
+/* 모달 내 다이어그램 스타일 - 전체 공간 활용 */
+.diagram-in-modal,
 .mermaid-in-modal {
   width: 100%;
   height: 100%;
@@ -442,7 +530,8 @@ mark.search-highlight {
   border-radius: 0.75rem;
 }
 
-/* 모달 내 Mermaid SVG - 가능한 크게 표시 */
+/* 모달 내 다이어그램 SVG - 가능한 크게 표시 */
+.diagram-in-modal svg,
 .mermaid-in-modal svg {
   max-width: 100% !important;
   max-height: 100% !important;

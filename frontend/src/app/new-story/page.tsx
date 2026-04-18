@@ -59,7 +59,11 @@ import ReactMarkdown from 'react-markdown';
 import { useUploadFile } from '@/hooks/useFiles';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { useVideoUpload } from '@/hooks/video/useVideoUpload';
-import { convertMarkdownToHtml, convertHtmlToMarkdown } from '@/utils/markdownConversion';
+import {
+  convertMarkdownToHtml,
+  convertHtmlToMarkdown,
+  getRichEditorCompatibilityIssues,
+} from '@/utils/markdownConversion';
 import HtmlContentRenderer from '@/components/ui/content-renderer/HtmlContentRenderer';
 import { validateContentSecurity } from '@/utils/contentSecurity';
 import { apiClient } from '@/lib/api';
@@ -834,6 +838,11 @@ export default function NewStoryPage() {
           // markdownEditorRef cleanup not needed or handled by React
           resetMarkdownVideo();
         } else {
+          const issues = getRichEditorCompatibilityIssues(currentContent);
+          if (issues.length > 0) {
+            toast.error(`리치 편집기로 안전하게 전환할 수 없는 요소가 있습니다: ${issues.join(', ')}`);
+            return;
+          }
           const html = convertMarkdownToHtml(currentContent);
           form.setValue('content', html || '<p></p>', { shouldDirty: true, shouldTouch: true });
           latestDraftRef.current = {
@@ -1073,17 +1082,13 @@ export default function NewStoryPage() {
           }
         }
 
-        if (isMarkdownMode) {
-          const contentWithYouTubeMarker = appendYouTubeThumbnailMarker(
-            data.content,
-            selectedYouTubeThumbnailId,
-          );
-          postData.content_markdown = contentWithYouTubeMarker;
-          postData.content_type = 'markdown';
-        } else {
-          postData.content = data.content;
-          postData.content_type = 'html';
-        }
+        const canonicalMarkdown = appendYouTubeThumbnailMarker(
+          isMarkdownMode ? data.content : convertHtmlToMarkdown(data.content),
+          selectedYouTubeThumbnailId,
+        );
+        postData.content_markdown = canonicalMarkdown;
+        postData.content = convertMarkdownToHtml(canonicalMarkdown);
+        postData.content_type = 'markdown';
 
         // 디버깅: 썸네일 정보 로깅
         if (process.env.NODE_ENV === 'development') {
@@ -1111,6 +1116,11 @@ export default function NewStoryPage() {
       }
       // 커뮤니티에 포스트 발행
       else {
+        const canonicalMarkdown = appendYouTubeThumbnailMarker(
+          isMarkdownMode ? data.content : convertHtmlToMarkdown(data.content),
+          selectedYouTubeThumbnailId,
+        );
+        const canonicalHtml = convertMarkdownToHtml(canonicalMarkdown);
         const hasPreferredYouTube = !isMarkdownMode && hasPreferredYouTubeInHtml(data.content);
 
         const communityPostData: any = {
@@ -1122,18 +1132,8 @@ export default function NewStoryPage() {
           isNsfw,
           isSpoiler,
         };
-        if (isMarkdownMode) {
-          const contentWithYouTubeMarker = appendYouTubeThumbnailMarker(
-            data.content,
-            selectedYouTubeThumbnailId,
-          );
-          // Markdown 모드: content와 contentMarkdown 둘 다 설정
-          // content는 필수 필드이므로 마크다운 원본을 그대로 저장
-          communityPostData.content = contentWithYouTubeMarker;
-          communityPostData.contentMarkdown = contentWithYouTubeMarker;
-        } else {
-          communityPostData.content = data.content;
-        }
+        communityPostData.content = canonicalHtml;
+        communityPostData.contentMarkdown = canonicalMarkdown;
 
         // 디버깅: 커뮤니티 포스트 정보 로깅
         if (process.env.NODE_ENV === 'development') {

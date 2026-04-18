@@ -25,6 +25,7 @@ import InfiniteScrollTrigger from '@/components/posts/InfiniteScrollTrigger';
 import { PostSkeletonWithShimmer } from '@/components/posts/PostSkeleton';
 import VirtualizedPostItem from '@/components/posts/VirtualizedPostItem';
 import { useScrollRestoration } from '@/hooks/useInfiniteScroll';
+import { useMediaQuery } from '@/hooks/useMediaQuery';
 import SidebarFooter from '@/components/home/SidebarFooter';
 import DeleteConfirmDialog from '@/components/ui/DeleteConfirmDialog';
 import { useDeletePost } from '@/hooks/usePosts';
@@ -87,6 +88,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
   const router = useRouter();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
+  const isDesktop = useMediaQuery('(min-width: 1024px)');
   const [sortBy, setSortBy] = useState<FeedSortType>('recent');
   const feedQueryKey = useMemo(() => ['unified-feed', 'all', sortBy, 20] as const, [sortBy]);
   const { isAdultVerified } = useAdultVerificationStatus();
@@ -95,8 +97,10 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
   const [activePickIndex, setActivePickIndex] = useState(0);
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
+  const [feedScrollElement, setFeedScrollElement] = useState<HTMLElement | null>(null);
   const activePick = editorPickPosts[activePickIndex];
   const activePickImage = activePick?.thumbnail || activePick?.images?.[0] || null;
+  const feedObserverRoot = isDesktop ? feedScrollElement : null;
   
   const editorPickHref = activePick?.blog?.slug
     ? `/${activePick.blog.slug}/${activePick.slug || activePick.id}`
@@ -135,7 +139,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
   }, [editorPickPosts.length]);
 
   // 스크롤 위치 복원
-  useScrollRestoration('home-page');
+  useScrollRestoration('home-page', { scrollElement: feedObserverRoot });
 
   const [pendingPostId, setPendingPostId] = useState<string | null>(null);
 
@@ -472,9 +476,12 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
   return (
     <div className="w-full bg-white text-[#1B2430] dark:bg-[#0E141B] dark:text-[#E6EDF3]">
       <div className="max-w-7xl mx-auto px-6 pb-16 pt-6">
-        <div className="flex flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_320px] gap-6">
+        <div className="flex flex-col gap-6 lg:grid lg:h-[calc(100vh-7rem)] lg:min-h-0 lg:grid-cols-[minmax(0,1fr)_320px] lg:items-stretch lg:overflow-hidden">
         {/* Main Content Area */}
-        <main className="flex-1 min-w-0 pt-0">
+        <main
+          ref={setFeedScrollElement}
+          className="min-w-0 pt-0 lg:h-full lg:min-h-0 lg:overflow-y-auto desktop-feed-scroll desktop-independent-scroll"
+        >
           <div className="space-y-6">
             <div className="max-w-[780px] mx-auto space-y-6">
               {/* Unified Editor's Picks (Slideshow with Swipe) */}
@@ -588,7 +595,6 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                     : undefined;
 
                   const hasImage = !!(item.thumbnail || (item.images && item.images.length > 0));
-                  // 이미지 유무에 따라 예상 높이 조정 (이미지 있을 때: ~640px, 없을 때: ~280px)
                   const estimatedHeight = hasImage ? 640 : 280;
 
                   return (
@@ -597,6 +603,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                       initialVisible={index < 5}
                       placeholder={<HomeFeedPlaceholderCard hasImage={hasImage} />}
                       estimatedHeight={estimatedHeight}
+                      observerRoot={feedObserverRoot}
                     >
                       <PostArticle
                         post={adapted.post}
@@ -624,6 +631,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                   totalPosts={filteredItems.length}
                   currentPostsCount={filteredItems.length}
                   onLoadMore={loadMorePosts}
+                  observerRoot={feedObserverRoot}
                   error={null}
                   onRetry={loadMorePosts}
                   tone="harbor"
@@ -640,7 +648,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
 
           {/* Sidebar - sticky positioning */}
           {!isMobile && (
-            <aside className="hidden lg:block lg:sticky lg:top-28 lg:h-[calc(100vh-7rem)] lg:overflow-y-auto sidebar-scroll bg-white dark:bg-[#0E141B]">
+            <aside className="hidden bg-white dark:bg-[#0E141B] lg:block lg:h-full lg:min-h-0 lg:overflow-y-auto sidebar-scroll desktop-independent-scroll">
             <div className="space-y-4 sm:space-y-6">
               {/* My Communities - 최상단 */}
               {user && (

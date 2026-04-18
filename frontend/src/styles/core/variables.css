@@ -172,6 +172,8 @@
   /* Typography */
   --font-sans: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
   --font-mono: 'GeistMono', 'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace;
+  --font-docs: 'Google Sans Flex', 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  --font-docs-mono: 'Google Sans Code', 'GeistMono', 'Fira Code', 'Monaco', 'Menlo', 'Consolas', monospace;
 
   /* Font Sizes */
   --text-xs: 0.75rem;

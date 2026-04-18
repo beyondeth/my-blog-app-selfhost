@@ -7,8 +7,8 @@ import { TransformWrapper, TransformComponent, ReactZoomPanPinchRef } from 'reac
 import { useMobileOverlayReset } from '@/hooks/useMobileOverlayReset';
 
 interface ModalProps {
-  type: 'image' | 'mermaid';
-  content: string; // image는 src URL, mermaid는 SVG string
+  type: 'image' | 'diagram';
+  content: string; // image는 src URL, diagram은 SVG string
   alt?: string;
   title?: string;
   isOpen: boolean;
@@ -19,7 +19,7 @@ interface ModalProps {
  * 통합 모달 컴포넌트
  *
  * 기능:
- * - 이미지와 Mermaid 다이어그램 모두 지원
+ * - 이미지와 SVG 다이어그램 모두 지원
  * - react-zoom-pan-pinch로 통합된 zoom/pan 기능
  * - 마우스 휠로 확대/축소
  * - 드래그로 이동
@@ -97,7 +97,7 @@ export default function Modal({
         {/* 상단 툴바 */}
         <div className="absolute top-0 left-0 right-0 bg-white/90 dark:bg-gray-50/90 backdrop-blur-sm border-b border-gray-200 dark:border-gray-300 p-4 flex items-center justify-between z-10">
           <div className="text-sm text-gray-700 dark:text-gray-800">
-            {type === 'mermaid' ? 'Mermaid 다이어그램' : '이미지'}
+            {type === 'diagram' ? '다이어그램' : '이미지'}
           </div>
 
           {/* 통합된 컨트롤 버튼 (이미지와 Mermaid 모두 사용) */}
@@ -146,7 +146,7 @@ export default function Modal({
         {/* 통합된 콘텐츠 컨테이너 - react-zoom-pan-pinch */}
         <TransformWrapper
           ref={transformComponentRef}
-          initialScale={type === 'mermaid' ? 0.8 : 1}
+          initialScale={type === 'diagram' ? 0.8 : 1}
           minScale={0.3}
           maxScale={5}
           centerOnInit={true}
@@ -208,9 +208,9 @@ export default function Modal({
                 draggable={false}
               />
             ) : (
-              /* Mermaid - 모달에서는 별도 클래스 사용 */
+              /* SVG 다이어그램 - 모달에서는 별도 클래스 사용 */
               <div
-                className="mermaid-in-modal"
+                className="diagram-in-modal"
                 style={{
                   // 모달 전체 공간을 활용
                   width: '100%',

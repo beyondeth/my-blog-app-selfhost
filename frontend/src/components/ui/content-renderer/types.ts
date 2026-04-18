@@ -10,6 +10,7 @@
 export type ContentPart =
   | { type: 'html'; content: string }
   | { type: 'mermaid'; content: string; id: string }
+  | { type: 'diagram'; content: string; id: string }
   | { type: 'code'; content: string; language: string; id: string }
   | { type: 'youtube'; videoId: string; title?: string }
   | { type: 'video'; videoId: string; src?: string; caption?: string }
@@ -28,6 +29,11 @@ export interface ContentProcessingOptions {
    * Mermaid 다이어그램 렌더링 활성화
    */
   enableMermaid?: boolean;
+
+  /**
+   * Custom diagram block 렌더링 활성화
+   */
+  enableDiagram?: boolean;
 
   /**
    * 이미지 모달 활성화
@@ -75,6 +81,11 @@ export interface MermaidInfo {
   theme?: 'default' | 'dark' | 'forest' | 'neutral';
 }
 
+export interface DiagramInfo {
+  id: string;
+  content: string;
+}
+
 /**
  * 콘텐츠 메타데이터
  */
@@ -93,6 +104,11 @@ export interface ContentMetadata {
    * 포함된 Mermaid 다이어그램 수
    */
   mermaidCount?: number;
+
+  /**
+   * 포함된 custom diagram block 수
+   */
+  diagramCount?: number;
 
   /**
    * 포함된 YouTube 비디오 수
