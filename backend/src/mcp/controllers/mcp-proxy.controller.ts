@@ -36,6 +36,10 @@ import { UploadCompleteDto } from "../../files/dto/upload-complete.dto";
 import { appendMcpAiDisclosureFooter } from "../utils/ai-disclosure-footer.util";
 import { KnowledgeQueryService } from "../../knowledge/services/knowledge-query.service";
 import { toKnowledgeSlug } from "../../knowledge/utils/knowledge-slug.util";
+import {
+  containsRawMermaidFence,
+  MCP_RAW_MERMAID_ERROR_MESSAGE,
+} from "../../common/utils/legacy-mermaid.util";
 
 /**
  * MCP Proxy 컨트롤러
@@ -262,6 +266,13 @@ export class McpProxyController {
       throw new BadRequestException(
         "콘텐츠는 필수 항목입니다 (content 또는 content_markdown)",
       );
+    }
+
+    if (
+      containsRawMermaidFence(createPostDto.content_markdown) ||
+      containsRawMermaidFence(createPostDto.content)
+    ) {
+      throw new BadRequestException(MCP_RAW_MERMAID_ERROR_MESSAGE);
     }
 
     if (!createPostDto.category) {

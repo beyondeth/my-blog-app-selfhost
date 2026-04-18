@@ -42,3 +42,23 @@
 - `pnpm --dir frontend type-check`
 - `pnpm --dir frontend exec playwright test tests/e2e/diagram-autoposting.spec.ts --reporter=line`
 - `pnpm --dir backend test -- --runInBand src/common/services/markdown-renderer.service.spec.ts src/files/files.service.spec.ts`
+
+### legacy Mermaid containment lane
+
+#### What changed
+- Added a backend ingress guard so direct MCP/API Key auto-posting can no longer create posts containing raw ` ```mermaid ` blocks.
+- Added a Mermaid-to-`diagram` backfill command for already stored legacy posts instead of expanding permanent Mermaid runtime compatibility.
+- Added regression tests for the new guard and the conversion utility.
+
+#### Impact
+- web: new auto-posted posts will stop reintroducing Mermaid render failures through the direct MCP path.
+- ios: no direct code change.
+- android: no direct code change.
+
+#### Risk
+- Existing legacy Mermaid posts remain broken until the backfill command is executed after deploy.
+- Non-flowchart Mermaid syntaxes are intentionally skipped by the backfill and still require manual rewriting if they exist.
+
+#### Verification
+- `pnpm --dir backend test -- --runInBand src/common/utils/legacy-mermaid.util.spec.ts src/mcp/controllers/mcp-proxy.controller.spec.ts`
+- `pnpm --dir backend exec tsc -p tsconfig.json --noEmit`

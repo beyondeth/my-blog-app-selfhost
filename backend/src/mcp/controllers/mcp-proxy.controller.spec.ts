@@ -4,6 +4,7 @@ jest.mock("nanoid", () => ({
 
 import { McpProxyController } from "./mcp-proxy.controller";
 import { appendMcpAiDisclosureFooter } from "../utils/ai-disclosure-footer.util";
+import { MCP_RAW_MERMAID_ERROR_MESSAGE } from "../../common/utils/legacy-mermaid.util";
 
 describe("McpProxyController", () => {
   const createController = () => {
@@ -232,6 +233,30 @@ describe("McpProxyController", () => {
         status: "created",
       }),
     });
+  });
+
+  it("rejects raw Mermaid fenced blocks on the direct MCP create path", async () => {
+    const { controller, postsService } = createController();
+
+    await expect(
+      controller.createPost(
+        { apiKey: { userId: "user-1", blogId: "blog-1" } },
+        {
+          title: "Legacy Mermaid",
+          content_markdown: [
+            "## Diagram",
+            "",
+            "```mermaid",
+            "flowchart LR",
+            "A[시작] --> B[끝]",
+            "```",
+          ].join("\n"),
+          category: "Tech",
+        } as any,
+      ),
+    ).rejects.toThrow(MCP_RAW_MERMAID_ERROR_MESSAGE);
+
+    expect(postsService.createFast).not.toHaveBeenCalled();
   });
 
   it("lists only the authenticated user's published posts for MCP read", async () => {
