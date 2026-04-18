@@ -5,6 +5,15 @@ import { PostMetadata } from "../../posts/entities/post-metadata.entity";
 import { KnowledgeSourceSnapshot } from "../knowledge.types";
 import { clampText } from "../utils/knowledge-slug.util";
 
+const KNOWLEDGE_CATEGORY_NORMALIZATION_MAP: Record<string, string> = {
+  tech_guides: "개발/기술 가이드",
+  coding_templates: "개발/코딩 템플릿",
+  ai_workflows: "개발/AI 워크플로",
+  data_analytics: "개발/데이터 분석",
+  ai_prompts: "개발/AI 프롬프트",
+  others: "기타",
+};
+
 @Injectable()
 export class KnowledgeSourceBuilderService {
   buildSnapshot(post: Post, metadata?: PostMetadata | null): {
@@ -13,7 +22,7 @@ export class KnowledgeSourceBuilderService {
   } {
     const markdown = post.content_markdown || "";
     const renderedContent = post.content || "";
-    const category = metadata?.category || "";
+    const category = this.normalizeKnowledgeCategory(metadata?.category);
     const categorySegments = category
       .split("/")
       .map((segment) => segment.trim())
@@ -48,6 +57,19 @@ export class KnowledgeSourceBuilderService {
       snapshot,
       contentHash: this.createContentHash(snapshot),
     };
+  }
+
+  private normalizeKnowledgeCategory(value: string | null | undefined): string {
+    const cleaned = (value || "").trim();
+    if (!cleaned) {
+      return "";
+    }
+
+    return (
+      KNOWLEDGE_CATEGORY_NORMALIZATION_MAP[cleaned] ??
+      KNOWLEDGE_CATEGORY_NORMALIZATION_MAP[cleaned.toLowerCase()] ??
+      cleaned
+    );
   }
 
   private stripHtml(value: string): string {

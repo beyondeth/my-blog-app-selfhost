@@ -4,6 +4,22 @@ Track operational rule changes for worktree/branch coordination.
 
 ## 2026-04-18
 
+### Additional update (KB cold-start publish path now normalizes marketplace categories before approval)
+
+#### What changed
+- Normalized KB source categories so auto-posted marketplace enums like `tech_guides`, `coding_templates`, and `ai_workflows` are converted into KB-facing roots such as `개발/기술 가이드` before compile.
+- Added a cold-start approval path for the first meaningful KB domain candidate when a blog only has the generic `기타` root, so newly compiled posts can attach to a public root immediately instead of stalling in `provisional`.
+- Added backend regression tests covering both category normalization and the new first-domain approval guard.
+
+#### Why
+- Production investigation showed KB compile runs were succeeding, but posts created through auto-posting still produced zero `post_knowledge_links` because the raw marketplace category `tech_guides` became a provisional open-world root and never graduated into the public graph.
+- The public KB surfaces read only approved nodes/links, so a successful compile could still leave the live knowledge map stuck on `기타` only.
+
+#### How
+- Scoped the fix to the backend KB pipeline so public API shapes and blog category UI remain unchanged.
+- Kept the stricter approval thresholds for topics/concepts/edges, while only relaxing the first domain bootstrap case.
+- Planned operational follow-up is to run `pnpm --dir backend knowledge:rebuild-blog -- --blog=@luticek-smoo` after deploy so already compiled posts are rebuilt under the new rules.
+
 ### Additional update (workspace state split into backup/shared/web lanes and production env source re-aligned)
 
 #### What changed

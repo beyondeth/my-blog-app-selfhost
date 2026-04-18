@@ -255,6 +255,99 @@ describe("KnowledgeCandidateGraphService", () => {
     expect(result).toBeNull();
   });
 
+  it("auto-approves the first meaningful domain when only the generic root exists", async () => {
+    const service = createService();
+    const ensureApprovedNode = jest
+      .spyOn(service as any, "ensureApprovedNode")
+      .mockResolvedValue({ id: "node-1", slug: "연구노트" });
+    const manager = {
+      getRepository: jest.fn().mockReturnValue({
+        find: jest.fn().mockResolvedValue([
+          {
+            slug: "기타",
+            title: "기타",
+            nodeType: "domain",
+            status: "active",
+          },
+        ]),
+      }),
+    } as any;
+
+    const result = await (service as any).maybeApproveCandidateNode(
+      {
+        userId: "user-1",
+        blogId: "blog-1",
+        slug: "연구노트",
+        title: "연구노트",
+        nodeType: "domain",
+        proposedParentSlug: null,
+        summary: "연구 글 묶음",
+        postCount: 1,
+        evidence: [
+          {
+            postId: "p1",
+            role: "root",
+            refs: ["section:연구노트-1", "category:연구노트/계약이론"],
+          },
+        ],
+      },
+      manager,
+    );
+
+    expect(ensureApprovedNode).toHaveBeenCalledWith(
+      manager,
+      "user-1",
+      "blog-1",
+      "연구노트",
+      "연구노트",
+      "domain",
+      null,
+      "연구 글 묶음",
+    );
+    expect(result).toEqual({ id: "node-1", slug: "연구노트" });
+  });
+
+  it("keeps first-pass open-world domains provisional without section evidence", async () => {
+    const service = createService();
+    const ensureApprovedNode = jest.spyOn(service as any, "ensureApprovedNode");
+    const manager = {
+      getRepository: jest.fn().mockReturnValue({
+        find: jest.fn().mockResolvedValue([
+          {
+            slug: "기타",
+            title: "기타",
+            nodeType: "domain",
+            status: "active",
+          },
+        ]),
+      }),
+    } as any;
+
+    const result = await (service as any).maybeApproveCandidateNode(
+      {
+        userId: "user-1",
+        blogId: "blog-1",
+        slug: "연구노트",
+        title: "연구노트",
+        nodeType: "domain",
+        proposedParentSlug: null,
+        summary: "연구 글 묶음",
+        postCount: 1,
+        evidence: [
+          {
+            postId: "p1",
+            role: "root",
+            refs: ["category:연구노트/계약이론"],
+          },
+        ],
+      },
+      manager,
+    );
+
+    expect(result).toBeNull();
+    expect(ensureApprovedNode).not.toHaveBeenCalled();
+  });
+
   it("keeps edges provisional unless both nodes are approved public relations with repeated section evidence", async () => {
     const service = createService();
     const manager = {

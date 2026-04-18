@@ -2,6 +2,26 @@
 
 ## 2026-04-18
 
+### KB cold-start root visibility lane
+
+#### What changed
+- Normalized KB source categories derived from auto-posting so marketplace enums like `tech_guides` are mapped into KB-facing categories such as `개발/기술 가이드` before compile.
+- Added a backend-side cold-start approval path for the first meaningful domain root when a blog only has `기타`, preventing newly compiled posts from remaining invisible in the public knowledge map.
+- Added backend regression tests for the normalization and cold-start approval path.
+
+#### Impact
+- web: public KB tree / map / flow-board can show a new root for freshly auto-posted content instead of staying pinned to `기타` only, once the post is recompiled or the blog is rebuilt.
+- ios: no direct code change.
+- android: no direct code change.
+
+#### Risk
+- Existing already-compiled posts do not automatically migrate; they still need a KB rebuild after deploy.
+- Topic / concept visibility remains intentionally conservative, so first-post visibility improves at the root level first, not full deep taxonomy exposure.
+
+#### Verification
+- `pnpm --dir backend exec tsc -p tsconfig.json --noEmit`
+- `pnpm --dir backend test -- --runInBand src/knowledge/services/knowledge-source-builder.service.spec.ts src/knowledge/services/knowledge-candidate-graph.service.spec.ts`
+
 ### diagram/D2 auto-posting rendering lane
 
 #### What changed
