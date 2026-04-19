@@ -25,10 +25,10 @@ export function McpOAuthRequestPanel({
       {showHeader && (
         <div className={`${showBadge ? 'mt-3' : ''} text-center`}>
           <h3 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-zinc-100">
-            {clientName} 권한 요청
+            {clientName} access request
           </h3>
           <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-            요청 권한을 확인해 주세요
+            Review the requested permissions.
           </p>
         </div>
       )}
@@ -45,7 +45,7 @@ export function McpOAuthRequestPanel({
         ))}
       </div>
       <div className="mt-3 text-center text-[11px] leading-5 text-zinc-500 dark:text-zinc-400">
-        연결 후에는 언제든 권한을 취소할 수 있습니다.
+        You can revoke access at any time after connecting.
       </div>
     </div>
   );
