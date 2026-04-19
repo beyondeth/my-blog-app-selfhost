@@ -33,6 +33,7 @@ import { RegisterDto } from "./dto/register.dto";
 import { DeleteAccountDto } from "./dto/delete-account.dto";
 import { ConsentDto } from "./dto/consent.dto";
 import { ChangePasswordDto } from "./dto/change-password.dto";
+import { CookieConsentDto } from "./dto/cookie-consent.dto";
 import { UnifiedRedisService } from "../redis/unified-redis.service";
 import { AuthProvider, User } from "../users/entities/user.entity";
 import {
@@ -242,7 +243,7 @@ export class AuthController {
       res.redirect(
         appendQueryParams(mobileRedirectUri, {
           error: "oauth_exchange_unavailable",
-          message: "소셜 로그인 코드 발급에 실패했습니다. 다시 시도해주세요.",
+          message: "We could not complete the social sign-in exchange. Please try again.",
         }),
       );
       return true;
@@ -293,7 +294,7 @@ export class AuthController {
     // 항상 JSON 응답 반환 (프론트엔드에서 리다이렉트 처리)
     return res.json({
       user: authResponse.user,
-      message: "로그인 성공",
+      message: "Signed in successfully.",
       ...(includeTokens && {
         access_token: authResponse.access_token,
         refresh_token: authResponse.refresh_token,
@@ -334,7 +335,7 @@ export class AuthController {
     // 토큰 제외하고 사용자 정보만 반환 (개발 환경에서는 토큰도 포함)
     return res.json({
       user: authResponse.user,
-      message: "회원가입 성공",
+      message: "Your account has been created.",
       ...(process.env.NODE_ENV !== "production" && {
         access_token: authResponse.access_token,
         refresh_token: authResponse.refresh_token,
@@ -365,7 +366,7 @@ export class AuthController {
         if (
           this.tryRedirectToMobileCallback(req, res, {
             error: "auth_failed",
-            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+            message: "Sign-in failed. Please try again.",
           })
         ) {
           return;
@@ -443,7 +444,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_DELETED" ||
-          errorMessage.includes("계정이 삭제되었습니다")
+          errorMessage.includes("This account has been deleted")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -460,7 +461,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_SUSPENDED" ||
-          errorMessage.includes("계정이 정지되었습니다")
+          errorMessage.includes("Your account is suspended")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -480,7 +481,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_BANNED" ||
-          errorMessage.includes("계정이 영구 차단되었습니다")
+          errorMessage.includes("permanently banned")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -500,13 +501,13 @@ export class AuthController {
         if (
           this.tryRedirectToMobileCallback(req, res, {
             error: "oauth_failed",
-            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+            message: "Sign-in failed. Please try again.",
           })
         ) {
           return;
         }
         return res.redirect(
-          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
+          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("Sign-in failed. Please try again.")}`,
         );
       }
     }
@@ -534,7 +535,7 @@ export class AuthController {
         if (
           this.tryRedirectToMobileCallback(req, res, {
             error: "auth_failed",
-            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+            message: "Sign-in failed. Please try again.",
           })
         ) {
           return;
@@ -587,18 +588,18 @@ export class AuthController {
         res.redirect(`${this.frontendBaseURL()}${redirectPath}`);
       }
     } catch (error) {
-      this.logger.error("카카오 로그인 콜백 처리 중 오류 발생:", error);
+      this.logger.error("Error while handling Kakao login callback:", error);
 
       // 헤더가 이미 전송되었는지 확인
       if (!res.headersSent) {
         const errorMessage =
-          error.message || "카카오 로그인 처리 중 오류가 발생했습니다.";
+          error.message || "Kakao sign-in failed.";
         const code = error.response?.code || error.code;
 
         // Handle specific error codes
         if (
           code === "ACCOUNT_DELETED" ||
-          errorMessage.includes("계정이 삭제되었습니다")
+          errorMessage.includes("This account has been deleted")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -615,7 +616,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_SUSPENDED" ||
-          errorMessage.includes("계정이 정지되었습니다")
+          errorMessage.includes("Your account is suspended")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -635,7 +636,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_BANNED" ||
-          errorMessage.includes("계정이 영구 차단되었습니다")
+          errorMessage.includes("permanently banned")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -689,7 +690,7 @@ export class AuthController {
         if (
           this.tryRedirectToMobileCallback(req, res, {
             error: "auth_failed",
-            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+            message: "Sign-in failed. Please try again.",
           })
         ) {
           return;
@@ -753,7 +754,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_DELETED" ||
-          errorMessage.includes("계정이 삭제되었습니다")
+          errorMessage.includes("This account has been deleted")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -770,7 +771,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_SUSPENDED" ||
-          errorMessage.includes("계정이 정지되었습니다")
+          errorMessage.includes("Your account is suspended")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -790,7 +791,7 @@ export class AuthController {
 
         if (
           code === "ACCOUNT_BANNED" ||
-          errorMessage.includes("계정이 영구 차단되었습니다")
+          errorMessage.includes("permanently banned")
         ) {
           if (
             this.tryRedirectToMobileCallback(req, res, {
@@ -810,13 +811,13 @@ export class AuthController {
         if (
           this.tryRedirectToMobileCallback(req, res, {
             error: "oauth_failed",
-            message: "로그인에 실패했습니다. 다시 시도해주세요.",
+            message: "Sign-in failed. Please try again.",
           })
         ) {
           return;
         }
         return res.redirect(
-          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("로그인에 실패했습니다. 다시 시도해주세요.")}`,
+          `${this.frontendBaseURL()}/login?error=oauth_failed&message=${encodeURIComponent("Sign-in failed. Please try again.")}`,
         );
       }
     }
@@ -833,7 +834,7 @@ export class AuthController {
       await this.emailService.sendVerificationCode(dto.email);
       return res.json({
         success: true,
-        message: "인증 코드가 발송되었습니다. 이메일을 확인해주세요.",
+        message: "A verification code has been sent. Please check your email.",
       });
     } catch (error) {
       if (error.status === 409) {
@@ -852,7 +853,7 @@ export class AuthController {
       }
       return res.status(500).json({
         success: false,
-        message: "인증 코드 발송에 실패했습니다.",
+        message: "Failed to send the verification code.",
       });
     }
   }
@@ -869,7 +870,7 @@ export class AuthController {
         success: true,
         verified: result.verified,
         sessionToken: result.sessionToken,
-        message: "이메일 인증이 완료되었습니다.",
+        message: "Your email has been verified.",
       });
     } catch (error) {
       if (error.status === 401 || error.status === 400) {
@@ -880,7 +881,7 @@ export class AuthController {
       }
       return res.status(500).json({
         success: false,
-        message: "인증 코드 검증에 실패했습니다.",
+        message: "Failed to verify the code.",
       });
     }
   }
@@ -895,7 +896,7 @@ export class AuthController {
       await this.emailService.resendVerificationCode(dto.email);
       return res.json({
         success: true,
-        message: "인증 코드가 재발송되었습니다. 이메일을 확인해주세요.",
+        message: "A new verification code has been sent. Please check your email.",
       });
     } catch (error) {
       if (error.status === 400) {
@@ -906,7 +907,7 @@ export class AuthController {
       }
       return res.status(500).json({
         success: false,
-        message: "인증 코드 재발송에 실패했습니다.",
+        message: "Failed to resend the verification code.",
       });
     }
   }
@@ -925,7 +926,7 @@ export class AuthController {
       req.cookies?.refresh_token || body?.refreshToken || body?.refresh_token;
 
     if (!refreshToken) {
-      return res.status(401).json({ message: "Refresh token not found" });
+      return res.status(401).json({ message: "Refresh token not found." });
     }
 
     const authResponse = await this.authService.refreshTokens(refreshToken);
@@ -955,7 +956,7 @@ export class AuthController {
 
     return res.json({
       user: authResponse.user,
-      message: "토큰이 갱신되었습니다.",
+      message: "Session refreshed successfully.",
       ...(includeTokens && {
         access_token: authResponse.access_token,
         refresh_token: authResponse.refresh_token,
@@ -1083,7 +1084,7 @@ export class AuthController {
 
     this.logger.log(`[Logout] 로그아웃 완료 - accountId: ${accountId}`);
 
-    return res.json({ message: "로그아웃되었습니다." });
+    return res.json({ message: "Signed out successfully." });
   }
 
   @Post("check-email")
@@ -1106,7 +1107,7 @@ export class AuthController {
     } catch (error) {
       return res.status(500).json({
         success: false,
-        message: "이메일 확인 중 오류가 발생했습니다.",
+        message: "Failed to check the email address.",
       });
     }
   }
@@ -1130,10 +1131,10 @@ export class AuthController {
       // 보안: 계정 존재 여부와 관계없이 동일한 응답
       return res.json({
         success: true,
-        message: "이메일이 등록되어 있다면 비밀번호 재설정 링크가 발송됩니다.",
+        message: "If that email is registered, a password reset link will be sent.",
       });
     } catch (error) {
-      if (error.message?.includes("소셜 로그인")) {
+      if (error.message?.includes("Social sign-in")) {
         return res.status(400).json({
           success: false,
           message: error.message,
@@ -1143,7 +1144,7 @@ export class AuthController {
       // 다른 에러도 보안상 동일한 메시지
       return res.json({
         success: true,
-        message: "이메일이 등록되어 있다면 비밀번호 재설정 링크가 발송됩니다.",
+        message: "If that email is registered, a password reset link will be sent.",
       });
     }
   }
@@ -1186,12 +1187,12 @@ export class AuthController {
 
       return res.json({
         success: true,
-        message: "비밀번호가 성공적으로 변경되었습니다.",
+        message: "Your password has been updated.",
       });
     } catch (error) {
       return res.status(400).json({
         success: false,
-        message: error.message || "비밀번호 재설정에 실패했습니다.",
+        message: error.message || "Failed to reset the password.",
       });
     }
   }
@@ -1228,7 +1229,7 @@ export class AuthController {
 
       return res.json({
         success: true,
-        message: "비밀번호가 성공적으로 변경되었습니다.",
+        message: "Your password has been updated.",
       });
     } catch (error) {
       // 상태 코드 결정
@@ -1236,7 +1237,7 @@ export class AuthController {
 
       return res.status(statusCode).json({
         success: false,
-        message: error.message || "비밀번호 변경에 실패했습니다.",
+        message: error.message || "Failed to change the password.",
       });
     }
   }
@@ -1272,7 +1273,7 @@ export class AuthController {
       if (!dto.password) {
         return res.status(400).json({
           success: false,
-          message: "비밀번호를 입력해주세요.",
+          message: "Enter your password to confirm account deletion.",
         });
       }
 
@@ -1284,7 +1285,7 @@ export class AuthController {
       if (!validUser) {
         return res.status(401).json({
           success: false,
-          message: "비밀번호가 일치하지 않습니다.",
+          message: "The password you entered is incorrect.",
         });
       }
     }
@@ -1335,12 +1336,12 @@ export class AuthController {
       return res.json({
         success: true,
         message:
-          "계정 삭제가 요청되었습니다. 개인정보는 즉시 마스킹되었으며, 관련 데이터는 법적 보관 기간 후 자동으로 삭제됩니다.",
+          "Your account deletion request has been accepted. Personal data has been masked immediately, and retained records will be removed after the applicable retention periods.",
         deletedAt: new Date().toISOString(),
         info: {
           personalDataMasked: true,
           backgroundDeletionQueued: true,
-          legalRetentionPeriod: "결제 기록: 5년, 분쟁 기록: 3년, 메시지: 30일",
+          legalRetentionPeriod: "Payment records: 5 years, dispute records: 3 years, messages: 30 days",
         },
       });
     } catch (error) {
@@ -1350,7 +1351,7 @@ export class AuthController {
       );
       return res.status(400).json({
         success: false,
-        message: error.message || "계정 삭제 중 오류가 발생했습니다.",
+        message: error.message || "Failed to delete the account.",
       });
     }
   }
@@ -1495,7 +1496,7 @@ export class AuthController {
       return res.status(403).json({
         error: "consent_required",
         code: "CONSENT_REQUIRED",
-        message: "필수 약관 동의가 필요합니다.",
+        message: "Required terms consent is still missing.",
       });
     }
 
@@ -1528,7 +1529,7 @@ export class AuthController {
       type: "object",
       properties: {
         success: { type: "boolean", example: true },
-        message: { type: "string", example: "약관 동의가 완료되었습니다." },
+        message: { type: "string", example: "Required consent has been recorded." },
       },
     },
   })
@@ -1543,14 +1544,47 @@ export class AuthController {
 
       return res.status(200).json({
         success: true,
-        message: "약관 동의가 완료되었습니다.",
+        message: "Required consent has been recorded.",
       });
     } catch (error) {
       this.logger.error(`Consent update failed for user ${user.id}:`, error);
       return res.status(400).json({
         success: false,
-        message: error.message || "약관 동의 처리 중 오류가 발생했습니다.",
+        message: error.message || "Failed to record the required consent.",
       });
     }
+  }
+
+  @Post("cookie-consent")
+  @UseGuards(JwtAuthGuard)
+  @ApiOperation({ summary: "Record cookie consent preferences" })
+  @ApiResponse({ status: 200, description: "Cookie consent recorded" })
+  async recordCookieConsent(
+    @CurrentUser() user: User,
+    @Body() consentDto: CookieConsentDto,
+    @Req() req: ExpressRequest,
+  ) {
+    const rawUserAgent = req.headers["user-agent"];
+    const userAgent = Array.isArray(rawUserAgent) ? rawUserAgent[0] : rawUserAgent;
+    const sessionId =
+      req.cookies?.["connect.sid"] ||
+      req.cookies?.session ||
+      req.cookies?.access_token ||
+      undefined;
+
+    await this.authService.recordCookieConsent(
+      user.id,
+      consentDto,
+      {
+        userId: user.id,
+        ipAddress: req.ip || req.socket?.remoteAddress,
+        userAgent,
+        sessionId,
+      },
+    );
+
+    return {
+      success: true,
+    };
   }
 }

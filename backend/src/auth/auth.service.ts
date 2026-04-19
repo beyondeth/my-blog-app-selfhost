@@ -5,6 +5,7 @@ import { User, AuthProvider } from "../users/entities/user.entity";
 import { LoginDto } from "./dto/login.dto";
 import { RegisterDto } from "./dto/register.dto";
 import { AuthResponse } from "./interfaces/auth-response.interface";
+import { AuditContext } from "../audit/audit.service";
 
 @Injectable()
 export class AuthService {
@@ -99,5 +100,17 @@ export class AuthService {
       currentPassword,
       newPassword,
     );
+  }
+
+  async recordCookieConsent(
+    userId: string,
+    consentDto: {
+      analyticsEnabled: boolean;
+      policyVersion: string;
+      source?: string;
+    },
+    context: AuditContext,
+  ): Promise<void> {
+    return this.authCommandService.recordCookieConsent(userId, consentDto, context);
   }
 }
