@@ -18,6 +18,13 @@ const en: MessageTree = {
     cancel: 'Cancel',
     save: 'Save',
   },
+  connections: {
+    title: 'Connections',
+    following: 'Following',
+    followers: 'Followers',
+    emptyFollowing: 'No following users yet.',
+    emptyFollowers: 'No followers yet.',
+  },
   publicSite: {
     header: {
       docsSidebar: 'Toggle docs sidebar',

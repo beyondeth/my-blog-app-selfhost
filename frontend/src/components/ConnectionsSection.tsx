@@ -8,6 +8,7 @@ import UserAvatar from './ui/UserAvatar';
 import UserLinkWithTooltip from './UserLinkWithTooltip';
 import { queryKeys } from '@/lib/queries/keys';
 import { useAuth } from '@/providers/AuthProviderV2';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 import { cn } from '@/lib/utils';
 
 interface ConnectionsSectionProps {
@@ -20,6 +21,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/a
 
 export default function ConnectionsSection({ userId }: ConnectionsSectionProps) {
   const { user: currentUser } = useAuth();
+  const { locale, t } = useLocaleContext();
   const [activeTab, setActiveTab] = useState<TabKey>('following');
 
   const { data: followingData, isLoading: isLoadingFollowing } = useQuery({
@@ -56,10 +58,10 @@ export default function ConnectionsSection({ userId }: ConnectionsSectionProps) 
 
   const tabs = useMemo(
     () => [
-      { key: 'following' as const, label: '팔로잉', count: followingData?.total || 0 },
-      { key: 'followers' as const, label: '팔로워', count: followersData?.total || 0 },
+      { key: 'following' as const, label: t('connections.following'), count: followingData?.total || 0 },
+      { key: 'followers' as const, label: t('connections.followers'), count: followersData?.total || 0 },
     ],
-    [followingData?.total, followersData?.total]
+    [followersData?.total, followingData?.total, t]
   );
 
   const activeState = useMemo(() => {
@@ -68,7 +70,7 @@ export default function ConnectionsSection({ userId }: ConnectionsSectionProps) 
         users: followingData?.data ?? [],
         total: followingData?.total || 0,
         isLoading: isLoadingFollowing,
-        emptyMessage: '아직 팔로잉 중인 사용자가 없습니다.',
+        emptyMessage: t('connections.emptyFollowing'),
       };
     }
 
@@ -76,9 +78,14 @@ export default function ConnectionsSection({ userId }: ConnectionsSectionProps) 
       users: followersData?.data ?? [],
       total: followersData?.total || 0,
       isLoading: isLoadingFollowers,
-      emptyMessage: '아직 나를 팔로우한 사용자가 없습니다.',
+      emptyMessage: t('connections.emptyFollowers'),
     };
-  }, [activeTab, followingData?.data, followingData?.total, followersData?.data, followersData?.total, isLoadingFollowers, isLoadingFollowing]);
+  }, [activeTab, followersData?.data, followersData?.total, followingData?.data, followingData?.total, isLoadingFollowers, isLoadingFollowing, t]);
+
+  const summaryText =
+    locale === 'ko'
+      ? `총 ${activeState.total.toLocaleString()}명과 연결되어 있어요`
+      : `Connected with ${activeState.total.toLocaleString()} people`;
 
   const renderSkeleton = () => (
     <div className="space-y-3" role="status" aria-live="polite">
@@ -102,9 +109,9 @@ export default function ConnectionsSection({ userId }: ConnectionsSectionProps) 
       <div className="mb-4 flex flex-col gap-1">
         <h3 className="flex items-center gap-2 text-lg font-semibold text-foreground">
           <span className="inline-flex h-2 w-2 rounded-full bg-[#264653] dark:bg-[#6CC3B2]" aria-hidden />
-          Connections
+          {t('connections.title')}
         </h3>
-        <p className="text-sm text-[#3F4A59] dark:text-[#E1E8F0]">총 {activeState.total.toLocaleString()}명과 연결되어 있어요</p>
+        <p className="text-sm text-[#3F4A59] dark:text-[#E1E8F0]">{summaryText}</p>
       </div>
 
       <div className="mb-5 flex rounded-full bg-[#F7F9FC] p-1 text-sm font-medium dark:bg-[#131A22]">
