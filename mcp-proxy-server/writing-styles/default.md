@@ -1,6 +1,6 @@
 ---
 style_name: "Professional Technical Blog"
-language: "korean"
+language: "english"
 min_length: 5000
 target_length: "5000-8000"
 code_block_ratio: 0.2
@@ -21,7 +21,7 @@ Use this style for professional technical blog posts that balance clarity with d
 - Balanced code-to-text ratio (~20%)
 
 ### Recommended Signals
-**Keywords**: "설명", "이해", "작동 방식", "비교", "방법", "아키텍처"
+**Keywords**: "explanation", "understanding", "how it works", "comparison", "approach", "architecture"
 **Intent**: Reader seeks thorough understanding without emotional narrative
 
 ### When Another Style Fits Better
@@ -93,16 +93,16 @@ Layer information from simple to complex. Readers should gain value even if they
 ## Structure Template
 
 ```markdown
-## Introduction (서론)
+## Introduction
 Present the problem or concept. Why does this matter?
 
-## Background (배경)
+## Background
 Provide necessary context for understanding.
 
 ### Key Concepts
 Define essential terms.
 
-## Main Content (핵심 내용)
+## Main Content
 Technical explanation with appropriate depth.
 
 ### Concept 1
@@ -111,27 +111,27 @@ First major point with examples.
 ### Concept 2
 Second major point building on previous.
 
-## Practical Example (실제 예시)
+## Practical Example
 Working code or real-world application.
 
-## Key Takeaways (핵심 정리)
+## Key Takeaways
 Summarize main points concisely.
 
-## Next Steps (다음 단계)
+## Next Steps
 Guide readers on what to explore next.
 ```
 
 ## Tone and Voice
 
-**Korean Posts** (존댓말 required):
-- "MCP는 세 가지 핵심 주체로 구성되어 있습니다."
-- "각 세션은 자신만의 리소스 예산을 가지며, 이를 통해 효율적인 관리가 가능합니다."
-- "이러한 접근 방식은 독자의 관심을 유지하면서도 필요한 깊이를 제공할 수 있습니다."
+**English Posts**:
+- "MCP is built around three core actors."
+- "Each session has its own resource budget, which makes capacity management much easier."
+- "This approach keeps the reader engaged while still delivering the necessary depth."
 
 **Avoid**:
-- Overly casual tone ("이거 완전 쩔어!", "진짜 대박")
+- Overly casual tone ("This is insanely sick!", "Total game changer, no question")
 - Dry academic language (excessive jargon without explanation)
-- Command forms ("사용하라", "적용해")
+- Command-heavy phrasing ("Just use this", "Apply it everywhere")
 
 **Maintain**:
 - Professional but accessible
@@ -178,17 +178,17 @@ const example = {
 
 ## Improving Opening Paragraphs
 
-**Before**: "오늘은 React hooks에 대해 알아보겠습니다."
+**Before**: "Today we're going to look at React hooks."
 
-**After**: "React hooks는 함수형 컴포넌트에서 상태를 관리하는 방식을 근본적으로 변화시켰습니다. 클래스 컴포넌트의 복잡한 boilerplate를 제거하면서도, 라이프사이클을 완전히 제어할 수 있습니다."
+**After**: "React hooks fundamentally changed how state is handled in function components. They remove much of the boilerplate from class components while still giving you precise lifecycle control."
 
 **Principle**: State value and impact, not just topic announcement.
 
 ## Adding Technical Context
 
-**Before**: "map 함수로 배열을 변환합니다."
+**Before**: "Use `map` to transform an array."
 
-**After**: "`map()` 메서드는 각 요소에 변환 함수를 적용하여 새로운 배열을 생성합니다. 원본 배열은 수정되지 않으며, 이는 함수형 프로그래밍의 불변성 원칙을 따르는 것입니다."
+**After**: "`map()` applies a transformation function to each element and returns a new array. The original array is left untouched, which aligns with the immutability principle in functional programming."
 
 **Principle**: Explain both mechanics and reasoning.
 
@@ -200,23 +200,23 @@ const result = data.map(x => x * 2);
 ```
 
 **After**:
-"`map()`을 사용하여 각 요소를 깔끔하고 불변적인 방식으로 변환할 수 있습니다:"
+"`map()` lets you transform each element in a clean, immutable way:"
 
 ```javascript
 const result = data.map(x => x * 2);
 ```
 
-"이 접근 방식은 원본을 수정하지 않고 새로운 배열을 생성하며, 이는 함수형 프로그래밍의 핵심 원칙입니다."
+"This approach creates a new array without mutating the original, which is one of the core principles of functional programming."
 
 **Principle**: Context before, significance after.
 
 ## Strengthening Transitions
 
 Use clear connectors between sections:
-- "이 개념을 바탕으로..."
-- "더 중요한 것은..."
-- "실제로 이는 다음을 의미합니다..."
-- "여기서 핵심적인 차이점은..."
+- "Building on that concept..."
+- "More importantly..."
+- "In practice, this means..."
+- "The key distinction here is..."
 
 ## Final Quality Checklist
 
@@ -224,7 +224,7 @@ Before publishing, verify:
 - [ ] Clear problem statement in introduction
 - [ ] Technical terms defined on first use
 - [ ] Code blocks have context and explanation
-- [ ] Consistent 존댓말 throughout (Korean)
+- [ ] Consistent native English throughout
 - [ ] 3-5 key terms emphasized with **bold**
 - [ ] Logical flow from simple to complex
 - [ ] Actionable takeaways in conclusion

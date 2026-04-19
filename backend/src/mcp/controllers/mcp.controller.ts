@@ -374,7 +374,7 @@ export class McpController {
           const styleMetadata: Record<string, any> = {
             default: {
               style_name: "Professional Technical Blog",
-              language: "korean",
+              language: "multilingual",
               min_length: 2000,
               target_length: "3000-5000",
               code_block_ratio: 0.2,
@@ -382,7 +382,7 @@ export class McpController {
             },
             novel: {
               style_name: "Fiction Writer's Narrative Style",
-              language: "korean",
+              language: "multilingual",
               min_length: 2500,
               target_length: "4000-6000",
               code_block_ratio: 0.05,
@@ -390,7 +390,7 @@ export class McpController {
             },
             podcast: {
               style_name: "Tech Podcast Script Style",
-              language: "korean",
+              language: "multilingual",
               min_length: 2500,
               target_length: "3500-5000",
               code_block_ratio: 0.05,
@@ -398,7 +398,7 @@ export class McpController {
             },
             vibe: {
               style_name: "Developer Learning Guide Style",
-              language: "korean",
+              language: "multilingual",
               min_length: 2500,
               target_length: "3500-5500",
               code_block_ratio: 0.15,
@@ -406,7 +406,7 @@ export class McpController {
             },
             research: {
               style_name: "Research Insight Analysis Style",
-              language: "korean",
+              language: "multilingual",
               min_length: 6000,
               target_length: "6000-9000",
               code_block_ratio: 0.1,
@@ -414,7 +414,7 @@ export class McpController {
             },
             pm: {
               style_name: "Product Manager Narrative Style",
-              language: "korean",
+              language: "multilingual",
               min_length: 5000,
               target_length: "5000-8000",
               code_block_ratio: 0.05,
@@ -422,7 +422,7 @@ export class McpController {
             },
             designer: {
               style_name: "Product Designer Case Study Style",
-              language: "korean",
+              language: "multilingual",
               min_length: 5000,
               target_length: "5000-8000",
               code_block_ratio: 0.05,
@@ -430,7 +430,7 @@ export class McpController {
             },
             marketer: {
               style_name: "Growth & Performance Marketing Style",
-              language: "korean",
+              language: "multilingual",
               min_length: 5000,
               target_length: "5000-8000",
               code_block_ratio: 0.02,
@@ -443,7 +443,7 @@ export class McpController {
             metadata: styleMetadata[styleName] || {
               style_name:
                 styleName.charAt(0).toUpperCase() + styleName.slice(1),
-              language: "korean",
+              language: "multilingual",
               min_length: 2000,
               target_length: "3000-5000",
               code_block_ratio: 0.2,

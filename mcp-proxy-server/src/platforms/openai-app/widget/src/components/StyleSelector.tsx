@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import type { StyleOption } from '../types';
-import { t } from '../i18n';
+import { t, formatT, localizeStyleOption } from '../i18n';
 import {
   callTool,
   saveWidgetState,
@@ -31,22 +31,27 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
     if (isSubmitting) return;
     setSelected(id);
     const opt = options.find(o => o.id === id);
-    setHint(`✅ ${opt?.label || id} 스타일이 선택되었습니다.`);
+    const localized = opt ? localizeStyleOption(opt) : null;
+    setHint(formatT('style_selected', { style: localized?.label || id }));
   }, [isSubmitting, options]);
 
   const handleSubmit = useCallback(async () => {
     if (isSubmitting || !selected) {
-      setHint('진행 중이거나 선택된 스타일이 없습니다.');
+      setHint(t('no_style_or_busy'));
       return;
     }
     if (!activeNonce || !canCallTool()) {
-      setHint('OpenAI API 통신 준비가 되지 않았거나 세션이 만료되었습니다. 새로고침해 주세요.');
+      setHint(t('bridge_unavailable'));
       return;
     }
 
     setIsSubmitting(true);
     setHasSubmitted(true);
-    setHint(`'${selected}' ` + t('submitting_style'));
+    const selectedOption = options.find((option) => option.id === selected);
+    const selectedLabel = selectedOption
+      ? localizeStyleOption(selectedOption).label
+      : selected;
+    setHint(`'${selectedLabel}' ` + t('submitting_style'));
 
     try {
       const response = await callTool('confirm_style', {
@@ -87,14 +92,14 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
         );
       } else if (status === 'blocked') {
         const reason = String(out.reason || meta.summary || t('session_renewed'));
-        setHint(`진행 불가: ${reason}`);
+        setHint(formatT('style_blocked', { reason }));
         setHasSubmitted(false);
         const newNonce = out.styleSelectionNonce || meta.styleSelectionNonce;
         if (typeof newNonce === 'string' && newNonce) {
           setActiveNonce(newNonce);
         }
       } else {
-        setHint(`상태 메시지: ${status} (서버 응답 대기 중)`);
+        setHint(formatT('status_waiting', { status }));
         setHasSubmitted(false);
       }
     } catch (err) {
@@ -103,7 +108,7 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
     } finally {
       setIsSubmitting(false);
     }
-  }, [isSubmitting, selected, activeNonce]);
+  }, [isSubmitting, selected, activeNonce, options]);
 
   // Expose submit to parent for rendering button outside .body
   useEffect(() => {
@@ -115,7 +120,9 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
   return (
     <div>
       <div className="style-grid">
-        {options.map(opt => (
+        {options.map((opt) => {
+          const localized = localizeStyleOption(opt);
+          return (
           <button
             key={opt.id}
             type="button"
@@ -124,10 +131,11 @@ export default function StyleSelector({ options, nonce, canSelect, onSubmitReady
             onClick={() => handleSelect(opt.id)}
           >
             {opt.emoji && <span className="style-emoji">{opt.emoji}</span>}
-            <div className="style-title">{opt.label || opt.id}</div>
-            <p className="style-desc">{opt.description || ''}</p>
+            <div className="style-title">{localized.label || opt.id}</div>
+            <p className="style-desc">{localized.description || ''}</p>
           </button>
-        ))}
+          );
+        })}
       </div>
 
       {hint && (

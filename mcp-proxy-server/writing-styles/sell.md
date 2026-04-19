@@ -1,6 +1,6 @@
 ---
 style_name: "Marketplace Product Listing"
-language: "korean"
+language: "english"
 min_length: 1000
 target_length: "1000-3000"
 code_block_ratio: 0.1
@@ -11,138 +11,137 @@ ai_tag_required: true
 
 ## When to Use Sell Style
 
-마켓플레이스에서 판매할 디지털 상품(프롬프트, 템플릿, 가이드, 워크플로)을 소개하는 글에 사용합니다.
-일반 블로그 포스트보다 짧고 핵심적이며, 구매 전환에 초점을 맞춥니다.
+Use this style for marketplace listings that introduce digital products such as prompts, templates, guides, and workflows.
+Keep the writing tighter than a standard blog post and optimize it for purchase conversion.
 
 ### Perfect For
-- AI 프롬프트 팩 판매
-- 코딩 템플릿/보일러플레이트 판매
-- 기술 가이드/튜토리얼 판매
-- AI 워크플로/자동화 스킬 판매
-- 데이터 분석 도구/대시보드 판매
+- AI prompt packs
+- Coding templates and boilerplates
+- Technical guides and tutorial bundles
+- AI workflows and automation assets
+- Data analysis tools and dashboards
 
 ### Recommended Signals
 **Keywords**: "--sell"
-**Intent**: 지식 콘텐츠를 유료 상품으로 등록하여 수익화
+**Intent**: Turn knowledge content into a paid digital product listing
 
 ### When Another Style Fits Better
-- **무료 기술 공유** → Use `default` style
-- **개발 일지/성장기** → Use `vibe` style
-- **심층 분석/벤치마크** → Use `research` style
+- **Free technical education** → Use `default` style
+- **Developer journals or growth posts** → Use `vibe` style
+- **Deep analysis or benchmarks** → Use `research` style
 
 ---
 
 # === CORE WRITING PRINCIPLES ===
 
-## 1. 가치 제안 최우선 (Value Proposition First)
+## 1. Value Proposition First
 
-첫 3문장 안에 "이 상품이 구매자에게 주는 핵심 가치"를 명확히 전달합니다.
+State the core buyer value within the first three sentences.
 
 **Pattern**:
 ```
-[구매자의 문제/니즈] → [이 상품이 해결하는 방법] → [기대 효과/절약되는 시간]
+[buyer problem or need] → [how the product solves it] → [expected outcome or time saved]
 ```
 
 **Good Example**:
-> ChatGPT로 매번 프롬프트를 처음부터 작성하시나요? 이 프롬프트 팩 하나로
-> 기술 블로그, 코드 리뷰, API 문서까지 10분 만에 완성할 수 있습니다.
+> Still writing every ChatGPT prompt from scratch? This prompt pack helps you ship technical blog posts, code reviews, and API docs in about 10 minutes.
 
-## 2. 미리보기 구분선 활용
+## 2. Use the Preview Divider
 
-`<!-- preview-end -->` 주석을 삽입하여 무료 미리보기 영역과 유료 전문을 구분합니다.
-이 주석 위의 콘텐츠만 미구매 사용자에게 노출됩니다.
+Insert the `<!-- preview-end -->` comment to separate the free preview from the paid section.
+Only the content above that divider is visible to users who have not purchased the product.
 
 **Structure**:
 ```markdown
-[가치 제안 + 상품 개요 — 무료 미리보기 영역]
+[value proposition + product overview — free preview area]
 
 <!-- preview-end -->
 
-[상세 내용 + 사용법 + 실전 예제 — 유료 전문]
+[detailed contents + usage guide + hands-on examples — paid content]
 ```
 
-## 3. 구체적 수치로 신뢰 구축
+## 3. Build Trust with Specific Numbers
 
-추상적 설명 대신 구체적 수치를 사용합니다.
+Prefer concrete numbers over abstract claims.
 
-| ❌ 추상적 | ✅ 구체적 |
+| ❌ Vague | ✅ Specific |
 |----------|---------|
-| "시간을 절약할 수 있습니다" | "평균 2시간 → 10분으로 단축" |
-| "다양한 템플릿 포함" | "12개 카테고리, 총 48개 템플릿" |
-| "많은 분들이 사용 중" | "출시 2주 만에 150건 판매" |
+| "It saves time" | "Cuts the task from roughly 2 hours to 10 minutes" |
+| "Includes lots of templates" | "Includes 48 templates across 12 categories" |
+| "Many people use it" | "Sold 150 copies in the first two weeks" |
 
 ---
 
 # === WRITING GUIDELINES ===
 
-## 글 구조 (필수 순서)
+## Recommended Structure
 
-### 1. 헤드라인 (제목)
-- 상품의 핵심 가치를 한 문장으로
-- 숫자 또는 결과를 포함
-- 예: "ChatGPT 프롬프트 48종 팩 — 기술 블로그 10분 완성"
+### 1. Headline
+- State the product's core value in one sentence
+- Include a number or outcome when possible
+- Example: "48 ChatGPT Prompts for Technical Writing — Publish in 10 Minutes"
 
-### 2. 가치 제안 (미리보기 영역 — 2~3문단)
-- 구매자의 문제 공감
-- 이 상품이 해결하는 방법
-- 포함된 내용 요약 (불릿 포인트)
-- **이 영역은 `<!-- preview-end -->` 위에 위치**
+### 2. Value Proposition (free preview area, 2-3 paragraphs)
+- Acknowledge the buyer's problem
+- Explain how the product solves it
+- Summarize what is included with bullet points
+- **Place this section above `<!-- preview-end -->`**
 
-### 3. 상세 설명 (유료 전문)
-- 상품 구성 목록 (표 형식 권장)
-- 각 항목별 사용법/활용 예시
-- 코드 블록이나 프롬프트 원문 (해당되는 경우)
+### 3. Detailed Breakdown (paid section)
+- List the product contents, ideally in a table
+- Explain how to use each part
+- Include code blocks or prompt text when relevant
 
-### 4. 사용 가이드
-- 단계별 적용 방법 (1, 2, 3 형식)
-- 주의사항/팁
+### 4. Usage Guide
+- Provide step-by-step application instructions
+- Include caveats or practical tips
 
-### 5. 마무리
-- 간결한 요약
-- AI 태그 포함 (ai:claude, ai:chatgpt 등)
+### 5. Closing
+- End with a concise summary
+- Include the AI tag (for example `ai:claude`, `ai:chatgpt`)
 
-## 톤 & 스타일
-- **전문적이지만 친근한** 톤
-- **짧고 핵심적인** 문장 (블로그 포스트보다 간결)
-- 과장 금지 — 실제 가치에 집중
-- "~하세요" 체 사용 (존댓말)
+## Tone & Style
+- Professional but approachable
+- Short, high-signal sentences
+- No hype; stay anchored to real value
+- Use direct, confident buyer-facing English
 
-## 포맷팅 규칙
-- 불릿 포인트 적극 활용
-- 표(table)로 구성 요약
-- 코드 블록은 **핵심 예시만** (전체 코드는 상품 안에)
-- 이미지/스크린샷 권장 (결과물 미리보기)
+## Formatting Rules
+- Use bullet points aggressively
+- Summarize product structure with tables when useful
+- Show only key code examples in the post
+- Screenshots or previews are strongly encouraged
 
 ---
 
 # === QUALITY ENHANCEMENT GUIDE ===
 
-## 판매 글 체크리스트
+## Listing Checklist
 
-### 구매 전환 요소
-- [ ] 첫 3문장에 핵심 가치가 명확한가?
-- [ ] 구매자의 문제를 공감하고 있는가?
-- [ ] 구체적 수치/성과가 포함되어 있는가?
-- [ ] `<!-- preview-end -->` 구분선이 적절한 위치에 있는가?
+### Conversion Elements
+- [ ] Is the core value clear within the first three sentences?
+- [ ] Does the post show empathy for the buyer's problem?
+- [ ] Does it include concrete numbers or outcomes?
+- [ ] Is `<!-- preview-end -->` placed in the right spot?
 
-### 콘텐츠 품질
-- [ ] 상품 구성이 명확하게 나열되어 있는가?
-- [ ] 사용법이 단계별로 설명되어 있는가?
-- [ ] 과장 없이 실제 가치만 서술했는가?
+### Content Quality
+- [ ] Are the product contents listed clearly?
+- [ ] Is the usage flow explained step by step?
+- [ ] Does the copy stay focused on real value instead of hype?
 
-### 메타데이터
-- [ ] 카테고리가 적절한가? (ai_prompts, coding_templates, tech_guides, ai_workflows, data_analytics, others)
-- [ ] 태그가 관련성 있는가? (최대 10개)
-- [ ] AI 태그가 포함되어 있는가?
+### Metadata
+- [ ] Is the product category correct? (`ai_prompts`, `coding_templates`, `tech_guides`, `ai_workflows`, `data_analytics`, `others`)
+- [ ] Are the tags relevant? (max 10)
+- [ ] Is the AI tag included?
 
 ---
 
 # === QUALITY CHECKLIST ===
 
-**최종 검증:**
+**Final check:**
 
-1. **가치 제안**: 구매자가 "왜 사야 하는지" 10초 안에 이해할 수 있는가?
-2. **미리보기**: `<!-- preview-end -->` 위 영역만으로 구매 욕구를 자극하는가?
-3. **분량**: 1000~3000자 범위 내인가? (너무 길면 블로그 스타일, 너무 짧으면 정보 부족)
-4. **신뢰**: 구체적 수치나 실제 예시가 포함되어 있는가?
-5. **AI 태그**: 적절한 AI 도구 태그가 포함되어 있는가?
+1. **Value proposition**: Can the buyer understand why this is worth buying within 10 seconds?
+2. **Preview**: Does the content above `<!-- preview-end -->` create genuine purchase intent?
+3. **Length**: Does it stay within 1000-3000 characters?
+4. **Trust**: Does it include specific numbers or concrete examples?
+5. **AI tag**: Is the appropriate AI tool tag included?

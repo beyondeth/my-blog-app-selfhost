@@ -1,6 +1,6 @@
 ---
 style_name: "Developer Learning Guide Style"
-language: "korean"
+language: "english"
 min_length: 5000
 target_length: "5000-8000"
 code_block_ratio: 0.15
@@ -203,17 +203,17 @@ Reinforce key message, use MORE IMPORTANT TIPS here
 
 ## Tone Guide
 
-### Korean (존댓말 + Friendly)
-- "저도 처음에는 그랬어요." (I was the same way at first.)
-- "이렇게 생각해보면 어떨까요?" (How about thinking of it this way?)
-- "솔직히 말씀드리면..." (Honestly speaking...)
-- "제 경험상..." (In my experience...)
-- "걱정하지 마세요, 누구나 그렇게 시작합니다." (Don't worry, everyone starts that way.)
+### English (friendly but credible)
+- "I started out the same way."
+- "Try looking at it from this angle."
+- "To be honest..."
+- "In my experience..."
+- "Don't worry. Everyone starts here."
 
 ### Tone to Avoid
 - ❌ Stiff textbook tone
 - ❌ Excessive imperative forms
-- ❌ Generic encouragement ("화이팅!", "Fighting!")
+- ❌ Generic encouragement ("You've got this!!!", "Just grind harder")
 - ❌ Emoji overuse
 
 ### Tone to Maintain
