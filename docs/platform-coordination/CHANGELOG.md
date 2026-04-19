@@ -2,7 +2,44 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-04-19
+
+### Additional update (public web launch moved to English-first canonical routing and Klaro consent)
+
+#### What changed
+- Normalized the public web surface to English-first canonical URLs so `/product`, `/docs`, `/legal/*`, `/login`, and `/register` are the launch routes, while `/en/*` and `/ko/*` now act only as legacy redirects.
+- Changed `/` routing so signed-out traffic is rewritten to the public product page and authenticated traffic still lands in the app shell.
+- Replaced the custom cookie banner with a Klaro-based consent manager, kept analytics opt-in off by default, and added a backend consent-audit endpoint for authenticated users.
+- Hid the development cache-clear button behind an explicit env flag so local debug tooling does not bleed Korean or debug UI into launch verification.
+
+#### Why
+- The previous routing model kept locale-prefixed public URLs alive and still exposed Korean launch content patterns on the main entry path, which conflicted with the current overseas launch strategy.
+- The previous consent banner was too custom and visually weak for the launch bar we are aiming at, while also lacking a clear path for audited consent persistence.
+- The always-visible dev cache button was contaminating launch-page QA and causing false positives for Korean copy leakage.
+
+#### How
+- Kept the work primarily in the web lane, but used a shared/backend addition only for the consent audit endpoint so future clients can reuse the same audit contract if needed.
+- Verified the English-only launch pages and legacy redirects with local browser automation after the routing and consent changes were applied.
+
 ## 2026-04-18
+
+### Additional update (managed post images now self-heal on save and orphan cleanup performs a second reference check)
+
+#### What changed
+- Added a managed-image reconciliation pass to post create/update flows so internal upload URLs found in `content` or `content_markdown` are reattached into `post_files` even when a legacy or auto-posting path skipped the relation.
+- Added a second-pass reference check in file orphan cleanup so a file is not scheduled for deletion when any live post still references its file key or uses it as `thumbnail_image_id`.
+- Added an admin-only post reconciliation endpoint for dry-run/reporting and one-time repair of already published posts with missing managed-image links.
+- Added backend utility coverage for managed image URL extraction plus focused orphan-cleanup regression coverage for the new “still referenced in post body” guard.
+
+#### Why
+- Production investigation showed some published posts still contained internal CDN image URLs even though the corresponding `post_files` relation was missing.
+- The previous cleanup path trusted relation state more than actual post content, so a valid in-post image could be misclassified as orphaned and eventually deleted.
+- We needed a low-friction recovery path for already stored posts, not just prevention for future saves.
+
+#### How
+- Kept the fix in shared/backend paths only so all clients benefit from the same storage truth without adding web-only heuristics.
+- Limited the runtime check to live post references (`content`, `content_markdown`, `thumbnail_image_id`) so orphan cleanup remains conservative without becoming a full crawler.
+- Exposed the repair flow as an admin endpoint with `dryRun=true` as the default so operators can inspect blast radius before writing new `post_files` links.
 
 ### Additional update (direct MCP now blocks raw Mermaid and legacy Mermaid can be backfilled to diagram blocks)
 
@@ -1020,3 +1057,44 @@ Track operational rule changes for worktree/branch coordination.
   - `frontend/src/components/layout/knowledge-flow-board/KnowledgeMapTreeSidebar.tsx`
   - `frontend/src/components/layout/knowledge-flow-board/useKnowledgeFlowBoardFocus.ts`
   - `frontend/tests/e2e/kb-map.spec.ts`
+
+## 2026-04-19 / web
+
+- 변경 타입: refactor
+- 범위: public i18n / navigation copy / docs
+- 변경 요약:
+  - 퍼블릭 문서의 앱 연결 가이드(`ChatGPT`, `Perplexity`, `Claude`)를 전부 자연스러운 영어로 재작성했다.
+  - 검색, 좌측/하단 내비게이션, 프로필 드롭다운, 홈 피드 카드, 커뮤니티 카드, 태그, 404, analytics placeholder 등 공용 UI의 남은 한국어 시스템 문구를 영어로 통일했다.
+  - `/`, `/product`, `/docs`, `/docs/apps/*`, `/support`, `/login`, `/register`, `/legal/*` 등 핵심 퍼블릭 경로를 브라우저로 검증해 렌더된 본문 기준 한국어 노출이 없는 상태를 확인했다.
+- 영향:
+  - web: 해외 사용자 첫 진입면과 문서/인증/법적 페이지의 영어 일관성이 올라간다.
+  - ios: 영향 없음.
+  - android: 영향 없음.
+- 회귀 리스크:
+  - 유저가 작성한 실제 콘텐츠는 번역 대상이 아니므로 홈/블로그/커뮤니티에 한국어 게시물이 있으면 그대로 노출될 수 있다.
+  - 로그인/회원가입 페이지 소스에는 일부 한국어 fallback 분기가 남아 있으나, 현재 런타임 로케일 기본값은 `en`이다.
+- 테스트/검증:
+  - `pnpm --dir frontend type-check`
+  - `pnpm --dir frontend lint`
+  - `pnpm --dir frontend exec node - <<'NODE' ... playwright smoke ... NODE`
+
+## 2026-04-19 / web
+
+- 변경 타입: refactor
+- 범위: mcp-proxy-server / OpenAI adapter / writing styles
+- 변경 요약:
+  - `mcp-proxy-server`의 사용자/LLM 노출 문자열을 영어 기준으로 정리했다. 대상은 OpenAI adapter, `check_auth`, `create_post`, style guide 응답, 런타임 환경 검증 로그, writing-style prompt 자산이다.
+  - ChatGPT widget은 이중 언어를 유지하되, 브라우저 언어가 `ko`일 때만 한국어 사전을 사용하고 그 외에는 영어를 기본으로 쓰도록 고정했다.
+  - widget i18n 포맷터를 `ES2020` 타깃에 맞게 수정했고, tool parity 스크립트도 현재 tool catalog 및 `sell` preset 기준으로 갱신했다.
+- 영향:
+  - web: ChatGPT/OpenAI 자동 포스팅 플로우와 MCP 응답, style prompt가 해외 출시 기준의 영어 기본값으로 정리된다.
+  - ios: 영향 없음.
+  - android: 영향 없음.
+- 회귀 리스크:
+  - widget의 `ko` 사전은 의도적으로 유지되므로 소스 코드 검색에서는 한국어가 계속 보인다.
+  - `verify:openai-contract`는 로컬 `/mcp-openai` 인증 세션이 없으면 `401`이 발생한다.
+- 테스트/검증:
+  - `pnpm --dir mcp-proxy-server build`
+  - `pnpm --dir mcp-proxy-server widget:build`
+  - `pnpm --dir mcp-proxy-server verify:tool-parity`
+  - `pnpm --dir mcp-proxy-server verify:openai-contract` -> local auth context 없음으로 `HTTP 401`
