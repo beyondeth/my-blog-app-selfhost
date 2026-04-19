@@ -6,7 +6,7 @@
 
 #### What changed
 - Tightened the direct API-key `/mcp` route so transport-style `GET /mcp` requests no longer enter the stateless direct transport path.
-- Switched the direct route transport to JSON-response mode and added explicit transport cleanup on response close to match the MCP SDK's stateless example more closely.
+- Kept the direct route on the SDK's default stateless POST response behavior and added explicit transport cleanup on response close.
 - Documented that direct client configs can keep `Accept: application/json, text/event-stream`, but standalone GET SSE on `/mcp` is intentionally unsupported and now returns `405` instead of hanging.
 
 #### Impact

@@ -8,7 +8,7 @@ Track operational rule changes for worktree/branch coordination.
 
 #### What changed
 - Re-scoped the direct `/mcp` route back to stateless API-key Streamable HTTP over `POST`, instead of letting transport-style `GET /mcp` requests fall through into the SDK transport handler.
-- Added JSON-response mode and explicit transport cleanup on response close for the direct API-key route so the server follows the SDK's stateless pattern more closely.
+- Added explicit transport cleanup on response close for the direct API-key route, while keeping the direct POST path on the SDK's default stateless response behavior.
 - Left `/mcp-remote` and `/mcp-openai` untouched because they serve different OAuth/platform compatibility paths.
 - Documented that client configs may still advertise `Accept: application/json, text/event-stream`, but the direct `/mcp` route intentionally does not offer standalone GET SSE and should answer those attempts with `405`.
 

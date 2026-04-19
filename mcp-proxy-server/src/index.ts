@@ -476,7 +476,6 @@ async function handleApiKeyMcpRequest(req: express.Request, res: express.Respons
     // 4. Transport 생성 (Context7와 동일한 옵션)
     const transport = new StreamableHTTPServerTransport({
       sessionIdGenerator: undefined,
-      enableJsonResponse: true,
     });
 
     // 5. MCP 서버와 Transport 연결
