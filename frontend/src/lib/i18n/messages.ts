@@ -25,6 +25,24 @@ const en: MessageTree = {
     emptyFollowing: 'No following users yet.',
     emptyFollowers: 'No followers yet.',
   },
+  followButton: {
+    loading: 'Loading...',
+    unfollowed: 'Unfollowed',
+    following: 'Following',
+    follow: 'Follow',
+    followers: 'Followers',
+    loginRequired: 'Login is required.',
+    cannotFollowSelf: 'You cannot follow yourself.',
+    updateFailed: 'Failed to update follow status.',
+    titleFollowing: 'Following',
+    titleFollow: 'Follow',
+  },
+  profileCard: {
+    followers: 'Followers',
+    visitBlog: 'Visit blog',
+    report: 'Report',
+    block: 'Block',
+  },
   publicSite: {
     header: {
       docsSidebar: 'Toggle docs sidebar',

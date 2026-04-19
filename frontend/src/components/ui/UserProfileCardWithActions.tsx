@@ -6,6 +6,7 @@ import FollowButton from '../FollowButton';
 import { DMButton } from '../dm/DMButton';
 import UserAvatar from './UserAvatar';
 import { getBlogLinkFromUser } from '@/lib/utils/blogUrl';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 interface UserProfileCardWithActionsProps {
   user: {
@@ -37,6 +38,7 @@ export default function UserProfileCardWithActions({
   onBlock
 }: UserProfileCardWithActionsProps) {
   const { user: loggedInUser } = useAuth();
+  const { t } = useLocaleContext();
 
   // Use provided followInfo or create default
   const followerState = followInfo || {
@@ -80,7 +82,7 @@ export default function UserProfileCardWithActions({
                 onClick={onReport}
                 className="h-8 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-center"
               >
-                신고하기
+                {t('profileCard.report')}
               </button>
             )}
             {onBlock && (
@@ -88,7 +90,7 @@ export default function UserProfileCardWithActions({
                 onClick={onBlock}
                 className="h-8 px-3 text-sm rounded-lg border border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-center"
               >
-                차단하기
+                {t('profileCard.block')}
               </button>
             )}
           </div>
@@ -110,7 +112,7 @@ export default function UserProfileCardWithActions({
             <span className="font-semibold text-gray-900 dark:text-foreground">
               {followerState.followersCount.toLocaleString()}
             </span>
-            <span className="text-gray-500 dark:text-gray-400">Followers</span>
+            <span className="text-gray-500 dark:text-gray-400">{t('profileCard.followers')}</span>
           </div>
         </div>
       </div>
@@ -128,7 +130,7 @@ export default function UserProfileCardWithActions({
           href={`/${user.blog.slug}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 hover:gap-2 group"
         >
-          <span>블로그 방문</span>
+          <span>{t('profileCard.visitBlog')}</span>
           <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
         </Link>
       )}
