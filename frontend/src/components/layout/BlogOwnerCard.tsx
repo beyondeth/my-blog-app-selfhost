@@ -21,7 +21,7 @@ interface BlogOwnerCardProps {
   profileImage?: string | null;
   userId?: string;
   isOwner?: boolean;
-  followInfo?: FollowInfo; // 외부에서 전달받을 팔로우 정보
+  followInfo?: FollowInfo;
   brandImage?: string | null;
   brandColor?: string | null;
   socialLinks?: SocialLink[];
@@ -35,14 +35,14 @@ interface FollowInfo {
 }
 
 const BlogOwnerCard = React.memo(function BlogOwnerCard({
-  name = "개발자",
+  name = "Developer",
   username,
   jobTitle,
   description,
   profileImage,
   userId,
   isOwner = false,
-  followInfo: externalFollowInfo, // 외부에서 전달받은 팔로우 정보
+  followInfo: externalFollowInfo,
   brandImage,
   brandColor,
   socialLinks,
@@ -62,7 +62,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
     queryKey: followInfoQueryKey,
     queryFn: async () => {
       if (!userId) {
-        throw new Error('사용자 정보를 찾을 수 없습니다.');
+        throw new Error('User information is unavailable.');
       }
 
       const endpoint = `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/users/${userId}/follow-info`;
@@ -163,7 +163,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
           !brandImage && "bg-gray-100 dark:bg-gray-800"
         )}
         style={bannerBackgroundStyle}
-        aria-label="블로그 브랜드 배경"
+        aria-label="Blog brand background"
       >
         {/* Visibility Gradient for Icons/Text on Image */}
         {brandImage && (
@@ -183,7 +183,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
                 href="/settings"
                 prefetch={false}
                 className="absolute -bottom-1 -right-2 h-7 w-7 rounded-full bg-white text-gray-700 border border-gray-200 shadow-sm flex items-center justify-center hover:bg-gray-50 dark:bg-[#1F2230] dark:text-white dark:border-gray-600 z-10 focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-gray-500"
-                aria-label="프로필 편집"
+                aria-label="Edit profile"
               >
                 <FiEdit className="w-3 h-3" />
               </Link>
@@ -202,7 +202,7 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
                   href={link.url}
                   target="_blank"
                   rel="noreferrer"
-                  aria-label={`${link.platform} 링크`}
+                  aria-label={`${link.platform} link`}
                   className={cn(
                     "flex h-5 w-5 items-center justify-center transition-all hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 pointer-events-auto",
                     brandImage 
@@ -260,11 +260,11 @@ const BlogOwnerCard = React.memo(function BlogOwnerCard({
             <>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-gray-900 dark:text-white">{formatFollowerCount(followerCount)}</span>
-                <span>팔로워</span>
+                <span>Followers</span>
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="font-semibold text-gray-900 dark:text-white">{formatFollowerCount(followingCount)}</span>
-                <span>팔로잉</span>
+                <span>Following</span>
               </div>
             </>
           )}

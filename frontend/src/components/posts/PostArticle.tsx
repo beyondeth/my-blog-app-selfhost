@@ -170,13 +170,13 @@ const PostArticle = React.memo(function PostArticle({
       {communityContext?.isPinned && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">
           <FiBookmark className="w-3 h-3" />
-          고정됨
+          Pinned
         </span>
       )}
       {communityContext?.isLocked && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
           <FiLock className="w-3 h-3" />
-          댓글 잠금
+          Comments locked
         </span>
       )}
       {communityContext?.isNsfw && (
@@ -187,7 +187,7 @@ const PostArticle = React.memo(function PostArticle({
       {communityContext?.isSpoiler && (
         <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
           <FiAlertTriangle className="w-3 h-3" />
-          스포일러
+          Spoiler
         </span>
       )}
     </div>
@@ -375,15 +375,15 @@ const PostArticle = React.memo(function PostArticle({
           <div className="bg-[#EEF3F8] dark:bg-[#1A232E] rounded-lg border-l-4 border-red-400 p-4">
             <div className={`flex items-center gap-3 ${metaMutedClass} mb-2`}>
               <FiAlertCircle className="w-5 h-5 text-red-400" />
-              <span className="font-medium">삭제된 게시물</span>
+              <span className="font-medium">Deleted post</span>
             </div>
             <p className={`text-sm ${metaFaintClass}`}>
-              이 포스트는 작성자에 의해 삭제되었습니다
+              This post was deleted by its author.
             </p>
             {post.title && (
               <div className="mt-3">
                 <p className={`text-xs ${metaMutedStrongClass} line-clamp-1`}>
-                  제목: {post.title}
+                  Title: {post.title}
                 </p>
               </div>
             )}
@@ -489,14 +489,14 @@ const PostArticle = React.memo(function PostArticle({
                     onClick={() => onEdit(post.id)}
                     className={editButtonClass}
                   >
-                    수정
+                    Edit
                   </button>
                   <button
                     onClick={() => onDelete(post.id)}
                     disabled={isDeleting}
                     className={deleteButtonClass}
                   >
-                    {isDeleting ? '삭제중...' : '삭제'}
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </button>
                 </>
               )}
@@ -511,7 +511,7 @@ const PostArticle = React.memo(function PostArticle({
                     }`}
                   >
                     <FiBookmark className={`w-3 h-3 ${communityContext?.isPinned ? 'fill-current' : ''}`} />
-                    {communityContext?.isPinned ? '고정 해제' : '상단 고정'}
+                    {communityContext?.isPinned ? 'Unpin' : 'Pin to top'}
                   </button>
               )}
               {isAdmin && (
@@ -520,7 +520,7 @@ const PostArticle = React.memo(function PostArticle({
                       className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
                     >
                       <FiAlertTriangle className="w-3 h-3" />
-                      제재
+                      Moderate
                     </button>
                   )}
               {post.isEditorPick && (
@@ -644,14 +644,14 @@ const PostArticle = React.memo(function PostArticle({
                     onClick={() => onEdit(post.id)}
                     className={editButtonClass}
                   >
-                    수정
+                    Edit
                   </button>
                   <button
                     onClick={() => onDelete(post.id)}
                     disabled={isDeleting}
                     className={deleteButtonClass}
                   >
-                    {isDeleting ? '삭제중...' : '삭제'}
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </button>
                   {isAdmin && (
                     <button
@@ -659,7 +659,7 @@ const PostArticle = React.memo(function PostArticle({
                       className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
                     >
                       <FiAlertTriangle className="w-3 h-3" />
-                      제재
+                      Moderate
                     </button>
                   )}
                 </>
@@ -794,14 +794,14 @@ const PostArticle = React.memo(function PostArticle({
                     onClick={() => onEdit(post.id)}
                     className={editButtonClass}
                   >
-                    수정
+                    Edit
                   </button>
                   <button
                     onClick={() => onDelete(post.id)}
                     disabled={isDeleting}
                     className={deleteButtonClass}
                   >
-                    {isDeleting ? '삭제중...' : '삭제'}
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </button>
                   {isAdmin && (
                     <button
@@ -809,7 +809,7 @@ const PostArticle = React.memo(function PostArticle({
                       className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
                     >
                       <FiAlertTriangle className="w-3 h-3" />
-                      제재
+                      Moderate
                     </button>
                   )}
                 </>
@@ -898,7 +898,7 @@ const PostArticle = React.memo(function PostArticle({
                       <FiPlay className="w-10 h-10 text-white fill-white" />
                     </div>
                     <span className={`absolute bottom-3 left-4 text-sm ${metaMutedClass}`}>
-                      비디오 포함
+                      Contains video
                     </span>
                   </button>
                 )}
@@ -914,7 +914,7 @@ const PostArticle = React.memo(function PostArticle({
           )}
           {!displayContent && !hasVideo && !hasYouTube && (
             <p className={`text-[15px] ${metaFaintClass} italic leading-relaxed line-clamp-3 break-words mb-7`}>
-              내용 미리보기가 없습니다.
+              No preview available.
             </p>
           )}
           {!isImageFocused && !hasVideo && renderFlairBadge('mb-4')}
@@ -965,14 +965,14 @@ const PostArticle = React.memo(function PostArticle({
                     onClick={() => onEdit(post.id)}
                     className={editButtonClass}
                   >
-                    수정
+                    Edit
                   </button>
                   <button
                     onClick={() => onDelete(post.id)}
                     disabled={isDeleting}
                     className={deleteButtonClass}
                   >
-                    {isDeleting ? '삭제중...' : '삭제'}
+                    {isDeleting ? 'Deleting...' : 'Delete'}
                   </button>
                   {isAdmin && (
                     <button
@@ -980,7 +980,7 @@ const PostArticle = React.memo(function PostArticle({
                       className="text-xs text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300 whitespace-nowrap flex items-center gap-1"
                     >
                       <FiAlertTriangle className="w-3 h-3" />
-                      제재
+                      Moderate
                     </button>
                   )}
                 </>

@@ -1,8 +1,15 @@
+'use client';
+
 import Link from 'next/link';
 import { Copyright } from 'lucide-react';
 import { PUBLIC_LEGAL_LINKS, PUBLIC_RESOURCES } from '@/lib/public-site';
+import { useLocaleContext } from '@/providers/LocaleProvider';
+import { useCookieConsent } from '@/providers/CookieConsentProvider';
 
 export default function PublicSiteFooter() {
+  const { t, href } = useLocaleContext();
+  const { openPreferences } = useCookieConsent();
+
   return (
     <footer className="border-t border-[#152131] bg-[#0c1622] text-white">
       <div className="mx-auto w-full max-w-[1440px] px-4 py-12 sm:px-6 lg:px-8">
@@ -16,24 +23,22 @@ export default function PublicSiteFooter() {
               <span>Codebase</span>
             </div>
             <p className="max-w-lg text-sm leading-7 text-[#9fb2c6]">
-              Codebase is a platform that automatically refines and publishes
-              conversations from everyday users across AI platforms, turning them
-              into structured knowledge for ongoing knowledge management.
+              {t('publicSite.footer.description')}
             </p>
           </div>
 
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7d92a9]">
-              Resources
+              {t('publicSite.footer.resources')}
             </h3>
             <div className="mt-4 space-y-3">
               {PUBLIC_RESOURCES.map((item) => (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href(item.href)}
                   className="block text-sm text-[#d7e0eb] transition-colors hover:text-white"
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               ))}
             </div>
@@ -41,18 +46,25 @@ export default function PublicSiteFooter() {
 
           <div>
             <h3 className="text-xs font-semibold uppercase tracking-[0.18em] text-[#7d92a9]">
-              Legal
+              {t('publicSite.footer.legal')}
             </h3>
             <div className="mt-4 space-y-3">
               {PUBLIC_LEGAL_LINKS.map((item) => (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href(item.href)}
                   className="block text-sm text-[#d7e0eb] transition-colors hover:text-white"
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               ))}
+              <button
+                type="button"
+                onClick={openPreferences}
+                className="block text-left text-sm text-[#d7e0eb] transition-colors hover:text-white"
+              >
+                {t('publicSite.footer.cookiePreferences')}
+              </button>
             </div>
           </div>
         </div>

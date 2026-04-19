@@ -12,6 +12,8 @@ import {
   clearMcpOAuthSession,
   readMcpOAuthSession,
 } from '@/lib/mcpOAuth';
+import { stripLocalePrefix } from '@/lib/i18n/config';
+import { useLocaleContext } from './LocaleProvider';
 
 /**
  * TanStack Query 기반 AuthProvider
@@ -28,6 +30,8 @@ export function AuthProviderV2({ children }: { children: React.ReactNode }) {
   const wasAuthenticatedRef = useRef(false);
   const router = useRouter();
   const pathname = usePathname();
+  const normalizedPathname = stripLocalePrefix(pathname || '/');
+  const { locale } = useLocaleContext();
 
   // 초기 인증 상태 확인 (한 번만)
   useEffect(() => {
@@ -64,20 +68,21 @@ export function AuthProviderV2({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    if (pathname === '/auth/mcp-consent') {
+    if (normalizedPathname === '/auth/mcp-consent') {
       return;
     }
 
-    if (pathname === '/consent') {
+    if (normalizedPathname === '/consent') {
       return;
     }
 
-    router.replace(buildMcpOAuthConsentPath(mcpOAuthData));
+    router.replace(buildMcpOAuthConsentPath(mcpOAuthData, locale));
   }, [
     authValue.isAuthenticated,
     authValue.user?.termsAcceptedAt,
     authValue.user?.privacyAcceptedAt,
-    pathname,
+    normalizedPathname,
+    locale,
     router,
   ]);
 

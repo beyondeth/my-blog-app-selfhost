@@ -96,7 +96,7 @@ const CommunityCard = React.memo(function CommunityCard({
             )}
           </div>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            {formatCount(community.memberCount)} 멤버
+            {formatCount(community.memberCount)} members
           </p>
         </div>
       </Link>
@@ -148,11 +148,11 @@ const CommunityCard = React.memo(function CommunityCard({
               {!community.isPublic && (
                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-200">
                   <Lock className="w-3 h-3" />
-                  비공개
+                  Private
                 </span>
               )}
               <span>
-                {formatCount(community.memberCount)} 멤버
+                {formatCount(community.memberCount)} members
               </span>
               {community.isNsfw && (
                 <span className="text-red-600 dark:text-red-300 font-semibold uppercase tracking-wide">

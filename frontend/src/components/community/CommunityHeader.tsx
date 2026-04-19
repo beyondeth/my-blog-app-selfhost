@@ -64,7 +64,7 @@ const CommunityHeader = React.memo(function CommunityHeader({
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={community.bannerUrl}
-              alt={`${community.name} 배너`}
+              alt={`${community.name} banner`}
               className={cn('w-full h-full', bannerImageClass)}
             />
           </>
@@ -127,11 +127,11 @@ const CommunityHeader = React.memo(function CommunityHeader({
               <Button
                 onClick={() => router.push(`/c/${community.slug}/submit`)}
                 disabled={isCommunityLocked}
-                title={isCommunityLocked ? '커뮤니티가 잠금 상태에서는 게시물을 작성할 수 없습니다.' : undefined}
+                title={isCommunityLocked ? 'Posting is disabled while the community is locked.' : undefined}
                 className="inline-flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
               >
                 <Plus className="w-4 h-4" />
-                <span className="text-xs sm:text-sm font-semibold">게시물 만들기</span>
+                <span className="text-xs sm:text-sm font-semibold">Create post</span>
               </Button>
             )}
 
@@ -141,7 +141,7 @@ const CommunityHeader = React.memo(function CommunityHeader({
                 variant="outline"
                 size="icon"
                 onClick={() => router.push(`/c/${community.slug}/settings`)}
-                title="커뮤니티 설정"
+                title="Community settings"
                 className="border-gray-300 text-gray-700 hover:bg-gray-100 dark:border-gray-600 dark:text-gray-100 dark:hover:bg-gray-700"
               >
                 <Settings className="w-4 h-4" />

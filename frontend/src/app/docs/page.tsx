@@ -1,73 +1,114 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import DocsPageLayout from '@/components/public-site/DocsPageLayout';
-
-export const metadata: Metadata = {
-  title: 'Documentation',
-  description: 'Codebase 자동포스팅 연결 방식과 실제 발행 흐름을 현재 구현 기준으로 안내합니다.',
-  alternates: {
-    canonical: '/docs',
+const PAGE_CONTENT = {
+  metadataDescription:
+    'Learn how Codebase MCP connections and publishing flow work in the current production implementation.',
+  title: 'Codebase Docs',
+  description:
+    'This guide reflects how the product works today. It follows the settings UI and the current server contract so you can understand the full flow from connection to publishing in one place.',
+  toc: [
+    { id: 'overview', label: 'Overview' },
+    { id: 'setup-model', label: 'Current setup model' },
+    { id: 'environment-guides', label: 'Environment guides' },
+    { id: 'what-you-can-do', label: 'What you can do' },
+  ],
+  overview: {
+    heading: 'Overview',
+    body: (
+      <>
+        This document explains Codebase auto-publishing based on the <strong>current implementation</strong>.
+        The primary source of truth is{' '}
+        <Link href="/settings/api-keys">Settings &gt; Auto-publishing connection</Link>, and the docs are
+        aligned to the configuration and server contract shown there.
+      </>
+    ),
   },
-};
+  setupModel: {
+    heading: 'Current setup model',
+    body: (
+      <>
+        The default public connection flow does not rely on a local proxy. Instead, it registers the
+        <strong> Codebase hosted MCP endpoint</strong> directly in each client. Users create an API key and
+        connect each environment with the matching setup flow.
+      </>
+    ),
+    items: [
+      '1. Create an API key in settings. You can keep up to 3 active keys at a time.',
+      '2. Register https://mcp.codebase.blog/mcp in the client you use.',
+      '3. Use a preset flag for standard publishing requests and --sell only for marketplace products.',
+    ],
+  },
+  guides: {
+    heading: 'Environment guides',
+    body: (
+      <>
+        The guides are organized by environment. Web and app surfaces such as ChatGPT, Claude, and Perplexity are
+        covered in <Link href="/docs/apps">Web &amp; App Connections</Link>, while MCP snippets and CLI or IDE
+        policies stay aligned with the settings page and the reference docs.
+      </>
+    ),
+  },
+  capabilities: {
+    heading: 'What you can do',
+    body:
+      'With the current connection model, you can do more than simple posting. You can also work with published posts and your personal knowledge surface.',
+    items: [
+      'Publish: create posts from a title, category, tags, and Markdown body.',
+      'Visibility: if the blog is private, a post requested as public still remains private in practice.',
+      'Readback: list published posts, inspect details, and query the knowledge manifest, knowledge nodes, and follow-up suggestions.',
+    ],
+  },
+} as const;
 
-const toc = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'setup-model', label: 'Current setup model' },
-  { id: 'environment-guides', label: 'Environment guides' },
-  { id: 'what-you-can-do', label: 'What you can do' },
-];
+export async function generateMetadata(): Promise<Metadata> {
+  const content = PAGE_CONTENT;
 
-export default function DocsHomePage() {
+  return {
+    title: 'Documentation',
+    description: content.metadataDescription,
+    alternates: {
+      canonical: '/docs',
+    },
+  };
+}
+
+export default async function DocsHomePage() {
+  const content = PAGE_CONTENT;
   return (
     <DocsPageLayout
       currentPath="/docs"
-      title="Codebase Docs"
-      description="현재 제품이 실제로 작동하는 방식에 맞춘 사용자 가이드입니다. 설정 화면과 서버 계약을 기준으로, 연결부터 발행까지의 흐름을 한 번에 확인할 수 있습니다."
-      toc={toc}
+      title={content.title}
+      description={content.description}
+      toc={[...content.toc]}
     >
       <section id="overview">
-        <h2>Overview</h2>
-        <p>
-          이 문서는 <strong>현재 구현 기준</strong>으로 Codebase 자동포스팅을 설명합니다.
-          가장 중요한 기준선은 <Link href="/settings/api-keys">설정 &gt; 자동포스팅 연결</Link>
-          페이지이며, 여기에 노출되는 설정 방식과 서버 계약을 바탕으로 문서를 맞춥니다.
-        </p>
+        <h2>{content.overview.heading}</h2>
+        <p>{content.overview.body}</p>
       </section>
 
       <section id="setup-model">
-        <h2>Current setup model</h2>
-        <p>
-          현재 public guide에서 지원하는 기본 연결 방식은 로컬 프록시가 아니라
-          <strong> Codebase의 hosted MCP endpoint</strong>를 각 클라이언트에 등록하는
-          구조입니다. 사용자별 API key를 발급한 뒤, 사용하는 클라이언트에 맞는 방식으로
-          연결합니다.
-        </p>
+        <h2>{content.setupModel.heading}</h2>
+        <p>{content.setupModel.body}</p>
         <ol className="mt-6 space-y-3">
-          <li>1. 설정 화면에서 API key를 발급합니다. 현재 active key는 최대 3개까지 유지할 수 있습니다.</li>
-          <li>2. 사용하는 클라이언트에 <code>https://mcp.codebase.blog/mcp</code>를 등록합니다.</li>
-          <li>3. 발행 요청 시 일반 문서는 preset flag를, 상품 등록은 <code>--sell</code>을 사용합니다.</li>
+          {content.setupModel.items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ol>
       </section>
 
       <section id="environment-guides">
-        <h2>Environment guides</h2>
-        <p>
-          연결 가이드는 사용 환경 기준으로 나눕니다. ChatGPT, Claude, Perplexity 같은 웹/앱
-          환경은 <Link href="/docs/apps">Web &amp; App Connections</Link>에서 안내하고,
-          CLI/IDE용 MCP 스니펫과 정책은 기존 문서와 설정 화면을 기준으로 유지합니다.
-        </p>
+        <h2>{content.guides.heading}</h2>
+        <p>{content.guides.body}</p>
       </section>
 
       <section id="what-you-can-do">
-        <h2>What you can do</h2>
-        <p>
-          현재 연결 방식으로는 단순 포스팅만이 아니라, 발행된 글과 개인 knowledge surface를
-          함께 다룰 수 있습니다.
-        </p>
+        <h2>{content.capabilities.heading}</h2>
+        <p>{content.capabilities.body}</p>
         <ul className="mt-6 space-y-3">
-          <li>발행: 제목, 카테고리, 태그, Markdown 본문을 기준으로 글을 발행합니다.</li>
-          <li>공개 상태: 블로그가 private면 글에 public을 요청해도 실제 공개 상태는 private로 유지됩니다.</li>
-          <li>조회: 발행된 글 목록과 상세를 읽고, knowledge manifest, node search, follow-up suggestion도 조회할 수 있습니다.</li>
+          {content.capabilities.items.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
         </ul>
       </section>
     </DocsPageLayout>

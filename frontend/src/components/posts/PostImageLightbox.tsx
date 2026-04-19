@@ -75,7 +75,7 @@ export default function PostImageLightbox({
         className="w-screen h-[100dvh] max-w-none rounded-none border-none bg-black p-0 text-white shadow-none sm:max-w-[95vw] sm:max-h-[95vh] sm:rounded-lg sm:shadow-2xl sm:bg-black/95"
         hideClose
       >
-        <DialogTitle className="sr-only">이미지 미리보기</DialogTitle>
+        <DialogTitle className="sr-only">Image preview</DialogTitle>
         <div className="flex flex-col h-full">
           <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
             <div className="text-sm">
@@ -95,7 +95,7 @@ export default function PostImageLightbox({
               <div className="relative w-full h-full sm:aspect-[16/10]">
                 <Image
                   src={safeImages[currentIndex]}
-                  alt={`게시물 이미지 ${currentIndex + 1}`}
+                  alt={`Post image ${currentIndex + 1}`}
                   fill
                   sizes="100vw"
                   className="object-contain select-none"
@@ -109,7 +109,7 @@ export default function PostImageLightbox({
                     type="button"
                     onClick={handlePrev}
                     className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/70 text-white p-2 hover:bg-black/80 focus:outline-none"
-                    aria-label="이전 이미지"
+                    aria-label="Previous image"
                   >
                     <ChevronLeft className="w-5 h-5" />
                   </button>
@@ -117,7 +117,7 @@ export default function PostImageLightbox({
                     type="button"
                     onClick={handleNext}
                     className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/70 text-white p-2 hover:bg-black/80 focus:outline-none"
-                    aria-label="다음 이미지"
+                    aria-label="Next image"
                   >
                     <ChevronRight className="w-5 h-5" />
                   </button>
@@ -133,7 +133,7 @@ export default function PostImageLightbox({
                   key={index}
                   type="button"
                   onClick={() => setCurrentIndex(index)}
-                  aria-label={`${index + 1}번 이미지 보기`}
+                  aria-label={`View image ${index + 1}`}
                   className={cn(
                     'h-2 w-2 rounded-full border border-white/40',
                     currentIndex === index ? 'bg-white' : 'bg-transparent',

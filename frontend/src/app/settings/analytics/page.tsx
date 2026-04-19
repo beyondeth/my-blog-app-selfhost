@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { SETTINGS_CARD_CLASS } from '@/app/settings/theme';
 import dynamic from 'next/dynamic';
 
-// ApexCharts SSR 방지
+// ApexCharts SSR guard
 const Chart = dynamic(() => import('react-apexcharts'), { ssr: false });
 
 interface BlogStatsData {
@@ -41,7 +41,7 @@ interface TopPost {
 }
 
 /**
- * 블로그 분석 페이지
+ * Blog analytics page
  */
 export default function BlogAnalyticsPage() {
   const { user } = useAuth();
@@ -60,26 +60,26 @@ export default function BlogAnalyticsPage() {
       setLoading(true);
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1';
 
-      // 통계 데이터 조회 (실패해도 계속 진행)
+      // Fetch each section independently so a single failure does not blank the page.
       const [statsRes, trendsRes, topPostsRes] = await Promise.allSettled([
         fetch(`${apiUrl}/blogs/${blog.id}/stats`, { credentials: 'include' }),
         fetch(`${apiUrl}/blogs/${blog.id}/stats/trends?period=daily&range=${period}`, { credentials: 'include' }),
         fetch(`${apiUrl}/blogs/${blog.id}/stats/top-posts?sortBy=views&limit=5`, { credentials: 'include' }),
       ]);
 
-      // 통계 처리
+      // Stats
       if (statsRes.status === 'fulfilled' && statsRes.value.ok) {
         const data = await statsRes.value.json();
         setStats(data);
       }
 
-      // 트렌드 처리
+      // Trends
       if (trendsRes.status === 'fulfilled' && trendsRes.value.ok) {
         const data = await trendsRes.value.json();
         setTrends(data.trends || []);
       }
 
-      // 인기 게시물 처리
+      // Top posts
       if (topPostsRes.status === 'fulfilled' && topPostsRes.value.ok) {
         const data = await topPostsRes.value.json();
         setTopPosts(data.posts || []);
@@ -103,18 +103,18 @@ export default function BlogAnalyticsPage() {
     await fetchAnalytics();
   };
 
-  // ApexCharts 설정
+  // ApexCharts options
   const lineChartOptions = {
     chart: {
       type: 'line' as const,
-      toolbar: { show: false }, // 툴바 숨김 (깔끔하게)
+      toolbar: { show: false },
       animations: { enabled: true, easing: 'easeinout' as const, speed: 800 },
       background: 'transparent',
       fontFamily: 'inherit',
     },
     stroke: { curve: 'smooth' as const, width: 3 },
     dataLabels: { enabled: false },
-    theme: { mode: 'dark' as const }, // 다크모드 대응을 위해 기본적으로 차트 테마 설정 (색상은 colors로 오버라이드)
+    theme: { mode: 'dark' as const },
     xaxis: {
       categories: trends.map((t) => {
         const date = new Date(t.date);
@@ -123,15 +123,15 @@ export default function BlogAnalyticsPage() {
       axisBorder: { show: false },
       axisTicks: { show: false },
       labels: {
-        style: { colors: '#d1d5db' } // text-gray-400
+        style: { colors: '#d1d5db' }
       }
     },
     yaxis: {
       labels: {
-        style: { colors: '#d1d5db' } // text-gray-400
+        style: { colors: '#d1d5db' }
       }
     },
-    colors: ['#6366f1', '#10B981', '#F59E0B'], // Indigo-500 equivalent for primary
+    colors: ['#6366f1', '#10B981', '#F59E0B'],
     legend: { 
       position: 'top' as const,
       labels: { colors: '#d1d5db' }
@@ -150,15 +150,15 @@ export default function BlogAnalyticsPage() {
   };
 
   const lineChartSeries = [
-    { name: '조회수', data: trends.map((t) => t.views) },
-    { name: '좋아요', data: trends.map((t) => t.likes) },
-    { name: '댓글', data: trends.map((t) => t.comments) },
+    { name: 'Views', data: trends.map((t) => t.views) },
+    { name: 'Likes', data: trends.map((t) => t.likes) },
+    { name: 'Comments', data: trends.map((t) => t.comments) },
   ];
 
   if (!user) {
     return (
       <div className={`${SETTINGS_CARD_CLASS} p-6 text-center text-gray-600 dark:text-gray-300`}>
-        로그인이 필요합니다
+        Sign in to view your analytics.
       </div>
     );
   }
@@ -166,10 +166,10 @@ export default function BlogAnalyticsPage() {
   if (blogLoading || loading) {
     return (
       <div className="space-y-6 pt-2">
-         {/* Title Skeleton */}
+         {/* Title skeleton */}
         <div className="h-8 w-48 bg-gray-200 dark:bg-white/5 rounded animate-pulse" />
         
-        {/* Stats Grid Skeleton */}
+        {/* Stats grid skeleton */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[...Array(4)].map((_, i) => (
             <div key={i} className={`${SETTINGS_CARD_CLASS} p-6 h-32 animate-pulse flex flex-col justify-between`}>
@@ -179,7 +179,7 @@ export default function BlogAnalyticsPage() {
           ))}
         </div>
         
-        {/* Chart Skeleton */}
+        {/* Chart skeleton */}
         <div className={`${SETTINGS_CARD_CLASS} p-6 h-[400px] animate-pulse`} />
       </div>
     );
@@ -187,28 +187,28 @@ export default function BlogAnalyticsPage() {
 
   const statCards = [
     {
-      title: '전체 조회수',
+      title: 'Total views',
       value: stats?.totalViews ?? 0,
       icon: Eye,
       color: 'text-blue-600 dark:text-blue-400',
       bgColor: 'bg-blue-50 dark:bg-blue-500/10',
     },
     {
-      title: '전체 좋아요',
+      title: 'Total likes',
       value: stats?.totalLikes ?? 0,
       icon: ArrowBigUp,
       color: 'text-rose-600 dark:text-rose-400',
       bgColor: 'bg-rose-50 dark:bg-rose-500/10',
     },
     {
-      title: '전체 댓글',
+      title: 'Total comments',
       value: stats?.totalComments ?? 0,
       icon: MessageSquare,
       color: 'text-amber-600 dark:text-amber-400',
       bgColor: 'bg-amber-50 dark:bg-amber-500/10',
     },
     {
-      title: '팔로워',
+      title: 'Followers',
       value: stats?.followerCount ?? 0,
       icon: Users,
       color: 'text-emerald-600 dark:text-emerald-400',
@@ -222,10 +222,10 @@ export default function BlogAnalyticsPage() {
         <div className="space-y-1">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
             <BarChart3 className="w-5 h-5" />
-            블로그 분석
+            Blog analytics
           </h2>
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            블로그 성과를 한눈에 확인하세요
+            Track your blog performance at a glance.
           </p>
         </div>
         <Button
@@ -236,11 +236,11 @@ export default function BlogAnalyticsPage() {
           className="bg-white dark:bg-[#121621] border-gray-200 dark:border-[#2e3545] text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-[#1c2130]"
         >
           <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          새로고침
+          Refresh
         </Button>
       </div>
 
-      {/* 개요 카드 */}
+      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-5">
         {statCards.map((stat) => {
           const Icon = stat.icon;
@@ -262,23 +262,23 @@ export default function BlogAnalyticsPage() {
         })}
       </div>
 
-      {/* 주간 하이라이트 */}
+      {/* Weekly highlights */}
       <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-4`}>
         <div className="flex items-center gap-2 mb-2">
           <TrendingUp className="w-5 h-5 text-emerald-500" />
           <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
-            주간 하이라이트
+            Weekly highlights
           </h3>
         </div>
         <div className="grid grid-cols-2 gap-5">
           <div className="p-5 bg-gray-50 dark:bg-[#1A1F2B] rounded-2xl border border-gray-100 dark:border-[#232834]">
-            <p className="text-xs text-gray-500 dark:text-gray-300 mb-1">이번 주 조회수</p>
+            <p className="text-xs text-gray-500 dark:text-gray-300 mb-1">Views this week</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-50">
               {(stats?.weeklyViews ?? 0).toLocaleString()}
             </p>
           </div>
           <div className="p-5 bg-gray-50 dark:bg-[#1A1F2B] rounded-2xl border border-gray-100 dark:border-[#232834]">
-            <p className="text-xs text-gray-500 dark:text-gray-300 mb-1">이번 주 좋아요</p>
+            <p className="text-xs text-gray-500 dark:text-gray-300 mb-1">Likes this week</p>
             <p className="text-2xl font-bold text-gray-900 dark:text-gray-50">
               {(stats?.weeklyLikes ?? 0).toLocaleString()}
             </p>
@@ -286,13 +286,13 @@ export default function BlogAnalyticsPage() {
         </div>
       </section>
 
-      {/* 트렌드 차트 */}
+      {/* Trend chart */}
       <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-6`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Calendar className="w-5 h-5 text-gray-400 dark:text-gray-500" />
             <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
-              일별 추이
+              Daily trend
             </h3>
           </div>
           <div className="flex gap-1 bg-gray-100 dark:bg-[#121621] p-1 rounded-xl">
@@ -306,7 +306,7 @@ export default function BlogAnalyticsPage() {
                     : 'text-gray-500 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-200'
                 }`}
               >
-                {p}일
+                {p}d
               </button>
             ))}
           </div>
@@ -326,17 +326,17 @@ export default function BlogAnalyticsPage() {
           ) : (
             <div className="h-[300px] flex flex-col items-center justify-center text-gray-500 dark:text-gray-300 bg-gray-50 dark:bg-[#1A1F2B] rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
               <BarChart3 className="w-10 h-10 mb-3 opacity-30" />
-              <p className="font-medium">아직 데이터가 없습니다</p>
-              <p className="text-xs mt-1 opacity-70">게시물을 작성하면 통계가 표시됩니다</p>
+              <p className="font-medium">No data yet</p>
+              <p className="text-xs mt-1 opacity-70">Publish posts to start seeing analytics.</p>
             </div>
           )}
         </div>
       </section>
 
-      {/* 인기 게시물 */}
+      {/* Top posts */}
       <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-5`}>
         <h3 className="text-base font-semibold text-gray-900 dark:text-gray-50">
-          인기 게시물
+          Top posts
         </h3>
         
         {topPosts.length > 0 ? (
@@ -373,7 +373,7 @@ export default function BlogAnalyticsPage() {
           </div>
         ) : (
           <div className="py-12 text-center text-gray-500 dark:text-gray-300 bg-gray-50 dark:bg-[#1A1F2B] rounded-2xl border border-dashed border-gray-200 dark:border-gray-700">
-            <p>아직 인기 게시물이 없습니다</p>
+            <p>No top posts yet.</p>
           </div>
         )}
       </section>

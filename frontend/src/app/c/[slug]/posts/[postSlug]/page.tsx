@@ -78,8 +78,8 @@ export async function generateMetadata(
 
   if (!post) {
     return {
-      title: '게시물을 찾을 수 없습니다',
-      description: '요청하신 게시물을 찾을 수 없습니다.',
+      title: 'Post not found',
+      description: 'The requested post could not be found.',
     };
   }
 
@@ -89,7 +89,7 @@ export async function generateMetadata(
     .replace(/\n+/g, ' ')    // 줄바꿈 공백 변환
     .trim()
     .substring(0, 160) ||    // 160자 제한
-    '커뮤니티 게시물';
+    'Community post';
 
   const siteName = process.env.NEXT_PUBLIC_SITE_NAME || 'Codebase';
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';

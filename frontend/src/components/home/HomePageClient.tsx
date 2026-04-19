@@ -44,12 +44,6 @@ import SidebarCtaSection from '@/components/layout/SidebarCtaSection';
 /**
  * 홈 페이지 메인 컴포넌트 (Client Side)
  */
-const sortOptions: Array<{ value: FeedSortType; label: string; icon: React.ComponentType<{ className?: string }> }> = [
-  { value: 'recent', label: '최신순', icon: Clock },
-  { value: 'hot', label: '인기순', icon: Flame },
-  { value: 'top', label: 'Top', icon: TrendingUp },
-];
-
 const HomeFeedPlaceholderCard = ({ hasImage = true }: { hasImage?: boolean }) => (
   <div className="h-full animate-pulse rounded-3xl border border-[#D9E0EA] bg-white p-5 sm:p-6 shadow-sm dark:border-[#4B5563] dark:bg-[#131A22]">
     <div className="flex items-center gap-3">
@@ -98,6 +92,21 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
   const [touchStart, setTouchStart] = useState<number | null>(null);
   const [touchEnd, setTouchEnd] = useState<number | null>(null);
   const [feedScrollElement, setFeedScrollElement] = useState<HTMLElement | null>(null);
+  const copy = {
+    sortOptions: [
+      { value: 'recent' as const, label: 'Latest', icon: Clock },
+      { value: 'hot' as const, label: 'Popular', icon: Flame },
+      { value: 'top' as const, label: 'Top', icon: TrendingUp },
+    ],
+    untitledPost: 'Post',
+    errorPrefix: 'Something went wrong:',
+    noEditorPick: "No Editor's Pick is available yet.",
+    goToEditorPick: (index: number) => `Go to Editor's Pick ${index + 1}`,
+    prevEditorPick: "Previous Editor's Pick",
+    nextEditorPick: "Next Editor's Pick",
+    noPosts: 'No posts yet.',
+  };
+  const sortOptions = copy.sortOptions;
   const activePick = editorPickPosts[activePickIndex];
   const activePickImage = activePick?.thumbnail || activePick?.images?.[0] || null;
   const feedObserverRoot = isDesktop ? feedScrollElement : null;
@@ -257,11 +266,11 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
         blogSlug: item.blog?.slug || item.blog?.alias || null,
         communitySlug: item.community?.slug || null,
         postSlug: item.slug || null,
-        title: item.title || '게시글',
+        title: item.title || copy.untitledPost,
       });
     });
     return map;
-  }, [filteredItems]);
+  }, [copy.untitledPost, filteredItems]);
 
   const pendingCursorRef = useRef<string | null>(null);
   const lastPageCursor = data?.pages?.[data.pages.length - 1]?.nextCursor ?? null;
@@ -443,7 +452,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
   if (error) {
     return (
       <ErrorMessage 
-        message={`오류가 발생했습니다: ${error.message}`}
+        message={`${copy.errorPrefix} ${error.message}`}
         showBackButton={false}
       />
     );
@@ -496,7 +505,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                     <div className="h-full w-full animate-pulse bg-gray-100 dark:bg-gray-800" />
                   ) : editorPickPosts.length === 0 ? (
                     <div className="p-6 text-sm text-[#4B5563] dark:text-[#A9B4C2]">
-                       아직 선정된 Editor&apos;s Pick이 없습니다.
+                       {copy.noEditorPick}
                     </div>
                   ) : (
                     <>
@@ -520,7 +529,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                                         ? `w-5 h-2 ${activePickImage ? 'bg-white' : 'bg-[#264653] dark:bg-[#6CC3B2]'}`
                                         : `w-2 h-2 ${activePickImage ? 'bg-white/50 hover:bg-white/70' : 'bg-[#D9E0EA] dark:bg-[#2A3645] hover:bg-[#C9D3E0] dark:hover:bg-[#223040]'}`
                                     }`}
-                                    aria-label={`Editor's Pick ${index + 1}로 이동`}
+                                    aria-label={copy.goToEditorPick(index)}
                                   />
                                 ))}
                               </div>
@@ -537,7 +546,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                               handlePickPrev();
                             }}
                             className="hidden sm:block absolute left-6 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                            aria-label="이전 Editor's Pick"
+                            aria-label={copy.prevEditorPick}
                           >
                             <ChevronLeft className="h-5 w-5" />
                           </button>
@@ -548,7 +557,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
                               handlePickNext();
                             }}
                             className="hidden sm:block absolute right-6 top-1/2 z-20 -translate-y-1/2 rounded-full bg-black/40 p-2 text-white transition hover:bg-black/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
-                            aria-label="다음 Editor's Pick"
+                            aria-label={copy.nextEditorPick}
                           >
                             <ChevronRight className="h-5 w-5" />
                           </button>
@@ -639,7 +648,7 @@ export default function HomePageClient({ isMobile = false }: HomePageClientProps
               </>
             ) : (
               <div className="text-center py-12 text-[#4B5563] dark:text-[#A9B4C2]">
-                <p className="text-sm sm:text-base">아직 포스트가 없습니다.</p>
+                <p className="text-sm sm:text-base">{copy.noPosts}</p>
               </div>
             )}
             </div>

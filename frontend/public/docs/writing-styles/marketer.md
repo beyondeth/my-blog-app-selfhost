@@ -1,6 +1,6 @@
 ---
 style_name: "Growth & Performance Marketing Style"
-language: "korean"
+language: "english"
 min_length: 5000
 target_length: "5000-8000"
 code_block_ratio: 0.02
@@ -103,8 +103,8 @@ Use this pattern for experiment-heavy posts.
 
 ## Replace Empty Success Language
 
-- `반응이 좋았다` → `댓글 저장률이 1.4배 높아졌다`
-- `전환이 개선됐다` → `가입 전환율이 2.1%에서 3.4%로 상승했다`
+- `engagement improved` → `comment saves increased by 1.4x`
+- `conversion improved` → `signup conversion increased from 2.1% to 3.4%`
 
 # === QUALITY CHECKLIST ===
 

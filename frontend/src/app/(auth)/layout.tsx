@@ -32,7 +32,7 @@ export default function AuthLayout({
   }, [pathname]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 flex items-center justify-center p-4 relative overflow-hidden">
+    <div className="relative">
       {/* 그라디언트 배경 효과를 위한 CSS 클래스 지원 */}
       <style jsx global>{`
         .auth-gradient-light {
@@ -81,11 +81,7 @@ export default function AuthLayout({
           75% { transform: translateX(5px); }
         }
       `}</style>
-
-      {/* 중앙 정렬된 인증 컨텐츠 - forgot-password는 전체 너비 사용 */}
-      <div className={`w-full ${pathname === '/forgot-password' ? '' : 'max-w-lg'}`}>
-        {children}
-      </div>
+      {children}
     </div>
   );
 }

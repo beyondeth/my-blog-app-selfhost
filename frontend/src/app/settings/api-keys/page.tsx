@@ -134,18 +134,18 @@ export default function ApiKeysPage() {
 
   const createKey = async (keyName: string) => {
     if (!selectedBlogId) {
-      showStatusMessage('error', '블로그를 선택해주세요.');
+      showStatusMessage('error', 'Select a blog first.');
       return;
     }
 
     if (keyLimitReached) {
-      showStatusMessage('error', `API Key는 최대 ${maxApiKeys}개까지 생성할 수 있습니다.`);
+      showStatusMessage('error', `You can create up to ${maxApiKeys} API keys.`);
       return;
     }
 
     const normalizedName = keyName.trim();
     if (!normalizedName) {
-      showStatusMessage('error', 'API 키 이름을 입력해주세요.');
+      showStatusMessage('error', 'Enter an API key name.');
       return;
     }
 
@@ -159,14 +159,14 @@ export default function ApiKeysPage() {
       saveRuntimeApiKey(created.keyHint, created.apiKey);
       await refreshKeys();
       setCreateModal({ isOpen: false, keyName: '' });
-      showStatusMessage('success', 'API Key가 생성되었습니다. 언제든 다시 복사할 수 있습니다.');
+      showStatusMessage('success', 'API key created. You can copy it again anytime.');
     } catch (error: any) {
       console.error('Failed to create API key:', error);
       const message =
         error?.message ||
         error?.response?.data?.message ||
-        '알 수 없는 오류가 발생했습니다.';
-      showStatusMessage('error', `API Key 생성 실패: ${message}`);
+        'An unknown error occurred.';
+      showStatusMessage('error', `Failed to create API key: ${message}`);
     } finally {
       setCreating(false);
     }
@@ -174,11 +174,11 @@ export default function ApiKeysPage() {
 
   const openCreateModal = () => {
     if (!selectedBlogId) {
-      showStatusMessage('error', '블로그를 선택해주세요.');
+      showStatusMessage('error', 'Select a blog first.');
       return;
     }
     if (keyLimitReached) {
-      showStatusMessage('error', `API Key는 최대 ${maxApiKeys}개까지 생성할 수 있습니다.`);
+      showStatusMessage('error', `You can create up to ${maxApiKeys} API keys.`);
       return;
     }
     setCreateModal({ isOpen: true, keyName: '' });
@@ -202,15 +202,15 @@ export default function ApiKeysPage() {
         removeRuntimeApiKey(deleteDialog.keyHint);
       }
       removeKeyLocally(deleteDialog.keyId);
-      showStatusMessage('success', 'API Key가 삭제되었습니다.');
+      showStatusMessage('success', 'API key deleted.');
       setDeleteDialog({ isOpen: false, keyId: null, keyName: '', keyHint: null });
     } catch (error: any) {
       console.error('Failed to delete API key:', error);
       const message =
         error?.message ||
         error?.response?.data?.message ||
-        '알 수 없는 오류가 발생했습니다.';
-      showStatusMessage('error', 'API Key 삭제 실패: ' + message);
+        'An unknown error occurred.';
+      showStatusMessage('error', 'Failed to delete API key: ' + message);
     }
   };
 
@@ -229,7 +229,7 @@ export default function ApiKeysPage() {
 
   const copyAndNotify = (text: string) => {
     copyToClipboard(text);
-    showStatusMessage('success', 'API Key를 복사했습니다.');
+    showStatusMessage('success', 'API key copied.');
     if (copyFeedbackTimeout.current) {
       clearTimeout(copyFeedbackTimeout.current);
     }
@@ -260,8 +260,8 @@ export default function ApiKeysPage() {
       const message =
         error?.message ||
         error?.response?.data?.message ||
-        '알 수 없는 오류가 발생했습니다.';
-      showStatusMessage('error', `API Key 복사 실패: ${message}`);
+        'An unknown error occurred.';
+      showStatusMessage('error', `Failed to copy API key: ${message}`);
     } finally {
       setRevealingKeyId((current) => (current === key.id ? null : current));
     }
@@ -298,7 +298,7 @@ export default function ApiKeysPage() {
   }> = [
     { id: 'mac-linux', title: 'macOS / Linux', description: '~/.codex/config.toml' },
     { id: 'windows', title: 'Windows', description: '%USERPROFILE%\\.codex\\config.toml' },
-    { id: 'wsl', title: 'WSL2', description: 'Linux 홈 디렉터리의 ~/.codex/config.toml' },
+    { id: 'wsl', title: 'WSL2', description: 'Linux home directory: ~/.codex/config.toml' },
   ];
 
   const mcpClientCards: Array<{
@@ -308,13 +308,13 @@ export default function ApiKeysPage() {
     configPath: string;
   }> = [
     { id: 'codex', title: 'OpenAI Codex', description: 'Codex CLI', configPath: '~/.codex/config.toml' },
-    { id: 'claude-code', title: 'Claude Code', description: 'CLI 명령', configPath: '터미널' },
-    { id: 'gemini', title: 'Gemini CLI', description: 'JSON 설정', configPath: '~/.gemini/settings.json' },
-    { id: 'antigravity', title: 'Antigravity', description: 'JSON 설정', configPath: 'mcp_config.json' },
-    { id: 'cursor', title: 'Cursor', description: 'JSON 설정', configPath: '~/.cursor/mcp.json' },
-    { id: 'windsurf', title: 'Windsurf', description: 'JSON 설정', configPath: '~/.windsurf/mcp.json' },
-    { id: 'vscode', title: 'VS Code', description: '워크스페이스 설정', configPath: '.mcp.json' },
-    { id: 'qwen', title: 'Qwen Coder', description: 'JSON 설정', configPath: '~/.qwen/mcp.json' },
+    { id: 'claude-code', title: 'Claude Code', description: 'CLI command', configPath: 'Terminal' },
+    { id: 'gemini', title: 'Gemini CLI', description: 'JSON config', configPath: '~/.gemini/settings.json' },
+    { id: 'antigravity', title: 'Antigravity', description: 'JSON config', configPath: 'mcp_config.json' },
+    { id: 'cursor', title: 'Cursor', description: 'JSON config', configPath: '~/.cursor/mcp.json' },
+    { id: 'windsurf', title: 'Windsurf', description: 'JSON config', configPath: '~/.windsurf/mcp.json' },
+    { id: 'vscode', title: 'VS Code', description: 'Workspace config', configPath: '.mcp.json' },
+    { id: 'qwen', title: 'Qwen Coder', description: 'JSON config', configPath: '~/.qwen/mcp.json' },
   ];
 
   const mcpConfigByClient = {
@@ -333,28 +333,28 @@ export default function ApiKeysPage() {
     {
       id: 'codex' as const,
       title: 'Codex',
-      description: 'CLI 설치',
+      description: 'CLI install',
       targetPath: 'Global Skill',
       command: skillsPerAgentCommands[0] ?? '',
     },
     {
       id: 'claude-code' as const,
       title: 'Claude Code',
-      description: 'CLI 설치',
+      description: 'CLI install',
       targetPath: 'Global Skill',
       command: skillsPerAgentCommands[1] ?? '',
     },
     {
       id: 'gemini-cli' as const,
       title: 'Gemini CLI',
-      description: 'CLI 설치',
+      description: 'CLI install',
       targetPath: 'Global Skill',
       command: skillsPerAgentCommands[2] ?? '',
     },
     {
       id: 'antigravity' as const,
       title: 'Antigravity',
-      description: 'CLI 설치',
+      description: 'CLI install',
       targetPath: 'Global Skill',
       command: skillsPerAgentCommands[3] ?? '',
     },
@@ -374,15 +374,15 @@ export default function ApiKeysPage() {
   }));
 
   const formatRelativeTime = (iso: string | null) => {
-    if (!iso) return '사용 안 함';
+    if (!iso) return 'Never used';
     const diffMs = Date.now() - new Date(iso).getTime();
     const minutes = Math.floor(diffMs / (1000 * 60));
-    if (minutes < 1) return '방금 전';
-    if (minutes < 60) return `${minutes}분 전`;
+    if (minutes < 1) return 'Just now';
+    if (minutes < 60) return `${minutes} min ago`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}시간 전`;
+    if (hours < 24) return `${hours} hr ago`;
     const days = Math.floor(hours / 24);
-    return `${days}일 전`;
+    return `${days} day${days === 1 ? '' : 's'} ago`;
   };
 
   const compactApiKey = (apiKey: string) => {
@@ -393,7 +393,7 @@ export default function ApiKeysPage() {
   const formatDate = (iso: string) => {
     const date = new Date(iso);
     if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString('ko-KR');
+    return date.toLocaleDateString('en-US');
   };
 
   // 블로그 로딩 중
@@ -416,7 +416,7 @@ export default function ApiKeysPage() {
   return (
     <div className="space-y-6 pt-2">
         <div className="mb-2 space-y-1 pt-1">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">자동포스팅 연결</h2>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Autoposting setup</h2>
         </div>
 
         {statusMessage && (
@@ -437,16 +437,15 @@ export default function ApiKeysPage() {
               type="button"
               onClick={() => setStatusMessage(null)}
               className="p-1 text-current opacity-80 hover:opacity-100"
-              aria-label="상태 메시지 닫기"
+              aria-label="Close status message"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         )}
 
-      {/* 설치 방법 선택 */}
       <div className={`${SETTINGS_CARD_CLASS} space-y-4 p-4 sm:p-6`}>
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">설치 방법 선택</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Choose a setup path</h2>
         <div className="overflow-hidden rounded-2xl border border-gray-200 dark:border-[#2F3440]">
           <div className="grid gap-0 sm:grid-cols-2 xl:grid-cols-4">
             <button
@@ -457,7 +456,7 @@ export default function ApiKeysPage() {
                   : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
               }`}
             >
-              <p className="text-sm font-semibold">웹/앱</p>
+              <p className="text-sm font-semibold">Web & apps</p>
               <p className={`mt-1 text-xs ${setupMode === 'web-app' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>ChatGPT · Claude · Perplexity</p>
             </button>
             <button
@@ -468,8 +467,8 @@ export default function ApiKeysPage() {
                   : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
               }`}
             >
-              <p className="text-sm font-semibold">SKILLS 설치</p>
-              <p className={`mt-1 text-xs ${setupMode === 'skills' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>초보자</p>
+              <p className="text-sm font-semibold">Install with Skills</p>
+              <p className={`mt-1 text-xs ${setupMode === 'skills' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>Beginner</p>
             </button>
             <button
               onClick={() => selectSetupMode('mcp')}
@@ -479,8 +478,8 @@ export default function ApiKeysPage() {
                   : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
               }`}
             >
-              <p className="text-sm font-semibold">MCP 직접 설정</p>
-              <p className={`mt-1 text-xs ${setupMode === 'mcp' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>고급 사용자</p>
+              <p className="text-sm font-semibold">Direct MCP setup</p>
+              <p className={`mt-1 text-xs ${setupMode === 'mcp' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>Advanced</p>
             </button>
             <button
               onClick={() => selectSetupMode('agents')}
@@ -490,8 +489,8 @@ export default function ApiKeysPage() {
                   : 'bg-white text-gray-900 hover:bg-gray-50 dark:bg-[#1F2229] dark:text-gray-100 dark:hover:bg-[#242a38]'
               }`}
             >
-              <p className="text-sm font-semibold">LLM Agents 설치</p>
-              <p className={`mt-1 text-xs ${setupMode === 'agents' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>자동 안내</p>
+              <p className="text-sm font-semibold">Install for LLM agents</p>
+              <p className={`mt-1 text-xs ${setupMode === 'agents' ? 'text-gray-100' : 'text-gray-500 dark:text-gray-400'}`}>Guided</p>
             </button>
           </div>
         </div>
@@ -500,35 +499,33 @@ export default function ApiKeysPage() {
       {setupMode === 'web-app' && (
         <div className={`${SETTINGS_CARD_CLASS} space-y-5 p-4 sm:p-6`}>
           <div className="space-y-2">
-            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">웹/앱 연결</h3>
+            <h3 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Web & app connections</h3>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              ChatGPT, Claude, Perplexity 같은 웹/앱 환경에서 Codebase 연결 흐름을 확인합니다.
-              단계별 설명은 공식 문서를 기준으로 정리했고, 스크린샷은 문서 자산 경로에 파일만
-              교체하면 바로 반영되도록 구성했습니다.
+              Review the connection flow for environments like ChatGPT, Claude, and Perplexity.
+              The step-by-step guidance follows official docs, and screenshots can be updated by replacing the files in the docs asset path.
             </p>
           </div>
 
           <div className="grid gap-3 lg:grid-cols-3">
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">1</div>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">환경 선택</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Choose your environment</h4>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                현재 사용 중인 웹/앱 환경을 선택하고 해당 연결 문서를 엽니다.
+                Pick the web or app environment you use and open the matching guide.
               </p>
             </div>
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">2</div>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">공식 문서 기준 확인</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Stay aligned with official docs</h4>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                각 가이드는 공식 문서를 기준으로 유지합니다. 문서 안의 스크린샷 슬롯은{' '}
-                <code>frontend/public/docs/apps/...</code> 파일을 교체하면 자동 반영됩니다.
+                Each guide is maintained against the official documentation. Screenshot slots update automatically when you replace files inside <code>frontend/public/docs/apps/...</code>.
               </p>
             </div>
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">3</div>
-              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">연결 상태 관리</h4>
+              <h4 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage existing connections</h4>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                이미 승인된 OAuth/앱 연결은 연결된 앱 화면에서 다시 확인하거나 정리할 수 있습니다.
+                Review or remove approved OAuth and app connections from the connected apps screen.
               </p>
             </div>
           </div>
@@ -554,14 +551,14 @@ export default function ApiKeysPage() {
                     onClick={() => router.push(card.docsHref)}
                     className="inline-flex flex-1 items-center justify-center rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-gray-800 dark:bg-[#6D79FF] dark:hover:bg-[#5A66E4]"
                   >
-                    설정 가이드 보기
+                    Open guide
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push('/settings/connected-apps')}
                     className={`${SETTINGS_SUBTLE_BUTTON_CLASS} flex-1`}
                   >
-                    연결 상태 관리
+                    Manage connections
                   </button>
                 </div>
               </div>
@@ -580,7 +577,7 @@ export default function ApiKeysPage() {
               className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100"
             >
               <Github className="h-4 w-4" />
-              <span>설치 소스</span>
+              <span>Install source</span>
               <span className="font-mono text-xs text-gray-500 dark:text-gray-400">github.com/beyondeth/codebase-skills</span>
             </a>
           </div>
@@ -588,22 +585,22 @@ export default function ApiKeysPage() {
           <div className="grid gap-3 grid-cols-1">
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">1</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Global 설치</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">모든 프로젝트에서 공통으로 사용합니다. (Codex, Claude Code, Gemini CLI, Antigravity)</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Global install</h3>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Use the integration across all projects. (Codex, Claude Code, Gemini CLI, Antigravity)</p>
               <QuickCommandBar
                 command={skillsGlobalInstallCommand}
-                copyLabel="설치 명령 복사"
+                copyLabel="Copy install command"
                 onCopy={() => {
                   copyToClipboard(skillsGlobalInstallCommand);
-                  showStatusMessage('success', '설치 명령을 복사했습니다.');
+                  showStatusMessage('success', 'Install command copied.');
                 }}
               />
             </div>
 
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">2</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Agent별 설치</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">현재 프로젝트에서 필요한 Agent만 설치합니다.</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Per-agent install</h3>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Install only the agents you need for the current project.</p>
               <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                 {skillAgentCards.map((card) => (
                   <button
@@ -624,15 +621,15 @@ export default function ApiKeysPage() {
               {selectedSkillAgentCard && (
                 <div className="mt-3 rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
                   <div className="mb-2 flex items-center justify-between gap-2">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{selectedSkillAgentCard.title} 설치 명령</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{selectedSkillAgentCard.title} install command</p>
                     <span className="text-xs text-gray-500 dark:text-gray-400">{selectedSkillAgentCard.targetPath}</span>
                   </div>
                   <QuickCommandBar
                     command={selectedSkillAgentCard.command}
-                    copyLabel={`${selectedSkillAgentCard.title} 설치 명령 복사`}
+                    copyLabel={`Copy ${selectedSkillAgentCard.title} install command`}
                     onCopy={() => {
                       copyToClipboard(selectedSkillAgentCard.command);
-                      showStatusMessage('success', `${selectedSkillAgentCard.title} 설치 명령을 복사했습니다.`);
+                      showStatusMessage('success', `${selectedSkillAgentCard.title} install command copied.`);
                     }}
                   />
                 </div>
@@ -641,14 +638,14 @@ export default function ApiKeysPage() {
 
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">3</div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Agent 설치 확인</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">전역 설치 기준으로 에이전트별 링크 상태를 확인합니다.</p>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Verify agent install</h3>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Check agent link status after global installation.</p>
               <QuickCommandBar
                 command={skillsVerifyGlobalByAgentsCommand}
-                copyLabel="Agent 설치 확인 명령 복사"
+                copyLabel="Copy verification command"
                 onCopy={() => {
                   copyToClipboard(skillsVerifyGlobalByAgentsCommand);
-                  showStatusMessage('success', 'Agent 설치 확인 명령을 복사했습니다.');
+                  showStatusMessage('success', 'Verification command copied.');
                 }}
               />
             </div>
@@ -662,14 +659,14 @@ export default function ApiKeysPage() {
             <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">1</div>
             <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">For LLM Agents</h3>
             <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-              아래 설치 가이드를 에이전트에게 전달하면, 문서를 읽고 설치 절차를 따라 자동으로 진행할 수 있습니다.
+              Share the guide below with another agent and it can read the document and follow the setup steps automatically.
             </p>
             <QuickCommandBar
               command={llmAgentsInstallGuideFetchCommand}
-              copyLabel="LLM Agents 설치 가이드 fetch 명령 복사"
+              copyLabel="Copy LLM agent guide fetch command"
               onCopy={() => {
                 copyToClipboard(llmAgentsInstallGuideFetchCommand);
-                showStatusMessage('success', 'LLM Agents 설치 가이드 fetch 명령을 복사했습니다.');
+                showStatusMessage('success', 'LLM agent guide fetch command copied.');
               }}
             />
           </div>
@@ -679,18 +676,18 @@ export default function ApiKeysPage() {
       {setupMode === 'mcp' && (
         <>
         <div className="mb-1 space-y-1">
-          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">MCP API Key 관리</h3>
+          <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">MCP API key management</h3>
         </div>
 
         <div className={`${SETTINGS_CARD_CLASS} overflow-hidden p-0`}>
           <div className="flex items-center justify-between border-b border-gray-100 px-4 py-4 dark:border-[#2F3440] sm:px-6">
             <div>
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">API 키</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">API keys</h2>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                계정당 최대 {maxApiKeys}개까지 생성할 수 있습니다.
+                You can create up to {maxApiKeys} keys per account.
               </p>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                생성됨 {keys.length}/{maxApiKeys}
+                Created {keys.length}/{maxApiKeys}
               </p>
             </div>
             <button
@@ -698,14 +695,14 @@ export default function ApiKeysPage() {
               disabled={creating || !selectedBlogId || keyLimitReached}
               className="rounded-lg bg-[#1f8e9a] px-4 py-2 text-sm font-semibold text-white hover:bg-[#187882] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {creating ? '생성 중...' : keyLimitReached ? '최대 3개 도달' : '+ API 키 생성'}
+              {creating ? 'Creating...' : keyLimitReached ? 'Limit reached' : '+ Create API key'}
             </button>
           </div>
 
           {keysLoading ? (
-            <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-300 sm:px-6">로딩 중...</p>
+            <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-300 sm:px-6">Loading...</p>
           ) : keys.length === 0 ? (
-            <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-300 sm:px-6">생성된 API 키가 없습니다.</p>
+            <p className="px-4 py-6 text-sm text-gray-500 dark:text-gray-300 sm:px-6">No API keys created yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[920px] table-fixed text-sm">
@@ -719,19 +716,19 @@ export default function ApiKeysPage() {
                 </colgroup>
                 <thead>
                   <tr className="border-b border-gray-100 text-left text-xs text-gray-500 dark:border-[#2F3440] dark:text-gray-400">
-                    <th className="px-4 py-3 font-medium whitespace-nowrap sm:px-6">이름</th>
-                    <th className="px-4 py-3 font-medium whitespace-nowrap">비밀 키</th>
-                    <th className="px-4 py-3 font-medium whitespace-nowrap">사용량</th>
-                    <th className="px-4 py-3 font-medium whitespace-nowrap">만료</th>
-                    <th className="px-4 py-3 font-medium whitespace-nowrap">최근에 사용됨</th>
-                    <th className="px-4 py-3 text-right font-medium whitespace-nowrap sm:px-6">작업</th>
+                    <th className="px-4 py-3 font-medium whitespace-nowrap sm:px-6">Name</th>
+                    <th className="px-4 py-3 font-medium whitespace-nowrap">Secret</th>
+                    <th className="px-4 py-3 font-medium whitespace-nowrap">Usage</th>
+                    <th className="px-4 py-3 font-medium whitespace-nowrap">Expires</th>
+                    <th className="px-4 py-3 font-medium whitespace-nowrap">Last used</th>
+                    <th className="px-4 py-3 text-right font-medium whitespace-nowrap sm:px-6">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
                   {keys.map((key) => {
                     const persistedApiKey = getRuntimeApiKey(key.keyHint);
                     const isRevealing = revealingKeyId === key.id;
-                    const usageText = `요청 ${key.requestCount.toLocaleString()}회 · 포스트 ${key.postsCreated.toLocaleString()}개`;
+                    const usageText = `${key.requestCount.toLocaleString()} requests · ${key.postsCreated.toLocaleString()} posts`;
                     const expiresText = formatDate(key.expiresAt);
                     const lastUsedText = formatRelativeTime(key.lastUsedAt);
 
@@ -770,8 +767,8 @@ export default function ApiKeysPage() {
                             <button
                               onClick={() => copyKeyValue(key)}
                               className="rounded-md p-2 text-gray-600 hover:bg-gray-100 hover:text-gray-900 disabled:cursor-not-allowed disabled:opacity-40 dark:text-gray-300 dark:hover:bg-[#2A2F3A] dark:hover:text-white"
-                              title={isRevealing ? '복호화 중...' : '전체 키 복사'}
-                              aria-label={isRevealing ? '복호화 중' : '전체 키 복사'}
+                              title={isRevealing ? 'Revealing...' : 'Copy full key'}
+                              aria-label={isRevealing ? 'Revealing' : 'Copy full key'}
                               disabled={isRevealing}
                             >
                               <Copy className="h-4 w-4" />
@@ -779,8 +776,8 @@ export default function ApiKeysPage() {
                             <button
                               onClick={() => openDeleteDialog(key.id, key.name, key.keyHint)}
                               className="rounded-md p-2 text-gray-600 hover:bg-red-50 hover:text-red-600 dark:text-gray-300 dark:hover:bg-red-900/20 dark:hover:text-red-400"
-                              title="삭제"
-                              aria-label="삭제"
+                              title="Delete"
+                              aria-label="Delete"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -799,7 +796,7 @@ export default function ApiKeysPage() {
           <div className="space-y-1">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">MCP setup</h2>
             <p className="text-sm text-gray-600 dark:text-gray-300">
-              상세 JSON/CLI 설정을 복사해서 직접 연결합니다.
+              Copy the JSON or CLI configuration below to connect manually.
             </p>
           </div>
 
@@ -807,18 +804,18 @@ export default function ApiKeysPage() {
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">1</div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Select</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">아래 클라이언트 카드에서 사용 환경을 선택합니다.</p>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Choose your current client from the cards below.</p>
             </div>
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">2</div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Copy</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">{selectedMcpCard.title} 설정을 복사해 붙여넣습니다.</p>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Copy and paste the {selectedMcpCard.title} configuration.</p>
               <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">{selectedMcpCard.configPath}</p>
             </div>
             <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
               <div className="mb-3 flex h-9 w-9 items-center justify-center rounded-full bg-gray-100 text-sm font-semibold text-gray-900 dark:bg-[#2A2F3A] dark:text-gray-100">3</div>
               <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Restart</h3>
-              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">클라이언트를 재시작한 뒤 MCP 호출을 테스트합니다.</p>
+              <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">Restart the client and test an MCP call.</p>
             </div>
           </div>
 
@@ -842,22 +839,22 @@ export default function ApiKeysPage() {
 
           <div className="rounded-2xl border border-gray-200 p-4 dark:border-[#2F3440]">
             <div className="mb-3 flex items-center justify-between gap-3">
-              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{selectedMcpCard.title} 설정</h3>
+              <h3 className="text-base font-semibold text-gray-900 dark:text-gray-100">{selectedMcpCard.title} configuration</h3>
               <span className="text-xs text-gray-500 dark:text-gray-400">{selectedMcpCard.configPath}</span>
             </div>
 
             {selectedMcpClient === 'codex' && (
               <div className="mb-3 rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  OpenAI Codex 공식 문서 기준으로 <code>codex mcp add</code>는 일반 MCP 등록용 CLI이지만,
-                  static <code>Authorization</code> header를 직접 넣는 공식 one-line install은 없습니다.
+                  In the official OpenAI Codex docs, <code>codex mcp add</code> is the generic CLI for MCP registration,
+                  but there is no official one-line install that injects a static <code>Authorization</code> header directly.
                 </p>
                 <p className="mt-2 text-sm text-gray-600 dark:text-gray-300">
-                  그래서 이 서버는 <code>~/.codex/config.toml</code>의 <code>http_headers</code>를 직접 수정하는 방식이
-                  정식 경로입니다. 기존 <code>codebase-blog-mcp</code> 블록이 있으면 아래 내용으로 교체한 뒤 Codex를 재시작하세요.
+                  For this server, the supported path is to edit <code>http_headers</code> directly inside <code>~/.codex/config.toml</code>.
+                  If you already have a <code>codebase-blog-mcp</code> block, replace it with the configuration below and restart Codex.
                 </p>
                 <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
-                  공식 문서:{' '}
+                  Official docs:{' '}
                   <a
                     href="https://developers.openai.com/codex/mcp"
                     target="_blank"
@@ -879,9 +876,9 @@ export default function ApiKeysPage() {
                 <div className="mt-4 rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">config.toml 열기</p>
+                      <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Open `config.toml`</p>
                       <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                        현재 Codex를 실행하는 환경에 맞는 경로를 선택하세요.
+                        Choose the path that matches the environment where Codex is running.
                       </p>
                     </div>
                   </div>
@@ -906,21 +903,20 @@ export default function ApiKeysPage() {
                   </div>
                   <QuickCommandBar
                     command={codexConfigOpenCommand}
-                    copyLabel="Codex config 열기 명령 복사"
+                    copyLabel="Copy Codex config open command"
                     onCopy={() => {
                       copyToClipboard(codexConfigOpenCommand);
-                      showStatusMessage('success', 'Codex config 열기 명령을 복사했습니다.');
+                      showStatusMessage('success', 'Copied the Codex config open command.');
                     }}
                   />
                   {selectedCodexOpenTarget === 'windows' && (
                     <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                      PowerShell 기준입니다. Windows에서 WSL2 안의 Codex를 사용 중이면 Windows 경로 대신 아래 WSL2 탭의 Linux 경로를 여세요.
+                      This command assumes PowerShell. If Codex is running inside WSL2, open the Linux path from the WSL2 tab instead of the Windows path.
                     </p>
                   )}
                   {selectedCodexOpenTarget === 'wsl' && (
                     <p className="mt-3 text-xs text-gray-500 dark:text-gray-400">
-                      WSL2에서 실행 중인 Codex는 Windows <code>%USERPROFILE%\\.codex</code>가 아니라 Linux 홈 디렉터리의{' '}
-                      <code>~/.codex/config.toml</code>을 읽습니다.
+                      Codex running inside WSL2 reads <code>~/.codex/config.toml</code> from the Linux home directory, not the Windows <code>%USERPROFILE%\\.codex</code> path.
                     </p>
                   )}
                 </div>
@@ -931,23 +927,23 @@ export default function ApiKeysPage() {
               code={mcpConfigByClient[selectedMcpClient]}
               onCopy={() => {
                 copyToClipboard(mcpConfigByClient[selectedMcpClient]);
-                showStatusMessage('success', `${selectedMcpCard.title} 설정을 복사했습니다.`);
+                showStatusMessage('success', `Copied the ${selectedMcpCard.title} configuration.`);
               }}
-              copyLabel={`${selectedMcpCard.title} 설정 복사`}
+              copyLabel={`Copy ${selectedMcpCard.title} configuration`}
             />
 
             {selectedMcpClient === 'codex' && (
               <div className="mt-3 rounded-xl border border-gray-200 p-3 dark:border-[#2F3440]">
                 <p className="text-sm text-gray-600 dark:text-gray-300">
-                  저장 후 Codex를 다시 열고 아래 명령으로 등록 상태를 확인하세요.
+                  After saving, reopen Codex and verify the registration with the command below.
                 </p>
                 <div className="mt-3">
                   <QuickCommandBar
                     command={codexMcpVerifyCommand}
-                    copyLabel="Codex MCP 확인 명령 복사"
+                    copyLabel="Copy Codex MCP verify command"
                     onCopy={() => {
                       copyToClipboard(codexMcpVerifyCommand);
-                      showStatusMessage('success', 'Codex MCP 확인 명령을 복사했습니다.');
+                      showStatusMessage('success', 'Copied the Codex MCP verify command.');
                     }}
                   />
                 </div>
@@ -962,18 +958,18 @@ export default function ApiKeysPage() {
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <span className="inline-flex rounded-full border border-gray-200 bg-gray-50 px-2.5 py-1 text-xs font-medium text-gray-600 dark:border-[#2F3440] dark:bg-[#1F2229] dark:text-gray-300">
-              가이드
+              Guide
             </span>
-            <h3 className="mt-2 text-base font-semibold text-gray-900 dark:text-white">사용법 알아보기</h3>
+            <h3 className="mt-2 text-base font-semibold text-gray-900 dark:text-white">Learn how it works</h3>
             <p className="mt-1 text-sm text-gray-600 dark:text-gray-300">
-              자동포스팅 예시와 현재 제공 중인 8개 스타일 가이드를 한 화면에서 확인할 수 있습니다.
+              See autoposting examples and the 8 writing styles currently available in one place.
             </p>
           </div>
           <button
             onClick={() => router.push('/docs/writing-styles')}
             className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-full sm:w-auto`}
           >
-            사용법 보기
+            Open guide
           </button>
         </div>
       </div>
@@ -984,16 +980,16 @@ export default function ApiKeysPage() {
             type="button"
             className="absolute inset-0 bg-black/35"
             onClick={closeCreateModal}
-            aria-label="닫기"
+            aria-label="Close"
           />
           <div className="relative z-10 w-full max-w-[560px] rounded-3xl bg-white p-6 shadow-2xl dark:bg-[#1F2229] sm:p-8">
-            <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">API 키 생성</h3>
+            <h3 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Create API key</h3>
             <div className="mt-7">
               <label
                 htmlFor="api-key-name"
                 className="block text-base font-medium text-gray-600 dark:text-gray-300"
               >
-                키 이름
+                Key name
               </label>
               <input
                 id="api-key-name"
@@ -1008,7 +1004,7 @@ export default function ApiKeysPage() {
                     submitCreateModal();
                   }
                 }}
-                placeholder="API 키의 이름을 입력하세요"
+                placeholder="Enter a name for this API key"
                 className="mt-3 h-12 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 text-base text-gray-900 placeholder:text-gray-400 focus:border-[#1f8e9a] focus:bg-white focus:outline-none dark:border-[#2F3440] dark:bg-[#161A22] dark:text-gray-100 dark:placeholder:text-gray-500"
                 autoFocus
                 maxLength={100}
@@ -1021,7 +1017,7 @@ export default function ApiKeysPage() {
                 disabled={creating}
                 className="rounded-xl bg-gray-200 px-5 py-2.5 text-base font-medium text-gray-900 transition hover:bg-gray-300 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#2F3440] dark:text-gray-100 dark:hover:bg-[#3A4150]"
               >
-                취소
+                Cancel
               </button>
               <button
                 type="button"
@@ -1029,7 +1025,7 @@ export default function ApiKeysPage() {
                 disabled={creating || !createModal.keyName.trim()}
                 className="rounded-xl bg-gray-900 px-5 py-2.5 text-base font-semibold text-white transition hover:bg-gray-800 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-[#6D79FF] dark:hover:bg-[#5A66E4]"
               >
-                {creating ? '생성 중...' : '키 생성'}
+                {creating ? 'Creating...' : 'Create key'}
               </button>
             </div>
           </div>
@@ -1041,10 +1037,10 @@ export default function ApiKeysPage() {
         isOpen={deleteDialog.isOpen}
         onClose={() => setDeleteDialog({ isOpen: false, keyId: null, keyName: '', keyHint: null })}
         onConfirm={deleteKey}
-        title="API Key를 삭제하시겠어요?"
-        description={`"${deleteDialog.keyName}" 키를 삭제하면 복원할 수 없습니다. 계속하시겠습니까?`}
-        confirmText="삭제"
-        cancelText="취소"
+        title="Delete this API key?"
+        description={`"${deleteDialog.keyName}" will be permanently deleted and cannot be restored. Continue?`}
+        confirmText="Delete"
+        cancelText="Cancel"
       />
     </div>
   );

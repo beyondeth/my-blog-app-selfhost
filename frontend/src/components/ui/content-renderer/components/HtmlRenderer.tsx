@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect, useRef } from 'react';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import { stripUnderline } from '@/utils/stripUnderline';
+import renderMathInElement from 'katex/contrib/auto-render';
 
 interface HtmlRendererProps {
   /**
@@ -28,6 +29,8 @@ interface HtmlRendererProps {
  * 추가적인 클라이언트 사이드 살균과 이미지 처리를 수행합니다.
  */
 export default function HtmlRenderer({ content, onImageClick, className = '' }: HtmlRendererProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+
   /**
    * HTML 콘텐츠를 클라이언트 사이드에서 추가 처리합니다.
    */
@@ -110,12 +113,35 @@ export default function HtmlRenderer({ content, onImageClick, className = '' }: 
     return processed;
   }, [content]);
 
+  useEffect(() => {
+    if (!content || !containerRef.current) {
+      return;
+    }
+
+    try {
+      renderMathInElement(containerRef.current, {
+        delimiters: [
+          { left: '$$', right: '$$', display: true },
+          { left: '$', right: '$', display: false },
+          { left: '\\[', right: '\\]', display: true },
+          { left: '\\(', right: '\\)', display: false },
+        ],
+        throwOnError: false,
+        ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code', 'option'],
+        output: 'html', // Use HTML only for consistent cross-browser rendering
+      });
+    } catch (e) {
+      console.error('[HtmlRenderer] KaTeX rendering error:', e);
+    }
+  }, [content, processedHtml]);
+
   if (!content) {
     return null;
   }
 
   return (
     <div
+      ref={containerRef}
       className={`html-content ${className}`}
       dangerouslySetInnerHTML={{ __html: processedHtml }}
       onClick={onImageClick}

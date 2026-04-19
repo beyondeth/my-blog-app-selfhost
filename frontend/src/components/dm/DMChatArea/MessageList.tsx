@@ -2,7 +2,6 @@
 
 import React, { useEffect, useRef, useCallback } from 'react';
 import { format, isToday, isYesterday } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import MessageItem from './MessageItem';
 import { User } from '../DMLayout/DMLayout.types';
 
@@ -44,11 +43,11 @@ const MessageList: React.FC<MessageListProps> = ({
   // Format date divider
   const formatDateDivider = (date: Date) => {
     if (isToday(date)) {
-      return '오늘';
+      return 'Today';
     } else if (isYesterday(date)) {
-      return '어제';
+      return 'Yesterday';
     } else {
-      return format(date, 'yyyy년 MM월 dd일(E)', { locale: ko }); // 요일 추가
+      return format(date, 'MMM d, yyyy (EEE)');
     }
   };
 
@@ -114,7 +113,7 @@ const MessageList: React.FC<MessageListProps> = ({
       {hasMore && (
         <div ref={loadMoreTriggerRef} className="text-center py-2">
           {isLoading && (
-            <div className="text-sm text-gray-500">이전 메시지 불러오는 중...</div>
+            <div className="text-sm text-gray-500">Loading earlier messages...</div>
           )}
         </div>
       )}
@@ -137,8 +136,8 @@ const MessageList: React.FC<MessageListProps> = ({
               />
             </svg>
           </div>
-          <p className="text-lg font-medium text-gray-700">대화를 시작하세요</p>
-          <p className="text-sm text-gray-500 mt-1">{otherUser?.username}님에게 메시지를 보내보세요</p>
+          <p className="text-lg font-medium text-gray-700">Start the conversation</p>
+          <p className="text-sm text-gray-500 mt-1">Send a message to {otherUser?.username}.</p>
         </div>
       )}
 

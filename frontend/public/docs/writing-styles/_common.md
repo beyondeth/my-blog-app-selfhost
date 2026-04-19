@@ -33,13 +33,13 @@ When the user requests auto-posting with style flags:
 ## Marketplace Product Posting (`--sell`)
 
 **IMPORTANT:** Only activate sell mode when the user **explicitly** includes `--sell` in their request.
-Do NOT treat natural language like "판매", "상품", "팔아줘" as sell triggers — these words can appear in normal blog posts about commerce topics.
+Do NOT treat natural language like "sell this", "product", or "put this on sale" as sell triggers. Those words can appear in normal blog posts about commerce topics.
 
 **Trigger:** `--sell` flag only. Examples:
-- "자동포스팅해줘 --sell" ✅
-- "이거 --sell로 올려줘" ✅
-- "판매 전략에 대해 포스팅해줘" ❌ (normal blog post about sales strategy)
-- "상품 리뷰 써줘" ❌ (normal product review blog post)
+- "Publish this automatically --sell" ✅
+- "List this with --sell" ✅
+- "Write a post about sales strategy" ❌ (normal blog post about sales strategy)
+- "Write a product review" ❌ (normal product review blog post)
 
 When `--sell` is explicitly present:
 
@@ -106,17 +106,17 @@ Keep sections explicit and front-load the most important point of each section.
 
 Close every post with lessons, heuristics, or a checklist that the reader can reuse.
 
-## Korean Writing Rules
+## English Writing Rules
 
-- Use professional Korean with natural rhythm: `~합니다`, `~할 수 있습니다`
+- Use professional English with natural rhythm and clear sentence flow
 - Avoid empty hype, filler, and generic openings
 - Prefer concrete verbs over ornamental adjectives
 - Keep terminology consistent through the whole post
 
 ## Common Patterns to Avoid
 
-- Generic openings such as `오늘은 ... 알아보겠습니다`
-- Empty intensifiers such as `정말`, `매우`, `완전히`
+- Generic openings such as `Today we're going to look at...`
+- Empty intensifiers such as `really`, `very`, `totally`
 - Paragraphs that explain a concept without an example
 - Long sections with no reader payoff
 - AI-sounding summaries with no concrete stance
@@ -146,7 +146,7 @@ For every major claim, check whether it has at least one of:
 
 ### Pass 3: Reader Relevance
 
-Add a sentence that answers `그래서 독자는 무엇을 얻는가?` in each major section.
+Add a sentence that answers `What does the reader get from this?` in each major section.
 
 ### Pass 4: Compression
 
@@ -168,9 +168,9 @@ The ending should not simply “wrap up.” It should leave the reader with:
 Use this pattern repeatedly:
 
 ```markdown
-주장: 무엇이 달라졌는가
-근거: 어떤 데이터/사례/관찰이 이를 뒷받침하는가
-의미: 그래서 팀이나 독자는 무엇을 바꿔야 하는가
+Claim: what changed
+Evidence: what data, example, or observation supports it
+Implication: what the team or reader should do differently
 ```
 
 ## Before -> After -> Why
@@ -178,9 +178,9 @@ Use this pattern repeatedly:
 This is the default pattern for examples:
 
 ```markdown
-이전 상태
-바꾼 방식
-왜 더 나아졌는가
+Before
+After
+Why it is better
 ```
 
 ## Make the Scannable Version Visible
@@ -196,8 +196,8 @@ For long posts, include at least one of:
 
 Replace vague nouns with concrete nouns.
 
-- `문제가 있었다` → `상세 조회 API의 응답 시간이 1.8초까지 늘어났다`
-- `성과가 좋았다` → `전환율이 2.1%에서 3.4%로 올랐다`
+- `There was a problem` → `The detail API response time climbed to 1.8 seconds`
+- `Results were good` → `Conversion increased from 2.1% to 3.4%`
 
 # === QUALITY CHECKLIST ===
 

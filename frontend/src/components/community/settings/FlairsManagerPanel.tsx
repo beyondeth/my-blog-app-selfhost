@@ -26,14 +26,14 @@ import { Plus, Edit, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const COLOR_PRESETS = [
-  { bg: '#ef4444', text: '#ffffff', label: '빨강' },
-  { bg: '#f97316', text: '#ffffff', label: '주황' },
-  { bg: '#eab308', text: '#000000', label: '노랑' },
-  { bg: '#22c55e', text: '#ffffff', label: '초록' },
-  { bg: '#3b82f6', text: '#ffffff', label: '파랑' },
-  { bg: '#8b5cf6', text: '#ffffff', label: '보라' },
-  { bg: '#ec4899', text: '#ffffff', label: '분홍' },
-  { bg: '#6b7280', text: '#ffffff', label: '회색' },
+  { bg: '#ef4444', text: '#ffffff', label: 'Red' },
+  { bg: '#f97316', text: '#ffffff', label: 'Orange' },
+  { bg: '#eab308', text: '#000000', label: 'Yellow' },
+  { bg: '#22c55e', text: '#ffffff', label: 'Green' },
+  { bg: '#3b82f6', text: '#ffffff', label: 'Blue' },
+  { bg: '#8b5cf6', text: '#ffffff', label: 'Purple' },
+  { bg: '#ec4899', text: '#ffffff', label: 'Pink' },
+  { bg: '#6b7280', text: '#ffffff', label: 'Gray' },
 ];
 
 interface FlairsManagerPanelProps {
@@ -134,15 +134,15 @@ export default function FlairsManagerPanel({ slug, embedded = false, initialFlai
       <header className="flex items-center justify-between">
         <div>
           <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">
-            게시물 말머리
+            Post flairs
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400">
-            게시물 분류 및 강조를 위한 말머리를 관리하세요.
+            Manage the flairs used to categorize and highlight posts.
           </p>
         </div>
         <Button size="sm" onClick={() => setIsCreating(true)} disabled={isCreating}>
           <Plus className="w-4 h-4 mr-1" />
-          말머리 추가
+          Add flair
         </Button>
       </header>
 
@@ -153,7 +153,7 @@ export default function FlairsManagerPanel({ slug, embedded = false, initialFlai
           <Input
             value={newFlair.name}
             onChange={(event) => setNewFlair((prev) => ({ ...prev, name: event.target.value }))}
-            placeholder="말머리 이름"
+            placeholder="Flair name"
           />
           <div className="flex flex-wrap gap-2">
             {COLOR_PRESETS.map((preset) => (
@@ -184,14 +184,14 @@ export default function FlairsManagerPanel({ slug, embedded = false, initialFlai
                 setNewFlair((prev) => ({ ...prev, isModOnly: checked }))
               }
             />
-            <span className="text-xs text-gray-500">운영진 전용</span>
+            <span className="text-xs text-gray-500">Moderators only</span>
           </div>
           <div className="flex justify-end gap-2">
             <Button variant='outline' size='sm' onClick={resetCreate}>
-              취소
+              Cancel
             </Button>
             <Button size='sm' onClick={handleCreate}>
-              저장
+              Save
             </Button>
           </div>
         </div>
@@ -200,7 +200,7 @@ export default function FlairsManagerPanel({ slug, embedded = false, initialFlai
       <div className="grid gap-3">
         {isLoading && (
           <div className="rounded-lg border border-gray-200 dark:border-gray-800 p-4 text-sm text-gray-500">
-            말머리를 불러오는 중...
+            Loading flairs...
           </div>
         )}
         {!isLoading &&
@@ -246,14 +246,14 @@ export default function FlairsManagerPanel({ slug, embedded = false, initialFlai
                           setEditState((prev) => ({ ...prev, isModOnly: checked }))
                         }
                       />
-                      <span className="text-xs text-gray-500">운영진 전용</span>
+                      <span className="text-xs text-gray-500">Moderators only</span>
                     </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => setEditingFlair(null)}>
-                        취소
+                        Cancel
                       </Button>
                       <Button size="sm" onClick={handleEditSave}>
-                        저장
+                        Save
                       </Button>
                     </div>
                   </div>
@@ -270,7 +270,7 @@ export default function FlairsManagerPanel({ slug, embedded = false, initialFlai
                         {flair.name}
                       </span>
                       {flair.isModOnly && (
-                        <span className="text-xs text-gray-500">운영진 전용</span>
+                        <span className="text-xs text-gray-500">Moderators only</span>
                       )}
                     </div>
                     <div className="flex gap-2">
@@ -295,21 +295,21 @@ export default function FlairsManagerPanel({ slug, embedded = false, initialFlai
             );
           })}
         {!isLoading && filteredFlairs.length === 0 && (
-          <p className="text-sm text-gray-500">조건에 맞는 말머리가 없습니다.</p>
+          <p className="text-sm text-gray-500">No flairs match the current conditions.</p>
         )}
       </div>
 
       <AlertDialog open={!!deleteTarget} onOpenChange={() => setDeleteTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>말머리 삭제</AlertDialogTitle>
+            <AlertDialogTitle>Delete flair</AlertDialogTitle>
             <AlertDialogDescription>
-              "{deleteTarget?.name}" 말머리를 삭제하시겠습니까?
+              Delete the flair "{deleteTarget?.name}"?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteConfirm}>삭제</AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteConfirm}>Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

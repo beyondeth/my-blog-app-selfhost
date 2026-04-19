@@ -211,26 +211,28 @@ export default function CommunityPostDetailClient({
     const isPrivateAccessError =
       errorSource instanceof Error &&
       (((errorSource as Error & { status?: number }).status ?? 0) === 403 ||
-        errorSource.message.includes('초대 전용'));
+        errorSource.message.includes('초대 전용') ||
+        errorSource.message.toLowerCase().includes('invite-only') ||
+        errorSource.message.toLowerCase().includes('invite only'));
 
     if (isPrivateAccessError) {
       return (
         <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-              초대 전용 커뮤니티입니다
+              This community is invite-only
             </h1>
             <p className="text-gray-500 dark:text-gray-400 mb-6">
-              멤버만 접근할 수 있습니다. 초대 링크가 필요합니다.
+              Only members can access it. You need an invite link to continue.
             </p>
             <div className="flex items-center justify-center gap-3">
               {!isAuthenticated && (
                 <Button onClick={() => router.push('/login')}>
-                  로그인
+                  Log in
                 </Button>
               )}
               <Button variant="outline" onClick={() => router.back()}>
-                뒤로 가기
+                Go back
               </Button>
             </div>
           </div>
@@ -245,12 +247,12 @@ export default function CommunityPostDetailClient({
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-4">
-            게시물을 불러올 수 없습니다
+            Unable to load the post
           </h1>
           <p className="text-gray-500 dark:text-gray-400 mb-6">
-            {postError instanceof Error ? postError.message : '알 수 없는 오류가 발생했습니다.'}
+            {postError instanceof Error ? postError.message : 'An unknown error occurred.'}
           </p>
-          <Button onClick={() => router.back()}>뒤로 가기</Button>
+          <Button onClick={() => router.back()}>Go back</Button>
         </div>
       </div>
     );
@@ -329,18 +331,18 @@ export default function CommunityPostDetailClient({
       <AlertDialog open={deletePostDialogOpen} onOpenChange={setDeletePostDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>게시물 삭제</AlertDialogTitle>
+            <AlertDialogTitle>Delete post</AlertDialogTitle>
             <AlertDialogDescription>
-              이 게시물을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+              Delete this post? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmDeletePost}
               className="bg-red-600 hover:bg-red-700"
             >
-              삭제
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

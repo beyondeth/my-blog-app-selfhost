@@ -137,7 +137,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
             value={messageContent}
             onChange={handleInputChange}
             onKeyPress={handleKeyPress}
-            placeholder={disabled ? '메시지를 보낼 수 없습니다' : '메시지를 입력하세요...'}
+            placeholder={disabled ? 'You cannot send messages right now' : 'Type a message...'}
             disabled={disabled || isSending}
             className="
               w-full
@@ -260,7 +260,7 @@ const MessageInput: React.FC<MessageInputProps> = ({
 
       {/* Hint text */}
       <p className="text-xs text-gray-400 mt-2 text-center">
-        Enter로 전송, Shift+Enter로 줄바꿈
+        Press Enter to send, Shift+Enter for a new line
       </p>
     </div>
   );

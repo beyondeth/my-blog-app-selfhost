@@ -149,9 +149,9 @@ function CommunityListContent() {
 
   // 정렬 탭 옵션
   const sortOptions = [
-    { value: 'popular' as const, label: '인기순', icon: TrendingUp },
-    { value: 'newest' as const, label: '최신순', icon: Clock },
-    { value: 'active' as const, label: '활동순', icon: Users },
+    { value: 'popular' as const, label: 'Popular', icon: TrendingUp },
+    { value: 'newest' as const, label: 'Newest', icon: Clock },
+    { value: 'active' as const, label: 'Most active', icon: Users },
   ];
 
   // 정렬 변경 핸들러
@@ -174,10 +174,10 @@ function CommunityListContent() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-            커뮤니티 탐색
+            Explore communities
           </h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            관심 있는 커뮤니티를 찾아 가입하세요
+            Find communities that match your interests.
           </p>
         </div>
 
@@ -188,7 +188,7 @@ function CommunityListContent() {
             className="inline-flex items-center gap-2 bg-gray-900 text-white hover:bg-gray-800 dark:bg-gray-700 dark:text-gray-100 dark:hover:bg-gray-600"
           >
             <Plus className="w-4 h-4" />
-            <span>커뮤니티 만들기</span>
+            <span>Create community</span>
           </Button>
         )}
       </div>
@@ -205,7 +205,7 @@ function CommunityListContent() {
             }
           `}
         >
-          전체
+          All
         </button>
         {isAuthenticated && (
           <button
@@ -218,7 +218,7 @@ function CommunityListContent() {
               }
             `}
           >
-            참여중
+            Joined
           </button>
         )}
         {isAuthenticated && (
@@ -232,7 +232,7 @@ function CommunityListContent() {
               }
             `}
           >
-            운영중
+            Managing
           </button>
         )}
       </div>
@@ -242,7 +242,7 @@ function CommunityListContent() {
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
         <Input
           type="text"
-          placeholder="커뮤니티 검색..."
+          placeholder="Search communities..."
           value={searchQuery}
           onChange={(e) => handleSearchChange(e.target.value)}
           className="pl-10 h-11"
@@ -279,14 +279,14 @@ function CommunityListContent() {
       {isError && (
         <div className="text-center py-12">
           <p className="text-red-500 dark:text-red-400">
-            {error instanceof Error ? error.message : '커뮤니티 목록을 불러오는데 실패했습니다.'}
+            {error instanceof Error ? error.message : 'Failed to load communities.'}
           </p>
           <Button
             variant="outline"
             className="mt-4"
             onClick={() => window.location.reload()}
           >
-            다시 시도
+            Retry
           </Button>
         </div>
       )}
@@ -301,12 +301,12 @@ function CommunityListContent() {
             <div className="text-center py-12">
               <p className="text-gray-500 dark:text-gray-400">
                 {debouncedSearch
-                  ? `"${debouncedSearch}"에 대한 검색 결과가 없습니다.`
+                  ? `No communities found for "${debouncedSearch}".`
                   : activeTab === 'joined'
-                    ? '아직 가입한 커뮤니티가 없습니다.'
+                    ? 'You have not joined any communities yet.'
                     : activeTab === 'owned'
-                      ? '아직 내가 만든 커뮤니티가 없습니다.'
-                      : '아직 커뮤니티가 없습니다.'}
+                      ? 'You are not managing any communities yet.'
+                      : 'No communities yet.'}
               </p>
               {activeTab === 'joined' ? (
                 <Button
@@ -314,7 +314,7 @@ function CommunityListContent() {
                   className="mt-4"
                   onClick={() => setActiveTab('all')}
                 >
-                  커뮤니티 탐색하기
+                  Explore all communities
                 </Button>
               ) : activeTab === 'owned' ? (
                 <Button
@@ -322,7 +322,7 @@ function CommunityListContent() {
                   className="mt-4"
                   onClick={() => router.push('/c/create')}
                 >
-                  커뮤니티 만들기
+                  Create community
                 </Button>
               ) : isAuthenticated && (
                 <Button
@@ -330,7 +330,7 @@ function CommunityListContent() {
                   className="mt-4"
                   onClick={() => router.push('/c/create')}
                 >
-                  첫 번째 커뮤니티 만들기
+                  Create your first community
                 </Button>
               )}
             </div>
@@ -354,7 +354,7 @@ function CommunityListContent() {
                     onClick={() => fetchNextPage()}
                     disabled={isFetchingNextPage}
                   >
-                    {isFetchingNextPage ? '불러오는 중...' : '더 보기'}
+                    {isFetchingNextPage ? 'Loading...' : 'Load more'}
                   </Button>
                 </div>
               )}

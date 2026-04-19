@@ -3,6 +3,7 @@
 @import '../styles/themes/atom-one-light-custom.css';
 @import 'highlight.js/styles/atom-one-dark.css';
 @import 'react-image-crop/dist/ReactCrop.css';
+@import 'katex/dist/katex.min.css';
 
 /* TipTap Simple Editor 스타일 */
 @import '../styles/_variables.css';
@@ -1077,4 +1078,443 @@ body .prose a.link-card:hover {
   --widget-accent: #4d68ff;
   --widget-accent-hover: #3c52c7;
   --widget-danger: #ef4444;
+}
+
+/* Klaro consent manager */
+.klaro.codebase-klaro {
+  --font-family: 'Pretendard Variable', 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  --font-size: 14px;
+  --green1: #101828;
+  --green2: #111827;
+  --green3: #1f2937;
+  --dark1: #101828;
+  --dark2: #344054;
+  --dark3: #667085;
+  --light1: #ffffff;
+  --light2: #e4e7ec;
+  --white1: #ffffff;
+  --white2: #f8fafc;
+  --white3: #eef2f6;
+  --border-radius: 20px;
+}
+
+.klaro.codebase-klaro .cookie-notice:not(.cookie-modal-notice) {
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  width: auto;
+  max-width: 960px;
+  margin: 0 auto;
+  border: 1px solid #d9e0ea;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 28px 64px -32px rgba(16, 24, 40, 0.3);
+  backdrop-filter: blur(18px);
+}
+
+.klaro.codebase-klaro .cookie-notice:not(.cookie-modal-notice) .cn-body {
+  padding: 20px 22px;
+}
+
+.klaro.codebase-klaro .cookie-notice:not(.cookie-modal-notice) .cn-body p {
+  color: #526477;
+  line-height: 1.7;
+}
+
+.klaro.codebase-klaro .cookie-notice:not(.cookie-modal-notice) .cn-body .cn-buttons {
+  gap: 10px;
+}
+
+.klaro.codebase-klaro .cm-btn {
+  min-height: 42px;
+  border-radius: 999px;
+  border: 1px solid #d9e0ea;
+  background: #ffffff;
+  color: #101828;
+  box-shadow: none;
+  font-weight: 600;
+}
+
+.klaro.codebase-klaro .cm-btn.cm-btn-success,
+.klaro.codebase-klaro .cm-btn.cm-btn-success-var {
+  border-color: #101828;
+  background: #101828;
+  color: #ffffff;
+}
+
+.klaro.codebase-klaro .cm-btn.cm-btn-info,
+.klaro.codebase-klaro .cm-btn.cm-btn-close {
+  background: #ffffff;
+  color: #101828;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-bg {
+  background: rgba(8, 15, 28, 0.62);
+  backdrop-filter: blur(6px);
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal.cm-klaro {
+  max-width: 760px;
+  border: 1px solid #d9e0ea;
+  border-radius: 28px;
+  background: #ffffff;
+  box-shadow: 0 34px 96px -42px rgba(15, 23, 42, 0.45);
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-header {
+  padding: 28px 30px 18px;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-header h1,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-header .title {
+  color: #101828;
+  font-size: 1.6rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.klaro.codebase-klaro .cookie-modal p,
+.klaro.codebase-klaro .cookie-modal strong,
+.klaro.codebase-klaro .cookie-modal li,
+.klaro.codebase-klaro .cookie-modal span,
+.klaro.codebase-klaro .cookie-notice p,
+.klaro.codebase-klaro .cookie-notice strong {
+  color: #344054;
+}
+
+.klaro.codebase-klaro .cookie-modal a,
+.klaro.codebase-klaro .cookie-notice a {
+  color: #101828;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body {
+  padding: 0 30px 24px;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-services li.cm-service {
+  border-top: 1px solid #eef2f6;
+  padding: 18px 0;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-services li.cm-service,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-services li.cm-purpose,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-purposes li.cm-service,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-purposes li.cm-purpose {
+  padding-left: 0;
+  min-height: 0;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-services li.cm-service > div,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-services li.cm-purpose > div,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-purposes li.cm-service > div,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-purposes li.cm-purpose > div {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  row-gap: 10px;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 18px;
+  min-width: 0;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-title,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-required,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-opt-out {
+  grid-column: 1;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-required {
+  display: none;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .cm-switch {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 24px;
+  flex-shrink: 0;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  box-shadow: none;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .cm-switch {
+  cursor: pointer;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body [id^='service-item-'][id$='-description'] {
+  min-width: 0;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .purposes {
+  margin: 0;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .slider {
+  position: relative;
+  inset: auto;
+  cursor: pointer;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input {
+  left: auto;
+  right: 0;
+  top: 0;
+}
+
+.klaro.codebase-klaro .cm-list-title {
+  color: #101828;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.klaro.codebase-klaro .cm-list-description {
+  color: #667085;
+  line-height: 1.65;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer {
+  padding: 0 30px 28px;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer-buttons {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 12px;
+  border-color: #d0d5dd;
+  background: #ffffff;
+  color: #344054;
+  font-weight: 600;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-success,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-success-var {
+  border-color: #101828;
+  background: #101828;
+  color: #ffffff;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-info,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-close {
+  background: #ffffff;
+  color: #344054;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .slider {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 1px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: #e5e7eb;
+  border: 1px solid transparent;
+  box-shadow: none;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .slider::after {
+  content: none;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input:checked + .cm-list-label .slider,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.half-checked:checked + .cm-list-label .slider,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.only-required + .cm-list-label .slider {
+  justify-content: flex-end;
+  background: #6d79ff;
+  border-color: #6d79ff;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.required + .cm-list-label .cm-switch,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.only-required + .cm-list-label .cm-switch {
+  cursor: not-allowed;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.required:checked + .cm-list-label .slider,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.only-required + .cm-list-label .slider {
+  box-shadow: none;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input:checked + .cm-list-label .slider,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.half-checked:checked + .cm-list-label .slider {
+  background: #6d79ff;
+  border-color: #6d79ff;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .slider::before {
+  content: "";
+  position: static;
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex: 0 0 20px;
+  left: auto;
+  bottom: auto;
+  border-radius: 999px;
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.18);
+  box-sizing: border-box;
+  transform: none;
+  transition: none;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input:checked + .cm-list-label .slider::before,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.half-checked:checked + .cm-list-label .slider::before,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.only-required + .cm-list-label .slider::before,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input.required:checked + .cm-list-label .slider::before,
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label input:checked + .slider::before {
+  position: static;
+  left: auto;
+  bottom: auto;
+  transform: none;
+}
+
+.klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input:focus-visible + .cm-list-label .cm-switch {
+  box-shadow: 0 0 0 2px #6d79ff, 0 0 0 4px rgba(109, 121, 255, 0.18);
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .slider {
+  background: #1f2229;
+  border-color: transparent;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .cm-switch {
+  background: transparent;
+}
+
+.dark .klaro.codebase-klaro .cookie-notice:not(.cookie-modal-notice) {
+  border-color: #223244;
+  background: rgba(14, 20, 27, 0.96);
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal.cm-klaro {
+  border-color: #223244;
+  background: #0e141b;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-header h1,
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-header .title,
+.dark .klaro.codebase-klaro .cm-list-title,
+.dark .klaro.codebase-klaro .cm-btn.cm-btn-info,
+.dark .klaro.codebase-klaro .cm-btn.cm-btn-close {
+  color: #f8fafc;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal p,
+.dark .klaro.codebase-klaro .cookie-modal strong,
+.dark .klaro.codebase-klaro .cookie-modal li,
+.dark .klaro.codebase-klaro .cookie-modal span,
+.dark .klaro.codebase-klaro .cookie-notice p,
+.dark .klaro.codebase-klaro .cookie-notice strong,
+.dark .klaro.codebase-klaro .cm-list-description {
+  color: #9fb2c6;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal a,
+.dark .klaro.codebase-klaro .cookie-notice a {
+  color: #ffffff;
+}
+
+.dark .klaro.codebase-klaro .cm-btn {
+  border-color: #223244;
+  background: #0e141b;
+  color: #f8fafc;
+}
+
+.dark .klaro.codebase-klaro .cm-btn.cm-btn-success,
+.dark .klaro.codebase-klaro .cm-btn.cm-btn-success-var {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #101828;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-body ul.cm-services li.cm-service {
+  border-top-color: #1a2633;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn {
+  border-color: #223244;
+  background: #0e141b;
+  color: #c8d5e3;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-success,
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-success-var {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: #101828;
+}
+
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-info,
+.dark .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn.cm-btn-close {
+  color: #e2e8f0;
+}
+
+@media (max-width: 768px) {
+  .klaro.codebase-klaro .cookie-notice:not(.cookie-modal-notice) {
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    border-radius: 20px;
+  }
+
+  .klaro.codebase-klaro .cookie-notice:not(.cookie-modal-notice) .cn-body {
+    padding: 18px;
+  }
+
+  .klaro.codebase-klaro .cookie-modal .cm-modal.cm-klaro {
+    width: calc(100% - 24px);
+    max-width: none;
+    border-radius: 24px;
+  }
+
+  .klaro.codebase-klaro .cookie-modal .cm-modal .cm-header,
+  .klaro.codebase-klaro .cookie-modal .cm-modal .cm-body,
+  .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  .klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-label .cm-switch {
+    grid-column: 1;
+    grid-row: auto;
+    justify-self: start;
+    margin-top: 0;
+  }
+
+  .klaro.codebase-klaro .cookie-modal .cm-modal .cm-body .cm-list-input {
+    left: 0;
+    right: auto;
+  }
+
+  .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer-buttons {
+    flex-direction: column;
+  }
+
+  .klaro.codebase-klaro .cookie-modal .cm-modal .cm-footer .cm-btn {
+    width: 100%;
+  }
 }

@@ -10,12 +10,6 @@ import { getPopularCommunityPosts } from "@/services/api/popular.service";
 
 type Period = "daily" | "weekly" | "monthly";
 
-const periodOptions: { label: string; value: Period }[] = [
-  { label: "일일", value: "daily" },
-  { label: "주간", value: "weekly" },
-  { label: "월간", value: "monthly" },
-];
-
 const Avatar = ({
   src,
   label,
@@ -27,7 +21,7 @@ const Avatar = ({
     return (
       <Image
         src={src}
-        alt={label ?? "작성자"}
+        alt={label ?? "Author"}
         width={32}
         height={32}
         className="h-8 w-8 rounded-full object-cover"
@@ -51,6 +45,18 @@ const TrendingCommunityPostsSection = React.memo(function TrendingCommunityPosts
   });
 
   const items = data?.items ?? [];
+  const copy = {
+    title: 'Trending community posts',
+    periodOptions: [
+      { label: 'Daily', value: 'daily' as const },
+      { label: 'Weekly', value: 'weekly' as const },
+      { label: 'Monthly', value: 'monthly' as const },
+    ],
+    loadError: 'Could not load the data.',
+    retry: 'Retry',
+    empty: 'No active community posts yet.',
+    unknown: 'Unknown',
+  };
 
   return (
     <SidebarSection
@@ -58,10 +64,10 @@ const TrendingCommunityPostsSection = React.memo(function TrendingCommunityPosts
         <div>
           <div className="flex items-center gap-2 mb-3">
             <Flame className="w-4 h-4 text-[#264653] dark:text-[#6CC3B2]" />
-            <span>인기 커뮤니티 포스트</span>
+            <span>{copy.title}</span>
           </div>
           <div className="flex gap-2">
-            {periodOptions.map((option) => (
+            {copy.periodOptions.map((option) => (
               <button
                 key={option.value}
                 onClick={() => setPeriod(option.value)}
@@ -95,13 +101,13 @@ const TrendingCommunityPostsSection = React.memo(function TrendingCommunityPosts
         </div>
       ) : error ? (
         <div className="text-sm text-[#3F4A59] dark:text-[#E1E8F0]">
-          데이터를 불러오지 못했습니다.
+          {copy.loadError}
           <button className="ml-2 text-[#264653] underline dark:text-[#6CC3B2]" onClick={() => refetch()}>
-            다시 시도
+            {copy.retry}
           </button>
         </div>
       ) : items.length === 0 ? (
-        <p className="text-sm text-[#3F4A59] dark:text-[#E1E8F0]">아직 활발한 커뮤니티 포스트가 없습니다.</p>
+        <p className="text-sm text-[#3F4A59] dark:text-[#E1E8F0]">{copy.empty}</p>
       ) : (
         <div className="-mx-5 divide-y divide-[#E5E7EB] dark:divide-[#4B5563]">
           {items.map((post) => (
@@ -115,7 +121,7 @@ const TrendingCommunityPostsSection = React.memo(function TrendingCommunityPosts
                 label={post.community?.name}
               />
               <div className="min-w-0 flex-1">
-                <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">{post.community?.name ?? "알 수 없음"}</p>
+                <p className="text-xs text-[#3F4A59] dark:text-[#E1E8F0]">{post.community?.name ?? copy.unknown}</p>
                 <p className="text-sm font-medium text-[#1B2430] dark:text-[#E6EDF3] line-clamp-2">{post.title}</p>
               </div>
             </Link>

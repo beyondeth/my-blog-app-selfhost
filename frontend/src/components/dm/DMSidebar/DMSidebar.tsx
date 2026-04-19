@@ -6,7 +6,6 @@ import { useDMStore, SidebarView } from '@/stores/dmStore';
 import { Avatar } from '@/components/ui/avatar';
 import {
   MessageSquare,
-  Settings,
   LogOut
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
@@ -42,7 +41,7 @@ const DMSidebar: React.FC = memo(() => {
     {
       id: 'chats' as const,
       icon: MessageSquare,
-      label: '채팅',
+      label: 'Chats',
       onClick: () => handleViewChange('chats'),
     },
   ];
@@ -78,7 +77,7 @@ const DMSidebar: React.FC = memo(() => {
       <div className="px-2 mt-auto">
         <DMSidebarButton
           icon={LogOut}
-          label="나가기"
+          label="Close"
           isActive={false}
           isCollapsed={false}
           onClick={handleExit}

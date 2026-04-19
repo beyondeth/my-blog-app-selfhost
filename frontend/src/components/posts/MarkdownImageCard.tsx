@@ -27,13 +27,13 @@ export function MarkdownImageCard({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={image.url}
-            alt={image.name || '업로드한 이미지'}
+            alt={image.name || 'Uploaded image'}
             className="h-full w-full object-cover"
           />
         </div>
         <div className="flex-1 min-w-0 space-y-1">
           <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-            {image.name || '업로드한 이미지'}
+            {image.name || 'Uploaded image'}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             <Button
@@ -42,13 +42,13 @@ export function MarkdownImageCard({
               variant={isActiveThumbnail ? 'default' : 'secondary'}
               onClick={() => onSetThumbnail(image.id)}
             >
-              {isActiveThumbnail ? '썸네일 ✓' : '썸네일'}
+              {isActiveThumbnail ? 'Thumbnail ✓' : 'Set thumbnail'}
             </Button>
           </div>
         </div>
       </div>
       <p className="text-[10px] text-gray-400 dark:text-gray-500">
-        본문에서 이미지를 클릭하면 크기/캡션을 직접 수정할 수 있습니다.
+        Click the image in the editor to adjust its size and caption.
       </p>
     </div>
   );

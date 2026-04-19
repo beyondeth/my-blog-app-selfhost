@@ -23,6 +23,8 @@ import { useSidebarStore } from '@/stores/sidebarStore';
 import { useDMModal } from '@/hooks/useDMModal';
 import { useUserBlogV2, invalidateUserBlog } from '@/hooks/useUserBlogV2';
 import { useQueryClient } from '@tanstack/react-query';
+import { stripLocalePrefix } from '@/lib/i18n/config';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 /**
  * 왼쪽 고정 사이드바 컴포넌트
@@ -38,14 +40,30 @@ export default function LeftSidebar() {
   const { user } = useAuth();
   const { isOpen } = useSidebarStore();
   const pathname = usePathname();
+  const normalizedPathname = stripLocalePrefix(pathname || '/');
   const router = useRouter();
   const { openModal: openDMModal } = useDMModal();
+  const { href } = useLocaleContext();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   const queryClient = useQueryClient();
   const { blog, loading } = useUserBlogV2(); // 내 블로그 정보 가져오기
   const inactiveNavClass =
     'text-[#4B5563] dark:text-[#D5DEE8] hover:bg-[#E7ECF3] hover:text-[#1B2430] dark:hover:bg-[#1A232E] dark:hover:text-[#F5F7FA]';
+  const isHomePath =
+    normalizedPathname === '/' ||
+    normalizedPathname === '/desktop' ||
+    normalizedPathname === '/mobile';
+  const copy = {
+    home: 'Home',
+    community: 'Community',
+    myBlog: 'My blog',
+    write: 'Write',
+    bookmarks: 'Bookmarks',
+    chat: 'Chat',
+    settings: 'Settings',
+    notifications: 'Notifications',
+  };
 
   // 클라이언트에서만 렌더링 (SSR 하이드레이션 불일치 방지)
   useEffect(() => {
@@ -88,9 +106,9 @@ export default function LeftSidebar() {
   });
 
   // Admin, 로그인, 회원가입 페이지에서는 사이드바를 숨김
-  const isAdminPage = pathname?.startsWith('/admin');
-  const isAuthPage = pathname === '/login' || pathname === '/register';
-  if (isAdminPage || isAuthPage) {
+  const isAdminPage = normalizedPathname.startsWith('/admin');
+  const isAuthPage = normalizedPathname === '/login' || normalizedPathname === '/register';
+  if (isAdminPage || isAuthPage || !user) {
     return null;
   }
 
@@ -100,7 +118,7 @@ export default function LeftSidebar() {
   }
 
   // 내 블로그 URL 결정 (alias 우선)
-  const myBlogUrl = blog ? (blog.alias ? `/@${blog.alias}` : `/${blog.slug}`) : '#';
+  const myBlogUrl = blog ? (blog.alias ? `/@${blog.alias}` : `/${blog.slug}`) : href('/settings/blog');
 
   // Debug logging for URL matching (개발 환경에서만 출력)
   logDebug('[LeftSidebar] myBlogUrl:', myBlogUrl);
@@ -121,87 +139,83 @@ export default function LeftSidebar() {
       <nav className="flex flex-col items-center py-6 space-y-6">
         {/* 홈 버튼 */}
         <Link
-          href="/"
+          href={href('/')}
           prefetch={true}
           className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
-            pathname === '/'
+            isHomePath
               ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
               : inactiveNavClass
           }`}
-          title="홈"
+          title={copy.home}
         >
-          <HomeIcon className={pathname === '/' ? 'opacity-100' : 'opacity-70'} size={24} />
-          <span className="text-xs mt-1 font-medium">홈</span>
+          <HomeIcon className={isHomePath ? 'opacity-100' : 'opacity-70'} size={24} />
+          <span className="text-xs mt-1 font-medium">{copy.home}</span>
         </Link>
 
         {/* 커뮤니티 버튼 */}
         <Link
-          href="/c"
+          href={href('/c')}
           prefetch={true}
           className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
-            pathname === '/c' || pathname?.startsWith('/c/')
+            normalizedPathname === '/c' || normalizedPathname.startsWith('/c/')
               ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
               : inactiveNavClass
           }`}
-          title="커뮤니티"
+          title={copy.community}
         >
-          <Users className={pathname === '/c' || pathname?.startsWith('/c/') ? 'opacity-100' : 'opacity-70'} size={24} />
-          <span className="text-xs mt-1 font-medium">커뮤니티</span>
+          <Users className={normalizedPathname === '/c' || normalizedPathname.startsWith('/c/') ? 'opacity-100' : 'opacity-70'} size={24} />
+          <span className="text-xs mt-1 font-medium">{copy.community}</span>
         </Link>
 
-        {/* My Blog 버튼 - 로그인 사용자만 표시 */}
-        {user && blog && (
-          <Link
-            href={myBlogUrl}
-            prefetch={true}
-            className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
-              pathname === myBlogUrl
-                ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
-                : inactiveNavClass
-            }`}
-            title="내 블로그"
-          >
-            <MyBlogIcon className={pathname === myBlogUrl ? 'opacity-100' : 'opacity-70'} size={24} />
-            <span className="text-xs mt-1 font-medium">내블로그</span>
-          </Link>
-        )}
+        {/* My Blog 버튼 */}
+        <Link
+          href={myBlogUrl}
+          prefetch={true}
+          className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
+            normalizedPathname === myBlogUrl
+              ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
+              : inactiveNavClass
+          }`}
+          title={copy.myBlog}
+        >
+          <MyBlogIcon className={normalizedPathname === myBlogUrl ? 'opacity-100' : 'opacity-70'} size={24} />
+          <span className="text-xs mt-1 font-medium">{copy.myBlog}</span>
+        </Link>
 
-        {/* 로그인한 사용자만 보이는 메뉴 */}
-        {user && (
-          <>
+        <>
             {/* 글쓰기 버튼 */}
             <Link
-              href="/new-story"
+              href={href('/new-story')}
               prefetch={true}
               onMouseEnter={() => {
                 // 전역 스타일 사이드이펙트를 막기 위해 에디터 모듈 직접 import는 피하고,
                 // 라우트 prefetch만 수행한다.
-                router.prefetch('/new-story');
+                router.prefetch(href('/new-story'));
               }}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
-                pathname === '/new-story' || pathname?.startsWith('/edit/')
+                normalizedPathname === '/new-story' || normalizedPathname.startsWith('/edit/')
                   ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
                   : inactiveNavClass
               }`}
-              title="글쓰기"
+              title={copy.write}
             >
-              <WriteIcon className={pathname === '/new-story' || pathname?.startsWith('/edit/') ? 'opacity-100' : 'opacity-70'} size={24} />
-              <span className="text-xs mt-1 font-medium">글쓰기</span>
+              <WriteIcon className={normalizedPathname === '/new-story' || normalizedPathname.startsWith('/edit/') ? 'opacity-100' : 'opacity-70'} size={24} />
+              <span className="text-xs mt-1 font-medium">{copy.write}</span>
             </Link>
 
             {/* 북마크 버튼 */}
             <Link
-              href="/bookmarks"
+              href={href('/bookmarks')}
               prefetch={true}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
-                pathname === '/bookmarks'
+                normalizedPathname === '/bookmarks'
                   ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
                   : inactiveNavClass
               }`}
-              title="북마크"
+              title={copy.bookmarks}
             >
-              <BookmarkIcon className={pathname === '/bookmarks' ? 'opacity-100' : 'opacity-70'} size={24} />
-              <span className="text-xs mt-1 font-medium">북마크</span>
+              <BookmarkIcon className={normalizedPathname === '/bookmarks' ? 'opacity-100' : 'opacity-70'} size={24} />
+              <span className="text-xs mt-1 font-medium">{copy.bookmarks}</span>
             </Link>
 
             {/* 채팅(DM) 버튼 */}
@@ -209,10 +223,10 @@ export default function LeftSidebar() {
               type="button"
               onClick={() => openDMModal()}
               className={`relative flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${inactiveNavClass}`}
-              title="채팅"
+              title={copy.chat}
             >
               <MessageCircle className="opacity-70" size={24} />
-              <span className="text-xs mt-1 font-medium">채팅</span>
+              <span className="text-xs mt-1 font-medium">{copy.chat}</span>
               {/* 읽지 않은 메시지 뱃지 (향후 API 연동 시 표시) */}
               {/* {unreadDMCount > 0 && (
                 <span className="absolute top-1 right-1 h-5 w-5 rounded-full bg-blue-500 text-white text-xs flex items-center justify-center">
@@ -223,17 +237,17 @@ export default function LeftSidebar() {
 
             {/* 설정 버튼 */}
             <Link
-              href="/settings"
+              href={href('/settings')}
               prefetch={true}
               className={`flex flex-col items-center justify-center w-16 h-16 rounded-xl transition-colors ${
-                pathname === '/settings' || pathname?.startsWith('/settings/')
+                normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/')
                   ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
                   : inactiveNavClass
               }`}
-              title="설정"
+              title={copy.settings}
             >
-              <SettingsIcon className={pathname === '/settings' || pathname?.startsWith('/settings/') ? 'opacity-100' : 'opacity-70'} size={24} />
-              <span className="text-xs mt-1 font-medium">설정</span>
+              <SettingsIcon className={normalizedPathname === '/settings' || normalizedPathname.startsWith('/settings/') ? 'opacity-100' : 'opacity-70'} size={24} />
+              <span className="text-xs mt-1 font-medium">{copy.settings}</span>
             </Link>
 
             {/* 알림 드롭다운 (Feature Flag) */}
@@ -246,10 +260,10 @@ export default function LeftSidebar() {
                       ? 'bg-[#D8E6EA] text-[#264653] dark:bg-[#1D3A36] dark:text-[#B9E6DC]'
                       : inactiveNavClass
                   }`}
-                  title="알림"
+                  title={copy.notifications}
                 >
                   <NotificationBellIcon className={isNotificationOpen ? 'opacity-100' : 'opacity-70'} size={24} />
-                  <span className="text-xs mt-1 font-medium">알림</span>
+                  <span className="text-xs mt-1 font-medium">{copy.notifications}</span>
                   {/* 읽지 않은 알림 뱃지 */}
                   {unreadCount > 0 && (
                     <span className="absolute top-1 right-1 h-5 w-5 rounded-full bg-red-500 text-white text-xs flex items-center justify-center">
@@ -263,8 +277,7 @@ export default function LeftSidebar() {
               </DropdownMenuContent>
             </DropdownMenu>
             )}
-          </>
-        )}
+        </>
       </nav>
     </aside>
   );

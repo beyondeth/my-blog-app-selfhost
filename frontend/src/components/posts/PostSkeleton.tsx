@@ -18,7 +18,7 @@ const PostSkeleton = React.memo(function PostSkeleton({ count = 3, tone = 'defau
         <article
           key={`skeleton-${index}`}
           className={`border-t ${borderClass} first:border-t-0 py-4 sm:py-6 animate-pulse`}
-          aria-label="로딩 중..."
+          aria-label="Loading..."
         >
           {/* 헤더 영역 */}
           <div className="flex items-center gap-2 mb-3">
@@ -83,7 +83,7 @@ export const PostSkeletonWithShimmer = React.memo(function PostSkeletonWithShimm
         <article
           key={`shimmer-skeleton-${index}`}
           className={`border-t ${borderClass} first:border-t-0 py-4 sm:py-6`}
-          aria-label="로딩 중..."
+          aria-label="Loading..."
           style={shimmerStyle}
         >
           {/* 헤더 영역 */}

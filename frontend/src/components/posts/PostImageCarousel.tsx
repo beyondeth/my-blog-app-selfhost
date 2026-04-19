@@ -212,7 +212,7 @@ export default function PostImageCarousel({
                key={index}
                src={img}
                index={index}
-               alt={`게시물 이미지 ${index + 1}`}
+               alt={`Post image ${index + 1}`}
                isHomeFeed={isHomeFeed}
                shouldBlur={shouldBlur}
                blurReason={blurReason}
@@ -253,7 +253,7 @@ export default function PostImageCarousel({
               {shouldBlur ? (
                 <BlurredImage
                   src={currentImage}
-                  alt={`게시물 이미지 ${currentIndex + 1}`}
+                  alt={`Post image ${currentIndex + 1}`}
                   isBlurred={shouldBlur}
                   blurReason={blurReason}
                   fill
@@ -266,7 +266,7 @@ export default function PostImageCarousel({
               ) : (
                 <Image
                   src={currentImage}
-                  alt={`게시물 이미지 ${currentIndex + 1}`}
+                  alt={`Post image ${currentIndex + 1}`}
                   fill
                   sizes="(max-width: 1024px) 90vw, 780px"
                   className="object-contain bg-black/5"
@@ -283,7 +283,7 @@ export default function PostImageCarousel({
                 type="button"
                 onClick={handlePrev}
                 className="absolute left-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white p-2 hover:bg-black/70 focus:outline-none z-10"
-                aria-label="이전 이미지"
+                aria-label="Previous image"
               >
                 <ChevronLeft className="w-5 h-5" />
               </button>
@@ -291,7 +291,7 @@ export default function PostImageCarousel({
                 type="button"
                 onClick={handleNext}
                 className="absolute right-3 top-1/2 -translate-y-1/2 rounded-full bg-black/50 text-white p-2 hover:bg-black/70 focus:outline-none z-10"
-                aria-label="다음 이미지"
+                aria-label="Next image"
               >
                 <ChevronRight className="w-5 h-5" />
               </button>
@@ -302,7 +302,7 @@ export default function PostImageCarousel({
                       key={index}
                       type="button"
                       onClick={() => setCurrentIndex(index)}
-                      aria-label={`${index + 1}번 이미지 보기`}
+                      aria-label={`View image ${index + 1}`}
                       className={cn(
                         'h-2 w-2 rounded-full transition-colors',
                         index === currentIndex ? 'bg-white' : 'bg-white/40',

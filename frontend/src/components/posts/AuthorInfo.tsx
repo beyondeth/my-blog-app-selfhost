@@ -84,7 +84,7 @@ export default function AuthorInfo({ author }: AuthorInfoProps) {
 
   // 삭제된 사용자 처리
   const isDeletedUser = author.username?.startsWith('deleted_');
-  const displayUsername = isDeletedUser ? '탈퇴한 사용자' : (author.username || 'Author');
+  const displayUsername = isDeletedUser ? 'Deleted user' : (author.username || 'Author');
 
   // 호버 툴팁에 사용할 사용자 데이터가 있는 경우에만 호버 기능 활성화
   if (userData && !isDeletedUser && mounted) {

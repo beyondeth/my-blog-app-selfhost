@@ -144,7 +144,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
           "
           aria-label="Back to conversations"
         >
-          대화목록
+          Conversations
         </button>
 
         {/* User info */}
@@ -182,14 +182,14 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
                 type="button"
                 className="w-full px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               >
-                신고하기
+                Report
               </button>
               <button
                 onClick={handleBlock}
                 type="button"
                 className="w-full px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors"
               >
-                차단하기
+                Block
               </button>
             </div>
           )}
@@ -203,7 +203,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
           onClick={handleAvatarClick}
           className="p-1 border-0 bg-transparent cursor-pointer rounded-lg hover:bg-gray-100 transition-colors"
           type="button"
-          aria-label="더보기"
+          aria-label="More actions"
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="text-gray-600">
             <circle cx="12" cy="5" r="1.5" fill="currentColor"/>
@@ -228,7 +228,7 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
             min-h-[44px]
           "
         >
-          나가기
+          Leave chat
         </button>
       </div>
 
@@ -237,10 +237,10 @@ const ChatHeader: React.FC<ChatHeaderProps> = memo(({ otherUser, isLoading, conv
         isOpen={showLeaveModal}
         onClose={() => setShowLeaveModal(false)}
         onConfirm={handleConfirmLeave}
-        title="대화방 나가기"
-        message="대화 내용이 사라집니다. 진행하시겠습니까?"
-        confirmText="나가기"
-        cancelText="취소"
+        title="Leave this chat?"
+        message="This conversation will be removed from your list. Continue?"
+        confirmText="Leave chat"
+        cancelText="Cancel"
         isLoading={isLeaving}
       />
 

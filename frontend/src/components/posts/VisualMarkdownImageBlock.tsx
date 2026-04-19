@@ -21,10 +21,10 @@ export interface VisualMarkdownImageBlockProps {
 
 const AVAILABLE_SIZES: ImageSize[] = ['small', 'medium', 'default', 'full'];
 const SIZE_LABELS: Record<ImageSize, string> = {
-  small: '작게',
-  medium: '중간',
-  default: '기본',
-  full: '전체',
+  small: 'Small',
+  medium: 'Medium',
+  default: 'Default',
+  full: 'Full width',
 };
 const SIZE_BOX_CLASS: Record<ImageSize, string> = {
   small: 'w-3 h-3',
@@ -99,8 +99,8 @@ export function VisualMarkdownImageBlock({
                       e.stopPropagation();
                       onChange({ size: option });
                     }}
-                    aria-label={`${SIZE_LABELS[option]} 크기`}
-                    title={`${SIZE_LABELS[option]} 크기`}
+                    aria-label={`${SIZE_LABELS[option]} size`}
+                    title={`${SIZE_LABELS[option]} size`}
                     className={cn(
                       'p-1 rounded-md border transition-colors',
                       isActive
@@ -130,7 +130,7 @@ export function VisualMarkdownImageBlock({
               }}
               className="text-sm font-medium text-red-600 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 px-2 py-1 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20"
             >
-              삭제
+              Delete
             </button>
           </div>
         </div>
@@ -151,7 +151,7 @@ export function VisualMarkdownImageBlock({
             type="text"
             value={localCaption}
             onChange={handleCaptionChange}
-            placeholder="이미지 캡션 (optional)"
+            placeholder="Image caption (optional)"
             className="w-full text-center text-sm text-gray-500 dark:text-gray-400 bg-transparent border-none focus:ring-0 focus:outline-none placeholder:text-gray-300 dark:placeholder:text-gray-600"
           />
         </div>

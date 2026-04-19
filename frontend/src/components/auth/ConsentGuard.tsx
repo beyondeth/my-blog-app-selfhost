@@ -4,6 +4,8 @@ import { useEffect, useRef } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { needsConsent } from '@/types';
+import { stripLocalePrefix } from '@/lib/i18n/config';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 /**
  * 약관 동의 가드 컴포넌트
@@ -18,7 +20,9 @@ import { needsConsent } from '@/types';
 export default function ConsentGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const normalizedPathname = stripLocalePrefix(pathname || '/');
   const { user, isLoading } = useAuth();
+  const { href } = useLocaleContext();
   const isRedirecting = useRef(false);
   const lastRedirectTime = useRef(0);
 
@@ -47,8 +51,8 @@ export default function ConsentGuard({ children }: { children: React.ReactNode }
 
     // 현재 경로가 제외 대상인지 확인
     const isExcluded =
-      excludedPaths.includes(pathname) ||
-      excludedPatterns.some((pattern) => pattern.test(pathname));
+      excludedPaths.includes(normalizedPathname) ||
+      excludedPatterns.some((pattern) => pattern.test(normalizedPathname));
 
     // 세션 스토리지에서 consent 리디렉션 방지 플래그 확인
     const consentLock = sessionStorage.getItem('consent_redirect_lock');
@@ -75,14 +79,14 @@ export default function ConsentGuard({ children }: { children: React.ReactNode }
 
       // 100ms 딜레이 후 리디렉션 (상태 업데이트 대기)
       setTimeout(() => {
-        router.push('/consent');
+        router.push(href('/consent'));
         // 1초 후 리디렉션 상태 초기화
         setTimeout(() => {
           isRedirecting.current = false;
         }, 1000);
       }, 100);
     }
-  }, [user, isLoading, pathname, router]);
+  }, [user, isLoading, normalizedPathname, router, href]);
 
   // 컴포넌트 언마운트 시 리디렉션 상태 초기화
   useEffect(() => {

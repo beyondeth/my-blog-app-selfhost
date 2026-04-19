@@ -1,6 +1,6 @@
 ---
 style_name: "Research Insight Analysis Style"
-language: "korean"
+language: "english"
 min_length: 6000
 target_length: "6000-9000"
 code_block_ratio: 0.1
@@ -21,7 +21,7 @@ Use this style for analyzing academic papers and translating them into clear, pr
 - Critical evaluation of limitations and risks
 
 ### Recommended Signals
-**Keywords**: "논문", "arXiv", "실험", "데이터셋", "baseline", "ablation", "재현", "한계", "인사이트"
+**Keywords**: "paper", "arXiv", "experiment", "dataset", "baseline", "ablation", "reproduction", "limitations", "insights"
 **Intent**: Reader wants to understand a paper's contribution and what it means in practice
 
 ### When Another Style Fits Better
@@ -38,8 +38,8 @@ Use this style for analyzing academic papers and translating them into clear, pr
 
 Clearly distinguish what the paper claims vs. your analysis.
 
-- **논문 주장**: paper's stated contributions or results
-- **분석/인사이트**: interpretation, implications, or critique
+- **Paper claims**: the contributions or results stated by the paper
+- **Analysis / insight**: your interpretation, implications, or critique
 
 ## 2. Evidence-First Summaries
 
@@ -80,42 +80,42 @@ End each major section with a short "so what":
 ## Paper Analysis Structure Template
 
 ```markdown
-## Paper Snapshot (논문 개요)
+## Paper Snapshot
 - Title / Authors / Venue / Year
 - One-sentence contribution summary
 - Reference: arXiv/DOI or official link
 
-## Problem & Context (문제와 배경)
+## Problem & Context
 What gap does the paper address? Why does it matter?
 
-## Method Summary (핵심 방법)
+## Method Summary
 Key idea and how it differs from prior work
 
-## Experimental Setup (실험 구성)
+## Experimental Setup
 Datasets, metrics, baselines, compute budget
 
-## Results & Findings (결과와 관찰)
+## Results & Findings
 Table or bullet summary of main results
 
-## Ablation & Analysis (분석)
+## Ablation & Analysis
 What components drive performance?
 
-## Limitations & Risks (한계와 리스크)
+## Limitations & Risks
 Explicit constraints and missing validations
 
-## Practical Insights (실무 인사이트)
+## Practical Insights
 Actionable takeaways for real-world use
 
-## Open Questions (추가 질문)
+## Open Questions
 What should be tested next?
 
-## Key Takeaways (핵심 정리)
+## Key Takeaways
 3-5 concise bullets
 ```
 
-## Tone and Voice (Korean)
+## Tone and Voice
 
-- Formal and clear: "~합니다", "~할 수 있습니다"
+- Formal and clear. Prefer direct, neutral English over hype.
 - Keep sentences short when stating results
 - Use neutral language, avoid hype or salesy tone
 
@@ -152,8 +152,8 @@ Use a compact table to show differences:
 ## Risk Framing
 
 Add a short "risk callout" for deployment:
-- "이 방식은 실시간 환경에서 지연이 커질 수 있습니다."
-- "데이터 분포가 바뀌면 성능이 급격히 저하될 수 있습니다."
+- "This method can introduce too much latency for real-time use."
+- "Performance may drop sharply when the data distribution shifts."
 
 ---
 

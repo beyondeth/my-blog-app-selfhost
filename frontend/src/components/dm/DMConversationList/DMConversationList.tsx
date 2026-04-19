@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useCallback, useMemo, useState, useRef, useEffect } from 'react';
-import { Search, Filter, RefreshCw } from 'lucide-react';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { Search, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useDMStore } from '@/stores/dmStore';
 import { useConversationList } from '@/hooks/useConversationList';
@@ -97,7 +97,7 @@ const DMConversationList: React.FC = () => {
       {/* Header */}
       <div className="px-4 py-4 border-b border-gray-200 bg-white">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-semibold text-gray-800">메시지</h2>
+          <h2 className="text-xl font-semibold text-gray-800">Messages</h2>
 
           {/* 모바일 전용: 프로필 이미지 + 나가기 버튼 */}
           <div className="flex items-center gap-2 md:hidden">
@@ -111,9 +111,9 @@ const DMConversationList: React.FC = () => {
             <button
               onClick={handleExit}
               className="px-3 py-1.5 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors text-sm font-medium"
-              aria-label="나가기"
+              aria-label="Exit messages"
             >
-              나가기
+              Exit
             </button>
           </div>
 
@@ -142,7 +142,7 @@ const DMConversationList: React.FC = () => {
               onChange={(e) => setShowUnreadOnly(e.target.checked)}
               className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
             />
-            <span className="text-sm text-gray-600">읽지 않은 메시지만</span>
+            <span className="text-sm text-gray-600">Unread only</span>
           </label>
         </div>
       </div>
@@ -176,13 +176,13 @@ const DMConversationList: React.FC = () => {
         ) : error ? (
           // Error state
           <div className="text-center p-4 sm:p-8">
-            <p className="text-sm sm:text-base text-red-500 mb-2">오류가 발생했습니다</p>
+            <p className="text-sm sm:text-base text-red-500 mb-2">Something went wrong</p>
             <p className="text-sm text-gray-500">{error}</p>
             <button
               onClick={handleRefresh}
               className="mt-3 sm:mt-4 px-4 py-2 min-h-[44px] bg-blue-600 text-white rounded-lg hover:bg-blue-700"
             >
-              다시 시도
+              Try again
             </button>
           </div>
         ) : filteredConversations.length === 0 ? (
@@ -193,11 +193,11 @@ const DMConversationList: React.FC = () => {
             </div>
             <p className="text-sm sm:text-base text-gray-500">
               {conversationFilter.searchQuery
-                ? '검색 결과가 없습니다'
-                : '대화가 없습니다'}
+                ? 'No search results'
+                : 'No conversations yet'}
             </p>
             <p className="text-sm text-gray-400 mt-2 break-keep">
-              프로필에서 메시지 버튼을 눌러 대화를 시작하세요
+              Start a conversation from someone&apos;s profile.
             </p>
           </div>
         ) : (
@@ -221,7 +221,7 @@ const DMConversationList: React.FC = () => {
                   disabled={isLoading}
                   className="text-sm text-blue-600 hover:text-blue-700"
                 >
-                  {isLoading ? '로딩 중...' : '더 보기'}
+                  {isLoading ? 'Loading...' : 'Load more'}
                 </button>
               </div>
             )}

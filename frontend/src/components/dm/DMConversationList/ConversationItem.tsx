@@ -2,7 +2,6 @@
 
 import React, { memo, useMemo } from 'react';
 import { formatDistanceToNow, format, isToday, isYesterday } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { Avatar } from '@/components/ui/avatar';
 import { Conversation } from '@/types/chat';
 
@@ -35,15 +34,15 @@ const ConversationItem: React.FC<ConversationItemProps> = memo(({
     const diffInMinutes = (now.getTime() - messageDate.getTime()) / (1000 * 60);
 
     if (diffInMinutes < 1) {
-      return '방금';
+      return 'Just now';
     } else if (diffInMinutes < 60) {
-      return `${Math.floor(diffInMinutes)}분 전`;
+      return `${Math.floor(diffInMinutes)}m ago`;
     } else if (isToday(messageDate)) {
       return format(messageDate, 'HH:mm');
     } else if (isYesterday(messageDate)) {
-      return '어제';
+      return 'Yesterday';
     } else if (diffInMinutes < 10080) { // Within a week
-      return formatDistanceToNow(messageDate, { addSuffix: true, locale: ko });
+      return formatDistanceToNow(messageDate, { addSuffix: true });
     } else {
       return format(messageDate, 'MM/dd');
     }
@@ -52,7 +51,7 @@ const ConversationItem: React.FC<ConversationItemProps> = memo(({
   // Truncate message preview
   const messagePreview = useMemo(() => {
     if (!conversation.lastMessage) {
-      return '대화를 시작하세요';
+      return 'Start the conversation';
     }
 
     const content = conversation.lastMessage.content;

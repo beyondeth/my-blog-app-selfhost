@@ -27,23 +27,23 @@ interface InviteManagementSectionProps {
 }
 
 const MAX_USE_OPTIONS = [
-  { label: '무제한', value: 0 },
-  { label: '1회', value: 1 },
-  { label: '5회', value: 5 },
-  { label: '10회', value: 10 },
-  { label: '25회', value: 25 },
-  { label: '50회', value: 50 },
-  { label: '100회', value: 100 },
+  { label: 'Unlimited', value: 0 },
+  { label: '1 use', value: 1 },
+  { label: '5 uses', value: 5 },
+  { label: '10 uses', value: 10 },
+  { label: '25 uses', value: 25 },
+  { label: '50 uses', value: 50 },
+  { label: '100 uses', value: 100 },
 ];
 
 const EXPIRE_OPTIONS = [
-  { label: '1시간', value: 1 },
-  { label: '6시간', value: 6 },
-  { label: '12시간', value: 12 },
-  { label: '1일', value: 24 },
-  { label: '3일', value: 72 },
-  { label: '7일', value: 168 },
-  { label: '30일', value: 720 },
+  { label: '1 hour', value: 1 },
+  { label: '6 hours', value: 6 },
+  { label: '12 hours', value: 12 },
+  { label: '1 day', value: 24 },
+  { label: '3 days', value: 72 },
+  { label: '7 days', value: 168 },
+  { label: '30 days', value: 720 },
 ];
 
 /**
@@ -103,7 +103,7 @@ export function InviteManagementSection({ slug }: InviteManagementSectionProps) 
         <div className="flex items-center gap-2">
           <LinkIcon className="w-5 h-5 text-blue-500" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            초대 링크 관리
+            Invite links
           </h2>
         </div>
         {isExpanded ? (
@@ -118,7 +118,7 @@ export function InviteManagementSection({ slug }: InviteManagementSectionProps) 
         <div className="px-6 pb-6 border-t border-gray-200 dark:border-gray-800/70">
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              초대 링크는 승인형/비공개 커뮤니티에서 멤버를 초대할 때 사용됩니다.
+              Invite links let you add members to approval-based or private communities.
             </p>
             {!showCreateForm && (
               <Button
@@ -129,7 +129,7 @@ export function InviteManagementSection({ slug }: InviteManagementSectionProps) 
                 onClick={() => setShowCreateForm(true)}
               >
                 <Plus className="w-4 h-4" />
-                새 초대 링크
+                New invite link
               </Button>
             )}
           </div>
@@ -146,22 +146,22 @@ export function InviteManagementSection({ slug }: InviteManagementSectionProps) 
           {/* 초대 목록 */}
           <div className="mt-6">
             <h3 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3">
-              활성화된 초대 링크
+              Active invite links
             </h3>
 
             {isLoading ? (
               <div className="py-6 text-center">
                 <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin mx-auto" />
-                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">로딩 중...</p>
+                <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
               </div>
             ) : isError ? (
               <div className="py-6 text-center text-red-500">
-                초대 목록을 불러오는데 실패했습니다.
+                Failed to load invite links.
               </div>
             ) : invites.length === 0 ? (
               <div className="py-6 text-center text-gray-500 dark:text-gray-400">
                 <LinkIcon className="w-10 h-10 mx-auto mb-2 opacity-50" />
-                <p>생성된 초대 링크가 없습니다.</p>
+                <p>No invite links created yet.</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -181,8 +181,8 @@ export function InviteManagementSection({ slug }: InviteManagementSectionProps) 
                       variant="outline"
                       onClick={() => fetchNextPage()}
                       disabled={isFetchingNextPage}
-                    >
-                      {isFetchingNextPage ? '로딩 중...' : '더 보기'}
+                  >
+                      {isFetchingNextPage ? 'Loading...' : 'Load more'}
                     </Button>
                   </div>
                 )}
@@ -219,9 +219,9 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
         : 'border-gray-200 text-gray-600 hover:border-gray-300 dark:border-gray-700 dark:text-gray-300 dark:hover:border-gray-500'
     );
 
-  const summaryText = `${maxUses === 0 ? '무제한 사용' : `${maxUses}회 사용`} · ${
-    EXPIRE_OPTIONS.find((option) => option.value === expiresInHours)?.label ?? '만료 없음'
-  } 설정으로 생성됩니다.`;
+  const summaryText = `${maxUses === 0 ? 'Unlimited uses' : `${maxUses} uses`} · ${
+    EXPIRE_OPTIONS.find((option) => option.value === expiresInHours)?.label ?? 'No expiration'
+  } will be used for this invite.`;
 
   return (
     <form
@@ -231,7 +231,7 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
       {!showAdvancedOptions && (
         <div className="flex flex-col gap-2 rounded-lg border border-dashed border-gray-300 dark:border-gray-600 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-sm text-gray-600 dark:text-gray-300">
-            기본값은 <span className="font-medium">무제한 사용 · 7일 만료</span>입니다. 대부분의 경우 이 설정이면 충분해요.
+            The default is <span className="font-medium">unlimited uses · 7-day expiry</span>. This is enough for most cases.
           </p>
           <Button
             type="button"
@@ -240,7 +240,7 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
             onClick={() => setShowAdvancedOptions(true)}
             disabled={isCreating}
           >
-            상세 옵션 조정
+            Adjust advanced options
           </Button>
         </div>
       )}
@@ -249,7 +249,7 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-3">
               <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-                최대 사용 횟수
+                Max uses
               </p>
               <button
                 type="button"
@@ -257,7 +257,7 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
                 disabled={isCreating}
                 className="text-xs text-blue-600 hover:underline dark:text-blue-400"
               >
-                무제한으로 설정
+                Set to unlimited
               </button>
             </div>
             <div className="flex flex-wrap gap-2">
@@ -277,7 +277,7 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
           </div>
           <div className="space-y-1.5">
             <p className="text-[11px] font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-              만료 시간
+              Expiration
             </p>
             <div className="flex flex-wrap gap-2">
               {EXPIRE_OPTIONS.map((option) => (
@@ -302,7 +302,7 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
               onClick={() => setShowAdvancedOptions(false)}
               disabled={isCreating}
             >
-              간단하게 보기
+              Back to simple mode
             </Button>
           </div>
         </div>
@@ -317,10 +317,10 @@ function CreateInviteForm({ onCreate, onCancel, isCreating }: CreateInviteFormPr
             onClick={onCancel}
             disabled={isCreating}
           >
-            취소
+            Cancel
           </Button>
           <Button type="submit" size="sm" disabled={isCreating}>
-            {isCreating ? '생성 중...' : '생성'}
+            {isCreating ? 'Creating...' : 'Create'}
           </Button>
         </div>
       </div>
@@ -344,12 +344,12 @@ function InviteItem({ invite, onRevoke, isRevoking }: InviteItemProps) {
     const now = new Date();
     const expires = new Date(invite.expiresAt);
     const diff = expires.getTime() - now.getTime();
-    if (diff <= 0) return '만료됨';
+    if (diff <= 0) return 'Expired';
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const days = Math.floor(hours / 24);
-    if (days > 0) return `${days}일 남음`;
-    if (hours > 0) return `${hours}시간 남음`;
-    return '1시간 미만';
+    if (days > 0) return `${days} day${days === 1 ? '' : 's'} left`;
+    if (hours > 0) return `${hours} hour${hours === 1 ? '' : 's'} left`;
+    return 'Less than 1 hour left';
   }, [invite.expiresAt]);
 
   const handleCopy = async () => {
@@ -371,11 +371,11 @@ function InviteItem({ invite, onRevoke, isRevoking }: InviteItemProps) {
   const isExpired = new Date(invite.expiresAt) < new Date();
   const isMaxUsesReached = invite.maxUses > 0 && invite.useCount >= invite.maxUses;
   const statusLabel = !invite.isActive
-    ? '비활성화'
+    ? 'Disabled'
     : isMaxUsesReached
-      ? '사용 완료'
+      ? 'Fully used'
       : null;
-  const timeLabel = isExpired ? '만료됨' : getTimeRemaining();
+  const timeLabel = isExpired ? 'Expired' : getTimeRemaining();
 
   return (
     <div className="rounded-2xl border border-gray-200 dark:border-gray-800/70 bg-white dark:bg-slate-950/40 p-4 space-y-3">
@@ -398,7 +398,7 @@ function InviteItem({ invite, onRevoke, isRevoking }: InviteItemProps) {
             className="gap-2"
           >
             {copied ? <Check className="w-4 h-4 text-emerald-500" /> : <Copy className="w-4 h-4" />}
-            {copied ? '복사됨' : '복사'}
+            {copied ? 'Copied' : 'Copy'}
           </Button>
           <Button
             type="button"
@@ -413,7 +413,7 @@ function InviteItem({ invite, onRevoke, isRevoking }: InviteItemProps) {
             ) : (
               <Trash2 className="w-4 h-4" />
             )}
-            삭제
+            Delete
           </Button>
         </div>
       </div>
@@ -423,7 +423,7 @@ function InviteItem({ invite, onRevoke, isRevoking }: InviteItemProps) {
           <Users className="w-3.5 h-3.5" />
           <span>
             {invite.useCount}
-            {invite.maxUses > 0 ? `/${invite.maxUses}회` : '회 사용'}
+            {invite.maxUses > 0 ? `/${invite.maxUses} uses` : ' uses'}
           </span>
         </div>
         <div className="inline-flex items-center gap-1 rounded-full bg-gray-100 px-2 py-0.5 dark:bg-slate-900/60">

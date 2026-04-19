@@ -1,7 +1,11 @@
 'use client';
+
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { DOCS_NAVIGATION } from '@/lib/public-site';
 import { usePublicDocsSidebarStore } from '@/stores/publicDocsSidebarStore';
+import { useLocaleContext } from '@/providers/LocaleProvider';
+import { stripLocalePrefix } from '@/lib/i18n/config';
 
 type DocsTocItem = {
   id: string;
@@ -34,6 +38,9 @@ export default function DocsPageLayout({
   eyebrow = 'Documentation',
 }: DocsPageLayoutProps) {
   const { isOpen: isSidebarOpen } = usePublicDocsSidebarStore();
+  const pathname = usePathname();
+  const { href } = useLocaleContext();
+  const normalizedCurrentPath = stripLocalePrefix(pathname || currentPath);
 
   return (
     <div
@@ -41,7 +48,6 @@ export default function DocsPageLayout({
       style={{ fontFamily: 'var(--font-docs)' }}
     >
       <div className="mx-auto flex w-full max-w-[1500px] flex-col lg:flex-row px-4 sm:px-6 lg:px-8 items-start">
-        {/* Left Sidebar */}
         <aside
           className={`hidden lg:block shrink-0 sticky top-0 max-h-screen overflow-y-auto border-r border-[#f1f3f4] py-12 transition-[width,padding,opacity] duration-200 dark:border-[#303134] ${
             isSidebarOpen ? 'w-[260px] pr-6 opacity-100' : 'w-0 pr-0 opacity-0 border-r-0'
@@ -56,11 +62,11 @@ export default function DocsPageLayout({
                 </div>
                 <div className="space-y-1">
                   {section.items.map((item) => {
-                    const active = matchesPath(currentPath, item.href);
+                    const active = matchesPath(normalizedCurrentPath, item.href);
                     return (
                       <Link
                         key={item.href}
-                        href={item.href}
+                        href={href(item.href)}
                         className={`block rounded-full px-4 py-2.5 text-[14px] font-medium transition-colors ${
                           active
                             ? 'bg-[#e8f0fe] text-[#1a73e8] dark:bg-[#8ab4f8]/10 dark:text-[#8ab4f8]'
@@ -77,7 +83,6 @@ export default function DocsPageLayout({
           </div>
         </aside>
 
-        {/* Center Main */}
         <main className="flex-1 min-w-0 py-12 lg:px-12 xl:px-20 mx-auto w-full max-w-4xl">
           <div className="mb-12">
             <div className="mb-3 text-[12px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8] dark:text-[#8ab4f8]">
@@ -106,7 +111,6 @@ export default function DocsPageLayout({
           </div>
         </main>
 
-        {/* Right Sidebar - TOC */}
         <aside className="hidden xl:block w-[240px] shrink-0 py-12 pl-8 sticky top-0 max-h-screen overflow-y-auto border-l border-[#f1f3f4] dark:border-[#303134]">
           <div className="text-[11px] font-bold uppercase tracking-widest text-[#5f6368] dark:text-[#9aa0a6] mb-6">
             On this page
@@ -125,7 +129,7 @@ export default function DocsPageLayout({
             </div>
           ) : (
             <p className="text-[13px] leading-relaxed text-[#5f6368] dark:text-[#9aa0a6]">
-               문서 목차가 존재하지 않습니다. 좌측 메뉴를 이용해 다른 페이지로 이동하세요.
+              This page does not have a table of contents. Use the left menu to move to another page.
             </p>
           )}
 
@@ -134,10 +138,10 @@ export default function DocsPageLayout({
                 Need help?
              </div>
              <p className="text-[13px] leading-relaxed text-[#5f6368] dark:text-[#9aa0a6] mb-4">
-               문제를 해결할 수 없다면 공식 지원 채널을 활용하세요.
+               Use the official support channel if the docs do not solve your issue.
              </p>
-             <Link href="/support" className="text-[13px] font-bold text-[#1a73e8] dark:text-[#8ab4f8] hover:underline flex items-center gap-1">
-                고객 지원 찾기 &rarr;
+             <Link href={href('/support')} className="text-[13px] font-bold text-[#1a73e8] dark:text-[#8ab4f8] hover:underline flex items-center gap-1">
+                Open support &rarr;
              </Link>
           </div>
         </aside>

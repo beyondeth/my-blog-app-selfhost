@@ -31,22 +31,22 @@ const MemberRoleBadge = React.memo(function MemberRoleBadge({
 
   const roleConfig = {
     [CommunityRole.OWNER]: {
-      label: '오너',
+      label: 'Owner',
       icon: Crown,
       className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
     },
     [CommunityRole.ADMIN]: {
-      label: '관리자',
+      label: 'Admin',
       icon: ShieldCheck,
       className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
     },
     [CommunityRole.MODERATOR]: {
-      label: '매니저',
+      label: 'Moderator',
       icon: Shield,
       className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
     },
     [CommunityRole.MEMBER]: {
-      label: '멤버',
+      label: 'Member',
       icon: User,
       className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
     },

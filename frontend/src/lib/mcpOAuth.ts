@@ -1,3 +1,5 @@
+import { localizePath, type AppLocale } from './i18n/config';
+
 export const MCP_OAUTH_SESSION_KEY = 'mcpOAuth';
 
 export type McpOAuthSessionData = {
@@ -52,12 +54,12 @@ function buildMcpOAuthQueryString(data: McpOAuthSessionData): string {
   }).toString();
 }
 
-export function buildMcpOAuthConsentPath(data: McpOAuthSessionData): string {
-  return `/auth/mcp-consent?${buildMcpOAuthQueryString(data)}`;
+export function buildMcpOAuthConsentPath(data: McpOAuthSessionData, locale?: AppLocale): string {
+  return `${locale ? localizePath('/auth/mcp-consent', locale) : '/auth/mcp-consent'}?${buildMcpOAuthQueryString(data)}`;
 }
 
-export function buildMcpOAuthLoginPath(data: McpOAuthSessionData): string {
-  return `/login?${buildMcpOAuthQueryString(data)}`;
+export function buildMcpOAuthLoginPath(data: McpOAuthSessionData, locale?: AppLocale): string {
+  return `${locale ? localizePath('/login', locale) : '/login'}?${buildMcpOAuthQueryString(data)}`;
 }
 
 export function buildMcpOAuthDeniedCallbackUrl(data: McpOAuthSessionData): string {

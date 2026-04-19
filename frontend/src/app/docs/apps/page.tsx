@@ -6,7 +6,7 @@ import { APP_CONNECTION_DOCS } from '@/lib/app-connection-docs';
 export const metadata: Metadata = {
   title: 'Web & App Connections',
   description:
-    'Codebase 연결은 Web & App Connections, API Keys & MCP, SKILLS 세 가지 방식으로 정리되어 있습니다.',
+    'Codebase connection guidance is organized into Web & App Connections, API Keys & MCP, and SKILLS.',
   alternates: {
     canonical: '/docs/apps',
   },
@@ -24,25 +24,24 @@ export default function AppConnectionsPage() {
     <DocsPageLayout
       currentPath="/docs/apps"
       title="Web & App Connections"
-      description="Codebase 연결 가이드는 사용 환경에 맞춰 세 가지 방식으로 정리되어 있습니다. 웹/앱 공식 문서, API key 기반 MCP 연결, 그리고 SKILLS 설치 흐름을 같은 문서 허브 안에서 확인할 수 있습니다."
+      description="Codebase connection guidance is organized into three paths: official web and app instructions, API key based MCP setup, and the SKILLS installation flow."
       toc={toc}
       eyebrow="Documentation"
     >
       <section id="overview">
         <h2>Overview</h2>
         <p>
-          Codebase 연결은 크게 세 가지 방식으로 나뉩니다. 첫째는 ChatGPT, Claude, Perplexity 같은
-          웹/앱 surface에서 직접 연결하는 방식이고, 둘째는 API key를 발급해 MCP 설정 파일이나 CLI
-          명령으로 붙이는 방식이며, 셋째는 SKILLS를 설치해 더 빠르게 온보딩하는 방식입니다.
+          Codebase connections are grouped into three practical paths. First, you can connect directly inside web and app surfaces such as ChatGPT, Claude, or Perplexity.
+          Second, you can issue an API key and register MCP through a config file or CLI command. Third, you can install SKILLS for a faster shared onboarding flow.
         </p>
       </section>
 
       <section id="web-and-app-connections">
         <h2>Web &amp; App Connections</h2>
         <p>
-          ChatGPT, Claude, Perplexity처럼 사용자가 직접 보는 웹/앱 환경의 연결 가이드입니다.
-          각 문서는 공식 문서를 기준으로 유지하고, 실제 화면 캡처는{' '}
-          <code>frontend/public/docs/apps/...</code> 아래 파일만 교체하면 반영되도록 설계했습니다.
+          This section covers the web and app environments users interact with directly, such as ChatGPT, Claude, and Perplexity.
+          Each guide is aligned to official documentation, and the screenshots are wired so replacing files under{' '}
+          <code>frontend/public/docs/apps/...</code> updates the page automatically.
         </p>
         <div className="not-prose mt-6 grid gap-4 md:grid-cols-3">
           {APP_CONNECTION_DOCS.map((doc) => (
@@ -61,7 +60,7 @@ export default function AppConnectionsPage() {
                 {doc.summary}
               </p>
               <p className="mt-4 text-sm font-medium text-[#1A73E8] dark:text-[#8AB4F8]">
-                문서 열기 →
+                Open guide →
               </p>
             </Link>
           ))}
@@ -71,28 +70,28 @@ export default function AppConnectionsPage() {
       <section id="api-keys-and-mcp">
         <h2>API Keys &amp; MCP</h2>
         <p>
-          API key를 발급한 뒤 hosted MCP endpoint를 각 클라이언트에 직접 등록하는 방식입니다.
-          현재 <Link href="/settings/api-keys">자동포스팅 연결</Link> 화면에 있는 key 관리, client 선택,
-          설정 복사, 재시작 흐름을 docs 형식으로 정리한 문서를 제공합니다.
+          This path issues an API key and registers the hosted MCP endpoint directly in each client.
+          The docs mirror the key management, client selection, copy, and restart flow shown in{' '}
+          <Link href="/settings/api-keys">Auto-publishing connection</Link>.
         </p>
         <div className="not-prose mt-6 rounded-[28px] border border-[#E6ECF3] bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)] dark:border-[#223244] dark:bg-[#0F1720] dark:shadow-none">
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">API key 관리</h3>
+              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">API key management</h3>
               <p className="mt-2 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-                최대 3개 key, 90일 만료, 사용량/만료/최근 사용 이력을 기준으로 관리합니다.
+                Manage up to 3 keys with 90-day expiration plus usage, expiry, and last-used history.
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">MCP 직접 설정</h3>
+              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">Direct MCP setup</h3>
               <p className="mt-2 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-                Select → Copy → Restart 흐름으로 Codex, Claude Code, Gemini, Cursor 등 각 환경에 맞춰 연결합니다.
+                Follow the Select → Copy → Restart flow for Codex, Claude Code, Gemini, Cursor, and related environments.
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">운영 체크포인트</h3>
+              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">Operational checks</h3>
               <p className="mt-2 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-                endpoint, 만료 key, 설정 형식, Codex 특수 규칙까지 문서형으로 정리했습니다.
+                The guide also covers endpoint validation, expired keys, config formats, and Codex-specific rules.
               </p>
             </div>
           </div>
@@ -101,13 +100,13 @@ export default function AppConnectionsPage() {
               href="/docs/mcp"
               className="inline-flex items-center justify-center rounded-xl bg-[#1A73E8] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#185ABC]"
             >
-              API Keys &amp; MCP 문서 열기
+              Open the API Keys &amp; MCP guide
             </Link>
             <Link
               href="/settings/api-keys"
               className="inline-flex items-center justify-center rounded-xl border border-[#D7E3F5] bg-[#F5F9FF] px-4 py-3 text-sm font-semibold text-[#1A56B5] transition hover:bg-[#EAF2FF] dark:border-[#2C425A] dark:bg-[#111D29] dark:text-[#8AB4F8] dark:hover:bg-[#162438]"
             >
-              설정 화면 열기
+              Open settings
             </Link>
           </div>
         </div>
@@ -116,28 +115,27 @@ export default function AppConnectionsPage() {
       <section id="skills">
         <h2>SKILLS</h2>
         <p>
-          Codebase skill을 설치해 Codex, Claude Code, Gemini CLI, Antigravity 같은 환경에서
-          공통 온보딩 흐름을 쓰는 방식입니다. settings 화면의 `SKILLS 설치`와 `LLM Agents 설치`
-          내용을 docs 형식으로 다시 정리했습니다.
+          This path installs the Codebase skill so Codex, Claude Code, Gemini CLI, and Antigravity can share the same onboarding flow.
+          It repackages the `SKILLS install` and `LLM Agents install` sections from settings as documentation.
         </p>
         <div className="not-prose mt-6 rounded-[28px] border border-[#E6ECF3] bg-white p-6 shadow-[0_8px_24px_rgba(15,23,42,0.04)] dark:border-[#223244] dark:bg-[#0F1720] dark:shadow-none">
           <div className="grid gap-4 md:grid-cols-3">
             <div>
-              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">Global 설치</h3>
+              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">Global install</h3>
               <p className="mt-2 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-                여러 에이전트를 한 번에 전역 설치하고, 동일한 skill source를 공통으로 사용합니다.
+                Install multiple agents globally in one pass and reuse the same skill source across them.
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">Agent별 설치</h3>
+              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">Per-agent install</h3>
               <p className="mt-2 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-                Codex, Claude Code, Gemini CLI, Antigravity 중 필요한 환경만 골라 설치할 수 있습니다.
+                Install only the environments you need, such as Codex, Claude Code, Gemini CLI, or Antigravity.
               </p>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">LLM Agents 안내</h3>
+              <h3 className="text-lg font-semibold text-[#101828] dark:text-white">LLM agent guidance</h3>
               <p className="mt-2 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-                설치 가이드를 fetch해서 문서 기반 자동 설치를 진행하는 방식까지 함께 포함했습니다.
+                Includes the fetch-based path for letting an agent read the installation guide and follow the process.
               </p>
             </div>
           </div>
@@ -146,13 +144,13 @@ export default function AppConnectionsPage() {
               href="/docs/skills"
               className="inline-flex items-center justify-center rounded-xl bg-[#1A73E8] px-4 py-3 text-sm font-semibold text-white transition hover:bg-[#185ABC]"
             >
-              SKILLS 문서 열기
+              Open the SKILLS guide
             </Link>
             <Link
               href="/settings/api-keys"
               className="inline-flex items-center justify-center rounded-xl border border-[#D7E3F5] bg-[#F5F9FF] px-4 py-3 text-sm font-semibold text-[#1A56B5] transition hover:bg-[#EAF2FF] dark:border-[#2C425A] dark:bg-[#111D29] dark:text-[#8AB4F8] dark:hover:bg-[#162438]"
             >
-              설정 화면 열기
+              Open settings
             </Link>
           </div>
         </div>

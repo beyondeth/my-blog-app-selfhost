@@ -60,7 +60,7 @@ export default function BookmarksPage() {
       await deleteBookmarkMutation.mutateAsync(postId);
       setShowDeleteMenu(null);
     } catch (error) {
-      toast.error('북마크 삭제에 실패했습니다.');
+      toast.error('Failed to remove the bookmark.');
     }
   };
 
@@ -121,7 +121,7 @@ export default function BookmarksPage() {
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <ErrorMessage message="북마크를 불러오는데 실패했습니다." />
+        <ErrorMessage message="Failed to load bookmarks." />
       </div>
     );
   }
@@ -137,7 +137,7 @@ export default function BookmarksPage() {
             <div className="relative w-full md:w-auto">
               <input
                 type="text"
-                placeholder="북마크 검색..."
+                placeholder="Search bookmarks..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full md:w-64 pl-10 pr-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
@@ -151,9 +151,9 @@ export default function BookmarksPage() {
               onChange={(e) => setSortBy(e.target.value as 'recent' | 'popular' | 'oldest')}
               className="w-full md:w-auto px-4 py-2 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring text-sm bg-card"
             >
-              <option value="recent">최근 추가순</option>
-              <option value="oldest">오래된 순</option>
-              <option value="popular">인기순</option>
+              <option value="recent">Recently added</option>
+              <option value="oldest">Oldest first</option>
+              <option value="popular">Most liked</option>
             </select>
 
             {/* 전체 북마크 버튼 */}
@@ -161,7 +161,7 @@ export default function BookmarksPage() {
               className="w-full md:w-auto flex items-center justify-center px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
             >
               <FiBookmark className="w-4 h-4" />
-              <span className="ml-2">전체 북마크</span>
+              <span className="ml-2">All bookmarks</span>
               <span className="ml-2 px-2 py-0.5 text-xs font-semibold rounded-full bg-primary-foreground/20 text-primary-foreground">
                 {data?.total || 0}
               </span>
@@ -206,7 +206,7 @@ export default function BookmarksPage() {
                               className={`flex items-center w-full px-4 py-2 text-sm font-medium transition ${DESTRUCTIVE_ACTION_CLASS}`}
                             >
                               <FiTrash2 className="mr-2 w-4 h-4" />
-                              북마크 삭제
+                              Remove bookmark
                             </button>
                           </div>
                         )}
@@ -240,7 +240,7 @@ export default function BookmarksPage() {
                           <div className="flex items-center">
                             <FiCalendar className="mr-1 w-3 h-3" />
                             <span>
-                              {new Date(post.publishedAt || post.createdAt).toLocaleDateString('ko-KR')}
+                              {new Date(post.publishedAt || post.createdAt).toLocaleDateString('en-US')}
                             </span>
                           </div>
 
@@ -263,7 +263,7 @@ export default function BookmarksPage() {
                           <div className="flex items-center text-accent">
                             <FiBookmark className="mr-1 w-3 h-3" />
                             <span>
-                              {new Date(post.bookmarkedAt).toLocaleDateString('ko-KR')} 추가
+                              Added {new Date(post.bookmarkedAt).toLocaleDateString('en-US')}
                             </span>
                           </div>
                         </div>
@@ -295,17 +295,17 @@ export default function BookmarksPage() {
             <div className="flex items-center justify-center min-h-[400px]">
               <div className="text-center">
                 <FiBookmark className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-foreground mb-2">북마크가 없습니다</h3>
+                <h3 className="text-lg font-medium text-foreground mb-2">No bookmarks yet</h3>
                 <p className="text-muted-foreground mb-6">
                   {searchQuery
-                    ? '검색 결과가 없습니다. 다른 검색어를 시도해보세요.'
-                    : '마음에 드는 포스트를 북마크에 추가해보세요.'}
+                    ? 'No results matched your search. Try a different keyword.'
+                    : 'Save posts here to revisit them later.'}
                 </p>
                 <Link
                   href="/"
                   className="inline-flex items-center px-4 py-2 bg-accent text-accent-foreground rounded-lg hover:bg-accent/90 transition-colors text-sm font-medium"
                 >
-                  포스트 둘러보기
+                  Browse posts
                 </Link>
               </div>
             </div>
@@ -319,7 +319,7 @@ export default function BookmarksPage() {
                 disabled={page === 1}
                 className="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                이전
+                Previous
               </button>
 
               {Array.from({ length: Math.min(5, data.totalPages) }, (_, i) => {
@@ -346,7 +346,7 @@ export default function BookmarksPage() {
                 disabled={page === data.totalPages}
                 className="px-3 py-1 text-sm border border-border rounded-md hover:bg-muted disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                다음
+                Next
               </button>
             </div>
           )}

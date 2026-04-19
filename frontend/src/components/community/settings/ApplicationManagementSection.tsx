@@ -71,7 +71,7 @@ export function ApplicationManagementSection({ slug }: ApplicationManagementSect
         <div className="flex items-center gap-2">
           <Clock className="w-5 h-5 text-yellow-500" />
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            대기 중인 가입 신청
+            Pending join requests
           </h2>
           {totalCount > 0 && (
             <span className="px-2 py-0.5 text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 rounded-full">
@@ -92,16 +92,16 @@ export function ApplicationManagementSection({ slug }: ApplicationManagementSect
           {isLoading ? (
             <div className="py-8 text-center">
               <div className="w-6 h-6 border-2 border-gray-300 border-t-blue-500 rounded-full animate-spin mx-auto" />
-              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">로딩 중...</p>
+              <p className="mt-2 text-sm text-gray-500 dark:text-gray-400">Loading...</p>
             </div>
           ) : isError ? (
             <div className="py-8 text-center text-red-500">
-              신청 목록을 불러오는데 실패했습니다.
+              Failed to load the request list.
             </div>
           ) : applications.length === 0 ? (
             <div className="py-8 text-center text-gray-500 dark:text-gray-400">
               <Clock className="w-10 h-10 mx-auto mb-2 opacity-50" />
-              <p>대기 중인 가입 신청이 없습니다.</p>
+              <p>No pending join requests.</p>
             </div>
           ) : (
             <div className="mt-4 space-y-3">
@@ -124,7 +124,7 @@ export function ApplicationManagementSection({ slug }: ApplicationManagementSect
                     onClick={() => fetchNextPage()}
                     disabled={isFetchingNextPage}
                   >
-                    {isFetchingNextPage ? '로딩 중...' : '더 보기'}
+                    {isFetchingNextPage ? 'Loading...' : 'Load more'}
                   </Button>
                 </div>
               )}
@@ -191,10 +191,10 @@ function ApplicationItem({
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
-            {application.user?.username ?? '알 수 없는 사용자'}
+            {application.user?.username ?? 'Unknown user'}
           </span>
           <span className="text-xs text-gray-500 dark:text-gray-400">
-            {new Date(application.joinedAt).toLocaleDateString('ko-KR')}
+            {new Date(application.joinedAt).toLocaleDateString('en-US')}
           </span>
         </div>
         {application.applicationMessage && (

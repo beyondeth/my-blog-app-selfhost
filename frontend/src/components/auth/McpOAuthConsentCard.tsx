@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { ArrowLeft, Check, X } from 'lucide-react';
 import { McpOAuthRequestPanel } from '@/components/auth/McpOAuthRequestPanel';
 import type { McpScopeInfo } from '@/lib/mcpScopes';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 interface McpOAuthConsentCardProps {
   clientName: string;
@@ -25,9 +26,11 @@ export function McpOAuthConsentCard({
   onBack,
   onCancel,
   onApprove,
-  approveLabel = '연결하기',
+  approveLabel = 'Connect',
   backLabel = 'Back',
 }: McpOAuthConsentCardProps) {
+  const { locale } = useLocaleContext();
+
   return (
     <div className="min-h-screen relative overflow-hidden bg-gradient-to-br from-gray-50 via-white to-gray-50 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950">
       <div className="auth-gradient-light dark:hidden" />
@@ -66,10 +69,10 @@ export function McpOAuthConsentCard({
                   />
                 </div>
                 <h3 className="text-sm sm:text-base font-semibold text-zinc-900 dark:text-zinc-100">
-                  {clientName} 권한 요청
+                  {locale === 'ko' ? `${clientName} 권한 요청` : `${clientName} access request`}
                 </h3>
                 <p className="mt-1 text-xs sm:text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-                  요청 권한을 확인해 주세요
+                  {locale === 'ko' ? '요청 권한을 확인해 주세요' : 'Review the requested permissions.'}
                 </p>
               </div>
 
@@ -94,7 +97,7 @@ export function McpOAuthConsentCard({
                   className="inline-flex items-center justify-center gap-2 rounded-xl border border-zinc-300 bg-white px-4 py-3 text-sm font-medium text-zinc-700 transition-colors hover:border-zinc-400 hover:text-zinc-900 disabled:cursor-not-allowed disabled:opacity-60 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200 dark:hover:border-zinc-600 dark:hover:text-zinc-50"
                 >
                   <X className="h-4 w-4" />
-                  취소
+                  {locale === 'ko' ? '취소' : 'Cancel'}
                 </button>
                 <button
                   type="button"

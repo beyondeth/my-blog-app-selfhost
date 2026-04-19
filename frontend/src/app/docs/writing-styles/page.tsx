@@ -11,7 +11,7 @@ import {
 export const metadata: Metadata = {
   title: 'Writing Styles',
   description:
-    'Codebase 자동포스팅에서 사용할 writing style 에 따라 글의 분위기와 내용이 달라집니다. 사용자의 상황에 따라 선택 가능합니다. 또한 원하는 스타일로 직접 커스터마이징해서 사용가능합니다.',
+    'Choose the writing style that matches the type of post you want to publish in Codebase, or customize one for your own workflow.',
   alternates: {
     canonical: '/docs/writing-styles',
   },
@@ -46,7 +46,7 @@ export default function WritingStylesPage() {
     <DocsPageLayout
       currentPath="/docs/writing-styles"
       title="Writing Styles"
-      description="Codebase 자동포스팅에서 사용할 writing style 에 따라 글의 분위기와 내용이 달라집니다. 사용자의 상황에 따라 선택 가능합니다. 또한 원하는 스타일로 직접 커스터마이징해서 사용가능합니다."
+      description="Pick the writing style that fits your post. Each preset changes tone, structure, and emphasis, and you can still adapt the final output to your own workflow."
       toc={toc}
       eyebrow="Documentation"
     >
@@ -54,11 +54,10 @@ export default function WritingStylesPage() {
       <section id="presets">
         <h2>Presets</h2>
         <p>
-          일반 글은 아래 8개 preset 중 하나를 선택합니다. 각 스타일을 클릭하면 상세 구조와
-          예시를 확인할 수 있습니다.
+          Standard posts should use one of the eight presets below. Click a style to review its structure, tone, and example guidance.
         </p>
         <div className="mt-4 rounded-lg bg-[#f1f3f4] px-4 py-3 text-[14px] text-[#3c4043] dark:bg-[#303134] dark:text-[#e8eaed]">
-          <strong>사용예시</strong> - <code>&quot;위 내용 자동포스팅해줘. --vibe&quot;</code>
+          <strong>Example</strong> - <code>&quot;Turn this into a post --vibe&quot;</code>
         </div>
 
         <div className="not-prose mt-6 mb-12 border-t border-[#e8eaed] dark:border-[#303134]">
@@ -73,14 +72,14 @@ export default function WritingStylesPage() {
       <section id="rules">
         <h2>Usage rules</h2>
         <ol>
-          <li>일반 글은 preset 하나만 선택합니다. 두 개를 섞지 않습니다.</li>
+          <li>Use one preset for a standard post. Do not mix two presets in the same request.</li>
           <li>
-            실제 발행 제약과 입력 필드는{' '}
-            <Link href="/docs/publishing-flow">Publishing Flow</Link>에서 확인합니다.
+            Review the request fields and publishing constraints in{' '}
+            <Link href="/docs/publishing-flow">Publishing Flow</Link>.
           </li>
           <li>
-            태그, Markdown, 파라미터 공통 규칙은{' '}
-            <Link href={`/docs/writing-styles/${commonRules.id}`}>Common Rules</Link>를 참고합니다.
+            Use{' '}
+            <Link href={`/docs/writing-styles/${commonRules.id}`}>Common Rules</Link> for shared guidance on tags, Markdown, and parameters.
           </li>
         </ol>
       </section>

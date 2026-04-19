@@ -18,10 +18,10 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  title = '확인',
+  title = 'Confirm',
   message,
-  confirmText = '확인',
-  cancelText = '취소',
+  confirmText = 'Confirm',
+  cancelText = 'Cancel',
   isLoading = false,
 }) => {
   if (!isOpen) return null;

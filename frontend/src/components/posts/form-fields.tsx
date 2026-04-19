@@ -18,7 +18,7 @@ interface FloatingTitleFieldProps {
 export function FloatingTitleField({
   field,
   disabled = false,
-  label = '제목',
+  label = 'Title',
   placeholder = '',
 }: FloatingTitleFieldProps) {
   const { ref: hookFormRef, ...restField } = field;
@@ -104,7 +104,7 @@ interface TagInputFieldProps {
 export function TagInputField({
   field,
   disabled = false,
-  label = '태그',
+  label = 'Tags',
   maxTags,
 }: TagInputFieldProps) {
   const [inputValue, setInputValue] = React.useState('');
@@ -149,7 +149,7 @@ export function TagInputField({
         <>
           <div className="mb-2 lg:hidden">
             <span className="text-xs text-gray-700 dark:text-gray-100">{label}</span>
-            <div className="text-[11px] text-gray-500 dark:text-gray-400">(선택)</div>
+            <div className="text-[11px] text-gray-500 dark:text-gray-400">(Optional)</div>
           </div>
           <div className="hidden lg:block absolute -left-24 top-3">
             <div className="flex flex-col text-gray-700 dark:text-gray-100">
@@ -157,7 +157,7 @@ export function TagInputField({
                 <Plus className="h-3 w-3" />
                 <span>{label}</span>
               </div>
-              <div className="ml-5 text-[11px] text-gray-500 dark:text-gray-400">(선택)</div>
+              <div className="ml-5 text-[11px] text-gray-500 dark:text-gray-400">(Optional)</div>
             </div>
           </div>
         </>
@@ -210,7 +210,7 @@ export function TagInputField({
           onBlur={handleBlur}
           disabled={disabled || isMaxReached}
           placeholder={
-            isMaxReached ? '최대 태그 개수에 도달했습니다' : '태그 입력 후 엔터 또는 콤마로 구분'
+            isMaxReached ? 'You have reached the maximum number of tags.' : 'Type a tag, then press Enter or comma.'
           }
           className="!border-0 focus-visible:ring-0 !px-0 text-lg h-auto py-1 w-auto min-w-[280px] !bg-transparent !rounded-none placeholder:text-gray-500 dark:placeholder:text-gray-300 text-gray-900 dark:text-gray-50"
           style={{ width: inputValue ? `${Math.max(280, inputValue.length * 14)}px` : '280px' }}
@@ -231,7 +231,7 @@ export function EditCategoryField({
     <TagInputField
       field={field}
       disabled={disabled}
-      label="카테고리"
+      label="Categories"
       maxTags={2}
     />
   );

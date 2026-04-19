@@ -1,47 +1,50 @@
 export type PublicNavItem = {
   href: string;
-  label: string;
-  description?: string;
+  labelKey: string;
+  descriptionKey?: string;
 };
 
 export type PublicDocsSection = {
   title: string;
-  items: PublicNavItem[];
+  items: Array<{
+    href: string;
+    label: string;
+  }>;
 };
 
 export const PUBLIC_USE_CASES: PublicNavItem[] = [
   {
     href: '/product#use-cases',
-    label: 'MCP 자동 포스팅',
-    description: '여러 AI 도구의 작업 흐름을 자동으로 글로 정리합니다.',
+    labelKey: 'publicSite.useCases.autopost.label',
+    descriptionKey: 'publicSite.useCases.autopost.description',
   },
   {
     href: '/product#community',
-    label: '커뮤니티 지식 공유',
-    description: '팀과 커뮤니티가 참고할 수 있는 구조화된 지식 허브를 만듭니다.',
+    labelKey: 'publicSite.useCases.community.label',
+    descriptionKey: 'publicSite.useCases.community.description',
   },
   {
     href: '/product#marketplace',
-    label: '콘텐츠 판매와 배포',
-    description: '정리된 지식을 상품과 문서로 연결해 배포합니다.',
+    labelKey: 'publicSite.useCases.marketplace.label',
+    descriptionKey: 'publicSite.useCases.marketplace.description',
   },
 ];
 
 export const PUBLIC_RESOURCES: PublicNavItem[] = [
   {
     href: '/docs/get-started',
-    label: 'Documentation',
-    description: 'Codebase 시작 가이드와 사용 문서를 확인합니다.',
+    labelKey: 'publicSite.resources.docs.label',
+    descriptionKey: 'publicSite.resources.docs.description',
   },
   {
     href: '/updates',
-    label: 'Changelog',
-    description: '사용자에게 보이는 주요 변경 사항을 버전별로 봅니다.',
+    labelKey: 'publicSite.resources.updates.label',
+    descriptionKey: 'publicSite.resources.updates.description',
   },
   {
     href: '/support',
-    label: 'Support',
-    description: 'FAQ, 피드백, 운영 정책과 지원 채널을 확인합니다.',
+    labelKey: 'publicSite.resources.support.label',
+    descriptionKey: 'publicSite.resources.support.description',
   },
 ];
 
@@ -74,7 +77,7 @@ export const DOCS_NAVIGATION: PublicDocsSection[] = [
 ];
 
 export const PUBLIC_LEGAL_LINKS = [
-  { href: '/legal/privacy', label: 'Privacy Policy' },
-  { href: '/legal/terms', label: 'Terms of Service' },
-  { href: '/legal/guidelines', label: 'Community Guidelines' },
+  { href: '/legal/privacy', labelKey: 'publicSite.legal.privacy' },
+  { href: '/legal/terms', labelKey: 'publicSite.legal.terms' },
+  { href: '/legal/guidelines', labelKey: 'publicSite.legal.guidelines' },
 ] as const;

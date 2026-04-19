@@ -11,7 +11,6 @@ import { getBlogBySlug } from '@/lib/api';
 import { FiGlobe, FiMessageSquare, FiLink, FiCalendar, FiSettings, FiCopy, FiCheck, FiX, FiAlertCircle, FiPlus } from 'react-icons/fi';
 import BlogBrandingSettings from '@/components/settings/BlogBrandingSettings';
 import { format } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import type { Blog, SocialLink } from '@/types';
 import { Switch } from '@/components/ui/switch';
 import { SETTINGS_CARD_CLASS, SETTINGS_INPUT_CLASS, SETTINGS_PRIMARY_BUTTON_CLASS, SETTINGS_SECTION_TITLE_CLASS, SETTINGS_SECTION_DESCRIPTION_CLASS } from '@/app/settings/theme';
@@ -154,7 +153,7 @@ export default function BlogSettingsPage() {
     if (!blog) return;
     const trimmedName = formData.name.trim();
     if (!trimmedName) {
-      setError('블로그 이름을 입력해주세요.');
+      setError('Enter a blog name.');
       return;
     }
 
@@ -186,7 +185,7 @@ export default function BlogSettingsPage() {
       );
 
       if (response.status === 401) {
-        setError('로그아웃되었습니다. 다시 로그인해주세요.');
+        setError('Your session expired. Please sign in again.');
         router.push('/login?next=/settings/blog');
         setGeneralSaving(false);
         return;
@@ -194,14 +193,14 @@ export default function BlogSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '블로그 정보를 업데이트하지 못했습니다');
+        throw new Error(error.message || 'Could not update the blog details.');
       }
 
       await refreshAcrossPages();
       setGeneralSaveSuccess(true);
       setTimeout(() => setGeneralSaveSuccess(false), 2000);
     } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다');
+      setError(err.message || 'Something went wrong.');
     } finally {
       setGeneralSaving(false);
     }
@@ -253,7 +252,7 @@ export default function BlogSettingsPage() {
     setSocialLinksLimitNotice('');
     setSocialLinks((prev) => {
       if (prev.length >= 3) {
-        setSocialLinksLimitNotice('최대 3개의 소셜 링크만 추가할 수 있습니다.');
+        setSocialLinksLimitNotice('You can add up to 3 social links.');
         return prev;
       }
       return [...prev, { platform: '', url: '' }];
@@ -296,7 +295,7 @@ export default function BlogSettingsPage() {
         if (process.env.NODE_ENV === 'development') {
           console.error('[BlogSettings] Failed to save social links', error);
         }
-        throw new Error(error.message || '소셜 링크 업데이트에 실패했습니다');
+        throw new Error(error.message || 'Failed to update social links.');
       }
 
       await refreshUser();
@@ -310,7 +309,7 @@ export default function BlogSettingsPage() {
       if (process.env.NODE_ENV === 'development') {
         console.error('[BlogSettings] Social links save error', err);
       }
-      setSocialLinksError(err.message || '오류가 발생했습니다');
+      setSocialLinksError(err.message || 'Something went wrong.');
     } finally {
       setSocialLinksSaving(false);
     }
@@ -327,17 +326,17 @@ export default function BlogSettingsPage() {
    */
   const handleAliasUpdate = useCallback(() => {
     if (!newAlias || newAlias.length < 3) {
-      setError('주소는 최소 3자 이상이어야 합니다.');
+      setError('The address must be at least 3 characters long.');
       return;
     }
 
     if (!/^[a-zA-Z0-9_-]{3,30}$/.test(newAlias)) {
-      setError('주소는 영문, 숫자, 하이픈(-), 언더스코어(_)만 사용 가능합니다.');
+      setError('Use only letters, numbers, hyphens, and underscores.');
       return;
     }
 
     if (!aliasCheck?.available) {
-      setError('사용할 수 없는 주소입니다. 다른 주소를 입력해주세요.');
+      setError('This address is unavailable. Try a different one.');
       return;
     }
 
@@ -350,7 +349,7 @@ export default function BlogSettingsPage() {
         setAliasCheckEnabled(false);
       },
       onError: (err: any) => {
-        setError(err.message || 'Alias 변경에 실패했습니다.');
+        setError(err.message || 'Failed to update the address.');
       }
     });
   }, [newAlias, aliasCheck, updateAlias, refreshAcrossPages]);
@@ -362,7 +361,7 @@ export default function BlogSettingsPage() {
   const handlePublicSettingChange = async (isPublic: boolean) => {
     if (isPublicSaving) return;
     setIsPublicSaving(true);
-    updatePrivacyFeedback('public', { type: 'info', text: '설정을 저장하고 있습니다...' });
+    updatePrivacyFeedback('public', { type: 'info', text: 'Saving your preference...' });
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/${blog?.id}`,
@@ -378,7 +377,7 @@ export default function BlogSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '블로그 공개 설정 업데이트에 실패했습니다');
+        throw new Error(error.message || 'Failed to update blog visibility.');
       }
 
       await refreshAcrossPages();
@@ -386,11 +385,11 @@ export default function BlogSettingsPage() {
         'public',
         {
           type: 'success',
-          text: isPublic ? '블로그를 공개 상태로 전환했습니다.' : '블로그를 비공개로 전환했습니다.',
+          text: isPublic ? 'Your blog is now public.' : 'Your blog is now private.',
         }
       );
     } catch (err: any) {
-      setError(err.message || '블로그 공개 설정 업데이트 중 오류가 발생했습니다');
+      setError(err.message || 'Something went wrong while updating blog visibility.');
       // 에러 발생 시 이전 상태로 되돌리기
       if (blog) {
         setFormData(prev => ({ ...prev, isPublic: blog.isPublic ?? true }));
@@ -399,7 +398,7 @@ export default function BlogSettingsPage() {
         'public',
         {
           type: 'error',
-          text: err.message || '블로그 공개 설정 업데이트에 실패했습니다.',
+          text: err.message || 'Failed to update blog visibility.',
         }
       );
     } finally {
@@ -414,7 +413,7 @@ export default function BlogSettingsPage() {
   const handleCommentsSettingChange = async (allowComments: boolean) => {
     if (isCommentsSaving) return;
     setIsCommentsSaving(true);
-    updatePrivacyFeedback('comments', { type: 'info', text: '설정을 저장하고 있습니다...' });
+    updatePrivacyFeedback('comments', { type: 'info', text: 'Saving your preference...' });
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000/api/v1'}/blogs/${blog?.id}`,
@@ -430,7 +429,7 @@ export default function BlogSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '댓글 허용 설정 업데이트에 실패했습니다');
+        throw new Error(error.message || 'Failed to update comment permissions.');
       }
 
       await refreshAcrossPages();
@@ -438,11 +437,11 @@ export default function BlogSettingsPage() {
         'comments',
         {
           type: 'success',
-          text: allowComments ? '댓글을 허용하도록 설정했습니다.' : '댓글을 비활성화했습니다.',
+          text: allowComments ? 'Comments are now enabled.' : 'Comments are now disabled.',
         }
       );
     } catch (err: any) {
-      setError(err.message || '댓글 허용 설정 업데이트 중 오류가 발생했습니다');
+      setError(err.message || 'Something went wrong while updating comment permissions.');
       // 에러 발생 시 이전 상태로 되돌리기
       if (blog) {
         setFormData(prev => ({ ...prev, allowComments: blog.allowComments ?? true }));
@@ -451,7 +450,7 @@ export default function BlogSettingsPage() {
         'comments',
         {
           type: 'error',
-          text: err.message || '댓글 허용 설정 업데이트에 실패했습니다.',
+          text: err.message || 'Failed to update comment permissions.',
         }
       );
     } finally {
@@ -463,7 +462,7 @@ export default function BlogSettingsPage() {
     return (
       <div className="space-y-6">
         <div className={`${SETTINGS_CARD_CLASS} p-6 text-center text-gray-600`}>
-          로그인이 필요합니다
+          You need to sign in to view this page.
         </div>
       </div>
     );
@@ -489,10 +488,10 @@ export default function BlogSettingsPage() {
       <div className="space-y-6">
         <div className={`${SETTINGS_CARD_CLASS} p-6 text-center space-y-4`}>
           <FiSettings className="w-12 h-12 text-gray-400 mx-auto" />
-          <h3 className="text-lg font-medium text-gray-900">블로그가 없습니다</h3>
-          <p className="text-sm text-gray-600">블로그를 찾을 수 없습니다. 새로고침을 시도해보세요.</p>
+          <h3 className="text-lg font-medium text-gray-900">No blog found</h3>
+          <p className="text-sm text-gray-600">We could not find your blog. Try refreshing the page.</p>
           <button onClick={() => window.location.reload()} className={`${SETTINGS_PRIMARY_BUTTON_CLASS} w-auto`}>
-            새로고침
+            Refresh
           </button>
         </div>
       </div>
@@ -509,15 +508,15 @@ export default function BlogSettingsPage() {
   return (
     <div className="space-y-6 pt-2">
       <div className="space-y-2 pt-1">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">블로그 설정</h2>
-        <p className="text-sm text-gray-600 dark:text-gray-300">블로그의 기본 정보와 설정을 관리하세요</p>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Blog settings</h2>
+        <p className="text-sm text-gray-600 dark:text-gray-300">Manage your blog details, URL, social links, and visibility.</p>
       </div>
 
       <div className="space-y-6">
         <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-6`}>
           <div className="space-y-2">
             <label htmlFor="name" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
-              블로그 이름
+              Blog name
             </label>
             <input
               type="text"
@@ -527,12 +526,12 @@ export default function BlogSettingsPage() {
               maxLength={50}
               className={SETTINGS_INPUT_CLASS}
             />
-            <p className="text-xs text-gray-500 dark:text-gray-300">2-50자, 한글/영문/숫자/공백 사용 가능</p>
+            <p className="text-xs text-gray-500 dark:text-gray-300">2-50 characters. Letters, numbers, and spaces are allowed.</p>
           </div>
 
           <div className="space-y-2">
             <label htmlFor="description" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
-              블로그 설명
+              Blog description
             </label>
             <textarea
               id="description"
@@ -545,10 +544,10 @@ export default function BlogSettingsPage() {
               rows={4}
               maxLength={1000}
               className={`${SETTINGS_INPUT_CLASS} min-h-[120px]`}
-              placeholder="블로그를 소개해주세요..."
+              placeholder="Tell people what your blog is about..."
             />
             <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-300">
-              <span>소개 문구는 블로그 홈에 표시됩니다</span>
+              <span>This description appears on your blog homepage.</span>
               <span>{formData.description.length}/1000</span>
             </div>
           </div>
@@ -566,12 +565,12 @@ export default function BlogSettingsPage() {
               }`}
             >
               {generalSaveSuccess
-                ? '기본 정보가 저장되었습니다.'
-                : generalSaving
-                ? '저장 중...'
-                : isGeneralDirty
-                ? '변경 사항이 있습니다.'
-                : '최신 상태입니다.'}
+                  ? 'Blog details saved.'
+                  : generalSaving
+                  ? 'Saving...'
+                  : isGeneralDirty
+                  ? 'You have unsaved changes.'
+                  : 'Everything is up to date.'}
             </div>
             <button
               type="button"
@@ -582,7 +581,7 @@ export default function BlogSettingsPage() {
               {generalSaving ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                '변경 사항 저장'
+                'Save changes'
               )}
             </button>
           </div>
@@ -593,23 +592,23 @@ export default function BlogSettingsPage() {
           <div className="mb-6 space-y-1">
             <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
               <FiCalendar className="w-5 h-5" />
-              블로그 정보
+              Blog information
             </h3>
-            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>블로그 생성일과 주소를 확인하세요.</p>
+            <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>Review your blog creation date and public URL.</p>
           </div>
           <div className="space-y-3 text-sm">
             <div className="flex items-center">
               <FiCalendar className="mr-2 text-gray-400 dark:text-gray-500" />
-              <span className="text-gray-600 dark:text-gray-300">생성일</span>
+              <span className="text-gray-600 dark:text-gray-300">Created</span>
               <span className="ml-2 text-gray-900 dark:text-gray-50">
-                {blog?.createdAt && format(new Date(blog.createdAt), 'yyyy년 MM월 dd일', { locale: ko })}
+                {blog?.createdAt && format(new Date(blog.createdAt), 'MMM d, yyyy')}
               </span>
             </div>
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
               <div className="flex items-start sm:items-center min-w-0 flex-1">
                 <FiLink className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <span className="text-gray-600 dark:text-gray-300 block sm:inline">전체 URL:</span>
+                  <span className="text-gray-600 dark:text-gray-300 block sm:inline">Full URL:</span>
                   <a
                     href={`/${blog?.alias || blog?.slug}`}
                     target="_blank"
@@ -628,10 +627,10 @@ export default function BlogSettingsPage() {
                   setTimeout(() => setCopied(false), 2000);
                 }}
                 className="min-w-[44px] min-h-[44px] p-2 text-gray-500 dark:text-gray-300 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-[#2A2F3A] rounded-md transition-colors flex items-center justify-center flex-shrink-0"
-                title="주소 복사"
+                title="Copy URL"
               >
                 {copied ? (
-                  <span className="text-xs text-emerald-600 dark:text-emerald-300 whitespace-nowrap">복사됨!</span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-300 whitespace-nowrap">Copied!</span>
                 ) : (
                   <FiCopy className="w-4 h-4" />
                 )}
@@ -645,17 +644,17 @@ export default function BlogSettingsPage() {
           <div className="mb-6 space-y-1">
             <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
               <FiLink className="w-5 h-5" />
-              블로그 주소 설정
+              Blog address
             </h3>
             <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
-              주소를 변경하면 이전 주소는 자동으로 리다이렉트되어 SEO가 보호됩니다.
+              If you change the address, the previous one redirects automatically to preserve SEO.
             </p>
           </div>
 
           <div className="space-y-4">
             <div className="flex items-center text-sm p-3 bg-gray-50 dark:bg-[#2A2F3A] rounded-lg">
               <FiLink className="mr-2 text-gray-400 dark:text-gray-500 flex-shrink-0" />
-              <span className="text-gray-600 dark:text-gray-300">현재 주소:</span>
+              <span className="text-gray-600 dark:text-gray-300">Current address:</span>
               <span className="ml-2 text-gray-900 dark:text-gray-100 font-medium">
                 @{blog?.alias || blog?.slug}
               </span>
@@ -663,7 +662,7 @@ export default function BlogSettingsPage() {
 
             <div className="space-y-2">
               <label htmlFor="newAlias" className="block text-sm font-medium text-gray-900 dark:text-gray-100">
-                새로운 주소
+                New address
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -677,7 +676,7 @@ export default function BlogSettingsPage() {
                     const value = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '');
                     setNewAlias(value);
                   }}
-                  placeholder="영문, 숫자 조합"
+                  placeholder="letters, numbers, _ or -"
                   maxLength={30}
                   className={`${SETTINGS_INPUT_CLASS} pl-8 pr-10`}
                 />
@@ -697,12 +696,12 @@ export default function BlogSettingsPage() {
                 {aliasCheckError ? (
                   <div className="flex items-start text-red-600 dark:text-red-400">
                     <FiX className="mr-1 mt-0.5 flex-shrink-0" />
-                    <span>{(aliasCheckError as any)?.message || '사용할 수 없는 주소입니다.'}</span>
+                    <span>{(aliasCheckError as any)?.message || 'This address is unavailable.'}</span>
                   </div>
                 ) : newAlias.length >= 3 && aliasCheck?.available ? (
                   <div className="flex items-center text-green-600 dark:text-green-400">
                     <FiCheck className="mr-1 flex-shrink-0" />
-                    <span>사용 가능한 주소입니다</span>
+                    <span>This address is available.</span>
                     {isCheckingAlias && (
                       <div className="w-3 h-3 border-2 border-gray-400 border-t-transparent rounded-full animate-spin ml-2" />
                     )}
@@ -710,12 +709,12 @@ export default function BlogSettingsPage() {
                 ) : newAlias.length > 0 && newAlias.length < 3 ? (
                   <div className="flex items-start text-gray-500 dark:text-gray-300">
                     <FiAlertCircle className="mr-1 mt-0.5 flex-shrink-0" />
-                    <span>최소 3자 이상 입력해주세요</span>
+                    <span>Enter at least 3 characters.</span>
                   </div>
                 ) : null}
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-300">
-                3-30자, 영문 소문자/숫자/하이픈/언더스코어만 사용 가능
+                3-30 characters. Lowercase letters, numbers, hyphens, and underscores only.
               </p>
 
               <button
@@ -727,10 +726,10 @@ export default function BlogSettingsPage() {
                 {isUpdatingAlias ? (
                   <>
                     <div className="w-4 h-4 mr-2 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    변경 중...
+                    Updating...
                   </>
                 ) : (
-                  '주소 변경'
+                  'Update address'
                 )}
               </button>
             </div>
@@ -742,17 +741,17 @@ export default function BlogSettingsPage() {
           <div className="mb-6 space-y-1">
             <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} flex items-center gap-2`}>
               <FiGlobe className="w-5 h-5" />
-              프로필 소셜 링크
+              Profile social links
             </h3>
             <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
-              블로그 프로필 카드에 표시됩니다. 최대 3개까지 연결할 수 있습니다.
+              These appear on your blog profile card. You can add up to 3 links.
             </p>
           </div>
 
           <div className="space-y-4">
             {socialLinks.length === 0 ? (
               <div className="rounded-lg border border-dashed border-gray-200 dark:border-gray-700 p-4 text-sm text-gray-500 dark:text-gray-300">
-                아직 연결된 링크가 없습니다. 아래 버튼으로 추가해보세요.
+                No links connected yet. Add one below.
               </div>
             ) : (
               <div className="space-y-4">
@@ -763,7 +762,7 @@ export default function BlogSettingsPage() {
                   >
                     <div className="space-y-1">
                       <label className="text-xs font-medium text-gray-600 dark:text-gray-300">
-                        플랫폼
+                        Platform
                       </label>
                       <input
                         type="text"
@@ -795,7 +794,7 @@ export default function BlogSettingsPage() {
                         type="button"
                         onClick={() => handleRemoveSocialLink(index)}
                         className="min-w-[44px] min-h-[44px] p-2 text-gray-500 hover:text-gray-900 dark:text-gray-300 dark:hover:text-gray-100 hover:bg-gray-100 dark:hover:bg-[#2A2F3A] rounded-md transition-colors"
-                        aria-label="소셜 링크 삭제"
+                        aria-label="Remove social link"
                       >
                         <FiX className="w-4 h-4" />
                       </button>
@@ -823,10 +822,10 @@ export default function BlogSettingsPage() {
                 className="inline-flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-200 hover:text-black dark:hover:text-white disabled:opacity-50"
               >
                 <FiPlus className="w-4 h-4" />
-                링크 추가
+                Add link
               </button>
               <p className="text-xs text-gray-500 dark:text-gray-300">
-                https:// 주소만 저장됩니다. 저장 시 자동으로 https가 추가됩니다.
+                Only `https://` links are saved. We add `https://` automatically if it is missing.
               </p>
               {socialLinksLimitNotice && (
                 <p className="text-xs text-amber-600 dark:text-amber-300">
@@ -847,12 +846,12 @@ export default function BlogSettingsPage() {
                 }`}
               >
                 {socialLinksSuccess
-                  ? '소셜 링크가 저장되었습니다.'
+                  ? 'Social links saved.'
                   : socialLinksSaving
-                  ? '저장 중...'
+                  ? 'Saving...'
                   : isSocialLinksDirty
-                  ? '변경 사항이 있습니다.'
-                  : '최신 상태입니다.'}
+                  ? 'You have unsaved changes.'
+                  : 'Everything is up to date.'}
               </div>
               <button
                 type="button"
@@ -863,7 +862,7 @@ export default function BlogSettingsPage() {
                 {socialLinksSaving ? (
                   <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 ) : (
-                  '소셜 링크 저장'
+                  'Save social links'
                 )}
               </button>
             </div>
@@ -879,9 +878,9 @@ export default function BlogSettingsPage() {
         {/* Privacy Settings */}
         <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-5`}>
           <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">공개 설정</h3>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">Privacy settings</h3>
             <p className="text-xs text-gray-500 dark:text-gray-300 mt-1">
-              방문 권한과 댓글 허용 여부를 제어합니다.
+              Control blog visibility and comment permissions.
             </p>
           </div>
           <div className="space-y-4">
@@ -890,9 +889,9 @@ export default function BlogSettingsPage() {
                 <FiGlobe className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
                   <label htmlFor="isPublic" className="text-sm font-medium text-gray-900 dark:text-gray-50">
-                    블로그 공개
+                    Public blog
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">모든 사람이 블로그를 볼 수 있습니다</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">Anyone can view your blog.</p>
                 </div>
               </div>
               <Switch
@@ -923,9 +922,9 @@ export default function BlogSettingsPage() {
                 <FiMessageSquare className="mr-2 mt-0.5 sm:mt-0 text-gray-400 dark:text-gray-500 flex-shrink-0" />
                 <div>
                   <label htmlFor="allowComments" className="text-sm font-medium text-gray-900 dark:text-gray-50">
-                    댓글 허용
+                    Allow comments
                   </label>
-                  <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">방문자가 글에 댓글을 남길 수 있습니다</p>
+                  <p className="text-xs text-gray-500 dark:text-gray-300 mt-0.5">Visitors can leave comments on posts.</p>
                 </div>
               </div>
               <Switch
