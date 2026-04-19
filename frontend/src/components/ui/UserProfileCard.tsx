@@ -7,6 +7,7 @@ import { DMButton } from '../dm/DMButton';
 import UserAvatar from './UserAvatar';
 import { User, FollowInfo } from '@/types/api';
 import { getBlogLinkFromUser } from '@/lib/utils/blogUrl';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 interface UserProfileCardProps {
   user: Partial<User> & {
@@ -23,6 +24,7 @@ interface UserProfileCardProps {
 
 export default function UserProfileCard({ user, followInfo }: UserProfileCardProps) {
   const { user: loggedInUser } = useAuth();
+  const { t } = useLocaleContext();
 
   // Use provided followInfo or create default
   const followerState = followInfo || {
@@ -75,7 +77,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
             <span className="font-semibold text-gray-900 dark:text-foreground">
               {followerState.followersCount.toLocaleString()}
             </span>
-            <span className="text-gray-500 dark:text-gray-400">Followers</span>
+            <span className="text-gray-500 dark:text-gray-400">{t('profileCard.followers')}</span>
           </div>
         </div>
       </div>
@@ -93,7 +95,7 @@ export default function UserProfileCard({ user, followInfo }: UserProfileCardPro
           href={`/${user.blog.slug}`}
           className="inline-flex items-center gap-1 text-sm font-medium text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 transition-all duration-200 hover:gap-2 group"
         >
-          <span>블로그 방문</span>
+          <span>{t('profileCard.visitBlog')}</span>
           <span className="transition-transform duration-200 group-hover:translate-x-1">→</span>
         </Link>
       )}
