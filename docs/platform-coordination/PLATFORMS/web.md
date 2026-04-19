@@ -1,5 +1,27 @@
 # Web Platform Log
 
+## 2026-04-20
+
+### direct `/mcp` GET timeout containment lane
+
+#### What changed
+- Tightened the direct API-key `/mcp` route so transport-style `GET /mcp` requests no longer enter the stateless direct transport path.
+- Switched the direct route transport to JSON-response mode and added explicit transport cleanup on response close to match the MCP SDK's stateless example more closely.
+- Documented that direct client configs can keep `Accept: application/json, text/event-stream`, but standalone GET SSE on `/mcp` is intentionally unsupported and now returns `405` instead of hanging.
+
+#### Impact
+- web: Antigravity/Gemini/Cortex-style direct MCP clients should stop driving repeated `GET /mcp` upstream timeouts on production after redeploy.
+- ios: no direct code change.
+- android: no direct code change.
+
+#### Risk
+- If a specific direct client actually depends on standalone GET SSE on `/mcp`, it will now fail fast with `405` and may need a dedicated compatibility route later.
+
+#### Verification
+- `pnpm --dir mcp-proxy-server build`
+- production follow-up: confirm `mcp.codebase.blog` no longer emits repeated `GET /mcp` timeout errors in NGINX after deploy
+- runtime follow-up: re-test Antigravity tool initialization against the direct API-key route
+
 ## 2026-04-19
 
 ### english-first public launch + Klaro consent lane

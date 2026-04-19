@@ -2,6 +2,25 @@
 
 Track operational rule changes for worktree/branch coordination.
 
+## 2026-04-20
+
+### Additional update (direct `/mcp` API-key route no longer hangs on transport-style GET requests)
+
+#### What changed
+- Re-scoped the direct `/mcp` route back to stateless API-key Streamable HTTP over `POST`, instead of letting transport-style `GET /mcp` requests fall through into the SDK transport handler.
+- Added JSON-response mode and explicit transport cleanup on response close for the direct API-key route so the server follows the SDK's stateless pattern more closely.
+- Left `/mcp-remote` and `/mcp-openai` untouched because they serve different OAuth/platform compatibility paths.
+- Documented that client configs may still advertise `Accept: application/json, text/event-stream`, but the direct `/mcp` route intentionally does not offer standalone GET SSE and should answer those attempts with `405`.
+
+#### Why
+- Production investigation showed repeated `GET /mcp` upstream timeouts on `mcp.codebase.blog` even though NGINX buffering was already disabled.
+- The regression was introduced when `/mcp` started treating `Accept: text/event-stream` GET requests as real transport traffic, which is not compatible with the current direct API-key stateless route.
+- Antigravity/Cortex failures were surfacing as SSE retry exhaustion because the direct route hung instead of returning a fast explicit response.
+
+#### How
+- Kept the fix inside `my-blog-app-integ` shared paths only, with no per-platform branch fan-out.
+- Confirmed production NGINX already had `proxy_buffering off` and `proxy_request_buffering off`, so no server config change was needed for this lane.
+
 ## 2026-04-19
 
 ### Additional update (public web launch moved to English-first canonical routing and Klaro consent)
