@@ -1,7 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger } from '../../utils/logger.js';
-import { applyMcpStreamingHeaders } from '../../utils/mcpHttp.js';
 import { config } from '../../config/env.validation.js';
 import { oauthMiddleware, getUserInfo, type OAuthStorage } from '../../oauth/index.js';
 import { createOpenAiServer } from './OpenAiServerFactory.js';
@@ -113,7 +112,6 @@ export function createOpenAiAppRouter(
       });
 
       await mcpServer.connect(transport);
-      applyMcpStreamingHeaders(res);
 
       const startTime = Date.now();
       await transport.handleRequest(req, res);

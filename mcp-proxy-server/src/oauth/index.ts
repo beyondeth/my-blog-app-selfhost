@@ -23,7 +23,6 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import axios from 'axios';
 
 import { logger } from '../utils/logger.js';
-import { applyMcpStreamingHeaders } from '../utils/mcpHttp.js';
 import { config } from '../config/env.validation.js';
 import { registerAllTools } from '../tools/index.js';
 import { getDiscoveryTools } from '../tools/catalog.js';
@@ -63,8 +62,8 @@ export async function oauthMiddleware(
     if (acceptsEventStream) {
       res.status(status);
       res.setHeader('Content-Type', 'text/event-stream; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-cache');
       res.setHeader('Connection', 'keep-alive');
-      applyMcpStreamingHeaders(res);
 
       const payload = JSON.stringify({
         jsonrpc: '2.0',
@@ -336,7 +335,6 @@ export function createOAuthRouter(redis: Redis, metricsService: MetricsService):
       });
 
       await mcpServer.connect(transport);
-      applyMcpStreamingHeaders(res);
 
       const startTime = Date.now();
       await transport.handleRequest(req, res);

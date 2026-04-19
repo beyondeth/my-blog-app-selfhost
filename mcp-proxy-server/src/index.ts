@@ -13,13 +13,6 @@ import Redis from 'ioredis';
 import { Server as McpServer } from '@modelcontextprotocol/sdk/server/index.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger, httpLogger } from './utils/logger.js';
-import {
-  applyMcpStreamingHeaders,
-  isAllowedMcpBrowserOrigin,
-  isMcpEndpointPath,
-  MCP_CORS_ALLOW_HEADERS,
-  MCP_CORS_EXPOSE_HEADERS,
-} from './utils/mcpHttp.js';
 import { config } from './config/env.validation.js';
 import { registerAllTools } from './tools/index.js';
 import { getDiscoveryTools } from './tools/catalog.js';
@@ -97,18 +90,24 @@ import path from 'path';
 app.use('/generated', express.static(path.join(process.cwd(), 'public/generated')));
 
 // CORS 설정
-// 일반 웹 요청과 브라우저형 MCP 클라이언트 정책을 분리한다.
+// MCP/OAuth 엔드포인트는 Bearer 토큰으로 보호되므로 모든 origin 허용
+// Claude 커스텀 커넥터 등 다양한 클라이언트 지원을 위해 필요
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   const allowedOrigins = config.CORS_ORIGINS.split(',').map(o => o.trim());
-  const isMcpEndpoint = isMcpEndpointPath(req.path);
+
+  // Bearer 토큰으로 보호되는 MCP/OAuth 엔드포인트는 모든 origin 허용
+  // ⚠️ 새 MCP 엔드포인트 추가 시 반드시 이 목록에도 추가할 것
+  const mcpPaths = ['/mcp', '/mcp-remote', '/mcp-openai', '/oauth', '/.well-known'];
+  const isMcpEndpoint = mcpPaths.some(p => req.path.startsWith(p));
 
   // Origin 검증
   let isAllowed = false;
 
   if (origin) {
+    // MCP 엔드포인트는 모든 origin 허용
     if (isMcpEndpoint) {
-      isAllowed = isAllowedMcpBrowserOrigin(origin);
+      isAllowed = true;
     } else {
       // 다른 엔드포인트는 whitelist 검증
       for (const allowed of allowedOrigins) {
@@ -125,20 +124,11 @@ app.use((req, res, next) => {
     if (isAllowed) {
       res.header('Access-Control-Allow-Origin', origin);
       res.header('Access-Control-Allow-Credentials', 'true');
-      res.append('Vary', 'Origin');
-      if (req.headers['access-control-request-headers']) {
-        res.append('Vary', 'Access-Control-Request-Headers');
-      }
     }
   }
 
   res.header('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
-  if (isMcpEndpoint) {
-    res.header('Access-Control-Allow-Headers', MCP_CORS_ALLOW_HEADERS);
-    res.header('Access-Control-Expose-Headers', MCP_CORS_EXPOSE_HEADERS);
-  } else {
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  }
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.sendStatus(isAllowed ? 204 : 403);
@@ -239,27 +229,6 @@ function isApiKeyTransportGetRequest(req: express.Request): boolean {
     typeof req.headers['mcp-session-id'] === 'string' ||
     typeof req.headers['mcp-protocol-version'] === 'string'
   );
-}
-
-function logApiKeyRouteDecision(
-  req: express.Request,
-  routeDecision: 'discovery' | 'reject_get_sse_405' | 'post_transport'
-) {
-  const logPayload = {
-    method: req.method,
-    path: req.path,
-    accept: req.headers.accept || '',
-    hasSessionHeader: typeof req.headers['mcp-session-id'] === 'string',
-    hasProtocolHeader: typeof req.headers['mcp-protocol-version'] === 'string',
-    routeDecision,
-  };
-
-  if (routeDecision === 'reject_get_sse_405') {
-    logger.info(logPayload, '🧭 API key MCP route decision');
-    return;
-  }
-
-  logger.debug(logPayload, '🧭 API key MCP route decision');
 }
 
 /**
@@ -475,53 +444,28 @@ async function handleApiKeyMcpRequest(req: express.Request, res: express.Respons
 
     // 4. Transport 생성 (Context7와 동일한 옵션)
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
+      sessionIdGenerator: undefined,  // Context7와 동일
     });
 
     // 5. MCP 서버와 Transport 연결
     await mcpServer.connect(transport);
 
-    let cleanedUp = false;
-    const cleanupTransport = async () => {
-      if (cleanedUp) {
-        return;
-      }
-      cleanedUp = true;
-
-      await transport.close().catch(error => {
-        logger.debug({ error }, '⚠️ Failed to close API key transport cleanly');
-      });
-      await mcpServer.close().catch(error => {
-        logger.debug({ error }, '⚠️ Failed to close API key MCP server cleanly');
-      });
-    };
-
-    res.on('close', () => {
-      void cleanupTransport();
-    });
-
-    // 6. 프록시 뒤에서 SSE/streamable HTTP 응답이 버퍼링되지 않도록 한다.
-    applyMcpStreamingHeaders(res);
-
-    // 7. 요청 처리 전 시간 기록 (메트릭 수집용)
+    // 6. 요청 처리 전 시간 기록 (메트릭 수집용)
     const startTime = Date.now();
-    logApiKeyRouteDecision(req, 'post_transport');
 
-    // 8. 요청 처리 (⚠️ req.body 전달하지 않음 - Transport가 raw stream 읽음)
+    // 7. 요청 처리 (⚠️ req.body 전달하지 않음 - Transport가 raw stream 읽음)
     await transport.handleRequest(req, res);
 
-    // 9. 메트릭 기록
+    // 8. 메트릭 기록
     const duration = Date.now() - startTime;
     metricsService.recordRequest('success', undefined, 'mcp');
     metricsService.recordRequestDuration(duration, undefined, 'mcp');
 
-    // 10. 자동 cleanup (함수 종료 시 GC가 처리)
+    // 9. 자동 cleanup (함수 종료 시 GC가 처리)
     logger.debug({
       userId: userData.userId.substring(0, 8),
       duration: `${duration}ms`,
     }, '✅ Request processed');
-
-    await cleanupTransport();
 
   } catch (error: any) {
     // 메트릭 기록 (에러)
@@ -557,20 +501,9 @@ app.post('/mcp', async (req, res) => {
  */
 app.get('/mcp', (req, res) => {
   if (isApiKeyTransportGetRequest(req)) {
-    logApiKeyRouteDecision(req, 'reject_get_sse_405');
-    res.setHeader('Allow', 'POST');
-    res.status(405).json({
-      jsonrpc: '2.0',
-      error: {
-        code: -32000,
-        message: 'Method not allowed. Standalone SSE GET is not supported on /mcp; use POST /mcp for direct API key transport.',
-      },
-      id: null,
-    });
+    void handleApiKeyMcpRequest(req, res);
     return;
   }
-
-  logApiKeyRouteDecision(req, 'discovery');
 
   // MCP 서버 Discovery 응답
   res.json({
