@@ -38,13 +38,13 @@ import {
 
 /** 금액 포맷팅 */
 function formatAmount(amount: number): string {
-  return new Intl.NumberFormat('ko-KR').format(amount);
+  return new Intl.NumberFormat('en-US').format(amount);
 }
 
 /** 날짜 포맷팅 */
 function formatDate(dateStr?: string | null): string {
   if (!dateStr) return '-';
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat('en-US', {
     year: 'numeric', month: 'long', day: 'numeric',
   }).format(new Date(dateStr));
 }
@@ -52,7 +52,7 @@ function formatDate(dateStr?: string | null): string {
 /** 짧은 날짜 */
 function formatShortDate(dateStr?: string | null): string {
   if (!dateStr) return '-';
-  return new Intl.DateTimeFormat('ko-KR', {
+  return new Intl.DateTimeFormat('en-US', {
     year: 'numeric', month: '2-digit', day: '2-digit',
     hour: '2-digit', minute: '2-digit',
   }).format(new Date(dateStr));
@@ -67,12 +67,12 @@ function getTierLabel(tier?: string): string {
 /** 상태 배지 */
 function getStatusBadge(status?: string): { label: string; cls: string } {
   const map: Record<string, { label: string; cls: string }> = {
-    active: { label: '활성', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
-    trialing: { label: '체험 중', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
-    canceled: { label: '취소됨', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
-    cancelled: { label: '취소됨', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
-    past_due: { label: '결제 실패', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
-    expired: { label: '만료', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500' },
+    active: { label: 'Active', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
+    trialing: { label: 'Trial', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
+    canceled: { label: 'Canceled', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+    cancelled: { label: 'Canceled', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+    past_due: { label: 'Payment failed', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
+    expired: { label: 'Expired', cls: 'bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-500' },
   };
   return map[status?.toLowerCase() || ''] || { label: status || '-', cls: 'bg-zinc-100 text-zinc-600' };
 }
@@ -80,11 +80,11 @@ function getStatusBadge(status?: string): { label: string; cls: string } {
 /** 결제 상태 배지 */
 function getPaymentBadge(status?: string): { label: string; cls: string } {
   const map: Record<string, { label: string; cls: string }> = {
-    succeeded: { label: '완료', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
-    failed: { label: '실패', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
-    refunded: { label: '환불', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
-    pending: { label: '처리 중', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
-    partially_refunded: { label: '부분환불', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+    succeeded: { label: 'Paid', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
+    failed: { label: 'Failed', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
+    refunded: { label: 'Refunded', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
+    pending: { label: 'Pending', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
+    partially_refunded: { label: 'Partially refunded', cls: 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400' },
   };
   return map[status?.toLowerCase() || ''] || { label: status || '-', cls: 'bg-zinc-100 text-zinc-600' };
 }
@@ -143,11 +143,11 @@ export default function BillingSettingsPage() {
     setCancelingDowngrade(true);
     try {
       const result = await cancelDowngrade();
-      toast.success(result.message || '다운그레이드 예약이 취소되었습니다');
+      toast.success(result.message || 'Scheduled downgrade canceled.');
       // 구독 데이터 새로고침
       window.location.reload();
     } catch (error: any) {
-      toast.error(error?.message || '예약 취소에 실패했습니다');
+      toast.error(error?.message || 'Failed to cancel the scheduled downgrade.');
     } finally {
       setCancelingDowngrade(false);
     }
@@ -161,9 +161,9 @@ export default function BillingSettingsPage() {
   if (!user) {
     return (
       <div className={`${SETTINGS_CARD_CLASS} p-8 text-center`}>
-        <p className="text-sm text-gray-500 dark:text-gray-400">로그인이 필요합니다.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">You need to sign in to view billing settings.</p>
         <button onClick={() => router.push('/login?next=/settings/billing')} className={`${SETTINGS_PRIMARY_BUTTON_CLASS} mt-4`}>
-          로그인
+          Sign in
         </button>
       </div>
     );
@@ -174,15 +174,15 @@ export default function BillingSettingsPage() {
       {/* 페이지 헤더 */}
       <div className="flex items-center justify-between pt-1">
         <div className="space-y-1">
-          <h2 className={SETTINGS_SECTION_TITLE_CLASS}>결제 관리</h2>
-          <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>구독 상태, 결제 수단, 결제 내역을 관리합니다.</p>
+          <h2 className={SETTINGS_SECTION_TITLE_CLASS}>Billing</h2>
+          <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>Manage your subscription, payment methods, and billing history.</p>
         </div>
         <button
           onClick={() => router.push('/marketplace/seller')}
           className={SETTINGS_SUBTLE_BUTTON_CLASS}
         >
           <ArrowUpRight className="h-3.5 w-3.5 mr-1" />
-          판매자 대시보드
+          Seller dashboard
         </button>
       </div>
 
@@ -197,9 +197,9 @@ export default function BillingSettingsPage() {
         <div className="flex items-start gap-3 rounded-2xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-900/10 p-4">
           <AlertTriangle className="h-5 w-5 text-red-500 shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-medium text-red-800 dark:text-red-300">결제에 실패했습니다</p>
+            <p className="text-sm font-medium text-red-800 dark:text-red-300">Payment failed</p>
             <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">
-              결제 수단을 확인하거나 새 카드를 등록해주세요. 반복 실패 시 구독이 자동 해지됩니다.
+              Review your payment method or add a new card. Repeated failures may cancel the subscription automatically.
             </p>
           </div>
         </div>
@@ -207,7 +207,7 @@ export default function BillingSettingsPage() {
 
       {/* ══════════ 구독 상태 ══════════ */}
       <div className={`${SETTINGS_CARD_CLASS} p-6`}>
-        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>구독 상태</h3>
+        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>Subscription status</h3>
 
         {subLoading ? (
           <div className="space-y-3">
@@ -219,7 +219,7 @@ export default function BillingSettingsPage() {
             {/* 플랜명 + 상태 배지 */}
             <div className="flex flex-wrap items-center gap-2 mb-5">
               <span className="text-lg font-semibold text-gray-900 dark:text-white">
-                {getTierLabel(tier)} 플랜
+                {getTierLabel(tier)} plan
               </span>
               {(() => {
                 const b = getStatusBadge(status);
@@ -232,23 +232,23 @@ export default function BillingSettingsPage() {
                 {/* 상세 정보 */}
                 <div className="grid grid-cols-2 gap-4 mb-5">
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">결제 주기</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Billing cycle</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">
-                      {sub?.billingCycle === 'yearly' ? '연간' : '월간'}
+                      {sub?.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">결제 금액</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Amount</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">₩{formatAmount(price)}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      {isCanceled ? '만료 예정일' : '다음 결제일'}
+                      {isCanceled ? 'Ends on' : 'Next billing date'}
                     </p>
                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">{formatDate(periodEnd)}</p>
                   </div>
                   <div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">자동 갱신</p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">Auto renew</p>
                     <p className="text-sm font-medium text-gray-900 dark:text-white mt-0.5">
                       {sub?.autoRenew !== false ? 'ON' : 'OFF'}
                     </p>
@@ -259,7 +259,7 @@ export default function BillingSettingsPage() {
                 {isCanceled && periodEnd && (
                   <div className="rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/50 p-3 mb-5">
                     <p className="text-sm text-zinc-600 dark:text-zinc-300">
-                      구독이 취소되었습니다. <strong>{formatDate(periodEnd)}</strong>까지 현재 플랜을 계속 이용할 수 있습니다.
+                      Your subscription is canceled. You can keep using the current plan until <strong>{formatDate(periodEnd)}</strong>.
                     </p>
                   </div>
                 )}
@@ -270,12 +270,11 @@ export default function BillingSettingsPage() {
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <p className="text-sm font-medium text-blue-800 dark:text-blue-300">
-                          플랜 변경 예약됨
+                          Plan change scheduled
                         </p>
                         <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
-                          <strong>{formatDate(periodEnd)}</strong> 이후 다음 결제 주기부터{' '}
-                          <strong>{getTierLabel(scheduledDowngrade.targetTier)}</strong> 플랜으로 변경됩니다.
-                          현재 기간 동안은 {getTierLabel(tier)} 플랜의 모든 기능을 계속 이용할 수 있습니다.
+                          Starting with the billing cycle after <strong>{formatDate(periodEnd)}</strong>, your subscription will move to the <strong>{getTierLabel(scheduledDowngrade.targetTier)}</strong> plan.
+                          You keep full access to the current {getTierLabel(tier)} plan until then.
                         </p>
                       </div>
                       <button
@@ -283,7 +282,7 @@ export default function BillingSettingsPage() {
                         disabled={cancelingDowngrade}
                         className="shrink-0 text-xs font-medium text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 underline underline-offset-2 transition-colors disabled:opacity-50"
                       >
-                        {cancelingDowngrade ? '취소 중...' : '예약 취소'}
+                        {cancelingDowngrade ? 'Canceling...' : 'Cancel schedule'}
                       </button>
                     </div>
                   </div>
@@ -291,7 +290,7 @@ export default function BillingSettingsPage() {
               </>
             ) : (
               <p className="text-sm text-gray-500 dark:text-gray-400 mb-5">
-                현재 무료 플랜을 사용 중입니다. 업그레이드하면 더 많은 MCP 자동포스팅과 고급 기능을 이용할 수 있습니다.
+                You are currently on the free plan. Upgrade to unlock more MCP autoposting capacity and advanced features.
               </p>
             )}
 
@@ -299,19 +298,19 @@ export default function BillingSettingsPage() {
             <div className="flex flex-wrap gap-2">
               <button onClick={() => router.push('/pricing')} className={SETTINGS_SUBTLE_BUTTON_CLASS}>
                 <ArrowUpRight className="h-3.5 w-3.5 mr-1.5" />
-                {isPaid ? '플랜 변경' : '업그레이드'}
+                {isPaid ? 'Change plan' : 'Upgrade'}
               </button>
               {isPaid && !isCanceled && (
                 <button
                   onClick={() => setShowCancel(true)}
                   className="inline-flex flex-none min-h-[36px] px-4 py-1.5 text-sm font-semibold text-red-600 dark:text-red-400 bg-white dark:bg-[#121621] border border-red-200 dark:border-red-800/50 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/10 transition-all items-center justify-center"
                 >
-                  구독 취소
+                  Cancel subscription
                 </button>
               )}
               {isCanceled && (
                 <button onClick={() => resumeMut.mutate()} disabled={resumeMut.isPending} className={SETTINGS_PRIMARY_BUTTON_CLASS}>
-                  {resumeMut.isPending ? '처리 중...' : '구독 재활성화'}
+                  {resumeMut.isPending ? 'Processing...' : 'Resume subscription'}
                 </button>
               )}
             </div>
@@ -322,7 +321,7 @@ export default function BillingSettingsPage() {
       {/* ══════════ 사용량 ══════════ */}
       {isPaid && (
         <div className={`${SETTINGS_CARD_CLASS} p-6`}>
-          <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>이번 달 사용량</h3>
+          <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>Usage this month</h3>
           {subLoading ? (
             <div className="h-4 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
           ) : (() => {
@@ -336,16 +335,16 @@ export default function BillingSettingsPage() {
             return (
               <div>
                 <div className="flex items-center justify-between mb-1.5">
-                  <span className="text-sm text-gray-700 dark:text-gray-300">MCP 자동포스팅</span>
-                  <span className="text-sm font-medium text-gray-900 dark:text-white">{mcpUsage} / {mcpLimit}건</span>
+                  <span className="text-sm text-gray-700 dark:text-gray-300">MCP autoposting</span>
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{mcpUsage} / {mcpLimit}</span>
                 </div>
                 <div className="h-2 w-full bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
                   <div className={`h-full rounded-full transition-all ${barColor}`} style={{ width: `${pct}%` }} />
                 </div>
                 {pct >= 80 && (
                   <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-1.5">
-                    사용량이 {Math.round(pct)}%에 도달했습니다.
-                    {pct >= 100 ? ' 한도에 도달하여 추가 포스팅이 제한됩니다.' : ''}
+                    You have used {Math.round(pct)}% of your limit.
+                    {pct >= 100 ? ' Additional posting is restricted until the limit resets.' : ''}
                   </p>
                 )}
               </div>
@@ -357,14 +356,14 @@ export default function BillingSettingsPage() {
       {/* ══════════ 결제 수단 ══════════ */}
       <div className={`${SETTINGS_CARD_CLASS} p-6`}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className={SETTINGS_SECTION_TITLE_CLASS}>결제 수단</h3>
+          <h3 className={SETTINGS_SECTION_TITLE_CLASS}>Payment methods</h3>
           {isPaid && (
             <button
               onClick={() => router.push('/pricing')}
               className={SETTINGS_SUBTLE_BUTTON_CLASS}
             >
               <ArrowUpRight className="h-3.5 w-3.5 mr-1" />
-              결제 수단 변경
+              Update payment method
             </button>
           )}
         </div>
@@ -374,7 +373,7 @@ export default function BillingSettingsPage() {
         ) : !paymentMethods || (Array.isArray(paymentMethods) && paymentMethods.length === 0) ? (
           <div className="text-center py-8">
             <CreditCard className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">등록된 결제 수단이 없습니다</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No saved payment methods.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -384,17 +383,17 @@ export default function BillingSettingsPage() {
                   <CreditCard className="h-5 w-5 text-gray-400 dark:text-gray-500" />
                   <div>
                     <p className="text-sm font-medium text-gray-900 dark:text-white">
-                      {pm.cardCompany || '카드'} {pm.cardNumber || ''}
+                      {pm.cardCompany || 'Card'} {pm.cardNumber || ''}
                     </p>
                     <p className="text-xs text-gray-400 dark:text-gray-500">
-                      {pm.cardType === 'credit' ? '신용카드' : pm.cardType === 'check' ? '체크카드' : pm.cardType || ''}
+                      {pm.cardType === 'credit' ? 'Credit card' : pm.cardType === 'check' ? 'Debit card' : pm.cardType || ''}
                     </p>
                   </div>
                 </div>
                 <button
                   onClick={() => setDeleteId(pm.id)}
                   className="p-2 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 transition-colors"
-                  title="삭제"
+                  title="Delete"
                 >
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -406,7 +405,7 @@ export default function BillingSettingsPage() {
 
       {/* ══════════ 결제 내역 ══════════ */}
       <div className={`${SETTINGS_CARD_CLASS} p-6`}>
-        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>결제 내역</h3>
+        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>Payment history</h3>
 
         {payLoading ? (
           <div className="space-y-3">
@@ -417,7 +416,7 @@ export default function BillingSettingsPage() {
         ) : !payments || (Array.isArray(payments) && payments.length === 0) ? (
           <div className="text-center py-8">
             <FileText className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">결제 내역이 없습니다</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No payment history yet.</p>
           </div>
         ) : (
           <>
@@ -434,7 +433,7 @@ export default function BillingSettingsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {p.description || p.orderName || '구독 결제'}
+                          {p.description || p.orderName || 'Subscription payment'}
                         </p>
                         <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${badge.cls}`}>{badge.label}</span>
                       </div>
@@ -454,7 +453,7 @@ export default function BillingSettingsPage() {
             {Array.isArray(payments) && payments.length >= historyLimit && (
               <button onClick={() => setHistoryLimit((prev) => prev + 10)}
                 className="mt-4 flex items-center justify-center gap-1 w-full py-2 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
-                <ChevronDown className="h-4 w-4" />더 보기
+                <ChevronDown className="h-4 w-4" />Load more
               </button>
             )}
           </>
@@ -463,7 +462,7 @@ export default function BillingSettingsPage() {
 
       {/* ══════════ 마켓플레이스 구매 내역 ══════════ */}
       <div className={`${SETTINGS_CARD_CLASS} p-6`}>
-        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>마켓플레이스 구매 내역</h3>
+        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>Marketplace purchases</h3>
 
         {purchasesLoading ? (
           <div className="space-y-3">
@@ -474,7 +473,7 @@ export default function BillingSettingsPage() {
         ) : !purchases || purchases.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">구매한 상품이 없습니다</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No purchases yet.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -486,16 +485,16 @@ export default function BillingSettingsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                      {order.productPost?.title || '상품'}
+                      {order.productPost?.title || 'Product'}
                     </p>
                     {order.status === 'refunded' && (
                       <span className="text-[11px] font-medium px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-500 dark:bg-zinc-800 dark:text-zinc-400">
-                        환불됨
+                        Refunded
                       </span>
                     )}
                   </div>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                    {order.seller?.username || '판매자'} · {formatShortDate(order.createdAt)}
+                    {order.seller?.username || 'Seller'} · {formatShortDate(order.createdAt)}
                   </p>
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
@@ -507,7 +506,7 @@ export default function BillingSettingsPage() {
                       href={`/marketplace/${order.productPost.slug}`}
                       className="text-xs text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300 underline underline-offset-2"
                     >
-                      보기
+                      View
                     </a>
                   )}
                 </div>
@@ -519,7 +518,7 @@ export default function BillingSettingsPage() {
 
       {/* ══════════ 환불 요청 내역 ══════════ */}
       <div className={`${SETTINGS_CARD_CLASS} p-6`}>
-        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>환불 요청 내역</h3>
+        <h3 className={`${SETTINGS_SECTION_TITLE_CLASS} mb-4`}>Refund requests</h3>
 
         {refundsLoading ? (
           <div className="space-y-3">
@@ -530,18 +529,18 @@ export default function BillingSettingsPage() {
         ) : !refundRequests || refundRequests.length === 0 ? (
           <div className="text-center py-8">
             <FileText className="h-8 w-8 text-gray-300 dark:text-gray-600 mx-auto mb-2" />
-            <p className="text-sm text-gray-500 dark:text-gray-400">환불 요청 내역이 없습니다</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400">No refund requests.</p>
           </div>
         ) : (
           <div className="space-y-3">
             {refundRequests.map((r: any) => {
               const statusMap: Record<string, { label: string; cls: string }> = {
-                pending: { label: '대기 중', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
-                approved: { label: '승인됨', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
-                processed: { label: '환불 완료', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
-                rejected: { label: '거부됨', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
-                escalated: { label: '관리자 처리 중', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
-                auto_approved: { label: '자동 승인', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
+                pending: { label: 'Pending', cls: 'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400' },
+                approved: { label: 'Approved', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
+                processed: { label: 'Refunded', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
+                rejected: { label: 'Rejected', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
+                escalated: { label: 'Under review', cls: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-400' },
+                auto_approved: { label: 'Auto approved', cls: 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400' },
               };
               const badge = statusMap[r.status] || { label: r.status, cls: 'bg-gray-100 text-gray-600' };
 
@@ -551,28 +550,28 @@ export default function BillingSettingsPage() {
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
-                          {r.order?.productPost?.title || '상품'}
+                          {r.order?.productPost?.title || 'Product'}
                         </p>
                         <span className={`text-[11px] font-medium px-1.5 py-0.5 rounded ${badge.cls}`}>
                           {badge.label}
                         </span>
                       </div>
                       <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-                        결제 금액 ₩{formatAmount(r.order?.amount || 0)}
+                        Paid amount ₩{formatAmount(r.order?.amount || 0)}
                       </p>
                     </div>
                   </div>
 
                   {/* 타임라인 */}
                   <div className="mt-3 space-y-1.5 text-xs text-gray-500 dark:text-zinc-400">
-                    <p>환불 요청일: {formatShortDate(r.createdAt)}</p>
-                    <p>사유: {r.reason}</p>
+                    <p>Requested on: {formatShortDate(r.createdAt)}</p>
+                    <p>Reason: {r.reason}</p>
 
                     {/* 거부 시 판매자 응답 */}
                     {r.status === 'rejected' && r.sellerResponse && (
                       <div className="rounded-lg bg-red-50/50 dark:bg-red-900/5 p-2.5 mt-1">
                         <p className="text-xs text-red-500 dark:text-red-400">
-                          판매자 응답: {r.sellerResponse}
+                          Seller response: {r.sellerResponse}
                         </p>
                       </div>
                     )}
@@ -581,10 +580,10 @@ export default function BillingSettingsPage() {
                     {(r.status === 'processed' || r.status === 'approved') && r.processedAt && (
                       <>
                         <p className="text-green-600 dark:text-green-400">
-                          환불 승인일: {formatShortDate(r.processedAt)}
+                          Approved on: {formatShortDate(r.processedAt)}
                         </p>
                         <p className="text-[11px] text-gray-400 dark:text-zinc-500">
-                          카드사에 따라 환불까지 3~5영업일이 소요될 수 있습니다
+                          Depending on your card issuer, the refund may take 3-5 business days.
                         </p>
                       </>
                     )}
@@ -593,7 +592,7 @@ export default function BillingSettingsPage() {
                   {/* 에스컬레이션 안내 */}
                   {r.status === 'escalated' && (
                     <p className="mt-2 text-xs text-red-500 dark:text-red-400">
-                      판매자 미응답으로 관리자에게 전달되었습니다. 처리까지 시간이 소요될 수 있습니다.
+                      The seller did not respond, so this request was escalated for review. It may take additional time to process.
                     </p>
                   )}
                 </div>
@@ -607,10 +606,10 @@ export default function BillingSettingsPage() {
       <ConfirmDialog
         isOpen={showCancel}
         onClose={() => setShowCancel(false)}
-        title="구독을 취소하시겠습니까?"
-        description={`현재 결제 기간이 끝나는 ${formatDate(periodEnd)}까지 서비스를 계속 이용할 수 있습니다.`}
-        confirmText="구독 취소"
-        cancelText="유지하기"
+        title="Cancel subscription?"
+        description={`You can continue using the service until the current billing period ends on ${formatDate(periodEnd)}.`}
+        confirmText="Cancel subscription"
+        cancelText="Keep plan"
         isLoading={cancelMut.isPending}
         confirmButtonClassName="!text-red-600 dark:!text-red-400"
         onConfirm={() => {
@@ -625,10 +624,10 @@ export default function BillingSettingsPage() {
       <ConfirmDialog
         isOpen={!!deleteId}
         onClose={() => setDeleteId(null)}
-        title="결제 수단을 삭제하시겠습니까?"
-        description="삭제하면 자동 결제에 사용할 수 없습니다. 활성 구독이 있는 경우 다음 결제가 실패할 수 있습니다."
-        confirmText="삭제"
-        cancelText="취소"
+        title="Delete this payment method?"
+        description="After deletion it cannot be used for auto-renewal. If you have an active subscription, the next charge may fail."
+        confirmText="Delete"
+        cancelText="Cancel"
         isLoading={deletePmMut.isPending}
         confirmButtonClassName="!text-red-600 dark:!text-red-400"
         onConfirm={() => {

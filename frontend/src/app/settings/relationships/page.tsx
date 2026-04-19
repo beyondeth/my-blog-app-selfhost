@@ -136,10 +136,10 @@ export default function RelationshipsPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['following'] });
       queryClient.invalidateQueries({ queryKey: ['followers'] });
-      showActionFeedback('success', '언팔로우했습니다');
+      showActionFeedback('success', 'Unfollowed.');
     },
     onError: () => {
-      showActionFeedback('error', '언팔로우에 실패했습니다');
+      showActionFeedback('error', 'Failed to unfollow.');
     },
   });
 
@@ -147,12 +147,12 @@ export default function RelationshipsPage() {
   const removeFollowerMutation = useMutation({
     mutationFn: async (userId: string) => {
       // TODO: 백엔드에 remove-follower API 추가 필요
-      showActionFeedback('info', '이 기능은 아직 준비 중입니다');
+      showActionFeedback('info', 'This action is not available yet.');
       throw new Error('Not implemented');
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['followers'] });
-      showActionFeedback('success', '팔로워를 삭제했습니다');
+      showActionFeedback('success', 'Follower removed.');
     },
     onError: () => {
       // 에러 메시지는 mutationFn에서 처리
@@ -178,40 +178,40 @@ export default function RelationshipsPage() {
   // Handle bulk unfollow
   const handleBulkUnfollow = async () => {
     if (selectedUsers.length === 0) {
-      showActionFeedback('error', '선택된 사용자가 없습니다');
+      showActionFeedback('error', 'No users selected.');
       return;
     }
 
-    const confirmed = confirm(`${selectedUsers.length}명을 언팔로우하시겠습니까?`);
+    const confirmed = confirm(`Unfollow ${selectedUsers.length} selected user(s)?`);
     if (!confirmed) return;
 
     const count = selectedUsers.length;
     try {
       await Promise.all(selectedUsers.map((userId) => unfollowMutation.mutateAsync(userId)));
       setSelectedUsers([]);
-      showActionFeedback('success', `${count}명을 언팔로우했습니다`);
+      showActionFeedback('success', `Unfollowed ${count} user(s).`);
     } catch (error) {
-      showActionFeedback('error', '일부 언팔로우에 실패했습니다');
+      showActionFeedback('error', 'Some users could not be unfollowed.');
     }
   };
 
   // Handle bulk unblock
   const handleBulkUnblock = async () => {
     if (selectedUsers.length === 0) {
-      showActionFeedback('error', '선택된 사용자가 없습니다');
+      showActionFeedback('error', 'No users selected.');
       return;
     }
 
-    const confirmed = confirm(`${selectedUsers.length}명의 차단을 해제하시겠습니까?`);
+    const confirmed = confirm(`Unblock ${selectedUsers.length} selected user(s)?`);
     if (!confirmed) return;
 
     const count = selectedUsers.length;
     try {
       await Promise.all(selectedUsers.map((userId) => unblockUser(userId)));
       setSelectedUsers([]);
-      showActionFeedback('success', `${count}명의 차단을 해제했습니다`);
+      showActionFeedback('success', `Unblocked ${count} user(s).`);
     } catch (error) {
-      showActionFeedback('error', '일부 차단 해제에 실패했습니다');
+      showActionFeedback('error', 'Some users could not be unblocked.');
     }
   };
 
@@ -279,7 +279,7 @@ export default function RelationshipsPage() {
             }`}
           >
             {isSelected && <Check className="w-3 h-3 text-white" />}
-            <span className="sr-only">사용자 선택</span>
+            <span className="sr-only">Select user</span>
           </button>
 
           {/* User Info */}
@@ -326,7 +326,7 @@ export default function RelationshipsPage() {
               disabled={unfollowMutation.isPending}
               className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-full sm:w-auto`}
             >
-              언팔로우
+              Unfollow
             </button>
           ) : (
             <button
@@ -335,7 +335,7 @@ export default function RelationshipsPage() {
               disabled={removeFollowerMutation.isPending}
               className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-full sm:w-auto`}
             >
-              삭제
+              Remove
             </button>
           )}
         </div>
@@ -346,9 +346,9 @@ export default function RelationshipsPage() {
   return (
     <div className="space-y-6 pt-2">
       <div className="space-y-2 pt-1">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">관계 설정</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Relationship settings</h2>
         <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">
-          Following, Followers, 차단 목록을 한 번에 관리하세요.
+          Manage following, followers, and blocked users from one place.
         </p>
       </div>
 
@@ -365,7 +365,7 @@ export default function RelationshipsPage() {
             >
               <Users className="w-4 h-4" />
               <span className="hidden sm:inline">Following</span>
-              <span className="sm:hidden">팔로잉</span>
+              <span className="sm:hidden">Following</span>
               ({followingTotal})
             </TabsTrigger>
             <TabsTrigger
@@ -374,7 +374,7 @@ export default function RelationshipsPage() {
             >
               <UserCheck className="w-4 h-4" />
               <span className="hidden sm:inline">Followers</span>
-              <span className="sm:hidden">팔로워</span>
+              <span className="sm:hidden">Followers</span>
               ({followersTotal})
             </TabsTrigger>
             <TabsTrigger
@@ -382,8 +382,8 @@ export default function RelationshipsPage() {
               className="flex flex-1 items-center justify-center gap-2 min-h-[48px] rounded-none border-b-2 border-transparent text-xs sm:text-sm data-[state=active]:border-[#5850ec] dark:data-[state=active]:border-[#818cf8] data-[state=active]:text-gray-900 dark:data-[state=active]:text-white"
             >
               <Ban className="w-4 h-4" />
-              <span className="hidden sm:inline">차단 목록</span>
-              <span className="sm:hidden">차단</span>
+              <span className="hidden sm:inline">Blocked</span>
+              <span className="sm:hidden">Blocked</span>
               ({blockedData?.total || 0})
             </TabsTrigger>
           </TabsList>
@@ -394,7 +394,7 @@ export default function RelationshipsPage() {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="사용자 검색..."
+                  placeholder="Search users..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={`${SETTINGS_INPUT_CLASS} pl-10`}
@@ -408,7 +408,7 @@ export default function RelationshipsPage() {
                     onClick={clearSelection}
                     className={`${SETTINGS_SUBTLE_BUTTON_CLASS} flex-1 sm:flex-initial`}
                   >
-                    선택 해제 ({selectedUsers.length})
+                    Clear selection ({selectedUsers.length})
                   </button>
                   {activeTab === 'following' && (
                     <button
@@ -417,8 +417,8 @@ export default function RelationshipsPage() {
                       className={`${SETTINGS_PRIMARY_BUTTON_CLASS} flex-1 sm:flex-initial`}
                     >
                       <UserMinus className="w-4 h-4" />
-                      <span className="hidden sm:inline">선택 언팔로우</span>
-                      <span className="sm:hidden">언팔로우</span>
+                      <span className="hidden sm:inline">Unfollow selected</span>
+                      <span className="sm:hidden">Unfollow</span>
                     </button>
                   )}
                   {activeTab === 'blocked' && (
@@ -428,8 +428,8 @@ export default function RelationshipsPage() {
                       className={`${SETTINGS_PRIMARY_BUTTON_CLASS} flex-1 sm:flex-initial`}
                     >
                       <X className="w-4 h-4" />
-                      <span className="hidden sm:inline">선택 차단 해제</span>
-                      <span className="sm:hidden">차단 해제</span>
+                      <span className="hidden sm:inline">Unblock selected</span>
+                      <span className="sm:hidden">Unblock</span>
                     </button>
                   )}
                 </div>
@@ -439,7 +439,7 @@ export default function RelationshipsPage() {
                   onClick={selectAllUsers}
                   className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-full sm:w-auto`}
                 >
-                  전체 선택
+                  Select all
                 </button>
               )}
             </div>
@@ -447,11 +447,11 @@ export default function RelationshipsPage() {
             <TabsContent value="following" className="mt-0">
               <div className="rounded-3xl border border-gray-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-[#161b27] dark:border-[#242a38] overflow-hidden">
                 {isLoadingFollowing ? (
-                  <div className="p-8 text-center text-gray-500 dark:text-gray-300">로딩 중...</div>
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-300">Loading...</div>
                 ) : allFollowing.length === 0 ? (
                   <div className="p-8 text-center text-gray-500 dark:text-gray-300">
                     <Users className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-                    <p>아직 Following하는 사용자가 없습니다</p>
+                    <p>You are not following anyone yet.</p>
                   </div>
                 ) : (
                   <>
@@ -459,7 +459,7 @@ export default function RelationshipsPage() {
                       <UserCard key={user.id} user={user} type="following" />
                     ))}
                     {filterUsers(allFollowing).length === 0 && searchQuery && (
-                      <div className="p-8 text-center text-gray-500 dark:text-gray-300">검색 결과가 없습니다</div>
+                      <div className="p-8 text-center text-gray-500 dark:text-gray-300">No results found.</div>
                     )}
                     {hasNextFollowing && (
                       <div className="p-4 border-t border-gray-100 dark:border-[#2F3440]">
@@ -468,7 +468,7 @@ export default function RelationshipsPage() {
                           disabled={isFetchingNextFollowing}
                           className="w-full py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50"
                         >
-                          {isFetchingNextFollowing ? '로딩 중...' : '더 보기'}
+                          {isFetchingNextFollowing ? 'Loading...' : 'Load more'}
                         </button>
                       </div>
                     )}
@@ -480,11 +480,11 @@ export default function RelationshipsPage() {
             <TabsContent value="followers" className="mt-0">
               <div className="rounded-3xl border border-gray-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-[#161b27] dark:border-[#242a38] overflow-hidden">
                 {isLoadingFollowers ? (
-                  <div className="p-8 text-center text-gray-500 dark:text-gray-300">로딩 중...</div>
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-300">Loading...</div>
                 ) : allFollowers.length === 0 ? (
                   <div className="p-8 text-center text-gray-500 dark:text-gray-300">
                     <UserCheck className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-                    <p>아직 Followers가 없습니다</p>
+                    <p>You do not have any followers yet.</p>
                   </div>
                 ) : (
                   <>
@@ -492,7 +492,7 @@ export default function RelationshipsPage() {
                       <UserCard key={user.id} user={user} type="follower" />
                     ))}
                     {filterUsers(allFollowers).length === 0 && searchQuery && (
-                      <div className="p-8 text-center text-gray-500 dark:text-gray-300">검색 결과가 없습니다</div>
+                      <div className="p-8 text-center text-gray-500 dark:text-gray-300">No results found.</div>
                     )}
                     {hasNextFollowers && (
                       <div className="p-4 border-t border-gray-100 dark:border-[#2F3440]">
@@ -501,7 +501,7 @@ export default function RelationshipsPage() {
                           disabled={isFetchingNextFollowers}
                           className="w-full py-3 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors disabled:opacity-50"
                         >
-                          {isFetchingNextFollowers ? '로딩 중...' : '더 보기'}
+                          {isFetchingNextFollowers ? 'Loading...' : 'Load more'}
                         </button>
                       </div>
                     )}
@@ -513,11 +513,11 @@ export default function RelationshipsPage() {
             <TabsContent value="blocked" className="mt-0">
               <div className="rounded-3xl border border-gray-100 bg-white shadow-[0_8px_24px_rgba(15,23,42,0.05)] dark:bg-[#161b27] dark:border-[#242a38] overflow-hidden">
                 {isLoadingBlocked ? (
-                  <div className="p-8 text-center text-gray-500 dark:text-gray-300 dark:text-gray-300">로딩 중...</div>
+                  <div className="p-8 text-center text-gray-500 dark:text-gray-300 dark:text-gray-300">Loading...</div>
                 ) : blockedData?.data?.length === 0 ? (
                   <div className="p-8 text-center text-gray-500 dark:text-gray-300 dark:text-gray-300">
                     <Ban className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600 dark:text-gray-300" />
-                    <p>차단한 사용자가 없습니다</p>
+                    <p>You have not blocked anyone.</p>
                   </div>
                 ) : (
                   <>
@@ -538,7 +538,7 @@ export default function RelationshipsPage() {
                             }`}
                           >
                             {selectedUsers.includes(user.id) && <Check className="w-3 h-3 text-white" />}
-                            <span className="sr-only">사용자 선택</span>
+                            <span className="sr-only">Select user</span>
                           </button>
                           <Link
                             href={user.blog?.slug ? `/${user.blog.slug}` : '#'}
@@ -557,19 +557,19 @@ export default function RelationshipsPage() {
                           <button
                             type="button"
                             onClick={() => {
-                              if (confirm(`${user.username}님의 차단을 해제하시겠습니까?`)) {
+                              if (confirm(`Unblock ${user.username}?`)) {
                                 unblockUser(user.id);
                               }
                             }}
                             className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-full sm:w-auto`}
                           >
-                            차단 해제
+                            Unblock
                           </button>
                         </div>
                       </div>
                     ))}
                     {filterUsers(blockedData?.data?.map((block: any) => block.blocked) || []).length === 0 && searchQuery && (
-                      <div className="p-8 text-center text-gray-500 dark:text-gray-300 dark:text-gray-300">검색 결과가 없습니다</div>
+                      <div className="p-8 text-center text-gray-500 dark:text-gray-300 dark:text-gray-300">No results found.</div>
                     )}
                   </>
                 )}

@@ -55,14 +55,14 @@ export default function CharacterSelector({
       );
 
       if (!response.ok) {
-        throw new Error('캐릭터 목록을 불러오는데 실패했습니다');
+        throw new Error('Failed to load avatar options.');
       }
 
       const data = await response.json();
       setCharacters(data.characters || []);
     } catch (err) {
       console.error('Failed to fetch characters:', err);
-      setError('캐릭터 목록을 불러올 수 없습니다');
+      setError('Could not load avatar options.');
     } finally {
       setLoading(false);
     }
@@ -81,7 +81,7 @@ export default function CharacterSelector({
       }, 1000);
     } catch (err) {
       console.error('Failed to update character:', err);
-      setError('프로필 이미지 변경에 실패했습니다');
+      setError('Failed to update the profile image.');
       setSelectedCharacter(null);
     } finally {
       setUpdating(false);
@@ -110,7 +110,7 @@ export default function CharacterSelector({
           {/* 헤더 */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
             <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-              캐릭터 선택
+              Choose an avatar
             </h2>
             <button
               onClick={onClose}
@@ -135,7 +135,7 @@ export default function CharacterSelector({
             ) : (
               <>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                  프로필 이미지로 사용할 캐릭터를 선택하세요 ({characters.length}개)
+                  Select the avatar to use for your profile image ({characters.length} options)
                 </p>
 
                 {/* 캐릭터 그리드 */}
@@ -205,7 +205,7 @@ export default function CharacterSelector({
               disabled={updating}
               className="px-4 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              닫기
+              Close
             </button>
           </div>
         </div>

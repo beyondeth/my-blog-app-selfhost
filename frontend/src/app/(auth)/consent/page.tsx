@@ -14,6 +14,7 @@ import {
   clearMcpOAuthSession,
   parseMcpOAuthSessionData,
 } from '@/lib/mcpOAuth';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 /**
  * OAuth 로그인 후 약관 동의 페이지
@@ -22,6 +23,7 @@ import {
 export default function ConsentPage() {
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { locale, t, href } = useLocaleContext();
   const refreshUserMutation = useRefreshAuthenticatedUser();
   const { resolvedTheme } = useTheme();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +47,7 @@ export default function ConsentPage() {
 
     // 로딩 완료 후 user가 없으면 로그인 페이지로 리다이렉트
     if (!user) {
-      router.push('/login');
+      router.push(href('/login'));
       return;
     }
 
@@ -54,7 +56,7 @@ export default function ConsentPage() {
       router.push('/');
       return;
     }
-  }, [user, isLoading, router]);
+  }, [user, isLoading, router, href]);
 
   // 로딩 중이면 로딩 화면 표시
   // OAuth 직후 user 정보가 로드될 때까지 대기
@@ -63,7 +65,7 @@ export default function ConsentPage() {
       <div className="min-h-screen flex items-center justify-center bg-white dark:bg-gray-950">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-4 border-gray-300 border-t-gray-900 dark:border-gray-700 dark:border-t-gray-100 mx-auto mb-4"></div>
-          <p className="text-gray-600 dark:text-gray-400">로딩 중...</p>
+          <p className="text-gray-600 dark:text-gray-400">{t('common.loading')}</p>
         </div>
       </div>
     );
@@ -117,12 +119,12 @@ export default function ConsentPage() {
 
     // 필수 항목 검증
     if (!consents.isOver14) {
-      setError('만 14세 이상만 가입할 수 있습니다.');
+      setError(t('auth.consent.ageError'));
       return;
     }
 
     if (!consents.termsAccepted || !consents.privacyAccepted) {
-      setError('필수 약관에 모두 동의해주세요.');
+      setError(t('auth.consent.requiredError'));
       return;
     }
 
@@ -150,10 +152,10 @@ export default function ConsentPage() {
       const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || '약관 동의 처리에 실패했습니다');
+        throw new Error(data.message || t('auth.consent.submitError'));
       }
 
-      toast.success('약관에 동의했습니다');
+      toast.success(t('auth.consent.success'));
 
       // 세션 스토리지에서 리디렉션 잠금 해제
       sessionStorage.removeItem('consent_redirect_lock');
@@ -168,7 +170,7 @@ export default function ConsentPage() {
         try {
           const mcpOAuthData = parseMcpOAuthSessionData(mcpOAuthRaw);
           if (mcpOAuthData) {
-            router.push(buildMcpOAuthConsentPath(mcpOAuthData));
+            router.push(buildMcpOAuthConsentPath(mcpOAuthData, locale));
             return;
           }
         } catch (mcpError) {
@@ -180,7 +182,7 @@ export default function ConsentPage() {
       // MCP OAuth가 없거나 완료 실패 시 일반 이동
       router.push('/');
     } catch (err: any) {
-      setError(err.message || '약관 동의 처리 중 오류가 발생했습니다');
+      setError(err.message || t('auth.consent.submitError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -204,10 +206,10 @@ export default function ConsentPage() {
       localStorage.clear();
 
       // 로그인 페이지로 이동
-      window.location.href = '/login';
+      window.location.href = href('/login');
     } catch (error) {
       // 에러가 발생해도 로그인 페이지로 이동
-      window.location.href = '/login';
+      window.location.href = href('/login');
     }
   };
 
@@ -229,7 +231,7 @@ export default function ConsentPage() {
             className="mb-2 sm:mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {t('common.back')}
           </button>
 
           <div className="auth-card rounded-2xl p-8 fade-in-up">
@@ -246,10 +248,10 @@ export default function ConsentPage() {
                 />
               </div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                약관 동의
+                {t('auth.consent.pageTitle')}
               </h1>
               <p className="mt-2 text-sm text-gray-600 dark:text-gray-400">
-                서비스 이용을 위해 약관에 동의해주세요
+                {t('auth.consent.pageDescription')}
               </p>
             </div>
 
@@ -272,7 +274,7 @@ export default function ConsentPage() {
                     className="mt-1 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                   />
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    전체 동의
+                    {t('auth.consent.all')}
                   </span>
                 </label>
 
@@ -286,7 +288,7 @@ export default function ConsentPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="text-red-500">*</span> (필수) 본인은 만 14세 이상입니다
+                      <span className="text-red-500">*</span> {t('auth.consent.over16')}
                     </span>
                   </label>
 
@@ -299,16 +301,16 @@ export default function ConsentPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="text-red-500">*</span> (필수){' '}
+                      <span className="text-red-500">*</span>{' '}
                       <Link
-                        href="/legal/terms"
+                        href={href('/legal/terms')}
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        이용약관
+                        {t('legal.termsTitle')}
                       </Link>
-                      에 동의합니다
+                      {locale === 'ko' ? '에 동의합니다' : ' (required)'}
                     </span>
                   </label>
 
@@ -321,16 +323,16 @@ export default function ConsentPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="text-red-500">*</span> (필수){' '}
+                      <span className="text-red-500">*</span>{' '}
                       <Link
-                        href="/legal/privacy"
+                        href={href('/legal/privacy')}
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        개인정보 처리방침
+                        {t('legal.privacyTitle')}
                       </Link>
-                      에 동의합니다
+                      {locale === 'ko' ? '에 동의합니다' : ' (required)'}
                     </span>
                   </label>
 
@@ -343,14 +345,14 @@ export default function ConsentPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      (선택) 마케팅 정보 수신에 동의합니다{' '}
+                      {t('auth.consent.marketing')}{' '}
                       <Link
-                        href="/legal/marketing-consent"
+                        href={href('/legal/marketing-consent')}
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        (자세히 보기)
+                        {locale === 'ko' ? '(자세히 보기)' : '(details)'}
                       </Link>
                     </span>
                   </label>
@@ -364,14 +366,14 @@ export default function ConsentPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      (선택) 뉴스레터 수신에 동의합니다{' '}
+                      {t('auth.consent.newsletter')}{' '}
                       <Link
-                        href="/legal/newsletter-consent"
+                        href={href('/legal/newsletter-consent')}
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        (자세히 보기)
+                        {locale === 'ko' ? '(자세히 보기)' : '(details)'}
                       </Link>
                     </span>
                   </label>
@@ -399,10 +401,10 @@ export default function ConsentPage() {
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-2">
                     <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                    처리 중...
+                    {locale === 'ko' ? '처리 중...' : 'Saving...'}
                   </span>
                 ) : (
-                  '동의하고 계속하기'
+                  t('auth.consent.submit')
                 )}
               </button>
             </form>
@@ -410,15 +412,15 @@ export default function ConsentPage() {
             {/* Footer */}
             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
               <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-4">
-                회원가입시{' '}
-                <Link href="/legal/terms" className="text-gray-700 dark:text-gray-300 underline">
-                  이용약관
+                {locale === 'ko' ? '회원가입시 ' : 'By continuing you agree to the '}
+                <Link href={href('/legal/terms')} className="text-gray-700 dark:text-gray-300 underline">
+                  {t('legal.termsTitle')}
                 </Link>
-                {' '}및{' '}
-                <Link href="/legal/privacy" className="text-gray-700 dark:text-gray-300 underline">
-                  개인정보 처리방침
+                {locale === 'ko' ? ' 및 ' : ' and '}
+                <Link href={href('/legal/privacy')} className="text-gray-700 dark:text-gray-300 underline">
+                  {t('legal.privacyTitle')}
                 </Link>
-                에 동의하게 됩니다.
+                {locale === 'ko' ? '에 동의하게 됩니다.' : '.'}
               </p>
 
               {/* 탈출 옵션 버튼 */}
@@ -428,12 +430,17 @@ export default function ConsentPage() {
                     onClick={handleLogout}
                     className="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
                   >
-                    로그아웃
+                    {locale === 'ko' ? '로그아웃' : 'Log out'}
                   </button>
                 </div>
                 <p className="text-center text-xs text-gray-400 dark:text-gray-500">
-                  동의하지 않으시면 로그아웃할 수 있습니다<br/>
-                  (계정은 보존되며 나중에 다시 로그인하여 동의할 수 있습니다)
+                  {locale === 'ko'
+                    ? '동의하지 않으시면 로그아웃할 수 있습니다'
+                    : 'You can log out if you do not want to continue.'}
+                  <br/>
+                  {locale === 'ko'
+                    ? '(계정은 보존되며 나중에 다시 로그인하여 동의할 수 있습니다)'
+                    : '(Your account is preserved and you can review consent later.)'}
                 </p>
               </div>
             </div>

@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { useChat } from '@/hooks/useChat';
 import { formatDistanceToNow } from 'date-fns';
-import { ko } from 'date-fns/locale';
 import { Avatar } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -74,7 +73,7 @@ export default function DMSettingsPage() {
 
   // 차단 해제
   const handleUnblock = async (userId: string) => {
-    if (!confirm('정말로 이 사용자의 차단을 해제하시겠습니까?')) {
+    if (!confirm('Unblock this user?')) {
       return;
     }
 
@@ -85,20 +84,20 @@ export default function DMSettingsPage() {
       });
 
       if (response.ok) {
-        toast.success('차단이 해제되었습니다.');
+        toast.success('User unblocked.');
         setBlockedUsers(prev => prev.filter(b => b.blockedUserId !== userId));
       } else {
-        toast.error('차단 해제에 실패했습니다.');
+        toast.error('Failed to unblock the user.');
       }
     } catch (error) {
       console.error('Failed to unblock user:', error);
-      toast.error('차단 해제에 실패했습니다.');
+      toast.error('Failed to unblock the user.');
     }
   };
 
   // 대화 삭제
   const handleDeleteConversation = async (conversationId: string) => {
-    if (!confirm('이 대화를 삭제하시겠습니까? 메시지는 상대방에게는 계속 보입니다.')) {
+    if (!confirm('Delete this conversation from your list? The other user will still keep their messages.')) {
       return;
     }
 
@@ -109,14 +108,14 @@ export default function DMSettingsPage() {
       });
 
       if (response.ok) {
-        toast.success('대화가 삭제되었습니다.');
+        toast.success('Conversation deleted.');
         await fetchConversations();
       } else {
-        toast.error('대화 삭제에 실패했습니다.');
+        toast.error('Failed to delete the conversation.');
       }
     } catch (error) {
       console.error('Failed to delete conversation:', error);
-      toast.error('대화 삭제에 실패했습니다.');
+      toast.error('Failed to delete the conversation.');
     }
   };
 
@@ -125,7 +124,7 @@ export default function DMSettingsPage() {
     setRefreshing(true);
     await Promise.all([fetchBlockedUsers(), fetchConversations()]);
     setRefreshing(false);
-    toast.success('새로고침되었습니다.');
+    toast.success('Refreshed.');
   };
 
   useEffect(() => {
@@ -148,8 +147,8 @@ export default function DMSettingsPage() {
     <div className="space-y-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">채팅 관리</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">DM 대화와 차단 사용자를 관리하세요.</p>
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Chat</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-300 dark:text-gray-300">Manage direct messages and blocked users.</p>
         </div>
         <Button
           onClick={handleRefresh}
@@ -157,7 +156,7 @@ export default function DMSettingsPage() {
           className={`${SETTINGS_PRIMARY_BUTTON_CLASS} bg-gray-900 dark:bg-[#1F2229] hover:bg-gray-800 dark:hover:bg-[#272C36]`}
         >
           <FiRefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          새로고침
+          Refresh
         </Button>
       </div>
 
@@ -168,13 +167,13 @@ export default function DMSettingsPage() {
                 value="conversations"
                 className="flex-1 min-h-[48px] border-b-2 border-transparent rounded-none data-[state=active]:border-[#5850ec] dark:data-[state=active]:border-[#818cf8] data-[state=active]:text-gray-900 dark:data-[state=active]:text-white"
               >
-                대화 목록
+                Conversations
               </TabsTrigger>
               <TabsTrigger
                 value="blocked"
                 className="flex-1 min-h-[48px] border-b-2 border-transparent rounded-none data-[state=active]:border-[#5850ec] dark:data-[state=active]:border-[#818cf8] data-[state=active]:text-gray-900 dark:data-[state=active]:text-white"
               >
-                차단 목록
+                Blocked users
               </TabsTrigger>
             </TabsList>
 
@@ -183,8 +182,8 @@ export default function DMSettingsPage() {
                 {conversations.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-300 dark:text-gray-300">
                     <FiMessageCircle className="h-12 w-12 text-gray-300 dark:text-gray-600 dark:text-gray-300 mx-auto mb-3" />
-                    진행 중인 대화가 없습니다.
-                    <p className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-300 mt-2">다른 사용자의 프로필에서 메시지를 눌러 대화를 시작하세요.</p>
+                    No conversations yet.
+                    <p className="text-sm text-gray-400 dark:text-gray-500 dark:text-gray-300 mt-2">Start a conversation from another user's profile.</p>
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -209,10 +208,9 @@ export default function DMSettingsPage() {
                               <p className="font-medium text-gray-900 dark:text-gray-100">{otherUser?.username || 'Unknown User'}</p>
                               {conversation.lastMessageAt && (
                                 <p className="text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">
-                                  마지막 메시지:{' '}
+                                  Last message:{' '}
                                   {formatDistanceToNow(new Date(conversation.lastMessageAt), {
                                     addSuffix: true,
-                                    locale: ko,
                                   })}
                                 </p>
                               )}
@@ -240,7 +238,7 @@ export default function DMSettingsPage() {
                 {blockedUsers.length === 0 ? (
                   <div className="text-center py-8 text-gray-500 dark:text-gray-300 dark:text-gray-300">
                     <FiUserX className="h-12 w-12 text-gray-300 dark:text-gray-600 dark:text-gray-300 mx-auto mb-3" />
-                    차단한 사용자가 없습니다.
+                    You have not blocked anyone.
                   </div>
                 ) : (
                   <div className="space-y-3">
@@ -259,17 +257,16 @@ export default function DMSettingsPage() {
                           <div>
                             <p className="font-medium text-gray-900 dark:text-gray-100">{blocked.blockedUser.username}</p>
                             <p className="text-xs text-gray-500 dark:text-gray-300 dark:text-gray-300">
-                              차단일:{' '}
+                              Blocked:{' '}
                               {formatDistanceToNow(new Date(blocked.createdAt), {
                                 addSuffix: true,
-                                locale: ko,
                               })}
                             </p>
                           </div>
                         </div>
                         <Button onClick={() => handleUnblock(blocked.blockedUserId)} className={SETTINGS_SUBTLE_BUTTON_CLASS} size="sm">
                           <FiUnlock className="h-4 w-4 mr-2" />
-                          차단 해제
+                          Unblock
                         </Button>
                       </div>
                     ))}
@@ -279,10 +276,10 @@ export default function DMSettingsPage() {
                 <div className="flex items-start gap-3 p-4 rounded-3xl border border-gray-100 bg-gray-50 dark:bg-[#161b27] dark:border-[#242a38]">
                   <FiAlertCircle className="h-5 w-5 text-gray-600 dark:text-gray-300 dark:text-gray-300 mt-0.5 flex-shrink-0" />
                   <div className="text-sm text-gray-700 dark:text-gray-200">
-                    <p className="font-medium mb-1">차단 기능 안내</p>
+                    <p className="font-medium mb-1">How blocking works</p>
                     <ul className="list-disc list-inside space-y-1 text-gray-600 dark:text-gray-300 dark:text-gray-300">
-                      <li>차단된 사용자는 당신에게 메시지를 보낼 수 없습니다.</li>
-                      <li>차단을 해제하면 이전 대화를 다시 볼 수 있습니다.</li>
+                      <li>Blocked users cannot send you new messages.</li>
+                      <li>If you unblock them, your previous conversation becomes visible again.</li>
                     </ul>
                   </div>
                 </div>

@@ -64,9 +64,9 @@ const brandingFieldConfig: Record<BrandingField, {
   cropAspectRatio: number;
 }> = {
   logoUrl: {
-    label: '블로그 로고 (프로필카드)',
-    description: '프로필 카드 상단 배경에 사용됩니다.',
-    recommendedSize: '권장 최소 320x240px (4:3 비율 이상)',
+    label: 'Blog logo',
+    description: 'Used in the top area of the profile card.',
+    recommendedSize: 'Recommended minimum: 320x240px (4:3 or wider)',
     aspectRatio: '',
     previewClass: 'w-full max-w-[260px] h-60',
     minHeightClass: 'min-h-[220px]',
@@ -79,9 +79,9 @@ const brandingFieldConfig: Record<BrandingField, {
     cropAspectRatio: 4 / 3,
   },
   iconUrl: {
-    label: '블로그 아이콘',
-    description: '파비콘 및 목록 썸네일에 사용',
-    recommendedSize: '64x64px (정사각형)',
+    label: 'Blog icon',
+    description: 'Used for the favicon and list thumbnails.',
+    recommendedSize: '64x64px (square)',
     aspectRatio: 'aspect-square',
     previewClass: 'w-32 h-32',
     roundedClass: 'rounded-2xl',
@@ -93,8 +93,8 @@ const brandingFieldConfig: Record<BrandingField, {
     cropAspectRatio: 1,
   },
   coverImageUrl: {
-    label: '커버 이미지',
-    description: '블로그 홈페이지 헤더 배경',
+    label: 'Cover image',
+    description: 'Shown in the blog homepage header.',
     recommendedSize: '1200x400px',
     aspectRatio: 'aspect-[3/1]',
     previewClass: 'w-full h-44',
@@ -255,7 +255,7 @@ type BrandingUpdatePayload = {
 
     if (!response.ok) {
       const error = await response.json();
-      throw new Error(error.message || '브랜딩 업데이트에 실패했습니다.');
+      throw new Error(error.message || 'Failed to update branding.');
     }
 
     return response.json();
@@ -279,11 +279,11 @@ type BrandingUpdatePayload = {
 
     const payload = await response.json().catch(() => null);
     if (!response.ok) {
-      throw new Error(payload?.message || '브랜딩 이미지 업로드에 실패했습니다.');
+      throw new Error(payload?.message || 'Failed to upload the branding image.');
     }
 
     if (!payload?.url || typeof payload.url !== 'string') {
-      throw new Error('브랜딩 이미지 URL을 받지 못했습니다.');
+      throw new Error('The branding image URL was missing from the response.');
     }
 
     return payload.url as string;
@@ -298,13 +298,13 @@ type BrandingUpdatePayload = {
   ) => {
     // 이미지 파일 검증
     if (!file.type.startsWith('image/')) {
-      setFeedbackMessage(field, { type: 'error', text: '이미지 파일만 업로드 가능합니다.' });
+      setFeedbackMessage(field, { type: 'error', text: 'Only image files can be uploaded.' });
       return;
     }
 
     // 파일 크기 제한 (10MB)
     if (file.size > 10 * 1024 * 1024) {
-      setFeedbackMessage(field, { type: 'error', text: '파일 크기는 10MB 이하여야 합니다.' });
+      setFeedbackMessage(field, { type: 'error', text: 'Files must be 10MB or smaller.' });
       return;
     }
 
@@ -316,14 +316,14 @@ type BrandingUpdatePayload = {
       // 영구 컨텍스트 URL로 브랜딩 업데이트
       await updateBranding({ [field]: uploadedUrl });
 
-      setFeedbackMessage(field, { type: 'success', text: '이미지를 업로드했습니다.' });
+      setFeedbackMessage(field, { type: 'success', text: 'Image uploaded.' });
       await onRefresh();
     } catch (error) {
       setFeedbackMessage(
         field,
         {
           type: 'error',
-          text: error instanceof Error ? error.message : '업로드에 실패했습니다.',
+          text: error instanceof Error ? error.message : 'Upload failed.',
         }
       );
     } finally {
@@ -341,14 +341,14 @@ type BrandingUpdatePayload = {
         ...prev,
         [field]: brandingFieldConfig[field].defaultImageFit,
       }));
-      setFeedbackMessage(field, { type: 'success', text: '이미지를 삭제했습니다.' });
+      setFeedbackMessage(field, { type: 'success', text: 'Image removed.' });
       await onRefresh();
     } catch (error) {
       setFeedbackMessage(
         field,
         {
           type: 'error',
-          text: error instanceof Error ? error.message : '삭제에 실패했습니다.',
+          text: error instanceof Error ? error.message : 'Delete failed.',
         }
       );
     }
@@ -379,15 +379,15 @@ type BrandingUpdatePayload = {
       setFitSavingField(fitField);
       try {
         await updateBranding({ [fitField]: nextMode });
-        const modeLabel = nextMode === 'cover' ? '화면에 맞춤' : '원본 비율';
-        setFeedbackMessage(field, { type: 'success', text: `${modeLabel} 방식으로 업데이트했습니다.` });
+        const modeLabel = nextMode === 'cover' ? 'Fill frame' : 'Keep aspect ratio';
+        setFeedbackMessage(field, { type: 'success', text: `Updated to "${modeLabel}".` });
         await onRefresh();
       } catch (error) {
         setFeedbackMessage(
           field,
           {
             type: 'error',
-            text: error instanceof Error ? error.message : '표시 방식을 업데이트하지 못했습니다.',
+            text: error instanceof Error ? error.message : 'Could not update the display mode.',
           }
         );
         setPreviewModes((prev) => ({
@@ -406,20 +406,20 @@ type BrandingUpdatePayload = {
    */
   const handleColorSave = useCallback(async () => {
     setIsColorSaving(true);
-    setFeedbackMessage('color', { type: 'info', text: '저장 중...' });
+    setFeedbackMessage('color', { type: 'info', text: 'Saving...' });
 
     try {
       if (brandColor === null) {
         await updateBranding({ brandColor: null });
-        setFeedbackMessage('color', { type: 'success', text: '브랜드 색상을 제거했습니다.' });
+        setFeedbackMessage('color', { type: 'success', text: 'Brand color removed.' });
       } else {
         if (!/^#[0-9A-Fa-f]{6}$/.test(brandColor)) {
-          setFeedbackMessage('color', { type: 'error', text: '올바른 HEX 색상을 입력해주세요. (예: #FF5722)' });
+          setFeedbackMessage('color', { type: 'error', text: 'Enter a valid HEX color, for example `#FF5722`.' });
           setIsColorSaving(false);
           return;
         }
         await updateBranding({ brandColor });
-        setFeedbackMessage('color', { type: 'success', text: '브랜드 색상을 저장했습니다.' });
+        setFeedbackMessage('color', { type: 'success', text: 'Brand color saved.' });
       }
       setColorSuccess(true);
       await onRefresh();
@@ -429,7 +429,7 @@ type BrandingUpdatePayload = {
         'color',
         {
           type: 'error',
-          text: error instanceof Error ? error.message : '색상 저장에 실패했습니다.',
+          text: error instanceof Error ? error.message : 'Failed to save the color.',
         }
       );
     } finally {
@@ -439,7 +439,7 @@ type BrandingUpdatePayload = {
 
   const handleColorReset = useCallback(() => {
     setBrandColor(null);
-    setFeedbackMessage('color', { type: 'info', text: '브랜드 색상 없음 상태입니다. 저장을 눌러 확정하세요.' });
+    setFeedbackMessage('color', { type: 'info', text: 'No brand color selected. Click save to confirm.' });
   }, [setFeedbackMessage]);
 
   const handleIconPlacementChange = useCallback(
@@ -448,16 +448,16 @@ type BrandingUpdatePayload = {
       const previousPlacement = iconPlacement;
       setIconPlacement(nextPlacement);
       setIsIconPlacementSaving(true);
-      setFeedbackMessage('iconPlacement', { type: 'info', text: '배치 저장 중...' });
+      setFeedbackMessage('iconPlacement', { type: 'info', text: 'Saving placement...' });
 
       try {
         await updateBranding({ iconPlacement: nextPlacement });
-        setFeedbackMessage('iconPlacement', { type: 'success', text: '아이콘 배치를 저장했습니다.' });
+        setFeedbackMessage('iconPlacement', { type: 'success', text: 'Icon placement saved.' });
         await onRefresh();
       } catch (error) {
         setFeedbackMessage('iconPlacement', {
           type: 'error',
-          text: error instanceof Error ? error.message : '아이콘 배치를 저장하지 못했습니다.',
+          text: error instanceof Error ? error.message : 'Could not save icon placement.',
         });
         setIconPlacement(previousPlacement);
       } finally {
@@ -471,7 +471,7 @@ type BrandingUpdatePayload = {
     if (iconTextSaving) return;
     setIconTextSaving(true);
     setIconTextSuccess(false);
-    setFeedbackMessage('iconText', { type: 'info', text: '브랜드 텍스트를 저장하고 있습니다...' });
+    setFeedbackMessage('iconText', { type: 'info', text: 'Saving brand text...' });
 
     try {
       await updateBranding({
@@ -481,14 +481,14 @@ type BrandingUpdatePayload = {
         iconLabel: iconTextForm.label.trim() ? iconTextForm.label.trim() : null,
         iconSubtitle: iconTextForm.subtitle.trim() ? iconTextForm.subtitle.trim() : null,
       });
-      setFeedbackMessage('iconText', { type: 'success', text: '브랜드 텍스트를 저장했습니다.' });
+      setFeedbackMessage('iconText', { type: 'success', text: 'Brand text saved.' });
       setIconTextSuccess(true);
       setTimeout(() => setIconTextSuccess(false), 2000);
       await onRefresh();
     } catch (error) {
       setFeedbackMessage('iconText', {
         type: 'error',
-        text: error instanceof Error ? error.message : '브랜드 텍스트를 저장하지 못했습니다.',
+        text: error instanceof Error ? error.message : 'Could not save brand text.',
       });
     } finally {
       setIconTextSaving(false);
@@ -502,7 +502,7 @@ type BrandingUpdatePayload = {
     const file = e.target.files?.[0];
     if (file) {
       if (!file.type.startsWith('image/')) {
-        setFeedbackMessage(field, { type: 'error', text: '이미지 파일만 선택 가능합니다.' });
+        setFeedbackMessage(field, { type: 'error', text: 'Only image files can be selected.' });
         return;
       }
 
@@ -537,8 +537,8 @@ type BrandingUpdatePayload = {
     const inputRef = getInputRef(field);
     const displayHelper =
       previewModes[field] === 'cover'
-        ? '이미지를 잘라서라도 영역 전체를 빈틈없이 채웁니다.'
-        : '이미지 비율을 유지하고 여백은 배경색으로 자연스럽게 채웁니다.';
+        ? 'Fills the frame edge to edge, even if the image needs to be cropped.'
+        : 'Keeps the original aspect ratio and uses the background color for any empty space.';
 
     const isCoverField = field === 'coverImageUrl';
     const coverTintGradient =
@@ -607,20 +607,20 @@ type BrandingUpdatePayload = {
                 {isUploading ? (
                   <div className="flex items-center gap-2">
                     <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
-                    업로드 중...
+                    Uploading...
                   </div>
                 ) : (
                   <>
                     <FiUpload className="h-6 w-6 text-gray-400 dark:text-gray-500" />
                     <span className="text-center text-xs">
-                      클릭해서 이미지 선택 (JPG·PNG·GIF·WebP, 10MB 이하)
+                      Click to choose an image (JPG, PNG, GIF, WebP, up to 10MB)
                     </span>
                   </>
                 )}
               </button>
             )}
             <p className="mt-3 text-[11px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
-              권장 {config.recommendedSize}
+              Recommended: {config.recommendedSize}
             </p>
             <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
               <button
@@ -632,12 +632,12 @@ type BrandingUpdatePayload = {
                 {isUploading ? (
                   <>
                     <div className="h-4 w-4 animate-spin rounded-full border-2 border-gray-400 border-t-transparent" />
-                    업로드 중...
+                    Uploading...
                   </>
                 ) : (
                   <>
                     <FiUpload className="h-4 w-4" />
-                    {currentUrl ? '새 이미지 선택' : '이미지 업로드'}
+                    {currentUrl ? 'Choose new image' : 'Upload image'}
                   </>
                 )}
               </button>
@@ -653,12 +653,12 @@ type BrandingUpdatePayload = {
                   )}
                 >
                   <FiX className="h-4 w-4" />
-                  삭제
+                  Remove
                 </button>
               )}
             </div>
             <div className="mt-4 flex flex-col items-center justify-center gap-2">
-              <p className="text-xs text-gray-500 dark:text-gray-400">JPG·PNG·GIF·WebP / 최대 10MB</p>
+              <p className="text-xs text-gray-500 dark:text-gray-400">JPG, PNG, GIF, WebP / up to 10MB</p>
               {config.allowFitToggle && currentUrl && (
                 <>
                   <div className="inline-flex rounded-full border border-gray-200 bg-white p-1 dark:border-[#3A414F] dark:bg-[#1F2229]">
@@ -676,7 +676,7 @@ type BrandingUpdatePayload = {
                         )}
                         disabled={config.fitField === fitSavingField}
                       >
-                        {mode === 'cover' ? '화면에 맞춤' : '원본 비율'}
+                        {mode === 'cover' ? 'Fill frame' : 'Keep ratio'}
                       </button>
                     ))}
                   </div>
@@ -699,14 +699,14 @@ type BrandingUpdatePayload = {
               )}
               {field === 'iconUrl' && (
                 <div className="w-full rounded-2xl border border-gray-200/80 bg-gray-50/80 p-4 text-left dark:border-[#3A414F] dark:bg-[#1F2229]">
-                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">아이콘 배치</p>
+                  <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Icon placement</p>
                   <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                    브랜드 헤더에서 아이콘이 표시될 위치를 선택하세요.
+                    Choose where the icon appears in the brand header.
                   </p>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     {[
-                      { value: 'inline' as const, title: '텍스트 옆', description: '제목 영역과 나란히 노출' },
-                      { value: 'badge' as const, title: '커버 배지', description: '커버 하단에 배지로 겹쳐 표시' },
+                      { value: 'inline' as const, title: 'Inline', description: 'Displayed beside the title area' },
+                      { value: 'badge' as const, title: 'Cover badge', description: 'Overlays as a badge near the bottom of the cover' },
                     ].map(option => {
                       const isActive = iconPlacement === option.value;
                       return (
@@ -768,9 +768,9 @@ type BrandingUpdatePayload = {
             <FiDroplet className="h-4 w-4" />
           </span>
           <div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">브랜드 색상</p>
+            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">Brand color</p>
             <p className="text-xs text-gray-500 dark:text-gray-400">
-              블로그 테마에 사용되는 메인 컬러를 지정하세요.
+              Set the primary color used across your blog theme.
             </p>
           </div>
         </div>
@@ -793,7 +793,7 @@ type BrandingUpdatePayload = {
                 'h-12 w-12 cursor-pointer rounded-2xl border-2 border-gray-300 bg-transparent p-0 dark:border-gray-700',
                 brandColor === null && 'opacity-0'
               )}
-              title="색상 선택"
+              title="Choose color"
             />
             {brandColor === null && (
               <div className="pointer-events-none absolute inset-0 rounded-2xl border-2 border-gray-300 bg-white dark:border-gray-700 dark:bg-[#1F2229] flex items-center justify-center">
@@ -827,16 +827,16 @@ type BrandingUpdatePayload = {
           {isColorSaving ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
           ) : colorSuccess ? (
-            '완료'
+            'Done'
           ) : (
-            '저장'
+            'Save'
           )}
         </button>
       </div>
 
       <div>
         <p className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-gray-400">
-          추천 팔레트
+          Suggested palette
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {[
@@ -873,7 +873,7 @@ type BrandingUpdatePayload = {
               'relative h-9 w-9 rounded-full border-2 bg-white/80 dark:bg-[#1F2229] flex items-center justify-center transition hover:scale-105',
               brandColor === null ? 'border-red-400 scale-110' : 'border-red-300'
             )}
-            title="색상 제거"
+            title="Remove color"
           >
             <span className="absolute inset-px rounded-full bg-white dark:bg-[#1F2229]" />
             <span className="relative w-3/4 h-0.5 bg-red-500 -rotate-45" />
@@ -921,19 +921,19 @@ type BrandingUpdatePayload = {
           ? 'text-gray-600 dark:text-gray-300'
           : 'text-gray-400 dark:text-gray-500';
     const statusText = iconTextSuccess
-      ? '브랜드 텍스트가 저장되었습니다.'
+      ? 'Brand text saved.'
       : iconTextSaving
-        ? '저장 중...'
+        ? 'Saving...'
         : isIconTextDirty
-          ? '변경 사항이 있습니다.'
-          : '최신 상태입니다.';
+          ? 'You have unsaved changes.'
+          : 'Everything is up to date.';
 
     return (
       <section className={`${SETTINGS_CARD_CLASS} p-6 space-y-5`}>
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">브랜드 텍스트</h3>
+          <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-50">Brand text</h3>
           <p className="text-xs text-gray-500 dark:text-gray-400">
-            헤더에 표시되는 라벨과 보조 문구를 관리하세요.
+            Manage the label and supporting copy shown in your header.
           </p>
         </div>
 
@@ -941,9 +941,9 @@ type BrandingUpdatePayload = {
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">라벨</label>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Label</label>
                 <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span>표시</span>
+                  <span>Show</span>
                   <Switch
                     checked={iconTextForm.labelEnabled}
                     onCheckedChange={(val) => setIconTextForm((prev) => ({ ...prev, labelEnabled: val }))}
@@ -962,19 +962,19 @@ type BrandingUpdatePayload = {
                   ICON_TEXT_INPUT_CLASS,
                   (!iconTextForm.textEnabled || !iconTextForm.labelEnabled) && 'opacity-60 cursor-not-allowed'
                 )}
-                placeholder="예: CREATOR BLOG"
+                placeholder="Example: CREATOR BLOG"
               />
               <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                <span>최대 120자</span>
+                <span>Up to 120 characters</span>
                 <span>{iconTextForm.label.length}/120</span>
               </div>
             </div>
 
             <div className="space-y-3">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">보조 문구</label>
+                <label className="text-xs font-medium text-gray-600 dark:text-gray-300">Supporting line</label>
                 <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
-                  <span>표시</span>
+                  <span>Show</span>
                   <Switch
                     checked={iconTextForm.subtitleEnabled}
                     onCheckedChange={(val) =>
@@ -995,10 +995,10 @@ type BrandingUpdatePayload = {
                   ICON_TEXT_INPUT_CLASS,
                   (!iconTextForm.textEnabled || !iconTextForm.subtitleEnabled) && 'opacity-60 cursor-not-allowed'
                 )}
-                placeholder="예: @park1818"
+                placeholder="Example: @park1818"
               />
               <div className="flex justify-between text-[11px] text-gray-500 dark:text-gray-400">
-                <span>최대 160자</span>
+                <span>Up to 160 characters</span>
                 <span>{iconTextForm.subtitle.length}/160</span>
               </div>
             </div>
@@ -1018,7 +1018,7 @@ type BrandingUpdatePayload = {
             {iconTextSaving ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
             ) : (
-              '변경 사항 저장'
+              'Save changes'
             )}
           </button>
         </div>
@@ -1043,9 +1043,9 @@ type BrandingUpdatePayload = {
   return (
     <section className="space-y-6 pt-1">
       <div className="space-y-1">
-        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">블로그 브랜딩</h2>
+        <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-50">Blog branding</h2>
         <p className="text-sm text-gray-600 dark:text-gray-400">
-          커버·아이콘·로고 자산과 브랜드 색상을 한 번에 설정하세요.
+          Set your cover, icon, logo, and brand color in one place.
         </p>
       </div>
 

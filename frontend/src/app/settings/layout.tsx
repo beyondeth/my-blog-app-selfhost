@@ -26,37 +26,37 @@ import { Button } from '@/components/ui/button';
 const getSettingsNav = (canManageBilling: boolean) => {
   const baseNav = [
     {
-      title: '프로필',
+      title: 'Profile',
       href: '/settings',
       icon: FiUser,
     },
     {
-      title: '관계 설정',
+      title: 'Relationships',
       href: '/settings/relationships',
       icon: FiUsers,
     },
     {
-      title: '채팅 관리',
+      title: 'Chat',
       href: '/settings/dm',
       icon: FiMessageCircle,
     },
     {
-      title: '블로그 설정',
+      title: 'Blog',
       href: '/settings/blog',
       icon: FiSettings,
     },
     {
-      title: '블로그 분석',
+      title: 'Analytics',
       href: '/settings/analytics',
       icon: BarChart3,
     },
     {
-      title: '보안',
+      title: 'Security',
       href: '/settings/security',
       icon: FiShield,
     },
     {
-      title: '자동포스팅 연결',
+      title: 'API & integrations',
       href: '/settings/api-keys',
       icon: FiKey,
     },
@@ -64,7 +64,7 @@ const getSettingsNav = (canManageBilling: boolean) => {
 
   if (canManageBilling) {
     baseNav.splice(5, 0, {
-      title: '결제 관리',
+      title: 'Billing',
       href: '/settings/billing',
       icon: CreditCard,
     });
@@ -73,7 +73,7 @@ const getSettingsNav = (canManageBilling: boolean) => {
   // 알림 기능이 활성화된 경우에만 메뉴에 추가
   if (FEATURES.NOTIFICATIONS) {
     baseNav.push({
-      title: '알림',
+      title: 'Notifications',
       href: '/settings/notifications',
       icon: FiBell,
     });
@@ -120,16 +120,16 @@ function SettingsLayoutContent({
             className="h-10 w-10 rounded-full border border-gray-200 dark:border-white/10"
           >
             <ArrowLeft className="h-4 w-4" />
-            <span className="sr-only">홈으로 돌아가기</span>
+            <span className="sr-only">Back to home</span>
           </Button>
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-50">설정</h1>
-            <p className="text-sm text-gray-500 dark:text-gray-300">프로필, 블로그 등을 관리하세요</p>
+            <h1 className="text-3xl font-semibold text-gray-900 dark:text-gray-50">Settings</h1>
+            <p className="text-sm text-gray-500 dark:text-gray-300">Manage your profile, blog, and account.</p>
           </div>
         </div>
 
         <div className="w-full space-y-2">
-          <p className="px-1 text-xs font-medium text-gray-500 dark:text-gray-400">설정 메뉴</p>
+          <p className="px-1 text-xs font-medium text-gray-500 dark:text-gray-400">Menu</p>
           <div className="rounded-2xl border border-gray-200 bg-[#FAFAFA] p-2 dark:border-[#2F3440] dark:bg-[#161B24]">
             <div className="grid gap-2 [grid-template-columns:repeat(auto-fit,minmax(132px,1fr))]">
               {settingsNav.map((item) => {
@@ -154,7 +154,7 @@ function SettingsLayoutContent({
           </div>
         </div>
 
-        <Suspense fallback={<div className="text-sm text-gray-500">로딩 중...</div>}>
+        <Suspense fallback={<div className="text-sm text-gray-500">Loading...</div>}>
           {children}
         </Suspense>
       </div>

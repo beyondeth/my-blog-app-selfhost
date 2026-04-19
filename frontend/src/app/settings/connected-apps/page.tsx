@@ -56,7 +56,7 @@ export default function ConnectedAppsPage() {
         router.push('/login');
       }
     } catch (error) {
-      console.error('연결된 앱 목록 조회 실패:', error);
+      console.error('Failed to fetch connected apps:', error);
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ export default function ConnectedAppsPage() {
    * 앱 연결 해제 (토큰 취소)
    */
   const revokeAccess = async (tokenId: string, appName: string) => {
-    if (!confirm(`"${appName}" 앱의 접근 권한을 취소하시겠습니까? 이 앱은 더 이상 블로그에 접근할 수 없게 됩니다.`)) {
+    if (!confirm(`Revoke access for "${appName}"? This app will no longer be able to access your blog.`)) {
       return;
     }
 
@@ -85,11 +85,11 @@ export default function ConnectedAppsPage() {
 
       if (response.ok) {
         setConnectedApps(connectedApps.filter(app => app.id !== tokenId));
-        alert(`"${appName}" 앱의 접근 권한이 취소되었습니다.`);
+        alert(`Access revoked for "${appName}".`);
       }
     } catch (error) {
-      console.error('앱 연결 해제 실패:', error);
-      alert('권한 취소 중 오류가 발생했습니다.');
+      console.error('Failed to revoke app access:', error);
+      alert('Something went wrong while revoking access.');
     }
   };
 
@@ -111,10 +111,10 @@ export default function ConnectedAppsPage() {
     const hours = Math.floor(diff / (1000 * 60 * 60));
     const minutes = Math.floor(diff / (1000 * 60));
 
-    if (days > 0) return `${days}일 전`;
-    if (hours > 0) return `${hours}시간 전`;
-    if (minutes > 0) return `${minutes}분 전`;
-    return '방금 전';
+    if (days > 0) return `${days}d ago`;
+    if (hours > 0) return `${hours}h ago`;
+    if (minutes > 0) return `${minutes}m ago`;
+    return 'Just now';
   };
 
   if (loading) {
@@ -134,18 +134,18 @@ export default function ConnectedAppsPage() {
   return (
     <div className="p-6">
       <div className="mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">연결된 앱</h2>
+        <h2 className="text-xl font-semibold text-gray-900">Connected apps</h2>
         <p className="text-sm text-gray-600 mt-1">
-          블로그에 접근 권한을 부여한 앱들을 관리합니다
+          Manage apps that have been granted access to your blog.
         </p>
       </div>
 
       {connectedApps.length === 0 ? (
         <div className="text-center py-12 bg-gray-50 rounded-lg">
           <FiShield className="mx-auto h-12 w-12 text-gray-400 mb-3" />
-          <p className="text-gray-500 mb-2">연결된 앱이 없습니다</p>
+          <p className="text-gray-500 mb-2">No connected apps</p>
           <p className="text-sm text-gray-400">
-            OAuth를 통해 블로그에 접근하는 앱이 여기에 표시됩니다
+            Apps that access your blog through OAuth will appear here.
           </p>
         </div>
       ) : (
@@ -163,7 +163,7 @@ export default function ConnectedAppsPage() {
                     {/* 권한 스코프 */}
                     <div className="flex items-center gap-2">
                       <FiShield className="h-4 w-4 text-gray-400" />
-                      <span className="text-sm text-gray-500">권한:</span>
+                      <span className="text-sm text-gray-500">Permissions:</span>
                       <div className="flex gap-2">
                         {app.scopes.map((scope, idx) => (
                           <span
@@ -179,7 +179,7 @@ export default function ConnectedAppsPage() {
 
                     {/* 연결된 블로그 */}
                     <div className="flex items-center gap-2">
-                      <span className="text-sm text-gray-500">블로그:</span>
+                      <span className="text-sm text-gray-500">Blog:</span>
                       <span className="text-sm font-medium">{app.blogName}</span>
                     </div>
 
@@ -187,7 +187,7 @@ export default function ConnectedAppsPage() {
                     <div className="flex items-center gap-2">
                       <FiCalendar className="h-4 w-4 text-gray-400" />
                       <span className="text-sm text-gray-500">
-                        연결됨: {new Date(app.createdAt).toLocaleDateString('ko-KR')}
+                        Connected: {new Date(app.createdAt).toLocaleDateString('en-US')}
                       </span>
                     </div>
 
@@ -196,7 +196,7 @@ export default function ConnectedAppsPage() {
                       <div className="flex items-center gap-2">
                         <FiActivity className="h-4 w-4 text-gray-400" />
                         <span className="text-sm text-gray-500">
-                          마지막 활동: {getRelativeTime(app.lastUsedAt)}
+                          Last active: {getRelativeTime(app.lastUsedAt)}
                         </span>
                       </div>
                     )}
@@ -205,7 +205,7 @@ export default function ConnectedAppsPage() {
                     {app.expiresAt && (
                       <div className="flex items-center gap-2">
                         <span className="text-sm text-gray-500">
-                          만료: {new Date(app.expiresAt).toLocaleDateString('ko-KR')}
+                          Expires: {new Date(app.expiresAt).toLocaleDateString('en-US')}
                         </span>
                       </div>
                     )}
@@ -217,7 +217,7 @@ export default function ConnectedAppsPage() {
                   className={`flex items-center gap-2 px-3 py-2 text-sm rounded-md ${DESTRUCTIVE_ACTION_CLASS}`}
                 >
                   <FiTrash2 className="h-4 w-4" />
-                  권한 취소
+                  Revoke access
                 </button>
               </div>
             </div>
@@ -227,12 +227,12 @@ export default function ConnectedAppsPage() {
 
       {/* 보안 안내 */}
       <div className="mt-8 p-4 bg-blue-50 rounded-lg">
-        <h3 className="font-semibold text-blue-900 mb-2">보안 안내</h3>
+        <h3 className="font-semibold text-blue-900 mb-2">Security tips</h3>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• 신뢰할 수 없는 앱의 권한은 즉시 취소하세요.</li>
-          <li>• 각 앱은 표시된 권한만 사용할 수 있습니다.</li>
-          <li>• 오래 사용하지 않은 앱은 정기적으로 정리하는 것이 좋습니다.</li>
-          <li>• 의심스러운 활동을 발견하면 즉시 권한을 취소하고 비밀번호를 변경하세요.</li>
+          <li>• Revoke access immediately for apps you do not trust.</li>
+          <li>• Each app can only use the permissions shown above.</li>
+          <li>• Review and remove apps you no longer use.</li>
+          <li>• If you notice suspicious activity, revoke access and change your password.</li>
         </ul>
       </div>
     </div>

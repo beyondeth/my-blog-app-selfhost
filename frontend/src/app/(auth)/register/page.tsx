@@ -8,17 +8,25 @@ import { EmailVerification } from '@/components/auth/EmailVerification';
 import { Eye, EyeOff, Lock, User, Check, X, ArrowLeft } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { SocialLoginGroup } from '@/components/auth/SocialLoginGroup';
-import { validatePasswordStrength, getPasswordStrengthColor, getPasswordStrengthWidth } from '@/lib/password-utils';
+import {
+  validatePasswordStrength,
+  getPasswordStrengthColor,
+  getPasswordStrengthWidth,
+  getPasswordRequirementLabels,
+} from '@/lib/password-utils';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { parseMcpScopes } from '@/lib/mcpScopes';
 import { isSafeRedirectUrl } from '@/lib/utils/sanitize';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 const AUTH_REDIRECT_BLOCKLIST = ['/login', '/register', '/forgot-password', '/reset-password'];
+const HANGUL_PATTERN = /[가-힣]/;
 
 export default function RegisterPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { href, locale } = useLocaleContext();
   const queryClient = useQueryClient();
   const { register, isLoading, clearError, refreshUser } = useAuth();
   const { resolvedTheme } = useTheme();
@@ -65,6 +73,43 @@ export default function RegisterPage() {
   const mcpClientName = searchParams.get('client_name') || 'Claude';
   const mcpScope = searchParams.get('scope') || 'mcp:tools';
   const requestedMcpScopes = parseMcpScopes(mcpScope);
+  const passwordLabels = getPasswordRequirementLabels(locale);
+  const signUpFailedFallback = locale === 'ko' ? '회원가입에 실패했습니다.' : 'Sign up failed.';
+  const usernameTakenFallback =
+    locale === 'ko'
+      ? '이미 사용 중인 사용자명입니다.'
+      : 'This display name is already taken. Choose a different one.';
+  const emailTakenFallback =
+    locale === 'ko'
+      ? '이미 등록된 이메일입니다. 로그인 페이지에서 로그인해주세요.'
+      : 'An account already exists for this email. Please sign in instead.';
+  const passwordReviewFallback =
+    locale === 'ko'
+      ? '비밀번호 요구사항을 확인해주세요.'
+      : 'Review the password requirements and try again.';
+
+  const localizeServerMessage = (message: string | null | undefined, fallback: string) => {
+    if (!message) {
+      return fallback;
+    }
+
+    if (locale === 'en' && HANGUL_PATTERN.test(message)) {
+      if (message.includes('이미 사용 중인')) {
+        return usernameTakenFallback;
+      }
+      if (message.includes('이미 존재하는 회원') || message.includes('이미 등록된 이메일')) {
+        return emailTakenFallback;
+      }
+      if (message.includes('비밀번호')) {
+        return passwordReviewFallback;
+      }
+
+      return fallback;
+    }
+
+    return message;
+  };
+
   const normalizeRedirectTarget = (target?: string | null) => {
     if (typeof window === 'undefined' || !target) {
       return '/';
@@ -133,8 +178,8 @@ export default function RegisterPage() {
 
   const returnUrlParam = getRedirectTargetFromParams();
   const loginHref = isMcpOAuth && mcpState && mcpCallbackUrl
-    ? `/login?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}${returnUrlParam ? `&returnUrl=${encodeURIComponent(returnUrlParam)}` : ''}`
-    : `/login${returnUrlParam ? `?returnUrl=${encodeURIComponent(returnUrlParam)}` : ''}`;
+    ? `${href('/login')}?mcp_oauth=true&state=${encodeURIComponent(mcpState)}&callback_url=${encodeURIComponent(mcpCallbackUrl)}&client_name=${encodeURIComponent(mcpClientName)}&scope=${encodeURIComponent(mcpScope)}${returnUrlParam ? `&returnUrl=${encodeURIComponent(returnUrlParam)}` : ''}`
+    : `${href('/login')}${returnUrlParam ? `?returnUrl=${encodeURIComponent(returnUrlParam)}` : ''}`;
 
   // 컴포넌트 마운트 시 전역 에러 초기화
   useEffect(() => {
@@ -163,12 +208,12 @@ export default function RegisterPage() {
   // 비밀번호 강도 체크
   useEffect(() => {
     if (formData.password) {
-      const strength = validatePasswordStrength(formData.password);
+      const strength = validatePasswordStrength(formData.password, locale);
       setPasswordStrength(strength);
     } else {
       setPasswordStrength(null);
     }
-  }, [formData.password]);
+  }, [formData.password, locale]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -262,34 +307,34 @@ export default function RegisterPage() {
     e.preventDefault();
 
     if (!formData.username || !formData.email || !formData.password) {
-      setError('모든 필드를 입력해주세요.');
+      setError(locale === 'ko' ? '모든 필드를 입력해주세요.' : 'Complete all required fields.');
       return;
     }
 
     if (!isEmailVerified) {
-      setError('이메일 인증을 완료해주세요.');
+      setError(locale === 'ko' ? '이메일 인증을 완료해주세요.' : 'Complete email verification first.');
       return;
     }
 
     // 약관 동의 체크
     if (!consents.isOver14) {
-      setError('만 14세 이상만 가입할 수 있습니다.');
+      setError(locale === 'ko' ? '만 14세 이상만 가입할 수 있습니다.' : 'This service is available only to eligible users.');
       return;
     }
 
     if (!consents.termsAccepted || !consents.privacyAccepted) {
-      setError('필수 약관에 모두 동의해주세요.');
+      setError(locale === 'ko' ? '필수 약관에 모두 동의해주세요.' : 'Please agree to the required terms.');
       return;
     }
 
     // 비밀번호 강도 체크
     if (!passwordStrength || !passwordStrength.isValid) {
-      setError(passwordStrength?.message || '비밀번호 요구사항을 확인해주세요.');
+      setError(passwordStrength?.message || (locale === 'ko' ? '비밀번호 요구사항을 확인해주세요.' : 'Check the password requirements.'));
       return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      setError('비밀번호가 일치하지 않습니다.');
+      setError(locale === 'ko' ? '비밀번호가 일치하지 않습니다.' : 'Passwords do not match.');
       return;
     }
 
@@ -328,13 +373,19 @@ export default function RegisterPage() {
       router.push(redirectTarget);
     } catch (error: any) {
       // 에러 메시지에 따라 적절한 필드에 에러 표시
-      const message = error.message || '회원가입에 실패했습니다.';
+      const message = localizeServerMessage(error.message, signUpFailedFallback);
 
       // "이미 사용 중인 'Park'입니다" 형태의 메시지 체크
       if (message.includes("이미 사용 중인") && message.includes("입니다")) {
         setFieldErrors(prev => ({ ...prev, username: message }));
         focusErrorField('username');
+      } else if (message === usernameTakenFallback) {
+        setFieldErrors(prev => ({ ...prev, username: message }));
+        focusErrorField('username');
       } else if (message.includes('이미 존재하는 회원') || message.includes('이미 등록된 이메일')) {
+        setFieldErrors(prev => ({ ...prev, email: message }));
+        focusErrorField('email');
+      } else if (message === emailTakenFallback) {
         setFieldErrors(prev => ({ ...prev, email: message }));
         focusErrorField('email');
       } else if (message.includes('비밀번호') || message.includes('password')) {
@@ -375,7 +426,7 @@ export default function RegisterPage() {
             className="mb-4 inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back
+            {locale === 'ko' ? '뒤로가기' : 'Back'}
           </button>
 
           {/* 통합된 회원가입 카드 - Resend 스타일 */}
@@ -393,15 +444,15 @@ export default function RegisterPage() {
                 />
               </div>
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
-                계정 만들기
+                {locale === 'ko' ? '계정 만들기' : 'Create your account'}
               </h1>
               <p className="mt-1 sm:mt-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                이미 계정이 있으신가요?{' '}
+                {locale === 'ko' ? '이미 계정이 있으신가요?' : 'Already have an account?'}{' '}
                 <Link
                   href={loginHref}
                   className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
                 >
-                  로그인
+                  {locale === 'ko' ? '로그인' : 'Sign in'}
                 </Link>
               </p>
             </div>
@@ -414,10 +465,14 @@ export default function RegisterPage() {
                   </div>
                   <div className="flex-1">
                     <h3 className="text-sm sm:text-base font-semibold text-indigo-900 dark:text-indigo-100">
-                      {mcpClientName} 연결을 위한 계정 준비
+                      {locale === 'ko'
+                        ? `${mcpClientName} 연결을 위한 계정 준비`
+                        : `Prepare your account for ${mcpClientName}`}
                     </h3>
                     <p className="mt-1 text-xs sm:text-sm text-indigo-700 dark:text-indigo-300">
-                      회원가입 후 {mcpClientName}가 사용할 권한은 아래와 같습니다.
+                      {locale === 'ko'
+                        ? `회원가입 후 ${mcpClientName}가 사용할 권한은 아래와 같습니다.`
+                        : `After sign up, ${mcpClientName} will request the following permissions.`}
                     </p>
                     <div className="mt-3 space-y-2">
                       {requestedMcpScopes.map((scope) => (
@@ -444,7 +499,7 @@ export default function RegisterPage() {
             </div>
 
             {/* 섹션 구분선 */}
-            <div className="auth-divider my-3 sm:my-6 w-full text-xs sm:text-sm">or</div>
+            <div className="auth-divider my-3 sm:my-6 w-full text-xs sm:text-sm">{locale === 'ko' ? '또는' : 'or'}</div>
 
             {/* 섹션 2: 이메일 회원가입 폼 */}
             <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-5 w-full">
@@ -457,7 +512,7 @@ export default function RegisterPage() {
               {/* 닉네임 필드 */}
               <div className="space-y-1 sm:space-y-2">
                 <label htmlFor="username" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  닉네임
+                  {locale === 'ko' ? '닉네임' : 'Display name'}
                 </label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 sm:w-5 sm:h-5" />
@@ -471,12 +526,12 @@ export default function RegisterPage() {
                     className={`w-full pl-9 sm:pl-10 pr-4 sm:pr-4 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                       fieldErrors.username ? 'border-red-500 dark:border-red-400' : ''
                     } ${shakeField === 'username' ? 'shake' : ''}`}
-                    placeholder="실명이 아닌 별명을 사용하세요"
+                    placeholder={locale === 'ko' ? '실명이 아닌 별명을 사용하세요' : 'Choose a public display name'}
                     required
                   />
                 </div>
                 <p className="text-[10px] sm:text-xs text-gray-500 dark:text-gray-400">
-                  프로필에서 변경 가능합니다
+                  {locale === 'ko' ? '프로필에서 변경 가능합니다' : 'You can change this later in your profile.'}
                 </p>
                 {fieldErrors.username && (
                   <p className="text-xs sm:text-sm text-red-600 dark:text-red-400">{fieldErrors.username}</p>
@@ -501,7 +556,7 @@ export default function RegisterPage() {
               {/* 비밀번호 필드 */}
               <div className="space-y-1 sm:space-y-2">
                 <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  비밀번호
+                  {locale === 'ko' ? '비밀번호' : 'Password'}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 sm:w-5 sm:h-5" />
@@ -515,7 +570,7 @@ export default function RegisterPage() {
                     className={`w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                       fieldErrors.password ? 'border-red-500 dark:border-red-400' : ''
                     } ${shakeField === 'password' ? 'shake' : ''}`}
-                    placeholder="최소 8자 이상"
+                    placeholder={locale === 'ko' ? '최소 8자 이상' : 'At least 8 characters'}
                     required
                   />
                   <button
@@ -555,27 +610,27 @@ export default function RegisterPage() {
                     <div className="grid grid-cols-2 gap-1 text-xs">
                       <div className={`flex items-center gap-1 ${passwordStrength.hasMinLength ? 'text-green-600' : 'text-gray-400'}`}>
                         {passwordStrength.hasMinLength ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>최소 8자 이상</span>
+                        <span>{passwordLabels.minLength}</span>
                       </div>
                       <div className={`flex items-center gap-1 ${passwordStrength.hasUpperCase ? 'text-green-600' : 'text-gray-400'}`}>
                         {passwordStrength.hasUpperCase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>대문자 포함</span>
+                        <span>{passwordLabels.upperCase}</span>
                       </div>
                       <div className={`flex items-center gap-1 ${passwordStrength.hasLowerCase ? 'text-green-600' : 'text-gray-400'}`}>
                         {passwordStrength.hasLowerCase ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>소문자 포함</span>
+                        <span>{passwordLabels.lowerCase}</span>
                       </div>
                       <div className={`flex items-center gap-1 ${passwordStrength.hasNumber ? 'text-green-600' : 'text-gray-400'}`}>
                         {passwordStrength.hasNumber ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>숫자 포함</span>
+                        <span>{passwordLabels.number}</span>
                       </div>
                       <div className={`flex items-center gap-1 ${passwordStrength.hasSpecialChar ? 'text-green-600' : 'text-gray-400'}`}>
                         {passwordStrength.hasSpecialChar ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>특수문자 포함</span>
+                        <span>{passwordLabels.specialChar}</span>
                       </div>
                       <div className={`flex items-center gap-1 ${!passwordStrength.hasForbiddenChars ? 'text-green-600' : 'text-red-500'}`}>
                         {!passwordStrength.hasForbiddenChars ? <Check className="w-3 h-3" /> : <X className="w-3 h-3" />}
-                        <span>금지 문자 없음</span>
+                        <span>{passwordLabels.noForbiddenChars}</span>
                       </div>
                     </div>
                   </div>
@@ -585,7 +640,7 @@ export default function RegisterPage() {
               {/* 비밀번호 확인 필드 */}
               <div className="space-y-1 sm:space-y-2">
                 <label htmlFor="confirmPassword" className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
-                  비밀번호 확인
+                  {locale === 'ko' ? '비밀번호 확인' : 'Confirm password'}
                 </label>
                 <div className="relative">
                   <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-4 h-4 sm:w-5 sm:h-5" />
@@ -599,7 +654,7 @@ export default function RegisterPage() {
                     className={`w-full pl-9 sm:pl-10 pr-10 sm:pr-12 py-2.5 sm:py-3 rounded-lg auth-input text-sm sm:text-base text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 outline-none ${
                       fieldErrors.confirmPassword ? 'border-red-500 dark:border-red-400' : ''
                     } ${shakeField === 'confirmPassword' ? 'shake' : ''}`}
-                    placeholder="비밀번호 재입력"
+                    placeholder={locale === 'ko' ? '비밀번호 재입력' : 'Re-enter your password'}
                     required
                   />
                   <button
@@ -626,7 +681,7 @@ export default function RegisterPage() {
                     className="mt-1 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                   />
                   <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-                    전체 동의
+                    {locale === 'ko' ? '전체 동의' : 'Accept all'}
                   </span>
                 </label>
 
@@ -640,7 +695,10 @@ export default function RegisterPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="text-red-500">*</span> (필수) 본인은 만 14세 이상입니다
+                      <span className="text-red-500">*</span>{' '}
+                      {locale === 'ko'
+                        ? '(필수) 본인은 만 14세 이상입니다'
+                        : 'I confirm that I meet the minimum age requirement. (required)'}
                     </span>
                   </label>
 
@@ -653,16 +711,33 @@ export default function RegisterPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="text-red-500">*</span> (필수){' '}
-                      <Link
-                        href="/legal/terms"
-                        target="_blank"
-                        className="text-indigo-600 dark:text-indigo-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        이용약관
-                      </Link>
-                      에 동의합니다
+                      {locale === 'ko' ? (
+                        <>
+                          <span className="text-red-500">*</span> (필수){' '}
+                          <Link
+                            href={href('/legal/terms')}
+                            target="_blank"
+                            className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            이용약관
+                          </Link>
+                          에 동의합니다
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-red-500">*</span> I agree to the{' '}
+                          <Link
+                            href={href('/legal/terms')}
+                            target="_blank"
+                            className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Terms of Service
+                          </Link>{' '}
+                          (required)
+                        </>
+                      )}
                     </span>
                   </label>
 
@@ -675,16 +750,33 @@ export default function RegisterPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      <span className="text-red-500">*</span> (필수){' '}
-                      <Link
-                        href="/legal/privacy"
-                        target="_blank"
-                        className="text-indigo-600 dark:text-indigo-400 hover:underline"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        개인정보 처리방침
-                      </Link>
-                      에 동의합니다
+                      {locale === 'ko' ? (
+                        <>
+                          <span className="text-red-500">*</span> (필수){' '}
+                          <Link
+                            href={href('/legal/privacy')}
+                            target="_blank"
+                            className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            개인정보 처리방침
+                          </Link>
+                          에 동의합니다
+                        </>
+                      ) : (
+                        <>
+                          <span className="text-red-500">*</span> I agree to the{' '}
+                          <Link
+                            href={href('/legal/privacy')}
+                            target="_blank"
+                            className="text-indigo-600 dark:text-indigo-400 hover:underline"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Privacy Policy
+                          </Link>{' '}
+                          (required)
+                        </>
+                      )}
                     </span>
                   </label>
 
@@ -697,14 +789,14 @@ export default function RegisterPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      (선택) 마케팅 정보 수신에 동의합니다{' '}
+                      {locale === 'ko' ? '(선택) 마케팅 정보 수신에 동의합니다' : 'Receive marketing updates (optional)'}{' '}
                       <Link
-                        href="/legal/marketing-consent"
+                        href={href('/legal/marketing-consent')}
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        (자세히 보기)
+                        {locale === 'ko' ? '(자세히 보기)' : '(details)'}
                       </Link>
                     </span>
                   </label>
@@ -718,14 +810,14 @@ export default function RegisterPage() {
                       className="mt-0.5 rounded border-gray-300 dark:border-gray-600 text-indigo-600 focus:ring-indigo-500"
                     />
                     <span className="text-sm text-gray-700 dark:text-gray-300">
-                      (선택) 뉴스레터 수신에 동의합니다{' '}
+                      {locale === 'ko' ? '(선택) 뉴스레터 수신에 동의합니다' : 'Receive the newsletter (optional)'}{' '}
                       <Link
-                        href="/legal/newsletter-consent"
+                        href={href('/legal/newsletter-consent')}
                         target="_blank"
                         className="text-indigo-600 dark:text-indigo-400 hover:underline"
                         onClick={(e) => e.stopPropagation()}
                       >
-                        (자세히 보기)
+                        {locale === 'ko' ? '(자세히 보기)' : '(details)'}
                       </Link>
                     </span>
                   </label>
@@ -742,15 +834,15 @@ export default function RegisterPage() {
                     : 'bg-gray-200 dark:bg-gray-700 text-gray-500 dark:text-gray-400 cursor-not-allowed'
                 }`}
               >
-                {!isEmailVerified ? '먼저 이메일을 인증해주세요' :
-                 (!consents.isOver14 || !consents.termsAccepted || !consents.privacyAccepted) ? '필수 약관에 동의해주세요' :
+                {!isEmailVerified ? (locale === 'ko' ? '먼저 이메일을 인증해주세요' : 'Verify your email first') :
+                 (!consents.isOver14 || !consents.termsAccepted || !consents.privacyAccepted) ? (locale === 'ko' ? '필수 약관에 동의해주세요' : 'Agree to the required terms') :
                   isSubmitting ? (
                     <span className="flex items-center justify-center gap-2">
                       <span className="animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full" />
-                      계정 생성 중...
+                      {locale === 'ko' ? '계정 생성 중...' : 'Creating account...'}
                     </span>
                   ) : (
-                    '계정 만들기'
+                    locale === 'ko' ? '계정 만들기' : 'Create account'
                   )
                 }
               </button>
@@ -759,23 +851,23 @@ export default function RegisterPage() {
             {/* Footer - Terms와 Login 링크 */}
             <div className="mt-8 pt-6 border-t border-gray-200 dark:border-gray-700">
               <p className="text-center text-xs text-gray-500 dark:text-gray-400 mb-3">
-                회원가입함으로써{' '}
-                <Link href="/legal/terms" className="text-gray-700 dark:text-gray-300 underline">
-                  이용약관
+                {locale === 'ko' ? '회원가입함으로써 ' : 'By signing up you agree to the '}
+                <Link href={href('/legal/terms')} className="text-gray-700 dark:text-gray-300 underline">
+                  {locale === 'ko' ? '이용약관' : 'Terms of Service'}
                 </Link>
-                {' '}및{' '}
-                <Link href="/legal/privacy" className="text-gray-700 dark:text-gray-300 underline">
-                  개인정보 처리방침
+                {locale === 'ko' ? ' 및 ' : ' and '}
+                <Link href={href('/legal/privacy')} className="text-gray-700 dark:text-gray-300 underline">
+                  {locale === 'ko' ? '개인정보 처리방침' : 'Privacy Policy'}
                 </Link>
-                에 동의하게 됩니다.
+                {locale === 'ko' ? '에 동의하게 됩니다.' : '.'}
               </p>
               <p className="text-center text-sm text-gray-600 dark:text-gray-400">
-                이미 계정이 있으신가요?{' '}
+                {locale === 'ko' ? '이미 계정이 있으신가요?' : 'Already have an account?'}{' '}
                 <Link
-                  href="/login"
+                  href={href('/login')}
                   className="font-medium text-indigo-600 dark:text-indigo-400 hover:text-indigo-500 dark:hover:text-indigo-300 transition-colors"
                 >
-                  로그인
+                  {locale === 'ko' ? '로그인' : 'Sign in'}
                 </Link>
               </p>
             </div>

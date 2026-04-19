@@ -5,7 +5,6 @@ import { useAuth } from '@/providers/AuthProviderV2';
 import { useQueryClient } from '@tanstack/react-query';
 import { FiCheck, FiMail, FiCalendar, FiShield, FiUser, FiAlertTriangle, FiLoader, FiBell } from 'react-icons/fi';
 import { format } from 'date-fns';
-import { ko } from 'date-fns/locale/ko';
 import Image from 'next/image';
 import { normalizeImageUrl } from '@/utils/imageUtils';
 import CharacterSelector from '@/components/settings/CharacterSelector';
@@ -124,13 +123,13 @@ export default function ProfileSettingsPage() {
 
     // 파일 크기 체크 (5MB)
     if (file.size > 5 * 1024 * 1024) {
-      setError('허용 크기를 초과했습니다 (최대 5MB)');
+      setError('File size exceeds the 5MB limit.');
       return;
     }
 
     // 파일 타입 체크
     if (!file.type.startsWith('image/')) {
-      setError('이미지 파일만 업로드 가능합니다');
+      setError('Only image files can be uploaded.');
       return;
     }
 
@@ -153,7 +152,7 @@ export default function ProfileSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '이미지 업로드에 실패했습니다');
+        throw new Error(error.message || 'Failed to upload the image.');
       }
 
       const result = await response.json();
@@ -170,7 +169,7 @@ export default function ProfileSettingsPage() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || '이미지 업로드 중 오류가 발생했습니다');
+      setError(err.message || 'Something went wrong while uploading the image.');
     } finally {
       setUploadingImage(false);
     }
@@ -201,7 +200,7 @@ export default function ProfileSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '프로필 이미지 변경에 실패했습니다');
+        throw new Error(error.message || 'Failed to update the profile image.');
       }
 
       // 로컬 상태 업데이트 (즉시 반영)
@@ -213,7 +212,7 @@ export default function ProfileSettingsPage() {
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err: any) {
-      setError(err.message || '캐릭터 선택 중 오류가 발생했습니다');
+      setError(err.message || 'Something went wrong while selecting an avatar.');
       throw err; // CharacterSelector에서 에러 처리
     }
   };
@@ -243,7 +242,7 @@ export default function ProfileSettingsPage() {
       if (!response.ok) {
         const error = await response.json();
         console.error('Marketing preference update failed:', error.message);
-        throw new Error(error.message || '마케팅 정보 수신 설정 업데이트에 실패했습니다');
+        throw new Error(error.message || 'Failed to update your email preference.');
       }
 
       await refreshUser();
@@ -251,7 +250,7 @@ export default function ProfileSettingsPage() {
       pushMarketingFeedback(
         key,
         'success',
-        `${label}이(가) ${nextValue ? '활성화되었습니다.' : '비활성화되었습니다.'}`
+        `${label} ${nextValue ? 'enabled' : 'disabled'}.`
       );
     } catch (err: any) {
       if (user) {
@@ -260,7 +259,7 @@ export default function ProfileSettingsPage() {
           newsletterOptIn: user.newsletterOptIn || false,
         });
       }
-      pushMarketingFeedback(key, 'error', `${label} 변경에 실패했습니다. 잠시 후 다시 시도하세요.`);
+      pushMarketingFeedback(key, 'error', `Could not update ${label}. Please try again.`);
     }
   };
 
@@ -273,7 +272,7 @@ export default function ProfileSettingsPage() {
     setProfileSaveSuccess(false);
 
     if (formData.username && formData.username.length < 2) {
-      setUsernameError('닉네임은 최소 2자 이상 입력하세요');
+      setUsernameError('Username must be at least 2 characters.');
       return;
     }
 
@@ -312,12 +311,12 @@ export default function ProfileSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        if (error.message && error.message.includes('닉네임')) {
+        if (error.message && error.message.toLowerCase().includes('username')) {
           setUsernameError(error.message);
         } else {
-          setError(error.message || '프로필 업데이트에 실패했습니다');
+          setError(error.message || 'Failed to update your profile.');
         }
-        throw new Error(error.message || '프로필 업데이트에 실패했습니다');
+        throw new Error(error.message || 'Failed to update your profile.');
       }
 
       await refreshUser();
@@ -337,7 +336,7 @@ export default function ProfileSettingsPage() {
       }, 2000);
     } catch (err: any) {
       if (!usernameError) {
-        setError(err.message || '오류가 발생했습니다');
+        setError(err.message || 'Something went wrong.');
       }
     } finally {
       setProfileSaveLoading(false);
@@ -363,31 +362,30 @@ export default function ProfileSettingsPage() {
 
       if (!response.ok) {
         const error = await response.json();
-        throw new Error(error.message || '계정 삭제에 실패했습니다');
+        throw new Error(error.message || 'Failed to delete the account.');
       }
 
       // 로그아웃 처리 및 홈으로 이동
       await logout('/');
     } catch (err: any) {
-      setError(err.message || '오류가 발생했습니다');
+      setError(err.message || 'Something went wrong.');
       setDeleteLoading(false);
     }
   };
 
-  const joinedAt =
-    user?.createdAt ? format(new Date(user.createdAt), 'yyyy년 M월 d일', { locale: ko }) : null;
+  const joinedAt = user?.createdAt ? format(new Date(user.createdAt), 'MMM d, yyyy') : null;
 
   const marketingOptions = [
     {
       key: 'marketingOptIn' as const,
-      title: '마케팅 정보 수신',
-      description: '새로운 기능과 이벤트 소식을 이메일로 받아보세요.',
+      title: 'Product updates',
+      description: 'Receive feature launches and event announcements by email.',
       icon: <FiBell className="h-4 w-4 text-gray-400" />,
     },
     {
       key: 'newsletterOptIn' as const,
-      title: '뉴스레터 수신',
-      description: '주간 업데이트와 커뮤니티 주요 소식을 알려드립니다.',
+      title: 'Newsletter',
+      description: 'Get weekly updates and notable community highlights.',
       icon: <FiMail className="h-4 w-4 text-gray-400" />,
     },
   ];
@@ -399,7 +397,7 @@ export default function ProfileSettingsPage() {
         <section className={`${SETTINGS_CARD_CLASS} p-6 text-center`}>
           <div className="flex flex-col items-center gap-3 text-gray-600 dark:text-gray-300">
             <FiLoader className="w-8 h-8 animate-spin text-gray-400" />
-            로딩 중...
+            Loading...
           </div>
         </section>
       </div>
@@ -410,7 +408,7 @@ export default function ProfileSettingsPage() {
     return (
       <div className="space-y-6 pt-2">
         <section className={`${SETTINGS_CARD_CLASS} p-6 text-center`}>
-          <p className="text-sm text-gray-600 dark:text-gray-300">로그인이 필요합니다.</p>
+          <p className="text-sm text-gray-600 dark:text-gray-300">You need to sign in to view this page.</p>
         </section>
       </div>
     );
@@ -427,7 +425,7 @@ export default function ProfileSettingsPage() {
   return (
     <>
       <div className="space-y-6 pt-2">
-        {error && !error.includes('크기') && !error.includes('닉네임') && (
+        {error && !error.toLowerCase().includes('size') && !error.toLowerCase().includes('username') && (
           <div className={cn('p-3 text-sm rounded-xl', DESTRUCTIVE_SURFACE_CLASS)}>
             {error}
           </div>
@@ -461,7 +459,7 @@ export default function ProfileSettingsPage() {
               </div>
               <div className="space-y-1">
                 <p className="text-base font-semibold text-gray-900 dark:text-gray-50 flex items-center gap-2">
-                  {formData.username || '프로필'}
+                  {formData.username || 'Profile'}
                   <LevelBadge userId={user?.id} />
                 </p>
                 <div className="flex flex-wrap items-center gap-2 text-sm text-gray-600 dark:text-gray-300">
@@ -469,14 +467,14 @@ export default function ProfileSettingsPage() {
                   <span>{formData.email}</span>
                   {user.isEmailVerified && (
                     <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:bg-[#1f352a] dark:text-emerald-300">
-                      <FiCheck className="mr-1 h-3 w-3" /> 인증됨
+                      <FiCheck className="mr-1 h-3 w-3" /> Verified
                     </span>
                   )}
                 </div>
                 {joinedAt && (
                   <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300">
                     <FiCalendar className="h-4 w-4 text-gray-400" />
-                    가입일 {joinedAt}
+                    Joined {joinedAt}
                   </div>
                 )}
               </div>
@@ -495,7 +493,7 @@ export default function ProfileSettingsPage() {
                 disabled={uploadingImage}
                 className={SETTINGS_SUBTLE_BUTTON_CLASS}
               >
-                {uploadingImage ? '업로드 중...' : '이미지 변경'}
+                {uploadingImage ? 'Uploading...' : 'Change image'}
               </button>
               <button
                 type="button"
@@ -503,11 +501,11 @@ export default function ProfileSettingsPage() {
                 disabled={uploadingImage}
                 className={SETTINGS_SUBTLE_BUTTON_CLASS}
               >
-                캐릭터 선택
+                Choose avatar
               </button>
             </div>
           </div>
-          {error && error.includes('크기') && (
+          {error && error.toLowerCase().includes('size') && (
             <p className="text-xs text-red-600 dark:text-red-400">{error}</p>
           )}
         </section>
@@ -516,7 +514,7 @@ export default function ProfileSettingsPage() {
           <div className="grid gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label htmlFor="username" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
-                닉네임 <span className="text-gray-400 text-xs">(필수)</span>
+                Username <span className="text-gray-400 text-xs">(Required)</span>
               </label>
               <input
                 type="text"
@@ -528,9 +526,9 @@ export default function ProfileSettingsPage() {
                   setFormData({ ...formData, username: value });
 
                   if (value && value.length < 2) {
-                    setUsernameError('닉네임은 최소 2자 이상 입력하세요');
+                    setUsernameError('Username must be at least 2 characters.');
                   } else if (value && value.length > 30) {
-                    setUsernameError('닉네임은 최대 30자까지 입력할 수 있습니다');
+                    setUsernameError('Username must be 30 characters or fewer.');
                   } else {
                     setUsernameError('');
                   }
@@ -540,7 +538,7 @@ export default function ProfileSettingsPage() {
                     ? 'border-red-300 dark:border-red-500 focus:ring-red-200 dark:focus:ring-red-500/40'
                     : ''
                 }`}
-                placeholder="실명이 아닌 별명을 사용하세요"
+                placeholder="Choose the name people will see publicly"
               />
               {usernameError && (
                 <p className="text-xs text-red-500 dark:text-red-400">{usernameError}</p>
@@ -549,7 +547,7 @@ export default function ProfileSettingsPage() {
 
             <div className="space-y-2">
               <label htmlFor="jobTitle" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
-                직업 <span className="text-gray-400 text-xs">(선택)</span>
+                Job title <span className="text-gray-400 text-xs">(Optional)</span>
               </label>
               <input
                 type="text"
@@ -563,13 +561,13 @@ export default function ProfileSettingsPage() {
                   }
                 }}
                 className={SETTINGS_INPUT_CLASS}
-                placeholder="예: 프론트엔드 엔지니어, 작가 등"
+                placeholder="Example: Frontend engineer, writer"
               />
             </div>
           </div>
           <div className="space-y-3">
             <label htmlFor="bio" className="block text-sm font-medium text-gray-900 dark:text-gray-50">
-              소개 <span className="text-gray-400 text-xs">(선택)</span>
+              Bio <span className="text-gray-400 text-xs">(Optional)</span>
             </label>
             <textarea
               id="bio"
@@ -583,22 +581,22 @@ export default function ProfileSettingsPage() {
               maxLength={BIO_MAX_LENGTH}
               rows={5}
               className={`${SETTINGS_INPUT_CLASS} resize-none`}
-              placeholder="자신을 소개하거나 앞으로의 계획을 적어보세요"
+              placeholder="Introduce yourself or share what you are working on"
             />
             <div className="flex flex-col gap-1 text-xs text-gray-500 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
               <span>{formData.bio.length}/{BIO_MAX_LENGTH}</span>
-              <span>닉네임·직업·소개는 공개 프로필에 표시됩니다</span>
+              <span>Your username, job title, and bio appear on your public profile.</span>
             </div>
           </div>
           <div className="border-t border-gray-100 dark:border-[#2F3440] pt-4 mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className={`text-xs font-medium ${profileSaveSuccess ? 'text-emerald-600 dark:text-emerald-300' : profileSaveLoading ? 'text-gray-500 dark:text-gray-300' : 'text-gray-500 dark:text-gray-300'}`}>
               {profileSaveSuccess
-                ? '프로필이 저장되었습니다.'
+                ? 'Profile saved.'
                 : profileSaveLoading
-                ? '저장 중...'
+                ? 'Saving...'
                 : isProfileDirty
-                ? '변경 사항이 있습니다.'
-                : '최신 상태입니다.'}
+                ? 'You have unsaved changes.'
+                : 'Everything is up to date.'}
             </div>
             <button
               type="button"
@@ -609,9 +607,9 @@ export default function ProfileSettingsPage() {
               {profileSaveLoading ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : profileSaveSuccess ? (
-                '저장 완료'
+                'Saved'
               ) : (
-                '변경 사항 저장'
+                'Save changes'
               )}
             </button>
           </div>
@@ -619,36 +617,36 @@ export default function ProfileSettingsPage() {
 
         <div className="grid gap-5 lg:grid-cols-2">
           <div className={`${SUMMARY_CARD_CLASS} p-6 space-y-4`}>
-            <p className="text-base font-semibold text-gray-900 dark:text-gray-50">계정 정보</p>
+            <p className="text-base font-semibold text-gray-900 dark:text-gray-50">Account overview</p>
             <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
               <FiShield className="h-5 w-5 text-gray-400" />
               <div>
-                <p className="font-medium">이메일/비밀번호 계정 사용 중</p>
+                <p className="font-medium">You are using an email/password account</p>
                   <p className="text-xs text-gray-500 dark:text-gray-300">{formData.email}</p>
                 </div>
               </div>
               <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
                 <FiCheck className="h-5 w-5 text-emerald-500" />
                 <div>
-                  <p className="font-medium">인증 상태</p>
+                  <p className="font-medium">Verification</p>
                   <p className="text-xs text-gray-500 dark:text-gray-300">
-                    {user.isEmailVerified ? '이메일 인증 완료' : '이메일 인증이 필요합니다'}
+                    {user.isEmailVerified ? 'Email verified' : 'Email verification required'}
                   </p>
                 </div>
               </div>
               <div className="flex items-start gap-3 text-sm text-gray-700 dark:text-gray-200">
                 <FiBell className="h-5 w-5 text-gray-400" />
                 <div>
-                  <p className="font-medium">최근 로그인</p>
+                  <p className="font-medium">Last sign-in method</p>
                   <p className="text-xs text-gray-500 dark:text-gray-300">
-                    {user.lastLoginProvider ? user.lastLoginProvider : 'local'} 계정
+                    {user.lastLoginProvider ? user.lastLoginProvider : 'local'} account
                   </p>
                 </div>
               </div>
             </div>
 
           <div className={`${SUMMARY_CARD_CLASS} p-6 space-y-5`}>
-            <p className="text-base font-semibold text-gray-900 dark:text-gray-50">마케팅 및 알림</p>
+            <p className="text-base font-semibold text-gray-900 dark:text-gray-50">Email preferences</p>
             <div className="space-y-4">
                 {marketingOptions.map((option) => (
                   <div
@@ -690,16 +688,16 @@ export default function ProfileSettingsPage() {
         <section className={`${SETTINGS_CARD_CLASS} p-6`}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="space-y-1">
-              <h4 className="text-base font-semibold text-gray-900 dark:text-gray-50">계정 삭제</h4>
+              <h4 className="text-base font-semibold text-gray-900 dark:text-gray-50">Delete account</h4>
               <p className="text-sm text-gray-600 dark:text-gray-300">
-                계정을 삭제하면 모든 블로그 게시물, 댓글, 파일이 영구적으로 삭제되며 복구할 수 없습니다.
+                Deleting your account permanently removes your posts, comments, uploads, and profile data. This cannot be undone.
               </p>
             </div>
             <button
               onClick={() => setShowDeleteModal(true)}
               className="min-h-[44px] px-4 py-2 rounded-lg text-sm font-semibold text-white transition-colors bg-gray-900 hover:bg-gray-800 dark:bg-[#5f63f3] dark:hover:bg-[#7377ff]"
             >
-              계정 삭제
+              Delete account
             </button>
           </div>
         </section>
@@ -710,24 +708,24 @@ export default function ProfileSettingsPage() {
           <div className="w-full max-w-md bg-white dark:bg-[#1F2332] border border-gray-100 dark:border-[#2F3440] rounded-2xl p-8 shadow-2xl">
             <div className="flex items-center mb-4">
               <FiAlertTriangle className="text-red-600 dark:text-red-400 w-6 h-6 mr-2" />
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">계정 삭제 확인</h3>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-gray-50">Confirm account deletion</h3>
             </div>
 
             <p className="text-gray-600 dark:text-gray-300 mb-6">
-              정말로 계정을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 다음 항목들이 모두 삭제됩니다:
+              This action is permanent. If you continue, the following data will be deleted:
             </p>
 
             <ul className="list-disc list-inside text-sm text-gray-600 dark:text-gray-300 mb-6 space-y-1">
-              <li>모든 블로그 게시물</li>
-              <li>모든 댓글</li>
-              <li>업로드한 모든 파일</li>
-              <li>API 키</li>
-              <li>프로필 정보</li>
+              <li>All blog posts</li>
+              <li>All comments</li>
+              <li>All uploaded files</li>
+              <li>All API keys</li>
+              <li>Your profile data</li>
             </ul>
 
             <div className="mb-6">
               <label htmlFor="deleteConfirmText" className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">
-                확인을 위해 <strong className="text-red-600 dark:text-red-400">&quot;계정 삭제&quot;</strong>를 입력하세요
+                Type <strong className="text-red-600 dark:text-red-400">&quot;DELETE ACCOUNT&quot;</strong> to confirm
               </label>
               <input
                 type="text"
@@ -735,7 +733,7 @@ export default function ProfileSettingsPage() {
                 value={deleteConfirmText}
                 onChange={(e) => setDeleteConfirmText(e.target.value)}
                 className={`${SETTINGS_INPUT_CLASS} focus:ring-red-200 dark:focus:ring-red-400`}
-                placeholder="계정 삭제"
+                placeholder="DELETE ACCOUNT"
                 autoFocus
               />
             </div>
@@ -744,7 +742,7 @@ export default function ProfileSettingsPage() {
               (!user?.lastLoginProvider && user?.authProvider === 'local')) && (
               <div className="mb-6">
                 <label htmlFor="deletePassword" className="block text-sm font-medium text-gray-800 dark:text-gray-200 mb-2">
-                  비밀번호 확인
+                  Password confirmation
                 </label>
                 <input
                   type="password"
@@ -752,10 +750,10 @@ export default function ProfileSettingsPage() {
                   value={deletePassword}
                   onChange={(e) => setDeletePassword(e.target.value)}
                   className={`${SETTINGS_INPUT_CLASS} focus:ring-red-200 dark:focus:ring-red-400`}
-                  placeholder="비밀번호를 입력하세요"
+                  placeholder="Enter your password"
                 />
                 <p className="mt-1 text-xs text-gray-500 dark:text-gray-300">
-                  로컬 계정으로 마지막 로그인하셨습니다. 보안을 위해 비밀번호를 확인합니다.
+                  Your last sign-in used a local account, so password confirmation is required.
                 </p>
               </div>
             )}
@@ -763,8 +761,8 @@ export default function ProfileSettingsPage() {
             {user?.lastLoginProvider && user.lastLoginProvider !== 'local' && (
               <div className="mb-6 p-3 bg-blue-50 dark:bg-[#1B2C3F] border border-blue-100 dark:border-[#234668] rounded-xl">
                 <p className="text-sm text-blue-700 dark:text-blue-200">
-                  {user.lastLoginProvider.charAt(0).toUpperCase() + user.lastLoginProvider.slice(1)} 계정으로 로그인하셨습니다.
-                  비밀번호 입력 없이 계정을 삭제할 수 있습니다.
+                  You last signed in with {user.lastLoginProvider.charAt(0).toUpperCase() + user.lastLoginProvider.slice(1)}.
+                  You can delete the account without entering a password.
                 </p>
               </div>
             )}
@@ -785,20 +783,20 @@ export default function ProfileSettingsPage() {
                 }}
                 className="flex-1 px-4 py-2 bg-gray-200 dark:bg-[#2A2F3A] text-gray-800 dark:text-gray-200 font-medium rounded-lg hover:bg-gray-300 dark:hover:bg-[#353C49] transition-colors"
               >
-                취소
+                Cancel
               </button>
               <button
                 onClick={handleDeleteAccount}
                 disabled={
                   deleteLoading ||
-                  deleteConfirmText !== '계정 삭제' ||
+                  deleteConfirmText !== 'DELETE ACCOUNT' ||
                   ((user?.lastLoginProvider === 'local' ||
                     (!user?.lastLoginProvider && user?.authProvider === 'local')) &&
                     !deletePassword)
                 }
                 className="flex-1 px-4 py-2 rounded-lg font-semibold text-gray-900 dark:text-gray-50 bg-gray-100 dark:bg-[#2A2F3A] hover:bg-gray-200 dark:hover:bg-[#353C49] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
-                {deleteLoading ? '삭제 중...' : '영구 삭제'}
+                {deleteLoading ? 'Deleting...' : 'Delete permanently'}
               </button>
             </div>
           </div>
