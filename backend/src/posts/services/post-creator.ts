@@ -26,6 +26,7 @@ import {
 import { CacheService } from "../../cache/cache.service";
 import { PostMetadataSyncService } from "./post-metadata-sync.service";
 import { PostSearchVectorService } from "./post-search-vector.service";
+import { PostFileService } from "./post-file.service";
 import {
   normalizeGithubResourceUrl,
   sanitizeGithubResourceDescription,
@@ -57,6 +58,7 @@ export class PostCreator {
     private readonly cacheService: CacheService,
     private readonly postMetadataSyncService: PostMetadataSyncService,
     private readonly postSearchVectorService: PostSearchVectorService,
+    private readonly postFileService: PostFileService,
   ) {}
 
   /**
@@ -488,6 +490,14 @@ export class PostCreator {
             `[PostCreator] Linked ${files.length} files to post ${savedPost.id}`,
           );
         }
+
+        // 본문에 남아 있는 managed image URL을 기준으로 관계를 한 번 더 재조정해
+        // legacy/자동포스팅 경로에서도 post_files 누락이 남지 않게 한다.
+        await this.postFileService.linkFilesFromContent(
+          savedPost,
+          author.id,
+          manager,
+        );
 
         // 10. 라이프사이클 이벤트 버퍼 (커밋 후 발행)
         eventBuffer.add(PostLifecycleEvents.CREATED, {

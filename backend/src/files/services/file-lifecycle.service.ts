@@ -3,6 +3,7 @@ import { InjectRepository } from "@nestjs/typeorm";
 import { Repository, LessThan, IsNull } from "typeorm";
 import { Cron, CronExpression } from "@nestjs/schedule";
 import { File } from "../entities/file.entity";
+import { Post } from "../../posts/entities/post.entity";
 import {
   FileContext,
   FileContextType,
@@ -41,6 +42,8 @@ export class FileLifecycleService {
   constructor(
     @InjectRepository(File)
     private fileRepository: Repository<File>,
+    @InjectRepository(Post)
+    private postsRepository: Repository<Post>,
     @InjectRepository(FileContext)
     private contextRepository: Repository<FileContext>,
     private s3Service: S3Service,
@@ -140,6 +143,13 @@ export class FileLifecycleService {
     let cleaned = 0;
     for (const file of orphanedFiles) {
       try {
+        if (await this.isFileStillReferenced(file)) {
+          this.logger.warn(
+            `Skipping orphan scheduling for referenced file ${file.id} (${file.fileKey})`,
+          );
+          continue;
+        }
+
         // 30일 후 삭제 예약
         file.expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
         await this.fileRepository.save(file);
@@ -229,6 +239,33 @@ export class FileLifecycleService {
     }
 
     return deleted;
+  }
+
+  private async isFileStillReferenced(file: File): Promise<boolean> {
+    const escapedKey = this.escapeLike(file.fileKey);
+    const keyPattern = `%${escapedKey}%`;
+
+    const count = await this.postsRepository
+      .createQueryBuilder("post")
+      .where('post."isDeleted" = false')
+      .andWhere(
+        `(
+          post.thumbnail_image_id = :fileId
+          OR post.content LIKE :keyPattern ESCAPE '\\'
+          OR post.content_markdown LIKE :keyPattern ESCAPE '\\'
+        )`,
+        {
+          fileId: file.id,
+          keyPattern,
+        },
+      )
+      .getCount();
+
+    return count > 0;
+  }
+
+  private escapeLike(value: string): string {
+    return value.replace(/[\\%_]/g, "\\$&");
   }
 
   /**

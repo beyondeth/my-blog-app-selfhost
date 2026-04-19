@@ -870,6 +870,23 @@ export class PostsController {
     return { message: "Files relinked successfully" };
   }
 
+  @Post("reconcile-managed-images")
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles(Role.ADMIN)
+  @ApiOperation({ summary: "managed image 관계 점검/복구 (관리자만)" })
+  @ApiBearerAuth()
+  @ApiQuery({
+    name: "dryRun",
+    required: false,
+    description: "true면 점검만 수행, false면 post_files 복구까지 수행",
+  })
+  async reconcileManagedImages(@Query("dryRun") dryRun?: string) {
+    const resolvedDryRun =
+      dryRun === undefined ? true : !["false", "0"].includes(dryRun);
+
+    return this.postsService.reconcileManagedImages(resolvedDryRun);
+  }
+
   @Post(":id/view")
   @Public()
   @UseGuards(OptionalJwtAuthGuard)

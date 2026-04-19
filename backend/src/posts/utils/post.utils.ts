@@ -34,6 +34,58 @@ export function extractImageUrlsFromContent(content: string): string[] {
   return urls;
 }
 
+export function extractImageUrlsFromMarkdown(markdown: string): string[] {
+  if (!markdown) return [];
+
+  const urls: string[] = [];
+  const markdownImageRegex = /!\[[^\]]*]\(([^)]+)\)/g;
+  let markdownMatch: RegExpExecArray | null;
+
+  while ((markdownMatch = markdownImageRegex.exec(markdown)) !== null) {
+    const rawCandidate = (markdownMatch[1] || "").trim().split(/\s+/)[0];
+    if (rawCandidate) {
+      urls.push(rawCandidate.split("?")[0]);
+    }
+  }
+
+  const htmlImageRegex = /<img[^>]+src=["']([^"']+)["'][^>]*>/gi;
+  let htmlMatch: RegExpExecArray | null;
+
+  while ((htmlMatch = htmlImageRegex.exec(markdown)) !== null) {
+    if (htmlMatch[1]) {
+      urls.push(htmlMatch[1].split("?")[0]);
+    }
+  }
+
+  return urls;
+}
+
+export function collectPostImageUrls(
+  content: string,
+  contentMarkdown?: string | null,
+): string[] {
+  const combined = [
+    ...extractImageUrlsFromContent(content),
+    ...extractImageUrlsFromMarkdown(contentMarkdown || ""),
+  ];
+
+  return Array.from(new Set(combined.filter(Boolean)));
+}
+
+export function isManagedImageUrl(url: string): boolean {
+  if (!url) return false;
+
+  const cleanUrl = url.split("?")[0];
+
+  return (
+    cleanUrl.startsWith("uploads/") ||
+    cleanUrl.includes("cdn.codebase.blog/uploads/") ||
+    cleanUrl.includes("/api/v1/files/proxy/") ||
+    cleanUrl.includes("localhost:3000/api/v1/files/proxy/") ||
+    cleanUrl.includes("backend:3000/api/v1/files/proxy/")
+  );
+}
+
 export function extractS3KeyFromUrl(url: string): string | null {
   if (!url) return null;
 
