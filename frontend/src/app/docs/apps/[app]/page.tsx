@@ -81,11 +81,10 @@ export default async function AppConnectionPage({
           {doc.statusDescription}
         </p>
         <p className="mt-4 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-          마지막 확인일: <strong className="text-[#101828] dark:text-white">{doc.lastVerified}</strong>
+          Last verified: <strong className="text-[#101828] dark:text-white">{doc.lastVerified}</strong>
         </p>
         <p className="mt-2 text-sm leading-7 text-[#475467] dark:text-[#9FB0C2]">
-          스크린샷은 대응하는 <code>frontend/public/docs/apps/{doc.slug}</code> 경로에 파일을
-          넣으면 자동으로 교체됩니다.
+          Screenshots are replaced automatically when you update the matching files under <code>frontend/public/docs/apps/{doc.slug}</code>.
         </p>
       </div>
 
@@ -133,8 +132,8 @@ export default async function AppConnectionPage({
           ))}
         </ul>
         <p className="mt-6">
-          연결 상태나 권한을 다시 확인해야 하면 <Link href="/settings/connected-apps">연결된 앱</Link>{' '}
-          페이지를 함께 확인하세요.
+          If you need to review connection state or permissions again, also check the <Link href="/settings/connected-apps">Connected apps</Link>{' '}
+          page.
         </p>
       </section>
 

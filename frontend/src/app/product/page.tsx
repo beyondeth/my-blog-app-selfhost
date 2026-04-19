@@ -17,6 +17,7 @@ import {
   Quote,
   Terminal,
 } from 'lucide-react';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 /* ─────────────────────── 애니메이션 유틸 ─────────────────────── */
 
@@ -94,76 +95,314 @@ const aiPlatforms = [
   { name: 'Perplexity', icon: PerplexityIcon, color: '#20b8cd' },
 ];
 
-/** 3단계 파이프라인 */
-const pipeline = [
-  {
-    number: '01',
-    title: '수집',
-    subtitle: '프롬프트 한 줄로 자동 수집',
-    description:
-      '여러 AI 플랫폼에 흩어진 대화와 지식을 MCP로 자동 수집합니다. "자동포스팅해줘" 한마디면 끝.',
-    icon: Plug,
+const PRODUCT_CONTENT = {
+  ko: {
+    heroBadge: 'MCP 기반 AI 지식 통합 플랫폼',
+    heroTitle: ['흩어진 AI 지식을', '한 곳에 모으고,', '수익으로 연결합니다'],
+    heroDescription:
+      'ChatGPT, Claude, Gemini, Perplexity — 프롬프트 한 줄이면 여러 AI에 파편화된 지식이 자동으로 수집되고, 블로그로 발행되며, 마켓에서 거래됩니다.',
+    primaryCta: '무료로 시작하기',
+    secondaryCta: '로그인',
+    orbitSnippets: [
+      '이 코드 리팩토링 해줘',
+      '이 논문 요약해줘',
+      '회의록 정리 좀 해줘',
+      '최신 트렌드 분석해줘',
+    ],
+    stats: [
+      { value: '4개+', label: '연동 가능 AI 플랫폼' },
+      { value: '< 1분', label: '포스트 자동 발행 시간' },
+      { value: '8종', label: 'Style Guide 프리셋' },
+      { value: '24/7', label: '자동 수집·발행' },
+    ],
+    problem: {
+      eyebrow: '문제 인식',
+      title: ['매일 AI로 지식을 만들고 있지만,', '그 지식은 어디에 있나요?'],
+      description:
+        '국내 AI 이용자 2,031만 명이 매일 ChatGPT, Claude, Gemini 등에서 지식을 생산하고 있지만, 각 플랫폼에 파편화되어 축적되지 못하고 사라집니다. 블로그에 정리하려면 1편에 2시간, 월 20편이면 40시간의 기회비용이 발생합니다.',
+      beforeLabel: '기존 방식',
+      afterLabel: 'Codebase',
+      beforeRows: [
+        { label: 'AI 기록 자동 발행', status: '불가' },
+        { label: '콘텐츠 정제', value: '수작업 2시간/편' },
+        { label: '지식 수익화', value: '별도 채널 필요' },
+      ],
+      afterRows: [
+        { label: 'AI 기록 자동 발행', check: '프롬프트 한 줄' },
+        { label: '콘텐츠 정제', value: 'Style Guide 자동' },
+        { label: '지식 수익화', value: '마켓플레이스 내장' },
+      ],
+    },
+    useCases: {
+      eyebrow: 'Use Cases',
+      title: ['프롬프트를 넘어서,', '코드베이스로 연결되는 세 가지 활용례'],
+      tabs: {
+        mcp: 'MCP 자동포스팅',
+        community: '커뮤니티 지식 공유',
+        marketplace: '콘텐츠 판매와 배포',
+      },
+      mcp: {
+        title: '프롬프트 하나로 AI 지식을 수집하세요',
+        description:
+          'npx mcporter connect 한 줄로 로컬 MCP 프록시 서버를 실행하고, 사용하는 어떤 대화형 AI(ChatGPT, Claude 등)와든 연결합니다. "자동포스팅해줘"라고 입력하면 8가지 Style Guide 프리셋(기술블로그, 에세이 등)을 적용해 SEO 메타데이터와 함께 콘텐츠로 정제되어 Codebase에 즉시 포스팅됩니다.',
+        bullets: [
+          '원클릭 CLI 인증 연동',
+          '모든 호환 AI 플랫폼 동시 대응',
+          '포스트 초안의 Markdown/HTML 변환 기능 탑재',
+        ],
+        consolePrompt: '이 내용으로 자동포스팅해줘.',
+        consoleResponse:
+          "네, '기술블로그' 스타일이 적용된 블로그 포스트를 생성했습니다. (id: post_12x...)",
+      },
+      community: {
+        title: '관심 커뮤니티에서 지식을 발전시키세요',
+        description:
+          '완성된 포스트는 단 한 번의 조작으로 Codebase 내의 다양한 /community 게시판과 연결됩니다. 관심 주제의 바이브코딩 커뮤니티에서 내 글을 공유하고, 나와 비슷한 워크플로우를 가진 전문가들과 함께 인사이트를 교류하며 토론할 수 있습니다.',
+        bullets: [
+          '발행 즉시 커뮤니티 타임라인 동기화',
+          '전문가 리뷰 및 댓글 피드백',
+          '토론형 스니펫 인용 및 리포스팅',
+        ],
+        communityName: 'AI Builders 커뮤니티',
+        communityMembers: '2.1k members',
+        shareTitle: '방금 전 포스팅한 내 게시물 공유하기',
+        shareDescription:
+          '"오늘 새롭게 발견한 Cursor 에디터 통합 팁입니다! 다들 어떻게 생각하시나요?"',
+        shareCardTitle: 'Cursor IDE와 MCP 연동 최적화 전략',
+        shareCardMeta: '2 mins read • Tech Blog Style',
+      },
+      marketplace: {
+        title: '지식을 안전하게 상품화하세요',
+        description:
+          '마켓플레이스의 강력한 4단계(4-Phase) 아키텍처를 기반으로 나만의 프롬프트 팩, 템플릿, 단축어 설정집을 손쉽게 상품화할 수 있습니다. DeliveryItem 체계를 통해 구매자만 접근 가능한 파일 및 시크릿 텍스트를 제공하여, 단순한 코딩 정보 그 이상의 독점적인 지식을 수익화하세요.',
+        bullets: [
+          '구매자 전용 3중 다운로드 계층 지원',
+          '악성코드 스캔 및 안전 검증 패스 (File Safety)',
+          '개별 결제 기반 주문 내역(Order) 및 영수증 제공',
+        ],
+        dashboardTitle: '마켓플레이스 대시보드',
+        sellerBadge: 'Seller Profile',
+        items: [
+          {
+            title: '웹개발 생산성 10배 AI 프롬프트 팩',
+            delivery: '배포: 3 files (Delivery Items)',
+            price: '₩15,000',
+            sales: '12 Sales',
+          },
+          {
+            title: 'Next.js 14 보일러플레이트 구조',
+            delivery: '배포: 1 file (With Download Track)',
+            price: '₩24,000',
+            sales: '8 Sales',
+          },
+        ],
+      },
+    },
+    pipelineSection: {
+      eyebrow: '작동 원리 요약',
+      title: ['수집, 공유, 거래가', '하나의 플랫폼에서 완결됩니다'],
+      steps: [
+        {
+          number: '01',
+          title: '수집',
+          subtitle: '프롬프트 한 줄로 자동 수집',
+          description:
+            '여러 AI 플랫폼에 흩어진 대화와 지식을 MCP로 자동 수집합니다. "자동포스팅해줘" 한마디면 끝.',
+        },
+        {
+          number: '02',
+          title: '공유',
+          subtitle: '커뮤니티에서 지식 교류',
+          description:
+            'Style Guide로 자동 정제된 포스트를 커뮤니티에서 공유하고, 같은 관심사를 가진 사람들과 토론하세요.',
+        },
+        {
+          number: '03',
+          title: '거래',
+          subtitle: '가치 있는 지식은 수익으로',
+          description:
+            '검증된 노하우와 콘텐츠를 마켓플레이스에서 거래하세요. 크리에이터에게 공정한 수익을 제공합니다.',
+        },
+      ],
+      collectStatus: '수집됨',
+      collectSession: '{name} 세션 연결',
+      collectSync: '최근 대화 12건 동기화 준비 완료',
+      shareDraftTitle: '포스트 초안 생성 완료',
+      shareDraftDescription: '기술블로그 스타일, SEO 메타데이터, 제목 3안 포함',
+      shareDraftChip: '초안 공유',
+      shareCommunityChip: '커뮤니티 게시',
+      monetizationItems: [
+        ['프롬프트 팩', '₩12,000'],
+        ['블로그 템플릿', '₩8,900'],
+        ['MCP 설정집', '₩15,000'],
+        ['자동화 노하우', '₩19,000'],
+      ],
+    },
+    finalCta: {
+      title: ['AI 지식, 더 이상', '흩어지지 않게'],
+      description:
+        'ChatGPT, Claude, Gemini, Perplexity — 어디서 작업하든 프롬프트 한 줄이면 지식이 자동으로 모이고 공유됩니다.',
+    },
   },
-  {
-    number: '02',
-    title: '공유',
-    subtitle: '커뮤니티에서 지식 교류',
-    description:
-      'Style Guide로 자동 정제된 포스트를 커뮤니티에서 공유하고, 같은 관심사를 가진 사람들과 토론하세요.',
-    icon: MessageSquare,
+  en: {
+    heroBadge: 'MCP-native AI knowledge hub',
+    heroTitle: ['Bring scattered AI work', 'into one place,', 'and turn it into leverage'],
+    heroDescription:
+      'ChatGPT, Claude, Gemini, Perplexity — with one prompt, knowledge spread across your AI tools is gathered automatically, published to your blog, and prepared for distribution.',
+    primaryCta: 'Start free',
+    secondaryCta: 'Sign in',
+    orbitSnippets: [
+      'Refactor this code',
+      'Summarize this paper',
+      'Turn this meeting into notes',
+      'Analyze the latest trend',
+    ],
+    stats: [
+      { value: '4+', label: 'Connected AI platforms' },
+      { value: '< 1 min', label: 'Time to publish a post' },
+      { value: '8', label: 'Writing style presets' },
+      { value: '24/7', label: 'Collection and publishing uptime' },
+    ],
+    problem: {
+      eyebrow: 'The problem',
+      title: ['You create knowledge with AI every day,', 'but where does it actually live?'],
+      description:
+        'People generate useful work every day in ChatGPT, Claude, Gemini, and similar tools, but that knowledge stays fragmented across platforms and disappears. Turning it into a blog post by hand can cost two hours per piece, or forty hours a month at twenty posts.',
+      beforeLabel: 'Before',
+      afterLabel: 'With Codebase',
+      beforeRows: [
+        { label: 'Automatic publishing from AI work', status: 'No' },
+        { label: 'Content refinement', value: '2 hours of manual editing per post' },
+        { label: 'Monetizing knowledge', value: 'Requires a separate channel' },
+      ],
+      afterRows: [
+        { label: 'Automatic publishing from AI work', check: 'One prompt' },
+        { label: 'Content refinement', value: 'Automatic via writing styles' },
+        { label: 'Monetizing knowledge', value: 'Marketplace built in' },
+      ],
+    },
+    useCases: {
+      eyebrow: 'Use Cases',
+      title: ['Move beyond prompts and into', 'three durable Codebase workflows'],
+      tabs: {
+        mcp: 'MCP publishing',
+        community: 'Community knowledge sharing',
+        marketplace: 'Sell and distribute content',
+      },
+      mcp: {
+        title: 'Collect AI knowledge with a single prompt',
+        description:
+          'Run a local MCP proxy server with one `npx mcporter connect` command and connect it to whichever conversational AI you use, including ChatGPT and Claude. When you type “publish this automatically,” Codebase applies one of eight writing style presets, adds SEO metadata, and turns the result into a structured post.',
+        bullets: [
+          'One-step CLI authentication',
+          'Works across every compatible AI client',
+          'Markdown and HTML export for generated drafts',
+        ],
+        consolePrompt: 'Publish this conversation automatically.',
+        consoleResponse:
+          "Done. I created a blog post in the 'technical blog' style. (id: post_12x...)",
+      },
+      community: {
+        title: 'Develop ideas with the right community',
+        description:
+          'A finished post can be shared directly into Codebase communities with one action. Publish into the communities that match your topic, compare workflows with people doing similar work, and use comments to refine your ideas.',
+        bullets: [
+          'Sync into the community timeline as soon as you publish',
+          'Get expert review and comments',
+          'Quote and repost discussion snippets in context',
+        ],
+        communityName: 'AI Builders Community',
+        communityMembers: '2.1k members',
+        shareTitle: 'Share the post I just published',
+        shareDescription:
+          '"I found a new Cursor editor integration tip today. Curious how everyone else approaches it."',
+        shareCardTitle: 'How to optimize Cursor IDE with MCP',
+        shareCardMeta: '2 min read • Technical blog style',
+      },
+      marketplace: {
+        title: 'Package knowledge safely as a product',
+        description:
+          'Use the marketplace’s four-phase architecture to package prompt packs, templates, and setup collections without reinventing delivery. The DeliveryItem system gives buyers access to gated files and secret text so you can distribute knowledge assets, not just generic code snippets.',
+        bullets: [
+          'Three gated download layers for buyers',
+          'Malware scanning and file safety checks',
+          'Order history and receipts per purchase',
+        ],
+        dashboardTitle: 'Marketplace dashboard',
+        sellerBadge: 'Seller profile',
+        items: [
+          {
+            title: '10x web productivity AI prompt pack',
+            delivery: 'Delivery: 3 files (Delivery Items)',
+            price: '$15',
+            sales: '12 sales',
+          },
+          {
+            title: 'Next.js 14 boilerplate structure',
+            delivery: 'Delivery: 1 file (with download tracking)',
+            price: '$24',
+            sales: '8 sales',
+          },
+        ],
+      },
+    },
+    pipelineSection: {
+      eyebrow: 'How it works',
+      title: ['Collection, sharing, and distribution', 'happen in one platform'],
+      steps: [
+        {
+          number: '01',
+          title: 'Collect',
+          subtitle: 'Capture knowledge with one prompt',
+          description:
+            'Use MCP to gather useful conversations and artifacts spread across multiple AI platforms without manual copy and paste.',
+        },
+        {
+          number: '02',
+          title: 'Share',
+          subtitle: 'Refine and publish with context',
+          description:
+            'Apply a writing style, generate a structured draft, and share it in the community where the right readers can respond.',
+        },
+        {
+          number: '03',
+          title: 'Distribute',
+          subtitle: 'Turn proven knowledge into assets',
+          description:
+            'Package templates, workflows, and prompts as reusable assets inside the marketplace with protected delivery.',
+        },
+      ],
+      collectStatus: 'Collected',
+      collectSession: '{name} session connected',
+      collectSync: 'Ready to sync the latest 12 conversations',
+      shareDraftTitle: 'Draft generated',
+      shareDraftDescription: 'Includes technical blog styling, SEO metadata, and three title options',
+      shareDraftChip: 'Share draft',
+      shareCommunityChip: 'Post to community',
+      monetizationItems: [
+        ['Prompt pack', '$12'],
+        ['Blog template', '$8.90'],
+        ['MCP setup kit', '$15'],
+        ['Automation playbook', '$19'],
+      ],
+    },
+    finalCta: {
+      title: ['Keep your AI knowledge', 'from disappearing'],
+      description:
+        'Wherever you work in ChatGPT, Claude, Gemini, or Perplexity, one prompt is enough to gather and reuse what matters.',
+    },
   },
-  {
-    number: '03',
-    title: '거래',
-    subtitle: '가치 있는 지식은 수익으로',
-    description:
-      '검증된 노하우와 콘텐츠를 마켓플레이스에서 거래하세요. 크리에이터에게 공정한 수익을 제공합니다.',
-    icon: ShoppingBag,
-  },
-];
-
-/** 소셜 프루프 수치 */
-const stats = [
-  { value: '4개+', label: '연동 가능 AI 플랫폼' },
-  { value: '< 1분', label: '포스트 자동 발행 시간' },
-  { value: '8종', label: 'Style Guide 프리셋' },
-  { value: '24/7', label: '자동 수집·발행' },
-];
-
-/** 테스티모니얼 데이터 */
-const testimonials = [
-  {
-    name: '하윤서',
-    role: '프리랜서 개발자',
-    company: '스텔라랩스',
-    quote:
-      'Claude랑 ChatGPT를 번갈아 쓰는데, 대화 내용 정리하려면 1시간씩 걸렸어요. 이제 "자동포스팅해줘" 한 마디면 블로그 글이 나옵니다. 포트폴리오 쌓는 속도가 완전히 달라졌어요.',
-  },
-  {
-    name: '박도현',
-    role: 'AI 리서처',
-    company: '베리파이',
-    quote:
-      'Perplexity로 리서치하고 Claude로 정리하는 워크플로우였는데, 그 과정이 자동화되니까 하루에 콘텐츠 3개는 거뜬합니다. SEO도 자동이라 검색 유입이 4배 늘었어요.',
-  },
-  {
-    name: '이서진',
-    role: 'PM / 바이브코더',
-    company: '루미너스',
-    quote:
-      '코딩은 AI로 하지만, 그 과정에서 쌓이는 지식은 어디에도 정리가 안 됐어요. Codebase 쓰고 나서는 매일 자동으로 기록이 남으니까, 나중에 다시 찾아보기도 편하고 팀원 온보딩 자료로도 씁니다.',
-  },
-  {
-    name: '정유나',
-    role: '콘텐츠 크리에이터',
-    company: '프리랜서',
-    quote:
-      '마켓플레이스에서 프롬프트 템플릿 올렸는데 한 달 만에 수익이 생기기 시작했어요. 제가 매일 쓰는 AI 노하우가 다른 분들한테 가치가 되는 거 보면 동기부여가 됩니다.',
-  },
-];
+} as const;
 
 /* ─────────────────────── 메인 컴포넌트 ─────────────────────── */
 export default function ProductPage() {
+  const { href } = useLocaleContext();
+  const content = PRODUCT_CONTENT.en;
+  const pipeline = content.pipelineSection.steps.map((step, index) => ({
+    ...step,
+    icon: [Plug, MessageSquare, ShoppingBag][index],
+  }));
+
   return (
     <div className="w-full text-zinc-900 dark:text-zinc-100 font-sans overflow-x-hidden">
       {/* ═══ 그레인 텍스처 오버레이 — 유기적 촉감 ═══ */}
@@ -195,37 +434,35 @@ export default function ProductPage() {
                 <FadeInSection>
                   <div className="inline-flex items-center gap-2 rounded-full border border-zinc-200 dark:border-white/10 bg-white/60 dark:bg-white/5 backdrop-blur-sm px-4 py-1.5 text-sm font-medium text-zinc-600 dark:text-zinc-400 shadow-[inset_0_1px_0_rgba(255,255,255,0.1)]">
                     <Plug className="h-3.5 w-3.5" />
-                    <span>MCP 기반 AI 지식 통합 플랫폼</span>
+                    <span>{content.heroBadge}</span>
                   </div>
                 </FadeInSection>
 
                 <FadeInSection delay={0.1}>
                   <h1 className="mt-8 text-4xl md:text-5xl font-bold leading-[1.15] tracking-tight text-zinc-900 dark:text-white">
-                    흩어진 AI 지식을
+                    {content.heroTitle[0]}
                     <br />
-                    한 곳에 모으고,
+                    {content.heroTitle[1]}
                     <br />
                     <span className="bg-gradient-to-r from-emerald-600 to-emerald-400 dark:from-emerald-400 dark:to-emerald-300 bg-clip-text text-transparent">
-                      수익으로 연결합니다
+                      {content.heroTitle[2]}
                     </span>
                   </h1>
                 </FadeInSection>
 
                 <FadeInSection delay={0.2}>
                   <p className="mt-6 text-base md:text-[1.05rem] leading-relaxed text-zinc-500 dark:text-zinc-400 max-w-[50ch]">
-                    ChatGPT, Claude, Gemini, Perplexity — 프롬프트 한 줄이면
-                    여러 AI에 파편화된 지식이 자동으로 수집되고,
-                    블로그로 발행되며, 마켓에서 거래됩니다.
+                    {content.heroDescription}
                   </p>
                 </FadeInSection>
 
                 <FadeInSection delay={0.3}>
                   <div className="mt-10 flex items-start">
                     <Link
-                      href="/register"
+                      href={href('/register')}
                       className="group inline-flex h-14 items-center justify-center rounded-xl bg-zinc-900 dark:bg-white px-8 text-base font-semibold text-white dark:text-zinc-900 transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-zinc-900/10 dark:shadow-black/20"
                     >
-                      무료로 시작하기
+                      {content.primaryCta}
                       <ArrowRight className="ml-2.5 h-4.5 w-4.5 transition-transform duration-300 group-hover:translate-x-1" />
                     </Link>
                   </div>
@@ -271,12 +508,6 @@ export default function ProductPage() {
                           'bottom-4 left-1/2 -translate-x-1/2',   // bottom
                           'top-1/2 left-4 -translate-y-1/2',      // left
                         ];
-                        const snippets = [
-                          '이 코드 리팩토링 해줘',
-                          '이 논문 요약해줘',
-                          '회의록 정리 좀 해줘',
-                          '최신 트렌드 분석해줘',
-                        ];
                         return (
                           <div
                             key={platform.name}
@@ -290,7 +521,7 @@ export default function ProductPage() {
                                     {platform.name}
                                   </p>
                                   <p className="text-[10px] text-zinc-400 dark:text-zinc-500 mt-0.5">
-                                    {snippets[i]}
+                                    {content.orbitSnippets[i]}
                                   </p>
                                 </div>
                               </div>
@@ -320,7 +551,7 @@ export default function ProductPage() {
           <div className="mx-auto max-w-7xl px-6 sm:px-8 lg:px-12">
             <FadeInSection>
               <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-zinc-100 dark:divide-white/[0.06]">
-                {stats.map((stat) => (
+                {content.stats.map((stat) => (
                   <div key={stat.label} className="text-center py-8 sm:py-10 [word-break:keep-all]">
                     <p className="text-[1.4rem] sm:text-[1.6rem] font-bold text-zinc-900 dark:text-white tracking-tight">
                       {stat.value}
@@ -344,17 +575,15 @@ export default function ProductPage() {
             <FadeInSection>
               <div className="[word-break:keep-all]">
                 <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
-                  문제 인식
+                  {content.problem.eyebrow}
                 </p>
                 <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-zinc-900 dark:text-white">
-                  매일 AI로 지식을 만들고 있지만,
+                  {content.problem.title[0]}
                   <br />
-                  그 지식은 어디에 있나요?
+                  {content.problem.title[1]}
                 </h2>
                 <p className="mt-5 text-base leading-relaxed text-zinc-500 dark:text-zinc-400 max-w-[50ch]">
-                  국내 AI 이용자 2,031만 명이 매일 ChatGPT, Claude, Gemini 등에서
-                  지식을 생산하고 있지만, 각 플랫폼에 파편화되어 축적되지 못하고
-                  사라집니다. 블로그에 정리하려면 1편에 2시간, 월 20편이면 40시간의 기회비용이 발생합니다.
+                  {content.problem.description}
                 </p>
               </div>
             </FadeInSection>
@@ -365,18 +594,14 @@ export default function ProductPage() {
                 {/* Before */}
                 <div className="rounded-xl border border-zinc-200 dark:border-white/[0.06] bg-white/50 dark:bg-white/[0.02] p-6 [word-break:keep-all]">
                   <p className="text-xs font-semibold text-zinc-400 dark:text-zinc-500 uppercase tracking-widest mb-4">
-                    기존 방식
+                    {content.problem.beforeLabel}
                   </p>
                   <div className="space-y-3">
-                    {[
-                      { label: 'AI 기록 자동 발행', status: false },
-                      { label: '콘텐츠 정제', value: '수작업 2시간/편' },
-                      { label: '지식 수익화', value: '별도 채널 필요' },
-                    ].map((item) => (
+                    {content.problem.beforeRows.map((item) => (
                       <div key={item.label} className="flex items-center justify-between text-sm">
                         <span className="text-zinc-500 dark:text-zinc-400">{item.label}</span>
-                        {item.status === false ? (
-                          <span className="text-red-400/80 font-medium">불가</span>
+                        {'status' in item ? (
+                          <span className="text-red-400/80 font-medium">{item.status}</span>
                         ) : (
                           <span className="text-zinc-400 dark:text-zinc-500">{item.value}</span>
                         )}
@@ -388,20 +613,16 @@ export default function ProductPage() {
                 {/* After — Codebase */}
                 <div className="rounded-xl border border-emerald-500/20 dark:border-emerald-400/20 bg-emerald-50/30 dark:bg-emerald-500/[0.04] p-6 [word-break:keep-all]">
                   <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
-                    Codebase
+                    {content.problem.afterLabel}
                   </p>
                   <div className="space-y-3">
-                    {[
-                      { label: 'AI 기록 자동 발행', check: true },
-                      { label: '콘텐츠 정제', value: 'Style Guide 자동' },
-                      { label: '지식 수익화', value: '마켓플레이스 내장' },
-                    ].map((item) => (
+                    {content.problem.afterRows.map((item) => (
                       <div key={item.label} className="flex items-center justify-between text-sm">
                         <span className="text-zinc-700 dark:text-zinc-300">{item.label}</span>
-                        {item.check ? (
+                        {'check' in item ? (
                           <span className="flex items-center gap-1 font-medium text-emerald-600 dark:text-emerald-400">
                             <CheckCircle2 className="h-3.5 w-3.5" />
-                            프롬프트 한 줄
+                            {item.check}
                           </span>
                         ) : (
                           <span className="font-medium text-zinc-900 dark:text-white">{item.value}</span>
@@ -429,12 +650,12 @@ export default function ProductPage() {
             <FadeInSection>
               <div className="max-w-2xl mb-12 [word-break:keep-all]">
                 <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
-                  Use Cases
+                  {content.useCases.eyebrow}
                 </p>
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-bold leading-tight tracking-tight text-zinc-900 dark:text-white">
-                  프롬프트를 넘어서,
+                  {content.useCases.title[0]}
                   <br />
-                  코드베이스로 연결되는 세 가지 활용례
+                  {content.useCases.title[1]}
                 </h2>
               </div>
             </FadeInSection>
@@ -446,19 +667,19 @@ export default function ProductPage() {
                     value="mcp"
                     className="flex-1 pb-4 rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none dark:data-[state=active]:text-white text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                   >
-                    MCP 자동포스팅
+                    {content.useCases.tabs.mcp}
                   </TabsTrigger>
                   <TabsTrigger
                     value="community"
                     className="flex-1 pb-4 rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none dark:data-[state=active]:text-white text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                   >
-                    커뮤니티 지식 공유
+                    {content.useCases.tabs.community}
                   </TabsTrigger>
                   <TabsTrigger
                     value="marketplace"
                     className="flex-1 pb-4 rounded-none border-b-2 border-transparent data-[state=active]:border-emerald-500 data-[state=active]:bg-transparent data-[state=active]:shadow-none dark:data-[state=active]:text-white text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300"
                   >
-                    콘텐츠 판매와 배포
+                    {content.useCases.tabs.marketplace}
                   </TabsTrigger>
                 </TabsList>
 
@@ -467,13 +688,14 @@ export default function ProductPage() {
                   <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                     <div>
                       <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4">
-                        프롬프트 하나로 AI 지식을 수집하세요
+                        {content.useCases.mcp.title}
                       </h3>
                       <p className="text-base text-zinc-500 dark:text-zinc-400 mb-6 leading-relaxed">
-                        <code className="text-sm bg-zinc-100 dark:bg-white/10 rounded px-1.5 py-0.5">npx mcporter connect</code> 한 줄로 로컬 MCP 프록시 서버를 실행하고, 사용하는 어떤 대화형 AI(ChatGPT, Claude 등)와든 연결합니다. &quot;자동포스팅해줘&quot;라고 입력하면 8가지 Style Guide 프리셋(기술블로그, 에세이 등)을 적용해 SEO 메타데이터와 함께 콘텐츠로 정제되어 Codebase에 즉시 포스팅됩니다.
+                        <code className="text-sm bg-zinc-100 dark:bg-white/10 rounded px-1.5 py-0.5">npx mcporter connect</code>{' '}
+                        {content.useCases.mcp.description}
                       </p>
                       <ul className="space-y-3">
-                        {['원클릭 CLI 인증 연동', '모든 호환 AI 플랫폼 동시 대응', '포스트 초안의 Markdown/HTML 변환 기능 탑재'].map((item) => (
+                        {content.useCases.mcp.bullets.map((item) => (
                            <li key={item} className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
                              <Check className="h-4 w-4 text-emerald-500" />
                              {item}
@@ -488,8 +710,8 @@ export default function ProductPage() {
                       <p className="text-zinc-300">✓ Listening on port 3100</p>
                       <br/>
                       <p className="text-zinc-500">{'// Meanwhile, in Claude window:'}</p>
-                      <p><span className="text-purple-400">User:</span> 이 내용으로 자동포스팅해줘.</p>
-                      <p><span className="text-blue-400">Claude:</span> 네, &apos;기술블로그&apos; 스타일이 적용된 블로그 포스트를 생성했습니다. (id: post_12x...)</p>
+                      <p><span className="text-purple-400">User:</span> {content.useCases.mcp.consolePrompt}</p>
+                      <p><span className="text-blue-400">Claude:</span> {content.useCases.mcp.consoleResponse}</p>
                     </div>
                   </div>
                 </TabsContent>
@@ -499,13 +721,21 @@ export default function ProductPage() {
                   <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                     <div className="lg:order-2">
                       <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4">
-                        관심 커뮤니티에서 지식을 발전시키세요
+                        {content.useCases.community.title}
                       </h3>
                       <p className="text-base text-zinc-500 dark:text-zinc-400 mb-6 leading-relaxed">
-                        완성된 포스트는 단 한 번의 조작으로 Codebase 내의 다양한 <code className="text-sm bg-zinc-100 dark:bg-white/10 rounded px-1.5 py-0.5">/community</code> 게시판과 연결됩니다. 관심 주제의 바이브코딩 커뮤니티에서 내 글을 공유하고, 나와 비슷한 워크플로우를 가진 전문가들과 함께 인사이트를 교류하며 토론할 수 있습니다.
+                        {content.useCases.community.description.split('/community').length > 1 ? (
+                          <>
+                            {content.useCases.community.description.split('/community')[0]}
+                            <code className="text-sm bg-zinc-100 dark:bg-white/10 rounded px-1.5 py-0.5">/community</code>
+                            {content.useCases.community.description.split('/community').slice(1).join('/community')}
+                          </>
+                        ) : (
+                          content.useCases.community.description
+                        )}
                       </p>
                       <ul className="space-y-3">
-                        {['발행 즉시 커뮤니티 타임라인 동기화', '전문가 리뷰 및 댓글 피드백', '토론형 스니펫 인용 및 리포스팅'].map((item) => (
+                        {content.useCases.community.bullets.map((item) => (
                            <li key={item} className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
                              <Check className="h-4 w-4 text-emerald-500" />
                              {item}
@@ -517,16 +747,16 @@ export default function ProductPage() {
                       <div className="flex items-center gap-3 mb-4">
                          <div className="h-10 w-10 shrink-0 rounded-full bg-indigo-100 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-lg">C</div>
                          <div>
-                            <div className="font-bold text-zinc-900 dark:text-white">AI Builders 커뮤니티</div>
-                            <div className="text-xs text-zinc-500">2.1k members</div>
+                            <div className="font-bold text-zinc-900 dark:text-white">{content.useCases.community.communityName}</div>
+                            <div className="text-xs text-zinc-500">{content.useCases.community.communityMembers}</div>
                          </div>
                       </div>
                       <div className="border border-zinc-100 dark:border-white/10 rounded-xl p-4 bg-zinc-50 dark:bg-white/5">
-                         <div className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">방금 전 포스팅한 내 게시물 공유하기</div>
-                         <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mb-4">&quot;오늘 새롭게 발견한 Cursor 에디터 통합 팁입니다! 다들 어떻게 생각하시나요?&quot;</div>
+                         <div className="text-sm font-semibold text-zinc-900 dark:text-white mb-1">{content.useCases.community.shareTitle}</div>
+                         <div className="text-[13px] text-zinc-500 dark:text-zinc-400 mb-4">{content.useCases.community.shareDescription}</div>
                          <div className="border border-emerald-500/20 rounded-lg p-3 bg-white dark:bg-zinc-800">
-                           <div className="font-medium text-sm text-emerald-600 dark:text-emerald-400">Cursor IDE와 MCP 연동 최적화 전략</div>
-                           <div className="text-xs text-zinc-400 mt-1">2 mins read • Tech Blog Style</div>
+                           <div className="font-medium text-sm text-emerald-600 dark:text-emerald-400">{content.useCases.community.shareCardTitle}</div>
+                           <div className="text-xs text-zinc-400 mt-1">{content.useCases.community.shareCardMeta}</div>
                          </div>
                       </div>
                     </div>
@@ -538,13 +768,21 @@ export default function ProductPage() {
                   <div className="grid lg:grid-cols-2 gap-10 lg:gap-16 items-center">
                     <div>
                       <h3 className="text-2xl font-bold text-zinc-900 dark:text-white mb-4">
-                        지식을 안전하게 상품화하세요
+                        {content.useCases.marketplace.title}
                       </h3>
                       <p className="text-base text-zinc-500 dark:text-zinc-400 mb-6 leading-relaxed">
-                        마켓플레이스의 강력한 4단계(4-Phase) 아키텍처를 기반으로 나만의 프롬프트 팩, 템플릿, 단축어 설정집을 손쉽게 상품화할 수 있습니다. <code className="text-sm bg-zinc-100 dark:bg-white/10 rounded px-1.5 py-0.5">DeliveryItem</code> 체계를 통해 구매자만 접근 가능한 파일 및 시크릿 텍스트를 제공하여, 단순한 코딩 정보 그 이상의 독점적인 지식을 수익화하세요.
+                        {content.useCases.marketplace.description.split('DeliveryItem').length > 1 ? (
+                          <>
+                            {content.useCases.marketplace.description.split('DeliveryItem')[0]}
+                            <code className="text-sm bg-zinc-100 dark:bg-white/10 rounded px-1.5 py-0.5">DeliveryItem</code>
+                            {content.useCases.marketplace.description.split('DeliveryItem').slice(1).join('DeliveryItem')}
+                          </>
+                        ) : (
+                          content.useCases.marketplace.description
+                        )}
                       </p>
                       <ul className="space-y-3">
-                        {['구매자 전용 3중 다운로드 계층 지원', '악성코드 스캔 및 안전 검증 패스 (File Safety)', '개별 결제 기반 주문 내역(Order) 및 영수증 제공'].map((item) => (
+                        {content.useCases.marketplace.bullets.map((item) => (
                            <li key={item} className="flex items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
                              <Check className="h-4 w-4 text-emerald-500" />
                              {item}
@@ -554,36 +792,29 @@ export default function ProductPage() {
                     </div>
                     <div className="rounded-2xl border border-zinc-200 dark:border-white/[0.06] bg-white dark:bg-zinc-900 shadow-lg p-6">
                        <div className="flex justify-between items-center mb-6">
-                         <div className="font-bold text-zinc-900 dark:text-white">마켓플레이스 대시보드</div>
-                         <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded text-xs font-bold">Seller Profile</div>
+                         <div className="font-bold text-zinc-900 dark:text-white">{content.useCases.marketplace.dashboardTitle}</div>
+                         <div className="bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-1 rounded text-xs font-bold">{content.useCases.marketplace.sellerBadge}</div>
                        </div>
                        <div className="space-y-4">
-                         <div className="flex border border-zinc-100 dark:border-white/10 rounded-xl p-3 gap-4 items-center">
+                         {content.useCases.marketplace.items.map((item, index) => (
+                         <div key={item.title} className="flex border border-zinc-100 dark:border-white/10 rounded-xl p-3 gap-4 items-center">
                            <div className="h-12 w-12 rounded-lg bg-emerald-100 dark:bg-emerald-500/20 flex items-center justify-center">
-                             <Terminal className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                             {index === 0 ? (
+                               <Terminal className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                             ) : (
+                               <Workflow className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                             )}
                            </div>
                            <div className="flex-1 min-w-0">
-                             <div className="font-semibold text-sm text-zinc-900 dark:text-white truncate">웹개발 생산성 10배 AI 프롬프트 팩</div>
-                             <div className="text-xs text-zinc-500">배포: 3 files (Delivery Items)</div>
+                             <div className="font-semibold text-sm text-zinc-900 dark:text-white truncate">{item.title}</div>
+                             <div className="text-xs text-zinc-500">{item.delivery}</div>
                            </div>
                            <div className="text-right">
-                             <div className="font-bold text-[13px] text-zinc-900 dark:text-white">₩15,000</div>
-                             <div className="text-[11px] text-zinc-400">12 Sales</div>
+                             <div className="font-bold text-[13px] text-zinc-900 dark:text-white">{item.price}</div>
+                             <div className="text-[11px] text-zinc-400">{item.sales}</div>
                            </div>
                          </div>
-                         <div className="flex border border-zinc-100 dark:border-white/10 rounded-xl p-3 gap-4 items-center">
-                           <div className="h-12 w-12 rounded-lg bg-blue-100 dark:bg-blue-500/20 flex items-center justify-center">
-                             <Workflow className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                           </div>
-                           <div className="flex-1 min-w-0">
-                             <div className="font-semibold text-sm text-zinc-900 dark:text-white truncate">Next.js 14 보일러플레이트 구조</div>
-                             <div className="text-xs text-zinc-500">배포: 1 file (With Download Track)</div>
-                           </div>
-                           <div className="text-right">
-                             <div className="font-bold text-[13px] text-zinc-900 dark:text-white">₩24,000</div>
-                             <div className="text-[11px] text-zinc-400">8 Sales</div>
-                           </div>
-                         </div>
+                         ))}
                        </div>
                     </div>
                   </div>
@@ -604,12 +835,12 @@ export default function ProductPage() {
             <FadeInSection>
               <div className="max-w-2xl mb-16 [word-break:keep-all]">
                 <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest mb-4">
-                  작동 원리 요약
+                  {content.pipelineSection.eyebrow}
                 </p>
                 <h2 className="text-2xl sm:text-3xl font-bold leading-tight tracking-tight text-zinc-900 dark:text-white">
-                  수집, 공유, 거래가
+                  {content.pipelineSection.title[0]}
                   <br />
-                  하나의 플랫폼에서 완결됩니다
+                  {content.pipelineSection.title[1]}
                 </h2>
               </div>
             </FadeInSection>
@@ -646,14 +877,14 @@ export default function ProductPage() {
                                     <PIcon className="h-4 w-4 shrink-0" style={{ color: p.color }} />
                                     <div className="min-w-0 flex-1">
                                       <p className="text-sm font-medium text-zinc-900 dark:text-zinc-100">
-                                        {p.name} 세션 연결
+                                        {content.pipelineSection.collectSession.replace('{name}', p.name)}
                                       </p>
                                       <p className="text-xs text-zinc-400 dark:text-zinc-500">
-                                        최근 대화 12건 동기화 준비 완료
+                                        {content.pipelineSection.collectSync}
                                       </p>
                                     </div>
                                     <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                      수집됨
+                                      {content.pipelineSection.collectStatus}
                                     </span>
                                   </div>
                                 );
@@ -668,18 +899,18 @@ export default function ProductPage() {
                               <div className="flex-1 space-y-3">
                                 <div className="rounded-2xl rounded-tl-md bg-zinc-100 px-4 py-3 dark:bg-white/[0.06]">
                                   <p className="text-sm font-medium text-zinc-800 dark:text-zinc-100">
-                                    포스트 초안 생성 완료
+                                    {content.pipelineSection.shareDraftTitle}
                                   </p>
                                   <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
-                                    기술블로그 스타일, SEO 메타데이터, 제목 3안 포함
+                                    {content.pipelineSection.shareDraftDescription}
                                   </p>
                                 </div>
                                 <div className="flex gap-2 pt-1">
                                   <span className="inline-flex h-7 items-center rounded-md bg-zinc-100 px-3 text-xs font-medium text-zinc-700 dark:bg-white/[0.06] dark:text-zinc-300">
-                                    초안 공유
+                                    {content.pipelineSection.shareDraftChip}
                                   </span>
                                   <span className="inline-flex h-7 items-center rounded-md bg-emerald-50 px-3 text-xs font-medium text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                    커뮤니티 게시
+                                    {content.pipelineSection.shareCommunityChip}
                                   </span>
                                 </div>
                               </div>
@@ -687,12 +918,7 @@ export default function ProductPage() {
                           )}
                           {i === 2 && (
                             <div className="grid grid-cols-2 gap-2.5">
-                              {[
-                                ['프롬프트 팩', '₩12,000'],
-                                ['블로그 템플릿', '₩8,900'],
-                                ['MCP 설정집', '₩15,000'],
-                                ['자동화 노하우', '₩19,000'],
-                              ].map(([title, price]) => (
+                              {content.pipelineSection.monetizationItems.map(([title, price]) => (
                                 <div
                                   key={title}
                                   className="rounded-lg border border-zinc-100 dark:border-white/[0.06] p-3 space-y-2"
@@ -747,27 +973,26 @@ export default function ProductPage() {
             <FadeInSection>
               <div className="text-center [word-break:keep-all]">
                 <h2 className="text-3xl sm:text-4xl font-bold tracking-tight text-zinc-900 dark:text-white leading-tight">
-                  AI 지식, 더 이상
+                  {content.finalCta.title[0]}
                   <br />
-                  흩어지지 않게
+                  {content.finalCta.title[1]}
                 </h2>
                 <p className="mt-5 mx-auto max-w-lg text-base text-zinc-500 dark:text-zinc-400 leading-relaxed">
-                  ChatGPT, Claude, Gemini, Perplexity — 어디서 작업하든
-                  프롬프트 한 줄이면 지식이 자동으로 모이고 공유됩니다.
+                  {content.finalCta.description}
                 </p>
                 <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-3">
                   <Link
-                    href="/register"
+                    href={href('/register')}
                     className="group inline-flex h-14 items-center justify-center rounded-xl bg-zinc-900 dark:bg-white px-8 text-base font-semibold text-white dark:text-zinc-900 transition-all duration-[400ms] ease-[cubic-bezier(0.16,1,0.3,1)] hover:scale-[1.02] active:scale-[0.98] shadow-lg shadow-zinc-900/10 dark:shadow-black/20"
                   >
-                    무료로 시작하기
+                    {content.primaryCta}
                     <ArrowRight className="ml-2.5 h-4.5 w-4.5 transition-transform duration-300 group-hover:translate-x-1" />
                   </Link>
                   <Link
-                    href="/login"
+                    href={href('/login')}
                     className="inline-flex h-14 items-center justify-center rounded-xl border border-zinc-200 dark:border-white/10 bg-white/50 dark:bg-white/5 backdrop-blur-sm px-8 text-base font-medium text-zinc-600 dark:text-zinc-400 transition-all duration-300 hover:bg-zinc-50 dark:hover:bg-white/10"
                   >
-                    로그인
+                    {content.secondaryCta}
                   </Link>
                 </div>
               </div>

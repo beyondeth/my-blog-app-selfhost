@@ -3,6 +3,7 @@ import { z } from 'zod';
 // 라우트 정의
 export const routes = {
   home: () => '/',
+  docs: () => '/docs',
   updates: () => '/updates',
   posts: (params?: { slug?: string }) =>
     params?.slug ? `/posts/${params.slug}` : '/posts',

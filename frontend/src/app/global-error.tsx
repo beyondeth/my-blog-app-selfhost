@@ -1,6 +1,5 @@
 'use client';
 
-// 동적 렌더링 강제 - prerendering 시 useContext 오류 방지
 export const dynamic = 'force-dynamic';
 
 /**
@@ -17,7 +16,7 @@ export default function GlobalError({
   reset: () => void;
 }) {
   return (
-    <html lang="ko">
+    <html lang="en">
       <body style={{
         margin: 0,
         fontFamily: '-apple-system, BlinkMacSystemFont, system-ui, sans-serif',
@@ -38,13 +37,13 @@ export default function GlobalError({
             color: '#111827',
             marginBottom: '16px'
           }}>
-            오류가 발생했습니다
+            Something went wrong
           </h1>
           <p style={{
             color: '#6b7280',
             marginBottom: '24px'
           }}>
-            예상치 못한 오류가 발생했습니다. 잠시 후 다시 시도해주세요.
+            An unexpected error interrupted this page. Please try again.
           </p>
           <button
             onClick={() => reset()}
@@ -58,7 +57,7 @@ export default function GlobalError({
               fontSize: '14px'
             }}
           >
-            다시 시도
+            Try again
           </button>
         </div>
       </body>

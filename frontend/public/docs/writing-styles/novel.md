@@ -1,6 +1,6 @@
 ---
 style_name: "Fiction Writer's Narrative Style"
-language: "korean"
+language: "english"
 min_length: 5000
 target_length: "5000-8000"
 code_block_ratio: 0.05
@@ -21,7 +21,7 @@ Use this style to transform technical experiences into compelling narratives wit
 - War stories that teach through experience
 
 ### Recommended Signals
-**Keywords**: "새벽", "장애", "위기", "디버깅", "고군분투", "깨달음", "여정"
+**Keywords**: "late night", "incident", "crisis", "debugging", "struggle", "breakthrough", "journey"
 **Emotional intent**: User wants to share the experience, not just the solution
 
 ### When Another Style Fits Better
@@ -81,7 +81,7 @@ Build tension through narrative arc:
 ```markdown
 ## Opening Scene
 Specific time, place, sensory detail
-"화요일 새벽 3시 47분. 고객 대시보드가 로딩 중이었다..."
+"Tuesday, 3:47 AM. The customer dashboard was still loading..."
 
 ## Act 1: The Problem Emerges
 First signals, initial response, growing concern
@@ -99,66 +99,66 @@ The "aha!" described viscerally
 Technical lesson (brief), personal growth, forward-looking insight
 ```
 
-## Voice and Tone (Korean)
+## Voice and Tone
 
 **Narrative voice**: Past tense, first-person storytelling
-- "세 번째 커피는 이미 식어있었다" (not "세 번째 커피가 식었다")
-- "우리는 Redis를 도입하기로 했다" (decision moment)
+- "My third coffee had already gone cold." (not "The coffee cooled down.")
+- "We decided to bring in Redis." (clear decision moment)
 
 **Dialogue**: Use direct quotes for realism
 ```markdown
-Sarah가 내 어깨 너머로 말했다. "아직도 SELECT * 쓰고 있어?"
+Sarah leaned over my shoulder. "Are you still using `SELECT *`?"
 
-"디버깅 세션이야, 프로덕션 아니고."
+"It's a debugging session, not production."
 
-"이미 3시간째야."
+"It's already been three hours."
 
-그녀가 맞았다. 자존심이 나쁜 아키텍처를 만든다.
+She was right. Pride is how bad architecture survives.
 ```
 
 ## Sensory and Temporal Markers
 
 ### Time Markers
-- Specific timestamps: "화요일 새벽 3시 47분"
-- Duration markers: "3시간 후", "48시간이 지났다"
-- Environmental changes: "해가 떠올랐다", "사무실이 어두워졌다"
+- Specific timestamps: "Tuesday, 3:47 AM"
+- Duration markers: "three hours later", "forty-eight hours passed"
+- Environmental changes: "sunlight started cutting through the blinds", "the office fell dark again"
 
 ### Physical Details
-- Coffee count: "세 번째 커피", "식은 커피"
-- Screen/monitor: "모니터를 채운 에러 로그"
-- Surroundings: "사무실의 냉방", "키보드 타이핑 소리만"
+- Coffee count: "third coffee", "cold coffee"
+- Screen / monitor: "error logs flooding the monitor"
+- Surroundings: "the office AC", "nothing but keyboard noise"
 
 ### Emotional State (through action)
-- "손이 떨렸다" (nervous)
-- "심호흡을 했다" (preparing)
-- "웃음이 나왔다" (ironic/bitter)
+- "My hands shook." (nervous)
+- "I took a long breath." (preparing)
+- "I laughed once." (ironic or bitter)
 
 ## Formatting for Narrative Flow
 
 ### Pacing
 - **Crisis/action**: Short, punchy sentences
   ```
-  에러가 나타났다.
-  다시 시도했다.
-  또 실패했다.
+  The error appeared.
+  I ran it again.
+  It failed again.
   ```
 
 - **Reflection**: Longer, thoughtful sentences
   ```
-  6개월 전의 나라면 이 코드를 cowboy coding 했을 것이다. 빠르게 배포하고,
-  프로덕션에서 디버깅하고, 다음으로 넘어가는 식으로. 하지만 화요일의
-  14시간 장애는 내게 가르쳐줬다...
+  Six months earlier, I would have cowboy-coded this and shipped it fast,
+  debugged it in production, and moved on. The fourteen-hour outage on that
+  Tuesday taught me otherwise...
   ```
 
 ### Dialogue Format
 ```markdown
-**Sarah**: "이게 진짜 문제야?"
+**Sarah**: "Is that really the problem?"
 
-**Me**: "...아마도."
+**Me**: "...Maybe."
 
-**Sarah**: \*노트북을 보여줌\*
+**Sarah**: \*turns the laptop toward me\*
 
-**Me**: "...아, 이런."
+**Me**: "...Oh no."
 ```
 
 ### Section Breaks
@@ -170,9 +170,9 @@ Use `---` between acts/major scenes to signal time/location shifts.
 
 ## Opening Transformation
 
-**Before**: "오늘은 우리 API 최적화 경험을 공유하겠습니다."
+**Before**: "Today I'll share how we optimized our API."
 
-**After**: "화요일 오전 10시 47분. 고객 대시보드가 로드되었다. 그리고 계속 로드되었다. 15초가 지났다. 내 커피가 식어갔다. CEO의 슬랙 메시지가 도착했다: '?????'"
+**After**: "Tuesday, 10:47 AM. The customer dashboard loaded. Then kept loading. Fifteen seconds passed. My coffee cooled beside the keyboard. A Slack message from the CEO arrived: '?????'"
 
 **Principle**: Start with a specific moment, not a topic announcement.
 
@@ -181,30 +181,30 @@ Use `---` between acts/major scenes to signal time/location shifts.
 Chronicle escalating failures:
 
 ```markdown
-**시도 1**: Redis 캐싱. 2시간 후 다시 크래시.
+**Attempt 1**: Redis caching. It crashed again two hours later.
 
-**시도 2**: Database read replicas. Write master는 여전히 버거워했다.
+**Attempt 2**: Database read replicas. The write master still could not keep up.
 
-**시도 3**: Horizontal scaling. AWS 비용은 두 배. 성능은 그대로.
+**Attempt 3**: Horizontal scaling. AWS cost doubled. Performance did not.
 
-**새벽 4시의 깨달음**: 우리는 처음부터 잘못된 것을 캐싱하고 있었다.
+**The 4 AM realization**: we had been caching the wrong thing from the start.
 ```
 
 ## Metaphor for Technical Concepts
 
 **Abstract**: "Event-driven architecture separates concerns."
 
-**Narrative**: "레스토랑 주방을 상상해 보자. 웨이터는 요리하지 않는다. 셰프는 서빙하지 않는다. 각자는 자기 신호를 기다린다—'주문 들어왔어요!' 혹은 '7번 테이블!'—그리고 자기 일을 한다. 그게 event-driven architecture다. 모두가 기다리고, 듣고, 반응할 준비를 하고 있다."
+**Narrative**: "Imagine a restaurant kitchen. Waiters do not cook. Chefs do not serve. Everyone waits for a signal, hears it, and responds. That is event-driven architecture: a system of listeners, boundaries, and reactions."
 
 ## Character Arc Through Tech Journey
 
-**Before**: "아키텍처 계획이 중요하다는 걸 배웠다."
+**Before**: "I learned that architecture planning matters."
 
-**After**: "6개월 전의 나라면 이 솔루션을 cowboy coding 했을 것이다. 빠르게 배포, 프로덕션에서 디버깅, 다음으로 넘어가기. 하지만 화요일의 14시간 장애가 가르쳐줬다: 기술 부채는 코드로 갚는 게 아니다. 팀의 야근 시간으로, CEO의 신뢰로, 사용자의 인내심으로 갚는다.
+**After**: "Six months earlier, I would have cowboy-coded this solution, shipped it fast, and debugged it in production. The fourteen-hour outage on Tuesday taught me something else: technical debt is not repaid with code. It gets repaid with a team's overtime, a CEO's trust, and a user's patience.
 
-이제 나는 지루하고, 문서화가 과한, 제대로 테스트된 코드를 쓴다.
+Now I write the boring, heavily documented, properly tested code.
 
-그리고 나는 잔다."
+And I sleep."
 
 **Principle**: Show transformation through contrasting past/present self.
 

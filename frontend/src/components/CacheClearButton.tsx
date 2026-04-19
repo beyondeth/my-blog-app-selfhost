@@ -19,15 +19,16 @@ interface CacheClearButtonProps {
  */
 export function CacheClearButton({ className = '' }: CacheClearButtonProps) {
   const queryClient = useQueryClient();
+  const isEnabled = process.env.NEXT_PUBLIC_ENABLE_DEBUG_CACHE_CLEAR === 'true';
 
   const handleClearCache = () => {
-    console.log('🧹 캐시 클리어 시작...');
+    console.log('🧹 Starting cache clear...');
 
-    // 1. TanStack Query 캐시 클리어
+    // 1. Clear TanStack Query cache
     queryClient.clear();
-    console.log('✅ TanStack Query 캐시 클리어 완료');
+    console.log('✅ Cleared TanStack Query cache');
 
-    // 2. localStorage 클리어 (관련 키만)
+    // 2. Clear related localStorage keys
     const localStorageKeys = Object.keys(localStorage);
     let removedKeys = 0;
 
@@ -40,9 +41,9 @@ export function CacheClearButton({ className = '' }: CacheClearButtonProps) {
         removedKeys++;
       }
     });
-    console.log(`✅ localStorage에서 ${removedKeys}개 키 제거 완료`);
+    console.log(`✅ Removed ${removedKeys} localStorage keys`);
 
-    // 3. sessionStorage 클리어 (관련 키만)
+    // 3. Clear related sessionStorage keys
     const sessionStorageKeys = Object.keys(sessionStorage);
     let sessionRemovedKeys = 0;
 
@@ -55,19 +56,18 @@ export function CacheClearButton({ className = '' }: CacheClearButtonProps) {
         sessionRemovedKeys++;
       }
     });
-    console.log(`✅ sessionStorage에서 ${sessionRemovedKeys}개 키 제거 완료`);
+    console.log(`✅ Removed ${sessionRemovedKeys} sessionStorage keys`);
 
-    // 4. 성공 알림
-    toast.success(`캐시 클리어 완료! (${removedKeys + sessionRemovedKeys}개 키 제거)`);
+    // 4. Show completion toast
+    toast.success(`Cache cleared (${removedKeys + sessionRemovedKeys} keys removed)`);
 
-    // 5. 1초 후 페이지 새로고침
+    // 5. Refresh after a short delay
     setTimeout(() => {
       window.location.reload();
     }, 1000);
   };
 
-  // 개발 환경에서만 표시
-  if (process.env.NODE_ENV === 'production') {
+  if (process.env.NODE_ENV === 'production' || !isEnabled) {
     return null;
   }
 
@@ -75,9 +75,9 @@ export function CacheClearButton({ className = '' }: CacheClearButtonProps) {
     <button
       onClick={handleClearCache}
       className={`fixed top-4 right-4 z-50 bg-red-500 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-red-600 transition-colors text-sm font-medium ${className}`}
-      title="캐시 클리어 (개발 전용)"
+      title="Clear caches (development only)"
     >
-      🧹 캐시 클리어
+      🧹 Clear caches
     </button>
   );
 }
