@@ -30,7 +30,7 @@ const FlairsList = React.memo(function FlairsList({
   selectedFlairId,
   className,
   showHeader = true,
-  headerTitle = '말머리',
+  headerTitle = 'Flairs',
   limit
 }: FlairsListProps) {
   // 게시물 플레어만 필터링하고 활성화된 것만 표시
@@ -103,7 +103,7 @@ const FlairsList = React.memo(function FlairsList({
           onClick={() => onFlairClick('')}
           className="mt-3 text-xs text-gray-500 hover:text-gray-700 dark:text-[#C7D1DD] dark:hover:text-[#E6EDF3] transition-colors block"
         >
-          필터 초기화
+          Clear filter
         </button>
       )}
 
@@ -115,14 +115,14 @@ const FlairsList = React.memo(function FlairsList({
               onClick={() => onFlairClick('')}
               className="mb-4 text-xs text-gray-500 hover:text-gray-700 dark:text-[#C7D1DD] dark:hover:text-[#E6EDF3] transition-colors block"
             >
-              필터 초기화
+              Clear filter
             </button>
           )}
           <button
             onClick={() => setIsExpanded(!isExpanded)}
             className="w-[calc(100%+2.5rem)] -mx-5 px-5 py-3 text-sm font-medium text-blue-600 dark:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors border-t border-gray-200 dark:border-gray-700 flex items-center justify-center rounded-b-xl"
           >
-            {isExpanded ? '접기' : `모두 보기 (${sortedFlairs.length - effectiveLimit}개 더)`}
+            {isExpanded ? 'Show less' : `Show all (${sortedFlairs.length - effectiveLimit} more)`}
           </button>
         </React.Fragment>
       )}

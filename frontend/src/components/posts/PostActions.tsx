@@ -43,7 +43,7 @@ export default function PostActions({
           className="flex items-center space-x-2 px-3 py-1 rounded-full text-xs text-gray-500 hover:bg-gray-50 hover:text-gray-700 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-300 transition-colors"
         >
           <FiShare2 className="w-4 h-4" />
-          <span>공유</span>
+          <span>Share</span>
         </button>
       </div>
     </div>

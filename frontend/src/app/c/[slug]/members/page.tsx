@@ -65,8 +65,7 @@ interface MembersPageProps {
 }
 
 /**
- * 커뮤니티 멤버 관리 페이지 (/c/[slug]/members)
- * ADMIN 이상 권한 필요
+ * Community member management page (/c/[slug]/members)
  */
 export default function MembersPage({ params }: MembersPageProps) {
   const { slug } = use(params);
@@ -264,10 +263,10 @@ export default function MembersPage({ params }: MembersPageProps) {
         <div className="text-center py-12">
           <Shield className="w-16 h-16 mx-auto text-gray-400 mb-4" />
           <h1 className="text-xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-            권한이 없습니다
+            Access denied
           </h1>
           <p className="text-gray-500 dark:text-gray-400">
-            멤버 관리는 관리자 이상의 권한이 필요합니다.
+            Member management requires admin access or higher.
           </p>
         </div>
       </CommunityAdminLayout>
@@ -279,8 +278,8 @@ export default function MembersPage({ params }: MembersPageProps) {
       <div className="space-y-6">
         <section className={`${SETTINGS_CARD_CLASS} p-4 sm:p-6 space-y-6`}>
           <div className="space-y-1">
-            <h2 className={SETTINGS_SECTION_TITLE_CLASS}>멤버 관리</h2>
-            <p className="text-sm text-gray-600 dark:text-gray-400">멤버 역할을 관리하고 차단 상태를 확인하세요.</p>
+            <h2 className={SETTINGS_SECTION_TITLE_CLASS}>Member management</h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400">Manage roles and review bans from one place.</p>
           </div>
 
           <div className="flex gap-2">
@@ -294,7 +293,7 @@ export default function MembersPage({ params }: MembersPageProps) {
               )}
             >
               <Users className="w-4 h-4 inline-block mr-2" />
-              멤버 ({membersData?.pages[0]?.total || 0})
+              Members ({membersData?.pages[0]?.total || 0})
             </button>
             <button
               onClick={() => setActiveTab('bans')}
@@ -306,7 +305,7 @@ export default function MembersPage({ params }: MembersPageProps) {
               )}
             >
               <Ban className="w-4 h-4 inline-block mr-2" />
-              차단됨 ({bansData?.pages[0]?.total || 0})
+              Banned ({bansData?.pages[0]?.total || 0})
             </button>
           </div>
 
@@ -318,7 +317,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                 <input
                   type="text"
-                  placeholder="멤버 검색..."
+                  placeholder="Search members..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className={`${SETTINGS_INPUT_CLASS} pl-10`}
@@ -329,14 +328,14 @@ export default function MembersPage({ params }: MembersPageProps) {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button className={`${SETTINGS_SUBTLE_BUTTON_CLASS} min-w-[140px] justify-between flex items-center`}>
-                    {roleFilter === 'all' ? '모든 역할' : (
+                    {roleFilter === 'all' ? 'All roles' : (
                       <>
                         {getRoleIcon(roleFilter)}
                         <span className="ml-2">
-                          {roleFilter === CommunityRole.OWNER && '오너'}
-                          {roleFilter === CommunityRole.ADMIN && '관리자'}
-                          {roleFilter === CommunityRole.MODERATOR && '매니저'}
-                          {roleFilter === CommunityRole.MEMBER && '멤버'}
+                          {roleFilter === CommunityRole.OWNER && 'Owner'}
+                          {roleFilter === CommunityRole.ADMIN && 'Admin'}
+                          {roleFilter === CommunityRole.MODERATOR && 'Moderator'}
+                          {roleFilter === CommunityRole.MEMBER && 'Member'}
                         </span>
                       </>
                     )}
@@ -345,24 +344,24 @@ export default function MembersPage({ params }: MembersPageProps) {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuItem onClick={() => setRoleFilter('all')}>
-                    모든 역할
+                    All roles
                   </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={() => setRoleFilter(CommunityRole.OWNER)}>
                     <Crown className="w-4 h-4 mr-2 text-yellow-500" />
-                    오너
+                    Owner
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setRoleFilter(CommunityRole.ADMIN)}>
                     <Shield className="w-4 h-4 mr-2 text-blue-500" />
-                    관리자
+                    Admin
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setRoleFilter(CommunityRole.MODERATOR)}>
                     <UserCog className="w-4 h-4 mr-2 text-green-500" />
-                    매니저
+                    Moderator
                   </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => setRoleFilter(CommunityRole.MEMBER)}>
                     <Users className="w-4 h-4 mr-2 text-gray-400" />
-                    멤버
+                    Member
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -376,7 +375,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                 </div>
               ) : allMembers.length === 0 ? (
                 <div key="members-empty" className="p-8 text-center text-gray-500 dark:text-gray-400">
-                  {searchQuery ? '검색 결과가 없습니다.' : '멤버가 없습니다.'}
+                  {searchQuery ? 'No matching members found.' : 'No members yet.'}
                 </div>
               ) : (
                 <div key="members-list" className="divide-y divide-gray-100 dark:divide-[#2F3440]">
@@ -431,7 +430,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                                 }
                               >
                                 <Shield className="w-4 h-4 mr-2 text-blue-500" />
-                                관리자로 임명
+                                Promote to admin
                               </DropdownMenuItem>
                             )}
                             {member.role !== CommunityRole.MODERATOR && (
@@ -446,7 +445,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                                 }
                               >
                                 <UserCog className="w-4 h-4 mr-2 text-green-500" />
-                                매니저로 임명
+                                Promote to moderator
                               </DropdownMenuItem>
                             )}
                             {member.role !== CommunityRole.MEMBER && (
@@ -461,7 +460,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                                 }
                               >
                                 <Users className="w-4 h-4 mr-2 text-gray-400" />
-                                일반 멤버로 변경
+                                Change to member
                               </DropdownMenuItem>
                             )}
                             <DropdownMenuSeparator />
@@ -476,7 +475,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                                 className="text-orange-600 dark:text-orange-400"
                               >
                                 <Crown className="w-4 h-4 mr-2 text-orange-500" />
-                                소유권 이전
+                                Transfer ownership
                               </DropdownMenuItem>
                             )}
                             {/* 차단 */}
@@ -485,7 +484,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                               className="text-red-600 dark:text-red-400"
                             >
                               <Ban className="w-4 h-4 mr-2" />
-                              차단하기
+                              Ban member
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -504,7 +503,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                     disabled={isFetchingMoreMembers}
                     className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-full justify-center`}
                   >
-                    {isFetchingMoreMembers ? '불러오는 중...' : '더 보기'}
+                    {isFetchingMoreMembers ? 'Loading...' : 'Load more'}
                   </button>
                 </div>
               )}
@@ -519,7 +518,7 @@ export default function MembersPage({ params }: MembersPageProps) {
               </div>
             ) : allBans.length === 0 ? (
               <div key="bans-empty" className="p-8 text-center text-gray-500 dark:text-gray-400">
-                차단된 멤버가 없습니다.
+                No banned members.
               </div>
             ) : (
               <div key="bans-list" className="divide-y divide-gray-100 dark:divide-[#2F3440]">
@@ -540,7 +539,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                         </p>
                         {ban.reason && (
                           <p className="text-sm text-gray-500 dark:text-gray-400">
-                            사유: {ban.reason}
+                            Reason: {ban.reason}
                           </p>
                         )}
                       </div>
@@ -553,7 +552,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                       className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-auto gap-2`}
                     >
                       <UserMinus className="w-4 h-4 mr-2" />
-                      차단 해제
+                      Unban
                     </button>
                   </div>
                 ))}
@@ -569,7 +568,7 @@ export default function MembersPage({ params }: MembersPageProps) {
                   disabled={isFetchingMoreBans}
                   className={`${SETTINGS_SUBTLE_BUTTON_CLASS} w-full justify-center`}
                 >
-                  {isFetchingMoreBans ? '불러오는 중...' : '더 보기'}
+                  {isFetchingMoreBans ? 'Loading...' : 'Load more'}
                 </button>
               </div>
             )}
@@ -582,21 +581,21 @@ export default function MembersPage({ params }: MembersPageProps) {
       <AlertDialog open={!!roleChangeTarget} onOpenChange={() => setRoleChangeTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>역할 변경</AlertDialogTitle>
+            <AlertDialogTitle>Change role</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{roleChangeTarget?.username}</strong>님의 역할을{' '}
+              Change <strong>{roleChangeTarget?.username}</strong>&apos;s role to{' '}
               <strong>
-                {roleChangeTarget?.newRole === CommunityRole.ADMIN && '관리자'}
-                {roleChangeTarget?.newRole === CommunityRole.MODERATOR && '매니저'}
-                {roleChangeTarget?.newRole === CommunityRole.MEMBER && '일반 멤버'}
+                {roleChangeTarget?.newRole === CommunityRole.ADMIN && 'admin'}
+                {roleChangeTarget?.newRole === CommunityRole.MODERATOR && 'moderator'}
+                {roleChangeTarget?.newRole === CommunityRole.MEMBER && 'member'}
               </strong>
-              로 변경하시겠습니까?
+              ?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmRoleChange}>
-              변경
+              Confirm
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -606,17 +605,17 @@ export default function MembersPage({ params }: MembersPageProps) {
       <AlertDialog open={!!ownershipTarget} onOpenChange={() => setOwnershipTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>소유권 이전</AlertDialogTitle>
+            <AlertDialogTitle>Transfer ownership</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{ownershipTarget?.username}</strong>님에게 커뮤니티 소유권을 이전하시겠습니까?
+              Transfer community ownership to <strong>{ownershipTarget?.username}</strong>?
               <br />
-              이전 후에는 오너 권한을 되돌릴 수 없습니다.
+              This cannot be reversed automatically.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={confirmTransferOwnership}>
-              이전
+              Transfer
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -626,32 +625,32 @@ export default function MembersPage({ params }: MembersPageProps) {
       <AlertDialog open={!!banTarget} onOpenChange={() => setBanTarget(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>멤버 차단</AlertDialogTitle>
+            <AlertDialogTitle>Ban member</AlertDialogTitle>
             <AlertDialogDescription>
-              <strong>{banTarget?.username}</strong>님을 차단하시겠습니까?
+              Ban <strong>{banTarget?.username}</strong> from this community?
               <br />
-              차단된 멤버는 커뮤니티에 접근할 수 없습니다.
+              Banned members will lose access to this community.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-4">
             <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
-              차단 사유 (선택)
+              Reason (optional)
             </label>
             <input
               type="text"
               value={banReason}
               onChange={(e) => setBanReason(e.target.value)}
-              placeholder="차단 사유를 입력하세요..."
+              placeholder="Add an internal note for this ban"
               className={`${SETTINGS_INPUT_CLASS} mt-2`}
             />
           </div>
           <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={confirmBan}
               className="bg-red-600 hover:bg-red-700"
             >
-              차단
+              Ban
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

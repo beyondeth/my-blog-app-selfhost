@@ -14,9 +14,11 @@ interface EditorPickCardProps {
 
 export function EditorPickCard({ post, priority = false, onClick, className = '' }: EditorPickCardProps) {
   const author = post?.author;
-  const authorName = author?.username || author?.email || '익명';
+  const authorName = author?.username || author?.email || 'Anonymous';
   const authorImage = author?.profileImage || null;
   const postImage = post?.thumbnail || post?.images?.[0] || null;
+  const ctaLabel = 'Open';
+  const emptyExcerpt = 'No summary is available for this post.';
   
   const href = post?.blog?.slug
     ? `/${post.blog.slug}/${post.slug || post.id}`
@@ -68,7 +70,7 @@ export function EditorPickCard({ post, priority = false, onClick, className = ''
                onClick={(e) => e.stopPropagation()}
                className="rounded-full bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-[#0B1220] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F87171] dark:bg-[#0B0F14] dark:hover:bg-[#111827] dark:focus-visible:ring-[#F87171]"
              >
-               바로 가기
+               {ctaLabel}
              </Link>
            </div>
         </div>
@@ -105,7 +107,7 @@ export function EditorPickCard({ post, priority = false, onClick, className = ''
             overflow: 'hidden',
           }}
         >
-          {post.editorPickExcerpt || post.excerpt || '요약이 없는 포스트입니다.'}
+          {post.editorPickExcerpt || post.excerpt || emptyExcerpt}
         </p>
       </div>
       <div className="mt-auto space-y-4">
@@ -125,7 +127,7 @@ export function EditorPickCard({ post, priority = false, onClick, className = ''
             onClick={(e) => e.stopPropagation()}
             className="rounded-full border border-[#111827] px-4 py-2 text-sm font-semibold text-[#111827] transition-colors hover:bg-[#111827] hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F87171] focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:border-[#E6EDF3] dark:text-[#E6EDF3] dark:hover:bg-[#E6EDF3] dark:hover:text-[#0E141B] dark:focus-visible:ring-[#F87171] dark:focus-visible:ring-offset-[#0E141B]"
           >
-            바로 가기
+            {ctaLabel}
           </Link>
         </div>
       </div>

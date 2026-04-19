@@ -6,7 +6,6 @@ import { useState, useEffect, useRef, useCallback, memo, Suspense } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/providers/AuthProviderV2';
 import { FiSearch } from 'react-icons/fi';
-import { routes } from '@/lib/navigation';
 import ProfileDropdown from './ProfileDropdown';
 import MobileProfileDropdown from './MobileProfileDropdown';
 import SubscriptionBadge from '../subscription/SubscriptionBadge';
@@ -14,6 +13,8 @@ import { ThemeSwitch } from '@/components/ui/ThemeSwitch';
 import { createSearchUrl, parseSearchParams } from '@/lib/navigation';
 import { canAccessSubscriptionUi } from '@/lib/subscription-access';
 import { useSidebarStore } from '@/stores/sidebarStore';
+import { stripLocalePrefix } from '@/lib/i18n/config';
+import { useLocaleContext } from '@/providers/LocaleProvider';
 
 // ============================================
 // SearchParamsSync: useSearchParams 사용 컴포넌트 (Suspense 필요)
@@ -39,12 +40,23 @@ function HeaderComponent() {
   const { toggleSidebar } = useSidebarStore();
   const router = useRouter();
   const pathname = usePathname();
+  const normalizedPathname = stripLocalePrefix(pathname || '/');
+  const { locale, href } = useLocaleContext();
   // useSearchParams는 SearchParamsSync 컴포넌트로 분리 (Suspense 경계 내에서만 사용)
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [mounted, setMounted] = useState(false);
   const canManageSubscription = canAccessSubscriptionUi(isAdmin);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const authCopy = locale === 'ko'
+    ? {
+        login: '로그인',
+        sidebarToggle: '사이드바 토글',
+      }
+    : {
+        login: 'Sign in',
+        sidebarToggle: 'Toggle sidebar',
+      };
 
   // 테마 마운트 상태 관리 (Hydration mismatch 방지)
   useEffect(() => {
@@ -52,33 +64,33 @@ function HeaderComponent() {
   }, []);
 
   // 홈 페이지로 이동 (캐시 보존)
-  const handleHomeNavigation = (e: React.MouseEvent) => {
+  const handleHomeNavigation = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
 
     // 홈으로 이동 (모든 검색 파라미터 초기화)
-    router.push('/');
+    router.push(href('/'));
 
     // 이미 홈 페이지에 있다면 스크롤을 맨 위로
-    if (pathname === '/') {
+    if (normalizedPathname === '/') {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
-  };
+  }, [href, normalizedPathname, router]);
 
   // SearchParamsSync 콜백 (useCallback으로 안정적인 참조 유지)
   const handleSearchQueryFromParams = useCallback((query: string) => {
     setSearchQuery(query);
   }, []);
 
-  const pathSegments = pathname?.split('/').filter(Boolean) ?? [];
-  const isBlogPage = pathname &&
-    !pathname.startsWith('/p/') &&
-    !pathname.startsWith('/settings/') &&
-    !pathname.startsWith('/new-story') &&
-    !pathname.startsWith('/login') &&
-    !pathname.startsWith('/register') &&
-    !pathname.startsWith('/dm') &&
-    !pathname.startsWith('/pricing') &&
-    pathname !== '/' &&
+  const pathSegments = normalizedPathname.split('/').filter(Boolean);
+  const isBlogPage = normalizedPathname &&
+    !normalizedPathname.startsWith('/p/') &&
+    !normalizedPathname.startsWith('/settings/') &&
+    !normalizedPathname.startsWith('/new-story') &&
+    !normalizedPathname.startsWith('/login') &&
+    !normalizedPathname.startsWith('/register') &&
+    !normalizedPathname.startsWith('/dm') &&
+    !normalizedPathname.startsWith('/pricing') &&
+    normalizedPathname !== '/' &&
     pathSegments.length === 1;
   const isCommunityPage = pathSegments[0] === 'c' && pathSegments.length === 2;
   const communitySlugFromPath = isCommunityPage ? pathSegments[1] : null;
@@ -151,7 +163,7 @@ function HeaderComponent() {
             <button
               onClick={toggleSidebar}
               className="hidden lg:flex items-center justify-center w-10 h-10 rounded-full border border-[#D9E0EA] bg-white text-[#1B2430] transition-colors hover:bg-[#F7F9FC] dark:border-[#2A3645] dark:bg-[#0E141B] dark:text-[#E6EDF3] dark:hover:bg-[#1A232E]"
-              aria-label="사이드바 토글"
+              aria-label={authCopy.sidebarToggle}
             >
               <Image
                 src="/assets/left-sidebar/menu.svg"
@@ -164,7 +176,7 @@ function HeaderComponent() {
 
             {/* Logo */}
             <a
-              href={routes.home()}
+              href={href('/')}
               onClick={handleHomeNavigation}
               className="hover:opacity-80 transition-opacity cursor-pointer flex items-center space-x-2"
             >
@@ -240,14 +252,14 @@ function HeaderComponent() {
                 </>
               ) : (
                 <>
-                  <Link
-                    href={routes.login()}
+              <Link
+                    href={href('/login')}
                     className="inline-flex items-center justify-center px-4 py-2 text-[15px] font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
                   onClick={(e) => {
                     // 회원가입 페이지에서 로그인 버튼 클릭 시 상태 초기화
-                    if (pathname === '/register') {
+                    if (normalizedPathname === '/register') {
                       e.preventDefault();
-                      router.push('/login');
+                      router.push(href('/login'));
                       // 약간의 지연 후 회원가입 페이지 상태 초기화를 위한 새로고침
                       setTimeout(() => {
                         window.dispatchEvent(new Event('register-page-reset'));
@@ -255,7 +267,7 @@ function HeaderComponent() {
                     }
                   }}
                 >
-                  로그인
+                  {authCopy.login}
                 </Link>
                 </>
               )}
@@ -287,19 +299,19 @@ function HeaderComponent() {
             ) : (
               // 비로그인 상태: 로그인 버튼
               <Link
-                href={routes.login()}
+                href={href('/login')}
                 className="inline-flex items-center justify-center px-4 py-2 text-sm font-medium bg-primary hover:bg-primary/90 text-primary-foreground rounded-full transition-all"
                 onClick={(e) => {
-                  if (pathname === '/register') {
+                  if (normalizedPathname === '/register') {
                     e.preventDefault();
-                    router.push('/login');
+                    router.push(href('/login'));
                     setTimeout(() => {
                       window.dispatchEvent(new Event('register-page-reset'));
                     }, 100);
                   }
                 }}
               >
-                로그인
+                {authCopy.login}
               </Link>
             )}
           </div>

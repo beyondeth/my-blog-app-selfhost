@@ -139,7 +139,7 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
         setSelectedWidgetId(existing.id);
         setPanelFeedback({
           type: 'info',
-          text: '해당 타입의 위젯이 이미 존재합니다. 목록에서 선택해 편집하세요.',
+          text: 'That widget type already exists. Select it from the list to edit it.',
         });
         return;
       }
@@ -148,11 +148,11 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
       const payload = buildInitialWidgetPayload(type, community);
       const created = await createMutation.mutateAsync(payload);
       setSelectedWidgetId(created.id);
-      setPanelFeedback({ type: 'success', text: '위젯을 생성했습니다.' });
+      setPanelFeedback({ type: 'success', text: 'Widget created.' });
     } catch (error: any) {
       setPanelFeedback({
         type: 'error',
-        text: error?.message || '위젯 생성 중 오류가 발생했습니다.',
+        text: error?.message || 'Failed to create the widget.',
       });
     }
   };
@@ -160,7 +160,7 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
   const handleDeleteWidget = async (widgetId: string) => {
     try {
       await deleteMutation.mutateAsync(widgetId);
-      setPanelFeedback({ type: 'success', text: '위젯을 삭제했습니다.' });
+      setPanelFeedback({ type: 'success', text: 'Widget deleted.' });
       setSelectedWidgetId((prev) => {
         if (prev === widgetId) {
           const remaining = orderedWidgets.filter((widget) => widget.id !== widgetId);
@@ -171,7 +171,7 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
     } catch (error: any) {
       setPanelFeedback({
         type: 'error',
-        text: error?.message || '위젯을 삭제하지 못했습니다.',
+        text: error?.message || 'Unable to delete the widget.',
       });
     }
   };
@@ -179,7 +179,7 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
   const handleToggleWidget = async (widgetId: string, nextValue: boolean) => {
     setPanelFeedback({
       type: 'info',
-      text: nextValue ? '위젯을 표시하도록 전환하는 중...' : '위젯을 숨기는 중...',
+      text: nextValue ? 'Making the widget visible...' : 'Hiding the widget...',
     });
     try {
       await updateMutation.mutateAsync({
@@ -188,45 +188,45 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
       });
       setPanelFeedback({
         type: 'success',
-        text: nextValue ? '위젯을 활성화했습니다.' : '위젯을 비활성화했습니다.',
+        text: nextValue ? 'Widget enabled.' : 'Widget disabled.',
       });
     } catch (error: any) {
       setPanelFeedback({
         type: 'error',
-        text: error?.message || '표시 상태를 업데이트하지 못했습니다.',
+        text: error?.message || 'Failed to update widget visibility.',
       });
     }
   };
 
   const handleWidgetSave = async (dto: UpdateCommunityWidgetInput) => {
     if (!selectedWidget) return;
-    setEditorFeedback({ type: 'info', text: '위젯을 저장하는 중입니다...' });
+    setEditorFeedback({ type: 'info', text: 'Saving widget...' });
     try {
       await updateMutation.mutateAsync({
         widgetId: selectedWidget.id,
         dto,
       });
-      setEditorFeedback({ type: 'success', text: '위젯을 저장했습니다.' });
+      setEditorFeedback({ type: 'success', text: 'Widget saved.' });
     } catch (error: any) {
       setEditorFeedback({
         type: 'error',
-        text: error?.message || '위젯을 저장하지 못했습니다.',
+        text: error?.message || 'Unable to save the widget.',
       });
       throw error;
     }
   };
 
   const handleWidgetImageUpload = async (_index: number, file: File) => {
-    if (!selectedWidget) throw new Error('선택된 위젯이 없습니다.');
-    setEditorFeedback({ type: 'info', text: '이미지를 업로드하는 중입니다...' });
+    if (!selectedWidget) throw new Error('No widget is selected.');
+    setEditorFeedback({ type: 'info', text: 'Uploading image...' });
     try {
       const result = await uploadMutation.mutateAsync({ widgetId: selectedWidget.id, file });
-      setEditorFeedback({ type: 'success', text: '이미지를 업로드했습니다.' });
+      setEditorFeedback({ type: 'success', text: 'Image uploaded.' });
       return result.url;
     } catch (error: any) {
       setEditorFeedback({
         type: 'error',
-        text: error?.message || '이미지 업로드에 실패했습니다.',
+        text: error?.message || 'Image upload failed.',
       });
       throw error;
     }
@@ -236,29 +236,29 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
     return (
       <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-300">
         <Loader2 className="w-4 h-4 animate-spin" />
-        로딩 중...
+        Loading...
       </div>
     );
   }
 
   if (!community) {
-    return <p className="text-sm text-red-500">커뮤니티 정보를 불러올 수 없습니다.</p>;
+    return <p className="text-sm text-red-500">Unable to load community details.</p>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h1 className={SETTINGS_SECTION_TITLE_CLASS}>커뮤니티 위젯</h1>
+          <h1 className={SETTINGS_SECTION_TITLE_CLASS}>Community widgets</h1>
           <p className={SETTINGS_SECTION_DESCRIPTION_CLASS}>
-            오른쪽 사이드바에 표시할 콘텐츠를 구성하고 순서를 조정하세요.
+            Configure the content shown in the right sidebar and adjust its order.
           </p>
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button className={`${SETTINGS_PRIMARY_BUTTON_CLASS} inline-flex items-center gap-2`}>
               <Plus className="w-4 h-4" />
-              위젯 추가
+              Add widget
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-64">
@@ -277,7 +277,7 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
                     <p className="text-xs text-gray-500 dark:text-gray-300">{option.description}</p>
                     {alreadyExists && (
                       <p className="text-[11px] font-medium text-amber-600 mt-1">
-                        이미 추가된 위젯입니다.
+                        This widget already exists.
                       </p>
                     )}
                   </div>
@@ -305,7 +305,7 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
       <div className="grid gap-6 md:grid-cols-[280px_minmax(0,1fr)]">
         <div className={`${SETTINGS_CARD_CLASS} p-3 dark:bg-[#181c2c] dark:border-[#2d3447]`}>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">위젯 목록</h2>
+            <h2 className="text-sm font-semibold text-gray-900 dark:text-gray-100">Widget list</h2>
             {isWidgetsFetching && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
           </div>
           <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
@@ -339,7 +339,7 @@ function WidgetSettingsPanel({ slug }: { slug: string }) {
             />
           ) : (
             <div className="text-sm text-gray-500 dark:text-gray-300">
-              추가하거나 편집할 위젯을 왼쪽 목록에서 선택하세요.
+              Select a widget from the left to edit it or add a new one.
             </div>
           )}
           {editorFeedback && (
@@ -405,7 +405,7 @@ function SortableWidgetRow({
         <p className="font-medium text-gray-900 dark:text-gray-100 truncate">
           {resolveWidgetTitle(widget)}
         </p>
-        <p className="text-xs text-gray-500 dark:text-gray-300">{widget.isEnabled ? '표시 중' : '비활성화'}</p>
+        <p className="text-xs text-gray-500 dark:text-gray-300">{widget.isEnabled ? 'Visible' : 'Disabled'}</p>
       </div>
       <Switch
         checked={widget.isEnabled}

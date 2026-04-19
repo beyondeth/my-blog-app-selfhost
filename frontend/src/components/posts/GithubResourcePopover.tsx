@@ -53,10 +53,10 @@ export default function GithubResourcePopover({
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-900 dark:text-gray-100">
             <Github className="h-4 w-4" />
-            <span>GitHub 리소스</span>
+            <span>GitHub resource</span>
           </div>
           <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-            공개할 GitHub 주소와 설명을 입력하세요.
+            Add the GitHub URL and description you want to share.
           </p>
         </div>
         <div className="space-y-2">
@@ -75,23 +75,23 @@ export default function GithubResourcePopover({
         </div>
         <div className="space-y-2">
           <Label htmlFor="github-resource-description" className="text-xs font-medium">
-            설명
+            Description
           </Label>
           <Textarea
             id="github-resource-description"
             value={draftDescription}
             onChange={(event) => setDraftDescription(event.target.value)}
-            placeholder="예: 이 글에서 소개한 예제 코드를 받아볼 수 있습니다."
+            placeholder="Example: Readers can download the sample code from this post here."
             rows={3}
             className="resize-none"
           />
         </div>
         <div className="flex items-center justify-end gap-2">
           <Button type="button" variant="outline" size="sm" onClick={handleCancel}>
-            취소
+            Cancel
           </Button>
           <Button type="button" size="sm" onClick={handleSave}>
-            저장
+            Save
           </Button>
         </div>
       </PopoverContent>

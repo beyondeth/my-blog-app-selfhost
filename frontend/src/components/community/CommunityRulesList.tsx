@@ -38,7 +38,7 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
   defaultExpanded = false,
   maxCollapsed = 3,
   showHeader = true,
-  headerTitle = '커뮤니티 규칙',
+  headerTitle = 'Community rules',
   showNumbering = true,
 }: CommunityRulesListProps) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
@@ -85,7 +85,7 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
             {headerTitle}
           </h3>
           <span className="text-sm text-gray-500 dark:text-[#C7D1DD]">
-            ({rules.length}개)
+            ({rules.length})
           </span>
         </div>
       )}
@@ -152,12 +152,12 @@ const CommunityRulesList = React.memo(function CommunityRulesList({
           {isExpanded ? (
             <>
               <ChevronUp className="w-4 h-4 inline mr-1" />
-              접기
+              Collapse
             </>
           ) : (
             <>
               <ChevronDown className="w-4 h-4 inline mr-1" />
-              모든 규칙 보기 ({rules.length - maxCollapsed}개 더)
+              View all rules ({rules.length - maxCollapsed} more)
             </>
           )}
         </button>

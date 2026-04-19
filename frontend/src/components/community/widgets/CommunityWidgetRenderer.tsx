@@ -285,14 +285,14 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
                   {event.startsAt && (
                     <div className="text-xs text-gray-600 dark:text-[#C7D1DD] space-y-1 mt-1">
                       <div className="flex gap-2">
-                        <span className="font-semibold text-gray-700 dark:text-[#C7D1DD]">시작</span>
+                        <span className="font-semibold text-gray-700 dark:text-[#C7D1DD]">Starts</span>
                         <span className="text-gray-600 dark:text-[#C7D1DD]">
                           {formatDate(event.startsAt)}
                         </span>
                       </div>
                       {event.endsAt && (
                         <div className="flex gap-2">
-                          <span className="font-semibold text-gray-700 dark:text-[#C7D1DD]">종료</span>
+                          <span className="font-semibold text-gray-700 dark:text-[#C7D1DD]">Ends</span>
                           <span className="text-gray-600 dark:text-[#C7D1DD]">
                             {formatDate(event.endsAt)}
                           </span>
@@ -302,7 +302,7 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
                   )}
                   {event.location && (
                     <p className="text-xs text-gray-500 dark:text-[#C7D1DD] mt-1">
-                      <span className="font-semibold text-gray-600 dark:text-[#C7D1DD]">장소</span>{' '}
+                      <span className="font-semibold text-gray-600 dark:text-[#C7D1DD]">Location</span>{' '}
                       {event.location}
                     </p>
                   )}
@@ -316,7 +316,7 @@ const CommunityWidgetRenderer: React.FC<CommunityWidgetRendererProps> = ({
                       rel="noopener noreferrer"
                       className="text-xs text-blue-600 dark:text-blue-400 inline-flex items-center gap-1 mt-2"
                     >
-                      이벤트 링크
+                      Event link
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                   )}

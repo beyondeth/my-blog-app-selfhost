@@ -32,7 +32,7 @@ export default function CommunityLockBanner({
   }
 
   const lockedAtLabel = lockedAt
-    ? new Date(lockedAt).toLocaleString('ko-KR', {
+    ? new Date(lockedAt).toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -55,27 +55,27 @@ export default function CommunityLockBanner({
         </div>
         <div className="flex-1 space-y-2">
           <div className="flex items-center gap-2 text-sm font-semibold tracking-tight">
-            <span>커뮤니티 잠금 상태</span>
+            <span>Community locked</span>
             <ShieldAlert className="h-4 w-4" />
           </div>
           <p className="text-sm leading-relaxed text-amber-900/90 dark:text-amber-100/90">
-            현재 커뮤니티는 관리자에 의해 잠금 처리되어 신규 게시글과 댓글 작성이 제한되었습니다. 운영팀이 문제를 확인하고 복구를 진행하는 동안 잠시 기다려 주세요.
+            This community has been locked by an administrator, so new posts and comments are temporarily restricted. Please wait while the moderation team reviews the issue and works on recovery.
           </p>
           <div className="text-xs text-amber-800/80 dark:text-amber-100/70">
-            {lockedAtLabel && <span className="mr-2">잠금 일시: {lockedAtLabel}</span>}
-            {lockedBy?.username && <span>담당자: {lockedBy.username}</span>}
+            {lockedAtLabel && <span className="mr-2">Locked at: {lockedAtLabel}</span>}
+            {lockedBy?.username && <span>Handled by: {lockedBy.username}</span>}
           </div>
           <div className="flex flex-wrap gap-2 pt-1">
             {communitySlug && (
               <Button size="sm" variant="outline" className="border-amber-300 text-amber-900 hover:bg-amber-100" asChild>
                 <Link href={`/c/${communitySlug}/report-moderator`}>
-                  매니저 신고/복구 요청
+                  Report moderator / request recovery
                 </Link>
               </Button>
             )}
             {showAdminLink && adminHref && (
               <Button size="sm" variant="ghost" className="text-amber-900 hover:bg-amber-100/60" asChild>
-                <Link href={adminHref}>Admin 복구 콘솔</Link>
+                <Link href={adminHref}>Admin recovery console</Link>
               </Button>
             )}
           </div>

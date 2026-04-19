@@ -22,7 +22,7 @@ const RecentPostsSection = React.memo(function RecentPostsSection({
       title={
         <div className="flex items-center gap-2">
           <Sparkles className="w-4 h-4 text-gray-700 dark:text-gray-300" />
-          <span>최근 포스트</span>
+          <span>Recent posts</span>
         </div>
       }
     >
@@ -39,7 +39,11 @@ const RecentPostsSection = React.memo(function RecentPostsSection({
               <div className="flex items-center">
                 <FiCalendar className="w-3 h-3 mr-1 flex-shrink-0" />
                 <span className="whitespace-nowrap">
-                  {new Date(post.createdAt).toLocaleDateString('ko-KR')}
+                  {new Date(post.createdAt).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
                 </span>
               </div>
               <div className="flex items-center">
@@ -53,7 +57,7 @@ const RecentPostsSection = React.memo(function RecentPostsSection({
         ))}
         {posts.length === 0 && (
           <div className="text-center py-4 text-gray-500 dark:text-gray-400">
-            <p className="text-sm">최근 포스트가 없습니다.</p>
+            <p className="text-sm">No recent posts yet.</p>
           </div>
         )}
       </div>

@@ -169,8 +169,8 @@ const MainToolbarContent = ({
         >
           <Button
             type="button"
-            tooltip="GitHub 리소스"
-            aria-label="GitHub 리소스"
+            tooltip="GitHub resource"
+            aria-label="GitHub resource"
             data-active-state={githubUrl.trim() ? "on" : "off"}
           >
             <Github className="tiptap-button-icon" />
@@ -264,7 +264,7 @@ export interface BlogSimpleEditorProps {
 export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
   content: initialContent = '',
   onChange,
-  placeholder = '내용을 입력하세요...',
+  placeholder = 'Write your content...',
   className = '',
   thumbnailImageId,
   onThumbnailChange,
@@ -329,7 +329,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       // 파일 크기 체크 (5MB) - 프론트엔드에서 사전 검증
       const MAX_FILE_SIZE = 5 * 1024 * 1024
       if (file.size > MAX_FILE_SIZE) {
-        throw new Error(`이미지는 1개당 최대 ${MAX_FILE_SIZE / (1024 * 1024)}MB까지 업로드 가능합니다`)
+        throw new Error(`Each image must be ${MAX_FILE_SIZE / (1024 * 1024)}MB or smaller.`)
       }
 
       // S3 업로드
@@ -373,7 +373,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
       return finalUrl
     } catch (error) {
       console.error('Image upload failed:', error)
-      const errorMessage = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다'
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload the image.'
       toast.error(errorMessage)
       throw error
     }
@@ -448,7 +448,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
           try {
             const MAX_FILE_SIZE = 5 * 1024 * 1024;
             if (file.size > MAX_FILE_SIZE) {
-              throw new Error(`이미지는 1개당 최대 ${MAX_FILE_SIZE / (1024 * 1024)}MB까지 업로드 가능합니다`);
+              throw new Error(`Each image must be ${MAX_FILE_SIZE / (1024 * 1024)}MB or smaller.`);
             }
 
             const result = await uploadMutation.mutateAsync({
@@ -487,7 +487,7 @@ export const BlogSimpleEditor = React.memo(function BlogSimpleEditor({
             }
           } catch (error) {
             console.error('Direct upload failed:', error);
-            const errorMessage = error instanceof Error ? error.message : '이미지 업로드에 실패했습니다';
+            const errorMessage = error instanceof Error ? error.message : 'Failed to upload the image.';
             toast.error(errorMessage);
             throw error;
           }

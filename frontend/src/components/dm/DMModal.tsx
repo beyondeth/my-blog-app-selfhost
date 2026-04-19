@@ -287,7 +287,7 @@ const DMModal: React.FC<DMModalProps> = ({
           <button
             onClick={toggleMinimize}
             className="flex items-center justify-center h-full w-full bg-gradient-to-br from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 rounded-full transition-all shadow-lg"
-            aria-label="채팅 펼치기"
+            aria-label="Expand chat"
           >
             <MessageCircle className="w-6 h-6 text-white" strokeWidth={2} />
           </button>

@@ -13,8 +13,8 @@ export default function CommunityError({
     <ErrorCard
       error={error}
       reset={reset}
-      title="커뮤니티를 불러올 수 없습니다"
-      description="커뮤니티 정보를 가져오는 중 오류가 발생했습니다. 존재하지 않는 커뮤니티이거나 일시적인 문제일 수 있습니다."
+      title="Unable to load the community"
+      description="An error occurred while fetching community details. The community may not exist, or the issue may be temporary."
     />
   );
 }

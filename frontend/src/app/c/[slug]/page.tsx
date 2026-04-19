@@ -29,7 +29,6 @@ async function getAuthCookieHeader(): Promise<string | undefined> {
   };
   const accessToken = readCookieValue('access_token');
 
-  // 보안: access_token만 전달 (refresh_token은 클라이언트 → 백엔드 /auth/refresh 전용)
   return accessToken ? `access_token=${accessToken}` : undefined;
 }
 
@@ -49,13 +48,10 @@ async function fetchCommunity(
       fetchOptions.next = { revalidate: 60 };
     }
 
-    // fetch URL: /community/:slug
     const res = await fetch(`${apiUrl}/community/${slug}`, fetchOptions);
 
     if (!res.ok) {
       if (res.status === 404) return null;
-      // 403 Forbidden (초대 전용 등)일 때도 null로 처리하거나 별도 처리 가능
-      // 여기서는 일단 null 반환 후 클라이언트에서 에러 처리 위임 혹은 404
       return null;
     }
 
@@ -67,7 +63,6 @@ async function fetchCommunity(
   }
 }
 
-// 중복 API 호출 방지를 위한 React Cache 적용 (익명 조회 전용)
 const getCommunityPublic = cache(async (slug: string): Promise<Community | null> =>
   fetchCommunity(slug)
 );
@@ -85,8 +80,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
   if (!community) {
     return {
-      title: '커뮤니티를 찾을 수 없습니다',
-      description: '요청하신 커뮤니티를 찾을 수 없습니다.',
+      title: 'Community not found',
+      description: 'The community you requested could not be found.',
     };
   }
 
@@ -95,9 +90,8 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const communityUrl = `${siteUrl}/c/${slug}`;
   const description =
     community.description ||
-    `AI 최신 트렌드와 바이브코딩 정보를 나누는 ${community.name} 커뮤니티입니다.`;
+    `Join ${community.name} to discuss AI trends, workflows, and practical building techniques.`;
 
-  // 대표 이미지 (아이콘이 없으면 기본 이미지)
   const imageUrl = community.iconUrl || `${siteUrl}/og-image-v2.png`;
 
   return {
@@ -138,7 +132,6 @@ export default async function CommunityPage({ params }: PageProps) {
     notFound();
   }
 
-  // JSON-LD 구조화된 데이터 생성
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3001';
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -146,7 +139,7 @@ export default async function CommunityPage({ params }: PageProps) {
     name: community.name,
     description:
       community.description ||
-      `AI 최신 트렌드와 바이브코딩 정보를 나누는 ${community.name} 커뮤니티 메인`,
+      `Main page for the ${community.name} community.`,
     url: `${siteUrl}/c/${slug}`,
     image: community.iconUrl || `${siteUrl}/og-image-v2.png`,
     mainEntity: {

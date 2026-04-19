@@ -261,7 +261,7 @@ export const HybridMarkdownEditor = forwardRef<HybridMarkdownEditorRef, HybridMa
                   }
                 }}
                 className="border-none shadow-none resize-none overflow-hidden focus-visible:ring-0 p-2 text-base leading-7 bg-transparent rounded-md"
-                placeholder={blocks.length === 1 ? (placeholder || "당신의 이야기를 적어보세요...") : undefined}
+                placeholder={blocks.length === 1 ? (placeholder || 'Start writing your story...') : undefined}
                 // 자동 높이 조절을 위해 ref 사용 고려 가능
               />
             );

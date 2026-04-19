@@ -43,7 +43,7 @@ export function WidgetEditorProvider({
 export function useWidgetEditorContext() {
   const ctx = useContext(WidgetEditorContext);
   if (!ctx) {
-    throw new Error('WidgetEditorProvider 하위에서만 사용 가능합니다.');
+    throw new Error('This hook must be used within WidgetEditorProvider.');
   }
   return ctx;
 }

@@ -7,14 +7,14 @@
  * @returns 상대 시간 문자열
  *
  * @example
- * formatRelativeTime('2025-10-06T10:00:00Z') // "5분 전"
- * formatRelativeTime(new Date()) // "방금 전"
+ * formatRelativeTime('2025-10-06T10:00:00Z') // "5m ago"
+ * formatRelativeTime(new Date()) // "just now"
  */
 export function formatRelativeTime(date: string | Date): string {
   const now = new Date();
   const past = parseDateInput(date);
   if (!past) {
-    return '방금 전';
+    return 'just now';
   }
 
   // 시간 차이 계산 (밀리초)
@@ -32,49 +32,39 @@ export function formatRelativeTime(date: string | Date): string {
 
   // 1분 미만
   if (diffMins < 1) {
-    return '방금 전';
+    return 'just now';
   }
 
   // 1분 ~ 59분
   if (diffMins < 60) {
-    return `${diffMins}분 전`;
+    return `${diffMins}m ago`;
   }
 
   // 1시간 ~ 23시간
   if (diffHours < 24) {
-    return `${diffHours}시간 전`;
-  }
-
-  // 1일
-  if (diffDays === 1) {
-    return '하루 전';
-  }
-
-  // 2일
-  if (diffDays === 2) {
-    return '이틀 전';
+    return `${diffHours}h ago`;
   }
 
   // 3일 ~ 7일
-  if (diffDays <= 7) {
-    return `${diffDays}일 전`;
+  if (diffDays < 7) {
+    return `${diffDays}d ago`;
   }
 
   // 8일 ~ 27일 (1주 ~ 3주)
   const diffWeeks = Math.floor(diffDays / 7);
   if (diffWeeks < 4) {
-    return `${diffWeeks}주 전`;
+    return `${diffWeeks}w ago`;
   }
 
   // 28일 ~ 364일 (1개월 ~ 11개월)
   const diffMonths = Math.floor(diffDays / 30);
   if (diffMonths < 12) {
-    return `${diffMonths}개월 전`;
+    return `${diffMonths}mo ago`;
   }
 
   // 365일 이상 (1년, 2년, 3년...)
   const diffYears = Math.floor(diffDays / 365);
-  return `${diffYears}년 전`;
+  return `${diffYears}y ago`;
 }
 
 function parseDateInput(input: string | Date): Date | null {
@@ -105,8 +95,9 @@ function parseDateInput(input: string | Date): Date | null {
 }
 
 function formatAbsoluteDate(date: Date): string {
-  const year = date.getFullYear();
-  const month = date.getMonth() + 1;
-  const day = date.getDate();
-  return `${year}. ${month}. ${day}.`;
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 }
