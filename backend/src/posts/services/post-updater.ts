@@ -346,7 +346,6 @@ export class PostUpdater {
         if (filesToSync || updatePostDto.attachedFileIds !== undefined) {
           const fileIds = (filesToSync || []).map((f) => f.id);
           await this.postFileService.unlinkUnusedFiles(id, user.id, fileIds);
-          await this.postFileService.linkFilesFromContent(updatedPost, user.id);
 
           // 첨부 파일 동기화 이후 썸네일 파일이 더 이상 유지 목록에 없으면
           // 고아 thumbnailImageId를 제거해 상세/피드 상태를 일치시킨다.
@@ -361,6 +360,10 @@ export class PostUpdater {
             await manager.save(post);
           }
         }
+
+        // attachedFileIds가 payload에 없더라도, 본문에 남아 있는 managed image URL을 기준으로
+        // post_files 누락을 자동 복구해 orphan 오판을 줄인다.
+        await this.postFileService.linkFilesFromContent(updatedPost, user.id);
 
         // 13. 썸네일 변경 시 특정 이벤트 발행
         // thumbnailImageId만 확인 - thumbnail URL은 PostMapperService에서 동적 생성

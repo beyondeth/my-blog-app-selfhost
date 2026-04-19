@@ -29,10 +29,10 @@ export async function handleCheckAuth(context: ToolContext): Promise<any> {
     content: [
       {
         type: 'text',
-        text: `✅ *** CODEBASE.BLOG 유저 인증이 완료됨 ***
+        text: `✅ *** Codebase.blog authentication verified ***
 ✅ ${context.userData.user.username} (${context.userData.user.email})
-✅ 블로그 주소 : ${publicBlogUrl}
-✅ 인증 방식 : ${authMode}`,
+✅ Blog URL: ${publicBlogUrl}
+✅ Connection: ${authMode}`,
       },
     ],
   };

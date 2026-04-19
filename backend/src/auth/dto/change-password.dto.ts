@@ -2,8 +2,7 @@ import { IsString, MinLength, Matches } from "class-validator";
 import { ApiProperty } from "@nestjs/swagger";
 
 /**
- * 비밀번호 변경 DTO
- * 로그인한 사용자가 현재 비밀번호를 입력하고 새 비밀번호로 변경
+ * Change password DTO
  */
 export class ChangePasswordDto {
   @ApiProperty({
@@ -12,7 +11,7 @@ export class ChangePasswordDto {
     example: "currentPassword123",
   })
   @IsString()
-  @MinLength(8, { message: "현재 비밀번호는 최소 8자 이상이어야 합니다" })
+  @MinLength(8, { message: "Current password must be at least 8 characters long." })
   currentPassword: string;
 
   @ApiProperty({
@@ -21,14 +20,14 @@ export class ChangePasswordDto {
     example: "NewPassword123",
   })
   @IsString()
-  @MinLength(8, { message: "새 비밀번호는 최소 8자 이상이어야 합니다" })
+  @MinLength(8, { message: "New password must be at least 8 characters long." })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
     message:
-      "비밀번호는 최소 하나의 소문자, 하나의 대문자, 그리고 하나의 숫자를 포함해야 합니다",
+      "Password must include at least one lowercase letter, one uppercase letter, and one number.",
   })
   @Matches(/^[^"'\\<>`\s]*$/, {
     message:
-      "비밀번호에 사용할 수 없는 문자가 포함되어 있습니다: \" ' \\ < > ` 공백",
+      "Password contains unsupported characters: \" ' \\ < > ` or whitespace.",
   })
   newPassword: string;
 }

@@ -15,6 +15,7 @@ import { FileContext } from "./entities/file-context.entity";
 import { Video } from "./entities/video.entity";
 import { User } from "../users/entities/user.entity";
 import { Profile } from "../users/entities/profile.entity";
+import { Post } from "../posts/entities/post.entity";
 import { ContextualFileService } from "./services/contextual-file.service";
 import { FileMigrationService } from "./services/file-migration.service";
 import { FileMonitoringService } from "./services/file-monitoring.service";
@@ -30,7 +31,7 @@ import { UrlSafetyService } from "../common/services/url-safety.service";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([File, FileContext, Video, User, Profile]),
+    TypeOrmModule.forFeature([File, FileContext, Video, User, Profile, Post]),
     ConfigModule.forFeature(s3Config),
     ConfigModule.forFeature(cdnConfig),
     ScheduleModule.forRoot(),

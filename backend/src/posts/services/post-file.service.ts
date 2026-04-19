@@ -17,10 +17,32 @@ import {
 import { FilesService } from "../../files/files.service";
 import { CdnService } from "../../files/services/cdn.service";
 import {
+  collectPostImageUrls,
   extractImageUrlsFromContent,
   extractS3KeyFromUrl,
+  isManagedImageUrl,
 } from "../utils/post.utils";
 import { CacheInvalidationEvents } from "../../common/events/cache.events";
+
+interface PostFileLinkAnalysis {
+  authorUserId: string;
+  imageUrls: string[];
+  extractedKeys: string[];
+  matchedFiles: File[];
+  existingFileIds: string[];
+  newFiles: File[];
+  missingManagedKeys: string[];
+}
+
+export interface ManagedImageReconcileSummary {
+  dryRun: boolean;
+  scannedPosts: number;
+  postsWithManagedImages: number;
+  repairedPosts: number;
+  linkedFiles: number;
+  unresolvedPosts: number;
+  missingManagedKeys: string[];
+}
 
 /**
  * 포스트 파일 관리 서비스
@@ -128,11 +150,6 @@ export class PostFileService {
   ): Promise<void> {
     const postId = post.id;
 
-    // Repository 선택 - 트랜잭션 EntityManager가 있으면 사용
-    const filesRepository = manager
-      ? manager.getRepository(File)
-      : this.filesRepository;
-
     this.logger.debug(
       `[LINK_FILES] Starting linkFilesFromContent for postId=${postId}`,
     );
@@ -141,8 +158,15 @@ export class PostFileService {
     );
 
     try {
-      // 1. 이미지 URL 추출
-      const imageUrls = this.extractImageUrlsFromContent(post.content);
+      const analysis = await this.analyzePostFileLinks(post, userId, manager);
+      const {
+        imageUrls,
+        extractedKeys,
+        matchedFiles,
+        newFiles,
+        missingManagedKeys,
+      } = analysis;
+
       this.logger.log(
         `[LINK_FILES] Extracted ${imageUrls.length} image URLs from content`,
       );
@@ -154,127 +178,72 @@ export class PostFileService {
 
       if (imageUrls.length === 0) {
         this.logger.debug(
-          `[LINK_FILES] No images found in content, skipping file linking`,
+          `[LINK_FILES] No images found in post content/markdown, skipping file linking`,
         );
         return;
       }
 
-      // 2. S3 키 추출
-      const s3Keys = imageUrls
-        .map((url) => this.extractS3KeyFromUrl(url))
-        .filter(Boolean) as string[];
       this.logger.log(
-        `[LINK_FILES] Extracted ${s3Keys.length} S3 keys from URLs`,
+        `[LINK_FILES] Extracted ${extractedKeys.length} file keys from URLs`,
       );
-      if (s3Keys.length > 0) {
-        s3Keys.forEach((key, index) => {
+      if (extractedKeys.length > 0) {
+        extractedKeys.forEach((key, index) => {
           this.logger.debug(`[LINK_FILES]   S3 Key ${index + 1}: ${key}`);
         });
       }
 
-      if (s3Keys.length === 0) {
+      if (extractedKeys.length === 0) {
         this.logger.warn(
           `[LINK_FILES] No valid S3 keys extracted from URLs. URL format might be incompatible.`,
         );
         return;
       }
 
-      // 3. 사용자 ID 확인
-      const authorUserId = userId || post.authorId;
-      this.logger.debug(
-        `[LINK_FILES] Using userId=${authorUserId} for file lookup`,
+      this.logger.log(
+        `[LINK_FILES] Found ${matchedFiles.length} files in database`,
       );
-
-      // 4. DB에서 파일 검색
-      this.logger.debug(
-        `[LINK_FILES] Searching for files with keys: ${JSON.stringify(s3Keys)} and userId=${authorUserId}`,
-      );
-      const files = await filesRepository.find({
-        where: { fileKey: In(s3Keys), userId: authorUserId },
-      });
-
-      this.logger.log(`[LINK_FILES] Found ${files.length} files in database`);
-      if (files.length > 0) {
-        files.forEach((file, index) => {
+      if (matchedFiles.length > 0) {
+        matchedFiles.forEach((file, index) => {
           this.logger.debug(
             `[LINK_FILES]   File ${index + 1}: id=${file.id}, fileKey=${file.fileKey}, originalName=${file.originalName}`,
           );
         });
       }
 
-      if (files.length > 0) {
-        // 5. 기존 연결된 파일 확인
-        const existingFileIds = post.attachedFiles?.map((f) => f.id) || [];
-        this.logger.debug(
-          `[LINK_FILES] Post already has ${existingFileIds.length} attached files: ${JSON.stringify(existingFileIds)}`,
-        );
-
-        // 6. 새로운 파일 필터링
-        const newFiles = files.filter((f) => !existingFileIds.includes(f.id));
-        this.logger.log(`[LINK_FILES] ${newFiles.length} new files to link`);
-
-        if (newFiles.length > 0) {
-          // 7. 포스트당 파일 컨텍스트 하나만 생성
-          const fileContextRepository = manager
-            ? manager.getRepository(FileContext)
-            : this.fileContextRepository;
-
-          // 이미 컨텍스트가 있는지 확인
-          const existingContext = await fileContextRepository.findOne({
-            where: {
-              contextId: postId,
-              contextType: FileContextType.POST,
-            },
-          });
-
-          if (!existingContext) {
-            // 포스트당 FileContext 하나만 생성
-            const newContext = fileContextRepository.create({
-              contextId: postId,
-              contextType: FileContextType.POST,
-              purpose: FilePurpose.CONTENT,
-              ownerId: authorUserId,
-              version: 1,
-              isActive: true,
-              fileCount: newFiles.length,
-              totalSize: newFiles.reduce(
-                (sum, file) => sum + (file.fileSize || 0),
-                0,
-              ),
-            });
-
-            await fileContextRepository.save(newContext);
-            this.logger.log(
-              `[LINK_FILES] Created single FileContext for postId=${postId} with ${newFiles.length} files`,
-            );
-          }
-
-          // 8. 포스트에 파일 연결 (성능 최적화된 방식으로 구현)
-          // 🔥 [FIX] Batch insertion using QueryBuilder for better performance
-          await this.linkFilesToPostOptimized(postId, newFiles, manager);
-          this.logger.log(
-            `[LINK_FILES] ✅ Linked ${newFiles.length} files using optimized batch operation`,
-          );
-
-          this.logger.log(
-            `[LINK_FILES] ✅ Successfully linked ${newFiles.length} files to postId=${postId}`,
-          );
-          newFiles.forEach((file) => {
-            this.logger.debug(
-              `[LINK_FILES]   Linked: fileId=${file.id}, fileKey=${file.fileKey}`,
-            );
-          });
-        } else {
-          this.logger.debug(`[LINK_FILES] All files already linked to post`);
-        }
-      } else {
+      if (missingManagedKeys.length > 0) {
         this.logger.warn(
-          `[LINK_FILES] ⚠️ No files found in database for the extracted S3 keys`,
-        );
-        this.logger.warn(
-          `[LINK_FILES]    This might indicate URL format mismatch or files not properly saved`,
+          `[LINK_FILES] Managed image references missing backing files for postId=${postId}: ${JSON.stringify(missingManagedKeys)}`,
         );
       }
+
+      if (matchedFiles.length === 0) {
+        this.logger.warn(
+          `[LINK_FILES] ⚠️ No files found in database for the extracted keys`,
+        );
+        return;
+      }
+
+      this.logger.log(`[LINK_FILES] ${newFiles.length} new files to link`);
+
+      if (newFiles.length === 0) {
+        this.logger.debug(`[LINK_FILES] All files already linked to post`);
+        return;
+      }
+
+      await this.attachFilesToPost(
+        postId,
+        analysis.authorUserId,
+        newFiles,
+        manager,
+      );
+      this.logger.log(
+        `[LINK_FILES] ✅ Successfully linked ${newFiles.length} files to postId=${postId}`,
+      );
+      newFiles.forEach((file) => {
+        this.logger.debug(
+          `[LINK_FILES]   Linked: fileId=${file.id}, fileKey=${file.fileKey}`,
+        );
+      });
     } catch (error) {
       this.logger.error(
         `[LINK_FILES] ❌ Failed to link files for postId=${postId}:`,
@@ -462,24 +431,69 @@ export class PostFileService {
    * @param posts 포스트 배열
    */
   async relinkContentFiles(posts: Post[]): Promise<void> {
+    const summary = await this.reconcileManagedImagesForPosts(posts, {
+      dryRun: false,
+    });
     this.logger.log(
-      `Starting to relink content files for ${posts.length} posts`,
+      `Finished relinking content files: scanned=${summary.scannedPosts}, repairedPosts=${summary.repairedPosts}, linkedFiles=${summary.linkedFiles}, unresolvedPosts=${summary.unresolvedPosts}`,
     );
+  }
+
+  async reconcileManagedImagesForPosts(
+    posts: Post[],
+    options: { dryRun?: boolean } = {},
+  ): Promise<ManagedImageReconcileSummary> {
+    const dryRun = options.dryRun ?? true;
+    const missingManagedKeys = new Set<string>();
+    let postsWithManagedImages = 0;
+    let repairedPosts = 0;
+    let linkedFiles = 0;
+    let unresolvedPosts = 0;
 
     for (const post of posts) {
       try {
-        // Lazy loading 방지: authorId 직접 사용
-        await this.linkFilesFromContent(post, post.authorId);
-        this.logger.log(`✅ Relinked files for post: ${post.title}`);
+        const analysis = await this.analyzePostFileLinks(post, post.authorId);
+        const managedImageCount = analysis.imageUrls.filter(isManagedImageUrl)
+          .length;
+
+        if (managedImageCount > 0) {
+          postsWithManagedImages++;
+        }
+
+        if (analysis.missingManagedKeys.length > 0) {
+          unresolvedPosts++;
+          analysis.missingManagedKeys.forEach((key) => missingManagedKeys.add(key));
+        }
+
+        if (analysis.newFiles.length > 0) {
+          repairedPosts++;
+          linkedFiles += analysis.newFiles.length;
+
+          if (!dryRun) {
+            await this.attachFilesToPost(
+              post.id,
+              analysis.authorUserId,
+              analysis.newFiles,
+            );
+          }
+        }
       } catch (error) {
         this.logger.error(
-          `❌ Failed to relink files for post ${post.id}:`,
-          error.message,
+          `[MANAGED_IMAGE_RECONCILE] Failed for post ${post.id}: ${error.message}`,
+          error.stack,
         );
       }
     }
 
-    this.logger.log("Finished relinking content files");
+    return {
+      dryRun,
+      scannedPosts: posts.length,
+      postsWithManagedImages,
+      repairedPosts,
+      linkedFiles,
+      unresolvedPosts,
+      missingManagedKeys: Array.from(missingManagedKeys).sort(),
+    };
   }
 
   /**
@@ -559,6 +573,121 @@ export class PostFileService {
       );
       throw new Error(`Failed to link files to post: ${error.message}`);
     }
+  }
+
+  private async analyzePostFileLinks(
+    post: Post,
+    userId?: string,
+    manager?: EntityManager,
+  ): Promise<PostFileLinkAnalysis> {
+    const filesRepository = manager
+      ? manager.getRepository(File)
+      : this.filesRepository;
+    const authorUserId = userId || post.authorId;
+    const imageUrls = collectPostImageUrls(post.content, post.content_markdown);
+    const extractedKeys = Array.from(
+      new Set(
+        imageUrls
+          .map((url) => this.extractS3KeyFromUrl(url))
+          .filter((key): key is string => Boolean(key)),
+      ),
+    );
+    const matchedFiles =
+      extractedKeys.length > 0
+        ? await filesRepository.find({
+            where: { fileKey: In(extractedKeys), userId: authorUserId },
+          })
+        : [];
+    const existingFileIds = await this.getExistingLinkedFileIds(post, manager);
+    const newFiles = matchedFiles.filter(
+      (file) => !existingFileIds.includes(file.id),
+    );
+    const matchedKeys = new Set(matchedFiles.map((file) => file.fileKey));
+    const missingManagedKeys = Array.from(
+      new Set(
+        imageUrls
+          .filter(isManagedImageUrl)
+          .map((url) => this.extractS3KeyFromUrl(url))
+          .filter((key): key is string => Boolean(key) && !matchedKeys.has(key)),
+      ),
+    );
+
+    return {
+      authorUserId,
+      imageUrls,
+      extractedKeys,
+      matchedFiles,
+      existingFileIds,
+      newFiles,
+      missingManagedKeys,
+    };
+  }
+
+  private async getExistingLinkedFileIds(
+    post: Post,
+    manager?: EntityManager,
+  ): Promise<string[]> {
+    if (Array.isArray(post.attachedFiles)) {
+      return post.attachedFiles.map((file) => file.id).filter(Boolean);
+    }
+
+    const rows = manager
+      ? await manager.query(
+          'SELECT "fileId" FROM "post_files" WHERE "postId" = $1',
+          [post.id],
+        )
+      : await this.postsRepository.query(
+          'SELECT "fileId" FROM "post_files" WHERE "postId" = $1',
+          [post.id],
+        );
+
+    return rows
+      .map((row: { fileId?: string }) => row.fileId)
+      .filter((fileId: string | undefined): fileId is string => Boolean(fileId));
+  }
+
+  private async attachFilesToPost(
+    postId: string,
+    authorUserId: string,
+    newFiles: File[],
+    manager?: EntityManager,
+  ): Promise<void> {
+    if (newFiles.length === 0) {
+      return;
+    }
+
+    const fileContextRepository = manager
+      ? manager.getRepository(FileContext)
+      : this.fileContextRepository;
+    const existingContext = await fileContextRepository.findOne({
+      where: {
+        contextId: postId,
+        contextType: FileContextType.POST,
+      },
+    });
+
+    if (!existingContext) {
+      const newContext = fileContextRepository.create({
+        contextId: postId,
+        contextType: FileContextType.POST,
+        purpose: FilePurpose.CONTENT,
+        ownerId: authorUserId,
+        version: 1,
+        isActive: true,
+        fileCount: newFiles.length,
+        totalSize: newFiles.reduce((sum, file) => sum + (file.fileSize || 0), 0),
+      });
+
+      await fileContextRepository.save(newContext);
+      this.logger.log(
+        `[LINK_FILES] Created single FileContext for postId=${postId} with ${newFiles.length} files`,
+      );
+    }
+
+    await this.linkFilesToPostOptimized(postId, newFiles, manager);
+    this.logger.log(
+      `[LINK_FILES] ✅ Linked ${newFiles.length} files using optimized batch operation`,
+    );
   }
 
   /**

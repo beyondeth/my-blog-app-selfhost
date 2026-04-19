@@ -12,6 +12,7 @@ import { UsersModule } from "../users/users.module";
 import { BlogsModule } from "../blogs/blogs.module";
 import { EmailModule } from "../email/email.module";
 import { RedisModule } from "../redis/redis.module";
+import { AuditModule } from "../audit/audit.module";
 import { PasswordResetToken } from "./entities/password-reset-token.entity";
 import { JwtStrategy } from "./strategies/jwt.strategy";
 import { GoogleStrategy } from "./strategies/google.strategy";
@@ -36,6 +37,7 @@ const providers: any[] = [
     BlogsModule,
     EmailModule,
     RedisModule,
+    AuditModule,
     PassportModule,
     TypeOrmModule.forFeature([PasswordResetToken]),
     JwtModule.registerAsync({

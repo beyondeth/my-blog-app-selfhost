@@ -69,15 +69,15 @@ type OpenAiToolPresentation = {
 };
 
 const STYLE_OPTION_DETAILS: Record<string, Omit<StyleOption, 'id'>> = {
-  default: { label: '기본', description: '균형 잡힌 톤으로 일반 독자에게 적합합니다.' },
-  novel: { label: '소설형', description: '감정선과 서사를 강조하는 스토리텔링 톤입니다.' },
-  podcast: { label: '팟캐스트형', description: '말하듯 자연스럽고 대화형 흐름을 제공합니다.' },
-  vibe: { label: '개발 성장형', description: '학습법, 커리어 성장, 멘토링 인사이트에 맞춘 톤입니다.' },
-  research: { label: '리서치형', description: '근거와 분석 중심으로 신뢰도를 높입니다.' },
-  pm: { label: 'PM형', description: '문제 정의, 의사결정 이유, trade-off를 설득력 있게 정리합니다.' },
-  designer: { label: '디자이너형', description: '맥락, 제약, 선택 근거와 사용자 영향을 case study로 풀어냅니다.' },
-  marketer: { label: '마케터형', description: '가설, 실험, 전환 지표와 배운 점을 growth 중심으로 정리합니다.' },
-  sell: { label: '마켓플레이스', description: '디지털 상품 판매 페이지 작성에 최적화된 전환 중심 톤입니다.' },
+  default: { label: 'Default', description: 'A balanced technical tone for broad audiences.' },
+  novel: { label: 'Narrative', description: 'A story-driven voice that emphasizes tension, emotion, and resolution.' },
+  podcast: { label: 'Podcast', description: 'A conversational format that reads like spoken dialogue.' },
+  vibe: { label: 'Developer Growth', description: 'A mentoring tone for learning systems, career growth, and mindset posts.' },
+  research: { label: 'Research', description: 'An evidence-first tone for analysis, benchmarks, and paper reviews.' },
+  pm: { label: 'Product Manager', description: 'A decision-oriented tone focused on product context, trade-offs, and rationale.' },
+  designer: { label: 'Designer', description: 'A case-study tone that explains context, constraints, and UX rationale.' },
+  marketer: { label: 'Marketer', description: 'A growth-oriented tone built around hypotheses, experiments, and metrics.' },
+  sell: { label: 'Marketplace', description: 'A conversion-focused tone for digital product listings.' },
 };
 
 const STYLE_OPTIONS: StyleOption[] = WRITING_STYLE_PRESETS.map((preset) => ({
@@ -89,50 +89,50 @@ const STYLE_OPTIONS: StyleOption[] = WRITING_STYLE_PRESETS.map((preset) => ({
 
 const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation> = {
   check_auth: {
-    title: '연결 상태 확인',
+    title: 'Check Connection',
     description:
-      '현재 연결된 Codebase.blog 계정을 확인합니다. 새 포스트 작성 전 반드시 가장 먼저 호출하세요.',
+      'Check the currently connected Codebase.blog account. Always call this first before creating a new post.',
     inputSchema: {
       type: 'object',
       properties: {},
     },
   },
   list_my_published_posts: {
-    title: '내 발행글 목록',
+    title: 'List Published Posts',
     description:
-      '현재 연결된 계정이 발행한 글 목록을 페이지, 태그, 카테고리, 기간 기준으로 조회합니다.',
+      'List posts published by the connected account with optional page, tag, category, and date filters.',
     inputSchema: toObjectInputSchema(
       TOOL_CATALOG.find((tool) => tool.name === 'list_my_published_posts')?.inputSchema
     ),
   },
   search_my_published_posts: {
-    title: '내 발행글 검색',
+    title: 'Search Published Posts',
     description:
-      '현재 연결된 계정의 발행글에서 키워드 검색을 실행합니다. 검색어와 메타데이터 필터를 함께 사용할 수 있습니다.',
+      'Search published posts from the connected account using a keyword plus optional metadata filters.',
     inputSchema: toObjectInputSchema(
       TOOL_CATALOG.find((tool) => tool.name === 'search_my_published_posts')?.inputSchema
     ),
   },
   read_my_published_post: {
-    title: '내 발행글 읽기',
+    title: 'Read Published Post',
     description:
-      '현재 연결된 계정이 발행한 글 1건의 본문과 메타데이터를 읽습니다.',
+      'Read the full body and metadata of a single published post from the connected account.',
     inputSchema: toObjectInputSchema(
       TOOL_CATALOG.find((tool) => tool.name === 'read_my_published_post')?.inputSchema
     ),
   },
   render_style_picker: {
-    title: '글쓰기 스타일 선택',
+    title: 'Show Writing Style Picker',
     description:
-      '글쓰기 스타일 선택 UI를 표시합니다. 이 도구만 위젯을 렌더링합니다. '
-      + '사용자가 위젯에서 선택할 때까지 기다리세요. 스타일을 채팅으로 다시 묻지 마세요.',
+      'Render the style selection UI. This is the only tool that displays the widget. '
+      + 'Wait for the user to choose inside the widget and do not ask for the style again in chat.',
     inputSchema: {
       type: 'object',
       properties: {},
     },
   },
   confirm_style: {
-    title: '글쓰기 스타일 확정',
+    title: 'Confirm Writing Style',
     description:
       'INTERNAL UI SUBMISSION TOOL. The widget uses this to confirm the selected style. '
       + 'The assistant must never call it directly unless explicitly instructed by the UI flow.',
@@ -162,11 +162,11 @@ const OPENAI_TOOL_PRESENTATION: Record<OpenAiMvpToolName, OpenAiToolPresentation
     },
   },
   create_post: {
-    title: '블로그 포스트 발행',
+    title: 'Publish Blog Post',
     description:
-      '스타일 확정 후 실행되는 최종 블로그 포스트 발행 도구입니다. '
-      + '스타일이 아직 확정되지 않았다면 이 도구는 차단됩니다. '
-      + '카테고리는 기존 글을 조회하지 말고 현재 글에 가장 맞는 하나를 바로 선택하세요.',
+      'Publish the final blog post after the style is confirmed. '
+      + 'This tool is blocked until the user confirms a style. '
+      + 'Choose the best fitting category directly from the current request instead of reading prior posts.',
     inputSchema: toObjectInputSchema(
       TOOL_CATALOG.find((tool) => tool.name === 'create_post')?.inputSchema
     ),
@@ -272,7 +272,7 @@ function getStyleInputSchemaField(defaultValue?: string): Record<string, unknown
     type: 'string',
     enum: WRITING_STYLE_PRESETS,
     description:
-      '글쓰기 스타일을 선택하세요. 대상 독자와 글의 목적에 맞는 톤을 고르면 됩니다.',
+      'Choose the writing style that best matches the audience and purpose of the post.',
     oneOf: STYLE_OPTIONS.map((option) => ({
       const: option.id,
       title: option.label,
@@ -330,43 +330,42 @@ function getOpenAiToolDescriptors() {
       _meta: {
         'openai/toolInvocation/invoking':
           toolName === 'create_post'
-            ? '포스트 발행 중…'
+            ? 'Publishing post...'
             : toolName === 'check_auth'
-            ? '연결 상태 확인 중…'
+            ? 'Checking connection...'
             : toolName === 'render_style_picker'
-            ? '스타일 선택 UI 여는 중…'
+            ? 'Opening style picker...'
             : toolName === 'confirm_style'
-            ? '선택한 스타일 확정 중…'
+            ? 'Confirming selected style...'
             : toolName === 'list_my_published_posts'
-            ? '발행글 목록 불러오는 중…'
+            ? 'Loading published posts...'
             : toolName === 'search_my_published_posts'
-            ? '발행글 검색 중…'
+            ? 'Searching published posts...'
             : toolName === 'read_my_published_post'
-            ? '글 읽는 중…'
-            : '처리 중…',
+            ? 'Loading post...'
+            : 'Working...',
         'openai/toolInvocation/invoked':
           toolName === 'create_post'
-            ? '발행 완료'
+            ? 'Post published'
             : toolName === 'check_auth'
-            ? '연결 완료'
+            ? 'Connection verified'
             : toolName === 'render_style_picker'
-            ? '스타일 선택 준비 완료'
+            ? 'Style picker ready'
             : toolName === 'confirm_style'
-            ? '스타일 확정 완료'
+            ? 'Style confirmed'
             : toolName === 'list_my_published_posts'
-            ? '목록 준비 완료'
+            ? 'Posts loaded'
             : toolName === 'search_my_published_posts'
-            ? '검색 완료'
+            ? 'Search complete'
             : toolName === 'read_my_published_post'
-            ? '글 로드 완료'
-            : '처리 완료',
-        // 확인 다이얼로그 한글화 (ChatGPT native UI 제어)
+            ? 'Post loaded'
+            : 'Done',
         ...(toolName === 'create_post'
           ? {
-              'openai/confirmation/title': 'Codebase.blog에 포스트를 발행하시겠습니까?',
-              'openai/confirmation/acceptLabel': '발행',
-              'openai/confirmation/rejectLabel': '취소',
-              'openai/confirmation/message': '선택한 스타일에 맞춰 블로그에 게시합니다.',
+              'openai/confirmation/title': 'Publish this post to Codebase.blog?',
+              'openai/confirmation/acceptLabel': 'Publish',
+              'openai/confirmation/rejectLabel': 'Cancel',
+              'openai/confirmation/message': 'The post will be published to the blog using the confirmed writing style.',
             }
           : {}),
         ...(OPENAI_WIDGET_TOOL_NAMES.has(toolName)
@@ -493,9 +492,9 @@ export async function registerOpenAiTools(
             {
               type: 'text',
               text:
-                `이 도구를 실행할 권한이 없습니다. `
-                + `필요 scope: ${scopeError.requiredScopes.join(', ')} / `
-                + `현재 scope: ${scopeError.grantedScopes.join(', ') || '(none)'}`,
+                `You do not have permission to run this tool. `
+                + `Required scopes: ${scopeError.requiredScopes.join(', ')} / `
+                + `Granted scopes: ${scopeError.grantedScopes.join(', ') || '(none)'}`,
             },
           ],
           structuredContent: {
@@ -507,7 +506,7 @@ export async function registerOpenAiTools(
             missingScopes: scopeError.missingScopes,
           },
           _meta: {
-            summary: `권한 부족으로 ${toolName} 호출이 차단되었습니다.`,
+            summary: `${toolName} was blocked due to insufficient scope.`,
             status: 'forbidden',
             route: 'mcp-openai',
           },
@@ -524,8 +523,8 @@ export async function registerOpenAiTools(
         await styleStateStore.clearAll(userId);
 
         const connectionHint = context.oauthToken
-          ? 'OAuth로 연결되었습니다.'
-          : 'API Key 방식으로 연결되었습니다.';
+          ? 'Connected through OAuth.'
+          : 'Connected through API key authentication.';
         const blogUrl = getBlogUrl(context);
         const baseStructuredContent = {
           tool: 'check_auth',
@@ -556,7 +555,7 @@ export async function registerOpenAiTools(
             workflowStage: 'connected',
           },
           _meta: {
-            summary: '연결 완료. 다음 단계로 render_style_picker를 호출하세요.',
+            summary: 'Connection verified. Call render_style_picker next.',
             confirmInstruction:
               'Call render_style_picker next. Do not ask the user to type a style in chat.',
             status: 'connected',
@@ -576,7 +575,7 @@ export async function registerOpenAiTools(
           content: [
             {
               type: 'text',
-              text: '아래 UI에서 글쓰기 스타일을 선택하고 [가이드 제출]을 눌러주세요. 스타일 확정 전에는 초안을 쓰지 마세요.',
+              text: 'Use the UI below to choose a writing style and click [Submit guide]. Do not draft the post before the style is confirmed.',
             },
           ],
           structuredContent: {
@@ -593,7 +592,7 @@ export async function registerOpenAiTools(
             canSelectStyle: true,
           },
           _meta: {
-            summary: '아래 UI에서 글쓰기 스타일을 선택해 주세요.',
+            summary: 'Choose a writing style in the widget below.',
             status: 'awaiting_style_selection',
             styleSelectionNonce: nonce,
             styleOptions: STYLE_OPTIONS,
@@ -685,7 +684,7 @@ export async function registerOpenAiTools(
                 type: 'text',
                 text:
                   styleBrief
-                    || `스타일 '${selectedStyle.label}'이 이미 확정되었습니다. 스타일을 다시 묻거나 추천하지 마세요. 즉시 create_post를 호출하여 포스트를 작성하세요.`,
+                    || `The style '${selectedStyle.label}' is already confirmed. Do not ask about style again. Call create_post immediately to draft and publish the post.`,
               },
             ],
             structuredContent: {
@@ -699,7 +698,7 @@ export async function registerOpenAiTools(
               hasCustomMarkdown: false,
             },
             _meta: {
-              summary: `스타일 '${selectedStyle.label}'이 이미 확정되어 있습니다. create_post로 진행하세요.`,
+              summary: `The style '${selectedStyle.label}' is already confirmed. Continue with create_post.`,
               confirmInstruction:
                 'Style is already confirmed. DO NOT ask about style. Call create_post immediately.',
               status: 'guide_ready',
@@ -714,17 +713,17 @@ export async function registerOpenAiTools(
             content: [
               {
                 type: 'text',
-                text: '스타일 확정에는 style 인자와 위젯 nonce가 필요합니다. 먼저 render_style_picker를 호출하세요.',
+                text: 'Style confirmation requires both a style value and a widget nonce. Call render_style_picker first.',
               },
             ],
             structuredContent: {
               status: 'blocked',
               tool: 'confirm_style',
-              reason: '먼저 render_style_picker를 호출해 스타일 선택 UI를 표시해야 합니다.',
+              reason: 'Call render_style_picker first so the style selection UI is visible.',
               workflowStage: 'awaiting_style_selection',
             },
             _meta: {
-              summary: '먼저 render_style_picker를 호출해 스타일 선택 UI를 표시하세요.',
+              summary: 'Call render_style_picker first to show the style picker.',
               status: 'blocked',
               route: 'mcp-openai',
             },
@@ -743,17 +742,17 @@ export async function registerOpenAiTools(
             content: [
               {
                 type: 'text',
-                text: 'confirm_style는 위젯 내부 제출 전용입니다. 먼저 render_style_picker에서 스타일을 고르세요.',
+                text: 'confirm_style is reserved for widget submissions. Choose the style inside render_style_picker first.',
               },
             ],
             structuredContent: {
               status: 'blocked',
               tool: 'confirm_style',
-              reason: 'confirm_style는 위젯 제출 전용입니다.',
+              reason: 'confirm_style is only available through the widget submission flow.',
               workflowStage: 'awaiting_style_selection',
             },
             _meta: {
-              summary: 'render_style_picker를 호출한 뒤 위젯에서 스타일을 선택하세요.',
+              summary: 'Call render_style_picker and choose a style in the widget.',
               status: 'blocked',
               route: 'mcp-openai',
             },
@@ -778,17 +777,17 @@ export async function registerOpenAiTools(
             content: [
               {
                 type: 'text',
-                text: '스타일 선택 화면이 닫히거나 오래되었습니다. 표시된 UI 창에서 원하시는 스타일을 다시 고르고 [가이드 제출] 버튼을 눌러주세요.',
+                text: 'The style selection session expired or was closed. Re-open the widget, choose a style again, and click [Submit guide].',
               },
             ],
             structuredContent: {
               status: 'blocked',
               tool: 'confirm_style',
-              reason: '스타일 선택 재확인 필요',
+              reason: 'Style selection must be confirmed again.',
               workflowStage: 'awaiting_style_selection',
             },
             _meta: {
-              summary: '스타일 선택 UI 창에서 원하시는 스타일을 다시 고르고 [가이드 제출]을 눌러주세요.',
+              summary: 'Re-open the style picker, choose a style again, and click [Submit guide].',
               status: 'blocked',
               styleSelectionNonce: nonce,
               styleOptions: STYLE_OPTIONS,
@@ -830,7 +829,7 @@ export async function registerOpenAiTools(
               type: 'text',
               text:
                 styleBrief
-                  || `스타일 '${selectedStyle.label}'이 확정되었습니다. 이 스타일로 글을 작성하고 발행하세요.`,
+                  || `The style '${selectedStyle.label}' is confirmed. Draft and publish the post using this style.`,
             },
           ],
           structuredContent: {
@@ -846,7 +845,7 @@ export async function registerOpenAiTools(
             hasCustomMarkdown: Boolean(args.customMarkdown),
           },
           _meta: {
-            summary: `스타일 '${selectedStyle.label}'이 확정되었습니다. 이제 포스트 초안을 작성합니다.`,
+            summary: `The style '${selectedStyle.label}' is confirmed. Continue to drafting.`,
             confirmInstruction:
               'Style is confirmed. DO NOT suggest or ask about styles. Call create_post now.',
             status: 'guide_ready',
@@ -871,13 +870,13 @@ export async function registerOpenAiTools(
               {
                 type: 'text',
                 text:
-                  '[SYSTEM ALERT] 스타일 선택이 누락되었습니다. 초안 작성을 멈추고 render_style_picker를 호출해 사용자가 위젯에서 스타일을 고를 때까지 기다리세요.',
+                  '[SYSTEM ALERT] Style selection is missing. Stop drafting, call render_style_picker, and wait for the user to choose a style in the widget.',
               },
             ],
             structuredContent: {
               status: 'blocked',
               tool: 'create_post',
-              reason: '스타일 선택이 선행되어야 합니다. 글을 미리 작성하지 마세요.',
+              reason: 'A confirmed style is required before drafting. Do not write the post first.',
               title: (args.title as string | undefined) || '',
               category: (args.category as string | undefined) || '',
               writingStyle: requestedStyle ? getStyleOption(requestedStyle).label : null,
@@ -889,7 +888,7 @@ export async function registerOpenAiTools(
             },
             _meta: {
               summary:
-                `'${(args.title as string | undefined) || '제목 없음'}' 발행 전 스타일 선택이 필요합니다.`,
+                `A style must be selected before publishing '${(args.title as string | undefined) || 'Untitled'}'.`,
               confirmInstruction:
                 'Call render_style_picker next. Do not write or suggest a tone before the user confirms a style.',
               status: 'blocked',
@@ -956,7 +955,7 @@ export async function registerOpenAiTools(
               workflowStage: 'published',
             },
             _meta: {
-              summary: `'${args.title as string}' 게시가 완료되었습니다. 다음 포스트 작성을 원한다면, 반드시 새 스타일을 골라야 합니다. API는 모두 정상 작동 중입니다.`,
+              summary: `'${args.title as string}' has been published. For the next post, the user must choose a new style first.`,
               confirmInstruction: 'Post is published successfully. ALL TOOLS ARE STILL AVAILABLE. However, for the next post, you MUST call check_auth again to let the user pick a new style.',
               status: 'published',
               publicUrl: postUrl,

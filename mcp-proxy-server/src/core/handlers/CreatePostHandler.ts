@@ -67,13 +67,13 @@ export async function handleCreatePost(
     if (isSell) {
       if (!args.price || args.price < 100) {
         return {
-          content: [{ type: 'text', text: '❌ 판매 상품 등록 시 가격이 필수입니다 (최소 100원).' }],
+          content: [{ type: 'text', text: '❌ A price is required for marketplace listings (minimum KRW 100).' }],
           isError: true,
         };
       }
       if (!args.productCategory) {
         return {
-          content: [{ type: 'text', text: '❌ 판매 상품 등록 시 카테고리가 필수입니다. (ai_prompts, coding_templates, tech_guides, ai_workflows, data_analytics, others)' }],
+          content: [{ type: 'text', text: '❌ A product category is required for marketplace listings. (ai_prompts, coding_templates, tech_guides, ai_workflows, data_analytics, others)' }],
           isError: true,
         };
       }
@@ -84,7 +84,7 @@ export async function handleCreatePost(
         content: [
           {
             type: 'text',
-            text: '❌ 새 자동포스팅에서는 raw Mermaid 블록을 사용할 수 없습니다. 구조도, 다이어그램, flow, workflow 요청은 반드시 ```diagram fenced block으로 다시 작성하세요. "mermaid"라는 표현이 요청에 있어도 diagram(D2) 경로로 변환해야 합니다.',
+            text: '❌ Raw Mermaid fenced blocks are not allowed in new auto-posted content. For structure diagrams, workflows, architecture maps, or flowcharts, rewrite the visual as a ```diagram fenced block so it renders through the D2 path.',
           },
         ],
         isError: true,
@@ -175,9 +175,9 @@ export async function handleCreatePost(
       warnings.push('blog_private_overrides_post_visibility');
     }
 
-    // 판매 상품 여부에 따라 응답 메시지 분기
+    // Add marketplace details only for sell-mode posts.
     const sellInfo = isSell
-      ? `\n\n🏷️ **마켓플레이스에 등록됨**\n- 가격: ₩${args.price?.toLocaleString()}\n- 카테고리: ${args.productCategory}\n- 마켓플레이스 URL: ${context.config.FRONTEND_URL || ''}/marketplace/${post.slug}`
+      ? `\n\n🏷️ **Marketplace listing**\n- Price: ₩${args.price?.toLocaleString()}\n- Category: ${args.productCategory}\n- Marketplace URL: ${context.config.FRONTEND_URL || ''}/marketplace/${post.slug}`
       : '';
 
     return {
