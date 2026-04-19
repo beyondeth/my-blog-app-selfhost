@@ -241,6 +241,27 @@ function isApiKeyTransportGetRequest(req: express.Request): boolean {
   );
 }
 
+function logApiKeyRouteDecision(
+  req: express.Request,
+  routeDecision: 'discovery' | 'reject_get_sse_405' | 'post_transport'
+) {
+  const logPayload = {
+    method: req.method,
+    path: req.path,
+    accept: req.headers.accept || '',
+    hasSessionHeader: typeof req.headers['mcp-session-id'] === 'string',
+    hasProtocolHeader: typeof req.headers['mcp-protocol-version'] === 'string',
+    routeDecision,
+  };
+
+  if (routeDecision === 'reject_get_sse_405') {
+    logger.info(logPayload, '🧭 API key MCP route decision');
+    return;
+  }
+
+  logger.debug(logPayload, '🧭 API key MCP route decision');
+}
+
 /**
  * MCP 서버 생성 (요청마다 새로 생성 - Context7 스타일)
  *
@@ -454,17 +475,38 @@ async function handleApiKeyMcpRequest(req: express.Request, res: express.Respons
 
     // 4. Transport 생성 (Context7와 동일한 옵션)
     const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,  // Context7와 동일
+      sessionIdGenerator: undefined,
+      enableJsonResponse: true,
     });
 
     // 5. MCP 서버와 Transport 연결
     await mcpServer.connect(transport);
+
+    let cleanedUp = false;
+    const cleanupTransport = async () => {
+      if (cleanedUp) {
+        return;
+      }
+      cleanedUp = true;
+
+      await transport.close().catch(error => {
+        logger.debug({ error }, '⚠️ Failed to close API key transport cleanly');
+      });
+      await mcpServer.close().catch(error => {
+        logger.debug({ error }, '⚠️ Failed to close API key MCP server cleanly');
+      });
+    };
+
+    res.on('close', () => {
+      void cleanupTransport();
+    });
 
     // 6. 프록시 뒤에서 SSE/streamable HTTP 응답이 버퍼링되지 않도록 한다.
     applyMcpStreamingHeaders(res);
 
     // 7. 요청 처리 전 시간 기록 (메트릭 수집용)
     const startTime = Date.now();
+    logApiKeyRouteDecision(req, 'post_transport');
 
     // 8. 요청 처리 (⚠️ req.body 전달하지 않음 - Transport가 raw stream 읽음)
     await transport.handleRequest(req, res);
@@ -479,6 +521,8 @@ async function handleApiKeyMcpRequest(req: express.Request, res: express.Respons
       userId: userData.userId.substring(0, 8),
       duration: `${duration}ms`,
     }, '✅ Request processed');
+
+    await cleanupTransport();
 
   } catch (error: any) {
     // 메트릭 기록 (에러)
@@ -514,9 +558,20 @@ app.post('/mcp', async (req, res) => {
  */
 app.get('/mcp', (req, res) => {
   if (isApiKeyTransportGetRequest(req)) {
-    void handleApiKeyMcpRequest(req, res);
+    logApiKeyRouteDecision(req, 'reject_get_sse_405');
+    res.setHeader('Allow', 'POST');
+    res.status(405).json({
+      jsonrpc: '2.0',
+      error: {
+        code: -32000,
+        message: 'Method not allowed. Standalone SSE GET is not supported on /mcp; use POST /mcp for direct API key transport.',
+      },
+      id: null,
+    });
     return;
   }
+
+  logApiKeyRouteDecision(req, 'discovery');
 
   // MCP 서버 Discovery 응답
   res.json({

@@ -6,6 +6,10 @@ This server supports two explicit routes:
 - `POST /mcp`: direct MCP with API key bearer auth
 - `POST /mcp-remote`: remote MCP with OAuth 2.1 bearer auth
 
+Route intent:
+- `/mcp`: direct API key route, stateless Streamable HTTP over `POST`
+- `/mcp-remote`: OAuth route for remote/web-style clients
+
 ## Overview
 
 `mcp-proxy-server` bridges MCP clients and the backend blog API.
@@ -31,14 +35,9 @@ mcp-proxy-server (Express + MCP SDK Streamable HTTP)
 backend API (/api/v1/mcp/*, /api/v1/users/:id/mcp-info)
 ```
 
-## Tool Catalog (5)
+## Tool Catalog
 
-The proxy exposes the same 5 tools on both routes:
-- `check_auth`
-- `get_writing_style_guide`
-- `create_post`
-- `get_image_upload_url`
-- `finalize_uploaded_image`
+The proxy exposes the same discovery-driven tool catalog on both routes.
 
 Source of truth:
 - `src/tools/catalog.ts`
@@ -61,6 +60,7 @@ Source of truth:
 
 ### MCP endpoints
 - `GET /mcp` discovery (API key route)
+- `GET /mcp` with transport/SSE headers returns `405 Method Not Allowed` on the direct API key route
 - `POST /mcp` JSON-RPC request handling (API key route)
 - `DELETE /mcp` session close no-op (stateless compatibility)
 - `GET /mcp-remote` discovery (OAuth route)
@@ -119,6 +119,10 @@ Default local assumptions:
 ## Client Configuration Examples
 
 ### Direct MCP (API key)
+
+Notes:
+- Keep `Accept: application/json, text/event-stream` in client configs for Streamable HTTP compliance.
+- The direct API key route does not offer standalone GET SSE on `/mcp`; clients should send MCP messages via `POST /mcp`.
 
 ```json
 {
