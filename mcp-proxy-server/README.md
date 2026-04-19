@@ -60,7 +60,6 @@ Source of truth:
 
 ### MCP endpoints
 - `GET /mcp` discovery (API key route)
-- `GET /mcp` with transport/SSE headers returns `405 Method Not Allowed` on the direct API key route
 - `POST /mcp` JSON-RPC request handling (API key route)
 - `DELETE /mcp` session close no-op (stateless compatibility)
 - `GET /mcp-remote` discovery (OAuth route)
@@ -122,7 +121,6 @@ Default local assumptions:
 
 Notes:
 - Keep `Accept: application/json, text/event-stream` in client configs for Streamable HTTP compliance.
-- The direct API key route does not offer standalone GET SSE on `/mcp`; clients should send MCP messages via `POST /mcp`.
 
 ```json
 {
